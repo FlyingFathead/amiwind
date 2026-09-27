@@ -2,6 +2,21 @@
 
 This guide describes a known-working FS-UAE configuration for playtesting AmiWind on Linux.
 
+Official homepage and downloads: [FS-UAE](https://fs-uae.net/).
+FS-UAE also supports Windows and macOS; AmiWind's v0.0.16 emulator
+validation used FS-UAE 3.1.66 on Linux.
+
+## Current v0.0.16 preset
+
+Save a local copy of
+[AmiWind-v0.0.16-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.16-FS-UAE.fs-uae),
+replace its ROM and HDF placeholder paths, then launch it with FS-UAE.
+To build the playable HDF from your Morrowind installation, use the
+[Linux](LINUX_BUILD.md) or [Windows / WSL build guide](WINDOWS_BUILD.md).
+The public source ZIP includes the preset, not game data, a playable HDF or
+a Kickstart ROM. The separate `AmiWind-v0.0.16-dry-run.hdf` boots only to a
+test notice. See [v0.0.16 validation](VALIDATION-v0.0.16.md) for test scope.
+
 The tested setup uses:
 
 - Amiga 1200 machine profile
@@ -28,7 +43,7 @@ Example files:
 
 ```text
 /path/to/your/kickstart-3.1-a1200.rom
-/path/to/your/AmiWind-v0.0.12-dev1.hdf
+/path/to/your/AmiWind-v0.0.16.hdf
 ```
 
 The exact AmiWind HDF filename may differ between releases or development builds.
@@ -58,11 +73,15 @@ amiga_model = A1200
 # 68040 with internal FPU, without MMU.
 # FS-UAE JIT is not compatible with MMU emulation.
 cpu = 68040-NOMMU
+fpu = 68040
 jit_compiler = 1
 uae_cpu_speed = max
+uae_address_space_24 = false
 
 # Memory
 chip_memory = 2048
+slow_memory = 0
+fast_memory = 0
 zorro_iii_memory = 16384
 
 # Disable emulated floppy-drive mechanical sounds
@@ -72,7 +91,11 @@ floppy_drive_volume = 0
 kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
 
 # AmiWind bootable HDF
-hard_drive_0 = /path/to/your/AmiWind-v0.0.12-dev1.hdf
+hard_drive_0 = /path/to/your/AmiWind-v0.0.16.hdf
+hard_drive_0_type = hdf
+
+# Keep movement keys available to AmiWind
+joystick_port_1 = none
 
 # Windowed mode
 fullscreen = 0
@@ -161,10 +184,11 @@ For compatibility or minimum-spec testing, use a separate emulator configuration
 ## Repository preset and validation note
 
 A matching example is supplied under
-[resources/emulators/AmiWind-v0.0.15-dev1-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.15-dev1-FS-UAE.fs-uae).
+[resources/emulators/AmiWind-v0.0.16-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.16-FS-UAE.fs-uae).
 It explicitly disables 24-bit addressing and keyboard joystick emulation,
 selects the internal FPU and supplies placeholders for the owned ROM and HDF.
-The guide above preserves the owner's working v0.0.12-dev1 recipe.
+The guide above carries forward the owner's working v0.0.12-dev1 recipe with
+the current image name and the preset's explicit memory, CPU and input settings.
 
 The earlier local FS-UAE 3.1.66 harness requested plain `68040` with JIT. Its
 log warned about MMU/JIT incompatibility, then reported the resolved machine as
@@ -176,4 +200,4 @@ settings as well as the startup log.
 
 Reference: [FS-UAE CPU options](https://fs-uae.net/docs/options/cpu/).
 
-Current hotfix preset: [AmiWind-v0.0.15-dev2-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.15-dev2-FS-UAE.fs-uae). Same machine settings; structural ship repair and debug scene picker.
+Historical hotfix preset: [AmiWind-v0.0.15-dev2-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.15-dev2-FS-UAE.fs-uae). Same machine settings; structural ship repair and debug scene picker.

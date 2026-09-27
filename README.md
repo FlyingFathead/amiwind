@@ -117,9 +117,30 @@ to ignored `out/`.
 ./build.sh --check
 ```
 
-The reference emulator configuration is A1200/AGA, 68040 with FPU, 2 MiB Chip and
-16 MiB Fast RAM. See [controls and setup](docs/AGA_BUILD.md),
-[WinUAE](docs/WINUAE.md) and [FS-UAE](docs/FS-UAE-PLAYTESTING.md).
+These commands preview setup and check prerequisites. Follow the linked build
+guide to install the required tools and build the playable HDF.
+
+### Run AmiWind in an emulator
+
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.16 configuration template |
+| --- | --- | --- | --- |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.16-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.16-WinUAE.uae) |
+
+1. Build `AmiWind-v0.0.16.hdf` from your own Morrowind installation using the
+   build guide above. The source ZIP contains the tools and templates, not a
+   playable game image.
+2. Install an emulator from its official homepage above and save a local copy
+   of its AmiWind configuration template.
+3. Follow the matching setup guide to select your licensed **A1200 Kickstart
+   3.1 ROM** and the built HDF. WinUAE uses an RDB hardfile on the UAE controller;
+   FS-UAE uses the ROM and HDF paths in the configuration file.
+4. Start emulation and click inside the window to capture the mouse. Use
+   **WASD** to move and the mouse to look; see [controls and setup](docs/AGA_BUILD.md).
+
+The presets use A1200/AGA, 68040 with FPU, 2 MiB Chip and 16 MiB Z3 Fast RAM,
+with JIT and maximum CPU speed. The v0.0.16 playable image was tested with
+FS-UAE 3.1.66 on Linux; the WinUAE preset is configuration guidance.
 The public [dry-run build](docs/CI_DRY_RUN.md) contains no game assets or ROMs
 and boots to a test notice; it is not the playable demo.
 

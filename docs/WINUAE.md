@@ -1,23 +1,30 @@
 # WinUAE setup
 
+Official homepage and downloads: [WinUAE](https://www.winuae.net/).
+
 ## Public versioned preset
 
-Load [AmiWind-v0.0.15-dev2-WinUAE.uae](../resources/emulators/AmiWind-v0.0.15-dev2-WinUAE.uae)
+Load [AmiWind-v0.0.16-WinUAE.uae](../resources/emulators/AmiWind-v0.0.16-WinUAE.uae)
 from WinUAE's Configurations panel. It sets the development machine below and
 opens the GUI. It deliberately leaves the ROM path empty and mounts no disk.
 In ROM, select your complete licensed A1200 Kickstart 3.1 ROM. In CD & Hard
-drives, add your locally generated `AmiWind-v0.0.15-dev2.hdf` as an RDB hardfile
+drives, add your locally generated `AmiWind-v0.0.16.hdf` as an RDB hardfile
 on the UAE controller, then save a private configured copy and Start.
+
+To produce the playable HDF, follow the [Linux](LINUX_BUILD.md) or
+[Windows / WSL build guide](WINDOWS_BUILD.md) with your own Morrowind files.
+The public source ZIP contains the preset, not a playable HDF or Kickstart ROM.
+The separate `AmiWind-v0.0.16-dry-run.hdf` boots only to a test notice.
 
 The preset contains no personal Windows paths, device identifiers, ROMs or
 game data. Its description and filename identify the development version.
 It is configuration guidance for WinUAE 6.0.3 based on the prior owner config;
 local execution tests use FS-UAE 3.1.66. Do not treat it as proof of a local
-WinUAE run or stock A1200 speed. The settings table below also applies to dev3. Its native checks are recorded
-in [checkpoint-010](CHECKPOINT_010_VALIDATION.md). The historical v0.0.10 startup
-threshold and owner reports remain below for comparison.
+WinUAE run or stock A1200 speed. See [v0.0.16 validation](VALIDATION-v0.0.16.md)
+for the tested machine and scope. Historical startup thresholds and owner
+reports remain below for comparison.
 
-The current boot text is `Loading AmiWind v0.0.15-dev2...`. Preflight still needs
+The current boot text is `Loading AmiWind v0.0.16...`. Preflight still needs
 12 MiB free Fast RAM, but its contiguous-block threshold now matches the actual
 9 MiB hunk plus 16 bytes for alignment. The previous checkpoint used an 8 MiB heap; the restored ship now needs room
 for actor/hand cache allocations. The hardware preset remains 16 MiB Fast.
