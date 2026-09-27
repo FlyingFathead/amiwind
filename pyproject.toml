@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amiwind"
+version = "0.0.16"
+description = "Morrowind conversion tools and experimental Commodore Amiga runtime"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/FlyingFathead/amiwind"
+Repository = "https://github.com/FlyingFathead/amiwind"
+
+[project.optional-dependencies]
+opening = ["Pillow>=9.1"]
+scenery = ["PyFFI==2.2.3", "numpy>=1.23", "Pillow>=9.1"]
+aga = ["numpy>=1.23", "Pillow>=9.1", "fast-simplification==0.2.0", "scipy>=1.10"]
+preview = ["numpy>=1.23", "matplotlib>=3.6"]
+
+[project.scripts]
+mwad = "mwad.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,29 @@
+# Planning profiles only. These do not configure a native executable yet.
+[a500]
+cpu = "68000"
+chipset = "OCS"
+total_ram_bytes = 1048576
+assumed_chip_ram_bytes = 524288
+display_width = 320
+display_height = 200
+display_bitplanes = 4
+
+[a1200]
+cpu = "68EC020"
+chipset = "AGA"
+total_ram_bytes = 2097152
+assumed_chip_ram_bytes = 2097152
+display_width = 320
+display_height = 200
+display_bitplanes = 4
+
+# Proposed full-3D development target; not validated by the current native demo.
+[a1200_040]
+cpu = "68040 with FPU"
+chipset = "AGA"
+os = "AmigaOS 3.1"
+chip_ram_bytes = 2097152
+fast_ram_bytes = 33554432
+display_width = 320
+display_height = 200
+display_bitplanes = 8

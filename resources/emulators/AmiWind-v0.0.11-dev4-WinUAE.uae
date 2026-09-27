@@ -1,0 +1,56 @@
+; AmiWind v0.0.11-dev4 — public machine preset, no game data or ROMs.
+; Load this preset, select your licensed A1200 Kickstart ROM, and add your
+; locally generated RDB HDF on the UAE controller. Save a private copy.
+; See docs/WINUAE.md. Guided configuration, not locally tested in WinUAE.
+config_description=AmiWind v0.0.11-dev4 safe startup / collision repair | AGA 040/FPU | 2M Chip + 16M Z3 | JIT/max | select owned ROM and HDF
+config_hardware=true
+config_host=true
+config_version=6.0.3
+use_gui=yes
+kickstart_rom_file=
+kickstart_ext_rom_file=
+floppy0=
+floppy1=
+floppy1type=-1
+floppy2=
+floppy3=
+nr_floppies=1
+chipset=aga
+chipset_compatible=A1200
+ntsc=false
+cpu_model=68040
+cpu_type=68040
+fpu_model=68040
+cpu_speed=max
+cpu_compatible=false
+cpu_24bit_addressing=false
+cpu_cycle_exact=false
+cpu_memory_cycle_exact=false
+blitter_cycle_exact=false
+cycle_exact=false
+immediate_blits=false
+cachesize=8192
+compfpu=true
+chipmem_size=4
+fastmem_size=0
+z3mem_size=16
+z3mem_start=0x40000000
+bogomem_size=0
+a3000mem_size=0
+mem25bit_size=0
+joyport0=mouse
+joyport1=none
+sound_output=exact
+sound_channels=stereo
+sound_frequency=44100
+sound_max_buff=16384
+sound_interpol=anti
+sound_filter=emulated
+sound_volume=0
+gfx_width_windowed=720
+gfx_height_windowed=568
+gfx_fullscreen_amiga=false
+gfx_vsync=false
+gfx_framerate=1
+gfx_resolution=hires
+gfx_linemode=double2

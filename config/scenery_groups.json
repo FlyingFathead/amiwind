@@ -1,0 +1,14 @@
+{
+  "arrival_ship": {
+    "presentation": "static arrival preview; opening scripts not executed",
+    "visual_profiles": {
+      "meshes/x/ex_de_ship.nif": {"ratio": 0.2, "texture_size": 32, "collision_source": "root_node"}
+    },
+    "members": {
+      "chargen boat": "ACTI",
+      "chargen_plank": "STAT",
+      "chargen_ship_trapdoor": "DOOR",
+      "chargen_cabindoor": "DOOR"
+    }
+  }
+}

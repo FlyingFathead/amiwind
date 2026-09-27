@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "status": "design_only_not_connected_to_a_baker",
+  "source_assets": "Resolved from the user's external installation; no model IDs or game assets are bundled.",
+  "appearance_fields": [
+    "rig_family",
+    "race_profile",
+    "body_type",
+    "proportions_profile",
+    "head",
+    "hair",
+    "skin_variant",
+    "equipment",
+    "combat_style"
+  ],
+  "body_templates": [
+    {
+      "id": "humanoid_male",
+      "rig_family": "humanoid",
+      "body_type": "male"
+    },
+    {
+      "id": "humanoid_female",
+      "rig_family": "humanoid",
+      "body_type": "female"
+    }
+  ],
+  "rig_policy": "Split incompatible skeletons, anatomy or animation conventions into separate rig families; do not force all bipeds onto one rig.",
+  "equipment_slots": [
+    "head",
+    "torso_inner",
+    "torso_armour",
+    "robe",
+    "legs_inner",
+    "legs_armour",
+    "left_shoulder",
+    "right_shoulder",
+    "left_hand",
+    "right_hand",
+    "feet",
+    "main_hand_item",
+    "off_hand_item"
+  ],
+  "equipment_policy": "These are internal planning slots, not an implemented mapping of original equipment/body-part records. Items may cover or replace multiple body parts.",
+  "combat_styles": [
+    "unarmed",
+    "one_handed",
+    "two_handed",
+    "bow",
+    "crossbow",
+    "thrown",
+    "spellcasting"
+  ],
+  "animation_states": [
+    "idle",
+    "walk",
+    "run",
+    "turn",
+    "attack",
+    "block",
+    "cast",
+    "hit",
+    "death"
+  ],
+  "animation_events": [
+    "contact",
+    "projectile_release",
+    "spell_release",
+    "recovery_end",
+    "footstep"
+  ],
+  "first_bake_experiment": {
+    "body_template": "humanoid_male",
+    "equipped_appearances": 1,
+    "combat_style": "unarmed",
+    "directions": 8,
+    "frame_width_pixels": 32,
+    "frame_height_pixels": 64,
+    "colour_bitplanes": 4,
+    "mask_bitplanes": 1,
+    "scale_variants": 1,
+    "proposed_samples_per_state": {
+      "idle": 2,
+      "walk": 6,
+      "attack": 6
+    },
+    "bounds_policy": "Expand bounds if limbs or equipment clip; size is a budget example, not a guaranteed fit."
+  }
+}

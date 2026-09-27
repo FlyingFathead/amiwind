@@ -1,0 +1,1925 @@
+--- a/Makefile
++++ b/Makefile
+@@ -1,6 +1,6 @@
+ # Makefile for AmiQuake - GCC m68k-amigaos build
+ # Based on awinquake 0.9 source
+-# Target: 68060 with FPU
++# AmiWind checkpoint: 68040/FPU reference build; experimental 68020 build
+ 
+ # Toolchain
+ CC = m68k-amigaos-gcc
+@@ -17,7 +17,7 @@
+ # NOTE: Using -O1 globally due to GCC optimizer bugs (culling, FP math)
+ # NOTE: cvar.c contains workaround for AmigaOS sprintf lacking %f support
+ WARN_FLAGS = -Wall -Wno-unused
+-DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=1 -DUSE_FAST_RECIPROCAL=1
++DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1
+ # USE_ASM_SPANS=1: Use optimized 68k assembly for span drawing (d_scan_68k.s)
+ # USE_FAST_RECIPROCAL=1: Use fast 1/x approximation in Turbulent8 (saves ~15 cycles per division)
+ # Note: Defining FALSE/TRUE as this GCC SDK doesn't provide them
+@@ -39,10 +39,17 @@
+ 
+ # Source files (from OBJSGCC in smakefile)
+ # Note: amiga_stubs.c provides stub implementations for assembly functions (timer, unlink)
+-# Note: C2P functions provided by c2p8_040_amlaukka.s
++# Display conversion is implemented independently in aw_c2p.c.
+ SRCS = \
+ 	amiga_stubs.c \
+-	cd_amiga.c \
++	aw_debug.c \
++	aw_console.c aw_console_glyphs.c aw_scene.c aw_hand_sprites.c \
++	aw_spawn.c \
++	aw_walk.c \
++	aw_music.c \
++	aw_profile.c \
++	aw_platform.c \
++	aw_fog.c \
+ 	chase.c \
+ 	cl_demo.c \
+ 	cl_input.c \
+@@ -72,7 +79,7 @@
+ 	in_amiga.c \
+ 	keys.c \
+ 	mathlib.c \
+-	menu.c \
++	aw_menu.c \
+ 	model.c \
+ 	net_dgrm.c \
+ 	net_loop.c \
+@@ -98,7 +105,8 @@
+ 	r_sprite.c \
+ 	r_surf.c \
+ 	r_vars.c \
+-	sbar.c \
++	aw_hud.c \
++	aw_c2p.c \
+ 	screen.c \
+ 	snd_dma.c \
+ 	snd_mem.c \
+@@ -116,38 +124,18 @@
+ 	world.c \
+ 	zone.c
+ 
+-# Assembly source files
+-# Using NovaCoder's optimized C2P and span drawing routines from AmiQuake v1.36 binary
+-ASM_C2P = c2p8.s
+-ASM_SPANS_FPU = d_scan_68k.s
+-ASM_SPANS_NOFPU = d_scan_68k_nofpu.s fixedpoint_asm.s
++# Release builds use GPL C spans and independent C2P; no extracted assembly.
++OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
++ALLOBJS = $(OBJS)
+ 
+-# Generate object file lists
+-OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
+-C2POBJ = $(ASM_C2P:%.s=$(OBJDIR)/%.o)
+-
+-# Only include span assembly if USE_ASM_SPANS=1
+-ifeq ($(findstring USE_ASM_SPANS=1,$(DEFINES)),USE_ASM_SPANS=1)
+-    # Use different assembly based on FPU/non-FPU build
+-    ifeq ($(OBJDIR),obj-nofpu)
+-        SPANOBJ = $(ASM_SPANS_NOFPU:%.s=$(OBJDIR)/%.o)
+-    else
+-        SPANOBJ = $(ASM_SPANS_FPU:%.s=$(OBJDIR)/%.o)
+-    endif
+-else
+-SPANOBJ =
+-endif
+-
+-ALLOBJS = $(OBJS) $(C2POBJ) $(SPANOBJ)
+-
+-# Default target - build both versions
++# Default target: verified CPU class; nofpu is an explicit experiment
+ .PHONY: all fpu nofpu
+-all: fpu nofpu
++all: fpu
+ 
+ # FPU target (68040 with FPU)
+ # Uses Quake III fast InvSqrt for math (2.3x faster than hardware sqrt on real 68040)
+ fpu: ARCH_FLAGS = -m68040 -m68881
+-fpu: DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=1 -DUSE_FAST_RECIPROCAL=1
++fpu: DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1
+ fpu: TARGET = build/AmiQuakeGCC
+ fpu: OBJDIR = obj
+ fpu: LDFLAGS = -m68040 -m68881 -s
+@@ -165,16 +153,12 @@
+ $(TARGET): $(OBJDIR) $(ALLOBJS)
+ 	@mkdir -p build
+ 	$(CC) $(LDFLAGS) -o $(TARGET) $(ALLOBJS) $(LIBS)
+-	@cp icons/template.info $(TARGET).info
++
+ 	@echo "Build complete: $(TARGET)"
+ 
+ # Compile C files
+ $(OBJDIR)/%.o: $(SRCDIR)/%.c
+ 	$(CC) $(CFLAGS) -c -o $@ $<
+-
+-# Assemble .s files (using 68040 for C2P compatibility)
+-$(OBJDIR)/%.o: $(SRCDIR)/%.s
+-	$(AS) -Fhunk -m68040 -phxass -quiet -I$(NDK_INC) -I$(NDK_INC)/lvo -o $@ $<
+ 
+ # Special rule for net_amigaudp.c (needs additional include path)
+ $(OBJDIR)/net_amigaudp.o: $(SRCDIR)/net_amigaudp.c
+@@ -206,25 +190,3 @@
+ 	@echo "Object files: $(words $(OBJS))"
+ 
+ 
+-# Sqrt benchmark test (InvSqrt vs stdlib)
+-bench_sqrt:
+-	@mkdir -p build
+-	$(CC) -m68040 -m68881 -O1 -I. -Isrc -I$(NDK_INC) -o build/bench_sqrt tests/bench_sqrt.c -lm -lamiga
+-	@echo "Benchmark built: build/bench_sqrt"
+-	@echo "Run with: venv/bin/vamos build/bench_sqrt"
+-
+-# AngleVectors benchmark (C vs ASM)
+-bench_anglevectors:
+-	@mkdir -p build
+-	$(CC) -m68040 -m68881 -O1 -I. -Isrc -I$(NDK_INC) -o build/bench_anglevectors tests/bench_anglevectors.c obj/mathlib_68k.o -lm -lamiga
+-	@echo "Benchmark built: build/bench_anglevectors"
+-	@echo "Run with: venv/bin/vamos -C 68040 build/bench_anglevectors"
+-
+-# AngleVectors test (assembly vs C)
+-test_anglevectors:
+-	@mkdir -p build
+-	$(CC) -m68040 -m68881 -O1 -I. -Isrc -I$(NDK_INC) -o build/test_anglevectors tests/test_anglevectors.c obj/mathlib_68k.o -lm -lamiga
+-	@echo "Test built: build/test_anglevectors"
+-	venv/bin/vamos -C 68040 build/test_anglevectors
+-
+-.PHONY: all clean rebuild config bench_sqrt bench_anglevectors test_anglevectors
+--- a/src/amiga_stubs.c
++++ b/src/amiga_stubs.c
+@@ -56,6 +56,9 @@
+ #include <string.h>
+ #include <ctype.h>
+ 
++#ifdef strnicmp
++#undef strnicmp
++#endif
+ int strnicmp(const char *s1, const char *s2, size_t n) {
+     // Use strncasecmp if available, otherwise implement it
+     #ifdef __GNUC__
+--- a/src/cl_input.c
++++ b/src/cl_input.c
+@@ -124,6 +124,24 @@
+ }
+ void IN_UpDown(void) {KeyDown(&in_up);}
+ void IN_UpUp(void) {KeyUp(&in_up);}
++/* One paired button: never append an impulse to a +command binding. Quake
++ * replays the minus form on key release, including releases in the console. */
++void IN_AWUseDown(void) {
++    if (key_dest != key_game) return;
++    if (!(in_up.state & 1) && AW_SceneUse()) return;
++    if (!(in_up.state & 1)) in_impulse = 201;
++    KeyDown(&in_up);
++}
++void IN_AWUseUp(void) {KeyUp(&in_up);}
++/* Clear held movement/attack at menu boundaries; keep mouse-look enabled. */
++void IN_AWClearButtons(void) {
++    kbutton_t *buttons[]={&in_left,&in_right,&in_forward,&in_back,&in_lookup,
++      &in_lookdown,&in_moveleft,&in_moveright,&in_strafe,&in_speed,&in_use,
++      &in_jump,&in_attack,&in_up,&in_down,&in_klook};
++    int i;for(i=0;i<16;i++)memset(buttons[i],0,sizeof(kbutton_t));
++    in_impulse=0;
++}
++
+ void IN_DownDown(void) {KeyDown(&in_down);}
+ void IN_DownUp(void) {KeyUp(&in_down);}
+ void IN_LeftDown(void) {KeyDown(&in_left);}
+@@ -408,6 +426,8 @@
+ */
+ void CL_InitInput (void)
+ {
++	Cmd_AddCommand ("+aw_use",IN_AWUseDown);
++	Cmd_AddCommand ("-aw_use",IN_AWUseUp);
+ 	Cmd_AddCommand ("+moveup",IN_UpDown);
+ 	Cmd_AddCommand ("-moveup",IN_UpUp);
+ 	Cmd_AddCommand ("+movedown",IN_DownDown);
+--- a/src/cl_main.c
++++ b/src/cl_main.c
+@@ -719,7 +719,7 @@
+ 	SZ_Alloc (&cls.message, 1024);
+ 
+ 	CL_InitInput ();
+-	CL_InitTEnts ();
++	/* No original Quake temporary-entity sounds in standalone content. */
+ 	
+ //
+ // register our commands
+--- a/src/client.h
++++ b/src/client.h
+@@ -92,7 +92,7 @@
+ 	vec3_t	start, end;
+ } beam_t;
+ 
+-#define	MAX_EFRAGS		640
++#define	MAX_EFRAGS		2048
+ 
+ #define	MAX_MAPSTRING	2048
+ #define	MAX_DEMOS		8
+@@ -270,7 +270,7 @@
+ 
+ 
+ #define	MAX_TEMP_ENTITIES	64			// lightning bolts, etc
+-#define	MAX_STATIC_ENTITIES	128			// torches, etc
++#define	MAX_STATIC_ENTITIES	512			// torches, etc
+ 
+ extern	client_state_t	cl;
+ 
+--- a/src/common.c
++++ b/src/common.c
+@@ -1169,7 +1169,9 @@
+ 	Cmd_AddCommand ("path", COM_Path_f);
+ 
+ 	COM_InitFilesystem ();
+-	COM_CheckRegistered ();
++	/* Standalone AmiWind content; no Quake game data is loaded. */
++	static_registered = 1;
++	Cvar_Set ("registered", "1");
+ }
+ 
+ 
+--- a/src/console.c
++++ b/src/console.c
+@@ -33,6 +33,7 @@
+ #include "quakedef.h"
+ 
+ int 		con_linewidth;
++int con_fullscreen;
+ 
+ float		con_cursorspeed = 4;
+ 
+@@ -88,13 +89,26 @@
+ 			M_Menu_Main_f ();
+ 		}
+ 	}
+-	else
+-		key_dest = key_console;
++	else {
++		con_fullscreen=0;key_dest = key_console;
++	}
+ 	
+ 	SCR_EndLoadingPlaque ();
+ 	memset (con_times, 0, sizeof(con_times));
+ }
+ 
++void Con_ToggleFullscreen_f(void) {
++    con_fullscreen=(key_dest==key_console)?!con_fullscreen:1;
++    key_dest=key_console;SCR_EndLoadingPlaque();Con_ClearNotify();
++}
++int Con_ScrollPage(void) {
++    int n=con_vislines/AW_ConsoleCharHeight()-3;return n>1?n:1;
++}
++int Con_ScrollMax(void) {
++    int n=con_totallines-con_vislines/AW_ConsoleCharHeight()-1;
++    return n>0?n:0;
++}
++
+ /*
+ ================
+ Con_Clear_f
+@@ -156,55 +170,31 @@
+ */
+ void Con_CheckResize (void)
+ {
+-	int		i, j, width, oldwidth, oldtotallines, numlines, numchars;
+-	char	tbuf[CON_TEXTSIZE];
+-
+-	width = (vid.width >> 3) - 2;
+-
+-	if (width == con_linewidth)
+-		return;
+-
+-	if (width < 1)			// video hasn't been initialized yet
+-	{
+-		width = 38;
+-		con_linewidth = width;
+-		con_totallines = CON_TEXTSIZE / con_linewidth;
+-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+-	}
+-	else
+-	{
+-		oldwidth = con_linewidth;
+-		con_linewidth = width;
+-		oldtotallines = con_totallines;
+-		con_totallines = CON_TEXTSIZE / con_linewidth;
+-		numlines = oldtotallines;
+-
+-		if (con_totallines < numlines)
+-			numlines = con_totallines;
+-
+-		numchars = oldwidth;
+-	
+-		if (con_linewidth < numchars)
+-			numchars = con_linewidth;
+-
+-		Q_memcpy (tbuf, con_text, CON_TEXTSIZE);
+-		Q_memset (con_text, ' ', CON_TEXTSIZE);
+-
+-		for (i=0 ; i<numlines ; i++)
+-		{
+-			for (j=0 ; j<numchars ; j++)
+-			{
+-				con_text[(con_totallines - 1 - i) * con_linewidth + j] =
+-						tbuf[((con_current - i + oldtotallines) %
+-							  oldtotallines) * oldwidth + j];
+-			}
+-		}
+-
+-		Con_ClearNotify ();
+-	}
+-
+-	con_backscroll = 0;
+-	con_current = con_totallines - 1;
++    int width,oldwidth,oldlines,i,j,length,row,oldcurrent,oldx,lastx=0;
++    char tbuf[CON_TEXTSIZE];
++    width=vid.width/AW_ConsoleCharWidth()-2;
++    if(width<1)width=38;
++    if(width>MAXCMDLINE-2)width=MAXCMDLINE-2;
++    if(width==con_linewidth)return;
++    oldwidth=con_linewidth;oldlines=con_totallines;oldcurrent=con_current;oldx=con_x;
++    memcpy(tbuf,con_text,CON_TEXTSIZE);
++    con_linewidth=width;con_totallines=CON_TEXTSIZE/width;
++    memset(con_text,' ',CON_TEXTSIZE);con_current=con_totallines-1;con_x=0;
++    /* Rewrap whole old rows, keeping their right-hand text and newest history.
++     * Blank padding is discarded; original soft wraps remain line boundaries. */
++    if(oldwidth>0 && oldlines>0)for(i=0;i<oldlines;i++) {
++        row=(oldcurrent+1+i)%oldlines;
++        length=oldwidth;while(length>0 && tbuf[row*oldwidth+length-1]==' ')length--;
++        if(!length)continue;
++        con_x=0;Con_Linefeed();
++        for(j=0;j<length;j++) {
++            if(con_x==width){con_x=0;Con_Linefeed();}
++            con_text[(con_current%con_totallines)*width+con_x++]=tbuf[row*oldwidth+j];
++        }
++        lastx=con_x;con_x=0;
++    }
++    if(oldx>0)con_x=lastx<width?lastx:0;
++    Con_ClearNotify();con_backscroll=0;
+ }
+ 
+ 
+@@ -247,6 +237,7 @@
+ 	Cvar_RegisterVariable (&con_notifytime);
+ 
+ 	Cmd_AddCommand ("toggleconsole", Con_ToggleConsole_f);
++	Cmd_AddCommand ("aw_console_fullscreen", Con_ToggleFullscreen_f);
+ 	Cmd_AddCommand ("messagemode", Con_MessageMode_f);
+ 	Cmd_AddCommand ("messagemode2", Con_MessageMode2_f);
+ 	Cmd_AddCommand ("clear", Con_Clear_f);
+@@ -261,6 +252,7 @@
+ */
+ void Con_Linefeed (void)
+ {
++	if(con_backscroll>0 && con_backscroll<Con_ScrollMax())con_backscroll++;
+ 	con_x = 0;
+ 	con_current++;
+ 	Q_memset (&con_text[(con_current%con_totallines)*con_linewidth]
+@@ -283,8 +275,6 @@
+ 	static int	cr;
+ 	int		mask;
+ 	
+-	con_backscroll = 0;
+-
+ 	if (txt[0] == 1)
+ 	{
+ 		mask = 128;		// go to colored text
+@@ -518,10 +508,10 @@
+ 		text += 1 + key_linepos - con_linewidth;
+ 		
+ // draw it
+-	y = con_vislines-16;
++	y = con_vislines-2*AW_ConsoleCharHeight();
+ 
+ 	for (i=0 ; i<con_linewidth ; i++)
+-		Draw_Character ( (i+1)<<3, con_vislines - 16, text[i]);
++		AW_ConsoleCharacter ((i+1)*AW_ConsoleCharWidth(), y, text[i]);
+ 
+ // remove cursor
+ 	key_lines[edit_line][key_linepos] = 0;
+@@ -560,9 +550,9 @@
+ 		scr_copytop = 1;
+ 
+ 		for (x = 0 ; x < con_linewidth ; x++)
+-			Draw_Character ( (x+1)<<3, v, text[x]);
+-
+-		v += 8;
++			AW_ConsoleCharacter ((x+1)*AW_ConsoleCharWidth(), v, text[x]);
++
++		v += AW_ConsoleCharHeight();
+ 	}
+ 
+ 
+@@ -611,10 +601,10 @@
+ // draw the text
+ 	con_vislines = lines;
+ 
+-	rows = (lines-16)>>3;		// rows of text to draw
+-	y = lines - 16 - (rows<<3);	// may start slightly negative
+-
+-	for (i= con_current - rows + 1 ; i<=con_current ; i++, y+=8 )
++	rows = lines/AW_ConsoleCharHeight()-2;		// rows of text to draw
++	y = lines - (rows+2)*AW_ConsoleCharHeight();	// may start slightly negative
++
++	for (i= con_current - rows + 1 ; i<=con_current ; i++, y+=AW_ConsoleCharHeight() )
+ 	{
+ 		j = i - con_backscroll;
+ 		if (j<0)
+@@ -622,7 +612,7 @@
+ 		text = con_text + (j % con_totallines)*con_linewidth;
+ 
+ 		for (x=0 ; x<con_linewidth ; x++)
+-			Draw_Character ( (x+1)<<3, y, text[x]);
++			AW_ConsoleCharacter ((x+1)*AW_ConsoleCharWidth(), y, text[x]);
+ 	}
+ 
+ // draw the input prompt, user text, and cursor if desired
+--- a/src/d_scan.c
++++ b/src/d_scan.c
+@@ -794,12 +794,10 @@
+ 		{
+ 			do
+ 			{
+-				ltemp = izi >> 16;
+-				izi += izistep;
+-				ltemp |= izi & 0xFFFF0000;
+-				izi += izistep;
+-				*(int *)pdest = ltemp;
+-				pdest += 2;
++                *pdest++ = (short)(izi >> 16);
++                izi += izistep;
++                *pdest++ = (short)(izi >> 16);
++                izi += izistep;
+ 			} while (--doublecount > 0);
+ 		}
+ 
+--- a/src/draw.c
++++ b/src/draw.c
+@@ -538,87 +538,7 @@
+ */
+ void Draw_ConsoleBackground (int lines)
+ {
+-	int				x, y, v;
+-	byte			*src, *dest;
+-	unsigned short	*pusdest;
+-	int				f, fstep;
+-	qpic_t			*conback;
+-	char			ver[100];
+-
+-	conback = Draw_CachePic ("gfx/conback.lmp");
+-
+-// hack the version number directly into the pic
+-#ifdef _WIN32
+-	sprintf (ver, "(WinQuake) %4.2f", (float)VERSION);
+-	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
+-#elif defined(X11)
+-	sprintf (ver, "(X11 Quake %2.2f) %4.2f", (float)X11_VERSION, (float)VERSION);
+-	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
+-#elif defined(__linux__)
+-	sprintf (ver, "(Linux Quake %2.2f) %4.2f", (float)LINUX_VERSION, (float)VERSION);
+-	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
+-#else
+-	dest = conback->data + 320 - 43 + 320*186;
+-	sprintf (ver, "%4.2f", VERSION);
+-#endif
+-
+-	for (x=0 ; x<strlen(ver) ; x++)
+-		Draw_CharToConback (ver[x], dest+(x<<3));
+-	
+-// draw the pic
+-	if (r_pixbytes == 1)
+-	{
+-		dest = vid.conbuffer;
+-
+-		for (y=0 ; y<lines ; y++, dest += vid.conrowbytes)
+-		{
+-			v = (vid.conheight - lines + y)*200/vid.conheight;
+-			src = conback->data + v*320;
+-			if (vid.conwidth == 320)
+-				memcpy (dest, src, vid.conwidth);
+-			else
+-			{
+-				f = 0;
+-				fstep = 320*0x10000/vid.conwidth;
+-				for (x=0 ; x<vid.conwidth ; x+=4)
+-				{
+-					dest[x] = src[f>>16];
+-					f += fstep;
+-					dest[x+1] = src[f>>16];
+-					f += fstep;
+-					dest[x+2] = src[f>>16];
+-					f += fstep;
+-					dest[x+3] = src[f>>16];
+-					f += fstep;
+-				}
+-			}
+-		}
+-	}
+-	else
+-	{
+-		pusdest = (unsigned short *)vid.conbuffer;
+-
+-		for (y=0 ; y<lines ; y++, pusdest += (vid.conrowbytes >> 1))
+-		{
+-		// FIXME: pre-expand to native format?
+-		// FIXME: does the endian switching go away in production?
+-			v = (vid.conheight - lines + y)*200/vid.conheight;
+-			src = conback->data + v*320;
+-			f = 0;
+-			fstep = 320*0x10000/vid.conwidth;
+-			for (x=0 ; x<vid.conwidth ; x+=4)
+-			{
+-				pusdest[x] = d_8to16table[src[f>>16]];
+-				f += fstep;
+-				pusdest[x+1] = d_8to16table[src[f>>16]];
+-				f += fstep;
+-				pusdest[x+2] = d_8to16table[src[f>>16]];
+-				f += fstep;
+-				pusdest[x+3] = d_8to16table[src[f>>16]];
+-				f += fstep;
+-			}
+-		}
+-	}
++	AW_ConsoleBackground(lines);
+ }
+ 
+ 
+--- a/src/host.c
++++ b/src/host.c
+@@ -705,12 +705,15 @@
+ 	if (host_speeds.value)
+ 		time1 = Sys_FloatTime ();
+ 		
++	CDAudio_Update();
++	S_ExtraUpdate();
+ 	SCR_UpdateScreen ();
+ 
+ 	if (host_speeds.value)
+ 		time2 = Sys_FloatTime ();
+ 		
+ // update audio
++    AW_Mark(3);
+ 	if (cls.signon == SIGNONS)
+ 	{
+ 		S_Update (r_origin, vpn, vright, vup);
+@@ -719,7 +722,9 @@
+ 	else
+ 		S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
+ 	
++	AW_EndMark(3);
+ 	CDAudio_Update();
++    AW_ProfileFrame();
+ 
+ 	if (host_speeds.value)
+ 	{
+@@ -912,6 +917,7 @@
+ #endif	// _WIN32
+ 		CDAudio_Init ();
+ 		Sbar_Init ();
++        AW_HandSpritesInit();
+ 		CL_Init ();
+ #ifdef _WIN32 // on non win32, mouse comes before video for security reasons
+ 		IN_Init ();
+@@ -953,6 +959,7 @@
+ 
+ 	Host_WriteConfiguration ();
+ 
++	AW_ProfileClose();
+ 	CDAudio_Shutdown ();
+ 	NET_Shutdown ();
+ 	S_Shutdown();
+--- a/src/host_cmd.c
++++ b/src/host_cmd.c
+@@ -168,6 +168,10 @@
+ 	}
+ 	else
+ 	{
++        if(SV_TestEntityPosition(sv_player)) {
++            SV_ClientPrintf("Still inside solid: fly clear or use aw_recover.\n");return;
++        }
++        VectorCopy(vec3_origin,sv_player->v.velocity);
+ 		noclip_anglehack = false;
+ 		sv_player->v.movetype = MOVETYPE_WALK;
+ 		SV_ClientPrintf ("noclip OFF\n");
+@@ -1325,7 +1329,8 @@
+ 		if ((Sys_FloatTime() - host_client->netconnection->connecttime) <= sv.time)
+ 			Sys_Printf ("%s entered the game\n", host_client->name);
+ 
+-		PR_ExecuteProgram (pr_global_struct->PutClientInServer);	
++		PR_ExecuteProgram (pr_global_struct->PutClientInServer);
++        AW_SceneSpawn(sv_player);	
+ 	}
+ 
+ 
+@@ -1879,6 +1884,7 @@
+ */
+ void Host_InitCommands (void)
+ {
++    AW_DebugInit();
+ 	Cmd_AddCommand ("status", Host_Status_f);
+ 	Cmd_AddCommand ("quit", Host_Quit_f);
+ 	Cmd_AddCommand ("god", Host_God_f);
+--- a/src/in_amiga.c
++++ b/src/in_amiga.c
+@@ -53,8 +53,12 @@
+   if (!mouse_has_moved)
+     return;
+     
+-  // Reset.  
++  // Consume pending movement while console is open without turning the player.
+   mouse_has_moved = false;
++  if(key_dest != key_game){
++    if(key_dest==key_menu)AW_MenuMouse(mouseX,mouseY);
++    old_mouse_x=old_mouse_y=0;return;
++  }
+ 
+   if (m_filter.value)
+   {
+--- a/src/keys.c
++++ b/src/keys.c
+@@ -159,6 +159,8 @@
+ void Key_Console (int key)
+ {
+ 	char	*cmd;
++	if(shift_down && key==K_UPARROW)key=K_PGUP;
++	if(shift_down && key==K_DOWNARROW)key=K_PGDN;
+ 	
+ 	if (key == K_ENTER)
+ 	{
+@@ -236,15 +238,15 @@
+ 
+ 	if (key == K_PGUP || key==K_MWHEELUP)
+ 	{
+-		con_backscroll += 2;
+-		if (con_backscroll > con_totallines - (vid.height>>3) - 1)
+-			con_backscroll = con_totallines - (vid.height>>3) - 1;
++		con_backscroll += key==K_MWHEELUP?2:Con_ScrollPage();
++		if (con_backscroll > Con_ScrollMax())
++			con_backscroll = Con_ScrollMax();
+ 		return;
+ 	}
+ 
+ 	if (key == K_PGDN || key==K_MWHEELDOWN)
+ 	{
+-		con_backscroll -= 2;
++		con_backscroll -= key==K_MWHEELDOWN?2:Con_ScrollPage();
+ 		if (con_backscroll < 0)
+ 			con_backscroll = 0;
+ 		return;
+@@ -252,7 +254,7 @@
+ 
+ 	if (key == K_HOME)
+ 	{
+-		con_backscroll = con_totallines - (vid.height>>3) - 1;
++		con_backscroll = Con_ScrollMax();
+ 		return;
+ 	}
+ 
+@@ -629,6 +631,21 @@
+ 	if (key == K_SHIFT)
+ 		shift_down = down;
+ 
++    /* Physical Amiga raw key 0 maps to grave (Finnish host: section key).
++     * F10 is a layout-independent fallback on the Amiga keyboard. */
++    if (key == '`' || key == K_F10) {
++        if(down)Cbuf_AddText(shift_down?"aw_console_fullscreen\n":"toggleconsole\n");
++        return;
++    }
++
++    /* Music history controls are handled before ordinary game bindings. */
++    if (down && key_dest == key_game && keydown[K_SHIFT] &&
++        (key == K_F5 || key == K_F6)) {
++        Cbuf_AddText(key == K_F5 ? "aw_music_previous\n" : "aw_music_next\n");
++        return;
++    }
++
++
+ //
+ // handle escape specialy, so the user can never unbind it
+ //
+@@ -644,8 +661,10 @@
+ 		case key_menu:
+ 			M_Keydown (key);
+ 			break;
++        case key_console:
++            Cbuf_AddText("toggleconsole\n");
++            break;
+ 		case key_game:
+-		case key_console:
+ 			M_ToggleMenu_f ();
+ 			break;
+ 		default:
+--- a/src/menu.c
++++ b/src/menu.c
+@@ -1628,6 +1628,8 @@
+ 
+ void M_Menu_Quit_f (void)
+ {
++    Sys_Quit();
++    return;
+ 	if (m_state == m_quit)
+ 		return;
+ 	wasInMenus = (key_dest == key_menu);
+@@ -3013,7 +3015,7 @@
+ 	Cmd_AddCommand ("menu_options", M_Menu_Options_f);
+ 	Cmd_AddCommand ("menu_keys", M_Menu_Keys_f);
+ 	Cmd_AddCommand ("menu_video", M_Menu_Video_f);
+-	Cmd_AddCommand ("help", M_Menu_Help_f);
++	Cmd_AddCommand ("menu_help", M_Menu_Help_f);
+ 	Cmd_AddCommand ("menu_quit", M_Menu_Quit_f);
+ }
+ 
+--- a/src/model.c
++++ b/src/model.c
+@@ -253,6 +253,29 @@
+ Loads a model into the cache
+ ==================
+ */
++/* AmiWind: decode loose BSP sections one at a time. The decoded world stays
++ * resident; this bounds temporary loading memory, not world-cell residency. */
++static FILE *aw_bsp_file;
++static long aw_bsp_bytes;
++static int aw_bsp_peak, aw_bsp_reads;
++static int AW_TryStreamBrush(model_t *mod) {
++    char path[MAX_OSPATH+64];dheader_t header;FILE *report;
++    if(strlen(com_gamedir)+strlen(mod->name)+2>=sizeof(path))return 0;
++    strcpy(path,com_gamedir);strcat(path,"/");strcat(path,mod->name);
++    aw_bsp_file=fopen(path,"rb");if(!aw_bsp_file)return 0;
++    if(fread(&header,1,sizeof(header),aw_bsp_file)!=sizeof(header) || LittleLong(header.version)!=BSPVERSION) {
++        fclose(aw_bsp_file);aw_bsp_file=NULL;return 0;
++    }
++    fseek(aw_bsp_file,0,SEEK_END);aw_bsp_bytes=ftell(aw_bsp_file);
++    aw_bsp_peak=aw_bsp_reads=0;
++    COM_FileBase(mod->name,loadname);loadmodel=mod;mod->needload=NL_PRESENT;
++    Mod_LoadBrushModel(mod,&header);
++    fclose(aw_bsp_file);aw_bsp_file=NULL;
++    report=fopen("bsp-load-profile.txt","w");
++    if(report){fprintf(report,"file_bytes=%ld\nmax_input_section_bytes=%d\nsection_reads=%d\n",aw_bsp_bytes,aw_bsp_peak,aw_bsp_reads);fclose(report);}
++    return 1;
++}
++
+ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
+ {
+ 	unsigned *buf;
+@@ -279,6 +302,7 @@
+ //
+ // load the file
+ //
++	if(AW_TryStreamBrush(mod))return mod;
+ 	buf = (unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
+ 	if (!buf)
+ 	{
+@@ -752,6 +776,8 @@
+ 
+ 		s->texturemins[i] = bmins[i] * 16;
+ 		s->extents[i] = (bmaxs[i] - bmins[i]) * 16;
++        /* Imported constant-UV faces still need a nonempty cache tile. */
++        if(s->extents[i]<16)s->extents[i]=16;
+ 		if ( !(tex->flags & TEX_SPECIAL) && s->extents[i] > 256)
+ 			Sys_Error ("Bad surface extents");
+ 	}
+@@ -785,7 +811,12 @@
+ 		out->numedges = LittleShort(in->numedges);		
+ 		out->flags = 0;
+ 
+-		planenum = LittleShort(in->planenum);
++        /* BSP29 face plane indices occupy all 16 bits. LittleShort returns
++         * a signed short; sign extension selected memory before the plane
++         * array once a converted scene passed 32767 planes. */
++		planenum = (unsigned short)LittleShort(in->planenum);
++        if (planenum >= loadmodel->numplanes)
++            Sys_Error("Face plane index outside plane lump");
+ 		side = LittleShort(in->side);
+ 		if (side)
+ 			out->flags |= SURF_PLANEBACK;			
+@@ -961,12 +992,12 @@
+ 	hull->firstclipnode = 0;
+ 	hull->lastclipnode = count-1;
+ 	hull->planes = loadmodel->planes;
+-	hull->clip_mins[0] = -16;
+-	hull->clip_mins[1] = -16;
+-	hull->clip_mins[2] = -24;
+-	hull->clip_maxs[0] = 16;
+-	hull->clip_maxs[1] = 16;
+-	hull->clip_maxs[2] = 32;
++	hull->clip_mins[0] = -7.32f;
++	hull->clip_mins[1] = -7.12f;
++	hull->clip_mins[2] = -16.625f;
++	hull->clip_maxs[0] = 7.32f;
++	hull->clip_maxs[1] = 7.12f;
++	hull->clip_maxs[2] = 16.625f;
+ 
+ 	hull = &loadmodel->hulls[2];
+ 	hull->clipnodes = out;
+@@ -1140,6 +1171,20 @@
+ Mod_LoadBrushModel
+ =================
+ */
++static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
++    lump_t section;int mark;
++    if(!aw_bsp_file){decode(l);return;}
++    if(l->fileofs<0 || l->filelen<0 || l->fileofs>aw_bsp_bytes || l->filelen>aw_bsp_bytes-l->fileofs)
++        Sys_Error("Invalid BSP section");
++    mark=Hunk_HighMark();mod_base=Hunk_TempAlloc(l->filelen+1);
++    if(!mod_base)Sys_Error("BSP section allocation failed");
++    if(fseek(aw_bsp_file,l->fileofs,SEEK_SET) || fread(mod_base,1,l->filelen,aw_bsp_file)!=(size_t)l->filelen)
++        Sys_Error("Short BSP section");
++    if(l->filelen>aw_bsp_peak)aw_bsp_peak=l->filelen;aw_bsp_reads++;
++    section.fileofs=0;section.filelen=l->filelen;decode(&section);
++    Hunk_FreeToHighMark(mark);mod_base=NULL;
++}
++
+ void Mod_LoadBrushModel (model_t *mod, void *buffer)
+ {
+ 	int			i, j;
+@@ -1162,21 +1207,21 @@
+ 
+ // load into heap
+ 	
+-	Mod_LoadVertexes (&header->lumps[LUMP_VERTEXES]);
+-	Mod_LoadEdges (&header->lumps[LUMP_EDGES]);
+-	Mod_LoadSurfedges (&header->lumps[LUMP_SURFEDGES]);
+-	Mod_LoadTextures (&header->lumps[LUMP_TEXTURES]);
+-	Mod_LoadLighting (&header->lumps[LUMP_LIGHTING]);
+-	Mod_LoadPlanes (&header->lumps[LUMP_PLANES]);
+-	Mod_LoadTexinfo (&header->lumps[LUMP_TEXINFO]);
+-	Mod_LoadFaces (&header->lumps[LUMP_FACES]);
+-	Mod_LoadMarksurfaces (&header->lumps[LUMP_MARKSURFACES]);
+-	Mod_LoadVisibility (&header->lumps[LUMP_VISIBILITY]);
+-	Mod_LoadLeafs (&header->lumps[LUMP_LEAFS]);
+-	Mod_LoadNodes (&header->lumps[LUMP_NODES]);
+-	Mod_LoadClipnodes (&header->lumps[LUMP_CLIPNODES]);
+-	Mod_LoadEntities (&header->lumps[LUMP_ENTITIES]);
+-	Mod_LoadSubmodels (&header->lumps[LUMP_MODELS]);
++	AW_LoadBrushSection(&header->lumps[LUMP_VERTEXES],Mod_LoadVertexes);
++	AW_LoadBrushSection(&header->lumps[LUMP_EDGES],Mod_LoadEdges);
++	AW_LoadBrushSection(&header->lumps[LUMP_SURFEDGES],Mod_LoadSurfedges);
++	AW_LoadBrushSection(&header->lumps[LUMP_TEXTURES],Mod_LoadTextures);
++	AW_LoadBrushSection(&header->lumps[LUMP_LIGHTING],Mod_LoadLighting);
++	AW_LoadBrushSection(&header->lumps[LUMP_PLANES],Mod_LoadPlanes);
++	AW_LoadBrushSection(&header->lumps[LUMP_TEXINFO],Mod_LoadTexinfo);
++	AW_LoadBrushSection(&header->lumps[LUMP_FACES],Mod_LoadFaces);
++	AW_LoadBrushSection(&header->lumps[LUMP_MARKSURFACES],Mod_LoadMarksurfaces);
++	AW_LoadBrushSection(&header->lumps[LUMP_VISIBILITY],Mod_LoadVisibility);
++	AW_LoadBrushSection(&header->lumps[LUMP_LEAFS],Mod_LoadLeafs);
++	AW_LoadBrushSection(&header->lumps[LUMP_NODES],Mod_LoadNodes);
++	AW_LoadBrushSection(&header->lumps[LUMP_CLIPNODES],Mod_LoadClipnodes);
++	AW_LoadBrushSection(&header->lumps[LUMP_ENTITIES],Mod_LoadEntities);
++	AW_LoadBrushSection(&header->lumps[LUMP_MODELS],Mod_LoadSubmodels);
+ 
+ 	Mod_MakeHull0 ();
+ 	
+@@ -1871,4 +1916,3 @@
+ 	}
+ }
+ 
+-
+--- a/src/quakedef.h
++++ b/src/quakedef.h
+@@ -333,3 +333,57 @@
+ void Chase_Init (void);
+ void Chase_Reset (void);
+ void Chase_Update (void);
++
++/* AmiWind standalone runtime modules, GPL-2.0-or-later. */
++void AW_ProfileFrame(void);
++void AW_ProfileClose(void);
++void AW_Mark(int stage);
++void AW_EndMark(int stage);
++void AW_AudioLate(int missed);
++void AW_MusicPaint(portable_samplepair_t *dst,int count);
++void AW_FogInit(void);
++void AW_FogDraw(void);
++
++void AW_PlatformInit(void);
++void AW_PlatformClose(void);
++void AW_CullBegin(void);
++int AW_NodeVisible(short *bounds);
++
++void AW_DebugInit(void);
++extern qboolean noclip_anglehack;
++int AW_ModelVisible(vec3_t origin,float radius);
++
++qboolean AW_FindSafeSpawn(edict_t *,vec3_t,vec3_t);
++qboolean AW_PlacePlayer(edict_t *,vec3_t);
++
++void AW_MenuMouse(int dx,int dy);
++int AW_DebugCoordsEnabled(void);
++int AW_SeaLevelEnabled(void);
++void AW_NoclipVelocity(vec3_t view, usercmd_t *cmd, float maximum, vec3_t out);
++int AW_DebugOverlaysEnabled(void);
++void IN_AWClearButtons(void);
++
++void AW_ConsoleInit(void);
++void AW_ConsoleSetSmall(int value);
++int AW_ConsoleCharWidth(void);
++int AW_ConsoleCharHeight(void);
++void AW_ConsoleCharacter(int x,int y,int c);
++extern int con_fullscreen;
++int Con_ScrollPage(void);
++int Con_ScrollMax(void);
++void AW_ConsoleBackground(int lines);
++int AW_DebugTranslate(int argc,char **argv,char *out,int capacity);
++
++int AW_Interior(void);
++int AW_SceneUse(void);
++void AW_SceneSpawn(edict_t *p);
++int AW_InteriorPlace(edict_t *p,vec3_t preferred);
++void AW_SceneInit(void);
++void AW_MusicSceneEvent(const char *why);
++
++#ifndef AMIWIND_SPRITE_HANDS
++#define AMIWIND_SPRITE_HANDS 0
++#endif
++void AW_HandSpritesInit(void);
++void AW_HandSpritesDraw(void);
++int AW_HandSpritesValidate(byte *data,unsigned long bytes);
+--- a/src/r_bsp.c
++++ b/src/r_bsp.c
+@@ -452,6 +452,7 @@
+ 
+ 	if (node->visframe != r_visframecount)
+ 		return;
++    if (!AW_NodeVisible(node->minmaxs)) return;
+ 
+ // cull the clipping planes if not trivial accept
+ // FIXME: the compiler is doing a lousy job of optimizing here; it could be
+--- a/src/r_draw.c
++++ b/src/r_draw.c
+@@ -409,6 +409,11 @@
+ 	medge_t		*pedges, tedge;
+ 	clipplane_t	*pclip;
+ 
++/* Hide only the temporary *water sea reference, before allocating edges.
++ * Contents/collision remain unchanged. Other future liquids are unaffected. */
++    if ((fa->flags & SURF_DRAWTURB) && !AW_SeaLevelEnabled() &&
++        !strcmp(fa->texinfo->texture->name,"*water")) return;
++
+ // skip out if no more surfs
+ 	if ((surface_p) >= surf_max)
+ 	{
+@@ -606,6 +611,11 @@
+ 	vec3_t		p_normal;
+ 	medge_t		tedge;
+ 	clipplane_t	*pclip;
++
++/* Hide only the temporary *water sea reference, before allocating edges.
++ * Contents/collision remain unchanged. Other future liquids are unaffected. */
++    if ((psurf->flags & SURF_DRAWTURB) && !AW_SeaLevelEnabled() &&
++        !strcmp(psurf->texinfo->texture->name,"*water")) return;
+ 
+ // skip out if no more surfs
+ 	if (surface_p >= surf_max)
+--- a/src/r_edge.c
++++ b/src/r_edge.c
+@@ -49,6 +49,9 @@
+ espan_t	*span_p, *max_span_p;
+ 
+ int		r_currentkey;
++/* Near-coplanar attachments need a much tighter tolerance than Quake doors.
++ * 0.01 is retained as a diagnostic comparison, never a draw-last override. */
++cvar_t aw_depthslop = {"aw_depthslop", "0.00001"};
+ 
+ extern	int	screenwidth;
+ 
+@@ -490,7 +493,7 @@
+ 				fu = (float)(edge->u - 0xFFFFF) * (1.0 / 0x100000);
+ 				newzi = surf->d_ziorigin + fv*surf->d_zistepv +
+ 						fu*surf->d_zistepu;
+-				newzibottom = newzi * 0.99;
++				newzibottom = newzi * (1.0 - aw_depthslop.value);
+ 
+ 				testzi = surf2->d_ziorigin + fv*surf2->d_zistepv +
+ 						fu*surf2->d_zistepu;
+@@ -500,7 +503,7 @@
+ 					goto newtop;
+ 				}
+ 
+-				newzitop = newzi * 1.01;
++				newzitop = newzi * (1.0 + aw_depthslop.value);
+ 				if (newzitop >= testzi)
+ 				{
+ 					if (surf->d_zistepu >= surf2->d_zistepu)
+@@ -530,7 +533,7 @@
+ 				fu = (float)(edge->u - 0xFFFFF) * (1.0 / 0x100000);
+ 				newzi = surf->d_ziorigin + fv*surf->d_zistepv +
+ 						fu*surf->d_zistepu;
+-				newzibottom = newzi * 0.99;
++				newzibottom = newzi * (1.0 - aw_depthslop.value);
+ 
+ 				testzi = surf2->d_ziorigin + fv*surf2->d_zistepv +
+ 						fu*surf2->d_zistepu;
+@@ -540,7 +543,7 @@
+ 					goto gotposition;
+ 				}
+ 
+-				newzitop = newzi * 1.01;
++				newzitop = newzi * (1.0 + aw_depthslop.value);
+ 				if (newzitop >= testzi)
+ 				{
+ 					if (surf->d_zistepu >= surf2->d_zistepu)
+--- a/src/r_main.c
++++ b/src/r_main.c
+@@ -32,7 +32,7 @@
+ qboolean	r_drawpolys;
+ qboolean	r_drawculledpolys;
+ qboolean	r_worldpolysbacktofront;
+-qboolean	r_recursiveaffinetriangles = true;
++qboolean	r_recursiveaffinetriangles = false;
+ int			r_pixbytes = 1;
+ float		r_aliasuvscale = 1.0;
+ int			r_outofsurfaces;
+@@ -49,7 +49,7 @@
+ qboolean	r_surfsonstack;
+ int			r_clipflags;
+ 
+-byte		*r_warpbuffer;
++byte		*r_warpbuffer __attribute__((aligned(4)));
+ 
+ byte		*r_stack_start;
+ 
+@@ -115,6 +115,7 @@
+ 
+ void R_MarkLeaves (void);
+ 
++cvar_t aw_drawdistance = {"aw_drawdistance","700",true};
+ cvar_t	r_draworder = {"r_draworder","0"};
+ cvar_t	r_speeds = {"r_speeds","0"};
+ cvar_t	r_timegraph = {"r_timegraph","0"};
+@@ -180,6 +181,7 @@
+ R_Init
+ ===============
+ */
++extern cvar_t aw_depthslop;
+ void R_Init (void)
+ {
+ 	int		dummy;
+@@ -192,7 +194,10 @@
+ 	Cmd_AddCommand ("timerefresh", R_TimeRefresh_f);	
+ 	Cmd_AddCommand ("pointfile", R_ReadPointFile_f);	
+ 
++	AW_FogInit();
++	Cvar_RegisterVariable (&aw_drawdistance);
+ 	Cvar_RegisterVariable (&r_draworder);
++    Cvar_RegisterVariable (&aw_depthslop);
+ 	Cvar_RegisterVariable (&r_speeds);
+ 	Cvar_RegisterVariable (&r_timegraph);
+ 	Cvar_RegisterVariable (&r_graphheight);
+@@ -540,6 +545,7 @@
+ 	for (i=0 ; i<cl_numvisedicts ; i++)
+ 	{
+ 		currententity = cl_visedicts[i];
++        if(!AW_ModelVisible(currententity->origin,currententity->model->radius))continue;
+ 
+ 		if (currententity == &cl_entities[cl.viewentity])
+ 			continue;	// don't draw the player
+@@ -626,6 +632,9 @@
+ 	if (!currententity->model)
+ 		return;
+ 
++#if AMIWIND_SPRITE_HANDS
++    AW_HandSpritesDraw();return;
++#endif
+ 	VectorCopy (currententity->origin, r_entorigin);
+ 	VectorSubtract (r_origin, r_entorigin, modelorg);
+ 
+@@ -634,8 +643,8 @@
+ 
+ 	j = R_LightPoint (currententity->origin);
+ 
+-	if (j < 24)
+-		j = 24;		// allways give some light on gun
++	if (j < 64)
++		j = 64;		// allways give some light on gun
+ 	r_viewlighting.ambientlight = j;
+ 	r_viewlighting.shadelight = j;
+ 
+@@ -765,11 +774,13 @@
+ 	{
+ 		currententity = cl_visedicts[i];
+ 
++
+ 		switch (currententity->model->type)
+ 		{
+ 		case mod_brush:
+ 
+ 			clmodel = currententity->model;
++            if(!AW_ModelVisible(currententity->origin,clmodel->radius))continue;
+ 
+ 		// see if the bounding box lets us trivially reject, also sets
+ 		// trivial accept status
+@@ -781,6 +792,8 @@
+ 						clmodel->maxs[j];
+ 			}
+ 
++            if(currententity->angles[0] || currententity->angles[1] || currententity->angles[2])
++                for(j=0;j<3;j++){minmaxs[j]=currententity->origin[j]-clmodel->radius;minmaxs[3+j]=currententity->origin[j]+clmodel->radius;}
+ 			clipflags = R_BmodelCheckBBox (clmodel, minmaxs);
+ 
+ 			if (clipflags != BMODEL_FULLY_CLIPPED)
+@@ -966,6 +979,7 @@
+ 		r_time1 = Sys_FloatTime ();
+ 
+ 	R_SetupFrame ();
++    AW_CullBegin();
+ 
+ #ifdef PASSAGES
+ SetVisibilityByPassages ();
+@@ -989,7 +1003,7 @@
+ 		VID_LockBuffer ();
+ 	}
+ 	
+-	R_EdgeDrawing ();
++	AW_Mark(0); R_EdgeDrawing (); AW_EndMark(0);
+ 
+ 	if (!r_dspeeds.value)
+ 	{
+@@ -1004,7 +1018,7 @@
+ 		de_time1 = se_time2;
+ 	}
+ 
+-	R_DrawEntitiesOnList ();
++	AW_Mark(1); R_DrawEntitiesOnList (); AW_EndMark(1);
+ 
+ 	if (r_dspeeds.value)
+ 	{
+@@ -1012,7 +1026,7 @@
+ 		dv_time1 = de_time2;
+ 	}
+ 
+-	R_DrawViewModel ();
++	/* First-person presentation follows world fog, below. */
+ 
+ 	if (r_dspeeds.value)
+ 	{
+@@ -1025,6 +1039,8 @@
+ 	if (r_dspeeds.value)
+ 		dp_time2 = Sys_FloatTime ();
+ 
++	AW_FogDraw();
++    AW_Mark(4);R_DrawViewModel();AW_EndMark(4);
+ 	if (r_dowarp)
+ 		D_WarpScreen ();
+ 
+--- a/src/r_misc.c
++++ b/src/r_misc.c
+@@ -385,6 +385,8 @@
+ 		Cvar_Set ("r_drawflat", "0");
+ 	}
+ 
++	if (surface_p && surfaces && surface_p-surfaces>r_maxsurfsseen) r_maxsurfsseen=surface_p-surfaces;
++	if (edge_p && r_edges && edge_p-r_edges>r_maxedgesseen) r_maxedgesseen=edge_p-r_edges;
+ 	if (r_numsurfs.value)
+ 	{
+ 		if ((surface_p - surfaces) > r_maxsurfsseen)
+--- a/src/screen.c
++++ b/src/screen.c
+@@ -34,7 +34,7 @@
+ cvar_t		scr_fov = {"fov","90"};	// 10 - 170
+ cvar_t		scr_conspeed = {"scr_conspeed","300"};
+ cvar_t		scr_centertime = {"scr_centertime","2"};
+-cvar_t		scr_showram = {"showram","1"};
++cvar_t		scr_showram = {"showram","0"};
+ cvar_t		scr_showturtle = {"showturtle","0"};
+ cvar_t		scr_showpause = {"showpause","1"};
+ cvar_t		scr_printspeed = {"scr_printspeed","8"};
+@@ -258,6 +258,9 @@
+ 	else
+ 		sb_lines = 24+16+8;
+ 
++    /* Keep the optional diagnostic strip outside the rendered world. */
++    if (AW_DebugCoordsEnabled() && sb_lines < 12) sb_lines = 12;
++
+ // these calculations mirror those in R_Init() for r_refdef, but take no
+ // account of water warping
+ 	vrect.x = 0;
+@@ -459,7 +462,7 @@
+ 		scr_con_current = scr_conlines;
+ 	}
+ 	else if (key_dest == key_console)
+-		scr_conlines = vid.height/2;	// half screen
++		scr_conlines = con_fullscreen?vid.height:vid.height/2;	// half screen
+ 	else
+ 		scr_conlines = 0;				// none visible
+ 	
+@@ -923,9 +926,11 @@
+ 	}
+ 	else
+ 	{
+-		SCR_DrawRam ();
+-		SCR_DrawNet ();
+-		SCR_DrawTurtle ();
++        if (AW_DebugOverlaysEnabled()) {
++		    SCR_DrawRam ();
++		    SCR_DrawNet ();
++		    SCR_DrawTurtle ();
++        }
+ 		SCR_DrawPause ();
+ 		SCR_CheckDrawCenterString ();
+ 		Sbar_Draw ();
+--- a/src/snd_amiga.c
++++ b/src/snd_amiga.c
+@@ -139,7 +139,7 @@
+         sampleCount >>= 1;
+     }
+   
+-    sampleCount = sampleCount * 8;
++    sampleCount = sampleCount * 32; /* 32 KiB stereo DMA ring. */
+      
+     if ((shm->buffer = AllocMem (sampleCount, MEMF_CHIP | MEMF_CLEAR)) == NULL) {
+         Sys_Error ("Could not allocate enough CHIP memory for the sound buffer");
+--- a/src/snd_dma.c
++++ b/src/snd_dma.c
+@@ -234,8 +234,6 @@
+ //	if (shm->buffer)
+ //		shm->buffer[4] = shm->buffer[5] = 0x7f;	// force a pop for debugging
+ 
+-	ambient_sfx[AMBIENT_WATER] = S_PrecacheSound ("ambience/water1.wav");
+-	ambient_sfx[AMBIENT_SKY] = S_PrecacheSound ("ambience/wind2.wav");
+ 
+ 	S_StopAllSounds (true);
+ }
+@@ -254,13 +252,12 @@
+ 	if (shm)
+ 		shm->gamealive = 0;
+ 
++	if (!fakedma)
++	{
++		SNDDMA_Shutdown();
++	}
+ 	shm = 0;
+ 	sound_started = 0;
+-
+-	if (!fakedma)
+-	{
+-		SNDDMA_Shutdown();
+-	}
+ }
+ 
+ 
+@@ -741,7 +738,7 @@
+ 	VectorCopy(up, listener_up);
+ 	
+ // update general area ambient sound sources
+-	S_UpdateAmbientSounds ();
++	/* Ambient loops come from converted Morrowind data in a later checkpoint. */
+ 
+ 	combine = NULL;
+ 
+@@ -864,6 +861,7 @@
+ {
+ 	unsigned        endtime;
+ 	int				samps;
++    static int scene_primed;
+ 	
+ 	if (!sound_started || (snd_blocked > 0))
+ 		return;
+@@ -874,12 +872,19 @@
+ // check to make sure that we haven't overshot
+ 	if (paintedtime < soundtime)
+ 	{
+-		//Con_Printf ("S_Update_ : overflow\n");
++		AW_AudioLate(soundtime-paintedtime);
+ 		paintedtime = soundtime;
+ 	}
+ 
+ // mix ahead of current position
+ 	endtime = soundtime + _snd_mixahead.value * shm->speed;
++    /* Prime the existing ring before the first expensive scene draw. Ordinary
++     * controls retain the configured mixahead after this startup prefill. */
++    if(!scene_primed && cls.state==ca_connected && cl.worldmodel && cls.signon==SIGNONS) {
++        unsigned prime=soundtime+(unsigned)(shm->speed*1.25f);
++        if(endtime<prime)endtime=prime;
++        scene_primed=1;
++    }
+ 	samps = shm->samples >> (shm->channels-1);
+ 	if (endtime - soundtime > samps)
+ 		endtime = soundtime + samps;
+--- a/src/snd_mix.c
++++ b/src/snd_mix.c
+@@ -381,6 +381,8 @@
+ 
+ 	// clear the paint buffer
+ 		Q_memset(paintbuffer, 0, (end - paintedtime) * sizeof(portable_samplepair_t));
++
++	AW_MusicPaint(paintbuffer, end-paintedtime);
+ 
+ 	// paint in the channels.
+ 		ch = channels;
+--- a/src/sv_main.c
++++ b/src/sv_main.c
+@@ -458,7 +458,7 @@
+ 				if (pvs[ent->leafnums[i] >> 3] & (1 << (ent->leafnums[i]&7) ))
+ 					break;
+ 				
+-			if (i == ent->num_leafs)
++			if (i == ent->num_leafs && ent->num_leafs < MAX_ENT_LEAFS)
+ 				continue;		// not visible
+ 		}
+ 
+--- a/src/sv_phys.c
++++ b/src/sv_phys.c
+@@ -52,6 +52,7 @@
+ #define	MOVE_EPSILON	0.01
+ 
+ void SV_Physics_Toss (edict_t *ent);
++extern void AW_WalkPlayer(edict_t *ent);
+ 
+ /*
+ ================
+@@ -287,7 +288,8 @@
+ 				ent->v.groundentity = EDICT_TO_PROG(trace.ent);
+ 			}
+ 		}
+-		if (!trace.plane.normal[2])
++		if (!trace.plane.normal[2] || (ent->v.movetype == MOVETYPE_WALK &&
++            trace.plane.normal[2] > 0 && trace.plane.normal[2] < 0.7f))
+ 		{
+ 			blocked |= 2;		// step
+ 			if (steptrace)
+@@ -954,7 +956,7 @@
+ Only used by players
+ ======================
+ */
+-#define	STEPSIZE	18
++#define	STEPSIZE	8.5f
+ void SV_WalkMove (edict_t *ent)
+ {
+ 	vec3_t		upmove, downmove;
+@@ -1032,7 +1034,7 @@
+ 
+ 	if (downtrace.plane.normal[2] > 0.7)
+ 	{
+-		if (ent->v.solid == SOLID_BSP)
++		if (downtrace.ent && downtrace.ent->v.solid == SOLID_BSP)
+ 		{
+ 			ent->v.flags =	(int)ent->v.flags | FL_ONGROUND;
+ 			ent->v.groundentity = EDICT_TO_PROG(downtrace.ent);
+@@ -1086,17 +1088,8 @@
+ 	case MOVETYPE_WALK:
+ 		if (!SV_RunThink (ent))
+ 			return;
+-		if (!SV_CheckWater (ent) && ! ((int)ent->v.flags & FL_WATERJUMP) )
+-			SV_AddGravity (ent);
+-		SV_CheckStuck (ent);
+-#ifdef QUAKE2
+-		VectorAdd (ent->v.velocity, ent->v.basevelocity, ent->v.velocity);
+-#endif
+-		SV_WalkMove (ent);
+-
+-#ifdef QUAKE2
+-		VectorSubtract (ent->v.velocity, ent->v.basevelocity, ent->v.velocity);
+-#endif
++		AW_WalkPlayer(ent);
++
+ 		break;
+ 		
+ 	case MOVETYPE_TOSS:
+--- a/src/sv_user.c
++++ b/src/sv_user.c
+@@ -134,10 +134,10 @@
+ 		return;
+ 
+ // if the leading edge is over a dropoff, increase friction
+-	start[0] = stop[0] = origin[0] + vel[0]/speed*16;
+-	start[1] = stop[1] = origin[1] + vel[1]/speed*16;
++	start[0] = stop[0] = origin[0] + vel[0]/speed*7.32f;
++	start[1] = stop[1] = origin[1] + vel[1]/speed*7.12f;
+ 	start[2] = origin[2] + sv_player->v.mins[2];
+-	stop[2] = start[2] - 34;
++	stop[2] = start[2] - 15.5f;
+ 
+ 	trace = SV_Move (start, vec3_origin, vec3_origin, stop, true, sv_player);
+ 
+@@ -410,6 +410,11 @@
+ 		angles[PITCH] = -v_angle[PITCH]/3;
+ 		angles[YAW] = v_angle[YAW];
+ 	}
++
++    if (sv_player->v.movetype == MOVETYPE_NOCLIP) {
++        AW_NoclipVelocity(sv_player->v.v_angle,&cmd,sv_maxspeed.value,velocity);
++        return;
++    }
+ 
+ 	if ( (int)sv_player->v.flags & FL_WATERJUMP )
+ 	{
+--- a/src/sys_amiga.c
++++ b/src/sys_amiga.c
+@@ -18,7 +18,7 @@
+ 
+ */
+ 
+-char *ID = "$VER: AmiQuake 1.22\r\n";  
++char *ID = "$VER: AmiWind 0.0.11-dev3 (27.09.2026)\r\n";  
+ 
+ #include "quakedef.h"
+ 
+@@ -26,10 +26,10 @@
+ 
+ // Amiga includes.
+ #include <proto/exec.h>
++#include <exec/memory.h>
+ #include <proto/dos.h>
+-
+-#include <clib/icon_protos.h>
+-#include <workbench/startup.h>
++#include <intuition/intuition.h>
++
+ 
+ 
+ // External video window from vid_amiga.c
+@@ -47,15 +47,11 @@
+ #define RAWKEY_NM_WHEEL_DOWN    0x7B
+ 
+ 
+-static quakeparms_t quakeparms; 
++static quakeparms_t quakeparms;
++/* Use checked Exec allocation for the large hunk; preserve the raw pointer. */
++static void *aw_heap_allocation;
++static ULONG aw_heap_allocation_size; 
+  
+-
+-
+-static int myArgc = 0;
+-static char	*myArgv[MAX_NUM_ARGVS];
+-
+-static int wbClosed = 0;
+-
+ 
+ 
+ #ifndef NDEBUG
+@@ -131,15 +127,25 @@
+ static void Sys_Init(void) {
+ 
+     // Allocate memory.
+-    quakeparms.memsize = 16*1024*1024;
+-    
+-    // alloc 16-byte aligned quake memory
++#ifndef AMIWIND_HEAP_MB
++#define AMIWIND_HEAP_MB 9
++#endif
++    quakeparms.memsize = AMIWIND_HEAP_MB*1024*1024;
++    
++    /* The SDK malloc failure path can trap before returning NULL. Keep this
++     * large, fixed allocation in Fast RAM and report a normal startup error.
++     * Leave up to 15 bytes of headroom for Quake's 16-byte hunk alignment. */
+     quakeparms.memsize = (quakeparms.memsize+15)&~15;
+-	quakeparms.membase = malloc(quakeparms.memsize);
+-	if (!quakeparms.membase) {
+-		Sys_Error ("Not enough memory free\n");
+-    }
+-    
++    aw_heap_allocation_size = (ULONG)quakeparms.memsize + 15;
++    aw_heap_allocation = AllocMem(aw_heap_allocation_size, MEMF_FAST|MEMF_PUBLIC);
++    if (!aw_heap_allocation) {
++        PutStr("AmiWind: cannot allocate the 9 MiB game heap in Fast RAM.\n"
++               "Use 16 MiB Fast RAM or more, then reboot.\n");
++        AW_PlatformClose();
++        exit(EXIT_FAILURE);
++    }
++    quakeparms.membase = (void *)(((ULONG)aw_heap_allocation + 15) & ~15UL);
++
+     // Mouse look by default.
+     IN_MLookDown();
+ }
+@@ -149,7 +155,8 @@
+ 	Host_Shutdown();
+         	
+ 	if (quakeparms.membase) {
+-        free(quakeparms.membase);
++        FreeMem(aw_heap_allocation, aw_heap_allocation_size);
++        aw_heap_allocation = NULL;
+         quakeparms.membase = NULL;
+     }
+     
+@@ -159,10 +166,10 @@
+     }
+ #endif    
+ 
+-	if (wbClosed) {
+-        OpenWorkBench();
+-    }
+-    
++
++    
++    PutStr("To restart AmiWind, type: amiwind\n");
++	AW_PlatformClose();
+ 	exit(EXIT_SUCCESS);	
+ }
+  
+@@ -187,14 +194,14 @@
+ 	Host_Shutdown();
+ 	
+ 	if (quakeparms.membase) {
+-        free(quakeparms.membase);
++        FreeMem(aw_heap_allocation, aw_heap_allocation_size);
++        aw_heap_allocation = NULL;
+         quakeparms.membase = NULL;
+     }	
+ 
+-	if (wbClosed) {
+-        OpenWorkBench();
+-    }
+-    
++
++    
++	AW_PlatformClose();
+ 	exit(EXIT_FAILURE);
+ }
+ 
+@@ -227,10 +234,11 @@
+ 
+   if (video_window != NULL) {
+     while ((msg = (struct IntuiMessage *)GetMsg (video_window->UserPort)) != NULL) {
+-        ReplyMsg ((struct Message *)msg);
+-            
+         class = msg->Class;
+         code = msg->Code;
++        mousex = msg->MouseX;
++        mousey = msg->MouseY;
++        ReplyMsg ((struct Message *)msg);
+ 
+         switch (class) {
+         case IDCMP_RAWKEY:
+@@ -246,6 +254,7 @@
+                 	break;
+                 
+                 default:
++                    if ((code & ~IECODE_UP_PREFIX) >= 0x68) break;
+                     if (code & IECODE_UP_PREFIX) {
+                 		Key_Event(xlate[code & ~IECODE_UP_PREFIX], false);
+                 	} else {
+@@ -281,8 +290,8 @@
+           break;
+           
+         case IDCMP_MOUSEMOVE:
+-          mouseX = msg->MouseX;
+-          mouseY = msg->MouseY;
++          mouseX = mousex;
++          mouseY = mousey;
+           mouse_has_moved = true;
+           break;
+           
+@@ -297,20 +306,6 @@
+ //=============================================================================
+ 
+ 
+-
+-/* these command line arguments are flags */
+-static char *flags[] = {
+-    "-nosound",
+-    "-condebug",
+-    "-rogue",
+-    "-hipnotic"               
+-};
+-
+-
+-/* these command line arguments each take a value */
+-static char *settings[] = {
+-    "-game"
+-};
+ 
+ static void RunGameLoop(void)
+ {
+@@ -329,86 +324,20 @@
+ }
+ 
+ 
+-int main(int argcWb, char *argvWb[]) {
+-	char path[MAX_OSPATH];
+-    struct DiskObject *diskObject;
+-    char *toolType;
+-    int i;
+-    struct WBStartup* wbStartup;
+-    int closeWb = 0;
+-
+-
+-    // Setup the system (allocate memory, enable mouselook).
++/* The boot image uses the AmigaDOS shell. Do not link icon tooltype support:
++ * some ROMs load icon.library from disk even before main() is entered. */
++int main(int argc, char *argv[]) {
++    static char *default_argv[] = {"AmiWind", NULL};
++    AW_PlatformInit();
++    PutStr("Loading AmiWind v0.0.15-dev2...\n");
+     Sys_Init();
+-
+-
+-    // Check if started from shell or Workbench
+-    if (argcWb != 0) {
+-        // Started from the shell - use standard argc/argv
+-        COM_InitArgv(argcWb, argvWb);
+-        // Use PROGDIR: to load files from executable's directory
+-        quakeparms.basedir = "PROGDIR:";
+-        quakeparms.cachedir = NULL;
+-        quakeparms.argc = com_argc;
+-        quakeparms.argv = com_argv;
+-    } else {
+-        // Started from Workbench - process tooltypes
+-        wbStartup = (struct WBStartup*)argvWb;
+-
+-        // Set the current directory to the executable's directory
+-        CurrentDir(wbStartup->sm_ArgList[0].wa_Lock);
+-        // Use PROGDIR: to load files from executable's directory
+-        quakeparms.basedir = "PROGDIR:";
+-        quakeparms.cachedir = NULL;
+-
+-        // Setup command line.
+-        myArgv[myArgc++] = "AmiQuake";
+-
+-        // Process Tooltypes.
+-        diskObject = GetDiskObject((char*)wbStartup->sm_ArgList[0].wa_Name);
+-
+-        if (diskObject != NULL) {
+-            toolType = (char*)FindToolType(diskObject->do_ToolTypes, "CLOSE_WB");
+-            if (toolType != NULL) {
+-                closeWb = 1;
+-            }
+-
+-            // Process DOS command line flags.
+-            for (i = 0; i < sizeof(flags)/sizeof(flags[0]); i++) {
+-                if (FindToolType(diskObject->do_ToolTypes, &flags[i][1]) != NULL) {
+-                    myArgv[myArgc++] = flags[i];
+-                }
+-            }
+-
+-            // Process DOS command line settings.
+-            for (i = 0; i < sizeof(settings)/sizeof(settings[0]); i++) {
+-                if ((toolType = FindToolType (diskObject->do_ToolTypes, &settings[i][1])) != NULL) {
+-                    myArgv[myArgc++] = settings[i];
+-                    myArgv[myArgc] = malloc(strlen(toolType)+1);
+-                    strcpy(myArgv[myArgc++], toolType);
+-                }
+-            }
+-        }
+-
+-        // Close WB if requested.
+-        if (closeWb) {
+-            wbClosed = CloseWorkBench();
+-        }
+-
+-        COM_InitArgv(myArgc, myArgv);
+-
+-        quakeparms.argc = myArgc;
+-        quakeparms.argv = myArgv;
+-    }
+-    
+-    // Setup the host.
+-	Host_Init(&quakeparms);
+-
+-
+-    // Never returns.
++    if (argc == 0) { argc = 1; argv = default_argv; }
++    COM_InitArgv(argc, argv);
++    quakeparms.basedir = "PROGDIR:";
++    quakeparms.cachedir = NULL;
++    quakeparms.argc = com_argc;
++    quakeparms.argv = com_argv;
++    Host_Init(&quakeparms);
+     RunGameLoop();
+-
+-    
+-    // Keep compiler happy!    
+     return EXIT_SUCCESS;
+ }
+--- a/src/vid_amiga.c
++++ b/src/vid_amiga.c
+@@ -68,9 +68,9 @@
+ #else
+ #ifdef __GNUC__
+ // GCC-compatible C2P stub - will link to assembly implementation
+-extern void *c2p8_reloc(struct BitMap *bitmap __asm("a0"));
+-extern void c2p8_deinit(void *c2p __asm("a0"));
+-extern void c2p8(void *c2p __asm("a0"), struct BitMap *bmp __asm("a1"), UBYTE *chunky __asm("a2"), ULONG size __asm("d0"));
++extern void *aw_c2p_reloc(struct BitMap *bitmap );
++extern void aw_c2p_deinit(void *c2p );
++extern void aw_c2p(void *c2p , struct BitMap *bmp , UBYTE *chunky , ULONG size );
+ #else
+ #include "c2p8_040_amlaukka.h"
+ #endif
+@@ -223,11 +223,8 @@
+   eclocks_per_second = ReadEClock (&start_time);
+ #endif
+ 
++  SetChipRev (SETCHIPREV_BEST);
+   CyberGfxBase = OpenLibrary ("cybergraphics.library", 0);
+-
+-  if ((AslBase = OpenLibrary ("asl.library", 38L)) == NULL ||
+-      (smr = AllocAslRequestTags (ASL_ScreenModeRequest, TAG_END)) == NULL)
+-    Sys_Error ("OpenLibrary(""asl.library"", 38) failed");
+ 
+   propertymask = DIPF_IS_EXTRAHALFBRITE | DIPF_IS_DUALPF | DIPF_IS_PF2PRI |
+                  DIPF_IS_HAM;
+@@ -249,7 +246,7 @@
+   // Try to show screen mode requester, but if it fails (e.g., headless/emulator),
+   // just use the default mode that was calculated above
+   // Skip requester on RTG systems - auto-detected mode works fine
+-  if (CyberGfxBase == NULL && AslRequestTags (smr,
++  if (0 && AslRequestTags (smr,
+                        ASLSM_TitleText,            (ULONG)"Quake",
+                        ASLSM_InitialDisplayID,     mode,
+                        ASLSM_InitialDisplayWidth,  BASEWIDTH,
+@@ -392,9 +389,9 @@
+     nextsbuffer = sbuffer[1];
+     rp.BitMap = nextsbuffer->sb_BitMap;
+ #ifndef __PPC__
+-    c2p[0] = c2p8_reloc (sbuffer[0]->sb_BitMap);
+-    c2p[1] = c2p8_reloc (sbuffer[1]->sb_BitMap);
+-    c2p[2] = c2p8_reloc (sbuffer[2]->sb_BitMap);
++    c2p[0] = aw_c2p_reloc (sbuffer[0]->sb_BitMap);
++    c2p[1] = aw_c2p_reloc (sbuffer[1]->sb_BitMap);
++    c2p[2] = aw_c2p_reloc (sbuffer[2]->sb_BitMap);
+     nextc2p = c2p[1];
+ #endif
+   }
+@@ -430,7 +427,7 @@
+   else
+     vid.numpages = 1;
+   vid.colormap = host_colormap;
+-  vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
++  vid.fullbright = 256; /* Generated AmiWind palette has no fullbright range. */
+   vid.buffer = vid.conbuffer = vid_buffer;
+   vid.rowbytes = vid.conrowbytes = width;
+   vid.direct = NULL;
+@@ -528,15 +525,15 @@
+     timermp = NULL;
+   }
+   if (c2p[0]) {
+-    c2p8_deinit (c2p[0]);
++    aw_c2p_deinit (c2p[0]);
+     c2p[0] = NULL;
+   }
+   if (c2p[1]) {
+-    c2p8_deinit (c2p[1]);
++    aw_c2p_deinit (c2p[1]);
+     c2p[1] = NULL;
+   }
+   if (c2p[2]) {
+-    c2p8_deinit (c2p[2]);
++    aw_c2p_deinit (c2p[2]);
+     c2p[2] = NULL;
+   }
+ #endif
+@@ -727,9 +724,11 @@
+       rects = rects->pnext;
+     }
+ #else
++    AW_Mark(2);
+     if (rects != NULL)
+-      c2p8 (nextc2p, nextsbuffer->sb_BitMap, vid.buffer,
++      aw_c2p (nextc2p, nextsbuffer->sb_BitMap, vid.buffer,
+             vid.width * (rects->y + rects->height));
++    AW_EndMark(2);
+ #endif
+   } else {
+     while (rects != NULL) {
+--- a/src/view.c
++++ b/src/view.c
+@@ -886,7 +886,11 @@
+ 										// the view dir
+ 										
+ 	
+-	bob = V_CalcBob ();
++	/* Preserve the locally simulated sub-unit eye offset; the legacy network
++     * byte quantizes it. Collision dimensions and movement bob are unchanged. */
++    if(sv.active && svs.maxclients==1 && svs.clients[0].edict)
++        cl.viewheight=svs.clients[0].edict->v.view_ofs[2];
++    bob = V_CalcBob ();
+ 	
+ // refresh position
+ 	VectorCopy (ent->origin, r_refdef.vieworg);
+--- a/src/world.c
++++ b/src/world.c
+@@ -384,27 +384,19 @@
+ 
+ // set the abs box
+ 
+-#ifdef QUAKE2
++/* AmiWind: static architectural brushes have non-zero yaw. */
++#if 1
+ 	if (ent->v.solid == SOLID_BSP && 
+ 	(ent->v.angles[0] || ent->v.angles[1] || ent->v.angles[2]) )
+ 	{	// expand for rotation
+-		float		max, v;
+-		int			i;
+-
+-		max = 0;
++        float radius, corner[3];
++        int i;
++        for(i=0;i<3;i++)corner[i]=fabs(ent->v.mins[i])>fabs(ent->v.maxs[i]) ? fabs(ent->v.mins[i]):fabs(ent->v.maxs[i]);
++        radius=sqrt(DotProduct(corner,corner));
+ 		for (i=0 ; i<3 ; i++)
+ 		{
+-			v =fabs( ent->v.mins[i]);
+-			if (v > max)
+-				max = v;
+-			v =fabs( ent->v.maxs[i]);
+-			if (v > max)
+-				max = v;
+-		}
+-		for (i=0 ; i<3 ; i++)
+-		{
+-			ent->v.absmin[i] = ent->v.origin[i] - max;
+-			ent->v.absmax[i] = ent->v.origin[i] + max;
++			ent->v.absmin[i] = ent->v.origin[i] - radius;
++			ent->v.absmax[i] = ent->v.origin[i] + radius;
+ 		}
+ 	}
+ 	else
+@@ -589,6 +581,9 @@
+ 	int			side;
+ 	float		midf;
+ 
++/* Same-side descent is iterative: long convex-union chains must not
++ * consume the Amiga task stack. Splitting segments still recurse. */
++aw_hull_next:
+ // check for empty
+ 	if (num < 0)
+ 	{
+@@ -627,14 +622,14 @@
+ 	
+ #if 1
+ 	if (t1 >= 0 && t2 >= 0)
+-		return SV_RecursiveHullCheck (hull, node->children[0], p1f, p2f, p1, p2, trace);
++		{num=node->children[0];goto aw_hull_next;}
+ 	if (t1 < 0 && t2 < 0)
+-		return SV_RecursiveHullCheck (hull, node->children[1], p1f, p2f, p1, p2, trace);
++		{num=node->children[1];goto aw_hull_next;}
+ #else
+ 	if ( (t1 >= DIST_EPSILON && t2 >= DIST_EPSILON) || (t2 > t1 && t1 >= 0) )
+-		return SV_RecursiveHullCheck (hull, node->children[0], p1f, p2f, p1, p2, trace);
++		{num=node->children[0];goto aw_hull_next;}
+ 	if ( (t1 <= -DIST_EPSILON && t2 <= -DIST_EPSILON) || (t2 < t1 && t1 <= 0) )
+-		return SV_RecursiveHullCheck (hull, node->children[1], p1f, p2f, p1, p2, trace);
++		{num=node->children[1];goto aw_hull_next;}
+ #endif
+ 
+ // put the crosspoint DIST_EPSILON pixels on the near side
+@@ -738,7 +733,8 @@
+ 	VectorSubtract (start, offset, start_l);
+ 	VectorSubtract (end, offset, end_l);
+ 
+-#ifdef QUAKE2
++/* AmiWind: static architectural brushes have non-zero yaw. */
++#if 1
+ 	// rotate start and end into the models frame of reference
+ 	if (ent->v.solid == SOLID_BSP && 
+ 	(ent->v.angles[0] || ent->v.angles[1] || ent->v.angles[2]) )
+@@ -764,7 +760,8 @@
+ // trace a line through the apropriate clipping hull
+ 	SV_RecursiveHullCheck (hull, hull->firstclipnode, 0, 1, start_l, end_l, &trace);
+ 
+-#ifdef QUAKE2
++/* AmiWind: static architectural brushes have non-zero yaw. */
++#if 1
+ 	// rotate endpos back to world frame of reference
+ 	if (ent->v.solid == SOLID_BSP && 
+ 	(ent->v.angles[0] || ent->v.angles[1] || ent->v.angles[2]) )
+@@ -795,6 +792,11 @@
+ 	if (trace.fraction != 1)
+ 		VectorAdd (trace.endpos, offset, trace.endpos);
+ 
++/* A blocked sweep has no usable destination. Some movement paths (step-down
++ * via SV_PushEntity) copy endpos even when allsolid, so returning the requested
++ * end lets an already-overlapping player sink through the ground. */
++    if(trace.allsolid) {trace.fraction=0;VectorCopy(start,trace.endpos);}
++
+ // did we clip the move?
+ 	if (trace.fraction < 1 || trace.startsolid  )
+ 		trace.ent = ent;
+@@ -811,6 +813,16 @@
+ Mins and maxs enclose the entire area swept by the move
+ ====================
+ */
++/* An exit from an overlapping solid must not discard a nearer floor hit.
++ * Keep startsolid as a flag while retaining the earliest blocking fraction. */
++void AW_MergeCollisionTrace(trace_t *best,trace_t *candidate,edict_t *touch) {
++    int started=best->startsolid || candidate->startsolid;
++    if(candidate->allsolid || candidate->fraction < best->fraction) {
++        *best=*candidate;best->ent=touch;
++    }
++    best->startsolid=started;
++}
++
+ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
+ {
+ 	link_t		*l, *next;
+@@ -858,20 +870,7 @@
+ 			trace = SV_ClipMoveToEntity (touch, clip->start, clip->mins2, clip->maxs2, clip->end);
+ 		else
+ 			trace = SV_ClipMoveToEntity (touch, clip->start, clip->mins, clip->maxs, clip->end);
+-		if (trace.allsolid || trace.startsolid ||
+-		trace.fraction < clip->trace.fraction)
+-		{
+-			trace.ent = touch;
+-		 	if (clip->trace.startsolid)
+-			{
+-				clip->trace = trace;
+-				clip->trace.startsolid = true;
+-			}
+-			else
+-				clip->trace = trace;
+-		}
+-		else if (trace.startsolid)
+-			clip->trace.startsolid = true;
++        AW_MergeCollisionTrace(&clip->trace,&trace,touch);
+ 	}
+ 	
+ // recurse down both sides

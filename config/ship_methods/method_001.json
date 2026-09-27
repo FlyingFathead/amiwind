@@ -1,0 +1,31 @@
+{
+  "method": "method_001",
+  "role": "immutable exterior-ship reference; not automatically loaded configuration",
+  "runtime": "0.0.14-dev1",
+  "checkpoint": 15,
+  "public_zip_sha256": "11c7a4873bd17bc9fb04d0728620e45a6448e651dd55c76abddcf7c34fa0cbd9",
+  "private_zip_sha256": "421c77fe8eaf1f896cc0abf84c037a2ea4080190cd5c578f9b6d1c044aa73ef6",
+  "source_files_sha256": {
+    "tools/prepare_scenery.py": "6f4faa06abb87662ba74d18fc60fd7077d758c530e6ede1e100f09e8a739c519",
+    "tools/prepare_mesh_bsp.py": "0459c6546e4b0c7c1617f9d6e34c76443615b49036c561366fd7689237ea6215",
+    "tools/static_lod.py": "07116eb62f7e1fa0e439fa82d40191aa886b4c4cedf541210bc9883f91743902",
+    "tools/mesh_geometry.py": "1b68c738ffb4c522abbc07f54c6e1f961142bb24d33bebc0bde0760b4f016d51",
+    "config/scenery_groups.json": "7d7ff0bef330fafadc6e7d07f23ba8ef11db4c56e683393dc3c3f889bf502073"
+  },
+  "arrival_ship_recipe": {
+    "presentation": "static arrival preview; opening scripts not executed",
+    "visual_profiles": {
+      "meshes/x/ex_de_ship.nif": {
+        "ratio": 0.2,
+        "texture_size": 32,
+        "collision_source": "root_node"
+      }
+    },
+    "members": {
+      "chargen boat": "ACTI",
+      "chargen_plank": "STAT",
+      "chargen_ship_trapdoor": "DOOR",
+      "chargen_cabindoor": "DOOR"
+    }
+  }
+}

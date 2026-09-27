@@ -1,0 +1,93 @@
+{
+  "schema": "amiwind-build-reference-v1",
+  "runtime": "0.0.15-dev2",
+  "source": "0.12.1.dev1",
+  "recorded": "2026-09-28",
+  "host": "Linux x86_64",
+  "evidence": "Checkpoint-017 handoff package versions; restored tools inspected; source 0.12.1.dev1 host tests and native engine/preflight compile. Full fresh conversion was not rerun.",
+  "python": "3.12.14",
+  "packages": {
+    "numpy": "2.5.3",
+    "scipy": "1.17.0",
+    "Pillow": "12.3.0",
+    "PyFFI": "2.2.3",
+    "fast-simplification": "0.2.0",
+    "amitools": "0.8.1"
+  },
+  "tools": {
+    "make": {
+      "version": "4.3",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "GNU Make (\\S+)"
+    },
+    "cc": {
+      "version": "13.3.0",
+      "arguments": [
+        "-dumpfullversion"
+      ],
+      "pattern": "^(\\d+(?:\\.\\d+)+)"
+    },
+    "ffmpeg": {
+      "version": "6.1.1-3ubuntu5",
+      "arguments": [
+        "-version"
+      ],
+      "pattern": "ffmpeg version (\\S+)"
+    },
+    "m68k-amigaos-gcc": {
+      "version": "16.2.0b 20260825082934",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "\\(GCC\\) ([^\\r\\n]+)"
+    },
+    "vasmm68k_mot": {
+      "version": "1.9d",
+      "arguments": [
+        "-help"
+      ],
+      "pattern": "vasm (\\S+)"
+    },
+    "qbsp": {
+      "version": "0.18.1",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "ericw-tools v([^\\s]+)"
+    },
+    "vis": {
+      "version": "0.18.1",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "ericw-tools v([^\\s]+)"
+    },
+    "light": {
+      "version": "0.18.1",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "ericw-tools v([^\\s]+)"
+    },
+    "xdftool": {
+      "version": "0.8.1",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "(\\d+\\.\\d+\\.\\d+)"
+    },
+    "rdbtool": {
+      "version": "0.8.1",
+      "arguments": [
+        "--version"
+      ],
+      "pattern": "(\\d+\\.\\d+\\.\\d+)"
+    },
+    "qcc": {
+      "version": "id Quake-Tools c0d1b91 (reference binary)",
+      "sha256": "10ebd069dbc0eb70c8478d38b6063a575f2bc7777b1ed58c6709a856a3903421"
+    }
+  }
+}

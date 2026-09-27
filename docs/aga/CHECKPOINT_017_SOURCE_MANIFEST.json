@@ -1,0 +1,678 @@
+{
+  "COPYING": {
+    "bytes": 17992,
+    "sha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670"
+  },
+  "Makefile": {
+    "bytes": 4361,
+    "sha256": "73941cac10685b2fa6fbf9c846d00ab76282f494fe5e21a3bbc49925347d4ba8"
+  },
+  "README.md": {
+    "bytes": 1973,
+    "sha256": "2a29a594fa85cfaa352407cf067257b74532f918e286208cca736fcaa2812e3e"
+  },
+  "boot/bootcheck.asm": {
+    "bytes": 5657,
+    "sha256": "d72fdf0784857673b37682cc4c2232da895bf2b633133197080c53ba66bbafbb"
+  },
+  "docs/COPYING.NEWLIB": {
+    "bytes": 78261,
+    "sha256": "fcfb5ec69b6ab52676dcc4dab7cf4338c8000ef97812dadd35b8592a640a8419"
+  },
+  "qc/defs.qc": {
+    "bytes": 5928,
+    "sha256": "3820f1a403e4257ba9128099ca1a2e9c4688219a51b4e5ba5b73c14c822c4017"
+  },
+  "qc/progs.src": {
+    "bytes": 30,
+    "sha256": "c4729cf51127b1e9b4a103b8cab642d0caff0f2ab411ec50d156fd16dbd2b5b2"
+  },
+  "qc/world.qc": {
+    "bytes": 7788,
+    "sha256": "e0f440f6d7624474476eb2c4a6fc5444f98a800877c6a94b151a3c7a843f8366"
+  },
+  "src/adivtab.h": {
+    "bytes": 10524,
+    "sha256": "06a327cee06d95748f772f48424dc8b48949778050cb452d17a03e33c9100e6f"
+  },
+  "src/amiga_c2p_aga.h": {
+    "bytes": 1421,
+    "sha256": "19f51d118af4bf324329bdc12da9c630f4384c59463fd5fb470f454e877f4f0e"
+  },
+  "src/amiga_ppc_stubs.h": {
+    "bytes": 3023,
+    "sha256": "adf1911e3ecbe6617b4851bfcff83854147017a61450c8910b3bca429f98f59f"
+  },
+  "src/amiga_stubs.c": {
+    "bytes": 2264,
+    "sha256": "2b27b70b81d856318c56228b4b657992c8433c1faabd3918e773761cb8c15d1c"
+  },
+  "src/amiga_timer.h": {
+    "bytes": 181,
+    "sha256": "cd7bcd69aa65892b1fb5dc393c473dc651c41bdf46ae68ec4833064d5c6ea6c6"
+  },
+  "src/anorm_dots.h": {
+    "bytes": 21261,
+    "sha256": "d9156f000b9df16f85d231e082733809a52f6b2e46fd8be0f7515a8aa2be398a"
+  },
+  "src/anorms.h": {
+    "bytes": 6295,
+    "sha256": "1d21f2e9c1ff6cb704ade4f04206cbc1aaadb6930370bb7d54a63c469eb9ee65"
+  },
+  "src/asm_draw.h": {
+    "bytes": 4240,
+    "sha256": "5c7189a00905e97a434a61aff615245b9948aa20c63af40ad40de127bd23e621"
+  },
+  "src/asm_i386.h": {
+    "bytes": 2523,
+    "sha256": "f27fc0fe4f95a79387006e5c3989a43a679a5674b4818035c734780e520b6e7d"
+  },
+  "src/aw_c2p.c": {
+    "bytes": 1196,
+    "sha256": "360a2a9360d60ed7152c28557475acd2c4bae8070bd35290d6896e461d295f4c"
+  },
+  "src/aw_console.c": {
+    "bytes": 6960,
+    "sha256": "5490f35039540dd4595de06547cfc135ca1c19bf9189d698440d78b3c8403f3f"
+  },
+  "src/aw_console_glyphs.c": {
+    "bytes": 2113,
+    "sha256": "e2ba858ceffea47b079b4c788e265afd8cc8423cac43948df88a8c8f511b47b6"
+  },
+  "src/aw_debug.c": {
+    "bytes": 6126,
+    "sha256": "745b530389bf697d811cd8a2aec048a68d1c9d17cd954bb9ddbc57840c188dd3"
+  },
+  "src/aw_fog.c": {
+    "bytes": 3502,
+    "sha256": "d8e2f5e35e653e66f5e88bd90fa155c33fda95a38cda5d1156548955ab597b6d"
+  },
+  "src/aw_hand_sprites.c": {
+    "bytes": 2886,
+    "sha256": "02d6682662d71facfecc248bae63c2f44cb2cbe8fe912dfdc1af5cf253837a77"
+  },
+  "src/aw_hud.c": {
+    "bytes": 3637,
+    "sha256": "2532971b22a40e1d92e3999de64c814d450f2065318de7486991fb57d20af505"
+  },
+  "src/aw_menu.c": {
+    "bytes": 8134,
+    "sha256": "07c249d25a72b2646012c3d73ae716158ff012ace55314ef63a97e001357e65f"
+  },
+  "src/aw_music.c": {
+    "bytes": 7488,
+    "sha256": "93789ff49e93b7745bc2b237a7dc11ace36c9832757569e9375fc5e4397fe8f4"
+  },
+  "src/aw_platform.c": {
+    "bytes": 751,
+    "sha256": "9e2ee7a23757dff08ee0c4ba43c76c36da322f88b3c6353a08c323c7c798bc77"
+  },
+  "src/aw_profile.c": {
+    "bytes": 3111,
+    "sha256": "2019b57d7eb85a45bcede98257c9bb0da5a6175211bf889f69dea5275b961204"
+  },
+  "src/aw_scene.c": {
+    "bytes": 5188,
+    "sha256": "5041a996eaf47681919e9ab110367d10ca6bb9eb037fd783e886d52a5611a7ae"
+  },
+  "src/aw_spawn.c": {
+    "bytes": 2766,
+    "sha256": "737a6b0c0c73ebb53b4f3c400d46a09476aec16dcb62c17c7f04add772a1b4f2"
+  },
+  "src/aw_walk.c": {
+    "bytes": 2665,
+    "sha256": "2317768aeafc77bc925cb583d923c1a4552523266b6b3baee83f8915437e76e9"
+  },
+  "src/block16.h": {
+    "bytes": 2840,
+    "sha256": "6cacc4acfa897258a6a5f2266c0b6f072fe5f206dc3b038bf35b70f422ed4500"
+  },
+  "src/block8.h": {
+    "bytes": 2789,
+    "sha256": "ec1cd81b3f66afc7ccc08dc35b92f39efbbfdd838e44bb402c998f16ea43a028"
+  },
+  "src/bspfile.h": {
+    "bytes": 7099,
+    "sha256": "7765b458a744879b253020f5039d7ed950fe52b2a0945ebfdd2f1027f53db700"
+  },
+  "src/c2p8_040_amlaukka.h": {
+    "bytes": 470,
+    "sha256": "34df05baefab29fec053511527b947bad9f5cafd21a297a42c7b513a99ef1e04"
+  },
+  "src/cdaudio.h": {
+    "bytes": 938,
+    "sha256": "8bb410e536d6ce0e077cf229bc5fb77cf7ae7501d2e71179ee4211b5cd7c0207"
+  },
+  "src/cdplayer_pragmas.h": {
+    "bytes": 7103,
+    "sha256": "54f4f0f0a7de7ecd002fed38ab2fce31a752acd1b886c4219525e6acc0b85ab3"
+  },
+  "src/chase.c": {
+    "bytes": 2519,
+    "sha256": "3bfeb7aa4323aa2f9134bf6795d458f20df42d359e6783fa0009c8bcd2742e2e"
+  },
+  "src/cl_demo.c": {
+    "bytes": 7316,
+    "sha256": "91e69fe8be5cc8c7c26fc483815dc6be0035d7a59a51b63946b4ea53fa1aa40a"
+  },
+  "src/cl_input.c": {
+    "bytes": 12078,
+    "sha256": "419dc197245e0e46d6e4787711ef38283ddae68d56f44bd6bc5a0f506df1fa9d"
+  },
+  "src/cl_main.c": {
+    "bytes": 15435,
+    "sha256": "54a676e03188d417e9aacc26dff18f0343d92f5cabeb920bfd5be1c20c2f549a"
+  },
+  "src/cl_parse.c": {
+    "bytes": 20827,
+    "sha256": "391e091f62421f3a0e93815d880446dcf99f9d362f3d87503264424b3b9649da"
+  },
+  "src/cl_tent.c": {
+    "bytes": 8901,
+    "sha256": "f2a2fca42dd9a01b8a7a9b87d7fbefaa79de35b6fdda27460cfccf9db620f70e"
+  },
+  "src/client.h": {
+    "bytes": 8950,
+    "sha256": "3acd7e597ce6259fb08f8e582111fa16b67bb20af2ab8b5dd800488b4d9671c8"
+  },
+  "src/cmd.c": {
+    "bytes": 12206,
+    "sha256": "2b799ac67544a1b66464a9fa23dbe085f05fe1e68d8e2433a782506a1c4a6b44"
+  },
+  "src/cmd.h": {
+    "bytes": 4336,
+    "sha256": "99ca99629e32c7711da8fe15d775257db3c2e82ed002527700fc7d87caf2d1a3"
+  },
+  "src/common.c": {
+    "bytes": 37134,
+    "sha256": "5f1cd145218078cc01f12b74efa8aefe999bcf09b9264df10e402ac610f9c25b"
+  },
+  "src/common.h": {
+    "bytes": 5527,
+    "sha256": "4a5e7fa9e396186c81e444f58f8e357ef8ab6b194a05550fbc74adceb56f34bf"
+  },
+  "src/conproc.h": {
+    "bytes": 1070,
+    "sha256": "4db179ad55ca2234327867a90a51a64ffaea6a37fafd44b250220d7d6d1fdf5c"
+  },
+  "src/console.c": {
+    "bytes": 13335,
+    "sha256": "4eb33fbb81febf29fff7d767e480aee032c06093e6b1ecb4d86f07e94ea8f2c7"
+  },
+  "src/console.h": {
+    "bytes": 1478,
+    "sha256": "6a3165abff55e700b336231482d0f91807ecaa5b92f43be9619d3ad700ef36cd"
+  },
+  "src/crc.c": {
+    "bytes": 3438,
+    "sha256": "549ea3a1ca39a60e7fe82eaa55510970082ab89364ad9904be8b32f2aaecfb54"
+  },
+  "src/crc.h": {
+    "bytes": 894,
+    "sha256": "cc7b9d14b3d7cbaf5c59226243d9f882a3396440a9ed905ccee6d84256c55798"
+  },
+  "src/cvar.c": {
+    "bytes": 4564,
+    "sha256": "353661debeb1116da247bcbf31c515b17f5da9652dbd94f5a7d6fc835e3dcf06"
+  },
+  "src/cvar.h": {
+    "bytes": 3388,
+    "sha256": "a7c534e9aba9e9f618f09a5c901b815e6a5ff4d582fdeb4046f71c17005d5efa"
+  },
+  "src/d_edge.c": {
+    "bytes": 7761,
+    "sha256": "abf26a245feee66fa9ccc612a9b13b51af902c6feb57b07b5a7d36e3fcf819fd"
+  },
+  "src/d_fill.c": {
+    "bytes": 1900,
+    "sha256": "3034406be8f6e5bd9b85a4c58e3a5e7354c527e01d7275cd298640e6653213fe"
+  },
+  "src/d_iface.h": {
+    "bytes": 6510,
+    "sha256": "16ade10fd30bcbc69aa541fd0940a20ec8faf3d8bfab64e6f01c26a6b74cae7c"
+  },
+  "src/d_ifacea.h": {
+    "bytes": 2828,
+    "sha256": "019b230b95f7e445a22648e2ab716eb09d1d5cf33fb76db02cacc0d201dbd9e9"
+  },
+  "src/d_init.c": {
+    "bytes": 3295,
+    "sha256": "ddd5887f2997d201b09d73c70853a5efd633d9a522e915d69629556eef5c0f81"
+  },
+  "src/d_local.h": {
+    "bytes": 3402,
+    "sha256": "33168a02550d5bd4e4a4ceb4cbaaf5d2dc0af99b8c8bff5d6bb0cb4132b71241"
+  },
+  "src/d_modech.c": {
+    "bytes": 2304,
+    "sha256": "36147dcc067acc754863e0212bd6c8be380c77d78f3b79a7425b99f386b919e6"
+  },
+  "src/d_part.c": {
+    "bytes": 3705,
+    "sha256": "e94ea46e1fee4c210d6ff51363f2c96ef1030345b1a18b848bc55adaed537555"
+  },
+  "src/d_polyse.c": {
+    "bytes": 25563,
+    "sha256": "1bf208f76d1b612387c1a083e67b69019874b6e1598d3b8044008371f33718d3"
+  },
+  "src/d_scan.c": {
+    "bytes": 19811,
+    "sha256": "9961008ad28d8f91e828b1c1d63e6782fb407eefa012ae7ee4d26467438061b6"
+  },
+  "src/d_sky.c": {
+    "bytes": 3223,
+    "sha256": "4bb67b5349ab76a1757a4dbf5e8178fa1f988e8e40e878434026843ce1d74cfb"
+  },
+  "src/d_sprite.c": {
+    "bytes": 10193,
+    "sha256": "29b6ce3bfc70b9db8162e2630ea1842a2a4b61fcb6f35bc6064c8a80d50a15a6"
+  },
+  "src/d_surf.c": {
+    "bytes": 7179,
+    "sha256": "b7d4f8607bfffc61b4127a10a6dd279a0f6f9a651eeede40cebe153137583914"
+  },
+  "src/d_vars.c": {
+    "bytes": 1742,
+    "sha256": "a53da85f986166dacb66c6a8627bee8e4bc80ac7e0a289d9aa5d126ab362aee2"
+  },
+  "src/d_zpoint.c": {
+    "bytes": 1219,
+    "sha256": "40a258b1afd20ac280f56e61fd6f946bf8d864d57c3142a2e59e485170720848"
+  },
+  "src/dosisms.h": {
+    "bytes": 2433,
+    "sha256": "637f3f16829eda107e4fc9f23c9e4d6ecf93c3e720a2e31ee38c2d69520fbc25"
+  },
+  "src/draw.c": {
+    "bytes": 15361,
+    "sha256": "a6f780a67710e399ae6dc256dcf524b192179781982647709831f4d2b5918ee9"
+  },
+  "src/draw.h": {
+    "bytes": 1489,
+    "sha256": "5a661fd88e0224ad59353dd9024f135089337ca7fcea0188159cc37442d3e674"
+  },
+  "src/gl_model.h": {
+    "bytes": 9113,
+    "sha256": "1937bdb212f76167015b3a7e1661bcacc21e3f36cd200648f886aee810593c61"
+  },
+  "src/gl_warp_sin.h": {
+    "bytes": 3183,
+    "sha256": "4c2805707a29602a3ed3a895f89c104f16086624efa82ec9a8aadca191e1d32f"
+  },
+  "src/glquake.h": {
+    "bytes": 6895,
+    "sha256": "c619baedb9270f3385683c95542850c8612aa783c1c0e79209f944a563e7e145"
+  },
+  "src/glquake2.h": {
+    "bytes": 5962,
+    "sha256": "dc36047f57cb8e4e1a13229092dcdaf090233c88e7722ec62d877068bd1c4c8a"
+  },
+  "src/host.c": {
+    "bytes": 20363,
+    "sha256": "479b23e059bf0b12621c094cd29c812d3573e729a39444558c12c907952d1137"
+  },
+  "src/host_cmd.c": {
+    "bytes": 38424,
+    "sha256": "f9318bbe864cc599f2e7649fe75003926e97c214f7084061465fa45c18a28f44"
+  },
+  "src/in_amiga.c": {
+    "bytes": 2514,
+    "sha256": "fecef4d5b0a3323d36688a2d7af72f556ce56e882c2017af4506e2579c562f3b"
+  },
+  "src/input.h": {
+    "bytes": 1097,
+    "sha256": "21f3c6ff84db0edd35ecfc446891d6e0003ffe34d487c94e498a9bf58da5a39e"
+  },
+  "src/keys.c": {
+    "bytes": 14903,
+    "sha256": "d1256012ad4aa7d45eb3ba509fc0ba42cb4db175ddff127a0b587ca355eb5fcc"
+  },
+  "src/keys.h": {
+    "bytes": 3047,
+    "sha256": "5e2511a5f5319441de1d98ce748dd32de88b088397d54be481b308d6e3498b55"
+  },
+  "src/mathlib.c": {
+    "bytes": 13227,
+    "sha256": "9e1be3333991d56e8d7539aa4560dd4b74d94ba0d3d0421f7b1cabb22216182d"
+  },
+  "src/mathlib.h": {
+    "bytes": 2742,
+    "sha256": "d738ca0d4a2c0179b552854481afb324004d95e3fe578ce9fd7c2eed0a5afc87"
+  },
+  "src/menu.h": {
+    "bytes": 1055,
+    "sha256": "404ce3e8d39bc91a04754faff7866cbf48c7416612a1dd19fdea4d894f04074d"
+  },
+  "src/model.c": {
+    "bytes": 43551,
+    "sha256": "30940ea70453c2563f0a25a4f86cac973ab8347db6fe5ef2c448f86f64c4fff6"
+  },
+  "src/model.h": {
+    "bytes": 7819,
+    "sha256": "61048ae2f29de24f09618b6b1a0552d078a0b1799a7b6caa684dddd8d72186a3"
+  },
+  "src/modelgen.h": {
+    "bytes": 3012,
+    "sha256": "1af78ac12387e348df2da0ddcc85c8ccbe3870da159bb86f74a60d69cca04fda"
+  },
+  "src/mpdosock.h": {
+    "bytes": 26952,
+    "sha256": "243c305a870da120fea261a8f6aae79cd67a2bd237ebd9406717dddce9bce06f"
+  },
+  "src/net.h": {
+    "bytes": 9708,
+    "sha256": "b706e37be4fe0362b3bcbe0b23541a41da68aef3fe0cb43969f98cad966544d2"
+  },
+  "src/net_amigaudp.c": {
+    "bytes": 12224,
+    "sha256": "7a36dbb33a3545b72c08fca128341958ebac4e4396bf3055b4c79668a9a48014"
+  },
+  "src/net_bsd.c": {
+    "bytes": 1897,
+    "sha256": "0e7e9fc752c91b2311908bcea0b582218140089e1024886f39467d4cdff46920"
+  },
+  "src/net_bw.h": {
+    "bytes": 1643,
+    "sha256": "1d1c604911974b801c1f892d4efe300f74f8c8cff1d14187433d5aaebc8d0654"
+  },
+  "src/net_dgrm.c": {
+    "bytes": 33205,
+    "sha256": "7d7456cb7a48dac69ccb05106fd5d9599d9d41f2060d6ac7c541aabe4110365e"
+  },
+  "src/net_dgrm.h": {
+    "bytes": 1319,
+    "sha256": "535ee1229f68dab1dd80c5bbdc2a472717632fb823530242ca4a4eb4ff1e6df9"
+  },
+  "src/net_ipx.h": {
+    "bytes": 1662,
+    "sha256": "71ec7a9e88b07d66f56d0a0833f0460e4f8e18ac007cad98d5c800548d99f5d5"
+  },
+  "src/net_loop.c": {
+    "bytes": 5254,
+    "sha256": "174bb5c02a8cc07b239cbd7376a3253d91229d44b5acdd81c68f9c6f019889b8"
+  },
+  "src/net_loop.h": {
+    "bytes": 1271,
+    "sha256": "b10db09189ec85b36be6b782022b641363678167e8a1cb0b7d6bac98b9090f45"
+  },
+  "src/net_main.c": {
+    "bytes": 19698,
+    "sha256": "c352f7480119b9cbe4d876ae1e3548a7f950965f885af5984f544ef25cd6c256"
+  },
+  "src/net_mp.h": {
+    "bytes": 1700,
+    "sha256": "49c41f4f228c576a9f44b6fb07d33bae4c2185920c25724232cf1780dffde8a6"
+  },
+  "src/net_ser.h": {
+    "bytes": 1293,
+    "sha256": "20934b1092ae4314a179549a8e9815669e0cbd06441813714a919b856a315db9"
+  },
+  "src/net_udp.h": {
+    "bytes": 1662,
+    "sha256": "9dc29dd6584690af08627f4e13d2a218f8ebdceab4161e227316c2a30bec7f5a"
+  },
+  "src/net_vcr.c": {
+    "bytes": 3500,
+    "sha256": "a78094df2f8047569bc98d45b62644b52bb0a37ec042ac248b14906746d1e1c7"
+  },
+  "src/net_vcr.h": {
+    "bytes": 1290,
+    "sha256": "7ca130f0ab94e56db4b41108559f8742a27441a574b2e1cc7954b448ca98eac7"
+  },
+  "src/net_wins.h": {
+    "bytes": 1681,
+    "sha256": "10490273a93223f60f7f2fd6781a894cddc90d3ce0c0d127a440c0abdada6408"
+  },
+  "src/net_wipx.h": {
+    "bytes": 1681,
+    "sha256": "5efd150b8060ae36786ca462c3e39620a23e8bcd3a8af62f68aa548a8e5b565b"
+  },
+  "src/nonintel.c": {
+    "bytes": 1228,
+    "sha256": "131077b48716a7c98486e0f24e8802c10680f2657a75bdfe8d3350f1c2452fc9"
+  },
+  "src/pr_cmds.c": {
+    "bytes": 37284,
+    "sha256": "09d7a84d24fdc8d68ff326234218e8429ed82db01e720c1bb046002858bbb685"
+  },
+  "src/pr_comp.h": {
+    "bytes": 3067,
+    "sha256": "30c8f32cb84bdb6ab31b79873390526e4a7bcc56ee14ea2b6b98dc274f5639ff"
+  },
+  "src/pr_edict.c": {
+    "bytes": 22034,
+    "sha256": "d8ac1fd0765452946e0b9d35e108c2c65ef4debedc16d2f86ac4122f31471457"
+  },
+  "src/pr_exec.c": {
+    "bytes": 12378,
+    "sha256": "43cc7181ee0a74f43e32045fb77f05767041fa1d94ef69f4cc8532d933340b8b"
+  },
+  "src/progdefs.h": {
+    "bytes": 803,
+    "sha256": "19f6787c93bde2fddacb956b8130eb14f4f891516f846166608fab15522e0f36"
+  },
+  "src/progdefs.q1": {
+    "bytes": 2598,
+    "sha256": "99e562ac15081804245e7c7018956f2241cffa00a024a954c97183248bd00ea4"
+  },
+  "src/progdefs.q2": {
+    "bytes": 2887,
+    "sha256": "ceb0e08442d8854341198cb17d04b9bafdfbfbdfac08c159603ff870c2a952a5"
+  },
+  "src/progs.h": {
+    "bytes": 3821,
+    "sha256": "2ba22bcae0bf4915970876e902064448c4191653968b3a2a2c5bdfade8005596"
+  },
+  "src/protocol.h": {
+    "bytes": 4789,
+    "sha256": "f48a144e3a9c523fb9e9432851fa84b8e9326a0e964b3a346693e1154821c381"
+  },
+  "src/quakeasm.h": {
+    "bytes": 6329,
+    "sha256": "91a98f65c3f30886b02216e19131d23c4ae32b00000a104d3587f68ad1ac8ee4"
+  },
+  "src/quakedef.h": {
+    "bytes": 10108,
+    "sha256": "c06b90d56a0a8f14c9628d8232f365a339e305f20e7e7ab94f41f99891425aad"
+  },
+  "src/r_aclip.c": {
+    "bytes": 8371,
+    "sha256": "b80568f0002b24473ada18d44242c21d5d97d5f0c3c3a55542d6574c25353886"
+  },
+  "src/r_alias.c": {
+    "bytes": 18716,
+    "sha256": "4d06d0b2801032de20be62a47144dd5cb1285e9cde2c29c0c060c4cf067fe297"
+  },
+  "src/r_bsp.c": {
+    "bytes": 14848,
+    "sha256": "4f97539c634703371ca2219b00d69b407ba4e1676ba19ba46ccf93005548b848"
+  },
+  "src/r_draw.c": {
+    "bytes": 20885,
+    "sha256": "1cdd546394d51501572c2a3dd7f5a2fd648b93e4d0ab84efdcc5b38ca986840a"
+  },
+  "src/r_edge.c": {
+    "bytes": 16144,
+    "sha256": "b14282e63849d7246ec475bd4697659b26e01340685d35853acc9f9de6900527"
+  },
+  "src/r_efrag.c": {
+    "bytes": 5039,
+    "sha256": "7922ef83807289740a4d957d81fbba08813e8aa29828122e996ed42a38427613"
+  },
+  "src/r_light.c": {
+    "bytes": 5320,
+    "sha256": "f71db4a482b7c7f8ad37b02e12b2cb5eba856d026425de43b69c686dacf452d2"
+  },
+  "src/r_local.h": {
+    "bytes": 8559,
+    "sha256": "cf7e2f4281558d79bb678275eca5ac829436b600d0e6cd677abfc9c9b17d94b6"
+  },
+  "src/r_main.c": {
+    "bytes": 26173,
+    "sha256": "25a64a7d7d168f70d755bc18b0af36e5e317a3099d394fd7f8e8350918d56317"
+  },
+  "src/r_misc.c": {
+    "bytes": 10005,
+    "sha256": "1a2347485a0a00785d704d10610451c4771b904253980b7cab914b74d76d5bff"
+  },
+  "src/r_part.c": {
+    "bytes": 15160,
+    "sha256": "6ac4a788d8d447112eada36bd0c6c540432bb646ab05dac73460e1ca4600ab57"
+  },
+  "src/r_shared.h": {
+    "bytes": 5058,
+    "sha256": "d4dcdbfb7162050d6f4e317e33abb85cebd4d8fe898d1c245b0d26c4b0f13584"
+  },
+  "src/r_sky.c": {
+    "bytes": 5146,
+    "sha256": "2c3d745122a6ff6c55cda7721f4b375d3211965cf49ecb75ac47fb040d63d4e7"
+  },
+  "src/r_sprite.c": {
+    "bytes": 10776,
+    "sha256": "f16660ed5d69398b3972f0f75aec9974508aa8997df7f09d65233ae23f1fe625"
+  },
+  "src/r_surf.c": {
+    "bytes": 14432,
+    "sha256": "dcdc3cd5037c992346e9480f5c89da47b8fad5b44bee9bfd2cd043d02b18a1ea"
+  },
+  "src/r_vars.c": {
+    "bytes": 1205,
+    "sha256": "4fe01f0d96698bcf5304d518130e3dad810f6af3528d3ae06255c6e3f35873af"
+  },
+  "src/render.h": {
+    "bytes": 4866,
+    "sha256": "c21a651dec5719f72241ca43dc0f9f4d34fbc7b77d7bbb2857ed86275eea4011"
+  },
+  "src/resource.h": {
+    "bytes": 614,
+    "sha256": "14caaaf113d2f8bd2536e573bc1bd457925baae7cc56742dce7335ae4c4ca46c"
+  },
+  "src/sbar.h": {
+    "bytes": 1264,
+    "sha256": "76eb2b6a3cc8f49812b86d758f7790701ab724b3d85a3649c8654f575d32d321"
+  },
+  "src/screen.c": {
+    "bytes": 19204,
+    "sha256": "0ecabaf62edc1231628fcf67eb36add2bf96ce9062ab7352f12b94b43a732386"
+  },
+  "src/screen.h": {
+    "bytes": 1611,
+    "sha256": "5b889200a07e3288487b63244a9d04b04d700f0fb13868a0a4821e848bc89997"
+  },
+  "src/server.h": {
+    "bytes": 7113,
+    "sha256": "a408184fe7a6261953d3b40f53df7020e43702abece1746206d736bc1ca59a5d"
+  },
+  "src/snd_amiga.c": {
+    "bytes": 7571,
+    "sha256": "b10394817c3e9916d7de67ce4583975224dc90eaff0e7613744770947f2d8f34"
+  },
+  "src/snd_dma.c": {
+    "bytes": 20676,
+    "sha256": "84e1551d7ca920cf4e0a462007dfdee5b47844291a8a9d9ac521fbaf0445d80a"
+  },
+  "src/snd_mem.c": {
+    "bytes": 6682,
+    "sha256": "6d6626624232b9e92037750642249fc15e4278eea3ee8cb6f95870aebc8b8d11"
+  },
+  "src/snd_mix.c": {
+    "bytes": 10095,
+    "sha256": "9ce27d4c6475cea5d5634551373670d5939bde32d9d4658ae497f46d63c82e96"
+  },
+  "src/sound.h": {
+    "bytes": 4842,
+    "sha256": "c3d18c65f381b7afdececb6cbed96c14a405516c18e0a0457830c7ba7259ec2b"
+  },
+  "src/spritegn.h": {
+    "bytes": 2808,
+    "sha256": "f3f707d9c4ccb8963e3aa4c014afa46ea7efc2f7724e768cc41838c18fde52ab"
+  },
+  "src/sv_main.c": {
+    "bytes": 27410,
+    "sha256": "259d3c6a77756e465abb6c855aaf93cda1f56d1422e33520bda1eb91c8ac2c26"
+  },
+  "src/sv_move.c": {
+    "bytes": 9482,
+    "sha256": "aea150d48835fb7c6ea2c24d01495622598510c39d08074856d67ffa07eeb92a"
+  },
+  "src/sv_phys.c": {
+    "bytes": 37223,
+    "sha256": "8977564b152ee23eb4c1707022be01cc4f5d27bf00e9d8d82038d235872add6f"
+  },
+  "src/sv_user.c": {
+    "bytes": 13195,
+    "sha256": "98f0574546d2b6cc47561a063130c29012c9100bf95d79034df35cfa3c30fb3f"
+  },
+  "src/sys.h": {
+    "bytes": 1939,
+    "sha256": "1dbd5e878eb5e350010e6955f5e5b7208de887f35216c91ae74f4afb751bb4ae"
+  },
+  "src/sys_amiga.c": {
+    "bytes": 8575,
+    "sha256": "6c90f36c351497c614c2f045fb4354275000b83b4ff1b551d61af3e5d7029db8"
+  },
+  "src/sys_file_amiga.c": {
+    "bytes": 2519,
+    "sha256": "5b5775e24a4050b7bdd2d7bd982734a7a6b12e7c6d68b2710cea1bc97cd6cc93"
+  },
+  "src/vgamodes.h": {
+    "bytes": 14561,
+    "sha256": "6a021e48cdb093b3b1639b09a7c1d968ab52a7559e330bb5471201c1b3169fac"
+  },
+  "src/vid.h": {
+    "bytes": 2718,
+    "sha256": "9bfa9bf45c3b28c851835c99f87be0e2e177882b00471798a4d4b85fba49be13"
+  },
+  "src/vid_amiga.c": {
+    "bytes": 27841,
+    "sha256": "40c9a9fa9cbcfd578b2de152d8b17b807ef2ab7efb2d3133ef94d6f8021be9c5"
+  },
+  "src/vid_amiga.h": {
+    "bytes": 940,
+    "sha256": "2cf54d99eab9811b41bdc5f253d3ea5d55e8bf49a265a3105c6ad9608c745de6"
+  },
+  "src/vid_dos.h": {
+    "bytes": 2816,
+    "sha256": "030c9b94923349c352417ec371aa8f2eca156ef74638ff3909356c102a7a8521"
+  },
+  "src/view.c": {
+    "bytes": 24322,
+    "sha256": "899e7e18d8c081c81b382e087de7a7c0b296d52bc062db7a6326b4eb9922da3a"
+  },
+  "src/view.h": {
+    "bytes": 1032,
+    "sha256": "5534d00f1491479f715969fec20b91e32e41a3af53dbb80ab6208c364b07c803"
+  },
+  "src/vregset.h": {
+    "bytes": 1379,
+    "sha256": "0aa317b6db07886f59a577d57b1298c6e45d3e4b510176a48e4c0d53ec3ac487"
+  },
+  "src/wad.c": {
+    "bytes": 3417,
+    "sha256": "29447665d1253e1fe73907ba8d3f0c26e825902b05a7c0207829e2e313f9ef29"
+  },
+  "src/wad.h": {
+    "bytes": 1737,
+    "sha256": "2791cfc7619069afcfc7f82098b8d2bcbd93216619535bb962a881a528487c4d"
+  },
+  "src/winquake.h": {
+    "bytes": 3478,
+    "sha256": "bf3e86e39ad5afd0516935f8eae73474c792e17266a3e0c707b91ae8de9c6d4f"
+  },
+  "src/world.c": {
+    "bytes": 22080,
+    "sha256": "fd19b56324814a1eefeecd09439ad37558a5e37ea815edd1b5f122809cfc75bd"
+  },
+  "src/world.h": {
+    "bytes": 2571,
+    "sha256": "2afb7c444c80c276537710c92bb5e0c5e1ccee61a6bdd94d4ca4cbd0776772e1"
+  },
+  "src/zone.c": {
+    "bytes": 18822,
+    "sha256": "67cb8b207c7b2e3b128d4f79f2b5efad7b9bfe95d45da15704974eef42a4032b"
+  },
+  "src/zone.h": {
+    "bytes": 3182,
+    "sha256": "aec01740b4937228223d3487d8f5fc5e30216055738375c7b605f882fbd6e938"
+  }
+}

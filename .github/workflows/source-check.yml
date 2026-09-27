@@ -1,0 +1,58 @@
+name: Source checks and asset-free Amiga build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install public host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-remove python3-venv build-essential ffmpeg unzip xz-utils fonts-dejavu-core libgmp10 libmpfr6 libmpc3
+          python -c "import subprocess,sys; from install_dependencies import PYTHON_PACKAGES; subprocess.run([sys.executable, '-m', 'pip', 'install', *PYTHON_PACKAGES], check=True)"
+      - name: Source allowlist and synthetic regression checks
+        run: |
+          python tools/release.py --check
+          python -m unittest discover -s tests -v
+          python tools/build.py --install-dependencies --plan
+      - name: Fetch the checksum-pinned public Amiga SDK
+        run: python tools/fetch_toolchain.py --out "$RUNNER_TEMP/amiwind-sdk"
+      - name: Compile the engine and create a boot-notice image
+        run: python tools/build.py --dry-run --sdk "$RUNNER_TEMP/amiwind-sdk" --name ci
+      - name: Package the test image and corresponding source
+        run: python tools/package_dry_run.py --image-dir out/build/ci/image --out out/artifacts
+      - name: Name the public artifact
+        id: artifact
+        run: |
+          python - <<'PY'
+          import os
+          from build_aga import VERSION
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'name=AmiWind-v{VERSION}-dry-run\n')
+          PY
+      - name: Upload only the asset-free package and checksum
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: |
+            out/artifacts/AmiWind-*-dry-run.zip
+            out/artifacts/AmiWind-*-dry-run.zip.sha256
+          if-no-files-found: error
+          retention-days: 14

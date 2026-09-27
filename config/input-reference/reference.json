@@ -1,0 +1,26 @@
+{
+  "schema": "amiwind-game-reference-v1",
+  "reference": "Owner-supplied installation used for checkpoint-017; edition/language not independently certified",
+  "recorded": "2026-09-28",
+  "scope": "File sizes and SHA-256 metadata only; no game content. Current build uses base master/archive, music and selected sounds. Fonts/Splash are optional. Other editions may differ.",
+  "shards": [
+    "files-01.json",
+    "files-02.json",
+    "files-03.json",
+    "files-04.json",
+    "files-05.json",
+    "files-06.json",
+    "files-07.json",
+    "files-08.json"
+  ],
+  "core": {
+    "morrowind.esm": {
+      "bytes": 79837557,
+      "sha256": "5c3c8c2cbd20e25901b59b3ece33d36b7ef0e3d60ad8d11828bcc61a5ead1647"
+    },
+    "morrowind.bsa": {
+      "bytes": 310459500,
+      "sha256": "3dcd5e6bfa08245521a53374bf733ee5c920df49103898a15aa31144ad64cf48"
+    }
+  }
+}
