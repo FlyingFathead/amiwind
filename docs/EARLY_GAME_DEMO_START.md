@@ -1,6 +1,10 @@
 # early_game_demo_start_1
 
-This is the default AGA demo opening for v0.0.17:
+This was the default AGA demo opening for v0.0.17. From v0.0.18-dev4 the
+game boots into `aw_main_menu`; this town opening remains an optional console
+command, `aw_demo_start`. The notes below describe the older startup wiring.
+
+The optional town opening:
 
 - Load the Seyda Neen exterior (`seyda`) at its existing town-center player start.
 - Retain the standing-hull spawn clearance and nearby-exit checks.

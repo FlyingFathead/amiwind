@@ -27,6 +27,15 @@ static void view(void) {
     p->v.fixangle=1;SV_LinkEdict(p,false);
 }
 static void tcl(void) { if(player())Cbuf_AddText("noclip\n"); }
+/* Camera-only diagnostic: preserve ordinary walking and collision. */
+static void aim(void) {
+    edict_t *p=player();float yaw,pitch;if(!p)return;
+    if(Cmd_Argc()!=3){Con_Printf("Usage: aw_aim yaw pitch\n");return;}
+    yaw=Q_atof(Cmd_Argv(1));pitch=Q_atof(Cmd_Argv(2));
+    if(!(yaw>=0 && yaw<360 && pitch>=-70 && pitch<=80))return;
+    V_StopPitchDrift();cl.viewangles[0]=pitch;cl.viewangles[1]=yaw;
+    p->v.angles[0]=pitch;p->v.angles[1]=yaw;p->v.angles[2]=0;p->v.fixangle=1;
+}
 static void help(void) {Cbuf_InsertText("debug help\n");}
 static void recover(void) {
     edict_t *p=player(),*start;int i;
@@ -106,10 +115,11 @@ static void blockers(void) {
     }
 }
 void AW_DebugInit(void) {
-    AW_ConsoleInit();AW_SceneInit();AW_UIInit();
+    AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_blockers",blockers);
     Cmd_AddCommand("aw_npcs",npcs);Cmd_AddCommand("tcl",tcl);Cmd_AddCommand("aw_help",help);Cmd_AddCommand("help",help);
     Cmd_AddCommand("aw_view",view);Cmd_AddCommand("aw_recover",recover);Cmd_AddCommand("aw_pos",position);Cmd_AddCommand("aw_probe",probe);
+    Cmd_AddCommand("aw_aim",aim);Cmd_AddCommand("aw_startup",AW_MovieStartup);
 }

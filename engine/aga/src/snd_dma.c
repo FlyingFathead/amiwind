@@ -381,8 +381,10 @@ channel_t *SND_PickChannel(int entnum, int entchannel)
 	if (first_to_die == -1)
 		return NULL;
 
-	if (channels[first_to_die].sfx)
-		channels[first_to_die].sfx = NULL;
+	if (channels[first_to_die].sfx) {
+        AW_SpeechStop(channels[first_to_die].entnum,channels[first_to_die].entchannel);
+        channels[first_to_die].sfx = NULL;
+    }
 
     return &channels[first_to_die];    
 }       
@@ -514,11 +516,13 @@ void S_StartSound(int entnum, int entchannel, sfx_t *sfx, vec3_t origin, float f
 		}
 		
 	}
+    AW_SpeechStart(entnum,entchannel,sfx->name,paintedtime,sc->length,shm->speed,(int)target_chan->pos);
 }
 
 void S_StopSound(int entnum, int entchannel)
 {
 	int i;
+    AW_SpeechStop(entnum,entchannel);
 
 	for (i=0 ; i<MAX_DYNAMIC_CHANNELS ; i++)
 	{
@@ -535,6 +539,7 @@ void S_StopSound(int entnum, int entchannel)
 void S_StopAllSounds(qboolean clear)
 {
 	int		i;
+    AW_SpeechStop(-1,-1);
 
 	if (!sound_started)
 		return;

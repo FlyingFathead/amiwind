@@ -28,3 +28,5 @@ int main(int argc,char **argv){
  p="abc";assert(AW_UILine(p,0,line,sizeof(line))>p);
  assert(AW_UIWidth("abc")>0);return 0;
 }
+
+double AW_SpeechRemaining(void){return 0;}

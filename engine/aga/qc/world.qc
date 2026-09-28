@@ -16,6 +16,7 @@ string(string name) precache_sound = #19;
 void(entity client, string name, string separator, string text) centerprint = #73;
 float() droptofloor = #34;
 float(vector value) vectoyaw = #13;
+void(vector position, string sample, float volume, float attenuation) ambientsound = #74;
 void() changeyaw = #49;
 float(float value) floor = #36;
 .float aw_hand_idle;
@@ -61,6 +62,11 @@ void() aw_hands_update = {
 .string aw_voice;
 .string aw_line;
 .float aw_idle_step;
+.float aw_intro_role;
+.float aw_walk_step;
+.float aw_moving;
+.float aw_volume;
+.float aw_attenuation;
 .float aw_next_pose;
 .float aw_next_poll;
 .float aw_hello_distance;
@@ -92,12 +98,12 @@ void() aw_npc_idle = {
     local vector delta;
     local float distance;
     self.nextthink = time + 0.125;
-    if (time >= self.aw_next_pose) {
+    if (!self.aw_moving && time >= self.aw_next_pose) {
         self.frame = self.frame + 1;
         if (self.frame >= 8) self.frame = 0;
         self.aw_next_pose = time + self.aw_idle_step;
     }
-    if (aw_player == world) return;
+    if (aw_player == world || self.aw_intro_role) return;
     delta = aw_player.origin - self.origin;
     if (time < self.aw_face_until) {
         /* Converted NIF characters face local +Y; Quake yaw zero is +X. */
@@ -124,7 +130,7 @@ void() aw_npc_idle = {
 };
 void() aw_npc = {
     precache_model(self.model);
-    precache_sound(self.aw_voice);
+    if (self.aw_voice != "") precache_sound(self.aw_voice);
     self.movetype = 0;
     self.solid = 0;
     setmodel(self,self.model);
@@ -132,6 +138,8 @@ void() aw_npc = {
     setorigin(self,self.origin + '0 0 8');
     droptofloor();
     setorigin(self,self.origin + '0 0 0.25');
+    // Ship actors block the player after their floor placement.
+    if (self.aw_intro_role >= 1 && self.aw_intro_role <= 4) self.solid = 3;
     setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
     self.think = aw_npc_idle;
     self.yaw_speed = 22.5;
@@ -160,7 +168,7 @@ void() aw_interact = {
         }
         npc = find(npc,classname,"aw_npc");
     }
-    if (best != world) {
+    if (best != world && !best.aw_intro_role) {
         aw_greet(best,self,0);
     }
 };
@@ -175,6 +183,10 @@ void() aw_static = {
     self.solid = 0;
     setmodel(self,self.model);
     makestatic(self);
+};
+void() aw_loop = {
+    precache_sound(self.aw_voice);
+    ambientsound(self.origin,self.aw_voice,self.aw_volume,self.aw_attenuation);
 };
 void() func_wall = {
     self.movetype = 7;

@@ -6,9 +6,15 @@
 extern byte *draw_chars;
 extern int scr_copyeverything;
 static byte font[26624],skin[4104];
+static byte background[64776],loading_background[64776];
+static int loading_state,loading_next;
+static byte logo[8008];
+static int logo_state;
+static int background_state;
 static int font_bytes,font_height=8,line_height=10,skin_ready,initialized;
 static cvar_t ui_font={"aw_ui_font","16",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
+static cvar_t ui_frame={"aw_ui_frame","0",true};
 static int ink[3],black,muted;
 static char subtitle[2048],speaker[80];
 static double subtitle_until,subtitle_started;
@@ -51,6 +57,42 @@ static int select_font(int size) {
     sprintf(path,"gfx/magic%ld.awf",(long)size);n=read_asset(path,candidate,sizeof(candidate));
     if(!AW_UIValidateFont(candidate,n))return 0;
     memcpy(font,candidate,n);font_bytes=n;font_height=font[4];line_height=font[5];return 1;
+}
+int AW_UIBackground(void) {
+    int x,y;byte *row;
+    if(!background_state){
+        background_state=read_asset("gfx/menu.awb",background,sizeof(background))==sizeof(background) &&
+            !memcmp(background,"AWB2",4) && u16(background+4)==320 && u16(background+6)==200?1:-1;
+    }
+    if(background_state<0)return 0;
+    for(y=0;y<vid.height;y++){
+        row=background+776+(y*200/vid.height)*320;
+        for(x=0;x<vid.width;x++)vid.buffer[y*vid.rowbytes+x]=row[x*320/vid.width];
+    }
+    return 1;
+}
+void AW_UILoading(void) {
+    int row,n;char path[40];
+    if(!loading_state){
+        sprintf(path,"gfx/loading%02ld.awb",(long)loading_next);
+        n=read_asset(path,loading_background,sizeof(loading_background));
+        if(!n && loading_next){loading_next=0;n=read_asset("gfx/loading00.awb",loading_background,sizeof(loading_background));}
+        loading_state=n==sizeof(loading_background) && !memcmp(loading_background,"AWB2",4) &&
+            u16(loading_background+4)==320 && u16(loading_background+6)==200?1:-1;
+        loading_next=(loading_next+1)%32;
+    }
+    if(loading_state==1 && vid.width==320 && vid.height==200){
+        for(row=0;row<200;row++)memcpy(vid.buffer+row*vid.rowbytes,loading_background+776+row*320,320);
+    }else if(!AW_UIBackground())AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+    AW_UIBox(70,160,180,30);AW_UITextBox(74,164,172,22,"Loading...",-1);
+}
+byte *AW_UIMenuPalette(void){
+    if(AW_LoadingScreen()){
+        if(loading_state==1)return loading_background+8;
+        if(background_state==1)return background+8;
+    }
+    else loading_state=0;
+    return background_state==1 && AW_MenuFrontEnd()?background+8:NULL;
 }
 static void initialize(void) {
     if(initialized)return;initialized=1;
@@ -95,6 +137,27 @@ void AW_UIText(int x,int y,const char *text,int color) {
         x+=advance(c);
     }
 }
+/* Centre the visible glyph bounds, not the font's top bearing. Drawing and
+ * mouse hit rectangles can now share exactly the same row geometry. */
+void AW_UITextBox(int x,int y,int w,int h,const char *text,int color) {
+    const unsigned char *p=(const unsigned char *)text;int top=32,bottom=-32,t,b;
+    initialize();
+    while(*p){
+        if(font_bytes){t=(signed char)font[8+*p*8+5];b=t+font[8+*p*8+3];}
+        else {t=0;b=8;}
+        if(t<top)top=t;if(b>bottom)bottom=b;p++;
+    }
+    if(bottom<top)return;
+    AW_UIText(x+(w-AW_UIWidth(text))/2,y+(h-bottom+top)/2-top,text,color);
+}
+int AW_UILogo(int x,int y) {
+    int row;
+    if(!logo_state)logo_state=read_asset("gfx/amiwind.awi",logo,sizeof(logo))==sizeof(logo) &&
+        !memcmp(logo,"AWI1",4) && u16(logo+4)==200 && u16(logo+6)==40?1:-1;
+    if(logo_state<0 || x<0 || y<0 || x+200>vid.width || y+40>vid.height)return 0;
+    for(row=0;row<40;row++)memcpy(vid.buffer+(y+row)*vid.rowbytes+x,logo+8+row*200,200);
+    return 1;
+}
 /* Returns the unconsumed text. Always consumes at least a byte for a narrow
  * box, and never splits a buffer or writes outside it. Long words are split. */
 const char *AW_UILine(const char *text,int width,char *out,int capacity) {
@@ -119,15 +182,24 @@ static void tile(int x,int y,int w,int h,int sx,int sy,int tw,int th) {
             dst[x+xx]=skin[8+(sy+yy%th)*64+sx+xx%tw];
     }
 }
-void AW_UIBox(int x,int y,int w,int h) {
+void AW_UIFrame(int x,int y,int w,int h) {
     initialize();if(w<8 || h<8)return;
-    AW_UIFill(x,y,w,h,black);
     if(!skin_ready){AW_UIFill(x,y,w,1,ink[1]);AW_UIFill(x,y+h-1,w,1,ink[1]);AW_UIFill(x,y,1,h,ink[1]);AW_UIFill(x+w-1,y,1,h,ink[1]);return;}
     tile(x,y,4,4,0,0,4,4);tile(x+w-4,y,4,4,20,0,4,4);
     tile(x,y+h-4,4,4,0,20,4,4);tile(x+w-4,y+h-4,4,4,20,20,4,4);
     tile(x+4,y,w-8,4,4,0,16,4);tile(x+4,y+h-4,w-8,4,4,20,16,4);
     tile(x,y+4,4,h-8,0,4,4,16);tile(x+w-4,y+4,4,h-8,20,4,4,16);
 }
+void AW_UIBox(int x,int y,int w,int h) {
+    initialize();if(w<8 || h<8)return;
+    AW_UIFill(x,y,w,h,black);AW_UIFrame(x,y,w,h);
+}
+void AW_UIOuterFrame(void) {
+    if(ui_frame.value && key_dest==key_game && cls.state==ca_connected)
+        AW_UIFrame(0,0,vid.width,vid.height);
+}
+int AW_UIFrameEnabled(void){return ui_frame.value!=0;}
+void AW_UIFrameToggle(void){Cvar_SetValue(ui_frame.name,!ui_frame.value);scr_copyeverything=1;}
 void AW_UISubtitle(const char *name,const char *text,double duration) {
     strncpy(speaker,name,sizeof(speaker)-1);speaker[sizeof(speaker)-1]=0;
     strncpy(subtitle,text,sizeof(subtitle)-1);subtitle[sizeof(subtitle)-1]=0;
@@ -135,15 +207,16 @@ void AW_UISubtitle(const char *name,const char *text,double duration) {
     subtitle_started=realtime;subtitle_until=realtime+duration;
 }
 void AW_UICenterMessage(const char *text) {
-    char name[80];const char *p=strchr(text,'\n');int n;
-    if(p && (n=(int)(p-text))<80){memcpy(name,text,n);name[n]=0;AW_UISubtitle(name,p+1,8);}
-    else AW_UISubtitle("",text,8);
+    char name[80];const char *p=strchr(text,'\n');int n;double duration=AW_SpeechRemaining();
+    if(duration<=0)duration=8;
+    if(p && (n=(int)(p-text))<80){memcpy(name,text,n);name[n]=0;AW_UISubtitle(name,p+1,duration);}
+    else AW_UISubtitle("",text,duration);
 }
 void AW_UIBar(int x,int y,int w,int h,int color,float fraction) {
-    int fill;
+    int fill,row;
     initialize();if(!(fraction>0))fraction=0;if(fraction>1)fraction=1;fill=(int)((w-4)*fraction);
     AW_UIFill(x,y,w,h,ink[1]);AW_UIFill(x+1,y+1,w-2,h-2,black);
-    if(fill>0){if(skin_ready)tile(x+2,y+2,fill,h-4,color*16,32,16,16);
+    if(fill>0){if(skin_ready){for(row=0;row<h-4;row++)tile(x+2,y+2+row,fill,1,color*16,32+(row*12/(h-4))+3,16,1);}
         else AW_UIFill(x+2,y+2,fill,h-4,AW_UIColor(color==0?170:35,color==2?160:35,color==1?170:35));}
 }
 void AW_UIHud(void) {
@@ -184,6 +257,6 @@ void AW_UIDraw(void) {
 
 static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original borders and three ink shades. The console keeps its own font.",12);}
 void AW_UIInit(void) {
-    Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);
+    Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

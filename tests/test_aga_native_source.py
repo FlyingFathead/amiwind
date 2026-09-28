@@ -16,6 +16,24 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_movie_stream_clock_skip_and_bounds(self):
+        self.compile_run("aga_movie_test.c", [ROOT/"engine/aga/src/aw_movie.c"])
+
+    def test_alias_staging_is_released_before_cache_allocation(self):
+        self.compile_run("aga_alias_cache_test.c", [Path(SOURCE)/"src/model.c",Path(SOURCE)/"src/mathlib.c"])
+
+    def test_alias_coarse_frustum_keeps_intersecting_bounds(self):
+        self.compile_run("aga_alias_cull_test.c", [Path(SOURCE)/"src/r_alias.c"])
+
+    def test_actor_step_matches_scaled_player_limit(self):
+        self.compile_run("aga_actor_step_test.c", [Path(SOURCE)/"src/sv_move.c",Path(SOURCE)/"src/mathlib.c"])
+
+    def test_speech_clock_end_interrupt_and_missing_envelope(self):
+        self.compile_run("aga_speech_test.c", [ROOT/"engine/aga/src/aw_speech.c"])
+
+    def test_path_grid_collision_stop_and_escort_wait(self):
+        self.compile_run("aga_nav_test.c", [ROOT/"engine/aga/src/aw_nav.c",Path(SOURCE)/"src/mathlib.c"])
+
     def test_ui_bounds_and_corrupt_fonts(self):
         self.compile_run("aga_ui_test.c", [ROOT/"engine/aga/src/aw_ui.c"])
 

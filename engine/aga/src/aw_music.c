@@ -13,6 +13,7 @@ static int active, at, valid[2], loading, loaded;
 static unsigned long remaining, total, played, reads, bytes_read, errors, opens;
 static unsigned long completions, manual_changes, sync_fills;
 static int current=-1, mode, paused, available;
+static int title_track=-1, title_playing;
 static int groups[2][100], counts[2], bags[2][100], left[2];
 static int history[2][HISTORY], length[2], cursor[2]={-1,-1};
 static int opened[256], opened_count;
@@ -45,7 +46,12 @@ static int open_track(int id,const char *reason) {
     if(!total || count!=(total+FRAMES-1)/FRAMES){errors++;close_music();return 0;}
     current=id;played=0;opens++;active=0;
     if(opened_count<256)opened[opened_count++]=id;
-    log_event(reason);Con_Printf("OST %s: track %02ld (%s)\n",mode?"battle":"explore",(long)id,reason);return 1;
+    log_event(reason);
+    /* Routine track notices belong to the optional debug layer. Keep the
+     * event log independent and leave explicit music_status queries visible. */
+    if(AW_DebugOverlaysEnabled())
+        Con_Printf("OST %s: track %02ld (%s)\n",mode?"battle":"explore",(long)id,reason);
+    return 1;
 }
 static int shuffled(void) {
     int i,j,t;
@@ -58,6 +64,7 @@ static int shuffled(void) {
 }
 static int advance(const char *reason) {
     int id,tries;
+    if(title_playing){if(open_track(title_track,reason))return 1;available=0;return 0;}
     for(tries=0;tries<counts[mode];tries++) {
         if(cursor[mode]+1<length[mode])id=history[mode][++cursor[mode]];
         else {
@@ -102,14 +109,20 @@ void AW_MusicPaint(portable_samplepair_t *dst,int n) {
         at+=take;played+=take;dst+=take;n-=take;
     }
 }
-static void music_next(void) {if(available){manual_changes++;fade=128;advance("next");}}
+static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
-    if(!available)return;manual_changes++;fade=128;
+    if(!available || title_playing)return;manual_changes++;fade=128;
     if(cursor[mode]>0)cursor[mode]--;
     open_track(history[mode][cursor[mode]],"previous");
 }
-static void music_mode(void) {mode=!mode;if(available){manual_changes++;fade=128;advance("mode");}}
-static void music_status(void) {Con_Printf("OST group=%s track=%02d played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",mode?"battle":"explore",current,played,total,completions,reads,errors);}
+static void music_mode(void) {if(title_playing)return;mode=!mode;if(available){manual_changes++;fade=128;advance("mode");}}
+static void music_status(void) {Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);}
+void AW_MusicTitle(void) {
+    if(!available)return;
+    title_playing=1;
+    if(title_track<0 || !open_track(title_track,"main-menu")){paused=1;return;}
+    paused=0;fade=0;previous_l=previous_r=0;
+}
 /* A deliberate demo opening followed by the remaining exploration shuffle.
  * Keep the chosen track in Previous/Next history and out of the first bag. */
 int AW_MusicStartTrack(int id) {
@@ -117,7 +130,7 @@ int AW_MusicStartTrack(int id) {
     if(!available)return 0;
     for(i=0;i<counts[0];i++)if(groups[0][i]==id)break;
     if(i==counts[0])return 0;
-    mode=0;
+    mode=0;title_playing=0;
     if(current==id && played==0 && music)log_event("early_game_demo_start_1");
     else if(!open_track(id,"early_game_demo_start_1")) {
         advance("demo-track-fallback");return 0;
@@ -145,6 +158,10 @@ int CDAudio_Init(void) {
             if(j==counts[g])groups[g][counts[g]++]=id;
         }
     }
+    /* Optional third line: converter-resolved canonical title track. Old
+     * two-line playlists retain world playback without assuming track 00. */
+    title_track=-1;title_playing=0;
+    if(fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
     fclose(f);available=1;paused=0;mode=0;loading=-1;
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
     events=fopen("music-events.csv","w");if(events)fprintf(events,"time_ms,event,mode,track,file,played_frames,total_frames\n");

@@ -664,6 +664,11 @@ void _Host_Frame (float time)
 // process console commands
 	Cbuf_Execute ();
 
+    if(AW_MovieActive()) {
+        S_Update(vec3_origin,vec3_origin,vec3_origin,vec3_origin);
+        AW_MovieUpdate();SCR_UpdateScreen();host_framecount++;return;
+    }
+
 	NET_Poll();
 
 // if running the server locally, make intentions now
@@ -723,6 +728,7 @@ void _Host_Frame (float time)
 		S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
 	
 	AW_EndMark(3);
+	AW_IntroTick();
 	CDAudio_Update();
     AW_ProfileFrame();
 
@@ -970,4 +976,3 @@ void Host_Shutdown(void)
 		VID_Shutdown();
 	}
 }
-

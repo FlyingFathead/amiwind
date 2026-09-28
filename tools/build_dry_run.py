@@ -14,7 +14,7 @@ from mwad.paths import ensure_external
 from build_aga import VERSION
 from check_aga_binary import check_binary
 from amiga_fs import check_image
-from project_version import CREDITS, PROJECT_URL
+from project_version import CREDITS, PROJECT_URL, THANKS
 
 
 def digest(path):
@@ -39,7 +39,7 @@ def build(args):
     (boot / "C").mkdir(parents=True)
     (boot / "S").mkdir()
     message = (f"AmiWind v{VERSION} - test build\n\n"
-               f"{CREDITS}\n{PROJECT_URL}\n\n"
+               f"{CREDITS}\n{PROJECT_URL}\n{THANKS}\n\n"
                "This is a test compile of AmiWind, built without game files.\n\n"
                "To play, obtain a copy of Morrowind and rebuild AmiWind\n"
                "using your installed game files.\n\n"

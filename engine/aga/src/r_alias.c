@@ -86,6 +86,15 @@ void R_AliasProjectFinalVert (finalvert_t *fv, auxvert_t *av);
 R_AliasCheckBBox
 ================
 */
+qboolean AW_AliasSphereVisible(vec3_t origin, float radius)
+{
+    int i;
+    if(!(radius>0))return true;
+    for(i=0;i<4;i++)
+        if(DotProduct(origin,view_clipplanes[i].normal)-view_clipplanes[i].dist < -radius)return false;
+    return true;
+}
+
 qboolean R_AliasCheckBBox (void)
 {
 	int					i, flags, frame, numv;
@@ -102,6 +111,9 @@ qboolean R_AliasCheckBBox (void)
 
 	currententity->trivial_accept = 0;
 	pmodel = currententity->model;
+	/* Reject wholly off-screen aliases before a cache miss can read the model
+	 * from disk. The exact animated bbox still handles every surviving model. */
+	if(!AW_AliasSphereVisible(currententity->origin,pmodel->radius))return false;
 	pahdr = Mod_Extradata (pmodel);
 	pmdl = (mdl_t *)((byte *)pahdr + pahdr->model);
 
@@ -755,4 +767,3 @@ static
 	else
 		R_AliasPreparePoints ();
 }
-

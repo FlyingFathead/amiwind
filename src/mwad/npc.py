@@ -73,11 +73,15 @@ def greeting_settings(kinds, behavior, scale=0.25):
             'poll_seconds':0.25,'sustained_polls':2,'global_cooldown_seconds':8}
 
 def outfit(kinds, actor_id, seed=0):
-    """One deterministic male humanoid appearance, no inventory simulation."""
+    """One deterministic humanoid appearance, no inventory simulation.
+
+    Female equipment uses CNAM when supplied, otherwise its male BNAM. Skin
+    parts prefer the actor's sex, with male parts as the source-data fallback.
+    """
     npc=kinds['NPC_'][actor_id.casefold()];female=bool(struct.unpack('<I',first(npc,'FLAG'))[0]&1)
-    if female:raise ValueError('This checkpoint accepts male humanoid actors only')
     race=text(npc,'RNAM').casefold();race_data=first(kinds['RACE'][race],'RADT')
     height,fheight,weight,fweight,flags=struct.unpack_from('<4fI',race_data,len(race_data)-20)
+    if female:height,weight=fheight,fweight
     if flags&2:raise ValueError('Beast skeletons are outside this checkpoint')
     if not .5<=height<=2 or not .5<=weight<=2:raise ValueError('Unsupported race proportions')
     selected={};priority={};equipment=[];rng=random.Random(seed)
@@ -85,8 +89,10 @@ def outfit(kinds, actor_id, seed=0):
         bydt=first(body,'BYDT')
         if len(bydt)!=4:raise ValueError('Malformed body descriptor')
         part,vampire,bflags,kind=bydt
-        if kind or vampire or bflags&1 or identifier.endswith('.1st') or text(body,'FNAM').casefold()!=race:continue
-        for slot in BODY_SLOTS.get(part,()):selected[slot]=identifier;priority[slot]=1
+        if kind or vampire or (bflags&1 and not female) or identifier.endswith('.1st') or text(body,'FNAM').casefold()!=race:continue
+        skin_rank=1 if bool(bflags&1)==female else .5
+        for slot in BODY_SLOTS.get(part,()):
+            if skin_rank>=priority.get(slot,0):selected[slot]=identifier;priority[slot]=skin_rank
     for slot,tag in ((0,'BNAM'),(1,'KNAM')):
         identifier=text(npc,tag).casefold()
         if identifier:selected[slot]=identifier;priority[slot]=1
@@ -130,6 +136,7 @@ def outfit(kinds, actor_id, seed=0):
                 if len(data)!=1 or data[0]>=len(PART_NAMES):raise ValueError('Bad equipment part')
                 slot=data[0];groups[slot]=None
             elif tag=='BNAM' and slot is not None:groups[slot]=string(data).casefold() or None
+            elif tag=='CNAM' and slot is not None and female and string(data):groups[slot]=string(data).casefold()
         if kind=='ARMO' and typ==0:groups.setdefault(1,None)
         if kind=='CLOT' and typ==4:
             for slot in (3,4,5,11,12,13,14,19,20,21,22):groups.setdefault(slot,None)

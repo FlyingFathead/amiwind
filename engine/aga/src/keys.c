@@ -631,6 +631,8 @@ void Key_Event (int key, qboolean down)
 	if (key == K_SHIFT)
 		shift_down = down;
 
+    if (AW_MovieKey(key,down)) return;
+
     /* Physical Amiga raw key 0 maps to grave (Finnish host: section key).
      * F10 is a layout-independent fallback on the Amiga keyboard. */
     if (key == '`' || key == K_F10) {
@@ -639,6 +641,8 @@ void Key_Event (int key, qboolean down)
     }
 
     /* Music history controls are handled before ordinary game bindings. */
+    if (down && AW_IntroKey(shift_down?keyshift[key]:key)) return;
+
     if (down && key_dest == key_game && keydown[K_SHIFT] &&
         (key == K_F5 || key == K_F6)) {
         Cbuf_AddText(key == K_F5 ? "aw_music_previous\n" : "aw_music_next\n");
@@ -775,4 +779,3 @@ void Key_ClearStates (void)
 		key_repeats[i] = 0;
 	}
 }
-

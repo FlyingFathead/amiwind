@@ -1,5 +1,46 @@
 # Development history
 
+## v0.0.19 — 28 September 2026
+
+Public release of the accumulated 0.0.18 checkpoints: intro/movie, UI/menus,
+loading screens, entrance prompts and parallel builds.
+Routine soundtrack notices now obey the debug-overlay switch at their source.
+Music events still log privately, and explicit status queries still work.
+See RELEASE-v0.0.19.md.
+
+## v0.0.18-dev5 — 28 September 2026
+
+Original main-menu art with bottom-right version, centered Esc menu and New Game
+confirmation, larger logo/movie frames and readable private title cards. Original
+loading screens replace transition-console flashes by default; debug overlays
+default off. Deck guard greeting/reminder, visible town entrance names and safe
+missing-interior feedback, private source layout reference, automatic compiler
+jobs with explicit overrides. See RELEASE-v0.0.18-dev5.md.
+
+## v0.0.18-dev4 — 28 September 2026
+
+Project-logo startup fade and upper-menu/README branding, main-menu title music,
+reset of the selected New Game track,
+optional streamed prophecy movie with Esc, mapped hatch activation bounds,
+ship NPC body collision and escort waiting, default-off disk indicator,
+actor-cache staging correction and three-line loading credits. See
+RELEASE-v0.0.18-dev4.md for validation and unfinished work.
+
+## v0.0.18-dev3 — 28 September 2026
+
+Original main-menu background with a separate palette, distinct return-to-game
+and main-menu flows, disabled Load, and New Game into the ship. Conservative
+animated alias bounds permit rejecting off-screen actors before disk-cache
+loads. See RELEASE-v0.0.18-dev3.md for verification and remaining work.
+
+## v0.0.18-dev2 — 28 September 2026
+
+First ship-script adapter, original introductory voices/name entry, talking and
+blinking head poses, female appearances, path-grid escort movement, ship ambience
+and darker hold lighting. Distinct HUD colors, optional outer frame off by default,
+New Game entry and integrated private conversion. See RELEASE-v0.0.18-dev2.md for
+verification and remaining dock/Census work. Journal filename corrected.
+
 ## v0.0.18-dev1 — 28 September 2026
 
 Original proportional Magic Cards UI, private original border/bar conversion,

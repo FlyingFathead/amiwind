@@ -128,6 +128,7 @@ void IN_UpUp(void) {KeyUp(&in_up);}
  * replays the minus form on key release, including releases in the console. */
 void IN_AWUseDown(void) {
     if (key_dest != key_game) return;
+    if (AW_IntroUse()) return;
     if (!(in_up.state & 1) && AW_SceneUse()) return;
     if (!(in_up.state & 1)) in_impulse = 201;
     KeyDown(&in_up);
@@ -358,6 +359,7 @@ void CL_SendMove (usercmd_t *cmd)
 	buf.cursize = 0;
 	buf.data = data;
 	
+	AW_IntroMove(cmd);
 	cl.cmd = *cmd;
 
 //
@@ -387,9 +389,9 @@ void CL_SendMove (usercmd_t *cmd)
 		bits |= 2;
 	in_jump.state &= ~2;
 	
-    MSG_WriteByte (&buf, bits);
+    MSG_WriteByte (&buf, AW_IntroButtons(bits));
 
-    MSG_WriteByte (&buf, in_impulse);
+    MSG_WriteByte (&buf, AW_IntroImpulse(in_impulse));
 	in_impulse = 0;
 
 #ifdef QUAKE2
@@ -465,4 +467,3 @@ void CL_InitInput (void)
 	Cmd_AddCommand ("-mlook", IN_MLookUp);
 
 }
-

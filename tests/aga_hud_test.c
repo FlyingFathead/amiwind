@@ -30,7 +30,8 @@ void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;assert(y+h==vid.height |
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
 int main(void) {
  client_t local;edict_t player;
- Sbar_Init();assert(!AW_DebugCoordsEnabled());
+ Sbar_Init();assert(!AW_DebugCoordsEnabled() && !AW_DebugOverlaysEnabled());
+ arg="on";master();assert(AW_DebugOverlaysEnabled());
  assert(AW_SeaLevelEnabled());arg="off";sea();assert(!AW_SeaLevelEnabled());arg="on";sea();
  command();assert(AW_DebugCoordsEnabled() && vid.recalc_refdef);
  vid.width=320;vid.height=200;cls.state=ca_connected;cl.viewentity=1;

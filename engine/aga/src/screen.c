@@ -27,6 +27,7 @@ int			scr_copytop;
 int			scr_copyeverything;
 
 float		scr_con_current;
+static cvar_t aw_transition_console={"aw_transition_console","0",true};
 float		scr_conlines;		// lines of console to display
 
 float		oldscreensize, oldfov;
@@ -320,6 +321,7 @@ SCR_Init
 */
 void SCR_Init (void)
 {
+	Cvar_RegisterVariable (&aw_transition_console);
 	Cvar_RegisterVariable (&scr_fov);
 	Cvar_RegisterVariable (&scr_viewsize);
 	Cvar_RegisterVariable (&scr_conspeed);
@@ -430,14 +432,7 @@ SCR_DrawLoading
 */
 void SCR_DrawLoading (void)
 {
-	qpic_t	*pic;
-
-	if (!scr_drawloading)
-		return;
-		
-	pic = Draw_CachePic ("gfx/loading.lmp");
-	Draw_Pic ( (vid.width - pic->width)/2, 
-		(vid.height - 48 - pic->height)/2, pic);
+    if(scr_drawloading)AW_UILoading();
 }
 
 
@@ -450,6 +445,10 @@ void SCR_DrawLoading (void)
 SCR_SetUpToDrawConsole
 ==================
 */
+int AW_LoadingScreen(void) {
+    return scr_drawloading || (!aw_transition_console.value && key_dest==key_game &&
+        !AW_MovieActive() && (!cl.worldmodel || cls.signon!=SIGNONS));
+}
 void SCR_SetUpToDrawConsole (void)
 {
 	Con_CheckResize ();
@@ -460,7 +459,11 @@ void SCR_SetUpToDrawConsole (void)
 // decide on the height of the console
 	con_forcedup = !cl.worldmodel || cls.signon != SIGNONS;
 
-	if (con_forcedup)
+	if (con_forcedup && key_dest != key_console && !aw_transition_console.value)
+    {
+        scr_conlines = scr_con_current = 0;
+    }
+    else if (con_forcedup)
 	{
 		scr_conlines = vid.height;		// full screen
 		scr_con_current = scr_conlines;
@@ -514,7 +517,7 @@ void SCR_DrawConsole (void)
 	}
 	else
 	{
-		if (key_dest == key_game || key_dest == key_message)
+		if ((key_dest == key_game && AW_DebugOverlaysEnabled()) || key_dest == key_message)
 			Con_DrawNotify ();	// only draw notify in game
 	}
 }
@@ -841,6 +844,24 @@ void SCR_UpdateScreen (void)
 	if (!scr_initialized || !con_initialized)
 		return;				// not initialized yet
 
+    if(AW_MovieActive()) {
+        D_EnableBackBufferAccess();AW_MovieDraw();D_DisableBackBufferAccess();
+        V_UpdatePalette();
+        vrect.x=vrect.y=0;vrect.width=vid.width;vrect.height=vid.height;vrect.pnext=NULL;
+        VID_Update(&vrect);scr_fullupdate=0;return;
+    }
+
+    /* A map signs on over several frames. Quake's forced console used to
+     * appear here, then slide away over the new world. Keep F10 available. */
+    if(!aw_transition_console.value && key_dest==key_game && (!cl.worldmodel || cls.signon!=SIGNONS)) {
+        con_forcedup=true;scr_conlines=scr_con_current=0;Con_ClearNotify();
+        D_EnableBackBufferAccess();
+        AW_UILoading();
+        D_DisableBackBufferAccess();V_UpdatePalette();
+        vrect.x=vrect.y=0;vrect.width=vid.width;vrect.height=vid.height;vrect.pnext=NULL;
+        VID_Update(&vrect);scr_fullupdate=0;return;
+    }
+
 	if (scr_viewsize.value != oldscr_viewsize)
 	{
 		oldscr_viewsize = scr_viewsize.value;
@@ -913,7 +934,7 @@ void SCR_UpdateScreen (void)
 	else if (scr_drawloading)
 	{
 		SCR_DrawLoading ();
-		Sbar_Draw ();
+        scr_copyeverything=true;
 	}
 	else if (cl.intermission == 1 && key_dest == key_game)
 	{
@@ -938,7 +959,10 @@ void SCR_UpdateScreen (void)
 		SCR_DrawPause ();
 		SCR_CheckDrawCenterString ();
 		Sbar_Draw ();
+        AW_SceneDraw();
         AW_UIDraw();
+        AW_IntroDraw();
+        AW_UIOuterFrame();
 		SCR_DrawConsole ();
 		M_Draw ();
 	}

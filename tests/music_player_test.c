@@ -14,6 +14,28 @@ int main(int argc,char **argv) {
     assert(argc==3);strcpy(com_gamedir,argv[1]);
     if(!strcmp(argv[2],"invalid")) {assert(CDAudio_Init()==-1);return 0;}
     assert(CDAudio_Init()==0);rng=42;
+    if(!strcmp(argv[2],"notifications")) {
+        assert(track_notices==0);
+        music_next();music_previous();music_mode();assert(track_notices==0);
+        debug_overlay=1;music_next();assert(track_notices==1);
+        /* Natural completion obeys the same switch as manual changes. */
+        for(j=0;j<20000 && completions<2;j++){
+            memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);
+        }
+        assert(completions>=2 && track_notices>=3);
+        debug_overlay=0;k=track_notices;music_next();music_previous();music_mode();
+        assert(track_notices==k);music_status();assert(status_queries==1);
+        CDAudio_Shutdown();return 0;
+    }
+    if(!strcmp(argv[2],"menu")) {
+        AW_MusicTitle();assert(title_playing && current==83 && !paused);
+        for(j=0;j<35;j++){memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);}
+        assert(current==83 && completions>=3);music_next();music_previous();music_mode();assert(current==83);
+        assert(AW_MusicStartTrack(4));assert(!title_playing && current==4 && played==0);
+        for(j=0;j<10;j++)AW_MusicPaint(&sample,1);
+        assert(AW_MusicStartTrack(4) && played==0);AW_MusicTitle();assert(current==83);
+        CDAudio_Shutdown();return 0;
+    }
     if(!strcmp(argv[2],"demo-missing")) {
         assert(!AW_MusicStartTrack(4));assert(available && music && current!=4);
         CDAudio_Shutdown();return 0;
@@ -50,6 +72,7 @@ int main(int argc,char **argv) {
         assert(++loops<100000);
     }
     assert(errors==0 && manual_changes==0);
+    assert(track_notices==0); /* Startup and 18 natural changes stay silent. */
     for(j=1;j<opened_count;j++)assert(opened[j]!=opened[j-1]);
     {int a=current,b;music_next();b=current;music_previous();assert(current==a);music_next();assert(current==b);}
     music_mode();assert(mode==1);

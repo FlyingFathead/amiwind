@@ -18,6 +18,7 @@ from mwad.paths import ensure_external
 from project_version import public_version, check_native_versions
 
 PROJECT = "amiwind"
+PROJECT_MEDIA = {"resources/media/AmiWind_logo_clear_background.png", "resources/media/AmiWind_wordmark.png"}
 IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
 
@@ -32,7 +33,7 @@ def allowed_files(root):
         p = PurePosixPath(name)
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
-        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in DOCUMENTATION_IMAGES
+        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in DOCUMENTATION_IMAGES or name in PROJECT_MEDIA
         native_aux = name in ("engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh"):
             raise ValueError(f"Unexpected distributable file type: {name}")
@@ -69,9 +70,10 @@ def inspect_source(root):
     content = {}
     for name in allowed:
         data = (root / name).read_bytes()
-        if name in DOCUMENTATION_IMAGES:
-            if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) > 1048576:
-                raise ValueError(f"Invalid documentation PNG: {name}")
+        if name in DOCUMENTATION_IMAGES or name in PROJECT_MEDIA:
+            limit = 2097152 if name in PROJECT_MEDIA else 1048576
+            if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) > limit:
+                raise ValueError(f"Invalid public PNG: {name}")
             content[name] = data
             continue
         if len(data) > 262144 or b"\0" in data:

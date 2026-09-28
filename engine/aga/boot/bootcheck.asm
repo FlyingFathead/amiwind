@@ -160,8 +160,9 @@ puts:
 dos_name:       dc.b "dos.library",0
 graphics_name:  dc.b "graphics.library",0
                include "amiwind_version.i"
-               dc.b "By FlyingFathead +- ChaosWhisperer",10
+               dc.b "By FlyingFathead",10
                dc.b "https://github.com/FlyingFathead/amiwind/",10
+               dc.b "Special thanks to: ChaosWhisperer",10
                dc.b "Hardware preflight",10,0
 need_os:       dc.b "FAIL: this AGA build needs Kickstart 3.1 or newer.",10,0
 need_cpu:      dc.b "FAIL: this build needs a 68040/68060 with internal FPU.",10,0

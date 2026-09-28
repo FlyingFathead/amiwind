@@ -1,0 +1,103 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * AWV1: desktop-decoded indexed video and mono PCM. No Bink decoder on Amiga.
+ * 160x100 or 320x200 at 10 fps; one frame and a 4 KiB audio cache.
+ */
+#include "quakedef.h"
+#include "sound.h"
+#define MAX_PIXELS 64000
+#define RATE 11025
+#define DATA_START 800
+extern int soundtime;
+typedef struct {byte palette[768],frame[MAX_PIXELS];signed char pcm[4096];} movie_buffers_t;
+static movie_buffers_t *buffers;
+static FILE *video,*audio;
+static long frames,samples,audio_start,clock_start,shown,pcm_start,pcm_count;
+static int broken,branding,width,height,pixels;
+static long pictures,dropped;
+static double started;
+static unsigned long be32(byte *p){return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3];}
+static void close_movie(void){
+    if(video)fclose(video);if(audio)fclose(audio);video=audio=NULL;
+    if(buffers)free(buffers);buffers=NULL;
+}
+int AW_MovieActive(void){return buffers!=NULL;}
+byte *AW_MoviePalette(void){return buffers?buffers->palette:NULL;}
+static void finish(const char *why){
+    Con_Printf("Movie profile: %ld ms, %ld pictures, %ld skipped pictures.\n",
+        (long)((Sys_FloatTime()-started)*1000),pictures,dropped);
+    close_movie();S_StopAllSounds(true);IN_AWClearButtons();
+    Con_Printf("Intro movie: %s.\n",why);
+    if(branding)Cbuf_AddText("aw_main_menu\n");else AW_IntroBegin();
+}
+static int start_movie(char *path,int brand){
+    byte h[32];long size,audio_size,expected;int i;
+    close_movie();
+    branding=brand;size=COM_FOpenFile(path,&video);
+    if(!video){Con_Printf("Video not found; skipping optional movie.\n");return 0;}
+    if(fread(h,1,32,video)!=32 || memcmp(h,"AWV1",4) ||
+       h[8] || h[9]!=10 || h[10]!=43 || h[11]!=17)goto invalid;
+    width=h[4]*256+h[5];height=h[6]*256+h[7];
+    if(!((width==160 && height==100) || (width==320 && height==200)))goto invalid;
+    pixels=width*height;
+    for(i=20;i<32;i++)if(h[i])goto invalid;
+    frames=be32(h+12);samples=be32(h+16);
+    if(frames<1 || frames>18000 || samples!=(frames*RATE+9)/10)goto invalid;
+    expected=DATA_START+frames*pixels+samples;
+    if(size!=expected || !shm || shm->speed!=RATE)goto invalid;
+    buffers=malloc(sizeof(*buffers));if(!buffers)goto invalid;
+    if(fread(buffers->palette,1,768,video)!=768 || fread(buffers->frame,1,pixels,video)!=pixels)goto invalid;
+    audio_size=COM_FOpenFile(path,&audio);
+    audio_start=DATA_START+frames*pixels;
+    if(!audio || audio_size!=expected || fseek(audio,audio_start,SEEK_SET))goto invalid;
+    CDAudio_Pause();S_StopAllSounds(true);clock_start=paintedtime;
+    shown=0;pcm_start=pcm_count=0;broken=0;pictures=1;dropped=0;started=Sys_FloatTime();
+    Con_Printf("Intro movie: %ld frames; Esc skips.\n",frames);return 1;
+invalid:
+    close_movie();Con_Printf("Video invalid or unavailable; skipping optional movie.\n");return 0;
+}
+int AW_MovieStart(void){return start_movie("intro/mw_intro.awv",0);}
+void AW_MovieStartup(void){
+    IN_AWClearButtons();key_dest=key_game;
+    if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText("aw_main_menu\n");
+}
+void AW_MovieUpdate(void){
+    long position,frame;if(!buffers)return;
+    if(broken){finish("read error");return;}
+    position=soundtime-clock_start;if(position<0)position=0;
+    if(position>=samples){finish("complete");return;}
+    frame=position*10/RATE;
+    if(frame==shown)return;
+    if(frame>=frames)frame=frames-1;
+    /* Drop late pictures without delaying the narration. Seek only on skips. */
+    if((frame!=shown+1 && fseek(video,DATA_START+frame*pixels,SEEK_SET)) ||
+       fread(buffers->frame,1,pixels,video)!=pixels){finish("video read error");return;}
+    if(frame>shown+1)dropped+=frame-shown-1;pictures++;shown=frame;
+}
+void AW_MoviePaint(portable_samplepair_t *dst,int count,int first_sample){
+    long position=first_sample-clock_start,take;int i,gain=(int)(volume.value*256);
+    if(!buffers || broken)return;
+    while(count>0 && position<samples){
+        if(position<0){dst++;position++;count--;continue;}
+        if(position<pcm_start || position>=pcm_start+pcm_count){
+            pcm_start=position;pcm_count=samples-position;if(pcm_count>4096)pcm_count=4096;
+            if(fseek(audio,audio_start+position,SEEK_SET) || fread(buffers->pcm,1,pcm_count,audio)!=(size_t)pcm_count){broken=1;return;}
+        }
+        take=pcm_start+pcm_count-position;if(take>count)take=count;
+        for(i=0;i<take;i++){int value=buffers->pcm[position-pcm_start+i]*gain;dst[i].left+=value;dst[i].right+=value;}
+        position+=take;dst+=take;count-=take;
+    }
+}
+void AW_MovieDraw(void){
+    int x,y;byte *row,*src;
+    if(!buffers || !vid.buffer || vid.width!=320 || vid.height!=200)return;
+    for(y=0;y<200;y++){
+        row=vid.buffer+y*vid.rowbytes;src=buffers->frame+(y*height/200)*width;
+        if(width==320)memcpy(row,src,320);
+        else for(x=0;x<160;x++)row[x*2]=row[x*2+1]=src[x];
+    }
+}
+int AW_MovieKey(int key,int down){
+    if(!buffers)return 0;
+    if(down && key==K_ESCAPE)finish("skipped");
+    return 1;
+}

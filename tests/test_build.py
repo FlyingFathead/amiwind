@@ -39,6 +39,8 @@ class GuidedBuildTests(unittest.TestCase):
         names = [name for name, _ in steps]
         self.assertLess(names.index("hands"), names.index("interior"))
         self.assertLess(names.index("interior"), names.index("image"))
+        self.assertLess(names.index("interior"), names.index("intro"))
+        self.assertLess(names.index("intro"), names.index("image"))
         commands = dict(steps)
         self.assertNotIn('--archive', commands['engine'])
         self.assertIn('/private/run/engine/runtime/build/AmiQuakeGCC', commands['image'])
@@ -46,7 +48,7 @@ class GuidedBuildTests(unittest.TestCase):
             command = commands[stage]
             self.assertEqual(command[command.index("--hands") + 1], "sprites")
         image = commands["image"]
-        self.assertEqual(image[image.index("--scene") + 1], "/private/run/interior-scene")
+        self.assertEqual(image[image.index("--scene") + 1], "/private/run/intro-scene")
 
     def test_shell_wrapper_from_another_directory_and_space_path(self):
         with tempfile.TemporaryDirectory(prefix="amiwind build ") as tmp:

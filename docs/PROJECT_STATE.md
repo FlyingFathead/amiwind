@@ -1,14 +1,21 @@
 # Current project state — 28 September 2026
 
-**Current target: AmiWind v0.0.18-dev1, one version for source and runtime.**
+**Current target: AmiWind v0.0.19, one version for source and runtime.**
 
-Original-font UI and the lower dialogue band now run natively. See
-[scope, verification and remaining work](RELEASE-v0.0.18-dev1.md).
-Facial morphs synchronized with speech and linked character-creation screens are
-next priorities. The historical state below describes the preceding releases.
+New Game enters the first ship introduction with original voices, name entry,
+speech-driven facial poses and bounded guard navigation. UI bars have distinct
+colors and the optional outer frame defaults off. See [scope and verification](RELEASE-v0.0.19.md).
+Version 0.0.19 also silences routine track-change notices when the debug overlay is off.
+Dev5 refines menus, increases movie/logo resolution, hides transition console/debug
+overlays by default, restores deck-guard speech and exposes town entrance names.
+Compiler jobs default to available CPU capacity. Dev4 added the project-logo fade before that menu, title music and the selected
+New Game opening track, maps the hatch surface and adds ship NPC body collision.
+The disk indicator is optional and off by default. Optional streamed movie playback
+precedes Jiub and supports Esc; see INTRO_VIDEO.md for source availability and tests. Dock/Census creation and the complete opening remain unfinished. The historical
+state below describes preceding releases, not the complete current feature set.
 
 The owner completed all 12 full game-data build stages with test-004 and
-confirmed test-006 works on 28 September 2026. This release includes FS-UAE
+confirmed test-006 works on 28 September 2026. That v0.0.17 release included FS-UAE
 autorun and the default `early_game_demo_start_1` town-center opening with
 track 04. Final ROM-directory prompting and documentation updates follow that
 confirmation; the engine is unchanged from test-006. Hosted CI is checked by

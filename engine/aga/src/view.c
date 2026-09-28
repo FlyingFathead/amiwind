@@ -615,7 +615,8 @@ void V_UpdatePalette (void)
 {
 	int		i, j;
 	qboolean	new;
-	byte	*basepal, *newpal;
+	byte	*basepal, *newpal, *menupal;
+    static byte *previous_palette;
 	byte	pal[768];
 	int		r,g,b;
 	qboolean force;
@@ -650,10 +651,9 @@ void V_UpdatePalette (void)
 		cl.cshifts[CSHIFT_BONUS].percent = 0;
 
 	force = V_CheckGamma ();
-	if (!new && !force)
-		return;
-			
-	basepal = host_basepal;
+    menupal=AW_MoviePalette();if(!menupal)menupal=AW_UIMenuPalette();basepal=menupal?menupal:host_basepal;
+    if(basepal!=previous_palette){force=true;previous_palette=basepal;}
+    if (!new && !force)return;
 	newpal = pal;
 	
 	for (i=0 ; i<256 ; i++)
@@ -663,7 +663,7 @@ void V_UpdatePalette (void)
 		b = basepal[2];
 		basepal += 3;
 	
-		for (j=0 ; j<NUM_CSHIFTS ; j++)	
+		for (j=0 ; !menupal && j<NUM_CSHIFTS ; j++)	
 		{
 			r += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[0]-r))>>8;
 			g += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[1]-g))>>8;

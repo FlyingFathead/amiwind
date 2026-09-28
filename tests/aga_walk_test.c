@@ -6,13 +6,14 @@ server_t sv;
 int pr_edict_size=sizeof(edict_t);
 static edict_t ground_entity;
 static float slope, step, floor_z;
-static int water, gravity_calls, walk_calls, absent;
+static int water, gravity_calls, walk_calls, absent,walk_movetype;
 float frame_time=0.05f;
 qboolean SV_CheckWater(edict_t *p) {return water;}
 void SV_CheckStuck(edict_t *p) {}
+void SV_LinkEdict(edict_t *p,qboolean touch){}
 void SV_AddGravity(edict_t *p) {p->v.velocity[2]-=800*frame_time;gravity_calls++;}
 void SV_WalkMove(edict_t *p) {
- walk_calls++;VectorMA(p->v.origin,frame_time,p->v.velocity,p->v.origin);
+ walk_calls++;walk_movetype=p->v.movetype;VectorMA(p->v.origin,frame_time,p->v.velocity,p->v.origin);
  p->v.flags=(int)p->v.flags & ~FL_ONGROUND;
 }
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int kind,edict_t *skip) {
@@ -43,5 +44,12 @@ int main(void) {
  memset(&p,0,sizeof p);p.v.origin[2]=floor_z;step=0;p.v.velocity[2]=150;
  AW_WalkPlayer(&p);assert(p.v.origin[2]>floor_z+5 && gravity_calls==2);
  water=1;p.v.velocity[2]=0;AW_WalkPlayer(&p);assert(gravity_calls==2);
+ /* Scripted actors share walking but must reject unsupported drops atomically. */
+ {
+  vec3_t move={2,0,0};water=0;step=-20;memset(&p,0,sizeof(p));p.v.origin[2]=floor_z;p.v.oldorigin[0]=7;p.v.velocity[0]=9;p.v.flags=FL_ONGROUND;
+  assert(!AW_ActorStep(&p,move,frame_time));assert(p.v.origin[0]==0 && p.v.origin[2]==floor_z && p.v.oldorigin[0]==7 && p.v.velocity[0]==9 && p.v.flags==FL_ONGROUND);
+  step=-4;assert(AW_ActorStep(&p,move,frame_time));assert(fabs(p.v.origin[0]-2)<.001f && fabs(p.v.origin[2]-(floor_z-4))<.04f);
+  assert(walk_movetype==MOVETYPE_WALK && p.v.movetype==MOVETYPE_NONE);
+ }
  puts("idle slope, uphill speed, descending step, cliff, jump and swimming passed");return 0;
 }

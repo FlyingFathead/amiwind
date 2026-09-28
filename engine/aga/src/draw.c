@@ -107,10 +107,13 @@ qpic_t	*Draw_CachePic (char *path)
 Draw_Init
 ===============
 */
+static cvar_t aw_showdisk={"aw_showdisk","0",true};
+static int disk_visible;
 void Draw_Init (void)
 {
 	int		i;
 
+	Cvar_RegisterVariable(&aw_showdisk);
 	draw_chars = W_GetLumpName ("conchars");
 	draw_disc = W_GetLumpName ("disc");
 	draw_backtile = W_GetLumpName ("backtile");
@@ -803,6 +806,8 @@ Call before beginning any disc IO.
 */
 void Draw_BeginDisc (void)
 {
+    if(!aw_showdisk.value || disk_visible)return;
+    disk_visible=1;
 
 	D_BeginDirectRect (vid.width - 24, 0, draw_disc->data, 24, 24);
 }
@@ -818,6 +823,8 @@ Call after completing any disc IO
 */
 void Draw_EndDisc (void)
 {
+    if(!disk_visible)return;
+    disk_visible=0;
 
 	D_EndDirectRect (vid.width - 24, 0, 24, 24);
 }

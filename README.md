@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind — A Commodore Amiga demake of Morrowind">
+</p>
+
 # AmiWind
 
 *For years, they thought the Nerevarine would never appear on the Commodore Amiga…*
@@ -18,25 +22,32 @@ they turn toward the player and can play original greetings. Walking, mouse look
 collision, Nord hands, streamed music, menus and a debug console are working.
 The new UI uses the original Magic Cards font and border artwork from your own
 game files, with dialogue in the lower strip and an unchanged console font.
+A separate main menu uses the original background; Load Game remains disabled.
 
-This is an early proof of concept. The scripted opening, character creation,
-full conversations, quests, NPC walking and combat are not implemented. Audio stalls and scene geometry still need work. Ordinary underwater tint is
+New Game now starts the first ship sequence: Jiub, name entry, original voices,
+speaking/blinking faces and a collision-aware escort. This is an early proof of
+concept. Dock/Census character creation, full conversations, quests, general town NPC collision
+and combat remain open. Audio stalls and scene geometry still need work. Ordinary underwater tint is
 blue; actual damage retains its separate red flash. The tested emulator
 reference is A1200/AGA with 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM; stock A1200
-performance is unproven. See the [current UI checkpoint](docs/RELEASE-v0.0.18-dev1.md)
+performance is unproven. See the [current development checkpoint](docs/RELEASE-v0.0.19.md)
 and [next steps](docs/SEYDA_NEEN_NEXT_STEPS.md).
 
-**AmiWind v0.0.18-dev1** uses one `VERSION` for source, tools and runtime.
-See [release notes](docs/RELEASE-v0.0.18-dev1.md) and
+**AmiWind v0.0.19** uses one `VERSION` for source, tools and runtime.
+See [release notes](docs/RELEASE-v0.0.19.md) and
 [setup changes and validation](docs/BUILD_SETUP-v0.0.17.md).
 The public dry-run image
 boots to a versioned notice screen. Build locally with your own Morrowind files
 for the playable scene; see [build instructions](docs/LINUX_BUILD.md).
 
-The default `early_game_demo_start_1` opening starts in **Seyda Neen's town
-center with track 04**, then continues the exploration shuffle. See
-[opening selection](docs/EARLY_GAME_DEMO_START.md) for details and the optional
-ship-first start.
+The game fades in the AmiWind logo, then opens the **main menu** with the original title music. New Game
+asks for confirmation, then plays the converted prophecy movie when available (Esc skips), then starts the
+prison introduction and resets the selected opening track 04. See
+[movie conversion](docs/INTRO_VIDEO.md). The
+previous town demonstration remains available through `aw_demo_start`.
+Aim at an entrance to see its destination, then press **E**. The ship hatch works;
+unbuilt town interiors show “Interior not found.” without moving the player.
+See [door mapping](docs/DOOR_MAPPING.md) for current coverage.
 
 | Ship and dock | NPCs in town |
 | :---: | :---: |

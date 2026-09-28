@@ -14,7 +14,9 @@ from prepare_quake import box,wad,miptex,CENTRE,SCALE
 from player_hull import rebuild_world_hull,lumps,pack_lumps
 
 
-def prepare(data_files,scene,out,qbsp,vis,light):
+from build_jobs import add_jobs, resolve_jobs
+
+def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'exterior scene');out=ensure_external(out,'interior bundle')
     if out.exists():raise ValueError('Choose a new interior output')
     cell=read_interior(child_ci(data_files,'Morrowind.esm'),'Imperial Prison Ship')
@@ -58,7 +60,7 @@ def prepare(data_files,scene,out,qbsp,vis,light):
     text+='{\n"classname" "info_player_start"\n"origin" "0 -35 -4"\n"angle" "90"\n}\n'
     (out/'prison.map').write_text(text)
     for exe,args in [(qbsp,['-nopercent','prison.map']),(vis,['-fast','prison.bsp']),(light,['-minlight','24','prison.bsp'])]:
-        subprocess.run([str(Path(exe).resolve()),*args],cwd=out,check=True)
+        subprocess.run([str(Path(exe).resolve()),*(['-threads',str(resolve_jobs(jobs))] if exe!=qbsp else []),*args],cwd=out,check=True)
     base=out/'prison-base.bsp';(out/'prison.bsp').rename(base);rebuild_world_hull(base,out/'prison.map',qbsp)
     report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting)
     shutil.copyfile(out/'prison.bsp',out/'id1/maps/prison.bsp')
@@ -72,6 +74,8 @@ def prepare(data_files,scene,out,qbsp,vis,light):
     links=[{'source':'prison','target':'seyda','point':inside_point,'arrival':exit_dest,'yaw':yaw(door['destination']['rotation_radians'])},
            {'source':'seyda','target':'prison','point':outside_point,'arrival':enter_dest,'yaw':yaw(entrance['destination']['rotation_radians'])}]
     (out/'id1/scene-links.txt').write_text(''.join(f"{r['source']} {r['target']} "+' '.join(f'{x:.5f}' for x in [*r['point'],*r['arrival'],r['yaw']])+'\n' for r in links))
+    from prepare_doors import prepare as prepare_doors
+    prepare_doors(data_files,out)
     report.update({'cell':cell['name'],'master_sha256':cell['master_sha256'],'omitted':omitted,'lighting':lighting,'links':links,'spawn':spawn,
                    'notes':'static furnishing/lighting preview; no items, inventory, NPCs or opening scripts; no shadows/flicker in this bake'})
     (out/'interior-report.json').write_text(json.dumps(report,indent=2)+'\n')
@@ -81,5 +85,5 @@ def prepare(data_files,scene,out,qbsp,vis,light):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','out','qbsp','vis','light'):p.add_argument('--'+n,type=Path,required=True)
-    a=p.parse_args()
-    print(json.dumps(prepare(a.data_files,a.scene,a.out,a.qbsp,a.vis,a.light),indent=2))
+    add_jobs(p);a=p.parse_args()
+    print(json.dumps(prepare(a.data_files,a.scene,a.out,a.qbsp,a.vis,a.light,a.jobs),indent=2))

@@ -407,7 +407,9 @@ void R_SetupFrame (void)
 				r_numallocatededges, r_maxedgesseen);
 	}
 
-	r_refdef.ambientlight = r_ambient.value;
+	/* The ship already carries source-derived lamp/ambient lightmaps. Adding
+	 * the exterior preview's brightness floor washes out the lower hold. */
+	r_refdef.ambientlight = AW_Interior()?0:r_ambient.value;
 
 	if (r_refdef.ambientlight < 0)
 		r_refdef.ambientlight = 0;
@@ -528,4 +530,3 @@ r_refdef.viewangles[2]=    0;
 
 	D_SetupFrame ();
 }
-

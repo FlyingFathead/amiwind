@@ -21,6 +21,7 @@ from mwad.paths import child_ci, ensure_external, inside, resolve_data_files, in
 from mwad import input_check
 from mwad.progress import Progress, live_log, section
 import build_versions
+from build_jobs import add_jobs, resolve_jobs
 from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources, check_quakec
 
 
@@ -55,6 +56,7 @@ def parser():
     p.add_argument("--xdftool", default="xdftool")
     p.add_argument("--rdbtool", default="rdbtool")
     p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: sprites currently Nord unarmed only")
+    add_jobs(p)
     return p
 
 
@@ -324,7 +326,7 @@ def dry_run_commands(args, run):
     binary = run / "engine" / RUNTIME_BUILD_DIR / "build/AmiQuakeGCC"
     return [
         ("engine", [sys.executable, str(ROOT / "tools/build_aga.py"), "engine", *common,
-                    "--out", str(run / "engine"), "--hands", args.hands]),
+                    "--out", str(run / "engine"), "--hands", args.hands, "--jobs", str(resolve_jobs(args.jobs))]),
         ("dry-run-image", [sys.executable, str(ROOT / "tools/build_dry_run.py"), *common,
                            "--engine", str(binary), "--out", str(run / "image")]),
     ]
@@ -344,17 +346,18 @@ def commands(args, tools, run):
         steps += [
             ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery")),
             ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene")),
-            ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene",
+            ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("npcs", tool("prepare_npcs.py", "--data-files", args.data_files, "--scene", run / "bsp-scene", "--out", run / "npc-scene", "--ffmpeg", tools["ffmpeg"])),
             ("hands", tool("prepare_hands.py", "--data-files", args.data_files, "--scene", run / "npc-scene", "--out", run / "hands-scene")),
-            ("interior", tool("prepare_interior.py", "--data-files", args.data_files, "--scene", run / "hands-scene", "--out", run / "interior-scene",
+            ("interior", tool("prepare_interior.py", "--data-files", args.data_files, "--scene", run / "hands-scene", "--out", run / "interior-scene", "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("dialogue-lookup", tool("prepare_dialogue_lookup.py", "--data-files", args.data_files, "--out", run / "voice-lookup.json")),
+            ("intro", tool("prepare_intro.py", "--data-files", args.data_files, "--scene", run / "interior-scene", "--out", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music")),
-            ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands,
+            ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "interior-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
     return steps
@@ -408,6 +411,7 @@ def provenance(args, tools):
         "stage": args.stage, "hands": args.hands if args.stage == "aga" else None,
         "python": sys.version, "data_files": str(args.data_files), "tools": tools,
         "version_comparison": getattr(args, "version_report", []),
+        "compiler_jobs": resolve_jobs(args.jobs),
         "input_check": getattr(args, "input_report", None),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else hashes(args.data_files, lambda path: True),

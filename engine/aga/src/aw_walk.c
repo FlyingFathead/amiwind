@@ -65,3 +65,23 @@ void AW_WalkPlayer(edict_t *p)
         ground(p,&floor);p->v.velocity[2]=0;
     }
 }
+
+/* Use the same stair/slide behavior for scripted humanoids. The old monster
+ * corner-support test rejects parts of the ship that the player can walk.
+ * A failed trial restores every movement field and cannot step off a ledge. */
+qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
+{
+    vec3_t origin,oldorigin,velocity,delta;float flags,groundentity,movetype;trace_t floor;int i;
+    if(dt<=0)return false;
+    VectorCopy(p->v.origin,origin);VectorCopy(p->v.oldorigin,oldorigin);VectorCopy(p->v.velocity,velocity);
+    flags=p->v.flags;groundentity=p->v.groundentity;movetype=p->v.movetype;
+    VectorCopy(origin,p->v.oldorigin);
+    for(i=0;i<2;i++)p->v.velocity[i]=move[i]/dt;
+    p->v.velocity[2]=0;p->v.movetype=MOVETYPE_WALK;AW_WalkPlayer(p);p->v.movetype=movetype;
+    VectorSubtract(p->v.origin,origin,delta);
+    if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && fabs(delta[2])<=8.75f && support(p,8.75f,&floor)) {
+        ground(p,&floor);VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,true);return true;
+    }
+    VectorCopy(origin,p->v.origin);VectorCopy(oldorigin,p->v.oldorigin);VectorCopy(velocity,p->v.velocity);
+    p->v.flags=flags;p->v.groundentity=groundentity;SV_LinkEdict(p,false);return false;
+}

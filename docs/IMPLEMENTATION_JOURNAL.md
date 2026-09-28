@@ -296,3 +296,222 @@ tests pass. The existing world palette makes the original bar artwork muted;
 a later conversion should reserve suitable UI colors before world quantization.
 The main-menu background request arrived after these checks and is queued with
 the next UI/intro work. It is not claimed by this checkpoint.
+
+## 2026-09-28: actor poses, escort and palette work (0.0.18-dev2 candidate)
+
+- Female ship guard failed the original male-only outfit gate. Added female skin,
+  equipment CNAM with BNAM fallback, and female race proportions.
+- Female animation file has no ordinary idle: use the shared base idle and the
+  female walk override. Do not substitute idle4 or a male appearance.
+- Walk groups contain root translation; baking those unchanged makes an actor
+  slide away from its collision body. Remove XY root displacement while keeping
+  vertical motion, and use authored loop start/stop rather than transition keys.
+- Script Say paths end in WAV but the owned distribution supplies MP3. Resolve
+  the same exact stem with MP3 fallback and record requested/resolved hashes.
+- Four talk levels and blink use original relative morph targets. The mouth
+  envelope follows native audio playback samples, not accumulated render time.
+- First native run played Jiub, accepted a name, and then exposed a guard route
+  block at the upper stair turn (-7,360,27). Do not teleport past it or call the
+  escort complete. Testing collision-aware local steering next.
+- The old scene palette uses indices 225..253 as duplicate sky colours. Audit
+  BSP textures, alias skins, fonts, WAD graphics, hand spans and lighting tables
+  before allocating those otherwise-unused slots to original status-bar hues.
+  Preserve world pixels, lighting tables and console glyphs byte-for-byte.
+- Ship scripts attach Boat Hull to two containers, not generic sound activators.
+  Convert those two localized water loops, and retain their scripted volume.
+  The recorded creak effects do not by themselves prove a prison-cell emitter.
+- Camera comparison against the recompiled original snapshot found unchanged
+  eye/NPC geometry; see PLAYER_MOVEMENT.md. The new reserved band moves the view
+  centre upward. The first diagnostic queued noclip after aw_view via the command
+  buffer, so placement was rejected; both captures remained at the same original
+  spawn. Their comparison is valid at that spawn, not the requested debug pose.
+
+- Sharing player movement initially stopped earlier: scripted actors still had
+  MOVETYPE_NONE, so SV_WalkMove skipped its step path. Enable MOVETYPE_WALK only
+  during the bounded movement trial and restore it afterwards. Use the moving
+  entity's water-jump flags, not the global player, in shared stepping. Added a
+  regression assertion for this mode and for complete rollback at a drop.
+
+- The corrected movement mode let the guard descend to Jiub and play the first
+  escort line in native run 6. Run 5's automated typing was not received; slower
+  individual key presses made the test reliable. Do not treat a missed synthetic
+  key sequence as proof of an intro-state failure.
+- Sample blink at the maximum authored key, not the time-range midpoint: the
+  midpoint did not fully close the lids. Reconverted all ten appearances.
+- Include intro conversion in the guided build; a private hand-built scene alone
+  does not make a source checkpoint reproducible by the owner.
+- A debug reload of the same ship map must also clear old intro pointers/prompts.
+  Reset the adapter on every non-New-Game scene spawn, including same-map reloads.
+
+- Native run 7 reached the requested downstairs stop but stalled six units from
+  the auxiliary final grid node, which lies beyond the stop against the player's
+  hull. Accept arrival at the actual destination on the final graph leg instead
+  of demanding an overshoot. Added a regression with a wall beyond the goal.
+  This preserves collision and does not warp or shrink either actor.
+
+- Run 8's return escort was obstructed by the diagnostic player camera placed
+  directly in the lower aisle at (5,235,-8). Noclip does not remove that body's
+  collision against NPCs. Keep scripted test cameras to one side and distinguish
+  a test obstruction from a staircase defect. This is not a manual route test.
+- Join a clear first path-grid leg directly, using a standing-hull sweep at the
+  current floor height. Otherwise an escort may double back into its follower
+  just to visit the nearest start node. Normal movement still checks floor and
+  collision on every step. A regression covers a blocked backward start.
+
+## v0.0.18-dev2 native checkpoint result
+
+Final run 9 (engine revision 12, freshly converted actor revision 5) entered New
+Game through the menu, accepted the name, played Jiub's responses, brought the
+guard downstairs, enabled movement, climbed the stairs and completed both upper
+travel targets. Guard state reached 70 with failed=0; the final instruction and
+reminder voices played. Diagnostic player positions stayed beside the route to
+exercise escort following/waiting without blocking it. This verifies NPC travel;
+it does not certify a manual player walk through the complete hull/hatch.
+
+The final native image also shows distinct bar colors and the optional frame.
+172 host tests pass; full native cross-build and every HDF payload readback pass.
+The legacy 9MiB heap and 16MiB Fast preset remain. Repeated alias-cache loads
+add visible overhead: 2,374 frames over 225,908ms in this mixed diagnostic run,
+with 3 late audio updates and no claim of glitch-free playback. Preserve this
+receipt for a paired cache investigation; do not report it as a hardware benchmark.
+
+## v0.0.18-dev3: alias cache and front-end palette
+
+- Dev2 repeatedly opened Jiub/escort models every rendered frame. The exact
+  alias visibility test first fetched the payload from the cache; hidden models
+  could therefore evict visible models before being rejected. Preserve a sphere
+  enclosing the entire packed quantization domain and reject wholly off-screen
+  models before Mod_Extradata. Keep exact per-frame culling for survivors.
+- The first native trial recorded Jiub=3, escort=2, upper=1 model opens across
+  menu-to-intro play, eliminating the observed per-frame reload pattern. Do not
+  quote a speedup percentage from different camera routes or timing.
+- Mapping the original menu image through the world/status-bar palette made it
+  too red. Give the front end a separate palette, retaining every UI atlas and
+  text color index. Palette selection must itself trigger an update: changes in
+  gamma/water/damage are not guaranteed on menu entry or exit. Tests also verify
+  that the menu ignores stale gameplay tint and restores it when returning.
+- Main Menu is a separate disconnected state. Escape there must not accidentally
+  resume a nonexistent game; New Game leaves that state before starting the map.
+
+Final dev3 native run confirms the original golden menu colors, disabled Load,
+Options and New Game back into the ship with restored world colors. It accepted
+the name and continued Jiub speech while the guard approached. Model opens remained Jiub=3, escort=2,
+upper=1. 173 tests pass against the final source, which cross-compiles and passes
+independent HDF payload readback.
+
+## v0.0.18-dev4: ship corrections, movie support and branding
+
+- Boot used the historical town-demo command even after the front end existed.
+  Startup now runs the short project-logo fade, then the main menu. Menu music
+  has its own canonical title identity and loops there; New Game starts the
+  selected explore track 04 only after the prophecy movie. The original base
+  CharGen scripts contain no music-change commands. This is not proof about
+  hard-coded original-engine cue selection; ship/deck/Census parity stays open.
+- The upper hatch origin is not a usable point target. Use source model bounds,
+  reference transform and DODT/DNAM destinations. Audited 41 placements; activate
+  only the two links with converted maps. Sounds/scripts are catalogued, not
+  general door scripting. Keep one scene resident.
+- A failed hatch trial was a test error: the camera was placed inside the hull,
+  so disabling noclip was rejected and E continued to fly up. Another lost its
+  pitch to view drift. Verify MOVETYPE_WALK and the actual camera angle. Native
+  run 4 aimed from approximately (20,52,43), yaw270/pitch-26, displayed the hatch
+  prompt and loaded the exterior. The return door also passed at about
+  (695,-486,74), yaw217/pitch37. Both logs report checked arrivals. This proves
+  activation and teleport placement, not a full manual walk of the escort route.
+- The first target hint was accidentally placed only in the draw-dialog branch;
+  move it into the ordinary HUD branch before speech, below the world viewport.
+- Ship NPC bodies previously did not stop the player, although the player could
+  stop the escort. Set body solidity for the three ship roles and explicitly
+  wait when the route sweep hits the player. Reset failure timers while waiting,
+  preserve the goal and resume when clear. Native run 1 reached guard state70,
+  failed0 with diagnostic follower positions; deliberate blockage waited and
+  resumed. Ordinary walking confirmed Jiub blocks passage.
+- The flashing upper-right square was Draw_BeginDisc, not the old RAM warning.
+  Pair begin/end only when aw_showdisk is enabled; default zero.
+- Native run 1 still reopened escort and upper-guard models 992 times each. Raw
+  MDL input in the high hunk and decoded staging in the low hunk consumed cache
+  headroom. Read bounded alias inputs through transient heap storage and release
+  decoded staging before allocating the final cache entry. Run 2 records escort1,
+  upper2, Jiub1. Host loader tests poison freed staging and inspect decoded data.
+  Do not quote an FPS multiplier: camera paths differ and world geometry remains
+  costly. No actor rescaling, viewport change, barrel reduction or extra resident
+  game heap was used.
+- The first game-data ZIP had no video payload. The owner supplied Video files
+  separately. Decode Bink on the host; AWV1 streams indexed frames and PCM with
+  about 21KiB of picture/audio/palette buffers. A synthetic native fixture passed
+  both EOF and Esc into Jiub. Original mw_intro.bik is 640x480, 57.5 seconds, with
+  stereo 44100Hz source audio; the first target conversion is 160x100/10fps and
+  mono11025Hz, 575 frames/9,834,738 bytes. Preserve aspect ratio with pillarboxing.
+- Startup-logo completion/skip goes to the menu; prophecy completion/skip goes
+  to Jiub. Sharing the stream reader must not conflate those continuations.
+  Missing optional video warns during conversion/build and skips at runtime.
+- Preserve the supplied 2048x682 transparent logo unchanged in resources/media;
+  README scales its display. Derived startup frames and the upper menu composite
+  are built separately. Public packaging allows only this explicitly named PNG,
+  not arbitrary game art.
+
+Final native image (engine revision9) plays the supplied logo's fade, presents
+the branded menu with disabled Load, plays the original 57.5-second prophecy,
+and reaches Jiub after both EOF and Esc. Movie PCM round-trip comparison is
+byte-identical to an independent source conversion. 177 host tests pass; the
+final 68040/FPU build matches its source-hash receipt and every HDF payload file
+passes independent SHA-256 readback. The same 9MiB game heap and 16MiB Fast RAM
+emulator preset remain; no physical-hardware playback or subjective audio claim.
+
+The final post-movie ship run also reached guard state70, unlocked1, failed0,
+using diagnostic follower positions through the original route. Preserve the
+manual-route caveat; camera placement was used to control this test.
+
+Movie counters in the final native run: startup logo 26/26 pictures, 2,573ms;
+original prophecy 575/575 pictures, 57,822ms; zero skipped pictures in both.
+Esc trial stopped at 5,791ms and reached Jiub. These are accelerated-emulator
+observations, not a physical-drive throughput guarantee.
+
+## v0.0.18-dev5 — UI redraw, entrances and compile workers
+
+- Quake's `SCR_SetUpToDrawConsole` forces the console up before world sign-on.
+  Preserve `con_forcedup` for renderer safety, but suppress visible console
+  height by default and draw loading artwork. Archived `aw_transition_console`
+  restores the old behavior at 1; 0 is default. Explicit F10 still works.
+- Menu geometry alone did not fix the front-end confirmation: partial screen
+  updates left the old lower menu visible. Every M_Draw now requests a full
+  refresh. Labels, highlight rectangles and mouse hit regions share row bounds.
+- Upscaling a 160×100 movie cannot recover burned-in lettering. Use 320×200,
+  optional private native-font cards and a larger startup wordmark. Palette
+  studies at 40×25 washed out narrow gold strokes and selected a blue movie
+  color. Reserve the three exact text shades plus black before quantization.
+- Auto jobs respect available CPUs/affinity/quota. Passing `-threads` to the
+  pinned QBSP failed (unsupported option); only VIS/LIGHT accept that switch.
+  Keep QBSP serial and use make -j for native compilation.
+- Earlier door conversion intentionally hid unbuilt destinations. AWD2 keeps
+  their bounds and names with unavailable target `-`; E reports the requested
+  message instead of queuing a map. Preserve AWD1/legacy readers. Round then
+  normalize yaw, since formatting 359.999999 as 360 would fail native validation.
+- Read source interior cells directly and keep separate reference identities
+  for multiple entrances into the same cell. A shared cell name is not enough
+  to infer reciprocal doors. Current catalogue: 41 links, 22 exposed entrances,
+  2 working transitions, 14 private source interior layouts.
+
+Final dev5 checks:179 host tests and the68040/FPU build passed. FS-UAE played
+all575 prophecy pictures in57.731s with no skipped pictures, then reached Jiub;
+Esc also reached Jiub. Native hatch E loaded the deck with checked arrival.
+The deck guard emitted one first line and five reminder events in the captured
+run. Arrille's front door displayed its name and the exact missing-interior
+message without changing scenes. Native reader accepted all22 entrance records.
+Saved config confirmed the transition console, debug overlay and disk marker at0.
+The maps are byte-identical to dev4; no camera/height change was made.
+
+## v0.0.19 — routine OST notice respects debug visibility
+
+The track opener still emitted an unconditional Con_Printf notice. Dev5's
+gameplay draw gate was useful but did not stop that notification being queued.
+Gate the routine notice with AW_DebugOverlaysEnabled at the shared track-open
+path, covering startup, EOF, Next, Previous and group changes. Preserve the
+event-log call and explicit status command. The player test checks silent
+off-state transitions, enabled notices, runtime toggling and status availability.
+
+Promoted this accumulated checkpoint to the owner's requested public v0.0.19
+release, without a development suffix. The final version passed 179 host tests,
+68040 compilation, complete HDF payload readback, and FS-UAE debug on/off/status
+checks. Only the enabled Next event emitted a routine OST console notice; three
+Next and two group events were still recorded privately.

@@ -177,7 +177,9 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
     return result
 
 
-def prepare(scene, out, scenery, qbsp, vis, light):
+from build_jobs import add_jobs, resolve_jobs
+
+def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
     scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
     scenery=ensure_external(scenery,'scenery input')
     shutil.copytree(scene,out)
@@ -191,7 +193,7 @@ def prepare(scene, out, scenery, qbsp, vis, light):
     (out/'seyda.map').write_text(text)
     for name in set(removed):(out/'id1'/name).unlink()
     for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'],'seyda.bsp'),(light,['-minlight','100'],'seyda.bsp')]:
-        subprocess.run([str(Path(executable).resolve()),*options,target],cwd=out,check=True)
+        subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable!=qbsp else []),*options,target],cwd=out,check=True)
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
     rebuild_world_hull(base,out/'seyda.map',qbsp)
     result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp')
@@ -206,8 +208,8 @@ def prepare(scene, out, scenery, qbsp, vis, light):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ['scene','out','scenery','qbsp','vis','light']:p.add_argument('--'+name,type=Path,required=True)
-    a=p.parse_args()
-    try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light),indent=2))
+    add_jobs(p);a=p.parse_args()
+    try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs),indent=2))
     except (OSError,ValueError,subprocess.CalledProcessError) as e:p.exit(1,str(e)+'\n')
 
 if __name__=='__main__':main()

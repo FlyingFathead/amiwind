@@ -5,6 +5,36 @@ Keep this register with the roadmap so interrupted chat messages do not lose wor
 Runtime baseline: v0.0.15-dev1 / checkpoint-016.
 Additional reports: 27 September 2026, 22:32–22:35 Helsinki.
 
+## v0.0.18-dev4 checkpoint status
+
+- [x] ~~Boot destination and New Game music reset.~~ Fixed in v0.0.18-dev4; logo fade, title-loop menu, selected ship track after movie.
+- [x] ~~Original prophecy movie conversion/playback with Esc.~~ Implemented in v0.0.18-dev4; see INTRO_VIDEO.md for native verification.
+- [x] ~~Hatch activation/teleport mapping.~~ Fixed in v0.0.18-dev4; both directions activated in walking mode, checked native arrival positions.
+- [x] ~~Walking through ship guards/Jiub.~~ Fixed in v0.0.18-dev4; body collision and escort wait/resume.
+- [x] ~~Blinking top-right disk marker.~~ Fixed in v0.0.18-dev4; `aw_showdisk` defaults to 0.
+- [x] ~~Visible actors evicting each other during loading.~~ Fixed in v0.0.18-dev4; native model-open counts recorded in the journal.
+- [x] ~~Supplied project logo in README and upper menu, startup fade, three-line credits.~~ Implemented in v0.0.18-dev4.
+- [ ] Remaining stair/barrel rendering cost: geometry unchanged; do not treat cache fix as all-view performance parity.
+- [ ] Full manual player route through the repaired hull, physical-hardware audio/movie throughput.
+
+## v0.0.18-dev3 checkpoint status
+
+- [x] ~~Original main-menu background and distinct Main Menu action.~~ Fixed in v0.0.18-dev3; Load remains disabled.
+- [x] ~~Repeated actor-model loads before off-screen rejection.~~ Fixed in v0.0.18-dev3; conservative bounds retain partially visible actors.
+
+## v0.0.18-dev2 checkpoint status
+
+- [x] ~~Correct HUD bar colors.~~ Fixed in v0.0.18-dev2: red/blue/green palette slots audited before allocation.
+- [x] ~~Optional outer frame, off by default.~~ Fixed in v0.0.18-dev2; Options toggle.
+- [x] ~~Talking and blinking original head morphs.~~ Fixed in v0.0.18-dev2 for converted humanoids; four audio-amplitude poses, not phoneme matching.
+- [x] ~~Jiub name prompt and original ship voices.~~ Fixed in v0.0.18-dev2; later creation screens remain open.
+- [x] ~~Journal filename.~~ Fixed in v0.0.18-dev2: HORSTATORS_JOURNAL_2026-09-28.md.
+- [x] ~~Guard downstairs/upstairs route.~~ Fixed in v0.0.18-dev2; native NPC route passed with diagnostic follower positions. Full manual player route remains open.
+- [ ] Complete opening: ship adapter/navigation implemented; dock, Census, papers, ring and release still pending.
+- [ ] General town NPC collision and attack/combat/crime reactions; ship body collision is in dev4.
+- [ ] Day/night, waiting after creation and book/scroll views; main-menu background is in dev3.
+- [ ] Condition-aware town voice variation, additional interiors, Silt Strider and terrain defect.
+
 ## Immediate correctness and diagnosis
 
 - [x] ~~Hammocks obstructing the ship interior route.~~ Fixed. Lower-hull structural repair delivered in checkpoint-017; owner confirmed the hammock obstruction is gone on 28 September.
@@ -35,7 +65,7 @@ Additional reports: 27 September 2026, 22:32–22:35 Helsinki.
 2. Add missing actors incrementally with measured geometry/cache/voice budgets.
    Existing male-human conversion is not support for all female or beast outfits.
    Prioritize ordinary exterior actors and the third town guard, then opening
-   actors with the required script state. Native NPC collision is still pending.
+   actors with the required script state. General town NPC collision remains pending; dev4 adds ship body collision.
 3. Compile authored action packages and speech conditions on the host. Separate
    Hello, idle, combat/alarm and interactive dialogue. Guards have multiple source
    candidates, not one fixed line; candidates are not an unconditional shuffle pool.
@@ -360,3 +390,24 @@ terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
 with proof of this formation's geometry cause. Backup first; keep this open.
+
+### Actor solidity and attack responses (2026-09-28)
+
+- [ ] Give NPCs collision and verify narrow passages and escort clearance.
+- [ ] Connect punches to hit/fatigue/health and original aggression rules.
+- [ ] Implement crime/witness/guard responses before claiming combat parity.
+- [ ] Convert localized and regional ambience with separate sound channels.
+
+## v0.0.18-dev5 follow-up
+
+- [x] ~~Show original town entrance names and offer activation before interiors
+  are built. Missing destinations report “Interior not found.”~~ Fixed in dev5.
+- [x] ~~Keep a source reference for the town interiors and their distinct doors.~~
+  Fixed in dev5: private 14-cell layout/placement reference and 41 door links.
+- [ ] Research the original arrival restriction between ship, pier and Census
+  Office. Owner recalls an invisible boundary preventing early escape. Inspect
+  collision meshes, activators, scripts, controls and chargen state to identify
+  the actual mechanism and when it is released. Do not assume a force-field
+  object exists or add arbitrary geometry before verifying the source.
+- [ ] Convert Census Office and remaining town interiors from those source cells;
+  implement their actors, registration menus and persistent door/reference state.

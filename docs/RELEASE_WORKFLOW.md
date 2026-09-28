@@ -2,8 +2,8 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current release version is **v0.0.17**; see
-[release notes](RELEASE-v0.0.17.md) and [validation](VALIDATION-v0.0.17.md). The existing v0.0.16 release remains immutable.
+Use one shared release number. The current release version is **v0.0.19**; see
+[release notes and validation](RELEASE-v0.0.19.md). The existing v0.0.16 release remains immutable.
 AmiWind remains a demo;
 keep increments within `0.0.x`, with `-devN` for development iterations as needed.
 The old separate Python pipeline numbering is historical. Root `VERSION` is the
@@ -19,7 +19,7 @@ original numbers. The naming examples below describe the published v0.0.16 set.
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.16-public-source.zip` | Complete repository under `amiwind/`; extract from `~/NeuralNetwork/`. |
+| `AmiWind-v0.0.16-public-source.zip` | Complete repository under `amiwind/`; extract from `/path/to/downloads/`. |
 | `AmiWind-v0.0.16-public-source-incremental.zip` | Added/changed public files under `amiwind/`, since the exact preceding delivered source. |
 | `AmiWind-v0.0.16-private-playable.zip` | Private package with `AmiWind-v0.0.16.hdf`, README and `build.json` at its root, plus `roms/`, `resources/emulators/`, `docs/`, `private-conversion/` and `evidence/`. |
 
@@ -69,11 +69,15 @@ remain private and must never become GitHub release assets.
 Normal preflight and dry-run screens display their shared AmiWind version and:
 
 ```text
-By FlyingFathead +- ChaosWhisperer
+By FlyingFathead
 https://github.com/FlyingFathead/amiwind/
+Special thanks to: ChaosWhisperer
 ```
 
 Public source excludes original/converted game data, reusable extracted fonts,
 ROMs and private images. The five owner-approved README screenshots are a
 documentation exception. Preserve component licence notices and keep complete
 development recovery sets separate from playable packages.
+
+Public documentation and release assets use generic example paths. Keep owner
+usernames, machine names and local directory layouts in private handoff material.

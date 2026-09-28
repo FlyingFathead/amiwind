@@ -109,3 +109,24 @@ legacy signed-byte network view-height quantization. Quake walk bob remains.
 `dbg eyeheight` prints the current values; an optional 4..24 offset permits A/B
 comparison. This corrects the documented prototype value, not a claim of exact
 animated camera parity for every race/equipment combination.
+
+## Dev1 regression comparison, 28 September 2026
+
+Owner reported that guards seemed smaller or the player taller. Recompiled the
+owner's v0.0.17 snapshot and compared it with v0.0.18-dev1 on the same HDF,
+scene, spawn and emulator configuration. Both native logs report eye offset
+16.434 / eye above feet 33.059, player origin (16,44,60), and identical placed
+NPC coordinates. Fargoth/guard MDLs and both BSP files are byte-identical to
+the pre-UI scene. The matched native screenshots show the nearest guard at
+roughly 89 pixels in both builds.
+
+The UI reserves 48 bottom rows: the 3D viewport is now 320x152, compared with
+320x200 when the previous debug strip was off. Horizontal FOV, pixel aspect,
+projection scale, collision hull and eye offset are unchanged. The visual centre
+moves upward by 24 pixels. FS-UAE scaling is another presentation variable;
+these captures held it fixed. Do not rescale actors to compensate for framing.
+
+Original-data caveat: free exploration still uses the calibrated Nord male
+first-person fixture. The base master's pre-creation Player record is Dark Elf.
+Creation must choose race/sex eye proportions explicitly; existing calibration
+is not proof of every original in-game camera or character appearance.

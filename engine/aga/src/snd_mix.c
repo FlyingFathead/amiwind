@@ -382,7 +382,8 @@ void S_PaintChannels(int endtime)
 	// clear the paint buffer
 		Q_memset(paintbuffer, 0, (end - paintedtime) * sizeof(portable_samplepair_t));
 
-	AW_MusicPaint(paintbuffer, end-paintedtime);
+	if(AW_MovieActive())AW_MoviePaint(paintbuffer,end-paintedtime,paintedtime);
+    else AW_MusicPaint(paintbuffer, end-paintedtime);
 
 	// paint in the channels.
 		ch = channels;

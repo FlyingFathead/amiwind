@@ -4,7 +4,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CREDITS = 'By FlyingFathead +- ChaosWhisperer'
+CREDITS = 'By FlyingFathead'
+THANKS = 'Special thanks to: ChaosWhisperer'
 PROJECT_URL = 'https://github.com/FlyingFathead/amiwind/'
 
 

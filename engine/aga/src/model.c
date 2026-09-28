@@ -31,6 +31,20 @@ char	loadname[32];	// for hunk tags
 void Mod_LoadSpriteModel (model_t *mod, void *buffer);
 void Mod_LoadBrushModel (model_t *mod, void *buffer);
 void Mod_LoadAliasModel (model_t *mod, void *buffer);
+/* Small converted aliases use transient host heap for their file image.
+ * Holding the file in the high hunk while decoding into the low hunk evicts
+ * other visible actors from the cache between them. No resident RAM increase. */
+static void *AW_AliasFile(char *name) {
+    FILE *f=NULL;byte *data;int size;
+    if(strlen(name)<4 || strcmp(name+strlen(name)-4,".mdl"))return NULL;
+    size=COM_FOpenFile(name,&f);if(!f)return NULL;
+    if(size<84 || size>512*1024){fclose(f);return NULL;}
+    data=malloc(size);if(!data){fclose(f);return NULL;}
+    Draw_BeginDisc();
+    if(fread(data,1,size,f)!=(size_t)size || memcmp(data,"IDPO",4)){free(data);data=NULL;}
+    fclose(f);Draw_EndDisc();return data;
+}
+
 model_t *Mod_LoadModel (model_t *mod, qboolean crash);
 
 byte	mod_novis[MAX_MAP_LEAFS/8];
@@ -280,6 +294,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 {
 	unsigned *buf;
 	byte	stackbuf[1024];		// avoid dirtying the cache heap
+    void *alias_file;
 
 	if (mod->type == mod_alias)
 	{
@@ -303,7 +318,8 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 // load the file
 //
 	if(AW_TryStreamBrush(mod))return mod;
-	buf = (unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
+	alias_file=AW_AliasFile(mod->name);
+    buf=alias_file?alias_file:(unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
 	if (!buf)
 	{
 		if (crash)
@@ -340,6 +356,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 		break;
 	}
 
+    if(alias_file)free(alias_file);
 	return mod;
 }
 
@@ -1499,6 +1516,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 	maliasskindesc_t	*pskindesc;
 	int					skinsize;
 	int					start, end, total;
+    void *copy;
 	
 	start = Hunk_LowMark ();
 
@@ -1687,8 +1705,13 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 	mod->type = mod_alias;
 
 // FIXME: do this right
-	mod->mins[0] = mod->mins[1] = mod->mins[2] = -16;
-	mod->maxs[0] = mod->maxs[1] = mod->maxs[2] = 16;
+	/* The quantization domain encloses every frame, including head morphs.
+	 * Keep this small bound resident even when the alias payload is evicted. */
+	for (i=0 ; i<3 ; i++) {
+		mod->mins[i] = pmodel->scale_origin[i];
+		mod->maxs[i] = pmodel->scale_origin[i] + pmodel->scale[i]*255;
+	}
+	mod->radius = RadiusFromBounds(mod->mins, mod->maxs) + 0.125f;
 
 //
 // move the complete, relocatable alias model to the cache
@@ -1696,12 +1719,13 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 	end = Hunk_LowMark ();
 	total = end - start;
 	
-	Cache_Alloc (&mod->cache, total, loadname);
-	if (!mod->cache.data)
-		return;
-	memcpy (mod->cache.data, pheader, total);
+    /* Release the decoded staging allocation before growing the cache. */
+    copy=total<=512*1024?malloc(total):NULL;
+    if(copy){memcpy(copy,pheader,total);Hunk_FreeToLowMark(start);}
+    Cache_Alloc (&mod->cache, total, loadname);
+    if(mod->cache.data)memcpy(mod->cache.data,copy?copy:(void *)pheader,total);
+    if(copy)free(copy);else Hunk_FreeToLowMark(start);
 
-	Hunk_FreeToLowMark (start);
 }
 
 //=============================================================================
@@ -1915,4 +1939,3 @@ void Mod_Print (void)
 		Con_Printf ("\n");
 	}
 }
-

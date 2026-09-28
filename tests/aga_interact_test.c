@@ -26,3 +26,5 @@ int main(void) {
     assert(in_mlook.state==1);
     return 0;
 }
+
+int AW_IntroUse(void){return 0;}

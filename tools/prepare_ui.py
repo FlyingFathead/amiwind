@@ -99,6 +99,18 @@ def pack_font(path, size):
     return struct.pack('<4sBBH', b'AWF1', size, size+2, len(pixels)) + metrics + pixels
 
 
+def background_packet(background,palette,protected):
+    """Give artwork the free palette entries without changing UI/text colors."""
+    free=[i for i in range(256) if i not in protected]
+    if len(free)<16:raise ValueError('Insufficient background palette budget')
+    colors=background.quantize(colors=len(free),dither=Image.Dither.NONE).getpalette()
+    result=bytearray(palette)
+    for n,i in enumerate(free):result[i*3:i*3+3]=bytes(colors[n*3:n*3+3])
+    pal=Image.new('P',(1,1));pal.putpalette(result)
+    indexed=background.quantize(palette=pal,dither=Image.Dither.NONE)
+    return b'AWB2'+struct.pack('<HH',320,200)+result+indexed.tobytes()
+
+
 def convert(data, palette_path, out):
     import sys, io
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
@@ -129,11 +141,30 @@ def convert(data, palette_path, out):
     pal = Image.new('P',(1,1)); pal.putpalette(palette)
     indexed = atlas.convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE)
     (out/'ui.awu').write_bytes(b'AWU1'+struct.pack('<HH',64,64)+indexed.tobytes())
+    path='textures/menu_morrowind.dds';raw=assets.read(path)
+    background=Image.open(io.BytesIO(raw)).convert('RGB').resize((320,200),Image.Resampling.BOX)
+    # Front-end artwork has its own palette; preserve every UI atlas/text color.
+    protected=set(indexed.tobytes())|{254,255}
+    for rgb in ((0,0,0),(76,67,46),(151,131,87),(223,199,144),(115,108,89),
+                (22,20,18),(210,184,121),(114,114,114),(62,53,36)):
+        protected.add(min(range(256),key=lambda i:sum((palette[i*3+c]-rgb[c])**2 for c in range(3))))
+    (out/'menu.awb').write_bytes(background_packet(background,palette,protected))
+    sources[path]=hashlib.sha256(raw).hexdigest()
+    splash=next((p for p in data.iterdir() if p.name.casefold()=='splash' and p.is_dir()),None)
+    screens=sorted((p for p in splash.iterdir() if p.suffix.casefold() in ('.tga','.dds','.bmp','.png')),
+                   key=lambda p:p.name.casefold()) if splash else []
+    loading=[]
+    if not screens:print('Warning: Splash images not found; loading screens will use the original menu artwork.')
+    for i,p in enumerate(screens[:32]):
+        art=Image.open(p).convert('RGB').resize((320,200),Image.Resampling.LANCZOS)
+        name=f'loading{i:02d}.awb';(out/name).write_bytes(background_packet(art,palette,protected))
+        loading.append({'source':p.name,'sha256':sha(p),'output':name})
     for size in (16,14,12): (out/f'magic{size}.awf').write_bytes(pack_font(font,size))
     report = {'format':'AmiWind private UI conversion 1','font_sha256':sha(font),
               'atlas_sha256':sha(OriginalFont(font).texture_path),'palette_sha256':sha(Path(palette_path)),
               'sources':sources,'encoding':'Original bitmap byte indices; CP1252 game strings',
-              'variants':[16,14,12], 'coverage':'three ink shades and transparent; packed 2-bit'}
+              'variants':[16,14,12], 'coverage':'three ink shades and transparent; packed 2-bit',
+              'loading_screens':loading}
     (out/'ui-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 

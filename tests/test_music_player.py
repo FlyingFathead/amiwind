@@ -25,7 +25,12 @@ typedef unsigned char byte;typedef int qboolean;
 static char com_gamedir[1024];
 static struct {float value;} bgmvolume={1.0};
 static double Sys_FloatTime(void){return 0;}
-static void Con_Printf(const char *fmt,...){(void)fmt;}
+static int debug_overlay,track_notices,status_queries;
+static int AW_DebugOverlaysEnabled(void){return debug_overlay;}
+static void Con_Printf(const char *fmt,...){
+    if(strstr(fmt,"OST %s: track"))track_notices++;
+    if(strstr(fmt,"OST group="))status_queries++;
+}
 static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn;}
 ''')
             (p / "sound.h").write_text("typedef struct {int left,right;} portable_samplepair_t;\n")
@@ -41,6 +46,7 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
                 (p / "music" / f"track{number:02}.mws").write_bytes(pack_stream(pcm))
             playlist = p / "music/playlist.txt"
             playlist.write_text("4 0 4 11 42\n2 42 83\n")
+            subprocess.run([str(exe), str(p), "notifications"], cwd=p, check=True, timeout=10)
             subprocess.run([str(exe), str(p), "normal"], cwd=p, check=True, timeout=10)
             events = (p / "music-events.csv").read_text().splitlines()
             completed = [line.split(",") for line in events[1:] if ",complete," in line]
@@ -51,6 +57,8 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
             demo = [line.split(',') for line in events if ',early_game_demo_start_1,' in line]
             self.assertTrue(demo)
             self.assertTrue(all(row[2:5] == ['0', '4', 'track04.mws'] for row in demo))
+            playlist.write_text("4 0 4 11 42\n2 42 83\n83\n")
+            subprocess.run([str(exe), str(p), "menu"], cwd=p, check=True, timeout=10)
             (p / 'music/track04.mws').unlink()
             subprocess.run([str(exe), str(p), "demo-missing"], cwd=p, check=True, timeout=10)
             playlist.write_text("1 0\n1 0\n")

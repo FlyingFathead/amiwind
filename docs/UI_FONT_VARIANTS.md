@@ -45,3 +45,10 @@ in v0.0.18-dev1. Extended-character locale mapping, full dialogue input routing,
 voice pacing and physical-target performance remain open. Original and converted font artwork
 stays outside this public source tree. The private study preserves its converter,
 metrics, preview images, rejected monochrome trial and notes.
+
+## v0.0.18-dev2 palette and optional frame
+
+Unused duplicate-sky palette slots 225..253 are audited across world/alias/UI
+pixels, packed hands and light/fog tables before assigning original bar colors.
+The console font and existing world pixels remain unchanged. Gold outer frame
+is available in Options and defaults off; dialogue borders remain enabled.

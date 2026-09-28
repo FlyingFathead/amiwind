@@ -11,7 +11,8 @@ A1200 performance. The current reference needs 040/FPU, AGA, 2 MiB Chip and
 and supply your installed game files. AmiWind's Morrowind demo cannot run
 without converted data from your own copy.** An existing installation is fine;
 there is no need to reinstall intact base files. GOG installers are not read
-directly. Tribunal, Bloodmoon, Video and mod load orders are not used yet.
+directly. Tribunal, Bloodmoon and mod load orders are not used. The optional base-game
+Video/mw_intro.bik and Splash artwork are converted when present.
 
 ## 1. Quickest setup and build
 
@@ -20,6 +21,13 @@ From the repository root, run:
 ```sh
 ./build.sh --autoinstall
 ```
+
+Native compilation defaults to the available CPU thread count, respecting CPU
+affinity and Linux container quotas. Use `-j 4` / `--jobs 4` (`--j 4` also works)
+to set a limit, or `--single-thread` / `-j 1` for one compiler job. The same limit
+reaches VIS and LIGHT. The pinned QBSP has no thread switch and stays serial;
+Python conversion stages remain ordered and FFmpeg manages its own threads.
+A higher job count is a scheduling choice, not a promise of linear speedup.
 
 Choose your Morrowind installation. The tool validates its files, discovers
 existing dependencies, proposes missing packages/downloads with their source

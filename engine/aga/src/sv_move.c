@@ -21,7 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
-#define	STEPSIZE	18
+/* Humanoid movement uses the same quarter-scale 34-unit step as the player. */
+#define	STEPSIZE	8.5f
 
 /*
 =============
@@ -424,4 +425,3 @@ void SV_MoveToGoal (void)
 		SV_NewChaseDir (ent, goal, dist);
 	}
 }
-

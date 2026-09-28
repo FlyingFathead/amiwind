@@ -18,6 +18,7 @@ from prepare_music import playlists, unpack_stream
 from check_aga_binary import check_binary
 from amiga_fs import check_image
 from project_version import VERSION, check_native_versions
+from build_jobs import add_jobs, resolve_jobs
 
 ROOT=Path(__file__).resolve().parents[1]
 UPSTREAM_COMMIT='9c62d905151614af3e788ae3145a0d4ecc8a7bb8'
@@ -114,14 +115,16 @@ def engine(args):
     out=new_output(args.out)
     tree,source_hashes=stage_runtime(out)
     env=os.environ.copy();env['PATH']=str(args.sdk.resolve()/'bin')+os.pathsep+env.get('PATH','')
-    run(['make','-B','-j4',('nofpu' if args.cpu=='68020' else 'fpu'),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0'),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
+    jobs=resolve_jobs(args.jobs)
+    print(f'Native compiler jobs: {jobs}',flush=True)
+    run(['make','-B',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0'),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
     binary=tree/('build/AmiQuakeGCC-NoFPU' if args.cpu=='68020' else 'build/AmiQuakeGCC')
     check_binary(binary.read_bytes())
     checker=tree/'build/AmiWindCheck'
     vasm=args.vasm.resolve() if args.vasm else args.sdk.resolve()/'bin/vasmm68k_mot'
     run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',args.sdk.resolve()/'m68k-amigaos/ndk-include','-I',tree/'build/version','-o',checker,tree/'boot/bootcheck.asm'])
     check_binary(checker.read_bytes())
-    (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n')
+    (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n')
     print(binary)
 
 def image(args):
@@ -141,12 +144,26 @@ def image(args):
     cfg.write_text(startup_config(cfg.read_text()))
     if args.data_files:
         from prepare_ui import convert as convert_ui
+        from ui_palette import reserve as reserve_ui_palette
         try:
+            reserve_ui_palette(args.data_files,boot/'id1')
             convert_ui(args.data_files,boot/'id1/gfx/palette.lmp',boot/'id1/gfx')
         except FileNotFoundError:
             print('[warning] Original font inputs missing; readable UI fallback retained.',flush=True)
-    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\naw_demo_start\n')
-    print('Default start: early_game_demo_start_1 enabled; Seyda Neen town center + track 04.',flush=True)
+    from prepare_logo import prepare_logo,prepare_menu_logo
+    logo=ROOT/'resources/media/AmiWind_wordmark.png'
+    prepare_menu_logo(logo,boot/'id1/gfx/palette.lmp',boot/'id1/gfx/amiwind.awi')
+    logo_stream=boot/'id1/intro/amiwind.awv'
+    if logo_stream.exists():logo_stream.unlink()
+    prepare_logo(logo,logo_stream,boot/'id1/gfx/magic16.awf')
+    movie=boot/'id1/intro/mw_intro.awv'
+    if movie.exists():
+        from prepare_video import validate as validate_video
+        validate_video(movie)
+    else:
+        print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\naw_startup\n')
+    print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
     (boot/'S/startup-sequence').write_text('FailAt 10\nSYS:AmiWindCheck\nStack 300000\nSYS:AmiWind\n')
@@ -180,7 +197,7 @@ def image(args):
         if digest(source)!=track['sha256']:raise ValueError('Music manifest mismatch')
         shutil.copyfile(source,target/track['file'])
     shutil.copyfile(music/'soundtrack.json',target/'soundtrack.json')
-    (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n')
+    (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n')
     # 128 MiB FFS partition, well below legacy size boundaries. No Workbench files.
     part=out/'partition.hdf';hdf=out/f'AmiWind-v{VERSION}.hdf'
     cmd=[args.xdftool,part,'create','size=128Mi','+','format','AMIWIND','ffs','+','boot','install']
@@ -198,12 +215,13 @@ def image(args):
         check.unlink()
     check_image(hdf,partition="DH0")
     part.unlink()
-    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'early_game_demo_start_1','enabled':True,'map':'seyda','spawn':'town-center info_player_start, standing-hull checked','music_track':4,'music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':9*1024*1024,'tested_minimum':False,'filesystem':'FFS, 128 MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
+    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':9*1024*1024,'tested_minimum':False,'filesystem':'FFS, 128 MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
     print(hdf)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     e=sub.add_parser('engine');e.add_argument('--cpu',choices=['68020','68040'],default='68040');e.add_argument('--archive',type=Path,help='Optional legacy provenance check; source is always engine/aga in this repository');e.add_argument('--out',type=Path,required=True);e.add_argument('--sdk',type=Path,required=True);e.add_argument('--vasm',type=Path,help='68000 preflight assembler; defaults to the SDK vasm')
+    add_jobs(e)
     i=sub.add_parser('image')
     i.add_argument('--data-files',type=Path,help='Owned original font and UI assets; absent retains fallback')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')

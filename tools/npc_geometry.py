@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Host-only TES3 male humanoid assembly and original idle pose sampling.
+"""Host-only TES3 humanoid assembly and original animation sampling.
 
 PyFFI is an external NIF reader. No game data or OpenMW implementation is embedded.
 Matrices use row vectors, matching the NIF reader; skin offsets are inverse binds.
@@ -103,7 +103,7 @@ class Skeleton:
         if b<=a:raise ValueError('Invalid idle range')
         return np.linspace(a,b,count,endpoint=False),(b-a)/count
 
-def assemble(assets, appearance, skeleton, times):
+def assemble(assets, appearance, skeleton, times, face_samples=None):
     N=skeleton.N;shapes=[];materials=[];textures={};cache={}
     poses=[skeleton.pose(float(t)) for t in times]
     for part in appearance['parts']:
@@ -146,7 +146,15 @@ def assemble(assets, appearance, skeleton, times):
                 attach=part['attach'];mirror=np.eye(4);mirrored=attach.startswith('Left')
                 if mirrored:mirror[0,0]=-1
                 mirror[3,:3]=offset
-                positions=np.array([(hom@transform@mirror@pose(attach))[:,:3] for pose in poses])
+                if part['slot']==0 and face_samples is not None:
+                    from npc_faces import sample_morph
+                    if len(face_samples)!=len(poses):raise ValueError('Facial sample count mismatch')
+                    head=[]
+                    for pose,sample in zip(poses,face_samples):
+                        v=vertices if sample is None else sample_morph(node,data,N,*sample)
+                        head.append((np.column_stack((v,np.ones(len(v))))@transform@mirror@pose(attach))[:,:3])
+                    positions=np.array(head)
+                else:positions=np.array([(hom@transform@mirror@pose(attach))[:,:3] for pose in poses])
             uv=np.array([[u.u,u.v] for u in g.uv_sets[0]]) if g.num_uv_sets else np.zeros((len(vertices),2))
             colours=np.array([[c.r,c.g,c.b,c.a] for c in g.vertex_colors]) if g.has_vertex_colors else np.ones((len(vertices),4))
             diffuse=[1.,1.,1.];alpha=1.;source=None
@@ -160,6 +168,11 @@ def assemble(assets, appearance, skeleton, times):
             mi=len(materials);materials.append({'texture_index':ti,'diffuse':diffuse,'alpha':alpha})
             faces=np.array(g.get_triangles(),int)
             if mirrored:faces=faces[:,[0,2,1]]
+            if face_samples is not None:
+                # Locomotion is advanced by collision-aware game movement. Bake
+                # the authored cycle in place; retain its vertical body motion.
+                root=np.array([pose('bip01')[3,:2] for pose in poses])
+                positions[13:,:,:2]-=(root[13:]-root[0])[:,None,:]
             positions*=np.array([appearance['weight'],appearance['weight'],appearance['height']])*.25
             shapes.append({'name':name,'part':part['slot'],'positions':positions,'faces':faces,'uv':uv,'colours':colours,'material':mi})
             found+=1
@@ -179,7 +192,7 @@ def bake(shapes,materials,textures,palette,budget=480):
     from scipy.spatial import cKDTree
     if not 64<=budget<=480:raise ValueError('Triangle budget must be 64..480')
     weights=np.array([len(s['faces'])*(1.7 if s['part']==0 else 1) for s in shapes],dtype=float);weights/=weights.sum()
-    quotas=np.full(len(shapes),4,int);remaining=budget-int(quotas.sum())
+    quotas=np.array([min(120,len(s['faces'])) if s['part']==0 and len(s['positions'])>8 else 4 for s in shapes],int);remaining=budget-int(quotas.sum())
     if remaining<0:raise ValueError('Too many separate shapes for budget')
     quotas+=np.floor(weights*remaining).astype(int)
     skin=Image.new('RGB',(512,256));allframes=[];outfaces=[];outuv=[];fi=0

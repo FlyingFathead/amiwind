@@ -146,3 +146,125 @@ triggers; reproduce their roles separately from speech and music.
 Use the original main-menu background from owned assets. Present New Game,
 Load Game, Options and Exit; Load Game remains visibly disabled until saves
 exist. New Game must enter the playable scripted opening once implemented.
+
+## Reading, menus and town voices, 05:39–05:40
+
+Match the original main-menu presentation and distinguish returning to the game
+from exiting to the main menu. Confirm Escape behavior; no save capability is
+implied by a displayed disabled entry. Add book and scroll views, needed for the
+registration papers and subsequent reading. Use source text and layout metadata.
+Town NPCs need varied periodic voice lines with original eligibility conditions,
+individual/global cooldowns and overlap handling, not one repeated audition.
+
+## Generic dialogue reference, 05:41
+
+Owner supplied the UESP Generic Dialogue Voiced table to cross-check variation.
+It explicitly flags missing entries and mixed expansion coverage. Use the owned
+master's ordered INFO conditions and assets as the authority; distinguish Hello
+from Idle, service, faction, weather, crime and combat responses. Do not import
+expansion-only or player-state-dependent lines into an unconditional town pool.
+
+## Actor collision, attack reactions and ambience, 05:58
+
+- [ ] NPCs need physical collision: no walking through people. Retain movement
+  around actors, doorway clearance and collision-aware escort behavior.
+- [ ] Punches need hit detection, original hand-to-hand fatigue/health rules,
+  aggression and combat reactions, nearby witness/guard responses and crime
+  consequences. An animation alone is not a functioning attack.
+- [ ] Reproduce environmental ambience separately from music and dialogue:
+  localized ship creaks/water, interior loops, region/weather sounds and
+  randomized intervals. Audit source scripts and sound records first.
+
+## Checkpoint pace and camera review, 06:01–06:04
+
+Keep the base version at 0.0.18 during these early milestones; increment only
+the dev suffix. Mark actual completed items with their checkpoint, leaving
+partial systems open. The owner reports that dev1 is heading in the right
+direction, but requests distinct red/blue/green bars and an eye-height check.
+The taller impression may have been one guard or fatigue; still verify it.
+
+## Frame and dialogue feedback, 06:11–06:13
+
+Try the original thick gold menu-border artwork around the whole game canvas,
+keeping the lower dialogue band black. Preserve projection/actor scale while
+comparing the frame. Physical emulator overscan is outside the game framebuffer.
+Owner likes the original voice clips and dialogue panels rising from below;
+retain this presentation and extend its line variation and synchronized faces.
+
+## Outer-frame correction and journal name, 06:14–06:16
+
+The outer gold frame is optional and OFF by default. Expose its toggle in
+Options; dialogue boxes retain their existing original borders. Rename this
+file to HORSTATORS_JOURNAL_2026-09-28.md, including the source allowlist.
+
+## v0.0.18-dev2 implementation checkpoint
+
+The filename correction and optional frame setting are applied. The first ship
+script adapter now has Jiub, name entry, original voices, talking/blinking heads
+and guard navigation. The dark hold uses its baked lamps plus original scripted
+hull-water loops. Bars have the intended three colors. Full creation and story
+release remain open; see RELEASE-v0.0.18-dev2.md for exact scope and evidence.
+
+## v0.0.18-dev3 checkpoint
+
+Original main-menu artwork is now converted and displayed, with separate New
+Game/Load/Options/Exit choices and an explicit route back to the main menu. The
+model-cache correction removes the observed repeated Jiub/guard loads without
+shrinking actors or changing the viewport. Creation screens and the remaining
+opening stages are still on the active checklist.
+
+## 28 September, morning — dev3 playtest follow-up
+
+- Start at the original-style main menu, with disabled Load until saving exists.
+- Check the remembered ship/deck/Census music sequence. The original CharGen
+  scripts do not request music changes; exact original engine cue timing remains
+  unverified. Keep the deliberately chosen opening track clearly identified.
+- The upper hatch is a teleport doorway, activated by the player. Audit original
+  destination records so the same approach can cover other town entrances.
+- Ship guards currently allow the player through while the escort can be blocked
+  by the player. Make collision symmetric and distinguish waiting from failure.
+- The stair approach and upper barrel views have severe local slowdown; Jiub's
+  area is comparatively acceptable in the owner's setup. Measure fixed views;
+  preserve the repaired structural hull. Exterior loads only on hatch activation.
+- Hide the blinking top-right disk icon by default; retain a debugging switch.
+- Loading credits: By FlyingFathead; project URL; Special thanks to:
+  ChaosWhisperer, on three separate lines. Owner's joking role: “fart director”.
+
+## 28 September, 11:26–11:32 Helsinki — prophecy movie
+
+The owner requests the original skippable New Game prophecy video before Jiub.
+The initial data ZIP has an empty Video directory; the owner is preparing the
+missing video files. Convert on the desktop to a small indexed stream and PCM,
+without a heavyweight decoder on the Amiga. Preserve narration and source aspect
+ratio, support Esc, and start the selected ship music after the movie ends.
+Native synthetic playback and both continuation paths pass; original footage
+requires its own conversion and review.
+
+## 28 September, 11:39–11:41 Helsinki — project logo
+
+Use the supplied transparent AmiWind logo at the top of the README, retain its
+original PNG in resources/media, fade it in from black during startup, and place
+a scaled version in the upper main menu. Startup branding and the New Game
+prophecy movie are separate sequences.
+
+## Dev5 steering, 28 September 2026, Helsinki
+
+- Original main-menu artwork without the added project logo. Put the version
+  at bottom right. Keep the startup fade; simplify the Esc wordmark and rule.
+- Sharper startup/logo/movie text, aligned menu rows and New Game confirmation.
+- Debug overlay off; console hidden during transitions through a saved switch.
+  Use the original Morrowind loading screens.
+- Restore the deck guard's scripted greeting/reminder cycle.
+- Default compilation to available CPU workers; provide ordinary jobs overrides.
+- Show entrance destination names now. On attempted entry into missing content,
+  display exactly “Interior not found.” and stay put. Keep the original interior
+  layouts and door arrival references for the next conversion milestone.
+- Research the original ship-to-Census escape restriction next. The recalled
+  invisible barrier is a research lead, not yet a verified mechanism.
+- Package dev5 as a complete public source snapshot plus dev4 incremental and
+  private playable. Owner publishes the full accumulated change set to GitHub.
+
+## Track-change overlay follow-up
+
+- [x] ~~Track changes must stop flashing text at the top left when the debug
+  layer is off.~~ Fixed in v0.0.19: routine notices obey the same switch.

@@ -3,7 +3,7 @@
 #include "amiwind_version.h"
 int sb_lines;
 static cvar_t coords = {"_aw_debug_coords", "0", true};
-static cvar_t overlays = {"_aw_debug_all", "1", true};
+static cvar_t overlays = {"_aw_debug_all", "0", true};
 static cvar_t fps = {"_aw_debug_fps", "0", true};
 extern int AW_FpsTenths(void);
 /* Temporary demo water at Z=0; visibility only, not water physics. */
