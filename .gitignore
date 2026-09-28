@@ -113,3 +113,6 @@ unins*
 !/docs/images/amiwind-v0.0.15-dev2-guard.png
 !/docs/images/amiwind-v0.0.15-dev2-town.png
 !/docs/images/amiwind-v0.0.15-dev2-waterfront.png
+
+# logs
+*.log
