@@ -139,6 +139,39 @@ This inspection work should inform region footprints, streaming/prefetch margins
 fog and height-triggered overview experiments before those choices are fixed.
 It is planned work; dev4 does not include a whole-world mesh or observer mode.
 
+
+## Recovered follow-up: world-scale flight and precomputed geometry experiments
+
+This follow-up was recovered from the surviving conversation after the frozen
+v0.0.21-dev4 package. It extends the terrain-topomesh milestone; it does not
+change dev4's implementation status.
+
+Add a dedicated native observer/stress mode, proposed as `dbg fly 1`, that can
+traverse the entire terrain coordinate space without normal gameplay simulation.
+The first representation should be deliberately simple: whole-world terrain
+coverage, ground colour/texture identity where practical, and a sea-level plane,
+with free noclip flight, fog, water, cell/region overlays, selectable terrain
+LODs and profiling counters. The complete source topology may exist in the host
+conversion/output model while the Amiga keeps only bounded/coarse resident
+representations. "Entire world loaded" therefore means the whole world is
+addressable by the experiment, not that every full-detail triangle is resident
+at once.
+
+Use this mode to determine whether the local mechanisms scale. Profile identical
+flight paths and viewpoints for triangle/edge submission, visible surfaces,
+cache churn, resident and peak memory, load/offload latency and audio continuity.
+Include high-altitude passes specifically because levitation makes false horizons
+and missing neighboring terrain much easier to expose.
+
+Also evaluate **something akin to Nanite in spirit, but on these old pieces of
+gear**: host-precomputed geometry hierarchies/clusters and multiple immutable
+representations selected by very cheap runtime rules. Candidate inputs to that
+selection include projected size, distance, altitude, fog limit and measured
+visibility. Distant structures may become simplified geometry, baked detail,
+silhouettes or nothing where the error is hidden. The Amiga must not perform
+expensive mesh simplification at runtime. Any added selection hierarchy must beat
+the existing AmiQuake renderer in measured total cost before adoption.
+
 ## Compact indices without accidental signed limits
 
 Use unsigned 16-bit local indices where the format and measured counts permit.

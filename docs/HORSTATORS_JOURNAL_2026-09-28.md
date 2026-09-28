@@ -418,3 +418,53 @@ durable state from rebuildable caches. Keep verified source behavior separate
 from proposals and unknowns. Use these tables to drive conversion, runtime
 structures, save schemas and acceptance cases, with Amiga memory limits in view.
 See [the development catalogue requirement](DEVELOPMENT.md#tables-tables-we-need-more-tables).
+
+### Post-dev4 recovered note — FREQUENT FLYER BONUS
+
+**Recovered from the surviving 28 September conversation after the frozen
+v0.0.21-dev4 package.** This is a design/profiling note, not an implemented dev4
+feature and not evidence that the whole world currently fits in Amiga memory.
+
+Horstator's proposed diagnostic is `dbg fly 1`: a dedicated world-observer mode
+for asking the question that matters after the local Seyda Neen success: **we
+have the mechanics locally, but can they scale?** Start with the entire
+Morrowind terrain topomesh in consistent world coordinates, retain the
+corresponding ground colour/texture identity where practical, and place it
+against an effectively unbounded sea-level plane. Do not add normal NPC, quest,
+container or intro simulation to the first experiment. The sea horizon and fog
+are allowed to do useful work; the purpose is to stress topology, visibility,
+LOD, residency and traversal without confusing the result with full gameplay.
+
+Fly it freely in noclip, from ground level through absurdly high viewpoints.
+Measure what is actually expensive: submitted/visible terrain, BSP/edge work,
+LOD selection, resident memory, cache pressure, loading/offloading stalls and
+audio deadlines. Keep fog active as both a genuine visibility/work bound and as
+part of Morrowind's atmosphere. The observer should make it easy to compare
+multiple LODs and streaming policies at identical positions so that "open
+world" remains a measured engineering target rather than an assumption.
+
+The owner does not want AmiWind to preserve the shape of Morrowind by turning it
+into a corridor of loading screens. Interiors being separate spaces is normal
+Morrowind behaviour; breaking the exterior world's sense of continuity is not.
+Distant objects may therefore need to become something else entirely: coarser
+terrain, simplified structures, baked surface detail, silhouettes or other
+precomputed substitutes that are cheap enough to select and render.
+
+### Something akin to Nanite, but on these old pieces of gear
+
+A related research question, partly serious and partly irresistible: could
+AmiWind eventually use **something akin to Nanite in spirit**, but designed for
+old Amiga-era hardware and the AmiQuake-derived renderer?
+
+This does **not** mean porting Unreal Engine's Nanite. The useful idea is to do
+heroic amounts of geometry analysis and preparation on the host side so the
+Amiga gets extremely cheap runtime choices about what geometry should exist,
+which prebuilt representation to use, and what can be rejected entirely.
+Possible experiments include hierarchical precomputed LODs, geometry clusters,
+projected-size/distance/altitude bands, precomputed visibility hints where they
+actually pay for themselves, and distant geometry reduced to cheaper forms.
+
+No expensive dynamic simplification belongs on the Amiga. AmiQuake already does
+remarkably well, so any extra hierarchy or bookkeeping must prove that it costs
+less than simply letting the existing renderer draw the polygons. The
+`dbg fly 1` world-scale observer is the place to measure that question.

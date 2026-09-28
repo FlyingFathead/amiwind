@@ -46,6 +46,35 @@ Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
 
 See [terrain inspection plan](WORLD_MAPPING_PLAN.md#next-milestone-entire-world-terrain-topomesh).
 
+
+## Recovered follow-up: FREQUENT FLYER BONUS / whole-world scaling harness
+
+Recovered from the surviving conversation after the frozen v0.0.21-dev4
+package; documentation/planning only.
+
+- [ ] Add a terrain-only native observer command, proposed as `dbg fly 1`, with
+  unrestricted noclip flight over the full Morrowind terrain coordinate space.
+- [ ] Start with terrain topology plus ground colour/texture identity where
+  practical and a sea-level plane; keep NPCs, quests and normal gameplay out of
+  the first benchmark so geometry/residency costs are measurable in isolation.
+- [ ] Keep fog active and couple it to actual work rejection/residency policy,
+  not only presentation. Measure low and high-altitude flight paths at fixed
+  viewpoints and speeds.
+- [ ] Expose/select prebuilt terrain LODs and record triangle/edge work, visible
+  surfaces, RAM, cache behaviour, loading/offloading stalls and audio deadlines.
+  The experiment's central question is: **the mechanics work locally; can they
+  scale to the whole world?**
+- [ ] Investigate **something akin to Nanite, but on these old pieces of gear**:
+  host-precomputed geometry hierarchies/clusters and cheap runtime selection of
+  immutable representations. Possible criteria include projected size, distance,
+  altitude and fog. No runtime mesh simplification is assumed. Adopt only if the
+  total measured cost beats simpler AmiQuake/BSP/LOD handling.
+- [ ] Preserve the open-world illusion as an acceptance criterion. Interiors may
+  load separately as in Morrowind, but exterior traversal should not degrade into
+  gratuitous loading screens merely to satisfy the partitioning strategy.
+
+See [world-scale flight and precomputed geometry experiments](WORLD_MAPPING_PLAN.md#recovered-follow-up-world-scale-flight-and-precomputed-geometry-experiments).
+
 ## Fundamental mechanics before attribute effects
 
 - [ ] **Tables, tables, we need more tables:** catalogue character attributes,

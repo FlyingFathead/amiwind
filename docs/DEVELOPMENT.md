@@ -182,6 +182,29 @@ colour or texture. Keep the visible wall's material, UVs and shape intact; do no
 blank the surrounding wall. Confirm concealment from both sides and every
 supported door state before removing geometry from the runtime asset.
 
+
+## Something akin to Nanite, but on these old pieces of gear
+
+Recovered post-dev4 research note. Treat this as an optimization experiment, not
+a promised renderer feature.
+
+AmiWind should prefer expensive **offline** analysis and cheap runtime choices.
+Where useful, conversion may generate hierarchical/clustered geometry and several
+immutable representations of the same terrain or structure. Runtime selection
+may use distance, projected size, altitude, fog/visibility bounds and measured
+resource budgets, but it must remain simpler than the work it avoids.
+
+Do not add runtime mesh simplification to the Amiga. Preserve the unsimplified
+source/baseline, deterministic conversion inputs, per-candidate change reports,
+material/UV/silhouette constraints and collision independence. Distant detail may
+become simplified geometry, baked texture detail, silhouettes or be omitted only
+when the measured visual error and gameplay constraints allow it.
+
+AmiQuake already provides strong BSP/frustum/edge machinery. Reuse that machinery
+first. Any extra hierarchy, visibility hint or LOD selector needs matched native
+profiling that includes its own bookkeeping, memory and cache cost. The proposed
+`dbg fly 1` whole-world observer is the intended stress harness for these trials.
+
 ## Tables, tables, we need more tables
 
 Owner requirement, 28 September 2026, 20:41 Helsinki: maintain a cross-system
