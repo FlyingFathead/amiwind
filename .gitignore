@@ -114,6 +114,7 @@ unins*
 !/docs/images/amiwind-v0.0.15-dev2-town.png
 !/docs/images/amiwind-v0.0.15-dev2-waterfront.png
 !/resources/media/AmiWind_logo_clear_background.png
+!/resources/media/AmiWind_wordmark.png
 
 # logs
 *.log
