@@ -43,7 +43,7 @@ The packer writes a candidate into external `incoming/`. A separate validation
 pass checks archive paths, CRCs, hashes, sizes and source-byte equality before
 promotion into `releases/`. The archive includes `docs/PACKAGE_MANIFEST.json`.
 A SHA-256 sidecar is written beside it. Existing versioned releases are never
-overwritten: bump `pyproject.toml` and update the changelog before the next release.
+overwritten: bump `VERSION` and update the changelog before the next release.
 The generated package manifest is a receipt, excluded from Git and regenerated
 when packaging a checkout extracted from a previous source archive.
 

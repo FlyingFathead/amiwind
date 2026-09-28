@@ -14,7 +14,8 @@ def fixture(root):
     (root / "tools").mkdir()
     (root / "README.md").write_text("Synthetic source fixture\n")
     (root / "pyproject.toml").write_text('[project]\nversion = "0.1.0"\n')
-    (root / "tools/release-files.json").write_text(json.dumps(["README.md", "pyproject.toml", "tools/release-files.json"]))
+    (root / "VERSION").write_text('0.1.0\n')
+    (root / "tools/release-files.json").write_text(json.dumps(["README.md", "VERSION", "pyproject.toml", "tools/release-files.json"]))
 
 
 class Release(unittest.TestCase):

@@ -1,0 +1,32 @@
+{
+  "version": "0.0.17",
+  "candidate": "test-004",
+  "base": "AmiWind-v0.0.17-public-source-test-003.zip",
+  "base_sha256": "c4e034b8b8e4ddfe348d02c02eaed7e39443ae5b29663e53a55524ea206ba5ee",
+  "changed_files": [
+    ".github/workflows/source-check.yml",
+    "docs/BUILD_DEPENDENCIES.md",
+    "docs/BUILD_SETUP-v0.0.17.md",
+    "docs/LINUX_BUILD.md",
+    "docs/PATCH-v0.0.17-test-004.json",
+    "pyproject.toml",
+    "tests/test_build_setup.py",
+    "tools/build-reference.json",
+    "tools/build.py",
+    "tools/fetch_native.py",
+    "tools/fetch_toolchain.py",
+    "tools/install_dependencies.py",
+    "tools/prepare_scenery.py",
+    "tools/release-files.json",
+    "tools/setup_build.py"
+  ],
+  "removed_files": [],
+  "instructions": "Apply over test-003 in the same isolated checkout, then rerun --autoinstall with the same tools-dir. The managed venv receives setuptools; completed native tools are retained. A new build run keeps previous results and logs.",
+  "fixes": [
+    "Explicit setuptools dependency for PyFFI on Python 3.12.",
+    "Actual synthetic NIF write/read in preflight and CI.",
+    "Source URL, temporary archive, final destination and hash/revision printed within each native download step.",
+    "Verbose pip source output."
+  ],
+  "validation": "40 build/setup tests passed. Reproduced distutils failure in isolated Python 3.12 without setuptools, then passed actual synthetic TES3 NIF write/read with setuptools 84.0.0. Full-game conversion still pending."
+}

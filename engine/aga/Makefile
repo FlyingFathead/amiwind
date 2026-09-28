@@ -22,7 +22,11 @@ DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1
 # USE_FAST_RECIPROCAL=1: Use fast 1/x approximation in Turbulent8 (saves ~15 cycles per division)
 # Note: Defining FALSE/TRUE as this GCC SDK doesn't provide them
 # Note: id68k is for SAS/C compiler, we use GCC so keep it undefined
-INCLUDES = -I. -Isrc -ICDPlayerSDK
+INCLUDES = -I. -Isrc -ICDPlayerSDK -Ibuild/version
+
+PYTHON ?= python3
+VERSION_FILE ?= $(if $(wildcard VERSION),VERSION,../../VERSION)
+VERSION_GENERATOR ?= $(if $(wildcard tools/project_version.py),tools/project_version.py,../../tools/project_version.py)
 
 CFLAGS = $(ARCH_FLAGS) $(OPT_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES)
 
@@ -132,6 +136,11 @@ ALLOBJS = $(OBJS)
 .PHONY: all fpu nofpu
 all: fpu
 
+build/version/amiwind_version.h: $(VERSION_FILE) $(VERSION_GENERATOR)
+	$(PYTHON) "$(VERSION_GENERATOR)" --version-file "$(VERSION_FILE)" --out build/version
+
+$(ALLOBJS): build/version/amiwind_version.h | $(OBJDIR)
+
 # FPU target (68040 with FPU)
 # Uses Quake III fast InvSqrt for math (2.3x faster than hardware sqrt on real 68040)
 fpu: ARCH_FLAGS = -m68040 -m68881
@@ -188,5 +197,4 @@ config:
 	@echo "Flags: $(CFLAGS)"
 	@echo "Source files: $(words $(SRCS))"
 	@echo "Object files: $(words $(OBJS))"
-
 

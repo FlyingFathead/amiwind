@@ -36,16 +36,23 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
             subprocess.run(["cc", "-std=gnu89", "-O2", "-I" + str(p), "-I" + str(ROOT / "engine/aga/src"),
                             str(ROOT / "tests/music_player_test.c"), "-o", str(exe)], check=True)
             (p / "music").mkdir()
-            for number, frames in zip((0, 11, 42, 83), (8200, 16413, 9001, 11)):
+            for number, frames in zip((0, 4, 11, 42, 83), (8200, 9131, 16413, 9001, 11)):
                 pcm = bytes(v for i in range(frames) for v in ((i*3+number*17)%256, (i*7+number*31)%256))
                 (p / "music" / f"track{number:02}.mws").write_bytes(pack_stream(pcm))
             playlist = p / "music/playlist.txt"
-            playlist.write_text("3 0 11 42\n2 42 83\n")
+            playlist.write_text("4 0 4 11 42\n2 42 83\n")
             subprocess.run([str(exe), str(p), "normal"], cwd=p, check=True, timeout=10)
             events = (p / "music-events.csv").read_text().splitlines()
             completed = [line.split(",") for line in events[1:] if ",complete," in line]
             self.assertGreaterEqual(len(completed), 18)
             self.assertTrue(all(row[-1] == row[-2] for row in completed))
+            subprocess.run([str(exe), str(p), "demo"], cwd=p, check=True, timeout=10)
+            events = (p / "music-events.csv").read_text().splitlines()
+            demo = [line.split(',') for line in events if ',early_game_demo_start_1,' in line]
+            self.assertTrue(demo)
+            self.assertTrue(all(row[2:5] == ['0', '4', 'track04.mws'] for row in demo))
+            (p / 'music/track04.mws').unlink()
+            subprocess.run([str(exe), str(p), "demo-missing"], cwd=p, check=True, timeout=10)
             playlist.write_text("1 0\n1 0\n")
             stream = p / "music/track00.mws"
             stream.write_bytes(stream.read_bytes()[:20])

@@ -24,9 +24,17 @@ reference is A1200/AGA with 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM; stock A12
 performance is unproven. See the [checkpoint details](docs/CHECKPOINT_017_VALIDATION.md)
 and [next steps](docs/SEYDA_NEEN_NEXT_STEPS.md).
 
-**Current release: v0.0.16**, shared by source, tools and runtime. The public dry-run image
+**AmiWind v0.0.17** uses one `VERSION` for source, tools and runtime.
+See [release notes](docs/RELEASE-v0.0.17.md) and
+[setup changes and validation](docs/BUILD_SETUP-v0.0.17.md).
+The public dry-run image
 boots to a versioned notice screen. Build locally with your own Morrowind files
 for the playable scene; see [build instructions](docs/LINUX_BUILD.md).
+
+The default `early_game_demo_start_1` opening starts in **Seyda Neen's town
+center with track 04**, then continues the exploration shuffle. See
+[opening selection](docs/EARLY_GAME_DEMO_START.md) for details and the optional
+ship-first start.
 
 | Ship and dock | NPCs in town |
 | :---: | :---: |
@@ -58,9 +66,9 @@ is preserved alongside the accelerated AGA development track.
 complete native engine source, tests and documentation. `engine/aga/` is part of
 this repository, not a second repository. See [repository layout](docs/REPOSITORY_LAYOUT.md).
 
-This first consolidated repository release adds guided build checks, asset-free
-CI, unified versioning and boot credits. It also changes ordinary water tint to
-blue and the exterior fog/draw default to 540. See the [release notes](docs/RELEASE-v0.0.16.md).
+Version 0.0.17 adds one-command dependency setup and building, optional FS-UAE
+autorun, and the town-center demo opening. The owner has confirmed the rebuilt
+demo works on their Linux/FS-UAE setup. See the [release notes](docs/RELEASE-v0.0.17.md).
 
 **Original Morrowind game files are required. You must provide your own copy.**
 Please support the original work by purchasing Morrowind from
@@ -105,6 +113,36 @@ generated game images are private build outputs, not public source releases.
 
 ## Building and playing
 
+**Quickest way to compile on Ubuntu/Debian Linux (or Ubuntu under WSL):**
+
+```sh
+./build.sh --autoinstall
+```
+
+**Easiest way to build and run on Linux:** install [FS-UAE](https://fs-uae.net/),
+then point the command at your own **A1200 Kickstart 3.1 ROM**:
+
+```sh
+./build.sh --autoinstall --autorun-fs-uae \
+  --kickstart-file "/path/to/your/kickstart-3.1-a1200.rom"
+```
+
+Replace the example ROM path with your actual file or a directory containing ROMs. The builder checks FS-UAE
+and the ROM before setup, fills both ROM and HDF paths in the
+[documented preset](docs/FS-UAE-PLAYTESTING.md), and launches the finished image.
+If you omit `--kickstart-file`, it checks `~/.roms/kickstart-3.1-a1200.rom` under
+the current user's home directory, then checks files directly in `~/.roms/` for
+the known SHA-256. If no ROM is selected, it **asks for a file or directory**.
+Directory searches select a checksum match; an explicitly selected different
+ROM warns that compatibility is unverified. Noninteractive runs exit with clear
+instructions if no ROM is selected. ROMs are never downloaded or included.
+
+Select your Morrowind installation and confirm the dependency proposal. The tool
+reuses installed dependencies, fetches missing pinned SDK/map tools, builds the
+reference QuakeC compiler when needed, uses its Python environment automatically,
+and continues into the build. APT may also ask for your sudo password and package
+confirmation. Use `--autoinstall --plan` to preview setup without installing.
+
 Start with [Linux build instructions](docs/LINUX_BUILD.md) or
 [Windows 11 / WSL](docs/WINDOWS_BUILD.md). Windows/WSL full builds remain untested.
 The tool accepts your Morrowind installation root, checks required file sizes
@@ -122,12 +160,15 @@ guide to install the required tools and build the playable HDF.
 
 ### Run AmiWind in an emulator
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.16 configuration template |
-| --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.16-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.16-WinUAE.uae) |
+The FS-UAE autorun command above handles configuration and launch automatically.
+For manual setup or WinUAE, use the guides and steps below.
 
-1. Build `AmiWind-v0.0.16.hdf` from your own Morrowind installation using the
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.17 configuration template |
+| --- | --- | --- | --- |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.17-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.17-WinUAE.uae) |
+
+1. Build `AmiWind-v0.0.17.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
    playable game image.
 2. Install an emulator from its official homepage above and save a local copy

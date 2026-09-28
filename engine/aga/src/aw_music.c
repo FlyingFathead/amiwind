@@ -110,6 +110,25 @@ static void music_previous(void) {
 }
 static void music_mode(void) {mode=!mode;if(available){manual_changes++;fade=128;advance("mode");}}
 static void music_status(void) {Con_Printf("OST group=%s track=%02d played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",mode?"battle":"explore",current,played,total,completions,reads,errors);}
+/* A deliberate demo opening followed by the remaining exploration shuffle.
+ * Keep the chosen track in Previous/Next history and out of the first bag. */
+int AW_MusicStartTrack(int id) {
+    int i,j,t,n=0;
+    if(!available)return 0;
+    for(i=0;i<counts[0];i++)if(groups[0][i]==id)break;
+    if(i==counts[0])return 0;
+    mode=0;
+    if(current==id && played==0 && music)log_event("early_game_demo_start_1");
+    else if(!open_track(id,"early_game_demo_start_1")) {
+        advance("demo-track-fallback");return 0;
+    }
+    paused=0;fade=0;previous_l=previous_r=0;
+    length[0]=1;cursor[0]=0;history[0][0]=id;
+    for(i=0;i<counts[0];i++)if(groups[0][i]!=id)bags[0][n++]=groups[0][i];
+    for(i=n-1;i>0;i--){j=random_bounded(i+1);t=bags[0][i];bags[0][i]=bags[0][j];bags[0][j]=t;}
+    left[0]=n;
+    return 1;
+}
 void CDAudio_Play(byte track,qboolean looping) {(void)track;(void)looping;paused=0;}
 void CDAudio_Stop(void) {paused=1;}
 void CDAudio_Pause(void) {paused=1;}

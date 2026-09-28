@@ -13,6 +13,21 @@ import tempfile
 REFERENCE = Path(__file__).with_name("build-reference.json")
 
 
+def find_qcc(args):
+    """An explicit compiler always wins; otherwise prefer the reference tool."""
+    if args.qcc:
+        return args.qcc
+    candidates = [args.tools_dir / 'Quake-Tools/qcc-host', 'qcc-host', 'qcc', 'fteqcc']
+    return next((str(Path(shutil.which(str(value))).resolve()) for value in candidates if shutil.which(str(value))), None)
+
+
+def find_quake_tools(args):
+    if args.quake_tools:
+        return args.quake_tools.expanduser().resolve()
+    candidate = args.tools_dir / 'ericw/bin'
+    return candidate.resolve() if all(shutil.which(str(candidate/name)) for name in ('qbsp', 'vis', 'light')) else None
+
+
 def compare(detected, reference):
     if detected is None:
         return "missing"
@@ -37,11 +52,14 @@ def probe(name, value, spec):
     row = {"name": name, "reference": spec["version"], "detected": None, "status": "missing"}
     if not path:
         return row
-    row["path"] = str(Path(path).resolve())
+    path = str(Path(path).resolve())
+    row["path"] = path
     row["sha256"] = hashlib.sha256(Path(path).read_bytes()).hexdigest()
     if "sha256" in spec:
         row.update(detected="sha256:" + row["sha256"],
                    status="matching" if row["sha256"] == spec["sha256"] else "unknown")
+        if name == 'qcc' and Path(path).name.lower().startswith('fteqcc'):
+            row.update(detected="FTEQCC; alternative compiler (not the id qcc reference)", status="alternative")
         return row
     try:
         # Some older tools print their banner and reject --version. Isolate
@@ -50,6 +68,12 @@ def probe(name, value, spec):
             result = subprocess.run([path, *spec["arguments"]], cwd=temp,
                                     stdin=subprocess.DEVNULL, capture_output=True,
                                     text=True, errors="replace", timeout=10)
+        if spec.get('availability_only'):
+            available = result.returncode == 0 and 'usage:' in (result.stdout + result.stderr).lower()
+            row.update(status='available' if available else 'unknown',
+                       detected='help works; CLI has no version flag; see amitools package above'
+                       if available else 'help probe failed')
+            return row
         match = re.search(spec["pattern"], result.stdout + result.stderr)
         row["detected"] = match[1].strip() if match else "unrecognized banner"
         row["status"] = compare(row["detected"], spec["version"])
@@ -78,14 +102,17 @@ def report(args, tools=None):
         if name == "vasmm68k_mot" and args.vasm:
             value = args.vasm
         values.setdefault(name, value)
+    map_dir = find_quake_tools(args)
     for name in ("qbsp", "vis", "light"):
-        values.setdefault(name, args.quake_tools / name if args.quake_tools else name)
-    values.setdefault("qcc", args.qcc or "qcc-host")
+        values.setdefault(name, map_dir / name if map_dir else name)
+    values.setdefault("qcc", find_qcc(args))
     for name, spec in reference["tools"].items():
         rows.append(probe(name, values.get(name), spec))
     print("Versions compared with the recorded Linux reference:")
     for row in rows:
         print(f"  [{row['status']}] {row['name']}: {row['detected'] or 'not found'} (reference {row['reference']})")
+        if row.get('path'):
+            print(f"    {row['path']}")
     print("Matching identifies the recorded version, not proof that this machine builds successfully.")
-    print("Newer/older/unknown versions need validation; see docs/BUILD_DEPENDENCIES.md.")
+    print("Newer/older/unknown/alternative versions need validation; see docs/BUILD_DEPENDENCIES.md.")
     return rows

@@ -34,6 +34,21 @@ def nif_reader():
     return NifFormat
 
 
+def check_nif_reader():
+    """Exercise the actual reader without original game files or disk output."""
+    N = nif_reader()
+    original = N.Data(version=0x04000002)
+    original.roots = [N.NiNode()]
+    stream = io.BytesIO()
+    original.write(stream)
+    stream.seek(0)
+    decoded = N.Data()
+    decoded.read(stream)
+    if decoded.version != 0x04000002 or len(decoded.roots) != 1 or not isinstance(decoded.roots[0], N.NiNode):
+        raise ValueError('Synthetic TES3 NIF round-trip failed')
+    print('[ok] PyFFI TES3 reader: synthetic NIF write/read passed; no game files used.', flush=True)
+
+
 def bsa_read(bsa, name):
     e = bsa.entries[normpath(name)]
     with bsa.path.open('rb') as f:

@@ -2,6 +2,25 @@
 
 Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
 
+## Build-tool TODOs, 28 September 2026
+
+- Add measured parallelism to independent host conversion stages and per-asset
+  work. Native compilation already uses `make -j4`, and some map tools use
+  internal threads; the overall conversion pipeline still runs stages in order.
+  First identify actual dependencies, then try independent music/terrain work
+  and bounded model or audio conversion workers. Preserve stage dependencies
+  and avoid concurrent writes to shared output directories.
+- Provide a configurable worker limit, account for memory and disk bandwidth,
+  and avoid multiplying worker counts with tools that already start threads.
+  Keep a serial mode for diagnosis. Compare elapsed time, peak memory and output
+  content with the same inputs before choosing a default.
+- Preserve live CLI feedback, step separators, progress and per-stage logs when
+  jobs overlap. Prefix concurrent output clearly; do not hide it by default.
+  Propagate failures, stop dependent jobs and retain completed results/logs.
+
+This parallel execution work is a future task, not a change to the owner's
+currently running v0.0.17 test-006 build.
+
 > *Fog only saves rendering work when we also cull what it hides.*
 
 Keep fog shading and visibility rejection coupled. The current renderer already

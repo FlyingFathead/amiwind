@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Build, independently validate and promote an immutable source archive."""
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -32,7 +34,7 @@ def allowed_files(root):
             raise ValueError("Unsafe source file list entry")
         preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in DOCUMENTATION_IMAGES
         native_aux = name in ("engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
-        if not preset and not native_aux and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", "LICENSE", "engine/aga/COPYING", "build.sh"):
+        if not preset and not native_aux and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)
 
@@ -87,9 +89,14 @@ def create_candidate(root, path):
                           for name, data in content.items()}}
     payload = dict(content)
     payload["docs/PACKAGE_MANIFEST.json"] = (json.dumps(manifest, indent=2, sort_keys=True)+"\n").encode()
+    epoch = int(os.environ.get('SOURCE_DATE_EPOCH', str(int((root/'VERSION').stat().st_mtime))))
+    stamp = datetime.fromtimestamp(epoch, timezone.utc)
+    if not 1980 <= stamp.year <= 2107:
+        raise ValueError('ZIP timestamp must be in 1980..2107')
+    zip_time = (stamp.year, stamp.month, stamp.day, stamp.hour, stamp.minute, stamp.second // 2 * 2)
     with zipfile.ZipFile(path, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name in sorted(payload):
-            info = zipfile.ZipInfo(f"{PROJECT}/{name}", date_time=(1980, 1, 1, 0, 0, 0))
+            info = zipfile.ZipInfo(f"{PROJECT}/{name}", date_time=zip_time)
             info.create_system = 3
             info.external_attr = (0o100755 if name == "build.sh" else 0o100644) << 16
             info.compress_type = zipfile.ZIP_DEFLATED

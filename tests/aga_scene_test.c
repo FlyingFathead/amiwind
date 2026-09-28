@@ -3,8 +3,16 @@
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 static char queued[64];static eval_t goal;static int clear_buttons,events;
+static void (*start_demo)(void);static cvar_t *demo_option;
+static int opening_track=-1,ship_available=1;
+void Cvar_RegisterVariable(cvar_t *c){demo_option=c;c->value=atof(c->string);}
+void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;}
+int Cmd_Argc(void){return 0;}
+char *Cmd_Argv(int i){return "";}
+int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 int COM_FOpenFile(char *name,FILE **f){
  const char *s="prison seyda 0 40 30 0 0 77 90\nprison evil;quit 0 40 30 0 0 77 90\n";
+ if(!strcmp(name,"maps/prison.bsp") && !ship_available){*f=NULL;return -1;}
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
 }
 void Con_Printf(char *fmt,...){}
@@ -35,5 +43,11 @@ int main(void){
  assert(p.v.angles[1]==90 && p.v.fixangle);assert(!AW_Interior());
  assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>50 && p.v.origin[2]<51);
  p.v.movetype=MOVETYPE_NOCLIP;assert(!AW_SceneUse());
+ AW_SceneInit();assert(start_demo && demo_option && demo_option->value==1);
+ assert(!strcmp(demo_option->name,"early_game_demo_start_1"));
+ start_demo();assert(!strcmp(queued,"map seyda\n"));assert(opening_track==4);
+ demo_option->value=0;opening_track=-1;start_demo();
+ assert(!strcmp(queued,"map prison\n"));assert(opening_track==-1);
+ ship_available=0;start_demo();assert(!strcmp(queued,"map seyda\n"));
  return 0;
 }

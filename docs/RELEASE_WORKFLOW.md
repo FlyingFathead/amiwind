@@ -2,12 +2,18 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number, currently **v0.0.16**. AmiWind remains a demo;
+Use one shared release number. The current release version is **v0.0.17**; see
+[release notes](RELEASE-v0.0.17.md) and [validation](VALIDATION-v0.0.17.md). The existing v0.0.16 release remains immutable.
+AmiWind remains a demo;
 keep increments within `0.0.x`, with `-devN` for development iterations as needed.
-The old separate Python pipeline numbering is historical. `pyproject.toml` is
-the authoritative version; build and packaging tools read it through
-`tools/project_version.py`. Python `.devN` maps to public `-devN` spelling.
-Native boot/HUD/load strings must match or the build/source gate stops.
+The old separate Python pipeline numbering is historical. Root `VERSION` is the
+only maintained version number. Build and packaging tools read it through
+`tools/project_version.py`; Python package metadata reads the same file.
+The native Makefile generates C and assembly version includes in the build tree.
+Boot/HUD/load text, the Amiga `$VER` identifier, receipts and output filenames
+therefore use that number. A value such as `0.0.17-dev1` normalizes to
+`0.0.17.dev1` in Python package metadata. Historical release records keep their
+original numbers. The naming examples below describe the published v0.0.16 set.
 
 ## Deliverables and structure
 
@@ -54,7 +60,9 @@ Update README, project state, changelog and validation notes before packaging.
 Report the tests actually run and their limits. Public CI compiles without game
 files or ROMs. Full conversion, Windows/WSL and physical Amiga behavior require
 their own validation. The owner runs Git/GitHub commands; see FIRST_RELEASE.md
-for one initialization/push/tag/release workflow. The repository starts private.
+for the historical first-release workflow. The source repository and source
+releases are public. Playable images, converted game files and supplied ROMs
+remain private and must never become GitHub release assets.
 
 ## Boot identity
 

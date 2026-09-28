@@ -49,9 +49,11 @@ class NativeSourceTests(unittest.TestCase):
     def compile_run(self, fixture, sources, defines=()):
         tree = Path(SOURCE).resolve()
         with tempfile.TemporaryDirectory() as tmp:
+            from project_version import generate_native
+            generate_native(ROOT/'VERSION', Path(tmp))
             exe = Path(tmp) / 'check'
             cmd = ['cc', *['-D'+d for d in defines], '-std=gnu89', '-ffunction-sections', '-fdata-sections',
-                   '-Wl,--gc-sections', '-I'+str(tree/'src'), str(ROOT/'tests'/fixture),
+                   '-Wl,--gc-sections', '-I'+tmp, '-I'+str(tree/'src'), str(ROOT/'tests'/fixture),
                    *[str(p) for p in sources], '-lm', '-o', str(exe)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

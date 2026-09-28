@@ -1,16 +1,72 @@
-# Windows 11 and Morrowind installations
+# Build AmiWind on Windows with WSL
 
-The first full-build route on Windows is Ubuntu under WSL2. The current AGA
-build was verified on Linux x86_64, not yet on Windows/WSL. Native Windows
-package provisioning and the complete native build are not validated. The input
-checker uses Python's standard library and accepts Windows paths.
+## Quickest route: Ubuntu under WSL2
 
-## Point at your installation
+Use Ubuntu under WSL2 to run the same one-command builder as Linux. Native
+Windows dependency installation and full Windows/WSL builds have not yet been
+validated; the owner has confirmed the Linux build and FS-UAE launch work.
 
-GOG commonly installs this edition to `C:\GOG Games\Morrowind\`. This is a
-suggestion, never a requirement. Select your actual installation root; the tool
-finds Data Files beneath it. Selecting Data Files directly also works. Quote
-command-line paths containing spaces.
+1. Install Ubuntu using [Microsoft's WSL guide](https://learn.microsoft.com/windows/wsl/install).
+   From an administrator PowerShell terminal: `wsl --install -d Ubuntu`.
+   Restart if requested, open Ubuntu, and finish its first-run setup.
+2. Extract the public source ZIP into your Ubuntu home directory and open a
+   terminal in its `amiwind/` directory. Keep tools and build outputs in the
+   Linux filesystem; you can read your existing Windows game installation.
+3. Run:
+
+```sh
+./build.sh --autoinstall
+```
+
+Enter your installed Morrowind folder when asked. For example, a Windows install
+at `C:\GOG Games\Morrowind` is normally `/mnt/c/GOG Games/Morrowind` in WSL:
+
+```sh
+./build.sh --autoinstall --data-files '/mnt/c/GOG Games/Morrowind'
+```
+
+The builder locates nested Data Files folders, checks game inputs, displays the
+missing APT/Python/native dependencies, asks before installing, and continues
+conversion and compilation. No manual venv activation, SDK, ericw-tools or qcc
+setup is needed. Progress, commands and stage logs stay visible. If a download
+fails, it prints the source link and manual setup instructions.
+
+Supply your own installed Morrowind files; buy the game from
+[GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
+[Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
+The builder does not download the game or run its Windows executable.
+
+Tools default to `../amiwind-tools/`; output defaults to
+`out/build/<run>/image/AmiWind-v0.0.17.hdf`. Use `--tools-dir` and `--workspace`
+to relocate them. `--autoinstall --plan` previews setup; `--autoinstall --dry-run`
+builds only the asset-free notice image. See the [Linux guide](LINUX_BUILD.md)
+for options and manual setup.
+
+## Run the result on Windows
+
+Install [WinUAE](https://www.winuae.net/) and use the
+[v0.0.17 WinUAE template](../resources/emulators/AmiWind-v0.0.17-WinUAE.uae)
+with the [WinUAE setup guide](WINUAE.md). Copy the completed HDF from WSL to a
+Windows folder, select that HDF and your own **A1200 Kickstart 3.1 ROM**, and
+save the configuration. The template includes the accelerated AGA/68040/FPU
+settings. Compilation itself needs no ROM.
+
+Alternatively, if Linux FS-UAE and GUI support work in your WSL installation,
+you can request automatic configuration and launch:
+
+```sh
+./build.sh --autoinstall --autorun-fs-uae \
+  --kickstart-file '/mnt/c/path/to/your/kickstart-3.1-a1200.rom'
+```
+
+Replace that example with a real WSL-readable file or ROM directory. `fs-uae`
+must be on the Linux PATH. The launcher accepts a file or searches immediate
+files in a directory for the recorded SHA-256; if no ROM is selected it asks
+interactively. It fills both ROM and HDF paths in the generated config.
+Missing FS-UAE stops before installation/conversion. WSL GUI autorun is untested;
+see the [FS-UAE guide](FS-UAE-PLAYTESTING.md). No ROM is downloaded or included.
+
+## Input checks without a full build
 
 With Python 3.10+ installed, check inputs from PowerShell:
 
@@ -18,48 +74,9 @@ With Python 3.10+ installed, check inputs from PowerShell:
 py -3 tools\build.py --check-inputs --data-files 'C:\GOG Games\Morrowind'
 ```
 
-Inside WSL Ubuntu, that Windows folder is usually mounted at
-`/mnt/c/GOG Games/Morrowind`. Pasted Windows drive paths are translated with
-WSL's `wslpath`, so either form can be supplied:
-
-```sh
-./build.sh --check-inputs --data-files 'C:\GOG Games\Morrowind'
-./build.sh --check-inputs --data-files '/mnt/c/GOG Games/Morrowind'
-```
-
-Interactive mode detects WSL or native Windows, checks the default GOG location,
-and compares Morrowind.esm/Morrowind.bsa sizes and SHA-256 hashes with the
-reference. A matching installation is offered with `[Y/n]`. Decline to enter
-another location. If no matching default is found, it asks for your folder.
-Explicit `--data-files` always wins; noninteractive runs never guess. Accepting
-the suggestion starts the full input check before conversion.
-
-Reference sizes are 79,837,557 bytes for Morrowind.esm and 310,459,500 bytes for
-Morrowind.bsa. Sizes alone are insufficient: both hashes must match too.
-Different editions/languages may be valid without matching our current reference;
-see [input comparison and overrides](BUILD_DEPENDENCIES.md).
-
-## Install and build under Ubuntu/WSL
-
-Install WSL/Ubuntu using [Microsoft's WSL guide](https://learn.microsoft.com/windows/wsl/install).
-Keep the source checkout and build intermediates in the Linux filesystem when
-practical; read the existing Windows game installation through its mount. There
-is no need to run Morrowind.exe or copy the Windows executables.
-
-```sh
-./build.sh --install-dependencies --install-sdk --plan
-./build.sh --install-dependencies --install-sdk
-. ../amiwind-tools/venv/bin/activate
-./build.sh --dry-run --sdk ../amiwind-tools/sdk --name first-test
-```
-
-This creates the asset-free notice image. For the playable scene, follow the
-[full Linux guide](LINUX_BUILD.md) for ericw-tools and qcc, then supply the game
-folder without `--dry-run`. Output defaults to `out/build/<name>/image/`; use
-`--workspace` to choose another parent.
-
-Compilation needs no Kickstart ROM. A separately supplied licensed ROM is needed
-when booting the HDF in WinUAE or FS-UAE.
+Within WSL, Morrowind drive paths can also be translated by `wslpath`. Explicit
+`--data-files` wins over discovery. Other editions or languages may differ from
+the reference; see [input comparison](BUILD_DEPENDENCIES.md).
 
 ## Share a checksum inventory without sharing game data
 

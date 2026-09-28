@@ -4,7 +4,7 @@
   "source": "0.12.1.dev1",
   "recorded": "2026-09-28",
   "host": "Linux x86_64",
-  "evidence": "Checkpoint-017 handoff package versions; restored tools inspected; source 0.12.1.dev1 host tests and native engine/preflight compile. Full fresh conversion was not rerun.",
+  "evidence": "Checkpoint-017 handoff package versions; restored tools inspected; source 0.12.1.dev1 host tests and native engine/preflight compile. Full fresh conversion was not rerun. Test-004: setuptools 84.0.0 verified with isolated Python 3.12 and a synthetic PyFFI TES3 NIF round-trip.",
   "python": "3.12.14",
   "packages": {
     "numpy": "2.5.3",
@@ -12,7 +12,8 @@
     "Pillow": "12.3.0",
     "PyFFI": "2.2.3",
     "fast-simplification": "0.2.0",
-    "amitools": "0.8.1"
+    "amitools": "0.8.1",
+    "setuptools": "84.0.0"
   },
   "tools": {
     "make": {
@@ -74,16 +75,16 @@
     "xdftool": {
       "version": "0.8.1",
       "arguments": [
-        "--version"
+        "--help"
       ],
-      "pattern": "(\\d+\\.\\d+\\.\\d+)"
+      "availability_only": true
     },
     "rdbtool": {
       "version": "0.8.1",
       "arguments": [
-        "--version"
+        "--help"
       ],
-      "pattern": "(\\d+\\.\\d+\\.\\d+)"
+      "availability_only": true
     },
     "qcc": {
       "version": "id Quake-Tools c0d1b91 (reference binary)",

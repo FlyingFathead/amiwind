@@ -1,0 +1,27 @@
+{
+  "version": "0.0.17",
+  "candidate": "test-005",
+  "base": "AmiWind-v0.0.17-public-source-test-004.zip",
+  "base_sha256": "3dabe55df9d2f1963900d7f5cc9f64cd81f460549195c0f2544f58c0bf750b28",
+  "changed_files": [
+    "README.md",
+    "docs/BUILD_SETUP-v0.0.17.md",
+    "docs/FS-UAE-PLAYTESTING.md",
+    "docs/LINUX_BUILD.md",
+    "docs/PATCH-v0.0.17-test-005.json",
+    "tests/test_run_fs_uae.py",
+    "tools/build.py",
+    "tools/release-files.json",
+    "tools/run_fs_uae.py"
+  ],
+  "removed_files": [],
+  "instructions": "Apply over test-004 in the same isolated checkout. Launch an existing HDF with python3 tools/run_fs_uae.py --image PATH --kickstart-file PATH, or add --autorun-fs-uae to a future build.",
+  "changes": [
+    "Early FS-UAE executable and owned ROM check before dependency setup or conversion.",
+    "Interactive ROM path prompt or explicit --kickstart-file; current home directory is resolved at runtime, without hardcoded usernames.",
+    "Fills both HDF and ROM absolute paths in the documented preset beside the local HDF.",
+    "Live emulator output; launch failures preserve completed build. No ROMs or game data in source packages.",
+    "Standalone existing-image launcher avoids rebuilding."
+  ],
+  "validation": "10 FS-UAE launcher tests and 40 build/setup regression tests passed. Actual stub process invocation tested; emulator boot not performed here. Owner test-004 completed all 12 game build stages; compiler warnings remain for review."
+}

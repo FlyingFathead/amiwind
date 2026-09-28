@@ -18,7 +18,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-char *ID = "$VER: AmiWind 0.0.11-dev3 (27.09.2026)\r\n";  
+#include "amiwind_version.h"
+char *ID = "$VER: AmiWind " AMIWIND_VERSION "\r\n";
 
 #include "quakedef.h"
 
@@ -329,7 +330,9 @@ static void RunGameLoop(void)
 int main(int argc, char *argv[]) {
     static char *default_argv[] = {"AmiWind", NULL};
     AW_PlatformInit();
-    PutStr("Loading AmiWind v0.0.16...\n");
+    PutStr("Loading AmiWind v");
+    /* Referencing the tag keeps Amiga Version-command metadata in the executable. */
+    PutStr(ID + sizeof("$VER: AmiWind ") - 1);
     Sys_Init();
     if (argc == 0) { argc = 1; argv = default_argv; }
     COM_InitArgv(argc, argv);

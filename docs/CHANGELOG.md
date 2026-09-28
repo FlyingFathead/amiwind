@@ -1,5 +1,20 @@
 # Development history
 
+## v0.0.17 — 28 September 2026
+
+One-command confirmed dependency setup and continuation, isolated fresh tools,
+bounded game-directory discovery, actionable download failures, corrected tool
+probes, QuakeC preflight, and one authoritative VERSION file. CI exercises the
+same installer with public tools and an asset-free image. Test-004 completed the
+owner's full game-data build; the owner subsequently confirmed test-006 works.
+See [validation scope](VALIDATION-v0.0.17.md) and [release notes](RELEASE-v0.0.17.md).
+
+- Optional FS-UAE autorun checks the emulator and owned ROM before building,
+  accepts a ROM file or directory and prompts if none is selected, and fills both paths in the documented preset.
+- `early_game_demo_start_1` is enabled by default: town-center spawn in Seyda
+  Neen, track 04 first, then the exploration shuffle. Ship-first startup remains
+  selectable; interior transitions do not reset the demo opening.
+
 ## v0.0.16
 
 - First consolidated repository release under FlyingFathead/amiwind.

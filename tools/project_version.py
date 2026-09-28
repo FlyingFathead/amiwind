@@ -1,4 +1,5 @@
-"""Shared release identity. pyproject.toml is the authoritative version."""
+"""Shared release identity; VERSION is the only maintained version number."""
+import argparse
 import re
 from pathlib import Path
 
@@ -7,28 +8,50 @@ CREDITS = 'By FlyingFathead +- ChaosWhisperer'
 PROJECT_URL = 'https://github.com/FlyingFathead/amiwind/'
 
 
-def python_version(root=ROOT):
-    matches = re.findall(r'^version = "([0-9]+\.[0-9]+\.[0-9]+(?:\.dev[0-9]+)?)"$',
-                         (Path(root) / 'pyproject.toml').read_text(), re.M)
-    if len(matches) != 1:
-        raise ValueError('Expected one project version in pyproject.toml')
-    return matches[0]
+def read_version(path):
+    value = Path(path).read_text().strip()
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-dev[0-9]+)?', value):
+        raise ValueError('VERSION must contain one number such as 0.0.17 or 0.0.17-dev1')
+    return value
 
 
 def public_version(root=ROOT):
-    return python_version(root).replace('.dev', '-dev')
+    return read_version(Path(root)/'VERSION')
+
+
+def python_version(root=ROOT):
+    return public_version(root).replace('-dev', '.dev')
+
+
+def generate_native(version_file, out):
+    value = read_version(version_file)
+    out = Path(out); out.mkdir(parents=True, exist_ok=True)
+    (out/'amiwind_version.h').write_text('/* Generated from VERSION; do not edit. */\n'
+        '#ifndef AMIWIND_VERSION_H\n#define AMIWIND_VERSION_H\n'
+        f'#define AMIWIND_VERSION "{value}"\n#endif\n')
+    (out/'amiwind_version.i').write_text('; Generated from VERSION; do not edit.\n'
+        f'banner: dc.b "Loading AmiWind v{value}...",10\n')
+    return value
 
 
 def check_native_versions(root=ROOT):
     root = Path(root)
     expected = public_version(root)
-    for name in ('src/aw_hud.c', 'src/aw_scene.c', 'src/sys_amiga.c', 'boot/bootcheck.asm'):
-        path = root / 'engine/aga' / name
-        found = re.findall(r'AmiWind v([0-9]+\.[0-9]+\.[0-9]+(?:-dev[0-9]+)?)',
-                           path.read_text(), re.I)
-        if not found or any(v != expected for v in found):
-            raise ValueError(f'Native version mismatch in {path}: expected {expected}, found {found}')
+    for name in ('src/aw_hud.c', 'src/aw_scene.c', 'src/sys_amiga.c'):
+        path = root/'engine/aga'/name
+        text = path.read_text()
+        if '#include "amiwind_version.h"' not in text or 'AMIWIND_VERSION' not in text or re.search(r'AmiWind v?[0-9]+\.[0-9]+\.[0-9]+', text, re.I):
+            raise ValueError(f'Native version must come from the generated header: {path}')
+    if 'include "amiwind_version.i"' not in (root/'engine/aga/boot/bootcheck.asm').read_text():
+        raise ValueError('Boot version must come from the generated VERSION include')
     return expected
 
 
-VERSION = public_version()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--version-file', type=Path, default=ROOT/'VERSION')
+    parser.add_argument('--out', type=Path, required=True)
+    args = parser.parse_args()
+    generate_native(args.version_file, args.out)
+else:
+    VERSION = public_version()

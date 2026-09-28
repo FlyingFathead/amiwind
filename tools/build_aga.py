@@ -7,8 +7,10 @@ import os
 import re
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import ensure_external
@@ -30,6 +32,51 @@ def new_output(path):
     path=ensure_external(path,'AGA build')
     path.mkdir(parents=True,exist_ok=False)
     return path
+
+def startup_config(config):
+    """Configure controls first; quake.rc selects the named start after autoexec."""
+    config=re.sub(r'(?m)^r_max(?:surfs|edges) [^\n]*\n?', '', config)
+    config=re.sub(r'(?m)^aw_drawdistance [^\n]*\n?', '', config)
+    config=config.replace('bind 2 "aw_drawdistance 700"','bind 2 "aw_drawdistance 540"')
+    config=config.replace('bind ESCAPE quit','bind ESCAPE togglemenu').replace('r_drawviewmodel 0','r_drawviewmodel 1')
+    config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
+        'r_maxsurfs 10240\nr_maxedges 20480\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
+    if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
+    return 'aw_drawdistance 540\n'+config.rstrip()+'\n'
+
+def validate_quakec(path):
+    """Reject incompatible compiler output before it reaches an Amiga image."""
+    raw = Path(path).read_bytes()
+    if len(raw) < 60:
+        raise ValueError('QuakeC compiler produced a truncated progs.dat')
+    header = struct.unpack_from('<15i', raw)
+    if header[:2] != (6, 5927):
+        raise ValueError(f'QuakeC output version/CRC {header[:2]} does not match engine (6, 5927); use standard Quake 1 output')
+    for index, width in ((2, 8), (4, 8), (6, 8), (8, 36), (10, 1), (12, 4)):
+        offset, count = header[index:index+2]
+        if offset < 60 or count <= 0 or offset + count * width > len(raw):
+            raise ValueError('QuakeC output has invalid program section bounds')
+    # The original VM supports opcodes 0..65; FTE-only extensions cannot run here.
+    for offset in range(header[2], header[2] + header[3]*8, 8):
+        if struct.unpack_from('<H', raw, offset)[0] > 65:
+            raise ValueError('QuakeC output contains an unsupported VM opcode')
+
+def check_quakec(compiler, hands='3d'):
+    """Compile our source in isolation; no game input or retained build output."""
+    compiler = str(Path(compiler).resolve())
+    with tempfile.TemporaryDirectory(prefix='amiwind-qcc-') as temp:
+        directory = Path(temp)
+        qc = directory/'qc'; qc.mkdir()
+        for name in ('defs.qc', 'world.qc', 'progs.src'):
+            shutil.copyfile(ROOT/'engine/aga/qc'/name, qc/name)
+        if hands == 'sprites':
+            source = qc/'world.qc'
+            source.write_text(source.read_text().replace('progs/v_nord.mdl', 'progs/player.mdl'))
+        result = subprocess.run([compiler], cwd=qc, stdin=subprocess.DEVNULL,
+                                capture_output=True, text=True, errors='replace', timeout=30)
+        if result.returncode or not (directory/'progs.dat').is_file():
+            raise ValueError(f'Compiler failed (exit {result.returncode}):\n' + (result.stdout + result.stderr)[-4000:])
+        validate_quakec(directory/'progs.dat')
 
 def runtime_sources(source=None):
     """Use the checked-in runtime directly; ignore only local build products."""
@@ -55,6 +102,9 @@ def stage_runtime(out, source=None):
         target=tree/name;target.parent.mkdir(parents=True,exist_ok=True)
         shutil.copyfile(source/name,target)
         if digest(target)!=expected:raise ValueError('Runtime source changed during staging: '+name)
+    shutil.copyfile(ROOT/'VERSION', tree/'VERSION')
+    (tree/'tools').mkdir(exist_ok=True)
+    shutil.copyfile(ROOT/'tools/project_version.py', tree/'tools/project_version.py')
     return tree,hashes
 
 def engine(args):
@@ -69,7 +119,7 @@ def engine(args):
     check_binary(binary.read_bytes())
     checker=tree/'build/AmiWindCheck'
     vasm=args.vasm.resolve() if args.vasm else args.sdk.resolve()/'bin/vasmm68k_mot'
-    run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',args.sdk.resolve()/'m68k-amigaos/ndk-include','-o',checker,tree/'boot/bootcheck.asm'])
+    run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',args.sdk.resolve()/'m68k-amigaos/ndk-include','-I',tree/'build/version','-o',checker,tree/'boot/bootcheck.asm'])
     check_binary(checker.read_bytes())
     (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n')
     print(binary)
@@ -88,13 +138,9 @@ def image(args):
     scene=ensure_external(args.scene,'AGA scene');music=ensure_external(args.music,'converted music');out=new_output(args.out)
     boot=out/'boot';shutil.copytree(scene/'id1',boot/'id1');(boot/'S').mkdir()
     cfg=boot/'id1/default.cfg'
-    config=re.sub(r'(?m)^r_max(?:surfs|edges) [^\n]*\n?', '', cfg.read_text())
-    config=re.sub(r'(?m)^aw_drawdistance [^\n]*\n?', '', config)
-    config=config.replace('bind 2 "aw_drawdistance 700"','bind 2 "aw_drawdistance 540"')
-    config='aw_drawdistance 540\n'+config
-    cfg.write_text(config.replace('bind ESCAPE quit','bind ESCAPE togglemenu').replace('r_drawviewmodel 0','r_drawviewmodel 1').replace('map seyda',
-        'r_maxsurfs 10240\nr_maxedges 20480\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown\nmap seyda'))
-    if (scene/'id1/maps/prison.bsp').is_file():cfg.write_text(cfg.read_text().replace('map seyda','map prison'))
+    cfg.write_text(startup_config(cfg.read_text()))
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\naw_demo_start\n')
+    print('Default start: early_game_demo_start_1 enabled; Seyda Neen town center + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
     (boot/'S/startup-sequence').write_text('FailAt 10\nSYS:AmiWindCheck\nStack 300000\nSYS:AmiWind\n')
@@ -115,7 +161,13 @@ def image(args):
         if not (scene/'id1/gfx/hands.aws').is_file():raise ValueError('Bake hand sprites first')
         q=qc/'world.qc';q.write_text(q.read_text().replace('progs/v_nord.mdl','progs/player.mdl'))
     (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n');run([args.qcc],qc)
+    validate_quakec(boot/'id1/progs.dat')
     manifest=json.loads((music/'soundtrack.json').read_text());groups=playlists(manifest['tracks'])
+    opening_track=manifest['tracks'][4] if 4 in groups['explore'] else None
+    if opening_track:
+        print('Opening music track 04: '+opening_track['source'],flush=True)
+    else:
+        print('[warning] Track 04 is not available in the exploration playlist; runtime will use normal music selection.',flush=True)
     target=boot/'id1/music';target.mkdir()
     for track in manifest['tracks']:
         source=music/track['file'];unpack_stream(source.read_bytes())
@@ -140,7 +192,7 @@ def image(args):
         check.unlink()
     check_image(hdf,partition="DH0")
     part.unlink()
-    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':9*1024*1024,'tested_minimum':False,'filesystem':'FFS, 128 MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
+    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'early_game_demo_start_1','enabled':True,'map':'seyda','spawn':'town-center info_player_start, standing-hull checked','music_track':4,'music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':9*1024*1024,'tested_minimum':False,'filesystem':'FFS, 128 MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
     print(hdf)
 
 def main():

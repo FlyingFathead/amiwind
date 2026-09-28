@@ -1,0 +1,27 @@
+{
+  "version": "0.0.17",
+  "candidate": "test-003",
+  "base": "AmiWind-v0.0.17-public-source-test-002.zip",
+  "base_sha256": "8c5bf2bd5cb7658181b5050cfc1a4f243a6077456535901bd54bfbc5ecb4dbff",
+  "changed_files": [
+    "docs/BUILD_SETUP-v0.0.17.md",
+    "docs/PATCH-v0.0.17-test-003.json",
+    "src/mwad/progress.py",
+    "tests/test_build_setup.py",
+    "tests/test_progress.py",
+    "tools/build.py",
+    "tools/install_dependencies.py",
+    "tools/release-files.json",
+    "tools/setup_build.py"
+  ],
+  "removed_files": [],
+  "instructions": "After stopping or finishing the current build, extract this ZIP into the parent of the test checkout. It overlays only changed public source files under amiwind/. Keep the existing tools and output directories. No git operations, game data or ROMs are included.",
+  "fixes": [
+    "Native-architecture package status checks handle multiple installed architectures.",
+    "No APT update or install when all required host packages are installed.",
+    "Terminal-width separators and one setup/build step at a time.",
+    "Explicit APT package list in the proposal.",
+    "No background status lines during sudo/APT prompts; child output remains live."
+  ],
+  "validation": "5 progress tests and 39 build/setup tests passed; patch overlay compared byte-for-byte with complete source ZIP."
+}

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "amiwind_version.h"
 int sb_lines;
 static cvar_t coords = {"_aw_debug_coords", "0", true};
 static cvar_t overlays = {"_aw_debug_all", "1", true};
@@ -43,7 +44,7 @@ void Sbar_Init(void) {
 void Sbar_Changed(void) {}
 void Sbar_Draw(void) {
     if(key_dest==key_console || !AW_DebugOverlaysEnabled())return;
-    Draw_String(8,8,AW_Interior()?"AMIWIND v0.0.16 / PRISON SHIP":"AMIWIND v0.0.16 / SEYDA NEEN");
+    Draw_String(8,8,AW_Interior()?"AMIWIND v" AMIWIND_VERSION " / PRISON SHIP":"AMIWIND v" AMIWIND_VERSION " / SEYDA NEEN");
     if(fps.value){
         char line[16];int n=AW_FpsTenths(),x=vid.width-80;
         sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));

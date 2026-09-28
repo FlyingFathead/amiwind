@@ -16,13 +16,12 @@ the owner publishes the repository; local compilation/image checks have passed.
 ## Local use
 
 ```sh
-./build.sh --install-dependencies --install-sdk
-. ../amiwind-tools/venv/bin/activate
-./build.sh --dry-run --sdk ../amiwind-tools/sdk --name first-dry-run
+./build.sh --autoinstall --dry-run --name first-dry-run
 ```
 
 Here `--dry-run` means an actual asset-free test compile and image build. Add
-`--plan` to preview the two stage commands without executing them, or `--check`
+`--plan` without `--autoinstall` to preview the two stage commands once tools
+are installed. `--autoinstall --plan` previews dependency setup only. Use `--check`
 to stop after prerequisites. It never accepts a game path. The normal full build
 uses no `--dry-run` flag. Both modes use the runtime VERSION in tools/build_aga.py.
 
@@ -31,8 +30,8 @@ chooses another output parent. Names are immutable; retry under a new name.
 
 | Build | Image name |
 | --- | --- |
-| Normal, with locally converted game data | AmiWind-v0.0.16.hdf |
-| Asset-free test compile | AmiWind-v0.0.16-dry-run.hdf |
+| Normal, with locally converted game data | AmiWind-v0.0.17.hdf |
+| Asset-free test compile | AmiWind-v0.0.17-dry-run.hdf |
 
 The test disk has an 8 MiB FFS partition in an RDB image. Its startup-sequence
 runs a tiny 68000 notice program using the ROM's console/font. It shows the
@@ -52,7 +51,7 @@ screen. The ROM is not included in any public image or artifact.
 python tools/package_dry_run.py --image-dir out/build/first-dry-run/image --out out/artifacts
 ```
 
-This creates `AmiWind-v0.0.16-dry-run.zip` and a checksum sidecar. The ZIP
+This creates `AmiWind-v0.0.17-dry-run.zip` and a checksum sidecar. The ZIP
 contains the exact HDF matching the asset-free build receipt, the receipt,
 README, native licence, and the corresponding versioned source ZIP. The nested
 source ZIP extracts into `amiwind/`. Normal game-containing HDFs cannot be passed

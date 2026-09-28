@@ -3,11 +3,13 @@
  * time. This is not inventory, quest persistence or original opening logic.
  */
 #include "quakedef.h"
+#include "amiwind_version.h"
 typedef struct {char source[16],target[16];vec3_t point,arrival;float yaw;} aw_scene_link_t;
 static aw_scene_link_t links[4];static int count,loaded,pending;
 static aw_scene_link_t next;
 static float health,hand_goal;
 static double started;
+static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
 int AW_Interior(void) {return sv.active && !strcmp(sv.name,"prison");}
 static int map_valid(char *name) {return !strcmp(name,"prison") || !strcmp(name,"seyda");}
 static void read_links(void) {
@@ -29,7 +31,7 @@ static void load_scene(aw_scene_link_t *link) {
     if(pending)return;next=*link;pending=1;started=Sys_FloatTime();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
     IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
-    Con_Printf("Loading AmiWind v0.0.16: %s...\n",next.target);
+    Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
     Cbuf_AddText(!strcmp(next.target,"prison")?"map prison\n":"map seyda\n");
 }
 int AW_SceneUse(void) {
@@ -91,4 +93,24 @@ static void scene_command(void) {
     else {r.arrival[0]=0;r.arrival[1]=0;r.arrival[2]=64;r.yaw=90;}
     load_scene(&r);
 }
-void AW_SceneInit(void) {Cmd_AddCommand("aw_scene",scene_command);}
+static void demo_start(void) {
+    FILE *f;
+    pending=0;
+    if(early_game_demo_start_1.value) {
+        Con_Printf("early_game_demo_start_1: Seyda Neen town center, track 04.\n");
+        if(!AW_MusicStartTrack(4))
+            Con_Printf("Track 04 unavailable in exploration playlist; using normal music selection.\n");
+        /* The exterior's info_player_start is the town-center point. Its
+         * normal spawn path still checks the standing hull and nearby exits. */
+        Cbuf_AddText("map seyda\n");
+    } else {
+        if(COM_FOpenFile("maps/prison.bsp",&f)>=0 && f) {
+            fclose(f);Cbuf_AddText("map prison\n");
+        } else Cbuf_AddText("map seyda\n");
+    }
+}
+void AW_SceneInit(void) {
+    Cvar_RegisterVariable(&early_game_demo_start_1);
+    Cmd_AddCommand("aw_scene",scene_command);
+    Cmd_AddCommand("aw_demo_start",demo_start);
+}

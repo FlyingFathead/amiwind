@@ -4,17 +4,17 @@ Official homepage and downloads: [WinUAE](https://www.winuae.net/).
 
 ## Public versioned preset
 
-Load [AmiWind-v0.0.16-WinUAE.uae](../resources/emulators/AmiWind-v0.0.16-WinUAE.uae)
+Load [AmiWind-v0.0.17-WinUAE.uae](../resources/emulators/AmiWind-v0.0.17-WinUAE.uae)
 from WinUAE's Configurations panel. It sets the development machine below and
 opens the GUI. It deliberately leaves the ROM path empty and mounts no disk.
 In ROM, select your complete licensed A1200 Kickstart 3.1 ROM. In CD & Hard
-drives, add your locally generated `AmiWind-v0.0.16.hdf` as an RDB hardfile
+drives, add your locally generated `AmiWind-v0.0.17.hdf` as an RDB hardfile
 on the UAE controller, then save a private configured copy and Start.
 
 To produce the playable HDF, follow the [Linux](LINUX_BUILD.md) or
 [Windows / WSL build guide](WINDOWS_BUILD.md) with your own Morrowind files.
 The public source ZIP contains the preset, not a playable HDF or Kickstart ROM.
-The separate `AmiWind-v0.0.16-dry-run.hdf` boots only to a test notice.
+The separate `AmiWind-v0.0.17-dry-run.hdf` boots only to a test notice.
 
 The preset contains no personal Windows paths, device identifiers, ROMs or
 game data. Its description and filename identify the development version.

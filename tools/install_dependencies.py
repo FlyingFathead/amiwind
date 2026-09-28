@@ -8,10 +8,12 @@ import subprocess
 import sys
 
 from mwad.paths import ensure_external, inside, installed_game_path
+from mwad.progress import section, setup_step
 
 HOST_PACKAGES = ("python3", "python3-venv", "python3-pip", "build-essential",
-                 "ffmpeg", "unzip", "xz-utils", "fonts-dejavu-core")
-PYTHON_PACKAGES = ("PyFFI==2.2.3", "numpy>=1.23", "Pillow>=9.1",
+                 "ffmpeg", "unzip", "xz-utils", "fonts-dejavu-core",
+                 "libgmp10", "libmpfr6", "libmpc3")
+PYTHON_PACKAGES = ("setuptools>=68", "PyFFI==2.2.3", "numpy>=1.23", "Pillow>=9.1",
                    "fast-simplification==0.2.0", "scipy>=1.10", "amitools==0.8.1")
 
 
@@ -29,12 +31,16 @@ def supported_host():
         raise ValueError("apt-get and dpkg-query are required for automatic host setup")
 
 
-def missing_packages():
+def missing_packages(packages=HOST_PACKAGES):
+    architecture = subprocess.run(['dpkg', '--print-architecture'], capture_output=True,
+                                  text=True, timeout=15, check=True).stdout.strip()
     missing = []
-    for package in HOST_PACKAGES:
-        result = subprocess.run(["dpkg-query", "-W", "-f=${Status}", package],
+    for package in packages:
+        result = subprocess.run(["dpkg-query", "-W", "-f=${Architecture}\t${Status}\n", package],
                                 capture_output=True, text=True, timeout=15)
-        if result.returncode or result.stdout.strip() != "install ok installed":
+        installed = any(line in (architecture + '\tinstall ok installed', 'all\tinstall ok installed')
+                        for line in result.stdout.splitlines())
+        if result.returncode or not installed:
             missing.append(package)
     return missing
 
@@ -67,22 +73,34 @@ def install(args, confirm=None):
                      prefix + ["apt-get", "install", "--no-remove", *missing]]
     if not venv.exists():
         commands.append([str(host_python), "-m", "venv", str(venv)])
-    commands.append([str(python), "-m", "pip", "install", *PYTHON_PACKAGES])
-    print("Dependency setup preview")
+    commands.append([str(python), "-m", "pip", "install", "--verbose", *PYTHON_PACKAGES])
+    section("Dependency setup preview")
     print("Missing Ubuntu/Debian packages: " + (", ".join(missing) or "none"))
     print(f"Python environment: {venv} ({'reuse' if venv.exists() else 'create'})")
     print("APT uses configured repositories; pip uses configured package indexes. Network access is required.")
     print("APT will show resolved package versions and sizes before its own confirmation.")
     if args.install_sdk:
         from fetch_toolchain import SPEC
-        if (directory / 'sdk').exists():
-            raise ValueError("SDK destination already exists; omit --install-sdk to reuse it")
+        sdk = directory / 'sdk'
+        present = sdk.exists() or sdk.is_symlink()
+        complete = all((sdk/name).is_file() for name in
+                       ('bin/m68k-amigaos-gcc', 'bin/vasmm68k_mot', 'm68k-amigaos/ndk-include/exec/exec_lib.i'))
+        if present and not complete:
+            raise ValueError("SDK destination exists but is incomplete; it will not be overwritten. Choose a new --tools-dir or supply an existing SDK to builds with --sdk")
         print(f"Amiga SDK: {SPEC['release']}, {SPEC['bytes']:,} download bytes; SHA-256 {SPEC['sha256']}")
+        print("SDK release page: https://github.com/AmigaPorts/m68k-amigaos-gcc/releases/tag/" + SPEC['release'])
         print("SDK source: " + SPEC['url'])
-        commands.append([sys.executable, str(Path(__file__).with_name('fetch_toolchain.py')), '--out', str(directory/'sdk')])
+        if complete:
+            print(f"Reusing existing SDK: {sdk}; no SDK download")
+        else:
+            commands.append([sys.executable, str(Path(__file__).with_name('fetch_toolchain.py')), '--out', str(sdk)])
     else:
-        print("Amiga SDK/vasm: separate setup, or rerun with --install-sdk for the pinned Linux x86_64 download.")
-    print("ericw-tools and qcc-host require separate setup for full game conversion; the dry-run does not need them.")
+        print("Amiga SDK/vasm: ./build.sh --install-sdk (works separately; no APT or pip setup).")
+        print("SDK releases: https://github.com/AmigaPorts/m68k-amigaos-gcc/releases")
+    print("Full conversion also needs ericw-tools: https://github.com/ericwa/ericw-tools/releases/tag/v0.18.1")
+    print("QuakeC: Ubuntu/Debian offers 'sudo apt-get install fteqcc'; the build checks its output before conversion.")
+    print("FTEQCC: https://fte.triptohell.info/ | Reference qcc: https://github.com/id-Software/Quake-Tools")
+    print("The asset-free dry-run does not need ericw-tools or a QuakeC compiler.")
     for command in commands:
         print("  " + shlex.join(command))
     if args.plan or args.check:
@@ -96,8 +114,9 @@ def install(args, confirm=None):
         print("Cancelled. No installation or directory creation performed.")
         return 0
     try:
-        for command in commands:
-            subprocess.run(command, check=True)
+        for number, command in enumerate(commands, 1):
+            with setup_step(command, number, len(commands)):
+                subprocess.run(command, check=True)
     except (OSError, subprocess.CalledProcessError) as exc:
         raise RuntimeError("Dependency setup stopped; earlier completed installations remain. Fix the reported error and rerun setup.") from exc
     print("Host dependency setup completed. In this shell, run:")

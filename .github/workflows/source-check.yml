@@ -2,7 +2,13 @@ name: Source checks and asset-free Amiga build
 
 on:
   push:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/images/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/images/**'
   workflow_dispatch:
 
 permissions:
@@ -22,20 +28,19 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - name: Install public host dependencies
+      - name: Bootstrap all public tools into an empty directory
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-remove python3-venv build-essential ffmpeg unzip xz-utils fonts-dejavu-core libgmp10 libmpfr6 libmpc3
-          python -c "import subprocess,sys; from install_dependencies import PYTHON_PACKAGES; subprocess.run([sys.executable, '-m', 'pip', 'install', *PYTHON_PACKAGES], check=True)"
+          test ! -e "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/build.py --autoinstall --install-dependencies --yes --tools-dir "$RUNNER_TEMP/amiwind-clean-tools"
+          echo "$RUNNER_TEMP/amiwind-clean-tools/venv/bin" >> "$GITHUB_PATH"
       - name: Source allowlist and synthetic regression checks
         run: |
           python tools/release.py --check
+          python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'
           python -m unittest discover -s tests -v
           python tools/build.py --install-dependencies --plan
-      - name: Fetch the checksum-pinned public Amiga SDK
-        run: python tools/fetch_toolchain.py --out "$RUNNER_TEMP/amiwind-sdk"
       - name: Compile the engine and create a boot-notice image
-        run: python tools/build.py --dry-run --sdk "$RUNNER_TEMP/amiwind-sdk" --name ci
+        run: python tools/build.py --dry-run --tools-dir "$RUNNER_TEMP/amiwind-clean-tools" --name ci
       - name: Package the test image and corresponding source
         run: python tools/package_dry_run.py --image-dir out/build/ci/image --out out/artifacts
       - name: Name the public artifact

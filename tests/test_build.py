@@ -16,6 +16,18 @@ from test_workflow import synthetic_install
 
 
 class GuidedBuildTests(unittest.TestCase):
+    def test_startup_controls_do_not_launch_before_profile_selection(self):
+        from build_aga import startup_config
+        text = startup_config('bind ESCAPE quit\nr_drawviewmodel 0\nr_maxsurfs 1\nmap seyda\n')
+        self.assertNotIn('map seyda', text)
+        self.assertNotIn('map prison', text)
+        self.assertIn('bind ESCAPE togglemenu', text)
+        self.assertIn('r_drawviewmodel 1', text)
+        self.assertEqual(text.count('r_maxsurfs '), 1)
+        self.assertEqual(text.count('r_maxedges '), 1)
+        with self.assertRaisesRegex(ValueError, 'exactly one startup map'):
+            startup_config('map seyda\nmap prison\n')
+
     def test_aga_variants_keep_interior_and_image_in_same_pipeline(self):
         args = build.parser().parse_args(["--hands", "sprites"])
         args.data_files = Path("/owned/Data Files")
@@ -92,3 +104,15 @@ class GuidedBuildTests(unittest.TestCase):
                 build.execute(steps, run, {})
             result = json.loads((run / "work/generated/seyda-neen/conversion.json").read_text())
             self.assertEqual(result["verification"]["status"], "passed")
+
+    def test_cancelled_stage_preserves_logs_and_stops(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp)/'run'
+            with patch.object(build.subprocess, 'run', side_effect=KeyboardInterrupt) as command, \
+                 contextlib.redirect_stdout(io.StringIO()), self.assertRaises(KeyboardInterrupt):
+                build.execute([('interrupted', ['fixture']), ('must-not-run', ['fixture'])], run, {})
+            self.assertEqual(command.call_count, 1)
+            state = json.loads((run/'build-state.json').read_text())
+            self.assertEqual(state['status'], 'cancelled')
+            self.assertEqual(state['steps'][0]['status'], 'cancelled')
+            self.assertTrue((run/'logs/01-interrupted.log').exists())

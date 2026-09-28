@@ -1,6 +1,8 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONUNBUFFERED=1
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 python_bin=${AMIWIND_PYTHON:-python3}
 if ! command -v "$python_bin" >/dev/null 2>&1; then

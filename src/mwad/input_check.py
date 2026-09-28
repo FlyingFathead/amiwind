@@ -7,7 +7,7 @@ from pathlib import Path
 import struct
 
 from .audit import BSA
-from .paths import child_ci, ensure_external, installed_game_path
+from .paths import child_ci, ensure_external, installed_game_path, resolve_data_files
 
 REFERENCE_DIR = Path(__file__).resolve().parents[2] / "config/input-reference"
 
@@ -93,13 +93,54 @@ def master_structure(path):
     return count
 
 
-def inspect(path, stage="aga", allow_differences=False, reference=None):
+def locate_data_files(selected, notify=None, choose=None, max_depth=4, max_dirs=2000):
+    """Find a core-file pair before inventory; never hash an arbitrary parent."""
+    say = notify or (lambda message: None)
+    try:
+        return resolve_data_files(selected)
+    except ValueError:
+        pass
+    say(f"Core game files not found directly in {selected} or its Data Files folder.")
+    say(f"Looking in subdirectories (up to {max_depth} levels; directory symlinks are not followed)...")
+    candidates = []
+    visited = 0
+    def walk_error(exc):
+        raise exc
+    for parent, dirs, files in os.walk(selected, onerror=walk_error, followlinks=False):
+        visited += 1
+        if visited > max_dirs:
+            raise ValueError(f"Game-directory search reached {max_dirs} folders; select a more specific installation directory")
+        parent = Path(parent)
+        names = {name.casefold() for name in files}
+        if {'morrowind.esm', 'morrowind.bsa'} <= names:
+            # The strict resolver also rejects ambiguous case and unsafe paths.
+            candidates.append(resolve_data_files(parent))
+            dirs[:] = []
+        elif len(parent.relative_to(selected).parts) >= max_depth:
+            dirs[:] = []
+        else:
+            dirs[:] = sorted(name for name in dirs if not (parent / name).is_symlink())
+    candidates = sorted(set(candidates))
+    if not candidates:
+        raise ValueError(f"No folder containing Morrowind.esm and Morrowind.bsa found within {max_depth} levels of {selected}. Select your installation root or Data Files directory")
+    if len(candidates) > 1:
+        if choose is None:
+            raise ValueError("Multiple Morrowind installations found; select one explicitly with --data-files:\n  - " + "\n  - ".join(map(str, candidates)))
+        data = choose(candidates)
+        if data not in candidates:
+            raise ValueError("No discovered Morrowind installation was selected")
+    else:
+        data = candidates[0]
+    say(f"Found candidate: {data}")
+    say("Checking this folder's containers, required assets, file sizes and reference SHA-256 hashes next.")
+    return data
+
+
+def inspect(path, stage="aga", allow_differences=False, reference=None, notify=None, choose=None):
     selected = ensure_external(installed_game_path(path), "game installation")
     if not selected.is_dir():
         raise ValueError(f"Game installation is not a directory: {selected}")
-    data = child_ci(selected, "Data Files", required=False) or selected
-    if not data.is_dir():
-        raise ValueError(f"Expected a Data Files directory: {data}")
+    data = locate_data_files(selected, notify=notify, choose=choose)
     errors, warnings, checks = [], [], []
     loose = {}
     # os.walk gives explicit errors, unlike silently skipped unreadable folders.

@@ -14,6 +14,17 @@ int main(int argc,char **argv) {
     assert(argc==3);strcpy(com_gamedir,argv[1]);
     if(!strcmp(argv[2],"invalid")) {assert(CDAudio_Init()==-1);return 0;}
     assert(CDAudio_Init()==0);rng=42;
+    if(!strcmp(argv[2],"demo-missing")) {
+        assert(!AW_MusicStartTrack(4));assert(available && music && current!=4);
+        CDAudio_Shutdown();return 0;
+    }
+    if(!strcmp(argv[2],"demo")) {
+        assert(AW_MusicStartTrack(4));assert(current==4 && mode==0 && !paused && played==0);
+        assert(length[0]==1 && cursor[0]==0 && history[0][0]==4);
+        assert(left[0]==counts[0]-1);
+        for(j=0;j<left[0];j++)assert(bags[0][j]!=4);
+        assert(!AW_MusicStartTrack(98));assert(current==4);
+    }
     if(!strcmp(argv[2],"truncated")) {
         memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);
         assert(errors==1 && !available && !music);
@@ -44,6 +55,10 @@ int main(int argc,char **argv) {
     music_mode();assert(mode==1);
     for(j=0;j<30;j++){int old=current;music_next();assert(current!=old);}
     music_mode();assert(mode==0);
+    if(!strcmp(argv[2],"demo")) {
+        music_mode();assert(mode==1);CDAudio_Pause();
+        assert(AW_MusicStartTrack(4));assert(current==4 && mode==0 && !paused);
+    }
     assert(reads*4096==bytes_read);
     CDAudio_Shutdown();free(raw);return 0;
 }

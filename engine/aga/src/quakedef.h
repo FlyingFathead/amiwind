@@ -380,6 +380,7 @@ void AW_SceneSpawn(edict_t *p);
 int AW_InteriorPlace(edict_t *p,vec3_t preferred);
 void AW_SceneInit(void);
 void AW_MusicSceneEvent(const char *why);
+int AW_MusicStartTrack(int id);
 
 #ifndef AMIWIND_SPRITE_HANDS
 #define AMIWIND_SPRITE_HANDS 0

@@ -1,8 +1,16 @@
 # Current project state — 28 September 2026
 
-**Current target: AmiWind v0.0.16, one version for source and runtime.**
+**Current target: AmiWind v0.0.17, one version for source and runtime.**
 
-The consolidated release includes boot credits, a blue ordinary-water tint and
+The owner completed all 12 full game-data build stages with test-004 and
+confirmed test-006 works on 28 September 2026. This release includes FS-UAE
+autorun and the default `early_game_demo_start_1` town-center opening with
+track 04. Final ROM-directory prompting and documentation updates follow that
+confirmation; the engine is unchanged from test-006. Hosted CI is checked by
+the owner when pushing the release commit. See [validation](VALIDATION-v0.0.17.md)
+and [demo opening](EARLY_GAME_DEMO_START.md).
+
+The published v0.0.16 release includes boot credits, a blue ordinary-water tint and
 the 540 fog/draw default. See RELEASE-v0.0.16.md for the completed validation
 record. The sections below preserve checkpoint-017 and consolidation history.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.

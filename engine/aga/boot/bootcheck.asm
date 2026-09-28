@@ -159,7 +159,7 @@ puts:
 
 dos_name:       dc.b "dos.library",0
 graphics_name:  dc.b "graphics.library",0
-banner:        dc.b "Loading AmiWind v0.0.16...",10
+               include "amiwind_version.i"
                dc.b "By FlyingFathead +- ChaosWhisperer",10
                dc.b "https://github.com/FlyingFathead/amiwind/",10
                dc.b "Hardware preflight",10,0

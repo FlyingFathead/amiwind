@@ -12,14 +12,16 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from mwad.paths import child_ci, ensure_external, inside, resolve_data_files, installed_game_path, is_wsl
 from mwad import input_check
+from mwad.progress import Progress, live_log, section
 import build_versions
-from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources
+from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources, check_quakec
 
 
 def parser():
@@ -29,21 +31,26 @@ def parser():
                    help="Build output parent (default: ignored out/ in this checkout)")
     p.add_argument("--stage", choices=("terrain", "aga"), default="aga",
                    help="terrain: host packets only; aga: full experimental HDF")
-    p.add_argument("--check", action="store_true", help="Read-only prerequisite check; no conversion")
+    p.add_argument("--check", action="store_true", help="Check prerequisites without conversion; optional interactive SDK setup requires confirmation")
     p.add_argument("--plan", action="store_true", help="Check prerequisites and print commands without running")
     p.add_argument("--install-dependencies", action="store_true", help="Preview and confirm Ubuntu/Debian host packages and an external Python environment")
-    p.add_argument("--install-sdk", action="store_true", help="With --install-dependencies, also fetch the pinned Linux x86_64 Amiga SDK after confirmation")
+    p.add_argument("--autoinstall", action="store_true", help="Quickest setup: confirm missing host/Python/native dependencies, install them, then continue the build")
+    p.add_argument("--yes", action="store_true", help="With --autoinstall, accept the displayed dependency proposal and APT installation (for CI)")
+    p.add_argument("--install-sdk", action="store_true", help="Fetch the pinned Linux x86_64 Amiga SDK after confirmation; works alone or with --install-dependencies")
     p.add_argument("--tools-dir", type=Path, default=ROOT.parent / "amiwind-tools", help="External dependency environment parent (default: ../amiwind-tools)")
     p.add_argument("--versions", action="store_true", help="Compare available tools/packages with the recorded build reference, then exit")
     p.add_argument("--check-inputs", action="store_true", help="Check the game installation without requiring build tools, then exit")
     p.add_argument("--dry-run", action="store_true", help="Actually compile the engine and create an asset-free boot-notice HDF; --plan only previews commands")
+    p.add_argument("--autorun-fs-uae", action="store_true", help="Check FS-UAE and your ROM before setup, then launch the completed HDF using the documented preset")
+    p.add_argument("--kickstart-file", "--kickstart", dest="kickstart_file", type=Path,
+                   help="Owned ROM file or directory for --autorun-fs-uae (default: ~/.roms/; asks if missing interactively)")
     p.add_argument("--allow-data-differences", action="store_true", help="Explicitly allow unverified edition/file checksum differences; container and required-group errors still block")
     p.add_argument("--name", help="New immutable run name; defaults to a UTC timestamp")
     p.add_argument("--sdk", type=Path, help="AmigaPorts GCC SDK root")
     p.add_argument("--vasm", type=Path, help="Separate vasmm68k_mot executable (default: SDK bin directory)")
     p.add_argument("--upstream-archive", type=Path, help="Optional legacy provenance check; the runtime source is included")
     p.add_argument("--quake-tools", type=Path, help="ericw-tools directory containing qbsp, vis, light")
-    p.add_argument("--qcc", help="Path to id Quake-Tools qcc-host")
+    p.add_argument("--qcc", help="QuakeC compiler path or command (qcc-host, qcc or fteqcc)")
     p.add_argument("--ffmpeg", default="ffmpeg")
     p.add_argument("--xdftool", default="xdftool")
     p.add_argument("--rdbtool", default="rdbtool")
@@ -56,6 +63,68 @@ def ask(value, prompt, interactive):
         return value
     if interactive:
         return input(prompt + ": ").strip() or None
+    return None
+
+
+def detected_sdk(args):
+    """Find the SDK installed by our setup command, without writing anything."""
+    candidate = ensure_external(args.tools_dir / "sdk", "SDK")
+    assembler = args.vasm or candidate / "bin/vasmm68k_mot"
+    required = (candidate / "bin/m68k-amigaos-gcc", assembler,
+                candidate / "m68k-amigaos/ndk-include/exec/exec_lib.i")
+    return candidate if all(path.is_file() for path in required) else None
+
+
+def select_sdk(args, interactive=False, game_data=None, install_requested=False):
+    """Downloads require explicit selection and consent; plans never fetch."""
+    if args.sdk:
+        return ensure_external(args.sdk, "SDK")
+    found = detected_sdk(args)
+    if found:
+        print(f"Using installed Amiga SDK: {found}")
+        return found
+
+    from fetch_toolchain import SPEC, fetch
+    destination = ensure_external(args.tools_dir / "sdk", "SDK download directory")
+    command = [sys.executable, str(ROOT / "tools/fetch_toolchain.py"),
+               "--out", str(destination)]
+    print("Amiga SDK not configured. It provides the Amiga cross-compiler and assembler.")
+    print(f"Pinned download: {SPEC['release']}, {SPEC['bytes']:,} bytes; size and SHA-256 checked before extraction.")
+    print("SDK release page: https://github.com/AmigaPorts/m68k-amigaos-gcc/releases/tag/" + SPEC['release'])
+    print("Source: " + SPEC['url'])
+    print(f"Destination: {destination}")
+    available = not destination.exists() and not destination.is_symlink()
+    if available:
+        print("Standalone SDK download command (no APT or pip installation):")
+        print("  " + shlex.join(command))
+    else:
+        print("This destination already exists but is not a complete SDK; it will not be overwritten.")
+        print("Select an existing SDK with --sdk, or choose a new --tools-dir for setup.")
+    if install_requested and (args.plan or args.check):
+        print("SDK setup preview only. No download or directory creation performed.")
+        return None
+    if args.plan:
+        print("Plan mode never downloads; use the standalone command separately.")
+    elif args.check:
+        print("This is a prerequisite check. Only choosing 'install' and confirming will write SDK files; no build will run.")
+    prompt = "SDK root, 'install' to download" if available and not args.plan else "Existing AmigaPorts SDK root"
+    raw = 'install' if install_requested else ask(None, prompt + " (Enter to report missing)", interactive)
+    if not raw:
+        return None
+    if raw.casefold() != 'install':
+        return ensure_external(raw, "SDK")
+    if args.plan or not available:
+        print("SDK download unavailable in this mode or destination. Use the setup guidance above.")
+        return None
+    if game_data and (inside(destination, game_data) or inside(game_data, destination)):
+        raise ValueError("Keep the SDK download directory separate from the game installation")
+    if input("Download and extract this SDK now? [y/N] ").strip().casefold() in ("y", "yes"):
+        try:
+            fetch(destination)
+        except tarfile.TarError as exc:
+            raise ValueError(f"SDK extraction failed: {exc}") from exc
+        return destination
+    print("SDK download declined. No SDK files created.")
     return None
 
 
@@ -77,6 +146,9 @@ def game_input(value, interactive):
         return value
     if not interactive:
         return None
+    print("Use your installed Morrowind files. Store pages:")
+    print("  GOG: https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition")
+    print("  Steam: https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/")
     print("Host: " + ("WSL" if is_wsl() else sys.platform))
     if sys.platform == "win32" or is_wsl():
         print(r"Checking C:\GOG Games\Morrowind for the reference core file sizes and SHA-256 hashes...", flush=True)
@@ -91,12 +163,36 @@ def game_input(value, interactive):
     return input("Morrowind installation root (or Data Files directory): ").strip() or None
 
 
+def choose_installation(candidates):
+    print("Multiple candidate installations found; choose the one to validate:")
+    for number, path in enumerate(candidates, 1):
+        print(f"  {number}. {path}")
+    while True:
+        answer = input("Installation number (Enter to cancel): ").strip()
+        if not answer:
+            raise ValueError("No installation selected; rerun with --data-files pointing to the desired folder")
+        if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+            return candidates[int(answer)-1]
+        print(f"Enter a number from 1 to {len(candidates)}.")
+
+
 def executable(value, label, errors):
     found = shutil.which(str(value)) if value else None
     if not found:
         errors.append(f"{label}: executable not found ({value or 'not supplied'})")
         return None
     return str(Path(found).resolve())
+
+
+def prepare_dependencies(args, interactive):
+    if args.autoinstall or (interactive and sys.platform == 'linux' and not args.plan):
+        from setup_build import setup
+        if not args.sdk:
+            args.sdk = detected_sdk(args)
+        if not setup(args, getattr(args, '_argv', []), interactive=interactive):
+            raise ValueError('Dependency setup was not accepted; build stopped before conversion')
+        if not args.sdk:
+            args.sdk = detected_sdk(args)
 
 
 def sha256(path):
@@ -115,7 +211,9 @@ def prerequisites(args, interactive=False):
     if raw:
         try:
             print("Checking the installed file tree, containers and reference SHA-256 hashes...", flush=True)
-            args.input_report = input_check.inspect(raw, args.stage, args.allow_data_differences)
+            with Progress("Verifying game files, containers and reference hashes"):
+                args.input_report = input_check.inspect(raw, args.stage, args.allow_data_differences,
+                                                       notify=print, choose=choose_installation if interactive else None)
             input_check.display(args.input_report)
             errors.extend(args.input_report["errors"])
             data = Path(args.input_report["data_files"])
@@ -125,17 +223,31 @@ def prerequisites(args, interactive=False):
             errors.append(str(exc))
     else:
         errors.append("Supply --data-files '/path/to/Morrowind/Data Files'")
+    if errors:
+        raise ValueError("Game inputs need attention before tool setup:\n  - " + "\n  - ".join(errors))
+    args.data_files = data
     if args.stage == "aga":
-        for module, package in (("PIL", "Pillow"), ("numpy", "numpy"),
+        prepare_dependencies(args, interactive)
+        for module, package in (("setuptools", "setuptools>=68 (provides distutils for PyFFI)"),
+                                ("PIL", "Pillow"), ("numpy", "numpy"),
                                 ("scipy", "scipy"), ("pyffi", "PyFFI==2.2.3"),
                                 ("fast_simplification", "fast-simplification==0.2.0")):
             if importlib.util.find_spec(module) is None:
                 errors.append(f"Python dependency missing: {package}; use this Python environment's pip")
+        if not errors and not args.plan:
+            try:
+                with Progress('Checking the PyFFI TES3 reader'):
+                    from prepare_scenery import check_nif_reader
+                    check_nif_reader()
+            except (ImportError, AttributeError, ValueError, OSError) as exc:
+                errors.append(f'PyFFI reader check failed: {exc}. Run --autoinstall to install required Python dependencies, including setuptools; see docs/BUILD_DEPENDENCIES.md')
+        if errors:
+            raise ValueError('Python conversion dependencies need attention:\n  - ' + '\n  - '.join(errors))
         for name in ("make",):
             tools[name] = executable(name, name, errors)
         for name in ("ffmpeg", "xdftool", "rdbtool"):
             tools[name] = executable(getattr(args, name), name, errors)
-        sdk = ask(args.sdk, "AmigaPorts SDK root", interactive)
+        sdk = select_sdk(args, interactive, game_data=data)
         if sdk:
             args.sdk = ensure_external(sdk, "SDK")
             tools["m68k-amigaos-gcc"] = executable(args.sdk / "bin/m68k-amigaos-gcc", "m68k-amigaos-gcc", errors)
@@ -143,7 +255,7 @@ def prerequisites(args, interactive=False):
             if not (args.sdk / "m68k-amigaos/ndk-include/exec/exec_lib.i").is_file():
                 errors.append("SDK NDK includes missing: m68k-amigaos/ndk-include/exec/exec_lib.i")
         else:
-            errors.append("Supply --sdk /path/to/m68k-amigaos-gcc-16.2")
+            errors.append("Amiga SDK missing: use the download command above or supply --sdk /path/to/sdk")
         try:
             runtime_sources()
         except (OSError, ValueError) as exc:
@@ -153,11 +265,27 @@ def prerequisites(args, interactive=False):
             args.upstream_archive = ensure_external(archive, "upstream source archive")
             if not args.upstream_archive.is_file() or sha256(args.upstream_archive) != UPSTREAM_SHA256:
                 errors.append(f"AmiQuake archive must match SHA-256 {UPSTREAM_SHA256}")
-        tool_dir = ask(args.quake_tools, "ericw-tools bin directory (blank to use PATH)", interactive)
+        if interactive:
+            print("Map tools: https://github.com/ericwa/ericw-tools/releases/tag/v0.18.1")
+        tool_dir = build_versions.find_quake_tools(args)
+        if not tool_dir and not all(shutil.which(name) for name in ('qbsp', 'vis', 'light')):
+            tool_dir = ask(args.quake_tools, "ericw-tools bin directory (blank to use PATH)", interactive)
         for name in ("qbsp", "vis", "light"):
             value = Path(tool_dir).expanduser() / name if tool_dir else name
             tools[name] = executable(value, name, errors)
-        tools["qcc"] = executable(ask(args.qcc, "qcc-host executable", interactive) or "qcc-host", "qcc-host", errors)
+        qcc = build_versions.find_qcc(args)
+        if not qcc:
+            print("QuakeC compiler missing. Ubuntu/Debian package: sudo apt-get install fteqcc")
+            print("FTEQCC: https://fte.triptohell.info/ | Reference compiler: https://github.com/id-Software/Quake-Tools")
+            qcc = ask(args.qcc, "QuakeC compiler path (qcc-host, qcc or fteqcc)", interactive)
+        tools["qcc"] = executable(qcc, "QuakeC compiler", errors)
+        if tools["qcc"] and not args.plan:
+            print(f"Checking QuakeC compilation with {tools['qcc']} (temporary files only)...", flush=True)
+            try:
+                check_quakec(tools['qcc'], args.hands)
+                print("  [ok] AmiWind QuakeC compiled; program version and system-variable CRC match the engine.")
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                errors.append(f"QuakeC compile check failed: {exc}")
         if not Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf").is_file():
             errors.append("Install fonts-dejavu-core (the scene builder uses DejaVuSansMono.ttf)")
     args.version_report = build_versions.report(args, tools) if args.stage == "aga" else []
@@ -172,9 +300,10 @@ def dry_run_prerequisites(args, interactive=False):
     args.workspace = ensure_external(args.workspace, "build workspace")
     if args.data_files:
         raise ValueError("The asset-free --dry-run does not accept --data-files")
-    sdk = ask(args.sdk, "AmigaPorts SDK root", interactive)
+    prepare_dependencies(args, interactive)
+    sdk = select_sdk(args, interactive)
     if not sdk:
-        raise ValueError("Supply --sdk for the asset-free native compile")
+        raise ValueError("Amiga SDK missing: use the download command above or supply --sdk for the asset-free native compile")
     args.sdk = ensure_external(sdk, "SDK")
     for name, value in (("make", "make"), ("m68k-amigaos-gcc", args.sdk / "bin/m68k-amigaos-gcc"),
                         ("vasmm68k_mot", args.vasm or args.sdk / "bin/vasmm68k_mot")):
@@ -242,18 +371,25 @@ def execute(steps, run, metadata):
     save()
     for number, (name, command) in enumerate(steps, 1):
         log = run / "logs" / f"{number:02}-{name}.log"
-        print(f"[{number}/{len(steps)}] {name} — log: {log}", flush=True)
+        section(f"Build [{number}/{len(steps)}]: {name}")
+        print(f"Log: {log}", flush=True)
         entry = {"name": name, "command": command, "status": "running", "log": str(log)}
         receipt["steps"].append(entry)
         save()
         start = time.monotonic()
         try:
             with log.open("w") as output:
-                subprocess.run(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, check=True)
+                with Progress(f"[{number}/{len(steps)}] {name}"), live_log(log):
+                    subprocess.run(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, check=True,
+                                   env=dict(os.environ, PYTHONUNBUFFERED='1'))
         except (OSError, subprocess.CalledProcessError, KeyboardInterrupt) as exc:
-            entry.update(status="failed", elapsed_seconds=round(time.monotonic() - start, 3))
-            receipt["status"] = "failed"
+            status = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
+            entry.update(status=status, elapsed_seconds=round(time.monotonic() - start, 3))
+            receipt["status"] = status
             save()
+            if isinstance(exc, KeyboardInterrupt):
+                print(f"Build cancelled. Earlier results and logs retained in {run}", flush=True)
+                raise
             raise RuntimeError(f"{name} failed. Earlier results are retained. Read {log}; use a new --name after fixing the problem.") from exc
         entry.update(status="passed", elapsed_seconds=round(time.monotonic() - start, 3))
         save()
@@ -276,26 +412,73 @@ def provenance(args, tools):
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else hashes(args.data_files, lambda path: True),
         "source_sha256": hashes(ROOT, lambda path:
-            (path.suffix in (".py", ".c", ".h", ".patch", ".qc", ".asm", ".sh") or path.name == "Makefile")
+            (path.suffix in (".py", ".c", ".h", ".patch", ".qc", ".asm", ".sh") or path.name in ("Makefile", "VERSION", "pyproject.toml"))
             and path.relative_to(ROOT).parts[0] != "out"
             and "__pycache__" not in path.parts),
     }
 
 
 def main(argv=None):
+    # Also cover direct Python invocations and subsequent environment re-exec.
+    os.environ['PYTHONUNBUFFERED'] = '1'
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(line_buffering=True)
     p = parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
     args = p.parse_args(argv)
+    args._argv = argv
     try:
         if sys.version_info < (3, 10):
             raise ValueError("Python 3.10 or newer is required")
-        if args.install_sdk and not args.install_dependencies:
-            raise ValueError("--install-sdk requires --install-dependencies")
-        if sum((args.install_dependencies, args.versions, args.check_inputs)) > 1:
-            raise ValueError("Use one of --install-dependencies, --versions or --check-inputs at a time")
+        if args.yes and not args.autoinstall:
+            raise ValueError('--yes requires --autoinstall')
+        if args.autoinstall and (args.install_sdk or args.versions or args.check_inputs or args.stage != 'aga'):
+            raise ValueError('--autoinstall is for AGA builds/checks; use it separately from setup-only or inventory modes')
+        if sum((args.install_dependencies or args.install_sdk, args.versions, args.check_inputs)) > 1:
+            raise ValueError("Use dependency/SDK setup, --versions or --check-inputs separately")
+        emulator = None
+        if args.kickstart_file and not args.autorun_fs_uae:
+            raise ValueError('--kickstart-file requires --autorun-fs-uae')
+        if args.autorun_fs_uae:
+            if args.stage != 'aga' or args.install_dependencies or args.install_sdk or args.versions or args.check_inputs:
+                raise ValueError('--autorun-fs-uae requires an AGA build; setup-only and inventory modes do not create an HDF')
+            from run_fs_uae import prepare_launch
+            emulator = prepare_launch(args.kickstart_file, interactive=sys.stdin.isatty() and not args.yes)
+            # Keep an interactively selected/relative ROM across managed-venv re-exec.
+            argv.extend(['--kickstart-file', str(emulator[1])])
+            if args.check or args.plan:
+                print('Check/plan mode: FS-UAE will not launch and no emulator configuration will be written.')
         if args.install_dependencies:
+            if args.autoinstall:
+                from setup_build import setup, use_environment
+                use_environment(args, argv)
+                args.sdk = args.sdk or detected_sdk(args)
+                if args.data_files:
+                    args.data_files = installed_game_path(args.data_files).expanduser().resolve()
+                accepted = setup(args, argv, interactive=sys.stdin.isatty(), preview=args.plan or args.check)
+                return 0 if accepted or args.plan or args.check else 1
             from install_dependencies import install
             return install(args)
+        if args.install_sdk:
+            if args.sdk:
+                raise ValueError("--install-sdk installs into --tools-dir/sdk; use --sdk only to select an existing SDK for checks/builds")
+            game = installed_game_path(args.data_files).expanduser().resolve() if args.data_files else None
+            select_sdk(args, interactive=sys.stdin.isatty(), game_data=game, install_requested=True)
+            return 0
+        if not args.check_inputs and args.stage == 'aga':
+            from setup_build import use_environment
+            use_environment(args, argv)
+        if args.autoinstall and args.plan:
+            from setup_build import setup
+            args.sdk = args.sdk or detected_sdk(args)
+            if args.data_files:
+                args.data_files = installed_game_path(args.data_files).expanduser().resolve()
+            setup(args, argv, preview=True)
+            return 0
         if args.versions:
+            if not args.sdk:
+                args.sdk = detected_sdk(args)
             build_versions.report(args)
             return 0
         if args.check_inputs:
@@ -303,7 +486,9 @@ def main(argv=None):
             if raw is None:
                 raise ValueError("Supply --data-files with your Morrowind installation root")
             print("Checking the installed file tree, containers and reference SHA-256 hashes...", flush=True)
-            report = input_check.inspect(raw, args.stage, args.allow_data_differences)
+            with Progress("Verifying game files, containers and reference hashes"):
+                report = input_check.inspect(raw, args.stage, args.allow_data_differences,
+                                             notify=print, choose=choose_installation if sys.stdin.isatty() else None)
             input_check.display(report)
             return 1 if report["errors"] else 0
         args.name = args.name or datetime.now(timezone.utc).strftime("build-%Y%m%d-%H%M%S")
@@ -322,15 +507,26 @@ def main(argv=None):
             for name, command in steps:
                 print(name + ": " + shlex.join(command))
             return 0
-        print("Recording input, tool and source checksums before conversion.", flush=True)
-        execute(steps, run, provenance(args, tools))
+        with Progress("Recording input, tool and source checksums"):
+            metadata = provenance(args, tools)
+        print(f"Build run: {run}\nLive tool output follows; per-stage logs are saved in {run / 'logs'}.", flush=True)
+        execute(steps, run, metadata)
         if args.dry_run:
             result = run / "image" / f"AmiWind-v{VERSION}-dry-run.hdf"
             print(f"Asset-free test build complete: {result}\nNo game assets or ROMs were used. This is not a playable demo.")
         else:
             result = run / "image" / f"AmiWind-v{VERSION}.hdf" if args.stage == "aga" else run / "work/generated/seyda-neen"
             print(f"Build complete: {result}\nPrivate generated content: do not include it in the public source package.")
+        if emulator:
+            from run_fs_uae import launch
+            try:
+                if launch(result, *emulator):
+                    print('[warning] Build succeeded, but FS-UAE launch/playtest did not complete successfully. HDF retained.')
+            except (OSError, ValueError) as exc:
+                print(f'[warning] Build succeeded; FS-UAE launch skipped: {exc}. HDF retained: {result}')
         return 0
+    except (KeyboardInterrupt, EOFError):
+        p.exit(130, "\nCancelled.\n")
     except (OSError, ValueError, RuntimeError) as exc:
         p.exit(1, f"Error: {exc}\n")
 
