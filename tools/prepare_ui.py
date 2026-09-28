@@ -84,6 +84,23 @@ def pack_font(path, size):
     return pack_glyphs(glyphs, size)
 
 
+def bake_family(item, sizes=(16, 14, 12)):
+    """Prefer the loose TTF; fall back to Bethesda FNT+TEX as one family."""
+    ttf_error = None
+    if item["ttf_path"]:
+        try:
+            return ({size: pack_truetype(item["ttf_path"], size) for size in sizes},
+                    "ttf", None)
+        except (OSError, ValueError) as exc:
+            ttf_error = str(exc)
+    if item["bitmap_ready"]:
+        return ({size: pack_font(item["bitmap_path"], size) for size in sizes},
+                "bitmap-fallback" if item["ttf_path"] else "bitmap", ttf_error)
+    if ttf_error:
+        raise ValueError(f"{item['label']} TTF conversion failed and no bitmap fallback is available: {ttf_error}")
+    raise ValueError(f"No usable source for {item['label']}")
+
+
 def pack_truetype(path, size):
     """Rasterize a caller-supplied font to AWF1 on the host, never on Amiga."""
     if size not in (12, 14, 16):
@@ -145,12 +162,13 @@ def background_packet(background,palette,protected):
 def convert(data, palette_path, out):
     import sys, io
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-    from mwad.paths import ensure_external, child_ci
+    from mwad.paths import ensure_external, child_ci, resolve_data_files
     from mwad.audit import BSA
+    from mwad import font_sources
     from npc_geometry import Assets
-    data = Path(data); out = ensure_external(Path(out), 'private UI assets')
+    data = resolve_data_files(data); out = ensure_external(Path(out), 'private UI assets')
     out.mkdir(parents=True, exist_ok=True)
-    font = child_ci(child_ci(data, 'Fonts'), 'Magic_Cards_Regular.fnt')
+    fonts = font_sources.discover(data)
     palette = Path(palette_path).read_bytes()
     if len(palette) != 768: raise ValueError('Expected 256 RGB palette')
     assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
@@ -190,10 +208,32 @@ def convert(data, palette_path, out):
         art=Image.open(p).convert('RGB').resize((320,200),Image.Resampling.LANCZOS)
         name=f'loading{i:02d}.awb';(out/name).write_bytes(background_packet(art,palette,protected))
         loading.append({'source':p.name,'sha256':sha(p),'output':name})
-    for size in (16,14,12): (out/f'magic{size}.awf').write_bytes(pack_font(font,size))
-    report = {'format':'AmiWind private UI conversion 1','font_sha256':sha(font),
-              'atlas_sha256':sha(OriginalFont(font).texture_path),'palette_sha256':sha(Path(palette_path)),
-              'sources':sources,'encoding':'Original bitmap byte indices; CP1252 game strings',
+    font_report = {}
+    for key, item in fonts.items():
+        if not font_sources.usable(item):
+            if key == 'magic':
+                raise ValueError('Magic Cards font is required for the AmiWind UI')
+            print(f"Warning: {item['label']} font unavailable; no TTF or complete FNT+TEX pair was found.")
+            continue
+        payloads, mode, ttf_error = bake_family(item)
+        if ttf_error:
+            print(f"Warning: preferred {item['ttf']} could not be converted safely ({ttf_error}); "
+                  f"using Bethesda bitmap fallback {item['bitmap']}.")
+        for size, payload in payloads.items():
+            (out/f"{item['output']}{size}.awf").write_bytes(payload)
+        selected = item['ttf_path'] if mode == 'ttf' else item['bitmap_path']
+        font_report[key] = {
+            'label': item['label'], 'mode': mode, 'source': selected.name,
+            'source_sha256': sha(selected),
+            'atlas_sha256': sha(item['atlas_path']) if mode != 'ttf' and item['atlas_path'] else None,
+            'ttf_error': ttf_error,
+            'outputs': [f"{item['output']}{size}.awf" for size in (16,14,12)],
+        }
+    magic = font_report['magic']
+    report = {'format':'AmiWind private UI conversion 2','font_sha256':magic['source_sha256'],
+              'atlas_sha256':magic['atlas_sha256'],'palette_sha256':sha(Path(palette_path)),
+              'font_families':font_report, 'sources':sources,
+              'encoding':'CP1252 game strings; preferred TTF or Bethesda bitmap fallback per family',
               'variants':[16,14,12], 'coverage':'three ink shades and transparent; packed 2-bit',
               'loading_screens':loading}
     (out/'ui-conversion.json').write_text(json.dumps(report,indent=2)+'\n')

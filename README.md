@@ -25,8 +25,8 @@ game files, with dialogue in the lower strip and an unchanged console font.
 The main menu now uses a smaller, lower panel; UI defaults to 14 px with 16/14/12
 and fallback choices in Options.
 
-**AmiWind v0.0.21-dev4** packages the evening world-mapping notes and a versioned
-rebuild of dev3. Polygonal POI regions remain an optional design experiment;
+**AmiWind v0.0.21-dev5** fixes Morrowind font-source portability while preserving the
+dev4 world-mapping checkpoint and gameplay baseline. Polygonal POI regions remain an optional design experiment;
 cell streaming is preserved as an option. The included dev3 maintenance repairs an omitted Census room, improves paper contrast,
 adds small interaction hints and WASD choices, and corrects dock interception,
 fighting permissions and courtyard ring depletion. New Game defaults to confirmation;
@@ -35,7 +35,7 @@ selection with rotating heads, Census Office rooms and NPCs, class/birthsign/sta
 review, papers and release adapters, and a bounded save/load implementation with
 adjustable autosave history. This remains a development slice: full dialogue,
 quests, inventory and combat are unfinished. Read the [checkpoint scope and
-remaining validation](docs/RELEASE-v0.0.21-dev4.md) before testing.
+remaining validation](docs/RELEASE-v0.0.21-dev5.md) before testing.
 
 Maintenance from v0.0.20 remains included: prison ambience is 5 dB lower in its
 mixer channels and debug overlay toggles include coordinates. Both intermittent
@@ -91,9 +91,26 @@ autorun, and the town-center demo opening. The owner has confirmed the rebuilt
 demo works on their Linux/FS-UAE setup. See the [release notes](docs/RELEASE-v0.0.17.md).
 
 **Original Morrowind game files are required. You must provide your own copy.**
-Please support the original work by purchasing Morrowind from
-[GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
-[Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
+
+> **AmiWind recommends the GOG GOTY edition of Morrowind.**
+>
+> AmiWind has been developed and tested primarily against the GOG Game of the Year
+> release. The GOG installation includes additional loose TrueType (TTF) font assets
+> that provide a better starting point for AmiWind's offline font conversion and
+> rasterization.
+>
+> The Steam GOTY edition does not normally include these loose TTF font assets. When
+> they are unavailable, AmiWind will fall back to Bethesda's original `.fnt` + `.tex`
+> bitmap fonts and continue the build. This fallback is supported, but converted font
+> quality and appearance may differ and may be inferior, particularly when fonts must
+> be rendered at sizes different from the original bitmap assets.
+>
+> **For the best-tested and preferred AmiWind conversion path, use the GOG GOTY edition:**
+>
+> https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition
+
+The Steam GOTY edition remains a supported fallback input when its required game data
+passes AmiWind's validation.
 
 The AGA runtime incorporates code from **id Software's Quake** and the
 **AmiQuake** lineage, modified, extended and adapted for **AmiWind**. These

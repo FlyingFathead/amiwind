@@ -141,11 +141,16 @@ inputs stop before dependency installation. The game prompt includes GOG and
 Steam store links. Ctrl+C cancels without a Python traceback.
 
 The terrain stage compares the core master/archive. The AGA stage also compares
-the reference Music and Sound files. Missing/different optional Fonts and Splash
-files do not block the current build. Additional files have no reference checksum
-and are reported as unrecognized. Expansion/plugin load orders are not applied.
-Fonts, videos, Windows executables, manuals and GOG extras are not required for
-the current scene. The original-font conversion experiment remains separate.
+the reference Music and Sound files. Splash remains optional. AGA font conversion
+now prefers the loose GOG GOTY `BookArt/*.ttf` sources and falls back per family to
+Bethesda's `Fonts/*.fnt` + `.tex` pairs. At least one usable Magic Cards source is
+required for the current UI. Missing preferred TTFs are warnings, not build errors,
+when the bitmap fallback is complete. The warning identifies the Steam-typical
+layout, recommends GOG GOTY, links its store page and notes that rasterized results
+may vary or be inferior at scaled/non-native sizes. Additional files have no
+reference checksum and are reported as unrecognized. Expansion/plugin load orders
+are not applied. Videos, Windows executables and manuals are not required for the
+current scene.
 
 An unrecognized edition or intentional file modification stops by default.
 `--allow-data-differences` explicitly permits checksum/missing-reference differences

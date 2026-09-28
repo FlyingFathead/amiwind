@@ -8,6 +8,7 @@ import struct
 
 from .audit import BSA
 from .paths import child_ci, ensure_external, installed_game_path, resolve_data_files
+from . import font_sources
 
 REFERENCE_DIR = Path(__file__).resolve().parents[2] / "config/input-reference"
 
@@ -191,8 +192,26 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
         combined = {**archive, **loose}
         if not any(key.startswith("sound/vo/") and info["bytes"] for key, info in combined.items()):
             errors.append("Sound/Vo/: no nonempty voice assets in loose files or Morrowind.bsa")
-    if not categories["fonts"]:
-        warnings.append("Fonts/ absent: optional for the current build; needed for future original-font conversion")
+    font_report = None
+    if stage == "aga":
+        fonts = font_sources.discover(data)
+        font_report = font_sources.public_inventory(fonts)
+        magic = fonts["magic"]
+        if not font_sources.usable(magic):
+            errors.append(
+                "No usable Magic Cards font source. AmiWind prefers BookArt/Magic Cards.ttf; "
+                "fallback requires Fonts/Magic_Cards_Regular.fnt and "
+                "Fonts/Magic_Cards_Regular_0_Lod_A.tex"
+            )
+        for key, item in fonts.items():
+            if key != "magic" and not font_sources.usable(item):
+                warnings.append(
+                    f"{item['label']} font unavailable: neither BookArt/{item['ttf']} nor the complete "
+                    f"Fonts/{item['bitmap']} + Fonts/{item['atlas']} fallback pair was found"
+                )
+        warnings.extend(font_sources.fallback_warnings(fonts))
+    elif not categories["fonts"]:
+        warnings.append("Fonts/ absent: not required by the terrain-only stage")
     empty = sum(not item["bytes"] for item in loose.values())
     if empty:
         warnings.append(f"{empty} empty loose files found; required inputs are checked separately")
@@ -212,6 +231,7 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
     return {"data_files": str(data), "selected_root": str(selected), "loose_files": len(loose),
             "loose_bytes": sum(item["bytes"] for item in loose.values()),
             "loose_categories": dict(categories), "archive_categories": dict(packed),
+            "font_sources": font_report,
             "checks": checks, "warnings": warnings, "errors": errors, "fingerprints": known}
 
 
@@ -227,8 +247,18 @@ def display(report):
     for category in ("meshes", "textures", "sound", "music", "fonts"):
         print(f"  {category}/: {report['loose_categories'].get(category, 0)} loose, "
               f"{report['archive_categories'].get(category, 0)} archived")
+    fonts = report.get("font_sources")
+    if fonts:
+        print("  Font conversion sources:")
+        for name, found in fonts["preferred_ttf"].items():
+            print(f"    [{'found' if found else 'not found'}] BookArt/{name}")
+        for item in fonts["families"].values():
+            selected = item["selected"] or "unavailable"
+            detail = item["preferred_ttf"] if selected == "ttf" else (
+                item["bitmap_fnt"] + " + " + item["bitmap_atlas"] if selected == "bitmap" else "no usable source")
+            print(f"    {item['label']}: {selected} ({detail})")
     for kind in ("warnings", "errors"):
         for message in report[kind]:
             print(f"  [{'warning' if kind == 'warnings' else 'missing/invalid'}] {message}")
     print("Container structure and required asset groups checked; conversion validates individual referenced assets.")
-    print("No game files changed. Executables, GOG extras and expansion/mod load orders are not build inputs.")
+    print("No game files changed. Executables and expansion/mod load orders are not build inputs; supported GOG font extras may be used when present.")

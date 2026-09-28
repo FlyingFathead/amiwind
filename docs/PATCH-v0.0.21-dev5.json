@@ -1,0 +1,33 @@
+{
+  "format": "amiwind-source-overlay-v1",
+  "base": {
+    "filename": "amiwind-2026-09-28_232242.zip",
+    "version": "0.0.21-dev4",
+    "sha256": "8b061e6eab1ef8961dd88244211e1adc4e94da15d30d754fe72ae8cdb29bf622"
+  },
+  "target": "0.0.21-dev5",
+  "summary": "Prefer GOG GOTY loose TTF font sources; support Steam GOTY by falling back to Bethesda FNT+TEX fonts with explicit diagnostics.",
+  "changed": [
+    "README.md",
+    "VERSION",
+    "docs/BUILD_DEPENDENCIES.md",
+    "docs/CHANGELOG.md",
+    "docs/LINUX_BUILD.md",
+    "docs/PROJECT_STATE.md",
+    "docs/RELEASE_WORKFLOW.md",
+    "src/mwad/input_check.py",
+    "tools/prepare_reading.py",
+    "tools/prepare_ui.py",
+    "tools/release-files.json"
+  ],
+  "added": [
+    "docs/PATCH-v0.0.21-dev5.json",
+    "docs/RELEASE-v0.0.21-dev5.md",
+    "resources/emulators/AmiWind-v0.0.21-dev5-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.21-dev5-WinUAE.uae",
+    "src/mwad/font_sources.py",
+    "tests/test_font_sources.py"
+  ],
+  "removed": [],
+  "application": "Extract from ~/NeuralNetwork/ so archive paths under amiwind/ overlay the existing checkout only after backing up local changes. No deletions are required."
+}

@@ -1,5 +1,21 @@
 # Development history
 
+## v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026
+
+- Prefer the GOG GOTY `BookArt/*.ttf` font sources for host-side AmiWind
+  rasterization when present. GOG GOTY remains the recommended source edition.
+- Support Steam GOTY's normal lack of loose BookArt TTFs by falling back to the
+  matching Bethesda `Fonts/*.fnt` + `.tex` pairs instead of aborting stage 13.
+- Report every preferred TTF as found/not found, the selected source per font
+  family, the GOG recommendation/link, and the possible quality difference.
+- Convert Magic Cards, Century Gothic, Century Gothic Big and Daedric families at
+  16/14/12 px. If a preferred TTF exceeds native AWF limits, fall back safely to
+  its bitmap family rather than clipping or corrupting glyphs.
+- Add Steam-style and GOG-style font-source regression tests. No gameplay change
+  is claimed relative to dev4.
+
+See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
+
 ## v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026
 
 - Record Horstator's optional polygonal POI-region fallback if cell streaming

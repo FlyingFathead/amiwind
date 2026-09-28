@@ -1,12 +1,16 @@
 # Current project state — 28 September 2026
 
-**Current development target: AmiWind v0.0.21-dev4.**
+**Current development target: AmiWind v0.0.21-dev5.**
+
+Dev5 preserves the dev4 gameplay/world-mapping checkpoint and fixes host-side
+font-source portability. GOG GOTY remains the preferred source installation: its
+loose BookArt TTFs are preferred for rasterization. Steam GOTY normally lacks
+those TTFs, so the build reports the difference and falls back to Bethesda FNT+TEX
+font data rather than failing at the reading stage. See [dev5 scope](RELEASE-v0.0.21-dev5.md).
 
 Dev4 packages Horstator's 28 September evening notes and the optional polygonal
-POI-region design in WORLD_MAPPING_PLAN.md and ROADMAP.md. It rebuilds dev3 with
-the new version identity; gameplay and converted scene content are unchanged.
-Region swapping and assisted doorway simplification remain planned, not shipped.
-See [dev4 scope](RELEASE-v0.0.21-dev4.md).
+POI-region design in WORLD_MAPPING_PLAN.md and ROADMAP.md. Region swapping and
+assisted doorway simplification remain planned, not shipped.
 
 Dev3 corrects the omitted Census room and dock approach distance, improves paper
 contrast and Census wall-art conversion, and selects New Game by default. The

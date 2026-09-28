@@ -9,10 +9,20 @@ A1200 performance. The current reference needs 040/FPU, AGA, 2 MiB Chip and
 [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
 [Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/)
 and supply your installed game files. AmiWind's Morrowind demo cannot run
-without converted data from your own copy.** An existing installation is fine;
-there is no need to reinstall intact base files. GOG installers are not read
-directly. Tribunal, Bloodmoon and mod load orders are not used. The optional base-game
-Video/mw_intro.bik and Splash artwork are converted when present.
+without converted data from your own copy.** An existing installation is fine.
+
+**The GOG GOTY edition is the preferred AmiWind source installation.** The GOG
+layout used for development includes loose `BookArt/*.ttf` TrueType fonts, which
+are preferred for host-side rasterization at AmiWind's target sizes. Steam GOTY
+normally lacks those loose TTFs. When they are absent, the builder reports that
+explicitly and falls back to Bethesda's `Fonts/*.fnt` + `.tex` bitmap fonts. The
+fallback is supported, but visual results may vary and may be inferior at scaled
+or non-native sizes. Preferred edition: <https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition>.
+
+There is no need to reinstall intact base files. GOG installers are not read
+directly; AmiWind reads the installed game tree. Tribunal, Bloodmoon and mod load
+orders are not used. The optional base-game Video/mw_intro.bik and Splash artwork
+are converted when present.
 
 ## 1. Quickest setup and build
 
