@@ -159,3 +159,52 @@ terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
 with proof of this formation's geometry cause. Backup first; keep this open.
+
+## 28 September 15:50 owner follow-up
+
+The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
+the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).
+The v0.0.20 maintenance work does not close this scene-conversion issue.
+
+## v0.0.21-dev1 regression / v0.0.21-dev2 correction
+
+| Item | Status | Evidence / remaining scope |
+| --- | --- | --- |
+| Invisible opening walls obstruct plank and redirect player into sea | Owner-reported dev1 regression; dev2 locally verified correction | Compound rotation order corrected; original placements and state condition retained. |
+| Deck/plank passage to dock race screen | Local FS-UAE 3.1.66 pass in dev2 | Debug setup at hatch arrival; ordinary walking thereafter, noclip off. Both lateral plank pushes blocked. Owner retest pending. |
+| Full natural intro-to-release, every escape route and courtyard edge | Still open acceptance scope | A focused plank pass does not certify the whole opening. See journal J015 and CHARACTER_CREATION.md. |
+| Compiler/host checks | 93 warnings, none new; 210 host tests pass | The new converter regression fails against the old code. Unrelated intermittent freezes remain open. |
+
+
+## v0.0.21-dev2 owner follow-up / dev3 maintenance
+
+Owner reports: dock guard misses interception; pier escape; missing Census floor
+and wall; blurred hanging art; unreadable papers; downstairs doors unavailable;
+punch fails after leaving the office; barrel falsely says Empty. Source-confirmed
+causes/candidates and fixed Y/N/version fields are maintained in [BUGS.md](BUGS.md).
+
+The selected default interaction layout is
+[npc_interaction_layout_template_001](INTERACTION_LAYOUTS.md). The latest owner
+console capture separately shows unbound MOUSE3/right click; attack is MOUSE1/left.
+Repeated `No valid compatible save generation` messages in that capture need
+exact selected-slot context before being treated as corruption: F9 requests the
+quicksave slot and does not automatically select the latest autosave. Existing
+saves are retained on failure. Keep this evidence in the private playtest bundle.
+
+Host suite:215 passing tests. Native warnings:87, down from93, no new diagnostics.
+The release evidence records focused FS-UAE checks; neither intermittent freeze
+has a demonstrated fix and the complete natural intro route remains unaccepted.
+
+Focused native checks cover automatic dock race interception, WASD choices,
+clerk/class/birthsign/review, readable papers with paging, and hall-guard paper
+acceptance followed by draw/left-click punch input. The final binary additionally
+passes demo-mode barrel pickup, a second activation showing Empty, and left-click
+punch input. These checks use debug positioning; they are not a continuous
+natural-route playthrough. The final demo F5/F9 attempt was correctly rejected
+before registration/release and is not evidence of a save/load pass. Persistent
+ring depletion and released-state controls have host regression coverage.
+
+The planned default-on door simplification is documented in journal J021 and
+the graphics/culling roadmap. No conversion flag or speedup ships in dev3 for
+that proposal. Only concealed wall patches may be simplified; visible wall
+texture/shape and actual openings must remain intact.

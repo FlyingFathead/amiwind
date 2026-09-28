@@ -80,8 +80,8 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
        lumps[5]+=struct.pack('<ihh6h2H',pn,nnxt,nin,*low,*high,0,0)
      return noderoots[0],roots[0]
     entities=[];instance_models={}
-    def entity(modelnum,origin,yaw):
-     return '{\n"classname" "func_wall"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
+    def entity(modelnum,origin,yaw,reference):
+     return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
 
     selected, selection_report = select_runtime_refs(index, centre, SCALE, 736)
     for ref in selected:
@@ -92,7 +92,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
      key=(mi,round(ref['scale'],6),round(ref['rotation_radians'][0],6),round(ref['rotation_radians'][1],6))
      if lighting:key=(*key,ref['number'])
      if key in instance_models:
-      entities.append(entity(instance_models[key],origin,yaw));continue
+      entities.append(entity(instance_models[key],origin,yaw,ref['number']));continue
 
      rx,ry,rz=-np.array(ref['rotation_radians']);rz=0;cx,sx,cy,sy,cz,sz=np.cos(rx),np.sin(rx),np.cos(ry),np.sin(ry),np.cos(rz),np.sin(rz)
      r=np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])@np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])@np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]]);scale=ref['scale']
@@ -152,7 +152,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
      points=v[:,:3]@r.T*SCALE*scale+o;lo=points.min(axis=0)-1;hi=points.max(axis=0)+1
      modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
      lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
-     instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw))
+     instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
      report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':scale,'visual_lod':lod,'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
      if len(lumps[5])//24>32767 or len(lumps[9])//8>32767:raise ValueError('Node budget exceeded')
     # New texture table, preserving the original lumps verbatim.

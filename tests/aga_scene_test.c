@@ -4,7 +4,7 @@
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 static char queued[64];static eval_t goal;static int clear_buttons,events,occluded;
 static void (*start_demo)(void);static cvar_t *demo_option;
-static int opening_track=-1,ship_available=1;
+static int opening_track=-1,ship_available=1,narrow_room;
 static char notice[96];
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
 void Cvar_RegisterVariable(cvar_t *c){demo_option=c;c->value=atof(c->string);}
@@ -30,6 +30,11 @@ void SV_LinkEdict(edict_t *p,qboolean touch){}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
  if(type==MOVE_NOMONSTERS){if(occluded)t.fraction=.3f;return t;}
+ if(narrow_room){
+  if(a[2]>88 || a[2]<66){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
+  if(b[2]<66){t.fraction=(a[2]-66)/(a[2]-b[2]);t.endpos[2]=66;t.plane.normal[2]=1;}
+  return t;
+ }
  if(a[2]>80){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
  if(b[2]<50 && a[2]>=50){t.fraction=(a[2]-50)/(a[2]-b[2]);t.endpos[2]=50;t.plane.normal[2]=1;}
  return t;
@@ -59,7 +64,14 @@ int main(void){
  demo_option->value=0;opening_track=-1;start_demo();
  assert(!strcmp(queued,"map prison\n"));assert(opening_track==-1);
  ship_available=0;start_demo();assert(!strcmp(queued,"map seyda\n"));
+ narrow_room=1;arrival[2]=84;
+ assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>66 && p.v.origin[2]<67);
  return 0;
 }
 
 void AW_IntroSpawn(void){}
+
+void AW_OpeningSpawn(void){}
+void AW_SaveCapture(void){}
+void AW_SaveSpawn(void){}
+void AW_SaveReset(void){}

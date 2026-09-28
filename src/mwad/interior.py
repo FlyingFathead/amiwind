@@ -54,7 +54,9 @@ def select_geometry(cell):
         elif not model:reason='no static model'
         elif 'marker' in model:reason='editor marker'
         elif ref['type'] not in ('STAT','DOOR','CONT','LIGH','ACTI'):reason='small item or actor deferred'
-        elif ref['type']=='ACTI' and 'active_de_bed' not in model:reason='unsupported activator'
+        elif ref['type']=='ACTI' and 'active_de_bed' not in model and not (
+                ref['id'].casefold()=='chargen stuff room' and
+                model=='i/in_c_plain_room_side.nif'):reason='unsupported activator'
         elif any(x in model for x in ('furn_bone','furn_de_rope','shack_hook','shack_basket')):reason='fine dressing deferred'
         if reason:omitted.append({'reference':ref['number'],'id':ref['id'],'reason':reason})
         else:selected.append(ref)

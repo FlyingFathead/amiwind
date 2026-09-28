@@ -129,6 +129,7 @@ void IN_UpUp(void) {KeyUp(&in_up);}
 void IN_AWUseDown(void) {
     if (key_dest != key_game) return;
     if (AW_IntroUse()) return;
+    if (AW_OpeningUse()) return;
     if (!(in_up.state & 1) && AW_SceneUse()) return;
     if (!(in_up.state & 1)) in_impulse = 201;
     KeyDown(&in_up);

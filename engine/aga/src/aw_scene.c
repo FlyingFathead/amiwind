@@ -3,30 +3,35 @@
  * time. This is not inventory, quest persistence or original opening logic.
  */
 #include "quakedef.h"
+#include "aw_save.h"
+#include "aw_story.h"
 #include "amiwind_version.h"
-typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;} aw_scene_link_t;
+typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
 static aw_scene_link_t links[64];static int count,loaded,pending;
 static aw_scene_link_t next;
 static float health,hand_goal;
 static double started;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
-int AW_Interior(void) {return sv.active && !strcmp(sv.name,"prison");}
-static int map_valid(char *name) {return !strcmp(name,"prison") || !strcmp(name,"seyda");}
+int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"prison") || !strcmp(sv.name,"census"));}
+static int map_valid(char *name) {return !strcmp(name,"prison") || !strcmp(name,"seyda") || !strcmp(name,"census");}
 static void read_links(void) {
     FILE *f;char line[384],extra;aw_scene_link_t r;int n,i,version;
     if(loaded)return;loaded=1;
     if(COM_FOpenFile("scene-doors.txt",&f)>=0 && f) {
         if(!fgets(line,sizeof(line),f)){fclose(f);return;}
-        version=!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
+        version=!strcmp(line,"AWD3\n")?3:!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
         if(!version){fclose(f);return;}
         while(count<64 && fgets(line,sizeof(line),f)) {
             memset(&r,0,sizeof(r));
-            n=sscanf(line,version==2?"%15s %15s %f %f %f %f %f %f %f %f %f %f %95[^\r\n]":"%15s %15s %f %f %f %f %f %f %f %f %f %f %c",r.source,r.target,
+            if(version==3)n=sscanf(line,"%15s %15s %u %f %f %f %f %f %f %f %f %f %f %95[^\r\n]",r.source,r.target,&r.reference,
+                &r.mins[0],&r.mins[1],&r.mins[2],&r.maxs[0],&r.maxs[1],&r.maxs[2],
+                &r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,r.label);
+            else n=sscanf(line,version==2?"%15s %15s %f %f %f %f %f %f %f %f %f %f %95[^\r\n]":"%15s %15s %f %f %f %f %f %f %f %f %f %f %c",r.source,r.target,
                 &r.mins[0],&r.mins[1],&r.mins[2],&r.maxs[0],&r.maxs[1],&r.maxs[2],
                 &r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,version==2?r.label:&extra);
-            if(n!=(version==2?13:12) || !map_valid(r.source) ||
-                (!map_valid(r.target) && !(version==2 && !strcmp(r.target,"-"))))continue;
-            if(version==2){for(i=0;r.label[i];i++)if((unsigned char)r.label[i]<32)break;if(r.label[i])continue;}
+            if(n!=(version==3?14:version==2?13:12) || !map_valid(r.source) ||
+                (!map_valid(r.target) && !(version>=2 && !strcmp(r.target,"-"))))continue;
+            if(version>=2){for(i=0;r.label[i];i++)if((unsigned char)r.label[i]<32)break;if(r.label[i])continue;}
             for(i=0;i<3;i++)if(!(fabs(r.mins[i])<32768 && fabs(r.maxs[i])<32768 &&
                 r.maxs[i]>=r.mins[i] && r.maxs[i]-r.mins[i]<=256 && fabs(r.arrival[i])<32768))break;
             if(i!=3 || !(r.yaw>=0 && r.yaw<360))continue;
@@ -49,10 +54,13 @@ static void read_links(void) {
 static void load_scene(aw_scene_link_t *link) {
     edict_t *p=svs.clients[0].edict;eval_t *v;
     if(pending)return;next=*link;pending=1;started=Sys_FloatTime();
+    AW_SaveCapture();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
     IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
     Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
-    Cbuf_AddText(!strcmp(next.target,"prison")?"map prison\n":"map seyda\n");
+    if(!strcmp(next.target,"prison"))Cbuf_AddText("map prison\n");
+    else if(!strcmp(next.target,"census"))Cbuf_AddText("map census\n");
+    else Cbuf_AddText("map seyda\n");
 }
 /* Ray/slab intersection with converted model bounds. The model origin may
  * be buried in the ceiling or far from the visible handle/hatch surface. */
@@ -78,6 +86,7 @@ static int aimed_door(void) {
     p=svs.clients[0].edict;if(p->v.movetype!=MOVETYPE_WALK)return -1;
     read_links();VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
     for(i=0;i<count;i++) {
+        if(aw_story.ship_disabled && !strcmp(links[i].target,"prison"))continue;
         if(strcmp(sv.name,links[i].source) || !door_hit(&links[i],eye,forward,hit))continue;
         VectorSubtract(hit,eye,delta);distance=Length(delta);if(distance>=closest)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,hit,MOVE_NOMONSTERS,p);
@@ -88,23 +97,65 @@ static int aimed_door(void) {
 }
 int AW_SceneUse(void) {
     int i;FILE *f=NULL;char path[40];if(pending)return 1;i=aimed_door();if(i<0)return 0;
+    if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
+    if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     sprintf(path,"maps/%s.bsp",links[i].target);
     if(!map_valid(links[i].target) || COM_FOpenFile(path,&f)<0 || !f){
         if(f)fclose(f);AW_UISubtitle("","Interior not found.",3);return 1;
     }
     fclose(f);
+    if(AW_StoryRestricted() && links[i].reference==119659)AW_StoryTransition(AW_STAGE_RELEASED);
     load_scene(&links[i]);return 1;
 }
+/* Match the manual QC greeting selector, including its voice cooldown and
+ * scripted-actor exclusion. This only labels greetings supported by that path. */
+static const char *npc_hint(void)
+{
+    edict_t *p,*e,*best=NULL;eval_t *v;ddef_t *g;int i;
+    vec3_t eye,point,delta,forward,right,up;float distance,closest=72;trace_t tr;
+    g=ED_FindGlobal("aw_voice_deadline");
+    if(g && sv.time<pr_globals[g->ofs])return NULL;
+    p=svs.clients[0].edict;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
+    for(i=1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);if(e->free || !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
+        VectorCopy(e->v.origin,point);point[2]+=27;VectorSubtract(point,eye,delta);distance=Length(delta);
+        if(distance<=.1f || distance>=closest || DotProduct(delta,forward)/distance<=.65f)continue;
+        tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NOMONSTERS,p);
+        if(tr.startsolid || tr.fraction<1)continue;
+        closest=distance;best=e;
+    }
+    if(!best)return NULL;
+    v=GetEdictFieldValue(best,"aw_intro_role");if(v && v->_float)return NULL;
+    v=GetEdictFieldValue(best,"aw_voice");if(!v || !v->string)return NULL;
+    return pr_strings+best->v.netname;
+}
+/* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
-    int i,y;const char *name;extern int scr_copyeverything;
-    if(key_dest!=key_game || pending || AW_IntroUse())return;
-    i=aimed_door();if(i<0)return;
+    int i,y,w,n,cw;char label[96],line[80];const char *name=NULL,*action=NULL;extern int scr_copyeverything;
+    if(key_dest!=key_game || pending || AW_IntroUse() || !sv.active ||
+       svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
+       svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
+    if(!AW_OpeningHint(&name,&action)){
+        i=aimed_door();
+        if(i>=0){
+            name=links[i].label[0]?links[i].label:!strcmp(links[i].target,"seyda")?"Seyda Neen":"Imperial Prison Ship";
+            action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
+                AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
+                !map_valid(links[i].target)?"Interior unavailable":"Enter: E";
+        }else{ name=npc_hint();if(name)action="Talk: E"; }
+    }
+    if(!name)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;
-    if(vid.height-y<44)return;
-    name=links[i].label[0]?links[i].label:!strcmp(links[i].target,"seyda")?"Seyda Neen":"Imperial Prison Ship";
-    AW_UIBox(84,y,vid.width-84,44);
-    AW_UITextBox(88,y+4,vid.width-92,18,name,-1);
-    AW_UITextBox(88,y+22,vid.width-92,18,"E: Enter",-1);
+    if(vid.height-y<20+AW_ConsoleCharHeight())return;
+    AW_UISmallBegin();
+    strncpy(label,name,sizeof(label)-1);label[sizeof(label)-1]=0;
+    for(n=strlen(label);n && AW_UIWidth(label)>vid.width-96;n--)label[n-1]=0;
+    w=AW_UIWidth(label);
+    AW_UITextBox(vid.width-w-6,y+3,w,14,label,-1);
+    AW_UISmallEnd();
+    sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
+    for(i=0;line[i];i++)AW_ConsoleCharacter(vid.width-w-6+i*cw,y+19,(unsigned char)line[i]);
     scr_copyeverything=1;
 }
 static void door_status(void) {
@@ -127,7 +178,7 @@ static void door_status(void) {
 int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
     vec3_t top,bottom,point;trace_t tr;int i,drop;
     static int offsets[9][2]={{0,0},{16,0},{-16,0},{0,16},{0,-16},{16,16},{-16,16},{16,-16},{-16,-16}};
-    for(drop=0;drop<=64;drop+=32)for(i=0;i<9;i++) {
+    for(drop=0;drop<=64;drop+=8)for(i=0;i<9;i++) {
         VectorCopy(preferred,top);top[0]+=offsets[i][0];top[1]+=offsets[i][1];top[2]+=8-drop;
         VectorCopy(top,bottom);bottom[2]-=32;
         tr=SV_Move(top,p->v.mins,p->v.maxs,bottom,MOVE_NORMAL,p);
@@ -153,7 +204,7 @@ void AW_SceneSpawn(edict_t *p) {
     } else {
         pending=0;if(AW_Interior())AW_InteriorPlace(p,p->v.origin);else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();
 }
 static void scene_command(void) {
     aw_scene_link_t r;char *s=Cmd_Argv(1);
@@ -167,7 +218,7 @@ static void scene_command(void) {
 }
 static void demo_start(void) {
     FILE *f;
-    pending=0;
+    pending=0;AW_StoryReset(0);AW_SaveReset();
     if(early_game_demo_start_1.value) {
         Con_Printf("early_game_demo_start_1: Seyda Neen town center, track 04.\n");
         if(!AW_MusicStartTrack(4))

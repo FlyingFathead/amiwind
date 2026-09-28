@@ -13,6 +13,41 @@ in [IMPLEMENTATION_IDEAS.md](IMPLEMENTATION_IDEAS.md).
 
 Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NEEN.md).
 
+## Index
+
+- [Verified mapping at checkpoint-014](#verified-mapping-at-checkpoint-014)
+- [J001 — later pier faces disappeared](#j001--later-pier-faces-disappeared)
+- [J002 — restored geometry exposed capacity and cache limits](#j002--restored-geometry-exposed-capacity-and-cache-limits)
+- [J003 — a hatch appeared without its ship](#j003--a-hatch-appeared-without-its-ship)
+- [J004 — movement stuck far from visible architecture](#j004--movement-stuck-far-from-visible-architecture)
+- [J005 — tight movement was partly a scale mismatch](#j005--tight-movement-was-partly-a-scale-mismatch)
+- [J006 — playlist advanced but the same file played](#j006--playlist-advanced-but-the-same-file-played)
+- [J007 — door panels disappeared behind walls](#j007--door-panels-disappeared-behind-walls)
+- [J008 — coordinates were drawn but the display stayed stale](#j008--coordinates-were-drawn-but-the-display-stayed-stale)
+- [Updating this journal](#updating-this-journal)
+- [J009 — arrival assembly, collision and cache pressure (checkpoint-015)](#j009--arrival-assembly-collision-and-cache-pressure-checkpoint-015)
+- [J010 — console contrast, typing and font (checkpoint-015)](#j010--console-contrast-typing-and-font-checkpoint-015)
+- [J011 — incomplete terrain/rock formation (open)](#j011--incomplete-terrainrock-formation-open)
+- [J012 — hollow ship rooms and collision stack (checkpoint-016)](#j012--hollow-ship-rooms-and-collision-stack-checkpoint-016)
+- [J013 — lightmap UVs, links and test-state mistakes (checkpoint-016)](#j013--lightmap-uvs-links-and-test-state-mistakes-checkpoint-016)
+- [J014 — eye height, hands and repeatable reports (checkpoint-016)](#j014--eye-height-hands-and-repeatable-reports-checkpoint-016)
+- [v0.0.15-dev2: curved interior shell and placed deletion](#v0015-dev2-curved-interior-shell-and-placed-deletion)
+- [28 September 2026: UI checkpoint preparation](#28-september-2026-ui-checkpoint-preparation)
+- [2026-09-28: actor poses, escort and palette work (0.0.18-dev2 candidate)](#2026-09-28-actor-poses-escort-and-palette-work-0018-dev2-candidate)
+- [v0.0.18-dev2 native checkpoint result](#v0018-dev2-native-checkpoint-result)
+- [v0.0.18-dev3: alias cache and front-end palette](#v0018-dev3-alias-cache-and-front-end-palette)
+- [v0.0.18-dev4: ship corrections, movie support and branding](#v0018-dev4-ship-corrections-movie-support-and-branding)
+- [v0.0.18-dev5 — UI redraw, entrances and compile workers](#v0018-dev5--ui-redraw-entrances-and-compile-workers)
+- [v0.0.19 — routine OST notice respects debug visibility](#v0019--routine-ost-notice-respects-debug-visibility)
+- [J015 — opening invisible barriers crossed the plank (v0.0.21-dev1)](#j015--opening-invisible-barriers-crossed-the-plank-v0021-dev1)
+- [J016 — dock approach used mismatched actor anchors](#j016--dock-approach-used-mismatched-actor-anchors)
+- [J017 — scripted room was omitted as an activator](#j017--scripted-room-was-omitted-as-an-activator)
+- [J018 — paper contrast and lost wall-art detail](#j018--paper-contrast-and-lost-wall-art-detail)
+- [J019 — independent fighting gates, target hints and container contents](#j019--independent-fighting-gates-target-hints-and-container-contents)
+- [J020 — repeatable room standing-hull audit](#j020--repeatable-room-standing-hull-audit)
+- [J021 — door-shaped cuts remove redundant runtime geometry](#j021--door-shaped-cuts-remove-redundant-runtime-geometry)
+
+
 ## Verified mapping at checkpoint-014
 
 | Input / identity | Current representation | Limit / next work |
@@ -515,3 +550,177 @@ release, without a development suffix. The final version passed 179 host tests,
 68040 compilation, complete HDF payload readback, and FS-UAE debug on/off/status
 checks. Only the enabled Next event emitted a routine OST console notice; three
 Next and two group events were still recorded privately.
+
+## J015 — opening invisible barriers crossed the plank (v0.0.21-dev1)
+
+- **Symptom:** owner report, 28 September 2026: walking from the ship toward
+  the dock guard was obstructed and pushed the player into the sea.
+- **Confirmed conversion defect:** the 22 original collision-only references
+  had correct centres and extents, but compound rotations used `Rz @ Ry @ Rx`.
+  Most side-wall thickness normals consequently faced world X. The placed
+  object convention requires `Rx @ Ry @ Rz` for our column vectors and negative
+  source angles. Compare the direct scene-node rotation in OpenMW 0.49
+  `Misc::Convert::makeOsgQuat`, taking OSG's quaternion product convention into
+  account. EditorMarker collision bounds were independently re-read from NIF;
+  those bounds were already correct.
+- **Candidate change:** v0.0.21-dev2 corrects the collision-only converter and
+  rebuilds its private AWB1 data. It retains all 22 references, source positions,
+  dimensions and conditional lifetime; it does not remove the enclosure.
+- **Failed coverage:** the earlier native collision fixtures exercised identity
+  and yaw rotations, and release conditions, but did not exercise the converter's
+  combined pitch/roll/yaw or walk the actual plank. Passing those tests was not
+  adequate route acceptance. The dev1 report remains a failed playtest.
+- **Host evidence:** the actual runtime SAT sweep with the standing player hull
+  and privately converted references hits two unintended walls along the old
+  plank route. The corrected data passes the same four route segments without
+  startsolid or allsolid. A synthetic ESM combined-rotation regression now checks
+  a diagonal wall's expected thickness normal. Native state tests also keep the
+  enclosure active across dock, race, office, courtyard and captain stages.
+- **Validation status:** locally verified correction in v0.0.21-dev2; owner
+  confirmation pending. In FS-UAE 3.1.66, debug setup placed the player at the
+  hatch arrival, then ordinary walking crossed the deck/plank. Sustained lateral
+  inputs hit both plank boundaries without falling into the sea. Continuing to
+  the dock guard triggered speech and the appearance selector. This focused
+  route is not a natural uninterrupted New Game-to-release acceptance run.
+- **Reusable game rule:** see [persistent opening access conditions](CHARACTER_CREATION.md#persistent-rule-opening-access-is-conditional-world-state).
+  Globals, journal indices, NPC locals, item checks and enabled references have
+  independent lifetimes. Keep route passage, sideways containment and eventual
+  release in the same acceptance plan. Jumping restrictions are separate again.
+- **Build:** 93 native compiler warnings, no new diagnostic messages versus
+  dev1; existing warnings and both intermittent freeze reports remain open.
+
+## J016 — dock approach used mismatched actor anchors
+
+- **Symptom:** owner says the dock guard does not catch the player as in the
+  original. Character selection itself otherwise works in the owner's playtest.
+- **Cause:** NPC native origin is at the feet; player native origin is at body
+  centre. Comparing raw origins shrank the source108-unit approach sphere.
+  OpenMW's GetDistance compares full 3-D reference positions; it is not a 2-D
+  radius or hull-edge distance. Native quarter scale gives a27-unit threshold.
+- **Candidate, v0.0.21-dev3:** compare both feet positions and use exact distance.
+  Keep speech completion, menu completion, 1.5-second delay and follow-up speech
+  as separate gates. Race acceptance does not remove the enclosure.
+- **Evidence:** production opening-state test fails against dev2 and passes the
+  candidate with undefined-behavior checks. It covers the exact boundary,
+  vertical separation, automatic speech, movement-lock state, menu gating and
+  later reminder. Focused native testing uses debug positioning followed by
+  ordinary walking; it does not certify the entire natural opening route.
+
+## J017 — scripted room was omitted as an activator
+
+- **Symptom:** owner falls beneath the Census Office floor and sees a missing
+  wall behind a cupboard. The precise later view is XYZ127/206/0, not the
+  supplied OCR's127/266/0. A separate wall view is XYZ46/192/65.
+- **Cause:** architectural reference172861, `chargen stuff room`, is ACTI using
+  `i/In_C_plain_room_side.nif`. The interior selector rejected all unsupported
+  activators, so an entire visible room segment and its floor collision vanished.
+- **Original behavior:** CharGenStuffRoom issues one-time item/tutorial messages
+  and tests GetStandingPC. Its script returning after CharGenState=-1 does not
+  disable the geometry. Architecture and tutorial activity are separate facts.
+- **Candidate, v0.0.21-dev3:** explicitly admit this audited ID/model pair, retain
+  its source placement/reference and existing hollow RootCollisionNode pipeline.
+  Unknown activators and editor markers remain outside this bounded adapter.
+- **Evidence:** missing-floor fall reproduced in FS-UAE3.1.66 at127/206/0.
+  Converted candidate collision has reference172861 under five room samples,
+  including127/206. Synthetic selector regression covers the intended room,
+  deleted reference, unknown activator and wrong model. Native result is recorded
+  with the release evidence; owner acceptance remains separate.
+- **Reusable lesson:** classify placed content by its visual/collision role and
+  scripted lifetime. A script-bearing record type does not imply disposable
+  geometry. Audit omitted structural references before accepting a new interior.
+
+## J018 — paper contrast and lost wall-art detail
+
+- **Paper cause:** noisy parchment and curled edges sit under small text; the
+  proportional renderer used menu-gold antialiasing even for explicit black ink.
+- **Candidate:** a white reading surface and black/gray glyph coverage, restoring
+  menu ink afterward. Original font assets and converted artwork are retained.
+  A real-renderer regression checks all three coverage values and restoration.
+- **Wall-art cause:** the owned source class hangings use256x512 DDS textures.
+  A32-pixel intermediate reduced them to16x32, then the BSP enlarged them to64x64.
+  Verified source paths and hashes; the correct artwork had lost its detail.
+- **Candidate:** retain up to128 pixels in the Census intermediate, producing
+ 64x128 class art before the existing64x64 final bake. Native texture dimensions
+  stay bounded; this is not a global quality increase or a new asset pack.
+
+
+## J019 — independent fighting gates, target hints and container contents
+
+**Failed approach:** the global opening barrier condition also masked all attack
+buttons until final release. Meanwhile draw/sheath was allowed earlier. Original
+`CharGenDoorGuardTalker` enables fighting on paper acceptance. Preserve this as
+an independent persisted fact; UI locks temporarily mask input, and future
+status effects must remain separate. Host tests exercise ship/dock, hall,
+courtyard, UI lock and final release. Native punch acceptance is recorded in the
+release evidence rather than inferred from the test of permission alone.
+
+**Failed approach:** returning "Empty" for every barrel interaction outside one
+UI stage confuses progression with world state. Persist a placed-container
+removal independently of inventory ownership; item transfer and depletion are
+atomic. A synthetic save round trip retains both facts. Future loot/container
+implementation must preserve this distinction and source-defined respawn rules.
+
+**UI:** use a pure shared opening-target query for E and the small two-line prompt;
+line of sight, range, hidden state and available action agree. Existing generic
+QC greeting selection retains its cooldown and scripted-actor exclusion. Native
+NPC dialogue remains a bounded greeting framework, not full dialogue trees.
+
+## J020 — repeatable room standing-hull audit
+
+`tools/audit_walkability.py` scans the actual compiled standing hulls, including
+placed brush transforms. It classifies blocked/supported/steep/unsupported
+samples and optionally follows connected surfaces within the 4.5-unit step limit.
+It reports reachable unsupported neighbors and scan boundaries for inspection.
+Finite samples are diagnostics, not proof against sub-grid holes or visual gaps.
+
+On the Census room region X80..144/Y180..248, origin height75, drop20, spacing4,
+old dev2 has128 blocked,84 supported and94 unsupported samples. Restoring room
+reference172861 yields128 blocked and178 supported, no unsupported samples.
+Probes127,206,75 and112,224,75 now hit that reference at origin Z64.825.
+The connected fixed scan reaches175 of178 supported samples; isolated furniture
+surfaces are not automatically treated as traversable routes. Do not patch every
+flag with a box: investigate omitted source geometry, transforms and collision.
+
+
+The later owner out-of-bounds view XYZ201,-210,0 is outside the restored room.
+Both old and fixed BSP standing hulls at X201/Y-210 trace down to the outer
+world enclosure at origin Z0.625; that is a catch floor, not a valid room floor.
+This illustrates why a long downward hit alone cannot certify walkability.
+Use a bounded drop for room audits and retain AW-20260928-20 until the escape
+route is reproduced. Do not turn the enclosure hit into a recovery checkpoint.
+
+
+## J021 — door-shaped cuts remove redundant runtime geometry
+
+**Observation (owner, 28 September):** both Census exterior exits show wall
+geometry protruding through the door. Reference camera: Seyda Neen XYZ396,-171,39,
+yaw170,pitch-3, v0.0.21-dev2. The proposed benefit is less unnecessary geometric
+work as well as a correct door surface; the actual FPS cost is unmeasured.
+
+**Required experiment:** a host conversion tool creates a door-shaped cut-out
+through the intruding/covered wall geometry, using the placed door's orientation,
+aperture and bounded depth. Preserve the frame, surrounding wall, visible opening
+and collision. Audit both door instances and record changed references/faces.
+Expose `door_priority=true` as the planned default once implemented and validated,
+with false retaining the original A/B baseline.
+Removing redundant faces before runtime is the goal; a draw-on-top bias retaining
+all geometry does not satisfy that goal. Compare original source geometry first:
+a conversion-created obstruction should be fixed at its cause rather than masked.
+
+**Status:** design/optimization observation, not a completed tool or fix.
+Tracked by AW-20260928-21 and the high-priority graphics/culling roadmap section.
+Do not add this to the lessons-confirmed-fixed list until the geometry and
+same-camera rendering/performance checks support the result.
+
+
+J021 owner refinement: leave a conservative margin concealed under the frame.
+For a transition doorway whose opening is never revealed, a wall-coloured flat
+backing rectangle can replace unnecessary covered depth. Preserve actual openings
+for hinged doors. Planned assisted simplification defaults on, with a disable
+switch; record it as design until the converter, config and acceptance exist.
+
+Further owner clarification: "blank" only the concealed patch to the wall's base
+colour/texture, beneath the door/frame margin. Do not blank or simplify exposed
+wall detail. The reason is to omit geometry which cannot contribute to the view
+from the runtime asset, reducing resident data and geometric work. Validate
+concealment across door states and viewpoints before removal.

@@ -31,7 +31,7 @@ void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strn
 int main(void) {
  client_t local;edict_t player;
  Sbar_Init();assert(!AW_DebugCoordsEnabled() && !AW_DebugOverlaysEnabled());
- arg="on";master();assert(AW_DebugOverlaysEnabled());
+ arg="on";master();assert(AW_DebugOverlaysEnabled() && AW_DebugCoordsEnabled());
  assert(AW_SeaLevelEnabled());arg="off";sea();assert(!AW_SeaLevelEnabled());arg="on";sea();
  command();assert(AW_DebugCoordsEnabled() && vid.recalc_refdef);
  vid.width=320;vid.height=200;cls.state=ca_connected;cl.viewentity=1;
@@ -46,6 +46,7 @@ int main(void) {
  assert(!fps_draws);arg="on";fps();Sbar_Draw();assert(fps_draws==1);
  arg="off";ram();assert(!scr_showram.value);
  arg="0";master();assert(!AW_DebugOverlaysEnabled() && !AW_DebugCoordsEnabled());
+ assert(settings[0]->value==0);
  assert(AW_SeaLevelEnabled());
  fill_y=-1;Sbar_Draw();assert(fill_y==-1 && fps_draws==1);
  arg="1";master();assert(AW_DebugCoordsEnabled() && !scr_showram.value);
@@ -56,5 +57,13 @@ int main(void) {
  argc=1;command();assert(AW_DebugCoordsEnabled());
  argc=3;arg="off";command();assert(AW_DebugCoordsEnabled());
  argc=2;command();assert(!AW_DebugCoordsEnabled());
+ /* Queries and rejected values preserve an explicit coordinate override. */
+ argc=1;master();assert(!AW_DebugCoordsEnabled());
+ argc=2;arg="nonsense";master();assert(!AW_DebugCoordsEnabled());
+ argc=3;arg="on";master();assert(!AW_DebugCoordsEnabled());
+ /* Every explicit enable restores coordinates, including when already on. */
+ argc=2;arg="TrUe";master();assert(AW_DebugCoordsEnabled());
+ arg="off";command();master();assert(!AW_DebugOverlaysEnabled());
+ arg="1";master();assert(AW_DebugOverlaysEnabled() && AW_DebugCoordsEnabled());
  return 0;
 }

@@ -15,6 +15,34 @@ the current builder. Keep the existing immutable release archives as baselines.
 See REPOSITORY_LAYOUT.md for the path mapping and RELEASE_WORKFLOW.md for the
 single version shared by source, runtime and release packages.
 
+## Mandatory build rule: ALWAYS CHECK COMPILER WARNINGS
+
+For every native build, capture the complete compiler output and inspect every
+warning. Successful compilation alone is not acceptance. Fewer unresolved
+warnings is the goal; do not let the count become an ignored background number.
+
+- Compare warnings against the preceding matching toolchain/configuration. Keep
+  count, category, affected function and actual diagnostic text in the build
+  evidence; a lower total must not conceal a new warning elsewhere.
+- Investigate new warnings before packaging. Prioritize bounds/undefined
+  behavior, uninitialized values, lifetime/dangling pointers, format overflows,
+  dangerous conversions and misleading control flow in C on the Amiga target.
+- Fix confirmed defects and exercise the affected behavior. Use host sanitizers
+  where practical, then rebuild the actual m68k target. A host pass does not
+  establish Amiga memory safety or explain an unrelated intermittent crash.
+- Rebuild after corrections and compare again. Never suppress a warning, weaken
+  warning flags or change toolchains merely to make the total look smaller.
+- Release notes/handoff must state the count, what changed, any new unresolved
+  warning and why existing warnings remain. Keep remaining substantive warnings
+  in the follow-up work until reviewed and resolved; do not call a warning-bearing
+  build warning-clean. Any explicitly deferred new warning needs a concrete
+  reason and tracked follow-up before a release can be accepted.
+
+The v0.0.20 maintenance comparison is 95 -> 93 with no new warnings under the
+same GCC 16.2-rc11 configuration. Two array-row bounds violations were reproduced
+and fixed. The other 93 warnings remain work, not a clean-bill-of-health claim.
+This rule applies to later builds too, including character creation and save/load.
+
 ## Tests
 
 ```sh
@@ -44,6 +72,10 @@ pass checks archive paths, CRCs, hashes, sizes and source-byte equality before
 promotion into `releases/`. The archive includes `docs/PACKAGE_MANIFEST.json`.
 A SHA-256 sidecar is written beside it. Existing versioned releases are never
 overwritten: bump `VERSION` and update the changelog before the next release.
+A host-tool/documentation packaging follow-up may instead use an explicitly
+numbered archive revision while retaining the existing runtime version and HDF.
+Give it new filenames/checksums, preserve the prior artifacts, and state clearly
+which code and validation changed. It is not a new native build.
 The generated package manifest is a receipt, excluded from Git and regenerated
 when packaging a checkout extracted from a previous source archive.
 
@@ -106,3 +138,77 @@ is preserved; it is not replaced by the new test counts.
 For current validation and first publication, see RELEASE-v0.0.16.md and
 FIRST_RELEASE.md. The older private development bundle above is not the
 required private playable package.
+
+
+## Static scene walkability audit
+
+Run the offline scanner against the converted BSP before native playtesting:
+
+```sh
+python tools/audit_walkability.py /path/to/census.bsp \
+  --bounds 80 180 144 248 --height 75 --spacing 4 --drop 20 \
+  --seed 128 208 --probe 127 206 75 --out /path/to/private/room-audit.json
+```
+
+Coordinates are native player origins, not raw TES3 coordinates or floor heights.
+Scan one height band per floor. Probes return exit code2 when unsupported,
+blocked or too steep; the JSON keeps all sample/reference evidence. The optional
+seed follows supported neighbors within the step limit, checks intervening hulls,
+and lists reachable fall/boundary candidates. Inspect doors and intentional
+stairs before labeling those edges defects. This test excludes actor/script
+states and visible mesh coverage; keep native walk and visual checks as gates.
+
+
+## Geometry optimization principle: remove unnecessary runtime work
+
+High-priority owner requirement: eliminate proven redundant or obstructing
+geometry during conversion so the Amiga does not repeatedly transform, clip and
+rasterize it. A visual layering fix alone does not meet this performance goal.
+The first reference case is both exterior Census doors, including Seyda Neen
+XYZ396,-171,39, yaw170,pitch-3: create a bounded, oriented door-shaped cut-out in
+intruding wall geometry while preserving the aperture, frame and collision.
+
+Keep the baseline and changed-face/reference report; measure native frame work
+before claiming a speedup. This principle is recorded as journal J021, bug
+AW-20260928-21, and high-priority graphics/culling roadmap work. The proposed
+conversion option/tool is not yet implemented.
+
+Planned doorway-assistance configuration: `door_priority=true` by default after
+implementation/validation, false for baseline comparisons. Keep a safety margin
+beneath the frame. Simplify concealed wall depth to a wall-coloured plane only
+where this does not seal a revealed opening. No active switch is claimed yet.
+Only the patch concealed by the door/frame may be reduced to the wall's base
+colour or texture. Keep the visible wall's material, UVs and shape intact; do not
+blank the surrounding wall. Confirm concealment from both sides and every
+supported door state before removing geometry from the runtime asset.
+
+## Tables, tables, we need more tables
+
+Owner requirement, 28 September 2026, 20:41 Helsinki: maintain a cross-system
+catalogue of the parameters and conditional rules needed for the game. This is
+planned coverage work, not a claim that all mechanics have been enumerated.
+
+| Domain | Parameters and relationships to catalogue |
+| --- | --- |
+| Character | Race/sex/class/birthsign, base attributes, skills, derived statistics, current values and progression. |
+| Effects and actions | Attribute/skill modifiers, duration, stacking/removal, action permissions, effect sources and recalculation dependencies. |
+| Quests and scripts | Journal indices, globals, script locals, branch conditions, one-time outcomes, rewards and completion semantics. |
+| NPCs and dialogue | Stable actor identity, placement, inventory, disposition, AI/action state, dialogue eligibility, speech/schedule timers and quest dependencies. |
+| Containers and items | Base contents, placed-instance changes, loot/leveled-list rules, depletion/restocking, ownership, counts and moved/dropped item identities. |
+| Doors and world references | Enable/disable state, locks, destinations, motion/collision state, moved/removed references and source-cell membership. |
+| World and time | Clock, cell/region metadata, water/weather data, unloaded-state behavior and elapsed-time rules. |
+| Persistence | Save-wide versus per-reference state, schema/content versions, limits, migration and load/recovery behavior. |
+
+Each catalogue entry needs a stable key and source provenance; type, units,
+range and default; who reads/writes it; trigger/condition/formula dependencies;
+and whether it is immutable, derived, transient or saved. Record base-record
+versus placed-reference scope explicitly. Unknown rules need a verification
+entry, not an invented default presented as original behavior.
+
+Cross-check owned source records/scripts and implementation references before
+locking the schema. Keep original facts separate from compact runtime encoding
+and UI stages. Generate lookup tables on the host where useful, budget resident
+tables on the Amiga, and define bounded paging for larger catalogues. Reference
+the same field definitions from conversion, game logic, save/load and tests so
+container resets, repeated rewards or stale modifiers cannot arise from several
+conflicting versions of the same state.

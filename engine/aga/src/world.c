@@ -955,7 +955,7 @@ trace_t SV_Move (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, int type, e
 
 // clip to entities
 	SV_ClipToLinks ( sv_areanodes, &clip );
+	AW_BarrierClip(start,mins,maxs,end,passedict,&clip.trace);
 
 	return clip.trace;
 }
-

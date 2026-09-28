@@ -1,6 +1,44 @@
 # Current project state — 28 September 2026
 
-**Current target: AmiWind v0.0.19, one version for source and runtime.**
+**Current development target: AmiWind v0.0.21-dev4.**
+
+Dev4 packages Horstator's 28 September evening notes and the optional polygonal
+POI-region design in WORLD_MAPPING_PLAN.md and ROADMAP.md. It rebuilds dev3 with
+the new version identity; gameplay and converted scene content are unchanged.
+Region swapping and assisted doorway simplification remain planned, not shipped.
+See [dev4 scope](RELEASE-v0.0.21-dev4.md).
+
+Dev3 corrects the omitted Census room and dock approach distance, improves paper
+contrast and Census wall-art conversion, and selects New Game by default. The
+fixed Y/N/version index is in BUGS.md. Full opening acceptance remains pending.
+
+The dev2 correction preserves the original invisible enclosure while fixing its
+compound rotations. Focused native plank passage/containment passed; owner
+confirmation and full opening acceptance remain pending.
+
+The opening/character/save prototype and UI changes are described in
+[the checkpoint notes](RELEASE-v0.0.21-dev3.md). Native validation is recorded
+separately from implemented source; incomplete acceptance items remain open.
+Numeric journal indices, globals, item counts and NPC script locals are separate
+state. The intro stage only coordinates this opening UI sequence.
+
+The following v0.0.20 and earlier notes are historical.
+
+The standalone [FS-UAE launcher](FS-UAE-LAUNCHER.md) now speeds up repeat
+playtests: latest-image selection, remembered ROM and generated local config.
+This host-tool addition does not change the runtime or resolve the open freeze.
+
+Owner chose maintenance first. The next milestone includes [dock character
+creation and Census Office interiors/NPCs](CHARACTER_CREATION.md), attributes set,
+and working [save/load with adjustable autosave history](SAVEGAME_PLAN.md). These are not v0.0.20 features.
+
+Ship wave/hull ambience is reduced by 5 dB relative to v0.0.19. This release
+documents the intermittent freezes; it does not claim to fix them. See
+[release notes](RELEASE-v0.0.20.md).
+
+**Open stability reports (28 September):** intermittent prison-ship exit freeze
+and a separate dock/menu freeze with looping music on FS-UAE 3.1.66. The hatch
+worked on retry. Both remain unresolved; see [bug register](BUGS.md).
 
 New Game enters the first ship introduction with original voices, name entry,
 speech-driven facial poses and bounded guard navigation. UI bars have distinct
@@ -129,3 +167,17 @@ terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
 with proof of this formation's geometry cause. Backup first; keep this open.
+
+## 28 September 15:50 owner follow-up
+
+The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
+the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).
+The v0.0.20 maintenance work does not close this scene-conversion issue.
+
+
+Latest dev3 maintenance also adds the two-line interaction layout (name in 12 px
+Morrowind font, action in the console font), arrows/WASD choices, separate
+fighting permission after hall acceptance, and persisted courtyard ring depletion.
+The room audit reproduces94 unsupported old-map samples and restores all94 with
+the original room section. General loot/icons, Fargoth return dialogue and status
+effects are roadmap work, not completed gameplay.

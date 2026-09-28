@@ -1,5 +1,36 @@
 # Seyda Neen follow-up register
 
+## Next implementation milestone agreed 28 September 2026
+
+Maintenance v0.0.20 comes first; then implement the source-backed opening sequence.
+
+- [ ] Dock guard route, original CharGenDock dialogue and race-menu speech gates.
+- [ ] Race/sex/face/hair selector with rotating head preview and bounded resource use.
+- [ ] Authored invisible chargen barriers and their completion-dependent removal.
+- [ ] Census Office interior rooms, door links, Socucius Ergalla, hall guard and
+  Sellus Gravius; class, birthsign, review, papers, ring and release logic.
+- [ ] Versioned character/attribute state and compact, recoverable save/load;
+  manageable named manual saves and player-adjustable autosave history of the
+  last X snapshots (not character levels). Deliver save/load together with completed
+  Census attributes as the next playable milestone. Compare semantics
+  with original ESS/OpenMW, test corruption/interruption and repeated-save growth.
+- [ ] Add the unimplemented Silt Strider and driver; keep that content work
+  separate from diagnosing the malformed landing geometry at XYZ260/417/30.
+- [ ] Keep both intermittent FS-UAE freezes open during the new work.
+- [ ] Review compiler warnings on every build and reduce the remaining 93; follow
+  the mandatory gate in DEVELOPMENT.md. Preserve full diagnostic evidence.
+
+Source audit, order and acceptance: [CHARACTER_CREATION.md](CHARACTER_CREATION.md).
+Save design and pending comparison gates: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md).
+
+## Current stability reports, 28 September 2026
+
+- [ ] [AW-20260928-01](BUGS.md#aw-20260928-01-potential-prison-ship-exit-freeze-during-intro): ship-exit freeze during intro on FS-UAE 3.1.66; second attempt worked.
+- [ ] [AW-20260928-02](BUGS.md#aw-20260928-02-potential-dockmenu-freeze-with-looping-music): freeze after remaining in the menu on the dock, with music looping, on the same machine/emulator.
+
+Both are owner reports with unknown cause. The earlier hatch implementation and
+passing activation checks below do not close these intermittent stability reports.
+
 Owner reports and requests recovered on 27 September 2026, 22:17–22:27 Helsinki.
 Keep this register with the roadmap so interrupted chat messages do not lose work.
 Runtime baseline: v0.0.15-dev1 / checkpoint-016.
@@ -411,3 +442,9 @@ with proof of this formation's geometry cause. Backup first; keep this open.
   object exists or add arbitrary geometry before verifying the source.
 - [ ] Convert Census Office and remaining town interiors from those source cells;
   implement their actors, registration menus and persistent door/reference state.
+
+## 28 September 15:50 owner follow-up
+
+The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
+the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).
+The v0.0.20 maintenance work does not close this scene-conversion issue.

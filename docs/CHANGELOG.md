@@ -1,5 +1,59 @@
 # Development history
 
+## v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026
+
+- Record Horstator's optional polygonal POI-region fallback if cell streaming
+  cannot meet the Amiga's measured budgets, starting with Seyda Neen.
+- Preserve both conversion strategies, original cell semantics and stable
+  reference state; plan concealed crossings, loading feedback and memory checks.
+- Package the updated diary, world-mapping plan and roadmap with a native rebuild
+  carrying the dev4 identity. Gameplay and converted assets remain as in dev3.
+  Region swapping and doorway simplification are not implemented by this release.
+
+See RELEASE-v0.0.21-dev4.md for validation and save compatibility.
+
+## v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026
+
+- Two-line lower-right NPC hints: 12 px Morrowind name and current console-font
+  action (`npc_interaction_layout_template_001`); matching opening aim/use query.
+- Arrows/WASD menu choices; fighting unlocked by hall paper acceptance rather
+  than final release; persistent courtyard ring depletion and atomic pickup.
+- Compiled standing-hull room audit for support, connected steps and fall edges.
+
+
+- Restore the scripted Census room floor/walls; correct dock proximity anchors.
+- Use black/gray reading text on white and retain more Census wall-art detail.
+- Record playtest bugs with fixed Y/N, version and verification status.
+
+Highlight New Game when opening its confirmation dialog, so Enter starts the
+intro immediately. Esc and explicit Cancel return to the menu. The hidden mouse
+position starts over the selected button as well. See RELEASE-v0.0.21-dev3.md.
+
+## v0.0.21-dev2 — opening barrier correction, 28 September 2026
+
+Correct compound rotations of the 22 collision-only opening references. Preserve
+the original positions, dimensions and CharGenState lifetime. Add converter and
+state regression coverage, an indexed journal incident, and persistent opening
+access/research priorities. See RELEASE-v0.0.21-dev2.md for exact validation
+coverage and pending owner acceptance.
+
+## Portable launcher helper — 28 September 2026
+
+Add `tools/AmiWind-FS-UAE-launcher.py` for existing local images: numeric release
+and development-version selection, date tie-breaking, saved ROM/settings,
+non-blocking ROM checksum warnings and automatic FS-UAE configuration with
+backups. Enter accepts the suggested image; `--yes` launches immediately.
+This host-tool follow-up leaves runtime v0.0.20 unchanged. See FS-UAE-LAUNCHER.md.
+
+## v0.0.20 — 28 September 2026
+
+Prison-ship hull ambience reduced by 5 dB per static mixer channel; audio files
+and other uses remain unchanged. Enabling debug overlays also enables coordinates.
+Corrected the current FS-UAE 24-bit-addressing option and two compiler-detected
+array-row bounds violations. Recorded intermittent ship-exit/menu freezes and
+the persistent Silt Strider-port report; their causes remain unresolved.
+See RELEASE-v0.0.20.md and BUGS.md.
+
 ## v0.0.19 — 28 September 2026
 
 Public release of the accumulated 0.0.18 checkpoints: intro/movie, UI/menus,

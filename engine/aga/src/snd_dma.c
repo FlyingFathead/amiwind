@@ -655,6 +655,12 @@ void S_StaticSound (sfx_t *sfx, vec3_t origin, float vol, float attenuation)
 	
 	ss->sfx = sfx;
 	VectorCopy (origin, ss->origin);
+    /* Balance only the prison ship's placed hull-loop channels. Keep the
+     * shared sample, authored emitter volume and uses in other maps intact.
+     * 10^(-5/20): five dB below the existing per-instance mixer gain. */
+    if (AW_Interior() && !strcmp(sfx->name, "env/boat_hull.wav")) {
+        vol *= 0.562341325f;
+    }
 	ss->master_vol = vol;
 	ss->dist_mult = (attenuation/64) / sound_nominal_clip_dist;
     ss->end = paintedtime + sc->length;	
@@ -1031,4 +1037,3 @@ void S_BeginPrecaching (void)
 void S_EndPrecaching (void)
 {
 }
-

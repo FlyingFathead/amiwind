@@ -118,3 +118,10 @@ unins*
 
 # logs
 *.log
+
+# Generated local launcher settings/configs; public presets remain included.
+AmiWind-launcher.json
+/AmiWind-*-FS-UAE.fs-uae
+/tools/AmiWind-*-FS-UAE.fs-uae
+/resources/emulators/backups/
+/tools/resources/emulators/backups/

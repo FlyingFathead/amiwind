@@ -34,22 +34,22 @@ int main(void){
  open_pause();click(100,54+2*19+18);assert(key_dest==key_menu && !changes);
  click(100,54+3*19);assert(key_dest==key_menu && !changes);
  click(100,54+1*19);M_Draw();assert(!changes && key_dest==key_menu);
- /* New Game defaults to Cancel; Esc and Enter both preserve the running game. */
- M_Keydown(K_ENTER);assert(!changes);M_Keydown(K_ENTER);M_Keydown(K_ESCAPE);assert(!changes);
- M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
+ /* New Game defaults to acceptance; Esc and explicit Cancel still return. */
+ M_Keydown(K_ESCAPE);assert(!changes);M_Keydown(K_ENTER);M_Keydown(K_LEFTARROW);M_Keydown(K_ENTER);assert(!changes);
+ M_Keydown(K_ENTER);M_Keydown(K_ENTER);
  assert(changes==1 && !strcmp(queued,"aw_new_game\n") && key_dest==key_game);
  open_pause();click(100,54+4*19+18);M_Draw(); /* last pixel in Options */
- M_Keydown(K_LEFTARROW);assert(distance==530);keydown[K_SHIFT]=true;M_Keydown(K_RIGHTARROW);assert(distance==531);keydown[K_SHIFT]=false;
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(distance==540);
+ M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
+ M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(gold_frame);
  M_Keydown(K_ENTER);assert(!gold_frame);M_Keydown(K_ESCAPE);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);assert(changes==1);
  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
  assert(changes==2 && !strcmp(queued,"disconnect\naw_main_menu\n"));
  front();mx=160;my=63;M_Draw();M_Keydown(K_ESCAPE);assert(key_dest==key_menu);
- click(80,112);assert(changes==2); /* Load disabled */
- click(80,92);assert(changes==2);M_Draw(); /* confirm New Game */
- M_Keydown(K_ESCAPE);M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
+ click(80,148);assert(changes==2); /* Load opens its own browser */
+ click(80,132);assert(changes==2);M_Draw(); /* confirm New Game */
+ M_Keydown(K_ESCAPE);M_Keydown(K_ENTER);M_Keydown(K_ENTER);
  assert(changes==3 && !strcmp(queued,"aw_new_game\n") && key_dest==key_game);
  key_dest=key_console;picker();M_Draw();M_Keydown(K_ESCAPE);assert(key_dest==key_console);
  picker();M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(changes==4 && !strcmp(queued,"aw_scene town\n"));
@@ -58,3 +58,13 @@ int main(void){
  open_pause();AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw();
  return 0;
 }
+
+int AW_UIFontSize(void){return 14;}
+int AW_UISetFontSize(int n){return 1;}
+int AW_SaveAllowed(void){return 0;}
+int AW_SaveMenuOpen(int n){return 1;}
+int AW_SaveMenuKey(int key){return 0;}
+int AW_SaveMenuActive(void){return 0;}
+void AW_SaveMenuDraw(void){}
+int AW_AutosaveCount(void){return 3;}
+void AW_SetAutosaveCount(int n){}

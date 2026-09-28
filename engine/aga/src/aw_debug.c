@@ -2,6 +2,7 @@
  * Local development console commands. No gameplay state/save format implied.
  */
 #include "quakedef.h"
+#include "aw_save.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -115,7 +116,7 @@ static void blockers(void) {
     }
 }
 void AW_DebugInit(void) {
-    AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();
+    AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_blockers",blockers);

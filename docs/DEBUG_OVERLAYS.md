@@ -1,20 +1,24 @@
 # Development overlays
 
-Runtime v0.0.15-dev2. Open the console with F10 or the key left of 1 (normally
+Runtime v0.0.20. Open the console with F10 or the key left of 1 (normally
 § on the Finnish layout). Boolean commands accept on/off, true/false and 1/0,
 case-insensitively. With no value they report their setting.
 
 | Command | Default | Purpose |
 | --- | --- | --- |
-| `amiwind_show_debug on` | on | Master switch for development overlays |
-| `amiwind_debug_all on` | on | Alias of the master switch |
-| `amiwind_debug_coords on` | off | Player XYZ, DEG heading and P pitch in the bottom-right strip |
+| `amiwind_show_debug on` | off | Master switch; enabling also turns coordinates on |
+| `amiwind_debug_all on` | off | Alias of the master switch |
+| `amiwind_debug_coords on` | off until master enabled | Player XYZ, DEG heading and P pitch in the bottom-right strip |
 | `amiwind_debug_showram on` | off | Alias of the actual `showram` setting |
 | `showram 0` | 0 | Original numeric cache-thrashing indicator setting |
 
 Master off hides the title/place, control hints, coordinates and renderer debug
-indicators. It preserves their individual selections for master on. Enabling
-master does not enable showram. Crosshair, menus, dialogue/subtitles and loading
+indicators. Every explicit master enable also enables coordinates; an existing
+saved coordinate-off preference does not prevent this. Use `debug coords off`
+afterward to hide coordinates separately. Master-off also sets coordinates off.
+Queries and invalid arguments leave
+the selection unchanged. Enabling master does not enable showram or FPS.
+Crosshair, menus, dialogue/subtitles and loading
 feedback remain visible; they are not debug overlays. Commands are small
 resident handlers; no disk lookup is needed for these toggles.
 

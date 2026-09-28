@@ -51,7 +51,7 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
         for ref in refs[:limit]:
             if abs(ref['scale']-1)>1e-5:raise ValueError('Actor instance scale needs a separate bake')
             pos=[(ref['position'][i]-(CENTRE[i] if i<2 else 0))*SCALE for i in range(3)]
-            fields={'classname':'aw_npc','model':model,'origin':' '.join(format(x,'.5f') for x in pos),
+            fields={'classname':'aw_npc','aw_ref':str(ref['number']),'model':model,'origin':' '.join(format(x,'.5f') for x in pos),
                     'angles':'0 '+str(-ref['rotation_radians'][2]*180/math.pi)+' 0',
                     'netname':appearance['name'],'aw_voice':voice,'aw_line':greeting['text'],
                     'aw_idle_step':format(step,'.7f'),

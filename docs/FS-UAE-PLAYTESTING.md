@@ -6,6 +6,10 @@ Official homepage and downloads: [FS-UAE](https://fs-uae.net/).
 FS-UAE also supports Windows and macOS; AmiWind's v0.0.16 emulator
 validation used FS-UAE 3.1.66 on Linux.
 
+For repeated runs of existing images, use the
+[portable FS-UAE launcher](FS-UAE-LAUNCHER.md). It selects the latest numeric
+version/development suffix, remembers the ROM and repairs local config paths.
+
 ## Current v0.0.17 preset
 
 Save a local copy of
@@ -124,7 +128,7 @@ cpu = 68040-NOMMU
 fpu = 68040
 jit_compiler = 1
 uae_cpu_speed = max
-uae_address_space_24 = false
+uae_cpu_24bit_addressing = false
 
 # Memory
 chip_memory = 2048

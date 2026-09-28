@@ -72,8 +72,9 @@ def prepare(data_files, scene):
     bsa=BSA(child_ci(data_files,'Morrowind.bsa'));N=nif_reader();cache={};links=[]
     for r in report['doors']:
         # A visible source entrance remains inspectable before its interior exists.
-        source='prison' if r['source_cell'].casefold()=='imperial prison ship' else 'seyda' if not r['source_interior'] else None
-        target='prison' if r.get('destination_cell','').casefold()=='imperial prison ship' else 'seyda' if not r['destination_interior'] else None
+        names={'imperial prison ship':'prison','seyda neen, census and excise office':'census'}
+        source=names.get(r['source_cell'].casefold()) if r['source_interior'] else 'seyda'
+        target=names.get(r.get('destination_cell','').casefold()) if r['destination_interior'] else 'seyda'
         if not source or not (scene/'id1/maps'/f'{source}.bsp').is_file():
             r['runtime_status']='source scene not converted';continue
         available=bool(target and (scene/'id1/maps'/f'{target}.bsp').is_file())
@@ -94,9 +95,9 @@ def prepare(data_files, scene):
               'mins':low,'maxs':high,'arrival':arrival,'yaw':yaw,'reference':r['number']}
         links.append(link);r['runtime_status']='mapped' if available else 'entrance mapped; interior unavailable';r['runtime']=link
     if len(links)>64:raise ValueError('Runtime doorway limit exceeded')
-    lines=['AWD2']
+    lines=['AWD3']
     for r in links:
-        lines.append(r['source']+' '+r['target']+' '+' '.join(f'{v:.5f}' for v in (*r['mins'],*r['maxs'],*r['arrival'],r['yaw']))+'\t'+r['label'])
+        lines.append(r['source']+' '+r['target']+' '+str(r['reference'])+' '+' '.join(f'{v:.5f}' for v in (*r['mins'],*r['maxs'],*r['arrival'],r['yaw']))+'\t'+r['label'])
     (scene/'id1/scene-doors.txt').write_text('\n'.join(lines)+'\n',encoding='cp1252')
     (scene/'door-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     interior_reference(child_ci(data_files,'Morrowind.esm'),report,scene)

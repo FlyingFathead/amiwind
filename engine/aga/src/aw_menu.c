@@ -2,6 +2,7 @@
  * Local menu layout. Original fonts/artwork are private converted inputs.
  */
 #include "quakedef.h"
+#include "aw_save.h"
 #include "amiwind_version.h"
 extern qboolean keydown[256];
 extern int scr_copyeverything;
@@ -20,8 +21,16 @@ static const char *items[]={"Return to game","New game","Save game","Load game",
 static const char *scene_items[]={"Prison ship interior","Seyda Neen exterior","Cancel"};
 #define ROW_Y 54
 #define ROW_H 19
+static int front_height(void){int size=AW_UIFontSize();return size>=16?18:16;}
+static int front_top(void){return 192-4*front_height();}
+static int front_width(void){int i,w=96,n;for(i=0;i<4;i++){n=AW_UIWidth(front_items[i])+16;if(n>w)w=n;}return w;}
+static void font_step(int direction){
+    int sizes[4]={0,12,14,16},i,current=AW_UIFontSize();
+    for(i=0;i<4;i++)if(sizes[i]==current)break;
+    AW_UISetFontSize(sizes[(i+direction+4)%4]);
+}
 static int inside(int x,int y,int w,int h){return mouse_x>=x && mouse_x<x+w && mouse_y>=y && mouse_y<y+h;}
-static int enabled(int row){return row==0 || (row==1 && intro_available) || row==4 || row==5;}
+static int enabled(int row){return row==3 || (row==2 && AW_SaveAllowed()) || row==0 || (row==1 && intro_available) || row==4 || row==5;}
 int AW_MenuFrontEnd(void){return frontend && !graphics && !confirming && key_dest==key_menu;}
 static void close_menu(void){
     if(frontend)return;
@@ -33,7 +42,10 @@ void M_Menu_Main_f(void){
     mouse_x=160;mouse_y=ROW_Y+ROW_H/2;
 }
 void M_ToggleMenu_f(void){if(key_dest==key_menu)close_menu();else M_Menu_Main_f();}
-static void confirm(int action){confirmation_return=selection;confirming=action;selection=0;mouse_visible=0;mouse_x=100;mouse_y=144;}
+static void confirm(int action){
+    confirmation_return=selection;confirming=action;selection=action==3;
+    mouse_visible=0;mouse_x=selection?219:100;mouse_y=144;
+}
 static void cancel_confirmation(void){confirming=0;selection=confirmation_return;mouse_visible=0;}
 void M_Menu_Quit_f(void){M_Menu_Main_f();confirm(1);}
 static void main_menu(void){frontend=1;M_Menu_Main_f();AW_MusicTitle();}
@@ -53,21 +65,28 @@ void M_Init(void){
 static int mouse_row(void){
     int i;
     if(confirming){if(inside(48,132,106,25))return 0;if(inside(166,132,106,25))return 1;return -1;}
-    if(graphics){if(inside(72,77,176,32))return 0;for(i=1;i<4;i++)if(inside(44,93+i*22,232,20))return i;return -1;}
+    if(graphics){for(i=0;i<6;i++)if(inside(44,62+i*20,232,20))return i;return -1;}
     if(scene_picker){for(i=0;i<3;i++)if(inside(44,65+i*24,232,24))return i;return -1;}
-    if(frontend){for(i=0;i<4;i++)if(inside(12,92+i*20,137,20))return i;return -1;}
+    if(frontend){for(i=0;i<4;i++)if(inside(12,front_top()+i*front_height(),front_width()-8,front_height()))return i;return -1;}
     for(i=0;i<6;i++)if(inside(44,ROW_Y+i*ROW_H,232,ROW_H))return i;
     return -1;
 }
 void AW_MenuMouse(int dx,int dy){
     int row;if(key_dest!=key_menu || (!dx && !dy))return;
     mouse_visible=1;mouse_x+=dx;mouse_y+=dy;
-    if(mouse_x<0)mouse_x=0;if(mouse_x>319)mouse_x=319;
-    if(mouse_y<0)mouse_y=0;if(mouse_y>199)mouse_y=199;
+    if(mouse_x<0)mouse_x=0;
+    if(mouse_x>319)mouse_x=319;
+    if(mouse_y<0)mouse_y=0;
+    if(mouse_y>199)mouse_y=199;
     row=mouse_row();if(row>=0)selection=row;
 }
 void M_Keydown(int key){
     int direction,row;
+    if(AW_SaveMenuKey(key)){if(key_dest==key_game){frontend=0;graphics=0;}return;}
+    if(key=='a' || key=='A')key=K_LEFTARROW;
+    if(key=='d' || key=='D')key=K_RIGHTARROW;
+    if(key=='w' || key=='W')key=K_UPARROW;
+    if(key=='s' || key=='S')key=K_DOWNARROW;
     if(key==K_MOUSE1){row=mouse_row();if(row<0)return;selection=row;}
     else mouse_visible=0;
     if(confirming){
@@ -84,13 +103,16 @@ void M_Keydown(int key){
     }
     if(graphics){
         if(key==K_ESCAPE){graphics=0;selection=frontend?2:4;return;}
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)selection=(selection+(key==K_UPARROW?3:1))%4;
+        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)selection=(selection+(key==K_UPARROW?5:1))%6;
         if(selection==0 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
-        if(key==K_MOUSE1 && selection==0 && inside(80,93,161,16))AW_SetDrawDistance(128+(mouse_x-80)*(1400-128)/160);
+        if(selection==3 && (key==K_LEFTARROW || key==K_RIGHTARROW))font_step(key==K_LEFTARROW?-1:1);
+        if(selection==4 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==1)AW_SetDrawDistance(540);
             else if(selection==2)AW_UIFrameToggle();
-            else if(selection==3){graphics=0;selection=frontend?2:4;}
+            else if(selection==3)font_step(1);
+            else if(selection==4)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
+            else if(selection==5){graphics=0;selection=frontend?2:4;}
         }
         return;
     }
@@ -106,9 +128,10 @@ void M_Keydown(int key){
         return;
     }
     if(frontend){
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){do{selection=(selection+(key==K_UPARROW?3:1))%4;}while(selection==1 || (selection==0 && !intro_available));}
+        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){do{selection=(selection+(key==K_UPARROW?3:1))%4;}while(selection==0 && !intro_available);}
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==0 && intro_available)confirm(3);
+            else if(selection==1)AW_SaveMenuOpen(1);
             else if(selection==2){graphics=1;selection=0;mouse_x=160;mouse_y=100;}
             else if(selection==3)confirm(1);
         }
@@ -119,6 +142,8 @@ void M_Keydown(int key){
     if(key==K_ENTER || key==K_MOUSE1){
         if(selection==0)close_menu();
         else if(selection==1 && intro_available)confirm(3);
+        else if(selection==2)AW_SaveMenuOpen(0);
+        else if(selection==3)AW_SaveMenuOpen(1);
         else if(selection==4){graphics=1;selection=0;mouse_x=160;mouse_y=100;}
         else if(selection==5)confirm(2);
     }
@@ -135,10 +160,11 @@ void M_Draw(void){
     int i,xx,yy,value,knob,w;char line[64];if(key_dest!=key_menu)return;
     scr_copyeverything=1;
     if(!ready){colours[0]=AW_UIColor(22,20,18);colours[1]=AW_UIColor(210,184,121);colours[2]=AW_UIColor(114,114,114);colours[3]=AW_UIColor(62,53,36);ready=1;}
+    if(AW_SaveMenuActive()){AW_SaveMenuDraw();return;}
     if(AW_MenuFrontEnd()){
         if(!AW_UIBackground())AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
-        AW_UIBox(8,88,145,90);
-        for(i=0;i<4;i++)label(12,92+i*20,137,20,front_items[i],i!=1 && (i!=0 || intro_available),i==selection);
+        AW_UIBox(8,front_top()-4,front_width(),front_height()*4+8);
+        for(i=0;i<4;i++)label(12,front_top()+i*front_height(),front_width()-8,front_height(),front_items[i],i!=0 || intro_available,i==selection);
         strcpy(line,"AmiWind v" AMIWIND_VERSION);w=AW_UIWidth(line);
         AW_UIFill(vid.width-w-10,180,w+8,20,AW_UIColor(0,0,0));
         AW_UITextBox(vid.width-w-6,180,w,20,line,colours[1]);cursor();return;
@@ -149,12 +175,14 @@ void M_Draw(void){
     AW_UIBox(28,6,264,188);
     if(!AW_UILogo(60,10))AW_UITextBox(44,10,232,40,"AmiWind",colours[1]);
     if(graphics){
-        AW_UITextBox(44,54,232,20,"Options",colours[1]);
-        value=AW_DrawDistance();sprintf(line,"Fog distance: %ld",(long)value);AW_UITextBox(44,77,232,19,line,selection==0?colours[1]:colours[2]);
-        AW_UIFill(80,100,161,3,colours[2]);knob=(value-128)*160/(1400-128);if(knob<0)knob=0;if(knob>160)knob=160;AW_UIFill(78+knob,95,5,13,colours[1]);
-        label(44,115,232,20,"Default: 540",1,selection==1);
-        label(44,137,232,20,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off",1,selection==2);
-        label(44,159,232,20,"Back",1,selection==3);
+        value=AW_DrawDistance();sprintf(line,"Fog distance: %ld",(long)value);
+        label(44,62,232,20,line,1,selection==0);
+        label(44,82,232,20,"Reset distance: 540",1,selection==1);
+        label(44,102,232,20,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off",1,selection==2);
+        value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");
+        label(44,122,232,20,line,1,selection==3);
+        sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());label(44,142,232,20,line,1,selection==4);
+        label(44,162,232,20,"Back",1,selection==5);
     }else if(scene_picker){
         for(i=0;i<3;i++)label(44,65+i*24,232,24,scene_items[i],i==2 || scene_available[i],selection==i);
     }else if(confirming){

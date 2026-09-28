@@ -2,11 +2,20 @@ import sys,unittest
 from pathlib import Path
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from interior_lighting import bake_surface
 from prepare_hand_sprites import render_frame,pack_frame
 from mesh_geometry import shell_collision_parts
 
 class InteriorPipelineTests(unittest.TestCase):
+ def test_scripted_room_architecture_is_retained_without_admitting_unknown_activators(self):
+  from mwad.interior import select_geometry
+  room={'number':172861,'id':'CharGen Stuff Room','type':'ACTI','model':'i\\In_C_plain_room_side.NIF'}
+  unknown=dict(room,number=2,id='unknown activator')
+  deleted=dict(room,number=3,deleted=True)
+  wrong_model=dict(room,number=4,model='EditorMarker.NIF')
+  selected,omitted=select_geometry({'refs':[room,unknown,deleted,wrong_model]})
+  self.assertEqual(selected,[room]);self.assertEqual(len(omitted),3)
  def test_constant_uv_lighting_has_finite_face_sample(self):
   p=np.array([[0.,0,0],[16.,0,0],[0,16.,0]])
   light={'ambient':[80,80,80],'lights':[]}

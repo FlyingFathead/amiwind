@@ -2,8 +2,8 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current release version is **v0.0.19**; see
-[release notes and validation](RELEASE-v0.0.19.md). The existing v0.0.16 release remains immutable.
+Use one shared release number. The current development package is **v0.0.21-dev4**;
+see [release notes and validation](RELEASE-v0.0.21-dev4.md). Earlier releases remain immutable.
 AmiWind remains a demo;
 keep increments within `0.0.x`, with `-devN` for development iterations as needed.
 The old separate Python pipeline numbering is historical. Root `VERSION` is the

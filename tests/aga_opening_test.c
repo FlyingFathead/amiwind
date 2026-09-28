@@ -1,0 +1,86 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+#include "quakedef.h"
+#include "aw_story.h"
+#include "aw_character.h"
+#include <assert.h>
+server_t sv;server_static_t svs;double host_frametime=.1;
+aw_character_t aw_character;char *pr_strings;
+int pr_edict_size=sizeof(edict_t);client_state_t cl;
+static edict_t object,clerk;static eval_t reference;static int occluded,reads;
+edict_t *EDICT_NUM(int n){return n==1?&object:&clerk;}
+trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
+ trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;return t;
+}
+static edict_t guard;static int speech,menu,done,nav_stops,nav_starts;
+static char line[32];
+edict_t *AW_IntroRole(int role){return role==5?&guard:role==6 && clerk.v.modelindex?&clerk:NULL;}
+int AW_NavLoad(const char *s){nav_stops++;return 1;}
+int AW_NavStart(edict_t *e,vec3_t goal){nav_starts++;return 1;}
+int AW_NavStep(double dt,int wait){return 0;}
+int AW_IntroSpeak(int role,const char *s){if(speech)return 0;strcpy(line,s);speech=1;return 1;}
+double AW_SpeechRemaining(void){return speech;}
+int AW_CharacterDone(void){int d=done;done=0;return d;}
+int AW_CharacterOpen(int kind){menu=kind;return 1;}
+int AW_ReaderActive(void){return 0;}
+int AW_ReaderResult(void){return 0;}
+int AW_ReaderOpen(const char *s,int n){reads++;return 1;}
+void AW_UISubtitle(const char *a,const char *b,double t){}
+void IN_AWClearButtons(void){}
+void Con_Printf(char *s,...){}
+eval_t *GetEdictFieldValue(edict_t *e,char *s){return e==&object && !strcmp(s,"aw_ref")?&reference:NULL;}
+void SV_LinkEdict(edict_t *e,qboolean t){}
+int SV_ModelIndex(char *s){return 0;}
+int main(void)
+{
+    edict_t player;client_t client;int i;
+    memset(&player,0,sizeof(player));memset(&guard,0,sizeof(guard));
+    client.edict=&player;svs.clients=&client;strcpy(sv.name,"seyda");
+    player.v.mins[2]=-16.625f;player.v.origin[2]=38.625f;guard.v.origin[2]=22;
+    AW_StoryReset(1);assert(AW_StoryTransition(AW_STAGE_DOCK));
+    player.v.origin[0]=27;AW_OpeningTick();assert(aw_story.dock==10 && !speech && !AW_OpeningLocked());
+    /* Exact 3-D source radius, not horizontal-only and not NPC feet to body centre. */
+    player.v.origin[0]=26;player.v.origin[2]+=20;
+    AW_OpeningTick();assert(aw_story.dock==10);player.v.origin[2]-=20;
+    AW_OpeningTick();assert(aw_story.dock==30 && AW_OpeningLocked());
+    assert(nav_stops==1 && !strcmp(line,"chargendock1") && !menu);
+    for(i=0;i<20;i++)AW_OpeningTick();assert(!menu && aw_story.dock==30);
+    speech=0;AW_OpeningTick();assert(menu==1 && aw_story.dock==40 && AW_OpeningLocked());
+    done=1;menu=0;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_OFFICE && AW_OpeningLocked());
+    for(i=0;i<16;i++)AW_OpeningTick();assert(aw_story.dock==50 && !strcmp(line,"chargendock2") && AW_OpeningLocked());
+    speech=0;AW_OpeningTick();assert(aw_story.dock==-1 && !AW_OpeningLocked() && nav_starts==2);
+    assert(AW_StoryRestricted()); /* Race completion must not remove the enclosure. */
+    for(i=0;i<70;i++)AW_OpeningTick();assert(!strcmp(line,"chargendock3"));
+    /* Prompt and E share aim/range/visibility and the same stateful target. */
+    {
+        const char *name,*action;
+        sv.active=1;sv.num_edicts=3;strcpy(sv.name,"census");
+        player.v.movetype=MOVETYPE_WALK;VectorCopy(vec3_origin,player.v.origin);
+        player.v.view_ofs[2]=13;object.v.modelindex=1;
+        object.v.absmin[0]=object.v.absmax[0]=30;
+        object.v.absmin[2]=object.v.absmax[2]=13;
+        reference._float=172859;
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Read: E"));
+        assert(AW_OpeningUse() && reads==1);
+        cl.viewangles[1]=180;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());cl.viewangles[1]=0;
+        occluded=1;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());occluded=0;
+        object.v.modelindex=0;assert(!AW_OpeningHint(&name,&action));object.v.modelindex=1;
+        player.v.origin[0]=-80;assert(!AW_OpeningHint(&name,&action));player.v.origin[0]=0;
+        reference._float=172860;assert(AW_OpeningHint(&name,&action) && strstr(action,"Locked"));
+        aw_story.hall=1;assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
+        assert(AW_OpeningUse() && aw_story.hall_open && !AW_OpeningHint(&name,&action));
+        reference._float=172851;AW_StoryReset(0); /* No false empty outside tutorial stage. */
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Take ring: E"));
+        assert(AW_OpeningUse() && AW_Ring()==1);
+        aw_story.stage=AW_STAGE_COURTYARD;AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",1);
+        AW_OpeningTick();assert(aw_story.stage==AW_STAGE_CAPTAIN);
+        assert(AW_ItemAdd(&aw_state,"ring_keley",-1));
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Empty"));
+        assert(AW_OpeningUse() && !AW_Ring());
+        object.v.modelindex=0;clerk.v.modelindex=1;clerk.v.origin[0]=20;
+        pr_strings="\0Socucius Ergalla";clerk.v.netname=1;AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Talk: E") && !strcmp(name,"Socucius Ergalla"));
+        speech=0;assert(AW_OpeningUse() && aw_story.census==10);
+        assert(!AW_OpeningHint(&name,&action));
+    }
+    return 0;
+}

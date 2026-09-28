@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#include "aw_character.h"
 
 // Mouse globals set by sys_amiga.c
 extern int mouseX;
@@ -59,6 +60,9 @@ void IN_Move (usercmd_t *cmd) {
     if(key_dest==key_menu)AW_MenuMouse(mouseX,mouseY);
     old_mouse_x=old_mouse_y=0;return;
   }
+
+  if(AW_ReaderActive()){AW_ReaderMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
+  if(AW_CharacterActive()){AW_CharacterMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
 
   if (m_filter.value)
   {

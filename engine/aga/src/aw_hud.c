@@ -13,21 +13,25 @@ extern int scr_copyeverything;
 int AW_DebugOverlaysEnabled(void) {return overlays.value != 0;}
 int AW_DebugCoordsEnabled(void) {return overlays.value != 0 && coords.value != 0;}
 int AW_SeaLevelEnabled(void) {return sealevel.value != 0;}
-static void debug_toggle(cvar_t *setting,char *name) {
+static int debug_toggle(cvar_t *setting,char *name) {
     char *value;
     if(Cmd_Argc()==1) {
-        Con_Printf("%s %s\n", name,setting->value?"on":"off");return;
+        Con_Printf("%s %s\n", name,setting->value?"on":"off");return 0;
     }
     value=Cmd_Argv(1);
     if(Cmd_Argc()!=2 || (Q_strcasecmp(value,"true") && Q_strcasecmp(value,"false") &&
        Q_strcasecmp(value,"on") && Q_strcasecmp(value,"off") && strcmp(value,"1") && strcmp(value,"0"))) {
-        Con_Printf("Usage: %s on/off, true/false, or 1/0\n",name);return;
+        Con_Printf("Usage: %s on/off, true/false, or 1/0\n",name);return 0;
     }
     Cvar_SetValue(setting->name, !Q_strcasecmp(value,"true") || !Q_strcasecmp(value,"on") || !strcmp(value,"1"));
     vid.recalc_refdef=true;
+    return 1;
 }
 static void debug_coords(void) {debug_toggle(&coords,"amiwind_debug_coords");}
-static void debug_all(void) {debug_toggle(&overlays,"amiwind_show_debug");}
+static void debug_all(void) {
+    if(debug_toggle(&overlays,"amiwind_show_debug"))
+        Cvar_SetValue(coords.name,overlays.value!=0);
+}
 static void debug_fps(void) {debug_toggle(&fps,"amiwind_debug_fps");}
 static void debug_showfps(void) {if(Cmd_Argc()==1)Cvar_SetValue(fps.name,1);else debug_fps();}
 static void debug_ram(void) {debug_toggle(&scr_showram,"amiwind_debug_showram");}
@@ -47,7 +51,7 @@ void Sbar_Draw(void) {
     if(key_dest==key_console)return;
     AW_UIHud();
     if(!AW_DebugOverlaysEnabled())return;
-    Draw_String(8,8,AW_Interior()?"AMIWIND v" AMIWIND_VERSION " / PRISON SHIP":"AMIWIND v" AMIWIND_VERSION " / SEYDA NEEN");
+    Draw_String(8,8,!strcmp(sv.name,"census")?"AMIWIND v" AMIWIND_VERSION " / CENSUS OFFICE":AW_Interior()?"AMIWIND v" AMIWIND_VERSION " / PRISON SHIP":"AMIWIND v" AMIWIND_VERSION " / SEYDA NEEN");
     if(fps.value){
         char line[16];int n=AW_FpsTenths(),x=8;
         sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));

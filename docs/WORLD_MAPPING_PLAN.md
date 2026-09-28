@@ -57,6 +57,88 @@ building meshes, actor appearances and textures should load once per cache entry
 with separate placement/state records. Convert supported visible ACTI objects
 explicitly; editor markers do not become visible scenery.
 
+## Optional polygonal POI regions
+
+Horstator's [28 September evening note](HORSTATORS_JOURNAL_2026-09-28.md#evening--polygonal-poi-regions-if-streaming-is-insufficient)
+adds a fallback experiment only if fog-assisted exterior streaming/offloading,
+including brief pauses at selected crossings, cannot meet the target budgets:
+compile polygonal regions around POIs and explicitly swap scenes at controlled
+crossings, with inexpensive backdrops and brief Loading feedback. Seyda Neen is
+the first proposed region. Preserve cell/chunk loading as a separate option.
+Fog provides a visibility limit for scheduling work; culling alone does not free
+RAM. Keep collision and movement headroom ready beyond what the fog conceals.
+For outdoor cell-crossing pauses, use only a minimal upper-center "Loading..."
+box, without a large overlay window. Preserve the original-style loading screens
+for interior/exterior transitions that already use that presentation.
+
+Source cells define original data and game semantics; runtime regions define
+residency. They need not have the same boundaries. Record their many-to-many
+mapping, world transforms, region dependencies, crossing/arrival data and stable
+reference ownership. Overlap is coverage, not permission to duplicate active
+objects or their state. Preserve original cell-dependent scripts, environmental
+rules and location queries even when a source-cell boundary lies inside one
+loaded region.
+
+Use "polygonal BSP regions with associated resource packs" for this proposal.
+The earlier "WAD" shorthand referred to the idea of swapping levels. Current
+AmiWind scenes are loose BSP files in `id1/maps/`; `gfx.wad` serves graphics.
+The polygon describes the region footprint, independently of its file container.
+Reuse the compiled scene/asset path where practical and measure the
+actual resource budgets. Snapshot dirty persistent state before releasing a
+region, validate destination dependencies, and provide recovery without assuming
+both whole scenes remain resident. Enter play only after the destination's
+collision and state are ready. Preserve baseline recipes and compare identical
+routes for memory, loading stalls, audio and seams before choosing a strategy.
+This is design work only; no region converter or loader is claimed as complete.
+
+### Elevated views and the topographic map
+
+Major unresolved risk, owner follow-up at 20:36 Helsinki: POI-region boundaries
+may conflict with open-world traversal and continuous topographic coverage,
+especially when the player can see above a concealing horizon or canopy.
+Experiment with an elevated view/residency mode above configurable height X
+over local terrain, using a broader/coarser terrain representation if feasible.
+Define the up-axis and terrain-height query explicitly; the proposed plane/vector
+is a representation choice, not a new disconnected gameplay coordinate system.
+Keep map coordinates, reference identity and state consistent. Test visibility
+into adjacent regions, interaction/collision from above, safe descent/detail
+restoration, threshold hysteresis and peak memory. Ground-level transition tests
+alone cannot validate the open-world design. No solution is selected yet.
+
+### The fog is our friend
+
+Preserve Morrowind's obscured
+distance and sense of mystery while using the visibility limit to bound real
+rendering work and resource residency. Horstator's reference is Xbox-era
+Morrowind under constrained graphics resources. This is both an atmospheric goal
+and a performance strategy to measure, not a claim that a fog effect by itself
+culls or unloads data. Apply it to both streaming and optional BSP regions.
+
+## Next milestone: entire-world terrain topomesh
+
+Owner priority, 28 September 2026, 20:38–20:39 Helsinki: export the entire map's
+terrain into a topographic mesh and provide a separate terrain inspection scene.
+This is full source-world coverage, not another bounded Seyda Neen export.
+
+1. Index all exterior terrain in the selected source-data set. Export consistent
+   world coordinates and cell identities, report extents/missing cells, and keep
+   the original full-detail baseline. Do not fabricate elevations to fill gaps.
+2. Extract source water levels/coverage separately; inspect coastlines and
+   terrain/water relationships without treating the temporary sea plane as truth.
+3. Generate selectable terrain LODs with retained boundaries and measurable
+   geometric error. Inspect neighboring LOD joins, hills and elevated views.
+4. Provide a dedicated observer scene/viewer with free camera, coordinate/cell
+   readout, optional wireframe/boundaries, water toggle, fog/view-distance controls
+   and LOD selection, without gameplay actors or opening progression.
+5. Compare mesh counts, resident/peak RAM, loading stalls, frame time and visual
+   error. A complete host dataset/overview is distinct from native residency:
+   use bounded chunks or a coarse overview rather than assume the whole original
+   mesh fits in Amiga memory. Preserve both cell and region experiments.
+
+This inspection work should inform region footprints, streaming/prefetch margins,
+fog and height-triggered overview experiments before those choices are fixed.
+It is planned work; dev4 does not include a whole-world mesh or observer mode.
+
 ## Compact indices without accidental signed limits
 
 Use unsigned 16-bit local indices where the format and measured counts permit.

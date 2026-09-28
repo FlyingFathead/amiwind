@@ -5,6 +5,8 @@ Captain's log, 28 September 2026, 05:10–05:24 Helsinki.
 Owner's development direction, recorded before the captain gets some sleep.
 This is a request/decision log. Completion belongs in checkpoint validation records.
 
+Later entry: [Evening — polygonal POI regions if streaming is insufficient](#evening--polygonal-poi-regions-if-streaming-is-insufficient).
+
 ## Starting point
 
 - The owner's `amiwind-2026-09-28_045110.zip` is the latest working repository
@@ -268,3 +270,151 @@ prophecy movie are separate sequences.
 
 - [x] ~~Track changes must stop flashing text at the top left when the debug
   layer is off.~~ Fixed in v0.0.19: routine notices obey the same switch.
+
+## Evening — polygonal POI regions if streaming is insufficient
+
+**Horstator's notes, 28 September 2026, 20:23 Helsinki.** Design proposal;
+not implemented, benchmarked or selected as a replacement for cell streaming.
+
+First try a sane way to use fog-limited visibility to load/offload exterior
+objects fast enough, allowing brief pauses at selected crossings if needed.
+Only if that approach cannot meet the Amiga's memory and frame-time budgets,
+try polygonal BSP regions, using Doom/Quake-style bounded levels and explicit
+transitions around points of interest. The owner's inspiration is a "John
+Carmack approach":
+prepare bounded levels for the engine rather than require the entire open world
+to stream seamlessly. This is a **must-try fallback if streaming proves
+insufficient**, not a reason to discard the streaming option now.
+
+For example, Seyda Neen and its immediate surroundings could form one
+"AmiWind cell area". Its polygonal footprint need not follow Morrowind's exterior
+cell grid: a region may combine parts of several original cells, with coverage
+overlap at the boundaries where needed. Divide the wider map by regions and POIs
+that make sense for traversal, sightlines and measured resource budgets. Walking
+out of one region would load the neighboring region, like changing levels.
+
+Use inexpensive distant scenery, a false horizon, tree silhouettes, fog or a
+canopy to conceal the changeover. At a controlled outdoor crossing, the viewport
+may briefly freeze, then resume at the matching position and facing in the next
+region. Show only an absolutely minimal "Loading..." box at the upper center of
+the screen for such a new-cell crossing, with no large overlay window or modal
+dialog. Preserve the original-Morrowind-style loading presentation for interior/
+exterior transitions that already use it. A brief explicit load is an
+acceptable experiment if it keeps the active world within memory. Backdrops
+must agree with the destination view and must not pretend to be reachable,
+interactive terrain; collision must be ready before movement resumes.
+
+Terminology clarification, 20:29 Helsinki: Doom stores map data and other
+resources in WAD archives. Quake uses compiled BSP levels, commonly packaged in
+PAK archives; its WADs hold graphics resources. AmiWind currently loads loose
+`seyda.bsp`, `prison.bsp` and `census.bsp` files from `id1/maps/` on the HDF,
+with a separate `gfx.wad` for graphics. Call this proposal **polygonal BSP
+regions with associated resource packs**. The polygon describes the region's
+world footprint; the resource container remains a separate choice. This
+corrects the original shorthand without changing the proposal. Owner clarification,
+20:31 Helsinki: the intended term is **polygonal BSP regions**, akin to the
+bounded levels of Doom and Quake. The footprint is the area being loaded, not
+a claim that Doom and Quake use the same map-file format.
+
+**Preserve both approaches.** Keep the original cell mapping, source assets and
+existing conversion recipes. Add region partitioning as an optional conversion/
+loading strategy, with a manifest connecting original cells and placed references
+to each runtime region. Preserve world coordinates, player/quest/NPC state and
+stable object identities across swaps. Overlapping coverage must not duplicate
+actors, colliders, scripts, loot or reset taken items. Runtime region boundaries
+must not redefine the original cell-dependent game rules.
+
+Compare a Seyda Neen region prototype with the cell/chunk approach using the same
+route: resident and peak transition RAM, load duration, frame time, audio
+continuity, visual seams and repeated crossings. Test returning to a region,
+save/load and failed-load recovery. A loading animation needs time to update;
+do not claim responsive feedback while an unbroken synchronous load blocks it.
+Do not assume two complete regions fit in memory during handoff. Choose the
+approach from these measurements; no best method or speedup is established yet.
+
+Follow-up: [world mapping options](WORLD_MAPPING_PLAN.md#optional-polygonal-poi-regions)
+and [roadmap experiment](ROADMAP.md#optional-polygonal-poi-regions).
+
+### 20:36 Helsinki — open-world/topographic-map limitation and elevated mode
+
+The owner flags a major problem with this region approach: Morrowind's open-world
+layout and topographic map do not stop at our selected POI boundaries. A high
+viewpoint can expose region edges, false horizons and missing neighboring terrain.
+Ground-level fog/backdrops alone do not establish that this design will work.
+
+Proposed experiment: when the player is more than a configurable distance X
+above the local ground, switch to a separate elevated terrain/view mode, perhaps
+a broader, coarser topographic representation. The original "Y axis / Z-plane /
+vector" wording expresses an altitude-triggered representation; define the
+actual engine up-axis and terrain-height query before implementation. Measure
+height above local terrain, not just height above sea level. This is a different
+rendering/residency mode, not permission to change the player's world coordinates
+or move gameplay onto a disconnected plane.
+
+Check what remains visible and interactive from above, how neighboring regions
+are represented, and how descent restores nearby detail/collision. Preserve one
+world/topomap mapping and persistent state through both modes. Consider separate
+enter/exit height thresholds to prevent rapid switching near X. Measure memory,
+handoff stalls and visual continuity on hills and across region boundaries.
+This is an unresolved architectural risk and an experimental mitigation, not
+evidence that polygonal regions already preserve open-world traversal.
+
+### The fog is our friend
+
+28 September 2026, 20:37 Helsinki.
+
+**The fog is our friend.** Even the elevated-mode experiment would be tricky.
+Horstator points to Xbox-era Morrowind as the reference for using limited view
+distance under constrained graphics resources. Keep fog central to AmiWind's
+design: it gives us a bounded visible neighborhood for rendering and loading,
+and it preserves the original world's mystique by leaving distant places unseen.
+Maximum visibility is not automatically the better artistic result.
+
+Use fog to support real distance culling and measured loading/offloading; simply
+painting fog over geometry that stays resident and is still processed does not
+deliver those savings. Keep enough collision/prefetch margin for movement and
+turning, and check the atmosphere as well as frame time and RAM when tuning the
+distance. Retain this principle whichever cell or polygonal-region strategy wins.
+
+### 20:38–20:39 Helsinki — entire-world terrain topomesh and inspection scene
+
+Near-term priority: build a topographic mesh of **the entire map's terrain**,
+not just Seyda Neen or the opening area. Use the original exterior terrain data
+in one consistent world-coordinate system, retain source-cell identity and
+report missing coverage. Then inspect original water levels and shorelines.
+Keep a full-detail terrain baseline before making reduced LOD variants.
+
+Provide a separate terrain-only inspection scene or observer mode where the
+world can be examined in peace, without the intro, quests or NPC simulation.
+Use a free camera, world/cell coordinates, optional wireframe/cell boundaries,
+water visibility, adjustable fog/view distance and selectable terrain LODs.
+Inspect the full landmass, elevated views, slopes, coastlines and transitions;
+show triangle/resource counts and measured runtime limits so we can determine
+what is possible and how far each approach can go.
+
+The full terrain dataset and host overview do not imply loading the entire
+full-detail mesh into Amiga RAM. Keep the inspection path capable of bounded
+regions or coarse overview LODs, preserve the original mesh and water metadata,
+and compare visible error, seams, memory and frame time. This is the next
+world-mapping experiment, not an implemented dev4 feature or a committed region
+partition. Use its results to choose LOD, fog, streaming and POI boundaries.
+
+### 20:40 Helsinki — a thought for Carmack
+
+> Horstator has been greatly amused by the idea of John Carmack himself one day witnessing Morrowind on Amiga via the otherworldly 3D gimmicks he did back in the day for Quake and such.
+
+### Tables, tables, we need more tables
+
+28 September 2026, 20:41 Helsinki. Map out the parameters needed for the game as
+a whole: character attributes and everything that affects them, skills, effects,
+quest progression, globals, containers, items, NPC state, dialogue conditions,
+world references and their relationships. Avoid building isolated next-scene
+flags without understanding the wider conditional state model.
+
+For each field/rule, record its source, identity, type/range, initial value,
+readers, writers, dependencies and persistence requirements. Distinguish base
+records from placed references, base values from modifiers/derived values, and
+durable state from rebuildable caches. Keep verified source behavior separate
+from proposals and unknowns. Use these tables to drive conversion, runtime
+structures, save schemas and acceptance cases, with Amiga memory limits in view.
+See [the development catalogue requirement](DEVELOPMENT.md#tables-tables-we-need-more-tables).

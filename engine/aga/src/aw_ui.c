@@ -5,14 +5,16 @@
 #include "quakedef.h"
 extern byte *draw_chars;
 extern int scr_copyeverything;
-static byte font[26624],skin[4104];
+static byte font_storage[26624],book_font[26624],skin[4104];
+static byte *font=font_storage;
+static int book_font_bytes,book_font_loaded;
 static byte background[64776],loading_background[64776];
 static int loading_state,loading_next;
 static byte logo[8008];
 static int logo_state;
 static int background_state;
 static int font_bytes,font_height=8,line_height=10,skin_ready,initialized;
-static cvar_t ui_font={"aw_ui_font","16",true};
+static cvar_t ui_font={"aw_ui_font","14",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
 static cvar_t ui_frame={"aw_ui_frame","0",true};
 static int ink[3],black,muted;
@@ -40,7 +42,10 @@ int AW_UIColor(int r,int g,int b) {
 }
 void AW_UIFill(int x,int y,int w,int h,int color) {
     int bottom=y+h,right=x+w;
-    if(x<0)x=0;if(y<0)y=0;if(right>vid.width)right=vid.width;if(bottom>vid.height)bottom=vid.height;
+    if(x<0)x=0;
+    if(y<0)y=0;
+    if(right>vid.width)right=vid.width;
+    if(bottom>vid.height)bottom=vid.height;
     if(right<=x || bottom<=y)return;
     for(;y<bottom;y++)memset(vid.buffer+y*vid.rowbytes+x,color,right-x);
 }
@@ -95,7 +100,8 @@ byte *AW_UIMenuPalette(void){
     return background_state==1 && AW_MenuFrontEnd()?background+8:NULL;
 }
 static void initialize(void) {
-    if(initialized)return;initialized=1;
+    if(initialized)return;
+    initialized=1;
     black=AW_UIColor(0,0,0);muted=AW_UIColor(115,108,89);
     ink[0]=AW_UIColor(76,67,46);ink[1]=AW_UIColor(151,131,87);ink[2]=AW_UIColor(223,199,144);
     skin_ready=read_asset("gfx/ui.awu",skin,sizeof(skin))==sizeof(skin) &&
@@ -111,6 +117,12 @@ static void font_command(void) {
     else {Con_Printf("Usage: dbg ui font 16/14/12/fallback\n");return;}
     if(!select_font(size)){Con_Printf("UI font missing or invalid; previous font preserved.\n");return;}
     Cvar_SetValue(ui_font.name,size);scr_copyeverything=1;
+}
+int AW_UIFontSize(void){initialize();return font_bytes?font_height:0;}
+int AW_UISetFontSize(int size){
+    initialize();
+    if(!select_font(size))return 0;
+    Cvar_SetValue(ui_font.name,size);scr_copyeverything=1;return 1;
 }
 int AW_UIHeight(void){initialize();return line_height;}
 static int advance(int c){return font_bytes?font[8+c*8+6]:8;}
@@ -145,7 +157,9 @@ void AW_UITextBox(int x,int y,int w,int h,const char *text,int color) {
     while(*p){
         if(font_bytes){t=(signed char)font[8+*p*8+5];b=t+font[8+*p*8+3];}
         else {t=0;b=8;}
-        if(t<top)top=t;if(b>bottom)bottom=b;p++;
+        if(t<top)top=t;
+        if(b>bottom)bottom=b;
+        p++;
     }
     if(bottom<top)return;
     AW_UIText(x+(w-AW_UIWidth(text))/2,y+(h-bottom+top)/2-top,text,color);
@@ -158,6 +172,34 @@ int AW_UILogo(int x,int y) {
     for(row=0;row<40;row++)memcpy(vid.buffer+(y+row)*vid.rowbytes+x,logo+8+row*200,200);
     return 1;
 }
+/* Reading uses its own pre-rasterized font without altering the menu setting. */
+static int saved_font_bytes,saved_font_height,saved_line_height;
+static int saved_book_ink[3];
+void AW_UIBookBegin(void) {
+    initialize();
+    if(!book_font_loaded){
+        book_font_loaded=1;
+        book_font_bytes=read_asset("gfx/book12.awf",book_font,sizeof(book_font));
+        if(!AW_UIValidateFont(book_font,book_font_bytes)){
+            book_font_bytes=read_asset("gfx/magic12.awf",book_font,sizeof(book_font));
+            if(!AW_UIValidateFont(book_font,book_font_bytes))book_font_bytes=0;
+        }
+    }
+    saved_font_bytes=font_bytes;saved_font_height=font_height;saved_line_height=line_height;
+    memcpy(saved_book_ink,ink,sizeof(saved_book_ink));
+    /* Antialiased book glyphs need gray edges on white, not menu gold. */
+    ink[0]=AW_UIColor(170,170,170);ink[1]=AW_UIColor(85,85,85);ink[2]=AW_UIColor(0,0,0);
+    if(book_font_bytes){font=book_font;font_bytes=book_font_bytes;font_height=12;line_height=14;}
+}
+void AW_UIBookEnd(void) {
+    font=font_storage;font_bytes=saved_font_bytes;font_height=saved_font_height;line_height=saved_line_height;
+    memcpy(ink,saved_book_ink,sizeof(saved_book_ink));
+}
+void AW_UISmallBegin(void) {
+    AW_UIBookBegin();
+    memcpy(ink,saved_book_ink,sizeof(saved_book_ink));
+}
+void AW_UISmallEnd(void) {AW_UIBookEnd();}
 /* Returns the unconsumed text. Always consumes at least a byte for a narrow
  * box, and never splits a buffer or writes outside it. Long words are split. */
 const char *AW_UILine(const char *text,int width,char *out,int capacity) {
@@ -203,7 +245,8 @@ void AW_UIFrameToggle(void){Cvar_SetValue(ui_frame.name,!ui_frame.value);scr_cop
 void AW_UISubtitle(const char *name,const char *text,double duration) {
     strncpy(speaker,name,sizeof(speaker)-1);speaker[sizeof(speaker)-1]=0;
     strncpy(subtitle,text,sizeof(subtitle)-1);subtitle[sizeof(subtitle)-1]=0;
-    if(duration<0)duration=0;if(duration>120)duration=120;
+    if(duration<0)duration=0;
+    if(duration>120)duration=120;
     subtitle_started=realtime;subtitle_until=realtime+duration;
 }
 void AW_UICenterMessage(const char *text) {

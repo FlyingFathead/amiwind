@@ -81,6 +81,37 @@ class OriginalFont:
 
 def pack_font(path, size):
     glyphs = OriginalFont(path).bake(size)
+    return pack_glyphs(glyphs, size)
+
+
+def pack_truetype(path, size):
+    """Rasterize a caller-supplied font to AWF1 on the host, never on Amiga."""
+    if size not in (12, 14, 16):
+        raise ValueError('Native font sizes are 12, 14 and 16')
+    try:
+        font = ImageFont.truetype(str(path), size, encoding='unic', layout_engine=ImageFont.Layout.BASIC)
+    except OSError:
+        # Older Magic Cards TTFs expose a Windows symbol charmap. Selecting
+        # FreeType's default map can silently rasterize .notdef for every letter.
+        font = ImageFont.truetype(str(path), size, encoding='symb', layout_engine=ImageFont.Layout.BASIC)
+    if len({bytes(font.getmask(c)) for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'}) < 8:
+        raise ValueError('Font charmap does not provide distinct Latin glyphs')
+    glyphs = []
+    for code in range(256):
+        char = bytes([code]).decode('cp1252', errors='replace')
+        if code < 32 or code == 127 or char == '\ufffd':
+            char = ' '
+        left, top, right, bottom = font.getbbox(char)
+        width, height = right-left, bottom-top
+        mask = Image.new('L', (max(1,width),max(1,height)))
+        ImageDraw.Draw(mask).text((-left,-top),char,font=font,fill=255)
+        mask = mask.point(lambda a: rounded(a/85)*85)
+        glyphs.append(dict(code=code,width=width,height=height,left=left,top=top,
+                           advance=rounded(font.getlength(char)),mask=mask if width and height else None))
+    return pack_glyphs(glyphs, size)
+
+
+def pack_glyphs(glyphs, size):
     metrics = bytearray(); pixels = bytearray()
     for g in glyphs:
         offset = len(pixels)

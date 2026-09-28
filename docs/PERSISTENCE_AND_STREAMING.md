@@ -4,6 +4,10 @@
 at a time and has no working save/load system. This proposal records a direction
 for extending that model without requiring the whole world to fit in RAM.
 
+Current next-step specification: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md), including
+attribute/appearance fields, save-list management and original/OpenMW comparison
+gates. Save/Load remain disabled in the v0.0.20 maintenance build.
+
 ## Separate base content from saved changes
 
 Keep converted cell/scene data immutable on disk. A save records changes to

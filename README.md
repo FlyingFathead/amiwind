@@ -22,20 +22,27 @@ they turn toward the player and can play original greetings. Walking, mouse look
 collision, Nord hands, streamed music, menus and a debug console are working.
 The new UI uses the original Magic Cards font and border artwork from your own
 game files, with dialogue in the lower strip and an unchanged console font.
-A separate main menu uses the original background; Load Game remains disabled.
+The main menu now uses a smaller, lower panel; UI defaults to 14 px with 16/14/12
+and fallback choices in Options.
 
-New Game now starts the first ship sequence: Jiub, name entry, original voices,
-speaking/blinking faces and a collision-aware escort. This is an early proof of
-concept. Dock/Census character creation, full conversations, quests, general town NPC collision
-and combat remain open. Audio stalls and scene geometry still need work. Ordinary underwater tint is
-blue; actual damage retains its separate red flash. The tested emulator
-reference is A1200/AGA with 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM; stock A1200
-performance is unproven. See the [current development checkpoint](docs/RELEASE-v0.0.19.md)
-and [next steps](docs/SEYDA_NEEN_NEXT_STEPS.md).
+**AmiWind v0.0.21-dev4** packages the evening world-mapping notes and a versioned
+rebuild of dev3. Polygonal POI regions remain an optional design experiment;
+cell streaming is preserved as an option. The included dev3 maintenance repairs an omitted Census room, improves paper contrast,
+adds small interaction hints and WASD choices, and corrects dock interception,
+fighting permissions and courtyard ring depletion. New Game defaults to confirmation;
+dev2's opening barrier correction remains included. The opening playtest includes: dock race/appearance
+selection with rotating heads, Census Office rooms and NPCs, class/birthsign/stat
+review, papers and release adapters, and a bounded save/load implementation with
+adjustable autosave history. This remains a development slice: full dialogue,
+quests, inventory and combat are unfinished. Read the [checkpoint scope and
+remaining validation](docs/RELEASE-v0.0.21-dev4.md) before testing.
 
-**AmiWind v0.0.19** uses one `VERSION` for source, tools and runtime.
-See [release notes](docs/RELEASE-v0.0.19.md) and
-[setup changes and validation](docs/BUILD_SETUP-v0.0.17.md).
+Maintenance from v0.0.20 remains included: prison ambience is 5 dB lower in its
+mixer channels and debug overlay toggles include coordinates. Both intermittent
+FS-UAE freezes remain open; see [bug reports](docs/BUGS.md). The emulator reference
+is A1200/AGA, 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM. Stock A1200 performance
+is unproven. Source, tools and runtime share one VERSION.
+
 The public dry-run image
 boots to a versioned notice screen. Build locally with your own Morrowind files
 for the playable scene; see [build instructions](docs/LINUX_BUILD.md).
@@ -173,6 +180,12 @@ guide to install the required tools and build the playable HDF.
 
 ### Run AmiWind in an emulator
 
+Already have a playable HDF? Copy
+[`AmiWind-FS-UAE-launcher.py`](tools/AmiWind-FS-UAE-launcher.py) beside it and run
+`python3 AmiWind-FS-UAE-launcher.py`. It suggests the newest version, remembers
+your ROM, checks its checksum and configures FS-UAE. Use `--yes` for immediate
+subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
+
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
@@ -200,7 +213,7 @@ and boots to a test notice; it is not the playable demo.
 
 ## Development
 
-[Project state](docs/PROJECT_STATE.md) · [Roadmap](docs/ROADMAP.md) ·
+[Project state](docs/PROJECT_STATE.md) · [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
 [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
 [Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
 [Licensing and credits](docs/LICENSING_AND_CREDITS.md)

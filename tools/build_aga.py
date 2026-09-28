@@ -43,7 +43,7 @@ def startup_config(config):
     config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
         'r_maxsurfs 10240\nr_maxedges 20480\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
-    return 'aw_drawdistance 540\n'+config.rstrip()+'\n'
+    return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\n'
 
 def validate_quakec(path):
     """Reject incompatible compiler output before it reaches an Amiga image."""
@@ -162,7 +162,7 @@ def image(args):
         validate_video(movie)
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
-    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\naw_startup\n')
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_startup\n')
     print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
@@ -185,6 +185,13 @@ def image(args):
         q=qc/'world.qc';q.write_text(q.read_text().replace('progs/v_nord.mdl','progs/player.mdl'))
     (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n');run([args.qcc],qc)
     validate_quakec(boot/'id1/progs.dat')
+    # Saved mutable state is only restored against this exact converted content.
+    fingerprint=hashlib.sha256()
+    for name in ('maps/prison.bsp','maps/seyda.bsp','maps/census.bsp','progs.dat','character/catalog.awc'):
+        asset=boot/'id1'/name
+        if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
+        fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))
+    (boot/'id1/save-content.bin').write_bytes(fingerprint.digest())
     manifest=json.loads((music/'soundtrack.json').read_text());groups=playlists(manifest['tracks'])
     opening_track=manifest['tracks'][4] if 4 in groups['explore'] else None
     if opening_track:

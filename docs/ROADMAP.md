@@ -1,6 +1,163 @@
 # Roadmap and implementation options
 
+## Next implementation milestone agreed 28 September 2026
+
+Maintenance v0.0.20 is retained. v0.0.21-dev1 implements the bounded opening,
+character/save and UI prototype; the checkboxes below track full acceptance,
+not merely source presence. See [checkpoint limits](RELEASE-v0.0.21-dev1.md).
+
+- [ ] Dock guard route, original CharGenDock dialogue and race-menu speech gates.
+- [ ] Race/sex/face/hair selector with rotating head preview and bounded resource use.
+- [ ] Authored invisible chargen barriers and their completion-dependent removal.
+  Preserve deck/plank/pier/courtyard containment and forward passage together;
+  see the persistent state rule in CHARACTER_CREATION.md and journal J015.
+- [ ] Census Office interior rooms, door links, Socucius Ergalla, hall guard and
+  Sellus Gravius; class, birthsign, review, papers, ring and release logic.
+- [ ] Versioned character/attribute state and compact, recoverable save/load;
+  manageable named manual saves and player-adjustable autosave history of the
+  last X snapshots (not character levels). Deliver save/load together with completed
+  Census attributes as the next playable milestone. Compare semantics
+  with original ESS/OpenMW, test corruption/interruption and repeated-save growth.
+- [ ] Add the unimplemented Silt Strider and driver; keep that content work
+  separate from diagnosing the malformed landing geometry at XYZ260/417/30.
+- [ ] Keep both intermittent FS-UAE freezes open during the new work.
+- [ ] Review compiler warnings on every build and reduce the remaining 93; follow
+  the mandatory gate in DEVELOPMENT.md. Preserve full diagnostic evidence.
+
+Source audit, order and acceptance: [CHARACTER_CREATION.md](CHARACTER_CREATION.md).
+Save design and pending comparison gates: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md).
+
 Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
+
+## Next world-mapping milestone: entire-world terrain inspection
+
+- [ ] Export a topomesh of the **entire map's terrain**, with original exterior
+  terrain coverage, global coordinates, source-cell IDs and a missing-data report.
+  Preserve the full-detail baseline before creating LODs.
+- [ ] Extract and inspect original water levels, coverage and shorelines; do not
+  derive the whole world from the current placeholder sea plane.
+- [ ] Add a separate terrain-only observer scene/viewer: free camera, coordinate/
+  cell readout, water toggle, optional wireframe/boundaries, fog/view distance and
+  LOD controls. Exclude NPC/quest/intro activity so geometry can be studied calmly.
+- [ ] Compare whole-world overview and detailed terrain patches for LOD error,
+  seams, triangle counts, RAM, load time and frame time. Complete source coverage
+  must not require complete full-detail native residency. Use findings to choose
+  streaming, optional polygonal BSP regions and elevated-view handling.
+
+See [terrain inspection plan](WORLD_MAPPING_PLAN.md#next-milestone-entire-world-terrain-topomesh).
+
+## Fundamental mechanics before attribute effects
+
+- [ ] **Tables, tables, we need more tables:** catalogue character attributes,
+  modifiers, skills, quests, globals/script locals, containers/items, NPCs,
+  dialogue, world references and persistence. Record sources, types, defaults,
+  dependencies, read/write events and save/unload behavior, with unknowns marked.
+  Use the shared catalogue to guide conversion/runtime/save schemas and bounded
+  memory; see [development notes](DEVELOPMENT.md#tables-tables-we-need-more-tables).
+
+Owner priority, 28 September 2026: establish persistent conditional game state,
+reference enable/disable behavior, interaction and dialogue gates, NPC actions,
+scene transitions and save/load before expanding what each attribute does in
+combat, movement, skills and spell calculations. Keep the character fields and
+starting-value work already present. Research later effects using UESP, original
+data and OpenMW; record uncertainty and exceptions in the implementation journal.
+See [research references](REFERENCES.md#game-mechanics-research).
+
+## UI readability and text scaling
+
+- [x] Add Options controls for existing 16, 14 and 12 px fonts plus the readable
+  fallback; preserve every font and size. Start the next playtest at 14 px.
+- [x] Move/size the main-menu panel with its font metrics so it clears the
+  background title at every supported size. Verify keyboard and mouse hit boxes.
+- [ ] Later separate menu, dialogue, journal and book size preferences, with
+  measured reflow/pagination and preserved content at each size. Text-heavy scenes
+  need readable wrapping and accessible controls rather than clipped paragraphs.
+- [ ] Owned TTF inputs may be rasterized on the host into bounded AWF1 atlases.
+  Preserve original bitmap-font conversion as well. Book pages and birthsign
+  artwork belong in the reading/character UI, with private source assets.
+
+- [ ] Explore the lower screen area for needed status icons and interaction/menu
+  controls as those mechanics arrive. Measure against 320x200 output, selected
+  font size, dialogue, resource bars and debug coordinates. Establish readable
+  priority/reflow before committing to an icon count or permanent layout.
+
+## Opening exterior residency and playtest blockers
+
+- [ ] Close the new Census missing-room and pier-escape reports before treating
+  the full opening as accepted; use BUGS.md fixed Y/N/version index.
+- [ ] Build a separate opening exterior with configurable radius X around the
+  boat/dock/Census route. Include intersecting bounds and complete assemblies,
+  all required doors/NPCs/navigation/barriers and enough backdrop for visibility.
+  Keep original world coordinates and stable reference IDs. Unload prison before
+  this scene, unload it on office entry, load the full town after release; include
+  courtyard round trips while still restricted. Preserve globals, script locals,
+  actor state and save content identity across both exterior variants.
+- [ ] Compare full/reduced scenes at identical cameras for frame time, polygon
+  work, resident geometry/textures, peak transition memory and audio continuity.
+  Existing radius selection is preprocessing only; the native BSP is resident.
+  Avoid loading both exteriors at once. Choose X from coverage and measurements.
+- [ ] Audit Census texture resolution and UV/material bindings; use bounded
+  per-material quality where close wall art needs it, not universal reduction.
+- [ ] Add generic interior hinged doors with source sound, pivot, motion and
+  swept collision; retain locked and opening-script-specific gates.
+- [ ] Add ambient NPC idle vocalizations/whistling later, with bounded polling,
+  distance, cooldowns and priority below active dialogue/intro speech.
+
+## Optional polygonal POI regions
+
+Owner principle: **"the fog is our friend"** for both bounded rendering/loading
+work and Morrowind's mystique. Preserve atmosphere when measuring view-distance
+tradeoffs; merely fogging still-processed/resident geometry is not the goal.
+
+Horstator's evening proposal, 28 September 2026: [full note](HORSTATORS_JOURNAL_2026-09-28.md#evening--polygonal-poi-regions-if-streaming-is-insufficient).
+First use fog-limited visibility to support measured cell/chunk streaming and
+offloading, allowing brief pauses at selected crossings. Only if no sane version
+of that approach meets the target budgets are explicit region swaps a required
+fallback experiment. Fog culling alone does not evict resources from RAM.
+
+- [ ] Add an optional polygonal region recipe around POIs, starting with Seyda
+  Neen; allow regions to span original cell boundaries. Keep the original cell
+  approach and source mapping intact. Use compiled BSP regions with associated
+  resource packs; the earlier "WAD region" shorthand does not prescribe the
+  container. No region converter or loader is implemented yet.
+- [ ] Plan crossings and inexpensive horizon/tree/canopy backdrops; show a short
+  Loading indication during a level swap and restore the matching safe position
+  and facing only after collision is ready. Outdoor cell crossings get only a
+  minimal upper-center "Loading..." box, not a large overlay window. Preserve
+  original-style loading screens for interior/exterior transitions that use them.
+  Test both crossing directions.
+- [ ] Keep stable reference ownership and persistent state across overlapping
+  coverage. Preserve original cell-dependent rules independently of rendering
+  regions; no duplicate loot, actors or script execution at seams.
+- [ ] Compare memory, peak load scratch/overlap, load duration, frame time and
+  audio continuity against the cell/chunk approach. Verify repeated travel,
+  save/load, missing-pack recovery and a handoff that does not require two full
+  regions in RAM. Adopt only on measured results; retain both recipes.
+
+- [ ] Treat elevated viewpoints and continuous topomap coverage as a major
+  acceptance risk for POI regions. Trial a broader/coarser terrain mode above
+  configurable height X over local ground; define the actual up-axis, preserve
+  world coordinates/state, and test adjacent-region views, descent, collision,
+  memory and separate enter/exit thresholds. A height switch alone is not proof
+  that hidden boundaries or missing terrain are solved.
+
+## Graphics and performance: crate geometry options
+
+Requested 28 September 2026; add containers using the normal method first.
+
+- [ ] **Type 001 / normal:** preserve the source crate's shape and recognizable
+  details through the normal conversion. This is the initial default when crates
+  are added, pending measurement.
+- [ ] **Type 002 / low polygon:** offer a simple rectangular box with the source
+  texture patterns mapped onto its faces, reducing geometry. Retain both methods
+  as selectable conversion options; do not silently replace the normal version.
+- [ ] Compare matching scenes and camera positions for visual quality, polygon
+  counts, memory use, frame time, collision and interaction. Decide whether type
+  002 is needed from those results.
+- [ ] Later evaluate a streaming/distance hybrid that uses detailed crates nearby
+  and simple boxes farther away, with bounded residency and controlled switching.
+  Keep container reference identity, inventory, ownership and saved state stable
+  across geometry changes; do not duplicate or reset contents during a switch.
 
 ## Build-tool TODOs, 28 September 2026
 
@@ -624,3 +781,96 @@ transitions and bounded resident memory; investigate adjacent-cell preloading
 after measuring RAM, disk latency and audio deadlines. A larger HDF increases
 storage capacity without making all content resident. This is a design direction,
 not implemented save support or seamless streaming.
+
+
+## Interaction and inventory follow-up, 28 September 2026
+
+Default layout: [npc_interaction_layout_template_001](INTERACTION_LAYOUTS.md).
+
+- [x] Small 12 px target hint, right-aligned immediately below the viewport:
+  `Fargoth` in the small Morrowind font, then `(Talk: E)` on the next line in
+  the current console font. Shared opening action query; range, visibility and current
+  permissions determine the displayed action. No extra panel or debug dependency.
+- [x] Menu/character choices accept arrows and WASD; preserve name-entry letters.
+- [x] Separate the hall guard's fighting permission from the global opening
+  enclosure. Do not enable every player action just because one gate ends.
+- [ ] General action permissions combine script restrictions, UI capture and
+  active effects. Model Paralyze and Silence separately: Silence affects casting,
+  not ordinary punches. Verify effect rules and expiration/restoration against
+  original records and OpenMW before implementing combat/magic.
+- [ ] Import container inventory entries and leveled-item lists from owned data;
+  preserve fixed items, quantities, list flags, level rules and chance-none.
+  Verify resolution/respawn behavior against OpenMW before choosing roll timing.
+- [ ] Item catalogue and icon conversion from original item records; bounded
+  palette/size/cache budgets, icons plus readable names/counts in inventory and
+  container UI. Do not replace missing icons with unrelated art.
+- [ ] Persist each placed container's resolved contents and player removals;
+  reopening or loading must not duplicate loot. Track respawn policy separately.
+- [ ] Fargoth ring dialogue: keep/return choice, original conditions, journal and
+  disposition/reward changes. The ring pickup exists; the return branch does not.
+- [ ] Replace the temporary namespaced courtyard-container fact with generalized
+  reference state when that store is introduced; migrate saves explicitly.
+- [x] Offline standing-hull scan reports floor support, bounded step connectivity,
+  reachable scan edges and potential fall edges. Visual completeness remains a
+  separate check; no automatically fabricated floors or invisible walls.
+
+
+### Runtime out-of-bounds safeguard (requested 28 September)
+
+- [ ] Bounded, low-frequency diagnostics poller for non-finite coordinates,
+  sustained embedding in solids and escape from converted playable cell volumes.
+  Use source-derived room/region bounds and reachable collision surfaces, not a
+  single guessed Z threshold; stairs, lower floors, swimming and scripted
+  transitions must remain valid.
+- [ ] Retain the last verified supported, non-embedded position per cell. Require
+  repeated grounded samples and exclude noclip, teleports/loads in progress,
+  menus and unsafe/water states. Reset or revalidate it when cell content changes.
+- [ ] Record version/cell/XYZ, previous safe location, nearby source references,
+  story state and collision reason before offering recovery. Rate-limit notices.
+  Do not silently move the player or convert that result into bug closure.
+- [ ] Verify the recovery sweep and floor support before returning the player;
+  never create autosaves while the character is out of bounds or unsupported.
+  Measure the poller's trace/time budget on the Amiga.
+
+
+### High priority: graphics/culling, door and wall assemblies
+
+Owner explicitly prioritizes this as a key culling/geometry issue. Keep this
+reference case when designing broader architectural occlusion and simplification.
+
+- [ ] Reproduce exterior Census door overlap at XYZ396,-171,39, yaw170,pitch-3
+  (AW-20260928-21); identify source door/wall references and offending triangles.
+- [ ] Planned host `door_priority` true/false recipe, default **true** once implemented and validated (false preserves the baseline): retain real door holes,
+  simplify covered planar wall geometry and remove proven redundant overlaps.
+  Keep frames, silhouette, visibility through open doors and correct collision.
+  Restrict any base-colour/texture backing to the concealed patch beneath the
+  door/frame, with a conservative hidden margin. Preserve visible wall texture,
+  UVs and shape. Remove redundant faces from the converted runtime asset; merely
+  repainting or hiding them does not remove their memory/rendering cost.
+  Never use unconditional door draw-on-top as a substitute for correct geometry.
+- [ ] Compare source/candidate mesh counts, renderer surfaces/edges and fixed-view
+  frame times. Separate visible correctness from a measured performance gain.
+
+- [ ] Automate an oriented doorway cut from the placed door aperture. The owner
+  confirms intrusion at both Census exits viewed from outside. Make a door-shaped cut-out: clear obstructing wall geometry behind/through
+  the door opening (bounded depth), preserve the surrounding
+  frame/wall, interpolate cut-face UVs and rebuild matching collision. Scope edits
+  to verified adjoining wall references; never flatten everything in a door AABB.
+  Report changed references/faces and retain source/baseline geometry. Validate
+  repeated instances, rotated doors, door motion and both sides of each opening.
+
+
+The door-cut optimization is intended to remove unnecessary geometry before
+runtime, so the Amiga does not transform/rasterize redundant faces. Hiding the
+artifact with a rendering priority while retaining that work does not meet the
+performance goal. Profile the resulting reduction rather than assuming a gain.
+
+
+Owner refinement: the assisted doorway simplification should be enabled by
+**default** in the future build configuration, with an explicit disable switch.
+Keep a conservative cut/overlap margin hidden underneath the door frame so no
+seam or missing wall leaks around the edge. Where a transition door never reveals
+an opening, replace unnecessary covered depth with a simple wall-coloured planar
+rectangle behind it. A real hinged/open-through door must retain its aperture;
+a backing rectangle must not seal a visible passage or create blocking collision.
+This describes the planned default; no such build switch is active yet.

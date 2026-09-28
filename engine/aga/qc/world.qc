@@ -19,6 +19,7 @@ float(vector value) vectoyaw = #13;
 void(vector position, string sample, float volume, float attenuation) ambientsound = #74;
 void() changeyaw = #49;
 float(float value) floor = #36;
+.string aw_hull;
 .float aw_hand_idle;
 .float aw_eye_height;
 .float aw_hand_draw;
@@ -63,6 +64,8 @@ void() aw_hands_update = {
 .string aw_line;
 .float aw_idle_step;
 .float aw_intro_role;
+.float aw_ref;
+.float aw_story_hidden;
 .float aw_walk_step;
 .float aw_moving;
 .float aw_volume;
@@ -138,8 +141,8 @@ void() aw_npc = {
     setorigin(self,self.origin + '0 0 8');
     droptofloor();
     setorigin(self,self.origin + '0 0 0.25');
-    // Ship actors block the player after their floor placement.
-    if (self.aw_intro_role >= 1 && self.aw_intro_role <= 4) self.solid = 3;
+    // Scripted actors block the player after their floor placement.
+    if (self.aw_intro_role >= 1 && self.aw_intro_role <= 8) self.solid = 3;
     setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
     self.think = aw_npc_idle;
     self.yaw_speed = 22.5;

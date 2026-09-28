@@ -1,11 +1,14 @@
 # Original-font and message-box direction
 
-Owner decisions, 28 September 2026. This is planned UI work, not a shipped feature.
+Owner decisions, 28 September 2026. In v0.0.21-dev1, 14 px is the default
+and Options cycles through 16, 14, 12 px and fallback. All existing atlases are
+preserved. The main-menu panel follows font metrics and sits lower to expose
+the Morrowind title. Independent dialogue/book size settings remain planned.
 
 | Variant | Decision |
 | --- | --- |
-| Magic Cards, 16px, three ink shades plus transparency | Preferred; most legible |
-| Magic Cards, 14px, three ink shades plus transparency | Accepted compact alternative |
+| Magic Cards, 16px, three ink shades plus transparency | Retained larger option |
+| Magic Cards, 14px, three ink shades plus transparency | Current playtest default |
 | Magic Cards, 12px, three ink shades plus transparency | Use only where space requires it |
 | Magic Cards, 12px, single ink shade | Rejected; retain historical experiment only |
 
