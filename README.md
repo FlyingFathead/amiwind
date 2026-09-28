@@ -16,16 +16,18 @@ target.** The current demo includes a bounded Seyda Neen exterior and a separate
 prison-ship interior. Fargoth and two guards have dressed, animated idle models;
 they turn toward the player and can play original greetings. Walking, mouse look,
 collision, Nord hands, streamed music, menus and a debug console are working.
+The new UI uses the original Magic Cards font and border artwork from your own
+game files, with dialogue in the lower strip and an unchanged console font.
 
 This is an early proof of concept. The scripted opening, character creation,
 full conversations, quests, NPC walking and combat are not implemented. Audio stalls and scene geometry still need work. Ordinary underwater tint is
 blue; actual damage retains its separate red flash. The tested emulator
 reference is A1200/AGA with 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM; stock A1200
-performance is unproven. See the [checkpoint details](docs/CHECKPOINT_017_VALIDATION.md)
+performance is unproven. See the [current UI checkpoint](docs/RELEASE-v0.0.18-dev1.md)
 and [next steps](docs/SEYDA_NEEN_NEXT_STEPS.md).
 
-**AmiWind v0.0.17** uses one `VERSION` for source, tools and runtime.
-See [release notes](docs/RELEASE-v0.0.17.md) and
+**AmiWind v0.0.18-dev1** uses one `VERSION` for source, tools and runtime.
+See [release notes](docs/RELEASE-v0.0.18-dev1.md) and
 [setup changes and validation](docs/BUILD_SETUP-v0.0.17.md).
 The public dry-run image
 boots to a versioned notice screen. Build locally with your own Morrowind files

@@ -659,6 +659,8 @@ refresh window.
 */
 void Draw_TileClear (int x, int y, int w, int h)
 {
+    AW_UIFill(x,y,w,h,AW_UIColor(0,0,0));
+    return;
 	int				width, height, tileoffsetx, tileoffsety;
 	byte			*psrc;
 	vrect_t			vr;

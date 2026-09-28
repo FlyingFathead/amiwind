@@ -89,6 +89,8 @@ for a few moments
 */
 void SCR_CenterPrint (char *str)
 {
+    AW_UICenterMessage(str);
+    return;
 	strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
 	scr_centertime_off = scr_centertime.value;
 	scr_centertime_start = cl.time;
@@ -258,6 +260,8 @@ static void SCR_CalcRefdef (void)
 	else
 		sb_lines = 24+16+8;
 
+    /* Keep normal HUD/dialogue entirely below the 3D view. */
+    if (!cl.intermission && sb_lines < 48) sb_lines = 48;
     /* Keep the optional diagnostic strip outside the rendered world. */
     if (AW_DebugCoordsEnabled() && sb_lines < 12) sb_lines = 12;
 
@@ -934,6 +938,7 @@ void SCR_UpdateScreen (void)
 		SCR_DrawPause ();
 		SCR_CheckDrawCenterString ();
 		Sbar_Draw ();
+        AW_UIDraw();
 		SCR_DrawConsole ();
 		M_Draw ();
 	}

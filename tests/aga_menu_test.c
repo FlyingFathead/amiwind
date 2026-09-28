@@ -19,6 +19,9 @@ int COM_FOpenFile(char *name,FILE **f){if(missing){*f=NULL;return -1;}*f=tmpfile
 void IN_AWClearButtons(void) {clears++;}
 void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"aw_scene_menu"))picker=fn;}
 void Cbuf_AddText(char *s) {if(!strcmp(s,"quit\n"))quit++;else{strcpy(queued,s);scene_changes++;}}
+void AW_UIText(int x,int y,const char *s,int c){}
+void AW_UIBox(int x,int y,int w,int h){}
+void Draw_String(int x,int y,char *s){}
 void Draw_FadeScreen(void) {}
 void Draw_Fill(int x,int y,int w,int h,int c) {
  assert(x>=0 && y>=0 && w>0 && h>0 && x+w<=320 && y+h<=200);

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
+void AW_UIHud(void){}
 int AW_Interior(void){return 0;}
 int AW_FpsTenths(void){return 123;}
 int fps_draws;
@@ -25,7 +26,7 @@ int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
 void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<4;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
 void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;}
-void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;assert(y+h==vid.height || (y==19 && h==10 && x==240 && w==80));}
+void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;assert(y+h==vid.height || (y==19 && h==10 && x==8 && w==80));}
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
 int main(void) {
  client_t local;edict_t player;

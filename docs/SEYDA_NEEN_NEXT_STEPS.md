@@ -7,11 +7,9 @@ Additional reports: 27 September 2026, 22:32–22:35 Helsinki.
 
 ## Immediate correctness and diagnosis
 
-- **Interior distortion:** owner rejects the current lower hold. Hull surfaces
-  intersect hammocks/boxes and obscure the route upstairs; textures stretch.
-  Independent host source-vs-8%-LOD renders reproduce hull flattening into the
-  room. Preserve structural source surfaces/UVs before reducing detail. Native
-  verification must use the reported views and a continuous lower-to-upper route.
+- [x] ~~Hammocks obstructing the ship interior route.~~ Fixed. Lower-hull structural repair delivered in checkpoint-017; owner confirmed the hammock obstruction is gone on 28 September.
+- **Remaining interior defects:** minor hull flicker/glitches remain open. Preserve structural source surfaces/UVs and check the continuous lower-to-upper route. The resolved hammock obstruction is not a claim that every hull view is correct.
+
 - **Debug camera:** already delivered XYZ + DEG horizontal yaw + P vertical pitch.
   Enable `dbg coords on`; include version, area, position and both angles.
 - **Missing town-edge formation:** the owner suspects the Silt Strider port.

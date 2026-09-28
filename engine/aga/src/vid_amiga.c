@@ -57,6 +57,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 #include "quakedef.h"
+#include <graphics/videocontrol.h>
 #include "d_local.h"
 
 #if defined(__PPC__) && defined(__SASC)
@@ -333,6 +334,12 @@ void	VID_Init (unsigned char *palette)
     Sys_Error ("OpenScreen() failed");
   }
 
+  {
+    struct TagItem border_tags[] = {{VTAG_BORDERBLANK_SET,0},{TAG_DONE,0}};
+    VideoControl(video_screen->ViewPort.ColorMap,border_tags);
+    MakeScreen(video_screen);
+    RethinkDisplay();
+  }
   Con_Printf ("Screen opened successfully\n");
 
   idcmp = IDCMP_RAWKEY;

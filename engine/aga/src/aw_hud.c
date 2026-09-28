@@ -29,6 +29,7 @@ static void debug_toggle(cvar_t *setting,char *name) {
 static void debug_coords(void) {debug_toggle(&coords,"amiwind_debug_coords");}
 static void debug_all(void) {debug_toggle(&overlays,"amiwind_show_debug");}
 static void debug_fps(void) {debug_toggle(&fps,"amiwind_debug_fps");}
+static void debug_showfps(void) {if(Cmd_Argc()==1)Cvar_SetValue(fps.name,1);else debug_fps();}
 static void debug_ram(void) {debug_toggle(&scr_showram,"amiwind_debug_showram");}
 static void debug_sea(void) {debug_toggle(&sealevel,"amiwind_debug_sealevel");}
 void Sbar_Init(void) {
@@ -39,14 +40,16 @@ void Sbar_Init(void) {
     Cmd_AddCommand("amiwind_show_debug",debug_all);
     Cmd_AddCommand("amiwind_debug_showram",debug_ram);
     Cmd_AddCommand("amiwind_debug_sealevel",debug_sea);
-    Cmd_AddCommand("amiwind_debug_fps",debug_fps);
+    Cmd_AddCommand("amiwind_debug_fps",debug_fps);Cmd_AddCommand("amiwind_debug_showfps",debug_showfps);
 }
 void Sbar_Changed(void) {}
 void Sbar_Draw(void) {
-    if(key_dest==key_console || !AW_DebugOverlaysEnabled())return;
+    if(key_dest==key_console)return;
+    AW_UIHud();
+    if(!AW_DebugOverlaysEnabled())return;
     Draw_String(8,8,AW_Interior()?"AMIWIND v" AMIWIND_VERSION " / PRISON SHIP":"AMIWIND v" AMIWIND_VERSION " / SEYDA NEEN");
     if(fps.value){
-        char line[16];int n=AW_FpsTenths(),x=vid.width-80;
+        char line[16];int n=AW_FpsTenths(),x=8;
         sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));
         Draw_Fill(x,19,80,10,255);Draw_String(x+4,20,line);
     }
@@ -63,7 +66,7 @@ void Sbar_Draw(void) {
         /* This strip is outside scr_vrect; the normal viewport-only update
          * would leave its old pixels on the Amiga screen. */
         scr_copyeverything=1;
-    } else Draw_String(8,vid.height-12,"WASD Mouse / F10 console");
+    } else Draw_String(92,vid.height-12,"WASD / F10 console");
 }
 void Sbar_IntermissionOverlay(void) {}
 void Sbar_FinaleOverlay(void) {}

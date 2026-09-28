@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+"""Bake an owned Morrowind bitmap font and draw host-side UI studies.
+
+No game artwork is embedded in this script. The FNT layout/metric meanings were
+checked against OpenMW's fontloader; this is an independent Python converter.
+"""
+import argparse
+import hashlib
+import json
+import math
+import struct
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def rounded(n):
+    return math.floor(n + 0.5)
+
+
+class OriginalFont:
+    def __init__(self, path):
+        raw = path.read_bytes()
+        if len(raw) != 296 + 256 * 56:
+            raise ValueError('Unexpected FNT length')
+        self.height, one, another = struct.unpack_from('<fII', raw)
+        if (one, another) != (1, 1) or not 0 < self.height <= 128:
+            raise ValueError('Invalid FNT header')
+        name = raw[12:296].split(b'\0', 1)[0].decode('ascii')
+        if Path(name).name != name:
+            raise ValueError('Atlas name must be a basename')
+        self.texture_path = next(p for p in path.parent.iterdir()
+                                 if p.name.lower() == (name + '.tex').lower())
+        tex = self.texture_path.read_bytes()
+        w, h = struct.unpack_from('<II', tex)
+        if not 0 < w <= 4096 or not 0 < h <= 4096 or len(tex) != 8 + w*h*4:
+            raise ValueError('Invalid TEX dimensions or payload')
+        self.atlas = Image.frombytes('RGBA', (w, h), tex[8:])
+        self.glyphs = []
+        for c in range(256):
+            f = struct.unpack_from('<14f', raw, 296+c*56)
+            if not all(math.isfinite(x) for x in f):
+                raise ValueError('Non-finite glyph data')
+            x, y, right, bottom = f[1]*w, f[2]*h, f[3]*w, f[6]*h
+            box = tuple(rounded(v) for v in (x, y, right, bottom))
+            if not (0 <= box[0] <= box[2] <= w and 0 <= box[1] <= box[3] <= h):
+                raise ValueError('Glyph outside texture')
+            width, height, left, extra, ascent = f[9:14]
+            if width < 0 or height < 0:
+                raise ValueError('Negative glyph dimensions')
+            self.glyphs.append(dict(code=c, crop=box, width=width, height=height,
+                                    advance=width+extra, left=left,
+                                    top=self.height-ascent))
+
+    def bake(self, size, levels=4):
+        scale = size/self.height
+        baked = []
+        for g in self.glyphs:
+            width, height = rounded(g['width']*scale), rounded(g['height']*scale)
+            mask = None
+            if width and height:
+                src = self.atlas.getchannel('A').crop(g['crop'])
+                if not src.width or not src.height:
+                    raise ValueError('Nonempty glyph has empty source crop')
+                # Area resampling is done once on the host, never at runtime.
+                src = src.resize((width, height), Image.Resampling.BOX)
+                if levels == 2:
+                    mask = src.point(lambda a: 255 if a >= 80 else 0)
+                else:
+                    mask = src.point(lambda a: rounded(a/255*(levels-1))*255//(levels-1))
+            baked.append(dict(code=g['code'], width=width, height=height,
+                              left=rounded(g['left']*scale), top=rounded(g['top']*scale),
+                              advance=max(0, rounded(g['advance']*scale)), mask=mask))
+        return baked
+
+
+
+def pack_font(path, size):
+    glyphs = OriginalFont(path).bake(size)
+    metrics = bytearray(); pixels = bytearray()
+    for g in glyphs:
+        offset = len(pixels)
+        values = list(g['mask'].getdata()) if g['mask'] is not None else []
+        for start in range(0, len(values), 4):
+            byte = 0
+            for i, value in enumerate(values[start:start+4]):
+                byte |= (value // 85) << (6 - i*2)
+            pixels.append(byte)
+        if g['width'] > 32 or g['height'] > 32 or not 0 <= g['advance'] <= 32:
+            raise ValueError('Glyph exceeds native limits')
+        metrics.extend(struct.pack('<HBBbbBB', offset, g['width'], g['height'],
+                                   g['left'], g['top'], g['advance'], 0))
+    if len(pixels) > 24000:
+        raise ValueError('Font exceeds native payload budget')
+    return struct.pack('<4sBBH', b'AWF1', size, size+2, len(pixels)) + metrics + pixels
+
+
+def convert(data, palette_path, out):
+    import sys, io
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
+    from mwad.paths import ensure_external, child_ci
+    from mwad.audit import BSA
+    from npc_geometry import Assets
+    data = Path(data); out = ensure_external(Path(out), 'private UI assets')
+    out.mkdir(parents=True, exist_ok=True)
+    font = child_ci(child_ci(data, 'Fonts'), 'Magic_Cards_Regular.fnt')
+    palette = Path(palette_path).read_bytes()
+    if len(palette) != 768: raise ValueError('Expected 256 RGB palette')
+    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    atlas = Image.new('RGBA', (64,64), (0,0,0,255)); sources = {}
+    specs = [('top_left_corner',(0,0),(4,4)), ('top',(4,0),(16,4)),
+             ('top_right_corner',(20,0),(4,4)), ('left',(0,4),(4,16)),
+             ('right',(20,4),(4,16)), ('bottom_left_corner',(0,20),(4,4)),
+             ('bottom',(4,20),(16,4)), ('bottom_right_corner',(20,20),(4,4))]
+    for name, pos, size in specs:
+        path = 'textures/menu_thick_border_'+name+'.dds'; raw = assets.read(path)
+        image = Image.open(io.BytesIO(raw)).convert('RGBA')
+        # Keep decorative edge detail; tile a source section, never smear it.
+        image = image.crop((0,0,*size))
+        atlas.paste(image, pos, image); sources[path] = hashlib.sha256(raw).hexdigest()
+    for i, color in enumerate(('red','blue','green')):
+        path = 'textures/menu_bar_'+color+'.dds'; raw = assets.read(path)
+        image = Image.open(io.BytesIO(raw)).convert('RGBA').resize((16,16),Image.Resampling.BOX)
+        atlas.paste(image, (16*i,32), image); sources[path] = hashlib.sha256(raw).hexdigest()
+    pal = Image.new('P',(1,1)); pal.putpalette(palette)
+    indexed = atlas.convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE)
+    (out/'ui.awu').write_bytes(b'AWU1'+struct.pack('<HH',64,64)+indexed.tobytes())
+    for size in (16,14,12): (out/f'magic{size}.awf').write_bytes(pack_font(font,size))
+    report = {'format':'AmiWind private UI conversion 1','font_sha256':sha(font),
+              'atlas_sha256':sha(OriginalFont(font).texture_path),'palette_sha256':sha(Path(palette_path)),
+              'sources':sources,'encoding':'Original bitmap byte indices; CP1252 game strings',
+              'variants':[16,14,12], 'coverage':'three ink shades and transparent; packed 2-bit'}
+    (out/'ui-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
+    return report
+
+if __name__ == '__main__':
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--data-files',type=Path,required=True)
+    p.add_argument('--palette',type=Path,required=True)
+    p.add_argument('--out',type=Path,required=True)
+    a=p.parse_args(); print(json.dumps(convert(a.data_files,a.palette,a.out),indent=2))

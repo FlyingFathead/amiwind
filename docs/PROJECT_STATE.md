@@ -1,6 +1,11 @@
 # Current project state — 28 September 2026
 
-**Current target: AmiWind v0.0.17, one version for source and runtime.**
+**Current target: AmiWind v0.0.18-dev1, one version for source and runtime.**
+
+Original-font UI and the lower dialogue band now run natively. See
+[scope, verification and remaining work](RELEASE-v0.0.18-dev1.md).
+Facial morphs synchronized with speech and linked character-creation screens are
+next priorities. The historical state below describes the preceding releases.
 
 The owner completed all 12 full game-data build stages with test-004 and
 confirmed test-006 works on 28 September 2026. This release includes FS-UAE
@@ -72,7 +77,7 @@ updates build access, versioning, ordinary-water tint and the fog default. Next 
 opening sequence: audit original scripts/voice completion timing; implement the
 first playable beat and dark bordered UI/subtitle/message boxes; evaluate an
 optional converted Morrowind font. Original Fonts/*.fnt and *.tex are present.
-No new intro state machine, UI box implementation, converted original font,
+At the preceding release there was no intro state machine, UI box implementation, converted original font,
 Jiub/intro-guard actor or Census interior has yet been implemented.
 
 Preserve existing readable/retro fonts, debug free-roam, scene links, hand paths,

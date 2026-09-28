@@ -1,5 +1,12 @@
 # Development history
 
+## v0.0.18-dev1 — 28 September 2026
+
+Original proportional Magic Cards UI, private original border/bar conversion,
+black lower-strip sliding subtitles, font selection with preserved console, and
+native font/clipping validation. See RELEASE-v0.0.18-dev1.md for the exact scope;
+this checkpoint does not claim the completed intro or gameplay resource systems.
+
 ## v0.0.17 — 28 September 2026
 
 One-command confirmed dependency setup and continuation, isolated fresh tools,

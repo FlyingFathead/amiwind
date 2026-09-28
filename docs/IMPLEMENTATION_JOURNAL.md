@@ -238,3 +238,61 @@ state. Host tests did not catch the target formatting difference. Use explicit
 long values/formats, as in existing coordinate HUD output, and verify visible
 values natively (675 → 665 → 664 → 700). This affects diagnostics, not the fog
 value itself. Preserve the failed screenshots and final native acceptance.
+
+## 28 September 2026: UI checkpoint preparation
+
+### Baseline and recovery
+
+The owner's `amiwind-2026-09-28_045110.zip` contains v0.0.17 and is the source
+baseline. All 162 original host tests passed before edits. Do not restart from
+v0.0.15-dev2 source just because those playable/recovery archives are attached.
+The older playable still provides a geometry/data comparison, not current code.
+
+Attempted recovery downloads and SDK extraction hit storage pressure. The
+previous development workspace still contained the complete validated SDK,
+map tools, compiler, emulator and owned input set. Reused those tools read-only;
+new source, build output and checkpoint candidates remain separate. Several
+recovery downloads reported HTTP 502; that is not proof that their archives are
+corrupt. Temporary duplicate recovery data were removed or relocated after the
+originals were located. No historical release was overwritten.
+
+### Font and UI decisions
+
+The independent preserved font-study reader was promoted into a public converter
+without artwork. A first font-format inspection used a 284-byte glyph offset;
+that was wrong: 284 is the name field size, preceded by the 12-byte header, so
+glyphs begin at byte 296. The retained study and format reference agree. Native
+assets use validated packed 2-bit coverage and per-glyph proportional metrics.
+
+The first dialogue animation targeted a position above the bars, which would
+cover rendered world pixels. Owner clarified that the panel belongs entirely
+inside the unused lower strip. Corrected the target: starts off-screen at the
+screen bottom, ends at the 3D viewport's lower boundary, temporarily replaces
+bars. Long subtitles page inside that strip. The console remains top-opening
+and retains its independent glyph/atlas selection.
+
+A version bump without matching emulator preset filenames broke nine launcher
+unit tests. Added new versioned presets while retaining historical ones; the
+launcher checks passed again. The new native font boundary test initially used
+`float` for the engine's `double host_frametime`; corrected the fixture type.
+These were development failures, not shipped regressions. Native visual
+acceptance and final checkpoint results are recorded separately after testing.
+
+Native run 1 loaded the fallback instead of Magic Cards: the SDK's Amiga
+formatted-output path treated `%d` as a word, so a 32-bit size argument produced
+`magic0.awf`. Changed the filename format to `%ld` with a long cast; native run 2
+loaded and displayed all three actual font sizes. The cream area outside the
+320x200 display was hardware border color, not the engine's tile fill. Added
+AGA/ECS border blanking via VideoControl, preserving palette index zero in game
+textures. Moved an options footer back inside its border after the larger font
+exposed an overlap. These fixes require another native visual check.
+
+Native run 3 showed that VideoControl alone did not activate border blanking.
+The AmigaOS graphics documentation requires rebuilding the screen viewport with
+MakeScreen and RethinkDisplay after changing the ColorMap. Run 4 confirmed black
+hardware margins. Font variants, lower-strip subtitle pages, original console,
+menu/options and prison transition all passed the native visual checks. 163 host
+tests pass. The existing world palette makes the original bar artwork muted;
+a later conversion should reserve suitable UI colors before world quantization.
+The main-menu background request arrived after these checks and is queued with
+the next UI/intro work. It is not claimed by this checkpoint.

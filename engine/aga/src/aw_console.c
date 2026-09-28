@@ -10,6 +10,9 @@ extern byte *draw_chars;
 typedef struct {char *words,*command,*arguments;} route_t;
 static route_t routes[]={
     {"reset location","amiwind_debug_reset_location","0"},
+    {"ui font","aw_ui_select","16/14/12/fallback"},
+    {"ui preview","aw_ui_preview",""},
+    {"show fps","amiwind_debug_showfps","[on/off]"},
     {"coords","amiwind_debug_coords","on/off"},
     {"fps","amiwind_debug_fps","on/off"},
     {"all","amiwind_show_debug","on/off"},

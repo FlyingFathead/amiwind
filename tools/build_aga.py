@@ -139,6 +139,12 @@ def image(args):
     boot=out/'boot';shutil.copytree(scene/'id1',boot/'id1');(boot/'S').mkdir()
     cfg=boot/'id1/default.cfg'
     cfg.write_text(startup_config(cfg.read_text()))
+    if args.data_files:
+        from prepare_ui import convert as convert_ui
+        try:
+            convert_ui(args.data_files,boot/'id1/gfx/palette.lmp',boot/'id1/gfx')
+        except FileNotFoundError:
+            print('[warning] Original font inputs missing; readable UI fallback retained.',flush=True)
     (boot/'id1/quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\naw_demo_start\n')
     print('Default start: early_game_demo_start_1 enabled; Seyda Neen town center + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
@@ -199,6 +205,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     e=sub.add_parser('engine');e.add_argument('--cpu',choices=['68020','68040'],default='68040');e.add_argument('--archive',type=Path,help='Optional legacy provenance check; source is always engine/aga in this repository');e.add_argument('--out',type=Path,required=True);e.add_argument('--sdk',type=Path,required=True);e.add_argument('--vasm',type=Path,help='68000 preflight assembler; defaults to the SDK vasm')
     i=sub.add_parser('image')
+    i.add_argument('--data-files',type=Path,help='Owned original font and UI assets; absent retains fallback')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
     for name in ['scene','music','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     for parser in (e,i):parser.add_argument('--hands',choices=['3d','sprites'],default='3d',help='Compile-time first-person renderer; retain both conversion paths')

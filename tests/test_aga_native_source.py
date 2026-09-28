@@ -16,6 +16,9 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_ui_bounds_and_corrupt_fonts(self):
+        self.compile_run("aga_ui_test.c", [ROOT/"engine/aga/src/aw_ui.c"])
+
     def test_underwater_palette_and_independent_damage(self):
         self.compile_run('aga_palette_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])
 

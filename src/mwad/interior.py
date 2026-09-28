@@ -6,7 +6,7 @@ from .audit import records, subrecords, cell_data, string, require
 
 def read_interior(path, name):
     raw=Path(path).read_bytes();cells=[];objects={};entrances=[]
-    kinds={'STAT','DOOR','CONT','LIGH','ACTI','NPC_','MISC','BOOK','INGR'}
+    kinds={'STAT','DOOR','CONT','LIGH','ACTI','NPC_','MISC','BOOK','INGR','WEAP','ARMO','CLOT','ALCH','APPA','REPA','LOCK','PROB','LEVC','LEVI','CREA'}
     for tag,flags,payload in records(raw):
         if tag not in kinds and tag!='CELL':continue
         subs=list(subrecords(payload));s=dict(subs)

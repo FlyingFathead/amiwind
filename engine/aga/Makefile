@@ -47,7 +47,7 @@ OBJDIR = obj
 SRCS = \
 	amiga_stubs.c \
 	aw_debug.c \
-	aw_console.c aw_console_glyphs.c aw_scene.c aw_hand_sprites.c \
+	aw_ui.c aw_console.c aw_console_glyphs.c aw_scene.c aw_hand_sprites.c \
 	aw_spawn.c \
 	aw_walk.c \
 	aw_music.c \

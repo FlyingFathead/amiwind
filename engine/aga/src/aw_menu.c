@@ -33,12 +33,7 @@ static int nearest(int r,int g,int b) {
     return best;
 }
 static void text(int x,int y,const char *s,int colour) {
-    int c,xx,yy;byte *src,*dst;
-    while(*s){c=(unsigned char)*s++;src=draw_chars+(c>>4)*1024+(c&15)*8;
-        for(yy=0;yy<8;yy++)if(y+yy>=0 && y+yy<vid.height){
-            dst=vid.buffer+(y+yy)*vid.rowbytes;
-            for(xx=0;xx<8;xx++)if(x+xx>=0 && x+xx<vid.width && src[yy*128+xx])dst[x+xx]=colour;
-        }x+=8;}
+    AW_UIText(x,y,s,colour);
 }
 static void close_menu(void) {confirming=0;scene_picker=0;graphics=0;key_dest=key_game;IN_AWClearButtons();}
 void M_Menu_Main_f(void) {IN_AWClearButtons();key_dest=key_menu;selection=0;confirming=0;scene_picker=0;graphics=0;mouse_x=160;mouse_y=57;}
@@ -114,7 +109,7 @@ void M_Draw(void) {
     /* The generated palette does not reserve index zero for black. */
     for(yy=0;yy<vid.height;yy++)for(xx=0;xx<vid.width;xx++)
         if((xx&3)!=((yy&1)<<1))vid.buffer[yy*vid.rowbytes+xx]=colours[0];
-    Draw_Fill(x-1,y-1,218,152,colours[1]);Draw_Fill(x,y,216,150,colours[0]);
+    AW_UIBox(x-1,y-1,218,152);
     text(132,31,"AMIWIND",colours[1]);
     if(graphics){
         text(80,48,"Options",colours[1]);Draw_Fill(164,45,84,14,colours[3]);text(168,48,"Graphics",colours[1]);
@@ -123,7 +118,7 @@ void M_Draw(void) {
         Draw_Fill(78+knob,91,5,13,colours[1]);
         if(selection>0)Draw_Fill(65,selection==1?113:137,190,17,colours[3]);
         text(80,118,"Medium/default: 540",colours[1]);text(80,142,"Back",colours[1]);
-        text(64,162,"128..1400 local units",colours[2]);
+        Draw_String(64,166,"128..1400 local units");
     }else if(scene_picker){
         for(i=0;i<3;i++){
             if(i==selection && (i==2 || scene_available[i]))Draw_Fill(65,49+i*19,190,17,colours[3]);
@@ -138,7 +133,7 @@ void M_Draw(void) {
         if(i==selection && enabled(i))Draw_Fill(65,49+i*19,190,17,colours[3]);
         text(80,54+i*19,items[i],enabled(i)?colours[1]:colours[2]);
     }
-    text(56,180,graphics?"L/R:10  Shift:1  Click / Esc":"Arrows / Enter / Mouse / Esc",colours[1]);
+    Draw_String(24,188,graphics?"L/R:10  Shift:1  Click / Esc":"Arrows / Enter / Mouse / Esc");
     Draw_Fill(mouse_x,mouse_y,mouse_x<319?2:1,mouse_y<194?6:200-mouse_y,colours[1]);
     Draw_Fill(mouse_x,mouse_y,mouse_x<314?6:320-mouse_x,mouse_y<199?2:1,colours[1]);
 }

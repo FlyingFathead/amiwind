@@ -388,3 +388,19 @@ int AW_MusicStartTrack(int id);
 void AW_HandSpritesInit(void);
 void AW_HandSpritesDraw(void);
 int AW_HandSpritesValidate(byte *data,unsigned long bytes);
+
+/* Original-style private-asset UI, independent of the console. */
+void AW_UIInit(void);
+int AW_UIValidateFont(const byte *,int);
+int AW_UIColor(int,int,int);
+void AW_UIFill(int,int,int,int,int);
+void AW_UIBox(int,int,int,int);
+void AW_UIText(int,int,const char *,int);
+int AW_UIWidth(const char *);
+int AW_UIHeight(void);
+const char *AW_UILine(const char *,int,char *,int);
+void AW_UISubtitle(const char *,const char *,double);
+void AW_UICenterMessage(const char *);
+void AW_UIDraw(void);
+void AW_UIHud(void);
+void AW_UIBar(int,int,int,int,int,float);

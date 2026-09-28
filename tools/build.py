@@ -354,7 +354,7 @@ def commands(args, tools, run):
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music")),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands,
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", "--hands", args.hands, "--scene", run / "interior-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "interior-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
     return steps
