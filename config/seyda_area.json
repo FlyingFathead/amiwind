@@ -1,0 +1,116 @@
+{
+  "format": 1,
+  "centre": [
+    -11264,
+    -71680
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1280,
+      -1792
+    ],
+    [
+      1664,
+      1536
+    ]
+  ],
+  "scenes": [
+    {
+      "id": 0,
+      "map": "prison",
+      "cell": "Imperial Prison Ship",
+      "interior": true
+    },
+    {
+      "id": 1,
+      "map": "seyda",
+      "cell": "Seyda Neen",
+      "interior": false
+    },
+    {
+      "id": 2,
+      "map": "census",
+      "cell": "Seyda Neen, Census and Excise Office",
+      "interior": true
+    },
+    {
+      "id": 3,
+      "map": "tradehouse",
+      "cell": "Seyda Neen, Arrille's Tradehouse",
+      "interior": true
+    },
+    {
+      "id": 4,
+      "map": "warehouse",
+      "cell": "Seyda Neen, Census and Excise Warehouse",
+      "interior": true
+    },
+    {
+      "id": 5,
+      "map": "draren",
+      "cell": "Seyda Neen, Draren Thiralas' House",
+      "interior": true
+    },
+    {
+      "id": 6,
+      "map": "eldafire",
+      "cell": "Seyda Neen, Eldafire's House",
+      "interior": true
+    },
+    {
+      "id": 7,
+      "map": "erene",
+      "cell": "Seyda Neen, Erene Llenim's Shack",
+      "interior": true
+    },
+    {
+      "id": 8,
+      "map": "fargoth",
+      "cell": "Seyda Neen, Fargoth's House",
+      "interior": true
+    },
+    {
+      "id": 9,
+      "map": "finemouth",
+      "cell": "Seyda Neen, Fine-Mouth's Shack",
+      "interior": true
+    },
+    {
+      "id": 10,
+      "map": "foryn",
+      "cell": "Seyda Neen, Foryn Gilnith's Shack",
+      "interior": true
+    },
+    {
+      "id": 11,
+      "map": "indrele",
+      "cell": "Seyda Neen, Indrele Rathryon's Shack",
+      "interior": true
+    },
+    {
+      "id": 12,
+      "map": "lighthouse",
+      "cell": "Seyda Neen, Lighthouse",
+      "interior": true
+    },
+    {
+      "id": 13,
+      "map": "terurise",
+      "cell": "Seyda Neen, Terurise Girvayne's House",
+      "interior": true
+    },
+    {
+      "id": 14,
+      "map": "vodunius",
+      "cell": "Seyda Neen, Vodunius Nuccius' House",
+      "interior": true
+    },
+    {
+      "id": 15,
+      "map": "addamasartus",
+      "cell": "Addamasartus",
+      "interior": true
+    }
+  ]
+}

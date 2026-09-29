@@ -21,6 +21,8 @@ PROJECT = "amiwind"
 PROJECT_MEDIA = {"resources/media/AmiWind_logo_clear_background.png", "resources/media/AmiWind_wordmark.png"}
 IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev2-{name}.png" for name in ("port", "fargoth", "tradehouse", "prison"))
+DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 
 
 def allowed_files(root):
@@ -33,7 +35,7 @@ def allowed_files(root):
         p = PurePosixPath(name)
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
-        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in DOCUMENTATION_IMAGES or name in PROJECT_MEDIA
+        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA
         native_aux = name in ("engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh"):
             raise ValueError(f"Unexpected distributable file type: {name}")
@@ -54,7 +56,7 @@ def check_source_whitespace(root, content):
     baseline = json.loads(patch.read_text()).get('base_files', {}) if patch.is_file() else {}
     errors = []
     for name, data in content.items():
-        if name in DOCUMENTATION_IMAGES or name in PROJECT_MEDIA:
+        if name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA:
             continue
         if baseline.get(name, {}).get('sha256') == hashlib.sha256(data).hexdigest():
             continue
@@ -97,6 +99,11 @@ def inspect_source(root):
     content = {}
     for name in allowed:
         data = (root / name).read_bytes()
+        if name in DOCUMENTATION_CLIPS:
+            if not data.startswith((b'GIF87a', b'GIF89a')) or len(data) > 4194304:
+                raise ValueError(f"Invalid public GIF: {name}")
+            content[name] = data
+            continue
         if name in DOCUMENTATION_IMAGES or name in PROJECT_MEDIA:
             limit = 2097152 if name in PROJECT_MEDIA else 1048576
             if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) > limit:

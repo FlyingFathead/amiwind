@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -51,8 +51,8 @@ qboolean mouse_has_moved = false;
 static quakeparms_t quakeparms;
 /* Use checked Exec allocation for the large hunk; preserve the raw pointer. */
 static void *aw_heap_allocation;
-static ULONG aw_heap_allocation_size; 
- 
+static ULONG aw_heap_allocation_size;
+
 
 
 #ifndef NDEBUG
@@ -72,7 +72,7 @@ void Sys_Printf (char *message, ...)
     }
 
     if (debugFileHandle) {
-    	Sys_FileWrite(debugFileHandle, text, strlen(text));
+	Sys_FileWrite(debugFileHandle, text, strlen(text));
     }
 }
 #endif
@@ -129,10 +129,12 @@ static void Sys_Init(void) {
 
     // Allocate memory.
 #ifndef AMIWIND_HEAP_MB
-#define AMIWIND_HEAP_MB 9
+/* Expanded starting area plus renderer and actor cache, within the existing
+ * 16 MiB Fast RAM playtest profile. Chip RAM remains reserved for hardware. */
+#define AMIWIND_HEAP_MB 11
 #endif
     quakeparms.memsize = AMIWIND_HEAP_MB*1024*1024;
-    
+
     /* The SDK malloc failure path can trap before returning NULL. Keep this
      * large, fixed allocation in Fast RAM and report a normal startup error.
      * Leave up to 15 bytes of headroom for Quake's 16-byte hunk alignment. */
@@ -140,7 +142,7 @@ static void Sys_Init(void) {
     aw_heap_allocation_size = (ULONG)quakeparms.memsize + 15;
     aw_heap_allocation = AllocMem(aw_heap_allocation_size, MEMF_FAST|MEMF_PUBLIC);
     if (!aw_heap_allocation) {
-        PutStr("AmiWind: cannot allocate the 9 MiB game heap in Fast RAM.\n"
+        PutStr("AmiWind: cannot allocate the 11 MiB game heap in Fast RAM.\n"
                "Use 16 MiB Fast RAM or more, then reboot.\n");
         AW_PlatformClose();
         exit(EXIT_FAILURE);
@@ -152,28 +154,28 @@ static void Sys_Init(void) {
 }
 
 void Sys_Quit(void) {
-    
+
 	Host_Shutdown();
-        	
+
 	if (quakeparms.membase) {
         FreeMem(aw_heap_allocation, aw_heap_allocation_size);
         aw_heap_allocation = NULL;
         quakeparms.membase = NULL;
     }
-    
+
 #ifndef NDEBUG
     if (debugFileHandle) {
-    	Sys_FileClose(debugFileHandle);
+	Sys_FileClose(debugFileHandle);
     }
-#endif    
+#endif
 
 
-    
+
     PutStr("To restart AmiWind, type: amiwind\n");
 	AW_PlatformClose();
-	exit(EXIT_SUCCESS);	
+	exit(EXIT_SUCCESS);
 }
- 
+
 
 void Sys_Error (char *error, ...)
 {
@@ -181,27 +183,27 @@ void Sys_Error (char *error, ...)
 	char		text[1024];
 	int errorFileHandle;
 
-    
+
     va_start (argptr, error);
     vsprintf (text, error, argptr);
     va_end (argptr);
 
     errorFileHandle = Sys_FileOpenWrite("ERROR.TXT");
     if (errorFileHandle) {
-    	Sys_FileWrite(errorFileHandle, text, strlen(text));
-    	Sys_FileClose(errorFileHandle);
+	Sys_FileWrite(errorFileHandle, text, strlen(text));
+	Sys_FileClose(errorFileHandle);
     }
 
 	Host_Shutdown();
-	
+
 	if (quakeparms.membase) {
         FreeMem(aw_heap_allocation, aw_heap_allocation_size);
         aw_heap_allocation = NULL;
         quakeparms.membase = NULL;
-    }	
+    }
 
 
-    
+
 	AW_PlatformClose();
 	exit(EXIT_FAILURE);
 }
@@ -223,10 +225,10 @@ static int xlate[0x68] = {
     K_F9, K_F10, '(', ')', '/', '*', '=', K_PAUSE,
     K_SHIFT, K_SHIFT, 0, K_CTRL, K_ALT, K_ALT, 0, K_CTRL
 };
-    
+
 
 void Sys_SendKeyEvents(void) {
-    
+
   ULONG class;
   UWORD code;
   WORD mousex, mousey;
@@ -245,26 +247,26 @@ void Sys_SendKeyEvents(void) {
         case IDCMP_RAWKEY:
             switch (code) {
                 case RAWKEY_NM_WHEEL_UP:
-                	Key_Event(K_MWHEELUP, true);
-                	Key_Event(K_MWHEELUP, false);
-                	break;
-                
+	Key_Event(K_MWHEELUP, true);
+	Key_Event(K_MWHEELUP, false);
+	break;
+
                 case RAWKEY_NM_WHEEL_DOWN:
-                	Key_Event(K_MWHEELDOWN, true);
-                	Key_Event(K_MWHEELDOWN, false);
-                	break;
-                
+	Key_Event(K_MWHEELDOWN, true);
+	Key_Event(K_MWHEELDOWN, false);
+	break;
+
                 default:
                     if ((code & ~IECODE_UP_PREFIX) >= 0x68) break;
                     if (code & IECODE_UP_PREFIX) {
-                		Key_Event(xlate[code & ~IECODE_UP_PREFIX], false);
-                	} else {
-                		Key_Event(xlate[code], true);
-                	}
+		Key_Event(xlate[code & ~IECODE_UP_PREFIX], false);
+	} else {
+		Key_Event(xlate[code], true);
+	}
                     break;
-            }         
+            }
             break;
-          
+
         case IDCMP_MOUSEBUTTONS:
           switch (code) {
             case IECODE_LBUTTON:
@@ -289,13 +291,13 @@ void Sys_SendKeyEvents(void) {
               break;
           }
           break;
-          
+
         case IDCMP_MOUSEMOVE:
           mouseX = mousex;
           mouseY = mousey;
           mouse_has_moved = true;
           break;
-          
+
         default:
           break;
         }
@@ -303,7 +305,7 @@ void Sys_SendKeyEvents(void) {
   }
 }
 
- 
+
 //=============================================================================
 
 
@@ -312,7 +314,7 @@ static void RunGameLoop(void)
 {
     float newtime;
     float oldtime;
-        
+
     // Never exits
     oldtime = Sys_FloatTime();
     while (true) {

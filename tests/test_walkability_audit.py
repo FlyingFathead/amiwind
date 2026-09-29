@@ -22,6 +22,13 @@ def scene(boxes):
     return Scene(pack_lumps(data))
 
 class WalkabilityAuditTests(unittest.TestCase):
+    def test_shared_collision_suffix_is_not_reported_as_a_cycle(self):
+        s=Scene.__new__(Scene)
+        s.planes=[(0.,0.,1.,i+.5) for i in range(40)]
+        s.nodes=[(i,i+1 if i<39 else -1,i+1 if i<39 else -1) for i in range(40)]
+        s.brushes=[(0,(0.,0.,0.),((1.,0.,0.),(0.,1.,0.),(0.,0.,1.)),'fixture')]
+        self.assertIsNone(s.trace((0,0,50),(0,0,-10)))
+
     def test_floor_hole_step_and_reachable_fall(self):
         s=scene([((-50,-50,-20),(0,50,10),'0 0 0','0 0 0'),((12,-50,-20),(50,50,14),'0 0 0','0 0 0')])
         self.assertEqual(s.floor((-4,0,20),20)['status'],'supported')

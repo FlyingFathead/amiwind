@@ -10,6 +10,7 @@ from prepare_scenery import bsa_read
 from preview_scenery import render
 from debug_font import readable_atlas
 from build_jobs import add_jobs, resolve_jobs
+from area_config import BOUNDS
 from build_parallel import ordered_map
 
 CENTRE=(-11264,-71680)
@@ -214,15 +215,21 @@ def prepare(workspace,scene,out,jobs=None):
         im=Image.new('RGB',(64 if n!='sky' else 256,64 if n!='sky' else 128),c)
         terrain_lumps.append((n,68,miptex(n,quantize(im))))
     (out/'town.wad').write_bytes(wad(terrain_lumps))
-    brushes=[];extent=768;step=128
-    for y in range(-extent,extent,step):
-        for x in range(-extent,extent,step):
-            corners=[];material=0
-            for dx,dy in [(0,0),(step,0),(step,step),(0,step)]:
-                z,material=terrain(CENTRE[0]+(x+dx)/SCALE,CENTRE[1]+(y+dy)/SCALE);corners.append([x+dx,y+dy,z*SCALE])
-            for ids in [(0,1,2),(0,2,3)]:
-                tri=[corners[i] for i in ids];pts=tri+[[p[0],p[1],-512] for p in tri]
-                brushes.append(brush(pts,[(0,1,2),(3,4,5),(0,1,4),(1,2,5),(2,0,3)],f'g{material}'))
+    brushes=[];extent=max(abs(v) for b in BOUNDS for v in b);step=128
+    tiles=[]
+    for y in range(BOUNDS[0][1],BOUNDS[1][1],step):
+        for x in range(BOUNDS[0][0],BOUNDS[1][0],step):
+            # Preserve original LAND vertices around the steep port approaches.
+            # Coarse interpolation here cut through the original ground/rocks.
+            detail=32 if 0<=x<896 and 256<=y<1024 else step
+            tiles.extend((xx,yy,detail) for yy in range(y,y+step,detail) for xx in range(x,x+step,detail))
+    for x,y,step in tiles:
+        corners=[];material=0
+        for dx,dy in [(0,0),(step,0),(step,step),(0,step)]:
+            z,material=terrain(CENTRE[0]+(x+dx)/SCALE,CENTRE[1]+(y+dy)/SCALE);corners.append([x+dx,y+dy,z*SCALE])
+        for ids in [(0,1,2),(0,2,3)]:
+            tri=[corners[i] for i in ids];pts=tri+[[p[0],p[1],-512] for p in tri]
+            brushes.append(brush(pts,[(0,1,2),(3,4,5),(0,1,4),(1,2,5),(2,0,3)],f'g{material}'))
     # Extend only the simple sea/enclosure. Terrain and object selection keep
     # their smaller bounds; this is a backdrop, not an archipelago conversion.
     sea=SEA_EXTENT
@@ -242,7 +249,7 @@ def prepare(workspace,scene,out,jobs=None):
         if abs(scale-1)>0.02:continue
         pos[0]+=centre[0]*math.cos(rz)+centre[1]*math.sin(rz);pos[1]+=-centre[0]*math.sin(rz)+centre[1]*math.cos(rz)
         local=[(pos[0]-CENTRE[0])*SCALE,(pos[1]-CENTRE[1])*SCALE,pos[2]*SCALE]
-        if abs(local[0])>extent-32 or abs(local[1])>extent-32:continue
+        if not all(BOUNDS[0][a]<=local[a]<=BOUNDS[1][a] for a in range(2)):continue
         name=index['models'][mi]['source'];refs+=1
         entities.append('{\n"classname" "aw_static"\n"model" "'+path+'"\n"origin" "'+' '.join(f'{n:.3f}' for n in local)+'"\n"angles" "0 '+str(-rz*180/math.pi)+' 0"\n}')
         if any(t in name for t in ['house_','shack_02','shack_03','lighthouse','tower_thatch']):
@@ -286,12 +293,12 @@ bind F6 aw_music_next
 bind F8 aw_music_mode
 bgmvolume 0.6
 _snd_mixahead 0.3
-r_maxsurfs 10240
-r_maxedges 20480
+r_maxsurfs 12288
+r_maxedges 24576
 map seyda
 '''
     (game/'quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\n');(game/'default.cfg').write_text(config);(game/'autoexec.cfg').write_text('')
-    report={'format':'AmiWind Quake scene experiment','scale':SCALE,'centre':CENTRE,'extent':extent,'sea_extent':SEA_EXTENT,'references':refs,'models':reports,'spawn':spawn,
+    report={'format':'AmiWind Quake scene experiment','scale':SCALE,'centre':CENTRE,'extent':extent,'bounds':BOUNDS,'sea_extent':SEA_EXTENT,'references':refs,'models':reports,'spawn':spawn,
             'scope':'bounded LAND + reduced alias meshes + alpha tree sprites + approximate building clip brushes; no actors/interiors/quests; non-unit scale references currently omitted'}
     (out/'scene-report.json').write_text(json.dumps(report,indent=2)+'\n');print('references',refs,'brushes',len(brushes));return report
 

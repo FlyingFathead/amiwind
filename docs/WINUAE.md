@@ -24,10 +24,10 @@ WinUAE run or stock A1200 speed. See [v0.0.16 validation](VALIDATION-v0.0.16.md)
 for the tested machine and scope. Historical startup thresholds and owner
 reports remain below for comparison.
 
-The current boot text is `Loading AmiWind v0.0.16...`. Preflight still needs
-12 MiB free Fast RAM, but its contiguous-block threshold now matches the actual
-9 MiB hunk plus 16 bytes for alignment. The previous checkpoint used an 8 MiB heap; the restored ship now needs room
-for actor/hand cache allocations. The hardware preset remains 16 MiB Fast.
+The v0.0.23-dev2 preflight requires 14 MiB free Fast RAM before loading the
+engine, including a contiguous 11 MiB heap plus 16 bytes for alignment. The
+expanded town and interiors use this larger heap; the hardware preset remains
+16 MiB Fast RAM.
 The historical 10 MiB contiguous threshold falsely rejected a usable fragmented
 pool; it is distinct from the current measured heap requirement. Type `amiwind` at the DOS prompt
 to restart; run `AmiWindCheck` separately for diagnostics. The current private checkpoint

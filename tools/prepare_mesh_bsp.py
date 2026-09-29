@@ -65,7 +65,7 @@ def _prepare_model(task):
 
 def _instance_key(ref, lighting):
     key=(ref['model_index'],round(ref['scale'],6),round(ref['rotation_radians'][0],6),round(ref['rotation_radians'][1],6))
-    return (*key,ref['number']) if lighting else key
+    return (*key,ref['number']) if lighting and not lighting.get('shared_ambient') else key
 
 
 def _prepare_placement(task):
@@ -97,9 +97,25 @@ def _prepare_placement(task):
     return surfaces,worldparts,points.min(axis=0)-1,points.max(axis=0)+1
 
 
+def order_face_planes(lumps, face_planes):
+    """Keep 16-bit face indices first; hull planes have full 32-bit indices."""
+    count=len(lumps[1])//20
+    visible=list(dict.fromkeys(face_planes))
+    if len(visible)>65536:raise ValueError('Visible plane budget exceeded')
+    seen=set(visible);order=visible+[i for i in range(count) if i not in seen]
+    remap={old:new for new,old in enumerate(order)}
+    lumps[1]=bytearray().join(lumps[1][i*20:(i+1)*20] for i in order)
+    for i,plane in enumerate(face_planes):struct.pack_into('<H',lumps[7],i*20,remap[plane])
+    for section,stride in ((5,24),(9,8)):
+        for offset in range(0,len(lumps[section]),stride):
+            old=struct.unpack_from('<i',lumps[section],offset)[0]
+            struct.pack_into('<i',lumps[section],offset,remap[old])
+
+
 def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None):
     b=src.read_bytes();assert struct.unpack_from('<i',b)[0]==29
     lumps=[bytearray(b[o:o+s]) for o,s in [struct.unpack_from('<ii',b,4+k*8) for k in range(15)]]
+    face_planes=[struct.unpack_from('<H',lumps[7],i)[0] for i in range(0,len(lumps[7]),20)]
     index=json.loads((scenery/'scenery-index.json').read_text());archive=(scenery/'scenery.mwpak').open('rb')
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
@@ -135,7 +151,8 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
        # Scaled humanoid standing hull, shared with runtime and world bake.
        expand=sum(-n[a]*MINS[a] if n[a]>=0 else -n[a]*MAXS[a] for a in range(3))
        pi=plane(n,d+expand);inside=root+j+1 if j+1<count else -2
-       lumps[9]+=struct.pack('<ihh',pi,nxt,inside)
+       if max(nxt,inside)>=65520:raise ValueError('Clipnode budget exceeded')
+       lumps[9]+=struct.pack('<iHH',pi,nxt&65535,inside&65535)
       # Point traces need no expansion or extra axial nodes. Retain their
       # original hull, saving nodes/RAM and LOS work for proximity greetings.
       nnxt=noderoot+len(point_eq) if k+1<len(pieces) else -empty_leaf-1
@@ -144,7 +161,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
        pn=plane(n,d);nin=noderoot+j+1 if j+1<len(point_eq) else -1
        lumps[5]+=struct.pack('<ihh6h2H',pn,nnxt,nin,*low,*high,0,0)
      return noderoots[0],roots[0]
-    entities=[];instance_models={}
+    entities=[];instance_models={};collision_models={}
     def entity(modelnum,origin,yaw,reference):
      return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
 
@@ -200,14 +217,19 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
        lightoffset=-1;styles=(255,255,255,255)
        if samples is not None:
         lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(0,255,255,255)
-       lumps[7]+=struct.pack('<Hhihh4Bi',pi,0,firstedge,len(verts),tx,*styles,lightoffset)
-      nroot,croot=collider(worldparts)
+       face_planes.append(pi)
+       lumps[7]+=struct.pack('<Hhihh4Bi',0,0,firstedge,len(verts),tx,*styles,lightoffset)
+      collision_key=_instance_key(ref,None)
+      if collision_key not in collision_models:
+       collision_models[collision_key]=collider(worldparts)
+      nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
       instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':lod,'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
-      if len(lumps[5])//24>32767 or len(lumps[9])//8>32767:raise ValueError('Node budget exceeded')
-    # New texture table, preserving the original lumps verbatim.
+      if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
+    order_face_planes(lumps,face_planes)
+    # New texture table, preserving the original texture payloads.
     tex=bytearray();offs=[]
     for t in textures:offs.append(4+4*len(textures)+len(tex));tex+=t
     lumps[2]=bytearray(struct.pack('<i',len(textures))+struct.pack('<'+'i'*len(offs),*offs)+tex)

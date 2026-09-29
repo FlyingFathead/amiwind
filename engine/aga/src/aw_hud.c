@@ -48,10 +48,13 @@ void Sbar_Init(void) {
 }
 void Sbar_Changed(void) {}
 void Sbar_Draw(void) {
+    char title[80];
     if(key_dest==key_console)return;
     AW_UIHud();
     if(!AW_DebugOverlaysEnabled())return;
-    Draw_String(8,8,!strcmp(sv.name,"census")?"AMIWIND v" AMIWIND_VERSION " / CENSUS OFFICE":AW_Interior()?"AMIWIND v" AMIWIND_VERSION " / PRISON SHIP":"AMIWIND v" AMIWIND_VERSION " / SEYDA NEEN");
+    snprintf(title,sizeof(title),"AMIWIND v" AMIWIND_VERSION " / %.36s",cl.levelname);
+    title[(vid.width>16 && vid.width<656)?(vid.width-16)/8:79]=0;
+    Draw_String(8,8,title);
     if(fps.value){
         char line[16];int n=AW_FpsTenths(),x=8;
         sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));

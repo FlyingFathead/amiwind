@@ -8,7 +8,14 @@ volatile dma_t *shm;static dma_t device;
 cvar_t volume={"volume","1",false,false,1};
 static byte file[800+128000+2205];static int length,starts,clears,pauses;
 double Sys_FloatTime(void){return soundtime/11025.0;}
-void Con_Printf(char *s,...){(void)s;}
+void Con_Printf(char *s,...){
+    static int finished;
+    /* Production console printing can redraw immediately after the movie
+     * closes. The destination must already have selected its loading style. */
+    if(!strcmp(s,"Intro movie: %s.\n")){
+        assert(starts+menus>finished);finished=starts+menus;
+    }
+}
 void S_StopAllSounds(qboolean clear){clears++;}
 void IN_AWClearButtons(void){}
 void AW_IntroBegin(void){starts++;}

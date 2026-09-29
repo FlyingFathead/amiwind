@@ -4,6 +4,7 @@
  */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_maps.h"
 #include "aw_story.h"
 #include "amiwind_version.h"
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
@@ -12,8 +13,8 @@ static aw_scene_link_t next;
 static float health,hand_goal;
 static double started;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
-int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"prison") || !strcmp(sv.name,"census"));}
-static int map_valid(char *name) {return !strcmp(name,"prison") || !strcmp(name,"seyda") || !strcmp(name,"census");}
+int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda");}
+static int map_valid(char *name) {return AW_MapId(name)>=0;}
 static void read_links(void) {
     FILE *f;char line[384],extra;aw_scene_link_t r;int n,i,version;
     if(loaded)return;loaded=1;
@@ -52,15 +53,13 @@ static void read_links(void) {
     fclose(f);
 }
 static void load_scene(aw_scene_link_t *link) {
-    edict_t *p=svs.clients[0].edict;eval_t *v;
-    if(pending)return;next=*link;pending=1;started=Sys_FloatTime();
+    edict_t *p=svs.clients[0].edict;eval_t *v;char command[32];
+    if(pending || !map_valid(link->target))return;next=*link;pending=1;started=Sys_FloatTime();
     AW_SaveCapture();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
     IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
     Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
-    if(!strcmp(next.target,"prison"))Cbuf_AddText("map prison\n");
-    else if(!strcmp(next.target,"census"))Cbuf_AddText("map census\n");
-    else Cbuf_AddText("map seyda\n");
+    sprintf(command,"map %s\n",next.target);Cbuf_AddText(command);
 }
 /* Ray/slab intersection with converted model bounds. The model origin may
  * be buried in the ceiling or far from the visible handle/hatch surface. */
@@ -207,9 +206,14 @@ void AW_SceneSpawn(edict_t *p) {
     AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();
 }
 static void scene_command(void) {
-    aw_scene_link_t r;char *s=Cmd_Argv(1);
-    if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town"))) {
-        Con_Printf("Usage: dbg scene ship/town\n");return;
+    aw_scene_link_t r;char *s=Cmd_Argv(1);int i;
+    if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
+        Con_Printf("Usage: dbg scene ship/town/<map name>, or dbg scene change\n");return;
+    }
+    if(map_valid(s)){
+        read_links();
+        for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){load_scene(&links[i]);return;}
+        Con_Printf("No converted entrance to %s.\n",s);return;
     }
     memset(&r,0,sizeof(r));strcpy(r.target,!strcmp(s,"ship")?"prison":"seyda");
     if(!strcmp(s,"ship")){r.arrival[1]=-35;r.arrival[2]=-4;r.yaw=90;}

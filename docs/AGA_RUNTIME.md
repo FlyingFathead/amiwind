@@ -1,4 +1,4 @@
-# AmiWind v0.0.16 corresponding runtime source
+# AmiWind v0.0.23-dev2 corresponding runtime source
 
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 Portions are based on id Software Quake, Peter McGavin's Amiga work,
@@ -38,3 +38,10 @@ The default is 0 (3D hands). The guided builder exposes `--hands
 sprites` and matches the image's QuakeC/asset choices to the engine receipt.
 Using the default image data with a differently compiled engine is unsupported.
 See FIRST_PERSON_HANDS.md and CONVERSION_RECIPES.md.
+
+The dev2 expanded area reserves an 11 MiB game heap within the unchanged 16 MiB
+Fast RAM reference machine. Preflight checks 14 MiB free Fast RAM before loading
+the engine, including a contiguous 11 MiB + 16 bytes. The heap is not the whole
+working set. Renderer pools are bounded to 12,288 surfaces and 24,576 edges; entity
+visibility links have 8,192 entries. Test logs, rather than the old checkpoint
+memory figures, describe the current build.

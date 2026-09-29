@@ -1,6 +1,6 @@
 """Bounded base-master interior audit. No script execution or asset redistribution."""
 from pathlib import Path
-import hashlib, struct
+import hashlib, math, struct
 from .audit import records, subrecords, cell_data, string, require
 
 
@@ -23,6 +23,16 @@ def read_interior(path, name):
             if string(header.get('NAME',b'')).casefold()!=name.casefold():continue
             cell=cell_data(subs)
             if not cell['flags']&1:continue
+            cell['water_height']=None
+            if cell['flags']&2:
+                # Original master uses integer INTV; later files may use WHGT.
+                water=0.
+                for tag,data in header.items():
+                    if tag in ('INTV','WHGT'):
+                        require(len(data)==4,'Invalid interior water height')
+                        water=struct.unpack('<i' if tag=='INTV' else '<f',data)[0]
+                require(math.isfinite(water),'Nonfinite interior water height')
+                cell['water_height']=water
             ambient=header.get('AMBI')
             require(ambient is not None and len(ambient)==16,'Interior AMBI missing/invalid')
             cell['lighting']={'ambient':list(ambient[:3]),'sunlight':list(ambient[4:7]),

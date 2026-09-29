@@ -3,6 +3,7 @@
  * Writing the inactive generation never renames or truncates the active one. */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_maps.h"
 #ifdef AMIGA
 #include <proto/dos.h>
 #else
@@ -60,7 +61,7 @@ static int newest(uint32_t profile,int slot,aw_save_t *state)
     if(b && (!a || other.sequence>state->sequence)){*state=other;return 1;}
     return a?0:-1;
 }
-static int scene_id(void){return !strcmp(sv.name,"prison")?0:!strcmp(sv.name,"seyda")?1:!strcmp(sv.name,"census")?2:-1;}
+static int scene_id(void){return AW_MapId(sv.name);}
 static uint32_t actor_id(edict_t *e)
 {
     eval_t *v=GetEdictFieldValue(e,"aw_ref");

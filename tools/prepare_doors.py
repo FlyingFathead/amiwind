@@ -8,6 +8,7 @@ from mwad.audit import records, subrecords, cell_data, string, BSA
 from mwad.paths import child_ci, ensure_external, resolve_data_files
 from prepare_scenery import bsa_read, model_geometry, nif_reader, world_bounds
 from prepare_quake import CENTRE
+from area_config import MAP_NAMES, inside
 
 
 def catalogue(master):
@@ -29,7 +30,8 @@ def catalogue(master):
             if not base or r.get('deleted') or 'destination' not in r:continue
             target=r.get('destination_cell','')
             # Includes links between town interiors and the ship, in both directions.
-            if not any('seyda neen' in x.casefold() or x.casefold()=='imperial prison ship' for x in (c['name'],target)):continue
+            if not any(x.casefold() in MAP_NAMES for x in (c['name'],target)):continue
+            if not interior and not inside(r['position']):continue
             out.append({**r,**base,'source_cell':c['name'],'source_interior':interior,
                         'source_grid':[c['x'],c['y']], 'destination_interior':bool(target)})
     return {'format':'AmiWind original door catalogue 1','master_sha256':hashlib.sha256(raw).hexdigest(),'doors':out}
@@ -72,7 +74,7 @@ def prepare(data_files, scene):
     bsa=BSA(child_ci(data_files,'Morrowind.bsa'));N=nif_reader();cache={};links=[]
     for r in report['doors']:
         # A visible source entrance remains inspectable before its interior exists.
-        names={'imperial prison ship':'prison','seyda neen, census and excise office':'census'}
+        names=MAP_NAMES
         source=names.get(r['source_cell'].casefold()) if r['source_interior'] else 'seyda'
         target=names.get(r.get('destination_cell','').casefold()) if r['destination_interior'] else 'seyda'
         if not source or not (scene/'id1/maps'/f'{source}.bsp').is_file():

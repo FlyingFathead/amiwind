@@ -37,7 +37,8 @@ class Scene:
             raise ValueError('Scene must declare the converted humanoid standing hull')
         self.sha256 = hashlib.sha256(raw).hexdigest()
         self.planes = list(struct.iter_unpack('<4fi', data[1]))
-        self.nodes = list(struct.iter_unpack('<ihh', data[9]))
+        self.nodes = [(p,a+65536 if a < -15 else a,b+65536 if b < -15 else b)
+                      for p,a,b in struct.iter_unpack('<ihh', data[9])]
         models = list(struct.iter_unpack('<9f7i', data[14]))
         if not models:
             raise ValueError('Missing BSP models')
@@ -69,13 +70,28 @@ class Scene:
         for root, origin, basis, ref in self.brushes:
             a = tuple(dot(tuple(start[i]-origin[i] for i in range(3)), axis) for axis in basis)
             b = tuple(dot(tuple(end[i]-origin[i] for i in range(3)), axis) for axis in basis)
-            stack = [(root, 0., 1., None)]; visits = 0
+            stack = [(root, 0., 1., None, False)]; visits = 0; states = {}
             while stack:
-                node, lo, hi, normal = stack.pop()
+                node, lo, hi, normal, done = stack.pop()
+                key = (node, lo, hi)
+                if done:
+                    states[key] = 2
+                    continue
+                if states.get(key) == 1:
+                    raise ValueError('Cyclic collision tree')
+                if states.get(key) == 2:
+                    continue
+                # A split exactly at an endpoint has no interval on one side.
+                # Following that empty branch through shared convex tails can
+                # multiply visits without adding any possible collision.
+                if hi-lo <= 1e-10:
+                    continue
                 if best and lo >= best['fraction']:
                     continue
+                states[key] = 1
+                stack.append((node, lo, hi, normal, True))
                 visits += 1
-                if visits > len(self.nodes)*2+1:
+                if visits > max(4096,len(self.nodes)*32):
                     raise ValueError('Cyclic or excessive collision tree')
                 if node < 0:
                     if node == -2:
@@ -86,14 +102,14 @@ class Scene:
                 da, db = dot(a, plane[:3])-plane[3], dot(b, plane[:3])-plane[3]
                 dl, dh = da+(db-da)*lo, da+(db-da)*hi
                 if dl >= 0 and dh >= 0:
-                    stack.append((front, lo, hi, normal)); continue
+                    stack.append((front, lo, hi, normal, False)); continue
                 if dl < 0 and dh < 0:
-                    stack.append((back, lo, hi, normal)); continue
+                    stack.append((back, lo, hi, normal, False)); continue
                 mid = min(hi, max(lo, -da/(db-da)))
                 first, second = (front, back) if dl >= 0 else (back, front)
                 entering = tuple(v*(1 if dl >= 0 else -1) for v in plane[:3])
-                stack.append((second, mid, hi, entering))
-                stack.append((first, lo, mid, normal))
+                stack.append((second, mid, hi, entering, False))
+                stack.append((first, lo, mid, normal, False))
         return best
 
     def floor(self, point, drop):

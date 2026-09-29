@@ -19,6 +19,29 @@ def fixture(root):
 
 
 class Release(unittest.TestCase):
+    def test_only_selected_bounded_documentation_clip_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/"repo"
+            fixture(root)
+            media = root/'docs/images'
+            media.mkdir(parents=True)
+            name = 'docs/images/amiwind-v0.0.23-dev2-port.gif'
+            allowlist = root/'tools/release-files.json'
+            paths = json.loads(allowlist.read_text())
+            allowlist.write_text(json.dumps(paths + [name]) + '\n')
+            (root/name).write_bytes(b'GIF89a\0')
+            inspect_source(root)
+            for invalid in (b'not a GIF', b'GIF89a' + b'\0'*4194304):
+                (root/name).write_bytes(invalid)
+                with self.assertRaisesRegex(ValueError, 'Invalid public GIF'):
+                    inspect_source(root)
+            other = 'docs/images/unreviewed.gif'
+            allowlist.write_text(json.dumps(paths + [other]) + '\n')
+            (root/name).unlink()
+            (root/other).write_bytes(b'GIF89a\0')
+            with self.assertRaisesRegex(ValueError, 'Unexpected distributable'):
+                inspect_source(root)
+
     def test_unknown_content_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)/"repo"

@@ -1,5 +1,8 @@
 # Roadmap and implementation options
 
+Current work: [29 September 2026 / v0.0.23-dev2](PLAN-2026-09-29.md).
+The dated plan tracks implementation evidence, inspection gates and the next voice checkpoint.
+
 ## Next implementation milestone agreed 28 September 2026
 
 Maintenance v0.0.20 is retained. v0.0.21-dev1 implements the bounded opening,
@@ -886,3 +889,41 @@ an opening, replace unnecessary covered depth with a simple wall-coloured planar
 rectangle behind it. A real hinged/open-through door must retain its aperture;
 a backing rectangle must not seal a visible passage or create blocking collision.
 This describes the planned default; no such build switch is active yet.
+
+## Next local-area checkpoints
+
+- v0.0.23-dev2: source-driven cast and all 13 Seyda Neen interiors plus
+  Addamasartus; original Silt Strider and Darvame Hleran placements; all NPCs
+  block the player; new gameplay captures for the main README.
+- Clock and calendar: persistent game time and dates, explicit time advancement
+  while waiting, and a wait interface. Debug control:
+  `dbg timeofday <0..24|morning|night|midday|day|evening|sunset|sunrise>`.
+  Match sunrise/sunset direction to the world axes. Start with an inexpensive
+  sun disc and colour gradients at dawn/dusk; evaluate a small original-owned
+  Morrowind night-sky texture against the Amiga memory and frame-time budget.
+  Keep the existing sky as a fallback (`dbg sky on/off`, also 1/0 or true/false).
+  Night-time guard torches belong to this lighting checkpoint.
+- Weather experiment: an explicitly selectable blight wind test after the clock
+  and sky path is stable. Measure the cost of tinted fog, directional particles
+  and original owned wind audio before enabling it during normal exploration.
+- Continue the audio audit: intro sea splash audibility, continuous exploration
+  music, and the reported occasional music clicks under WinUAE.
+
+Delivery gate: check trailing whitespace in every changed source and in the
+exact generated apply/publish script before packaging or posting commands.
+
+### Transport and resident voices
+
+After the interior inspection checkpoint, expose Darvame Hleran's source travel
+routes in an interaction screen beside the Silt Strider. Show destination, fare
+and current gold; check affordability before travel. An unconverted destination
+must say "Location not available." and must never deduct gold. Load only the
+selected destination scene and charge only after a successful transition.
+
+Replace the prototype single greeting with the original eligible NPC voice
+pools and cycling. Preserve speaker/race/sex/class and quest/location/time
+conditions; do not play every extracted line indiscriminately. Avoid immediate
+repeats, retain speech cooldowns and interruption rules, and distinguish casual
+ambient lines from player-initiated greetings and service dialogue. Guard lines
+need their own pools. Record skipped/unsupported conditions in the private
+conversion audit rather than silently substituting unrelated dialogue.

@@ -44,6 +44,11 @@ void AW_IntroBegin(void) {
     AW_StoryReset(1);AW_CharacterReset();AW_SaveReset();
     pending=1;active=0;deck_state=0;deck_timer=0;IN_AWClearButtons();key_dest=key_game;
     if(!AW_MusicStartTrack(4))Con_Printf("Selected opening track unavailable.\n");
+    AW_EndLoadingStyle();
+    AW_SetNextLoadingStyle(AW_LOADING_BLANK);
+    /* A screen update can happen before the queued map command runs. Select
+     * black now as well as throughout the subsequent reconnect/sign-on. */
+    AW_BeginLoadingStyle();
     Cbuf_AddText("map prison\n");
 }
 static void new_game(void) {

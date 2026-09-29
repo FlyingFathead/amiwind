@@ -15,7 +15,7 @@ flag, first fixed version (or an em dash), and evidence/status below.
 | --- | --- | --- | --- | --- |
 | AW-20260928-01 | Ship-exit intermittent freeze | N | — | Open; retry succeeded, cause unknown |
 | AW-20260928-02 | Dock/menu freeze and looping audio | N | — | Open; third run remained stable |
-| AW-20260928-03 | Silt Strider landing geometry | N | — | Open; strider/driver are separate unimplemented content |
+| AW-20260928-03 | Silt Strider landing geometry | N | — | Expanded bounds and missing rock restored; Strider/Darvame now present; exact-view acceptance pending |
 | AW-20260928-04 | Invisible barriers across plank | Y | v0.0.21-dev2 | Focused native passage/containment passed; owner acceptance pending; pier escape below remains separate |
 | AW-20260928-05 | Dock guard misses approach interception | Y | v0.0.21-dev3 | Feet-anchor regression and focused FS-UAE automatic approach/race passed; full escort route remains open |
 | AW-20260928-06 | Player can leave pier and become stranded | N | — | Owner report; join/edge coverage under investigation |
@@ -27,13 +27,42 @@ flag, first fixed version (or an em dash), and evidence/status below.
 | AW-20260928-12 | Downstairs interior doors cannot open | N | — | Ordinary hinged-door interaction not implemented; only opening hall special case exists |
 | AW-20260928-13 | New Game confirmation defaults to Cancel | Y | v0.0.21-dev3 | Main/pause host checks and native confirmation/start passed |
 | AW-20260928-14 | Master debug toggle omits coordinates | Y | v0.0.20 | Host regression checks on/off and explicit coordinate override |
-| AW-20260928-15 | Prison wave ambience masks dialogue | Y | v0.0.20 | Scoped mixer -5 dB; listening acceptance remains subjective |
+| AW-20260928-15 | Prison wave ambience masks dialogue | Y | v0.0.20 | Historical -5 dB correction; superseded by dev2 authored gain after new quiet-wave report |
 | AW-20260928-16 | Two compiler-reported array bounds violations | Y | v0.0.20 | Sanitizer reproductions and corrected production routines |
 | AW-20260928-17 | FS-UAE 24-bit-addressing option rejected | Y | v0.0.20 | Preset corrected against FS-UAE parser; unrelated freezes remain open |
 | AW-20260928-18 | Punch blocked after Census office exit | N | — | Candidate: hall fighting gate separated from opening enclosure; post-exit native check pending |
 | AW-20260928-19 | Courtyard barrel incorrectly says empty | Y | v0.0.21-dev3 | Final native build: Take ring, inventory ring present, then Empty; host checks persisted depletion and no refill after losing the ring |
 | AW-20260928-20 | Census clipped outside room near captain wing | N | — | Owner screenshot XYZ201,-210,0; route/cause unconfirmed; separate from restored room172861 |
 | AW-20260928-21 | Exterior Census door/wall overlap | N | — | Owner screenshot XYZ396,-171,39, heading170, pitch-3; cause and FPS impact unmeasured |
+| AW-20260929-01 | Player passes through town NPCs | Y | v0.0.23-dev2 | Shared solid-body spawn path; real engine swept-box checks and native Fargoth approach stop |
+| AW-20260929-02 | NPCs missing from expanded town render | Y | v0.0.23-dev2 | 256-entry draw list exhausted; full bounded list and 8,192 visibility links; Darvame/Fargoth captured |
+| AW-20260929-03 | Music cuts during loading | Y | v0.0.23-dev2 | Buffer-clear protection, bounded loader servicing; repeated transitions keep track open with no post-startup underruns in tested runs |
+| AW-20260929-04 | Loading artwork flashes after intro movie | Y | v0.0.23-dev2 | One-shot blank style; native transition sequence contains all-black loading frames, then ship |
+| AW-20260929-05 | Ship waves too quiet | N | — | Loop confirmed running; extra -5 dB reduction removed in dev2; owner listening acceptance pending |
+| AW-20260929-06 | Expanded scene exhausts 9 MiB heap | Y | v0.0.23-dev2 | Removed redundant plane allocation; 11 MiB heap inside unchanged 16 MiB Fast RAM profile |
+
+## 29 September dev2 notes
+
+The expanded footprint retains rock reference 309452 (`terrain_rock_bc_18`). Its
+origin lay outside the previous selection cutoff while the rock geometry crossed
+into the playable area. Full-bounds selection now retains it. The exact reported
+view is XYZ 211,447,47 / heading 4 / pitch 0; the candidate has been captured, but
+owner acceptance is still required before closing AW-20260928-03.
+
+A further port viewpoint exceeded the 10,240-surface buffer. The final image
+raises the bounded surface/edge pools to 12,288 / 24,576 within the same reference
+hardware profile. This is distinct from missing terrain assets and entity links.
+
+The quieter wave report supersedes the earlier balance request: the two original
+placed loops were active, but carried an extra hardcoded -5 dB reduction. Dev2
+removes only that additional gain reduction, retaining the source sound volume,
+script multiplier and spatial falloff. `soundinfo` now lists live channels and
+their mixed volumes/positions for diagnosis. User listening feedback remains the
+acceptance criterion; an active loop alone does not prove the desired balance.
+
+The loading fixes apply to common map, restart/changelevel, file, BSP/model and
+entity-spawn work. They do not prove that every future blocking operation is
+bounded, or resolve the older intermittent freeze reports.
 
 ## AW-20260928-01: potential prison-ship exit freeze during intro
 

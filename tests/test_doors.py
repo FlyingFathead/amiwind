@@ -8,7 +8,8 @@ def record(tag,data):return tag.encode()+struct.pack('<III',len(data),0,0)+data
 def cell(name,flags,ref,target=None):
     data=sub('NAME',name.encode()+b'\0')+sub('DATA',struct.pack('<Iii',flags,-1,-9))
     data+=sub('FRMR',struct.pack('<I',ref))+sub('NAME',b'hatch\0')
-    data+=sub('DATA',struct.pack('<6f',10,20,30,0,0,0))
+    point=(10,20,30) if flags&1 else (-11000,-71000,30)
+    data+=sub('DATA',struct.pack('<6f',*point,0,0,0))
     data+=sub('DODT',struct.pack('<6f',-8482,-73627,320,0,0,.7854))
     if target is not None:data+=sub('DNAM',target.encode()+b'\0')
     return record('CELL',data)

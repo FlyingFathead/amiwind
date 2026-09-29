@@ -1,6 +1,6 @@
 # Development overlays
 
-Runtime v0.0.20. Open the console with F10 or the key left of 1 (normally
+Runtime v0.0.23-dev2. Open the console with F10 or the key left of 1 (normally
 § on the Finnish layout). Boolean commands accept on/off, true/false and 1/0,
 case-insensitively. With no value they report their setting.
 
@@ -116,7 +116,9 @@ remain line breaks. No new GUI or unbounded scrollback allocation.
 the existing debug master; on/off, true/false and 1/0 are accepted. This does not
 hide gameplay menus or the crosshair.
 
-`dbg scene ship` and `dbg scene town` load the two current scenes. `dbg recover`
+`dbg scene ship` and `dbg scene town` retain their aliases. The scene picker and
+`dbg scene <map>` also cover the 13 town interiors and Addamasartus; see
+[the scene list](SEYDA_NEEN_INTERIORS.md). `dbg recover`
 finds a checked spawn in the current scene; `dbg reset location 0` returns to town.
 `dbg eyeheight` reports eye offset and height above the feet. An optional numeric
 offset (4..24 runtime units above the hull origin) supports comparison, e.g.
@@ -175,3 +177,21 @@ No extra clock call, file access or unbounded history is added. The number is
 AmiWind's frame rate, not WinUAE's video refresh rate or host compositor FPS.
 `dbg overlay off` hides it while preserving its individual setting. Use the
 same overlay/viewport settings when comparing views.
+
+## Loading presentation
+
+`aw_loading_style normal` is the default. `aw_loading_style blank` selects a
+black loading frame with no artwork or text for subsequent loads. Other values
+fall back to normal. This setting lasts for the session. The opening movie uses
+a one-transition blank override; ordinary doors return to the selected default.
+
+Loading style controls presentation only. Map loads preserve the selected music
+track and buffered samples, and service playback between bounded reads and
+decode batches. Deliberate track changes, pauses and movie audio retain their
+existing meaning. This is cooperative servicing on the main Amiga task; slow
+individual disk operations can still exceed a playback deadline.
+
+`soundinfo` also prints the live sound channels (sample name, emitter gain,
+left/right volume and playback position), plus the loading-music flag. This helps
+separate a missing loop from a quiet or distant one. Ship waves now use the
+converted source gain; the earlier extra 5 dB reduction is removed.

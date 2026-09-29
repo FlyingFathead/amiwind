@@ -49,13 +49,32 @@ int main(void) {
   assert(floor.fraction==.2f && floor.endpos[2]==100 && floor.startsolid);
  }
  {
-  static dclipnode_t chain[24000];hull_t hull;trace_t tr;mplane_t plane;vec3_t p={1,0,0},q={2,0,0};
+  static dclipnode_t chain[50000];hull_t hull;trace_t tr;mplane_t plane;vec3_t p={1,0,0},q={2,0,0};
   struct rlimit limit;getrlimit(RLIMIT_STACK,&limit);limit.rlim_cur=262144;assert(!setrlimit(RLIMIT_STACK,&limit));
   memset(&hull,0,sizeof(hull));memset(&tr,0,sizeof(tr));memset(&plane,0,sizeof(plane));
   plane.normal[0]=1;plane.type=0;
-  for(i=0;i<24000;i++){chain[i].planenum=0;chain[i].children[0]=i==23999?CONTENTS_EMPTY:i+1;chain[i].children[1]=CONTENTS_SOLID;}
-  hull.clipnodes=chain;hull.planes=&plane;hull.lastclipnode=23999;tr.allsolid=true;tr.fraction=1;
+  for(i=0;i<50000;i++){chain[i].planenum=0;chain[i].children[0]=i==49999?CONTENTS_EMPTY:i+1;chain[i].children[1]=CONTENTS_SOLID;}
+  hull.clipnodes=chain;hull.planes=&plane;hull.lastclipnode=49999;tr.allsolid=true;tr.fraction=1;
   assert(SV_RecursiveHullCheck(&hull,0,0,1,p,q,&tr));assert(!tr.allsolid && !tr.startsolid);
+ }
+ {
+  /* Resident slideboxes must block the scaled player's swept volume in every
+   * horizontal direction, but leave a route around the actor. */
+  extern void SV_InitBoxHull(void);
+  vec3_t pmin={-7.32f,-7.12f,-16.625f},pmax={7.32f,7.12f,16.625f};
+  int axis,sign;
+  SV_InitBoxHull();memset(&ent,0,sizeof(ent));ent.v.solid=SOLID_SLIDEBOX;
+  ent.v.mins[0]=-7.32f;ent.v.mins[1]=-7.12f;
+  ent.v.maxs[0]=7.32f;ent.v.maxs[1]=7.12f;ent.v.maxs[2]=33.25f;
+  for(axis=0;axis<2;axis++)for(sign=-1;sign<=1;sign+=2){
+   VectorCopy(vec3_origin,a);VectorCopy(vec3_origin,b);a[2]=b[2]=16.875f;
+   a[axis]=sign*40;b[axis]=-sign*40;
+   hit=SV_ClipMoveToEntity(&ent,a,pmin,pmax,b);
+   assert(!hit.startsolid && hit.fraction>0 && hit.fraction<.5f);
+   assert(fabs(hit.endpos[axis])>=14.2f);
+   a[1-axis]=b[1-axis]=24;
+   hit=SV_ClipMoveToEntity(&ent,a,pmin,pmax,b);assert(hit.fraction==1);
+  }
  }
  puts("rotated platform hit and vacated-space sweep passed");return 0;
 }

@@ -1,5 +1,22 @@
 # Development history
 
+## 0.0.23-dev2 — 29 September 2026
+
+- Expand the exterior beyond the port; retain crossing object bounds, the missing
+  rock mound, original Silt Strider and Darvame.
+- Convert all thirteen town interiors plus Addamasartus through bounded parallel
+  room jobs; preserve doors, source placements, cave water height and save identity.
+- Add the local cast, beast skeleton support and shared solid NPC collision.
+- Correct entity visibility capacity and unsigned BSP collision-node handling;
+  reduce plane allocation and use an 11 MiB heap within the same reference RAM.
+- Add normal/blank loading styles and black movie-to-Jiub loading. Service music
+  during common file/model/entity loading without clearing the music DMA buffer.
+- Restore authored ship-wave emitter gain by removing the extra 5 dB reduction.
+- Refresh README gameplay captures, explicit media exceptions and dated roadmap.
+- Retain default parallel compilation and both TTF / bitmap font paths.
+
+See `RELEASE-v0.0.23-dev2.md` for measured checks and incomplete gameplay.
+
 ## v0.0.23-dev1 - parallel builds, 29 September 2026
 
 - Public package revision 2 removes two trailing-whitespace defects that blocked

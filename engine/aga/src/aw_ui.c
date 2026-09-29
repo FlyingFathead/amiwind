@@ -14,6 +14,9 @@ static byte *paper_font;
 static int paper_font_bytes,paper_font_loaded;
 static byte background[64776],loading_background[64776];
 static int loading_state,loading_next;
+static cvar_t loading_style={"aw_loading_style","normal",false};
+static int next_loading_style=-1,loading_active,loading_blank;
+static byte loading_black_palette[768];
 static byte logo[8008];
 static int logo_state;
 static int background_state;
@@ -80,8 +83,22 @@ int AW_UIBackground(void) {
     }
     return 1;
 }
+void AW_SetNextLoadingStyle(aw_loading_style_t style) {
+    next_loading_style=style==AW_LOADING_BLANK?AW_LOADING_BLANK:AW_LOADING_NORMAL;
+}
+void AW_BeginLoadingStyle(void) {
+    /* Reconnect also begins a plaque: do not consume the one-shot override twice. */
+    if(loading_active)return;
+    loading_blank=next_loading_style>=0?next_loading_style==AW_LOADING_BLANK:
+        !Q_strcasecmp(loading_style.string,"blank");
+    next_loading_style=-1;loading_active=1;loading_state=0;
+}
+void AW_EndLoadingStyle(void) {
+    loading_active=loading_blank=loading_state=0;
+}
 void AW_UILoading(void) {
     int row,n;char path[40];
+    if(loading_blank){AW_UIFill(0,0,vid.width,vid.height,0);return;}
     if(!loading_state){
         sprintf(path,"gfx/loading%02ld.awb",(long)loading_next);
         n=read_asset(path,loading_background,sizeof(loading_background));
@@ -97,6 +114,7 @@ void AW_UILoading(void) {
 }
 byte *AW_UIMenuPalette(void){
     if(AW_LoadingScreen()){
+        if(loading_blank)return loading_black_palette;
         if(loading_state==1)return loading_background+8;
         if(background_state==1)return background+8;
     }
@@ -330,5 +348,6 @@ void AW_UIDraw(void) {
 static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original borders and three ink shades. The console keeps its own font.",12);}
 void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
+    Cvar_RegisterVariable(&loading_style);
     Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

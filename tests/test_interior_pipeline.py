@@ -1,4 +1,4 @@
-import sys,unittest
+import sys,unittest,struct,tempfile
 from pathlib import Path
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
@@ -8,6 +8,14 @@ from prepare_hand_sprites import render_frame,pack_frame
 from mesh_geometry import shell_collision_parts
 
 class InteriorPipelineTests(unittest.TestCase):
+ def test_owned_cell_integer_and_float_water_heights(self):
+  from mwad.interior import read_interior
+  def sub(tag,data):return tag.encode()+struct.pack('<I',len(data))+data
+  for tag,water,expected,flags in [('INTV',struct.pack('<i',-760),-760,3),('WHGT',struct.pack('<f',12.5),12.5,3),('INTV',struct.pack('<i',99),None,1)]:
+   body=sub('NAME',b'Fixture\0')+sub('DATA',struct.pack('<Iii',flags,0,0))+sub(tag,water)+sub('AMBI',bytes(16))
+   with tempfile.TemporaryDirectory() as tmp:
+    p=Path(tmp)/'master.esm';p.write_bytes(b'CELL'+struct.pack('<III',len(body),0,0)+body)
+    self.assertEqual(read_interior(p,'Fixture')['water_height'],expected)
  def test_scripted_room_architecture_is_retained_without_admitting_unknown_activators(self):
   from mwad.interior import select_geometry
   room={'number':172861,'id':'CharGen Stuff Room','type':'ACTI','model':'i\\In_C_plain_room_side.NIF'}

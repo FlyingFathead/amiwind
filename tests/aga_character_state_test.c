@@ -54,6 +54,13 @@ int main(void)
     assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
     assert(!AW_StateGet(&decoded.state,AW_ITEM,"bk_a1_1_caiuspackage")); /* Released saves may lack a former quest item. */
     for(i=12;i<n;i++){raw[i]^=1;assert(!AW_SaveDecode(raw,n,&decoded));raw[i]^=1;}
+    strcpy(source.scene,"addamasartus");source.actor_count=1;
+    source.actors[0].reference=42;source.actors[0].scene=15;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0);
+    assert(AW_SaveDecode(raw,n,&decoded));assert(!strcmp(decoded.scene,"addamasartus"));
+    assert(decoded.actors[0].scene==15 && decoded.actors[0].reference==42);
+    source.actors[0].scene=16;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
+    strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;
     source.character.current[0]=NAN;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
     return 0;

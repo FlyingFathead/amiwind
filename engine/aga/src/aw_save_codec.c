@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include "aw_save.h"
+#include "aw_maps.h"
 static unsigned char *writing;
 static const unsigned char *reading;
 static int at,end,error;
@@ -69,7 +70,7 @@ static void fields(aw_save_t *s)
     if(!s->sequence || !s->profile)error=1;
     string(s->scene,16);string(s->label,32);string(q->name,32);
     if(error)return;
-    if(strcmp(s->scene,"seyda") && strcmp(s->scene,"census") && strcmp(s->scene,"prison"))error=1;
+    if(AW_MapId(s->scene)<0)error=1;
     for(i=0;i<3;i++){floating(&s->position[i],-32767,32767);floating(&s->angles[i],-360,360);}
     id(&c->race,0);id(&c->clas,1);id(&c->birth,2);id(&c->head,3);id(&c->hair,3);
     integer(&c->female,0,1);integer(&c->level,1,1000);c->valid=1;
@@ -107,7 +108,7 @@ static void fields(aw_save_t *s)
     if(error)return;
     for(i=0;i<s->actor_count;i++){
         aw_saved_actor_t *a=&s->actors[i];
-        word(&a->reference);integer(&a->scene,0,2);
+        word(&a->reference);integer(&a->scene,0,AW_MAP_COUNT-1);
         if(!a->reference || a->reference>0xffffffU)error=1;
         for(j=0;j<3;j++){floating(&a->position[j],-32767,32767);floating(&a->angles[j],-360,360);}
         floating(&a->health,-10000,100000);

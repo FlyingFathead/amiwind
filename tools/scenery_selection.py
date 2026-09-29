@@ -63,6 +63,10 @@ def validate_groups(references, groups):
 
 def select_runtime_refs(index, centre, scale, extent):
     """Intersect whole assembly bounds; preserve all of its attachments."""
+    bounds = index.get('runtime_bounds', [[-extent, -extent], [extent, extent]])
+    def intersects(low, high):
+        return all((high[a]-centre[a])*scale >= bounds[0][a] and
+                   (low[a]-centre[a])*scale <= bounds[1][a] for a in range(2))
     references = index['references']
     groups = index.get('groups', {})
     validate_groups(references, groups)
@@ -71,14 +75,13 @@ def select_runtime_refs(index, centre, scale, extent):
         members = [r for r in references if r['number'] in group['references']]
         low = [min(r['bounds'][0][a] for r in members) for a in range(2)]
         high = [max(r['bounds'][1][a] for r in members) for a in range(2)]
-        if all((high[a]-centre[a])*scale >= -extent and
-               (low[a]-centre[a])*scale <= extent for a in range(2)):
+        if intersects(low, high):
             enabled.add(name)
     selected, rejected = [], []
     for ref in references:
         member = set(ref.get('scene_groups', []))
-        inside = all(abs((ref['position'][a]-centre[a])*scale) <= extent
-                     for a in range(2))
+        inside = intersects(*ref['bounds']) if 'runtime_bounds' in index else all(
+            abs((ref['position'][a]-centre[a])*scale) <= extent for a in range(2))
         # A group is selected as a whole, never partially by an origin fallback.
         accepted = bool(member & enabled) if member else inside
         if accepted:
@@ -86,5 +89,5 @@ def select_runtime_refs(index, centre, scale, extent):
         else:
             rejected.append({'reference': ref['number'], 'id': ref['id'],
                              'reason': 'outside assembly bounds' if member else
-                                       'outside legacy origin coverage'})
+                                       'outside runtime coverage'})
     return selected, {'selected_groups': sorted(enabled), 'omitted': rejected}

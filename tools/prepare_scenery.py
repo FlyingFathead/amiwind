@@ -17,6 +17,7 @@ from mwad.scene import pack_geometry, unpack_geometry, visible_refs, resident_se
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from scenery_selection import load_groups, select_source_refs, validate_groups
+from area_config import BOUNDS, inside
 
 
 def nif_reader():
@@ -68,6 +69,14 @@ def model_geometry(raw, N, collision=False):
     data = N.Data(); data.read(io.BytesIO(raw))
     vertices, faces, materials = [], [], []
     skipped = []
+    worlds = {}
+    def collect(node, parent):
+        if not isinstance(node, N.NiAVObject):return
+        transform = np.array(node.get_transform().as_list()) @ parent
+        worlds[id(node)] = transform
+        for child in getattr(node, 'children', []):
+            if child is not None:collect(child, transform)
+    for root in data.roots:collect(root, np.eye(4))
     def visit(node, parent, hidden=False, in_collision=False):
         if not isinstance(node, N.NiAVObject):
             return
@@ -76,8 +85,6 @@ def model_geometry(raw, N, collision=False):
         hidden = hidden or bool(node.flags & 1)
         transform = np.array(node.get_transform().as_list()) @ parent
         if isinstance(node, N.NiTriShape) and (in_collision if collision else not hidden and not in_collision):
-            if node.skin_instance is not None:
-                skipped.append(name + ': skinned shape'); return
             g = node.data
             if g is None or not g.num_vertices or not g.num_triangles:
                 return
@@ -91,8 +98,21 @@ def model_geometry(raw, N, collision=False):
             materials.append({'texture_source': texture, 'diffuse': diffuse, 'alpha': alpha,
                               'source_shape': name})
             start = len(vertices)
+            hom = np.array([[v.x,v.y,v.z,1.] for v in g.vertices])
+            positions = hom @ transform
+            if node.skin_instance is not None:
+                positions = np.zeros((len(hom),4)); weights = np.zeros(len(hom))
+                for bone, info in zip(node.skin_instance.bones, node.skin_instance.data.bone_list):
+                    if bone is None or id(bone) not in worlds:raise ValueError('Missing static skin bone')
+                    ids = np.array([w.index for w in info.vertex_weights], int)
+                    values = np.array([w.weight for w in info.vertex_weights])
+                    if not len(ids):continue
+                    positions[ids] += (hom[ids] @ np.array(info.get_transform().as_list()) @ worlds[id(bone)]) * values[:,None]
+                    weights[ids] += values
+                if np.any(np.abs(weights-1)>.02):raise ValueError('Invalid static skin weights')
+                positions /= weights[:,None]
             for i, v in enumerate(g.vertices):
-                position = np.array([v.x, v.y, v.z, 1.]) @ transform
+                position = positions[i]
                 uv = g.uv_sets[0][i] if g.num_uv_sets and g.uv_sets else None
                 colour = g.vertex_colors[i] if g.has_vertex_colors else None
                 rgba = [colour.r, colour.g, colour.b, colour.a] if colour else [1., 1., 1., 1.]
@@ -125,14 +145,19 @@ def world_bounds(bounds, ref):
     return [points.min(axis=0).tolist(), points.max(axis=0).tolist()]
 
 
-def prepare(workspace, out, radius=4096, texture_size=64, jobs=None):
+def prepare(workspace, out, radius=11500, texture_size=64, jobs=None):
     from PIL import Image
     workspace, state = read_workspace(workspace)
     data_files = resolve_data_files(state['data_files'])
     placements = json.loads((workspace / 'generated/seyda-neen/placements.json').read_text())
     centre = [-11200., -71504., 400.]
     refs, groups = select_source_refs(placements, centre, radius, load_groups())
-    return export_refs(data_files,out,refs,groups,centre,radius,texture_size,jobs=jobs)
+    # Keep a generous origin margin while the actual geometry bounds are not yet
+    # known. Runtime selection intersects the converted bounds, including rocks
+    # whose origins lie outside the playable rectangle.
+    refs = [r for r in refs if r.get('scene_groups') or inside(r['position'], 512)]
+    return export_refs(data_files,out,refs,groups,centre,radius,texture_size,
+                       metadata={'runtime_bounds': BOUNDS},jobs=jobs)
 
 
 def _read_model(task):
@@ -145,7 +170,11 @@ def _read_model(task):
             raise ValueError('Truncated BSA model')
         N = nif_reader()
         result = model_geometry(raw, N)
-        collision_result = model_geometry(raw, N, collision=True) if collision else None
+        collision_result = None
+        if collision:
+            try:collision_result = model_geometry(raw, N, collision=True)
+            except ValueError as exc:
+                if collision != 'root_node_or_visual' or str(exc) != 'No supported visible static triangles':raise
         return name, raw, result, collision_result, None
     except (ValueError, KeyError, struct.error) as exc:
         return name, None, None, None, str(exc)
@@ -171,7 +200,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
         f.write(bytes(pad)); offset = f.tell(); f.write(raw)
         return {'offset': offset, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
     tasks = [(name, bsa.path, bsa.entries.get(name, {'offset': 0, 'bytes': 0}),
-              profiles.get(name, {}).get('collision_source') == 'root_node') for name in names]
+              profiles.get(name, {}).get('collision_source') if profiles.get(name, {}).get('collision_source') in ('root_node', 'root_node_or_visual') else None) for name in names]
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))
     print(f'Scenery geometry workers: {workers}', flush=True)
     with archive.open('xb') as f:
@@ -181,7 +210,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                     raise ValueError(error)
                 packet, materials, bounds, skipped = result
                 collision_record = None
-                if profiles.get(name,{}).get('collision_source') == 'root_node':
+                if collision_result is not None:
                     cpacket, _, cbounds, cskipped = collision_result
                     cv, cf, _ = unpack_geometry(cpacket)
                     collision_record={'source':'NIF RootCollisionNode','bounds':cbounds,
@@ -227,7 +256,12 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
             for x in range(math.floor(bounds[0][0]/2048), math.floor(bounds[1][0]/2048)+1):
                 index['chunks'].setdefault(f'{x},{y}', []).append(n)
     # A failed hull conversion must not silently leave an orphan hatch again.
-    validate_groups(index['references'], groups)
+    if index['errors']:
+        (out/'conversion-errors.json').write_text(json.dumps(index['errors'],indent=2)+'\n')
+    try:
+        validate_groups(index['references'], groups)
+    except ValueError as exc:
+        raise ValueError(str(exc)+'; '+str(index['errors'])) from exc
     # Read every payload independently, through the same seek/extent contract.
     collisions=[m['collision'] for m in index['models'] if m.get('collision')]
     with archive.open('rb') as f:
@@ -246,7 +280,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--workspace',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
-    p.add_argument('--radius',type=int,choices=range(512,16385),default=4096)
+    p.add_argument('--radius',type=int,choices=range(512,16385),default=11500)
     p.add_argument('--texture-size',type=int,choices=(32,64,128),default=64)
     add_jobs(p);a=p.parse_args()
     print(json.dumps(prepare(a.workspace,a.out,a.radius,a.texture_size,a.jobs),indent=2))

@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -409,6 +409,13 @@ void AW_UITextBox(int,int,int,int,const char *,int);
 int AW_UILogo(int,int);
 void AW_UILoading(void);
 int AW_LoadingScreen(void);
+typedef enum { AW_LOADING_NORMAL, AW_LOADING_BLANK } aw_loading_style_t;
+void AW_SetNextLoadingStyle(aw_loading_style_t);
+void AW_BeginLoadingStyle(void);
+void AW_EndLoadingStyle(void);
+extern qboolean aw_loading_music;
+extern void (*aw_load_audio_tick)(void);
+void S_LoadingUpdate(void);
 int AW_UIWidth(const char *);
 int AW_UIHeight(void);
 const char *AW_UILine(const char *,int,char *,int);

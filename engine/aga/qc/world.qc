@@ -141,8 +141,8 @@ void() aw_npc = {
     setorigin(self,self.origin + '0 0 8');
     droptofloor();
     setorigin(self,self.origin + '0 0 0.25');
-    // Scripted actors block the player after their floor placement.
-    if (self.aw_intro_role >= 1 && self.aw_intro_role <= 8) self.solid = 3;
+    // Every resident blocks the player after floor placement, including town NPCs.
+    self.solid = 3;
     setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
     self.think = aw_npc_idle;
     self.yaw_speed = 22.5;

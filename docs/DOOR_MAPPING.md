@@ -19,19 +19,19 @@ coordinates; AmiWind subtracts the current exterior origin before quarter scalin
 The destination is a feet position, converted to the standing body's origin and
 checked against collision/floor geometry when the destination map loads.
 
-`tools/prepare_doors.py` audits 41 teleport placements around Seyda Neen and its
-named interiors in the supplied base master. The private `door-conversion.json`
-preserves IDs, transforms, destinations and sound/script names. `scene-doors.txt`
-is bounded AWD2 data: source/target map, transformed activation bounds, arrival,
-yaw and a CP1252 destination label. Dev5 exposes 22 entrances in the two resident
-scenes: 21 exterior references and the interior ship hatch. Two have working
-transitions. Aim at a door for its name and E prompt; activation of an unavailable
-destination displays exactly “Interior not found.” and preserves location/state.
-The original full cell name remains in the catalogue; the repeated “Seyda Neen,”
-prefix is omitted from the narrow on-screen label. A target `-` means unavailable.
-The converter also writes private interior-reference.json/md for 14 source cells,
-including object transforms, lights, actors and per-reference destination points.
-These are conversion references, not 14 playable interiors.
+`tools/prepare_doors.py` now resolves the configured area through
+`config/seyda_area.json`. The private audit contains 43 teleport placements,
+including Addamasartus and both Tradehouse entrances. `scene-doors.txt` stores
+source/target map IDs, transformed activation bounds, arrival, yaw and the
+original destination label. All configured destinations have converted maps.
+An unsupported destination still displays “Interior not found.” and preserves
+location/state. Lock/key rules and general door scripts remain unfinished.
+
+The Tradehouse front-door round trip passed a native emulator check. All scenes
+also loaded through the inspector. This is not exhaustive validation of all
+43 links or the introductory quest route. Original arrival coordinates are
+retained, then checked with the standing hull and floor search. The private
+catalogue retains each placed reference, including separate basement doors.
 
 The prison hatch is `chargen_shipdoor`, an overhead teleport door. Activate its
 visible surface to load the exterior deck. It does not require a physically
@@ -41,9 +41,8 @@ a 56-unit reach and a world occlusion trace. AWD1 and the old single-origin form
 readable for older conversion bundles. Both supported directions preserve current
 health/hand state and queue at most one map load per activation.
 
-This remains one active BSP at a time. Door mapping does not implement all town
-interiors, lock/key rules, ownership, character-creation gates or persistent
-reference state. Original transition sound IDs are catalogued but not yet played.
+This remains one active BSP at a time. Door mapping does not implement general lock/key rules, ownership,
+character-creation gates or persistent reference state. Original transition sound IDs are catalogued but not yet played.
 
 Reference: [OpenMW, Doors and Connecting Cells](https://openmw.readthedocs.io/en/latest/reference/modding/doors-and-teleports.html)
 corroborates the interior-name/exterior-coordinate distinction. The owned master

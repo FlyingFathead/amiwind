@@ -16,6 +16,13 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_scenery_cannot_displace_late_npcs_from_visible_list(self):
+        self.compile_run('aga_visible_entities_test.c', [Path(SOURCE)/'src/r_efrag.c'])
+
+    def test_loading_services_music_without_clearing_dma_or_loading_sfx(self):
+        self.compile_run('aga_loading_audio_test.c', [Path(SOURCE)/'src'/n for n in
+            ('snd_dma.c', 'snd_mix.c')])
+
     def test_character_catalogue_and_preview_decoder_bounds(self):
         self.compile_run('aga_character_assets_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_character.c','aw_head.c')],
@@ -77,7 +84,7 @@ class NativeSourceTests(unittest.TestCase):
                     arguments=[mode])
 
     def test_ui_bounds_and_corrupt_fonts(self):
-        self.compile_run("aga_ui_test.c", [ROOT/"engine/aga/src/aw_ui.c"])
+        self.compile_run("aga_ui_test.c", [ROOT/"engine/aga/src/aw_ui.c", ROOT/"engine/aga/src/aw_intro.c"])
 
     def test_underwater_palette_and_independent_damage(self):
         self.compile_run('aga_palette_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])

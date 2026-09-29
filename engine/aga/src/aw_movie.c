@@ -26,8 +26,10 @@ static void finish(const char *why){
     Con_Printf("Movie profile: %ld ms, %ld pictures, %ld skipped pictures.\n",
         (long)((Sys_FloatTime()-started)*1000),pictures,dropped);
     close_movie();S_StopAllSounds(true);IN_AWClearButtons();
-    Con_Printf("Intro movie: %s.\n",why);
     if(branding)Cbuf_AddText("aw_main_menu\n");else AW_IntroBegin();
+    /* Con_Printf may refresh a disconnected client's screen. Select the
+     * intro loading style before that refresh can request normal artwork. */
+    Con_Printf("Intro movie: %s.\n",why);
 }
 static int start_movie(char *path,int brand){
     byte h[32];long size,audio_size,expected;int i;

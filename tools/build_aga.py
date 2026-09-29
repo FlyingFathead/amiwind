@@ -41,7 +41,7 @@ def startup_config(config):
     config=config.replace('bind 2 "aw_drawdistance 700"','bind 2 "aw_drawdistance 540"')
     config=config.replace('bind ESCAPE quit','bind ESCAPE togglemenu').replace('r_drawviewmodel 0','r_drawviewmodel 1')
     config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
-        'r_maxsurfs 10240\nr_maxedges 20480\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
+        'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
     return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\n'
 
@@ -187,7 +187,8 @@ def image(args):
     validate_quakec(boot/'id1/progs.dat')
     # Saved mutable state is only restored against this exact converted content.
     fingerprint=hashlib.sha256()
-    for name in ('maps/prison.bsp','maps/seyda.bsp','maps/census.bsp','progs.dat','character/catalog.awc'):
+    from area_config import SCENES
+    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'progs.dat', 'character/catalog.awc']:
         asset=boot/'id1'/name
         if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))
@@ -205,15 +206,18 @@ def image(args):
         shutil.copyfile(source,target/track['file'])
     shutil.copyfile(music/'soundtrack.json',target/'soundtrack.json')
     (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n')
-    # 128 MiB FFS partition, well below legacy size boundaries. No Workbench files.
+    # Leave filesystem metadata and future saves room; retain legacy-safe sizes.
+    payload_bytes=sum(p.stat().st_size for p in boot.rglob('*') if p.is_file())
+    partition_mib=max(128,((payload_bytes*6//5 + 16*1024*1024 + 127*1024*1024)//(128*1024*1024))*128)
+    if partition_mib>1024:raise ValueError('Boot payload exceeds supported image budget')
     part=out/'partition.hdf';hdf=out/f'AmiWind-v{VERSION}.hdf'
-    cmd=[args.xdftool,part,'create','size=128Mi','+','format','AMIWIND','ffs','+','boot','install']
+    cmd=[args.xdftool,part,'create',f'size={partition_mib}Mi','+','format','AMIWIND','ffs','+','boot','install']
     for path in sorted((p for p in boot.rglob('*') if p.is_dir()),key=lambda p:len(p.parts)):
         cmd+=['+','makedir',path.relative_to(boot).as_posix()]
     for path in sorted(p for p in boot.rglob('*') if p.is_file()):cmd+=['+','write',path,path.relative_to(boot).as_posix()]
     run(cmd)
     root_check=check_image(part,normalize=True)
-    run([args.rdbtool,hdf,'create','chs=4097,1,64','+','init','+','addimg',part,'name=DH0','bootable=1','pri=0'])
+    run([args.rdbtool,hdf,'create',f'chs={partition_mib*32+1},1,64','+','init','+','addimg',part,'name=DH0','bootable=1','pri=0'])
     # Verify every payload via an independent read from the finished RDB image.
     check=out/'readback.tmp'
     for path in sorted(p for p in boot.rglob('*') if p.is_file()):
@@ -222,7 +226,7 @@ def image(args):
         check.unlink()
     check_image(hdf,partition="DH0")
     part.unlink()
-    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':9*1024*1024,'tested_minimum':False,'filesystem':'FFS, 128 MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
+    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':f'FFS, {partition_mib} MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
     print(hdf)
 
 def main():

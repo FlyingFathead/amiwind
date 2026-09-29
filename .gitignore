@@ -85,6 +85,7 @@ unins*
 *.tga
 *.bmp
 *.png
+*.gif
 *.jpg
 *.wav
 *.mp3
@@ -113,6 +114,11 @@ unins*
 !/docs/images/amiwind-v0.0.15-dev2-guard.png
 !/docs/images/amiwind-v0.0.15-dev2-town.png
 !/docs/images/amiwind-v0.0.15-dev2-waterfront.png
+!/docs/images/amiwind-v0.0.23-dev2-port.png
+!/docs/images/amiwind-v0.0.23-dev2-fargoth.png
+!/docs/images/amiwind-v0.0.23-dev2-tradehouse.png
+!/docs/images/amiwind-v0.0.23-dev2-prison.png
+!/docs/images/amiwind-v0.0.23-dev2-port.gif
 !/resources/media/AmiWind_logo_clear_background.png
 !/resources/media/AmiWind_wordmark.png
 

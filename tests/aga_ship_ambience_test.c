@@ -21,11 +21,11 @@ int main(void){
     sample.length=11025;sample.loopstart=0;sample.speed=11025;
     sample.width=1;sample.data[0]=73;original=sample;
     cl.viewentity=1;total_channels=first;
-    /* Both placed hull instances get the local gain before spatialization. */
+    /* Both placed hull instances retain authored gain before spatialization. */
     for(i=0;i<2;i++)S_StaticSound(&hull,position,102,128);
     for(i=first;i<first+2;i++){
-        assert(channels[i].master_vol==57);
-        assert(channels[i].leftvol==57 && channels[i].rightvol==57);
+        assert(channels[i].master_vol==102);
+        assert(channels[i].leftvol==102 && channels[i].rightvol==102);
         assert(channels[i].sfx==&hull);
     }
     S_StaticSound(&other,position,102,128);
@@ -34,8 +34,8 @@ int main(void){
     interior=0;S_StaticSound(&hull,position,102,128);
     assert(channels[first+3].master_vol==102);
     interior=1;S_StaticSound(&hull,position,102,128);
-    assert(channels[first+4].master_vol==57);
-    /* Dynamic use (including dialogue) bypasses the ambience-only adjustment. */
+    assert(channels[first+4].master_vol==102);
+    /* Dynamic use (including dialogue) bypasses the static emitter path. */
     sound_started=1;S_StartSound(1,2,&hull,position,.4f,0);
     assert(channels[NUM_AMBIENTS].master_vol==102);
     assert(channels[NUM_AMBIENTS].leftvol==102);

@@ -82,7 +82,6 @@ def outfit(kinds, actor_id, seed=0):
     race=text(npc,'RNAM').casefold();race_data=first(kinds['RACE'][race],'RADT')
     height,fheight,weight,fweight,flags=struct.unpack_from('<4fI',race_data,len(race_data)-20)
     if female:height,weight=fheight,fweight
-    if flags&2:raise ValueError('Beast skeletons are outside this checkpoint')
     if not .5<=height<=2 or not .5<=weight<=2:raise ValueError('Unsupported race proportions')
     selected={};priority={};equipment=[];rng=random.Random(seed)
     for identifier,body in kinds['BODY'].items():
@@ -154,6 +153,7 @@ def outfit(kinds, actor_id, seed=0):
                           'mesh':text(kinds['BODY'][identifier],'MODL')})
     return {'id':actor_id,'name':text(npc,'FNAM'),'race':race,'female':female,
             'class':text(npc,'CNAM'),'faction':text(npc,'ANAM'),'height':height,'weight':weight,
+            'skeleton':'meshes/base_animkna.nif' if flags&2 else 'meshes/base_anim.nif',
             'parts':parts,'equipment':equipment,'seed':seed,'level':level}
 
 def greeting_fixture(topics, appearance, disposition=50):

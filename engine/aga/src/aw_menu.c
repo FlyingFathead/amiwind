@@ -3,6 +3,7 @@
  */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_maps.h"
 #include "amiwind_version.h"
 extern qboolean keydown[256];
 extern int scr_copyeverything;
@@ -13,12 +14,12 @@ qboolean m_return_onerror;
 char m_return_reason[32];
 static int frontend,selection,confirming,confirmation_return;
 static int mouse_x=160,mouse_y=63,mouse_visible;
-static int scene_picker,scene_available[2],graphics,intro_available;
+static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,intro_available;
 static keydest_t picker_return;
 static int colours[4],ready;
 static const char *front_items[]={"New game","Load game","Options","Exit game"};
 static const char *items[]={"Return to game","New game","Save game","Load game","Options","Main menu"};
-static const char *scene_items[]={"Prison ship interior","Seyda Neen exterior","Cancel"};
+
 #define ROW_Y 54
 #define ROW_H 19
 static int front_height(void){int size=AW_UIFontSize();return size>=16?18:16;}
@@ -50,11 +51,12 @@ static void cancel_confirmation(void){confirming=0;selection=confirmation_return
 void M_Menu_Quit_f(void){M_Menu_Main_f();confirm(1);}
 static void main_menu(void){frontend=1;M_Menu_Main_f();AW_MusicTitle();}
 static void scene_menu(void){
-    FILE *f;int i,size;char *paths[]={"maps/prison.bsp","maps/seyda.bsp"};
+    FILE *f;int i,size;char path[48];
     if(!sv.active || Cmd_Argc()!=1){Con_Printf("Use dbg scene change during play.\n");return;}
-    for(i=0;i<2;i++){f=NULL;size=COM_FOpenFile(paths[i],&f);scene_available[i]=f && size>=124;if(f)fclose(f);}
+    for(i=0;i<AW_MAP_COUNT;i++){sprintf(path,"maps/%s.bsp",AW_MapName(i));f=NULL;size=COM_FOpenFile(path,&f);scene_available[i]=f && size>=124;if(f)fclose(f);}
     picker_return=key_dest;IN_AWClearButtons();key_dest=key_menu;
-    scene_picker=1;graphics=confirming=mouse_visible=0;selection=scene_available[0]?0:scene_available[1]?1:2;
+    scene_picker=1;graphics=confirming=mouse_visible=0;selection=AW_MAP_COUNT;scene_top=0;
+    for(i=0;i<AW_MAP_COUNT;i++)if(scene_available[i]){selection=i;break;}
     mouse_x=160;mouse_y=65+selection*24+12;
 }
 void M_Init(void){
@@ -66,7 +68,7 @@ static int mouse_row(void){
     int i;
     if(confirming){if(inside(48,132,106,25))return 0;if(inside(166,132,106,25))return 1;return -1;}
     if(graphics){for(i=0;i<6;i++)if(inside(44,62+i*20,232,20))return i;return -1;}
-    if(scene_picker){for(i=0;i<3;i++)if(inside(44,65+i*24,232,24))return i;return -1;}
+    if(scene_picker){for(i=0;i<6 && scene_top+i<=AW_MAP_COUNT;i++)if(inside(44,55+i*19,232,19))return scene_top+i;return -1;}
     if(frontend){for(i=0;i<4;i++)if(inside(12,front_top()+i*front_height(),front_width()-8,front_height()))return i;return -1;}
     for(i=0;i<6;i++)if(inside(44,ROW_Y+i*ROW_H,232,ROW_H))return i;
     return -1;
@@ -81,7 +83,7 @@ void AW_MenuMouse(int dx,int dy){
     row=mouse_row();if(row>=0)selection=row;
 }
 void M_Keydown(int key){
-    int direction,row;
+    int direction,row;char command[48];
     if(AW_SaveMenuKey(key)){if(key_dest==key_game){frontend=0;graphics=0;}return;}
     if(key=='a' || key=='A')key=K_LEFTARROW;
     if(key=='d' || key=='D')key=K_RIGHTARROW;
@@ -119,11 +121,14 @@ void M_Keydown(int key){
     if(scene_picker){
         if(key==K_ESCAPE){scene_picker=0;key_dest=picker_return;IN_AWClearButtons();return;}
         if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){
-            direction=key==K_UPARROW?-1:1;do{selection=(selection+direction+3)%3;}while(selection<2 && !scene_available[selection]);
+            direction=key==K_UPARROW?-1:1;do{selection=(selection+direction+AW_MAP_COUNT+1)%(AW_MAP_COUNT+1);}
+            while(selection<AW_MAP_COUNT && !scene_available[selection]);
+            if(selection<scene_top)scene_top=selection;
+            if(selection>=scene_top+6)scene_top=selection-5;
         }
         if(key==K_ENTER || key==K_MOUSE1){
-            if(selection==2){scene_picker=0;key_dest=picker_return;IN_AWClearButtons();}
-            else if(scene_available[selection]){direction=selection;close_menu();Cbuf_AddText(direction?"aw_scene town\n":"aw_scene ship\n");}
+            if(selection==AW_MAP_COUNT){scene_picker=0;key_dest=picker_return;IN_AWClearButtons();}
+            else if(scene_available[selection]){direction=selection;close_menu();sprintf(command,"aw_scene %s\n",direction==0?"ship":direction==1?"town":AW_MapName(direction));Cbuf_AddText(command);}
         }
         return;
     }
@@ -184,7 +189,8 @@ void M_Draw(void){
         sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());label(44,142,232,20,line,1,selection==4);
         label(44,162,232,20,"Back",1,selection==5);
     }else if(scene_picker){
-        for(i=0;i<3;i++)label(44,65+i*24,232,24,scene_items[i],i==2 || scene_available[i],selection==i);
+        for(i=scene_top;i<=AW_MAP_COUNT && i<scene_top+6;i++)
+            label(44,55+(i-scene_top)*19,232,19,AW_MapTitle(i),i==AW_MAP_COUNT || scene_available[i],selection==i);
     }else if(confirming){
         AW_UITextBox(40,69,240,26,confirming==3?"Start a new game?":confirming==2?"Return to main menu?":"Exit the game?",colours[1]);
         if(sv.active)AW_UITextBox(40,97,240,24,"Current progress will be lost.",colours[2]);

@@ -1,16 +1,19 @@
-# Current project state - 29 September 2026
+# Current project state — 29 September 2026
 
-**Current development checkpoint: AmiWind v0.0.23-dev1, based on public v0.0.22.**
+**AmiWind v0.0.23-dev2: interiors and local cast inspection checkpoint.**
 
-This checkpoint adds default bounded parallel host builds; gameplay and font
-selection are preserved. See [build details](PARALLEL_BUILD.md) and
-[checkpoint validation](RELEASE-v0.0.23-dev1.md). Owner confirmed the v0.0.22 Steam
-bitmap fallback works. Local TTF and bitmap-only build evidence is recorded in
-the new checkpoint note, separately from that owner report.
+Thirteen town interiors, Addamasartus, the existing prison ship and the expanded
+exterior are converted. Original Strider/Darvame placement, beast NPCs, solid NPC
+bodies, reusable normal/blank loading, and music servicing during loading are
+implemented. Renderer entity limits and memory allocation were adjusted for this
+larger scene; the reference hardware profile stays unchanged.
 
-Next checkpoints: diagnose the missing/quiet intro sea sound, verify continuous
-world music, and implement all Seyda Neen interiors with linked doors. Existing
-Census/prison coverage does not complete the town interiors request.
+See [release evidence and remaining limits](RELEASE-v0.0.23-dev2.md),
+[room inventory](SEYDA_NEEN_INTERIORS.md) and the continuously maintained
+[29 September work plan](PLAN-2026-09-29.md). Complete voice behaviour is the next
+checkpoint. Strider travel, calendar/wait/day-night sky and blight remain planned.
+
+## Historical context
 
 The following describes the preceding v0.0.22 release.
 

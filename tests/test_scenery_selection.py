@@ -47,3 +47,10 @@ class ScenerySelectionTests(unittest.TestCase):
                                             ref(2,'tree','STAT',30)]},[0,0],1,10)
         self.assertEqual([r['number'] for r in chosen],[1])
         self.assertEqual(len(report['omitted']),1)
+
+    def test_rectangular_coverage_keeps_rocks_crossing_boundary(self):
+        rock=ref(1,'rock','STAT',12,[[8,-2,-1],[18,2,1]])
+        outside=ref(2,'rock','STAT',30)
+        selected,_=select_runtime_refs({'references':[rock,outside],
+            'runtime_bounds':[[-10,-4],[10,4]]},[0,0],1,736)
+        self.assertEqual([r['number'] for r in selected],[1])

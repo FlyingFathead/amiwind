@@ -15,76 +15,63 @@ Commodore Amiga.**
 
 ## Current state of the project
 
-**A small, traversable Morrowind demake is running on the Amiga AGA development
-target.** The current demo includes a bounded Seyda Neen exterior and a separate
-prison-ship interior. Fargoth and two guards have dressed, animated idle models;
-they turn toward the player and can play original greetings. Walking, mouse look,
-collision, Nord hands, streamed music, menus and a debug console are working.
-The new UI uses the original Magic Cards font and border artwork from your own
-game files, with dialogue in the lower strip and an unchanged console font.
-The main menu now uses a smaller, lower panel; UI defaults to 14 px with 16/14/12
-and fallback choices in Options.
+**AmiWind v0.0.23-dev2** expands the playable Seyda Neen area, with all **13 town
+interiors**, nearby **Addamasartus**, the prison ship, and the original **Silt
+Strider and Darvame Hleran** at the port. The local cast now includes 30 ordinary
+NPC placements / 27 appearances alongside the scripted introduction actors.
+NPCs have solid bodies; interior furniture, lights and original door destinations
+are converted from your own game data.
 
-**AmiWind v0.0.23-dev1** is the current development checkpoint after the v0.0.22
-release. The build now schedules independent stages concurrently and uses bounded
-process workers for scenery decoding, scene previews, BSP geometry/lightmaps, intro actors, character heads and music.
-The default worker budget follows available CPUs; `--jobs N` sets a limit and
-`--single-thread` selects the serial path. See [parallel builds](docs/PARALLEL_BUILD.md).
+This is an **interior inspection checkpoint**. All 16 scenes have loaded in the
+reference emulator, and the Tradehouse front door has been tested in both
+directions. This does not certify every floor, stair or door. Cave lighting is
+still basic; full dialogue, voice cycles, NPC services, inventory and combat remain
+unfinished. The Strider is a placed model; travel service is planned.
+See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23-dev2.md) and
+[29 September roadmap](docs/PLAN-2026-09-29.md).
 
-Font source selection remains automatic: usable TTFs are preferred; absent or
-unusable TTFs use the original FNT/TEX data. `--bitmap-paper-ink filled` (default)
-and `--bitmap-paper-ink original` select the bitmap **reading-page ink**, not the
-font source. Dialogue/menu fonts are preserved. See [font options](docs/PAPER_FONT_OPTIONS.md).
+New Game plays the optional owned intro movie (Esc skips), then uses a **blank
+loading screen** into Jiub's ship scene. Ordinary travel keeps the owned loading
+art. Music remains serviced through map reads and decoding; repeated interior
+loads kept the selected track playing with no measured underruns after startup.
+The extra ship-wave attenuation has been removed. The reusable setting is
+`aw_loading_style normal|blank`; see [debug controls](docs/DEBUG_OVERLAYS.md).
 
-The preserved dev7 startup behavior keeps the versioned startup environment preflight on
-screen for a five-second default countdown; **Space or Enter continues immediately**.
-The public asset-free dry-run HDF now runs the same `AmiWindCheck` first and then
-shows its original test-build notice, so screenshots expose the exact build and
-hardware result without relying on console scrollback. The guest-side checker
-reports observable CPU/FPU, AGA, PAL timing, Exec API and memory state; the portable
-FS-UAE launcher covers host-only JIT/CPU-speed/profile facts and the reference
-Kickstart 3.1 A1200 40.68 SHA-256. Dev7 otherwise preserves dev6/dev5 gameplay.
-Polygonal POI regions remain an optional design experiment;
-cell streaming is preserved as an option. The included dev3 maintenance repairs an omitted Census room, improves paper contrast,
-adds small interaction hints and WASD choices, and corrects dock interception,
-fighting permissions and courtyard ring depletion. New Game defaults to confirmation;
-dev2's opening barrier correction remains included. The opening playtest includes: dock race/appearance
-selection with rotating heads, Census Office rooms and NPCs, class/birthsign/stat
-review, papers and release adapters, and a bounded save/load implementation with
-adjustable autosave history. This remains a development slice: full dialogue,
-quests, inventory and combat are unfinished. Read the [release scope and
-validation](docs/RELEASE-v0.0.23-dev1.md) before testing.
+Builds run in parallel by default, within one CPU budget. `--jobs N` sets the
+limit; `--single-thread` selects one worker. New interiors also convert in
+parallel. Both complete font-input variants have compiled in about seven minutes
+with six workers here; this is a build measurement, not a cross-machine speedup
+claim. See [parallel builds](docs/PARALLEL_BUILD.md).
 
-Maintenance from v0.0.20 remains included: prison ambience is 5 dB lower in its
-mixer channels and debug overlay toggles include coordinates. Both intermittent
-FS-UAE freezes remain open; see [bug reports](docs/BUGS.md). The emulator reference
-is A1200/AGA, 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM. Stock A1200 performance
-is unproven. Source, tools and runtime share one VERSION.
+Font selection is automatic: usable owned TTFs are preferred, with original
+FNT/TEX fallback. `--bitmap-paper-ink filled` is the default; `original` selects
+the older bitmap reading-page treatment. This switch does not disable TTFs.
+See [font options](docs/PAPER_FONT_OPTIONS.md).
 
-The public dry-run image runs the same versioned preflight first, waits up to five
-seconds (Space/Enter skips), and then shows the versioned notice screen. Build locally with your own Morrowind files
-for the playable scene; see [build instructions](docs/LINUX_BUILD.md).
+The reference target remains **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
+16 MiB Fast RAM**. Stock A1200 performance is unproven. The versioned preflight
+waits five seconds; Space or Enter continues immediately. Build with your own game
+files using the [Linux instructions](docs/LINUX_BUILD.md). Public CI builds only an
+asset-free boot-notice image. Earlier intermittent freezes remain tracked in
+[BUGS.md](docs/BUGS.md).
 
-The game fades in the AmiWind logo, then opens the **main menu** with the original title music. New Game
-asks for confirmation, then plays the converted prophecy movie when available (Esc skips), then starts the
-prison introduction and resets the selected opening track 04. See
-[movie conversion](docs/INTRO_VIDEO.md). The
-previous town demonstration remains available through `aw_demo_start`.
-Aim at an entrance to see its destination, then press **E**. The ship hatch works;
-unbuilt town interiors show “Interior not found.” without moving the player.
-See [door mapping](docs/DOOR_MAPPING.md) for current coverage.
+Aim at a door and press **E**. The debug scene picker and `aw_scene <map>` expose
+all converted rooms for inspection. The character-creation route, bounded saves,
+menus and first-person hands remain available. See [interior coverage](docs/SEYDA_NEEN_INTERIORS.md)
+and [door mapping](docs/DOOR_MAPPING.md).
 
-| Ship and dock | NPCs in town |
+| Silt Strider and Darvame | Fargoth in the expanded town |
 | :---: | :---: |
-| <img src="docs/images/amiwind-v0.0.15-dev2-dock.png" width="400" height="237" alt="AmiWind: ship and dock at Seyda Neen"> | <img src="docs/images/amiwind-v0.0.15-dev2-npc.png" width="400" height="237" alt="AmiWind: NPC beside a Seyda Neen building"> |
-| **Guard near town** | **Town center** |
-| <img src="docs/images/amiwind-v0.0.15-dev2-guard.png" width="400" height="237" alt="AmiWind: guard near the town's buildings"> | <img src="docs/images/amiwind-v0.0.15-dev2-town.png" width="400" height="237" alt="AmiWind: town center and tower"> |
-| **Waterfront buildings** | |
-| <img src="docs/images/amiwind-v0.0.15-dev2-waterfront.png" width="400" height="237" alt="AmiWind: wooden and stone buildings by the waterfront"> | |
+| ![Original Silt Strider and rider at Seyda Neen](docs/images/amiwind-v0.0.23-dev2-port.png) | ![Fargoth rendered in town](docs/images/amiwind-v0.0.23-dev2-fargoth.png) |
+| **Inside Arrille's Tradehouse** | **Jiub and the bitmap-font name prompt** |
+| ![Tradehouse entry and interior](docs/images/amiwind-v0.0.23-dev2-tradehouse.png) | ![Prison introduction with original bitmap fonts](docs/images/amiwind-v0.0.23-dev2-prison.png) |
 
-*Owner-supplied development screenshots from v0.0.15-dev2. Capture margins are
-cropped; all five images are 954 × 565 pixels, without rescaling the game view.
-Debug FPS values show individual moments, not a hardware benchmark.*
+![In-engine camera pan around the Silt Strider port](docs/images/amiwind-v0.0.23-dev2-port.gif)
+
+*Actual v0.0.23-dev2 FS-UAE captures, 29 September 2026. Screenshots crop only the
+emulator margins; the seven-second camera pan is reduced to 444 pixels wide / 8 fps
+for the README. No generated scenery or composited characters. Dark interiors
+reflect the current renderer. Capture details: [gameplay media](docs/GAMEPLAY_MEDIA.md).*
 
 ## About AmiWind
 
@@ -103,10 +90,6 @@ is preserved alongside the accelerated AGA development track.
 **Repository root: `amiwind/`.** This directory contains the conversion tools,
 complete native engine source, tests and documentation. `engine/aga/` is part of
 this repository, not a second repository. See [repository layout](docs/REPOSITORY_LAYOUT.md).
-
-Version 0.0.17 adds one-command dependency setup and building, optional FS-UAE
-autorun, and the town-center demo opening. The owner has confirmed the rebuilt
-demo works on their Linux/FS-UAE setup. See the [release notes](docs/RELEASE-v0.0.17.md).
 
 **Original Morrowind game files are required. You must provide your own copy.**
 
@@ -151,7 +134,7 @@ independent project is not an OpenMW release or an official Bethesda product.
 > **Public source package — no commercial game data or ROMs.** No Quake or
 > Morrowind game data, reusable game artwork, music, voices, game
 > executables, Amiga Kickstart ROMs or Workbench files are included. This source
-> package includes the selected development screenshots for documentation, but
+> package includes the selected development screenshots and a short clip for documentation, but
 > contains no compiled AmiWind executable or assembly recovered
 > from a game binary. GPL-licensed engine source is distinct from game assets.
 > Supply your own Morrowind installation to convert its data, and a suitable
@@ -224,12 +207,12 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.17 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.23-dev2 configuration template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.17-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.17-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.23-dev2-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.23-dev2-WinUAE.uae) |
 
-1. Build `AmiWind-v0.0.17.hdf` from your own Morrowind installation using the
+1. Build `AmiWind-v0.0.23-dev2.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
    playable game image.
 2. Install an emulator from its official homepage above and save a local copy
