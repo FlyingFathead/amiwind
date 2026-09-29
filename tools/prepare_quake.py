@@ -9,6 +9,8 @@ from mwad.audit import BSA, normpath
 from prepare_scenery import bsa_read
 from preview_scenery import render
 from debug_font import readable_atlas
+from build_jobs import add_jobs, resolve_jobs
+from build_parallel import ordered_map
 
 CENTRE=(-11264,-71680)
 SCALE=.25
@@ -75,7 +77,64 @@ def box(lo,hi,tex,rotation=0):
     return brush(p,[(0,1,2),(4,5,6),(0,1,5),(1,2,6),(2,3,7),(3,0,4)],tex)
 
 
-def prepare(workspace,scene,out):
+def _preview_model(task):
+    import numpy as np
+    from PIL import Image
+    import fast_simplification
+    mi, m, packet, textures, palette, grouped_models = task
+    pal=Image.new('P',(1,1));pal.putpalette(palette)
+    def quantize(im):return im.convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE)
+    name=m['source']
+    if any(t in name for t in ['marker_','scum_','lantern_hook','furn_de_rope']):return mi,None,None,None
+    # Assemblies go directly through the shared BSP mesh pass. The
+    # discarded legacy alias preview cannot represent a whole ship;
+    # forcing it through that vertex budget can stop a valid BSP build.
+    if mi in grouped_models and 'flora_' not in name:
+        return mi,None,None,{'model':name,'kind':'deferred BSP assembly'}
+    vv,ff,_=unpack_geometry(packet);v=np.array(vv);f=np.array(ff,int)
+    if 'flora_' in name:
+        centre=(v[:,:2].min(axis=0)+v[:,:2].max(axis=0))/2;v[:,:2]-=centre
+        radius=float(np.linalg.norm(v[:,:2],axis=1).max());bottom=v[:,2].min();top=v[:,2].max()
+        w=max(1,math.ceil(radius*2*SCALE));h=max(1,math.ceil((top-bottom)*SCALE))
+        rgba=render(v,f,m['materials'],textures,0,(w,h),(-radius,radius,bottom,top))
+        pix=np.array(quantize(rgba));pix[np.array(rgba)[:,:,3]<128]=255
+        raw=struct.pack('<4siifiiifi',b'IDSP',1,2,radius*SCALE,w,h,1,0.,0)
+        raw+=struct.pack('<5i',0,-w//2,round(top*SCALE),w,h)+pix.tobytes()
+        path=f'progs/m{mi:03}.spr'
+        return mi,raw,(path,centre.tolist(),0),{'model':name,'kind':'sprite','bytes':len(raw)}
+    # Weld positions, decimate, then bake a separate small texture triangle per face.
+    points,inverse=np.unique(np.round(v[:,:3],5),axis=0,return_inverse=True)
+    faces=inverse[f[:,:3]];target=280 if any(t in name for t in ['house','shack','tower','lighthouse']) else 100
+    if len(faces)>target:
+        points,faces=fast_simplification.simplify(points,faces.astype(np.int32),target_count=target)
+    if len(faces)>600:raise ValueError('Simplification exceeded alias budget')
+    skin=Image.new('RGB',(256,256));uv=[];outpoints=[];outfaces=[]
+    orig_centres=v[f[:,:3],:3].mean(axis=1)
+    for fi,face in enumerate(faces):
+        triangle=points[face];mid=triangle.mean(axis=0)
+        oi=int(np.argmin(((orig_centres-mid)**2).sum(axis=1)));old=v[f[oi,:3]];mat=m['materials'][f[oi,3]]
+        # Project onto the nearest original triangle for a bounded UV bake.
+        basis=np.column_stack((old[1,:3]-old[0,:3],old[2,:3]-old[0,:3]));inv=np.linalg.pinv(basis)
+        coords=(triangle-old[0,:3])@inv.T
+        texuv=old[0,3:5]+coords[:,0,None]*(old[1,3:5]-old[0,3:5])+coords[:,1,None]*(old[2,3:5]-old[0,3:5])
+        tile=np.zeros((8,8,3),np.uint8)
+        for y in range(8):
+            for x in range(8):
+                weights=np.array([max(0.,1-(x+y)/7),x/7,y/7]);weights/=weights.sum()
+                if mat['texture_index'] is None:colour=np.array([180.,180.,180.])
+                else:
+                    t=textures[mat['texture_index']];u,w=weights@texuv
+                    colour=t[int(math.floor(w*t.shape[0]))%t.shape[0],int(math.floor(u*t.shape[1]))%t.shape[1],:3].astype(float)
+                colour*=np.array(mat['diffuse'])*np.mean(old[:,5:8],axis=0)/255
+                tile[y,x]=np.clip(colour*1.25,0,255)
+        tx=(fi%32)*8;ty=(fi//32)*8;skin.paste(Image.fromarray(tile,'RGB'),(tx,ty))
+        uv.extend([(tx,ty),(tx+7,ty),(tx,ty+7)])
+        start=len(outpoints);outpoints.extend((triangle*SCALE).tolist());outfaces.append([start,start+2,start+1])
+    path=f'progs/m{mi:03}.mdl';raw=mdl(outpoints,outfaces,uv,quantize(skin))
+    return mi,raw,(path,[0,0],len(faces)),{'model':name,'kind':'mesh','source_triangles':len(f),'triangles':len(faces),'bytes':len(raw)}
+
+
+def prepare(workspace,scene,out,jobs=None):
     import numpy as np
     from PIL import Image,ImageDraw,ImageFont
     import fast_simplification
@@ -128,58 +187,19 @@ def prepare(workspace,scene,out):
         (game/'gfx'/f'{name}.lmp').write_bytes(struct.pack('<ii',*size)+im.tobytes())
     generated={};reports=[]
     grouped_models={r['model_index'] for r in index['references'] if r.get('scene_groups')}
-    with (scene/'scenery.mwpak').open('rb') as archive:
-        for mi,m in enumerate(index['models']):
-            name=m['source']
-            if any(t in name for t in ['marker_','scum_','lantern_hook','furn_de_rope']):continue
-            # Assemblies go directly through the shared BSP mesh pass. The
-            # discarded legacy alias preview cannot represent a whole ship;
-            # forcing it through that vertex budget can stop a valid BSP build.
-            if mi in grouped_models and 'flora_' not in name:
-                reports.append({'model':name,'kind':'deferred BSP assembly'})
-                continue
-            vv,ff,_=unpack_geometry(read_asset(archive,m));v=np.array(vv);f=np.array(ff,int)
-            if 'flora_' in name:
-                centre=(v[:,:2].min(axis=0)+v[:,:2].max(axis=0))/2;v[:,:2]-=centre
-                radius=float(np.linalg.norm(v[:,:2],axis=1).max());bottom=v[:,2].min();top=v[:,2].max()
-                w=max(1,math.ceil(radius*2*SCALE));h=max(1,math.ceil((top-bottom)*SCALE))
-                rgba=render(v,f,m['materials'],textures,0,(w,h),(-radius,radius,bottom,top))
-                pix=np.array(quantize(rgba));pix[np.array(rgba)[:,:,3]<128]=255
-                raw=struct.pack('<4siifiiifi',b'IDSP',1,2,radius*SCALE,w,h,1,0.,0)
-                raw+=struct.pack('<5i',0,-w//2,round(top*SCALE),w,h)+pix.tobytes()
-                path=f'progs/m{mi:03}.spr';(game/path).write_bytes(raw);generated[mi]=(path,centre.tolist(),0)
-                reports.append({'model':name,'kind':'sprite','bytes':len(raw)});continue
-            # Weld positions, decimate, then bake a separate small texture triangle per face.
-            points,inverse=np.unique(np.round(v[:,:3],5),axis=0,return_inverse=True)
-            faces=inverse[f[:,:3]];target=280 if any(t in name for t in ['house','shack','tower','lighthouse']) else 100
-            if len(faces)>target:
-                points,faces=fast_simplification.simplify(points,faces.astype(np.int32),target_count=target)
-            if len(faces)>600:raise ValueError('Simplification exceeded alias budget')
-            skin=Image.new('RGB',(256,256));uv=[];outpoints=[];outfaces=[]
-            orig_centres=v[f[:,:3],:3].mean(axis=1)
-            for fi,face in enumerate(faces):
-                triangle=points[face];mid=triangle.mean(axis=0)
-                oi=int(np.argmin(((orig_centres-mid)**2).sum(axis=1)));old=v[f[oi,:3]];mat=m['materials'][f[oi,3]]
-                # Project onto the nearest original triangle for a bounded UV bake.
-                basis=np.column_stack((old[1,:3]-old[0,:3],old[2,:3]-old[0,:3]));inv=np.linalg.pinv(basis)
-                coords=(triangle-old[0,:3])@inv.T
-                texuv=old[0,3:5]+coords[:,0,None]*(old[1,3:5]-old[0,3:5])+coords[:,1,None]*(old[2,3:5]-old[0,3:5])
-                tile=np.zeros((8,8,3),np.uint8)
-                for y in range(8):
-                    for x in range(8):
-                        weights=np.array([max(0.,1-(x+y)/7),x/7,y/7]);weights/=weights.sum()
-                        if mat['texture_index'] is None:colour=np.array([180.,180.,180.])
-                        else:
-                            t=textures[mat['texture_index']];u,w=weights@texuv
-                            colour=t[int(math.floor(w*t.shape[0]))%t.shape[0],int(math.floor(u*t.shape[1]))%t.shape[1],:3].astype(float)
-                        colour*=np.array(mat['diffuse'])*np.mean(old[:,5:8],axis=0)/255
-                        tile[y,x]=np.clip(colour*1.25,0,255)
-                tx=(fi%32)*8;ty=(fi//32)*8;skin.paste(Image.fromarray(tile,'RGB'),(tx,ty))
-                uv.extend([(tx,ty),(tx+7,ty),(tx,ty+7)])
-                start=len(outpoints);outpoints.extend((triangle*SCALE).tolist());outfaces.append([start,start+2,start+1])
-            path=f'progs/m{mi:03}.mdl';raw=mdl(outpoints,outfaces,uv,quantize(skin));(game/path).write_bytes(raw)
-            generated[mi]=(path,[0,0],len(faces));reports.append({'model':name,'kind':'mesh','source_triangles':len(f),'triangles':len(faces),'bytes':len(raw)})
-            print('mesh',mi,len(faces),name,flush=True)
+    def tasks():
+        with (scene/'scenery.mwpak').open('rb') as archive:
+            for mi,m in enumerate(index['models']):
+                used={mat['texture_index'] for mat in m['materials'] if mat['texture_index'] is not None}
+                yield mi,m,read_asset(archive,m),{ti:textures[ti] for ti in used},palette,grouped_models
+    workers=min(resolve_jobs(jobs),max(1,len(index['models'])))
+    print(f'Scene preview workers: {workers}',flush=True)
+    for mi,raw,generated_model,report in ordered_map(_preview_model,tasks(),workers):
+        if report is not None:reports.append(report)
+        if generated_model is not None:
+            generated[mi]=generated_model
+            (game/generated_model[0]).write_bytes(raw)
+        print('preview',mi+1,'/',len(index['models']),flush=True)
     # A tiny original player placeholder; first-person view does not draw itself.
     skin=Image.new('P',(16,16),224)
     (game/'progs/player.mdl').write_bytes(mdl([[0,0,0],[1,0,0],[0,1,0]],[[0,1,2]],[(0,0),(1,0),(0,1)],skin))
@@ -277,4 +297,4 @@ map seyda
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True);p.add_argument('--scene',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
-    a=p.parse_args();prepare(a.workspace,a.scene,a.out)
+    add_jobs(p);a=p.parse_args();prepare(a.workspace,a.scene,a.out,a.jobs)

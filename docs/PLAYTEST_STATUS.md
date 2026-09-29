@@ -4,6 +4,17 @@ Keep owner reports separate from local acceptance tests. A fix at one location
 is not evidence that every collision/rendering issue is solved. New reports
 append to the relevant version; do not rewrite earlier observations as passes.
 
+## v0.0.23-dev1 / parallel-build checkpoint
+
+Both TTF-present and bitmap-only builds compile and boot to the menu/prison
+name prompt in FS-UAE 3.1.66 with the reference profile. Font receipts verify
+automatic selection and filled bitmap paper ink. Movie skip works. The debug
+town transition completes, but the following scripted Census command was not
+confirmed and is not an acceptance pass. No full opening-route, hardware or
+Windows test is claimed. Earlier intermittent freezes remain unresolved.
+See [the release record](RELEASE-v0.0.23-dev1.md) for conversion comparisons,
+build timings and remaining audio/interior work.
+
 ## v0.0.12-dev2 / checkpoint-013
 
 | Item | Status | Evidence / remaining scope |

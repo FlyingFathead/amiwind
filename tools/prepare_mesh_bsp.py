@@ -32,7 +32,72 @@ def bounded_planes(points, equations):
     return np.unique(np.round(np.vstack((equations, axial)), 5), axis=0)
 
 
-def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
+def _prepare_model(task):
+    mi, m, profile, archive_path = task
+    name = m['source']
+    with Path(archive_path).open('rb') as archive:
+        vv,ff,_=unpack_geometry(read_asset(archive,m));v=np.array(vv);f=np.array(ff)
+        lod={};visual_v,visual_f=v,f
+        if profile:
+         prefixes=profile.get('preserve_shape_prefixes',[])
+         matched={prefix:[i for i,mat in enumerate(m['materials'])
+                          if mat.get('source_shape','').casefold().startswith(prefix.casefold())]
+                  for prefix in prefixes}
+         if any(not values for values in matched.values()):raise ValueError('Missing preserved structural shape in '+name)
+         keep={i for values in matched.values() for i in values}
+         visual_v,visual_f,lod=reduce_mesh(v,f,profile['ratio'],keep)
+        collision_v,collision_f=v,f
+        if m.get('collision'):
+         cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
+         collision_v,collision_f=np.array(cv),np.array(cf)
+         lod['collision']='authored RootCollisionNode, approximate convex conversion'
+        pieces=(shell_collision_parts(collision_v,collision_f) if profile.get("hollow_collision") else collision_parts(collision_v,collision_f,2))
+    polys = surface_polygons(visual_v, visual_f)
+    texsize = profile.get('texture_size', 64)
+    if texsize not in (16, 32, 64):
+        raise ValueError('Unsupported static texture size')
+    polys = [(patch, mat, ax, off, normal) for poly, mat, ax, off, normal in polys
+             for patch in split_surface(poly, np.column_stack((ax.T*texsize, off*texsize)))]
+    # The assembly pass recomputes world-space hulls after each placement.
+    pieces = [(points, None, ids, error) for points, hull, ids, error in pieces]
+    return mi, (v, f, polys, pieces, lod)
+
+
+def _instance_key(ref, lighting):
+    key=(ref['model_index'],round(ref['scale'],6),round(ref['rotation_radians'][0],6),round(ref['rotation_radians'][1],6))
+    return (*key,ref['number']) if lighting else key
+
+
+def _prepare_placement(task):
+    from scipy.spatial import ConvexHull
+    from types import SimpleNamespace
+    ref, data, texsize, centre, lighting = task
+    v,f,polys,components,lod=data
+    origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
+    o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
+    rx,ry,rz=-np.array(ref['rotation_radians']);rz=0;cx,sx,cy,sy,cz,sz=np.cos(rx),np.sin(rx),np.cos(ry),np.sin(ry),np.cos(rz),np.sin(rz)
+    r=np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])@np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])@np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]]);scale=ref['scale']
+    yr=math.radians(yaw);rotation=np.array([[math.cos(yr),-math.sin(yr),0],[math.sin(yr),math.cos(yr),0],[0,0,1]])
+    surfaces=[]
+    for polygon,material,axes,offset,source_normal in polys:
+        q=polygon@r.T*scale+o;n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
+        normal=r@source_normal
+        if n@normal<0:q=q[::-1];n=-n
+        ax=r@axes/scale*texsize;off=offset*texsize-o@ax
+        samples=None
+        if lighting:
+            from interior_lighting import bake_surface
+            samples=bake_surface(q,ax,off,rotation,origin,lighting)
+        surfaces.append((q,n,ax,off,material,samples))
+    worldparts=[]
+    for points,hull,ids,error in components:
+        points=points@r.T*scale+o
+        worldparts.append((points,SimpleNamespace(equations=ConvexHull(points).equations),ids,error))
+    points=v[:,:3]@r.T*SCALE*scale+o
+    return surfaces,worldparts,points.min(axis=0)-1,points.max(axis=0)+1
+
+
+def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None):
     b=src.read_bytes();assert struct.unpack_from('<i',b)[0]==29
     lumps=[bytearray(b[o:o+s]) for o,s in [struct.unpack_from('<ii',b,4+k*8) for k in range(15)]]
     index=json.loads((scenery/'scenery-index.json').read_text());archive=(scenery/'scenery.mwpak').open('rb')
@@ -84,77 +149,64 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
      return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
 
     selected, selection_report = select_runtime_refs(index, centre, SCALE, 736)
-    for ref in selected:
-     mi=ref['model_index'];m=index['models'][mi];name=m['source']
-     if any(t in name for t in ['flora_','marker_','scum_','lantern_hook','furn_de_rope']):continue
-     o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
-     origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
-     key=(mi,round(ref['scale'],6),round(ref['rotation_radians'][0],6),round(ref['rotation_radians'][1],6))
-     if lighting:key=(*key,ref['number'])
-     if key in instance_models:
-      entities.append(entity(instance_models[key],origin,yaw,ref['number']));continue
+    unique = dict.fromkeys(ref['model_index'] for ref in selected
+                           if not any(t in index['models'][ref['model_index']]['source']
+                                      for t in ['flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope']))
+    tasks = [(mi, index['models'][mi], profiles.get(index['models'][mi]['source'], {}),
+              scenery/'scenery.mwpak') for mi in unique]
+    workers = min(resolve_jobs(jobs), max(1, len(tasks)))
+    print(f'BSP geometry workers: {workers}; {len(tasks)} unique models', flush=True)
+    models = dict(ordered_map(_prepare_model, tasks, workers))
+    def placement_tasks():
+     seen=set()
+     for ref in selected:
+       mi=ref['model_index']
+       if mi not in models:continue
+       key=_instance_key(ref,lighting)
+       if key in seen:continue
+       seen.add(key)
+       yield ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting
+    # Geometry and lightmaps are private worker results. BSP offsets, shared
+    # palettes and entity order are assigned by this single assembly writer.
+    from contextlib import closing
+    with closing(ordered_map(_prepare_placement,placement_tasks(),workers)) as placements:
+     for ref in selected:
+      mi=ref['model_index'];m=index['models'][mi];name=m['source']
+      if any(t in name for t in ['flora_','marker_','scum_','lantern_hook','furn_de_rope']):continue
+      o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
+      origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
+      key=_instance_key(ref,lighting)
+      if key in instance_models:
+       entities.append(entity(instance_models[key],origin,yaw,ref['number']));continue
 
-     rx,ry,rz=-np.array(ref['rotation_radians']);rz=0;cx,sx,cy,sy,cz,sz=np.cos(rx),np.sin(rx),np.cos(ry),np.sin(ry),np.cos(rz),np.sin(rz)
-     r=np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])@np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])@np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]]);scale=ref['scale']
-     if mi not in models:
-      vv,ff,_=unpack_geometry(read_asset(archive,m));v=np.array(vv);f=np.array(ff)
-      profile=profiles.get(name,{});lod={};visual_v,visual_f=v,f
-      if profile:
-       prefixes=profile.get('preserve_shape_prefixes',[])
-       matched={prefix:[i for i,mat in enumerate(m['materials'])
-                        if mat.get('source_shape','').casefold().startswith(prefix.casefold())]
-                for prefix in prefixes}
-       if any(not values for values in matched.values()):raise ValueError('Missing preserved structural shape in '+name)
-       keep={i for values in matched.values() for i in values}
-       visual_v,visual_f,lod=reduce_mesh(v,f,profile['ratio'],keep)
-      collision_v,collision_f=v,f
-      if m.get('collision'):
-       cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
-       collision_v,collision_f=np.array(cv),np.array(cf)
-       lod['collision']='authored RootCollisionNode, approximate convex conversion'
-      pieces=(shell_collision_parts(collision_v,collision_f) if profile.get("hollow_collision") else collision_parts(collision_v,collision_f,2))
-      models[mi]=(v,f,surface_polygons(visual_v,visual_f),pieces,lod)
-     v,f,polys,components,lod=models[mi]
-     texsize=profiles.get(name,{}).get('texture_size',64)
-     if texsize not in (16,32,64):raise ValueError('Unsupported static texture size')
-     polys=[(patch,mat,ax,off,normal) for poly,mat,ax,off,normal in polys
-            for patch in split_surface(poly,np.column_stack((ax.T*texsize,off*texsize)))]
-     firstface=len(lumps[7])//20;vmap={};emap={}
-     def vertex(p):
-      key=tuple(np.round(p,5))
-      if key not in vmap:vmap[key]=len(lumps[3])//12;lumps[3]+=struct.pack('<3f',*p)
-      return vmap[key]
-     for polygon,material,axes,offset,source_normal in polys:
-      q=polygon@r.T*scale+o;n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
-      normal=r@source_normal
-      if n@normal<0:q=q[::-1];n=-n
-      pi=plane(n,float(n@q[0]));ax=r@axes/scale*texsize;off=offset*texsize-o@ax;t=texture(m,material,texsize);txkey=(*np.round(ax.flatten(),5),*np.round(off,4),t)
-      if txkey not in texinfo_cache:
-       tx=len(lumps[6])//40;texinfo_cache[txkey]=tx;lumps[6]+=struct.pack('<8fii',*ax[:,0],off[0],*ax[:,1],off[1],t,0)
-      tx=texinfo_cache[txkey];verts=[vertex(p) for p in q[::-1]];firstedge=len(lumps[13])//4
-      for a,c in zip(verts,verts[1:]+verts[:1]):
-       if (a,c) in emap:ed=emap[a,c]
-       elif (c,a) in emap:ed=-emap[c,a]
-       else:ed=len(lumps[12])//4;emap[a,c]=ed;lumps[12]+=struct.pack('<HH',a,c)
-       lumps[13]+=struct.pack('<i',ed)
-      lightoffset=-1;styles=(255,255,255,255)
-      if lighting:
-       from interior_lighting import bake_surface
-       yr=math.radians(yaw);rotation=np.array([[math.cos(yr),-math.sin(yr),0],[math.sin(yr),math.cos(yr),0],[0,0,1]])
-       samples=bake_surface(q,ax,off,rotation,origin,lighting)
-       lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(0,255,255,255)
-      lumps[7]+=struct.pack('<Hhihh4Bi',pi,0,firstedge,len(verts),tx,*styles,lightoffset)
-     worldparts=[]
-     for p,hull,ids,error in components:
-      from scipy.spatial import ConvexHull
-      p=p@r.T*scale+o;worldparts.append((p,ConvexHull(p),ids,error))
-     nroot,croot=collider(worldparts)
-     points=v[:,:3]@r.T*SCALE*scale+o;lo=points.min(axis=0)-1;hi=points.max(axis=0)+1
-     modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
-     lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
-     instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
-     report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':scale,'visual_lod':lod,'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
-     if len(lumps[5])//24>32767 or len(lumps[9])//8>32767:raise ValueError('Node budget exceeded')
+      v,f,polys,components,lod=models[mi]
+      texsize=profiles.get(name,{}).get('texture_size',64)
+      surfaces,worldparts,lo,hi=next(placements)
+      firstface=len(lumps[7])//20;vmap={};emap={}
+      def vertex(p):
+       key=tuple(np.round(p,5))
+       if key not in vmap:vmap[key]=len(lumps[3])//12;lumps[3]+=struct.pack('<3f',*p)
+       return vmap[key]
+      for q,n,ax,off,material,samples in surfaces:
+       pi=plane(n,float(n@q[0]));t=texture(m,material,texsize);txkey=(*np.round(ax.flatten(),5),*np.round(off,4),t)
+       if txkey not in texinfo_cache:
+        tx=len(lumps[6])//40;texinfo_cache[txkey]=tx;lumps[6]+=struct.pack('<8fii',*ax[:,0],off[0],*ax[:,1],off[1],t,0)
+       tx=texinfo_cache[txkey];verts=[vertex(p) for p in q[::-1]];firstedge=len(lumps[13])//4
+       for a,c in zip(verts,verts[1:]+verts[:1]):
+        if (a,c) in emap:ed=emap[a,c]
+        elif (c,a) in emap:ed=-emap[c,a]
+        else:ed=len(lumps[12])//4;emap[a,c]=ed;lumps[12]+=struct.pack('<HH',a,c)
+        lumps[13]+=struct.pack('<i',ed)
+       lightoffset=-1;styles=(255,255,255,255)
+       if samples is not None:
+        lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(0,255,255,255)
+       lumps[7]+=struct.pack('<Hhihh4Bi',pi,0,firstedge,len(verts),tx,*styles,lightoffset)
+      nroot,croot=collider(worldparts)
+      modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
+      lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
+      instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
+      report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':lod,'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
+      if len(lumps[5])//24>32767 or len(lumps[9])//8>32767:raise ValueError('Node budget exceeded')
     # New texture table, preserving the original lumps verbatim.
     tex=bytearray();offs=[]
     for t in textures:offs.append(4+4*len(textures)+len(tex));tex+=t
@@ -178,6 +230,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None):
 
 
 from build_jobs import add_jobs, resolve_jobs
+from build_parallel import ordered_map
 
 def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
     scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
@@ -196,7 +249,7 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
         subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable!=qbsp else []),*options,target],cwd=out,check=True)
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
     rebuild_world_hull(base,out/'seyda.map',qbsp)
-    result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp')
+    result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs)
     shutil.copyfile(out/'seyda.bsp',out/'id1/maps/seyda.bsp')
     result['format']='AmiWind compiled mesh BSP29'
     result['standing_hull_profile']=PROFILE

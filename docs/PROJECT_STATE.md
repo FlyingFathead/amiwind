@@ -1,6 +1,18 @@
 # Current project state - 29 September 2026
 
-**Current public source release: AmiWind v0.0.22.**
+**Current development checkpoint: AmiWind v0.0.23-dev1, based on public v0.0.22.**
+
+This checkpoint adds default bounded parallel host builds; gameplay and font
+selection are preserved. See [build details](PARALLEL_BUILD.md) and
+[checkpoint validation](RELEASE-v0.0.23-dev1.md). Owner confirmed the v0.0.22 Steam
+bitmap fallback works. Local TTF and bitmap-only build evidence is recorded in
+the new checkpoint note, separately from that owner report.
+
+Next checkpoints: diagnose the missing/quiet intro sea sound, verify continuous
+world music, and implement all Seyda Neen interiors with linked doors. Existing
+Census/prison coverage does not complete the town interiors request.
+
+The following describes the preceding v0.0.22 release.
 
 v0.0.22 promotes the reconciled v0.0.21-dev8 source checkpoint to the current
 normal public release without adding gameplay features. The dev7 boot checker,

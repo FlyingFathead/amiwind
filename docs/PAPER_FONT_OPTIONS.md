@@ -15,6 +15,15 @@ Both bitmap modes leave dialogue and menu glyphs unchanged, including the 12px
 small-text character UI. TTF parsing failures are reported before the same bitmap
 fallback is used. Output errors such as a full disk remain build failures.
 
+## Font-source selection
+
+Selection is automatic in both the guided build and native-image assembly.
+A usable TTF wins; otherwise the complete corresponding FNT/TEX pair is used.
+There is no `--font-source` switch in this checkpoint. `--bitmap-paper-ink`
+controls bitmap paper coverage only and does not force the bitmap path when a
+usable TTF exists. Testing a bitmap-only installation requires a separate input
+copy without the loose BookArt TTFs; keep the owned installation unchanged.
+
 ## Command line and JSON
 
 Append either option to the normal guided build command:

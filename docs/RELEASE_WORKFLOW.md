@@ -5,8 +5,8 @@ Official project: https://github.com/FlyingFathead/amiwind/
 Use one shared release number. The current public source release is **v0.0.22**;
 see [release notes and validation](RELEASE-v0.0.22.md). Earlier releases remain immutable.
 AmiWind remains a demo. Public GitHub releases use plain `0.0.x` version numbers;
-older `-devN` tags remain historical development checkpoints rather than the preferred
-public-release naming scheme.
+development checkpoints after v0.0.22 use **v0.0.23-dev1**, then dev2, dev3, and so on.
+Use a new dev suffix for each delivered checkpoint; retain prior artifacts unchanged.
 The old separate Python pipeline numbering is historical. Root `VERSION` is the
 only maintained version number. Build and packaging tools read it through
 `tools/project_version.py`; Python package metadata reads the same file.
@@ -14,20 +14,21 @@ The native Makefile generates C and assembly version includes in the build tree.
 Boot/HUD/load text, the Amiga `$VER` identifier, receipts and output filenames
 therefore use that number. A value such as `0.0.17-dev1` normalizes to
 `0.0.17.dev1` in Python package metadata. Historical release records keep their
-original numbers. The naming examples below describe the published v0.0.16 set.
+original numbers. The current delivery set is v0.0.23-dev1.
 
 ## Deliverables and structure
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.16-public-source.zip` | Complete repository under `amiwind/`; extract from `/path/to/downloads/`. |
-| `AmiWind-v0.0.16-public-source-incremental.zip` | Added/changed public files under `amiwind/`, since the exact preceding delivered source. |
-| `AmiWind-v0.0.16-private-playable.zip` | Private package with `AmiWind-v0.0.16.hdf`, README and `build.json` at its root, plus `roms/`, `resources/emulators/`, `docs/`, `private-conversion/` and `evidence/`. |
+| `AmiWind-v0.0.23-dev1-public-source.zip` | Complete repository under `amiwind/`; extract from `/path/to/downloads/`. |
+| `AmiWind-v0.0.23-dev1-public-source-incremental.zip` | Added/changed public files under `amiwind/`, since the exact uploaded v0.0.22 workspace. |
+| `AmiWind-v0.0.23-dev1-private-playable.zip` | TTF-present private playtest: HDF, launcher, README and `build.json` at its root, plus ROM, presets, conversion receipts and evidence. |
+| `AmiWind-v0.0.23-dev1-bitmap-private-playable.zip` | Separate bitmap-only private playtest with the same structure and filled paper ink. |
 
 Each ZIP has a same-name `.sha256` sidecar. The private package includes the
 owner's supplied ROM as `roms/kickstart-3.1-a1200.rom`; it is never a GitHub asset.
-The optional asset-free `AmiWind-v0.0.16-dry-run.zip` has a notice HDF and matching
-source, contains no ROM/game data and does not replace the playable package.
+Asset-free dry-run images contain no ROM/game data and do not replace playable
+packages. No separate dry-run archive is delivered for dev1.
 
 The source repository has one root. Native AGA code is in `engine/aga/`, host
 conversion code in `src/mwad/`, commands in `tools/`, documentation in `docs/`,
@@ -37,19 +38,33 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-Name the exact patch base and SHA-256 in `docs/PATCH-v0.0.16.json`. Include only
+Name the exact patch base and SHA-256 in `docs/PATCH-v0.0.23-dev1.json`. Include only
 added/changed files and patch metadata. List deletions explicitly; unzip alone
 cannot remove obsolete files. Verify a clean application reproduces the full
 source tree, including its generated package manifest. Always provide the full
 source alongside the patch.
 
-This patch starts from `amiwind-0.12.1.dev1-source.zip`, SHA-256
-`73b06b6189de15ad0baa9d43c47541de30fe2e07d83dfcb3e44fdebfd90423c4`.
-That file contains newer consolidation work despite its misleading old pipeline
-number. Users starting from the two-root v0.0.15-dev2 source should extract the
-full v0.0.16 ZIP into a fresh `amiwind/` instead. Back up local edits first.
+The dev1 patch starts from `amiwind-2026-09-29_124939.zip`, SHA-256
+`d01d1bf130e4072dc794417f4127a3d7e62469861a85b3b3d146ff5d1baad568`.
+Its base manifest identifies the actual uploaded source bytes. Do not overwrite
+newer local changes with the incremental archive. Check the base first or unpack
+the complete source into a separate directory for comparison.
 
 ## Release gate
+
+**ALWAYS CHECK FOR TRAILING WHITESPACE BEFORE POSTING AN AUTOMATED PUSH/PUBLISH
+SCRIPT.** Check all delivered files before posting or packaging. This check
+belongs to package preparation, before the owner downloads or applies anything.
+Passing tests and an archive allowlist do not replace it.
+
+`tools/release.py --check`, candidate creation and candidate validation all reject
+trailing spaces/tabs, whitespace-only lines, space-before-tab indentation and
+blank lines at EOF in new or modified text files. Only byte-identical historical
+base files are exempt; the current patch's base hashes identify them. This also
+covers files that are untracked or extracted without Git metadata. Before
+delivery, additionally run `git diff --no-index --check BASE_TREE CANDIDATE_TREE`
+on clean extracted source trees and retain the result. Keep the owner's
+`git diff --check` as a final check, not the first place defects are discovered.
 
 Candidates are written under `incoming/`, checked independently, then promoted
 into immutable `releases/`. Validate ZIP paths, source allowlist, content hashes,

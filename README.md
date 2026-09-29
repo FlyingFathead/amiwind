@@ -25,13 +25,16 @@ game files, with dialogue in the lower strip and an unchanged console font.
 The main menu now uses a smaller, lower panel; UI defaults to 14 px with 16/14/12
 and fallback choices in Options.
 
-**AmiWind v0.0.22** is the current public source release. It carries forward the
-reconciled boot/launcher work and the approved bitmap paper-ink correction from
-the v0.0.21 development line. TTF remains preferred; missing or unusable TTFs
-use stronger bitmap ink on reading pages by default. Dialogue and menu fonts
-are unchanged. Use `--bitmap-paper-ink original` to opt out; see
-[paper font options](docs/PAPER_FONT_OPTIONS.md). Whole-pipeline parallelization
-is still pending and is not part of v0.0.22.
+**AmiWind v0.0.23-dev1** is the current development checkpoint after the v0.0.22
+release. The build now schedules independent stages concurrently and uses bounded
+process workers for scenery decoding, scene previews, BSP geometry/lightmaps, intro actors, character heads and music.
+The default worker budget follows available CPUs; `--jobs N` sets a limit and
+`--single-thread` selects the serial path. See [parallel builds](docs/PARALLEL_BUILD.md).
+
+Font source selection remains automatic: usable TTFs are preferred; absent or
+unusable TTFs use the original FNT/TEX data. `--bitmap-paper-ink filled` (default)
+and `--bitmap-paper-ink original` select the bitmap **reading-page ink**, not the
+font source. Dialogue/menu fonts are preserved. See [font options](docs/PAPER_FONT_OPTIONS.md).
 
 The preserved dev7 startup behavior keeps the versioned startup environment preflight on
 screen for a five-second default countdown; **Space or Enter continues immediately**.
@@ -50,7 +53,7 @@ selection with rotating heads, Census Office rooms and NPCs, class/birthsign/sta
 review, papers and release adapters, and a bounded save/load implementation with
 adjustable autosave history. This remains a development slice: full dialogue,
 quests, inventory and combat are unfinished. Read the [release scope and
-validation](docs/RELEASE-v0.0.22.md) before testing.
+validation](docs/RELEASE-v0.0.23-dev1.md) before testing.
 
 Maintenance from v0.0.20 remains included: prison ambience is 5 dB lower in its
 mixer channels and debug overlay toggles include coordinates. Both intermittent

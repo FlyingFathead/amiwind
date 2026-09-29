@@ -21,9 +21,10 @@ from prepare_quake import box, wad, miptex
 from prepare_npcs import quote
 from player_hull import lumps, pack_lumps, rebuild_world_hull
 from prepare_doors import prepare as prepare_doors
+from build_jobs import add_jobs, resolve_jobs
 
 
-def prepare(data_files, scene, qbsp, vis, light):
+def prepare(data_files, scene, qbsp, vis, light, jobs=None):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'census conversion')
     from ui_palette import reserve
     reserve(data_files,scene/'id1')
@@ -44,7 +45,7 @@ def prepare(data_files, scene, qbsp, vis, light):
     # Retain detail in rectangular wall art until the final bounded BSP bake.
     # A 32-pixel intermediate reduced tall tapestries to only 16 pixels wide,
     # then the BSP upscaled that loss. Runtime texture budgets stay unchanged.
-    export_refs(data_files,parts,refs,groups,[0,0,0],4096,128,{'scope':'Census Office geometry and registration paper','cell':cell['name'],'lighting':lighting})
+    export_refs(data_files,parts,refs,groups,[0,0,0],4096,128,{'scope':'Census Office geometry and registration paper','cell':cell['name'],'lighting':lighting},jobs=jobs)
     index=json.loads((parts/'scenery-index.json').read_text())
     if index['errors']:raise ValueError('Census conversion errors: '+str(index['errors']))
     low=np.floor(np.min([r['bounds'][0] for r in index['references']],axis=0)*.25)-32
@@ -64,10 +65,10 @@ def prepare(data_files, scene, qbsp, vis, light):
     source='{\n"classname" "worldspawn"\n"wad" "census.wad"\n"message" "Census and Excise Office"\n'+timings+'\n'+'\n'.join(walls)+'\n}\n'
     source+='{\n"classname" "info_player_start"\n"origin" "'+' '.join(map(str,spawn))+'"\n"angle" "'+str(heading)+'"\n}\n'
     (scene/'census.map').write_text(source)
-    for exe,args in [(qbsp,['-nopercent','census.map']),(vis,['-threads','2','-fast','census.bsp']),(light,['-threads','2','-minlight','24','census.bsp'])]:
+    for exe,args in [(qbsp,['-nopercent','census.map']),(vis,['-threads',str(resolve_jobs(jobs)),'-fast','census.bsp']),(light,['-threads',str(resolve_jobs(jobs)),'-minlight','24','census.bsp'])]:
         subprocess.run([str(Path(exe).resolve()),*args],cwd=scene,check=True)
     base=scene/'census-base.bsp';(scene/'census.bsp').rename(base);rebuild_world_hull(base,scene/'census.map',qbsp)
-    report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting)
+    report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs)
     kinds,_,_=load_master(child_ci(data_files,'Morrowind.esm'));entities=[]
     for identifier,stem,role in [('chargen class','census',6),('chargen captain','captain',7),('chargen door guard','hall',8)]:
         ref=next(r for r in cell['refs'] if r['id'].casefold()==identifier and not r.get('deleted'))
@@ -88,4 +89,4 @@ def prepare(data_files, scene, qbsp, vis, light):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','qbsp','vis','light'):p.add_argument('--'+n,type=Path,required=True)
-    a=p.parse_args();prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light)
+    add_jobs(p);a=p.parse_args();prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.jobs)

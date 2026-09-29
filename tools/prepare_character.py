@@ -15,6 +15,10 @@ from mwad.paths import ensure_external, resolve_data_files, child_ci
 from prepare_quake import CENTRE
 
 
+from build_jobs import add_jobs, resolve_jobs
+from build_parallel import ordered_map
+
+
 def fixed(text, size):
     raw = text.encode('cp1252')
     if not raw or len(raw) >= size or b'\0' in raw:
@@ -188,7 +192,20 @@ def head_preview(assets, skeleton, part, palette):
     return bytes(raw)
 
 
-def prepare(data_files, scene, previews=True):
+_preview_context = None
+
+
+def _head(task):
+    global _preview_context
+    data_files, part, palette = task
+    from npc_geometry import Assets, Skeleton
+    if _preview_context is None or _preview_context[0] != data_files:
+        assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))
+        _preview_context = (data_files, assets, Skeleton(assets))
+    return head_preview(_preview_context[1], _preview_context[2], part, palette)
+
+
+def prepare(data_files, scene, previews=True, jobs=None):
     from npc_geometry import Assets, Skeleton
     data_files = resolve_data_files(data_files); scene = ensure_external(scene, 'character conversion')
     master = child_ci(data_files, 'Morrowind.esm')
@@ -198,10 +215,11 @@ def prepare(data_files, scene, previews=True):
     raw, refs = barriers(master); (scene/'id1/intro/barriers.awb').write_bytes(raw)
     (scene/'id1/intro/seyda.awn').write_bytes(exterior_navigation(master))
     if previews:
-        assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa'))); skeleton = Skeleton(assets)
         palette = (scene/'id1/gfx/palette.lmp').read_bytes()
-        for i, part in enumerate(parts):
-            raw = head_preview(assets, skeleton, part, palette)
+        workers=min(resolve_jobs(jobs),len(parts));print(f'Character preview workers: {workers}',flush=True)
+        tasks=((data_files,part,palette) for part in parts)
+        for i, raw in enumerate(ordered_map(_head,tasks,workers)):
+            part=parts[i]
             (dest/f'h{i:03d}.awh').write_bytes(raw)
             print(f'Head preview {i+1}/{len(parts)}: {part["id"]}', flush=True)
     report.update(parts=parts, barriers=refs, master_sha256=hashlib.sha256(master.read_bytes()).hexdigest())
@@ -214,5 +232,6 @@ if __name__ == '__main__':
     parser.add_argument('--data-files', type=Path, required=True)
     parser.add_argument('--scene', type=Path, required=True)
     parser.add_argument('--no-previews', action='store_true')
+    add_jobs(parser)
     args = parser.parse_args()
-    prepare(args.data_files, args.scene, not args.no_previews)
+    prepare(args.data_files, args.scene, not args.no_previews, args.jobs)

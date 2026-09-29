@@ -9,6 +9,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from mwad.paths import child_ci, ensure_external
+from build_jobs import add_jobs, resolve_jobs
+from build_parallel import ordered_map
 
 RATE = 11015
 BLOCK_FRAMES = 8192
@@ -96,7 +98,28 @@ def unpack_stream(data):
     return bytes(out[:frames * 2])
 
 
-def prepare_music(data_files, output, ffmpeg):
+def _convert_track(task):
+    i, source, data_files, ffmpeg = task
+    pcm = subprocess.check_output([ffmpeg, "-v", "error", "-nostdin", "-threads", "1", "-i", str(source),
+                                   "-threads", "1", "-filter_threads", "1",
+                                   "-vn", "-ac", "2", "-ar", str(RATE),
+                                   "-af", "aresample=osf=u8:dither_method=triangular",
+                                   "-f", "s8", "pipe:1"])
+    packed = pack_stream(pcm)
+    if unpack_stream(packed) != pcm:
+        raise ValueError("Music round-trip mismatch")
+    name = f"track{i:02d}.mws"
+
+    frames = len(pcm) // 2
+    record = {"file": name, "source": source.relative_to(data_files).as_posix(),
+                    "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                    "pcm_frames": frames, "seconds": frames / RATE,
+                    "blocks": (frames + BLOCK_FRAMES - 1) // BLOCK_FRAMES,
+                    "bytes": len(packed), "sha256": hashlib.sha256(packed).hexdigest()}
+    return record, packed
+
+
+def prepare_music(data_files, output, ffmpeg, jobs=None):
     output = ensure_external(output, "soundtrack conversion")
     output.mkdir(parents=True, exist_ok=False)
     music = child_ci(data_files, "Music")
@@ -109,22 +132,13 @@ def prepare_music(data_files, output, ffmpeg):
                               else 1 if p.parts[-2].casefold() == "explore"
                               else 2 if p.parts[-2].casefold() == "battle" else 3))
     records = []
-    for i, source in enumerate(sources):
-        pcm = subprocess.check_output([ffmpeg, "-v", "error", "-nostdin", "-i", str(source),
-                                       "-vn", "-ac", "2", "-ar", str(RATE),
-                                       "-af", "aresample=osf=u8:dither_method=triangular",
-                                       "-f", "s8", "pipe:1"])
-        packed = pack_stream(pcm)
-        if unpack_stream(packed) != pcm:
-            raise ValueError("Music round-trip mismatch")
-        name = f"track{i:02d}.mws"
-        (output / name).write_bytes(packed)
-        frames = len(pcm) // 2
-        records.append({"file": name, "source": source.relative_to(data_files).as_posix(),
-                        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-                        "pcm_frames": frames, "seconds": frames / RATE,
-                        "blocks": (frames + BLOCK_FRAMES - 1) // BLOCK_FRAMES,
-                        "bytes": len(packed), "sha256": hashlib.sha256(packed).hexdigest()})
+    workers = min(resolve_jobs(jobs), len(sources))
+    print(f'Music conversion workers: {workers}', flush=True)
+    tasks = ((i, source, data_files, ffmpeg) for i, source in enumerate(sources))
+    for record, packed in ordered_map(_convert_track, tasks, workers):
+        (output / record['file']).write_bytes(packed)
+        records.append(record)
+        print(f"Music {len(records)}/{len(sources)}: {record['source']}", flush=True)
     manifest = {"format": "MWA1", "rate": RATE, "channels": 2, "bits": 8,
                 "block_frames": BLOCK_FRAMES, "tracks": records,
                 "seconds": sum(r["seconds"] for r in records),
@@ -139,5 +153,6 @@ if __name__ == "__main__":
     parser.add_argument("--data-files", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--ffmpeg", default="ffmpeg")
+    add_jobs(parser)
     args = parser.parse_args()
-    print(json.dumps(prepare_music(args.data_files, args.out, args.ffmpeg), indent=2))
+    print(json.dumps(prepare_music(args.data_files, args.out, args.ffmpeg, args.jobs), indent=2))

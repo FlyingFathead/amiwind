@@ -40,12 +40,24 @@ def job_value(value):
 
 
 def resolve_jobs(value=None):
-    return auto_jobs() if value is None else value
+    if value is not None:
+        return value
+    # A scheduled stage must not expand its allocation back to all host CPUs.
+    inherited = os.environ.get('AMIWIND_BUILD_JOBS')
+    if inherited is not None:
+        try:
+            count = int(inherited)
+        except ValueError:
+            raise ValueError('AMIWIND_BUILD_JOBS must be a positive integer') from None
+        if count < 1:
+            raise ValueError('AMIWIND_BUILD_JOBS must be a positive integer')
+        return count
+    return auto_jobs()
 
 
 def add_jobs(parser):
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-j', '--jobs', '--j', type=job_value, default=None,
-                       metavar='N', help='Compiler jobs (default: auto, available CPU threads)')
+                       metavar='N', help='Total compiler/conversion worker budget (default: auto, available CPU threads)')
     group.add_argument('--single-thread', dest='jobs', action='store_const', const=1,
-                       help='Alias for --jobs 1 for native and map compilation')
+                       help='Alias for --jobs 1; serialize compilation and conversion')

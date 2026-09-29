@@ -21,7 +21,7 @@ class JobTests(unittest.TestCase):
             args.data_files=Path('/owned');args.sdk=Path('/sdk')
             tools={n:'/tools/'+n for n in ('qbsp','vis','light','qcc','ffmpeg','xdftool','rdbtool')}
             for name, command in build.commands(args, tools, Path('/out')):
-                if name in ('engine','interior','bsp'):
+                if name in ('engine','interior','bsp','scenery','scene','census','intro','character','music'):
                     self.assertEqual(command[command.index('--jobs')+1], '1')
             engine=dict(build.dry_run_commands(args,Path('/out')))['engine']
             self.assertEqual(engine[engine.index('--jobs')+1], '1')

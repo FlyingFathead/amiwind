@@ -58,6 +58,8 @@ def parser():
     p.add_argument("--rdbtool", default="rdbtool")
     p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: sprites currently Nord unarmed only")
     add_jobs(p)
+    p.add_argument('--serial-stages', action='store_true',
+                   help='Run stages in order while retaining each stage job limit (diagnostics)')
     add_font_options(p)
     return p
 
@@ -347,8 +349,8 @@ def commands(args, tools, run):
     if args.stage == "aga":
         binary = run / "engine" / RUNTIME_BUILD_DIR / "build/AmiQuakeGCC"
         steps += [
-            ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery")),
-            ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene")),
+            ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery", "--jobs", resolve_jobs(args.jobs))),
+            ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene", "--jobs", resolve_jobs(args.jobs))),
             ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("npcs", tool("prepare_npcs.py", "--data-files", args.data_files, "--scene", run / "bsp-scene", "--out", run / "npc-scene", "--ffmpeg", tools["ffmpeg"])),
@@ -356,14 +358,15 @@ def commands(args, tools, run):
             ("interior", tool("prepare_interior.py", "--data-files", args.data_files, "--scene", run / "hands-scene", "--out", run / "interior-scene", "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("dialogue-lookup", tool("prepare_dialogue_lookup.py", "--data-files", args.data_files, "--out", run / "voice-lookup.json")),
-            ("intro", tool("prepare_intro.py", "--data-files", args.data_files, "--scene", run / "interior-scene", "--out", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
+            ("intro", tool("prepare_intro.py", "--jobs", resolve_jobs(args.jobs), "--data-files", args.data_files, "--scene", run / "interior-scene", "--out", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
             ("census", tool("prepare_census.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
+                "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
-            ("character", tool("prepare_character.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
+            ("character", tool("prepare_character.py", "--jobs", resolve_jobs(args.jobs), "--data-files", args.data_files, "--scene", run / "intro-scene")),
             ("reading", tool("prepare_reading.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
                 "--bitmap-paper-ink", font_options["bitmap_paper_ink"])),
             ("opening-references", tool("prepare_opening_refs.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
-            ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music")),
+            ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
             ("image", tool("build_aga.py", "image", "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
@@ -373,6 +376,9 @@ def commands(args, tools, run):
 
 
 def execute(steps, run, metadata):
+    if metadata.get('compiler_jobs', 1) > 1 and not metadata.get('serial_stages', False):
+        from build_parallel import execute_parallel
+        return execute_parallel(steps, run, metadata, ROOT)
     run.mkdir(parents=True, exist_ok=False)
     (run / "logs").mkdir()
     receipt = {**metadata, "status": "running", "steps": []}
@@ -392,8 +398,10 @@ def execute(steps, run, metadata):
         try:
             with log.open("w") as output:
                 with Progress(f"[{number}/{len(steps)}] {name}"), live_log(log):
+                    from build_parallel import THREAD_LIMITS
                     subprocess.run(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, check=True,
-                                   env=dict(os.environ, PYTHONUNBUFFERED='1'))
+                                   env=dict(os.environ, **THREAD_LIMITS, PYTHONUNBUFFERED='1',
+                                            AMIWIND_BUILD_JOBS=str(metadata.get('compiler_jobs', 1))))
         except (OSError, subprocess.CalledProcessError, KeyboardInterrupt) as exc:
             status = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
             entry.update(status=status, elapsed_seconds=round(time.monotonic() - start, 3))
@@ -421,6 +429,7 @@ def provenance(args, tools):
         "python": sys.version, "data_files": str(args.data_files), "tools": tools,
         "version_comparison": getattr(args, "version_report", []),
         "compiler_jobs": resolve_jobs(args.jobs),
+        "serial_stages": args.serial_stages,
         "font_options": getattr(args, "font_options", None) or resolve_font_options(args),
         "input_check": getattr(args, "input_report", None),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},

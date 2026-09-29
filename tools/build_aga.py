@@ -117,7 +117,7 @@ def engine(args):
     env=os.environ.copy();env['PATH']=str(args.sdk.resolve()/'bin')+os.pathsep+env.get('PATH','')
     jobs=resolve_jobs(args.jobs)
     print(f'Native compiler jobs: {jobs}',flush=True)
-    run(['make','-B',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0'),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
+    run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0'),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
     binary=tree/('build/AmiQuakeGCC-NoFPU' if args.cpu=='68020' else 'build/AmiQuakeGCC')
     check_binary(binary.read_bytes())
     checker=tree/'build/AmiWindCheck'

@@ -168,5 +168,5 @@ The launcher also accepts ROM directories, checks immediate candidate files by
 SHA-256, and prompts for another location if no match is found. This host-side
 change does not alter the engine tested in test-006. README and both Linux/WSL
 guides now lead with `--autoinstall`, with FS-UAE autorun as the Linux play route.
-Future bounded build parallelism is recorded in [ROADMAP](ROADMAP.md).
+Default bounded build parallelism is documented in [PARALLEL_BUILD](PARALLEL_BUILD.md).
 See [final validation scope](VALIDATION-v0.0.17.md).

@@ -1,5 +1,23 @@
 # Development history
 
+## v0.0.23-dev1 - parallel builds, 29 September 2026
+
+- Public package revision 2 removes two trailing-whitespace defects that blocked
+  owner publication and enforces whitespace checks before packaging/delivery.
+  Runtime identity and private compiled images remain unchanged.
+- Resume numbered development checkpoints after the v0.0.22 public release.
+- Schedule independent build stages concurrently under one automatic CPU budget.
+- Use bounded process workers for scenery, previews, BSP geometry/lightmaps,
+  intro actors, character heads and music; preserve deterministic output order.
+- Propagate compiler limits through interiors/Census, keep complete stage logs
+  and cancel dependent work on failure. Add `--serial-stages` for diagnosis.
+- Compile and boot private playtests with TTFs and with bitmap-only font inputs.
+  Document automatic font selection and the existing filled paper-ink default.
+- Preserve gameplay code; sea audio, continuous music verification and the
+  remaining Seyda Neen interiors are subsequent checkpoints.
+
+See [release scope and validation](RELEASE-v0.0.23-dev1.md).
+
 ## v0.0.22 - normal public source release, 29 September 2026
 
 - Promote the reconciled v0.0.21-dev8 source checkpoint to a normal GitHub release.

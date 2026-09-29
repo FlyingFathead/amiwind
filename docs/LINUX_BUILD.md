@@ -34,8 +34,8 @@ Use `--bitmap-paper-ink original` to opt out, or `--bitmap-paper-ink filled` to
 select the candidate explicitly. The same setting is available in
 `config/build-defaults.json` or an external `--build-config FILE.json`.
 CLI settings override the selected JSON, which overrides the shipped defaults.
-See [paper font options](PAPER_FONT_OPTIONS.md). This does not parallelize the
-build. Native/HDF acceptance for the combined dev8 source remains separate.
+See [paper font options](PAPER_FONT_OPTIONS.md). This option changes bitmap reading-page ink;
+TTF/FNT source selection is automatic and independent of the worker limit.
 
 ## 1. Quickest setup and build
 
@@ -45,12 +45,15 @@ From the repository root, run:
 ./build.sh --autoinstall
 ```
 
-Native compilation defaults to the available CPU thread count, respecting CPU
-affinity and Linux container quotas. Use `-j 4` / `--jobs 4` (`--j 4` also works)
-to set a limit, or `--single-thread` / `-j 1` for one compiler job. The same limit
-reaches VIS and LIGHT. The pinned QBSP has no thread switch and stays serial;
-Python conversion stages remain ordered and FFmpeg manages its own threads.
-A higher job count is a scheduling choice, not a promise of linear speedup.
+Compilation and conversion default to a shared worker budget based on available
+CPUs, affinity and Linux container quotas. `-j 4`, `--jobs 4` and `--j 4` set the
+budget. `--single-thread` or `-j 1` runs the serial path. Independent engine, music
+and dialogue stages can overlap the ordered scene pipeline. Scenery decoding,
+scene previews and BSP model preparation use separate processes; shared files
+are assembled in deterministic input order. Census VIS/LIGHT use the same limit.
+FFmpeg and numerical-library threads are bounded to avoid nested oversubscription.
+The pinned QBSP and final BSP/HDF assembly remain serial. See
+[parallel build details and verification](PARALLEL_BUILD.md).
 
 Choose your Morrowind installation. The tool validates its files, discovers
 existing dependencies, proposes missing packages/downloads with their source

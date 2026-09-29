@@ -44,6 +44,33 @@ def version(root):
     return public_version(root)
 
 
+def check_source_whitespace(root, content):
+    """Block whitespace defects before checking or packaging changed source.
+
+    Exact unchanged base files retain their historical formatting. New/modified
+    text files are checked in full, including untracked files in an extracted ZIP.
+    """
+    patch = root / 'docs' / f'PATCH-v{version(root)}.json'
+    baseline = json.loads(patch.read_text()).get('base_files', {}) if patch.is_file() else {}
+    errors = []
+    for name, data in content.items():
+        if name in DOCUMENTATION_IMAGES or name in PROJECT_MEDIA:
+            continue
+        if baseline.get(name, {}).get('sha256') == hashlib.sha256(data).hexdigest():
+            continue
+        lines = data.splitlines()
+        for number, line in enumerate(lines, 1):
+            if line.endswith((b' ', b'\t')):
+                errors.append(f'{name}:{number}: trailing whitespace')
+            indent = re.match(rb'^[ \t]*', line).group()
+            if b' \t' in indent:
+                errors.append(f'{name}:{number}: space before tab in indentation')
+        if lines and not lines[-1].strip():
+            errors.append(f'{name}:{len(lines)}: blank line at EOF')
+    if errors:
+        raise ValueError('Source whitespace check failed:\n' + '\n'.join(errors))
+
+
 def inspect_source(root):
     if (root / 'engine/aga').exists():
         check_native_versions(root)
@@ -80,6 +107,7 @@ def inspect_source(root):
             raise ValueError(f"Unexpected binary or oversized source content: {name}")
         data.decode("utf-8")
         content[name] = data
+    check_source_whitespace(root, content)
     return content
 
 

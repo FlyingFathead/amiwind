@@ -328,3 +328,14 @@ other Census exterior exit. Desired conversion tool performs an oriented,
 door-shaped cut in intruding wall geometry, leaving the door in its proper
 aperture. This is a reusable assembly operation with a changed-face report,
 not just a visual priority flag. Both exits must be checked before closure.
+
+
+## 29 September 2026 owner report: intro sea ambience
+
+The owner reports the splash/wave sound in the starting ship scene is almost
+inaudible or absent in recent builds, including the supplied v0.0.22 source line.
+The earlier intentional 5 dB ship-only reduction is present, but is not yet
+proven to explain the reported silence. v0.0.23-dev1 preserves the audio runtime.
+Next: verify the converted wave sample and loop cue, placed emitter records,
+spatial attenuation and mixer channels during the actual New Game path. Restore
+audibility without drowning dialogue or global music. Owner acceptance pending.

@@ -188,40 +188,23 @@ Requested 28 September 2026; add containers using the normal method first.
   Keep container reference identity, inventory, ownership and saved state stable
   across geometry changes; do not duplicate or reset contents during a switch.
 
-## Build-tool TODOs, 28 September 2026
+## Build parallelism, 29 September 2026
 
-- Add measured parallelism to independent host conversion stages and per-asset
-  work. Native compilation already uses `make -j4`, and some map tools use
-  internal threads; the overall conversion pipeline still runs stages in order.
-  First identify actual dependencies, then try independent music/terrain work
-  and bounded model or audio conversion workers. Preserve stage dependencies
-  and avoid concurrent writes to shared output directories.
-- Provide a configurable worker limit, account for memory and disk bandwidth,
-  and avoid multiplying worker counts with tools that already start threads.
-  Keep a serial mode for diagnosis. Compare elapsed time, peak memory and output
-  content with the same inputs before choosing a default.
-- Preserve live CLI feedback, step separators, progress and per-stage logs when
-  jobs overlap. Prefix concurrent output clearly; do not hide it by default.
-  Propagate failures, stop dependent jobs and retain completed results/logs.
+v0.0.23-dev1 implements default dependency scheduling and bounded process workers
+for scenery decoding, alias/sprite previews, BSP model geometry/lightmaps, intro actors, character heads and soundtrack
+conversion. It preserves single-writer scene assembly, live prefixed output,
+per-stage logs, failure propagation and explicit serial mode. Native make and
+VIS/LIGHT use the shared budget; Census no longer hard-codes two threads.
+See [PARALLEL_BUILD.md](PARALLEL_BUILD.md) for boundaries and measured validation.
 
-This parallel execution work is a future task, not a change to the owner's
-currently running v0.0.17 test-006 build.
+Remaining opportunities: individual actor/hand conversion internals, terrain
+conversion, final assembly and safe incremental caches.
+Measure them before adding workers or changing the conversion recipe.
 
-> *Fog only saves rendering work when we also cull what it hides.*
-
-Keep fog shading and visibility rejection coupled. The current renderer already
-rejects distant BSP nodes and models against the fog's forward-depth limit;
-fog is not being proposed as a new culling mechanism. Geometry within that limit
-still needs conversion-time simplification, shared models and measured render
-budgets. Preserve partially visible bounds to avoid cutting holes in the view.
-
-AmiWind retains PAL A500, 68000/OCS, 512 KiB Chip + 512 KiB slow RAM,
-Kickstart 1.3 as the low-end experiment. A richer 040/FPU/AGA target with
-16 MiB Fast RAM and KS3.1 is the current emulator reference. The preferred
-optimization target is an A1200 with its original 68020, added Fast RAM and HDD;
-that target is not yet playable or proven. Disk images may grow as large as a measured, documented storage
-profile supports. Keep public source and private assets as separate deliverables
-at every checkpoint. The owner handles Git/GitHub publication.
+Next gameplay checkpoints requested by the owner: restore audible intro sea
+ambience, verify continuous gameplay music, and cover every Seyda Neen interior
+with original door destinations and repeatable entry/exit. Do not mark these
+complete from a successful host build.
 
 ## Next major milestone: the connected starting area
 

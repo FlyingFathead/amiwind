@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import BSA, normpath
 from mwad.paths import child_ci, ensure_external, read_workspace, resolve_data_files
 from mwad.scene import pack_geometry, unpack_geometry, visible_refs, resident_set, read_asset
+from build_jobs import add_jobs, resolve_jobs
+from build_parallel import ordered_map
 from scenery_selection import load_groups, select_source_refs, validate_groups
 
 
@@ -123,24 +125,39 @@ def world_bounds(bounds, ref):
     return [points.min(axis=0).tolist(), points.max(axis=0).tolist()]
 
 
-def prepare(workspace, out, radius=4096, texture_size=64):
+def prepare(workspace, out, radius=4096, texture_size=64, jobs=None):
     from PIL import Image
     workspace, state = read_workspace(workspace)
     data_files = resolve_data_files(state['data_files'])
     placements = json.loads((workspace / 'generated/seyda-neen/placements.json').read_text())
     centre = [-11200., -71504., 400.]
     refs, groups = select_source_refs(placements, centre, radius, load_groups())
-    return export_refs(data_files,out,refs,groups,centre,radius,texture_size)
+    return export_refs(data_files,out,refs,groups,centre,radius,texture_size,jobs=jobs)
 
 
-def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None):
+def _read_model(task):
+    name, path, extent, collision = task
+    try:
+        with Path(path).open('rb') as source:
+            source.seek(extent['offset'])
+            raw = source.read(extent['bytes'])
+        if len(raw) != extent['bytes']:
+            raise ValueError('Truncated BSA model')
+        N = nif_reader()
+        result = model_geometry(raw, N)
+        collision_result = model_geometry(raw, N, collision=True) if collision else None
+        return name, raw, result, collision_result, None
+    except (ValueError, KeyError, struct.error) as exc:
+        return name, None, None, None, str(exc)
+
+
+def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None,jobs=None):
     from PIL import Image
     out = ensure_external(out, 'scenery export'); out.mkdir(parents=True, exist_ok=False)
     bsa = BSA(child_ci(data_files, 'Morrowind.bsa'))
     profiles={name:profile for group in groups.values()
               for name,profile in group.get('visual_profiles',{}).items()}
     names = sorted({normpath('meshes/' + r['model']) for r in refs})
-    N = nif_reader()
     index = {'format': 'MWSC1', 'version': 1, 'centre': centre, 'study_radius': radius,
              'units': 'original Morrowind world units; XYZ z-up; reference rotations retained',
              'scope': 'base master STAT/DOOR and explicitly grouped visible ACTI; static preview, no opening scripts',
@@ -153,14 +170,19 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
         pad = (-f.tell()) % 512
         f.write(bytes(pad)); offset = f.tell(); f.write(raw)
         return {'offset': offset, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+    tasks = [(name, bsa.path, bsa.entries.get(name, {'offset': 0, 'bytes': 0}),
+              profiles.get(name, {}).get('collision_source') == 'root_node') for name in names]
+    workers = min(resolve_jobs(jobs), max(1, len(tasks)))
+    print(f'Scenery geometry workers: {workers}', flush=True)
     with archive.open('xb') as f:
-        for name in names:
+        for name, raw, result, collision_result, error in ordered_map(_read_model, tasks, workers):
             try:
-                raw = bsa_read(bsa, name)
-                packet, materials, bounds, skipped = model_geometry(raw, N)
+                if error is not None:
+                    raise ValueError(error)
+                packet, materials, bounds, skipped = result
                 collision_record = None
                 if profiles.get(name,{}).get('collision_source') == 'root_node':
-                    cpacket, _, cbounds, cskipped = model_geometry(raw, N, collision=True)
+                    cpacket, _, cbounds, cskipped = collision_result
                     cv, cf, _ = unpack_geometry(cpacket)
                     collision_record={'source':'NIF RootCollisionNode','bounds':cbounds,
                                       'vertices':len(cv),'triangles':len(cf),
@@ -226,7 +248,7 @@ def main():
     p.add_argument('--workspace',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--radius',type=int,choices=range(512,16385),default=4096)
     p.add_argument('--texture-size',type=int,choices=(32,64,128),default=64)
-    a=p.parse_args()
-    print(json.dumps(prepare(a.workspace,a.out,a.radius,a.texture_size),indent=2))
+    add_jobs(p);a=p.parse_args()
+    print(json.dumps(prepare(a.workspace,a.out,a.radius,a.texture_size,a.jobs),indent=2))
 
 if __name__=='__main__': main()

@@ -35,7 +35,7 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
     groups={'prison_interior':{'references':[r['number'] for r in refs],'visual_profiles':profiles}}
     refs=[dict(r,scene_groups=['prison_interior']) for r in refs]
     lighting={**cell['lighting'],'lights':[dict(r['light'],position=r['position']) for r in cell['refs'] if r.get('light') and not r.get('deleted')]}
-    export_refs(data_files,parts,refs,groups,[0,0,0],4096,32,{'scope':'prison structural/furnishing preview; no opening scripts','cell':cell['name'],'omitted':omitted,'lighting':lighting})
+    export_refs(data_files,parts,refs,groups,[0,0,0],4096,32,{'scope':'prison structural/furnishing preview; no opening scripts','cell':cell['name'],'omitted':omitted,'lighting':lighting},jobs=jobs)
     index=json.loads((parts/'scenery-index.json').read_text())
     if index['errors']:raise ValueError('Interior conversion errors: '+str(index['errors']))
     low=np.floor(np.min([r['bounds'][0] for r in index['references']],axis=0)*SCALE)-32
@@ -62,7 +62,7 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
     for exe,args in [(qbsp,['-nopercent','prison.map']),(vis,['-fast','prison.bsp']),(light,['-minlight','24','prison.bsp'])]:
         subprocess.run([str(Path(exe).resolve()),*(['-threads',str(resolve_jobs(jobs))] if exe!=qbsp else []),*args],cwd=out,check=True)
     base=out/'prison-base.bsp';(out/'prison.bsp').rename(base);rebuild_world_hull(base,out/'prison.map',qbsp)
-    report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting)
+    report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs)
     shutil.copyfile(out/'prison.bsp',out/'id1/maps/prison.bsp')
     def pos(source,exterior=False):
         return [(source[0]-(CENTRE[0] if exterior else 0))*.25,(source[1]-(CENTRE[1] if exterior else 0))*.25,source[2]*.25]

@@ -54,3 +54,33 @@ class Release(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release(root, workspace)
             self.assertEqual(before, Path(first["archive"]).read_bytes())
+
+    def test_whitespace_blocks_inspection_and_packaging(self):
+        for bad in (b'word \n', b'word\t\n', b' \n', b'    \n', b' \tword\n', b'word\n\n'):
+            with self.subTest(source=bad), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / 'repo'
+                fixture(root)
+                (root / 'README.md').write_bytes(bad)
+                with self.assertRaisesRegex(ValueError, 'whitespace check failed'):
+                    inspect_source(root)
+                candidate = Path(tmp) / 'candidate.zip'
+                with self.assertRaisesRegex(ValueError, 'whitespace check failed'):
+                    create_candidate(root, candidate)
+                self.assertFalse(candidate.exists())
+
+    def test_only_exact_unchanged_legacy_files_are_exempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'repo'
+            fixture(root)
+            legacy = b'Historical text \n'
+            (root / 'README.md').write_bytes(legacy)
+            (root / 'docs').mkdir()
+            patch_name = 'docs/PATCH-v0.1.0.json'
+            (root / patch_name).write_text(json.dumps({'base_files': {
+                'README.md': {'sha256': hashlib.sha256(legacy).hexdigest()}}}) + '\n')
+            allowlist = root / 'tools/release-files.json'
+            allowlist.write_text(json.dumps(json.loads(allowlist.read_text()) + [patch_name]) + '\n')
+            inspect_source(root)
+            (root / 'README.md').write_bytes(legacy + b'Changed text\n')
+            with self.assertRaisesRegex(ValueError, 'trailing whitespace'):
+                inspect_source(root)

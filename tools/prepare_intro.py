@@ -13,6 +13,8 @@ from npc_faces import ActorSkeleton,actor_samples,envelope
 from player_hull import lumps,pack_lumps
 from prepare_npcs import quote
 from prepare_quake import CENTRE
+from build_jobs import add_jobs, resolve_jobs
+from build_parallel import ordered_map
 
 
 def voice_convert(assets,source,target,ffmpeg='ffmpeg',speech=True):
@@ -76,28 +78,43 @@ def ship_ambience(data,out,ffmpeg='ffmpeg'):
             'attenuation':'Quake spatial falloff approximation; not original distance-model parity'}
 
 
-def prepare(data,scene,out,ffmpeg='ffmpeg'):
+_actor_context = None
+
+
+def _actor(task):
+    global _actor_context
+    data, palette, identifier, stem, role, appearance = task
+    if _actor_context is None or _actor_context[0] != data:
+        assets=Assets(data,BSA(data/'Morrowind.bsa'));base=Skeleton(assets)
+        skeletons={False:ActorSkeleton(base),True:ActorSkeleton(base,Skeleton(assets,'meshes/base_anim_female.nif'))}
+        _actor_context=(data,assets,skeletons)
+    _,assets,skeletons=_actor_context
+    skeleton=skeletons[appearance['female']];times,facesamples,step,walkstep=actor_samples(skeleton)
+    shapes,materials,textures=assemble(assets,appearance,skeleton,times,facesamples)
+    frames,faces,uv,skin=bake(shapes,materials,textures,palette)
+    raw=animated_mdl(frames,faces,uv,skin);model='progs/np_'+stem+'.mdl'
+    report={'model':model,'frames':len(frames),'triangles':len(faces),'vertices':frames.shape[1],
+        'sha256':hashlib.sha256(raw).hexdigest(),'talk_displacement':float(abs(frames[11]-frames[8]).max()),
+        'blink_displacement':float(abs(frames[12]-frames[8]).max()),'idle_step':float(step),'walk_step':float(walkstep),'appearance':appearance}
+    return identifier,role,raw,report
+
+
+def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None):
     data=ensure_external(data,'owned data');scene=ensure_external(scene,'existing scene');out=ensure_external(out,'intro conversion')
     if out.exists():raise ValueError('Choose a new output')
     shutil.copytree(scene,out)
     assets=Assets(data,BSA(data/'Morrowind.bsa'));kinds,cells,topics=load_master(data/'Morrowind.esm')
-    base=Skeleton(assets)
-    skeletons={False:ActorSkeleton(base),True:ActorSkeleton(base,Skeleton(assets,'meshes/base_anim_female.nif'))}
     palette=(out/'id1/gfx/palette.lmp').read_bytes();report={'actors':{},'speech':{},'scripts':{}}
     prison=read_interior(data/'Morrowind.esm','Imperial Prison Ship')
     actors=[('chargen name','jiub',1),('chargen boat guard 2','escort',2),('chargen boat guard 3','upper',3),
             ('chargen boat guard 1','deck',4),('chargen dock guard','dock',5),('chargen class','census',6),
             ('chargen captain','captain',7),('chargen door guard','hall',8),('fargoth','fargoth',0),('imperial guard','imperial_guard',0)]
     entities={'prison':[],'seyda':[]}
-    for identifier,stem,role in actors:
-        appearance=outfit(kinds,identifier)
-        skeleton=skeletons[appearance['female']];times,facesamples,step,walkstep=actor_samples(skeleton)
-        shapes,materials,textures=assemble(assets,appearance,skeleton,times,facesamples)
-        frames,faces,uv,skin=bake(shapes,materials,textures,palette)
-        raw=animated_mdl(frames,faces,uv,skin);model='progs/np_'+stem+'.mdl';(out/'id1'/model).write_bytes(raw)
-        report['actors'][identifier]={'model':model,'frames':len(frames),'triangles':len(faces),'vertices':frames.shape[1],
-            'sha256':hashlib.sha256(raw).hexdigest(),'talk_displacement':float(abs(frames[11]-frames[8]).max()),
-            'blink_displacement':float(abs(frames[12]-frames[8]).max()),'idle_step':float(step),'walk_step':float(walkstep),'appearance':appearance}
+    tasks=[(data,palette,identifier,stem,role,outfit(kinds,identifier)) for identifier,stem,role in actors]
+    workers=min(resolve_jobs(jobs),len(tasks));print(f'Intro actor workers: {workers}',flush=True)
+    for identifier,role,raw,record in ordered_map(_actor,tasks,workers):
+        model=record['model'];appearance=record['appearance'];step=record['idle_step'];walkstep=record['walk_step']
+        (out/'id1'/model).write_bytes(raw);report['actors'][identifier]=record
         print('actor',identifier,'talk',report['actors'][identifier]['talk_displacement'],flush=True)
         if not role:continue
         refs=[(prison,r) for r in prison['refs'] if r['id'].casefold()==identifier]
@@ -157,4 +174,4 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','out'):p.add_argument('--'+n,type=Path,required=True)
-    p.add_argument('--ffmpeg',default='ffmpeg');a=p.parse_args();prepare(a.data_files,a.scene,a.out,a.ffmpeg)
+    p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);a=p.parse_args();prepare(a.data_files,a.scene,a.out,a.ffmpeg,a.jobs)
