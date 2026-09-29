@@ -56,7 +56,9 @@ class OriginalFont:
                                     advance=width+extra, left=left,
                                     top=self.height-ascent))
 
-    def bake(self, size, levels=4):
+    def bake(self, size, levels=4, *, paper_ink="original"):
+        if paper_ink not in ("original", "filled"):
+            raise ValueError("Bitmap paper ink must be 'filled' or 'original'")
         scale = size/self.height
         baked = []
         for g in self.glyphs:
@@ -68,6 +70,13 @@ class OriginalFont:
                     raise ValueError('Nonempty glyph has empty source crop')
                 # Area resampling is done once on the host, never at runtime.
                 src = src.resize((width, height), Image.Resampling.BOX)
+                if paper_ink == "filled":
+                    # Approved paper-only coverage correction, before quantization.
+                    # No dilation, new pixels outside the glyph, or metric changes.
+                    # Preserve the original transparent cutoff (43), while assigning
+                    # medium/solid ink earlier. This matches the approved 2x preview.
+                    src = src.point(lambda a: 0 if a < 43 else
+                                    85 if a < 80 else 170 if a < 190 else 255)
                 if levels == 2:
                     mask = src.point(lambda a: 255 if a >= 80 else 0)
                 else:
@@ -79,8 +88,8 @@ class OriginalFont:
 
 
 
-def pack_font(path, size):
-    glyphs = OriginalFont(path).bake(size)
+def pack_font(path, size, *, paper_ink="original"):
+    glyphs = OriginalFont(path).bake(size, paper_ink=paper_ink)
     return pack_glyphs(glyphs, size)
 
 

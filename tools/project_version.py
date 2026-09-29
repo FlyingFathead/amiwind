@@ -31,7 +31,12 @@ def generate_native(version_file, out):
         '#ifndef AMIWIND_VERSION_H\n#define AMIWIND_VERSION_H\n'
         f'#define AMIWIND_VERSION "{value}"\n#endif\n')
     (out/'amiwind_version.i').write_text('; Generated from VERSION; do not edit.\n'
-        f'banner: dc.b "Loading AmiWind v{value}...",10\n')
+        f'banner: dc.b "----------------------------------------------",10\n'
+        f'        dc.b "AmiWind v{value} hardware preflight",10\n'
+        f'        dc.b "----------------------------------------------",10,0\n'
+        f'passed: dc.b "AmiWind v{value} preflight OK.",10,0\n'
+        f'stopped: dc.b "AmiWind v{value} was not loaded. Change settings and reboot.",10,0\n'
+        f'version_tag: dc.b "$VER: AmiWindCheck {value}",0\n')
     return value
 
 

@@ -24,6 +24,30 @@ DEFAULT_SETTINGS = {'format': 1, 'kickstart_rom': '', 'hdf': 'latest',
                     'fs_uae': 'fs-uae', 'confirm_launch': True}
 VERSION = r'(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z0-9][A-Za-z0-9._-]*))?'
 IMAGE_NAME = re.compile(r'AmiWind-v(' + VERSION + r')\.hdf', re.IGNORECASE)
+PROFILE_VALUES = {
+    'amiga_model': 'A1200',
+    'cpu': '68040-NOMMU',
+    'fpu': '68040',
+    'jit_compiler': '1',
+    'uae_cpu_speed': 'max',
+    'uae_cpu_24bit_addressing': 'false',
+    'chip_memory': '2048',
+    'slow_memory': '0',
+    'fast_memory': '0',
+    'zorro_iii_memory': '16384',
+    'joystick_port_1': 'none',
+    'floppy_drive_volume': '0',
+}
+PROFILE_LABELS = (
+    ('Amiga type', 'amiga_model', 'A1200'),
+    ('CPU', 'cpu', '68040-NOMMU'),
+    ('FPU', 'fpu', '68040 internal'),
+    ('CPU speed', 'uae_cpu_speed', 'Fastest possible'),
+    ('JIT', 'jit_compiler', 'ON'),
+    ('24-bit addressing', 'uae_cpu_24bit_addressing', 'OFF'),
+    ('Chip RAM', 'chip_memory', '2048 KiB'),
+    ('Z3 Fast RAM', 'zorro_iii_memory', '16384 KiB'),
+)
 PRESET = '''# AmiWind v{version} accelerated Linux playtest preset.
 # Local paths filled by AmiWind-FS-UAE-launcher.py.
 # This is not a stock A1200 performance configuration.
@@ -215,10 +239,12 @@ def configured_text(text, image, rom):
     sections = [s for s in parser.sections() if s.lower() == 'config']
     if len(sections) != 1 or parser.defaults():
         raise ValueError('Expected one [config] section and no DEFAULT settings; configuration preserved unchanged.')
-    values = {'kickstart_file': str(rom), 'hard_drive_0': str(image),
-              'hard_drive_0_type': 'hdf', 'uae_cpu_24bit_addressing': 'false'}
-    # Preserve custom settings/comments. Only paths, HDF type and the known
-    # rejected legacy addressing option are managed by this utility.
+    values = dict(PROFILE_VALUES)
+    values.update({'kickstart_file': str(rom), 'hard_drive_0': str(image),
+                   'hard_drive_0_type': 'hdf'})
+    # Preserve unrelated custom settings/comments. Core AmiWind machine-profile
+    # values, paths and HDF type are managed so repeat playtests cannot silently
+    # fall back to a slow or incompatible emulator profile.
     lines = text.splitlines(keepends=True)
     result = []
     found = set()
@@ -253,6 +279,43 @@ def configured_text(text, image, rom):
     if inside:
         missing()
     return ''.join(result)
+
+
+def parsed_config(path):
+    parser = configparser.ConfigParser(interpolation=None, delimiters=('=',), strict=True)
+    parser.read(path, encoding='utf-8-sig')
+    sections = [section for section in parser.sections() if section.lower() == 'config']
+    if len(sections) != 1 or parser.defaults():
+        raise ValueError('Expected one [config] section and no DEFAULT settings: ' + str(path))
+    return parser[sections[0]]
+
+
+def print_host_preflight(version, image, rom, config):
+    values = parsed_config(config)
+    digest = rom_hash(rom)
+    print('----------------------------------------------', flush=True)
+    print('AmiWind v' + version + ' host preflight', flush=True)
+    print('----------------------------------------------', flush=True)
+    failed = False
+    for label, key, display in PROFILE_LABELS:
+        actual = values.get(key, '')
+        expected = PROFILE_VALUES[key]
+        ok = actual.strip().casefold() == expected.casefold()
+        failed = failed or not ok
+        shown = display if ok else (actual or '<missing>')
+        print(('%-21s %-23s %s' % (label + ':', shown, '[x] OK' if ok else '[!] FAIL')), flush=True)
+    speed_ok = values.get('uae_cpu_speed', '').strip().casefold() == 'max'
+    failed = failed or not speed_ok
+    print(('%-21s %-23s %s' % ('Cycle-exact speed:', 'OFF (cpu_speed=max)' if speed_ok else 'possible / unknown',
+                                      '[x] OK' if speed_ok else '[!] FAIL')), flush=True)
+    rom_ok = digest == REFERENCE_ROM_SHA256
+    print(('%-21s %-23s %s' % ('Kickstart:', '3.1 A1200 40.68' if rom_ok else 'unrecognized ROM',
+                                      '[x] OK' if rom_ok else '[!] WARN')), flush=True)
+    print('ROM SHA-256:          ' + digest, flush=True)
+    print('HDF:                  ' + image.name, flush=True)
+    print('----------------------------------------------', flush=True)
+    if failed:
+        raise ValueError('Generated FS-UAE configuration failed the AmiWind accelerated-profile self-check.')
 
 
 def write_config(root, version, image, rom):
@@ -395,6 +458,7 @@ def main(argv=None):
             else:
                 settings['fs_uae'] = command
         save_settings(root, settings)
+        print_host_preflight(version, image, rom, config)
         print('AmiWind v' + version + '\nHDF: ' + str(image) + '\nROM: ' + str(rom), flush=True)
         if args.configure_only:
             print('Files matched. Configuration ready.', flush=True)

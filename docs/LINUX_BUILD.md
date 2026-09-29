@@ -24,6 +24,19 @@ directly; AmiWind reads the installed game tree. Tribunal, Bloodmoon and mod loa
 orders are not used. The optional base-game Video/mw_intro.bik and Splash artwork
 are converted when present.
 
+## Bitmap paper readability (integrated in dev8)
+
+TTF remains the preferred source. When reading pages use the Bethesda bitmap
+fallback, the approved stronger-coverage candidate is now the default. Dialogue,
+normal menus and small character/menu text retain their existing coverage.
+
+Use `--bitmap-paper-ink original` to opt out, or `--bitmap-paper-ink filled` to
+select the candidate explicitly. The same setting is available in
+`config/build-defaults.json` or an external `--build-config FILE.json`.
+CLI settings override the selected JSON, which overrides the shipped defaults.
+See [paper font options](PAPER_FONT_OPTIONS.md). This does not parallelize the
+build. Native/HDF acceptance for the combined dev8 source remains separate.
+
 ## 1. Quickest setup and build
 
 From the repository root, run:
@@ -220,7 +233,9 @@ Do not publish game-containing HDFs, converted audio, textures, meshes or game
 records. The selected README screenshots are a specific documentation exception.
 They remain derived game content. The source release contains source and
 documentation; the separate asset-free dry-run image contains only compiled code
-and original notice text; see [content policy](CONTENT_POLICY.md).
+and original notice text. Dev7 runs `AmiWindCheck` first, keeps a successful report
+visible for up to five seconds (Space/Enter skips), then shows the original dry-run
+notice; see [content policy](CONTENT_POLICY.md).
 
 ## Rebuilding only the first NPC slice
 

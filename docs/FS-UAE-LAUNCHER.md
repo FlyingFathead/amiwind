@@ -116,8 +116,26 @@ configs and config symlinks are rejected without overwriting them. FS-UAE is
 started with literal arguments, without a shell, and its exit status is returned.
 
 The launcher does not modify HDF or ROM bytes. FS-UAE can write to the selected
-HDF during play; retain a clean backup. This utility does not diagnose or fix
-the open intermittent ship-exit/menu freeze.
+HDF during play; retain a clean backup. Before launching, dev6 prints a versioned
+host preflight and enforces the managed AmiWind accelerated profile:
+
+```text
+AmiWind v0.0.21-dev7 host preflight
+Amiga type:           A1200                   [x] OK
+CPU:                  68040-NOMMU             [x] OK
+FPU:                  68040 internal          [x] OK
+CPU speed:            Fastest possible        [x] OK
+JIT:                  ON                      [x] OK
+24-bit addressing:    OFF                     [x] OK
+Cycle-exact speed:    OFF (cpu_speed=max)     [x] OK
+Kickstart:            3.1 A1200 40.68         [x] OK
+```
+
+The Kickstart label above is shown only when the ROM SHA-256 matches the known
+development ROM. Existing configs with different managed machine values are
+backed up and corrected; unrelated custom options such as window/fullscreen
+choices are preserved. This utility does not diagnose or fix the open intermittent
+ship-exit/menu freeze.
 
 ## Validation
 

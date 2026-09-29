@@ -1,6 +1,33 @@
-# Current project state — 28 September 2026
+# Current project state - 29 September 2026
 
-**Current development target: AmiWind v0.0.21-dev5.**
+**Current development target: AmiWind v0.0.21-dev8.**
+
+Dev8 reconciles the newer dev7 boot/launcher tree with paper-font checkpoint 002.
+The uploaded dev7 boot checker, launcher, dry-run builder and version generator
+are preserved byte-for-byte. TTF paper output stays preferred; bitmap-derived
+paper ink defaults to the approved filled candidate, with JSON/CLI opt-out.
+The small character UI, other menus and dialogue retain their existing fonts.
+CPU-job detection now tolerates a failed process CPU-count query.
+See [dev8 scope](RELEASE-v0.0.21-dev8.md) and [paper settings](PAPER_FONT_OPTIONS.md).
+
+Whole-pipeline parallel scheduling remains pending. This source merge does not
+claim a new Amiga/HDF build or emulator playtest. The owner completed all 17
+stages of the earlier dev5 Steam build; that is separate historical evidence.
+
+Dev7 makes the native preflight visible long enough to diagnose startup: after a
+successful check it counts down for five seconds, with Space or Enter as an immediate
+skip. The asset-free dry-run image now runs `AmiWindCheck` before `AmiWindDryRun`,
+then shows the existing dry-run notice. This avoids relying on Amiga console
+scrollback and makes the dry-run HDF a useful preflight test image. See
+[dev7 scope](RELEASE-v0.0.21-dev7.md).
+
+Dev6 added a two-layer startup diagnostics path. The native `AmiWindCheck` prints
+its exact AmiWind version at entry and exit and reports guest-observable CPU/FPU,
+AGA, PAL timing, Exec API and memory state. JIT, fastest-possible CPU mode,
+cycle-exact policy and exact ROM-file identity remain host-side facts; the portable
+FS-UAE launcher now enforces the accelerated reference profile, prints a checklist,
+and maps the known ROM SHA-256 to Kickstart 3.1 A1200 40.68. See
+[dev6 scope](RELEASE-v0.0.21-dev6.md).
 
 Dev5 preserves the dev4 gameplay/world-mapping checkpoint and fixes host-side
 font-source portability. GOG GOTY remains the preferred source installation: its

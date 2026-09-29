@@ -4,6 +4,9 @@
 import argparse
 from html.parser import HTMLParser
 import io
+import hashlib
+import os
+import tempfile
 import json
 from pathlib import Path
 import re
@@ -16,7 +19,8 @@ from mwad.npc import load_master,text
 from mwad.paths import child_ci,resolve_data_files,ensure_external
 from mwad import font_sources
 from npc_geometry import Assets
-from prepare_ui import pack_truetype
+from prepare_ui import pack_truetype, pack_font
+from build_font_options import INK_MODES, add_font_options, resolve_font_options
 
 
 class BookText(HTMLParser):
@@ -28,8 +32,106 @@ class BookText(HTMLParser):
     def value(self):return re.sub(r'\n{3,}','\n\n',''.join(self.parts).replace('\r','')).strip()
 
 
-def prepare(data_files,scene):
+def _write_generated(path, payload):
+    """Replace one generated output only after its complete bytes are written."""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".paper-font-", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(payload)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def prepare_paper_font(data_files, scene, bitmap_paper_ink="filled"):
+    """Keep the preferred TTF, or bake the approved paper-only bitmap candidate.
+
+    The normal book12/magic12 assets remain the small-UI font sources. The
+    optional paper12 asset is selected only inside the native paper renderer.
+    """
+    if bitmap_paper_ink not in INK_MODES:
+        raise ValueError("Bitmap paper ink must be filled or original")
+    data_files = resolve_data_files(data_files)
+    scene = ensure_external(Path(scene), "reading conversion")
+    gfx = scene / "id1/gfx"
+    gfx.mkdir(parents=True, exist_ok=True)
+    fonts = font_sources.discover(data_files)
+    magic = fonts["magic"]
+    payload = None
+    ttf_error = None
+    if magic["ttf_path"] is not None:
+        try:
+            payload = pack_truetype(magic["ttf_path"], 12)
+        except (OSError, ValueError) as exc:
+            ttf_error = str(exc)
+            print(f"[warning] Preferred paper TTF could not be converted safely: {ttf_error}", flush=True)
+    if payload is not None:
+        source = magic["ttf_path"]
+        mode = "ttf"
+        treatment = "not applied (TTF)"
+        asset = "gfx/book12.awf"
+        output = gfx / "book12.awf"
+        legacy = payload
+        stale = [gfx / "paper12.awf"]
+    elif magic["bitmap_ready"]:
+        source = magic["bitmap_path"]
+        mode = "bitmap-fallback" if ttf_error else "bitmap"
+        treatment = bitmap_paper_ink
+        legacy = pack_font(source, 12)
+        payload = pack_font(source, 12, paper_ink="filled") if treatment == "filled" else legacy
+        # The correction changes coverage only: preserve all 256 metrics and size.
+        if payload[:2056] != legacy[:2056] or len(payload) != len(legacy):
+            raise ValueError("Paper correction changed font metrics or payload size")
+        asset = "gfx/paper12.awf" if treatment == "filled" else "gfx/magic12.awf"
+        output = gfx / "paper12.awf" if treatment == "filled" else None
+        # A rerun must not retain a TTF or filled asset from the previous choice.
+        stale = [gfx / "book12.awf"]
+        if output is None:
+            stale.append(gfx / "paper12.awf")
+        for warning in font_sources.fallback_warnings(fonts):
+            print("[warning] " + warning, flush=True)
+    else:
+        reason = f" TTF conversion error: {ttf_error}." if ttf_error else ""
+        raise ValueError(
+            "No usable Magic Cards paper font: provide BookArt/Magic Cards.ttf "
+            "or the complete Fonts/Magic_Cards_Regular.fnt + TEX pair." + reason)
+    report = {
+        "format": "AmiWind paper font conversion 1",
+        "source_mode": mode,
+        "source": source.relative_to(data_files).as_posix(),
+        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        "atlas_sha256": (hashlib.sha256(magic["atlas_path"].read_bytes()).hexdigest()
+                         if mode != "ttf" else None),
+        "requested_bitmap_paper_ink": bitmap_paper_ink,
+        "effective_paper_ink": treatment,
+        "runtime_asset": asset,
+        "generated_asset": asset if output is not None else None,
+        "expected_awf_sha256": hashlib.sha256(payload).hexdigest(),
+        "ordinary_awf_sha256": hashlib.sha256(legacy).hexdigest(),
+        "awf_bytes": len(payload),
+        "size_px": 12,
+        "ttf_error": ttf_error,
+        "dialogue_and_menu_assets_changed": False,
+    }
+    if output is not None:
+        _write_generated(output, payload)
+    for old in stale:
+        old.unlink(missing_ok=True)
+    _write_generated(gfx / "paper-font-conversion.json",
+                     (json.dumps(report, indent=2) + "\n").encode("utf-8"))
+    print(f"[font] Paper source: {report['source']} ({mode})", flush=True)
+    print(f"[font] Bitmap paper ink: {treatment}; reading uses {asset}", flush=True)
+    if output is None:
+        print("[font] Original paper treatment: magic12.awf is supplied by the UI conversion stage.", flush=True)
+    print("[font] Dialogue/menu font coverage unchanged.", flush=True)
+    return report
+
+
+def prepare(data_files,scene,bitmap_paper_ink="filled"):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'reading conversion')
+    font_report=prepare_paper_font(data_files,scene,bitmap_paper_ink)
     master=child_ci(data_files,'Morrowind.esm');assets=Assets(data_files,BSA(child_ci(data_files,'Morrowind.bsa')))
     dest=scene/'id1/reading';dest.mkdir(exist_ok=True)
     palette=(scene/'id1/gfx/palette.lmp').read_bytes();pal=Image.new('P',(1,1));pal.putpalette(palette)
@@ -59,23 +161,18 @@ def prepare(data_files,scene):
                     ('removeitem' if topic=='greeting 1' else 'additem') in text(f,'BNAM').casefold()]
         if len(candidates)!=1:raise ValueError('Ambiguous captain dialogue branch: '+topic)
         page(stem,'Sellus Gravius',text(candidates[0],'NAME').replace('%name',text(kinds['NPC_']['chargen captain'],'FNAM')))
-    # Prefer the loose GOG GOTY TrueType source for reading pages. Steam GOTY
-    # normally lacks BookArt/*.ttf, so the runtime intentionally falls back to
-    # magic12.awf generated by prepare_ui from Bethesda's FNT+TEX data.
-    fonts=font_sources.discover(data_files);magic=fonts['magic']
-    font=magic['ttf_path']
-    if font:
-        (scene/'id1/gfx/book12.awf').write_bytes(pack_truetype(font,12))
-        book_font='preferred BookArt/Magic Cards.ttf to book12.awf'
-    elif magic['bitmap_ready']:
-        for warning in font_sources.fallback_warnings(fonts):print('Warning: '+warning)
-        book_font='runtime magic12.awf fallback from Fonts/Magic_Cards_Regular.fnt + TEX'
-    else:
-        raise ValueError('No usable Magic Cards font: preferred BookArt/Magic Cards.ttf is absent and the Fonts/Magic_Cards_Regular.fnt + TEX fallback is incomplete')
-    return {'birthsign_images':len(signs),'book_font':book_font}
+    return {'birthsign_images':len(signs),
+            'book_font':font_report['runtime_asset'], 'paper_font':font_report}
+
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--data-files',type=Path,required=True);p.add_argument('--scene',type=Path,required=True)
-    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.scene),indent=2))
+    add_font_options(p)
+    a=p.parse_args()
+    try:
+        options=resolve_font_options(a)
+        print(json.dumps(prepare(a.data_files,a.scene,options["bitmap_paper_ink"]),indent=2))
+    except (OSError, ValueError) as exc:
+        p.exit(1, f"Error: {exc}\n")

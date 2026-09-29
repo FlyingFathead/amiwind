@@ -60,7 +60,7 @@ ship hatch links are active; other interiors and quests are not implemented. See
 
 To quit, open the Escape menu, choose Exit and confirm. Wait for the shell
 prompt and filesystem writes to finish. Type
-`amiwind` and press Enter to restart. Run `AmiWindCheck` separately to print the hardware/memory
+`amiwind` and press Enter to restart. Run `AmiWindCheck` separately to print the versioned hardware/memory
 checks again. New, Save and Load are visible but disabled; Options → Graphics is active.
 See [hands/menu reference](OPENMW_REF_CONTROLS_MENU.md) and
 [debug overlays](DEBUG_OVERLAYS.md).

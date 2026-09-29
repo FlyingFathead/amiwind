@@ -22,6 +22,7 @@ from mwad import input_check
 from mwad.progress import Progress, live_log, section
 import build_versions
 from build_jobs import add_jobs, resolve_jobs
+from build_font_options import add_font_options, resolve_font_options
 from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources, check_quakec
 
 
@@ -57,6 +58,7 @@ def parser():
     p.add_argument("--rdbtool", default="rdbtool")
     p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: sprites currently Nord unarmed only")
     add_jobs(p)
+    add_font_options(p)
     return p
 
 
@@ -333,6 +335,7 @@ def dry_run_commands(args, run):
 
 
 def commands(args, tools, run):
+    font_options = getattr(args, "font_options", None) or resolve_font_options(args)
     py = sys.executable
     def tool(name, *items):
         return [py, str(ROOT / "tools" / name), *map(str, items)]
@@ -357,7 +360,8 @@ def commands(args, tools, run):
             ("census", tool("prepare_census.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("character", tool("prepare_character.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
-            ("reading", tool("prepare_reading.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
+            ("reading", tool("prepare_reading.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
+                "--bitmap-paper-ink", font_options["bitmap_paper_ink"])),
             ("opening-references", tool("prepare_opening_refs.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music")),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
@@ -417,6 +421,7 @@ def provenance(args, tools):
         "python": sys.version, "data_files": str(args.data_files), "tools": tools,
         "version_comparison": getattr(args, "version_report", []),
         "compiler_jobs": resolve_jobs(args.jobs),
+        "font_options": getattr(args, "font_options", None) or resolve_font_options(args),
         "input_check": getattr(args, "input_report", None),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else hashes(args.data_files, lambda path: True),
@@ -438,6 +443,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     args._argv = argv
     try:
+        args.font_options = resolve_font_options(args)
         if sys.version_info < (3, 10):
             raise ValueError("Python 3.10 or newer is required")
         if args.yes and not args.autoinstall:
@@ -503,6 +509,10 @@ def main(argv=None):
         args.name = args.name or datetime.now(timezone.utc).strftime("build-%Y%m%d-%H%M%S")
         if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}", args.name):
             raise ValueError("--name must be 1–64 letters, digits, dots, hyphens or underscores")
+        if args.stage == "aga" and not args.dry_run:
+            print("Bitmap paper ink: " + args.font_options["bitmap_paper_ink"] +
+                  " (" + args.font_options["selected_by"] +
+                  "); preferred TTF conversion and dialogue/menu fonts unchanged.")
         tools = (dry_run_prerequisites if args.dry_run else prerequisites)(args, interactive=sys.stdin.isatty())
         run = ensure_external(args.workspace / "build" / args.name, "build run")
         print(f"Prerequisites passed. Scope: {'asset-free test compile' if args.dry_run else args.stage}; data: {args.data_files}")

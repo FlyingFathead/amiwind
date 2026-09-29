@@ -1,0 +1,48 @@
+{
+  "format": "AmiWind incremental source checkpoint 1",
+  "target_version": "0.0.21-dev6",
+  "checkpoint": "paper-002",
+  "status": "font checkpoint; parallelization and native HDF validation pending",
+  "base_archive": "amiwind-2026-09-29_003353.zip",
+  "base_archive_sha256": "2a3eb8322ac871a5616d3a4dd3ca56e1ed5b1c7ef1b418ca8cb1e191ef029267",
+  "added": [
+    "config/build-defaults.json",
+    "docs/CHECKPOINT-v0.0.21-dev6-paper-002.md",
+    "docs/PAPER_FONT_OPTIONS.md",
+    "docs/PATCH-v0.0.21-dev6-paper-002.json",
+    "resources/emulators/AmiWind-v0.0.21-dev6-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.21-dev6-WinUAE.uae",
+    "tests/aga_paper_font_test.c",
+    "tests/test_paper_ink.py",
+    "tools/build_font_options.py"
+  ],
+  "modified": [
+    "README.md",
+    "VERSION",
+    "docs/CHANGELOG.md",
+    "docs/LINUX_BUILD.md",
+    "docs/PROJECT_STATE.md",
+    "docs/RELEASE_WORKFLOW.md",
+    "engine/aga/src/aw_ui.c",
+    "tests/test_aga_native_source.py",
+    "tools/build.py",
+    "tools/prepare_reading.py",
+    "tools/prepare_ui.py",
+    "tools/release-files.json"
+  ],
+  "removed": [],
+  "expected_base_sha256": {
+    "README.md": "70143b96612845c6fd82997207bef051c03403e549e83c6f19960e2b0a19effe",
+    "VERSION": "ab966923df5e7d1b1e2e1ad3958c7ab0cd5e7df5dc633b087e224dbd0086c0d1",
+    "docs/CHANGELOG.md": "0eaf83c4903bf4d1c49487b7878e74ba66835934160f414a5dad0a7697b47932",
+    "docs/LINUX_BUILD.md": "9e699ad33addf5c78f03e588bc6ff238c609235e5286dc1a4d5faa506c0ff547",
+    "docs/PROJECT_STATE.md": "9ec8fb18d25123fadc72ccf49618daabb94514f047735ff88c217246bf32f694",
+    "docs/RELEASE_WORKFLOW.md": "cf5c58d1c2e7ea1a43ce1b4378bdbd1a8831eac3fb13e847056af7d9481423a7",
+    "engine/aga/src/aw_ui.c": "c1e6315fc5ade84e67ca835fa52a1049c36ea1ff4be2b0db475036367974101c",
+    "tests/test_aga_native_source.py": "11605779a6c0c467893f49465243e4d913c6c431bf4aeabf023c60a28b0f481b",
+    "tools/build.py": "4130c06c53f7a331ce9953f5d4da0810a01d11e24896c4a133118d1cfaf69d8c",
+    "tools/prepare_reading.py": "0a1d82688bf26c2d24d616dc192f08c38549dd8cf3be8f0dd4a3408c696a5e92",
+    "tools/prepare_ui.py": "f99b783f1e48952e8f2689c3599c80a52cba842c2d258e70d321a1fd718fa7c2",
+    "tools/release-files.json": "04ebb159b694bcdc35736730993d0767e8ae61e242ddcd0135f83b445a8e42fd"
+  }
+}

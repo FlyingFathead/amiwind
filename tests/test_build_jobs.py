@@ -26,3 +26,10 @@ class JobTests(unittest.TestCase):
             engine=dict(build.dry_run_commands(args,Path('/out')))['engine']
             self.assertEqual(engine[engine.index('--jobs')+1], '1')
         with self.assertRaises(SystemExit):build.parser().parse_args(['-j','0'])
+
+    def test_process_cpu_count_error_uses_remaining_limits(self):
+        with patch('build_jobs.os.cpu_count', return_value=8), \
+             patch('build_jobs.os.process_cpu_count', side_effect=OSError, create=True), \
+             patch('build_jobs.os.sched_getaffinity', return_value={0, 1}, create=True), \
+             patch.object(Path, 'read_text', side_effect=OSError):
+            self.assertEqual(auto_jobs(), 2)

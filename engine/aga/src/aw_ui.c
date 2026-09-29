@@ -8,6 +8,10 @@ extern int scr_copyeverything;
 static byte font_storage[26624],book_font[26624],skin[4104];
 static byte *font=font_storage;
 static int book_font_bytes,book_font_loaded;
+/* Optional paper-only candidate; allocate its actual size once, not a full
+ * second static font bank. No allocation on TTF/original builds. */
+static byte *paper_font;
+static int paper_font_bytes,paper_font_loaded;
 static byte background[64776],loading_background[64776];
 static int loading_state,loading_next;
 static byte logo[8008];
@@ -175,7 +179,7 @@ int AW_UILogo(int x,int y) {
 /* Reading uses its own pre-rasterized font without altering the menu setting. */
 static int saved_font_bytes,saved_font_height,saved_line_height;
 static int saved_book_ink[3];
-void AW_UIBookBegin(void) {
+static void small_font_begin(void) {
     initialize();
     if(!book_font_loaded){
         book_font_loaded=1;
@@ -187,17 +191,42 @@ void AW_UIBookBegin(void) {
     }
     saved_font_bytes=font_bytes;saved_font_height=font_height;saved_line_height=line_height;
     memcpy(saved_book_ink,ink,sizeof(saved_book_ink));
+    if(book_font_bytes){font=book_font;font_bytes=book_font_bytes;font_height=12;line_height=14;}
+}
+static void load_paper_font(void) {
+    FILE *f=NULL;byte *candidate;int n,ok;
+    if(paper_font_loaded)return;
+    paper_font_loaded=1;
+    n=COM_FOpenFile("gfx/paper12.awf",&f);
+    if(!f)return; /* Normal TTF/original builds intentionally omit this asset. */
+    if(n<2056 || n>(int)sizeof(book_font)){
+        fclose(f);Con_Printf("Paper font invalid; original reading font retained.\n");return;
+    }
+    candidate=(byte *)malloc(n);
+    if(!candidate){
+        fclose(f);Con_Printf("Paper font allocation failed; original reading font retained.\n");return;
+    }
+    ok=fread(candidate,1,n,f)==(size_t)n;
+    fclose(f);
+    if(!ok || !AW_UIValidateFont(candidate,n) || candidate[4]!=12){
+        free(candidate);Con_Printf("Paper font invalid; original reading font retained.\n");return;
+    }
+    paper_font=candidate;paper_font_bytes=n;
+}
+void AW_UIBookBegin(void) {
+    small_font_begin();
     /* Antialiased book glyphs need gray edges on white, not menu gold. */
     ink[0]=AW_UIColor(170,170,170);ink[1]=AW_UIColor(85,85,85);ink[2]=AW_UIColor(0,0,0);
-    if(book_font_bytes){font=book_font;font_bytes=book_font_bytes;font_height=12;line_height=14;}
+    load_paper_font();
+    if(paper_font_bytes){font=paper_font;font_bytes=paper_font_bytes;font_height=12;line_height=14;}
 }
 void AW_UIBookEnd(void) {
     font=font_storage;font_bytes=saved_font_bytes;font_height=saved_font_height;line_height=saved_line_height;
     memcpy(ink,saved_book_ink,sizeof(saved_book_ink));
 }
 void AW_UISmallBegin(void) {
-    AW_UIBookBegin();
-    memcpy(ink,saved_book_ink,sizeof(saved_book_ink));
+    /* Small character/menu text must not inherit paper-only coverage. */
+    small_font_begin();
 }
 void AW_UISmallEnd(void) {AW_UIBookEnd();}
 /* Returns the unconsumed text. Always consumes at least a byte for a narrow

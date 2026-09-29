@@ -31,8 +31,10 @@ def build(args):
     engine = ensure_external(args.engine, "compiled engine")
     check_binary(engine.read_bytes())
     record = json.loads((engine.parents[2] / 'engine-build.json').read_text())
-    if record.get('version') != VERSION or record.get('binary_sha256') != digest(engine):
-        raise ValueError('Engine does not match the current versioned build receipt')
+    checker = engine.parent / 'AmiWindCheck'
+    if (record.get('version') != VERSION or record.get('binary_sha256') != digest(engine)
+            or not checker.is_file() or record.get('bootcheck_sha256') != digest(checker)):
+        raise ValueError('Engine/preflight checker does not match the current versioned build receipt')
     vasm = args.vasm or sdk / "bin/vasmm68k_mot"
     out.mkdir(parents=True, exist_ok=False)
     boot = out / "boot"
@@ -57,8 +59,10 @@ def build(args):
                     '-I', str(sdk / 'm68k-amigaos/ndk-include'), '-I', str(out),
                     '-o', str(notice), str(ROOT / 'engine/aga/boot/dryrun.asm')], check=True)
     check_binary(notice.read_bytes())
+    shutil.copyfile(checker, boot / "C/AmiWindCheck")
     shutil.copyfile(engine, boot / "C/AmiWind")
-    (boot / 'S/startup-sequence').write_text('SYS:C/AmiWindDryRun\n')
+    (boot / 'S/startup-sequence').write_text(
+        'FailAt 10\nSYS:C/AmiWindCheck\nSYS:C/AmiWindDryRun\n')
     (boot / 'README.txt').write_text(message)
     shutil.copyfile(ROOT / 'engine/aga/COPYING', boot / 'COPYING')
     # Use Python module entry points so wrappers cannot select another Python.

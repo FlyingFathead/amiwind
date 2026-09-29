@@ -8,7 +8,10 @@ from pathlib import Path
 def auto_jobs():
     counts = [os.cpu_count() or 1]
     if hasattr(os, 'process_cpu_count'):
-        counts.append(os.process_cpu_count() or 1)
+        try:
+            counts.append(os.process_cpu_count() or 1)
+        except OSError:
+            pass  # Continue with affinity/quota/fallback when this query is unavailable.
     if hasattr(os, 'sched_getaffinity'):
         try:
             counts.append(len(os.sched_getaffinity(0)))

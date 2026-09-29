@@ -25,8 +25,22 @@ game files, with dialogue in the lower strip and an unchanged console font.
 The main menu now uses a smaller, lower panel; UI defaults to 14 px with 16/14/12
 and fallback choices in Options.
 
-**AmiWind v0.0.21-dev5** fixes Morrowind font-source portability while preserving the
-dev4 world-mapping checkpoint and gameplay baseline. Polygonal POI regions remain an optional design experiment;
+**AmiWind v0.0.21-dev8** merges the dev7 boot/launcher work with the approved
+bitmap paper-ink correction. TTF remains preferred; missing or unusable TTFs
+use stronger bitmap ink on reading pages by default. Dialogue and menu fonts
+are unchanged. Use `--bitmap-paper-ink original` to opt out; see
+[paper font options](docs/PAPER_FONT_OPTIONS.md). Whole-pipeline parallelization
+is still pending and is not part of this source prerelease.
+
+The preserved dev7 startup behavior keeps the versioned startup environment preflight on
+screen for a five-second default countdown; **Space or Enter continues immediately**.
+The public asset-free dry-run HDF now runs the same `AmiWindCheck` first and then
+shows its original test-build notice, so screenshots expose the exact build and
+hardware result without relying on console scrollback. The guest-side checker
+reports observable CPU/FPU, AGA, PAL timing, Exec API and memory state; the portable
+FS-UAE launcher covers host-only JIT/CPU-speed/profile facts and the reference
+Kickstart 3.1 A1200 40.68 SHA-256. Dev7 otherwise preserves dev6/dev5 gameplay.
+Polygonal POI regions remain an optional design experiment;
 cell streaming is preserved as an option. The included dev3 maintenance repairs an omitted Census room, improves paper contrast,
 adds small interaction hints and WASD choices, and corrects dock interception,
 fighting permissions and courtyard ring depletion. New Game defaults to confirmation;
@@ -35,7 +49,7 @@ selection with rotating heads, Census Office rooms and NPCs, class/birthsign/sta
 review, papers and release adapters, and a bounded save/load implementation with
 adjustable autosave history. This remains a development slice: full dialogue,
 quests, inventory and combat are unfinished. Read the [checkpoint scope and
-remaining validation](docs/RELEASE-v0.0.21-dev5.md) before testing.
+remaining validation](docs/RELEASE-v0.0.21-dev8.md) before testing.
 
 Maintenance from v0.0.20 remains included: prison ambience is 5 dB lower in its
 mixer channels and debug overlay toggles include coordinates. Both intermittent
@@ -43,8 +57,8 @@ FS-UAE freezes remain open; see [bug reports](docs/BUGS.md). The emulator refere
 is A1200/AGA, 68040/FPU, 2 MiB Chip and 16 MiB Fast RAM. Stock A1200 performance
 is unproven. Source, tools and runtime share one VERSION.
 
-The public dry-run image
-boots to a versioned notice screen. Build locally with your own Morrowind files
+The public dry-run image runs the same versioned preflight first, waits up to five
+seconds (Space/Enter skips), and then shows the versioned notice screen. Build locally with your own Morrowind files
 for the playable scene; see [build instructions](docs/LINUX_BUILD.md).
 
 The game fades in the AmiWind logo, then opens the **main menu** with the original title music. New Game

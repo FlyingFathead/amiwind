@@ -212,6 +212,34 @@ class LauncherTests(unittest.TestCase):
         self.assertNotIn('uae_address_space_24', result)
         self.assertIn('hard_drive_0 = ' + str(self.image), result)
 
+    def test_launcher_enforces_accelerated_profile_and_prints_checklist(self):
+        cfg = self.root / 'AmiWind-v0.0.19-FS-UAE.fs-uae'
+        cfg.write_text('[config]\n'
+                       'amiga_model = A500\n'
+                       'cpu = 68020\n'
+                       'fpu = 0\n'
+                       'jit_compiler = 0\n'
+                       'uae_cpu_speed = real\n'
+                       'uae_cpu_24bit_addressing = true\n'
+                       'chip_memory = 1024\n'
+                       'zorro_iii_memory = 0\n'
+                       'fullscreen = 1\n')
+        before = cfg.read_bytes()
+        status, output = self.run_main(['--configure-only'])
+        self.assertEqual(status, 0, output)
+        values = launcher.parsed_config(cfg)
+        for key, expected in launcher.PROFILE_VALUES.items():
+            self.assertEqual(values.get(key), expected)
+        self.assertIn('AmiWind v0.0.19 host preflight', output)
+        self.assertIn('CPU speed:', output)
+        self.assertIn('Fastest possible', output)
+        self.assertIn('Cycle-exact speed:', output)
+        self.assertIn('OFF (cpu_speed=max)', output)
+        self.assertIn('24-bit addressing:', output)
+        self.assertIn('[x] OK', output)
+        backups = list((self.root / 'resources/emulators/backups').glob('*.bak'))
+        self.assertEqual([p.read_bytes() for p in backups], [before])
+
     def test_moved_directory_repairs_paths_keeps_old_config(self):
         self.assertEqual(self.run_main(['--configure-only'])[0], 0)
         config_name = 'AmiWind-v0.0.19-FS-UAE.fs-uae'

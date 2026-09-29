@@ -69,6 +69,13 @@ class NativeSourceTests(unittest.TestCase):
     def test_path_grid_collision_stop_and_escort_wait(self):
         self.compile_run("aga_nav_test.c", [ROOT/"engine/aga/src/aw_nav.c",Path(SOURCE)/"src/mathlib.c"])
 
+    def test_paper_font_isolated_from_small_ui_and_safe_fallback(self):
+        for mode in ("valid", "missing", "corrupt", "wrong-size", "truncated", "oversized", "allocation"):
+            with self.subTest(mode=mode):
+                self.compile_run("aga_paper_font_test.c", [ROOT/"engine/aga/src/aw_ui.c"],
+                    cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all", "-Wl,--wrap=malloc"],
+                    arguments=[mode])
+
     def test_ui_bounds_and_corrupt_fonts(self):
         self.compile_run("aga_ui_test.c", [ROOT/"engine/aga/src/aw_ui.c"])
 

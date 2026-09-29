@@ -17,7 +17,11 @@ python3 tools/build_aga.py engine --sdk /external/m68k-amigaos-gcc-16.2 --out ..
 ```
 
 The engine executable is `../engine-build/runtime/build/AmiQuakeGCC`; the
-preflight program is alongside it as `AmiWindCheck`. The source checkout remains
+preflight program is alongside it as `AmiWindCheck`. Dev7 prints the AmiWind
+version in the preflight banner and pass/fail footer, plus guest-observable CPU/FPU,
+AGA, timing and memory checks. A successful report stays visible for a five-second
+countdown; Space or Enter skips immediately. Host-only UAE settings are verified by
+the portable launcher rather than guessed inside the Amiga. The source checkout remains
 free of object files and compiled binaries. See LINUX_BUILD.md and AGA_BUILD.md.
 
 Independent C2P and GPL C spans are used. Output build/AmiQuakeGCC is renamed

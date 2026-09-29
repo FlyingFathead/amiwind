@@ -2,8 +2,8 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current development package is **v0.0.21-dev5**;
-see [release notes and validation](RELEASE-v0.0.21-dev5.md). Earlier releases remain immutable.
+Use one shared release number. The current development package is **v0.0.21-dev8**;
+see [release notes and validation](RELEASE-v0.0.21-dev8.md). Earlier releases remain immutable.
 AmiWind remains a demo;
 keep increments within `0.0.x`, with `-devN` for development iterations as needed.
 The old separate Python pipeline numbering is historical. Root `VERSION` is the
@@ -66,7 +66,11 @@ remain private and must never become GitHub release assets.
 
 ## Boot identity
 
-Normal preflight and dry-run screens display their shared AmiWind version and:
+Normal preflight and dry-run screens display their shared AmiWind version. The
+preflight also repeats the version in its pass/fail footer so screenshots always
+identify the runtime under test. Guest-visible hardware is reported by
+`AmiWindCheck`; FS-UAE-only settings are validated by the portable host launcher.
+The boot identity also includes:
 
 ```text
 By FlyingFathead

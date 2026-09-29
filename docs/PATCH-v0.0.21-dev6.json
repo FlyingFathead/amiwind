@@ -1,0 +1,35 @@
+{
+  "format": "amiwind-source-overlay-v1",
+  "base": {
+    "filename": "amiwind-2026-09-29_015210.zip",
+    "version": "0.0.21-dev5",
+    "sha256": "2a3eb8322ac871a5616d3a4dd3ca56e1ed5b1c7ef1b418ca8cb1e191ef029267"
+  },
+  "target": "0.0.21-dev6",
+  "summary": "Add a versioned native startup environment checklist plus an FS-UAE host preflight that enforces the accelerated AmiWind profile.",
+  "changed": [
+    "README.md",
+    "VERSION",
+    "docs/AGA_BUILD.md",
+    "docs/AGA_RUNTIME.md",
+    "docs/CHANGELOG.md",
+    "docs/FS-UAE-LAUNCHER.md",
+    "docs/FS-UAE-PLAYTESTING.md",
+    "docs/PROJECT_STATE.md",
+    "docs/RELEASE_WORKFLOW.md",
+    "engine/aga/boot/bootcheck.asm",
+    "tests/test_fs_uae_launcher.py",
+    "tests/test_project_version.py",
+    "tools/AmiWind-FS-UAE-launcher.py",
+    "tools/project_version.py",
+    "tools/release-files.json"
+  ],
+  "added": [
+    "docs/PATCH-v0.0.21-dev6.json",
+    "docs/RELEASE-v0.0.21-dev6.md",
+    "resources/emulators/AmiWind-v0.0.21-dev6-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.21-dev6-WinUAE.uae"
+  ],
+  "removed": [],
+  "application": "Extract from ~/NeuralNetwork/ so archive paths under amiwind/ overlay the existing dev5 checkout only after backing up local changes. No deletions are required. Rebuild the native runtime/HDF before calling dev6 playable-validated."
+}

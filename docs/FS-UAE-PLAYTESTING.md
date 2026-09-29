@@ -10,16 +10,18 @@ For repeated runs of existing images, use the
 [portable FS-UAE launcher](FS-UAE-LAUNCHER.md). It selects the latest numeric
 version/development suffix, remembers the ROM and repairs local config paths.
 
-## Current v0.0.17 preset
+## Current v0.0.21-dev7 preset
 
 Save a local copy of
-[AmiWind-v0.0.17-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.17-FS-UAE.fs-uae),
+[AmiWind-v0.0.21-dev7-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.21-dev7-FS-UAE.fs-uae),
 replace its ROM and HDF placeholder paths, then launch it with FS-UAE.
 To build the playable HDF from your Morrowind installation, use the
 [Linux](LINUX_BUILD.md) or [Windows / WSL build guide](WINDOWS_BUILD.md).
 The public source ZIP includes the preset, not game data, a playable HDF or
-a Kickstart ROM. The separate `AmiWind-v0.0.17-dry-run.hdf` boots only to a
-test notice. See [v0.0.17 validation](VALIDATION-v0.0.17.md) for test scope.
+a Kickstart ROM. A public dry-run HDF, when produced for the current version, boots only to a
+test notice. See [dev6 release notes](RELEASE-v0.0.21-dev7.md) for the new
+preflight scope and [v0.0.17 validation](VALIDATION-v0.0.17.md) for the earlier
+locally validated FS-UAE baseline.
 
 ## Build and launch automatically
 
@@ -51,7 +53,8 @@ without a match prompts for another location instead of guessing.
 The checksum identifies matching bytes; it does not establish licensing or origin.
 
 After a successful build, the launcher fills in this preset's absolute HDF and
-ROM paths, saves `AmiWind-v0.0.17.fs-uae` beside the HDF, and runs FS-UAE with live
+ROM paths, saves a version-matched `.fs-uae` file beside the HDF (for example,
+`AmiWind-v0.0.21-dev7.fs-uae`), and runs FS-UAE with live
 output. Close FS-UAE to return to the shell. `--check` and `--plan` check autorun
 prerequisites but do not write a config or launch anything. `--dry-run` can also
 autorun its asset-free notice HDF. Setup-only/inventory modes reject autorun.
@@ -61,7 +64,7 @@ the completed HDF and successful build result are retained.
 To launch an existing HDF without rebuilding, run from the repository root:
 
 ```sh
-python3 tools/run_fs_uae.py --image /absolute/path/to/AmiWind-v0.0.17.hdf
+python3 tools/run_fs_uae.py --image /absolute/path/to/AmiWind-v0.0.21-dev7.hdf
 ```
 
 This also accepts `--kickstart-file`. An identical generated config is reused; an
@@ -95,7 +98,7 @@ Example files:
 
 ```text
 /path/to/your/kickstart-3.1-a1200.rom
-/path/to/your/AmiWind-v0.0.17.hdf
+/path/to/your/AmiWind-v0.0.21-dev7.hdf
 ```
 
 The exact AmiWind HDF filename may differ between releases or development builds.
@@ -143,7 +146,7 @@ floppy_drive_volume = 0
 kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
 
 # AmiWind bootable HDF
-hard_drive_0 = /path/to/your/AmiWind-v0.0.17.hdf
+hard_drive_0 = /path/to/your/AmiWind-v0.0.21-dev7.hdf
 hard_drive_0_type = hdf
 
 # Keep movement keys available to AmiWind
@@ -167,7 +170,16 @@ The HDF should boot directly into the AmiWind playtesting environment.
 
 ## Expected memory check
 
-AmiWind performs a hardware check during startup.
+AmiWind performs a hardware check during startup. In dev7 the native checker
+prints its exact AmiWind version and reports only facts the guest can observe.
+FS-UAE-only settings such as JIT and fastest-possible CPU mode are printed and
+validated by `AmiWind-FS-UAE-launcher.py`; the guest deliberately labels them as
+host-side instead of pretending to detect them.
+
+After a successful check, the report remains visible for a **five-second countdown**.
+Press **Space** or **Enter** to continue immediately. The public dry-run HDF executes
+the same checker first and then displays the normal asset-free test-build notice.
+Do not depend on the boot console having scrollback.
 
 A working configuration should report approximately:
 
@@ -236,7 +248,7 @@ For compatibility or minimum-spec testing, use a separate emulator configuration
 ## Repository preset and validation note
 
 A matching example is supplied under
-[resources/emulators/AmiWind-v0.0.17-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.17-FS-UAE.fs-uae).
+[resources/emulators/AmiWind-v0.0.21-dev7-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.21-dev7-FS-UAE.fs-uae).
 It explicitly disables 24-bit addressing and keyboard joystick emulation,
 selects the internal FPU and supplies placeholders for the owned ROM and HDF.
 The guide above carries forward the owner's working v0.0.12-dev1 recipe with

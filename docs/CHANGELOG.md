@@ -1,5 +1,52 @@
 # Development history
 
+## v0.0.21-dev8 - reconciled boot/launcher and paper-font sources, 29 September 2026
+
+- Preserve the uploaded dev7 boot checker, five-second report/skip behavior,
+  launcher and dry-run startup ordering without replacing them with dev5 files.
+- Integrate the approved paper-only bitmap ink candidate, enabled by default
+  when TTF conversion is unavailable. Keep preferred TTF and dialogue/menu fonts.
+- Add `--bitmap-paper-ink filled|original` and an external `--build-config` JSON
+  override, with actual-source diagnostics and private conversion receipts.
+- Give paper text a separate optional font cache so small character UI is not
+  affected; retain safe missing/invalid/allocation-failure fallback.
+- Handle `OSError` from Python's process CPU-count query and test that fallback.
+- No parallelization overhaul, new HDF or emulator acceptance is claimed here.
+
+See [release scope and validation](RELEASE-v0.0.21-dev8.md).
+
+## v0.0.21-dev7 - visible five-second preflight and dry-run boot order, 29 September 2026
+
+- Keep a successful `AmiWindCheck` report visible for five seconds by default.
+  Space or Enter skips the countdown immediately; the wait is timer-backed rather
+  than a CPU-speed-dependent busy loop.
+- Do not rely on shell-console scrollback for startup diagnostics.
+- Put `AmiWindCheck` into the asset-free dry-run HDF and run it before the existing
+  `AmiWindDryRun` notice. A failed hardware check still stops before the notice via
+  `FailAt 10`.
+- Preserve the existing dry-run notice after the preflight and keep the exact
+  AmiWind version generated from the single root `VERSION` file.
+
+See RELEASE-v0.0.21-dev7.md for scope and validation.
+
+## v0.0.21-dev6 - versioned boot/environment preflight, 29 September 2026
+
+- Expand `AmiWindCheck` into a readable startup checklist. It reports the exact
+  AmiWind version, Exec API level, 68040-class CPU, internal FPU, PAL timing,
+  AGA machine class, Chip/Fast memory and usable Z3/32-bit memory path.
+- Keep host-only facts honest: the Amiga guest labels JIT, CPU-speed/cycle policy
+  and exact ROM-file revision as host checks instead of guessing them.
+- Make generated native version data supply the preflight banner, pass/fail footer
+  and `$VER: AmiWindCheck ...` identity from the single root `VERSION` file.
+- Make the portable FS-UAE launcher enforce the reference A1200/68040-NOMMU/FPU,
+  JIT, `uae_cpu_speed=max`, 32-bit addressing and 2 MiB Chip + 16 MiB Z3 profile.
+  It backs up a mismatched existing config, corrects only the managed machine
+  settings/paths, preserves unrelated options, and prints a host checklist.
+- A reference-ROM checksum match is identified as Kickstart 3.1 A1200 40.68. An
+  unknown ROM remains a warning rather than a false identification.
+
+See RELEASE-v0.0.21-dev6.md for scope and validation.
+
 ## v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026
 
 - Prefer the GOG GOTY `BookArt/*.ttf` font sources for host-side AmiWind
