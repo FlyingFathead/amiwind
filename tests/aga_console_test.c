@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
+#include "aw_boolean.h"
 viddef_t vid;
 int scr_copyeverything;
 void Con_CheckResize(void){}
@@ -34,6 +35,7 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
 }
 int main(void){
  char output[160];byte atlas[16384];int i;
+ char *hud[]={"dbg","hud","on"};
  char *shortform[]={"debug","reset","location","0"};
  char *longform[]={"amiwind","debug","reset","location","0"};
  char *toggle[]={"DeBuG","coords","TrUe"};
@@ -65,6 +67,13 @@ int main(void){
  assert(!strcmp(output,"aw_scene_menu\n"));
  assert(AW_DebugTranslate(4,fog,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 400\n"));
  assert(AW_DebugTranslate(4,distance,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 500\n"));
+ assert(AW_DebugTranslate(3,hud,output,sizeof(output))==1);
+ assert(!strcmp(output,"amiwind_show_debug on\n"));
+ assert(AW_ParseBoolean("TRUE")==1 && AW_ParseBoolean("on")==1 && AW_ParseBoolean("1")==1);
+ assert(AW_ParseBoolean("FALSE")==0 && AW_ParseBoolean("off")==0 && AW_ParseBoolean("0")==0);
+ assert(AW_ParseBoolean("2")==-1 && AW_ParseBoolean("truth")==-1);
+ assert(AW_BooleanCvar("aw_fog") && !AW_BooleanCvar("aw_drawdistance"));
+ assert(!AW_BooleanCvar("aw_dialogue_box_layout") && !AW_BooleanCvar("aw_ui_font"));
  AW_ConsoleInit();assert(colour->value==255);assert(dbg_command==debug_command);
  memset(pixels,17,sizeof(pixels));vid.conbuffer=pixels+4;
  vid.conwidth=8;vid.conrowbytes=12;vid.conheight=4;

@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cvar.c -- dynamic variable tracking
 
 #include "quakedef.h"
+#include "aw_boolean.h"
 
 cvar_t	*cvar_vars;
 char	*cvar_null_string = "";
@@ -32,7 +33,7 @@ Cvar_FindVar
 cvar_t *Cvar_FindVar (char *var_name)
 {
 	cvar_t	*var;
-	
+
 	for (var=cvar_vars ; var ; var=var->next)
 		if (!Q_strcmp (var_name, var->name))
 			return var;
@@ -48,7 +49,7 @@ Cvar_VariableValue
 float	Cvar_VariableValue (char *var_name)
 {
 	cvar_t	*var;
-	
+
 	var = Cvar_FindVar (var_name);
 	if (!var)
 		return 0;
@@ -64,7 +65,7 @@ Cvar_VariableString
 char *Cvar_VariableString (char *var_name)
 {
 	cvar_t *var;
-	
+
 	var = Cvar_FindVar (var_name);
 	if (!var)
 		return cvar_null_string;
@@ -81,12 +82,12 @@ char *Cvar_CompleteVariable (char *partial)
 {
 	cvar_t		*cvar;
 	int			len;
-	
+
 	len = Q_strlen(partial);
-	
+
 	if (!len)
 		return NULL;
-		
+
 // check functions
 	for (cvar=cvar_vars ; cvar ; cvar=cvar->next)
 		if (!Q_strncmp (partial,cvar->name, len))
@@ -105,7 +106,7 @@ void Cvar_Set (char *var_name, char *value)
 {
 	cvar_t	*var;
 	qboolean changed;
-	
+
 	var = Cvar_FindVar (var_name);
 	if (!var)
 	{	// there is an error in C code if this happens
@@ -114,9 +115,9 @@ void Cvar_Set (char *var_name, char *value)
 	}
 
 	changed = Q_strcmp(var->string, value);
-	
+
 	Z_Free (var->string);	// free the old value string
-	
+
 	var->string = Z_Malloc (Q_strlen(value)+1);
 	Q_strcpy (var->string, value);
 	var->value = Q_atof (var->string);
@@ -165,27 +166,27 @@ Adds a freestanding variable to the variable list.
 void Cvar_RegisterVariable (cvar_t *variable)
 {
 	char	*oldstr;
-	
+
 // first check to see if it has allready been defined
 	if (Cvar_FindVar (variable->name))
 	{
 		Con_Printf ("Can't register variable %s, allready defined\n", variable->name);
 		return;
 	}
-	
+
 // check for overlap with a command
 	if (Cmd_Exists (variable->name))
 	{
 		Con_Printf ("Cvar_RegisterVariable: %s is a command\n", variable->name);
 		return;
 	}
-		
+
 // copy the value off, because future sets will Z_Free it
 	oldstr = variable->string;
-	variable->string = Z_Malloc (Q_strlen(variable->string)+1);	
+	variable->string = Z_Malloc (Q_strlen(variable->string)+1);
 	Q_strcpy (variable->string, oldstr);
 	variable->value = Q_atof (variable->string);
-	
+
 // link the variable in
 	variable->next = cvar_vars;
 	cvar_vars = variable;
@@ -206,7 +207,7 @@ qboolean	Cvar_Command (void)
 	v = Cvar_FindVar (Cmd_Argv(0));
 	if (!v)
 		return false;
-		
+
 // perform a variable print or set
 	if (Cmd_Argc() == 1)
 	{
@@ -214,7 +215,14 @@ qboolean	Cvar_Command (void)
 		return true;
 	}
 
-	Cvar_Set (v->name, Cmd_Argv(1));
+    if(AW_BooleanCvar(v->name)) {
+        int value=AW_ParseBoolean(Cmd_Argv(1));
+        if(Cmd_Argc()!=2 || value<0) {
+            Con_Printf("Boolean value required: on/off, true/false, 1/0\n");
+            return true;
+        }
+        Cvar_SetValue(v->name,value);
+    } else Cvar_Set (v->name, Cmd_Argv(1));
 	return true;
 }
 
@@ -230,9 +238,8 @@ with the archive flag set to true.
 void Cvar_WriteVariables (FILE *f)
 {
 	cvar_t	*var;
-	
+
 	for (var = cvar_vars ; var ; var = var->next)
 		if (var->archive)
 			fprintf (f, "%s \"%s\"\n", var->name, var->string);
 }
-

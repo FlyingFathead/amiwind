@@ -3,10 +3,15 @@
 #include <assert.h>
 #include "aw_story.h"
 keydest_t key_dest=key_game;
-char *pr_strings="\0aw_npc\0Fargoth\0worldspawn";
+char *pr_strings="\0aw_npc\0Fargoth\0worldspawn\0Darvame Hleran";
 static cvar_t *names_option;
 static edict_t target;static int target_trace;
-static int voice_aim,prompt;
+static int voice_aim,prompt,travel_trace;
+static char drawn[2048];
+void AW_UIBox(int a,int b,int c,int d){}
+void AW_UISmallBegin(void){}
+void AW_UISmallEnd(void){}
+void AW_UITextBox(int a,int b,int c,int d,const char *s,int e){strcat(drawn,s);strcat(drawn,"|");}
 int AW_IntroPromptActive(void){return prompt;}
 int AW_UIVoiceAimOnly(void){return voice_aim;}
 int AW_CharacterActive(void){return 0;}
@@ -41,6 +46,7 @@ qboolean AW_PlacePlayer(edict_t *p,vec3_t v){return false;}
 void SV_LinkEdict(edict_t *p,qboolean touch){}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
+ if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-96*96)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(type==MOVE_NOMONSTERS){if(occluded)t.fraction=.3f;return t;}
  if(narrow_room){
@@ -92,6 +98,20 @@ int main(void){
  names_option->value=0;assert(!AW_SceneTargetName());target_trace=0;
  narrow_room=1;arrival[2]=84;
  assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>66 && p.v.origin[2]<67);
+ travel_trace=1;narrow_room=0;target.v.netname=27;
+ p.v.movetype=MOVETYPE_WALK;key_dest=key_game;aw_story.stage=AW_STAGE_RELEASED;
+ AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);
+ AW_StateSet(&aw_state,AW_ITEM,"gold_001",87);
+ occluded=1;assert(!AW_SceneUse());occluded=0;
+ assert(AW_SceneUse() && key_dest==key_menu);
+ drawn[0]=0;assert(AW_TravelDraw());assert(strstr(drawn,"Balmora") && strstr(drawn,"Gnisis") && strstr(drawn,"Suran") && strstr(drawn,"Vivec") && strstr(drawn,"Cancel"));
+ {int i;for(i=0;i<4;i++){
+   queued[0]=0;assert(AW_TravelKey(K_ENTER));drawn[0]=0;assert(AW_TravelDraw());
+   assert(strstr(drawn,"Destination not found."));assert(!queued[0]);
+   assert(AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);AW_TravelKey(K_DOWNARROW);
+ }}
+ assert(AW_TravelKey(K_ENTER) && key_dest==key_game);
+ assert(!AW_TravelDraw());assert(AW_SceneUse());AW_TravelKey(K_ESCAPE);assert(key_dest==key_game);
  return 0;
 }
 

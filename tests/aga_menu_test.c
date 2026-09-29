@@ -76,6 +76,7 @@ void AW_SaveMenuDraw(void){}
 int AW_AutosaveCount(void){return 3;}
 void AW_SetAutosaveCount(int n){}
 
+int AW_TravelDraw(void){return 0;}
 int AW_WaitDraw(void){return 0;}
 
 static int voices,dialogue=2,scene_options[]={1,2,1};

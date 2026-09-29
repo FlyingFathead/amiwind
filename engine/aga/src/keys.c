@@ -641,6 +641,7 @@ void Key_Event (int key, qboolean down)
     }
 
     /* Music history controls are handled before ordinary game bindings. */
+    if (down && AW_TravelKey(shift_down?keyshift[key]:key)) return;
     if (down && AW_WaitKey(shift_down?keyshift[key]:key)) return;
     if (down && AW_IntroKey(shift_down?keyshift[key]:key)) return;
 

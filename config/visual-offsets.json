@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "profiles": [
+    {
+      "model": "meshes/d/ex_nord_door_01.nif",
+      "references": [
+        113833,
+        113893
+      ],
+      "local_runtime_offset": [
+        0,
+        -2,
+        0
+      ],
+      "reason": "Census exterior wall intersection; visual separation only"
+    }
+  ]
+}

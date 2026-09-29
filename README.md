@@ -15,7 +15,7 @@ Commodore Amiga.**
 
 ## Current state of the project
 
-**AmiWind v0.0.23-dev5** adds flat textured windows, sentence-aware speech pages,
+**AmiWind v0.0.23** restores all four facade windows and adds Darvame's destination menu and boolean HUD aliases. It retains flat textured windows, sentence-aware speech pages,
 painted-glyph centering and the restored F10 half/full console cycle. Target names
 default below the viewport, above Talk: E. See the
 [mesh investigation and measurements](docs/MESH_TIPS_AND_TRICKS.md). The expanded
@@ -30,8 +30,8 @@ The dev2 **interior inspection** coverage is retained. All 16 scenes loaded in t
 reference emulator, and the Tradehouse front door has been tested in both
 directions. This does not certify every floor, stair or door. Cave lighting is
 still basic; full dialogue, voice cycles, NPC services, inventory and combat remain
-unfinished. The Strider is a placed model; travel service is planned.
-See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23-dev5.md) and
+unfinished. The Strider has a destination menu; rides remain unavailable until destination maps are added.
+See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23.md) and
 [29 September roadmap](docs/PLAN-2026-09-29.md).
 
 The startup logo fades in for two seconds, holds five, then fades out for one,

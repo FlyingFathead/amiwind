@@ -37,7 +37,7 @@ class SurfaceFlattenTests(unittest.TestCase):
 
     def test_mounting_follows_wall_and_rejects_missing_support(self):
         wall=np.array([[[0,2,0],[2,2,0],[2,2,2]],[[0,2,0],[2,2,2],[0,2,2]]],float)
-        self.assertAlmostEqual(mounting_shift([1,0,1],[0,-1,0],wall),-1.95)
+        self.assertAlmostEqual(mounting_shift([1,0,1],[0,-1,0],wall),-1.5)
         with self.assertRaises(ValueError):mounting_shift([10,0,1],[0,-1,0],wall)
         with self.assertRaises(ValueError):mounting_shift([1,0,1],[0,1,0],wall)
 

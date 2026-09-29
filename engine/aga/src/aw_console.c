@@ -23,6 +23,7 @@ static route_t routes[]={
     {"fps","amiwind_debug_fps","on/off"},
     {"all","amiwind_show_debug","on/off"},
     {"overlay","amiwind_show_debug","on/off true/false 1/0"},
+    {"hud","amiwind_show_debug","on/off true/false 1/0 (overlay alias)"},
     {"showram","amiwind_debug_showram","on/off"},
     {"sealevel","amiwind_debug_sealevel","on/off"},
     {"scene change","aw_scene_menu","(scene picker)"},

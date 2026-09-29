@@ -95,11 +95,11 @@ def bake_panel(vertices, faces, materials, image_for_material, profile):
     return out, triangles, rgb, report
 
 
-def mounting_shift(origin, normal, triangles, reach=16.0, clearance=0.05):
+def mounting_shift(origin, normal, triangles, reach=16.0, clearance=0.5):
     """Ray-test a supporting façade; return movement along the outward normal.
 
     Inputs are placed runtime coordinates. Only parallel, outward-facing wall
-    triangles qualify. A small clearance prevents coplanar z-fighting. Missing
+    triangles qualify. Half a runtime unit separates quantized renderer depth from the wall. Missing
     support is an error: silently guessing can hide a window behind its wall.
     """
     origin=np.asarray(origin,float);normal=np.asarray(normal,float)

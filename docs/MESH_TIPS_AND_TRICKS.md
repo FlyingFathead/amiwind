@@ -165,3 +165,57 @@ openings and sightlines; never trade frame rate for disappearing scenery.
 Streaming and resident-memory reduction remain separate future work. The dev5
 window pass reduces rendered geometry; it does not claim a streaming system or
 complete hidden-house rejection.
+
+## Fourth window regression: v0.0.23 follow-up
+
+### Problem
+
+The tall facade showed only three of its four original windows at local camera
+(-200, 601, 17), yaw 279, pitch -43, as reported in the dev5 screenshot.
+
+### Investigation
+
+The original references 113981 through 113984 are all present. The missing
+lower window was not absent from the export. The flattened visual had only
+0.05 runtime units of wall clearance. A native trial at the reported camera
+showed all four after increasing this clearance to 0.5.
+
+### Solution
+
+Use 0.5 runtime units as the shared mounting clearance. Preserve source meshes
+and original collision. Check all four windows from the reported viewpoint,
+including upper and lower rows, rather than accepting a close view of only two.
+
+## Census exterior doors: wall breakthrough (v0.0.23)
+
+### 1. Problem
+
+Wall-coloured patches appeared through both Census and Excise exterior door
+faces. Reproduction views: XYZ 226 69 54, yaw 285, pitch 3; and XYZ 367 -156 46,
+yaw 181, pitch 5. This was an intersection problem, not a missing door texture.
+
+### 2. Investigation
+
+Both placements use `meshes/d/ex_nord_door_01.nif`, with 41 exported faces.
+Their original references are 113833 and 113893. The wall and the rendered door
+occupy overlapping depth. A trial moving the visible door two runtime units
+along its local -Y axis cleared the wall patches at both reported views.
+Changing every instance of this shared door model would also change unrelated
+entrances, so model-name matching alone is insufficient.
+
+### 3. Solution
+
+`config/visual-offsets.json` explicitly selects those two references and supplies
+a local runtime offset of [0, -2, 0]. Setting `enabled` to false reverses it on
+rebuild. The conversion moves only visual vertices and compensates texture
+coordinates, retaining the authored collision, entity origins and interaction
+positions. Render bounds include the shifted geometry. Visual instance sharing
+includes this offset; collision sharing deliberately does not.
+
+This fix does not flatten the entire wall or remove doorway geometry. For future
+polygon reduction, inspect mounted details against their supporting wall after
+simplification. Preserve original assets and collision, use a narrow profile,
+and inspect both frontal and oblique views. Do not apply one clearance globally:
+too little causes breakthrough, too much can make an attachment visibly float.
+The native emulator trials verify these two views; exhaustive angle and movement
+acceptance remains part of playtesting.

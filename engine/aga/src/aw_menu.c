@@ -178,6 +178,7 @@ static void cursor(void){
 void M_Draw(void){
     int i,xx,yy,value,knob,w;char line[64];if(key_dest!=key_menu)return;
     scr_copyeverything=1;
+    if(AW_TravelDraw())return;
     if(AW_WaitDraw())return;
     if(!ready){colours[0]=AW_UIColor(22,20,18);colours[1]=AW_UIColor(210,184,121);colours[2]=AW_UIColor(114,114,114);colours[3]=AW_UIColor(62,53,36);ready=1;}
     if(AW_SaveMenuActive()){AW_SaveMenuDraw();return;}

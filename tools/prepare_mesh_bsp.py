@@ -93,13 +93,14 @@ def _prepare_placement(task):
     # Runtime applies the entity yaw. Bake its inverse first so the composed
     # transform is exactly the authored TES3 rotation, including tilted rocks.
     r=rotation.T @ reference_rotation(ref);scale=ref['scale']
+    visual_delta=r @ np.asarray(ref.get("_visual_offset", [0,0,0]), dtype=float)*scale
     surfaces=[]
     for polygon,material,axes,offset,source_normal in polys:
         q=polygon@r.T*scale+o;n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
         normal=r@source_normal
-        q=q+normal*ref.get('_flatten_shift',0)
+        q=q+normal*ref.get('_flatten_shift',0)+visual_delta
         if n@normal<0:q=q[::-1];n=-n
-        ax=r@axes/scale*texsize;off=offset*texsize-o@ax
+        ax=r@axes/scale*texsize;off=offset*texsize-o@ax-visual_delta@ax
         samples=None
         if lighting:
             from interior_lighting import bake_surface
@@ -110,7 +111,8 @@ def _prepare_placement(task):
         points=points@r.T*scale+o
         worldparts.append((points,SimpleNamespace(equations=ConvexHull(points).equations),ids,error))
     points=v[:,:3]@r.T*SCALE*scale+o
-    return surfaces,worldparts,points.min(axis=0)-1,points.max(axis=0)+1
+    bounds=np.concatenate([points, *(surface[0] for surface in surfaces)])
+    return surfaces,worldparts,bounds.min(axis=0)-1,bounds.max(axis=0)+1
 
 
 def order_face_planes(lumps, face_planes):
@@ -206,12 +208,14 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     models = dict(ordered_map(_prepare_model, tasks, workers))
     from surface_flatten import mount_references
     mount_references(index,selected,models,centre,SCALE)
+    from visual_offsets import apply_visual_offsets, visual_key
+    apply_visual_offsets(index,selected)
     def placement_tasks():
      seen=set()
      for ref in selected:
        mi=ref['model_index']
        if mi not in models:continue
-       key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5))
+       key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
        if key in seen:continue
        seen.add(key)
        yield ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting
@@ -224,7 +228,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       if any(t in name for t in ['flora_','marker_','scum_','lantern_hook','furn_de_rope']):continue
       o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
       origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
-      key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5))
+      key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
       if key in instance_models:
        entities.append(entity(instance_models[key],origin,yaw,ref['number']));continue
 

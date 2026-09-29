@@ -376,6 +376,8 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity);
 
 int AW_Interior(void);
 int AW_SceneUse(void);
+int AW_TravelKey(int key);
+int AW_TravelDraw(void);
 void AW_SceneDraw(void);
 void AW_SceneSpawn(edict_t *p);
 int AW_InteriorPlace(edict_t *p,vec3_t preferred);

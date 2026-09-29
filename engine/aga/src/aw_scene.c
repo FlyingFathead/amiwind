@@ -145,8 +145,54 @@ static int aimed_door(void) {
     }
     return best;
 }
+/* Travel stays unavailable until the destination has a validated arrival
+ * and map registration. A stray BSP file alone must never enable a paid ride. */
+static int travel_open,travel_choice;
+static const char *travel_names[]={"Balmora","Gnisis","Suran","Vivec","Cancel"};
+static const char *travel_message;
+static int travel_use(void) {
+    edict_t *p,*e;trace_t tr;vec3_t eye,end,forward,right,up;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients ||
+       cls.state!=ca_connected || key_dest!=key_game || AW_StoryRestricted())return 0;
+    p=svs.clients[0].edict;
+    if(!p || p->v.movetype!=MOVETYPE_WALK)return 0;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);
+    AngleVectors(cl.viewangles,forward,right,up);VectorMA(eye,72,forward,end);
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
+    if(tr.startsolid || !e || e->free ||
+       strcmp(pr_strings+e->v.classname,"aw_npc") ||
+       strcmp(pr_strings+e->v.netname,"Darvame Hleran"))return 0;
+    travel_open=1;travel_choice=0;travel_message=NULL;
+    key_dest=key_menu;IN_AWClearButtons();return 1;
+}
+int AW_TravelKey(int key) {
+    if(!travel_open)return 0;
+    if(!sv.active || key_dest!=key_menu){travel_open=0;return 0;}
+    if(key==K_ESCAPE || (key==K_ENTER && travel_choice==4)){
+        travel_open=0;key_dest=key_game;IN_AWClearButtons();return 1;
+    }
+    if(key==K_UPARROW || key=='w'){travel_choice=(travel_choice+4)%5;travel_message=NULL;}
+    if(key==K_DOWNARROW || key=='s'){travel_choice=(travel_choice+1)%5;travel_message=NULL;}
+    if(key==K_ENTER)travel_message="Destination not found.";
+    return 1;
+}
+int AW_TravelDraw(void) {
+    int i;char line[96];
+    if(!travel_open || key_dest!=key_menu)return 0;
+    AW_UIBox(18,18,284,170);AW_UISmallBegin();
+    AW_UITextBox(26,23,268,20,"Silt Strider: Darvame Hleran",-1);
+    sprintf(line,"Your gold: %ld",(long)AW_StateGet(&aw_state,AW_ITEM,"gold_001"));
+    AW_UITextBox(26,44,268,16,line,-1);
+    for(i=0;i<5;i++){
+        sprintf(line,"%s%s",i==travel_choice?"> ":"  ",travel_names[i]);
+        AW_UITextBox(40,63+i*17,240,17,line,-1);
+    }
+    AW_UITextBox(26,153,268,16,travel_message?travel_message:"Arrows: select  Enter: choose",-1);
+    AW_UITextBox(26,170,268,14,"Esc: cancel",-1);
+    AW_UISmallEnd();return 1;
+}
 int AW_SceneUse(void) {
-    int i;FILE *f=NULL;char path[40];if(pending)return 1;i=aimed_door();if(i<0)return 0;
+    int i;FILE *f=NULL;char path[40];if(pending)return 1;if(travel_use())return 1;i=aimed_door();if(i<0)return 0;
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     sprintf(path,"maps/%s.bsp",links[i].target);
