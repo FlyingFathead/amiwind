@@ -235,3 +235,19 @@ tables on the Amiga, and define bounded paging for larger catalogues. Reference
 the same field definitions from conversion, game logic, save/load and tests so
 container resets, repeated rewards or stale modifiers cannot arise from several
 conflicting versions of the same state.
+
+
+## Mandatory delivery gate
+
+ALWAYS CHECK FOR TRAILING WHITESPACE BEFORE POSTING AN AUTOMATED PUSH/PUBLISH
+SCRIPT. Check the exact distributed helper, all changed/new source, and the
+reconstructed archive. Run `git diff --check` and `git diff --cached --check`
+before commit. Do not bypass a failed check. Preserve immutable issued archives;
+use a new revision for a correction. The owner runs publication.
+
+## Terrain coverage workflow
+
+LAND/topomap alone is insufficient where placed rocks or structures cover the
+ground. Audit source references, complete transforms and low-poly coverage before
+patching a hole. Follow [What are rocks?](WHAT_ARE_ROCKS.md), including native
+before/after views, compound-rotation tests and separate collision checks.

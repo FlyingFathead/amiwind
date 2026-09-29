@@ -14,7 +14,7 @@ qboolean m_return_onerror;
 char m_return_reason[32];
 static int frontend,selection,confirming,confirmation_return;
 static int mouse_x=160,mouse_y=63,mouse_visible;
-static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,intro_available;
+static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,interface_options,intro_available;
 static keydest_t picker_return;
 static int colours[4],ready;
 static const char *front_items[]={"New game","Load game","Options","Exit game"};
@@ -33,13 +33,19 @@ static void font_step(int direction){
 static int inside(int x,int y,int w,int h){return mouse_x>=x && mouse_x<x+w && mouse_y>=y && mouse_y<y+h;}
 static int enabled(int row){return row==3 || (row==2 && AW_SaveAllowed()) || row==0 || (row==1 && intro_available) || row==4 || row==5;}
 int AW_MenuFrontEnd(void){return frontend && !graphics && !confirming && key_dest==key_menu;}
+static void interface_change(int direction){
+    if(selection==0)font_step(direction);
+    else if(selection==1)AW_UIVoiceNamesToggle();
+    else if(selection==2)AW_UIDialogueCycle(direction);
+    else if(selection>=3 && selection<=5)AW_SceneUIOption(selection-3,direction);
+}
 static void close_menu(void){
     if(frontend)return;
-    confirming=scene_picker=graphics=0;key_dest=key_game;IN_AWClearButtons();
+    confirming=scene_picker=graphics=interface_options=0;key_dest=key_game;IN_AWClearButtons();
 }
 void M_Menu_Main_f(void){
     FILE *f=NULL;intro_available=COM_FOpenFile("intro/chargenname1.txt",&f)>0 && f!=NULL;if(f)fclose(f);
-    IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=mouse_visible=0;
+    IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=interface_options=mouse_visible=0;
     mouse_x=160;mouse_y=ROW_Y+ROW_H/2;
 }
 void M_ToggleMenu_f(void){if(key_dest==key_menu)close_menu();else M_Menu_Main_f();}
@@ -67,6 +73,7 @@ void M_Init(void){
 static int mouse_row(void){
     int i;
     if(confirming){if(inside(48,132,106,25))return 0;if(inside(166,132,106,25))return 1;return -1;}
+    if(interface_options){for(i=0;i<7;i++)if(inside(44,54+i*19,232,19))return i;return -1;}
     if(graphics){for(i=0;i<6;i++)if(inside(44,62+i*20,232,20))return i;return -1;}
     if(scene_picker){for(i=0;i<6 && scene_top+i<=AW_MAP_COUNT;i++)if(inside(44,55+i*19,232,19))return scene_top+i;return -1;}
     if(frontend){for(i=0;i<4;i++)if(inside(12,front_top()+i*front_height(),front_width()-8,front_height()))return i;return -1;}
@@ -103,16 +110,23 @@ void M_Keydown(int key){
         }
         return;
     }
+    if(interface_options){
+        if(key==K_ESCAPE){interface_options=0;selection=3;return;}
+        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)selection=(selection+(key==K_UPARROW?6:1))%7;
+        if(key==K_LEFTARROW || key==K_RIGHTARROW)interface_change(key==K_LEFTARROW?-1:1);
+        if(key==K_ENTER || key==K_MOUSE1){if(selection==6){interface_options=0;selection=3;}else interface_change(1);}
+        return;
+    }
     if(graphics){
         if(key==K_ESCAPE){graphics=0;selection=frontend?2:4;return;}
         if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)selection=(selection+(key==K_UPARROW?5:1))%6;
         if(selection==0 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
-        if(selection==3 && (key==K_LEFTARROW || key==K_RIGHTARROW))font_step(key==K_LEFTARROW?-1:1);
+        if(selection==3 && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
         if(selection==4 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==1)AW_SetDrawDistance(540);
             else if(selection==2)AW_UIFrameToggle();
-            else if(selection==3)font_step(1);
+            else if(selection==3){interface_options=1;selection=0;}
             else if(selection==4)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
             else if(selection==5){graphics=0;selection=frontend?2:4;}
         }
@@ -164,6 +178,7 @@ static void cursor(void){
 void M_Draw(void){
     int i,xx,yy,value,knob,w;char line[64];if(key_dest!=key_menu)return;
     scr_copyeverything=1;
+    if(AW_WaitDraw())return;
     if(!ready){colours[0]=AW_UIColor(22,20,18);colours[1]=AW_UIColor(210,184,121);colours[2]=AW_UIColor(114,114,114);colours[3]=AW_UIColor(62,53,36);ready=1;}
     if(AW_SaveMenuActive()){AW_SaveMenuDraw();return;}
     if(AW_MenuFrontEnd()){
@@ -179,13 +194,22 @@ void M_Draw(void){
         if((xx&3)!=((yy&1)<<1))vid.buffer[yy*vid.rowbytes+xx]=colours[0];
     AW_UIBox(28,6,264,188);
     if(!AW_UILogo(60,10))AW_UITextBox(44,10,232,40,"AmiWind",colours[1]);
-    if(graphics){
+    if(interface_options){
+        static const char *places[]={"Below right","Top right","Above bars"};
+        value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");
+        label(44,54,232,19,line,1,selection==0);
+        label(44,73,232,19,AW_UIVoiceStyle()==2?"Voice identity: Aim only":AW_UIVoiceNames()?"Voice speaker names: On":"Voice speaker names: Off",1,selection==1);
+        sprintf(line,"Dialogue style: %ld",(long)AW_UIDialogueMethod());label(44,92,232,19,line,1,selection==2);
+        label(44,111,232,19,AW_SceneUIOption(0,0)?"Aimed NPC names: On":"Aimed NPC names: Off",1,selection==3);
+        sprintf(line,"NPC: %s",places[AW_SceneUIOption(1,0)-1]);label(44,130,232,19,line,1,selection==4);
+        sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);label(44,149,232,19,line,1,selection==5);
+        label(44,168,232,19,"Back",1,selection==6);
+    }else if(graphics){
         value=AW_DrawDistance();sprintf(line,"Fog distance: %ld",(long)value);
         label(44,62,232,20,line,1,selection==0);
         label(44,82,232,20,"Reset distance: 540",1,selection==1);
         label(44,102,232,20,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off",1,selection==2);
-        value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");
-        label(44,122,232,20,line,1,selection==3);
+        label(44,122,232,20,"Interface...",1,selection==3);
         sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());label(44,142,232,20,line,1,selection==4);
         label(44,162,232,20,"Back",1,selection==5);
     }else if(scene_picker){

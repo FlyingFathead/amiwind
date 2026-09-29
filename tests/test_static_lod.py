@@ -26,6 +26,13 @@ class DebugFontTests(unittest.TestCase):
 @unittest.skipUnless(all(importlib.util.find_spec(n) for n in
     ('numpy','scipy','fast_simplification')), 'optional geometry dependencies')
 class StaticLODTests(unittest.TestCase):
+    def test_terrain_rocks_get_a_bounded_visual_target(self):
+        from static_lod import rock_profile
+        self.assertAlmostEqual(rock_profile('meshes/f/Terrain_rock_BC_18.nif',174)['ratio'],64/174)
+        self.assertEqual(rock_profile('meshes/f/terrain_rock_tiny.nif',32)['ratio'],1)
+        self.assertEqual(rock_profile('meshes/x/ex_nord_rock_01.nif',35),{})
+        self.assertEqual(rock_profile('meshes/x/rock_named_house.nif',400),{})
+
     def test_structural_material_keeps_original_shape_and_uvs(self):
         import numpy as np
         from static_lod import reduce_mesh

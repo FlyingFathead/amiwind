@@ -13,6 +13,46 @@ static aw_scene_link_t next;
 static float health,hand_goal;
 static double started;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
+static cvar_t target_names={"aw_target_names","1",true};
+static cvar_t label_style={"aw_interaction_label_style","1",true};
+static cvar_t target_style={"aw_target_name_style","2",true};
+int AW_SceneUIOption(int option,int change) {
+    cvar_t *c=option==0?&target_names:option==1?&target_style:&label_style;int value;
+    value=option==0?(c->value!=0):(int)c->value;
+    if(option!=0 && (value<1 || value>3))value=option==1?2:1;
+    if(change){value=option==0?!value:(value-1+change+3)%3+1;Cvar_SetValue(c->name,value);}
+    return value;
+}
+static void set_label_style(cvar_t *setting) {
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2 && (!Q_strcasecmp(s,"below") || !strcmp(s,"1")))Cvar_SetValue(setting->name,1);
+    else if(Cmd_Argc()==2 && (!Q_strcasecmp(s,"topright") || !strcmp(s,"2")))Cvar_SetValue(setting->name,2);
+    else if(Cmd_Argc()==2 && (!Q_strcasecmp(s,"hudleft") || !strcmp(s,"3")))Cvar_SetValue(setting->name,3);
+    else Con_Printf("%s: below/topright/hudleft (1/2/3)\n",setting->name);
+}
+static void label_style_command(void){set_label_style(&label_style);}
+static void target_style_command(void){set_label_style(&target_style);}
+static void target_names_command(void) {
+    char *s=Cmd_Argv(1);int value=-1;
+    if(!Q_strcasecmp(s,"on") || !strcmp(s,"1") || !Q_strcasecmp(s,"true"))value=1;
+    if(!Q_strcasecmp(s,"off") || !strcmp(s,"0") || !Q_strcasecmp(s,"false"))value=0;
+    if(Cmd_Argc()==2 && value>=0)Cvar_SetValue(target_names.name,value);
+    else Con_Printf("dbg ui targetnames on/off (after character creation)\n");
+}
+const char *AW_SceneTargetName(void) {
+    edict_t *p,*e;vec3_t eye,end,forward,right,up;trace_t tr;int i;
+    if((!target_names.value && !AW_UIVoiceAimOnly()) || key_dest!=key_game || pending || !sv.active ||
+       svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict ||
+       cls.state!=ca_connected || AW_CharacterActive() || AW_ReaderActive() ||
+       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
+    p=svs.clients[0].edict;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
+    for(i=0;i<3;i++)end[i]=eye[i]+forward[i]*96;
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
+    if(tr.startsolid || tr.allsolid || tr.fraction>=1 || !e || e->free ||
+       !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc") || !e->v.netname)return NULL;
+    return pr_strings+e->v.netname;
+}
 int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda");}
 static int map_valid(char *name) {return AW_MapId(name)>=0;}
 static void read_links(void) {
@@ -125,13 +165,18 @@ static const char *npc_hint(void)
         closest=distance;best=e;
     }
     if(!best)return NULL;
+    /* Identity is independent of the greeting cooldown. Only advertise Talk
+     * when the manual greeting candidate is also the NPC under the crosshair. */
+    VectorMA(eye,96,forward,point);tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NORMAL,p);
+    if(tr.ent!=best || tr.startsolid || tr.allsolid)return NULL;
     v=GetEdictFieldValue(best,"aw_intro_role");if(v && v->_float)return NULL;
     v=GetEdictFieldValue(best,"aw_voice");if(!v || !v->string)return NULL;
     return pr_strings+best->v.netname;
 }
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
-    int i,y,w,n,cw;char label[96],line[80];const char *name=NULL,*action=NULL;extern int scr_copyeverything;
+    int i,y,w,cw,npc=0;char line[80];const char *name=NULL,*action=NULL;extern int scr_copyeverything;
+    if(!AW_UISpeakerAtRight() || target_style.value!=2)AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
     if(key_dest!=key_game || pending || AW_IntroUse() || !sv.active ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
@@ -142,17 +187,12 @@ void AW_SceneDraw(void) {
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
                 !map_valid(links[i].target)?"Interior unavailable":"Enter: E";
-        }else{ name=npc_hint();if(name)action="Talk: E"; }
+        }else{ name=npc_hint();if(name){action="Talk: E";npc=1;} }
     }
     if(!name)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;
     if(vid.height-y<20+AW_ConsoleCharHeight())return;
-    AW_UISmallBegin();
-    strncpy(label,name,sizeof(label)-1);label[sizeof(label)-1]=0;
-    for(n=strlen(label);n && AW_UIWidth(label)>vid.width-96;n--)label[n-1]=0;
-    w=AW_UIWidth(label);
-    AW_UITextBox(vid.width-w-6,y+3,w,14,label,-1);
-    AW_UISmallEnd();
+    if(!npc && (!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
     sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
     for(i=0;line[i];i++)AW_ConsoleCharacter(vid.width-w-6+i*cw,y+19,(unsigned char)line[i]);
     scr_copyeverything=1;
@@ -237,6 +277,9 @@ static void demo_start(void) {
     }
 }
 void AW_SceneInit(void) {
+    Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);
+    Cvar_RegisterVariable(&label_style);Cmd_AddCommand("aw_label_style",label_style_command);
+    Cvar_RegisterVariable(&target_names);Cmd_AddCommand("aw_target_names_set",target_names_command);
     Cmd_AddCommand("aw_door_status",door_status);
     Cvar_RegisterVariable(&early_game_demo_start_1);
     Cmd_AddCommand("aw_scene",scene_command);

@@ -665,8 +665,8 @@ void S_StaticSound (sfx_t *sfx, vec3_t origin, float vol, float attenuation)
 
 	ss->sfx = sfx;
 	VectorCopy (origin, ss->origin);
-    /* Keep the converted original emitter level. The former extra -5 dB
-     * ship-only reduction made the waves too quiet in the opening mix. */
+    /* Keep emitter gain intact: ship-wave attenuation is baked once from the
+     * original recording by the converter, never compounded in this mixer. */
 	ss->master_vol = vol;
 	ss->dist_mult = (attenuation/64) / sound_nominal_clip_dist;
     ss->end = paintedtime + sc->length;

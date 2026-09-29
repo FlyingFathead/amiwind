@@ -17,7 +17,9 @@ from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 
 
-def voice_convert(assets,source,target,ffmpeg='ffmpeg',speech=True):
+def voice_convert(assets,source,target,ffmpeg='ffmpeg',speech=True,gain_db=0):
+    if not math.isfinite(gain_db) or not -60<=gain_db<=0:
+        raise ValueError('Audio gain must be finite and between -60 and 0 dB')
     target.parent.mkdir(parents=True,exist_ok=True)
     requested=source;resolved=source.replace('\\','/')
     try:raw=assets.read('sound/'+resolved)
@@ -26,10 +28,18 @@ def voice_convert(assets,source,target,ffmpeg='ffmpeg',speech=True):
         resolved=str(Path(resolved).with_suffix('.mp3'));raw=assets.read('sound/'+resolved)
     with tempfile.TemporaryDirectory() as td:
         p=Path(td)/'source';p.write_bytes(raw)
-        subprocess.run([ffmpeg,'-v','error','-nostdin','-i',str(p),'-ac','1','-ar','11025','-c:a','pcm_u8',str(target)],check=True)
+        filters=['-af',f'volume={gain_db:g}dB'] if gain_db else []
+        subprocess.run([ffmpeg,'-v','error','-nostdin','-y','-i',str(p),*filters,'-ac','1','-ar','11025','-c:a','pcm_u8',str(target)],check=True)
     if speech:target.with_suffix('.lip').write_bytes(envelope(target))
     with wave.open(str(target)) as w:duration=w.getnframes()/w.getframerate()
-    return {'requested':requested,'source':resolved,'source_sha256':hashlib.sha256(raw).hexdigest(),'seconds':duration,'bytes':target.stat().st_size}
+    return {'requested':requested,'source':resolved,'source_sha256':hashlib.sha256(raw).hexdigest(),'gain_db':gain_db,'seconds':duration,'bytes':target.stat().st_size}
+
+def ship_hull_convert(assets,source,target,ffmpeg='ffmpeg'):
+    """Always start with the owned source: never attenuate a previous build."""
+    receipt=voice_convert(assets,source,target,ffmpeg,speech=False,gain_db=-5)
+    raw=target.read_bytes();cue=b'cue '+struct.pack('<I',28)+struct.pack('<III4sIII',1,0,0,b'data',0,0,0)
+    raw=raw+cue;raw=raw[:4]+struct.pack('<I',len(raw)-8)+raw[8:];target.write_bytes(raw)
+    return {**receipt,'bytes':len(raw),'output_sha256':hashlib.sha256(raw).hexdigest(),'runtime_loop_start':0}
 
 def navigation(master,name):
     """Preserve original node/connection order, converted to local quarter units."""
@@ -63,9 +73,7 @@ def ship_ambience(data,out,ffmpeg='ffmpeg'):
     script=scripts['sound_boat_hull']
     if not re.search(r'PlayLoopSound3DVP\s+"Boat Hull"\s+0\.4\s*,\s*1\.0',script,re.I):raise ValueError('Unsupported hull sound script')
     sound=sounds['boat hull'];voice='env/boat_hull.wav';target=out/'id1/sound'/voice
-    receipt=voice_convert(assets,string(sound['FNAM']),target,ffmpeg,speech=False)
-    raw=target.read_bytes();cue=b'cue '+struct.pack('<I',28)+struct.pack('<III4sIII',1,0,0,b'data',0,0,0)
-    raw=raw+cue;raw=raw[:4]+struct.pack('<I',len(raw)-8)+raw[8:];target.write_bytes(raw)
+    receipt=ship_hull_convert(assets,string(sound['FNAM']),target,ffmpeg)
     cell=read_interior(data/'Morrowind.esm','Imperial Prison Ship');entities=[]
     for ref in cell['refs']:
         if objects.get(ref['id'].casefold())!='sound_boat_hull' or ref.get('deleted'):continue

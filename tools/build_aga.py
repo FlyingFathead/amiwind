@@ -43,7 +43,7 @@ def startup_config(config):
     config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
         'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
-    return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\n'
+    return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\nbind t aw_wait\nbind F1 aw_quick_help\n'
 
 def validate_quakec(path):
     """Reject incompatible compiler output before it reaches an Amiga image."""

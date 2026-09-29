@@ -11,7 +11,8 @@ from mwad.paths import ensure_external
 from player_hull import MINS, MAXS, PROFILE, rebuild_world_hull
 from mwad.scene import read_asset, unpack_geometry
 from scenery_selection import select_runtime_refs
-from static_lod import reduce_mesh
+from static_lod import reduce_mesh, rock_profile
+from prepare_scenery import reference_rotation
 
 
 def bounded_planes(points, equations):
@@ -65,6 +66,9 @@ def _prepare_model(task):
 
 def _instance_key(ref, lighting):
     key=(ref['model_index'],round(ref['scale'],6),round(ref['rotation_radians'][0],6),round(ref['rotation_radians'][1],6))
+    # Tilt and yaw do not commute. Flat instances can still share one bake.
+    if any(abs(math.sin(a))>1e-7 or math.cos(a)<0 for a in ref['rotation_radians'][:2]):
+        key=(*key,round(ref['rotation_radians'][2],6))
     return (*key,ref['number']) if lighting and not lighting.get('shared_ambient') else key
 
 
@@ -75,9 +79,10 @@ def _prepare_placement(task):
     v,f,polys,components,lod=data
     origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
     o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
-    rx,ry,rz=-np.array(ref['rotation_radians']);rz=0;cx,sx,cy,sy,cz,sz=np.cos(rx),np.sin(rx),np.cos(ry),np.sin(ry),np.cos(rz),np.sin(rz)
-    r=np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])@np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])@np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]]);scale=ref['scale']
     yr=math.radians(yaw);rotation=np.array([[math.cos(yr),-math.sin(yr),0],[math.sin(yr),math.cos(yr),0],[0,0,1]])
+    # Runtime applies the entity yaw. Bake its inverse first so the composed
+    # transform is exactly the authored TES3 rotation, including tilted rocks.
+    r=rotation.T @ reference_rotation(ref);scale=ref['scale']
     surfaces=[]
     for polygon,material,axes,offset,source_normal in polys:
         q=polygon@r.T*scale+o;n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
@@ -169,6 +174,9 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     unique = dict.fromkeys(ref['model_index'] for ref in selected
                            if not any(t in index['models'][ref['model_index']]['source']
                                       for t in ['flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope']))
+    for mi in unique:
+        model=index['models'][mi]
+        profiles.setdefault(model['source'],rock_profile(model['source'],model['triangles']))
     tasks = [(mi, index['models'][mi], profiles.get(index['models'][mi]['source'], {}),
               scenery/'scenery.mwpak') for mi in unique]
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))

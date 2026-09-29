@@ -131,3 +131,6 @@ AmiWind-launcher.json
 /tools/AmiWind-*-FS-UAE.fs-uae
 /resources/emulators/backups/
 /tools/resources/emulators/backups/
+!/docs/images/amiwind-v0.0.23-dev3-rock-before.png
+!/docs/images/amiwind-v0.0.23-dev3-rock-after.png
+!/docs/images/amiwind-v0.0.23-dev3-dialogue.png

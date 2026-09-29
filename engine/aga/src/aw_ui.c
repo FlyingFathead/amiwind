@@ -24,6 +24,10 @@ static int font_bytes,font_height=8,line_height=10,skin_ready,initialized;
 static cvar_t ui_font={"aw_ui_font","14",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
 static cvar_t ui_frame={"aw_ui_frame","0",true};
+static cvar_t dialogue_method={"aw_dialogue_box_display_method","2",true};
+static cvar_t voice_names={"aw_show_speaker_name_during_voiceovers","0",true};
+static cvar_t voice_style={"aw_voice_dialogue_display_style","2",true};
+static int subtitle_voice;
 static int ink[3],black,muted;
 static char subtitle[2048],speaker[80];
 static double subtitle_until,subtitle_started;
@@ -147,6 +151,23 @@ int AW_UISetFontSize(int size){
     Cvar_SetValue(ui_font.name,size);scr_copyeverything=1;return 1;
 }
 int AW_UIHeight(void){initialize();return line_height;}
+int AW_UIDialogueMethod(void){int n=(int)dialogue_method.value;return n>=1 && n<=4?n:2;}
+int AW_UIVoiceStyle(void){return voice_style.value==1?1:2;}
+int AW_UIVoiceNames(void){return AW_UIVoiceStyle()==1 && voice_names.value!=0;}
+int AW_UIVoiceAimOnly(void){return AW_UIVoiceStyle()==2 && subtitle_voice && subtitle[0] && subtitle_until>realtime;}
+void AW_UIVoiceNamesToggle(void){
+    if(AW_UIVoiceStyle()==2){Cvar_SetValue(voice_style.name,1);Cvar_SetValue(voice_names.name,1);}
+    else if(voice_names.value)Cvar_SetValue(voice_names.name,0);
+    else Cvar_SetValue(voice_style.name,2);
+}
+void AW_UIDialogueCycle(int step){Cvar_SetValue(dialogue_method.name,(AW_UIDialogueMethod()-1+step+4)%4+1);}
+int AW_UISpeakerAtRight(void){return AW_UIDialogueMethod()==4 && subtitle_until>realtime && subtitle[0] && speaker[0] && (!subtitle_voice || AW_UIVoiceNames()) && !AW_IntroPromptActive();}
+static void dialogue_command(void) {
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2 && strlen(s)==1 && s[0]>='1' && s[0]<='4')
+        Cvar_SetValue(dialogue_method.name,s[0]-'0');
+    else Con_Printf("dbg ui dialogue 1 classic / 2 above / 3 target only / 4 speaker upper right\n");
+}
 static int advance(int c){return font_bytes?font[8+c*8+6]:8;}
 int AW_UIWidth(const char *text) {
     int width=0,best=0;initialize();
@@ -290,17 +311,22 @@ void AW_UIOuterFrame(void) {
 int AW_UIFrameEnabled(void){return ui_frame.value!=0;}
 void AW_UIFrameToggle(void){Cvar_SetValue(ui_frame.name,!ui_frame.value);scr_copyeverything=1;}
 void AW_UISubtitle(const char *name,const char *text,double duration) {
+    subtitle_voice=0;
     strncpy(speaker,name,sizeof(speaker)-1);speaker[sizeof(speaker)-1]=0;
     strncpy(subtitle,text,sizeof(subtitle)-1);subtitle[sizeof(subtitle)-1]=0;
     if(duration<0)duration=0;
     if(duration>120)duration=120;
     subtitle_started=realtime;subtitle_until=realtime+duration;
 }
+void AW_UIVoiceSubtitle(const char *name,const char *text,double duration) {
+    AW_UISubtitle(name,text,duration);subtitle_voice=1;
+}
 void AW_UICenterMessage(const char *text) {
-    char name[80];const char *p=strchr(text,'\n');int n;double duration=AW_SpeechRemaining();
+    char name[80];const char *p=strchr(text,'\n');int n;double duration=AW_SpeechRemaining();int voiced=duration>0;
     if(duration<=0)duration=8;
     if(p && (n=(int)(p-text))<80){memcpy(name,text,n);name[n]=0;AW_UISubtitle(name,p+1,duration);}
     else AW_UISubtitle("",text,duration);
+    subtitle_voice=voiced;
 }
 void AW_UIBar(int x,int y,int w,int h,int color,float fraction) {
     int fill,row;
@@ -319,15 +345,42 @@ void AW_UIHud(void) {
     AW_UIBar(8,y,75,7,0,health/100);AW_UIBar(8,y+8,75,7,1,1);AW_UIBar(8,y+16,75,7,2,1);
     scr_copyeverything=1;
 }
+/* Names are bounded text over the world, with no panel/background fill. */
+static void name_label(const char *name,int x,int y,int right) {
+    char label[80];int n,w;
+    strncpy(label,name,sizeof(label)-1);label[sizeof(label)-1]=0;
+    for(n=strlen(label);n && AW_UIWidth(label)>vid.width-24;n--)label[n-1]=0;
+    w=AW_UIWidth(label);
+    AW_UITextBox(right?x-w:x,y,w,line_height,label,-1);
+}
+void AW_UITargetName(const char *name) {
+    if(!name || !*name)return;
+    initialize();name_label(name,vid.width-10,6,1);scr_copyeverything=1;
+}
+void AW_UIObjectName(const char *name,int style) {
+    int y=r_refdef.vrect.y+r_refdef.vrect.height;
+    if(!name || !*name)return;
+    if(style==2){AW_UITargetName(name);return;}
+    if(vid.height-y<24)return;
+    AW_UISmallBegin();
+    name_label(name,style==3?8:vid.width-6,y+3,style!=3);
+    AW_UISmallEnd();scr_copyeverything=1;
+}
 void AW_UIDraw(void) {
-    const char *p;char line[256];int lines=0,h,y,row,maxlines,page,pages,skip;
+    const char *p;char line[256];int lines=0,h,y,row,maxlines,page,pages,skip,legacy,show_name;
     float target,step;double elapsed,duration;
     initialize();
     if(key_dest==key_console)return;
+    /* Input prompts own the strip; an expired speaker must not linger above it. */
+    if(AW_IntroPromptActive()){panel_position=0;return;}
     h=vid.height-(r_refdef.vrect.y+r_refdef.vrect.height);
     if(h<24)return;
-    maxlines=(h-12-(speaker[0]?line_height:0))/line_height;
+    legacy=AW_UIDialogueMethod()==1;
+    show_name=speaker[0] && (!subtitle_voice || AW_UIVoiceNames());
+    maxlines=legacy?(h-12-(show_name?line_height:0))/line_height:
+        (h-8+line_height-font_height)/line_height;
     if(maxlines<1)maxlines=1;
+    if(!legacy && maxlines>3)maxlines=3;
     p=subtitle;while(*p){p=AW_UILine(p,vid.width-24,line,sizeof(line));lines++;}
     target=subtitle_until>realtime && subtitle[0]?1:0;step=host_frametime*6;
     if(panel_position<target){panel_position+=step;if(panel_position>target)panel_position=target;}
@@ -335,13 +388,23 @@ void AW_UIDraw(void) {
     if(panel_position<=0)return;
     /* Start below the screen. Final panel occupies only the reserved UI strip. */
     y=vid.height-(int)(h*panel_position);AW_UIBox(0,y,vid.width,h);
-    row=y+6;if(speaker[0]){AW_UIText(10,row,speaker,-1);row+=line_height;}
+    row=y+(legacy?6:4);
+    if(show_name){
+        if(legacy){AW_UIText(10,row,speaker,-1);row+=line_height;}
+        else if(target && AW_UIDialogueMethod()==2)name_label(speaker,10,y-line_height-2,0);
+        else if(target && AW_UIDialogueMethod()==4)name_label(speaker,vid.width-10,6,1);
+    }
     pages=(lines+maxlines-1)/maxlines;if(pages<1)pages=1;
     elapsed=realtime-subtitle_started;duration=subtitle_until-subtitle_started;
     page=duration>0?(int)(elapsed*pages/duration):0;if(page>=pages)page=pages-1;if(page<0)page=0;
     p=subtitle;skip=page*maxlines;
     while(*p && skip--)p=AW_UILine(p,vid.width-24,line,sizeof(line));
-    while(*p && maxlines--){p=AW_UILine(p,vid.width-24,line,sizeof(line));AW_UIText(10,row,line,-1);row+=line_height;}
+    while(*p && maxlines--){
+        p=AW_UILine(p,vid.width-24,line,sizeof(line));
+        if(legacy)AW_UIText(10,row,line,-1);
+        else AW_UITextBox(10,row,AW_UIWidth(line),font_height,line,-1);
+        row+=line_height;
+    }
     scr_copyeverything=1;
 }
 
@@ -349,5 +412,9 @@ static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original b
 void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cvar_RegisterVariable(&loading_style);
+    Cvar_RegisterVariable(&dialogue_method);
+    Cvar_RegisterVariable(&voice_names);
+    Cvar_RegisterVariable(&voice_style);
+    Cmd_AddCommand("aw_dialogue_method",dialogue_command);
     Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

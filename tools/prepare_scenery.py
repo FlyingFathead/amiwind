@@ -132,16 +132,22 @@ def model_geometry(raw, N, collision=False):
     return packet, materials, [points.min(axis=0).tolist(), points.max(axis=0).tolist()], skipped
 
 
-def world_bounds(bounds, ref):
+def reference_rotation(ref):
     import numpy as np
-    # TES3 reference rotations are clockwise about their axes (radians).
+    # TES3 uses Z then Y then X on column vectors, all clockwise.
+    # Keep the same convention as the authored chargen collision boxes.
     x, y, z = [-a for a in ref['rotation_radians']]
     cx, sx, cy, sy, cz, sz = math.cos(x), math.sin(x), math.cos(y), math.sin(y), math.cos(z), math.sin(z)
     rx = np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]])
     ry = np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])
     rz = np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])
+    return rx @ ry @ rz
+
+
+def world_bounds(bounds, ref):
+    import numpy as np
     corners = np.array([[a,b,c] for a in (bounds[0][0],bounds[1][0]) for b in (bounds[0][1],bounds[1][1]) for c in (bounds[0][2],bounds[1][2])])
-    points = corners @ (rz @ ry @ rx).T * ref['scale'] + ref['position']
+    points = corners @ reference_rotation(ref).T * ref['scale'] + ref['position']
     return [points.min(axis=0).tolist(), points.max(axis=0).tolist()]
 
 

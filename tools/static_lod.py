@@ -6,6 +6,15 @@ approximation for a selected large prop, not a replacement for original source
 geometry or collision. Keep the original geometry for collider generation.
 """
 import numpy as np
+
+
+def rock_profile(name, triangles):
+    """Bound terrain-rock visual cost; collision retains the source geometry."""
+    stem=name.replace('\\', '/').rsplit('/', 1)[-1].casefold()
+    if not stem.startswith('terrain_rock_'):
+        return {}
+    return {'ratio': min(1., 64/max(1, triangles)), 'texture_size': 64,
+            'visual_triangle_target': 64}
 from mesh_geometry import connected_components
 
 

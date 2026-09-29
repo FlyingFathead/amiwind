@@ -11,7 +11,12 @@ typedef struct {char *words,*command,*arguments;} route_t;
 static route_t routes[]={
     {"reset location","amiwind_debug_reset_location","0"},
     {"ui font","aw_ui_select","16/14/12/fallback"},
+    {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise]"},
     {"ui preview","aw_ui_preview",""},
+    {"ui dialogue","aw_dialogue_method","1/2/3/4 (default 2)"},
+    {"ui labels","aw_label_style","below/topright/hudleft"},
+    {"ui targetplace","aw_target_place","below/topright/hudleft"},
+    {"ui targetnames","aw_target_names_set","on/off (after creation)"},
     {"show fps","amiwind_debug_showfps","[on/off]"},
     {"coords","amiwind_debug_coords","on/off"},
     {"fps","amiwind_debug_fps","on/off"},

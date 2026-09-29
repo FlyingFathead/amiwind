@@ -1,6 +1,6 @@
 # Development overlays
 
-Runtime v0.0.23-dev2. Open the console with F10 or the key left of 1 (normally
+Runtime v0.0.23-dev3. Open the console with F10 or the key left of 1 (normally
 § on the Finnish layout). Boolean commands accept on/off, true/false and 1/0,
 case-insensitively. With no value they report their setting.
 
@@ -195,3 +195,28 @@ individual disk operations can still exceed a playback deadline.
 left/right volume and playback position), plus the loading-music flag. This helps
 separate a missing loop from a quiet or distant one. Ship waves now use the
 converted source gain; the earlier extra 5 dB reduction is removed.
+
+## Dialogue, target names and time
+
+- `dbg ui dialogue 2`: default speaker above; `1`: classic inside name;
+  `3`: target-only identity; `4`: speaker at upper right.
+  Archived parameter: `aw_dialogue_box_display_method`.
+- `dbg ui targetnames on/off`: independent upper-right aimed NPC label, default
+  on; enabled only after Census review or in the inspection demo. Archived
+  parameter `aw_target_names`; unrelated to the master diagnostics overlay.
+- `dbg ui targetplace below/topright/hudleft`: place aimed NPC names.
+  `dbg ui labels below/topright/hudleft`: independently place object/action labels.
+- `dbg timeofday`: show time/date; append an hour in [0,24), or `morning`,
+  `night`, `midday`, `day`, `evening`, `sunset`, `sunrise`. Sets the time on the
+  current date; does not render a different sky yet.
+- `aw_wait` opens the hours selector (T by default); `aw_quick_help` opens help
+  (F1). `bind t aw_wait` and `bind F1 aw_quick_help` restore these defaults.
+
+See [dialogue and waiting](DIALOGUE_AND_WAIT.md) for semantics and limits.
+
+`aw_show_speaker_name_during_voiceovers 0/1` controls voiced speaker identity
+(default 0). Options → Interface provides these same persisted settings.
+
+Voiceover identity: `aw_voice_dialogue_display_style 2` (default) forces aim-only
+identity and suppresses all speaker headers. Style 1 honours
+`aw_show_speaker_name_during_voiceovers 0/1` and the dialogue layout.

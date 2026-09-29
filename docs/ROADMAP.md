@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-Current work: [29 September 2026 / v0.0.23-dev2](PLAN-2026-09-29.md).
+Current work: [29 September 2026 / v0.0.23-dev3](PLAN-2026-09-29.md).
 The dated plan tracks implementation evidence, inspection gates and the next voice checkpoint.
 
 ## Next implementation milestone agreed 28 September 2026
@@ -927,3 +927,11 @@ repeats, retain speech cooldowns and interruption rules, and distinguish casual
 ambient lines from player-initiated greetings and service dialogue. Guard lines
 need their own pools. Record skipped/unsupported conditions in the private
 conversion audit rather than silently substituting unrelated dialogue.
+
+## dev3 feedback follow-up — 29 September 2026
+
+The reported Vodunius-house visibility holes and the misrotated port rock are
+addressed; see [terrain findings and workflow](WHAT_ARE_ROCKS.md). Voice style 2
+now defaults to aim-only identity, overriding voiced speaker headers.
+NPC conversation-facing, deck/pier sideways containment and door squeaks remain
+open in [the consolidated dev2 feedback](FEEDBACK-v0.0.23-dev2.md).

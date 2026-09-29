@@ -16,6 +16,17 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_brush_fragments_do_not_use_far_culled_leaf_keys(self):
+        self.compile_run('aga_brush_culling_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_bsp.c', 'r_efrag.c', 'mathlib.c')])
+
+    def test_dialogue_modes_preserve_panel_and_transparent_names(self):
+        self.compile_run('aga_dialogue_test.c', [Path(SOURCE)/'src/aw_ui.c'])
+
+    def test_wait_cancel_bounds_calendar_and_debug_time(self):
+        self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_wait.c','aw_clock.c','aw_state.c')])
+
     def test_scenery_cannot_displace_late_npcs_from_visible_list(self):
         self.compile_run('aga_visible_entities_test.c', [Path(SOURCE)/'src/r_efrag.c'])
 
@@ -30,7 +41,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_character_stats_conditional_state_and_save_corruption(self):
         self.compile_run('aga_character_state_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_character.c','aw_story.c','aw_state.c','aw_save_codec.c')],
+            ('aw_character.c','aw_story.c','aw_state.c','aw_save_codec.c','aw_clock.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_authored_rotated_barriers_and_release_condition(self):

@@ -18,3 +18,12 @@ Only these exact paths are public media exceptions in `.gitignore` and
 `tools/release.py`; other game images, audio, converted assets and ROMs stay out of
 source archives. The release check verifies signatures and size limits (1 MiB
 per screenshot, 4 MiB for the selected GIF).
+
+## v0.0.23-dev3 captures — 29 September 2026
+
+The README ship dialogue and corrected port hill are native FS-UAE captures from
+dev3, cropped to the same 592×372 game area. Existing Tradehouse/Fargoth images
+and the port pan retain their dev2 attribution. The before/after rock views in
+WHAT_ARE_ROCKS.md use the same reported camera. None is generated or composited.
+Only explicitly named promotional PNGs are exceptions to the global image ignore
+and public source allowlist; private reference images remain excluded.

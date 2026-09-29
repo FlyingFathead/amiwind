@@ -24,7 +24,7 @@ static int say(int role,const char *stem) {
     face(actor);S_StartSound(NUM_FOR_EDICT(actor),2,sound,actor->v.origin,.9,1);
     duration=AW_SpeechRemaining();if(duration<=0)return -1;
     AW_ExpandPlayerName(expanded,sizeof(expanded),text);
-    AW_UISubtitle(pr_strings+actor->v.netname,expanded,duration);
+    AW_UIVoiceSubtitle(pr_strings+actor->v.netname,expanded,duration);
     Con_Printf("Intro speech: %s (%ld ms)\n",stem,(long)(duration*1000));return 1;
 }
 static void failure(const char *reason) {
@@ -126,6 +126,7 @@ int AW_IntroButtons(int bits){
 }
 int AW_IntroImpulse(int impulse){return ((active && !failed) || !AW_StoryFighting() || AW_OpeningLocked() || AW_CharacterActive()) && impulse==202?0:impulse;}
 int AW_IntroUse(void){return (active && !failed && !unlocked) || AW_OpeningLocked() || AW_CharacterActive();}
+int AW_IntroPromptActive(void){return prompt!=0;}
 int AW_IntroKey(int key) {
     int n;if(AW_ReaderKey(key) || AW_CharacterKey(key))return 1;
     if(!active || !prompt || key_dest!=key_game)return 0;

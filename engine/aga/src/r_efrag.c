@@ -170,6 +170,9 @@ void R_SplitEntityOnNode2 (mnode_t *node)
 
 	if (node->visframe != r_visframecount)
 		return;
+	/* Use the same far plane as world traversal and clipped brush faces. */
+	if (!AW_NodeVisible(node->minmaxs))
+		return;
 
 	if (node->contents < 0)
 	{

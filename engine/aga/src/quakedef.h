@@ -422,6 +422,19 @@ const char *AW_UILine(const char *,int,char *,int);
 void AW_UISubtitle(const char *,const char *,double);
 void AW_UICenterMessage(const char *);
 void AW_UIDraw(void);
+int AW_UIDialogueMethod(void);
+int AW_UISpeakerAtRight(void);
+int AW_UIVoiceNames(void);
+int AW_UIVoiceStyle(void);
+int AW_UIVoiceAimOnly(void);
+void AW_UIVoiceNamesToggle(void);
+void AW_UIDialogueCycle(int step);
+void AW_UIVoiceSubtitle(const char *name,const char *text,double duration);
+int AW_SceneUIOption(int option,int change);
+void AW_UITargetName(const char *name);
+void AW_UIObjectName(const char *name,int style);
+int AW_IntroPromptActive(void);
+const char *AW_SceneTargetName(void);
 void AW_UIHud(void);
 void AW_UIBar(int,int,int,int,int,float);
 
@@ -477,3 +490,8 @@ int AW_IntroImpulse(int);
 int AW_IntroUse(void);
 int AW_IntroKey(int);
 void AW_IntroDraw(void);
+
+void AW_WaitInit(void);
+void AW_WaitTick(void);
+int AW_WaitKey(int key);
+int AW_WaitDraw(void);

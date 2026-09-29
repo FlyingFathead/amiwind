@@ -368,3 +368,19 @@ proven to explain the reported silence. v0.0.23-dev1 preserves the audio runtime
 Next: verify the converted wave sample and loop cue, placed emitter records,
 spatial attenuation and mixer channels during the actual New Game path. Restore
 audibility without drowning dialogue or global music. Owner acceptance pending.
+
+
+## Owner dev2 feedback — 29 September 2026
+
+Deck/pier sideways escape during creation and missing interior door open/close
+squeaks remain open in dev3. The owner confirms improved pier guard orientation
+and working ship-to-Census progression; preserve those behaviours. Full report,
+UI dispositions and reproduction gates: [FEEDBACK-v0.0.23-dev2.md](FEEDBACK-v0.0.23-dev2.md).
+
+## dev3 feedback follow-up — 29 September 2026
+
+The reported Vodunius-house visibility holes and the misrotated port rock are
+addressed; see [terrain findings and workflow](WHAT_ARE_ROCKS.md). Voice style 2
+now defaults to aim-only identity, overriding voiced speaker headers.
+NPC conversation-facing, deck/pier sideways containment and door squeaks remain
+open in [the consolidated dev2 feedback](FEEDBACK-v0.0.23-dev2.md).

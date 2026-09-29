@@ -14,6 +14,7 @@ static byte specialization[27];
 static const byte *cursor,*limit;
 static int decode_error;
 static int menu,accepted,row,review_return,page;
+static int confirming,confirm_yes;
 static int mouse_x=160,mouse_y=90,mouse_visible;
 static aw_character_t choice;
 static float rotation;
@@ -145,7 +146,7 @@ int AW_CharacterRebuild(aw_character_t *c)
 
 void AW_CharacterReset(void)
 {
-    memset(&aw_character,0,sizeof(aw_character));menu=accepted=review_return=0;
+    memset(&aw_character,0,sizeof(aw_character));menu=accepted=review_return=confirming=0;
     AW_HeadClear();
     if(!AW_CharacterLoad())return;
     aw_character.head=part_next(-1,0,0,0,1);aw_character.hair=part_next(-1,0,0,1,1);
@@ -155,7 +156,7 @@ void AW_CharacterReset(void)
 int AW_CharacterOpen(int kind)
 {
     if(kind<1 || kind>4 || !AW_CharacterLoad() || !aw_character.valid)return 0;
-    choice=aw_character;menu=kind;row=page=accepted=review_return=mouse_visible=0;rotation=0;
+    choice=aw_character;menu=kind;row=page=accepted=review_return=mouse_visible=confirming=0;rotation=0;
     IN_AWClearButtons();
     if(kind==1 && !AW_HeadLoad(choice.head,choice.hair)){menu=0;return 0;}
     return 1;
@@ -185,13 +186,24 @@ void AW_CharacterMouse(int dx,int dy)
     if(mouse_x>319)mouse_x=319;
     if(mouse_y<0)mouse_y=0;
     if(mouse_y>199)mouse_y=199;
+    if(confirming){if(mouse_y>=143 && mouse_y<166)confirm_yes=mouse_x>=160;return;}
     if(menu==1 && mouse_x<198 && mouse_y>=38 && mouse_y<148)row=(mouse_y-38)/22;
     if(mouse_y>=166)row=4;
 }
 int AW_CharacterKey(int key)
 {
-    int old;
     if(!menu || key_dest!=key_game)return 0;
+    if(confirming){
+        if(key==K_ESCAPE || key=='n' || key=='N'){confirming=0;return 1;}
+        if(key==K_LEFTARROW || key==K_RIGHTARROW || key==K_TAB)confirm_yes=!confirm_yes;
+        if(key==K_MOUSE1 && (mouse_y<143 || mouse_y>=166 || mouse_x<44 || mouse_x>=276))return 1;
+        if(key=='y' || key=='Y')confirm_yes=1;
+        if(key==K_ENTER || key==K_MOUSE1 || key=='y' || key=='Y'){
+            confirming=0;
+            if(confirm_yes){aw_character=choice;accepted=menu;menu=0;AW_HeadClear();IN_AWClearButtons();}
+        }
+        return 1;
+    }
     if(key==K_ESCAPE)return 0; /* Pause menu, retaining the unfinished choice. */
     if(key=='a' || key=='A')key=K_LEFTARROW;
     if(key=='d' || key=='D')key=K_RIGHTARROW;
@@ -218,7 +230,7 @@ int AW_CharacterKey(int key)
         if(menu==1 && row<4){row++;return 1;}
         if(!AW_CharacterRebuild(&choice))return 1;
         if(review_return){menu=4;review_return=0;page=0;return 1;}
-        aw_character=choice;old=menu;menu=0;accepted=old;AW_HeadClear();IN_AWClearButtons();
+        confirming=1;confirm_yes=0;mouse_visible=0;return 1;
     }
     return 1;
 }
@@ -270,5 +282,24 @@ void AW_CharacterDraw(void)
         AW_UITextBox(12,143,296,19,"R: race  C: class  B: birthsign",muted);
     }
     AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   [ ]: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
+    if(confirming){
+        AW_UIBox(16,48,288,126);AW_UISmallBegin();
+        AW_UITextBox(24,53,272,20,"Really choose this character?",gold);
+        sprintf(line,"%s - %s",aw_races[choice.race].name,choice.female?"Female":"Male");
+        AW_UITextBox(24,75,272,18,line,gold);
+        if(menu==1){
+            int faces=0,hairs=0;
+            for(i=0;i<=choice.head;i++)if(part_valid(i,&choice,0))faces++;
+            for(i=0;i<=choice.hair;i++)if(part_valid(i,&choice,1))hairs++;
+            sprintf(line,"Face %ld / Hair %ld",(long)faces,(long)hairs);
+            AW_UITextBox(24,96,272,18,line,gold);
+        }else{
+            AW_UITextBox(24,96,272,18,aw_classes[choice.clas].name,gold);
+            AW_UITextBox(24,117,272,18,aw_births[choice.birth].name,gold);
+        }
+        AW_UIFill(confirm_yes?164:44,143,112,23,AW_UIColor(54,47,32));
+        AW_UITextBox(44,143,112,23,"Go back",gold);
+        AW_UITextBox(164,143,112,23,"Choose",gold);AW_UISmallEnd();
+    }
     if(mouse_visible){AW_UIFill(mouse_x,mouse_y,2,6,gold);AW_UIFill(mouse_x,mouse_y,6,2,gold);}
 }

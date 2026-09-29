@@ -99,3 +99,12 @@ Private tests on the supplied font sources preserve all 256 metrics. The
 preview title and four body lines match the approved two-times-enlarged candidate
 pixel-for-pixel in a host-side comparison. All twelve ordinary bitmap family/size outputs
 remain byte-identical to dev5. No source or converted font files are distributed.
+
+
+## dev2 owner feedback / dev3 recommendation
+
+The supplied Sellus Gravius paper capture still shows rough, broken-looking
+bitmap strokes with the current filled-ink treatment. Prefer conversion using
+usable owned TTFs for papers and dialogue; this remains the recommended visual
+path. The bitmap build is retained for compatibility and comparison, without a
+claim of equivalent text quality or a new glyph-quality fix in dev3.

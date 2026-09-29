@@ -1,13 +1,24 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
+#include "aw_story.h"
+keydest_t key_dest=key_game;
+char *pr_strings="\0aw_npc\0Fargoth\0worldspawn";
+static cvar_t *names_option;
+static edict_t target;static int target_trace;
+static int voice_aim;
+int AW_UIVoiceAimOnly(void){return voice_aim;}
+int AW_CharacterActive(void){return 0;}
+int AW_ReaderActive(void){return 0;}
+int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
+void Cvar_SetValue(char *s,float v){if(names_option && !strcmp(s,names_option->name))names_option->value=v;}
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 static char queued[64];static eval_t goal;static int clear_buttons,events,occluded;
 static void (*start_demo)(void);static cvar_t *demo_option;
 static int opening_track=-1,ship_available=1,narrow_room;
 static char notice[96];
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
-void Cvar_RegisterVariable(cvar_t *c){demo_option=c;c->value=atof(c->string);}
+void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
 void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;}
 int Cmd_Argc(void){return 0;}
 char *Cmd_Argv(int i){return "";}
@@ -29,6 +40,7 @@ qboolean AW_PlacePlayer(edict_t *p,vec3_t v){return false;}
 void SV_LinkEdict(edict_t *p,qboolean touch){}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
+ if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-96*96)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(type==MOVE_NOMONSTERS){if(occluded)t.fraction=.3f;return t;}
  if(narrow_room){
   if(a[2]>88 || a[2]<66){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
@@ -64,6 +76,17 @@ int main(void){
  demo_option->value=0;opening_track=-1;start_demo();
  assert(!strcmp(queued,"map prison\n"));assert(opening_track==-1);
  ship_available=0;start_demo();assert(!strcmp(queued,"map seyda\n"));
+ target_trace=1;target.v.classname=1;target.v.netname=8;target.v.modelindex=1;
+ assert(names_option->value==1);names_option->value=0;assert(!AW_SceneTargetName());names_option->value=1;
+ names_option->value=0;voice_aim=1;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
+ names_option->value=1;voice_aim=0;
+ aw_story.stage=AW_STAGE_SHIP;assert(!AW_SceneTargetName());aw_story.stage=AW_STAGE_REVIEW;assert(!AW_SceneTargetName());
+ aw_story.stage=AW_STAGE_PAPERS;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
+ occluded=1;assert(!AW_SceneTargetName());occluded=0;
+ target.free=1;assert(!AW_SceneTargetName());target.free=0;
+ target.v.classname=16;assert(!AW_SceneTargetName());target.v.classname=1;
+ key_dest=key_menu;assert(!AW_SceneTargetName());key_dest=key_game;
+ names_option->value=0;assert(!AW_SceneTargetName());target_trace=0;
  narrow_room=1;arrival[2]=84;
  assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>66 && p.v.origin[2]<67);
  return 0;

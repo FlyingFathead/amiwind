@@ -116,7 +116,7 @@ static void blockers(void) {
     }
 }
 void AW_DebugInit(void) {
-    AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
+    AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_blockers",blockers);

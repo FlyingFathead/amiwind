@@ -42,7 +42,14 @@ int main(void){
  M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
  M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(gold_frame);
- M_Keydown(K_ENTER);assert(!gold_frame);M_Keydown(K_ESCAPE);
+ M_Keydown(K_ENTER);assert(!gold_frame);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw(); /* Interface */
+ M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
+ M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
+ M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
+ M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_UPARROW);M_Keydown(K_ESCAPE);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);assert(changes==1);
  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
  assert(changes==2 && !strcmp(queued,"disconnect\naw_main_menu\n"));
@@ -68,3 +75,11 @@ int AW_SaveMenuActive(void){return 0;}
 void AW_SaveMenuDraw(void){}
 int AW_AutosaveCount(void){return 3;}
 void AW_SetAutosaveCount(int n){}
+
+int AW_WaitDraw(void){return 0;}
+
+static int voices,dialogue=2,scene_options[]={1,2,1};
+int AW_UIVoiceStyle(void){return 1;}
+int AW_UIVoiceNames(void){return voices;}void AW_UIVoiceNamesToggle(void){voices=!voices;}
+int AW_UIDialogueMethod(void){return dialogue;}void AW_UIDialogueCycle(int step){dialogue=(dialogue-1+step+4)%4+1;}
+int AW_SceneUIOption(int n,int change){if(change)scene_options[n]=n?(scene_options[n]-1+change+3)%3+1:!scene_options[n];return scene_options[n];}

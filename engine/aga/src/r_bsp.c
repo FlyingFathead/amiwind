@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -86,7 +86,7 @@ void R_RotateBmodel (void)
 // TODO: share work with R_SetUpAliasTransform
 
 // yaw
-	angle = currententity->angles[YAW];		
+	angle = currententity->angles[YAW];
 	angle = angle * M_PI*2 / 360;
 	s = sin(angle);
 	c = cos(angle);
@@ -103,7 +103,7 @@ void R_RotateBmodel (void)
 
 
 // pitch
-	angle = currententity->angles[PITCH];		
+	angle = currententity->angles[PITCH];
 	angle = angle * M_PI*2 / 360;
 	s = sin(angle);
 	c = cos(angle);
@@ -121,7 +121,7 @@ void R_RotateBmodel (void)
 	R_ConcatRotations (temp2, temp1, temp3);
 
 // roll
-	angle = currententity->angles[ROLL];		
+	angle = currententity->angles[ROLL];
 	angle = angle * M_PI*2 / 360;
 	s = sin(angle);
 	c = cos(angle);
@@ -299,7 +299,9 @@ void R_RecursiveClipBPoly (bedge_t *pedges, mnode_t *pnode, msurface_t *psurf)
 			pn = pnode->children[i];
 
 		// we're done with this branch if the node or leaf isn't in the PVS
-			if (pn->visframe == r_visframecount)
+			/* Match world far clipping: a culled leaf has no current sort key.
+			 * Emitting its brush fragments can sort distant water over a wall. */
+			if (pn->visframe == r_visframecount && AW_NodeVisible(pn->minmaxs))
 			{
 				if (pn->contents < 0)
 				{
@@ -497,7 +499,7 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 				clipflags &= ~(1<<i);	// node is entirely on screen
 		}
 	}
-	
+
 // if a leaf node, draw stuff
 	if (node->contents < 0)
 	{
@@ -554,7 +556,7 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 			dot = DotProduct (modelorg, plane->normal) - plane->dist;
 			break;
 		}
-	
+
 		if (dot >= 0)
 			side = 0;
 		else
@@ -680,5 +682,3 @@ void R_RenderWorld (void)
 		}
 	}
 }
-
-
