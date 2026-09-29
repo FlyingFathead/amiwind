@@ -1,5 +1,16 @@
 # Development history
 
+## v0.0.22 - normal public source release, 29 September 2026
+
+- Promote the reconciled v0.0.21-dev8 source checkpoint to a normal GitHub release.
+- Keep the dev8 boot/launcher, paper-font and CPU-query behavior unchanged.
+- Use plain `0.0.x` numbering for public releases going forward; older `-devN` tags
+  remain historical development checkpoints.
+- No new gameplay feature, HDF build, emulator acceptance or parallel-build speedup
+  is claimed by this version-only promotion.
+
+See [release scope and validation](RELEASE-v0.0.22.md).
+
 ## v0.0.21-dev8 - reconciled boot/launcher and paper-font sources, 29 September 2026
 
 - Preserve the uploaded dev7 boot checker, five-second report/skip behavior,

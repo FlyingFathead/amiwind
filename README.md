@@ -25,12 +25,13 @@ game files, with dialogue in the lower strip and an unchanged console font.
 The main menu now uses a smaller, lower panel; UI defaults to 14 px with 16/14/12
 and fallback choices in Options.
 
-**AmiWind v0.0.21-dev8** merges the dev7 boot/launcher work with the approved
-bitmap paper-ink correction. TTF remains preferred; missing or unusable TTFs
+**AmiWind v0.0.22** is the current public source release. It carries forward the
+reconciled boot/launcher work and the approved bitmap paper-ink correction from
+the v0.0.21 development line. TTF remains preferred; missing or unusable TTFs
 use stronger bitmap ink on reading pages by default. Dialogue and menu fonts
 are unchanged. Use `--bitmap-paper-ink original` to opt out; see
 [paper font options](docs/PAPER_FONT_OPTIONS.md). Whole-pipeline parallelization
-is still pending and is not part of this source prerelease.
+is still pending and is not part of v0.0.22.
 
 The preserved dev7 startup behavior keeps the versioned startup environment preflight on
 screen for a five-second default countdown; **Space or Enter continues immediately**.
@@ -48,8 +49,8 @@ dev2's opening barrier correction remains included. The opening playtest include
 selection with rotating heads, Census Office rooms and NPCs, class/birthsign/stat
 review, papers and release adapters, and a bounded save/load implementation with
 adjustable autosave history. This remains a development slice: full dialogue,
-quests, inventory and combat are unfinished. Read the [checkpoint scope and
-remaining validation](docs/RELEASE-v0.0.21-dev8.md) before testing.
+quests, inventory and combat are unfinished. Read the [release scope and
+validation](docs/RELEASE-v0.0.22.md) before testing.
 
 Maintenance from v0.0.20 remains included: prison ambience is 5 dB lower in its
 mixer channels and debug overlay toggles include coordinates. Both intermittent
@@ -84,7 +85,7 @@ Debug FPS values show individual moments, not a hardware benchmark.*
 
 ## About AmiWind
 
-Created by **FlyingFathead a.k.a. Horstator**  
+Created by **FlyingFathead a.k.a. Horstator**
 Thanks to: **ChaosWhisperer**
 
 > Massive thanks to everyone in the Amiga community who have been willing to

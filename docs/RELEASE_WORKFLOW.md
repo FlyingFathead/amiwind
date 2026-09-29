@@ -2,10 +2,11 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current development package is **v0.0.21-dev8**;
-see [release notes and validation](RELEASE-v0.0.21-dev8.md). Earlier releases remain immutable.
-AmiWind remains a demo;
-keep increments within `0.0.x`, with `-devN` for development iterations as needed.
+Use one shared release number. The current public source release is **v0.0.22**;
+see [release notes and validation](RELEASE-v0.0.22.md). Earlier releases remain immutable.
+AmiWind remains a demo. Public GitHub releases use plain `0.0.x` version numbers;
+older `-devN` tags remain historical development checkpoints rather than the preferred
+public-release naming scheme.
 The old separate Python pipeline numbering is historical. Root `VERSION` is the
 only maintained version number. Build and packaging tools read it through
 `tools/project_version.py`; Python package metadata reads the same file.

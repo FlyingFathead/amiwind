@@ -1,14 +1,14 @@
 # Current project state - 29 September 2026
 
-**Current development target: AmiWind v0.0.21-dev8.**
+**Current public source release: AmiWind v0.0.22.**
 
-Dev8 reconciles the newer dev7 boot/launcher tree with paper-font checkpoint 002.
-The uploaded dev7 boot checker, launcher, dry-run builder and version generator
-are preserved byte-for-byte. TTF paper output stays preferred; bitmap-derived
-paper ink defaults to the approved filled candidate, with JSON/CLI opt-out.
-The small character UI, other menus and dialogue retain their existing fonts.
-CPU-job detection now tolerates a failed process CPU-count query.
-See [dev8 scope](RELEASE-v0.0.21-dev8.md) and [paper settings](PAPER_FONT_OPTIONS.md).
+v0.0.22 promotes the reconciled v0.0.21-dev8 source checkpoint to the current
+normal public release without adding gameplay features. The dev7 boot checker,
+launcher, dry-run builder and version generator remain preserved. TTF paper output
+stays preferred; bitmap-derived paper ink defaults to the approved filled candidate,
+with JSON/CLI opt-out. The small character UI, other menus and dialogue retain their
+existing fonts. CPU-job detection tolerates a failed process CPU-count query.
+See [v0.0.22 scope](RELEASE-v0.0.22.md) and [paper settings](PAPER_FONT_OPTIONS.md).
 
 Whole-pipeline parallel scheduling remains pending. This source merge does not
 claim a new Amiga/HDF build or emulator playtest. The owner completed all 17
