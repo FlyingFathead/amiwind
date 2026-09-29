@@ -140,11 +140,14 @@ int AW_IntroKey(int key) {
     return 1;
 }
 void AW_IntroDraw(void) {
-    int y;char text[40];extern int scr_copyeverything;
+    int y,caret_height;extern int scr_copyeverything;
     if(key_dest==key_game && (AW_CharacterActive() || AW_ReaderActive() || prompt))scr_copyeverything=1;
     AW_CharacterDraw();AW_ReaderDraw();if(!prompt || key_dest!=key_game)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;AW_UIBox(0,y,vid.width,vid.height-y);
-    if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);sprintf(text,"%s_",player_name);AW_UIText(10,y+22,text,-1);}
+    if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_UIText(10,y+22,player_name,-1);
+        /* Original font punctuation can be ornamental: the input caret is geometry. */
+        caret_height=AW_UIFontSize();if(!caret_height)caret_height=8;
+        AW_UIFill(11+AW_UIWidth(player_name),y+22,1,caret_height,AW_UIColor(223,199,144));}
     else {AW_UIText(10,y+4,"W A S D: move. E: activate.",-1);AW_UIText(10,y+22,"Enter to follow the guard.",-1);}
 }
 static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",
@@ -156,4 +159,4 @@ static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / p
         (long)AW_StateGet(&aw_state,AW_GLOBAL,"CharGenState"),
         (long)AW_StateGet(&aw_state,AW_JOURNAL,"A1_1_FindSpymaster"),
         (long)AW_Papers(),(long)AW_Ring(),(long)AW_Package());}
-void AW_IntroInit(void){Cmd_AddCommand("aw_new_game",new_game);Cmd_AddCommand("aw_intro_status",status);}
+void AW_IntroInit(void){AW_MovieInit();Cmd_AddCommand("aw_new_game",new_game);Cmd_AddCommand("aw_intro_status",status);}

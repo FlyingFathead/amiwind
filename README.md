@@ -15,11 +15,12 @@ Commodore Amiga.**
 
 ## Current state of the project
 
-**AmiWind v0.0.23-dev3** adds clearer dialogue, quieter ship water, character
-confirmation, waiting with a saved game clock, and fixes for house visibility
-and the misplaced rock beside the Silt Strider. It retains the expanded playable Seyda Neen area, with all **13 town
-interiors**, nearby **Addamasartus**, the prison ship, and the original **Silt
-Strider and Darvame Hleran** at the port. The local cast now includes 30 ordinary
+**AmiWind v0.0.23-dev4** fixes the cut-off tree and Darvame's platform placement,
+adds padded, content-sized dialogue, restores the vertical input caret and
+readable rotation hint, and improves the logo/theme transition. The expanded
+Seyda Neen area retains all **13 town interiors**, nearby **Addamasartus**, the
+prison ship, and the original **Silt Strider and Darvame Hleran** at the port.
+The local cast now includes 30 ordinary
 NPC placements / 27 appearances alongside the scripted introduction actors.
 NPCs have solid bodies; interior furniture, lights and original door destinations
 are converted from your own game data.
@@ -29,10 +30,12 @@ reference emulator, and the Tradehouse front door has been tested in both
 directions. This does not certify every floor, stair or door. Cave lighting is
 still basic; full dialogue, voice cycles, NPC services, inventory and combat remain
 unfinished. The Strider is a placed model; travel service is planned.
-See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23-dev3.md) and
+See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23-dev4.md) and
 [29 September roadmap](docs/PLAN-2026-09-29.md).
 
-New Game plays the optional owned intro movie (Esc skips), then uses a **blank
+The startup logo fades in for two seconds, holds five, then fades out for one,
+with theme music from the start; Space/Enter/Esc skips. New Game plays the optional
+owned intro movie (Esc skips), then uses a **blank
 loading screen** into Jiub's ship scene. Ordinary travel keeps the owned loading
 art. Music remains serviced through map reads and decoding; repeated interior
 loads kept the selected track playing with no measured underruns after startup.
@@ -44,8 +47,9 @@ Voiceovers default to **aim-only identity** (`aw_voice_dialogue_display_style 2`
 the bottom dialogue panel contains speech text, with no speaker header.
 Aim at nearby NPCs to see their names, even when talking is unavailable. Options
 → Interface offers voice identity options, four dialogue styles and three target/
-object-label positions. The unchanged panel fits two default-font rows or three
-at 12 px.
+object-label positions. The new default sizes the box to the text with equal
+padding and centers the lines vertically and horizontally. `dbg ui layout 1/2/3`
+selects legacy, full-width or content-sized geometry.
 After registration, **T** opens a 1–24 hour wait selector; **F1** shows quick help.
 Waiting advances the saved time/date. Sky lighting and NPC schedules are still
 pending. See [dialogue and waiting controls](docs/DIALOGUE_AND_WAIT.md).
@@ -77,13 +81,13 @@ and [door mapping](docs/DOOR_MAPPING.md).
 
 | Silt Strider and Darvame | Fargoth in the expanded town |
 | :---: | :---: |
-| ![Original Silt Strider and rider at Seyda Neen](docs/images/amiwind-v0.0.23-dev3-rock-after.png) | ![Fargoth rendered in town](docs/images/amiwind-v0.0.23-dev2-fargoth.png) |
+| ![Original Silt Strider and rider at Seyda Neen](docs/images/amiwind-v0.0.23-dev4-darvame.png) | ![Fargoth rendered in town](docs/images/amiwind-v0.0.23-dev2-fargoth.png) |
 | **Inside Arrille's Tradehouse** | **Jiub dialogue with TTF-converted text** |
-| ![Tradehouse entry and interior](docs/images/amiwind-v0.0.23-dev2-tradehouse.png) | ![Ship speech uses the full dialogue panel](docs/images/amiwind-v0.0.23-dev3-dialogue.png) |
+| ![Tradehouse entry and interior](docs/images/amiwind-v0.0.23-dev2-tradehouse.png) | ![Padded centered ship dialogue](docs/images/amiwind-v0.0.23-dev4-dialogue.png) |
 
 ![In-engine camera pan around the Silt Strider port](docs/images/amiwind-v0.0.23-dev2-port.gif)
 
-*Actual FS-UAE captures, 29 September 2026: port hill and Jiub dialogue are dev3;
+*Actual FS-UAE captures, 29 September 2026: Darvame and Jiub dialogue are dev4;
 Fargoth, Tradehouse and the pan are dev2. Screenshots crop only the
 emulator margins; the seven-second camera pan is reduced to 444 pixels wide / 8 fps
 for the README. No generated scenery or composited characters. Dark interiors

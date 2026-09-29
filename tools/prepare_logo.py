@@ -98,7 +98,8 @@ def prepare_logo(source, target, font_path=None):
         draw = ImageDraw.Draw(full)
         for i, line in enumerate(lines):
             draw.text((WIDTH//2, 141+i*14), line, anchor='mt', fill=(223,199,144), font=ImageFont.load_default())
-    gains = [i/10 for i in range(11)] + [1]*14 + [i/5 for i in range(4, -1, -1)] + [0]
+    # Two-second fade, five seconds fully visible, one-second fade to black.
+    gains = [i/20 for i in range(20)] + [1]*50 + [i/10 for i in range(9, -1, -1)]
     frames = [ImageEnhance.Brightness(full).enhance(gain) for gain in gains]
     contact = Image.new('RGB', (WIDTH, HEIGHT*len(frames)))
     for i, frame in enumerate(frames): contact.paste(frame, (0, HEIGHT*i))
@@ -112,3 +113,26 @@ def prepare_logo(source, target, font_path=None):
             stream.write(frame.quantize(palette=palette, dither=Image.Dither.NONE).tobytes())
         stream.write(bytes(samples))
     return validate(target)
+
+
+def prepare_opening_card(captions, font_path, target, movie_frames):
+    """A runtime-switchable first quote; leave the original AWV audio/video intact."""
+    import json
+    cards = json.loads(Path(captions).read_text())
+    if not isinstance(cards, list) or not cards or not isinstance(cards[0], dict):
+        raise ValueError('Expected a nonempty private title-card list')
+    card = cards[0]
+    start, end, text = card.get('start'), card.get('end'), card.get('text')
+    if (not isinstance(start, (int, float)) or not isinstance(end, (int, float))
+            or not 0 <= start < end <= movie_frames / FPS
+            or not isinstance(text, str) or not text.strip()):
+        raise ValueError('Invalid opening-card time or text')
+    first, last = int(start * FPS), int(end * FPS)
+    if last <= first:
+        raise ValueError('Opening card must last at least one frame')
+    result = draw_text_card(Image.new('RGB', (WIDTH, HEIGHT)), text, font_path)
+    indexed = result.quantize(colors=256, dither=Image.Dither.NONE)
+    raw = (struct.pack('>4sIII', b'AWT1', first, last, 0)
+           + bytes(indexed.getpalette()).ljust(768, b'\0')[:768] + indexed.tobytes())
+    Path(target).write_bytes(raw)
+    return {'first_frame': first, 'end_frame': last, 'bytes': len(raw)}

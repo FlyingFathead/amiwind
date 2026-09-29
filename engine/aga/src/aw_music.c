@@ -119,6 +119,8 @@ static void music_mode(void) {if(title_playing)return;mode=!mode;if(available){m
 static void music_status(void) {Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);}
 void AW_MusicTitle(void) {
     if(!available)return;
+    /* Startup branding and its destination menu share the same title stream. */
+    if(title_playing && music && current==title_track && !paused)return;
     title_playing=1;
     if(title_track<0 || !open_track(title_track,"main-menu")){paused=1;return;}
     paused=0;fade=0;previous_l=previous_r=0;

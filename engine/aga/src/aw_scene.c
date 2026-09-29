@@ -43,8 +43,8 @@ const char *AW_SceneTargetName(void) {
     edict_t *p,*e;vec3_t eye,end,forward,right,up;trace_t tr;int i;
     if((!target_names.value && !AW_UIVoiceAimOnly()) || key_dest!=key_game || pending || !sv.active ||
        svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict ||
-       cls.state!=ca_connected || AW_CharacterActive() || AW_ReaderActive() ||
-       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
+       cls.state!=ca_connected || AW_CharacterActive() || AW_ReaderActive() || AW_IntroPromptActive() ||
+       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS && !AW_UIVoiceAimOnly()))return NULL;
     p=svs.clients[0].edict;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
     for(i=0;i<3;i++)end[i]=eye[i]+forward[i]*96;

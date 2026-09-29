@@ -281,7 +281,7 @@ void AW_CharacterDraw(void)
         }
         AW_UITextBox(12,143,296,19,"R: race  C: class  B: birthsign",muted);
     }
-    AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   [ ]: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
+    AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   LMB: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
     if(confirming){
         AW_UIBox(16,48,288,126);AW_UISmallBegin();
         AW_UITextBox(24,53,272,20,"Really choose this character?",gold);

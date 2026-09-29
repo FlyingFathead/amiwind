@@ -13,6 +13,7 @@ static route_t routes[]={
     {"ui font","aw_ui_select","16/14/12/fallback"},
     {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise]"},
     {"ui preview","aw_ui_preview",""},
+    {"ui layout","aw_dialogue_layout","1 legacy / 2 full width / 3 padded content (default)"},
     {"ui dialogue","aw_dialogue_method","1/2/3/4 (default 2)"},
     {"ui labels","aw_label_style","below/topright/hudleft"},
     {"ui targetplace","aw_target_place","below/topright/hudleft"},

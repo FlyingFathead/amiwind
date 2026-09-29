@@ -131,6 +131,18 @@ void() aw_npc_idle = {
     if (self.aw_hello_polls >= 2 && time >= aw_voice_deadline)
         aw_greet(self,aw_player,1);
 };
+/* All static brushes must be linked before the actor's floor trace. Exported
+ * entity order is not a collision guarantee: the port platform may spawn last. */
+void() aw_npc_floor = {
+    setorigin(self,self.origin + '0 0 8');
+    droptofloor();
+    setorigin(self,self.origin + '0 0 0.25');
+    self.solid = 3;
+    setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
+    self.think = aw_npc_idle;
+    self.aw_next_pose = time + self.aw_idle_step;
+    self.nextthink = time + self.aw_idle_step;
+};
 void() aw_npc = {
     precache_model(self.model);
     if (self.aw_voice != "") precache_sound(self.aw_voice);
@@ -138,16 +150,12 @@ void() aw_npc = {
     self.solid = 0;
     setmodel(self,self.model);
     setsize(self,'0 0 0','0 0 0');
-    setorigin(self,self.origin + '0 0 8');
-    droptofloor();
-    setorigin(self,self.origin + '0 0 0.25');
-    // Every resident blocks the player after floor placement, including town NPCs.
-    self.solid = 3;
-    setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
     self.think = aw_npc_idle;
     self.yaw_speed = 22.5;
     self.aw_next_pose = time + self.aw_idle_step;
     self.nextthink = time + self.aw_idle_step;
+    self.think = aw_npc_floor;
+    self.nextthink = time + 0.1;
 };
 void() aw_interact = {
     local entity npc, best;

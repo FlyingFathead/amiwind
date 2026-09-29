@@ -10,6 +10,11 @@
 extern int soundtime;
 typedef struct {byte palette[768],frame[MAX_PIXELS];signed char pcm[4096];} movie_buffers_t;
 static movie_buffers_t *buffers;
+/* A single optional host-rasterized opening quote. No text/owned pixels in source. */
+static byte *opening_card;
+static long card_first,card_end;
+static cvar_t intro_text_overlay={"aw_intro_text_overlay","1",true};
+void AW_MovieInit(void){Cvar_RegisterVariable(&intro_text_overlay);}
 static FILE *video,*audio;
 static long frames,samples,audio_start,clock_start,shown,pcm_start,pcm_count;
 static int broken,branding,width,height,pixels;
@@ -19,13 +24,27 @@ static unsigned long be32(byte *p){return ((unsigned long)p[0]<<24)|((unsigned l
 static void close_movie(void){
     if(video)fclose(video);if(audio)fclose(audio);video=audio=NULL;
     if(buffers)free(buffers);buffers=NULL;
+    if(opening_card)free(opening_card);
+    opening_card=NULL;
 }
 int AW_MovieActive(void){return buffers!=NULL;}
-byte *AW_MoviePalette(void){return buffers?buffers->palette:NULL;}
+static int card_visible(void){return buffers && opening_card && intro_text_overlay.value && shown>=card_first && shown<card_end;}
+byte *AW_MoviePalette(void){return card_visible()?opening_card:(buffers?buffers->palette:NULL);}
+static void load_opening_card(void){
+    FILE *f=NULL;byte h[16];long n;
+    n=COM_FOpenFile("intro/opening.awt",&f);if(!f)return;
+    if(n!=16+768+MAX_PIXELS || fread(h,1,16,f)!=16 || memcmp(h,"AWT1",4))goto done;
+    card_first=be32(h+4);card_end=be32(h+8);
+    if(card_first<0 || card_end<=card_first || card_end>frames || be32(h+12))goto done;
+    opening_card=malloc(768+MAX_PIXELS);
+    if(opening_card && fread(opening_card,1,768+MAX_PIXELS,f)!=768+MAX_PIXELS){free(opening_card);opening_card=NULL;}
+done:
+    fclose(f);
+}
 static void finish(const char *why){
     Con_Printf("Movie profile: %ld ms, %ld pictures, %ld skipped pictures.\n",
         (long)((Sys_FloatTime()-started)*1000),pictures,dropped);
-    close_movie();S_StopAllSounds(true);IN_AWClearButtons();
+    close_movie();if(!branding)S_StopAllSounds(true);IN_AWClearButtons();
     if(branding)Cbuf_AddText("aw_main_menu\n");else AW_IntroBegin();
     /* Con_Printf may refresh a disconnected client's screen. Select the
      * intro loading style before that refresh can request normal artwork. */
@@ -51,9 +70,11 @@ static int start_movie(char *path,int brand){
     audio_size=COM_FOpenFile(path,&audio);
     audio_start=DATA_START+frames*pixels;
     if(!audio || audio_size!=expected || fseek(audio,audio_start,SEEK_SET))goto invalid;
-    CDAudio_Pause();S_StopAllSounds(true);clock_start=paintedtime;
+    S_StopAllSounds(true);
+    if(branding)AW_MusicTitle();else {CDAudio_Pause();load_opening_card();}
+    clock_start=paintedtime;
     shown=0;pcm_start=pcm_count=0;broken=0;pictures=1;dropped=0;started=Sys_FloatTime();
-    Con_Printf("Intro movie: %ld frames; Esc skips.\n",frames);return 1;
+    Con_Printf("Intro movie: %ld frames; %s skips.\n",frames,branding?"Space/Enter/Esc":"Esc");return 1;
 invalid:
     close_movie();Con_Printf("Video invalid or unavailable; skipping optional movie.\n");return 0;
 }
@@ -78,6 +99,7 @@ void AW_MovieUpdate(void){
 void AW_MoviePaint(portable_samplepair_t *dst,int count,int first_sample){
     long position=first_sample-clock_start,take;int i,gain=(int)(volume.value*256);
     if(!buffers || broken)return;
+    if(branding){AW_MusicPaint(dst,count);return;}
     while(count>0 && position<samples){
         if(position<0){dst++;position++;count--;continue;}
         if(position<pcm_start || position>=pcm_start+pcm_count){
@@ -93,13 +115,15 @@ void AW_MovieDraw(void){
     int x,y;byte *row,*src;
     if(!buffers || !vid.buffer || vid.width!=320 || vid.height!=200)return;
     for(y=0;y<200;y++){
-        row=vid.buffer+y*vid.rowbytes;src=buffers->frame+(y*height/200)*width;
+        row=vid.buffer+y*vid.rowbytes;
+        if(card_visible()){memcpy(row,opening_card+768+y*320,320);continue;}
+        src=buffers->frame+(y*height/200)*width;
         if(width==320)memcpy(row,src,320);
         else for(x=0;x<160;x++)row[x*2]=row[x*2+1]=src[x];
     }
 }
 int AW_MovieKey(int key,int down){
     if(!buffers)return 0;
-    if(down && key==K_ESCAPE)finish("skipped");
+    if(down && (key==K_ESCAPE || (branding && (key==K_ENTER || key==K_SPACE))))finish("skipped");
     return 1;
 }

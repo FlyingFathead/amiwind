@@ -1,5 +1,11 @@
 # Development history
 
+## v0.0.23-dev4 — 29 September 2026
+
+Padded content-sized dialogue and caret/rotation regressions; 2/5/1-second logo
+with continuous title music; optional opening quote overlay; sprite background
+depth and deferred NPC floor placement. See [release notes](RELEASE-v0.0.23-dev4.md).
+
 ## 0.0.23-dev2 — 29 September 2026
 
 - Expand the exterior beyond the port; retain crossing object bounds, the missing

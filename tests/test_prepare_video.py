@@ -39,3 +39,26 @@ class VideoTests(unittest.TestCase):
             path.write_bytes(path.read_bytes()[:-1])
             with self.assertRaisesRegex(ValueError, "Truncated"):
                 validate(path)
+
+    def test_logo_hold_and_switchable_opening_card(self):
+        from prepare_logo import prepare_logo, prepare_opening_card
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)
+            Image.new('RGBA',(100,40),(255,255,255,255)).save(p/'logo.png')
+            info=prepare_logo(p/'logo.png',p/'logo.awv')
+            self.assertEqual(info['frames'],80)
+            raw=(p/'logo.awv').read_bytes()
+            frames=[raw[800+i*64000:800+(i+1)*64000] for i in range(80)]
+            self.assertTrue(all(frame==frames[20] for frame in frames[20:70]))
+            self.assertNotEqual(frames[19],frames[20])
+            self.assertNotEqual(frames[70],frames[20])
+            self.assertEqual(frames[0],frames[-1])
+            font=p/'font.awf'
+            font.write_bytes(struct.pack('<4sBBH',b'AWF1',16,18,1)+
+                             struct.pack('<HBBbbBB',0,1,1,0,0,2,0)*256+b'\xc0')
+            cards=p/'cards.json';cards.write_text(json.dumps([{'start':.5,'end':7,'text':'Opening'}]))
+            info=prepare_opening_card(cards,font,p/'opening.awt',200)
+            self.assertEqual((info['first_frame'],info['end_frame']),(5,70))
+            self.assertEqual(len((p/'opening.awt').read_bytes()),64784)
+            with self.assertRaises(ValueError):prepare_opening_card(cards,font,p/'invalid.awt',30)

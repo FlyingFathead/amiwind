@@ -220,3 +220,13 @@ See [dialogue and waiting](DIALOGUE_AND_WAIT.md) for semantics and limits.
 Voiceover identity: `aw_voice_dialogue_display_style 2` (default) forces aim-only
 identity and suppresses all speaker headers. Style 1 honours
 `aw_show_speaker_name_during_voiceovers 0/1` and the dialogue layout.
+
+## dev4 layout and opening quote
+
+`dbg ui layout 3` selects padded content-sized dialogue (default); `2` keeps full
+width with centered text, `1` retains the fixed legacy body. Saved parameter:
+`aw_dialogue_box_layout`. Classic speaker method 1 keeps its exact older layout.
+
+`aw_intro_text_overlay 0/1` switches original/readable first movie text, when the
+private optional opening card is present. Aim-only identity also works during
+sampled introductory speech; input prompts and character selectors suppress it.

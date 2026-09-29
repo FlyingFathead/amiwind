@@ -23,6 +23,7 @@ IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev2-{name}.png" for name in ("port", "fargoth", "tradehouse", "prison"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev3-{name}.png" for name in ("rock-before", "rock-after", "dialogue"))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev4-{name}.png" for name in ("dialogue", "darvame", "tree"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 
 

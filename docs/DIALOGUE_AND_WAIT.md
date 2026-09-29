@@ -1,4 +1,4 @@
-# Dialogue, character confirmation and waiting — v0.0.23-dev3
+# Dialogue, character confirmation and waiting — v0.0.23-dev4
 
 ## Dialogue display
 
@@ -8,18 +8,38 @@ names, NPC placement and object placement. These are archived settings.
 **Default: `aw_voice_dialogue_display_style 2` — Aim only.** Sampled speech never
 shows a speaker header in this mode, overriding all four dialogue methods and
 `aw_show_speaker_name_during_voiceovers`. The freed row holds dialogue text.
-After Census review, a close, unobstructed aiming ray identifies the NPC under
-the pointer during speech, even if the ordinary aim-name toggle is off. Looking
+During sampled speech, including the opening ship scene, a close, unobstructed
+aiming ray identifies the NPC under the pointer, even if the ordinary aim-name toggle is off. Looking
 away removes that identification. NPC placement still selects the label position;
-character-creation/menu gates still apply. Unvoiced messages retain their method.
+name-entry, character-selector and menu gates still apply. Unvoiced messages retain their method.
 
 `aw_voice_dialogue_display_style 1` restores the configured behaviour: the saved
 `aw_show_speaker_name_during_voiceovers` switch (default 0) controls speaking
 names. Set both style 1 and that switch to 1 to show them. The Interface row
 cycles **Aim only → On → Off → Aim only**, with no additional panel.
 
-The panel keeps its existing position, height, slide animation and artwork.
-At the reference 320 × 200 view it rests at y=152 and is 48 pixels high.
+### Box geometry (independent of speaker placement)
+
+`aw_dialogue_box_layout 3` is the new default, also `dbg ui layout 3`.
+Wrap text first, measure visible glyph bounds, then size the box to the widest
+line and the complete block height plus **eight pixels on each side**. Each line
+is horizontally centered; the complete block is vertically centered. Spaces are
+not stretched. The box remains centered at the bottom of the screen and uses
+existing border artwork and slide animation. A short “Yes?” gets a compact box.
+Measurement is bounded integer work; there is no allocation per frame. The lower
+HUD strip is cleared during dialogue, as the old full-width panel covered it,
+so fragments of bars/action hints do not appear beside a compact box.
+
+| Layout | Geometry |
+| --- | --- |
+| `1` | Previous full-width, fixed-height, left-aligned body |
+| `2` | Full width with centered text; shorter single-line panel |
+| `3` (default) | Content width and height, equal padding, centered text |
+
+The classic name-inside speaker method 1 deliberately retains its original
+geometry and spacing. Other speaker methods use the selected box layout.
+At the reference viewport, ordinary default-font speech wraps to two rows before
+paging; compact font permits three. Each page is measured separately.
 
 | Method | Speaker name | Body |
 | --- | --- | --- |
@@ -55,6 +75,9 @@ Targeting uses a 96-unit solid-world/entity ray,
 not the broad greeting cone. Walls and other solid entities block it. Menus,
 reading and character selectors suppress it. Identification is independent of speech availability/cooldowns; `(Talk: E)` is
 shown only when a supported manual greeting can target that same NPC.
+
+The name-entry caret is a drawn vertical line. In the appearance screen, click
+the head preview to rotate it (`LMB: rotate`); bracket keys also remain available.
 
 Pier appearance, Census choices and final review require confirmation: **Really choose this
 character?** The overlay shows the selected race/sex and face/hair or class/birthsign.

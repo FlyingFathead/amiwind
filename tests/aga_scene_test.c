@@ -6,7 +6,8 @@ keydest_t key_dest=key_game;
 char *pr_strings="\0aw_npc\0Fargoth\0worldspawn";
 static cvar_t *names_option;
 static edict_t target;static int target_trace;
-static int voice_aim;
+static int voice_aim,prompt;
+int AW_IntroPromptActive(void){return prompt;}
 int AW_UIVoiceAimOnly(void){return voice_aim;}
 int AW_CharacterActive(void){return 0;}
 int AW_ReaderActive(void){return 0;}
@@ -81,6 +82,8 @@ int main(void){
  names_option->value=0;voice_aim=1;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
  names_option->value=1;voice_aim=0;
  aw_story.stage=AW_STAGE_SHIP;assert(!AW_SceneTargetName());aw_story.stage=AW_STAGE_REVIEW;assert(!AW_SceneTargetName());
+ voice_aim=1;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
+ prompt=1;assert(!AW_SceneTargetName());prompt=0;voice_aim=0;
  aw_story.stage=AW_STAGE_PAPERS;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
  occluded=1;assert(!AW_SceneTargetName());occluded=0;
  target.free=1;assert(!AW_SceneTargetName());target.free=0;

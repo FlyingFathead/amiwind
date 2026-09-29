@@ -85,3 +85,23 @@ Exact gold ink shades are reserved in the movie palette.
 The normal build converts at 320×200. To reproduce the private replacement cards,
 run the optional caption conversion above and copy its AWV into the scene before
 `build_aga.py image`. Missing videos still warn and continue to Jiub.
+
+## v0.0.23-dev4 opening-only option
+
+`./build.sh --intro-captions /private/cards.json ...` forwards the private card
+file to image assembly. `build_aga.py image --intro-captions ...` also accepts it.
+Only the first entry is used for a small `intro/opening.awt` sidecar; the AWV is
+not rewritten. Use the existing JSON schema (`start`, `end` in seconds, `text`).
+The image's converted 16 px Magic Cards font rasterizes that text on the host.
+Use a separate private file for your language/edition's first quote. The private
+playtest includes its exact input JSON for rebuilding; public source contains
+no game quote or converted font data.
+
+Archived `aw_intro_text_overlay 1` (default) displays the sidecar during its time
+window; `0` plays the original burned-in text. If no sidecar is supplied, original
+video plays. The older `prepare_video.py --captions` path remains available for
+intentionally baked multi-card replacements.
+
+Branding now runs 2 s fade in + 5 s hold + 1 s fade out. Space, Enter and Esc skip
+it. Title music begins with branding and continues into the main menu. The movie
+still uses its own unchanged PCM; starting New Game deliberately pauses the theme.

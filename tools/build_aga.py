@@ -159,7 +159,11 @@ def image(args):
     movie=boot/'id1/intro/mw_intro.awv'
     if movie.exists():
         from prepare_video import validate as validate_video
-        validate_video(movie)
+        movie_info=validate_video(movie)
+        if getattr(args,'intro_captions',None):
+            from prepare_logo import prepare_opening_card
+            prepare_opening_card(args.intro_captions,boot/'id1/gfx/magic16.awf',
+                                 boot/'id1/intro/opening.awt',movie_info['frames'])
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
     (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_startup\n')
@@ -235,6 +239,7 @@ def main():
     add_jobs(e)
     i=sub.add_parser('image')
     i.add_argument('--data-files',type=Path,help='Owned original font and UI assets; absent retains fallback')
+    i.add_argument('--intro-captions',type=Path,help='Private JSON title cards; first card becomes a switchable opening overlay')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
     for name in ['scene','music','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     for parser in (e,i):parser.add_argument('--hands',choices=['3d','sprites'],default='3d',help='Compile-time first-person renderer; retain both conversion paths')

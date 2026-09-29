@@ -27,3 +27,11 @@ and the port pan retain their dev2 attribution. The before/after rock views in
 WHAT_ARE_ROCKS.md use the same reported camera. None is generated or composited.
 Only explicitly named promotional PNGs are exceptions to the global image ignore
 and public source allowlist; private reference images remain excluded.
+
+## v0.0.23-dev4 captures — 29 September 2026
+
+New README Darvame and Jiub screenshots are native TTF-playtest captures, cropped
+only to the game display. The restored-tree capture records the reported camera
+`-71 -429 38 / 262 / -7`. Existing Fargoth, Tradehouse and port GIF remain dev2.
+The screenshot exceptions are exact filenames; all other generated/owned media
+remain excluded. No generated imagery, brightness changes or compositing.

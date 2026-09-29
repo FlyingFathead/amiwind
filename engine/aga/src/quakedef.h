@@ -450,6 +450,7 @@ int AW_NavStart(edict_t *,vec3_t);
 int AW_NavStep(double,int);
 qboolean AW_ActorStep(edict_t *,vec3_t,double);
 int AW_MovieStart(void);
+void AW_MovieInit(void);
 void AW_MovieStartup(void);
 int AW_MovieActive(void);
 void AW_MovieUpdate(void);

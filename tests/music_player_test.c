@@ -30,7 +30,10 @@ int main(int argc,char **argv) {
     if(!strcmp(argv[2],"menu")) {
         AW_MusicTitle();assert(title_playing && current==83 && !paused);
         for(j=0;j<35;j++){memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);}
-        assert(current==83 && completions>=3);music_next();music_previous();music_mode();assert(current==83);
+        assert(current==83 && completions>=3);
+        position=played;offset=opens;AW_MusicTitle();
+        assert(played==position && opens==offset && !paused); /* logo -> menu continuity */
+        music_next();music_previous();music_mode();assert(current==83);
         assert(AW_MusicStartTrack(4));assert(!title_playing && current==4 && played==0);
         for(j=0;j<10;j++)AW_MusicPaint(&sample,1);
         assert(AW_MusicStartTrack(4) && played==0);AW_MusicTitle();assert(current==83);

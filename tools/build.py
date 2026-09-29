@@ -53,6 +53,7 @@ def parser():
     p.add_argument("--upstream-archive", type=Path, help="Optional legacy provenance check; the runtime source is included")
     p.add_argument("--quake-tools", type=Path, help="ericw-tools directory containing qbsp, vis, light")
     p.add_argument("--qcc", help="QuakeC compiler path or command (qcc-host, qcc or fteqcc)")
+    p.add_argument("--intro-captions", type=Path, help="Private opening quote JSON; runtime aw_intro_text_overlay 0/1 selects original/readable text")
     p.add_argument("--ffmpeg", default="ffmpeg")
     p.add_argument("--xdftool", default="xdftool")
     p.add_argument("--rdbtool", default="rdbtool")
@@ -372,7 +373,7 @@ def commands(args, tools, run):
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
     return steps

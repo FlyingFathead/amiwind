@@ -935,3 +935,12 @@ addressed; see [terrain findings and workflow](WHAT_ARE_ROCKS.md). Voice style 2
 now defaults to aim-only identity, overriding voiced speaker headers.
 NPC conversation-facing, deck/pier sideways containment and door squeaks remain
 open in [the consolidated dev2 feedback](FEEDBACK-v0.0.23-dev2.md).
+
+## 29 September 2026 / v0.0.23-dev4
+
+Published base: dev3 / `7e36e9051da477147f78cf22236a0a4c0c7201ae`.
+See the updated [dated plan](PLAN-2026-09-29.md) and
+[dev3 feedback disposition](FEEDBACK-v0.0.23-dev3.md). This checkpoint corrects
+content-sized dialogue, input/rotation glyphs, startup audio/timing, opening quote,
+tree sprite depth and Darvame's floor placement. The owner accepts the dev3 rock
+fix. Door sounds, containment, complete voice behaviour and sky remain pending.

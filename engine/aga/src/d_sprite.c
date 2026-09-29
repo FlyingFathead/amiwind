@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -165,7 +165,9 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 				btemp = *(pbase + (s >> 16) + (t >> 16) * cachewidth);
 				if (btemp != 255)
 				{
-					if (*pz <= (izi >> 16))
+					/* Background depth is negative. Preserve the signed comparison
+                     * while retaining unsigned fixed-point accumulator wrap. */
+                    if (*pz <= (int)(izi >> 16))
 					{
 						*pz = izi >> 16;
 						*pdest = btemp;
@@ -334,7 +336,7 @@ void D_SpriteScanRightEdge (void)
 
 	} while (i != maxindex);
 
-	pspan->count = DS_SPAN_LIST_END;	// mark the end of the span list 
+	pspan->count = DS_SPAN_LIST_END;	// mark the end of the span list
 }
 
 
@@ -443,4 +445,3 @@ void D_DrawSprite (void)
 	D_SpriteScanRightEdge ();
 	D_SpriteDrawSpans (sprite_spans);
 }
-

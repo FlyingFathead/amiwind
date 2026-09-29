@@ -100,3 +100,12 @@ FS-UAE captures at the reported port position, cropped only to the game viewport
 The displayed repair is verified at these views. Full port walking/collision
 acceptance and other rock seams still require inspection; a visual closure does
 not certify every collider.
+
+## dev4 follow-up
+
+The owner confirms the port rock fix in dev3. The later missing rider was an
+entity spawn-order problem: actor floor traces ran before the platform brushes
+were linked. The cut-off town tree was a signed sprite-depth comparison against
+the background. Neither required changing the accepted rock mesh or terrain.
+See [dev3 feedback trials](FEEDBACK-v0.0.23-dev3.md) for the discarded culling
+experiment and the final fixes. Preserve structural rocks when optimizing LAND.

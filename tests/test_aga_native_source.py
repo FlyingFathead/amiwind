@@ -16,6 +16,9 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_sprite_background_depth_and_wall_occlusion(self):
+        self.compile_run('aga_sprite_depth_test.c', [Path(SOURCE)/'src/d_sprite.c'])
+
     def test_brush_fragments_do_not_use_far_culled_leaf_keys(self):
         self.compile_run('aga_brush_culling_test.c', [Path(SOURCE)/'src'/n for n in
             ('r_bsp.c', 'r_efrag.c', 'mathlib.c')])

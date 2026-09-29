@@ -25,6 +25,7 @@ static cvar_t ui_font={"aw_ui_font","14",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
 static cvar_t ui_frame={"aw_ui_frame","0",true};
 static cvar_t dialogue_method={"aw_dialogue_box_display_method","2",true};
+static cvar_t dialogue_layout={"aw_dialogue_box_layout","3",true};
 static cvar_t voice_names={"aw_show_speaker_name_during_voiceovers","0",true};
 static cvar_t voice_style={"aw_voice_dialogue_display_style","2",true};
 static int subtitle_voice;
@@ -167,6 +168,12 @@ static void dialogue_command(void) {
     if(Cmd_Argc()==2 && strlen(s)==1 && s[0]>='1' && s[0]<='4')
         Cvar_SetValue(dialogue_method.name,s[0]-'0');
     else Con_Printf("dbg ui dialogue 1 classic / 2 above / 3 target only / 4 speaker upper right\n");
+}
+static void layout_command(void) {
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2 && (!strcmp(s,"1") || !strcmp(s,"2") || !strcmp(s,"3")))
+        Cvar_SetValue(dialogue_layout.name,s[0]-'0');
+    else Con_Printf("dbg ui layout 1 legacy / 2 full width centered / 3 padded content (default)\n");
 }
 static int advance(int c){return font_bytes?font[8+c*8+6]:8;}
 int AW_UIWidth(const char *text) {
@@ -366,8 +373,27 @@ void AW_UIObjectName(const char *name,int style) {
     name_label(name,style==3?8:vid.width-6,y+3,style!=3);
     AW_UISmallEnd();scr_copyeverything=1;
 }
+/* Visible bounds share a baseline; blank glyphs must not skew centering. */
+static void text_bounds(const char *text,int *left,int *top,int *right,int *bottom) {
+    const unsigned char *p=(const unsigned char *)text;int x=0,l,t,w,h;
+    *left=*top=32767;*right=*bottom=-32767;
+    while(*p){
+        if(font_bytes){const byte *m=font+8+*p*8;l=x+(signed char)m[4];t=(signed char)m[5];w=m[2];h=m[3];}
+        else {l=x;t=0;w=h=*p==' '?0:8;}
+        if(w && h){
+            if(l<*left)*left=l;
+            if(t<*top)*top=t;
+            if(l+w>*right)*right=l+w;
+            if(t+h>*bottom)*bottom=t+h;
+        }
+        x+=advance(*p++);
+    }
+    if(*right<*left){*left=*right=*top=*bottom=0;}
+}
 void AW_UIDraw(void) {
-    const char *p;char line[256];int lines=0,h,y,row,maxlines,page,pages,skip,legacy,show_name;
+    const char *p;char line[256],visible[3][256];
+    int lines=0,h,y,row,maxlines,page,pages,skip,legacy,show_name,centered,n=0,i;
+    int l,t,r,b,top=32767,bottom=-32767,boxwidth=vid.width,boxx=0,wide=0;
     float target,step;double elapsed,duration;
     initialize();
     if(key_dest==key_console)return;
@@ -375,7 +401,7 @@ void AW_UIDraw(void) {
     if(AW_IntroPromptActive()){panel_position=0;return;}
     h=vid.height-(r_refdef.vrect.y+r_refdef.vrect.height);
     if(h<24)return;
-    legacy=AW_UIDialogueMethod()==1;
+    legacy=AW_UIDialogueMethod()==1;centered=!legacy && dialogue_layout.value!=1;
     show_name=speaker[0] && (!subtitle_voice || AW_UIVoiceNames());
     maxlines=legacy?(h-12-(show_name?line_height:0))/line_height:
         (h-8+line_height-font_height)/line_height;
@@ -386,20 +412,45 @@ void AW_UIDraw(void) {
     if(panel_position<target){panel_position+=step;if(panel_position>target)panel_position=target;}
     if(panel_position>target){panel_position-=step;if(panel_position<target)panel_position=target;}
     if(panel_position<=0)return;
-    /* Start below the screen. Final panel occupies only the reserved UI strip. */
-    y=vid.height-(int)(h*panel_position);AW_UIBox(0,y,vid.width,h);
-    row=y+(legacy?6:4);
-    if(show_name){
-        if(legacy){AW_UIText(10,row,speaker,-1);row+=line_height;}
-        else if(target && AW_UIDialogueMethod()==2)name_label(speaker,10,y-line_height-2,0);
-        else if(target && AW_UIDialogueMethod()==4)name_label(speaker,vid.width-10,6,1);
-    }
     pages=(lines+maxlines-1)/maxlines;if(pages<1)pages=1;
     elapsed=realtime-subtitle_started;duration=subtitle_until-subtitle_started;
     page=duration>0?(int)(elapsed*pages/duration):0;if(page>=pages)page=pages-1;if(page<0)page=0;
     p=subtitle;skip=page*maxlines;
     while(*p && skip--)p=AW_UILine(p,vid.width-24,line,sizeof(line));
-    while(*p && maxlines--){
+    if(centered){
+        while(*p && n<maxlines){
+            p=AW_UILine(p,vid.width-24,visible[n],sizeof(visible[n]));
+            text_bounds(visible[n],&l,&t,&r,&b);
+            if(r-l>wide)wide=r-l;
+            if(t+n*line_height<top)top=t+n*line_height;
+            if(b+n*line_height>bottom)bottom=b+n*line_height;
+            n++;
+        }
+        /* Layout 3 adds equal padding to actual glyph bounds. Layout 2
+         * retains full width and a shorter single-line strip. */
+        if(dialogue_layout.value!=2 && n){
+            boxwidth=wide+16;
+            if(boxwidth>vid.width)boxwidth=vid.width;
+            boxx=(vid.width-boxwidth)/2;h=bottom-top+16;
+        }else if(n==1 && h>font_height+16)h=font_height+16;
+    }
+    /* The old full-width panel covered bars and action hints. Clear their
+     * strip before a compact box too, so partial labels cannot leak beside it. */
+    if(centered)AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
+    y=vid.height-(int)(h*panel_position);AW_UIBox(boxx,y,boxwidth,h);
+    row=y+(legacy?6:4);
+    if(show_name){
+        if(legacy){AW_UIText(10,row,speaker,-1);row+=line_height;}
+        else if(target && AW_UIDialogueMethod()==2)name_label(speaker,centered?boxx+8:10,y-line_height-2,0);
+        else if(target && AW_UIDialogueMethod()==4)name_label(speaker,vid.width-10,6,1);
+    }
+    if(centered){
+        if(n)row=y+(h-bottom+top)/2-top;
+        for(i=0;i<n;i++){
+            text_bounds(visible[i],&l,&t,&r,&b);
+            AW_UIText((vid.width-r+l)/2-l,row+i*line_height,visible[i],-1);
+        }
+    }else while(*p && maxlines--){
         p=AW_UILine(p,vid.width-24,line,sizeof(line));
         if(legacy)AW_UIText(10,row,line,-1);
         else AW_UITextBox(10,row,AW_UIWidth(line),font_height,line,-1);
@@ -412,9 +463,9 @@ static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original b
 void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cvar_RegisterVariable(&loading_style);
-    Cvar_RegisterVariable(&dialogue_method);
+    Cvar_RegisterVariable(&dialogue_method);Cvar_RegisterVariable(&dialogue_layout);
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);
-    Cmd_AddCommand("aw_dialogue_method",dialogue_command);
+    Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);
     Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

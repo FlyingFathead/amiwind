@@ -384,3 +384,12 @@ addressed; see [terrain findings and workflow](WHAT_ARE_ROCKS.md). Voice style 2
 now defaults to aim-only identity, overriding voiced speaker headers.
 NPC conversation-facing, deck/pier sideways containment and door squeaks remain
 open in [the consolidated dev2 feedback](FEEDBACK-v0.0.23-dev2.md).
+
+## dev3 regression retest / dev4
+
+Owner confirms the port rock is fixed. Newly reproduced and corrected: tree
+sprite background-depth rejection; Darvame dropping under the platform before
+static scenery spawns; uneven dialogue padding; ornamental caret/rotation glyphs;
+startup theme/timing; missing optional opening quote overlay. See
+[the full feedback table and trials](FEEDBACK-v0.0.23-dev3.md).
+These focused checks do not close unrelated open items above.
