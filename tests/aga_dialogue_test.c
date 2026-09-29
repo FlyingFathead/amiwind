@@ -28,10 +28,11 @@ static void clean(void){memset(frame,137,sizeof(frame));}
 static int changed(int x,int y){return vid.buffer[y*320+x]!=137;}
 static int framed(int x,int y){return vid.buffer[y*320+x]==AW_UIColor(151,131,87);}
 int main(void){
-    int i,x,y;
+    int i,x,y;char pagebuf[768];const char *rest;
     for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
     memset(glyphs,255,sizeof(glyphs));vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=frame+2;
-    r_refdef.vrect.height=152;AW_UIInit();assert(AW_UIDialogueMethod()==2);
+    r_refdef.vrect.height=152;AW_UIInit();assert(AW_UIDialogueMethod()==3);
+    Cvar_SetValue("aw_dialogue_box_display_method",2);
     Cvar_SetValue("aw_dialogue_box_layout",1);
     AW_UISubtitle("Speaker","AAAA\nBBBB\nCCCC",10);clean();AW_UIDraw();
     assert(changed(0,152) && !changed(0,151)); /* Unchanged panel footprint. */
@@ -67,7 +68,7 @@ int main(void){
     for(i=0;i<152*320;i++)assert(vid.buffer[i]==137);
     AW_UIVoiceNamesToggle();clean();AW_UIDraw();assert(AW_UISpeakerAtRight() && changed(268,10));
     AW_UIVoiceNamesToggle();AW_UISubtitle("Speaker","Unvoiced",10);assert(AW_UISpeakerAtRight());
-    Cvar_SetValue("aw_dialogue_box_display_method",999);assert(AW_UIDialogueMethod()==2);
+    Cvar_SetValue("aw_dialogue_box_display_method",999);assert(AW_UIDialogueMethod()==3);
     /* New content layout: exact eight-pixel padding around visible glyphs,
      * centered lines, short single-line panel and page-specific measurement. */
     Cvar_SetValue("aw_dialogue_box_layout",3);
@@ -96,5 +97,18 @@ int main(void){
     Cvar_SetValue("aw_dialogue_box_layout",2);clean();AW_UIDraw();
     assert(framed(0,170) && !framed(0,169)); /* full-width option retained */
     assert(frame[0]==137 && frame[1]==137 && frame[64002]==137 && frame[64003]==137);
+    rest=AW_UIPage("Stand up. You were dreaming. What's your name?",72,2,pagebuf,sizeof(pagebuf));
+    assert(!strcmp(pagebuf,"Stand up."));
+    assert(!strcmp(rest,"You were dreaming. What's your name?"));
+    rest=AW_UIPage(rest,72,2,pagebuf,sizeof(pagebuf));
+    assert(!strcmp(pagebuf,"You were\ndreaming."));
+    assert(!strcmp(rest,"What's your name?"));
+    rest=AW_UIPage("Dr. Hleran has 3.5 gold. Yes?",160,2,pagebuf,sizeof(pagebuf));
+    assert(!*rest); /* titles and decimal points stay inside the sentence */
+    rest=AW_UIPage("A very long sentence that cannot fit on one page continues safely.",72,2,pagebuf,sizeof(pagebuf));
+    assert(rest[0] && strstr(pagebuf,"A very long"));
+    clean();AW_UIBox(0,152,320,48);AW_UICenteredLines(0,152,320,48,"AAAA\nBB");
+    assert(vid.buffer[164*320+149]==AW_UIColor(223,199,144));
+    assert(vid.buffer[180*320+155]==AW_UIColor(223,199,144));
     return 0;
 }

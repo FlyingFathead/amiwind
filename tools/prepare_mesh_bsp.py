@@ -34,12 +34,12 @@ def bounded_planes(points, equations):
 
 
 def _prepare_model(task):
-    mi, m, profile, archive_path = task
+    mi, m, profile, archive_path, *extras = task
     name = m['source']
     with Path(archive_path).open('rb') as archive:
         vv,ff,_=unpack_geometry(read_asset(archive,m));v=np.array(vv);f=np.array(ff)
         lod={};visual_v,visual_f=v,f
-        if profile:
+        if profile.get('ratio'):
          prefixes=profile.get('preserve_shape_prefixes',[])
          matched={prefix:[i for i,mat in enumerate(m['materials'])
                           if mat.get('source_shape','').casefold().startswith(prefix.casefold())]
@@ -47,6 +47,16 @@ def _prepare_model(task):
          if any(not values for values in matched.values()):raise ValueError('Missing preserved structural shape in '+name)
          keep={i for values in matched.values() for i in values}
          visual_v,visual_f,lod=reduce_mesh(v,f,profile['ratio'],keep)
+        if profile.get('flatten'):
+         from surface_flatten import bake_panel
+         texture_records=extras[0]
+         def source_image(material):
+          ti=m['materials'][material]['texture_index']
+          if ti is None:return np.full((1,1,3),180,dtype=np.uint8)
+          raw=read_asset(archive,texture_records[ti]);_,w,h=struct.unpack_from('>4sHH',raw)
+          return np.frombuffer(raw[8:],np.uint8).reshape(h,w,4)
+         visual_v,visual_f,baked,details=bake_panel(v,f,m['materials'],source_image,profile['flatten'])
+         lod['flatten']=details;lod['_flat_rgb']=baked
         collision_v,collision_f=v,f
         if m.get('collision'):
          cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
@@ -87,6 +97,7 @@ def _prepare_placement(task):
     for polygon,material,axes,offset,source_normal in polys:
         q=polygon@r.T*scale+o;n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
         normal=r@source_normal
+        q=q+normal*ref.get('_flatten_shift',0)
         if n@normal<0:q=q[::-1];n=-n
         ax=r@axes/scale*texsize;off=offset*texsize-o@ax
         samples=None
@@ -125,6 +136,8 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
     texture_cache={};planes_cache={};texinfo_cache={};models={};report=[]
+    from surface_flatten import load_profiles
+    flatten_profiles=load_profiles()
     profiles={name:profile for group in index.get('groups',{}).values()
               for name,profile in group.get('visual_profiles',{}).items()}
     empty_leaf=next(i for i in range(len(lumps[10])//28) if struct.unpack_from('<i',lumps[10],i*28)[0]==-1)
@@ -134,6 +147,12 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       i=len(lumps[1])//20;planes_cache[key]=i;lumps[1]+=struct.pack('<4fi',*n,d,3)
      return planes_cache[key]
     def texture(m,mi,size):
+     if mi==len(m['materials']):
+      key=('flatten',m['source'],size)
+      if key not in texture_cache:
+       im=Image.fromarray(models[model_ids[m['source']]][4]['_flat_rgb']).quantize(palette=pal,dither=Image.Dither.NONE)
+       texture_cache[key]=len(textures);textures.append(miptex('flat'+str(len(textures)),im))
+      return texture_cache[key]
      mat=m['materials'][mi];ti=mat['texture_index'];key=(ti,size,tuple(round(x,2) for x in mat['diffuse']))
      if key not in texture_cache:
       if ti is None:rgb=np.full((32,32,3),180.)
@@ -177,17 +196,22 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     for mi in unique:
         model=index['models'][mi]
         profiles.setdefault(model['source'],rock_profile(model['source'],model['triangles']))
+        if model['source'] in flatten_profiles:
+            profiles[model['source']]={**profiles[model['source']], 'flatten':flatten_profiles[model['source']]}
+    model_ids={m['source']:i for i,m in enumerate(index['models'])}
     tasks = [(mi, index['models'][mi], profiles.get(index['models'][mi]['source'], {}),
-              scenery/'scenery.mwpak') for mi in unique]
+              scenery/'scenery.mwpak',index['textures']) for mi in unique]
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))
     print(f'BSP geometry workers: {workers}; {len(tasks)} unique models', flush=True)
     models = dict(ordered_map(_prepare_model, tasks, workers))
+    from surface_flatten import mount_references
+    mount_references(index,selected,models,centre,SCALE)
     def placement_tasks():
      seen=set()
      for ref in selected:
        mi=ref['model_index']
        if mi not in models:continue
-       key=_instance_key(ref,lighting)
+       key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5))
        if key in seen:continue
        seen.add(key)
        yield ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting
@@ -200,7 +224,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       if any(t in name for t in ['flora_','marker_','scum_','lantern_hook','furn_de_rope']):continue
       o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
       origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
-      key=_instance_key(ref,lighting)
+      key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5))
       if key in instance_models:
        entities.append(entity(instance_models[key],origin,yaw,ref['number']));continue
 
@@ -234,7 +258,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
       instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
-      report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':lod,'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
+      report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
     order_face_planes(lumps,face_planes)
     # New texture table, preserving the original texture payloads.

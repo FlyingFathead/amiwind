@@ -16,6 +16,9 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_console_half_full_closed_and_escape(self):
+        self.compile_run('aga_console_cycle_test.c', [Path(SOURCE)/'src/console.c'])
+
     def test_sprite_background_depth_and_wall_occlusion(self):
         self.compile_run('aga_sprite_depth_test.c', [Path(SOURCE)/'src/d_sprite.c'])
 

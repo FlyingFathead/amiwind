@@ -1,0 +1,11 @@
+{
+  "types": {
+    "decorative_windows": {
+      "flatten": true,
+      "models": {
+        "meshes/x/ex_nord_win_01.nif": {"axis": 1, "facing": -1, "plane": 0, "texture_size": 64},
+        "meshes/x/ex_nord_win_02.nif": {"axis": 1, "facing": -1, "plane": 0, "texture_size": 64}
+      }
+    }
+  }
+}

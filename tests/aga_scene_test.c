@@ -79,10 +79,10 @@ int main(void){
  ship_available=0;start_demo();assert(!strcmp(queued,"map seyda\n"));
  target_trace=1;target.v.classname=1;target.v.netname=8;target.v.modelindex=1;
  assert(names_option->value==1);names_option->value=0;assert(!AW_SceneTargetName());names_option->value=1;
- names_option->value=0;voice_aim=1;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
+ names_option->value=0;voice_aim=1;assert(!AW_SceneTargetName());
  names_option->value=1;voice_aim=0;
  aw_story.stage=AW_STAGE_SHIP;assert(!AW_SceneTargetName());aw_story.stage=AW_STAGE_REVIEW;assert(!AW_SceneTargetName());
- voice_aim=1;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
+ voice_aim=1;assert(!AW_SceneTargetName());
  prompt=1;assert(!AW_SceneTargetName());prompt=0;voice_aim=0;
  aw_story.stage=AW_STAGE_PAPERS;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
  occluded=1;assert(!AW_SceneTargetName());occluded=0;

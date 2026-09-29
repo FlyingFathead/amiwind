@@ -15,9 +15,10 @@ Commodore Amiga.**
 
 ## Current state of the project
 
-**AmiWind v0.0.23-dev4** fixes the cut-off tree and Darvame's platform placement,
-adds padded, content-sized dialogue, restores the vertical input caret and
-readable rotation hint, and improves the logo/theme transition. The expanded
+**AmiWind v0.0.23-dev5** adds flat textured windows, sentence-aware speech pages,
+painted-glyph centering and the restored F10 half/full console cycle. Target names
+default below the viewport, above Talk: E. See the
+[mesh investigation and measurements](docs/MESH_TIPS_AND_TRICKS.md). The expanded
 Seyda Neen area retains all **13 town interiors**, nearby **Addamasartus**, the
 prison ship, and the original **Silt Strider and Darvame Hleran** at the port.
 The local cast now includes 30 ordinary
@@ -30,7 +31,7 @@ reference emulator, and the Tradehouse front door has been tested in both
 directions. This does not certify every floor, stair or door. Cave lighting is
 still basic; full dialogue, voice cycles, NPC services, inventory and combat remain
 unfinished. The Strider is a placed model; travel service is planned.
-See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23-dev4.md) and
+See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23-dev5.md) and
 [29 September roadmap](docs/PLAN-2026-09-29.md).
 
 The startup logo fades in for two seconds, holds five, then fades out for one,
@@ -45,7 +46,8 @@ The reusable loading setting is
 
 Voiceovers default to **aim-only identity** (`aw_voice_dialogue_display_style 2`):
 the bottom dialogue panel contains speech text, with no speaker header.
-Aim at nearby NPCs to see their names, even when talking is unavailable. Options
+After character creation, aim at nearby NPCs to see their names below the viewport,
+even when talking is unavailable. Options
 → Interface offers voice identity options, four dialogue styles and three target/
 object-label positions. The new default sizes the box to the text with equal
 padding and centers the lines vertically and horizontally. `dbg ui layout 1/2/3`

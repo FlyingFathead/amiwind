@@ -55,6 +55,8 @@ int main(void){
  assert(!AW_DebugTranslate(2,missing,output,sizeof(output)));
  assert(!AW_DebugTranslate(4,shortform,output,8));
  assert(AW_DebugTranslate(2,help,output,sizeof(output))==2);
+ assert(AW_DebugTranslate(1,help,output,sizeof(output))==2);
+ assert(AW_DebugTranslate(1,picker,output,sizeof(output))==2);
  assert(AW_DebugTranslate(7,view,output,sizeof(output))==1);
  assert(!strcmp(output,"aw_view -20 30 40 90 -60\n"));
  assert(AW_DebugTranslate(3,abbr,output,sizeof(output))==1);

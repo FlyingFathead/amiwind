@@ -636,7 +636,7 @@ void Key_Event (int key, qboolean down)
     /* Physical Amiga raw key 0 maps to grave (Finnish host: section key).
      * F10 is a layout-independent fallback on the Amiga keyboard. */
     if (key == '`' || key == K_F10) {
-        if(down)Cbuf_AddText(shift_down?"aw_console_fullscreen\n":"toggleconsole\n");
+        if(down)Cbuf_AddText(shift_down?"aw_console_fullscreen\n":"aw_console_cycle\n");
         return;
     }
 

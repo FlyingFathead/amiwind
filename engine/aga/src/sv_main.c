@@ -1129,6 +1129,10 @@ void SV_SpawnServer (char *server)
 
 	strcpy (sv.name, server);
 	sprintf (sv.modelname,"maps/%s.bsp", server);
+    {
+        const char *variant=AW_SceneWorldModel(server);
+        if(variant)strcpy(sv.modelname,variant);
+    }
 	sv.worldmodel = Mod_ForName (sv.modelname, false);
 	if (!sv.worldmodel)
 	{

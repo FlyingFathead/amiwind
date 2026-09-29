@@ -65,16 +65,25 @@ void AW_FogDraw(void) {
  * cutoffs removed visible edge-of-screen ground before it reached the fog. */
 static cvar_t aw_cull={"aw_cull","1"};
 static float far_normal[3],far_distance;
+/* Brush polygons revisit the same world nodes many times in a frame.
+ * Cache only the far-plane decision; PVS and brush sort keys remain untouched. */
+typedef struct {short *bounds;unsigned frame;int visible;} aw_far_cache_t;
+static aw_far_cache_t far_cache[2048];
+static unsigned far_frame;
 void AW_CullBegin(void) {
     float distance=AW_Interior()?4096:AW_DrawDistance();
+    if(!++far_frame){memset(far_cache,0,sizeof(far_cache));far_frame=1;}
     VectorCopy(vpn,far_normal);
     far_distance=DotProduct(r_origin,far_normal)+distance+16;
 }
 int AW_NodeVisible(short *bounds) {
-    float nearest=0;int i;
+    float nearest=0;int i;aw_far_cache_t *cached;
     if(!aw_cull.value)return 1;
+    cached=&far_cache[((size_t)bounds>>4)&2047];
+    if(cached->bounds==bounds && cached->frame==far_frame)return cached->visible;
     for(i=0;i<3;i++)nearest+=far_normal[i]*bounds[i+(far_normal[i]<0?3:0)];
-    return nearest<=far_distance;
+    cached->bounds=bounds;cached->frame=far_frame;
+    return cached->visible=nearest<=far_distance;
 }
 int AW_ModelVisible(vec3_t origin,float radius) {
     return !aw_cull.value || DotProduct(origin,far_normal)-radius<=far_distance;

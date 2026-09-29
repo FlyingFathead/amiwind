@@ -148,7 +148,7 @@ void AW_IntroDraw(void) {
         /* Original font punctuation can be ornamental: the input caret is geometry. */
         caret_height=AW_UIFontSize();if(!caret_height)caret_height=8;
         AW_UIFill(11+AW_UIWidth(player_name),y+22,1,caret_height,AW_UIColor(223,199,144));}
-    else {AW_UIText(10,y+4,"W A S D: move. E: activate.",-1);AW_UIText(10,y+22,"Enter to follow the guard.",-1);}
+    else AW_UICenteredLines(0,y,vid.width,vid.height-y,"WASD: move. E: activate.\nEnter to follow the guard.");
 }
 static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",
     (long)active,(long)jiub_state,(long)guard_state,(long)prompt,(long)unlocked,(long)failed);

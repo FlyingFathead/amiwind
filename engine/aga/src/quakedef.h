@@ -496,3 +496,8 @@ void AW_WaitInit(void);
 void AW_WaitTick(void);
 int AW_WaitKey(int key);
 int AW_WaitDraw(void);
+
+void AW_UICenteredLines(int x,int y,int w,int h,const char *text);
+const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity);
+
+const char *AW_SceneWorldModel(const char *name);

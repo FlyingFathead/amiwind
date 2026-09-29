@@ -13,13 +13,14 @@ static aw_scene_link_t next;
 static float health,hand_goal;
 static double started;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
+static cvar_t intro_docks_variant={"intro_docks_variant","2",true};
 static cvar_t target_names={"aw_target_names","1",true};
 static cvar_t label_style={"aw_interaction_label_style","1",true};
-static cvar_t target_style={"aw_target_name_style","2",true};
+static cvar_t target_style={"aw_target_name_style","1",true};
 int AW_SceneUIOption(int option,int change) {
     cvar_t *c=option==0?&target_names:option==1?&target_style:&label_style;int value;
     value=option==0?(c->value!=0):(int)c->value;
-    if(option!=0 && (value<1 || value>3))value=option==1?2:1;
+    if(option!=0 && (value<1 || value>3))value=1;
     if(change){value=option==0?!value:(value-1+change+3)%3+1;Cvar_SetValue(c->name,value);}
     return value;
 }
@@ -41,10 +42,10 @@ static void target_names_command(void) {
 }
 const char *AW_SceneTargetName(void) {
     edict_t *p,*e;vec3_t eye,end,forward,right,up;trace_t tr;int i;
-    if((!target_names.value && !AW_UIVoiceAimOnly()) || key_dest!=key_game || pending || !sv.active ||
+    if(!target_names.value || key_dest!=key_game || pending || !sv.active ||
        svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict ||
        cls.state!=ca_connected || AW_CharacterActive() || AW_ReaderActive() || AW_IntroPromptActive() ||
-       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS && !AW_UIVoiceAimOnly()))return NULL;
+       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
     p=svs.clients[0].edict;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
     for(i=0;i<3;i++)end[i]=eye[i]+forward[i]*96;
@@ -52,6 +53,16 @@ const char *AW_SceneTargetName(void) {
     if(tr.startsolid || tr.allsolid || tr.fraction>=1 || !e || e->free ||
        !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc") || !e->v.netname)return NULL;
     return pr_strings+e->v.netname;
+}
+const char *AW_SceneWorldModel(const char *name) {
+    FILE *f=NULL;
+    if(!strcmp(name,"seyda") && intro_docks_variant.value==2 &&
+       aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE){
+        if(COM_FOpenFile("maps/intro_docks.bsp",&f)>=0 && f){fclose(f);return "maps/intro_docks.bsp";}
+        if(f)fclose(f);
+        Con_Printf("Intro docks variant missing; retaining full exterior.\n");
+    }
+    return NULL;
 }
 int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda");}
 static int map_valid(char *name) {return AW_MapId(name)>=0;}
@@ -277,6 +288,7 @@ static void demo_start(void) {
     }
 }
 void AW_SceneInit(void) {
+    Cvar_RegisterVariable(&intro_docks_variant);
     Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);
     Cvar_RegisterVariable(&label_style);Cmd_AddCommand("aw_label_style",label_style_command);
     Cvar_RegisterVariable(&target_names);Cmd_AddCommand("aw_target_names_set",target_names_command);

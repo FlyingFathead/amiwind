@@ -24,11 +24,12 @@ static int font_bytes,font_height=8,line_height=10,skin_ready,initialized;
 static cvar_t ui_font={"aw_ui_font","14",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
 static cvar_t ui_frame={"aw_ui_frame","0",true};
-static cvar_t dialogue_method={"aw_dialogue_box_display_method","2",true};
+static cvar_t dialogue_method={"aw_dialogue_box_display_method","3",true};
 static cvar_t dialogue_layout={"aw_dialogue_box_layout","3",true};
 static cvar_t voice_names={"aw_show_speaker_name_during_voiceovers","0",true};
 static cvar_t voice_style={"aw_voice_dialogue_display_style","2",true};
 static int subtitle_voice;
+static unsigned subtitle_revision;
 static int ink[3],black,muted;
 static char subtitle[2048],speaker[80];
 static double subtitle_until,subtitle_started;
@@ -152,7 +153,7 @@ int AW_UISetFontSize(int size){
     Cvar_SetValue(ui_font.name,size);scr_copyeverything=1;return 1;
 }
 int AW_UIHeight(void){initialize();return line_height;}
-int AW_UIDialogueMethod(void){int n=(int)dialogue_method.value;return n>=1 && n<=4?n:2;}
+int AW_UIDialogueMethod(void){int n=(int)dialogue_method.value;return n>=1 && n<=4?n:3;}
 int AW_UIVoiceStyle(void){return voice_style.value==1?1:2;}
 int AW_UIVoiceNames(void){return AW_UIVoiceStyle()==1 && voice_names.value!=0;}
 int AW_UIVoiceAimOnly(void){return AW_UIVoiceStyle()==2 && subtitle_voice && subtitle[0] && subtitle_until>realtime;}
@@ -318,7 +319,7 @@ void AW_UIOuterFrame(void) {
 int AW_UIFrameEnabled(void){return ui_frame.value!=0;}
 void AW_UIFrameToggle(void){Cvar_SetValue(ui_frame.name,!ui_frame.value);scr_copyeverything=1;}
 void AW_UISubtitle(const char *name,const char *text,double duration) {
-    subtitle_voice=0;
+    subtitle_voice=0;subtitle_revision++;
     strncpy(speaker,name,sizeof(speaker)-1);speaker[sizeof(speaker)-1]=0;
     strncpy(subtitle,text,sizeof(subtitle)-1);subtitle[sizeof(subtitle)-1]=0;
     if(duration<0)duration=0;
@@ -373,13 +374,42 @@ void AW_UIObjectName(const char *name,int style) {
     name_label(name,style==3?8:vid.width-6,y+3,style!=3);
     AW_UISmallEnd();scr_copyeverything=1;
 }
+/* Cache painted extents for each font selection, including sparse bitmap masks.
+ * A bounding rectangle may contain transparent rows after host quantization. */
+static byte *bounds_font;
+static int bounds_bytes=-1,bounds_height;
+static signed char glyph_bounds[256][4];
+static void prepare_bounds(void) {
+    int c,x,y,k,w,h,left,top,right,bottom;const byte *m,*pixels;
+    if(bounds_font==font && bounds_bytes==font_bytes && bounds_height==font_height)return;
+    bounds_font=font;bounds_bytes=font_bytes;bounds_height=font_height;
+    for(c=0;c<256;c++){
+        left=top=32;right=bottom=0;
+        if(font_bytes){
+            m=font+8+c*8;w=m[2];h=m[3];pixels=font+2056+u16(m);
+            for(y=0;y<h;y++)for(x=0;x<w;x++){
+                k=y*w+x;if(!((pixels[k>>2]>>(6-2*(k&3)))&3))continue;
+                if(x<left)left=x;
+                if(y<top)top=y;
+                if(x+1>right)right=x+1;
+                if(y+1>bottom)bottom=y+1;
+            }
+            if(right){left+=(signed char)m[4];right+=(signed char)m[4];
+                top+=(signed char)m[5];bottom+=(signed char)m[5];}
+        }else if(c!=' '){left=top=0;right=bottom=8;}
+        if(!right && !bottom)left=top=0;
+        glyph_bounds[c][0]=left;glyph_bounds[c][1]=top;
+        glyph_bounds[c][2]=right;glyph_bounds[c][3]=bottom;
+    }
+}
 /* Visible bounds share a baseline; blank glyphs must not skew centering. */
 static void text_bounds(const char *text,int *left,int *top,int *right,int *bottom) {
     const unsigned char *p=(const unsigned char *)text;int x=0,l,t,w,h;
     *left=*top=32767;*right=*bottom=-32767;
+    prepare_bounds();
     while(*p){
-        if(font_bytes){const byte *m=font+8+*p*8;l=x+(signed char)m[4];t=(signed char)m[5];w=m[2];h=m[3];}
-        else {l=x;t=0;w=h=*p==' '?0:8;}
+        l=x+glyph_bounds[*p][0];t=glyph_bounds[*p][1];
+        w=glyph_bounds[*p][2]-glyph_bounds[*p][0];h=glyph_bounds[*p][3]-t;
         if(w && h){
             if(l<*left)*left=l;
             if(t<*top)*top=t;
@@ -390,9 +420,81 @@ static void text_bounds(const char *text,int *left,int *top,int *right,int *bott
     }
     if(*right<*left){*left=*right=*top=*bottom=0;}
 }
+/* Shared fixed-panel centering for instructional text and ordinary dialogue. */
+void AW_UICenteredLines(int x,int y,int w,int h,const char *text) {
+    const char *p=text;char lines[3][256];int n=0,i,l,t,r,b,top=32767,bottom=-32767,row;
+    initialize();
+    while(*p && n<3){
+        p=AW_UILine(p,w-16,lines[n],sizeof(lines[n]));
+        text_bounds(lines[n],&l,&t,&r,&b);
+        if(t+n*line_height<top)top=t+n*line_height;
+        if(b+n*line_height>bottom)bottom=b+n*line_height;
+        n++;
+    }
+    if(!n)return;
+    row=y+(h-(bottom-top))/2-top;
+    for(i=0;i<n;i++){
+        text_bounds(lines[i],&l,&t,&r,&b);
+        AW_UIText(x+(w-(r-l))/2-l,row+i*line_height,lines[i],-1);
+    }
+}
+/* Sentence-aware paging without a regex engine or per-frame allocation.
+ * End punctuation can be followed by quotes; decimal points and common
+ * abbreviations do not end a sentence. Oversized sentences word-wrap. */
+static const char *sentence_end(const char *start) {
+    const char *p=start,*q,*word;char token[12];int n;
+    for(;*p;p++){
+        if(*p!='.' && *p!='?' && *p!='!')continue;
+        if(*p=='.' && p>start && p[-1]>='0' && p[-1]<='9' && p[1]>='0' && p[1]<='9')continue;
+        q=p+1;while(*q=='.' || *q=='?' || *q=='!' || *q=='"' || *q=='\'' || *q==')')q++;
+        if(*q && *q!=' ' && *q!='\n' && *q!='\t')continue;
+        if(*p=='.'){
+            word=p;while(word>start && ((word[-1]>='A' && word[-1]<='Z') || (word[-1]>='a' && word[-1]<='z')))word--;
+            n=p-word;
+            if(n==1 && *word>='A' && *word<='Z')continue;
+            if(n>0 && n<11){memcpy(token,word,n);token[n]=0;
+                if(!Q_strcasecmp(token,"Mr") || !Q_strcasecmp(token,"Mrs") || !Q_strcasecmp(token,"Ms") ||
+                   !Q_strcasecmp(token,"Dr") || !Q_strcasecmp(token,"St"))continue;}
+        }
+        while(*q==' ' || *q=='\n' || *q=='\t')q++;
+        return q;
+    }
+    return p;
+}
+static int wrapped_count(const char *text,int width,int limit) {
+    char line[256];int n=0;
+    while(*text && n<=limit){text=AW_UILine(text,width,line,sizeof(line));n++;}
+    return n;
+}
+const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity) {
+    const char *p=text,*end,*accepted=text,*next;char candidate[2048],line[256];int len,n=0,used=0,k;
+    initialize();if(capacity<2 || rows<1)return text;
+    /* Pack complete sentences while the whole page still fits. */
+    while(*p){
+        end=sentence_end(p);len=end-text;if(len>=(int)sizeof(candidate))break;
+        memcpy(candidate,text,len);while(len && (candidate[len-1]==' ' || candidate[len-1]=='\n' || candidate[len-1]=='\t'))len--;
+        candidate[len]=0;if(wrapped_count(candidate,width,rows)>rows)break;
+        accepted=end;p=end;
+    }
+    p=text;
+    while(*p && n<rows && (accepted==text || p<accepted)){
+        if(accepted>text){len=accepted-p;if(len>=(int)sizeof(candidate))len=sizeof(candidate)-1;
+            memcpy(candidate,p,len);candidate[len]=0;next=AW_UILine(candidate,width,line,sizeof(line));next=p+(next-candidate);
+        }else next=AW_UILine(p,width,line,sizeof(line));
+        k=strlen(line);while(k && (line[k-1]==' ' || line[k-1]=='\t'))line[--k]=0;
+        if(used+k+2>capacity)break;
+        if(n)out[used++]='\n';
+        memcpy(out+used,line,k);used+=k;p=next;n++;
+    }
+    out[used]=0;return p;
+}
 void AW_UIDraw(void) {
     const char *p;char line[256],visible[3][256];
-    int lines=0,h,y,row,maxlines,page,pages,skip,legacy,show_name,centered,n=0,i;
+    int h,y,row,maxlines,page,pages,legacy,show_name,centered,n=0,i;
+    char page_text[768];const char *next;int weight=0;
+    static unsigned cached_revision=~0u;
+    static int cached_width,cached_rows,cached_size,cached_pages,total;
+    static unsigned short page_offsets[512],page_weights[512];
     int l,t,r,b,top=32767,bottom=-32767,boxwidth=vid.width,boxx=0,wide=0;
     float target,step;double elapsed,duration;
     initialize();
@@ -407,16 +509,33 @@ void AW_UIDraw(void) {
         (h-8+line_height-font_height)/line_height;
     if(maxlines<1)maxlines=1;
     if(!legacy && maxlines>3)maxlines=3;
-    p=subtitle;while(*p){p=AW_UILine(p,vid.width-24,line,sizeof(line));lines++;}
+
     target=subtitle_until>realtime && subtitle[0]?1:0;step=host_frametime*6;
     if(panel_position<target){panel_position+=step;if(panel_position>target)panel_position=target;}
     if(panel_position>target){panel_position-=step;if(panel_position<target)panel_position=target;}
     if(panel_position<=0)return;
-    pages=(lines+maxlines-1)/maxlines;if(pages<1)pages=1;
+    /* Weights include a small per-page reading pause; long pages get longer.
+     * The sum remains exactly the supplied speech duration. */
+    if(cached_revision!=subtitle_revision || cached_width!=vid.width ||
+       cached_rows!=maxlines || cached_size!=font_height){
+        cached_revision=subtitle_revision;cached_width=vid.width;
+        cached_rows=maxlines;cached_size=font_height;
+        p=subtitle;cached_pages=0;total=0;
+        while(*p && cached_pages<512){
+            next=AW_UIPage(p,vid.width-24,maxlines,page_text,sizeof(page_text));
+            if(next==p)break;
+            page_offsets[cached_pages]=p-subtitle;total+=(int)(next-p)+16;
+            page_weights[cached_pages++]=total;p=next;
+        }
+    }
+    pages=cached_pages;
     elapsed=realtime-subtitle_started;duration=subtitle_until-subtitle_started;
-    page=duration>0?(int)(elapsed*pages/duration):0;if(page>=pages)page=pages-1;if(page<0)page=0;
-    p=subtitle;skip=page*maxlines;
-    while(*p && skip--)p=AW_UILine(p,vid.width-24,line,sizeof(line));
+    if(elapsed<0)elapsed=0;
+    weight=duration>0?(int)(elapsed*total/duration):0;
+    page=0;while(page<pages-1 && weight>=page_weights[page])page++;
+    page_text[0]=0;
+    if(pages)AW_UIPage(subtitle+page_offsets[page],vid.width-24,maxlines,page_text,sizeof(page_text));
+    p=page_text;
     if(centered){
         while(*p && n<maxlines){
             p=AW_UILine(p,vid.width-24,visible[n],sizeof(visible[n]));

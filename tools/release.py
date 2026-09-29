@@ -24,6 +24,7 @@ DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name 
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev2-{name}.png" for name in ("port", "fargoth", "tradehouse", "prison"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev3-{name}.png" for name in ("rock-before", "rock-after", "dialogue"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev4-{name}.png" for name in ("dialogue", "darvame", "tree"))
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.23-dev5-windows.png")
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 
 

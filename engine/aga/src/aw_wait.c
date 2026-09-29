@@ -116,7 +116,7 @@ int AW_WaitDraw(void) {
             snprintf(line,sizeof(line),"%s: %s",Key_KeynumToString(k),action);
             help_text(12,66+row*(ch+3),line);row++;
         }
-        help_text(12,165,"Mouse: look. Console: bind key command");
+        help_text(12,165,"F10: console half / full / closed");
         help_text(12,180,"Arrows: page  Enter/Esc: return");
         scr_copyeverything=1;return 1;
     }

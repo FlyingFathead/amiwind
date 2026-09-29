@@ -182,6 +182,8 @@ def image(args):
     else:
         raise ValueError('Prepare the matching mesh scene before building this runtime image')
     shutil.copyfile(out/'seyda.bsp',boot/'id1/maps/seyda.bsp')
+    from prepare_intro_docks import convert as convert_intro_docks
+    convert_intro_docks(boot/'id1/maps/seyda.bsp',boot/'id1/maps/intro_docks.bsp')
     qc=out/'qc';qc.mkdir()
     for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
     if args.hands=='sprites':
@@ -192,7 +194,7 @@ def image(args):
     # Saved mutable state is only restored against this exact converted content.
     fingerprint=hashlib.sha256()
     from area_config import SCENES
-    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'progs.dat', 'character/catalog.awc']:
+    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'progs.dat', 'character/catalog.awc']:
         asset=boot/'id1'/name
         if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))

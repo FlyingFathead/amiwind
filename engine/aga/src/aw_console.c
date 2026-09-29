@@ -14,7 +14,7 @@ static route_t routes[]={
     {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise]"},
     {"ui preview","aw_ui_preview",""},
     {"ui layout","aw_dialogue_layout","1 legacy / 2 full width / 3 padded content (default)"},
-    {"ui dialogue","aw_dialogue_method","1/2/3/4 (default 2)"},
+    {"ui dialogue","aw_dialogue_method","1/2/3/4 (default 3)"},
     {"ui labels","aw_label_style","below/topright/hudleft"},
     {"ui targetplace","aw_target_place","below/topright/hudleft"},
     {"ui targetnames","aw_target_names_set","on/off (after creation)"},
