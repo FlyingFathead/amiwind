@@ -6,29 +6,28 @@
 
 ## Current state of the project
 
-**v0.0.24-rc1 — Welcome to Balmora candidate.** Balmora now has 43 destination
-interiors, 93 NPC placements and 80 living voice sets, alongside its exterior
-sub-cells and Silt Strider travel. The stair/arch, terrain, gold-font and Talk
-checks are recorded in the [RC release notes](docs/RELEASE-v0.0.24-rc1.md).
+**v0.0.24-rc2 — Welcome to Balmora test candidate.** This checkpoint adds the
+character model gallery, close-range NPC targeting and initial placement work,
+plus an opt-in area read-ahead experiment. It retains RC1's 43 destination
+interiors and original entrance links. Remaining model conversion, foot-contact
+and sticky-terrain findings are listed in the [RC2 notes](docs/RELEASE-v0.0.24-rc2.md).
 
-| Balmora exterior | Inside the Guild of Mages |
+| Balmora streets | Along the river |
 | :---: | :---: |
-| ![Balmora exterior in RC1](docs/images/amiwind-v0.0.24-rc1-balmora.png) | ![Balmora Mages Guild in RC1](docs/images/amiwind-v0.0.24-rc1-mages.png) |
+| ![Balmora street in RC2](docs/images/amiwind-v0.0.24-rc2-balmora-street.png) | ![Balmora riverfront in RC2](docs/images/amiwind-v0.0.24-rc2-balmora-river.png) |
 
-*Actual native RC1 captures in FS-UAE; no generated scenery, compositing or
-brightness adjustment. [Capture details](docs/GAMEPLAY_MEDIA.md).*
+*Actual native RC2 captures in FS-UAE; diagnostic camera placement, with no
+colour adjustment or compositing. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
-All 70 exterior entrance/return routes and two additional Fighters Guild links
-passed targeted native checks. The positive-Y staircase report and exact
-stairs/rock wedge remain open; see the [full checklist](docs/INVESTIGATION-v0.0.24-rc1.md).
-This is a candidate for owner playtesting. Stable **v0.0.24, Welcome to Balmora**
-requires owner approval; v0.0.23 remains stable and dev5 remains published as a
-prerelease.
+RC1 passed targeted checks of 70 exterior entrance/return pairs and two internal
+Fighters Guild links. RC2 is an interim owner-testing checkpoint; the new sticky
+walking reports and 23 strict foot-contact findings remain open. Stable
+**v0.0.24, Welcome to Balmora**, is still pending. v0.0.23 remains stable.
 
 Balmora uses 64 overlapping regions. Seyda Neen retains 25 regular regions,
 compact intro-pier and ring-courtyard scenes, thirteen town interiors,
 Addamasartus and the prison ship. Map replacement pauses behind the accepted
-frozen-frame Loading... box; background streaming is planned. Full combat,
+frozen-frame Loading... box. Method 2 read-ahead is experimental; method 1 remains the default. Full combat,
 quests, NPC services and schedules remain unfinished.
 
 The accepted Strider, Quake 90-degree FOV, base player dimensions and race/sex
@@ -45,7 +44,7 @@ asset-free checks; converted game data and ROMs stay private.
 Use owned TTF inputs for the preferred reading text; bitmap fonts remain a
 fallback. The gold UI also retains `dbg ui ink original` alongside the readable
 candidate. See [font options](docs/PAPER_FONT_OPTIONS.md),
-[debug controls](docs/DEBUG_OVERLAYS.md), [project state](docs/PROJECT_STATE.md)
+[debug controls](docs/DEBUG_OVERLAYS.md), [model gallery](docs/CHARACTER_MODEL_GALLERY.md), [project state](docs/PROJECT_STATE.md)
 and [conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md).
 
 *For years, they thought the Nerevarine would never appear on the Commodore Amiga…*

@@ -22,6 +22,8 @@ int AW_UIBackground(void){return 1;}int AW_UILogo(int x,int y){assert(x==60 && y
 int AW_UIWidth(const char *s){return strlen(s)*7;}
 int AW_UIColor(int r,int g,int b){return 0;}
 void AW_UIFill(int x,int y,int w,int h,int c){}
+void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);}
+int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);}
 void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
 void AW_MusicTitle(void){}
@@ -55,7 +57,10 @@ int main(void){
  M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
  M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
  click(100,149+18);assert(frozen_loading); /* final pixel of the new loading row */
- click(100,168);M_Draw(); /* Back starts at the next pixel */
+ click(100,168);M_Draw();assert(AW_CellChangeMethod()==2); /* loading method */
+ M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_StreamOption(1,0)==256);
+ M_Keydown(K_RIGHTARROW);assert(AW_StreamOption(1,0)==512);
+ M_Keydown(K_DOWNARROW);M_Draw();M_Keydown(K_ENTER); /* scrolled Back */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);assert(changes==1);
  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
  assert(changes==2 && !strcmp(queued,"disconnect\naw_main_menu\n"));
@@ -84,6 +89,9 @@ void AW_SetAutosaveCount(int n){}
 
 int AW_TravelDraw(void){return 0;}
 int AW_WaitDraw(void){return 0;}
+static int load_method=1,buffer_index;
+int AW_CellChangeMethod(void){return load_method;}
+int AW_StreamOption(int option,int step){static const int sizes[]={128,256,512};if(!option){if(step)load_method=3-load_method;return load_method;}if(step)buffer_index=(buffer_index+(step>0?1:2))%3;return sizes[buffer_index];}
 
 static int voices,dialogue=2,scene_options[]={1,2,1};
 int AW_UIVoiceStyle(void){return 1;}

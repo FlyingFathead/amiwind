@@ -8,6 +8,7 @@ import bisect
 import io
 import math
 import struct
+from collections import OrderedDict
 from pathlib import Path
 import numpy as np
 from PIL import Image
@@ -18,6 +19,7 @@ class Assets:
     def __init__(self, data_files, bsa):
         self.bsa=bsa
         self.loose={normpath(p.relative_to(data_files).as_posix()):p for p in data_files.rglob('*') if p.is_file()}
+        self.models=OrderedDict();self.textures=OrderedDict();self.texture_bytes=0
     def read(self, name):
         name=normpath(name)
         if name.startswith('/') or '..' in Path(name).parts:raise ValueError('Unsafe asset path')
@@ -26,8 +28,16 @@ class Assets:
     def texture(self, name):
         name=normpath(name)
         if not name.startswith('textures/'):name='textures/'+name
+        if name in self.textures:
+            self.textures.move_to_end(name);return self.textures[name]
         for candidate in (str(Path(name).with_suffix('.dds')),name):
-            try:return np.array(Image.open(io.BytesIO(self.read(candidate))).convert('RGBA'))
+            try:
+                image=np.array(Image.open(io.BytesIO(self.read(candidate))).convert('RGBA'))
+                if image.nbytes<=16*1024*1024:
+                    while self.textures and self.texture_bytes+image.nbytes>16*1024*1024:
+                        _,old=self.textures.popitem(last=False);self.texture_bytes-=old.nbytes
+                    image.setflags(write=False);self.textures[name]=image;self.texture_bytes+=image.nbytes
+                return image
             except KeyError:pass
         raise ValueError('Missing texture '+name)
 
@@ -104,7 +114,7 @@ class Skeleton:
         return np.linspace(a,b,count,endpoint=False),(b-a)/count
 
 def assemble(assets, appearance, skeleton, times, face_samples=None):
-    N=skeleton.N;shapes=[];materials=[];textures={};cache={}
+    N=skeleton.N;shapes=[];materials=[];textures={};cache=assets.models
     poses=[skeleton.pose(float(t)) for t in times]
     for part in appearance['parts']:
         mesh=normpath('meshes/'+part['mesh'])
@@ -112,6 +122,8 @@ def assemble(assets, appearance, skeleton, times, face_samples=None):
             raw=assets.read(mesh)
             if not raw.startswith(b'NetImmerse File Format, Version 4.0.0.2\n'):raise ValueError('Unsupported NIF version')
             d=N.Data();d.read(io.BytesIO(raw));cache[mesh]=d
+            while len(cache)>32:cache.popitem(last=False)
+        cache.move_to_end(mesh)
         data=cache[mesh];nodes=[]
         def walk(node,parent,hidden=False):
             if not isinstance(node,N.NiAVObject):return
@@ -194,6 +206,17 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
     alias budget is still enforced by bake; no triangles are silently dropped.
     """
     import fast_simplification
+    # Some authored armour panels duplicate every triangle with reversed
+    # winding. Decimating that non-manifold pair as one mesh erodes the panel.
+    # Simplify one surface, then restore both visible sides explicitly.
+    canonical=np.sort(faces,axis=1)
+    _,first,inverse,counts=np.unique(canonical,axis=0,return_index=True,return_inverse=True,return_counts=True)
+    if len(first)*2==len(faces) and np.all(counts==2):
+        normals=np.cross(points[faces[:,1]]-points[faces[:,0]],points[faces[:,2]]-points[faces[:,0]])
+        paired=all(np.dot(*normals[np.flatnonzero(inverse==i)])<=0 for i in range(len(first)))
+        if paired:
+            p,f=simplify_shape(points,faces[first],max(2,quota//2),preserve_shell)
+            return p,np.concatenate((f,f[:,[0,2,1]]))
     def area(p, f):
         return np.linalg.norm(np.cross(p[f[:,1]]-p[f[:,0]],
                                        p[f[:,2]]-p[f[:,0]]), axis=1).sum()
@@ -224,10 +247,11 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
         failed=quota;quota=max(quota+1,quota*2)
     return points, faces
 
-def bake(shapes,materials,textures,palette,budget=480):
+def bake(shapes,materials,textures,palette,budget=480,face_limit=666):
     """One topology shared by every frame, per-face tiny UV atlas patches."""
     from scipy.spatial import cKDTree
     if not 64<=budget<=480:raise ValueError('Triangle budget must be 64..480')
+    if face_limit not in (666,777):raise ValueError('Unsupported alias face limit')
     weights=np.array([len(s['faces'])*(1.7 if s['part']==0 else 1) for s in shapes],dtype=float);weights/=weights.sum()
     quotas=np.array([min(120,len(s['faces'])) if s['part']==0 and len(s['positions'])>8 else 4 for s in shapes],int);remaining=budget-int(quotas.sum())
     if remaining<0:raise ValueError('Too many separate shapes for budget')
@@ -276,20 +300,22 @@ def bake(shapes,materials,textures,palette,budget=480):
                 px=np.floor(sampleuv[:,0]*tex.shape[1]).astype(int)%tex.shape[1];py=np.floor(sampleuv[:,1]*tex.shape[0]).astype(int)%tex.shape[0]
                 colours=tex[py,px,:3].astype(float)
             colours*=samplecolour*np.array(mat['diffuse']);tile=np.clip(colours,0,255).astype(np.uint8).reshape(16,16,3)
-            if fi>=666:raise ValueError('Alias vertex budget exceeded')
-            if fi==512:
-                # Disconnected authored armour can resist edge collapse. The
-                # native alias limit allows 1999 vertices, or 666 face tiles.
-                larger=Image.new('RGB',(512,336));larger.paste(skin,(0,0));skin=larger
+            if fi>=face_limit:raise ValueError('Alias vertex budget exceeded')
+            ty_required=((fi//32)+1)*16
+            if ty_required>skin.height:
+                # Grow only within the declared model budget. Gallery's 777
+                # triangles need at most 400 rows before atlas compaction.
+                larger=Image.new('RGB',(512,((face_limit+31)//32)*16));larger.paste(skin,(0,0));skin=larger
             tx=fi%32*16;ty=fi//32*16;skin.paste(Image.fromarray(tile),(tx,ty));outuv.extend([(tx,ty),(tx+15,ty),(tx,ty+15)])
             outfaces.append([fi*3,fi*3+2,fi*3+1]);fi+=1
     pal=Image.new('P',(1,1));pal.putpalette(palette)
     return np.concatenate(allframes,axis=1),np.array(outfaces),np.array(outuv),skin.quantize(palette=pal,dither=Image.Dither.NONE)
 
-def animated_mdl(frames,faces,uv,skin):
+def animated_mdl(frames,faces,uv,skin,vertex_limit=1999):
     if frames.ndim!=3 or frames.shape[2]!=3 or not np.isfinite(frames).all():raise ValueError('Invalid alias frames')
     nf,nv,_=frames.shape
-    if not 1<=nf<=32 or nv>1999 or not len(faces):raise ValueError('Alias budget exceeded')
+    if vertex_limit not in (1999,2331):raise ValueError('Unsupported alias vertex limit')
+    if not 1<=nf<=32 or nv>vertex_limit or not len(faces):raise ValueError('Alias budget exceeded')
     if faces.min()<0 or faces.max()>=nv:raise ValueError('Alias face index')
     lo=frames.min(axis=(0,1));hi=frames.max(axis=(0,1));scale=np.maximum((hi-lo)/255,.0001)
     xyz=np.clip(np.rint((frames-lo)/scale),0,255).astype(np.uint8);w,h=skin.size

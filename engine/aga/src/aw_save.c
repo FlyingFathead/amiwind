@@ -90,6 +90,24 @@ void AW_SaveCapture(void)
         }
     }
 }
+/* Temporary debug excursions use the same persistent state as normal saves,
+ * without touching a profile, manual slot or autosave generation. */
+int AW_SaveSnapshot(aw_save_t *snapshot)
+{
+    edict_t *p;
+    if(!snapshot || !sv.active || scene_id()<0 || loading || svs.maxclients!=1 ||
+       !svs.clients || !(p=svs.clients[0].edict))return 0;
+    AW_SaveCapture();*snapshot=world;
+    snapshot->story=aw_story;snapshot->state=aw_state;snapshot->character=aw_character;
+    VectorCopy(p->v.origin,snapshot->position);VectorCopy(cl.viewangles,snapshot->angles);
+    strcpy(snapshot->scene,sv.name);return 1;
+}
+void AW_SaveSnapshotRestore(const aw_save_t *snapshot)
+{
+    if(!snapshot)return;
+    world=*snapshot;aw_story=world.story;aw_state=world.state;aw_character=world.character;
+    loading=scheduled=0;last_auto=realtime;
+}
 void AW_SaveSpawn(void)
 {
     int i,j,k,scene=scene_id();edict_t *e;eval_t *v;uint32_t ref;aw_saved_actor_t *a;
@@ -108,7 +126,9 @@ void AW_SaveSpawn(void)
                 v=GetEdictFieldValue(e,(char *)actor_fields[k]);
                 if(v)v->_float=k==0?a->hello_count:k==1?a->manual_count:a->hello_done;
             }
-            SV_LinkEdict(e,false);break;
+            /* Restore identity/state, then revalidate feet in the current
+             * sub-cell. Persisted source-height errors must not undo settling. */
+            AW_NPCFloor(e);SV_LinkEdict(e,false);break;
         }
         if(!AW_RegionContains(e->v.origin))ED_Free(e);
     }

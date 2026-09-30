@@ -16,6 +16,38 @@ static byte background[64776],loading_background[64776];
 static int loading_state,loading_next;
 static cvar_t loading_style={"aw_loading_style","normal",false};
 static cvar_t region_loading={"aw_region_loading","1",true};
+
+/* Shared proportional scrollbar for menus and future dialogue/topic panes.
+ * Geometry is bounded; drawing and hit testing use the same ten-pixel rail. */
+static void scroll_metrics(int height,int total,int visible,int top,int *start,int *thumb) {
+    int rail=height-20,range=total-visible;
+    if(top<0)top=0;
+    if(top>range)top=range;
+    *thumb=rail*visible/total;if(*thumb<8)*thumb=8;if(*thumb>rail)*thumb=rail;
+    *start=10+(range?(rail-*thumb)*top/range:0);
+}
+void AW_UIScrollbar(int x,int y,int height,int total,int visible,int top) {
+    int start,thumb,i,gold,dark;
+    if(total<=visible || visible<1 || height<32)return;
+    scroll_metrics(height,total,visible,top,&start,&thumb);
+    gold=AW_UIColor(210,184,121);dark=AW_UIColor(54,47,32);
+    AW_UIFill(x,y,10,height,dark);AW_UIFill(x,y,1,height,gold);AW_UIFill(x+9,y,1,height,gold);
+    for(i=0;i<4;i++){
+        AW_UIFill(x+4-i,y+2+i,2+i*2,1,gold);
+        AW_UIFill(x+4-i,y+height-3-i,2+i*2,1,gold);
+    }
+    AW_UIFill(x+2,y+start,6,thumb,gold);
+    if(thumb>4)AW_UIFill(x+3,y+start+2,4,thumb-4,dark);
+}
+int AW_UIScrollHit(int mx,int my,int x,int y,int height,int total,int visible,int top) {
+    int start,thumb,position,range=total-visible,travel;
+    if(mx<x || mx>=x+10 || my<y || my>=y+height || range<=0 || visible<1 || height<32)return -1;
+    if(my<y+10)return top>0?top-1:0;
+    if(my>=y+height-10)return top<range?top+1:range;
+    scroll_metrics(height,total,visible,top,&start,&thumb);travel=height-20-thumb;
+    position=my-y-10-thumb/2;if(position<0)position=0;if(position>travel)position=travel;
+    return travel?(position*range+travel/2)/travel:0;
+}
 static int next_loading_style=-1,loading_active,loading_blank,loading_frozen;
 static int loading_width,loading_height;
 static byte loading_black_palette[768];

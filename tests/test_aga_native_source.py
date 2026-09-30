@@ -16,6 +16,22 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_prefetch_byte_identity_cancellation_eviction_and_low_memory_fallback(self):
+        self.compile_run('aga_stream_test.c', [Path(SOURCE)/'src/aw_stream.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_optional_alias_budget_default_cap_and_invalid_settings(self):
+        self.compile_run('aga_alias_budget_test.c', [Path(SOURCE)/'src/model.c'])
+
+    def test_gallery_lookup_variants_keys_bounds_and_return_scene(self):
+        self.compile_run('aga_gallery_test.c', [Path(SOURCE)/'src/aw_gallery.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_npc_visible_head_close_target_and_bounded_ground_contact(self):
+        self.compile_run('aga_npc_contact_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_scene.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
     def test_legacy_numeric_view_binds_preserve_custom_slots(self):
         self.compile_run('aga_controls_migration_test.c', [Path(SOURCE)/'src/keys.c'])
 

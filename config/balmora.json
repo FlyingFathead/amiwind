@@ -103,6 +103,19 @@
       "source_material": 0,
       "material": 34,
       "reason": "Owner Part 9 ground8 at 252 169 faces blank pavement tile adjoining WG_road to west and north"
+    },
+    {
+      "cell": [
+        -2,
+        -2
+      ],
+      "tile": [
+        0,
+        4
+      ],
+      "source_material": 0,
+      "material": 8,
+      "reason": "RC1 owner view 1144 -426 114 yaw225 pitch64: isolated default tile in the adjoining hill material"
     }
   ],
   "arrival_actor": "selvil sareloth",

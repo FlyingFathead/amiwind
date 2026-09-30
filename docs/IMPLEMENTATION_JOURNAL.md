@@ -15,6 +15,9 @@ Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NE
 
 ## Index
 
+- [J024 — initial NPC support and incomplete overlap collision](#j024--initial-npc-support-and-incomplete-overlap-collision)
+- [J025 — RC2 gallery and bounded geometry exceptions](#j025--rc2-gallery-and-bounded-geometry-exceptions-1-october-2026)
+
 - [Verified mapping at checkpoint-014](#verified-mapping-at-checkpoint-014)
 - [J001 — later pier faces disappeared](#j001--later-pier-faces-disappeared)
 - [J002 — restored geometry exposed capacity and cache limits](#j002--restored-geometry-exposed-capacity-and-cache-limits)
@@ -806,3 +809,53 @@ lookup, preflight every payload component and preserve original source identity
 in a generated mapping. [Amiga limitations](RELEASE_WORKFLOW.md#amiga-limitations)
 is now a release-workflow requirement. Full findings, implications and validation
 limits are collected in [Balmora lessons](BALMORA_CONVERSION_LESSONS.md).
+
+## J024 — initial NPC support and incomplete overlap collision
+
+**Symptom:** several RC1 Balmora residents visibly float; a broad settling pass
+also risks moving some occupants below their visible platforms. **Cause:** source
+placement Z is not proof of contact with converted geometry, and distant render
+overlap can retain a platform whose collision is omitted there. **Change under
+validation:** resolve initial placement in the owning sub-cell, copy it to every
+overlap instance, classify initial support explicitly, and independently audit
+final BSP/MDL contact on the host before packaging. Unknown states and unresolved
+contact fail the build. See [the workflow](NPC_GROUND_CONTACT.md).
+
+The first expanded mesh-contact audit also exposed a bookkeeping error: source
+IDs were case-folded during lookup but some policy entries retained original
+capitalization. Normalize the policy as well as the lookup; do not misreport a
+known actor as a new unsupported case. It further flagged contact cases that an
+origin-only floor trace accepted. Those require investigation, not relaxed
+thresholds merely to obtain a green report. Native restore and overlap checks
+remain separate evidence. Final release acceptance is still pending.
+
+## J025 — RC2 gallery and bounded geometry exceptions, 1 October 2026
+
+The disk-backed browser keeps eight rows only while open. Search and paging scan
+on demand; ordinary play does not scan the catalogue. Gallery return uses a
+captured supported save state, with the queued map load inserted before following
+commands. Earlier queued-command checks exposed and corrected that ordering bug.
+The return snapshot survives a missing-map attempt. F1 stays local to the gallery.
+
+The original 2,000-vertex path is preserved. Extended models use a separate draw
+frame bounded to 2,331 vertices, gated by an opt-in boolean, auto/numeric cap and
+byte-specific per-model table. Three of 28 initially failing conversions fit the
+777-triangle trial; 25 still fail rather than discarding protected shell geometry.
+The source/engine baseline before this trial is retained with a checksum.
+
+The owner requested an interim RC2 while these investigations continue. The
+candidate reports its 23 open contact findings and reproducible walking stalls;
+it does not assert a passed production placement gate or final visual acceptance.
+
+Final native screenshot review found a browser-only formatting defect: friendly
+names were blank while source IDs remained visible. The Amiga formatter's `%c`
+path did not accept the int-sized prefix as the host libc did. Constructing that
+prefix directly restored the friendly names; the final HDF screenshot verifies
+both names and IDs. Host-only rendering stubs had not exposed this difference.
+
+The matched loading comparison is retained in
+[PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md). Disk reads and BSP
+setup are measured separately from the complete visible transition. Across both
+directions, method 2 and larger buffers did not consistently beat method 1.
+Retain method 1 as the default and investigate lost return-prefetch reuse before
+raising default RAM costs. Do not present partial-loader time as the visible pause.

@@ -19,7 +19,7 @@ def text(fields, tag):
     return string(first(fields,tag))
 
 def load_master(path):
-    kinds={k:{} for k in ('NPC_','RACE','BODY','CLOT','ARMO','LEVI','WEAP','GMST')}
+    kinds={k:{} for k in ('NPC_','CREA','RACE','BODY','CLOT','ARMO','LEVI','WEAP','GMST')}
     cells=[];topics={};topic=None
     for tag,flags,raw in records(path.read_bytes()):
         if tag in kinds:
@@ -74,7 +74,7 @@ def greeting_settings(kinds, behavior, scale=0.25):
     return {'distance':radius,'reset_distance':reset,'duration':duration,
             'poll_seconds':0.25,'sustained_polls':2,'global_cooldown_seconds':8}
 
-def outfit(kinds, actor_id, seed=0):
+def outfit(kinds, actor_id, seed=0, equipped=True):
     """One deterministic humanoid appearance, no inventory simulation.
 
     Female equipment uses CNAM when supplied, otherwise its male BNAM. Skin
@@ -117,7 +117,7 @@ def outfit(kinds, actor_id, seed=0):
         chosen=rng.choice(entries)[1];equipment.append({'list':key,'chosen':chosen})
         return resolve(chosen,(*stack,key))
     worn=[]
-    for tag,data in npc:
+    for tag,data in (npc if equipped else []):
         if tag!='NPCO':continue
         if len(data)!=36:raise ValueError('Malformed NPC inventory entry')
         if struct.unpack_from('<i',data)[0]==0:continue

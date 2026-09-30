@@ -201,7 +201,8 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             if abs(ref['scale']-1)>1e-5:raise ValueError('Resident instance scale requires separate bake')
             record=models[ref['id'].casefold()];settings=record['settings']
             pos=[(v-(CENTRE[a] if slug=='seyda' and a<2 else 0))*SCALE for a,v in enumerate(ref['position'])]
-            fields={'classname':'aw_corpse' if record['appearance'].get('initially_dead') else 'aw_npc','aw_ref':ref['number'],'model':record['model'],
+            from actor_grounding import fields as grounding_fields
+            fields={**grounding_fields(ref['id']),'classname':'aw_corpse' if record['appearance'].get('initially_dead') else 'aw_npc','aw_ref':ref['number'],'model':record['model'],
                     'origin':' '.join(f'{v:.5f}' for v in pos),
                     'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",
                     'netname':display_text(record['appearance']['name']),'aw_voice':record['voice'],

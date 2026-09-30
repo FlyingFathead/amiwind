@@ -49,3 +49,15 @@ is the current renderer's output. Only the two exact RC1 PNG paths are added
 to the public media allowlist; raw captures and other game assets stay private.
 The final stable release must keep verified screenshots near its release info
 under the logo, at the top of Current state of the project.
+
+## v0.0.24-rc2 captures — 1 October 2026
+
+Three 320×200 PNGs preserve native screenshot pixels from the final RC2 production
+executable in Linux FS-UAE, using the stated A1200/AGA/PAL 68040/FPU/JIT profile.
+They show the Balmora bridge, the western street/guard and the eastern riverfront.
+Diagnostic camera origins/yaw/pitch are `214,-480,115 / 125 / 5`,
+`-495,-501,142 / 89 / -4`, and `232,282,80 / 223 / 4`. These are composition
+positions, not proof of natural walking to those locations. No brightness, colour
+or content alterations were made. The directory-backed capture run checks the
+same binary and content later written to the HDF; the packaged-image boot check
+is a separate receipt. Raw captures and diagnostic views stay private.

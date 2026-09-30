@@ -32,6 +32,23 @@ ship-exit scene. Performance observations remain separate from measured claims.
   investigate the view-dependent distance-1000 speed-up. Keep the prison ship's
   interior cost separate. Background loading/prefetch remains future work.
 
+## Future world-coordinate HUD (investigate first; not v0.0.24 work)
+
+- [ ] Establish a reversible transform from each runtime scene's local XYZ to
+  original Morrowind world coordinates and exterior cell/grid coordinates.
+  Check quarter-scale conversion, each area's origin and axis conventions,
+  negative-cell boundaries, sub-cell copies and interior identity. Interiors
+  must not invent an exterior location when the source has none.
+- [ ] After that investigation, add a small console-font XYZ display at the
+  upper right, matching the current AmiWind/debug text size. Define what the
+  proposed world-map "mini coords" represent before showing them.
+- [ ] Support `dbg global coords on/off`, `true/false`, and `1/0`, with the same
+  forms through `debug`. Store the setting in game configuration; once the
+  feature is implemented it should default to visible within `dbg hud on`.
+- [ ] Relate the display to the original exterior-cell grid and the whole-world
+  topographic/coverage planning map. Keep this separate from changing gameplay
+  coordinates or adding continuous world travel.
+
 ## Optional field-of-view control
 
 - [ ] Consider an Options FOV slider, subject to measured performance acceptance.
@@ -1144,3 +1161,13 @@ failure mode across repeated meshes, not a one-location defect. Inspect slope
 classification separately from player dimensions and arch clearance; validate
 idle support, ascent, descent and rejection of steeper non-walkable surfaces.
 Procedure and RC1 evidence: [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md).
+
+## Dialogue inspection and long menus
+
+- Reuse a vertical scrollbar for long option, destination, topic and text panes;
+  support keyboard paging and pointer/wheel interaction with visible selection.
+- Extend the isolated [character gallery](CHARACTER_MODEL_GALLERY.md) from bounded
+  greeting previews to one-NPC topic/condition/result-script tests. Declare the
+  test state and restore the entry snapshot on return to the game.
+- Friendly-name search is debug-only, read from disk on demand. No gallery
+  catalogue work belongs in ordinary gameplay's frame loop.

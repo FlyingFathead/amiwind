@@ -1,4 +1,20 @@
-# Current project state — 30 September 2026
+# Current project state — 1 October 2026
+
+**AmiWind v0.0.24-rc2 — interim owner-testing checkpoint.** The gallery catalogue
+covers all 2,935 base-master character/creature records, with 3,526 of 3,551 model
+assets converted and 25 explicitly unavailable. Three larger models use
+byte-specific opt-in allowances. The browser, gallery help and return snapshot
+are implemented; full dialogue trees and individual visual acceptance remain open.
+
+Grounding resolves residents in their owning sub-cell and preserves overlap
+copies. All reported Balmora floater references pass the new mesh-contact check,
+but 23 broader contact findings remain unresolved. The new city-centre and region
+walking stalls also remain. The requested candidate carries these failed audit
+results; the normal production image gate still requires a complete pass.
+Method 1 remains the loading default: method 2 and larger buffers did not produce
+a consistent improvement. See [RC2 scope](RELEASE-v0.0.24-rc2.md).
+
+## RC1 baseline (historical)
 
 **AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
 

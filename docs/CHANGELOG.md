@@ -1,5 +1,13 @@
 # Development history
 
+## v0.0.24-rc2 — 1 October 2026
+
+Interim owner-testing checkpoint: gallery browser/help/return, bounded per-model
+geometry allowances, canonical ground placement and independent contact audit,
+close NPC targeting, birthsign ordering, guarded hill-material repair, Options
+scrolling and measured experimental read-ahead. The strict contact and walking
+findings remain open. See [full scope and limits](RELEASE-v0.0.24-rc2.md).
+
 ## v0.0.24-rc1 — 30 September 2026
 
 **AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**

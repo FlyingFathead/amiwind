@@ -42,6 +42,12 @@ int main(int argc,char **argv){
  for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
  memset(frame,137,sizeof(frame));vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=frame+2;
  AW_UIInit();AW_UIBox(-12,-12,80,80);AW_UIBox(300,190,80,80);
+ AW_UIScrollbar(276,54,133,9,7,0);AW_UIScrollbar(315,190,100,100,6,94);
+ assert(AW_UIScrollHit(280,55,276,54,133,9,7,1)==0);
+ assert(AW_UIScrollHit(280,186,276,54,133,9,7,1)==2);
+ assert(AW_UIScrollHit(275,100,276,54,133,9,7,0)==-1);
+ assert(AW_UIScrollHit(280,100,276,54,133,7,7,0)==-1);
+ for(i=64;i<177;i++){int top=AW_UIScrollHit(280,i,276,54,133,100,7,0);assert(top>=0 && top<=93);}
  AW_UIText(-40,-10,"Bounds: Wgjpq 123",-1);AW_UIText(315,195,"offscreen",-1);
  assert(frame[0]==137 && frame[1]==137 && frame[64002]==137 && frame[64003]==137);
  p="A verylongword and more";i=0;

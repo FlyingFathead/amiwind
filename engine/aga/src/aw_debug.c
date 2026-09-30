@@ -3,6 +3,7 @@
  */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_region.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -118,6 +119,30 @@ static void npcs(void) {
                 field(p,"aw_hello_count"),field(p,"aw_manual_count"),!field(p,"aw_hello_done"));
     }
 }
+/* Read-only release audit of live feet against current collision. Run after
+ * settling, region re-entry and quickload. Exceptions are explicit metadata. */
+static void npc_floors(void) {
+    FILE *f;int i,index,bad=0,total=0,exempt;edict_t *e;eval_t *id;model_t *m;
+    vec3_t start,end;trace_t tr;float feet,gap;const char *status;
+    if(!player())return;
+    f=fopen("npc-ground.tsv","a");if(!f){Con_Printf("Cannot write npc-ground.tsv\n");return;}
+    for(i=1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
+        total++;index=(int)e->v.modelindex;m=index>0 && index<MAX_MODELS?sv.models[index]:NULL;
+        feet=e->v.origin[2]+(m?m->mins[2]:0);
+        VectorCopy(e->v.origin,start);VectorCopy(start,end);start[2]+=8;end[2]-=64;
+        tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,e);
+        gap=feet-tr.endpos[2];exempt=field(e,"aw_ground_mode")!=0;
+        status=exempt?"exempt":!AW_RegionGroundCoverage(e->v.origin)?"deferred-owner-core":tr.startsolid || tr.allsolid?"blocked":tr.fraction>=1?"unsupported":
+            tr.plane.normal[2]<AW_WALKABLE_Z?"steep":gap<-.5f?"embedded":gap>1.0f?"floating":"grounded";
+        if(!exempt && strcmp(status,"grounded") && strcmp(status,"deferred-owner-core"))bad++;
+        id=GetEdictFieldValue(e,"aw_source_id");
+        fprintf(f,"%s\t%ld\t%s\t%s\t%s\t%.5f\t%.5f\t%.5f\t%.5f\t%.5f\n",sv.name,
+            field(e,"aw_ref"),id && id->string?pr_strings+id->string:"?",pr_strings+e->v.netname,status,
+            (double)e->v.origin[0],(double)e->v.origin[1],(double)feet,(double)tr.endpos[2],(double)gap);
+    }
+    fclose(f);Con_Printf("NPC ground audit: %ld residents, %ld need review; npc-ground.tsv\n",(long)total,(long)bad);
+}
 /* On demand only: trace the actual standing hull, including scene broadphase. */
 static void blockers(void) {
     static const float directions[8][2]={{1,0},{.7071,.7071},{0,1},{-.7071,.7071},
@@ -134,10 +159,13 @@ static void blockers(void) {
     }
 }
 void AW_DebugInit(void) {
+    AW_GalleryInit();
+    AW_StreamInit();
     AW_InputDebugInit();AW_DoorAudioInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_dimensions",dimensions);
+    Cmd_AddCommand("aw_npc_floors",npc_floors);
     Cmd_AddCommand("aw_blockers",blockers);
     Cmd_AddCommand("aw_npcs",npcs);Cmd_AddCommand("tcl",tcl);Cmd_AddCommand("aw_help",help);Cmd_AddCommand("help",help);
     Cmd_AddCommand("aw_view",view);Cmd_AddCommand("aw_recover",recover);Cmd_AddCommand("aw_pos",position);Cmd_AddCommand("aw_probe",probe);

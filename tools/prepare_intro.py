@@ -134,6 +134,8 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None):
             fields={'classname':'aw_npc','model':model,'origin':' '.join(f'{v:.5f}' for v in p),
                 'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",'netname':appearance['name'],
                 'aw_intro_role':role,'aw_idle_step':f'{step:.7f}','aw_walk_step':f'{walkstep:.7f}'}
+            from actor_grounding import fields as grounding_fields
+            fields.update(grounding_fields(identifier));fields['aw_ref']=ref['number']
             entities[name].append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
     # Replace the bounded town actors' model paths; all older assets remain available.
     for name in entities:

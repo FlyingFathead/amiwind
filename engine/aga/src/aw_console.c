@@ -9,6 +9,10 @@ extern int scr_copyeverything;
 extern byte *draw_chars;
 typedef struct {char *words,*command,*arguments;} route_t;
 static route_t routes[]={
+    {"gallery","aw_charplane","[number/name/ID; next/previous/body/browse/help/exit]"},
+    {"aw charplane","aw_charplane","[number/name/ID; next/previous/body/exit]"},
+    {"modelgallery","aw_charplane","[number/name/ID]"},
+    {"npcgallery","aw_charplane","[number/name/ID]"},
     {"reset location","amiwind_debug_reset_location","0"},
     {"ui font","aw_ui_select","16/14/12/fallback"},
     {"ui ink","aw_ui_ink","original/readable"},
@@ -40,6 +44,7 @@ static route_t routes[]={
     {"dimensions","aw_dimensions",""},
     {"pos","aw_pos",""},{"blockers","aw_blockers",""},
     {"npcs","aw_npcs",""},{"hands","aw_hands",""},
+    {"npcfloors","aw_npc_floors","(read-only ground-contact report)"},
     {"view","aw_view","x y z yaw pitch"},
     {"probe","aw_probe","(slow floor audit)"},
     {"noclip","noclip",""},{"recover","aw_recover",""},
@@ -78,7 +83,7 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
             if(!n || used+n+3>capacity)return 0;
             for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
                 (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
-                token[k]=='-' || token[k]=='+' || token[k]=='.'))return 0;
+                token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_'))return 0;
             out[used++]=' ';memcpy(out+used,token,n);used+=n;
         }
         out[used++]='\n';out[used]=0;return 1;

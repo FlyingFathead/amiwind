@@ -110,3 +110,138 @@ system**. Keep these distinctions in the implementation and release notes.
 Related entries: [28 September journal](HORSTATORS_JOURNAL_2026-09-28.md),
 [mesh investigations](MESH_TIPS_AND_TRICKS.md), and
 [29 September roadmap](PLAN-2026-09-29.md).
+
+## From Seyda Neen to Balmora: evening notes, 30 September 2026
+
+Continued into 1 October, Helsinki. Owner's direction for the v0.0.24 follow-up;
+implementation and measured acceptance remain recorded separately.
+
+### A town is beginning to feel like a town
+
+Getting from Seyda Neen to Balmora has been encouraging. The interiors, residents
+and recent optimizations make the scope of the project easier to see. Balmora is
+also a useful stress test: if its dense streets can be divided sensibly, smaller
+settlements may prove more forgiving. The lessons should travel with us. Future
+towns should inherit the conversion checks and subdivision tools, rather than
+repeat the same discoveries one building at a time.
+
+The short Loading pauses are still noticeable. They are tolerable for a working
+build, but walking through a city ought to feel continuous. The next question is
+how much of the coming scene can be prepared before the player reaches it. First
+measure the reads, BSP setup and asset loading separately. Then try bounded work
+between frames, keeping the 11 MiB heap and ordinary walking performance in view.
+A larger buffer is worth testing; it is not automatically a better buffer if it
+pushes useful models out of memory or adds stutter before the boundary.
+
+Keep the current loader as `aw_cell_change_method 1`. Trial read-ahead as method
+2, with explicit buffer and prediction settings, and preserve the old method for
+comparison. Judge the experiment by the complete visible transition, steady frame
+times and audio service, not just one faster disk read. The existing frozen-frame
+Loading presentation remains useful whenever a real pause is unavoidable.
+
+### Put the work on the world map
+
+It would help to see the whole island laid out as terrain, with the original
+Morrowind cell grid and our converted areas marked on it. Seyda Neen and Balmora
+would become visible examples of what is finished, what is partial and what has
+yet to be touched. A topographic overview could guide the next town or route
+without implying that terrain alone makes a complete playable region.
+
+Original cells are useful units for source inventory and progress tracking.
+Runtime regions can still follow different boundaries where memory, geometry and
+sightlines demand it. We should investigate both together before committing the
+whole world to either one-cell-at-a-time loading or a single uniform subdivision.
+
+A related future convenience is a translation from the current local XYZ display
+to original world coordinates and a clearly defined world-map coordinate view.
+Establish the transforms first, including interior limitations and negative cell
+boundaries. The proposed small upper-right display and `dbg global coords` switch
+belong in [the roadmap](ROADMAP.md#future-world-coordinate-hud-investigate-first-not-v0024-work),
+not in this release's implementation queue.
+
+### Meet the entire cast on a plain floor
+
+The character model gallery should make conversion inspectable. A quiet, evenly
+lit plane is enough: one actor at a time, at the correct scale, with a footprint
+square beneath it and room to walk around. Start with the largest creatures and
+work down to the smallest. Include humanoids, enemies and animals, with equipped
+and base-body views where the source separates clothing from the body.
+
+Enter through `dbg aw charplane`, with `dbg modelgallery` and `dbg npcgallery` as
+aliases. Keep next/previous controls and lookup instructions on screen. Names,
+original IDs and stable conversion numbers should all lead to the right entry;
+searching for Dagoth Ur should not require guessing punctuation. The catalogue
+can be large on disk. Only the selected model needs to occupy the inspection
+scene. Failed conversions must remain visible in the inventory so nothing is
+quietly omitted from the claim of complete coverage.
+
+### Residents should arrive on the ground when they are meant to
+
+The Balmora floaters point to a workflow problem as well as individual bad
+placements. A converted town should not depend on someone walking every street
+to discover residents suspended above the paving. The main check belongs in the
+build: establish the intended initial state, resolve support against the complete
+owning scene, then independently measure the rendered model against the final
+collision geometry. An unresolved placement should stop packaging.
+
+There is a subtle trap in the overlapping sub-cells. A distant copy can retain a
+visible platform while omitting its collision hull. Settling its occupant against
+that reduced scene can move them to the terrain underneath. Compute a canonical
+placement where the support is complete, and carry it unchanged into the overlap
+copies. Initial loading and save/sub-cell restoration must preserve that result.
+
+The rule is intended support at initialization. Tarhiel must still fall from the
+sky; cliff racers must still fly; Vivec must retain his levitating pose. Neither
+race nor faction is enough to decide. Record explicit states and exceptions, and
+flag unknown cases. The expensive geometric checks belong on the build machine,
+leaving the Amiga with prepared placements and small, occasional diagnostics.
+[The placement workflow](NPC_GROUND_CONTACT.md) defines the current guarantee and
+its limits, including the difference between initial idle contact and later
+animation or scripted movement.
+
+### Finish the small things that break the illusion
+
+Before final v0.0.24, work through the premature birthsign display, disappearing
+NPC names and Talk hints, reported floating residents, the blank hill patch and
+both sticky walking locations. Keep every reported camera and duplicate view in
+[the feedback record](FEEDBACK-v0.0.24-rc1.md), and distinguish a reproduced fix
+from a plausible explanation. The dancers question is settled: the remembered
+trio belongs to Desele's in Suran, not Balmora's South Wall Cornerclub.
+
+Take a few more honest native screenshots of Balmora along the way. Once the
+fixes and checks are complete, the owner's intended release is **v0.0.24 —
+Welcome to Balmora**, rather than another RC1 label. Record the remaining limits
+plainly; a release milestone should make the project's progress easy to see.
+
+### A browser and a safe return from the gallery
+
+Add `dbg gallery` as the short entry command. Tab (with B as an alias) opens a
+small browser of friendly names; case-insensitive keywords should find a
+character without requiring exact punctuation. Keep its original ID and stable
+conversion number visible when names overlap. This catalogue belongs on disk,
+with only one page loaded while the debug browser is open.
+
+Put the selected name below the viewport at the bottom right, with a Talk hint
+when a converted greeting is available. F1 should explain only the gallery's
+controls: next and previous, Shift+B for the base body, browsing, lookup and
+return. Ctrl+X and `dbg gallery exit` should restore the game captured on entry.
+That also makes this a useful future bench for testing one NPC's dialogue trees
+against a known state, without carrying test changes back into the adventure.
+Full topic and result-script support remains separate work. Scrolling will be
+needed for longer topic lists and text panels.
+
+The immediate build is RC2 for another owner test where necessary; final
+**v0.0.24 — Welcome to Balmora** remains the goal after the outstanding checks.
+
+### An inspection checkpoint before the final release — 1 October 2026
+
+The gallery should turn repeated model inspection into a durable conversion
+record. Source identities remain stable, shared appearances point to the same
+asset, and an approval follows that asset only while its checksum remains the
+same. Larger models should receive specific allowances when justified; one
+troublesome outfit must not raise every actor's budget. An automatic setting
+means using those recorded allowances within the renderer's tested ceiling.
+
+RC2 gives us a useful checkpoint for more playtesting while the remaining model,
+foot-contact and walking cases are investigated. Keep those cases visible, retain
+the original renderer, and promote the final release only with clear evidence.

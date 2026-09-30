@@ -70,6 +70,18 @@ remain private and must never become GitHub release assets.
 
 ## Boot identity
 
+NPC placement is a release gate: follow [NPC_GROUND_CONTACT.md](NPC_GROUND_CONTACT.md)
+on fresh scene loads, sub-cell/door re-entry and save restoration. Keep original
+reference IDs in the report, investigate non-grounded residents and document
+intentional airborne/scripted exceptions. A floor correction is not proof that
+the final packaged runtime passes the audit.
+
+Transition experiments follow the numbered-method protocol in
+[PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md): preserve current
+method 1, measure loading phases and heap separately, and compare any new method
+2 before making it a default. Do not replace the existing loader during research.
+
+
 Normal preflight and dry-run screens display their shared AmiWind version. The
 preflight also repeats the version in its pass/fail footer so screenshots always
 identify the runtime under test. Guest-visible hardware is reported by
@@ -145,3 +157,15 @@ For recurrence: trace the rejected path to its converter; choose a stable
 short name; update producer and consumer together; emit the mapping; run the
 payload preflight; rebuild the HDF; read files back and boot the packed image.
 Do not fix only a local staging copy or rely solely on a host-directory boot.
+
+## RC2 diagnostic snapshot boundary
+
+The owner requested an interim v0.0.24-rc2 while the stricter contact audit and
+model-budget investigation remain open. Its separate snapshot receipt explicitly
+records a failed production placement gate (23 findings); no audit row is removed.
+`build_aga.py image` still stops on those findings. Do not promote this snapshot
+as a passed final build. Retain payload/readback hashes, source/binary receipt,
+full failed audit and native evidence in the private package. The ordinary source
+allowlist and whitespace checks still apply. Publish only public-source archives
+and their checksums, using the prerelease flag; never publish the playable HDF,
+ROM, model catalogue, converted assets or private inspection reports.

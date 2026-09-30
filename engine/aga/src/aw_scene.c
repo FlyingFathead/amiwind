@@ -51,16 +51,68 @@ static void target_names_command(void) {
 }
 static const char *npc_hint(void);
 static edict_t *travel_target(void);
-/* Name, action and manual greeting use the same 72-unit crosshair trace. */
+/* Resolve the authored feet point against linked world/architectural brushes.
+ * Balmora's ground conversion leaves source feet up to 18 units above paving.
+ * Bound correction to 32 units so a missing floor cannot move actors a storey. */
+int AW_NPCFloor(edict_t *e) {
+    vec3_t start,end;trace_t tr;eval_t *mode;
+    mode=GetEdictFieldValue(e,"aw_ground_mode");if(mode && mode->_float)return 0;
+    if(!AW_RegionGroundCoverage(e->v.origin))return 0;
+    VectorCopy(e->v.origin,start);VectorCopy(start,end);start[2]+=8;end[2]-=32;
+    tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,e);
+    if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
+    VectorCopy(tr.endpos,e->v.origin);e->v.origin[2]+=0.25f;
+    e->v.flags=(int)e->v.flags|FL_ONGROUND;
+    if(tr.ent)e->v.groundentity=EDICT_TO_PROG(tr.ent);
+    SV_LinkEdict(e,false);return 1;
+}
+/* Shared with the QC greeting builtin. A visible head can be above the fixed
+ * walking hull. Intersect the resident alias bounds in model space, retaining
+ * the exact crosshair and world/brush occlusion rather than a facing cone. */
+edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {
+    edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,a,b,o,d,t;
+    vec3_t eye,end,forward,right,up,delta,local,ray;trace_t tr;
+    if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(angles,forward,right,up);
+    VectorMA(eye,72,forward,end);
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
+    /* Keep direct physical hits, including legacy assets without bounds. */
+    limit=72;
+    if(!tr.startsolid && !tr.allsolid && tr.fraction<1){
+        limit=tr.fraction*72;
+        if(e && !e->free && e->v.modelindex && e->v.netname &&
+           !strcmp(pr_strings+e->v.classname,"aw_npc"))best=e;
+    }else{
+        tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
+        if(tr.startsolid || tr.allsolid)return NULL;
+        limit=tr.fraction*72;
+    }
+    for(i=1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);index=(int)e->v.modelindex;
+        if(e==p || e->free || !e->v.netname || index<=0 || index>=MAX_MODELS ||
+           strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
+        m=sv.models[index];if(!m || m->type!=mod_alias)continue;
+        VectorSubtract(eye,e->v.origin,delta);
+        AngleVectors(e->v.angles,local,right,up);
+        ray[0]=DotProduct(forward,local);ray[1]=-DotProduct(forward,right);ray[2]=DotProduct(forward,up);
+        end[0]=DotProduct(delta,local);end[1]=-DotProduct(delta,right);end[2]=DotProduct(delta,up);
+        lo=0;hi=limit;
+        for(j=0;j<3;j++){
+            o=end[j];d=ray[j];
+            if(fabs(d)<0.00001f){if(o<m->mins[j] || o>m->maxs[j])break;}
+            else{
+                a=(m->mins[j]-o)/d;b=(m->maxs[j]-o)/d;
+                if(a>b){t=a;a=b;b=t;}if(a>lo)lo=a;if(b<hi)hi=b;
+                if(lo>hi)break;
+            }
+        }
+        if(j==3 && lo<limit){limit=lo;best=e;}
+    }
+    return best;
+}
 static edict_t *npc_target(void) {
-    edict_t *p,*e;vec3_t eye,end,forward,right,up;trace_t tr;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || cls.state!=ca_connected)return NULL;
-    p=svs.clients[0].edict;if(p->v.movetype!=MOVETYPE_WALK)return NULL;
-    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
-    VectorMA(eye,72,forward,end);tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
-    if(tr.startsolid || tr.allsolid || tr.fraction>=1 || !e || e->free ||
-       !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc") || !e->v.netname)return NULL;
-    return e;
+    return AW_NPCTarget(svs.clients[0].edict,cl.viewangles);
 }
 const char *AW_SceneTargetName(void) {
     edict_t *driver;
@@ -133,7 +185,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     if(pending || !map_valid(link->target))return;
     if(!AW_RegionSelect(link->target,link->arrival,intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
-    next=*link;pending=1;started=Sys_FloatTime();
+    next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
     IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
@@ -244,16 +296,12 @@ int AW_SceneUse(void) {
     }else {door_close=links[i].reference;load_scene(&links[i],0);}
     return 1;
 }
-/* Match the manual QC greeting selector, including its voice cooldown and
- * scripted-actor exclusion. This only labels greetings supported by that path. */
+/* Identity remains visible during speech; cooldown only controls playback. */
 static const char *npc_hint(void)
 {
-    edict_t *e;eval_t *v;ddef_t *g;
-    g=ED_FindGlobal("aw_voice_deadline");
-    if(g && sv.time<pr_globals[g->ofs])return NULL;
+    edict_t *e;eval_t *v;
     e=npc_target();if(!e)return NULL;
     v=GetEdictFieldValue(e,"aw_intro_role");if(v && v->_float)return NULL;
-    v=GetEdictFieldValue(e,"aw_voice");if(!v || !v->string)return NULL;
     return pr_strings+e->v.netname;
 }
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
@@ -272,12 +320,17 @@ void AW_SceneDraw(void) {
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
                 !map_valid(links[i].target)?"Interior unavailable":"Enter: E";
-        }else{ name=npc_hint();if(name){action="E: Talk";npc=1;} }
+        }else{ name=npc_hint();if(name){
+            eval_t *voice;edict_t *target=npc_target();npc=1;
+            voice=target?GetEdictFieldValue(target,"aw_voice"):NULL;
+            if(voice && voice->string && pr_strings[voice->string])action="E: Talk";
+        } }
     }
     if(!name)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;
     if(vid.height-y<20+AW_ConsoleCharHeight())return;
     if(!npc && (!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
+    if(!action)return;
     sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
     for(i=0;line[i];i++)AW_ConsoleCharacter(vid.width-w-6+i*cw,y+19,(unsigned char)line[i]);
     scr_copyeverything=1;
@@ -331,17 +384,21 @@ void AW_SceneSpawn(edict_t *p) {
         p->v.health=health;v=GetEdictFieldValue(p,"aw_hand_goal");if(v)v->_float=hand_goal;
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
-        AW_MusicSceneEvent("scene-enter");pending=0;
+        AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
     } else {
         pending=0;
         if(AW_Interior() || !strcmp(sv.name,"balmora"))AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();region_crossing=0;
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_GallerySpawn(p);region_crossing=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
 }
 void AW_SceneTick(void) {
     aw_scene_link_t r;edict_t *p;
+    if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
+       key_dest==key_game && svs.maxclients==1 && svs.clients && (p=svs.clients[0].edict))
+        AW_StreamTick(AW_CellChangeMethod()==2?AW_RegionAhead(p->v.origin,p->v.velocity,
+            intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE,AW_StreamLookahead()):NULL);
     if(door_ready){
         if(!sv.active || strcmp(sv.name,opening_door.source)){door_ready=0;return;}
         if(realtime>=door_ready){door_ready=0;door_close=opening_door.reference;load_scene(&opening_door,0);}

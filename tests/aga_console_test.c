@@ -36,6 +36,7 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
 int main(void){
  char output[160];byte atlas[16384];int i;
  char *hud_type[]={"dbg","hud","type","2"};
+ char *gallery[]={"dbg","gallery","exit"};
  char *hors[]={"dbg","aw","hors","0"};
  char *hud[]={"dbg","hud","on"};
  char *shortform[]={"debug","reset","location","0"};
@@ -52,6 +53,7 @@ int main(void){
  char *fog[]={"dbg","fog","distance","400"};
  char *distance[]={"debug","draw","distance","500"};
  char *view[]={"debug","view","-20","30","40","90","-60"};
+ assert(AW_DebugTranslate(3,gallery,output,sizeof(output))==1 && !strcmp(output,"aw_charplane exit\n"));
  assert(AW_DebugTranslate(4,shortform,output,sizeof(output))==1);
  assert(!strcmp(output,"amiwind_debug_reset_location 0\n"));
  assert(AW_DebugTranslate(5,longform,output,sizeof(output))==1);

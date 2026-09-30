@@ -35,6 +35,12 @@ void AW_UITextBox(int a,int b,int c,int d,const char *s,int e){strcat(drawn,s);s
 int AW_IntroPromptActive(void){return prompt;}
 int AW_UIVoiceAimOnly(void){return voice_aim;}
 int AW_CharacterActive(void){return 0;}
+void AW_GallerySpawn(edict_t *p){}
+void AW_StreamTick(const char *path){}
+float AW_StreamLookahead(void){return 1.5f;}
+int AW_CellChangeMethod(void){return 1;}
+void AW_StreamTransitionBegin(void){}
+void AW_StreamTransitionReady(void){}
 int AW_CharacterLoad(void){return 0;}
 float AW_CharacterEyeHeight(void){return 0;}
 int AW_ReaderActive(void){return 0;}
@@ -156,7 +162,7 @@ int main(void){
  target_trace=1;names_option->value=1;
  hint[0]=0;AW_SceneDraw();assert(!strcmp(hint,"(E: Talk)") && !strcmp(AW_SceneTargetName(),"Fargoth"));
  role._float=1;hint[0]=0;AW_SceneDraw();assert(!hint[0]);role._float=0;
- globals[0]=100;hint[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());globals[0]=0;
+ globals[0]=100;hint[0]=0;AW_SceneDraw();assert(!strcmp(hint,"(E: Talk)") && !strcmp(AW_SceneTargetName(),"Fargoth"));globals[0]=0;
  occluded=1;hint[0]=0;AW_SceneDraw();assert(!hint[0]);occluded=0;
  target_trace=0;travel_trace=1;target.v.netname=27;
  occluded=1;assert(!AW_SceneUse());occluded=0;

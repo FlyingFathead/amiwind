@@ -967,6 +967,7 @@ void SCR_UpdateScreen (void)
         AW_SceneDraw();
         AW_UIDraw();
         AW_IntroDraw();
+        AW_GalleryDraw();
         AW_UIOuterFrame();
         SCR_DrawConsole ();
         M_Draw ();

@@ -365,7 +365,10 @@ void AW_CharacterDraw(void)
             AW_UITextBox(24,96,272,18,line,gold);
         }else{
             AW_UITextBox(24,96,272,18,aw_classes[choice.clas].name,gold);
-            AW_UITextBox(24,117,272,18,aw_births[choice.birth].name,gold);
+            /* Class comes before birthsign in the original registration flow.
+             * The default table index is not a choice the player has made. */
+            if(menu==3 || menu==4)
+                AW_UITextBox(24,117,272,18,aw_births[choice.birth].name,gold);
         }
         AW_UIFill(confirm_yes?164:44,143,112,23,AW_UIColor(54,47,32));
         AW_UITextBox(44,143,112,23,"Go back",gold);

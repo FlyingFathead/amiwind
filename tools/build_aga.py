@@ -192,6 +192,16 @@ def image(args):
     (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n');run([args.qcc],qc)
     validate_quakec(boot/'id1/progs.dat')
     # Saved mutable state is only restored against this exact converted content.
+    if args.data_files:
+        from actor_grounding import annotate, bake_ground
+        from mwad.paths import child_ci
+        grounding=annotate(boot/'id1/maps',child_ci(args.data_files,'Morrowind.esm'))
+        (out/'actor-grounding.json').write_text(json.dumps(grounding,indent=2)+'\n')
+        (out/'actor-ground-support.json').write_text(json.dumps(bake_ground(boot/'id1/maps'),indent=2)+'\n')
+    # Placement correction is not its own proof: independently read the final
+    # BSP/MDL payload, and stop before fingerprinting or HDF creation on failure.
+    from check_actor_ground import require as require_actor_ground
+    require_actor_ground(boot/'id1/maps',out/'actor-initial-contact.json')
     fingerprint=hashlib.sha256()
     from area_config import SCENES
     from balmora_regions import config as balmora_config, regions as balmora_regions

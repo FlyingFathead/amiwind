@@ -27,6 +27,7 @@ from prepare_quake import box, brush, miptex, wad
 from prepare_area import build_resident, entity
 from player_hull import lumps, pack_lumps, rebuild_world_hull
 from surface_flatten import load_profiles
+from actor_grounding import fields as grounding_fields
 
 
 def write_json(path, value):
@@ -184,7 +185,7 @@ def resident_entities(cast, models, settings):
         if abs(ref['scale'] - 1) > 1e-5: raise ValueError('Resident scale requires separate bake')
         record = models[ref['id'].casefold()]; greeting = record['settings']
         point = [(v - (settings['centre'][i] if i < 2 else 0)) * settings['scale'] for i, v in enumerate(ref['position'])]
-        entities.append(entity({'classname': 'aw_npc', 'aw_ref': ref['number'], 'model': record['model'],
+        entities.append(entity({**grounding_fields(ref['id']), 'classname': 'aw_npc', 'aw_ref': ref['number'], 'model': record['model'],
             'origin': ' '.join(f'{v:.5f}' for v in point),
             'angles': f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",
             'netname': record['appearance']['name'], 'aw_voice': record['voice'],

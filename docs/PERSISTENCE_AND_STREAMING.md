@@ -3,8 +3,8 @@
 **Status, 30 September 2026:** bounded character/world state and save/load are
 implemented; broader object persistence and background region streaming remain
 planned. Balmora replaces one resident BSP synchronously among 64 overlapping
-regions, carrying player state across the boundary. It does not keep two complete
-regions resident or prefetch the destination in the background.
+regions, carrying player state across the boundary. Method 1 does not prefetch. Experimental method 2 reads a bounded destination
+prefix ahead of a crossing; neither keeps two complete regions resident.
 
 Dev3 can hold the last rendered frame with a small top Loading box during these
 swaps; Options retains the previous black-screen method. This masks the blank
@@ -24,6 +24,93 @@ runtime objects; release resources only when no active placement references them
 
 The remainder records the broader design direction. See [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md)
 for the save format and remaining persistence acceptance gates.
+
+## Numbered transition investigation, 30 September 2026
+
+Preserve the current synchronous transition implementation as method **1**.
+Introduce a selector named `aw_cell_change_method` when an alternative is ready
+to exercise. New incremental/prefetch experiments use **2**, then later numbers;
+never overwrite method 1 or reuse a number for a different implementation.
+Method 2 now exists as an opt-in bounded read-ahead experiment. It predicts an
+adjacent regular region from current velocity, reads at most 8 KiB per frame
+into an evictable 128, 256 or 512 KiB prefix cache, and reuses available bytes during the
+ordinary BSP load. It does not incrementally build a second renderer/collision
+world. Direction changes cancel speculation; insufficient headroom, eviction or
+an incomplete prefix use the ordinary disk path. Method 1 remains the default after the comparison below. The Loading presentation is independent
+of this implementation choice. Hide the box only when the transition actually
+meets its frame/audio budget, not merely to conceal an unchanged stall.
+
+Measure the same dense-city crossing in both directions with cold and warm
+caches. Record disk read bytes/calls/time, BSP parse/plane/node/leaf and collision
+setup time, texture/alias/sound loading and linking time, state restoration,
+longest frame, total pause, steady frame rate, audio underruns and peak heap.
+Retain captures, raw timings, target hardware and content hashes privately.
+
+Try bounded per-frame work and early neighbour selection first. Cancel stale
+prefetch after a direction change. Track ownership so speculative assets never
+evict resources still used by the current frame. Bound scratch allocations and
+reads within the measured headroom of the existing **11 MiB** heap; two resident
+full BSPs are not presumed affordable. Resource pressure, late arrivals or an
+unsupported case must fall back to method 1 with its honest Loading display.
+
+Acceptance requires fewer disruptive pauses without slower city roaming,
+missed audio deadlines, duplicated/lost NPCs, collision gaps or save regressions.
+Repeat the [NPC ground-contact check](NPC_GROUND_CONTACT.md) after fresh loads,
+sub-cell returns and restores for every tested method. Keep the experimental
+method opt-in until the owner accepts those comparisons.
+
+`cell-load-profile.tsv` records map, method, measured model/BSP disk bytes and
+read calls, time inside those reads, BSP decode time, whole-world-model time,
+entity/precache time, total server construction time, reused prefix bytes,
+earlier prefetch read time, low hunk and high hunk bytes. These phase columns
+overlap: do not add world time, its nested I/O/decode times and entity time as
+independent totals. Sound/catalogue reads and filesystem open/seek overhead are
+not all individually timed; total construction and entity/precache timing retain
+that cost. Compare frame profiles separately, including the read-ahead frames.
+
+## Controlled read-ahead comparison, 30 September 2026
+
+Ten native FS-UAE runs repeated the same north/south Balmora crossing, with the
+five configurations run in forward and reverse order. Conversion workers were
+paused for this comparison. Each cell contains the two measured **complete
+visible transition** times in milliseconds, from the change request through the
+first presented frame after scene sign-on. Server construction alone is shorter
+and must not be reported as the whole visible pause.
+
+| Method | Buffer | Prediction | North, ms | South, ms |
+| --- | --- | --- | --- | --- |
+| 1 | unused | unused | 319.8, 325.3 | 380.3, 329.0 |
+| 2 | 128 KiB | 1.5 s | 316.7, 321.8 | 364.8, 348.2 |
+| 2 | 256 KiB | 1.5 s | 333.1, 325.7 | 383.7, 384.7 |
+| 2 | 512 KiB | 1.5 s | 316.0, 319.9 | 325.5, 373.5 |
+| 2 | 512 KiB | 4 s | 314.5, 296.3 | 354.3, 364.0 |
+
+Method 2 is **not a demonstrated overall improvement**. A larger buffer did not
+consistently shorten the pause. The 128 KiB setting reused about 128 KiB in both
+directions. Larger settings reused about 248–344 KiB northbound, but no prefix
+bytes survived to the southbound load, despite earlier reads. Cache pressure or
+prediction cancellation can consume the benefit before the crossing. The 512
+KiB / 4 s pair also had widely differing sampled roaming frame medians (72.3 and
+41.9 ms), so its best northbound result is not a reliable seamless-loading claim.
+
+All ten runs recorded zero surface/edge overflow frames and zero reported audio
+late events after warm-up. These were Linux FS-UAE A1200/AGA/PAL, 68040/FPU/JIT,
+2 MiB Chip + 16 MiB Z3, with the existing 11 MiB runtime heap, a host-directory
+drive and null audio. Host filesystem caches were not forced cold. This is not a
+physical-drive, Windows/WSL or subjective audio-quality measurement. There are
+two samples per direction/configuration; retain the raw profiles privately.
+
+Options exposes the loading method and read-ahead buffer. Method 1 is the RC2
+default; the buffer is relevant to method 2 only. The persisted variables are
+`aw_cell_change_method` and `aw_cell_prefetch_kib`. Prediction horizon remains an
+experimental console setting, `aw_cell_prefetch_seconds` (0.5–4 s). Bigger is not
+a performance recommendation. No option increases the total 11 MiB heap.
+
+`cell-visible-profile.tsv` records the complete visible pause. The load profile
+also includes requested cache capacity, filled bytes, worst individual 8 KiB
+prefetch read and prediction horizon. Prefix fill is not the same as bytes reused
+at load. Further work should separate cache loss from read latency and reduce
+synchronous decode/setup work before increasing speculative allocations again.
 
 ## Separate base content from saved changes
 

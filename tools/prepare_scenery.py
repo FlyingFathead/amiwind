@@ -62,7 +62,7 @@ def bsa_read(bsa, name):
     return raw
 
 
-def model_geometry(raw, N, collision=False):
+def model_geometry(raw, N, collision=False, repair_uv=False):
     import numpy as np
     if not raw.startswith(b'NetImmerse File Format, Version 4.0.0.2\n'):
         raise ValueError('Only base-game TES3 NIF 4.0.0.2 is supported')
@@ -111,12 +111,24 @@ def model_geometry(raw, N, collision=False):
                     weights[ids] += values
                 if np.any(np.abs(weights-1)>.02):raise ValueError('Invalid static skin weights')
                 positions /= weights[:,None]
+            coords=np.array([[u.u,u.v] for u in g.uv_sets[0]]) if g.num_uv_sets and g.uv_sets else np.zeros((len(g.vertices),2))
+            invalid=~np.isfinite(coords).all(axis=1)
+            if repair_uv and invalid.any():
+                triangles=np.array(g.get_triangles(),dtype=int)
+                original=coords.copy()
+                for index in np.flatnonzero(invalid):
+                    adjacent=np.unique(triangles[np.any(triangles==index,axis=1)])
+                    adjacent=adjacent[~invalid[adjacent]]
+                    if not len(adjacent):raise ValueError('Malformed source UV has no finite neighbouring values')
+                    neighbours=original[adjacent]
+                    coords[index]=neighbours.mean(axis=0)
+                    skipped.append(dict(repair='nonfinite-source-uv',shape=name,vertex=int(index),
+                                        replacement=coords[index].tolist(),neighbours=adjacent.tolist()))
             for i, v in enumerate(g.vertices):
                 position = positions[i]
-                uv = g.uv_sets[0][i] if g.num_uv_sets and g.uv_sets else None
                 colour = g.vertex_colors[i] if g.has_vertex_colors else None
                 rgba = [colour.r, colour.g, colour.b, colour.a] if colour else [1., 1., 1., 1.]
-                vertices.append([*map(float, position[:3]), uv.u if uv else 0., uv.v if uv else 0.,
+                vertices.append([*map(float, position[:3]), *map(float,coords[i]),
                                  *[round(max(0., min(1., c)) * 255) for c in rgba]])
             faces.extend([start + a, start + b, start + c, material] for a, b, c in g.get_triangles())
         for child in getattr(node, 'children', []):

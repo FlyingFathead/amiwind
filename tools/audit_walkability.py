@@ -29,7 +29,8 @@ def axes(angles):
 
 
 class Scene:
-    def __init__(self, raw):
+    def __init__(self, raw, hull=1):
+        if hull not in (0,1): raise ValueError('Expected point or standing hull')
         data = lumps(raw)
         entities = [dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"', block))
                     for block in re.findall(r'\{[^{}]*\}', data[0].decode('cp1252'))]
@@ -39,6 +40,10 @@ class Scene:
         self.planes = list(struct.iter_unpack('<4fi', data[1]))
         self.nodes = [(p,a+65536 if a < -15 else a,b+65536 if b < -15 else b)
                       for p,a,b in struct.iter_unpack('<ihh', data[9])]
+        if hull==0:
+            leaves=[r[0] for r in struct.iter_unpack('<ii6h2H4B',data[10])]
+            def child(n): return n if n>=0 else leaves[-n-1]
+            self.nodes=[(r[0],child(r[1]),child(r[2])) for r in struct.iter_unpack('<ihh6h2H',data[5])]
         models = list(struct.iter_unpack('<9f7i', data[14]))
         if not models:
             raise ValueError('Missing BSP models')
@@ -59,7 +64,7 @@ class Scene:
             angles = tuple(map(float, e.get('angles', '0 0 0').split()))
             if len(origin) != 3 or len(angles) != 3 or not all(map(math.isfinite, (*origin, *angles))):
                 raise ValueError('Invalid brush transform')
-            root = models[index][10]  # headnode[1], already expanded for player
+            root = models[index][9+hull]  # point or expanded standing hull
             if root >= len(self.nodes):
                 raise ValueError('Invalid hull root')
             self.brushes.append((root, origin, axes(angles), e.get('aw_ref', e['model'])))

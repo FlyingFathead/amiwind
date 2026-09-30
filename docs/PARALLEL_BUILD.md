@@ -57,3 +57,19 @@ check ordered results, stage prerequisites, budget limits, inherited limits,
 worker errors and cancellation. Private source-data comparisons cover actual
 BSP geometry, collision, textures, lightmaps, actor models and head previews.
 Changes to the conversion recipe are not part of this scheduling checkpoint.
+
+## Automatic RAM headroom limit
+
+`--jobs auto` also considers host `MemAvailable` and container memory headroom
+(cgroup v2, with a v1 fallback). It reserves a quarter of available headroom, at
+least 256 MiB, and budgets 512 MiB per worker before applying the CPU/affinity/quota
+limit. This is a conservative estimate, not a proof of the peak size of every
+future source model. At least one worker is selected; a single unusually large
+input can still require more memory than the machine has available.
+
+The top-level scheduler shares that allocation between independent stages.
+Children inherit their assigned `AMIWIND_BUILD_JOBS` rather than recalculating an
+all-CPU budget. BLAS/OpenMP libraries use one thread per process worker. Explicit
+`--jobs N` remains an override for measured environments, and `--single-thread`
+remains available. Shared scene writes, final catalogues, HDF assembly and
+readback verification keep their required ordering.

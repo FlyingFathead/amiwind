@@ -468,3 +468,11 @@ No expensive dynamic simplification belongs on the Amiga. AmiQuake already does
 remarkably well, so any extra hierarchy or bookkeeping must prove that it costs
 less than simply letting the existing renderer draw the polygons. The
 `dbg fly 1` world-scale observer is the place to measure that question.
+
+## Later continuation: Balmora, 30 September–1 October
+
+The [continuing musings](HORSTATORS_MUSINGS_2026-09-29.md#from-seyda-neen-to-balmora-evening-notes-30-september-2026)
+record the Balmora follow-up: measured read-ahead trials, a complete character
+inspection gallery, world/cell mapping ideas, build-time initial-placement checks,
+and the owner's direction toward final v0.0.24. The world-coordinate HUD remains
+future roadmap work.

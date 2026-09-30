@@ -99,6 +99,16 @@ int AW_RegionCrossing(const float *point,int intro)
     id=AW_RegionOwner(a->regions,a->count,point,a->current,a->hysteresis);
     return id>=0 && id!=a->current;
 }
+const char *AW_RegionAhead(const float *point,const float *velocity,int intro,float seconds) {
+    int area=area_id(sv.name),id,k;float projected[3];aw_region_area_t *a;static char next[40];
+    if(area<0 || intro || !read_regions(area))return NULL;
+    a=&areas[area];if(a->kind || a->current<0)return NULL;
+    if(velocity[0]*velocity[0]+velocity[1]*velocity[1]<16)return NULL;
+    for(k=0;k<3;k++)projected[k]=point[k]+velocity[k]*seconds;
+    id=AW_RegionOwner(a->regions,a->count,projected,a->current,a->hysteresis);
+    if(id<0 || id==a->current)return NULL;
+    sprintf(next,"maps/%s.bsp",a->regions[id].name);return next;
+}
 int AW_RegionContains(const float *point)
 {
     int area=area_id(sv.name),k;const float *low,*high;aw_region_area_t *a;
@@ -108,6 +118,16 @@ int AW_RegionContains(const float *point)
     high=a->kind==1?dock_high:a->kind==2?court_high:a->regions[a->current].cover_high;
     for(k=0;k<2;k++)if(point[k]<low[k]+24 || point[k]>high[k]-24)return 0;
     return 1;
+}
+int AW_RegionGroundCoverage(const float *point) {
+    int area=area_id(sv.name);aw_region_area_t *a;
+    if(area<0)return 1;
+    a=&areas[area];
+    if(!read_regions(area) || a->current<0)return 0;
+    if(a->kind)return AW_RegionContains(point);
+    /* Far render overlap deliberately omits some architectural collision.
+     * Audit/correct in the owning core; other copies keep the baked support Z. */
+    return AW_RegionOwner(a->regions,a->count,point,-1,0)==a->current;
 }
 int AW_BalmoraArrival(int returning,float *point,float *yaw)
 {

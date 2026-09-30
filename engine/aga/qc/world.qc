@@ -65,6 +65,9 @@ void() aw_hands_update = {
 .float aw_idle_step;
 .float aw_intro_role;
 .float aw_ref;
+.float aw_ground_mode; // 0 ground resident; 1 authored airborne/scripted exception
+.string aw_source_id;
+.float aw_authored_z;
 .float aw_story_hidden;
 .float aw_walk_step;
 .float aw_moving;
@@ -134,12 +137,9 @@ void() aw_npc_idle = {
 };
 /* All static brushes must be linked before the actor's floor trace. Exported
  * entity order is not a collision guarantee: the port platform may spawn last. */
+float(entity actor) aw_npcfloor = #80;
 void() aw_npc_floor = {
-    local vector authored;
-    authored=self.origin;
-    setorigin(self,self.origin + '0 0 8');
-    if (!droptofloor() || authored_z-self.origin_z>8) setorigin(self,authored);
-    setorigin(self,self.origin + '0 0 0.25');
+    aw_npcfloor(self);
     self.solid = 3;
     setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
     self.think = aw_npc_idle;
@@ -169,15 +169,12 @@ void() aw_corpse = {
     setsize(self,'0 0 0','0 0 0');
     self.frame = 0;
 };
+entity(entity player) aw_npctarget = #79;
 void() aw_interact = {
     local entity npc;
-    local vector eye;
     if (self.movetype != 3 || time < aw_voice_deadline) return;
-    makevectors(self.v_angle);
-    eye = self.origin + self.view_ofs;
-    traceline(eye,eye + v_forward * 72,0,self);
-    npc = trace_ent;
-    if (trace_fraction >= 1 || npc == world) return;
+    npc = aw_npctarget(self);
+    if (npc == world) return;
     if (npc.classname == "aw_npc" && !npc.aw_intro_role && npc.aw_voice != "")
         aw_greet(npc,self,0);
 };

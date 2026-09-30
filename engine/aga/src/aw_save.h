@@ -30,6 +30,8 @@ void AW_SaveReset(void);
 int AW_SaveAllowed(void);
 void AW_SaveTick(void);
 void AW_SaveCapture(void);
+int AW_SaveSnapshot(aw_save_t *snapshot);
+void AW_SaveSnapshotRestore(const aw_save_t *snapshot);
 void AW_SaveSpawn(void);
 void AW_SaveSchedule(void);
 int AW_SaveWrite(int slot);
