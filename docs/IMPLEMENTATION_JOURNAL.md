@@ -785,3 +785,24 @@ walking endpoints, measurements and limits. Gold glyph coverage, appearance
 arrows/Race focus, compact HUD, Hors preset, authored door sounds and rotated
 hall-door targeting accompany the focused fixes. Preserve accepted Strider,
 FOV/dimensions, Shift+V and frozen-frame loading behavior.
+
+## RC1 — Balmora completion and repeatable conversion checks
+
+Missing tower rooms came from applying an exterior distance cutoff around
+local zero to complete interiors. A separate dressing filter dropped another
+99 selected references. Remove the inappropriate cutoff for explicit complete
+cell selection and audit reference IDs, not only visually representative rooms.
+All 3,408 selected geometry references now occur once across 43 maps.
+
+Stair failures had separate geometry/bevel and movement-classification causes.
+An authored ramp normal Z=0.6976600289 was below the old 0.7 floor threshold.
+The shared 0.69 threshold passes the measured ramp and rejects steeper surfaces;
+player dimensions and FOV remain unchanged. Keep ascent/descent and arch
+clearance checks distinct. See [recurrence guide](STAIR_RAMP_WALKABILITY.md).
+
+The release packer exposed a third boundary: a 31-byte host-valid door filename
+failed legacy Amiga FFS. Shorten producer and consumer together, retain backwards
+lookup, preflight every payload component and preserve original source identity
+in a generated mapping. [Amiga limitations](RELEASE_WORKFLOW.md#amiga-limitations)
+is now a release-workflow requirement. Full findings, implications and validation
+limits are collected in [Balmora lessons](BALMORA_CONVERSION_LESSONS.md).

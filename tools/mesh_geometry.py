@@ -8,7 +8,7 @@ import collections
 import numpy as np
 from scipy.spatial import ConvexHull
 
-def surface_polygons(v,f):
+def surface_polygons(v,f,geometry_only=False):
  groups=collections.defaultdict(list)
  for face in f:
   p=v[face[:3],:3]*.25; uv=v[face[:3],3:5]; n=np.cross(p[1]-p[0],p[2]-p[0]);area=np.linalg.norm(n)
@@ -16,7 +16,8 @@ def surface_polygons(v,f):
   n/=area
   # Texture affine derivatives on the surface, with zero normal component.
   A=np.vstack((p[1]-p[0],p[2]-p[0],n));b=np.vstack((uv[1]-uv[0],uv[2]-uv[0],[0,0]));axes=np.linalg.solve(A,b);off=uv[0]-p[0]@axes
-  key=(int(face[3]),*np.round(n,4),round(float(n@p[0]),2),*np.round(axes.flatten(),5),*np.round(off,3))
+  key=(0 if geometry_only else int(face[3]),*np.round(n,4),round(float(n@p[0]),2))
+  if not geometry_only:key+=(*np.round(axes.flatten(),5),*np.round(off,3))
   groups[key].append((p,axes,off))
  result=[]
  for key,tris in groups.items():
@@ -99,7 +100,7 @@ def shell_collision_parts(v,f,thickness=.2):
  Merge only actual planar surfaces, then give each a small two-sided thickness.
  """
  out=[]
- for poly,material,axes,offset,normal in surface_polygons(v,f):
+ for poly,material,axes,offset,normal in surface_polygons(v,f,geometry_only=True):
   points=np.vstack((poly-normal*thickness,poly+normal*thickness))
   out.append((points,ConvexHull(points),[],0.))
  return out

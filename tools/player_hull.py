@@ -15,6 +15,8 @@ MINS=(-7.32,-7.12,-16.625)
 MAXS=(7.32,7.12,16.625)
 FACTORS=(16/7.32,16/7.12,56/33.25)
 PROFILE='tes3-humanoid-v1'
+# Keep the offline floor diagnostic aligned with quakedef.h's AW_WALKABLE_Z.
+WALKABLE_Z=0.69
 
 def scaled_map(text):
     pattern=r'\(\s*([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s*\)'

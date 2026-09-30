@@ -2,7 +2,7 @@
  * Converted DOOR SNAM/ANAM -> SOUN files; no per-frame file reads. */
 #include "quakedef.h"
 typedef struct {unsigned ref;char path[2][32];float volume[2],seconds[2];} door_audio_t;
-static door_audio_t entries[128];static int loaded,count;
+static door_audio_t entries[256];static int loaded,count;
 static cvar_t enabled={"aw_door_sounds","1",true};
 void AW_DoorAudioInit(void){Cvar_RegisterVariable(&enabled);}
 static int valid_path(const char *s){
@@ -17,7 +17,7 @@ static void load(void){
     loaded=1;
     if(COM_FOpenFile("door-sounds.txt",&f)<0 || !f)return;
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWSFX1\n")){fclose(f);return;}
-    while(count<128 && fgets(line,sizeof(line),f)){
+    while(count<256 && fgets(line,sizeof(line),f)){
         if(sscanf(line,"%u %31s %31s %f %f %f %f %c",&e.ref,e.path[0],e.path[1],
            &e.volume[0],&e.volume[1],&e.seconds[0],&e.seconds[1],&extra)!=7)continue;
         for(i=0;i<2;i++)if(!valid_path(e.path[i]) || !(e.volume[i]>=0 && e.volume[i]<=1) ||

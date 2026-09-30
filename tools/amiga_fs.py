@@ -16,6 +16,20 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import ensure_external
 
 
+def check_payload_names(root):
+    """Reject host paths that legacy OFS/FFS cannot represent before packing."""
+    seen=set()
+    for path in sorted(Path(root).rglob('*')):
+        rel=path.relative_to(root)
+        try: name=path.name.encode('latin-1')
+        except UnicodeEncodeError as exc: raise ValueError('Non-Amiga filename: '+str(rel)) from exc
+        if not name or len(name)>30 or any(c<32 for c in name) or ':' in path.name:
+            raise ValueError('Invalid legacy Amiga filename (maximum 30 bytes): '+str(rel))
+        key=rel.as_posix().casefold()
+        if key in seen:raise ValueError('Case-insensitive filename collision: '+str(rel))
+        seen.add(key)
+
+
 def legacy_root(data, dos_type, normalize=False):
     if dos_type not in range(0x444f5300,0x444f5304):
         raise ValueError('Only legacy DOS0..3 are supported by this check')

@@ -11,6 +11,7 @@ typedef struct {char *words,*command,*arguments;} route_t;
 static route_t routes[]={
     {"reset location","amiwind_debug_reset_location","0"},
     {"ui font","aw_ui_select","16/14/12/fallback"},
+    {"ui ink","aw_ui_ink","original/readable"},
     {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise]"},
     {"ui preview","aw_ui_preview",""},
     {"ui layout","aw_dialogue_layout","1 legacy / 2 full width / 3 padded content (default)"},

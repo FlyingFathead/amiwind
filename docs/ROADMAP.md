@@ -1,14 +1,14 @@
 # Roadmap and implementation options
 
-Current work: [Seyda Neen subdivision and opening follow-up](RELEASE-v0.0.24-dev4.md);
+Current work: [Welcome to Balmora RC1](RELEASE-v0.0.24-rc1.md);
 [Strider and loading presentation](RELEASE-v0.0.24-dev3.md) remains the preceding checkpoint.
 The earlier [29 September plan](PLAN-2026-09-29.md) retains the preceding work.
 
 ## Balmora interiors and loading
 
-- [ ] Add Balmora interiors from the original named cells, with two-way door
-  links, valid arrival points, NPCs and stable saved state. Exterior acceptance
-  does not imply that interiors are present.
+- [x] Convert 43 original Balmora destination interiors, 93 NPC placements and
+  80 living voice sets. Native checks cover all 70 exterior round trips and both
+  same-room Fighters Guild links. Full services/quests/schedules remain future work.
 - [x] Offer frozen-frame sub-cell loading with a small top Loading box; keep
   the existing black-screen method selectable. Implemented in dev3.
 - [ ] Profile read/decode stalls and memory ownership before bounded prefetch
@@ -21,7 +21,7 @@ Owner feedback: Balmora's dev3 subdivision works surprisingly well; its exterior
 often feels faster than Seyda Neen. Use that successful approach from the first
 ship-exit scene. Performance observations remain separate from measured claims.
 
-- [x] Add 30 regular overlapping Seyda Neen regions, a dedicated compact pier
+- [x] Add 25 regular overlapping Seyda Neen regions, a dedicated compact pier
   (`intro_seyda_neen_subcell_pier`, file `intro_docks.bsp`) and ring courtyard.
   Retain complete intersecting objects, stable reference IDs and shared coordinates.
 - [x] Keep the accepted frozen frame with a small top Loading... box; retain
@@ -1136,3 +1136,11 @@ b04 arches and the new b02 approach (549,-739,58), plus the bridge05/06 stairs.
 Keep citywide route acceptance open; a handful of passing routes is not complete
 coverage. The birthsign cursor-only regression remains unreproduced; normal
 native key dispatch passes and raw-event tracing is available.
+## Recurring conversion acceptance: stair ramps
+
+Every new region/interior family must include an authored stair-ramp check.
+The Balmora `0.69766` normal versus former `0.7` walkable cutoff is a reusable
+failure mode across repeated meshes, not a one-location defect. Inspect slope
+classification separately from player dimensions and arch clearance; validate
+idle support, ascent, descent and rejection of steeper non-walkable surfaces.
+Procedure and RC1 evidence: [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md).

@@ -152,14 +152,14 @@ def order_face_planes(lumps, face_planes):
 
 
 def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None,
-                  references=None, prepared_models=None, retain_dressing=False):
+                  references=None, prepared_models=None, retain_dressing=False, collision_bounds=None, collision_compiler=None, collision_cache=None):
     b=src.read_bytes();assert struct.unpack_from('<i',b)[0]==29
     lumps=[bytearray(b[o:o+s]) for o,s in [struct.unpack_from('<ii',b,4+k*8) for k in range(15)]]
     face_planes=[struct.unpack_from('<H',lumps[7],i)[0] for i in range(0,len(lumps[7]),20)]
     index=json.loads((scenery/'scenery-index.json').read_text());archive=(scenery/'scenery.mwpak').open('rb')
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
-    texture_cache={};planes_cache={};texinfo_cache={};models={};report=[]
+    texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[]
     from surface_flatten import load_profiles
     flatten_profiles=load_profiles()
     profiles={name:profile for group in index.get('groups',{}).values()
@@ -185,12 +185,21 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       rgb*=np.array(mat['diffuse']);im=Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).resize((size,size)).quantize(palette=pal,dither=Image.Dither.NONE)
       t=len(textures);texture_cache[key]=t;textures.append(miptex('surface'+str(t),im))
      return texture_cache[key]
-    def collider(pieces, exact=False):
+    def collider(pieces, exact=False, model_name='', reference=0):
+     if not pieces:return -empty_leaf-1,-1
      # A union of convex volumes. Outside each piece tries the next one.
+     compiled=None
+     if exact and collision_compiler:
+      from collision_bsp import compile_standing
+      try:compiled=compile_standing(pieces,collision_compiler,collision_cache)
+      except ValueError as error:
+       collision_fallbacks.append({'model':model_name,'reference':reference,'reason':str(error),
+                                   'fallback':'exact standing-box convex pieces'})
+       print('Collision union fallback to exact planes:',model_name,reference,str(error)[-200:],flush=True)
      roots=[];noderoots=[]
      for k,(points,hull,ids,error) in enumerate(pieces):
       point_eq=np.unique(np.round(hull.equations,5),axis=0)
-      eq=standing_planes(points,point_eq,exact);root=len(lumps[9])//8;noderoot=len(lumps[5])//24;roots.append(root);noderoots.append(noderoot)
+      eq=standing_planes(points,point_eq,exact) if compiled is None else [];root=len(lumps[9])//8;noderoot=len(lumps[5])//24;roots.append(root);noderoots.append(noderoot)
       count=len(eq)
       nxt=root+count if k+1<len(pieces) else -1
       low=np.floor(points.min(axis=0)).astype(int);high=np.ceil(points.max(axis=0)).astype(int)
@@ -207,8 +216,16 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
        pn=plane(n,d);nin=noderoot+j+1 if j+1<len(point_eq) else -1
        if max(nnxt,nin)>32767:raise ValueError('Point node budget exceeded')
        lumps[5]+=struct.pack('<ihh6h2H',pn,nnxt,nin,*low,*high,0,0)
+     if compiled is not None:
+      nodes,croot=compiled;start=len(lumps[9])//8
+      if start+len(nodes)>=65520:raise ValueError('Compiled collision node budget exceeded')
+      for equation,front,back in nodes:
+       pi=plane(equation[:3],equation[3])
+       children=[start+n if n>=0 else n&65535 for n in (front,back)]
+       lumps[9]+=struct.pack('<iHH',pi,*children)
+      return noderoots[0],start+croot if croot>=0 else croot
      return noderoots[0],roots[0]
-    entities=[];instance_models={};collision_models={}
+    entities=[];instance_models={};collision_models={};visual_models={};part_cache={}
     def entity(modelnum,origin,yaw,reference):
      return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
 
@@ -220,6 +237,16 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
         if {r['number'] for r in selected} != wanted:
             raise ValueError('Explicit BSP references were not all converted')
         selection_report = {'selected_groups': [], 'omitted': [], 'explicit_references': len(wanted)}
+    def resident_parts(parts,ref):
+        if collision_bounds is None:return tuple(range(len(parts)))
+        yaw=-ref['rotation_radians'][2];co=math.cos(yaw);si=math.sin(yaw)
+        rotation=np.array([[co,-si,0],[si,co,0],[0,0,1]])
+        origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
+        kept=[]
+        for i,part in enumerate(parts):
+            points=part[0]@rotation.T+origin;lo=points.min(axis=0);hi=points.max(axis=0)
+            if all(hi[a]>=collision_bounds[0][a] and lo[a]<=collision_bounds[1][a] for a in range(2)):kept.append(i)
+        return tuple(kept)
     excluded = [] if retain_dressing else ['flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope']
     unique = dict.fromkeys(ref['model_index'] for ref in selected
                            if not any(t in index['models'][ref['model_index']]['source']
@@ -259,12 +286,21 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
       origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
       key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
-      if key in instance_models:
-       entities.append(entity(instance_models[key],origin,yaw,ref['number']));continue
-
       v,f,polys,components,lod=models[mi]
       texsize=profiles.get(name,{}).get('texture_size',64)
-      surfaces,worldparts,lo,hi=next(placements)
+      if key in visual_models:
+       worldparts=part_cache[key];subset=resident_parts(worldparts,ref);variant=(key,subset)
+       if variant not in instance_models:
+        collision_key=(_instance_key(ref,None),subset)
+        if collision_key not in collision_models:
+         collision_models[collision_key]=collider([worldparts[i] for i in subset],bool(lod.get('collision_bevels')),name,ref['number'])
+        nroot,croot=collision_models[collision_key]
+        original=visual_models[key];header=bytearray(lumps[14][original*64:(original+1)*64])
+        struct.pack_into('<4i',header,36,nroot,croot,croot,croot)
+        instance_models[variant]=len(lumps[14])//64;lumps[14]+=header
+       entities.append(entity(instance_models[variant],origin,yaw,ref['number']));continue
+      surfaces,worldparts,lo,hi=next(placements);part_cache[key]=worldparts
+      subset=resident_parts(worldparts,ref);variant=(key,subset)
       firstface=len(lumps[7])//20;vmap={};emap={}
       def vertex(p):
        key=tuple(np.round(p,5))
@@ -287,13 +323,13 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
         lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(0,255,255,255)
        face_planes.append(pi)
        lumps[7]+=struct.pack('<Hhihh4Bi',0,0,firstedge,len(verts),tx,*styles,lightoffset)
-      collision_key=_instance_key(ref,None)
+      collision_key=(_instance_key(ref,None),subset)
       if collision_key not in collision_models:
-       collision_models[collision_key]=collider(worldparts, bool(lod.get('collision_bevels')))
+       collision_models[collision_key]=collider([worldparts[i] for i in subset], bool(lod.get('collision_bevels')),name,ref['number'])
       nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
-      instance_models[key]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
+      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
     order_face_planes(lumps,face_planes)
@@ -310,6 +346,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     out.write_bytes(header+data)
     archive.close()
     result={'models':report,'selection':selection_report,
+            'collision_compiler_fallbacks':collision_fallbacks,
             'groups':index.get('groups',{}),
             'faces':len(lumps[7])//20,'vertices':len(lumps[3])//12,
             'nodes':len(lumps[5])//24,'clipnodes':len(lumps[9])//8,'bytes':out.stat().st_size,

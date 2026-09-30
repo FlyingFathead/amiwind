@@ -29,7 +29,7 @@ static qboolean support(edict_t *p, float depth, trace_t *t)
     VectorCopy(p->v.origin,end);end[2]-=depth;
     *t=SV_Move(p->v.origin,p->v.mins,p->v.maxs,end,MOVE_NORMAL,p);
     return !t->startsolid && !t->allsolid && t->fraction<1 &&
-           t->plane.normal[2]>0.7f && t->ent && t->ent->v.solid==SOLID_BSP;
+           t->plane.normal[2]>=AW_WALKABLE_Z && t->ent && t->ent->v.solid==SOLID_BSP;
 }
 
 static void ground(edict_t *p, trace_t *t)

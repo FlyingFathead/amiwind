@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 
 AREA = json.loads((Path(__file__).resolve().parents[1] / 'config/seyda_area.json').read_text())
-SCENES = AREA['scenes']
+BALMORA_INTERIORS = json.loads((Path(__file__).resolve().parents[1] / 'config/balmora_interiors.json').read_text())['scenes']
+SCENES = AREA['scenes'] + BALMORA_INTERIORS
 MAP_NAMES = {s['cell'].casefold(): s['map'] for s in SCENES}
 BOUNDS = AREA['bounds']
 

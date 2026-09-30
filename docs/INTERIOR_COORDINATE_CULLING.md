@@ -108,9 +108,22 @@ These are conversion results; native traversal and arrival validation remain
 separate RC1 acceptance gates. Source CELL/BSA data and detailed private build
 reports are not part of the public source package.
 
-A subsequent reference-ID audit of all 43 geometry assemblies found exact
-index-to-entity coverage in 24 rooms. The other 19 omit 99 references matching
-the separate legacy dressing policy above; none were unexplained distance
-rejections. Those omissions still require a content-policy review. They do not
-invalidate the three tower counts, but they prevent treating a zero-distance-
-omission report as proof that every exported interior object shipped.
+A subsequent reference-ID audit initially found exact coverage in 24 rooms.
+The other 19 omitted 99 references through the separate legacy dressing policy,
+with no further distance rejections. The Balmora builder now sets
+`retain_dressing=True`: `select_geometry()` has already made the room's content
+selection, so assembly must retain its exported dressing too. Rebuilding those
+rooms produced exact coverage in all 43 final maps: 3,408 selected references,
+3,408 placed references, no missing IDs or duplicates. The final entity pass
+also retained 90 living NPC placements and three authored corpses.
+
+That rebuild detected four truncated intermediate `scenery.mwpak` caches. The
+converter correctly rejected their short payloads. They were re-exported from
+the owned source data; every indexed payload's length and SHA-256 now verifies
+across all 43 rooms. Keep these integrity checks: do not pad a short asset or
+weaken validation to get through a build.
+
+A subsequent native smoke pass loaded and captured all 43 final rooms, including
+the three far-origin towers, then exited cleanly after 899 frames with zero
+surface or edge overflow frames. This verifies loading and initial rendering;
+it does not certify all walking routes, NPC interactions or two-way arrivals.

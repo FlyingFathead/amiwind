@@ -12,7 +12,7 @@
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
 static aw_scene_link_t links[128];static int count,loaded,pending;
 static aw_scene_link_t next;
-static int links_balmora;
+static char links_map[16];
 static double door_ready;
 static aw_scene_link_t opening_door;
 static unsigned door_close;
@@ -49,19 +49,25 @@ static void target_names_command(void) {
     if(Cmd_Argc()==2 && value>=0)Cvar_SetValue(target_names.name,value);
     else Con_Printf("dbg ui targetnames on/off (after character creation)\n");
 }
-const char *AW_SceneTargetName(void) {
-    edict_t *p,*e;vec3_t eye,end,forward,right,up;trace_t tr;int i;
-    if(!target_names.value || key_dest!=key_game || pending || !sv.active ||
-       svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict ||
-       cls.state!=ca_connected || AW_CharacterActive() || AW_ReaderActive() || AW_IntroPromptActive() ||
-       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
-    p=svs.clients[0].edict;
+static const char *npc_hint(void);
+static edict_t *travel_target(void);
+/* Name, action and manual greeting use the same 72-unit crosshair trace. */
+static edict_t *npc_target(void) {
+    edict_t *p,*e;vec3_t eye,end,forward,right,up;trace_t tr;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || cls.state!=ca_connected)return NULL;
+    p=svs.clients[0].edict;if(p->v.movetype!=MOVETYPE_WALK)return NULL;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
-    for(i=0;i<3;i++)end[i]=eye[i]+forward[i]*96;
-    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
+    VectorMA(eye,72,forward,end);tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
     if(tr.startsolid || tr.allsolid || tr.fraction>=1 || !e || e->free ||
        !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc") || !e->v.netname)return NULL;
-    return pr_strings+e->v.netname;
+    return e;
+}
+const char *AW_SceneTargetName(void) {
+    edict_t *driver;
+    if(!target_names.value || key_dest!=key_game || pending || AW_CharacterActive() ||
+       AW_ReaderActive() || AW_IntroPromptActive() ||
+       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
+    driver=travel_target();return driver?pr_strings+driver->v.netname:npc_hint();
 }
 const char *AW_SceneWorldModel(const char *name) {
     FILE *f=NULL;const char *region;
@@ -77,12 +83,16 @@ const char *AW_SceneWorldModel(const char *name) {
 }
 int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora");}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
-static void read_links_for(int balmora) {
-    FILE *f;char line[384],extra;aw_scene_link_t r;int n,i,version;
-    i=balmora;
-    if(loaded && links_balmora==i)return;
-    links_balmora=i;loaded=1;count=0;
-    if(COM_FOpenFile(links_balmora?"scene-doors-balmora.txt":"scene-doors.txt",&f)>=0 && f) {
+static void read_links_for(const char *map) {
+    FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
+    if(!map_valid(map))return;
+    if(loaded && !strcmp(links_map,map))return;
+    strcpy(links_map,map);loaded=1;count=0;
+    sprintf(path,"doors-%s.txt",map);
+    COM_FOpenFile(path,&f);
+    if(!f){sprintf(path,"scene-doors-%s.txt",map);COM_FOpenFile(path,&f);}
+    if(!f && strcmp(map,"balmora"))COM_FOpenFile("scene-doors.txt",&f);
+    if(f) {
         if(!fgets(line,sizeof(line),f)){fclose(f);return;}
         version=!strcmp(line,"AWD3\n")?3:!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
         if(!version){fclose(f);return;}
@@ -104,7 +114,7 @@ static void read_links_for(int balmora) {
         }
         fclose(f);return;
     }
-    if(links_balmora)return;
+    if(!strcmp(map,"balmora"))return;
     if(COM_FOpenFile("scene-links.txt",&f)<0 || !f)return;
     while(count<128 && fgets(line,sizeof(line),f)) {
         memset(&r,0,sizeof(r));
@@ -117,7 +127,7 @@ static void read_links_for(int balmora) {
     }
     fclose(f);
 }
-static void read_links(void){read_links_for(!strcmp(sv.name,"balmora"));}
+static void read_links(void){read_links_for(sv.name);}
 static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;eval_t *v;char command[32];
     if(pending || !map_valid(link->target))return;
@@ -171,17 +181,9 @@ static int travel_return,travel_count=5;
 static const char *travel_names[]={"Balmora","Gnisis","Suran","Vivec","Cancel"};
 static const char *travel_message;
 static edict_t *travel_target(void) {
-    edict_t *p,*e;trace_t tr;vec3_t eye,end,forward,right,up;
-    if(!sv.active || svs.maxclients!=1 || !svs.clients ||
-       cls.state!=ca_connected || key_dest!=key_game || AW_StoryRestricted())return 0;
-    p=svs.clients[0].edict;
-    if(!p || p->v.movetype!=MOVETYPE_WALK)return 0;
-    VectorAdd(p->v.origin,p->v.view_ofs,eye);
-    AngleVectors(cl.viewangles,forward,right,up);VectorMA(eye,72,forward,end);
-    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
-    if(tr.startsolid || !e || e->free ||
-       strcmp(pr_strings+e->v.classname,"aw_npc") ||
-       (strcmp(pr_strings+e->v.netname,"Darvame Hleran") && strcmp(pr_strings+e->v.netname,"Selvil Sareloth")))return 0;
+    edict_t *e;
+    if(key_dest!=key_game || AW_StoryRestricted())return NULL;
+    e=npc_target();if(!e)return NULL;
     if(!strcmp(sv.name,"balmora") && !strcmp(pr_strings+e->v.netname,"Selvil Sareloth"))return e;
     if(!strcmp(sv.name,"seyda") && !strcmp(pr_strings+e->v.netname,"Darvame Hleran"))return e;
     return NULL;
@@ -246,26 +248,13 @@ int AW_SceneUse(void) {
  * scripted-actor exclusion. This only labels greetings supported by that path. */
 static const char *npc_hint(void)
 {
-    edict_t *p,*e,*best=NULL;eval_t *v;ddef_t *g;int i;
-    vec3_t eye,point,delta,forward,right,up;float distance,closest=72;trace_t tr;
+    edict_t *e;eval_t *v;ddef_t *g;
     g=ED_FindGlobal("aw_voice_deadline");
     if(g && sv.time<pr_globals[g->ofs])return NULL;
-    p=svs.clients[0].edict;
-    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
-    for(i=1;i<sv.num_edicts;i++){
-        e=EDICT_NUM(i);if(e->free || !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
-        v=GetEdictFieldValue(e,"aw_intro_role");if(v && v->_float)continue;
-        v=GetEdictFieldValue(e,"aw_voice");if(!v || !v->string)continue;
-        VectorCopy(e->v.origin,point);point[2]+=27;VectorSubtract(point,eye,delta);distance=Length(delta);
-        if(distance<=.1f || distance>=closest || DotProduct(delta,forward)/distance<=.65f)continue;
-        tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NOMONSTERS,p);
-        if(tr.startsolid || tr.fraction<1)continue;
-        closest=distance;best=e;
-    }
-    if(!best)return NULL;
-    /* The manual greeting uses this clear near-facing candidate, not an exact
-     * ray against the actor's shorter physical box. Keep the hint equivalent. */
-    return pr_strings+best->v.netname;
+    e=npc_target();if(!e)return NULL;
+    v=GetEdictFieldValue(e,"aw_intro_role");if(v && v->_float)return NULL;
+    v=GetEdictFieldValue(e,"aw_voice");if(!v || !v->string)return NULL;
+    return pr_strings+e->v.netname;
 }
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
@@ -317,7 +306,7 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
         VectorCopy(preferred,top);top[0]+=offsets[i][0];top[1]+=offsets[i][1];top[2]+=8-drop;
         VectorCopy(top,bottom);bottom[2]-=32;
         tr=SV_Move(top,p->v.mins,p->v.maxs,bottom,MOVE_NORMAL,p);
-        if(tr.startsolid || tr.allsolid || tr.fraction==1 || tr.plane.normal[2]<.7f)continue;
+        if(tr.startsolid || tr.allsolid || tr.fraction==1 || tr.plane.normal[2]<AW_WALKABLE_Z)continue;
         VectorCopy(tr.endpos,point);point[2]+=.25f;
         tr=SV_Move(point,p->v.mins,p->v.maxs,point,MOVE_NORMAL,p);
         if(tr.startsolid || tr.allsolid)continue;
@@ -330,6 +319,7 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
 void AW_SceneSpawn(edict_t *p) {
     eval_t *v;int placed=0;float eye;
     door_ready=0;
+    if(!region_crossing)AW_UISubtitle("","",0);
     if(pending && !strcmp(sv.name,next.target)) {
         if(region_crossing){
             VectorCopy(next.arrival,p->v.origin);VectorCopy(next.arrival,p->v.oldorigin);
@@ -398,10 +388,9 @@ static void scene_command(void) {
             else Con_Printf("Balmora conversion not found.\n");
             return;
         }
-        /* Supported non-Balmora destinations use the Seyda entrance catalogue,
-         * including when teleporting there from Balmora. Normal door lookups
-         * reload the current area's catalogue on the next interaction. */
-        read_links_for(0);
+        /* Select the destination area's entrance catalogue. Appended Balmora
+         * interior IDs must not fall back to Seyda's unrelated door bank. */
+        read_links_for(AW_MapId(s)>AW_MapId("balmora")?"balmora":"seyda");
         /* The catalogue's first Census entry is a separate upper doorway.
          * Debug arrival uses the inspected registration entrance from the pier. */
         if(!strcmp(s,"census"))for(i=0;i<count;i++)

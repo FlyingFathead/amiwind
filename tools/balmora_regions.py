@@ -32,9 +32,8 @@ def visual_profile(source, triangles):
     profile = {'ratio': min(1., target / max(1, triangles)), 'texture_size': texture_size}
     # Convex approximation closes these authored underpasses. Keep each
     # collision surface instead, independent of visible mesh reduction.
-    if stem in ('ex_hlaalu_bridge_05.nif', 'ex_hlaalu_bridge_06.nif', 'ex_hlaalu_bridge_07.nif', 'ex_velothi_temple_02.nif',
-                'ex_hlaalu_b_02.nif', 'ex_hlaalu_b_04.nif', 'ex_hlaalu_b_13.nif', 'ex_hlaalu_b_15.nif',
-                'ex_hlaalu_b_17.nif', 'ex_hlaalu_dsteps_03.nif'):
+    if stem.startswith(('ex_hlaalu_b_', 'ex_hlaalu_bal_', 'ex_hlaalu_bridge_',
+                        'ex_hlaalu_dsteps_', 'ex_hlaalu_steps_', 'ex_hlaalu_wall_gate_')) or stem=='ex_velothi_temple_02.nif':
         profile['hollow_collision'] = True
         profile['exact_collision_bevels'] = True
     return profile
@@ -109,3 +108,13 @@ def audit_coverage(index, entries, settings):
             'max_region_references': max(map(len, selected), default=0),
             'overlap': settings['overlap'], 'hysteresis': settings['hysteresis'],
             'draw_distance': settings['draw_distance']}
+
+
+def collision_coverage(entry, settings):
+    """Physical/interaction overlap; rendering retains its independent overlap."""
+    margin=settings['collision_margin']
+    # 96-unit hysteresis + 72 interaction reach + 32 normal frame movement
+    # (320 units/s at the 0.1s frame cap) + 8 standing half-width.
+    if margin<settings['hysteresis']+72+32+8:raise ValueError('Insufficient collision overlap')
+    return [[entry['core'][0][i]-margin for i in range(2)],
+            [entry['core'][1][i]+margin for i in range(2)]]

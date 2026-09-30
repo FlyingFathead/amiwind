@@ -1,7 +1,7 @@
 """Synthetic source-door mapping: exterior destinations need no cell name."""
 import struct,tempfile,unittest
 from pathlib import Path
-from prepare_doors import catalogue,runtime_position
+from prepare_doors import catalogue,runtime_position,name_mapping
 
 def sub(tag,data):return tag.encode()+struct.pack('<I',len(data))+data
 def record(tag,data):return tag.encode()+struct.pack('<III',len(data),0,0)+data
@@ -25,3 +25,20 @@ class Doors(unittest.TestCase):
         self.assertEqual(rows[0]['open_sound'],'open')
         self.assertEqual(runtime_position([-8482,-73627,320],False),[695.5,-486.75,80])
         self.assertEqual(runtime_position([20,40,80],True),[5,10,20])
+
+    def test_short_names_retain_original_cell_and_placed_door_identity(self):
+        from unittest.mock import patch
+        source = {'source_cell': 'Balmora, Hlaalu Council Manor', 'source_grid': [0, 0],
+                  'number': 77, 'id': 'hlaalu_load_door', 'model': 'i\\Original_Door.NIF',
+                  'destination_cell': '', 'runtime': {'source': 'bmhlaalucouncil', 'target': 'balmora'}}
+        report = {'master_sha256': 'fixture', 'doors': [source]}
+        with patch('area_config.SCENES', [{'cell': source['source_cell'], 'map': 'bmhlaalucouncil'}]):
+            row = name_mapping(report)['scenes'][0]
+        self.assertEqual(row['runtime_door_bank'], 'id1/doors-bmhlaalucouncil.txt')
+        self.assertEqual(row['original_cell'], source['source_cell'])
+        self.assertEqual(row['doors'][0]['source_mesh'], source['model'])
+        self.assertEqual(row['doors'][0]['reference'], 77)
+        self.assertGreater(len(Path(row['previous_door_bank']).name), 30)
+        with patch('area_config.SCENES', [{'cell': 'Long room', 'map': 'x' * 21}]):
+            with self.assertRaisesRegex(ValueError, 'filename limit'):
+                name_mapping(report)

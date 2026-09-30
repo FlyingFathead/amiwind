@@ -4,7 +4,7 @@
 #include "quakedef.h"
 #include "aw_story.h"
 #include "aw_character.h"
-static int route_started,route_failed;
+static int route_started,route_failed,route_done;
 static float near_actor(int role)
 {
     edict_t *actor=AW_IntroRole(role),*player=svs.clients[0].edict;vec3_t delta;
@@ -19,8 +19,10 @@ static float near_actor(int role)
 static int dock_route(int second)
 {
     vec3_t goal;
-    goal[0]=((second?-9944.f:-8914.f)+11264)*.25f;
-    goal[1]=((second?-72481.f:-73093.f)+71680)*.25f;goal[2]=31.5f;
+    /* The final post is left of the door when approaching from the pier.
+     * Leave the doorway clear and face southeast, out toward the docks. */
+    goal[0]=second?299.f:(-8914.f+11264)*.25f;
+    goal[1]=second?-202.f:(-73093.f+71680)*.25f;goal[2]=31.5f;
     route_started=AW_NavStart(AW_IntroRole(5),goal);
     if(!route_started){
         route_failed=1;Con_Printf("Dock route unavailable; story held for inspection.\n");
@@ -35,7 +37,7 @@ static void hide(edict_t *e)
 void AW_OpeningSpawn(void)
 {
     int i,reference;edict_t *e;eval_t *v;
-    route_started=route_failed=0;
+    route_started=route_failed=route_done=0;
     if(aw_story.stage==AW_STAGE_DEMO)return;
     if(!strcmp(sv.name,"census") && aw_story.stage>=AW_STAGE_OFFICE)aw_story.ship_disabled=1;
     for(i=1;i<sv.num_edicts;i++){
@@ -111,14 +113,21 @@ int AW_OpeningTick(void)
             if(aw_story.stage==AW_STAGE_OFFICE)aw_story.dock_timer+=dt;
             if(aw_story.dock_timer>=1.5 && AW_IntroSpeak(5,"chargendock2")){aw_story.dock=50;aw_story.dock_timer=0;}
         }else if(aw_story.dock==50 && AW_SpeechRemaining()<=0){
-            aw_story.dock=-1;route_started=route_failed=0;dock_route(1);IN_AWClearButtons();
+            aw_story.dock=-1;route_started=route_failed=route_done=0;dock_route(1);IN_AWClearButtons();
         }else if(aw_story.dock==-1){
-            if(!route_started && !route_failed)dock_route(1);
+            if(!route_started && !route_failed && !route_done)dock_route(1);
             if(route_started && !route_failed){result=AW_NavStep(dt,0);
-            if(result)route_failed=1;}
+                if(result>0){route_started=0;route_done=1;}
+                else if(result<0){route_started=0;route_failed=1;Con_Printf("Dock guard post blocked.\n");}}
             if(near_actor(5)<37.5 && AW_SpeechRemaining()<=0){
                 aw_story.dock_timer+=dt;
                 if(aw_story.dock_timer>6 && AW_IntroSpeak(5,"chargendock3"))aw_story.dock_timer=0;
+            }
+            if(route_done){
+                /* Converted actors face local +Y: native yaw 225 faces the
+                 * dock at world yaw 315. Do not keep following the player. */
+                AW_IntroRole(5)->v.angles[1]=225;
+                SV_LinkEdict(AW_IntroRole(5),false);
             }
         }
     }

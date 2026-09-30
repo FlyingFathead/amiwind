@@ -16,7 +16,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import ensure_external
 from prepare_music import playlists, unpack_stream
 from check_aga_binary import check_binary
-from amiga_fs import check_image
+from amiga_fs import check_image, check_payload_names
 from project_version import VERSION, check_native_versions
 from build_jobs import add_jobs, resolve_jobs
 
@@ -214,6 +214,7 @@ def image(args):
     shutil.copyfile(music/'soundtrack.json',target/'soundtrack.json')
     (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n')
     # Leave filesystem metadata and future saves room; retain legacy-safe sizes.
+    check_payload_names(boot)
     payload_bytes=sum(p.stat().st_size for p in boot.rglob('*') if p.is_file())
     partition_mib=max(128,((payload_bytes*6//5 + 16*1024*1024 + 127*1024*1024)//(128*1024*1024))*128)
     if partition_mib>1024:raise ValueError('Boot payload exceeds supported image budget')

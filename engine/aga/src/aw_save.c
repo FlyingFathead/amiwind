@@ -217,7 +217,8 @@ int AW_SaveRead(uint32_t profile,int slot)
     if(!AW_RegionSelect(candidate.scene,candidate.position,0))return 0;
     pending=candidate;loading=1;scheduled=0;
     IN_AWClearButtons();key_dest=key_game;
-    snprintf(map,sizeof(map),"map %s\n",candidate.scene);Cbuf_AddText(map);return 1;
+    /* Restore before later console commands can replace the pending scene. */
+    snprintf(map,sizeof(map),"map %s\n",candidate.scene);Cbuf_InsertText(map);return 1;
 }
 void AW_SaveSchedule(void){if(aw_story.stage==AW_STAGE_RELEASED){scheduled=1;settle=realtime+3;}}
 void AW_SaveTick(void)

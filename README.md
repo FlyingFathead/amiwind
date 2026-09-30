@@ -4,105 +4,53 @@
 
 # AmiWind
 
-*For years, they thought the Nerevarine would never appear on the Commodore Amiga…*
-
-*Well, those n'wahs were wrong!*
-
-**Introducing AmiWind — A Morrowind conversion pipeline and demake for
-Commodore Amiga.**
-
-*The prophecy said nothing about the frame rate.*
-
 ## Current state of the project
 
-**AmiWind v0.0.24-dev5** corrects inspected Balmora stairs and native surface
-ordering behind jagged arches and missing courtyard wall strips. It also repairs
-the inspected guard chest, road tile and small gold font strokes. Seyda Neen's
-centre stays together in one core, with the northern edge at the bridge.
-`dbg aw hors 0` creates a Nord / Barbarian / The Steed test character after Census;
-`dbg tp balmora` creates it if no character exists. Appearance starts on Race and
-has clickable gold arrows. The default debug banner uses the compact font.
-See [scope and validation](docs/RELEASE-v0.0.24-dev5.md).
-Balmora's accepted dev3 Strider, frozen-frame Loading... box, Shift+V shortcut,
-Quake 90-degree FOV, player dimensions and bob remain.
+**v0.0.24-rc1 — Welcome to Balmora candidate.** Balmora now has 43 destination
+interiors, 93 NPC placements and 80 living voice sets, alongside its exterior
+sub-cells and Silt Strider travel. The stair/arch, terrain, gold-font and Talk
+checks are recorded in the [RC release notes](docs/RELEASE-v0.0.24-rc1.md).
 
-The Balmora exterior expansion includes original terrain,
-1,488 scenery placements, 18 residents, and travel from Darvame with a return
-route through Selvil. The exterior uses 64 overlapping sub-cells. Static scenery
-has its own rendering/collision catalogue, leaving game entity slots for actors.
-Boundary changes currently pause to load the next BSP; background streaming is
-still planned. See the [original Balmora scope](docs/BALMORA-v0.0.24-dev1.md).
-
-The existing Seyda Neen area, 13 town interiors, Addamasartus, prison ship,
-opening sequence and interface options are retained. Balmora interiors, creature
-simulation, wandering, combat, services and the remaining Strider routes are
-unfinished. This development ride does not charge a fare. The default exterior
-fog distance is the maximum currently supported by the Balmora and Seyda Neen region overlap.
-
-Earlier inspection evidence is recorded in [v0.0.23](docs/RELEASE-v0.0.23.md)
-and the [mesh notes](docs/MESH_TIPS_AND_TRICKS.md). Converted collision remains
-approximate; loading an area does not certify every stair, roof or doorway.
-
-The startup logo fades in for two seconds, holds five, then fades out for one,
-with theme music from the start; Space/Enter/Esc skips. New Game plays the optional
-owned intro movie (Esc skips), then uses a **blank
-loading screen** into Jiub's ship scene. Ordinary travel keeps the owned loading
-art. Music remains serviced through map reads and decoding; repeated interior
-loads kept the selected track playing with no measured underruns after startup.
-Ship waves are now converted once at **-5 dB** from the owned original recording.
-The reusable loading setting is
-`aw_loading_style normal|blank`; see [debug controls](docs/DEBUG_OVERLAYS.md).
-
-Voiceovers default to **aim-only identity** (`aw_voice_dialogue_display_style 2`):
-the bottom dialogue panel contains speech text, with no speaker header.
-After character creation, aim at nearby NPCs to see their names below the viewport,
-even when talking is unavailable. Options
-→ Interface offers voice identity options, four dialogue styles and three target/
-object-label positions. The new default sizes the box to the text with equal
-padding and centers the lines vertically and horizontally. `dbg ui layout 1/2/3`
-selects legacy, full-width or content-sized geometry.
-After registration, **T** opens a 1–24 hour wait selector; **F1** shows quick help.
-Waiting advances the saved time/date. Sky lighting and NPC schedules are still
-pending. See [dialogue and waiting controls](docs/DIALOGUE_AND_WAIT.md).
-
-Builds run in parallel by default, within one CPU budget. `--jobs N` sets the
-limit; `--single-thread` selects one worker. New interiors also convert in
-parallel. Both complete font-input variants have compiled in about seven minutes
-with six workers here; this is a build measurement, not a cross-machine speedup
-claim. See [parallel builds](docs/PARALLEL_BUILD.md).
-
-**Use the TTF-converted version for the best text, especially papers and dialogue.**
-The original bitmap paper font still has uneven/broken-looking strokes; it is a
-compatibility fallback, not equivalent visual quality. Font selection is automatic: usable owned TTFs are preferred, with original
-FNT/TEX fallback. `--bitmap-paper-ink filled` is the default; `original` selects
-the older bitmap reading-page treatment. This switch does not disable TTFs.
-See [font options](docs/PAPER_FONT_OPTIONS.md).
-
-The reference target remains **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
-16 MiB Fast RAM**. Stock A1200 performance is unproven. The versioned preflight
-waits five seconds; Space or Enter continues immediately. Build with your own game
-files using the [Linux instructions](docs/LINUX_BUILD.md). Public CI builds only an
-asset-free boot-notice image. Earlier intermittent freezes remain tracked in
-[BUGS.md](docs/BUGS.md).
-
-Aim at a door and press **E**. The debug scene picker and `aw_scene <map>` expose
-all converted rooms for inspection. The character-creation route, bounded saves,
-menus and first-person hands remain available. See [interior coverage](docs/SEYDA_NEEN_INTERIORS.md)
-and [door mapping](docs/DOOR_MAPPING.md).
-
-| Silt Strider and Darvame | Fargoth in the expanded town |
+| Balmora exterior | Inside the Guild of Mages |
 | :---: | :---: |
-| ![Original Silt Strider and rider at Seyda Neen](docs/images/amiwind-v0.0.23-dev4-darvame.png) | ![Fargoth rendered in town](docs/images/amiwind-v0.0.23-dev2-fargoth.png) |
-| **Inside Arrille's Tradehouse** | **Jiub dialogue with TTF-converted text** |
-| ![Tradehouse entry and interior](docs/images/amiwind-v0.0.23-dev2-tradehouse.png) | ![Padded centered ship dialogue](docs/images/amiwind-v0.0.23-dev4-dialogue.png) |
+| ![Balmora exterior in RC1](docs/images/amiwind-v0.0.24-rc1-balmora.png) | ![Balmora Mages Guild in RC1](docs/images/amiwind-v0.0.24-rc1-mages.png) |
 
-![In-engine camera pan around the Silt Strider port](docs/images/amiwind-v0.0.23-dev2-port.gif)
+*Actual native RC1 captures in FS-UAE; no generated scenery, compositing or
+brightness adjustment. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
-*Actual FS-UAE captures, 29 September 2026: Darvame and Jiub dialogue are dev4;
-Fargoth, Tradehouse and the pan are dev2. Screenshots crop only the
-emulator margins; the seven-second camera pan is reduced to 444 pixels wide / 8 fps
-for the README. No generated scenery or composited characters. Dark interiors
-reflect the current renderer. Capture details: [gameplay media](docs/GAMEPLAY_MEDIA.md).*
+All 70 exterior entrance/return routes and two additional Fighters Guild links
+passed targeted native checks. The positive-Y staircase report and exact
+stairs/rock wedge remain open; see the [full checklist](docs/INVESTIGATION-v0.0.24-rc1.md).
+This is a candidate for owner playtesting. Stable **v0.0.24, Welcome to Balmora**
+requires owner approval; v0.0.23 remains stable and dev5 remains published as a
+prerelease.
+
+Balmora uses 64 overlapping regions. Seyda Neen retains 25 regular regions,
+compact intro-pier and ring-courtyard scenes, thirteen town interiors,
+Addamasartus and the prison ship. Map replacement pauses behind the accepted
+frozen-frame Loading... box; background streaming is planned. Full combat,
+quests, NPC services and schedules remain unfinished.
+
+The accepted Strider, Quake 90-degree FOV, base player dimensions and race/sex
+view heights remain. Shift+V cycles distance; `dbg aw hors 0` creates a Nord /
+Barbarian / The Steed character after Census; `dbg tp balmora` supplies that
+character if none exists. `dbg tp` opens the destination picker. Aim at doors
+and press E; ordinary NPC greetings use the same target as their Talk hint.
+
+The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
+16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game
+files using the [Linux instructions](docs/LINUX_BUILD.md). Public CI produces
+asset-free checks; converted game data and ROMs stay private.
+
+Use owned TTF inputs for the preferred reading text; bitmap fonts remain a
+fallback. The gold UI also retains `dbg ui ink original` alongside the readable
+candidate. See [font options](docs/PAPER_FONT_OPTIONS.md),
+[debug controls](docs/DEBUG_OVERLAYS.md), [project state](docs/PROJECT_STATE.md)
+and [conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md).
+
+*For years, they thought the Nerevarine would never appear on the Commodore Amiga…*
+
+*Well, those n'wahs were wrong! The prophecy said nothing about the frame rate.*
 
 ## About AmiWind
 

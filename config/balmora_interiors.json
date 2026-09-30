@@ -1,0 +1,306 @@
+{
+  "format": 1,
+  "scenes": [
+    {
+      "id": 17,
+      "map": "bmastius",
+      "cell": "Balmora, Astius Hanotepelus' House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 18,
+      "map": "bmbalyn",
+      "cell": "Balmora, Balyn Omarel's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 19,
+      "map": "bmcaius",
+      "cell": "Balmora, Caius Cosades' House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 20,
+      "map": "bmclagius",
+      "cell": "Balmora, Clagius Clanler: Outfitter",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 21,
+      "map": "bmcouncil",
+      "cell": "Balmora, Council Club",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 22,
+      "map": "bmbooks",
+      "cell": "Balmora, Dorisa Darvel: Bookseller",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 23,
+      "map": "bmdralasa",
+      "cell": "Balmora, Dralasa Nithryon: Pawnbroker",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 24,
+      "map": "bmdralcea",
+      "cell": "Balmora, Dralcea Arethi's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 25,
+      "map": "bmdralosa",
+      "cell": "Balmora, Dralosa Athren's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 26,
+      "map": "bmdrarayne",
+      "cell": "Balmora, Drarayne Thelas' House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 27,
+      "map": "bmstorage",
+      "cell": "Balmora, Drarayne Thelas' Storage",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 28,
+      "map": "bmdura",
+      "cell": "Balmora, Dura gra-Bol's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 29,
+      "map": "bmeastguard",
+      "cell": "Balmora, Eastern Guard Tower",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 30,
+      "map": "bmeightplates",
+      "cell": "Balmora, Eight Plates",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 31,
+      "map": "bmeddie",
+      "cell": "Balmora, Fast Eddie's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 32,
+      "map": "bmfighters",
+      "cell": "Balmora, Guild of Fighters",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 33,
+      "map": "bmmages",
+      "cell": "Balmora, Guild of Mages",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 34,
+      "map": "bmhecerinde",
+      "cell": "Balmora, Hecerinde's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 35,
+      "map": "bmhlaalo",
+      "cell": "Balmora, Hlaalo Manor",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 36,
+      "map": "bmhlaalucouncil",
+      "cell": "Balmora, Hlaalu Council Manor",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 37,
+      "map": "bmitan",
+      "cell": "Balmora, Itan's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 38,
+      "map": "bmkarlirah",
+      "cell": "Balmora, Karlirah's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 39,
+      "map": "bmluckylockup",
+      "cell": "Balmora, Lucky Lockup",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 40,
+      "map": "bmmeldor",
+      "cell": "Balmora, Meldor: Armorer",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 41,
+      "map": "bmmilie",
+      "cell": "Balmora, Milie Hastien: Fine Clothier",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 42,
+      "map": "bmmoragtong",
+      "cell": "Balmora, Morag Tong Guild",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 43,
+      "map": "bmnalcarya",
+      "cell": "Balmora, Nalcarya of White Haven: Fine Alchemist",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 44,
+      "map": "bmnerano",
+      "cell": "Balmora, Nerano Manor",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 45,
+      "map": "bmninetoes",
+      "cell": "Balmora, Nine Toes' House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 46,
+      "map": "bmravirr",
+      "cell": "Balmora, Ra'Virr: Trader",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 47,
+      "map": "bmrarayn",
+      "cell": "Balmora, Rarayn Radarys' House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 48,
+      "map": "bmrithleen",
+      "cell": "Balmora, Rithleen's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 49,
+      "map": "bmsouthwall",
+      "cell": "Balmora, South Wall Cornerclub",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 50,
+      "map": "bmtemple",
+      "cell": "Balmora, Temple",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 51,
+      "map": "bmrazorhole",
+      "cell": "Balmora, The Razor Hole",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 52,
+      "map": "bmtsiya",
+      "cell": "Balmora, Tsiya's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 53,
+      "map": "bmtyermaillin",
+      "cell": "Balmora, Tyermaillin's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 54,
+      "map": "bmtyravel",
+      "cell": "Balmora, Tyravel Manor",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 55,
+      "map": "bmvorar",
+      "cell": "Balmora, Vorar Helas' House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 56,
+      "map": "bmvori",
+      "cell": "Balmora, Vori's House",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 57,
+      "map": "bmwestnorth",
+      "cell": "Balmora, Western Guard Tower North",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 58,
+      "map": "bmwestsouth",
+      "cell": "Balmora, Western Guard Tower South",
+      "interior": true,
+      "area": "balmora"
+    },
+    {
+      "id": 59,
+      "map": "tharystomb",
+      "cell": "Tharys Ancestral Tomb",
+      "interior": true,
+      "area": "balmora"
+    }
+  ]
+}

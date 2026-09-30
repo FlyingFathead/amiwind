@@ -2,9 +2,10 @@
 import struct
 import sys
 import unittest
+import tempfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from amiga_fs import legacy_root
+from amiga_fs import legacy_root, check_payload_names
 
 
 def root(marker=0, bitmap=0xffffffff):
@@ -16,6 +17,20 @@ def root(marker=0, bitmap=0xffffffff):
 
 
 class LegacyRootTests(unittest.TestCase):
+    def test_payload_names_reject_long_names_and_case_collisions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            (directory/'doors-bmhlaalucouncil.txt').touch()
+            check_payload_names(directory)
+            bad = directory/'scene-doors-bmhlaalucouncil.txt'
+            bad.touch()
+            with self.assertRaisesRegex(ValueError, '30 bytes'):
+                check_payload_names(directory)
+            bad.unlink()
+            (directory/'DOORS-bmhlaalucouncil.txt').touch()
+            with self.assertRaisesRegex(ValueError, 'collision'):
+                check_payload_names(directory)
+
     def test_modern_marker_is_rejected_until_normalized(self):
         for dos in range(0x444f5300,0x444f5304):
             before=root(dos, bitmap=0)

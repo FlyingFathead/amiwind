@@ -51,5 +51,17 @@ int main(void) {
   step=-4;assert(AW_ActorStep(&p,move,frame_time));assert(fabs(p.v.origin[0]-2)<.001f && fabs(p.v.origin[2]-(floor_z-4))<.04f);
   assert(walk_movetype==MOVETYPE_WALK && p.v.movetype==MOVETYPE_NONE);
  }
+ /* Hlaalu's authored stair ramp is just steeper than Quake's old .7 cutoff.
+  * It must hold an idle walker and preserve uphill speed in both directions. */
+ water=0;step=0;slope=1.02669f;gravity_calls=0;
+ memset(&p,0,sizeof p);p.v.origin[2]=floor_z;p.v.movetype=MOVETYPE_WALK;
+ for(i=0;i<30;i++)AW_WalkPlayer(&p);
+ assert(!gravity_calls && ((int)p.v.flags & FL_ONGROUND));
+ for(i=0;i<20;i++){p.v.velocity[0]=20;AW_WalkPlayer(&p);}
+ assert(fabs(p.v.origin[0]-20)<.001f && fabs(p.v.origin[2]-(floor_z+20*slope))<.04f);
+ for(i=0;i<20;i++){p.v.velocity[0]=-20;AW_WalkPlayer(&p);}
+ assert(fabs(p.v.origin[0])<.001f && fabs(p.v.origin[2]-floor_z)<.04f);
+ slope=1.2f;memset(&p,0,sizeof p);p.v.origin[2]=floor_z;gravity_calls=0;
+ AW_WalkPlayer(&p);assert(gravity_calls==1 && !((int)p.v.flags & FL_ONGROUND));
  puts("idle slope, uphill speed, descending step, cliff, jump and swimming passed");return 0;
 }

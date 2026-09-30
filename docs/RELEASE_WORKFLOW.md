@@ -2,33 +2,25 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current public source release is **v0.0.22**;
-see [release notes and validation](RELEASE-v0.0.22.md). Earlier releases remain immutable.
-AmiWind remains a demo. Public GitHub releases use plain `0.0.x` version numbers;
-development checkpoints after v0.0.22 use **v0.0.23-dev1**, then dev2, dev3, and so on.
-Use a new dev suffix for each delivered checkpoint; retain prior artifacts unchanged.
-The old separate Python pipeline numbering is historical. Root `VERSION` is the
-only maintained version number. Build and packaging tools read it through
-`tools/project_version.py`; Python package metadata reads the same file.
-The native Makefile generates C and assembly version includes in the build tree.
-Boot/HUD/load text, the Amiga `$VER` identifier, receipts and output filenames
-therefore use that number. A value such as `0.0.17-dev1` normalizes to
-`0.0.17.dev1` in Python package metadata. Historical release records keep their
-original numbers. The current delivery set is v0.0.23-dev1.
+Use one shared release number. The current candidate is **v0.0.24-rc1**.
+The owner published v0.0.24-dev5 at commit `1e1823d`; v0.0.23 remains the
+stable release. Stable v0.0.24, titled **Welcome to Balmora**, requires owner
+approval after RC playtesting. Earlier archives and tags remain immutable.
+`VERSION` is the maintained version source for Python metadata, native build
+includes, runtime/boot strings, receipts, presets and package filenames.
 
 ## Deliverables and structure
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.23-dev1-public-source.zip` | Complete repository under `amiwind/`; extract from `/path/to/downloads/`. |
-| `AmiWind-v0.0.23-dev1-public-source-incremental.zip` | Added/changed public files under `amiwind/`, since the exact uploaded v0.0.22 workspace. |
-| `AmiWind-v0.0.23-dev1-private-playable.zip` | TTF-present private playtest: HDF, launcher, README and `build.json` at its root, plus ROM, presets, conversion receipts and evidence. |
-| `AmiWind-v0.0.23-dev1-bitmap-private-playable.zip` | Separate bitmap-only private playtest with the same structure and filled paper ink. |
+| `AmiWind-v0.0.24-rc1-public-source.zip` | Complete repository under `amiwind/`. |
+| `AmiWind-v0.0.24-rc1-from-v0.0.24-dev5.zip` | Added/changed public files and patch metadata, from the exact published dev5 source ZIP. |
+| `AmiWind-v0.0.24-rc1-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24-rc1/`, following the delivered dev5 wrapper. |
 
-Each ZIP has a same-name `.sha256` sidecar. The private package includes the
-owner's supplied ROM as `roms/kickstart-3.1-a1200.rom`; it is never a GitHub asset.
-Asset-free dry-run images contain no ROM/game data and do not replace playable
-packages. No separate dry-run archive is delivered for dev1.
+Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
+their checksums belong in GitHub release assets. No private playable, ROM or
+converted game assets may be included. Asset-free dry runs do not replace the
+playable HDF verification.
 
 The source repository has one root. Native AGA code is in `engine/aga/`, host
 conversion code in `src/mwad/`, commands in `tools/`, documentation in `docs/`,
@@ -38,17 +30,13 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-Name the exact patch base and SHA-256 in `docs/PATCH-v0.0.23-dev1.json`. Include only
-added/changed files and patch metadata. List deletions explicitly; unzip alone
-cannot remove obsolete files. Verify a clean application reproduces the full
-source tree, including its generated package manifest. Always provide the full
-source alongside the patch.
-
-The dev1 patch starts from `amiwind-2026-09-29_124939.zip`, SHA-256
-`d01d1bf130e4072dc794417f4127a3d7e62469861a85b3b3d146ff5d1baad568`.
-Its base manifest identifies the actual uploaded source bytes. Do not overwrite
-newer local changes with the incremental archive. Check the base first or unpack
-the complete source into a separate directory for comparison.
+The exact base is `AmiWind-v0.0.24-dev5-public-source.zip`, SHA-256
+`e52651a616e4f27f476d19e85623a05deebff7130b9a97b7438752cb7581aecb`.
+`docs/PATCH-v0.0.24-rc1.json` records the base, changed paths and removals.
+Verify a clean application reproduces every file in the full source ZIP,
+including the package manifest. Unzip does not delete obsolete files; apply
+only explicitly listed removals. Protect existing local changes first.
+Always provide the full source archive alongside the incremental.
 
 ## Release gate
 
@@ -95,9 +83,65 @@ Special thanks to: ChaosWhisperer
 ```
 
 Public source excludes original/converted game data, reusable extracted fonts,
-ROMs and private images. The five owner-approved README screenshots are a
+ROMs and private images. The explicitly allowlisted owner-approved README screenshots are a
 documentation exception. Preserve component licence notices and keep complete
 development recovery sets separate from playable packages.
 
 Public documentation and release assets use generic example paths. Keep owner
 usernames, machine names and local directory layouts in private handoff material.
+
+## Amiga limitations
+
+### Legacy filesystem names: 30 bytes per component
+
+The RC1 HDF build rejected `scene-doors-bmhlaalucouncil.txt`: 31 ASCII
+characters/bytes exceed the selected legacy Amiga OFS/FFS limit of **30 bytes
+for each filename or directory component, including the extension**. A name
+that works in the host workspace can therefore fail during Amiga packaging.
+This is a constraint of our legacy target format; do not assume that newer
+Amiga filesystems or a host-directory emulator mount behave identically.
+
+Use stable abbreviations, shorthands, numbering or bounded identifiers when
+needed. Reserve room for prefixes, suffixes and extensions. Do not silently
+truncate: different originals can then collide. Keep target names ASCII where
+possible, case-insensitively unique, and independent of display labels.
+
+The door converter now emits `doors-bmhlaalucouncil.txt` (25 bytes). Runtime
+loading prefers `doors-<map>.txt` and retains the older-name fallback. The
+payload preflight `tools/amiga_fs.py:check_payload_names` runs before HDF
+packing and rejects overlength components, unsupported characters and
+case-insensitive path collisions. Validate the complete staged payload, not
+only the examples that originally failed.
+
+### Traceable original-to-target mapping
+
+Every shortening must retain a reverse lookup. `config/seyda_area.json` and
+`config/balmora_interiors.json` keep original cell names beside stable runtime
+map IDs. `tools/prepare_doors.py` additionally generates private
+`asset-name-map.json`: source master SHA-256, original cell, runtime map ID,
+BSP path, current/previous door-bank filename, and each original door's record
+ID, placed reference number, cell/grid, mesh path and destination. RC1 has
+60 scene entries and 185 placed door records. Keep exact source spellings;
+never replace them with the shortened target name.
+
+| Original Morrowind cell | Runtime map | Generated door bank |
+| --- | --- | --- |
+| Balmora, Hlaalu Council Manor | `bmhlaalucouncil` | `doors-bmhlaalucouncil.txt` |
+| Balmora, Caius Cosades' House | `bmcaius` | `doors-bmcaius.txt` |
+| Balmora, Guild of Mages | `bmmages` | `doors-bmmages.txt` |
+
+That JSON covers scene/BSP and door-bank naming. Other asset families retain
+source-to-output receipts: `balmora-interiors.json` links NPC record IDs,
+appearance part meshes and authored greeting paths to hashed MDL/WAV names;
+`door-audio.json` links source samples and hashes to short WAV names. Original
+placed geometry and transforms remain in `interior-reference.json`, while
+room conversion reports identify selected meshes. These are complementary
+records, not a claim that a single JSON covers every texture and sound in the
+game. Keep the reports with private conversion evidence and include new asset
+families as they are introduced. A one-to-many conversion must list every
+output; reused outputs must preserve every relevant source identity.
+
+For recurrence: trace the rejected path to its converter; choose a stable
+short name; update producer and consumer together; emit the mapping; run the
+payload preflight; rebuild the HDF; read files back and boot the packed image.
+Do not fix only a local staging copy or rely solely on a host-directory boot.

@@ -56,7 +56,7 @@ char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 int COM_FOpenFile(char *name,FILE **f){
  const char *s="AWD3\nprison seyda 1 -5 35 25 5 45 35 0 0 77 90\tSeyda Neen\nprison evil;quit 2 -5 35 25 5 45 35 0 0 77 90\tInvalid\nprison seyda 3 nan 35 25 5 45 35 0 0 77 90\tInvalid\nseyda - 4 -5 35 25 5 45 35 0 0 0 90\tCensus and Excise Office\nseyda census 474482 -5 235 25 5 245 35 0 0 77 90\tOther doorway\nseyda census 113893 -5 235 25 5 245 35 12 34 77 90\tRegistration entrance\n";
- if(!strcmp(name,"scene-doors-balmora.txt"))s="AWD2\n";
+ if(!strcmp(name,"doors-balmora.txt") || !strcmp(name,"scene-doors-balmora.txt"))s="AWD3\nbalmora bmcaius 42 -5 35 25 5 45 35 22 44 77 90\tCaius Cosades House\n";
  if(!strcmp(name,"maps/prison.bsp") && !ship_available){*f=NULL;return -1;}
 #ifdef BALMORA_AVAILABLE
  if(!strcmp(name,"balmora-regions.txt"))s="AWBR1 1 96 540 0 0 77 90 0 0 77 90\nbm000 -1024 -1024 1024 1024 -2048 -2048 2048 2048\n";
@@ -81,7 +81,7 @@ void SV_LinkEdict(edict_t *p,qboolean touch){}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
  if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
- if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-96*96)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
+ if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(type==MOVE_NOMONSTERS){if(occluded)t.fraction=.3f;return t;}
  if(narrow_room){
   if(a[2]>88 || a[2]<66){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
@@ -124,6 +124,7 @@ int main(void){
  assert(!strcmp(queued,"map prison\n"));assert(opening_track==-1);
  ship_available=0;start_demo();assert(!strcmp(queued,"map seyda\n"));
  target_trace=1;target.v.classname=1;target.v.netname=8;target.v.modelindex=1;
+ p.v.movetype=MOVETYPE_WALK;voice.string=8;
  assert(names_option->value==1);names_option->value=0;assert(!AW_SceneTargetName());names_option->value=1;
  names_option->value=0;voice_aim=1;assert(!AW_SceneTargetName());
  names_option->value=1;voice_aim=0;
@@ -146,23 +147,26 @@ int main(void){
  globals[0]=100;sv.time=0;hint[0]=0;AW_SceneDraw();
  assert(!strcmp(hint,"(E: Talk)")); /* Service survives greeting cooldown. */
  hint[0]=0;occluded=1;AW_SceneDraw();assert(!hint[0]);occluded=0;
- /* Ordinary Talk matches the clear, near-facing QC selector even when a
-  * precise crosshair ray misses the actor's physical box. */
+ /* A nearby facing actor without a direct hit must not produce a prompt.
+  * The name and Talk action become available together on a clear hit. */
  travel_trace=0;target.v.netname=8;voice.string=8;role._float=0;
  target.v.origin[0]=40;target.v.origin[1]=0;p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;
  cl.viewangles[1]=0;sv.num_edicts=2;globals[0]=0;
- hint[0]=0;AW_SceneDraw();assert(!strcmp(hint,"(E: Talk)"));
+ hint[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());
+ target_trace=1;names_option->value=1;
+ hint[0]=0;AW_SceneDraw();assert(!strcmp(hint,"(E: Talk)") && !strcmp(AW_SceneTargetName(),"Fargoth"));
  role._float=1;hint[0]=0;AW_SceneDraw();assert(!hint[0]);role._float=0;
- globals[0]=100;hint[0]=0;AW_SceneDraw();assert(!hint[0]);globals[0]=0;
+ globals[0]=100;hint[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());globals[0]=0;
  occluded=1;hint[0]=0;AW_SceneDraw();assert(!hint[0]);occluded=0;
- travel_trace=1;target.v.netname=27;
+ target_trace=0;travel_trace=1;target.v.netname=27;
  occluded=1;assert(!AW_SceneUse());occluded=0;
  assert(AW_SceneUse() && key_dest==key_menu);
  drawn[0]=0;assert(AW_TravelDraw());assert(strstr(drawn,"Balmora") && strstr(drawn,"Gnisis") && strstr(drawn,"Suran") && strstr(drawn,"Vivec") && strstr(drawn,"Cancel"));
 #ifdef BALMORA_AVAILABLE
  assert(AW_TravelKey(K_ENTER));assert(!strcmp(queued,"map balmora\n"));
  assert(key_dest==key_game && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
- strcpy(sv.name,"balmora");AW_SceneSpawn(&p);assert(!AW_Interior());
+ strcpy(notice,"Old room greeting");
+ strcpy(sv.name,"balmora");AW_SceneSpawn(&p);assert(!AW_Interior());assert(!notice[0]);
  target.v.netname=27+strlen(pr_strings+27)+1;
  assert(AW_SceneUse());drawn[0]=0;assert(AW_TravelDraw());assert(strstr(drawn,"Seyda Neen"));
  assert(AW_TravelKey(K_ENTER));assert(!strcmp(queued,"map seyda\n"));
@@ -194,6 +198,8 @@ int main(void){
  command_argc=2;command_args[1]="census";strcpy(sv.name,"balmora");
  scene();assert(!strcmp(queued,"map census\n")); /* Destination catalogue, not Balmora's empty links. */
  strcpy(sv.name,"census");AW_SceneSpawn(&p);assert(p.v.origin[0]==12 && p.v.origin[1]==34);
+ command_args[1]="bmcaius";scene();assert(!strcmp(queued,"map bmcaius\n"));
+ strcpy(sv.name,"bmcaius");AW_SceneSpawn(&p);assert(p.v.origin[0]==22 && p.v.origin[1]==44);
 #ifdef BALMORA_AVAILABLE
  command_args[1]="BaLmOrA";teleport();assert(!strcmp(queued,"map balmora\n"));
  strcpy(sv.name,"balmora");AW_SceneSpawn(&p);

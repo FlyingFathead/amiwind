@@ -11,12 +11,13 @@ edict_t *EDICT_NUM(int n){return n==1?&object:&clerk;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;return t;
 }
-static edict_t guard;static int speech,menu,done,nav_stops,nav_starts;
+static edict_t guard;static int speech,menu,done,nav_stops,nav_starts,nav_result;
+static vec3_t nav_goal;
 static char line[32];
 edict_t *AW_IntroRole(int role){return role==5?&guard:role==6 && clerk.v.modelindex?&clerk:NULL;}
 int AW_NavLoad(const char *s){nav_stops++;return 1;}
-int AW_NavStart(edict_t *e,vec3_t goal){nav_starts++;return 1;}
-int AW_NavStep(double dt,int wait){return 0;}
+int AW_NavStart(edict_t *e,vec3_t goal){nav_starts++;VectorCopy(goal,nav_goal);return 1;}
+int AW_NavStep(double dt,int wait){return nav_result;}
 int AW_IntroSpeak(int role,const char *s){if(speech)return 0;strcpy(line,s);speech=1;return 1;}
 double AW_SpeechRemaining(void){return speech;}
 int AW_CharacterDone(void){int d=done;done=0;return d;}
@@ -49,6 +50,10 @@ int main(void)
     done=1;menu=0;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_OFFICE && AW_OpeningLocked());
     for(i=0;i<16;i++)AW_OpeningTick();assert(aw_story.dock==50 && !strcmp(line,"chargendock2") && AW_OpeningLocked());
     speech=0;AW_OpeningTick();assert(aw_story.dock==-1 && !AW_OpeningLocked() && nav_starts==2);
+    assert(nav_goal[0]==299 && nav_goal[1]==-202);
+    guard.v.angles[1]=10;nav_result=0;AW_OpeningTick();assert(guard.v.angles[1]==10);
+    nav_result=1;AW_OpeningTick();assert(guard.v.angles[1]==225);
+    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==225);
     assert(AW_StoryRestricted()); /* Race completion must not remove the enclosure. */
     for(i=0;i<70;i++)AW_OpeningTick();assert(!strcmp(line,"chargendock3"));
     /* Prompt and E share aim/range/visibility and the same stateful target. */

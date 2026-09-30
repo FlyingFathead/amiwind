@@ -393,3 +393,18 @@ static scenery spawns; uneven dialogue padding; ornamental caret/rotation glyphs
 startup theme/timing; missing optional opening quote overlay. See
 [the full feedback table and trials](FEEDBACK-v0.0.23-dev3.md).
 These focused checks do not close unrelated open items above.
+
+## RC1 remaining acceptance items — 30 September 2026
+
+The coordinate-by-coordinate record is in
+[INVESTIGATION-v0.0.24-rc1.md](INVESTIGATION-v0.0.24-rc1.md). Keep these open:
+
+- stairs10 at -685,+619,141: reported origin is inside terrain; do not silently
+  substitute the older negative-Y report or call it a passed staircase.
+- wedge1 at -225,348,131: exact trapped state not yet reproduced; nearby native
+  retreat works only after lateral placement recovery.
+- Full natural intro and owner city-roaming acceptance; physical Amiga, Windows
+  and subjective audio checks have not been established by Linux null-audio runs.
+
+NPC greetings, room population and entrance traversal are implemented; full
+services, wandering/combat and quest behavior are not implied by their presence.

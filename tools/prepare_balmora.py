@@ -18,7 +18,7 @@ from PIL import Image
 from mwad.audit import audit, BSA, normpath
 from mwad.paths import child_ci, ensure_external, resolve_data_files
 from mwad.npc import load_master, outfit, greeting_fixture, behavior_record, greeting_settings
-from balmora_regions import config, regions, select_references, audit_coverage, owner, visual_profile
+from balmora_regions import config, regions, select_references, audit_coverage, owner, visual_profile, collision_coverage
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from prepare_scenery import export_refs, bsa_read
@@ -279,7 +279,9 @@ def prepare(data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None
         rebuild_world_hull(base, root / 'terrain.map', qbsp)
         report = append_meshes(base, root / 'scene.bsp', out / 'scenery', scene / 'id1/gfx/palette.lmp',
                                centre=settings['centre'], jobs=jobs, references=selected,
-                               prepared_models=prepared, retain_dressing=True)
+                               prepared_models=prepared, retain_dressing=True,
+                               collision_bounds=collision_coverage(entry,settings),
+                               collision_compiler=qbsp,collision_cache=out/'collision-cache')
         if report['unique_models'] > settings['model_budget']:
             raise ValueError(entry['name'] + ': inline model budget exceeded')
         report.update(region=entry, references=selected)

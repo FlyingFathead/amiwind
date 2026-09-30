@@ -135,8 +135,10 @@ void() aw_npc_idle = {
 /* All static brushes must be linked before the actor's floor trace. Exported
  * entity order is not a collision guarantee: the port platform may spawn last. */
 void() aw_npc_floor = {
+    local vector authored;
+    authored=self.origin;
     setorigin(self,self.origin + '0 0 8');
-    droptofloor();
+    if (!droptofloor() || authored_z-self.origin_z>8) setorigin(self,authored);
     setorigin(self,self.origin + '0 0 0.25');
     self.solid = 3;
     setsize(self,'-7.32 -7.12 0','7.32 7.12 33.25');
@@ -158,31 +160,26 @@ void() aw_npc = {
     self.think = aw_npc_floor;
     self.nextthink = time + 0.1;
 };
+/* Authored dead residents keep the sampled final death pose and never greet. */
+void() aw_corpse = {
+    precache_model(self.model);
+    self.movetype = 0;
+    self.solid = 0;
+    setmodel(self,self.model);
+    setsize(self,'0 0 0','0 0 0');
+    self.frame = 0;
+};
 void() aw_interact = {
-    local entity npc, best;
-    local vector delta, eye;
-    local float distance, closest;
-    if (self.movetype != 3) return;
-    if (time < aw_voice_deadline) return;
+    local entity npc;
+    local vector eye;
+    if (self.movetype != 3 || time < aw_voice_deadline) return;
     makevectors(self.v_angle);
     eye = self.origin + self.view_ofs;
-    closest = 72;
-    npc = find(world,classname,"aw_npc");
-    best = world;
-    while (npc != world) {
-        delta = npc.origin + '0 0 27' - eye;
-        distance = vlen(delta);
-        if (!npc.aw_intro_role && npc.aw_voice != "" && distance < closest && distance > 0.1) {
-            if ((delta * v_forward) / distance > 0.65) {
-                traceline(eye,npc.origin + '0 0 27',1,self);
-                if (trace_fraction == 1) { best = npc; closest = distance; }
-            }
-        }
-        npc = find(npc,classname,"aw_npc");
-    }
-    if (best != world && !best.aw_intro_role) {
-        aw_greet(best,self,0);
-    }
+    traceline(eye,eye + v_forward * 72,0,self);
+    npc = trace_ent;
+    if (trace_fraction >= 1 || npc == world) return;
+    if (npc.classname == "aw_npc" && !npc.aw_intro_role && npc.aw_voice != "")
+        aw_greet(npc,self,0);
 };
 void() worldspawn = {
     precache_model("progs/player.mdl");

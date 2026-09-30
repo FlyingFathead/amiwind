@@ -11,7 +11,7 @@ PROJECT_URL = 'https://github.com/FlyingFathead/amiwind/'
 
 def read_version(path):
     value = Path(path).read_text().strip()
-    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-dev[0-9]+)?', value):
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-(?:dev|rc)[0-9]+)?', value):
         raise ValueError('VERSION must contain one number such as 0.0.17 or 0.0.17-dev1')
     return value
 
@@ -21,7 +21,7 @@ def public_version(root=ROOT):
 
 
 def python_version(root=ROOT):
-    return public_version(root).replace('-dev', '.dev')
+    return public_version(root).replace('-dev', '.dev').replace('-rc', 'rc')
 
 
 def generate_native(version_file, out):

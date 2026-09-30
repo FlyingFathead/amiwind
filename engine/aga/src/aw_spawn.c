@@ -7,7 +7,7 @@
 static qboolean floor_at(edict_t *p, vec3_t top, vec3_t bottom, vec3_t result)
 {
     trace_t t = SV_Move(top,p->v.mins,p->v.maxs,bottom,MOVE_NORMAL,p);
-    if(t.startsolid || t.allsolid || t.fraction >= 1 || t.plane.normal[2] < 0.7f)
+    if(t.startsolid || t.allsolid || t.fraction >= 1 || t.plane.normal[2] < AW_WALKABLE_Z)
         return false;
     VectorCopy(t.endpos,result);
     result[2] += 0.25f;

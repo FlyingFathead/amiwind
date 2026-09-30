@@ -35,3 +35,17 @@ only to the game display. The restored-tree capture records the reported camera
 `-71 -429 38 / 262 / -7`. Existing Fargoth, Tradehouse and port GIF remain dev2.
 The screenshot exceptions are exact filenames; all other generated/owned media
 remain excluded. No generated imagery, brightness changes or compositing.
+
+## v0.0.24-rc1 captures — 30 September 2026
+
+The README and RC notes show native Balmora exterior and Mages Guild frames
+captured from a writable copy of the matching production HDF. The production
+binary hash is verified against the package. Diagnostic free-camera placement
+is used for reproducible composition; images are not traversal proof.
+
+PNG conversion preserves the native screenshot pixels, with no generated
+content, compositing, colour or brightness adjustment. Dark interior lighting
+is the current renderer's output. Only the two exact RC1 PNG paths are added
+to the public media allowlist; raw captures and other game assets stay private.
+The final stable release must keep verified screenshots near its release info
+under the logo, at the top of Current state of the project.

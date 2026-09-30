@@ -2,6 +2,7 @@
 #include "quakedef.h"
 server_t sv;server_static_t svs;
 #include "aw_save.h"
+#include "aw_maps.h"
 #include <assert.h>
 #include <stdint.h>
 #include "aw_clock.h"
@@ -112,7 +113,14 @@ int main(void)
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0);
     assert(AW_SaveDecode(raw,n,&decoded));assert(!strcmp(decoded.scene,"balmora"));
     assert(decoded.actors[0].scene==16);
-    source.actors[0].scene=17;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
+    strcpy(source.scene,"bmastius");source.actors[0].scene=17;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && AW_SaveDecode(raw,n,&decoded));
+    assert(!strcmp(decoded.scene,"bmastius") && decoded.actors[0].scene==17);
+    strcpy(source.scene,"tharystomb");source.actor_count=AW_SAVE_ACTORS;
+    for(i=0;i<AW_SAVE_ACTORS;i++){source.actors[i]=source.actors[0];source.actors[i].scene=AW_MAP_COUNT-1;source.actors[i].reference=i+1;}
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && AW_SaveDecode(raw,n,&decoded));
+    assert(decoded.actor_count==AW_SAVE_ACTORS && decoded.actors[AW_SAVE_ACTORS-1].reference==AW_SAVE_ACTORS);
+    source.actors[0].scene=AW_MAP_COUNT;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
     strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;
     source.character.current[0]=NAN;assert(!AW_SaveEncode(raw,sizeof(raw),&source));

@@ -22,6 +22,17 @@ def scene(boxes):
     return Scene(pack_lumps(data))
 
 class WalkabilityAuditTests(unittest.TestCase):
+    def test_authored_ramp_and_steeper_surface_follow_native_threshold(self):
+        import math,re
+        from player_hull import WALKABLE_Z
+        native=(Path(__file__).resolve().parents[1]/'engine/aga/src/quakedef.h').read_text()
+        self.assertEqual(float(re.search(r'#define AW_WALKABLE_Z ([0-9.]+)f',native)[1]),WALKABLE_Z)
+        s=Scene.__new__(Scene);s.nodes=[(0,-1,-2)]
+        s.brushes=[(0,(0.,0.,0.),((1.,0.,0.),(0.,1.,0.),(0.,0.,1.)),'ramp')]
+        for z,status in ((0.6976600289,'supported'),(0.64,'steep')):
+            s.planes=[(-math.sqrt(1-z*z),0.,z,0.)]
+            self.assertEqual(s.floor((0,0,2),4)['status'],status)
+
     def test_shared_collision_suffix_is_not_reported_as_a_cycle(self):
         s=Scene.__new__(Scene)
         s.planes=[(0.,0.,1.,i+.5) for i in range(40)]

@@ -27,14 +27,86 @@
   "terrain_step": 128,
   "terrain_material_repairs": [
     {
-      "cell": [-3, -2],
-      "tile": [12, 3],
+      "cell": [
+        -3,
+        -2
+      ],
+      "tile": [
+        12,
+        3
+      ],
       "source_material": 0,
       "material": 34,
       "reason": "Isolated default tile inside WG_road at the reported east-bank paving gap"
+    },
+    {
+      "cell": [
+        -3,
+        -2
+      ],
+      "tile": [
+        7,
+        9
+      ],
+      "source_material": 0,
+      "material": 34,
+      "reason": "Owner ground1/ground2 and Part 5 view: default tile interrupts surrounding paving"
+    },
+    {
+      "cell": [
+        -3,
+        -3
+      ],
+      "tile": [
+        12,
+        14
+      ],
+      "source_material": 0,
+      "material": 34,
+      "reason": "Owner Part 2 ground view at 562 -1176: default tile at road approach"
+    },
+    {
+      "cell": [
+        -4,
+        -2
+      ],
+      "tile": [
+        15,
+        0
+      ],
+      "source_material": 0,
+      "material": 14,
+      "reason": "Owner Part 6 ground5 at -1036 -901: default tile surrounded on three sides by known WG_rockyscrub"
+    },
+    {
+      "cell": [
+        -3,
+        -2
+      ],
+      "tile": [
+        9,
+        7
+      ],
+      "source_material": 0,
+      "material": 34,
+      "reason": "Owner Part 8 ground6 at 121 -49 looks into unfilled tile next to WG_road pavement"
+    },
+    {
+      "cell": [
+        -3,
+        -2
+      ],
+      "tile": [
+        10,
+        9
+      ],
+      "source_material": 0,
+      "material": 34,
+      "reason": "Owner Part 9 ground8 at 252 169 faces blank pavement tile adjoining WG_road to west and north"
     }
   ],
   "arrival_actor": "selvil sareloth",
   "entity_budget": 1000,
-  "model_budget": 220
+  "model_budget": 220,
+  "collision_margin": 224
 }

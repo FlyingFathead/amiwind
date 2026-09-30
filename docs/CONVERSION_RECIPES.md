@@ -1,5 +1,9 @@
 # Reusable conversion recipes
 
+For the consolidated Balmora problem/cause/implications/resolution reference,
+see [Balmora conversion lessons](BALMORA_CONVERSION_LESSONS.md). Its RC1 checklist
+link tracks the owner reports and remaining native acceptance gates.
+
 AmiWind is a host conversion pipeline plus an Amiga runtime. The goal is to
 repeat a documented build from user-provided inputs, not to repair each scene
 manually after export. Owned input, generated intermediate files, images and
@@ -10,20 +14,20 @@ performance evidence stay outside the source repository.
 `build.sh` records a versioned build receipt with the recipe ID, hand mode,
 commands, input/source/tool SHA-256 checksums, tool paths, stage logs and timings
 under the external workspace. Each named run is immutable; failures preserve
-completed earlier stages. The AGA path now includes the prison interior after
-terrain, scenery, NPCs and hands, before compiling the runtime and HDF.
+completed earlier stages. The AGA path includes the opening, Seyda Neen interiors/regions, Balmora
+regions and 43 Balmora destination interiors before the native runtime and HDF.
 
 | Stage | Reusable work | Current bounded recipe |
 | --- | --- | --- |
-| Read | ESM cells/references, BSA meshes and textures | Base Morrowind; fixed Seyda Neen coverage |
+| Read | ESM cells/references, BSA meshes and textures | Base Morrowind; configured Seyda Neen and Balmora coverage |
 | Resolve | Object IDs, transforms, materials, complete assemblies | Arrival ship assembly explicitly configured |
 | Geometry | Same-plane merging, optional component/material LOD, UV patches | Selected ship hull LOD; ordinary scenery retained |
-| Collision | Standing hull profile, convex proxies, hollow surface prisms | Hollow collision selected for the prison shell |
+| Collision | Standing hull profile, convex proxies, hollow surface prisms | Authored hollow surfaces, exact standing-box bevels and compiled unions |
 | Lighting | Offline scalar ambient and bounded lamp falloff | Prison AMBI/LIGH; no shadows, flicker or coloured lights |
-| Actors | Body-part assembly, clothing, sampled animation | Three town NPCs and Nord unarmed first person |
+| Actors | Body-part assembly, clothing, sampled animation | Opening/town actors and 93 Balmora interior placements |
 | First person | Same poses to MDL and optional opaque sprite spans | `--hands 3d` default; `--hands sprites` experiment |
-| Links | Authored door source/destination coordinates | Prison ship and exterior hatch only |
-| Pack | Bounded BSP/data formats, music blocks, RDB/FFS HDF | One resident scene; continuous music identity |
+| Links | Authored door source/destination coordinates | Original per-area banks; all 70 Balmora exterior entrances and 43 interiors |
+| Pack | Bounded BSP/data formats, music blocks, RDB/FFS HDF | One resident BSP; overlapping regions, persistent actors, continuous music |
 | Verify | Synthetic tests, binary/filesystem checks, native recordings | Pinned emulator/ROM/config and versioned evidence |
 
 ## Generalise through recipes, not silent guesses
@@ -32,8 +36,8 @@ Keep source cell coordinates (8192-unit exterior cells) separate from smaller
 runtime chunks and the current 0.25 world scale. A future scene recipe should
 name its source cells, included assemblies, spawn, links, lighting policy,
 geometry/collision variants and hard budgets. The host reader and exporters
-already accept reusable inputs; the full guided build remains a **two-scene
-prototype**, not an arbitrary-cell conversion promise.
+already accept reusable inputs; the guided build supports the configured starting area and Balmora. It does not
+promise arbitrary-cell conversion without a coverage and budget audit.
 
 New recipes must report included and omitted object IDs with reasons. Unknown
 records should be visible in the report. Do not silently replace interactive
@@ -92,3 +96,19 @@ recipe schema; then select another exterior or interior without editing converte
 logic. Reuse this path for other games only after implementing a source-format
 adapter, unit/axis mapping and equivalent behavioral tests. Generality must grow
 from proven recipes; it must not hide per-game assumptions.
+
+
+## Interiors far from local zero
+
+If a room exports correctly but loses floors/walls during BSP assembly, check
+for an exterior distance filter applied to local interior coordinates. See
+[Interior geometry lost to an exterior distance filter](INTERIOR_COORDINATE_CULLING.md)
+for the cause, implications, correction and reference-coverage checks.
+
+## Repeated stair ramps and movement thresholds
+
+Visible steps may use an authored collision ramp just beyond the engine's
+walkable-floor cutoff. Check the actual blocking reference and full-precision
+surface normal before changing player dimensions or reshaping the mesh.
+[Stair ramp walkability](STAIR_RAMP_WALKABILITY.md) records the repeated Hlaalu
+case, shared threshold, targeted validation and future regression procedure.

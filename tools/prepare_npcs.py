@@ -16,6 +16,17 @@ def quote(value):
     if any(c in str(value) for c in ('"','\\','\0','\n','\r')):raise ValueError('Unsafe entity value')
     return '"'+str(value)+'"'
 
+def display_text(value):
+    """Readable single-line text for BSP's non-escaping quoted strings.
+
+    Keep authored text in conversion reports; only its displayed representation
+    uses apostrophes for embedded quotation marks. Never apply this to keys,
+    paths or numeric fields, and retain quote() validation of the result.
+    """
+    text=' '.join(str(value).replace('"', "'").split())
+    quote(text)
+    return text
+
 def prepare(data,scene,out,ffmpeg='ffmpeg'):
     data=ensure_external(data,'owned data');scene=ensure_external(scene,'mesh scene');out=ensure_external(out,'NPC scene')
     ready=json.loads((scene/'scene-ready.json').read_text())
@@ -53,7 +64,7 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
             pos=[(ref['position'][i]-(CENTRE[i] if i<2 else 0))*SCALE for i in range(3)]
             fields={'classname':'aw_npc','aw_ref':str(ref['number']),'model':model,'origin':' '.join(format(x,'.5f') for x in pos),
                     'angles':'0 '+str(-ref['rotation_radians'][2]*180/math.pi)+' 0',
-                    'netname':appearance['name'],'aw_voice':voice,'aw_line':greeting['text'],
+                    'netname':display_text(appearance['name']),'aw_voice':voice,'aw_line':display_text(greeting['text']),
                     'aw_idle_step':format(step,'.7f'),
                     'aw_hello_distance':settings['distance'],
                     'aw_hello_reset':settings['reset_distance'],

@@ -168,6 +168,41 @@ def pack_glyphs(glyphs, size):
     return struct.pack('<4sBBH', b'AWF1', size, size+2, len(pixels)) + metrics + pixels
 
 
+def readable_gold(raw):
+    """Offline e/H legibility variant; preserve all metrics and other glyphs."""
+    if raw[:4]!=b'AWF1' or len(raw)<2056:raise ValueError('Invalid source font')
+    out=bytearray(raw)
+    for code in (ord('e'),ord('H')):
+        offset,w,h,left,top,advance,_=struct.unpack_from('<HBBbbBB',raw,8+code*8)
+        if w<4 or h<4:continue
+        def get(x,y):
+            k=y*w+x;return (raw[2056+offset+k//4]>>(6-2*(k%4)))&3
+        mask=[[get(x,y) for x in range(w)] for y in range(h)]
+        occupied=[(x,y) for y in range(h) for x in range(w) if mask[y][x]]
+        if not occupied:continue
+        x0=min(x for x,y in occupied);x1=max(x for x,y in occupied)
+        y0=min(y for x,y in occupied);y1=max(y for x,y in occupied)
+        middle=(y0+y1)//2
+        if code==ord('e'):
+            for x in range(x0+1,x1):mask[middle][x]=max(2,mask[middle][x])
+        else:
+            # Two full-height uprights, a central bar and small source-sized
+            # serifs. Uppercase height and advance remain exactly as authored.
+            mask=[[0]*w for _ in range(h)]
+            l=min(x0+1,x1);r=max(l+2,x1-1)
+            if r>=w:r=w-1
+            for y in range(y0,y1+1):mask[y][l]=mask[y][r]=3
+            for x in range(l,r+1):mask[middle][x]=3
+            for y in (y0,y1):
+                for stem in (l,r):
+                    for x in range(max(0,stem-1),min(w,stem+2)):mask[y][x]=max(2,mask[y][x])
+        for y in range(h):
+            for x in range(w):
+                k=y*w+x;index=2056+offset+k//4;shift=6-2*(k%4)
+                out[index]=(out[index]&~(3<<shift))|(mask[y][x]<<shift)
+    return bytes(out)
+
+
 def background_packet(background,palette,protected):
     """Give artwork the free palette entries without changing UI/text colors."""
     free=[i for i in range(256) if i not in protected]
@@ -242,6 +277,7 @@ def convert(data, palette_path, out):
                   f"using Bethesda bitmap fallback {item['bitmap']}.")
         for size, payload in payloads.items():
             (out/f"{item['output']}{size}.awf").write_bytes(payload)
+            if key=="magic":(out/f"magicclear{size}.awf").write_bytes(readable_gold(payload))
         selected = item['ttf_path'] if mode == 'ttf' else item['bitmap_path']
         font_report[key] = {
             'label': item['label'], 'mode': mode, 'source': selected.name,

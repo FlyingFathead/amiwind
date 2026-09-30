@@ -8,6 +8,14 @@ from mwad.npc import greeting_fixture,first,behavior_record,greeting_settings
 from player_hull import MINS,MAXS,FACTORS,lumps,pack_lumps,graft_hull
 
 class ActorRecords(unittest.TestCase):
+    def test_display_text_handles_nickname_quotes_without_relaxing_entity_syntax(self):
+        from prepare_npcs import quote, display_text
+        source='Edd "Fast Eddie" Theman'
+        self.assertEqual(quote(display_text(source)), '"Edd \'Fast Eddie\' Theman"')
+        self.assertEqual(display_text('Hello.\r\n Welcome.'), 'Hello. Welcome.')
+        for value in ('bad\\path', 'bad\0value'):
+            with self.assertRaises(ValueError): display_text(value)
+        with self.assertRaises(ValueError): quote(source)
     def test_wander_settings_and_package_order(self):
         fields=[('AIDT',struct.pack('<HBBB3xI',513,40,30,20,0x102)),
                 ('AI_W',struct.pack('<hh10B',512,5,9,60,20,15,5,0,0,0,0,1)),

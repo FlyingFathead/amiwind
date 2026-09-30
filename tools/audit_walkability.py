@@ -14,7 +14,7 @@ import math
 from pathlib import Path
 import re
 import struct
-from player_hull import lumps, PROFILE
+from player_hull import lumps, PROFILE, WALKABLE_Z
 
 
 def dot(a, b):
@@ -118,7 +118,7 @@ class Scene:
         if hit:
             result.update(hit)
             result['height'] = point[2]-drop*hit['fraction']
-            result['status'] = 'blocked' if hit['fraction'] == 0 else 'supported' if hit['normal'][2] >= .7 else 'steep'
+            result['status'] = 'blocked' if hit['fraction'] == 0 else 'supported' if hit['normal'][2] >= WALKABLE_Z else 'steep'
         return result
 
 

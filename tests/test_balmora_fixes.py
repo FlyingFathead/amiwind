@@ -34,6 +34,19 @@ class TerrainMaterials(unittest.TestCase):
         self.assertIn(' g34 ', text)
         self.assertNotIn(' g0 ', text)
 
+    def test_part6_default_patch_matches_surrounding_scrub(self):
+        from prepare_balmora import terrain_material
+        grid={'heights':[[504]*65 for _ in range(65)],
+              'materials':[[14]*16 for _ in range(16)]}
+        grid['materials'][0][15]=0
+        grids={(-4,-2):grid}
+        self.assertEqual(terrain_material(grids,self.settings,-1056,-921),14)
+        grid['materials'][0][14]=0
+        self.assertEqual(terrain_material(grids,self.settings,-1200,-921),0)
+        grid['materials'][0][15]=24
+        with self.assertRaisesRegex(ValueError,'source tile'):
+            terrain_material(grids,self.settings,-1056,-921)
+
 
 @unittest.skipUnless(all(importlib.util.find_spec(m) for m in
                        ('numpy', 'scipy', 'fast_simplification')), 'optional actor dependencies')

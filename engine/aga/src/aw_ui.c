@@ -23,6 +23,8 @@ static byte logo[8008];
 static int logo_state;
 static int background_state;
 static int font_bytes,font_height=8,line_height=10,skin_ready,initialized;
+static unsigned font_revision;
+static cvar_t ui_readable={"aw_ui_readable","1",true};
 static cvar_t ui_font={"aw_ui_font","14",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
 static cvar_t ui_frame={"aw_ui_frame","0",true};
@@ -74,9 +76,11 @@ static int select_font(int size) {
     byte candidate[26624];char path[32];int n;
     if(!size){font_bytes=0;font_height=8;line_height=10;return 1;}
     if(size!=12 && size!=14 && size!=16)return 0;
-    sprintf(path,"gfx/magic%ld.awf",(long)size);n=read_asset(path,candidate,sizeof(candidate));
+    n=0;
+    if(ui_readable.value){sprintf(path,"gfx/magicclear%ld.awf",(long)size);n=read_asset(path,candidate,sizeof(candidate));}
+    if(!AW_UIValidateFont(candidate,n)){sprintf(path,"gfx/magic%ld.awf",(long)size);n=read_asset(path,candidate,sizeof(candidate));}
     if(!AW_UIValidateFont(candidate,n))return 0;
-    memcpy(font,candidate,n);font_bytes=n;font_height=font[4];line_height=font[5];return 1;
+    memcpy(font,candidate,n);font_revision++;font_bytes=n;font_height=font[4];line_height=font[5];return 1;
 }
 int AW_UIBackground(void) {
     int x,y;byte *row;
@@ -173,6 +177,13 @@ static void font_command(void) {
     else {Con_Printf("Usage: dbg ui font 16/14/12/fallback\n");return;}
     if(!select_font(size)){Con_Printf("UI font missing or invalid; previous font preserved.\n");return;}
     Cvar_SetValue(ui_font.name,size);scr_copyeverything=1;
+}
+static void ink_command(void) {
+    float old=ui_readable.value;char *s=Cmd_Argv(1);int value;
+    if(Cmd_Argc()!=2 || (strcmp(s,"original") && strcmp(s,"readable"))){Con_Printf("dbg ui ink original/readable\n");return;}
+    value=!strcmp(s,"readable");initialize();Cvar_SetValue(ui_readable.name,value);
+    if(!select_font((int)ui_font.value))Cvar_SetValue(ui_readable.name,old);
+    scr_copyeverything=1;
 }
 int AW_UIFontSize(void){initialize();return font_bytes?font_height:0;}
 int AW_UISetFontSize(int size){
@@ -406,11 +417,12 @@ void AW_UIObjectName(const char *name,int style) {
  * A bounding rectangle may contain transparent rows after host quantization. */
 static byte *bounds_font;
 static int bounds_bytes=-1,bounds_height;
+static unsigned bounds_revision;
 static signed char glyph_bounds[256][4];
 static void prepare_bounds(void) {
     int c,x,y,k,w,h,left,top,right,bottom;const byte *m,*pixels;
-    if(bounds_font==font && bounds_bytes==font_bytes && bounds_height==font_height)return;
-    bounds_font=font;bounds_bytes=font_bytes;bounds_height=font_height;
+    if(bounds_font==font && bounds_bytes==font_bytes && bounds_height==font_height && bounds_revision==font_revision)return;
+    bounds_font=font;bounds_bytes=font_bytes;bounds_height=font_height;bounds_revision=font_revision;
     for(c=0;c<256;c++){
         left=top=32;right=bottom=0;
         if(font_bytes){
@@ -608,12 +620,12 @@ void AW_UIDraw(void) {
 
 static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original borders and three ink shades. The console keeps its own font.",12);}
 void AW_UIInit(void) {
-    Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
+    Cvar_RegisterVariable(&ui_readable);Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cvar_RegisterVariable(&loading_style);
     Cvar_RegisterVariable(&region_loading);
     Cvar_RegisterVariable(&dialogue_method);Cvar_RegisterVariable(&dialogue_layout);
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);
     Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);
-    Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
+    Cmd_AddCommand("aw_ui_ink",ink_command);Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

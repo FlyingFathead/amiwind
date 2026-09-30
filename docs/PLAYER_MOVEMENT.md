@@ -126,6 +126,12 @@ Keep the owner's preferred Quake camera motion: `cl_bob 0.02`,
 `cl_bobcycle 0.6`, `cl_bobup 0.5`. These defaults and the view code are unchanged.
 Collision fixes must not remove bob or replace it with a motionless camera.
 
+RC1 uses the shared `AW_WALKABLE_Z = 0.69f` floor-normal threshold. An authored
+Hlaalu stair ramp measured `0.6976600289` and failed the former `0.7` cutoff.
+This recurring geometry/movement mismatch and its validation are documented
+in [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md). Keep movement, support
+and placement tests consistent when changing the threshold.
+
 See checkpoint-012 validation for native evidence and remaining limitations.
 
 ## Checkpoint-013 architectural ghost volumes

@@ -4,6 +4,37 @@ Keep owner reports separate from local acceptance tests. A fix at one location
 is not evidence that every collision/rendering issue is solved. New reports
 append to the relevant version; do not rewrite earlier observations as passes.
 
+## v0.0.24-rc1
+
+**AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
+
+Balmora now includes 43 destination interiors (42 city interiors plus Tharys
+Ancestral Tomb), 93 NPC placements (90 living and three authored corpses), and
+80 living NPC voice sets. Original links cover 70 exterior entrances and two
+additional same-room Fighters Guild links. All 43 maps passed native loading;
+all 70 entrance/return routes and both internal links passed targeted native
+checks. Ordinary walking checks cover the reported stairs/arches except the
+unresolved positive-Y report. The exact stairs/rock wedge is also still open.
+
+Full selected interior geometry is retained, including distant-origin towers
+and previously omitted dressing. The checklist records stair collision and
+slope classification, ground-material repairs, clearer gold e/H glyphs, shared
+NPC targeting, the guard's final dock post and filename packaging corrections.
+These are local checks, not owner acceptance of every route or the full game.
+
+The accepted Strider, frozen-frame Loading... box, Shift+V, 90-degree FOV,
+base player hull and race/sex eye heights remain. Balmora has 64 overlapping
+regions; Seyda Neen has 25 regular regions plus the intro pier and ring
+courtyard. Loading replaces a BSP synchronously. Background streaming,
+whole-map polygon-density analysis, full NPC services, schedules, combat and
+quest simulation remain future work. Greetings use a bounded authored fixture.
+
+Stable v0.0.23 and the published dev5 prerelease remain unchanged. Final
+v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
+[complete checklist](INVESTIGATION-v0.0.24-rc1.md),
+[conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
+[Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
+
 ## v0.0.23-dev1 / parallel-build checkpoint
 
 Both TTF-present and bitmap-only builds compile and boot to the menu/prison

@@ -38,6 +38,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	GAMENAME	"id1"
 #endif
 
+/* Inspected Hlaalu stair ramps reach normal Z=0.69766 (~45.76 degrees). */
+#define AW_WALKABLE_Z 0.69f
+
 #include <math.h>
 #include <string.h>
 #include <stdarg.h>

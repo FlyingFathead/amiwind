@@ -199,15 +199,29 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
                                        p[f[:,2]]-p[f[:,0]]), axis=1).sum()
     original_area = area(points, faces)
     span = np.ptp(points, axis=0)
+    failed=0
+    def reduced(target):
+        p,f=fast_simplification.simplify(points,faces,target_count=target)
+        if len(f)>target+2:p,f=fast_simplification.simplify(points,faces,target_count=target,agg=10.)
+        valid=len(f) and (not preserve_shell or
+                (area(p,f)>=.8*original_area and np.all(np.ptp(p,axis=0)>=.7*span)))
+        return p,f,valid
     while quota < len(faces):
-        candidate, triangles = fast_simplification.simplify(points, faces, target_count=quota)
-        if len(triangles)>quota+2:
-            candidate, triangles = fast_simplification.simplify(points, faces, target_count=quota, agg=10.)
-        if len(triangles) and (not preserve_shell or
-                (area(candidate, triangles) >= .8*original_area and
-                 np.all(np.ptp(candidate, axis=0) >= .7*span))):
+        candidate,triangles,valid=reduced(quota)
+        if valid:
+            # Doubling can overshoot the smallest safe open-panel mesh. Refine
+            # between the failed and passing budgets, retaining the same area
+            # and silhouette checks for every accepted candidate.
+            if preserve_shell and failed:
+                low,high=failed+1,quota-1
+                while low<=high:
+                    mid=(low+high)//2;p,f,ok=reduced(mid)
+                    if ok:
+                        if len(f)<len(triangles):candidate,triangles=p,f
+                        high=mid-1
+                    else:low=mid+1
             return candidate, triangles
-        quota = max(quota+1, quota*2)
+        failed=quota;quota=max(quota+1,quota*2)
     return points, faces
 
 def bake(shapes,materials,textures,palette,budget=480):

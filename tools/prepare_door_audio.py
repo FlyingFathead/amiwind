@@ -43,7 +43,7 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
         if not lines or lines[0]!='AWD3':raise ValueError('Door audio needs placed-reference AWD3 links')
         wanted.update(int(line.split()[2]) for line in lines[1:] if line.strip())
     rows=catalogue(child_ci(data,'Morrowind.esm').read_bytes(),wanted)
-    if len(rows)>128:raise ValueError('Door sound catalogue exceeds runtime bound')
+    if len(rows)>256:raise ValueError('Door sound catalogue exceeds runtime bound')
     assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')));converted={};lines=['AWSFX1']
     for row in rows:
         names=[];volumes=[];durations=[]
