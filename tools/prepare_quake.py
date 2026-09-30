@@ -275,9 +275,6 @@ bind ` toggleconsole
 bind F10 toggleconsole
 bind e +moveup
 bind q +movedown
-bind 1 "aw_drawdistance 450"
-bind 2 "aw_drawdistance 540"
-bind 3 "aw_drawdistance 1000"
 +mlook
 sensitivity 3
 cl_forwardspeed 120

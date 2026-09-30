@@ -12,6 +12,9 @@ static byte depths[32768];
 static int old_distance;
 static cvar_t aw_cull;
 int AW_DrawDistance(void) {
+    /* This exterior's converted overlap is certified for the default range.
+     * Keep the user's larger setting available to other scenes. */
+    if(sv.active && (!strcmp(sv.name,"balmora") || !strcmp(sv.name,"seyda")) && aw_drawdistance.value>540)return 540;
     if(!(aw_drawdistance.value>=128))return 128;
     if(aw_drawdistance.value>4096)return 4096;
     return (int)aw_drawdistance.value;
@@ -34,7 +37,12 @@ static void distance_command(void) {
 invalid:
     Con_Printf("Usage: dbg fog distance 128..1400 (default 540)\n");
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+static void cycle_distance(void) {
+    int value=aw_drawdistance.value<540?540:aw_drawdistance.value<1000?1000:450;
+    AW_SetDrawDistance(value);
+    Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
+}
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {

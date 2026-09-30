@@ -35,6 +35,8 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
 }
 int main(void){
  char output[160];byte atlas[16384];int i;
+ char *hud_type[]={"dbg","hud","type","2"};
+ char *hors[]={"dbg","aw","hors","0"};
  char *hud[]={"dbg","hud","on"};
  char *shortform[]={"debug","reset","location","0"};
  char *longform[]={"amiwind","debug","reset","location","0"};
@@ -44,6 +46,9 @@ int main(void){
  char *missing[]={"debug","reset"};
  char *help[]={"debug","help"};
  char *picker[]={"dbg","scene","change"};
+ char *tp[]={"dbg","tp","balmora"};
+ char *tp_menu[]={"amiwind","debug","tp","menu"};
+ char *tp_bad[]={"dbg","tp","balmora;quit"};
  char *fog[]={"dbg","fog","distance","400"};
  char *distance[]={"debug","draw","distance","500"};
  char *view[]={"debug","view","-20","30","40","90","-60"};
@@ -65,10 +70,22 @@ int main(void){
  assert(!strcmp(output,"amiwind_debug_coords on\n"));
  assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1);
  assert(!strcmp(output,"aw_scene_menu\n"));
+ assert(AW_DebugTranslate(2,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport\n"));
+ assert(AW_DebugTranslate(3,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport balmora\n"));
+ tp[2]="seydaneen";
+ assert(AW_DebugTranslate(3,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport seydaneen\n"));
+ tp[0]="DeBuG";tp[2]="prisonship";
+ assert(AW_DebugTranslate(3,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport prisonship\n"));
+ assert(AW_DebugTranslate(4,tp_menu,output,sizeof(output))==1 && !strcmp(output,"aw_scene_menu\n"));
+ assert(!AW_DebugTranslate(3,tp_bad,output,sizeof(output)));
+ tp_bad[2]="../prison";assert(!AW_DebugTranslate(3,tp_bad,output,sizeof(output)));
+ assert(!AW_DebugTranslate(3,tp,output,8));
  assert(AW_DebugTranslate(4,fog,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 400\n"));
  assert(AW_DebugTranslate(4,distance,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 500\n"));
  assert(AW_DebugTranslate(3,hud,output,sizeof(output))==1);
  assert(!strcmp(output,"amiwind_show_debug on\n"));
+ assert(AW_DebugTranslate(4,hud_type,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hud_type 2\n"));
+ assert(AW_DebugTranslate(4,hors,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hors 0\n"));
  assert(AW_ParseBoolean("TRUE")==1 && AW_ParseBoolean("on")==1 && AW_ParseBoolean("1")==1);
  assert(AW_ParseBoolean("FALSE")==0 && AW_ParseBoolean("off")==0 && AW_ParseBoolean("0")==0);
  assert(AW_ParseBoolean("2")==-1 && AW_ParseBoolean("truth")==-1);
@@ -93,5 +110,9 @@ int main(void){
  font_size=8;font_command();assert(atlas[0]==99);
  font_size=sizeof(atlas);font_command();for(i=0;i<sizeof(atlas);i++)assert(atlas[i]==i%251);
  args[1]="retro";memset(atlas,99,sizeof(atlas));font_command();assert(atlas[500]==500%251);
+ memset(pixels,17,sizeof(pixels));vid.buffer=pixels+4;vid.width=8;vid.rowbytes=12;vid.height=4;
+ AW_ConsoleSetSmall(0);AW_SmallString(-1,-1,"oooo");
+ for(i=0;i<64;i++)if(i<4 || i>=48 || (i-4)%12>=8)assert(pixels[i]==17);
+ assert(AW_ConsoleCharWidth()==8); /* HUD cannot change console mode. */
  return 0;
 }

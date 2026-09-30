@@ -28,7 +28,8 @@ class ActorRecords(unittest.TestCase):
               'igreetduration':[('INTV',struct.pack('<i',4))]}
         result=greeting_settings({'GMST':gmst},{'hello':30})
         self.assertEqual((result['distance'],result['reset_distance'],result['duration']),(45,128,4))
-        with self.assertRaises(ValueError):greeting_settings({'GMST':gmst},{'hello':200})
+        self.assertEqual(greeting_settings({'GMST':gmst},{'hello':90})['distance'],135)
+        with self.assertRaises(ValueError):greeting_settings({'GMST':gmst},{'hello':3000})
     def test_greeting_rejects_context_and_preserves_order(self):
         def info(id,disp=50,gender=0):return [('INAM',id.encode()),('DATA',struct.pack('<iibbbb',1,disp,-1,gender,-1,0)),('RNAM',b'test race'),('SNAM',b'fixture.wav'),('NAME',id.encode())]
         ap={'id':'test actor','race':'test race','class':'test class','female':False}

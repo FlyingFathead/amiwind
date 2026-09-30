@@ -18,11 +18,72 @@ scale 1 and a centred player hull:
 | Minimum | -7.32, -7.12, -16.625 |
 | Maximum | 7.32, 7.12, 16.625 |
 | Full body dimensions | 14.64 x 14.24 x 33.25 |
-| Eye above origin | 16.4338 (sampled Nord male camera, checkpoint-016) |
-| Eye above feet | 33.0588; collision dimensions unchanged |
+| Eye above origin | Selected eye above feet minus 16.625; dev2 pre-creation 14.551 |
+| Eye above feet | Race/sex Camera-bone sample; dev2 pre-creation 31.176 |
 
 This replaces a footprint about 2.2 times too wide. It is a base humanoid
-collision profile, not an implementation of character creation or all races.
+collision profile. The dev2 eye-height selection is independent of this box.
+
+## Physical recheck, v0.0.24-dev2
+
+The owner reports being too tall relative to both Seyda Neen and Balmora. A live
+Amiga calibration room compares body and point sweeps against known flat walls,
+floor and ceiling. This tests the effective baked collision, not just constants:
+
+| Axis | Negative body / point stop | Positive body / point stop | Measured full size |
+| --- | --- | --- | --- |
+| X | -56.64875 / -63.96875 | 56.64875 / 63.96875 | 14.640 |
+| Y | -56.84875 / -63.96875 | 56.84875 / 63.96875 | 14.240 |
+| Z | 16.65625 / 0.03125 | 43.34375 / 59.96875 | 33.250 |
+
+The common trace epsilon cancels in each difference. No hidden doubled height or
+vertical hull-origin shift is present. The original full collision dimensions
+are 58.56 x 56.96 x 133; scenery, terrain and player all use the same 0.25 scale.
+The two reported Balmora passages also fit this body against original triangles;
+their converted concave collision was obstructing the routes. Source triangle
+tests include larger-body positive controls. See the full symptom/cause/fix
+record in [mesh notes](MESH_TIPS_AND_TRICKS.md#balmora-underpasses-and-global-player-height-v0024-dev2).
+
+Dev1 nevertheless applies the Nord eye fixture to every character. Dev2 exports
+the ordinary idle Camera bone (124.7052 source units) and each race/sex height
+into an optional AWE1 catalogue trailer. It uses the source Player race before
+creation, applies confirmed choices immediately, and reapplies the selected eye
+after scene/save restoration. Dark Elf/Imperial eyes are 31.176 units above feet,
+Nord 33.047, High Elf 34.294, Breton female 29.617 and Wood Elf male 28.059.
+Legacy catalogues retain their baked eye fallback. Physical collision is unchanged.
+Host checks cover catalogue bounds, legacy data, pre-creation selection,
+confirmation/cancellation and unchanged physical bounds. The native rebuilt
+catalogue reports 31.176 before creation.
+
+Keep **90-degree horizontal FOV** and the existing Quake bob. The optional slider
+in the roadmap must pass a performance comparison and is not a world-scale fix.
+These measurements do not establish original-game animated camera parity or
+close the owner's broader assessment of player proportions.
+
+## Original race-based heights
+
+Read directly from the owned base `Morrowind.esm` playable RACE records, RADT
+male/female height fields (30 September 2026). These are relative height
+multipliers, not metres and not the separate weight fields.
+
+| Race | Male height | Female height |
+| --- | --- | --- |
+| Argonian | 1.03 | 1.00 |
+| Breton | 1.00 | 0.95 |
+| Dark Elf | 1.00 | 1.00 |
+| High Elf | 1.10 | 1.10 |
+| Imperial | 1.00 | 1.00 |
+| Khajiit | 1.00 | 0.95 |
+| Nord | 1.06 | 1.06 |
+| Orc | 1.05 | 1.05 |
+| Redguard | 1.02 | 1.00 |
+| Wood Elf | 0.90 | 1.00 |
+
+Nords are taller than the 1.00 baseline; High Elves are taller still. This is
+source-defined character stature, not an AmiWind invention. Dev2 uses these
+values for `eye above feet = sampled first-person Camera height * 0.25 * race/sex
+height`. It does not multiply the base collision box by race height. The earlier
+fixed Nord camera incorrectly applied the 1.06 proportion to all choices.
 
 References inspected at OpenMW revision
 `46bd4599203ee52ffc0f3e8edb3fc159a0303a49`:
@@ -130,3 +191,14 @@ Original-data caveat: free exploration still uses the calibrated Nord male
 first-person fixture. The base master's pre-creation Player record is Dark Elf.
 Creation must choose race/sex eye proportions explicitly; existing calibration
 is not proof of every original in-game camera or character appearance.
+
+
+## dev4 Balmora stair entrance
+
+The Nord report at XYZ925,-290,62 identifies `ex_hlaalu_b_17`, reference 32631.
+Its convex collision approximation seals the authored stair opening. Preserve
+the authored surfaces as thin collision shells for both placements, 32631 and
+32644. Native walking reaches XYZ1078,-292,144 through the previously blocked
+entrance. Physical dimensions, selected race/sex eye height, step/slope rules,
+bob and 90-degree FOV remain unchanged. The later deformed stair report at
+XYZ613,-125,59 is a different asset and remains open; see the dev4 investigation.

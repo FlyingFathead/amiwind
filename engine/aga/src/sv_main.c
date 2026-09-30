@@ -1182,6 +1182,7 @@ void SV_SpawnServer (char *server)
 // serverflags are for cross level information (sigils)
 	pr_global_struct->serverflags = svs.serverflags;
 
+    AW_SceneryBegin(sv.worldmodel->entities);
 	ED_LoadFromFile (sv.worldmodel->entities);
 
 	sv.active = true;

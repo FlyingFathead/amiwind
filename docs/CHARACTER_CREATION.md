@@ -122,6 +122,13 @@ attributes and skills; do not save only the displayed numbers or selector indice
 The current Nord hands are not proof that selected-race first-person appearance
 has been implemented. Audit those assets as a separate acceptance item.
 
+Race-based height is also original data. The complete male/female multiplier
+table and its source are recorded in
+[player movement](PLAYER_MOVEMENT.md#original-race-based-heights). Dev2 exports
+those proportions for the first-person eye and applies the confirmed race/sex,
+replacing the fixed Nord camera. This does not implement race-specific hands or
+change the shared physical collision box.
+
 ## Acceptance before the next playable
 
 - New Game through hatch, dock greeting, race choice and office entry without
@@ -188,3 +195,20 @@ The namespaced runtime fact `amiwind:ref:172851:ring_taken` records depletion;
 atomic pickup changes that fact and inventory together. Returning, dropping or
 losing the ring later cannot restock it. Full containers, loot lists, item icons
 and Fargoth's keep/return dialogue remain on the roadmap.
+
+
+## dev4 confirmation and review navigation
+
+Choose is highlighted by default in character confirmation dialogs. Enter accepts;
+move Left to Cancel when revising a choice. Character review has a centered title,
+`Review your character (page 1/5)`, updated as pages change. During registration,
+the Census front door back to the pier is locked; continue through the courtyard.
+
+## dev5 playtest follow-up
+
+Appearance entry selects Race; zero mouse movement preserves keyboard focus.
+Race, sex, face and hair each have clickable gold left/right arrows. Label clicks
+select a row; arrow clicks change that row. Choose remains the confirmation
+default. The debug preset `dbg aw hors 0` uses normal catalogue rebuilding for
+a male Nord, Barbarian and The Steed (source ID `Charioteer`), then applies the
+post-Census quest/inventory state and starts in Seyda Neen square.

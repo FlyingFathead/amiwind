@@ -1,6 +1,6 @@
 # Mesh tips and tricks: expensive scenery
 
-Working findings for v0.0.23-dev5, 29 September 2026. Separate observed
+Working findings through v0.0.24-dev3, 30 September 2026. Separate observed
 performance, source inspection and proposed fixes; update this record after
 native visual checks. A compiling mesh is not proof that its detail is useful.
 
@@ -219,3 +219,224 @@ and inspect both frontal and oblique views. Do not apply one clearance globally:
 too little causes breakthrough, too much can make an attachment visibly float.
 The native emulator trials verify these two views; exhaustive angle and movement
 acceptance remains part of playtesting.
+
+## Balmora missing facades (v0.0.24-dev2)
+
+### 1. Problem and initial suspicion
+
+Most building shells appeared destroyed, with separate signs, doors and trim
+floating in space. Reported cameras: (-669,-768,142), yaw 65, pitch -6;
+(-544,-784,142), yaw 2, pitch -11; and (-1109,-98,256), yaw 180, pitch -15.
+The initial question was whether building bodies were stored elsewhere and
+had been omitted, while their attachments were exported.
+
+### 2. Inspected cause
+
+The bodies are present in the owned NIF meshes and private scenery archive.
+For example, reference 6867 uses `meshes/x/ex_hlaalu_b_07.nif`. The generic
+200-triangle reduction assigned to architecture reduces its 738 source
+triangles to 309 across 60 material components. The effective count can exceed
+the target because small components remain. Open facade components lose their
+boundaries and large parts of the wall; separate placed decorations survive.
+
+An isolated native comparison changed only visual reduction, keeping terrain,
+placement, source collision, textures and engine fixed. The reduced version
+loses the facade; the original geometry restores it. This rules out missing
+source files as the cause of that defect. Disabling far culling in a separate
+experiment also exhausted the renderer surface pool, but that is a distinct
+limit, not the cause of the isolated facade destruction.
+
+### 3. Fix and validation
+
+`tools/balmora_regions.py:visual_profile` now preserves original architecture
+and manufactured props. Organic prop reductions have separate limits. Retain
+structural boundaries rather than assigning every mesh the same triangle quota.
+All 64 regions have been rebuilt. Overlap is 896 instead of 1024, retaining the
+540-unit draw distance and 96-unit hysteresis with diagonal coverage. All 1,488
+scenery reference IDs remain covered; the maximum resident count is 654.
+
+The restored original bm019 region repaired the first two reported native views,
+with no surface/edge overflow (5,975 peak surface fragments, 11,320 edges).
+Final dev2 full-scene captures and memory results are recorded in
+[the investigation record](INVESTIGATION-v0.0.24-dev2.md). This does not certify
+every facade in the city. The dev1 visual inspection was insufficient: reference
+counts and successful collision checks did not establish intact visible meshes.
+
+### Owner playtest, 30 September 2026, v0.0.24-dev2
+
+The owner reports that Balmora's exteriors now look pretty good and, ironically,
+seem faster than Seyda Neen's exteriors on the same less-capable machine. This is
+positive exterior playtest feedback, not a matched frame-time benchmark or a
+claim that every asset is correct. The Balmora Silt Strider still has visibly
+broken/reduced geometry at (96,-1445,71), yaw 204, pitch -27; it is being compared
+with the better-looking Seyda Neen conversion separately.
+
+Investigate splitting Seyda Neen into smaller resident sub-cells, using the
+Balmora approach as a candidate. First compare matched views and costs; preserve
+the authored opening, barriers, NPC state, doors and continuous exterior feel.
+The perceived speed difference alone does not establish subdivision as its cause.
+
+## Balmora underpasses and global player height (v0.0.24-dev2)
+
+### 1. Problem and initial suspicion
+
+The player could not enter two visibly open passages at (-455,-22,142), yaw 89,
+and (-419,722,210), yaw 92. The owner also reports feeling too tall throughout
+Seyda Neen, so this is not solely a Balmora concern. Suspected causes were an
+oversized player, a high camera, or conversion filling the openings.
+
+### 2. Inspected collision cause
+
+Standing-hull traces identify reference 32701, `meshes/x/ex_hlaalu_bridge_07.nif`,
+and reference 5970, `meshes/x/ex_velothi_temple_02.nif`. Both have authored
+`RootCollisionNode` geometry. The multipart convex approximation closes parts
+of their concave openings. The visual facade reduction is a separate defect.
+
+Isolated terrain-plus-building comparisons retain the same 14.64 x 14.24 x
+33.25 standing player. Old collision blocks the bridge approach near y=10 and
+the temple approach near y=816. Preserving the authored collision surfaces
+allows that same player along the sampled paths y=-22..138 and y=722..882.
+Rounded HUD coordinates may place a diagnostic start slightly inside the floor;
+the scan first finds ground support and advances with bounded floor following.
+
+### 3. Collision fix and limits
+
+Those two mesh profiles now use `hollow_collision`: thin convex prisms follow
+the actual source surfaces instead of enclosing the arch in a solid volume.
+The bridge uses 54 surface pieces instead of 14 approximated volumes; the temple
+uses 159 instead of 23. Fifteen affected resident regions were rebuilt. The
+player's physical dimensions remain unchanged. The isolated collision comparison
+also held eye height fixed. Full-scene native
+walking results are recorded in the investigation record. Other collision
+proxies remain approximate; do not treat these two repairs as universal proof.
+
+### 4. Global physical dimensions: runtime measurement
+
+The owner specifically requested player dimensions versus world scale, not a
+field-of-view explanation. A native calibration room therefore checks the actual
+movement sweeps, independently of the constants printed by the engine. Its inner
+walls are x/y=-64..64 and floor/ceiling z=0..60, compiled through the same world
+standing-hull pipeline. Body-versus-point stopping differences measure half sizes
+7.320, 7.120 and 16.625 on both sides. The effective body is **14.64 x 14.24 x
+33.25**, with no extra vertical expansion or centre offset. Original full bounds
+58.56 x 56.96 x 133 use the same 0.25 scale as scenery and terrain.
+
+A separate triangle/AABB check uses the original visual and RootCollisionNode
+triangles, bypassing the converted convex proxies. The existing 33.25-high body
+fits both sampled source passages; 40 also fits. Positive controls do collide:
+60 blocks in the bridge and 50 in the temple. Together with the old/new proxy
+comparison, this establishes a conversion obstruction at these two locations.
+It does not certify every opening, dynamic movement, or the overall height feel.
+
+### 5. Confirmed global eye-height error and correction
+
+Dev1 gives every character a fixed Nord eye, 33.0588 units above the feet, even
+though the owned pre-creation Player is Dark Elf and the creator offers other
+races and sexes. Race height is real source data: Nord is 1.06, Dark Elf and
+Imperial 1.00, and High Elf 1.10 for both sexes.
+
+Dev2 exports the first-person Camera bone in the ordinary idle pose, then applies
+the owned race/sex height. The prior sample was an armed idle; its small pose
+difference is 0.0113 unscaled runtime units, separate from the 6% Nord multiplier.
+
+| Proportions | Source multiplier | New eye above feet |
+| --- | --- | --- |
+| Nord male/female | 1.06 | 33.047 |
+| Dark Elf / Imperial | 1.00 | 31.176 |
+| Breton female | 0.95 | 29.617 |
+| Wood Elf male | 0.90 | 28.059 |
+| High Elf male/female | 1.10 | 34.294 |
+
+An optional AWE1 trailer in the character catalogue supplies these values and the
+pre-creation race/sex. Acceptance applies the selected eye; scene entry and save
+restoration reapply it. Older catalogues retain the map fallback. This changes
+the eye height only; the verified base collision box is retained. Native dev2
+reports 31.176 before creation. Exact animated original-game camera parity and
+the owner's assessment of the resulting proportions remain open.
+
+The owner prefers **90-degree Quake FOV and Quake bob**. Both remain unchanged.
+A potential FOV slider is only a performance-gated roadmap option; it is not the
+physical-size fix. See [player movement](PLAYER_MOVEMENT.md) and
+[roadmap](ROADMAP.md#optional-field-of-view-control).
+
+## Balmora Silt Strider — dev3 correction, 30 September 2026
+
+**Observed:** dev2 exterior buildings now look okay overall, but the Strider is
+fragmented into disconnected strips. Owner position: XYZ 96 -1445 71, yaw 204,
+pitch -27. Seyda Neen's Strider looked better.
+
+**Inspected cause:** both use the same original `meshes/r/siltstrider.nif`
+(5,600 triangles, 119 material components). Balmora's organic-model branch used
+a target of 400 triangles and 32 px textures. Seyda Neen already used a 0.5
+reduction ratio and 64 px textures. The aggressive per-component reduction loses
+large parts of the body and legs; this is not a missing facade/source-path issue.
+
+**Fix:** Balmora now reads the canonical Seyda Neen profile from
+`config/scenery_groups.json`. The actual reduced result rises from 1,162 to 3,057
+triangles and 1,222 to 3,266 prepared surface patches; small retained material
+components explain why the old result exceeded its nominal target. Rebuild the
+16 overlapping regions intersecting the placement, not the other 48 maps.
+
+**Validation and cost:** native inspection at the reported view restores the body
+and main legs. Every affected map's collision nodes with resolved planes and its
+entity lump match dev2; unaffected maps match byte-for-byte. Source collision
+still has 386 authored triangles converted to 34 parts. The matched region uses
+389,824 more hunk bytes (380.7 KiB). A single 141-frame A/B observation recorded
+7,113 / 8,955 ms elapsed and 6,357 / 8,182 ms world rendering; these sequential
+host observations are not a controlled universal FPS comparison. More retained
+geometry has a cost. Neither run overflowed surfaces or edges. Do not claim a
+zero-cost fix, perfect original-model fidelity or global performance acceptance.
+
+## Balmora black boundary flashes — dev3 loading presentation
+
+**Observed:** black flashes while roaming; owner requested a held gameplay frame
+and a small top Loading box, retaining the existing load method.
+
+**Inspected cause:** `AW_SceneTick` explicitly requested `AW_LOADING_BLANK` on
+region crossings. Loading replaces the resident BSP synchronously. This confirms
+the blank transition path; it does not diagnose every possible future black flash.
+
+**Fix:** Options → Area loading selects Freeze frame (default) or Black screen.
+`aw_region_loading 1/0` is archived. Freeze captures the most recent framebuffer
+once per crossing into the existing loading-art pixel bank. It preserves the
+current palette, draws a small top-centred box, avoids rendering an unloaded
+world and remains stable across reconnect/signon. The first ready frame resumes
+normal rendering and refreshes the palette. Invalid/oversized snapshots fall
+back to blank. Ordinary travel/loading artwork and intro-to-ship blank loading
+retain their previous behavior. The loading timeout also releases the style.
+
+**Validation:** host checks cover padded rows, guarded bounds, repeated plaques,
+unchanged pixels outside the box, size changes/null buffer fallback, palette
+retention/release and menu keyboard/mouse selection. Native freeze → black →
+freeze crossings complete, with captures showing the held view/top box and no
+surface/edge overflow. Music servicing remains active. Native PCX screenshot
+commands encode the base palette, so the blank screenshot appears as base index
+zero; the actual blank display uses an all-black palette. This is presentation,
+not asynchronous loading: measured native swaps still take hundreds of ms.
+
+## Balmora dev5: separate image ordering from physical collision
+
+The original and prepared stair/arch polygons were intact; native dark strips
+remained even in flat shading. Changing depth tolerance, integer-edge sampling
+or splitting intersecting polygons did not solve the inspected image. A span
+can change its nearest mesh surface between edge events. Splitting at that depth
+crossing fixes the recorded stairs/arches and Census courtyard wall views.
+
+Independently, open stair recesses need shell collision. Offsetting face and
+axial planes alone still overfills oblique edges when expanded by the standing
+box. Full convex sums of each shell prism with the reflected player box add
+the missing edge bevels offline. Runtime clip nodes remain standard. Apply the
+profile to inspected models, enforce node/memory limits, then walk both ways
+through multiple placements. Keep collision dimensions distinct from race/sex
+eye height and field of view. Details: `INVESTIGATION-v0.0.24-dev5.md`.
+
+## Large room collision unions: index before flattening
+
+The prison shell's 1,205 pieces made server time roughly as expensive as drawing
+the cabin. `collision_index.py` adds a bounds hierarchy to the existing compiled
+union, preserving source piece planes and empty/solid leaves. It verifies axial
+standing bounds before using them, retains the lowest-index root required by
+Quake, and enforces node limits. Apply only to the inspected ship shell for now.
+Sampled classification equivalence and native same-view server timing validate
+the improvement. Do not call a process exit a successful native test when
+`ERROR.TXT` exists or no gameplay frames were produced.

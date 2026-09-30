@@ -15,24 +15,33 @@ Commodore Amiga.**
 
 ## Current state of the project
 
-**AmiWind v0.0.23** restores all four facade windows and adds Darvame's destination menu and boolean HUD aliases. It retains flat textured windows, sentence-aware speech pages,
-painted-glyph centering and the restored F10 half/full console cycle. Target names
-default below the viewport, above Talk: E. See the
-[mesh investigation and measurements](docs/MESH_TIPS_AND_TRICKS.md). The expanded
-Seyda Neen area retains all **13 town interiors**, nearby **Addamasartus**, the
-prison ship, and the original **Silt Strider and Darvame Hleran** at the port.
-The local cast now includes 30 ordinary
-NPC placements / 27 appearances alongside the scripted introduction actors.
-NPCs have solid bodies; interior furniture, lights and original door destinations
-are converted from your own game data.
+**AmiWind v0.0.24-dev5** corrects inspected Balmora stairs and native surface
+ordering behind jagged arches and missing courtyard wall strips. It also repairs
+the inspected guard chest, road tile and small gold font strokes. Seyda Neen's
+centre stays together in one core, with the northern edge at the bridge.
+`dbg aw hors 0` creates a Nord / Barbarian / The Steed test character after Census;
+`dbg tp balmora` creates it if no character exists. Appearance starts on Race and
+has clickable gold arrows. The default debug banner uses the compact font.
+See [scope and validation](docs/RELEASE-v0.0.24-dev5.md).
+Balmora's accepted dev3 Strider, frozen-frame Loading... box, Shift+V shortcut,
+Quake 90-degree FOV, player dimensions and bob remain.
 
-The dev2 **interior inspection** coverage is retained. All 16 scenes loaded in the
-reference emulator, and the Tradehouse front door has been tested in both
-directions. This does not certify every floor, stair or door. Cave lighting is
-still basic; full dialogue, voice cycles, NPC services, inventory and combat remain
-unfinished. The Strider has a destination menu; rides remain unavailable until destination maps are added.
-See the [checkpoint evidence and limits](docs/RELEASE-v0.0.23.md) and
-[29 September roadmap](docs/PLAN-2026-09-29.md).
+The Balmora exterior expansion includes original terrain,
+1,488 scenery placements, 18 residents, and travel from Darvame with a return
+route through Selvil. The exterior uses 64 overlapping sub-cells. Static scenery
+has its own rendering/collision catalogue, leaving game entity slots for actors.
+Boundary changes currently pause to load the next BSP; background streaming is
+still planned. See the [original Balmora scope](docs/BALMORA-v0.0.24-dev1.md).
+
+The existing Seyda Neen area, 13 town interiors, Addamasartus, prison ship,
+opening sequence and interface options are retained. Balmora interiors, creature
+simulation, wandering, combat, services and the remaining Strider routes are
+unfinished. This development ride does not charge a fare. The default exterior
+fog distance is the maximum currently supported by the Balmora and Seyda Neen region overlap.
+
+Earlier inspection evidence is recorded in [v0.0.23](docs/RELEASE-v0.0.23.md)
+and the [mesh notes](docs/MESH_TIPS_AND_TRICKS.md). Converted collision remains
+approximate; loading an area does not certify every stair, roof or doorway.
 
 The startup logo fades in for two seconds, holds five, then fades out for one,
 with theme music from the start; Space/Enter/Esc skips. New Game plays the optional
@@ -229,12 +238,12 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.23-dev2 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.24-dev1 configuration template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.23-dev2-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.23-dev2-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.24-dev1-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.24-dev1-WinUAE.uae) |
 
-1. Build `AmiWind-v0.0.23-dev2.hdf` from your own Morrowind installation using the
+1. Build `AmiWind-v0.0.24-dev1.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
    playable game image.
 2. Install an emulator from its official homepage above and save a local copy

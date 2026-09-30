@@ -6,12 +6,21 @@
 #include "aw_save.h"
 #include "aw_maps.h"
 #include "aw_story.h"
+#include "aw_region.h"
+#include "aw_character.h"
 #include "amiwind_version.h"
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
-static aw_scene_link_t links[64];static int count,loaded,pending;
+static aw_scene_link_t links[128];static int count,loaded,pending;
 static aw_scene_link_t next;
+static int links_balmora;
+static double door_ready;
+static aw_scene_link_t opening_door;
+static unsigned door_close;
 static float health,hand_goal;
 static double started;
+static int region_crossing;
+static vec3_t crossing_angles,crossing_velocity;
+static float crossing_movetype;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
 static cvar_t intro_docks_variant={"intro_docks_variant","2",true};
 static cvar_t target_names={"aw_target_names","1",true};
@@ -55,7 +64,9 @@ const char *AW_SceneTargetName(void) {
     return pr_strings+e->v.netname;
 }
 const char *AW_SceneWorldModel(const char *name) {
-    FILE *f=NULL;
+    FILE *f=NULL;const char *region;
+    region=AW_RegionWorldModel(name,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE);
+    if(region)return region;
     if(!strcmp(name,"seyda") && intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE){
         if(COM_FOpenFile("maps/intro_docks.bsp",&f)>=0 && f){fclose(f);return "maps/intro_docks.bsp";}
@@ -64,16 +75,18 @@ const char *AW_SceneWorldModel(const char *name) {
     }
     return NULL;
 }
-int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda");}
-static int map_valid(char *name) {return AW_MapId(name)>=0;}
-static void read_links(void) {
+int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora");}
+static int map_valid(const char *name) {return AW_MapId(name)>=0;}
+static void read_links_for(int balmora) {
     FILE *f;char line[384],extra;aw_scene_link_t r;int n,i,version;
-    if(loaded)return;loaded=1;
-    if(COM_FOpenFile("scene-doors.txt",&f)>=0 && f) {
+    i=balmora;
+    if(loaded && links_balmora==i)return;
+    links_balmora=i;loaded=1;count=0;
+    if(COM_FOpenFile(links_balmora?"scene-doors-balmora.txt":"scene-doors.txt",&f)>=0 && f) {
         if(!fgets(line,sizeof(line),f)){fclose(f);return;}
         version=!strcmp(line,"AWD3\n")?3:!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
         if(!version){fclose(f);return;}
-        while(count<64 && fgets(line,sizeof(line),f)) {
+        while(count<128 && fgets(line,sizeof(line),f)) {
             memset(&r,0,sizeof(r));
             if(version==3)n=sscanf(line,"%15s %15s %u %f %f %f %f %f %f %f %f %f %f %95[^\r\n]",r.source,r.target,&r.reference,
                 &r.mins[0],&r.mins[1],&r.mins[2],&r.maxs[0],&r.maxs[1],&r.maxs[2],
@@ -91,8 +104,9 @@ static void read_links(void) {
         }
         fclose(f);return;
     }
+    if(links_balmora)return;
     if(COM_FOpenFile("scene-links.txt",&f)<0 || !f)return;
-    while(count<64 && fgets(line,sizeof(line),f)) {
+    while(count<128 && fgets(line,sizeof(line),f)) {
         memset(&r,0,sizeof(r));
         n=sscanf(line,"%15s %15s %f %f %f %f %f %f %f %c",r.source,r.target,
             &r.point[0],&r.point[1],&r.point[2],&r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,&extra);
@@ -103,14 +117,19 @@ static void read_links(void) {
     }
     fclose(f);
 }
-static void load_scene(aw_scene_link_t *link) {
+static void read_links(void){read_links_for(!strcmp(sv.name,"balmora"));}
+static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;eval_t *v;char command[32];
-    if(pending || !map_valid(link->target))return;next=*link;pending=1;started=Sys_FloatTime();
+    if(pending || !map_valid(link->target))return;
+    if(!AW_RegionSelect(link->target,link->arrival,intro_docks_variant.value==2 &&
+       aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
+    next=*link;pending=1;started=Sys_FloatTime();
     AW_SaveCapture();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
     IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
     Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
-    sprintf(command,"map %s\n",next.target);Cbuf_AddText(command);
+    sprintf(command,"map %s\n",next.target);
+    if(immediate)Cbuf_InsertText(command);else Cbuf_AddText(command);
 }
 /* Ray/slab intersection with converted model bounds. The model origin may
  * be buried in the ceiling or far from the visible handle/hatch surface. */
@@ -148,9 +167,10 @@ static int aimed_door(void) {
 /* Travel stays unavailable until the destination has a validated arrival
  * and map registration. A stray BSP file alone must never enable a paid ride. */
 static int travel_open,travel_choice;
+static int travel_return,travel_count=5;
 static const char *travel_names[]={"Balmora","Gnisis","Suran","Vivec","Cancel"};
 static const char *travel_message;
-static int travel_use(void) {
+static edict_t *travel_target(void) {
     edict_t *p,*e;trace_t tr;vec3_t eye,end,forward,right,up;
     if(!sv.active || svs.maxclients!=1 || !svs.clients ||
        cls.state!=ca_connected || key_dest!=key_game || AW_StoryRestricted())return 0;
@@ -161,30 +181,45 @@ static int travel_use(void) {
     tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
     if(tr.startsolid || !e || e->free ||
        strcmp(pr_strings+e->v.classname,"aw_npc") ||
-       strcmp(pr_strings+e->v.netname,"Darvame Hleran"))return 0;
+       (strcmp(pr_strings+e->v.netname,"Darvame Hleran") && strcmp(pr_strings+e->v.netname,"Selvil Sareloth")))return 0;
+    if(!strcmp(sv.name,"balmora") && !strcmp(pr_strings+e->v.netname,"Selvil Sareloth"))return e;
+    if(!strcmp(sv.name,"seyda") && !strcmp(pr_strings+e->v.netname,"Darvame Hleran"))return e;
+    return NULL;
+}
+static int travel_use(void) {
+    edict_t *e=travel_target();
+    if(!e)return 0;
+    travel_return=!strcmp(sv.name,"balmora");
+    travel_count=travel_return?2:5;
     travel_open=1;travel_choice=0;travel_message=NULL;
     key_dest=key_menu;IN_AWClearButtons();return 1;
 }
 int AW_TravelKey(int key) {
     if(!travel_open)return 0;
     if(!sv.active || key_dest!=key_menu){travel_open=0;return 0;}
-    if(key==K_ESCAPE || (key==K_ENTER && travel_choice==4)){
+    if(key==K_ESCAPE || (key==K_ENTER && travel_choice==travel_count-1)){
         travel_open=0;key_dest=key_game;IN_AWClearButtons();return 1;
     }
-    if(key==K_UPARROW || key=='w'){travel_choice=(travel_choice+4)%5;travel_message=NULL;}
-    if(key==K_DOWNARROW || key=='s'){travel_choice=(travel_choice+1)%5;travel_message=NULL;}
-    if(key==K_ENTER)travel_message="Destination not found.";
+    if(key==K_UPARROW || key=='w'){travel_choice=(travel_choice+travel_count-1)%travel_count;travel_message=NULL;}
+    if(key==K_DOWNARROW || key=='s'){travel_choice=(travel_choice+1)%travel_count;travel_message=NULL;}
+    if(key==K_ENTER){
+        aw_scene_link_t r;memset(&r,0,sizeof(r));
+        if(travel_choice==0 && AW_BalmoraArrival(travel_return,r.arrival,&r.yaw)){
+            strcpy(r.target,travel_return?"seyda":"balmora");
+            travel_open=0;key_dest=key_game;load_scene(&r,0);
+        }else travel_message="Destination not found.";
+    }
     return 1;
 }
 int AW_TravelDraw(void) {
     int i;char line[96];
     if(!travel_open || key_dest!=key_menu)return 0;
     AW_UIBox(18,18,284,170);AW_UISmallBegin();
-    AW_UITextBox(26,23,268,20,"Silt Strider: Darvame Hleran",-1);
+    AW_UITextBox(26,23,268,20,travel_return?"Silt Strider: Selvil Sareloth":"Silt Strider: Darvame Hleran",-1);
     sprintf(line,"Your gold: %ld",(long)AW_StateGet(&aw_state,AW_ITEM,"gold_001"));
     AW_UITextBox(26,44,268,16,line,-1);
-    for(i=0;i<5;i++){
-        sprintf(line,"%s%s",i==travel_choice?"> ":"  ",travel_names[i]);
+    for(i=0;i<travel_count;i++){
+        sprintf(line,"%s%s",i==travel_choice?"> ":"  ",travel_return?(i?"Cancel":"Seyda Neen"):travel_names[i]);
         AW_UITextBox(40,63+i*17,240,17,line,-1);
     }
     AW_UITextBox(26,153,268,16,travel_message?travel_message:"Arrows: select  Enter: choose",-1);
@@ -192,8 +227,8 @@ int AW_TravelDraw(void) {
     AW_UISmallEnd();return 1;
 }
 int AW_SceneUse(void) {
-    int i;FILE *f=NULL;char path[40];if(pending)return 1;if(travel_use())return 1;i=aimed_door();if(i<0)return 0;
-    if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
+    int i;float duration;FILE *f=NULL;char path[40];if(pending || door_ready)return 1;if(travel_use())return 1;i=aimed_door();if(i<0)return 0;
+    if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     sprintf(path,"maps/%s.bsp",links[i].target);
     if(!map_valid(links[i].target) || COM_FOpenFile(path,&f)<0 || !f){
@@ -201,7 +236,11 @@ int AW_SceneUse(void) {
     }
     fclose(f);
     if(AW_StoryRestricted() && links[i].reference==119659)AW_StoryTransition(AW_STAGE_RELEASED);
-    load_scene(&links[i]);return 1;
+    duration=AW_DoorSound(links[i].reference,0);
+    if(duration>0){
+        opening_door=links[i];door_ready=realtime+(duration>1?1:duration);
+    }else {door_close=links[i].reference;load_scene(&links[i],0);}
+    return 1;
 }
 /* Match the manual QC greeting selector, including its voice cooldown and
  * scripted-actor exclusion. This only labels greetings supported by that path. */
@@ -215,6 +254,8 @@ static const char *npc_hint(void)
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);if(e->free || !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
+        v=GetEdictFieldValue(e,"aw_intro_role");if(v && v->_float)continue;
+        v=GetEdictFieldValue(e,"aw_voice");if(!v || !v->string)continue;
         VectorCopy(e->v.origin,point);point[2]+=27;VectorSubtract(point,eye,delta);distance=Length(delta);
         if(distance<=.1f || distance>=closest || DotProduct(delta,forward)/distance<=.65f)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NOMONSTERS,p);
@@ -222,29 +263,27 @@ static const char *npc_hint(void)
         closest=distance;best=e;
     }
     if(!best)return NULL;
-    /* Identity is independent of the greeting cooldown. Only advertise Talk
-     * when the manual greeting candidate is also the NPC under the crosshair. */
-    VectorMA(eye,96,forward,point);tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NORMAL,p);
-    if(tr.ent!=best || tr.startsolid || tr.allsolid)return NULL;
-    v=GetEdictFieldValue(best,"aw_intro_role");if(v && v->_float)return NULL;
-    v=GetEdictFieldValue(best,"aw_voice");if(!v || !v->string)return NULL;
+    /* The manual greeting uses this clear near-facing candidate, not an exact
+     * ray against the actor's shorter physical box. Keep the hint equivalent. */
     return pr_strings+best->v.netname;
 }
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
-    int i,y,w,cw,npc=0;char line[80];const char *name=NULL,*action=NULL;extern int scr_copyeverything;
+    int i,y,w,cw,npc=0;char line[80];edict_t *driver;const char *name=NULL,*action=NULL;extern int scr_copyeverything;
     if(!AW_UISpeakerAtRight() || target_style.value!=2)AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
     if(key_dest!=key_game || pending || AW_IntroUse() || !sv.active ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
-    if(!AW_OpeningHint(&name,&action)){
+    driver=travel_target();
+    if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
+    else if(!AW_OpeningHint(&name,&action)){
         i=aimed_door();
         if(i>=0){
             name=links[i].label[0]?links[i].label:!strcmp(links[i].target,"seyda")?"Seyda Neen":"Imperial Prison Ship";
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
                 !map_valid(links[i].target)?"Interior unavailable":"Enter: E";
-        }else{ name=npc_hint();if(name){action="Talk: E";npc=1;} }
+        }else{ name=npc_hint();if(name){action="E: Talk";npc=1;} }
     }
     if(!name)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;
@@ -289,33 +328,109 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
     Con_Printf("Interior spawn blocked; use dbg noclip to inspect.\n");return 0;
 }
 void AW_SceneSpawn(edict_t *p) {
-    eval_t *v;int placed=0;
+    eval_t *v;int placed=0;float eye;
+    door_ready=0;
     if(pending && !strcmp(sv.name,next.target)) {
-        placed=AW_InteriorPlace(p,next.arrival);
+        if(region_crossing){
+            VectorCopy(next.arrival,p->v.origin);VectorCopy(next.arrival,p->v.oldorigin);
+            VectorCopy(crossing_angles,p->v.angles);VectorCopy(crossing_velocity,p->v.velocity);
+            p->v.movetype=crossing_movetype;p->v.fixangle=1;SV_LinkEdict(p,false);placed=1;
+        }else placed=AW_InteriorPlace(p,next.arrival);
         p->v.angles[0]=0;p->v.angles[1]=next.yaw;p->v.angles[2]=0;p->v.fixangle=1;
+        if(region_crossing)VectorCopy(crossing_angles,p->v.angles);
         p->v.health=health;v=GetEdictFieldValue(p,"aw_hand_goal");if(v)v->_float=hand_goal;
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
         AW_MusicSceneEvent("scene-enter");pending=0;
     } else {
-        pending=0;if(AW_Interior())AW_InteriorPlace(p,p->v.origin);else AW_PlacePlayer(p,p->v.origin);
+        pending=0;
+        if(AW_Interior() || !strcmp(sv.name,"balmora"))AW_InteriorPlace(p,p->v.origin);
+        else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();region_crossing=0;
+    if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
+}
+void AW_SceneTick(void) {
+    aw_scene_link_t r;edict_t *p;
+    if(door_ready){
+        if(!sv.active || strcmp(sv.name,opening_door.source)){door_ready=0;return;}
+        if(realtime>=door_ready){door_ready=0;door_close=opening_door.reference;load_scene(&opening_door,0);}
+        return;
+    }
+    if(door_close && !pending && cls.state==ca_connected && cls.signon==SIGNONS){
+        AW_DoorSound(door_close,1);door_close=0;
+    }
+    if(pending || !sv.active || cls.state!=ca_connected || cls.signon!=SIGNONS || key_dest!=key_game ||
+       svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
+       p->v.health<=0 || (p->v.movetype!=MOVETYPE_WALK && p->v.movetype!=MOVETYPE_NOCLIP) ||
+       !AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
+    memset(&r,0,sizeof(r));strcpy(r.target,sv.name);VectorCopy(p->v.origin,r.arrival);r.yaw=p->v.angles[1];
+    VectorCopy(p->v.v_angle,crossing_angles);VectorCopy(p->v.velocity,crossing_velocity);crossing_movetype=p->v.movetype;
+    region_crossing=1;
+    AW_SetNextLoadingStyle(AW_RegionLoadingFrozen()?AW_LOADING_FROZEN:AW_LOADING_BLANK);
+    load_scene(&r,1);
 }
 static void scene_command(void) {
-    aw_scene_link_t r;char *s=Cmd_Argv(1);int i;
+    aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];FILE *f=NULL;int i,size;
+    if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
+       !Q_strcasecmp((char *)s,"town"))s="town";
+    else if(!Q_strcasecmp((char *)s,"ship") || !Q_strcasecmp((char *)s,"prisonship"))s="ship";
+    else for(i=0;i<AW_MAP_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_MapName(i))){s=AW_MapName(i);break;}
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
-        Con_Printf("Usage: dbg scene ship/town/<map name>, or dbg scene change\n");return;
+        Con_Printf("During play: dbg tp balmora/seydaneen/prisonship/<map name>; dbg tp opens the menu.\n");return;
     }
+    door_ready=0;door_close=0;
+    sprintf(path,"maps/%s.bsp",!strcmp(s,"ship")?"prison":!strcmp(s,"town")?"seyda":s);
+    size=COM_FOpenFile(path,&f);if(f)fclose(f);
+    if(!f || size<124){Con_Printf("Destination not found: %s.\n",s);return;}
     if(map_valid(s)){
-        read_links();
-        for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){load_scene(&links[i]);return;}
+        if(!strcmp(s,"balmora")){
+            memset(&r,0,sizeof(r));strcpy(r.target,"balmora");
+            if(AW_BalmoraArrival(0,r.arrival,&r.yaw)){
+                if(!aw_character.valid || !aw_story.name[0]){
+                    if(!AW_CharacterHors()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
+                    AW_SaveReset();svs.clients[0].edict->v.health=aw_character.current[0];
+                    svs.clients[0].edict->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
+                    Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");
+                }
+                load_scene(&r,1);
+            }
+            else Con_Printf("Balmora conversion not found.\n");
+            return;
+        }
+        /* Supported non-Balmora destinations use the Seyda entrance catalogue,
+         * including when teleporting there from Balmora. Normal door lookups
+         * reload the current area's catalogue on the next interaction. */
+        read_links_for(0);
+        /* The catalogue's first Census entry is a separate upper doorway.
+         * Debug arrival uses the inspected registration entrance from the pier. */
+        if(!strcmp(s,"census"))for(i=0;i<count;i++)
+            if(links[i].reference==113893 && !strcmp(links[i].target,s)){
+                load_scene(&links[i],1);return;
+            }
+        for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){load_scene(&links[i],1);return;}
         Con_Printf("No converted entrance to %s.\n",s);return;
     }
     memset(&r,0,sizeof(r));strcpy(r.target,!strcmp(s,"ship")?"prison":"seyda");
     if(!strcmp(s,"ship")){r.arrival[1]=-35;r.arrival[2]=-4;r.yaw=90;}
     else {r.arrival[0]=0;r.arrival[1]=0;r.arrival[2]=64;r.yaw=90;}
-    load_scene(&r);
+    load_scene(&r,1);
+}
+static void hors_command(void) {
+    aw_scene_link_t r;
+    if(!sv.active || !svs.clients || pending || Cmd_Argc()!=2 || strcmp(Cmd_Argv(1),"0")){
+        Con_Printf("During play: dbg aw hors 0 (restart after Census in Seyda Neen)\n");return;
+    }
+    if(!AW_CharacterHors()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
+    door_ready=0;door_close=0;
+    AW_SaveReset();svs.clients[0].edict->v.health=aw_character.current[0];
+    svs.clients[0].edict->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
+    memset(&r,0,sizeof(r));strcpy(r.target,"seyda");r.arrival[2]=64;r.yaw=90;
+    Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");load_scene(&r,1);
+}
+static void teleport_command(void) {
+    if(Cmd_Argc()==1 && sv.active){Cbuf_InsertText("aw_scene_menu\n");return;}
+    scene_command();
 }
 static void demo_start(void) {
     FILE *f;
@@ -334,6 +449,7 @@ static void demo_start(void) {
     }
 }
 void AW_SceneInit(void) {
+    Cmd_AddCommand("aw_debug_hors",hors_command);
     Cvar_RegisterVariable(&intro_docks_variant);
     Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);
     Cvar_RegisterVariable(&label_style);Cmd_AddCommand("aw_label_style",label_style_command);
@@ -341,5 +457,6 @@ void AW_SceneInit(void) {
     Cmd_AddCommand("aw_door_status",door_status);
     Cvar_RegisterVariable(&early_game_demo_start_1);
     Cmd_AddCommand("aw_scene",scene_command);
+    Cmd_AddCommand("aw_teleport",teleport_command);
     Cmd_AddCommand("aw_demo_start",demo_start);
 }

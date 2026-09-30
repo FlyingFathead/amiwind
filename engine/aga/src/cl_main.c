@@ -656,6 +656,7 @@ int CL_ReadFromServer (void)
 		Con_Printf ("\n");
 
 	CL_RelinkEntities ();
+    AW_SceneryLink();
 	AW_SpeechRelink();
 	CL_UpdateTEnts ();
 

@@ -3,7 +3,9 @@
 #include <assert.h>
 keydest_t key_dest;qboolean keydown[256];viddef_t vid;server_t sv;int scr_copyeverything;
 byte pixels[320*200];int clears,quit,changes,missing,intro_missing;
-static int distance=540,gold_frame;
+static int distance=540,gold_frame,frozen_loading=1;
+int AW_RegionLoadingFrozen(void){return frozen_loading;}
+void AW_RegionLoadingToggle(void){frozen_loading=!frozen_loading;}
 static void (*picker)(void),(*front)(void);static char queued[64];
 static int mx=160,my=63;
 int AW_UIFrameEnabled(void){return gold_frame;}
@@ -38,7 +40,7 @@ int main(void){
  M_Keydown(K_ESCAPE);assert(!changes);M_Keydown(K_ENTER);M_Keydown(K_LEFTARROW);M_Keydown(K_ENTER);assert(!changes);
  M_Keydown(K_ENTER);M_Keydown(K_ENTER);
  assert(changes==1 && !strcmp(queued,"aw_new_game\n") && key_dest==key_game);
- open_pause();click(100,54+4*19+18);M_Draw(); /* last pixel in Options */
+ open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw(); /* last pixel in Options */
  M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
  M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(gold_frame);
@@ -49,7 +51,11 @@ int main(void){
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
- M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_UPARROW);M_Keydown(K_ESCAPE);
+ M_Draw();M_Keydown(K_ESCAPE);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
+ M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
+ click(100,149+18);assert(frozen_loading); /* final pixel of the new loading row */
+ click(100,168);M_Draw(); /* Back starts at the next pixel */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);assert(changes==1);
  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
  assert(changes==2 && !strcmp(queued,"disconnect\naw_main_menu\n"));

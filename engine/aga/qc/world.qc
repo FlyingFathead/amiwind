@@ -117,7 +117,8 @@ void() aw_npc_idle = {
     if (time < self.aw_next_poll) return;
     self.aw_next_poll = time + 0.25;
     distance = vlen(delta);
-    if (distance >= self.aw_hello_reset) self.aw_hello_done = 0;
+    if (distance >= self.aw_hello_reset && distance >= self.aw_hello_distance)
+        self.aw_hello_done = 0;
     if (self.aw_hello_done || self.aw_hello_distance <= 0 ||
         distance >= self.aw_hello_distance || aw_player.health <= 0 ||
         aw_player.movetype != 3 || aw_player.waterlevel >= 2) {
@@ -171,7 +172,7 @@ void() aw_interact = {
     while (npc != world) {
         delta = npc.origin + '0 0 27' - eye;
         distance = vlen(delta);
-        if (distance < closest && distance > 0.1) {
+        if (!npc.aw_intro_role && npc.aw_voice != "" && distance < closest && distance > 0.1) {
             if ((delta * v_forward) / distance > 0.65) {
                 traceline(eye,npc.origin + '0 0 27',1,self);
                 if (trace_fraction == 1) { best = npc; closest = distance; }

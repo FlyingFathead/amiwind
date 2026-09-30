@@ -27,7 +27,8 @@ int AW_NavDecode(const byte *data,int size) {
         if(nodes[i].count>n || edge_count+nodes[i].count>512 || at+nodes[i].count*2>size)return 0;
         for(j=0;j<nodes[i].count;j++){edges[edge_count]=u16(data+at);if(edges[edge_count++]>=n)return 0;at+=2;}
     }
-    if(at!=size)return 0;node_count=n;return 1;
+    if(at!=size)return 0;
+    node_count=n;return 1;
 }
 int AW_NavLoad(const char *map) {
     FILE *f=NULL;byte raw[2822];char path[48];int n;
@@ -69,7 +70,8 @@ int AW_NavStep(double dt,int wait_for_player) {
     vec3_t delta,move,target,side;float length,step,angle;eval_t *field;int i,moved;
     static const int avoid[6]={30,-30,60,-60,90,-90};
     if(!walker)return -1;
-    if(dt<=0)return 0;if(dt>.1)dt=.1;
+    if(dt<=0)return 0;
+    if(dt>.1)dt=.1;
     if(wait_for_player){VectorSubtract(walker->v.origin,svs.clients[0].edict->v.origin,delta);
         if(Length(delta)>96){walker->v.frame=0;return 0;}}
     /* The final grid node may lie beyond the requested stop (including inside
@@ -79,6 +81,15 @@ int AW_NavStep(double dt,int wait_for_player) {
         VectorSubtract(destination,walker->v.origin,delta);
         if(delta[0]*delta[0]+delta[1]*delta[1]<25 && fabs(delta[2])<20){
             walker->v.frame=0;field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=0;walker=NULL;return 1;
+        }
+        /* The nearest final grid node is only a routing aid. If the actual
+         * nearby destination is clear, finish there instead of steering into
+         * the Census steps beyond it. Actor avoidance still runs below. */
+        if(route_at<route_count && delta[0]*delta[0]+delta[1]*delta[1]<64*64 && fabs(delta[2])<20){
+            trace_t tr=SV_Move(walker->v.origin,walker->v.mins,walker->v.maxs,destination,MOVE_NOMONSTERS,walker);
+            if(!tr.startsolid && !tr.allsolid && tr.fraction==1){
+                route_at=route_count;best_distance=1e30f;stalled=0;
+            }
         }
     }
     if(route_at<route_count){VectorCopy(nodes[route[route_at]].point,target);}
@@ -103,7 +114,8 @@ int AW_NavStep(double dt,int wait_for_player) {
             player_wait=1;blocked=stalled=0;best_distance=1e30f;walker->v.frame=0;
             field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=0;return 0;
         }
-        if(player_wait)Con_Printf("Escort path clear; resuming.\n");player_wait=0;
+        if(player_wait)Con_Printf("Escort path clear; resuming.\n");
+        player_wait=0;
     }
     walker->v.angles[1]=atan2(delta[1],delta[0])*180/M_PI-90;
     field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=1;

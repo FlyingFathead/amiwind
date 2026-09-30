@@ -1,7 +1,50 @@
 # Roadmap and implementation options
 
-Current work: [29 September 2026 / v0.0.23-dev3](PLAN-2026-09-29.md).
-The dated plan tracks implementation evidence, inspection gates and the next voice checkpoint.
+Current work: [Seyda Neen subdivision and opening follow-up](RELEASE-v0.0.24-dev4.md);
+[Strider and loading presentation](RELEASE-v0.0.24-dev3.md) remains the preceding checkpoint.
+The earlier [29 September plan](PLAN-2026-09-29.md) retains the preceding work.
+
+## Balmora interiors and loading
+
+- [ ] Add Balmora interiors from the original named cells, with two-way door
+  links, valid arrival points, NPCs and stable saved state. Exterior acceptance
+  does not imply that interiors are present.
+- [x] Offer frozen-frame sub-cell loading with a small top Loading box; keep
+  the existing black-screen method selectable. Implemented in dev3.
+- [ ] Profile read/decode stalls and memory ownership before bounded prefetch
+  or offloading. Preserve audio servicing and persistent state when releasing
+  scene resources. Frozen-frame presentation does not remove synchronous pauses.
+
+## Seyda Neen subdivision
+
+Owner feedback: Balmora's dev3 subdivision works surprisingly well; its exterior
+often feels faster than Seyda Neen. Use that successful approach from the first
+ship-exit scene. Performance observations remain separate from measured claims.
+
+- [x] Add 30 regular overlapping Seyda Neen regions, a dedicated compact pier
+  (`intro_seyda_neen_subcell_pier`, file `intro_docks.bsp`) and ring courtyard.
+  Retain complete intersecting objects, stable reference IDs and shared coordinates.
+- [x] Keep the accepted frozen frame with a small top Loading... box; retain
+  the black-screen choice. Physically remove unreferenced BSP data from files.
+- [ ] Complete owner playtest of natural ship/plank/guard/office/courtyard flow,
+  bidirectional seams, containment, save/restore and peripheral views.
+- [ ] Profile matched views and transition stalls on the owner's weaker machine;
+  investigate the view-dependent distance-1000 speed-up. Keep the prison ship's
+  interior cost separate. Background loading/prefetch remains future work.
+
+## Optional field-of-view control
+
+- [ ] Consider an Options FOV slider, subject to measured performance acceptance.
+  Keep the owner's preferred **90-degree horizontal Quake FOV as the default**.
+  A narrower setting, including 75 degrees, would be an optional preference.
+- [ ] Use the existing runtime projection setting; changing FOV does not require
+  reconverting assets, rebaking collision or rebuilding maps. It does not change
+  the player's dimensions relative to the world and is not a height correction.
+- [ ] Benchmark fixed boat, Seyda Neen and Balmora views on the reference profile
+  before adopting the slider. Compare frame times, surface/edge work and overflow
+  at the proposed limits; wider views can expose more geometry. Proceed only
+  without a measurable default-setting regression and with an acceptable cost
+  across the supported range. Defer the feature if that condition cannot be met.
 
 ## Next implementation milestone agreed 28 September 2026
 
@@ -944,3 +987,152 @@ See the updated [dated plan](PLAN-2026-09-29.md) and
 content-sized dialogue, input/rotation glyphs, startup audio/timing, opening quote,
 tree sprite depth and Darvame's floor placement. The owner accepts the dev3 rock
 fix. Door sounds, containment, complete voice behaviour and sky remain pending.
+
+
+## Next version: world geometry density analysis
+
+**Future-version work, outside the current fixes, by owner request (30 September 2026).**
+Analyze source map placements to identify high- and low-polygon concentrations.
+Produce spatial density maps and ranked areas, counting placed instances as
+well as unique meshes, textures and expected resident data. Compare source and
+converted complexity with actual visible/frame-time cost. Use this evidence
+to guide sub-cell boundaries, overlap and loading/offloading budgets.
+Treat this as a general world-streaming rule: identify the expensive concentrations
+and the inexpensive stretches before choosing boundaries. Keep larger, more
+continuous resident areas where measured cost permits; use tighter sub-cells and
+earlier offloading around demonstrated bottlenecks. Polygon count is an input,
+not a substitute for frame-time, visibility, collision and resident-memory data.
+Begin with Seyda Neen and Balmora, then expand coverage. This is a planning
+item, not part of the current implementation or validation claim.
+
+
+## FIXES NEEDED IN BALMORA
+
+### Jagged doorway arches
+
+Owner report, v0.0.24-dev3, 30 September 2026: many Balmora doorways have
+strongly jagged upper arches. Reference cameras: XYZ1218,-792,120, yaw352,
+pitch-7; XYZ1269,-788,133, yaw343, pitch-18; and XYZ-1012,-939,142,
+yaw204, pitch-5. Screenshots show irregular
+dark strips around the upper door arch.
+
+- [ ] Inspect source arch geometry, wall/door overlap and converted polygons;
+  distinguish conversion defects from low-resolution rasterization.
+- [ ] Compare a corrected mesh with a baked flat surface, bitmap or sprite
+  where appropriate, choosing the least expensive method that preserves the
+  intended appearance from nearby and oblique views. Preserve interaction and
+  collision; a world-aligned surface must not turn to face the camera.
+- [ ] Measure rendering cost and memory before adopting it broadly. Link this
+  investigation with J021's concealed door/wall geometry work.
+
+This is a recorded polish/optimization task, not an implemented dev4 change.
+
+
+### Recurring deformed and blocked stairs — reusable conversion fix
+
+Owner report from v0.0.24-dev3: XYZ962,119,64, yaw18, pitch-8. The screenshot
+shows jagged stair treads and the owner cannot traverse them. The camera lies
+inside the bounds of `ex_hlaalu_b_15`, placed reference 41379. Together with
+XYZ613,-125,59 and the earlier b17 opening, this makes stair conversion a
+recurring city issue, with both visual and movement consequences.
+
+- [ ] Audit affected source visual triangles and authored collision separately;
+  inspect surface winding, merging, overlap and depth ordering before attributing
+  the jagged appearance to one cause. Check shared meshes across all placements.
+- [ ] Build a reusable stair-aware collision conversion/validation step. Preserve
+  authored walkable ramp/step surfaces and side boundaries; reject convex volumes
+  that fill stair openings. Where reconstruction is needed, use bounded convex
+  pieces or surface shells, retaining open space and the original landing heights.
+- [ ] Sweep the unchanged standing hull along ascent/descent paths and landings,
+  checking clearance, floor support, step height and slope; flag failures with
+  source mesh, placed reference and coordinates. Do not force a generic ramp
+  through an obstruction or change global player dimensions to hide the defect.
+- [ ] Compare native before/after views and traversal, and measure clipnode/RAM
+  cost before applying any higher-detail collision method across the city.
+
+The current b17 shell correction is a narrow verified fix. It is **not** a claim
+that these newly reported b04/dsteps03 and b15 stairs are repaired. This algorithm
+and the doorway arch cleanup remain open work beyond the current dev4 correction.
+
+
+### Proposed module: Balmora stairway optimizer
+
+Additional owner report, v0.0.24-dev3: XYZ-883,126,300, yaw346, pitch-14.
+The narrow stairs cannot be climbed. The camera is within `ex_hlaalu_b_13`,
+reference 24020. Add this case to the recurring **Stairway to Balmora** issue.
+
+Plan a reusable **Balmora stairway optimizer** in the Morrowind translation
+pipeline, initially validated on these city cases but useful for other locations.
+Its acceptance matrix must cover ascent, descent, narrow width, headroom,
+landings, source/converted visual fidelity and runtime geometry/memory cost.
+Collision success and intact appearance are separate required outcomes. Keep
+the unchanged player hull as the test fixture; do not hide defects by shrinking
+the character or changing FOV. This is TODO/design, not delivered functionality.
+
+
+### Missing street ground texture
+
+Owner report, v0.0.24-dev3: XYZ455,-699,61, yaw3, pitch17. The supplied
+screenshot has the same XYZ and HUD yaw1/pitch16; retain both as nearby views.
+It shows a broad flat untextured street patch around the lightpost in front of
+two doorways.
+
+- [ ] Inspect the source ground placement/material and converted face/UV/texture
+  references to distinguish missing geometry, missing texture and incorrect mapping.
+- [ ] Restore a continuous patch of the surrounding usual paving where supported
+  by the original layout, matching texture scale/orientation and edge seams.
+  Verify floor collision and avoid extra overlapping surfaces.
+
+Suggested owner treatment: continue the usual street texture across the patch.
+Status: recorded TODO; cause and correction not yet verified.
+
+
+Additional stair validation case: v0.0.24-dev3, XYZ1182,-141,119, yaw91,
+pitch-12; the owner cannot enter the stairway. Nearby mapped placements are
+`ex_hlaalu_dsteps_03` reference41134 and `ex_hlaalu_b_04` reference22539.
+This is another instance of the same dsteps03/b04 asset combination seen at
+XYZ613,-125,59, strengthening the case for a reusable per-mesh correction
+validated across placed rotations. Add to the Balmora stairway optimizer suite;
+currently open, not covered by the b17 correction.
+
+
+### Hlaalu guard missing/transparent chest armor
+
+Owner screenshot, v0.0.24-dev3, Balmora: XYZ862,-502,58, yaw290, pitch13.
+The guard's chest plate/torso appears absent or transparent, with the background
+visible between the shoulders and waist. Owner suspects material conversion.
+
+- [ ] Trace the NPC's equipped cuirass and BODY/armor slot resolution into the
+  assembled actor; verify that torso suppression is paired with replacement armor.
+- [ ] Check source submeshes, triangle retention/winding and transforms, plus
+  material/texture presence, alpha flags and transparency-index conversion.
+- [ ] Compare the original equipped appearance with the converted actor in native
+  front/side/back views and animation; test other users of the same armor mesh.
+
+Status: visual defect confirmed from the screenshot; exact conversion cause
+remains unverified. Record independently from static building/door/stair issues.
+
+## Debug teleport expansion
+
+`dbg tp` means **debug teleport**. Keep the current named points of interest.
+Future work: support original Morrowind world/map coordinates and placenames,
+including case-insensitive `seydaneen`, `"seyda neen"` and `seyda_neen` aliases.
+Inspect original coordinate/cell conventions before implementing conversion;
+distinguish runtime-local XYZ from original world XYZ and validate safe arrival.
+The requested `dbg aw hors 0` preset is current dev5 work: Hors, male Nord,
+Barbarian, The Steed, after Census in Seyda Neen's square. A Balmora teleport
+creates that preset only when no character exists; it preserves existing ones.
+
+Owner acceptance against dev4, 30 September: Shift+V works; Balmora temple
+passage is accessible as a Nord. Additional public stair reports remain in the
+dev5 investigation: (-323,226,138), yaw260/pitch0 and (-527,187,143), yaw274/pitch-3.
+
+## dev5 follow-up status (30 September 2026)
+
+The earlier Balmora jagged-arch, blocked-stair, missing-paving and guard-chest
+reports now have inspected causes and implemented candidates in
+`INVESTIGATION-v0.0.24-dev5.md`. Native walking passes the previously stubborn
+b04 arches and the new b02 approach (549,-739,58), plus the bridge05/06 stairs.
+Keep citywide route acceptance open; a handful of passing routes is not complete
+coverage. The birthsign cursor-only regression remains unreproduced; normal
+native key dispatch passes and raw-event tracing is available.

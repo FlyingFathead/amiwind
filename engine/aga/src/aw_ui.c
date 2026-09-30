@@ -15,7 +15,9 @@ static int paper_font_bytes,paper_font_loaded;
 static byte background[64776],loading_background[64776];
 static int loading_state,loading_next;
 static cvar_t loading_style={"aw_loading_style","normal",false};
-static int next_loading_style=-1,loading_active,loading_blank;
+static cvar_t region_loading={"aw_region_loading","1",true};
+static int next_loading_style=-1,loading_active,loading_blank,loading_frozen;
+static int loading_width,loading_height;
 static byte loading_black_palette[768];
 static byte logo[8008];
 static int logo_state;
@@ -90,20 +92,45 @@ int AW_UIBackground(void) {
     return 1;
 }
 void AW_SetNextLoadingStyle(aw_loading_style_t style) {
-    next_loading_style=style==AW_LOADING_BLANK?AW_LOADING_BLANK:AW_LOADING_NORMAL;
+    next_loading_style=style>=AW_LOADING_NORMAL && style<=AW_LOADING_FROZEN?style:AW_LOADING_NORMAL;
+}
+int AW_RegionLoadingFrozen(void){return region_loading.value!=0;}
+void AW_RegionLoadingToggle(void){Cvar_SetValue(region_loading.name,!AW_RegionLoadingFrozen());}
+int AW_LoadingFrozen(void){
+    return loading_active && loading_frozen && vid.width==loading_width && vid.height==loading_height;
 }
 void AW_BeginLoadingStyle(void) {
+    int row;
     /* Reconnect also begins a plaque: do not consume the one-shot override twice. */
     if(loading_active)return;
     loading_blank=next_loading_style>=0?next_loading_style==AW_LOADING_BLANK:
         !Q_strcasecmp(loading_style.string,"blank");
+    loading_frozen=next_loading_style==AW_LOADING_FROZEN;
+    if(loading_frozen){
+        /* Reuse the artwork pixel bank, outside the map hunk. Copy only on a
+         * crossing; the new world may overwrite the framebuffer during signon. */
+        if(vid.buffer && vid.width>0 && vid.height>0 && vid.rowbytes>=vid.width &&
+           vid.width<=64000/vid.height){
+            loading_width=vid.width;loading_height=vid.height;
+            for(row=0;row<vid.height;row++)memcpy(loading_background+776+row*vid.width,
+                vid.buffer+row*vid.rowbytes,vid.width);
+        }else {loading_frozen=0;loading_blank=1;}
+    }
     next_loading_style=-1;loading_active=1;loading_state=0;
 }
 void AW_EndLoadingStyle(void) {
-    loading_active=loading_blank=loading_state=0;
+    loading_active=loading_blank=loading_state=loading_frozen=0;
 }
 void AW_UILoading(void) {
-    int row,n;char path[40];
+    int row,n,w,h,x;char path[40];
+    if(loading_frozen && !AW_LoadingFrozen()){loading_frozen=0;loading_blank=1;}
+    if(loading_frozen){
+        for(row=0;row<vid.height;row++)memcpy(vid.buffer+row*vid.rowbytes,
+            loading_background+776+row*vid.width,vid.width);
+        w=AW_UIWidth("Loading...")+20;h=AW_UIHeight()+8;x=(vid.width-w)/2;
+        AW_UIBox(x,6,w,h);AW_UITextBox(x+4,10,w-8,h-8,"Loading...",-1);
+        return;
+    }
     if(loading_blank){AW_UIFill(0,0,vid.width,vid.height,0);return;}
     if(!loading_state){
         sprintf(path,"gfx/loading%02ld.awb",(long)loading_next);
@@ -120,6 +147,7 @@ void AW_UILoading(void) {
 }
 byte *AW_UIMenuPalette(void){
     if(AW_LoadingScreen()){
+        if(AW_LoadingFrozen())return NULL;
         if(loading_blank)return loading_black_palette;
         if(loading_state==1)return loading_background+8;
         if(background_state==1)return background+8;
@@ -582,6 +610,7 @@ static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original b
 void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cvar_RegisterVariable(&loading_style);
+    Cvar_RegisterVariable(&region_loading);
     Cvar_RegisterVariable(&dialogue_method);Cvar_RegisterVariable(&dialogue_layout);
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);

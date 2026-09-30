@@ -15,8 +15,8 @@ server_t sv;
 server_static_t svs;
 entity_t cl_entities[MAX_EDICTS];
 cvar_t scr_showram={"showram","0"};
-cvar_t *settings[4];int settings_count;
-void (*command)(void),(*master)(void),(*ram)(void),(*sea)(void),(*fps)(void);
+cvar_t *settings[5];int settings_count;
+void (*command)(void),(*master)(void),(*ram)(void),(*sea)(void),(*fps)(void),(*hud_type)(void);
 int argc=2,fill_y=-1,text_y=-1,text_x=-1;
 char *arg="on",last[80];
 int Cmd_Argc(void) {return argc;}
@@ -24,10 +24,12 @@ char *Cmd_Argv(int n) {return arg;}
 void Con_Printf(char *fmt,...) {}
 int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
-void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<4;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
-void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;}
+void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<5;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
+void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;else if(!strcmp(name,"aw_debug_hud_type"))hud_type=fn;}
 void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;assert(y+h==vid.height || (y==19 && h==10 && x==8 && w==80));}
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
+static int small_draws;
+void AW_SmallString(int x,int y,const char *s){assert(x==8 && y==8);small_draws++;}
 int main(void) {
  client_t local;edict_t player;
  Sbar_Init();assert(!AW_DebugCoordsEnabled() && !AW_DebugOverlaysEnabled());
@@ -37,6 +39,7 @@ int main(void) {
  vid.width=320;vid.height=200;cls.state=ca_connected;cl.viewentity=1;
  cl_entities[1].origin[0]=-12;cl_entities[1].origin[1]=42;cl_entities[1].origin[2]=66;
  Sbar_Draw();assert(fill_y==188 && text_y==190 && text_x+strlen(last)*8==312);
+ assert(small_draws==1);arg="1";hud_type();Sbar_Draw();assert(small_draws==1);arg="2";hud_type();Sbar_Draw();assert(small_draws==2);
  assert(!strcmp(last,"XYZ:-12 42 66 DEG:0 P:0") && scr_copyeverything);
  memset(&local,0,sizeof(local));memset(&player,0,sizeof(player));
  sv.active=true;svs.maxclients=1;svs.clients=&local;local.edict=&player;

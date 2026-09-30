@@ -218,13 +218,13 @@ void	VID_UnlockBuffer (void);
 
 typedef struct
 {
-	vec3_t	origin;
-	vec3_t	angles;
-	int		modelindex;
-	int		frame;
-	int		colormap;
-	int		skin;
-	int		effects;
+    vec3_t	origin;
+    vec3_t	angles;
+    int		modelindex;
+    int		frame;
+    int		colormap;
+    int		skin;
+    int		effects;
 } entity_state_t;
 
 
@@ -270,12 +270,12 @@ typedef struct
 
 typedef struct
 {
-	char	*basedir;
-	char	*cachedir;		// for development over ISDN lines
-	int		argc;
-	char	**argv;
-	void	*membase;
-	int		memsize;
+    char	*basedir;
+    char	*cachedir;		// for development over ISDN lines
+    int		argc;
+    char	**argv;
+    void	*membase;
+    int		memsize;
 } quakeparms_t;
 
 
@@ -301,7 +301,7 @@ extern	byte		*host_basepal;
 extern	byte		*host_colormap;
 extern	int			host_framecount;	// incremented every frame, never reset
 extern	double		realtime;			// not bounded in any way, changed at
-										// start of every frame, never reset
+                                        // start of every frame, never reset
 
 void Host_ClearMemory (void);
 void Host_ServerFrame (void);
@@ -316,10 +316,10 @@ void Host_ClientCommands (char *fmt, ...);
 void Host_ShutdownServer (qboolean crash);
 
 extern qboolean		msg_suppress_1;		// suppresses resolution and cache size console output
-										//  an fullscreen DIB focus gain/loss
+                                        //  an fullscreen DIB focus gain/loss
 extern int			current_skill;		// skill level for currently loaded level (in case
-										//  the user changes the cvar while the level is
-										//  running, this reflects the level actually in use)
+                                        //  the user changes the cvar while the level is
+                                        //  running, this reflects the level actually in use)
 
 extern qboolean		isDedicated;
 
@@ -350,6 +350,7 @@ void AW_CullBegin(void);
 int AW_NodeVisible(short *bounds);
 
 void AW_DebugInit(void);
+void AW_InputDebugInit(void);
 extern qboolean noclip_anglehack;
 int AW_ModelVisible(vec3_t origin,float radius);
 
@@ -368,6 +369,7 @@ void AW_ConsoleSetSmall(int value);
 int AW_ConsoleCharWidth(void);
 int AW_ConsoleCharHeight(void);
 void AW_ConsoleCharacter(int x,int y,int c);
+void AW_SmallString(int x,int y,const char *text);
 extern int con_fullscreen;
 int Con_ScrollPage(void);
 int Con_ScrollMax(void);
@@ -382,6 +384,15 @@ void AW_SceneDraw(void);
 void AW_SceneSpawn(edict_t *p);
 int AW_InteriorPlace(edict_t *p,vec3_t preferred);
 void AW_SceneInit(void);
+void AW_DoorAudioInit(void);
+float AW_DoorSound(unsigned reference,int closing);
+void AW_SceneTick(void);
+void AW_SceneryClear(void);
+void AW_SceneryBegin(const char *entities);
+int AW_SceneryCapture(edict_t *e);
+void AW_SceneryLink(void);
+void AW_SceneryClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *best);
+trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 void AW_MusicSceneEvent(const char *why);
 int AW_MusicStartTrack(int id);
 void AW_MusicTitle(void);
@@ -411,10 +422,13 @@ void AW_UITextBox(int,int,int,int,const char *,int);
 int AW_UILogo(int,int);
 void AW_UILoading(void);
 int AW_LoadingScreen(void);
-typedef enum { AW_LOADING_NORMAL, AW_LOADING_BLANK } aw_loading_style_t;
+typedef enum { AW_LOADING_NORMAL, AW_LOADING_BLANK, AW_LOADING_FROZEN } aw_loading_style_t;
 void AW_SetNextLoadingStyle(aw_loading_style_t);
 void AW_BeginLoadingStyle(void);
 void AW_EndLoadingStyle(void);
+int AW_LoadingFrozen(void);
+int AW_RegionLoadingFrozen(void);
+void AW_RegionLoadingToggle(void);
 extern qboolean aw_loading_music;
 extern void (*aw_load_audio_tick)(void);
 void S_LoadingUpdate(void);

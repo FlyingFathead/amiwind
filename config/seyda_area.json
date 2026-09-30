@@ -111,6 +111,12 @@
       "map": "addamasartus",
       "cell": "Addamasartus",
       "interior": true
+    },
+    {
+      "id": 16,
+      "map": "balmora",
+      "cell": "Balmora",
+      "interior": false
     }
   ]
 }

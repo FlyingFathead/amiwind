@@ -63,6 +63,10 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
         subprocess.run([str(Path(exe).resolve()),*(['-threads',str(resolve_jobs(jobs))] if exe!=qbsp else []),*args],cwd=out,check=True)
     base=out/'prison-base.bsp';(out/'prison.bsp').rename(base);rebuild_world_hull(base,out/'prison.map',qbsp)
     report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs)
+    from collision_index import index_model_collision
+    report['collision_index'] = index_model_collision(out/'prison.bsp', shell['number'])
+    indexed = lumps((out/'prison.bsp').read_bytes())
+    report.update(nodes=len(indexed[5])//24, clipnodes=len(indexed[9])//8, bytes=(out/'prison.bsp').stat().st_size)
     shutil.copyfile(out/'prison.bsp',out/'id1/maps/prison.bsp')
     def pos(source,exterior=False):
         return [(source[0]-(CENTRE[0] if exterior else 0))*.25,(source[1]-(CENTRE[1] if exterior else 0))*.25,source[2]*.25]

@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -52,6 +52,7 @@ int		r_currentkey;
 /* Near-coplanar attachments need a much tighter tolerance than Quake doors.
  * 0.01 is retained as a diagnostic comparison, never a draw-last override. */
 cvar_t aw_depthslop = {"aw_depthslop", "0.00001"};
+cvar_t aw_surface_order = {"aw_surface_order", "2", true};
 
 extern	int	screenwidth;
 
@@ -69,6 +70,7 @@ edge_t	edge_sentinel;
 float	fv;
 
 void R_GenerateSpans (void);
+void AW_GenerateMeshSpans (void);
 void R_GenerateSpansBackward (void);
 
 void R_LeadingEdge (edge_t *edge);
@@ -148,7 +150,7 @@ void R_BeginEdgeFrame (void)
 	}
 	else
 	{
-		pdrawfunc = R_GenerateSpans;
+		pdrawfunc = aw_surface_order.value==1?R_GenerateSpans:AW_GenerateMeshSpans;
 		surfaces[1].key = 0x7FFFFFFF;
 		r_currentkey = 0;
 	}
@@ -205,7 +207,7 @@ addedge:
 }
 
 #endif	// !id386
-	
+
 
 #if	!id386
 
@@ -245,29 +247,29 @@ nextedge:
 		if (pedge->u < pedge->prev->u)
 			goto pushback;
 		pedge = pedge->next;
-			
+
 		pedge->u += pedge->u_step;
 		if (pedge->u < pedge->prev->u)
 			goto pushback;
 		pedge = pedge->next;
-			
+
 		pedge->u += pedge->u_step;
 		if (pedge->u < pedge->prev->u)
 			goto pushback;
 		pedge = pedge->next;
-			
+
 		pedge->u += pedge->u_step;
 		if (pedge->u < pedge->prev->u)
 			goto pushback;
 		pedge = pedge->next;
-			
-		goto nextedge;		
-		
+
+		goto nextedge;
+
 pushback:
 		if (pedge == &edge_aftertail)
 			return;
-			
-	// push it back to keep it sorted		
+
+	// push it back to keep it sorted
 		pnext_edge = pedge->next;
 
 	// pull the edge out of the edge list
@@ -400,7 +402,7 @@ newtop:
 
 		// set last_u on the new span
 		surf->last_u = iu;
-				
+
 gotposition:
 	// insert before surf2
 		surf->next = surf2;
@@ -575,7 +577,7 @@ newtop:
 
 			// set last_u on the new span
 			surf->last_u = iu;
-				
+
 gotposition:
 		// insert before surf2
 			surf->next = surf2;
@@ -605,7 +607,7 @@ void R_GenerateSpans (void)
 
 // generate spans
 	for (edge=edge_head.next ; edge != &edge_tail; edge=edge->next)
-	{			
+	{
 		if (edge->surfs[0])
 		{
 		// it has a left surface, so a surface is going away for this span
@@ -643,7 +645,7 @@ void R_GenerateSpansBackward (void)
 
 // generate spans
 	for (edge=edge_head.next ; edge != &edge_tail; edge=edge->next)
-	{			
+	{
 		if (edge->surfs[0])
 			R_TrailingEdge (&surfaces[edge->surfs[0]], edge);
 
@@ -659,7 +661,7 @@ void R_GenerateSpansBackward (void)
 ==============
 R_ScanEdges
 
-Input: 
+Input:
 newedges[] array
 	this has links to edges, which have links to surfaces
 
@@ -689,7 +691,7 @@ void R_ScanEdges (void)
 	edge_head.next = &edge_tail;
 	edge_head.surfs[0] = 0;
 	edge_head.surfs[1] = 1;
-	
+
 	edge_tail.u = (r_refdef.vrectright << 20) + 0xFFFFF;
 	edge_tail_u_shift20 = edge_tail.u >> 20;
 	edge_tail.u_step = 0;
@@ -697,7 +699,7 @@ void R_ScanEdges (void)
 	edge_tail.next = &edge_aftertail;
 	edge_tail.surfs[0] = 1;
 	edge_tail.surfs[1] = 0;
-	
+
 	edge_aftertail.u = -1;		// force a move
 	edge_aftertail.u_step = 0;
 	edge_aftertail.next = &edge_sentinel;
@@ -707,7 +709,7 @@ void R_ScanEdges (void)
 	edge_sentinel.u = 2000 << 24;		// make sure nothing sorts past this
 	edge_sentinel.prev = &edge_aftertail;
 
-//	
+//
 // process all scan lines
 //
 	bottom = r_refdef.vrectbottom - 1;
@@ -734,7 +736,7 @@ void R_ScanEdges (void)
 			VID_UnlockBuffer ();
 			S_ExtraUpdate ();	// don't let sound get messed up if going slow
 			VID_LockBuffer ();
-		
+
 			if (r_drawculledpolys)
 			{
 				R_DrawCulledPolys ();
@@ -779,3 +781,58 @@ void R_ScanEdges (void)
 }
 
 
+
+/* Mesh surfaces can exchange depth order between their boundary edges.
+ * Quake's insertion-only stack assumes they cannot; stair treads and doorway
+ * trim violate that assumption. Sweep edge intervals, choosing the nearest
+ * surface with the foremost BSP key, and split at analytic depth crossings.
+ * Adjacent intervals with the same winner share a span. No pixel depth buffer
+ * or extra heap allocation; at most one span per screen pixel per row. */
+void AW_GenerateMeshSpans (void)
+{
+    edge_t *edge;surf_t *s,*best,*last=NULL;espan_t *span;
+    int x=edge_head_u_shift20,end,next,start=x;
+    float z,bestz,delta,slope;
+    surfaces[1].next=surfaces[1].prev=&surfaces[1];
+    edge=edge_head.next;
+    while(x<edge_tail_u_shift20){
+        while(edge!=&edge_tail && (edge->u>>20)<=x){
+            if(edge->surfs[0]){
+                s=&surfaces[edge->surfs[0]];
+                if(--s->spanstate==0){s->prev->next=s->next;s->next->prev=s->prev;}
+            }
+            if(edge->surfs[1]){
+                s=&surfaces[edge->surfs[1]];
+                if(++s->spanstate==1){s->next=surfaces[1].next;s->prev=&surfaces[1];s->next->prev=s;surfaces[1].next=s;}
+            }
+            edge=edge->next;
+        }
+        end=edge==&edge_tail?edge_tail_u_shift20:edge->u>>20;
+        best=&surfaces[1];bestz=-1e30f;
+        for(s=surfaces[1].next;s!=&surfaces[1];s=s->next){
+            z=s->d_ziorigin+fv*s->d_zistepv+x*s->d_zistepu;
+            if(s->key<best->key || (s->key==best->key && z>bestz)){
+                best=s;bestz=z;
+            }
+        }
+        next=end;
+        for(s=surfaces[1].next;s!=&surfaces[1];s=s->next){
+            if(s==best || s->key!=best->key)continue;
+            slope=s->d_zistepu-best->d_zistepu;
+            if(slope<=0)continue;
+            delta=bestz-(s->d_ziorigin+fv*s->d_zistepv+x*s->d_zistepu);
+            if(delta < (end-x)*slope){
+                int crossing=x+(int)(delta/slope)+1;
+                if(crossing<next && crossing>x)next=crossing;
+            }
+        }
+        if(best!=last){
+            if(last && x>start){span=span_p++;span->u=start;span->v=current_iv;span->count=x-start;span->pnext=last->spans;last->spans=span;}
+            last=best;start=x;
+        }
+        x=next;
+    }
+    if(last && x>start){span=span_p++;span->u=start;span->v=current_iv;span->count=x-start;span->pnext=last->spans;last->spans=span;}
+    for(s=surfaces[1].next;s!=&surfaces[1];s=s->next)s->spanstate=0;
+    surfaces[1].spanstate=0;
+}

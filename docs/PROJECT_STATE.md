@@ -1,17 +1,39 @@
-# Current project state — 29 September 2026
+# Current project state — 30 September 2026
 
-**AmiWind v0.0.23-dev2: interiors and local cast inspection checkpoint.**
+**AmiWind v0.0.24-dev4: Seyda Neen subdivision, opening controls and teleport shortcuts.**
 
-Thirteen town interiors, Addamasartus, the existing prison ship and the expanded
-exterior are converted. Original Strider/Darvame placement, beast NPCs, solid NPC
-bodies, reusable normal/blank loading, and music servicing during loading are
-implemented. Renderer entity limits and memory allocation were adjusted for this
-larger scene; the reference hardware profile stays unchanged.
+Seyda Neen now has 30 overlapping regular regions plus compact arrival-pier and
+Census ring-courtyard BSPs. The first ship exit uses the compact pier. Shared
+coordinates, overlap, hysteresis and state restoration extend the Balmora method;
+frozen-frame Loading... presentation remains the default. Both exteriors cap
+effective distance at 540 to stay within their certified overlap.
 
-See [release evidence and remaining limits](RELEASE-v0.0.23-dev2.md),
-[room inventory](SEYDA_NEEN_INTERIORS.md) and the continuously maintained
-[29 September work plan](PLAN-2026-09-29.md). Complete voice behaviour is the next
-checkpoint. Strider travel, calendar/wait/day-night sky and blight remain planned.
+`dbg tp` opens the destination picker; direct shortcuts include `balmora`,
+`seydaneen`, `prisonship` and the other converted scene names. Seyda Neen interior
+lookup works from Balmora. Choose defaults highlighted, review has page numbers,
+Shift+V replaces bare numeric distance presets, and the Census front exit stays
+locked during registration. See [dev4 scope](RELEASE-v0.0.24-dev4.md) and
+[investigation findings](INVESTIGATION-v0.0.24-dev4.md).
+
+Seyda Neen, thirteen town interiors, Addamasartus, the prison ship and Balmora's
+exterior are converted. Balmora uses 64 overlapping resident regions and return
+Strider travel. Dev2 restores missing architectural facades, repairs two concave
+underpass colliders, the guard's final approach and Talk hints. Race/sex now
+selects eye height; the measured base player body and Quake 90-degree FOV remain.
+
+Owner playtest: dev3 Balmora regions/sub-cells work surprisingly well and are a
+promising basis for the wider world. The Strider is explicitly accepted: leave
+its conversion unchanged. Balmora often feels faster than Seyda Neen; this
+observation remains distinct from matched measurements. The loader replaces
+one BSP synchronously and does not yet stream in the background.
+
+See [earlier findings and evidence](INVESTIGATION-v0.0.24-dev2.md),
+[mesh mapping notes](MESH_TIPS_AND_TRICKS.md), [race heights](PLAYER_MOVEMENT.md#original-race-based-heights)
+and [roadmap](ROADMAP.md). Boat performance still needs optimization; the matched
+v0.0.23/dev1 test did not reproduce a new slowdown. Boundary loading remains
+synchronous. Balmora interiors, most services, combat, broader AI, day/night sky
+and blight remain unfinished. Full natural-opening and citywide walking acceptance
+are still open; focused checks do not close those items.
 
 ## Historical context
 

@@ -73,7 +73,7 @@ DEPENDENCIES = {
     'scene': ('scenery',), 'bsp': ('scene',), 'npcs': ('bsp',),
     'hands': ('npcs',), 'interior': ('hands',),
     'dialogue-lookup': (), 'intro': ('interior',),
-    'census': ('intro',), 'area': ('census',), 'character': ('area',),
+    'census': ('intro',), 'area': ('census',), 'balmora': ('area',), 'door-audio': ('balmora',), 'character': ('door-audio',),
     'reading': ('character',), 'opening-references': ('reading',),
     'music': (), 'engine': (),
     'image': ('opening-references', 'music', 'engine', 'dialogue-lookup'),

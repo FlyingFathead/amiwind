@@ -106,6 +106,29 @@ static void sweep(aw_barrier_t *b,vec3_t start,vec3_t mins,vec3_t maxs,
     trace->plane.dist=DotProduct(normal,trace->endpos);
 }
 
+/* The source boxes surround the ship/plank but stop before the long pier.
+ * Complete the two side edges and shore end during the dock stage. Bounds
+ * follow the placed dock tiles; only the player is constrained, never the guard.
+ * The ship end stays open where it overlaps the authored plank enclosure. */
+static void pier_clip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *trace)
+{
+    aw_barrier_t b;int side;
+    const float ux=.8414506f,uy=-.5403344f;
+    if(aw_story.ship_disabled || aw_story.stage>AW_STAGE_OFFICE)return;
+    memset(&b,0,sizeof(b));
+    b.axis[0][0]=ux;b.axis[0][1]=uy;
+    b.axis[1][0]=-uy;b.axis[1][1]=ux;b.axis[2][2]=1;
+    b.half[0]=200;b.half[1]=1;b.half[2]=1023;
+    for(side=-1;side<=1;side+=2){
+        b.centre[0]=306+ux*200-uy*side*31;
+        b.centre[1]=-185+uy*200+ux*side*31;
+        sweep(&b,start,mins,maxs,end,trace);
+    }
+    /* Close the shore end within interaction distance of the real office door. */
+    b.half[0]=1;b.half[1]=32;b.centre[0]=306;b.centre[1]=-185;
+    sweep(&b,start,mins,maxs,end,trace);
+}
+
 void AW_BarrierClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,
                     edict_t *entity,trace_t *trace)
 {
@@ -114,4 +137,5 @@ void AW_BarrierClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,
        !svs.clients || entity!=svs.clients[0].edict ||
        entity->v.movetype!=MOVETYPE_WALK || maxs[2]-mins[2]<1)return;
     for(i=0;i<count;i++)sweep(&boxes[i],start,mins,maxs,end,trace);
+    pier_clip(start,mins,maxs,end,trace);
 }

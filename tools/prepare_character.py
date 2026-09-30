@@ -26,9 +26,14 @@ def fixed(text, size):
     return raw.ljust(size, b'\0')
 
 
-def catalogue(master):
+def catalogue(master, eye_base=None):
     kinds = {k: {} for k in ('RACE', 'BODY', 'CLAS', 'BSGN', 'SPEL', 'SKIL')}
+    player = None
     for tag, flags, raw in records(Path(master).read_bytes()):
+        if tag == 'NPC_' and eye_base is not None:
+            f = dict(subrecords(raw))
+            if string(f.get('NAME', b'')).casefold() == 'player':
+                player = f
         if tag not in kinds or flags & 0x20:
             continue
         fields = list(subrecords(raw)); f = dict(fields)
@@ -102,8 +107,23 @@ def catalogue(master):
         raw += powers_bytes(powers)
     for part in parts:
         raw += struct.pack('<64s3Bx', fixed(part['id'], 64), part['race'], part['female'], part['kind'])
+    eyes = {}
+    if eye_base is not None:
+        if player is None or not math.isfinite(eye_base) or not 8 <= eye_base <= 60:
+            raise ValueError('Missing source player or invalid sampled camera height')
+        default_race = race_index[string(player['RNAM']).casefold()]
+        default_female = struct.unpack('<I', player['FLAG'])[0] & 1
+        raw += struct.pack('<4sBB', b'AWE1', default_race, default_female)
+        for identifier, f in races:
+            heights = struct.unpack_from('<2f', f['RADT'], len(f['RADT']) - 20)
+            values = [round(eye_base * h * 1000) for h in heights]
+            if not all(math.isfinite(h) and .5 <= h <= 2 for h in heights) or not all(8000 <= v <= 60000 for v in values):
+                raise ValueError('Invalid race eye height: ' + identifier)
+            raw += struct.pack('<2H', *values)
+            eyes[identifier] = [v / 1000 for v in values]
     return bytes(raw), parts, {'races': [x[0] for x in races], 'classes': [x[0] for x in classes],
-                              'birthsigns': [x[0] for x in births], 'skill_specializations': special}
+                              'birthsigns': [x[0] for x in births], 'skill_specializations': special,
+                              'eye_above_feet': eyes, 'camera_base': eye_base}
 
 
 def barriers(master):
@@ -210,7 +230,11 @@ def prepare(data_files, scene, previews=True, jobs=None):
     data_files = resolve_data_files(data_files); scene = ensure_external(scene, 'character conversion')
     master = child_ci(data_files, 'Morrowind.esm')
     dest = scene/'id1/character'; dest.mkdir(exist_ok=True)
-    raw, parts, report = catalogue(master)
+    assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))
+    first_person = Skeleton(assets, 'meshes/base_anim.1st.nif')
+    # Ordinary standing idle, independent of the Nord hand-to-hand fixture.
+    eye_base = float(first_person.pose(first_person.events['idle: start'])('Camera')[3, 2]) * .25
+    raw, parts, report = catalogue(master, eye_base)
     (dest/'catalog.awc').write_bytes(raw)
     raw, refs = barriers(master); (scene/'id1/intro/barriers.awb').write_bytes(raw)
     (scene/'id1/intro/seyda.awn').write_bytes(exterior_navigation(master))

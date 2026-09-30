@@ -27,6 +27,7 @@ int AW_ReaderOpen(const char *s,int n){reads++;return 1;}
 void AW_UISubtitle(const char *a,const char *b,double t){}
 void IN_AWClearButtons(void){}
 void Con_Printf(char *s,...){}
+float AW_DoorSound(unsigned ref,int close){return 0;}
 eval_t *GetEdictFieldValue(edict_t *e,char *s){return e==&object && !strcmp(s,"aw_ref")?&reference:NULL;}
 void SV_LinkEdict(edict_t *e,qboolean t){}
 int SV_ModelIndex(char *s){return 0;}
@@ -52,7 +53,7 @@ int main(void)
     for(i=0;i<70;i++)AW_OpeningTick();assert(!strcmp(line,"chargendock3"));
     /* Prompt and E share aim/range/visibility and the same stateful target. */
     {
-        const char *name,*action;
+        const char *name,*action;model_t door_model;
         sv.active=1;sv.num_edicts=3;strcpy(sv.name,"census");
         player.v.movetype=MOVETYPE_WALK;VectorCopy(vec3_origin,player.v.origin);
         player.v.view_ofs[2]=13;object.v.modelindex=1;
@@ -65,10 +66,23 @@ int main(void)
         occluded=1;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());occluded=0;
         object.v.modelindex=0;assert(!AW_OpeningHint(&name,&action));object.v.modelindex=1;
         player.v.origin[0]=-80;assert(!AW_OpeningHint(&name,&action));player.v.origin[0]=0;
-        reference._float=172860;assert(AW_OpeningHint(&name,&action) && strstr(action,"Locked"));
+        reference._float=172860;object.v.absmax[2]=145;assert(AW_OpeningHint(&name,&action) && strstr(action,"Locked"));
         aw_story.hall=1;assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
+        /* A rotated brush's broad-phase radius box can contain the eye even
+         * though the actual door is ahead. Use its local bounds for targeting. */
+        memset(&door_model,0,sizeof(door_model));door_model.type=mod_brush;
+        door_model.mins[0]=-12;door_model.maxs[0]=12;
+        door_model.mins[1]=-1;door_model.maxs[1]=1;
+        door_model.mins[2]=0;door_model.maxs[2]=140;
+        sv.models[1]=&door_model;object.v.origin[0]=30;object.v.angles[1]=90;
+        object.v.absmin[0]=-40;object.v.absmax[0]=100;
+        object.v.absmin[1]=-70;object.v.absmax[1]=70;
+        object.v.absmin[2]=-70;object.v.absmax[2]=145;
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
         assert(AW_OpeningUse() && aw_story.hall_open && !AW_OpeningHint(&name,&action));
-        reference._float=172851;AW_StoryReset(0); /* No false empty outside tutorial stage. */
+        sv.models[1]=NULL;object.v.absmin[0]=object.v.absmax[0]=30;
+        object.v.absmin[1]=object.v.absmax[1]=0;object.v.absmin[2]=13;
+        reference._float=172851;object.v.absmax[2]=13;AW_StoryReset(0); /* No false empty outside tutorial stage. */
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Take ring: E"));
         assert(AW_OpeningUse() && AW_Ring()==1);
         aw_story.stage=AW_STAGE_COURTYARD;AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",1);

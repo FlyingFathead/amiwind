@@ -33,6 +33,25 @@ def bounded_planes(points, equations):
     return np.unique(np.round(np.vstack((equations, axial)), 5), axis=0)
 
 
+def standing_planes(points, equations, exact=False):
+    """Obstacle planes after expansion by the standing player box.
+
+    Open stair shells need edge bevels as well as face/axial planes: offsetting
+    those planes alone can close a narrow arch even when the box fits through.
+    Build the complete convex sum offline; the native clipper stays unchanged.
+    """
+    if exact:
+        from itertools import product
+        from scipy.spatial import ConvexHull
+        corners = np.array(list(product(*zip(MINS, MAXS))))
+        expanded = (points[:, None, :] - corners[None, :, :]).reshape(-1, 3)
+        return np.unique(np.round(ConvexHull(expanded).equations, 5), axis=0)
+    result = bounded_planes(points, equations).copy()
+    result[:, 3] -= np.where(result[:, :3] >= 0,
+                            -result[:, :3]*MINS, -result[:, :3]*MAXS).sum(axis=1)
+    return result
+
+
 def _prepare_model(task):
     mi, m, profile, archive_path, *extras = task
     name = m['source']
@@ -63,6 +82,8 @@ def _prepare_model(task):
          collision_v,collision_f=np.array(cv),np.array(cf)
          lod['collision']='authored RootCollisionNode, approximate convex conversion'
         pieces=(shell_collision_parts(collision_v,collision_f) if profile.get("hollow_collision") else collision_parts(collision_v,collision_f,2))
+        if profile.get('exact_collision_bevels'):
+         lod['collision_bevels'] = 'exact standing-box convex sum'
     polys = surface_polygons(visual_v, visual_f)
     texsize = profile.get('texture_size', 64)
     if texsize not in (16, 32, 64):
@@ -130,7 +151,8 @@ def order_face_planes(lumps, face_planes):
             struct.pack_into('<i',lumps[section],offset,remap[old])
 
 
-def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None):
+def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None,
+                  references=None, prepared_models=None, retain_dressing=False):
     b=src.read_bytes();assert struct.unpack_from('<i',b)[0]==29
     lumps=[bytearray(b[o:o+s]) for o,s in [struct.unpack_from('<ii',b,4+k*8) for k in range(15)]]
     face_planes=[struct.unpack_from('<H',lumps[7],i)[0] for i in range(0,len(lumps[7]),20)]
@@ -163,20 +185,18 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       rgb*=np.array(mat['diffuse']);im=Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).resize((size,size)).quantize(palette=pal,dither=Image.Dither.NONE)
       t=len(textures);texture_cache[key]=t;textures.append(miptex('surface'+str(t),im))
      return texture_cache[key]
-    def collider(pieces):
+    def collider(pieces, exact=False):
      # A union of convex volumes. Outside each piece tries the next one.
      roots=[];noderoots=[]
      for k,(points,hull,ids,error) in enumerate(pieces):
       point_eq=np.unique(np.round(hull.equations,5),axis=0)
-      eq=bounded_planes(points,point_eq);root=len(lumps[9])//8;noderoot=len(lumps[5])//24;roots.append(root);noderoots.append(noderoot)
+      eq=standing_planes(points,point_eq,exact);root=len(lumps[9])//8;noderoot=len(lumps[5])//24;roots.append(root);noderoots.append(noderoot)
       count=len(eq)
       nxt=root+count if k+1<len(pieces) else -1
       low=np.floor(points.min(axis=0)).astype(int);high=np.ceil(points.max(axis=0)).astype(int)
       for j,e in enumerate(eq):
        n=e[:3];d=-e[3]
-       # Scaled humanoid standing hull, shared with runtime and world bake.
-       expand=sum(-n[a]*MINS[a] if n[a]>=0 else -n[a]*MAXS[a] for a in range(3))
-       pi=plane(n,d+expand);inside=root+j+1 if j+1<count else -2
+       pi=plane(n,d);inside=root+j+1 if j+1<count else -2
        if max(nxt,inside)>=65520:raise ValueError('Clipnode budget exceeded')
        lumps[9]+=struct.pack('<iHH',pi,nxt&65535,inside&65535)
       # Point traces need no expansion or extra axial nodes. Retain their
@@ -185,16 +205,25 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       for j,e in enumerate(point_eq):
        n=e[:3];d=-e[3]
        pn=plane(n,d);nin=noderoot+j+1 if j+1<len(point_eq) else -1
+       if max(nnxt,nin)>32767:raise ValueError('Point node budget exceeded')
        lumps[5]+=struct.pack('<ihh6h2H',pn,nnxt,nin,*low,*high,0,0)
      return noderoots[0],roots[0]
     entities=[];instance_models={};collision_models={}
     def entity(modelnum,origin,yaw,reference):
      return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
 
-    selected, selection_report = select_runtime_refs(index, centre, SCALE, 736)
+    if references is None:
+        selected, selection_report = select_runtime_refs(index, centre, SCALE, 736)
+    else:
+        wanted = set(references)
+        selected = [dict(r) for r in index['references'] if r['number'] in wanted]
+        if {r['number'] for r in selected} != wanted:
+            raise ValueError('Explicit BSP references were not all converted')
+        selection_report = {'selected_groups': [], 'omitted': [], 'explicit_references': len(wanted)}
+    excluded = [] if retain_dressing else ['flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope']
     unique = dict.fromkeys(ref['model_index'] for ref in selected
                            if not any(t in index['models'][ref['model_index']]['source']
-                                      for t in ['flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope']))
+                                      for t in excluded))
     for mi in unique:
         model=index['models'][mi]
         profiles.setdefault(model['source'],rock_profile(model['source'],model['triangles']))
@@ -205,7 +234,8 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
               scenery/'scenery.mwpak',index['textures']) for mi in unique]
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))
     print(f'BSP geometry workers: {workers}; {len(tasks)} unique models', flush=True)
-    models = dict(ordered_map(_prepare_model, tasks, workers))
+    models = ({mi: prepared_models[mi] for mi in unique} if prepared_models is not None
+              else dict(ordered_map(_prepare_model, tasks, workers)))
     from surface_flatten import mount_references
     mount_references(index,selected,models,centre,SCALE)
     from visual_offsets import apply_visual_offsets, visual_key
@@ -225,7 +255,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     with closing(ordered_map(_prepare_placement,placement_tasks(),workers)) as placements:
      for ref in selected:
       mi=ref['model_index'];m=index['models'][mi];name=m['source']
-      if any(t in name for t in ['flora_','marker_','scum_','lantern_hook','furn_de_rope']):continue
+      if any(t in name for t in excluded):continue
       o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
       origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
       key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
@@ -239,12 +269,14 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
       def vertex(p):
        key=tuple(np.round(p,5))
        if key not in vmap:vmap[key]=len(lumps[3])//12;lumps[3]+=struct.pack('<3f',*p)
+       if vmap[key] >= 65536:raise ValueError('Vertex budget exceeded')
        return vmap[key]
       for q,n,ax,off,material,samples in surfaces:
        pi=plane(n,float(n@q[0]));t=texture(m,material,texsize);txkey=(*np.round(ax.flatten(),5),*np.round(off,4),t)
        if txkey not in texinfo_cache:
         tx=len(lumps[6])//40;texinfo_cache[txkey]=tx;lumps[6]+=struct.pack('<8fii',*ax[:,0],off[0],*ax[:,1],off[1],t,0)
        tx=texinfo_cache[txkey];verts=[vertex(p) for p in q[::-1]];firstedge=len(lumps[13])//4
+       if tx>32767:raise ValueError('Texture mapping budget exceeded')
        for a,c in zip(verts,verts[1:]+verts[:1]):
         if (a,c) in emap:ed=emap[a,c]
         elif (c,a) in emap:ed=-emap[c,a]
@@ -257,7 +289,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
        lumps[7]+=struct.pack('<Hhihh4Bi',0,0,firstedge,len(verts),tx,*styles,lightoffset)
       collision_key=_instance_key(ref,None)
       if collision_key not in collision_models:
-       collision_models[collision_key]=collider(worldparts)
+       collision_models[collision_key]=collider(worldparts, bool(lod.get('collision_bevels')))
       nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
@@ -282,7 +314,7 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
             'faces':len(lumps[7])//20,'vertices':len(lumps[3])//12,
             'nodes':len(lumps[5])//24,'clipnodes':len(lumps[9])//8,'bytes':out.stat().st_size,
             'instances':len(entities),'unique_models':len(instance_models),
-            'collision':'axis-bounded approximate multipart convex union; standing player hull only',
+            'collision':'multipart convex union; exact standing-box bevels for open shells, axial bounds otherwise',
             'scope':'resident bounded scene, shared building meshes, no cells streamed during play'}
     return result
 

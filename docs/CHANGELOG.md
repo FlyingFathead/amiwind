@@ -1,5 +1,57 @@
 # Development history
 
+## v0.0.24-dev4 — 30 September 2026
+
+- Add `dbg tp` for the existing destination menu, and direct `balmora`,
+  `seydaneen`, `prisonship` and converted-map shortcuts. Retain `dbg scene`.
+- Resolve interior entrances from their destination catalogue when teleporting
+  out of Balmora. Reject missing scene files before leaving the current scene.
+- Add 30 Seyda Neen regions, a compact first-exit pier and separate ring courtyard;
+  remove unused BSP data while preserving complete selected placements.
+- Extend accepted frozen-frame loading and checked state-preserving arrivals.
+- Default character confirmation to Choose; center review title with page count.
+- Lock the Census front exit during registration; supplement long-pier containment.
+- Move distance presets to Shift+V; preserve custom numeric bindings. Both region
+  exteriors cap effective distance at 540; other scenes retain the stored setting.
+- Preserve authored collision surfaces for the blocked Hlaalu b17 stair opening;
+  keep player dimensions, FOV and the accepted dev3 Strider unchanged.
+- Record new stair/door appearance reports as open Balmora fixes and defer the
+  whole-map polygon-density study to the next version.
+- See [scope and validation](RELEASE-v0.0.24-dev4.md).
+
+## v0.0.24-dev3 — 30 September 2026
+
+- Share Seyda Neen's inspected Strider profile in Balmora; rebuild the 16 affected
+  regions. Collision, entities and the other 48 maps remain unchanged.
+- Add Options → Area loading: Freeze frame / Black screen. Freeze is the default
+  for region crossings; hold the displayed image and palette with a small top
+  Loading box. Reuse the existing loading-art storage; retain music servicing.
+- Record positive dev2 exterior feedback, missing Balmora interiors, the reported
+  faster city performance and Seyda Neen subdivision/prefetch investigation.
+- Pass 279 host tests; native warning review remains 82, with no new diagnostics.
+  See [validation and limitations](RELEASE-v0.0.24-dev3.md).
+
+## v0.0.24-dev2 — 30 September 2026
+
+- Restore original Balmora architectural geometry after generic reduction
+  destroyed open facades; rebuild all 64 regions with bounded 896-unit overlap.
+- Preserve authored collision surfaces in the two reported bridge/temple arches.
+  Measure the physical standing box in the native runtime against original scale.
+- Export original race/sex heights for the first-person eye, replacing the fixed
+  Nord fixture. Keep 90-degree Quake FOV and bob; record an optional FOV slider
+  as a performance-gated roadmap item.
+- Follow the dock guard's clear final approach to the actual goal; align ordinary
+  NPC and Strider driver Talk hints with their respective interaction conditions.
+- Record matched boat performance, native captures and remaining limits in
+  [the investigation](INVESTIGATION-v0.0.24-dev2.md) and the existing mesh notes.
+- Pass 278 host tests. Review native warnings: 85 to 82, no added diagnostic.
+
+## v0.0.24-dev1 — 30 September 2026
+
+Initial Balmora exterior, 64 overlapping regions, 1,488 scenery placements,
+18 residents and return Strider travel. See [original scope](BALMORA-v0.0.24-dev1.md).
+Its generic architectural reduction was defective; dev2 corrects that conversion.
+
 ## v0.0.23-dev4 — 29 September 2026
 
 Padded content-sized dialogue and caret/rotation regressions; 2/5/1-second logo

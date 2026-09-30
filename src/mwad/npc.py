@@ -67,7 +67,9 @@ def greeting_settings(kinds, behavior, scale=0.25):
     radius=behavior['hello']*value('iGreetDistanceMultiplier','INTV','<i')*scale
     reset=value('fGreetDistanceReset','FLTV','<f')*scale
     duration=value('iGreetDuration','INTV','<i')
-    if not 0<=radius<=4096 or not radius<reset<=8192 or not 0<duration<=30:
+    # Original actors may have a Hello radius larger than the global reset
+    # distance (Balyn Omavel is one). Preserve both authored values.
+    if not 0<=radius<=4096 or not 0<reset<=8192 or not 0<duration<=30:
         raise ValueError('Unsupported greeting settings')
     return {'distance':radius,'reset_distance':reset,'duration':duration,
             'poll_seconds':0.25,'sustained_polls':2,'global_cooldown_seconds':8}

@@ -928,6 +928,7 @@ void ED_LoadFromFile (char *data)
 		else
 			ent = ED_Alloc ();
 		data = ED_ParseEdict (data, ent);
+        if(AW_SceneryCapture(ent)) { ED_Free(ent); continue; }
 
 // remove things from different skill levels or deathmatch
 		if (deathmatch.value)

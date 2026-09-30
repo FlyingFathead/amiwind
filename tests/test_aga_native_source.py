@@ -16,6 +16,9 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_legacy_numeric_view_binds_preserve_custom_slots(self):
+        self.compile_run('aga_controls_migration_test.c', [Path(SOURCE)/'src/keys.c'])
+
     def test_console_half_full_closed_and_escape(self):
         self.compile_run('aga_console_cycle_test.c', [Path(SOURCE)/'src/console.c'])
 
@@ -107,13 +110,19 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_palette_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])
 
     def test_scene_links_preserve_state_and_find_hatch_floor(self):
-        self.compile_run("aga_scene_test.c", [ROOT/"engine/aga/src/aw_scene.c", ROOT/"engine/aga/src/aw_story.c", ROOT/"engine/aga/src/aw_state.c", Path(SOURCE)/"src/mathlib.c"])
+        self.compile_run("aga_scene_test.c", [ROOT/"engine/aga/src/aw_scene.c", ROOT/"engine/aga/src/aw_region.c", ROOT/"engine/aga/src/aw_story.c", ROOT/"engine/aga/src/aw_state.c", Path(SOURCE)/"src/mathlib.c"])
 
     def test_first_person_sprite_span_bounds(self):
         self.compile_run("aga_hand_sprites_test.c", [ROOT/"engine/aga/src/aw_hand_sprites.c"], ["AMIWIND_SPRITE_HANDS=1"])
 
     def test_console_reflow_and_scrolled_log_anchor(self):
         self.compile_run("aga_console_buffer_test.c", [Path(SOURCE)/"src/console.c"])
+
+    def test_authored_door_audio_setting_and_catalogue_bounds(self):
+        self.compile_run("aga_door_audio_test.c", [ROOT/"engine/aga/src/aw_door_audio.c"])
+
+    def test_mesh_depth_crossings_and_span_coverage(self):
+        self.compile_run("aga_mesh_spans_test.c", [ROOT/"engine/aga/src/r_edge.c"])
 
     def test_console_dispatch_background_and_palette(self):
         self.compile_run("aga_console_test.c", [ROOT/"engine/aga/src/aw_console.c", ROOT/"engine/aga/src/aw_console_glyphs.c"])
@@ -133,8 +142,20 @@ class NativeSourceTests(unittest.TestCase):
     def test_interaction_only_on_game_key_down(self):
         self.compile_run('aga_interact_test.c', [Path(SOURCE)/'src/cl_input.c'])
 
+    def test_balmora_region_round_trip(self):
+        self.compile_run('aga_region_test.c', [Path(SOURCE)/'src/aw_region.c'])
+
+    def test_strider_available_destination_and_return(self):
+        self.compile_run('aga_scene_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_scene.c', 'aw_region.c', 'aw_story.c', 'aw_state.c', 'mathlib.c')], ['BALMORA_AVAILABLE'])
+
+    def test_scenery_above_edict_limit_and_rotated_collision(self):
+        self.compile_run('aga_scenery_test.c', [Path(SOURCE)/'src/world.c', Path(SOURCE)/'src/mathlib.c'])
+
     def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=()):
         tree = Path(SOURCE).resolve()
+        if any(p.name == "world.c" for p in sources):
+            sources = [*sources, tree/"src/aw_scenery.c"]
         with tempfile.TemporaryDirectory() as tmp:
             from project_version import generate_native
             generate_native(ROOT/'VERSION', Path(tmp))

@@ -9,17 +9,19 @@ static byte base[768], output[768];
 byte *host_basepal=base;
 static int reads;
 static byte menu[768];static int menu_active;
+static int frozen,shifts;
+int AW_LoadingFrozen(void){return frozen;}
 byte *AW_MoviePalette(void){return NULL;}
 byte *AW_UIMenuPalette(void){return menu_active?menu:NULL;}
 int MSG_ReadByte(void){return reads++ ? 40 : 0;}
 float MSG_ReadCoord(void){return 0;}
-void VID_ShiftPalette(unsigned char *pal){memcpy(output,pal,768);}
+void VID_ShiftPalette(unsigned char *pal){memcpy(output,pal,768);shifts++;}
 void V_SetContentsColor(int);
 void V_ParseDamage(void);
 void V_UpdatePalette(void);
 extern cvar_t v_gamma;
 int main(void) {
- int red,blue;
+ int red,blue,previous_shifts;
  memset(base,128,sizeof(base));v_gamma.value=1;host_frametime=0;
  V_SetContentsColor(CONTENTS_EMPTY);V_UpdatePalette();
  assert(output[0]==128 && output[1]==128 && output[2]==128);
@@ -42,6 +44,10 @@ int main(void) {
  assert(cl.cshifts[CSHIFT_DAMAGE].percent>0); /* Leaving water retains damage. */
  memset(menu,64,sizeof(menu));menu_active=1;V_UpdatePalette();assert(output[0]==64 && output[1]==64 && output[2]==64);
  menu_active=0;V_UpdatePalette();assert(output[0]>output[1]); /* World shift is restored without a gamma change. */
+ frozen=1;previous_shifts=shifts;V_UpdatePalette();V_UpdatePalette();assert(shifts==previous_shifts);
+ memset(cl.cshifts,0,sizeof(cl.cshifts));memset(cl.prev_cshifts,0,sizeof(cl.prev_cshifts));
+ V_UpdatePalette();assert(shifts==previous_shifts); /* Disconnect cannot recolour the frozen world. */
+ frozen=0;V_UpdatePalette();assert(shifts==previous_shifts+1 && output[0]==128 && output[1]==128);
  puts("blue water, red damage, combined shifts, fading and surfacing passed");
  return 0;
 }

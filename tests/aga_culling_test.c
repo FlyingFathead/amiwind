@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+server_t sv;
 #include <assert.h>
 static int inside;
 int AW_Interior(void){return inside;}
@@ -45,5 +46,8 @@ int main(void) {
  argument="999999999999999999999";distance_command();assert(AW_DrawDistance()==400);
  argument="700junk";distance_command();assert(AW_DrawDistance()==400);
  argument="700";distance_command();assert(AW_DrawDistance()==700);
+ sv.active=true;strcpy(sv.name,"balmora");assert(AW_DrawDistance()==540);
+ assert(aw_drawdistance.value==700);strcpy(sv.name,"seyda");assert(AW_DrawDistance()==540);
+ strcpy(sv.name,"prison");assert(AW_DrawDistance()==700);
  puts("forward-depth culling retains visible edge/door and rejects far bounds");return 0;
 }

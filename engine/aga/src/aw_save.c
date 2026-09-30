@@ -3,6 +3,7 @@
  * Writing the inactive generation never renames or truncates the active one. */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_region.h"
 #include "aw_maps.h"
 #ifdef AMIGA
 #include <proto/dos.h>
@@ -72,7 +73,7 @@ static uint32_t actor_id(edict_t *e)
 void AW_SaveCapture(void)
 {
     int i,j,k,scene;uint32_t ref;edict_t *e;eval_t *v;aw_saved_actor_t *a;
-    if(!sv.active || (scene=scene_id())<0 || aw_story.stage==AW_STAGE_DEMO)return;
+    if(!sv.active || (scene=scene_id())<0)return;
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);
         if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
@@ -97,7 +98,6 @@ void AW_SaveSpawn(void)
         world=pending;aw_story=world.story;aw_character=world.character;aw_state=world.state;
         AW_BarrierLoad();AW_OpeningSpawn();
     }
-    if(aw_story.stage==AW_STAGE_DEMO)return;
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
         ref=actor_id(e);if(!ref)continue;
@@ -110,6 +110,7 @@ void AW_SaveSpawn(void)
             }
             SV_LinkEdict(e,false);break;
         }
+        if(!AW_RegionContains(e->v.origin))ED_Free(e);
     }
     if(loading){
         e=svs.clients[0].edict;
@@ -213,6 +214,7 @@ int AW_SaveRead(uint32_t profile,int slot)
     /* Loading an older manual save must still produce newer generations than
      * every existing autosave of this character. */
     for(i=0;i<=20;i++)if(newest(profile,i,&other)>=0 && other.sequence>candidate.sequence)candidate.sequence=other.sequence;
+    if(!AW_RegionSelect(candidate.scene,candidate.position,0))return 0;
     pending=candidate;loading=1;scheduled=0;
     IN_AWClearButtons();key_dest=key_game;
     snprintf(map,sizeof(map),"map %s\n",candidate.scene);Cbuf_AddText(map);return 1;

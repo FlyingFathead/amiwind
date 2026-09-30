@@ -147,3 +147,14 @@ uses a small independent shuffled bag and canonical content identities.
 `MWBOOT:MWMUSIC.BIN` is a 136-byte big-endian diagnostic: `MWM1`, uint16 count,
 uint16 final group (0 exploration, 1 battle), then 64 uint16 track IDs. It records
 the first 64 successful opens. It does not claim to record audible start times.
+
+## Authored door sounds (dev5)
+
+`prepare_door_audio.py` resolves placed DOOR references, their SNAM/ANAM IDs and
+the corresponding SOUN files/volumes. It converts only sounds needed by the
+entrance catalogue and the Census hall door, sharing identical source files.
+The bounded AWSFX1 catalogue stores paths, volumes and durations. Native
+`aw_door_sounds` defaults on and persists; `dbg door sounds on/off` is the short
+command. Transition openings play before the map change (at most a one-second
+lead-in); their closing sample plays after sign-on. The existing Census hall
+action plays the opening sample without adding a close action.

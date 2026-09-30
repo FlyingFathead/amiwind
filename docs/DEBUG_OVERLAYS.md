@@ -124,6 +124,12 @@ finds a checked spawn in the current scene; `dbg reset location 0` returns to to
 offset (4..24 runtime units above the hull origin) supports comparison, e.g.
 `dbg eyeheight 13.3` restores the old nominal camera for this scene session.
 
+`dbg dimensions` reports the live player box and BSP standing-hull dimensions,
+then compares standing-body and point sweeps along all six axes. In a known flat
+calibration room, subtract their stopping coordinates to measure the effective
+physical half-extents. In ordinary scenery the two sweeps can hit different
+surfaces; do not interpret those differences as a new player size.
+
 ## Reproducing a reported view
 
 `dbg coords on` in v0.0.15-dev2 already shows XYZ, DEG (horizontal yaw) and P
@@ -131,15 +137,37 @@ offset (4..24 runtime units above the hull origin) supports comparison, e.g.
 overlay/viewport and hand mode for comparisons. Existing owner lower-hold views:
 (12,142,-9), DEG47/P11; (-3,276,-8), DEG282/P10; (7,234,-9), DEG95/P-8.
 
-## Scene-picker popup (checkpoint-017)
+## Teleport shortcuts and destination menu (v0.0.24-dev4)
 
-`dbg scene change`, `debug scene change` or `amiwind debug scene change` opens
-a small menu offering Prison ship interior, Seyda Neen exterior and Cancel.
-Arrows/Tab move selection; Enter or mouse selects; Escape returns to the console
-without a load. Missing scene files are disabled. It lists the two supported
-compiled scenes, not arbitrary filenames or every Morrowind cell. Existing
-direct `dbg scene ship` / `dbg scene town` commands remain. The debug picker
-will remain independent of future opening-story travel restrictions.
+Use these during play:
+
+| Command | Destination / action |
+| --- | --- |
+| `dbg tp` or `dbg tp menu` | Open the destination picker |
+| `dbg tp balmora` | Balmora exterior at the converted arrival point |
+| `dbg tp seydaneen` | Seyda Neen exterior at the checked town recall point |
+| `dbg tp prisonship` | Imperial Prison Ship interior |
+| `dbg tp census` | Census and Excise Office |
+| `dbg tp tradehouse` | Arrille's Tradehouse |
+| `dbg tp lighthouse` | Lighthouse interior |
+| `dbg tp addamasartus` | Addamasartus |
+
+Other converted map names from [the scene list](SEYDA_NEEN_INTERIORS.md) work too.
+Names are case-insensitive. `seyda` / `town` and `ship` retain their short aliases.
+`debug tp ...` and `amiwind debug tp ...` use the same handler. Teleport uses the
+existing scene state capture and checked arrival path, not a New Game reset.
+Missing map files and unknown destinations are rejected before leaving the scene.
+This is a development shortcut and can bypass the intended opening route.
+
+`dbg scene change` remains an alias for the same menu. The picker lists all 17
+converted logical scenes, including Balmora, plus Cancel. Arrows/Tab scroll the
+list; Enter or mouse selects; Escape returns without loading. Missing scene files
+are disabled. It does not expose arbitrary filenames, individual `bmNNN` regions,
+or unconverted Balmora interiors. Legacy `dbg scene <map>` commands remain.
+
+The entrance lookup for an interior now uses its destination catalogue even
+when invoked from Balmora. Previously the picker could offer a Seyda Neen interior
+but search Balmora's unconverted door catalogue and fail to find the entrance.
 
 ## Live exterior fog/draw distance (checkpoint-017)
 
@@ -153,7 +181,11 @@ depth, not a radius or a real-world metre measurement.
 Escape → Options → Graphics has a live slider. Select Fog distance and use
 Left/Right (10-unit steps), Shift+Left/Right (1-unit nudges), or click the bar. Select Medium/default to restore
 700. Escape/Back returns to the main menu; Return to game resumes. Try 500 or
-400 for a shorter view. Existing 1/2/3 shortcuts retain 450/700/1000.
+400 for a shorter view. **Shift+V** cycles requested 450/540/1000 distance.
+Bare 1/2/3 no longer set distance. Startup removes only the exact old generated
+numeric distance bindings; unrelated custom bindings survive. Both Balmora and
+Seyda Neen region exteriors cap effective distance at 540 so the view stays within
+converted overlap. The larger stored request remains available in other scenes.
 
 Fog still starts at 40% of the selected depth and becomes opaque at 100%; BSP
 and model rejection use the same distance with the existing small safety margin.
@@ -180,7 +212,13 @@ same overlay/viewport settings when comparing views.
 
 ## Loading presentation
 
-`aw_loading_style normal` is the default. `aw_loading_style blank` selects a
+For exterior sub-cell crossings, Options → Area loading selects **Freeze frame**
+(default) or **Black screen**. `aw_region_loading 1` holds the last frame/palette
+with a small top Loading box; `aw_region_loading 0` restores blank transitions.
+The setting is saved in the configuration. Neither option changes BSP loading
+latency or enables background streaming.
+
+`aw_loading_style normal` is the default for ordinary scene loads. `aw_loading_style blank` selects a
 black loading frame with no artwork or text for subsequent loads. Other values
 fall back to normal. This setting lasts for the session. The opening movie uses
 a one-transition blank override; ordinary doors return to the selected default.
@@ -230,3 +268,17 @@ width with centered text, `1` retains the fixed legacy body. Saved parameter:
 `aw_intro_text_overlay 0/1` switches original/readable first movie text, when the
 private optional opening card is present. Aim-only identity also works during
 sampled introductory speech; input prompts and character selectors suppress it.
+
+## dev5 playtest controls
+
+`dbg hud type 2` is the default compact version/location banner; type 1 retains
+the original size. `dbg render order 2` selects the corrected mesh span ordering;
+type 1 keeps the legacy renderer for matched-camera comparisons.
+
+`dbg aw hors 0` resets to Hors (male Nord, Barbarian, The Steed), after Census in
+Seyda Neen square. `dbg tp balmora` creates Hors only without an existing
+character. `dbg door sounds on/off` controls authored opening/closing samples.
+`dbg input trace on/off` logs raw key/mouse events to the debug log when running
+with `-condebug`; turn it off after reproducing the birthsign input report.
+Frame CSV now also records server time and surface-order mode, separating
+movement/logic cost from world rendering. Shift+V stays unchanged.

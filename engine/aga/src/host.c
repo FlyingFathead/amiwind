@@ -485,6 +485,7 @@ not reinitialize anything.
 */
 void Host_ClearMemory (void)
 {
+    AW_SceneryClear();
 	Con_DPrintf ("Clearing memory\n");
 	D_FlushCaches ();
 	Mod_ClearAll ();
@@ -685,8 +686,9 @@ void _Host_Frame (float time)
 // check for commands typed to the host
 	Host_GetConsoleCommands ();
 
-	if (sv.active)
-		Host_ServerFrame ();
+	if (sv.active) {
+        AW_Mark(5);Host_ServerFrame ();AW_EndMark(5);
+    }
 
 //-------------------
 //
@@ -732,6 +734,7 @@ void _Host_Frame (float time)
 	AW_IntroTick();
     AW_WaitTick();
 	AW_SaveTick();
+    AW_SceneTick();
 	CDAudio_Update();
     AW_ProfileFrame();
 

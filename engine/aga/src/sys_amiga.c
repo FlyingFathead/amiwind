@@ -43,6 +43,8 @@ qboolean isDedicated = FALSE;
 int mouseX = 0;
 int mouseY = 0;
 qboolean mouse_has_moved = false;
+static cvar_t aw_input_trace={"aw_input_trace","0"};
+void AW_InputDebugInit(void){Cvar_RegisterVariable(&aw_input_trace);}
 
 #define RAWKEY_NM_WHEEL_UP      0x7A
 #define RAWKEY_NM_WHEEL_DOWN    0x7B
@@ -230,7 +232,7 @@ static int xlate[0x68] = {
 void Sys_SendKeyEvents(void) {
 
   ULONG class;
-  UWORD code;
+  UWORD code,qualifier;
   WORD mousex, mousey;
   struct IntuiMessage *msg;
 
@@ -239,12 +241,14 @@ void Sys_SendKeyEvents(void) {
     while ((msg = (struct IntuiMessage *)GetMsg (video_window->UserPort)) != NULL) {
         class = msg->Class;
         code = msg->Code;
+        qualifier = msg->Qualifier;
         mousex = msg->MouseX;
         mousey = msg->MouseY;
         ReplyMsg ((struct Message *)msg);
 
         switch (class) {
         case IDCMP_RAWKEY:
+            if(aw_input_trace.value)Con_Printf("Input raw %ld qualifier %ld\n",(long)code,(long)qualifier);
             switch (code) {
                 case RAWKEY_NM_WHEEL_UP:
 	Key_Event(K_MWHEELUP, true);
@@ -293,6 +297,7 @@ void Sys_SendKeyEvents(void) {
           break;
 
         case IDCMP_MOUSEMOVE:
+          if(aw_input_trace.value)Con_Printf("Input mouse %ld %ld qualifier %ld\n",(long)mousex,(long)mousey,(long)qualifier);
           mouseX = mousex;
           mouseY = mousey;
           mouse_has_moved = true;

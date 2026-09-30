@@ -186,20 +186,46 @@ def combined(shapes,frame=0):
         faces.extend([[*(f+base),shape['material']] for f in shape['faces']])
     return np.array(vertices),np.array(faces,int)
 
+def simplify_shape(points, faces, quota, preserve_shell=False):
+    """Bound reduction without allowing a large torso panel to collapse away.
+
+    Thin/open armour does not have the volume protection of a closed body.
+    Retry with more faces when its surface area or extent collapses. The final
+    alias budget is still enforced by bake; no triangles are silently dropped.
+    """
+    import fast_simplification
+    def area(p, f):
+        return np.linalg.norm(np.cross(p[f[:,1]]-p[f[:,0]],
+                                       p[f[:,2]]-p[f[:,0]]), axis=1).sum()
+    original_area = area(points, faces)
+    span = np.ptp(points, axis=0)
+    while quota < len(faces):
+        candidate, triangles = fast_simplification.simplify(points, faces, target_count=quota)
+        if len(triangles)>quota+2:
+            candidate, triangles = fast_simplification.simplify(points, faces, target_count=quota, agg=10.)
+        if len(triangles) and (not preserve_shell or
+                (area(candidate, triangles) >= .8*original_area and
+                 np.all(np.ptp(candidate, axis=0) >= .7*span))):
+            return candidate, triangles
+        quota = max(quota+1, quota*2)
+    return points, faces
+
 def bake(shapes,materials,textures,palette,budget=480):
     """One topology shared by every frame, per-face tiny UV atlas patches."""
-    import fast_simplification
     from scipy.spatial import cKDTree
     if not 64<=budget<=480:raise ValueError('Triangle budget must be 64..480')
     weights=np.array([len(s['faces'])*(1.7 if s['part']==0 else 1) for s in shapes],dtype=float);weights/=weights.sum()
     quotas=np.array([min(120,len(s['faces'])) if s['part']==0 and len(s['positions'])>8 else 4 for s in shapes],int);remaining=budget-int(quotas.sum())
     if remaining<0:raise ValueError('Too many separate shapes for budget')
     quotas+=np.floor(weights*remaining).astype(int)
+    actor_height = max(s['positions'][0,:,2].max() for s in shapes)-min(s['positions'][0,:,2].min() for s in shapes)
     skin=Image.new('RGB',(512,256));allframes=[];outfaces=[];outuv=[];fi=0
     for shape,quota in zip(shapes,quotas):
         orig=shape['positions'];faces=shape['faces'];p=orig[0]
         points,ix=np.unique(np.round(p,5),axis=0,return_inverse=True);ff=ix[faces]
-        if len(ff)>quota:points,ff=fast_simplification.simplify(points,ff.astype(np.int32),target_count=int(quota))
+        if len(ff)>quota:
+            preserve_shell = shape['part']==3 and np.ptp(p[:,2]) >= .2*actor_height
+            points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
         old_tri=p[faces];centres=old_tri.mean(axis=1);tree=cKDTree(centres)
         mat=materials[shape['material']];tex=textures.get(mat['texture_index'])
         for face in ff:
@@ -236,7 +262,11 @@ def bake(shapes,materials,textures,palette,budget=480):
                 px=np.floor(sampleuv[:,0]*tex.shape[1]).astype(int)%tex.shape[1];py=np.floor(sampleuv[:,1]*tex.shape[0]).astype(int)%tex.shape[0]
                 colours=tex[py,px,:3].astype(float)
             colours*=samplecolour*np.array(mat['diffuse']);tile=np.clip(colours,0,255).astype(np.uint8).reshape(16,16,3)
-            if fi>=512:raise ValueError('Alias skin tile budget exceeded')
+            if fi>=666:raise ValueError('Alias vertex budget exceeded')
+            if fi==512:
+                # Disconnected authored armour can resist edge collapse. The
+                # native alias limit allows 1999 vertices, or 666 face tiles.
+                larger=Image.new('RGB',(512,336));larger.paste(skin,(0,0));skin=larger
             tx=fi%32*16;ty=fi//32*16;skin.paste(Image.fromarray(tile),(tx,ty));outuv.extend([(tx,ty),(tx+15,ty),(tx,ty+15)])
             outfaces.append([fi*3,fi*3+2,fi*3+1]);fi+=1
     pal=Image.new('P',(1,1));pal.putpalette(palette)

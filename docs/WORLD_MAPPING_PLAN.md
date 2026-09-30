@@ -1,9 +1,12 @@
 # World mapping and streaming plan
 
-Core design recorded 27 September 2026. This is the intended architecture;
-checkpoint-015 still loads one resident scene and streams only music during play.
-The existing terrain packets and scenery index are host experiments, not proof
-that this whole runtime design is already implemented.
+Core design recorded 27 September 2026; status updated 30 September. Balmora now
+uses 64 overlapping runtime regions with synchronous replacement of one resident
+BSP. Player state crosses those boundaries. Dev3 adds optional frozen-frame
+loading presentation; background prefetch/shared resource streaming remains a
+future extension, described in [PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md).
+Seyda Neen subdivision is a profiling candidate after the owner's faster-Balmora
+playtest report. The broader architecture below is not all implemented.
 
 > Source cells preserve Morrowind's world structure; smaller runtime chunks
 > determine what the Amiga loads.
@@ -22,7 +25,7 @@ Current scene conversion uses:
 - local X = (source X - center X) * 0.25
 - local Y = (source Y - center Y) * 0.25
 - local Z = source Z * 0.25
-- current center = (-11264,-71680)
+- Seyda Neen center = (-11264,-71680); each area retains its own configured center
 
 These are current converter coordinates, not a universal engine-format mandate.
 Document any future axis, scale or origin change and rebuild collision, doors,

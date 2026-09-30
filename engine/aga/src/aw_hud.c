@@ -5,6 +5,7 @@ int sb_lines;
 static cvar_t coords = {"_aw_debug_coords", "0", true};
 static cvar_t overlays = {"_aw_debug_all", "0", true};
 static cvar_t fps = {"_aw_debug_fps", "0", true};
+static cvar_t hud_type = {"_aw_debug_hud_type", "2", true};
 extern int AW_FpsTenths(void);
 /* Temporary demo water at Z=0; visibility only, not water physics. */
 static cvar_t sealevel = {"_aw_debug_sealevel", "1", true};
@@ -36,10 +37,19 @@ static void debug_fps(void) {debug_toggle(&fps,"amiwind_debug_fps");}
 static void debug_showfps(void) {if(Cmd_Argc()==1)Cvar_SetValue(fps.name,1);else debug_fps();}
 static void debug_ram(void) {debug_toggle(&scr_showram,"amiwind_debug_showram");}
 static void debug_sea(void) {debug_toggle(&sealevel,"amiwind_debug_sealevel");}
+static void debug_hud_type(void) {
+    if(Cmd_Argc()==1){Con_Printf("Debug HUD type %ld\n",(long)hud_type.value);return;}
+    if(Cmd_Argc()!=2 || (strcmp(Cmd_Argv(1),"1") && strcmp(Cmd_Argv(1),"2"))){
+        Con_Printf("Usage: dbg hud type 1/2\n");return;
+    }
+    Cvar_SetValue(hud_type.name,atoi(Cmd_Argv(1)));scr_copyeverything=1;
+}
 void Sbar_Init(void) {
     Cvar_RegisterVariable(&coords);Cvar_RegisterVariable(&overlays);
     Cvar_RegisterVariable(&sealevel);
     Cvar_RegisterVariable(&fps);
+    Cvar_RegisterVariable(&hud_type);
+    Cmd_AddCommand("aw_debug_hud_type",debug_hud_type);
     Cmd_AddCommand("amiwind_debug_coords",debug_coords);Cmd_AddCommand("amiwind_debug_all",debug_all);
     Cmd_AddCommand("amiwind_show_debug",debug_all);
     Cmd_AddCommand("amiwind_debug_showram",debug_ram);
@@ -48,13 +58,14 @@ void Sbar_Init(void) {
 }
 void Sbar_Changed(void) {}
 void Sbar_Draw(void) {
-    char title[80];
+    char title[128];int limit,width=hud_type.value==1?8:4;
     if(key_dest==key_console)return;
     AW_UIHud();
     if(!AW_DebugOverlaysEnabled())return;
-    snprintf(title,sizeof(title),"AMIWIND v" AMIWIND_VERSION " / %.36s",cl.levelname);
-    title[(vid.width>16 && vid.width<656)?(vid.width-16)/8:79]=0;
-    Draw_String(8,8,title);
+    snprintf(title,sizeof(title),"AMIWIND v" AMIWIND_VERSION " / %s",cl.levelname);
+    limit=(vid.width-16)/width;if(limit<0)limit=0;if(limit>127)limit=127;
+    title[limit]=0;
+    if(width==8)Draw_String(8,8,title);else AW_SmallString(8,8,title);
     if(fps.value){
         char line[16];int n=AW_FpsTenths(),x=8;
         sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));

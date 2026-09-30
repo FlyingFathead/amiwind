@@ -6,7 +6,7 @@
 static int AW_BooleanCvar(const char *name) {
     static const char *const names[]={"aw_fog","aw_cull","aw_ui_hud","aw_ui_frame",
         "aw_intro_text_overlay","aw_show_speaker_name_during_voiceovers",
-        "aw_target_names","early_game_demo_start_1","_aw_debug_all",
+        "aw_input_trace","aw_door_sounds","aw_target_names","early_game_demo_start_1","_aw_debug_all",
         "_aw_debug_coords","_aw_debug_fps","_aw_debug_sealevel","showram",
         "r_drawentities","r_drawworld","r_fullbright","r_drawviewmodel",
         "cl_nolerp","lookspring","lookstrafe",NULL};

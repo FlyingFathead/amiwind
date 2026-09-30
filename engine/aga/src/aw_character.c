@@ -13,6 +13,8 @@ byte aw_character_source[32];
 static byte specialization[27];
 static const byte *cursor,*limit;
 static int decode_error;
+static unsigned short eye_heights[16][2];
+static int default_eye_race,default_eye_female;
 static int menu,accepted,row,review_return,page;
 static int confirming,confirm_yes;
 static int mouse_x=160,mouse_y=90,mouse_visible;
@@ -47,6 +49,7 @@ int AW_CharacterDecode(const byte *data,int size)
     int nr,nc,nb,np,i,j;byte pad=0;
     aw_race_t *r;aw_class_t *c;aw_birth_t *b;aw_part_t *p;
     aw_race_count=aw_class_count=aw_birth_count=aw_part_count=0;
+    memset(eye_heights,0,sizeof(eye_heights));default_eye_race=default_eye_female=0;
     if(size<72 || size>98304 || memcmp(data,"AWC1",4))return 0;
     cursor=data+4;limit=data+size;decode_error=0;
     nr=number();nc=number();nb=number();np=number();
@@ -81,6 +84,16 @@ int AW_CharacterDecode(const byte *data,int size)
         p=&aw_parts[i];name(p->id,64);take(&p->race,1);take(&p->female,1);take(&p->kind,1);take(&pad,1);
         if(pad || p->race>=nr || p->female>1 || p->kind>1)decode_error=1;
     }
+    if(!decode_error && cursor<limit){
+        byte header[6];
+        if(limit-cursor!=6+nr*4 || !take(header,6) || memcmp(header,"AWE1",4) ||
+           header[4]>=nr || header[5]>1)return 0;
+        default_eye_race=header[4];default_eye_female=header[5];
+        for(i=0;i<nr;i++)for(j=0;j<2;j++){
+            int height=number();if(height<8000 || height>60000)return 0;
+            eye_heights[i][j]=height;
+        }
+    }
     if(decode_error || cursor!=limit)return 0;
     /* Reject duplicate IDs and missing race/sex choices before selectors use it. */
     for(i=0;i<np;i++)for(j=0;j<i;j++)if(!strcmp(aw_parts[i].id,aw_parts[j].id))return 0;
@@ -104,6 +117,26 @@ int AW_CharacterLoad(void)
     ok=fread(raw,1,size,f)==(size_t)size;fclose(f);
     if(ok)ok=AW_CharacterDecode(raw,size);
     free(raw);return ok;
+}
+
+float AW_CharacterEyeHeight(void)
+{
+    int race=default_eye_race,sex=default_eye_female;
+    if(!aw_race_count)return 0;
+    if(aw_character.valid && (aw_story.stage==AW_STAGE_DEMO || aw_story.stage>=AW_STAGE_OFFICE)){
+        race=aw_character.race;sex=aw_character.female;
+    }
+    if(race<0 || race>=aw_race_count || sex<0 || sex>1)return 0;
+    return eye_heights[race][sex]*.001f;
+}
+
+static void apply_eye(void)
+{
+    float height;edict_t *p;
+    if(!aw_character.valid || aw_character.race<0 || aw_character.race>=aw_race_count || aw_character.female<0 || aw_character.female>1)return;
+    height=eye_heights[aw_character.race][aw_character.female]*.001f;
+    if(height<=0 || !sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return;
+    p->v.view_ofs[2]=height+p->v.mins[2];
 }
 
 static int part_next(int current,int race,int sex,int kind,int direction)
@@ -153,10 +186,34 @@ void AW_CharacterReset(void)
     AW_CharacterRebuild(&aw_character);
 }
 
+/* Explicit development restart. Resolve catalogue IDs and use the ordinary
+ * stat builder; never invent a second set of Nord/class/birthsign values. */
+int AW_CharacterHors(void)
+{
+    aw_character_t c;int i;
+    if(!AW_CharacterLoad())return 0;
+    memset(&c,0,sizeof(c));c.race=c.clas=c.birth=-1;
+    for(i=0;i<aw_race_count;i++)if(!Q_strcasecmp(aw_races[i].id,"nord"))c.race=i;
+    for(i=0;i<aw_class_count;i++)if(!Q_strcasecmp(aw_classes[i].id,"barbarian"))c.clas=i;
+    for(i=0;i<aw_birth_count;i++)if(!Q_strcasecmp(aw_births[i].id,"charioteer"))c.birth=i;
+    if(c.race<0 || c.clas<0 || c.birth<0)return 0;
+    c.head=part_next(-1,c.race,0,0,1);c.hair=part_next(-1,c.race,0,1,1);
+    if(!AW_CharacterRebuild(&c))return 0;
+    AW_StoryReset(0);strcpy(aw_story.name,"Hors");
+    AW_CourtyardTakeRing();AW_CaptainDuties();
+    AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);
+    aw_story.stage=AW_STAGE_RELEASED;aw_story.ship_disabled=1;
+    aw_story.hall=aw_story.hall_open=1;aw_story.captain=-1;
+    aw_story.dock=aw_story.census=-1;
+    aw_character=c;menu=accepted=review_return=confirming=0;AW_HeadClear();apply_eye();
+    return 1;
+}
+
 int AW_CharacterOpen(int kind)
 {
     if(kind<1 || kind>4 || !AW_CharacterLoad() || !aw_character.valid)return 0;
     choice=aw_character;menu=kind;row=page=accepted=review_return=mouse_visible=confirming=0;rotation=0;
+    mouse_x=100;mouse_y=kind==1?48:176;
     IN_AWClearButtons();
     if(kind==1 && !AW_HeadLoad(choice.head,choice.hair)){menu=0;return 0;}
     return 1;
@@ -180,14 +237,14 @@ static void change(int direction)
 }
 void AW_CharacterMouse(int dx,int dy)
 {
-    if(!menu)return;
+    if(!menu || (!dx && !dy))return;
     mouse_visible=1;mouse_x+=dx;mouse_y+=dy;
     if(mouse_x<0)mouse_x=0;
     if(mouse_x>319)mouse_x=319;
     if(mouse_y<0)mouse_y=0;
     if(mouse_y>199)mouse_y=199;
     if(confirming){if(mouse_y>=143 && mouse_y<166)confirm_yes=mouse_x>=160;return;}
-    if(menu==1 && mouse_x<198 && mouse_y>=38 && mouse_y<148)row=(mouse_y-38)/22;
+    if(menu==1 && mouse_x<198 && mouse_y>=38 && mouse_y<126)row=(mouse_y-38)/22;
     if(mouse_y>=166)row=4;
 }
 int AW_CharacterKey(int key)
@@ -200,7 +257,7 @@ int AW_CharacterKey(int key)
         if(key=='y' || key=='Y')confirm_yes=1;
         if(key==K_ENTER || key==K_MOUSE1 || key=='y' || key=='Y'){
             confirming=0;
-            if(confirm_yes){aw_character=choice;accepted=menu;menu=0;AW_HeadClear();IN_AWClearButtons();}
+            if(confirm_yes){aw_character=choice;accepted=menu;menu=0;AW_HeadClear();IN_AWClearButtons();apply_eye();}
         }
         return 1;
     }
@@ -210,12 +267,20 @@ int AW_CharacterKey(int key)
     if(key=='w' || key=='W')key=K_UPARROW;
     if(key=='s' || key=='S')key=K_DOWNARROW;
     if(key==K_MOUSE1){
-        if(mouse_y>=166 && mouse_y<187)key=K_ENTER;
+        if(menu==1 && mouse_x<198 && mouse_y>=38 && mouse_y<126){
+            row=(mouse_y-38)/22;
+            if(mouse_x>=12 && mouse_x<=33)change(-1);
+            else if(mouse_x>=171 && mouse_x<=193)change(1);
+            return 1;
+        }
+        if(mouse_y>=166 && mouse_y<187){if(menu==1)row=4;key=K_ENTER;}
         else if(menu==1 && mouse_x>=200){rotation+=.4f;return 1;}
+        else if(menu==1)return 1;
         else {change(mouse_x<100?-1:1);return 1;}
     }
     if(menu==4 && (key=='r' || key=='c' || key=='b')){
         review_return=1;menu=key=='r'?1:key=='c'?2:3;row=0;
+        mouse_visible=0;mouse_x=100;mouse_y=menu==1?48:176;
         if(menu==1)AW_HeadLoad(choice.head,choice.hair);
         return 1;
     }
@@ -230,17 +295,18 @@ int AW_CharacterKey(int key)
         if(menu==1 && row<4){row++;return 1;}
         if(!AW_CharacterRebuild(&choice))return 1;
         if(review_return){menu=4;review_return=0;page=0;return 1;}
-        confirming=1;confirm_yes=0;mouse_visible=0;return 1;
+        confirming=1;confirm_yes=1;mouse_visible=0;mouse_x=220;mouse_y=154;return 1;
     }
     return 1;
 }
 void AW_CharacterDraw(void)
 {
-    int i,y,index,gold,muted;char line[96];
+    int i,j,y,index,gold,muted;char line[96];
     if(!menu || key_dest!=key_game)return;
     gold=AW_UIColor(223,199,144);muted=AW_UIColor(120,109,87);
     AW_UIBox(2,2,316,196);
-    AW_UITextBox(10,8,300,20,menu==1?"Choose your appearance":menu==2?"Choose your class":menu==3?"Choose your birthsign":"Review your character",gold);
+    if(menu==4)sprintf(line,"Review your character (page %ld/5)",(long)page+1);
+    AW_UITextBox(10,8,300,20,menu==1?"Choose your appearance":menu==2?"Choose your class":menu==3?"Choose your birthsign":line,gold);
     if(menu==1){
         const char *labels[]={"Race","Sex","Face","Hair"};
         for(i=0;i<4;i++){
@@ -256,7 +322,11 @@ void AW_CharacterDraw(void)
             }
             y=38+i*22;
             if(row==i)AW_UIFill(9,y,186,21,AW_UIColor(54,47,32));
-            AW_UITextBox(12,y,180,21,line,gold);
+            for(j=0;j<=6;j++){
+                AW_UIFill(16+j,y+10-j,1,j*2+1,gold);
+                AW_UIFill(188-j,y+10-j,1,j*2+1,gold);
+            }
+            AW_UITextBox(34,y,136,21,line,gold);
         }
         AW_UITextBox(10,133,185,23,"Arrows/WASD: Choose",muted);
         rotation+=host_frametime*.35f;AW_HeadDraw(201,34,108,122,rotation);

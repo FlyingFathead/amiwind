@@ -39,7 +39,7 @@ Use a working copy of the image: exit writes profiling files to the filesystem.
 | Left / right arrow | Turn |
 | Shift | Run |
 | Space | Jump; upward swim input when submerged |
-| 1 / 2 / 3 | Short / medium / longer fog and draw distance: 450 / 540 / 1000 Quake units |
+| Shift+V | Cycle requested draw distance: 450 / 540 / 1000; region exteriors cap at 540 |
 | Shift+F5 / Shift+F6 | Previous / next song in playback history, then shuffled selection |
 | F6 | Next song (legacy alias) |
 | F8 | Audition battle/exploration music mode; not combat detection |

@@ -32,6 +32,23 @@ int main(void)
     b[0]=0;t=check(a,b,&p);assert(t.startsolid && t.allsolid && t.fraction==0);
     AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);t=check(a,b,&p);assert(t.fraction==1 && !t.startsolid);
     AW_StoryReset(1);p.v.movetype=MOVETYPE_NOCLIP;t=check(a,b,&p);assert(t.fraction==1);
+    /* Continuous pier sides, shore end and stage release; use the real hull. */
+    AW_StoryReset(1);aw_story.stage=AW_STAGE_DOCK;p.v.movetype=MOVETYPE_WALK;
+    { vec3_t lo={-7.32,-7.12,-16.625},hi={7.32,7.12,16.625};int side;
+      for(side=-1;side<=1;side+=2){
+        a[0]=474.29012;a[1]=-293.06688;a[2]=50;
+        b[0]=a[0]+side*100*.5403344;b[1]=a[1]+side*100*.8414506;b[2]=50;
+        memset(&t,0,sizeof(t));t.fraction=1;AW_BarrierClip(a,lo,hi,b,&p,&t);
+        assert(!t.startsolid && t.fraction>0 && t.fraction<.3);
+      }
+      a[0]=587.5;a[1]=-353.25;b[0]=330;b[1]=-200.25;
+      memset(&t,0,sizeof(t));t.fraction=1;AW_BarrierClip(a,lo,hi,b,&p,&t);
+      assert(t.fraction==1 && !t.startsolid);
+      b[0]=280;b[1]=-166;
+      memset(&t,0,sizeof(t));t.fraction=1;AW_BarrierClip(a,lo,hi,b,&p,&t);assert(t.fraction<1);
+      aw_story.ship_disabled=1;
+      memset(&t,0,sizeof(t));t.fraction=1;AW_BarrierClip(a,lo,hi,b,&p,&t);assert(t.fraction==1);
+    }
     put(raw,3,NAN);assert(!AW_BarrierDecode(raw,sizeof(raw)));p.v.movetype=MOVETYPE_WALK;t=check(a,b,&p);assert(t.fraction==1);
     return 0;
 }

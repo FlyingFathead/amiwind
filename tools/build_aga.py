@@ -38,7 +38,7 @@ def startup_config(config):
     """Configure controls first; quake.rc selects the named start after autoexec."""
     config=re.sub(r'(?m)^r_max(?:surfs|edges) [^\n]*\n?', '', config)
     config=re.sub(r'(?m)^aw_drawdistance [^\n]*\n?', '', config)
-    config=config.replace('bind 2 "aw_drawdistance 700"','bind 2 "aw_drawdistance 540"')
+    config=re.sub(r'(?m)^bind "?[123]"? "aw_drawdistance (?:450|540|700|1000)"\n?', "", config)
     config=config.replace('bind ESCAPE quit','bind ESCAPE togglemenu').replace('r_drawviewmodel 0','r_drawviewmodel 1')
     config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
         'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
@@ -166,7 +166,7 @@ def image(args):
                                  boot/'id1/intro/opening.awt',movie_info['frames'])
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
-    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_startup\n')
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_startup\n')
     print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
@@ -182,8 +182,8 @@ def image(args):
     else:
         raise ValueError('Prepare the matching mesh scene before building this runtime image')
     shutil.copyfile(out/'seyda.bsp',boot/'id1/maps/seyda.bsp')
-    from prepare_intro_docks import convert as convert_intro_docks
-    convert_intro_docks(boot/'id1/maps/seyda.bsp',boot/'id1/maps/intro_docks.bsp')
+    from prepare_seyda_regions import convert as convert_seyda_regions, regions as seyda_regions
+    convert_seyda_regions(boot/'id1/maps/seyda.bsp',boot/'id1/maps')
     qc=out/'qc';qc.mkdir()
     for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
     if args.hands=='sprites':
@@ -194,7 +194,8 @@ def image(args):
     # Saved mutable state is only restored against this exact converted content.
     fingerprint=hashlib.sha256()
     from area_config import SCENES
-    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'progs.dat', 'character/catalog.awc']:
+    from balmora_regions import config as balmora_config, regions as balmora_regions
+    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', *(f"maps/{r['name']}.bsp" for r in seyda_regions()), 'balmora-regions.txt', *(f"maps/{r['name']}.bsp" for r in balmora_regions(balmora_config())), 'progs.dat', 'character/catalog.awc']:
         asset=boot/'id1'/name
         if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))

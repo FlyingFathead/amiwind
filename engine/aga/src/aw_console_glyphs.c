@@ -104,6 +104,17 @@ static const byte glyphs[95][5]={
 void AW_ConsoleSetSmall(int value) {small=value!=0;}
 int AW_ConsoleCharWidth(void) {return small?4:8;}
 int AW_ConsoleCharHeight(void) {return small?6:8;}
+void AW_SmallString(int x,int y,const char *text) {
+    int r,col,c,bits;byte *p;
+    for(;*text && x<vid.width;text++,x+=4){
+        c=*text&127;if(c<32 || c>126)continue;
+        for(r=0;r<5;r++){
+            if(y+r<0 || y+r>=vid.height)continue;
+            bits=glyphs[c-32][r];p=vid.buffer+(y+r)*vid.rowbytes;
+            for(col=0;col<3;col++)if(x+col>=0 && x+col<vid.width && (bits&(4>>col)))p[x+col]=254;
+        }
+    }
+}
 void AW_ConsoleCharacter(int x,int y,int c) {
     int r,col,bits;byte *p;c&=127;
     if(!small){Draw_Character(x,y,c);return;}

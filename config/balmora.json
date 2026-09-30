@@ -1,0 +1,40 @@
+{
+  "format": 1,
+  "source_cell": [
+    -3,
+    -2
+  ],
+  "source_radius": 1,
+  "centre": [
+    -20480,
+    -12288
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -3072,
+      -3072
+    ],
+    [
+      3072,
+      3072
+    ]
+  ],
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [
+    {
+      "cell": [-3, -2],
+      "tile": [12, 3],
+      "source_material": 0,
+      "material": 34,
+      "reason": "Isolated default tile inside WG_road at the reported east-bank paving gap"
+    }
+  ],
+  "arrival_actor": "selvil sareloth",
+  "entity_budget": 1000,
+  "model_budget": 220
+}

@@ -7,7 +7,7 @@ viddef_t vid;refdef_t r_refdef;keydest_t key_dest;double realtime;double host_fr
 client_static_t cls;server_t sv;server_static_t svs;int scr_copyeverything;
 byte pal[768],glyphs[16384],frame[64004];byte *host_basepal=pal,*draw_chars=glyphs;
 static char *directory;
-static cvar_t *loading_parameter;
+static cvar_t *loading_parameter,*region_parameter;
 static int queued_prison;
 void AW_StoryReset(int new_game){}
 void AW_CharacterReset(void){}
@@ -17,10 +17,10 @@ int AW_MusicStartTrack(int track){assert(track==4);return 1;}
 void Cbuf_AddText(char *text){assert(!strcmp(text,"map prison\n"));queued_prison=1;}
 int COM_FOpenFile(char *name,FILE **f){char p[1024];int n;sprintf(p,"%s/%s",directory,name);*f=fopen(p,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);rewind(*f);return n;}
 void Con_Printf(char *fmt,...){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;}
 int AW_LoadingScreen(void){return 1;}
 int AW_MenuFrontEnd(void){return 0;}
-void Cvar_SetValue(char *s,float v){}
+void Cvar_SetValue(char *s,float v){if(region_parameter && !strcmp(s,region_parameter->name))region_parameter->value=v;}
 void Cmd_AddCommand(char *s,void(*f)(void)){}
 char *Cmd_Argv(int i){return "";}
 int Cmd_Argc(void){return 0;}
@@ -51,6 +51,31 @@ int main(int argc,char **argv){
  AW_UIBookBegin();AW_UIText(20,20,"A",0);
  assert(vid.buffer[20*320+20]==170 && vid.buffer[20*320+21]==85 && vid.buffer[20*320+22]==0);
  AW_UIBookEnd();AW_UIText(20,20,"A",0);assert(!memcmp(before,vid.buffer+20*320+20,3));
+ /* Only the small top box changes; padded rows and repeated reconnect plaques
+  * preserve the original pixels after the live buffer has been overwritten. */
+ {
+  byte padded[64804];int x,y,left,w,h;
+  assert(region_parameter && region_parameter->archive && AW_RegionLoadingFrozen());
+  AW_RegionLoadingToggle();assert(!AW_RegionLoadingFrozen());AW_RegionLoadingToggle();
+  memset(padded,137,sizeof(padded));vid.buffer=padded+2;vid.rowbytes=324;
+  for(y=0;y<200;y++)for(x=0;x<320;x++)vid.buffer[y*324+x]=(x+y)%251+1;
+  AW_SetNextLoadingStyle(AW_LOADING_FROZEN);AW_BeginLoadingStyle();assert(AW_LoadingFrozen());
+  for(y=0;y<200;y++)memset(vid.buffer+y*324,0,320);
+  AW_BeginLoadingStyle();AW_UILoading();assert(!AW_UIMenuPalette());
+  w=AW_UIWidth("Loading...")+20;h=AW_UIHeight()+8;left=(320-w)/2;
+  for(y=0;y<200;y++)for(x=0;x<324;x++){
+   if(x>=320)assert(vid.buffer[y*324+x]==137);
+   else if(y<6 || y>=6+h || x<left || x>=left+w)assert(vid.buffer[y*324+x]==(x+y)%251+1);
+  }
+  AW_UILoading();assert(vid.buffer[150*324+88]==(150+88)%251+1);
+  assert(padded[0]==137 && padded[64803]==137);
+  vid.height=199;AW_UILoading();assert(!AW_LoadingFrozen());
+  assert(AW_UIMenuPalette() && !AW_UIMenuPalette()[100]);
+  AW_EndLoadingStyle();assert(!AW_LoadingFrozen());
+  vid.buffer=NULL;AW_SetNextLoadingStyle(AW_LOADING_FROZEN);AW_BeginLoadingStyle();
+  assert(!AW_LoadingFrozen());AW_EndLoadingStyle();
+  vid.buffer=frame+2;vid.rowbytes=320;vid.height=200;
+ }
  /* Blank is a complete black frame/palette, then normal art resumes. */
  assert(loading_parameter && !strcmp(loading_parameter->string,"normal"));
  AW_SetNextLoadingStyle(AW_LOADING_BLANK);AW_BeginLoadingStyle();AW_BeginLoadingStyle();AW_UILoading();

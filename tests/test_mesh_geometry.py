@@ -13,6 +13,26 @@ if READY:
 
 @unittest.skipUnless(READY, "optional numpy/scipy geometry dependencies required")
 class MeshGeometryTests(unittest.TestCase):
+    def test_oblique_shell_bevel_keeps_clear_space_beside_stair_arch(self):
+        from scipy.spatial import ConvexHull
+        from itertools import product
+        from prepare_mesh_bsp import standing_planes
+        from player_hull import MINS, MAXS
+        triangle = np.array([[0,0,0], [30,30,10], [0,40,20]], float)
+        normal = np.cross(triangle[1]-triangle[0], triangle[2]-triangle[0])
+        normal /= np.linalg.norm(normal)
+        points = np.concatenate((triangle + normal*.2, triangle - normal*.2))
+        hull = ConvexHull(points)
+        approximate = standing_planes(points, hull.equations)
+        exact = standing_planes(points, hull.equations, exact=True)
+        clear = np.array([13., -7., -6.])
+        self.assertLess(np.max(approximate[:,:3]@clear + approximate[:,3]), 0)
+        self.assertGreater(np.max(exact[:,:3]@clear + exact[:,3]), 3)
+        # Every box touching a real vertex remains on/inside the collision hull.
+        for corner in product(*zip(MINS, MAXS)):
+            contacts = points - corner
+            self.assertLess(np.max(contacts@exact[:,:3].T + exact[:,3]), .002)
+
     def test_acute_piece_does_not_create_distant_solid_spike(self):
         from scipy.spatial import ConvexHull
         from prepare_mesh_bsp import bounded_planes

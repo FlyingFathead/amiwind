@@ -724,3 +724,64 @@ colour/texture, beneath the door/frame margin. Do not blank or simplify exposed
 wall detail. The reason is to omit geometry which cannot contribute to the view
 from the runtime asset, reducing resident data and geometric work. Validate
 concealment across door states and viewpoints before removal.
+
+
+## J022 — accepted sub-cell loading presentation (30 September 2026)
+
+The owner tested Balmora's v0.0.24-dev3 sub-cell transitions and explicitly
+approved the frozen last frame with a small top-centred **Loading...** box.
+Keep this as the default method for exterior sub-cells, including Seyda Neen.
+Retain the existing blank-frame mode as an option. This acceptance concerns
+the presentation, not asynchronous streaming: replacement remains synchronous,
+with only one BSP resident and music serviced during loading.
+
+Seyda Neen must use real sub-cells from the first ship-exit exterior entry.
+The Census courtyard containing Fargoth's ring is an explicit separate area.
+Reuse Balmora's shared coordinates, complete intersecting placements, overlap,
+hysteresis, persistent state and arrival checks. Do not repeat facade loss by
+clipping buildings at their origins or applying blanket mesh reduction.
+
+New owner observation: pressing the old distance-1000 shortcut made the opening
+pier view faster. Keep this as an open performance report until matched-camera
+measurements reproduce it; do not infer that larger distances are always faster.
+The intro_docks variant hides distant scenery and world marks but retained the
+full BSP payload. True offloading must remove unreferenced geometry from the
+loaded file, and performance claims need frame-time evidence.
+
+
+The arrival-area design name is `intro_seyda_neen_subcell_pier`; its short BSP
+filename remains `intro_docks.bsp` for the existing runtime/image workflow. The
+owner's annotated circle guides a conservative polygon footprint retaining
+whole intersecting objects and the Strider silhouette across the water.
+A wider map-density study is explicitly deferred to the next version.
+
+
+## J023 — Balmora dev3 acceptance and second stair report
+
+Owner acceptance, 30 September 2026: Balmora's region/sub-cell approach works
+surprisingly well and is a promising foundation for streaming the wider game
+without disruptive scene transitions. Preserve the frozen frame and Loading...
+box. This is acceptance of the current synchronous approach, not a claim that
+asynchronous whole-world streaming is already implemented.
+
+The owner also accepts Balmora's Silt Strider in v0.0.24-dev3: **leave its
+geometry and conversion profile unchanged**. Earlier broken-Strider reports
+are superseded by this confirmation.
+
+New stair report: XYZ613,-125,59, yaw22, pitch-5, looks deformed. The camera is
+beside placed reference 41159 (`ex_hlaalu_dsteps_03`) and building 22548
+(`ex_hlaalu_b_04`). Keep this separate from the earlier blocked stair entrance
+at XYZ925,-290,62, belonging to `ex_hlaalu_b_17` reference 32631. Source mesh,
+conversion and walking collision need separate evidence before calling it fixed.
+
+## v0.0.24-dev5: measured Balmora and ship follow-up
+
+Separate native surface-order defects from collision volume defects. Add mesh
+span depth crossings, authored stair shells with complete box bevels, the
+checked road tile and torso-reduction coverage checks. Index the prison shell's
+large collision union; matched lower-cabin server time falls from roughly 34 ms
+to 1 ms while retaining the floor. See the dev5 investigation for failed trials,
+walking endpoints, measurements and limits. Gold glyph coverage, appearance
+arrows/Race focus, compact HUD, Hors preset, authored door sounds and rotated
+hall-door targeting accompany the focused fixes. Preserve accepted Strider,
+FOV/dimensions, Shift+V and frozen-frame loading behavior.

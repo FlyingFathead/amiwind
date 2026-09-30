@@ -167,10 +167,28 @@ int AW_OpeningTick(void)
 /* A pure query shared by the prompt and activation. Hidden, occluded and
  * out-of-reach objects cannot advertise an action. Automatic actor scripts
  * retain their separate proximity triggers above. */
+static void door_point(edict_t *e,vec3_t eye,vec3_t point)
+{
+    model_t *m;int i,index=(int)e->v.modelindex;vec3_t local,delta,f,r,u;
+    m=index>0 && index<MAX_MODELS?sv.models[index]:NULL;
+    if(m && m->type==mod_brush){
+        AngleVectors(e->v.angles,f,r,u);VectorSubtract(eye,e->v.origin,delta);
+        local[0]=DotProduct(delta,f);local[1]=-DotProduct(delta,r);local[2]=DotProduct(delta,u);
+        for(i=0;i<3;i++){
+            if(local[i]<m->mins[i])local[i]=m->mins[i];
+            if(local[i]>m->maxs[i])local[i]=m->maxs[i];
+        }
+        for(i=0;i<3;i++)point[i]=e->v.origin[i]+local[0]*f[i]-local[1]*r[i]+local[2]*u[i];
+    }else for(i=0;i<3;i++){
+        point[i]=eye[i];
+        if(point[i]<e->v.absmin[i])point[i]=e->v.absmin[i];
+        if(point[i]>e->v.absmax[i])point[i]=e->v.absmax[i];
+    }
+}
 static edict_t *opening_target(void)
 {
     int i,ref,role;edict_t *p,*e,*target=NULL;eval_t *v;
-    vec3_t eye,delta,forward,right,up,point;float distance,best=49;trace_t tr;
+    vec3_t eye,delta,forward,right,up,point;float distance,best=57;trace_t tr;
     if(!sv.active || !svs.clients)return NULL;
     p=svs.clients[0].edict;if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
@@ -186,9 +204,13 @@ static edict_t *opening_target(void)
             if(ref!=172859 && ref!=172860 && ref!=172851)continue;
             if(ref==172860 && aw_story.hall_open)continue;
             VectorAdd(e->v.absmin,e->v.absmax,point);VectorScale(point,.5f,point);
+            /* A tall hinged door's centre can be above the player's reach.
+             * Aim toward its nearest visible surface at eye height, while
+             * retaining facing, distance and occlusion checks. */
+            if(ref==172860)door_point(e,eye,point);
         }
         VectorSubtract(point,eye,delta);distance=Length(delta);
-        if(distance<.1f || distance>=best || DotProduct(delta,forward)/distance<.65f)continue;
+        if(distance<.1f || distance>=best || distance>=(ref==172860?56:49) || DotProduct(delta,forward)/distance<.65f)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NORMAL,p);
         if(tr.startsolid || (tr.fraction<1 && tr.ent!=e))continue;
         best=distance;target=e;
@@ -228,7 +250,7 @@ int AW_OpeningUse(void)
     v=GetEdictFieldValue(target,"aw_ref");ref=(int)v->_float;
     if(ref==172859){AW_ReaderOpen("papers",1);return 1;}
     if(ref==172860){
-        if(aw_story.hall){target->v.angles[1]=-90;SV_LinkEdict(target,false);aw_story.hall_open=1;}
+        if(aw_story.hall){AW_DoorSound(ref,0);target->v.angles[1]=-90;SV_LinkEdict(target,false);aw_story.hall_open=1;}
         else AW_UISubtitle("","The door is locked. Show your papers to the guard.",4);
         return 1;
     }

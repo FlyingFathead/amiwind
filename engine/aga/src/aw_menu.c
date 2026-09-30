@@ -74,7 +74,7 @@ static int mouse_row(void){
     int i;
     if(confirming){if(inside(48,132,106,25))return 0;if(inside(166,132,106,25))return 1;return -1;}
     if(interface_options){for(i=0;i<7;i++)if(inside(44,54+i*19,232,19))return i;return -1;}
-    if(graphics){for(i=0;i<6;i++)if(inside(44,62+i*20,232,20))return i;return -1;}
+    if(graphics){for(i=0;i<7;i++)if(inside(44,54+i*19,232,19))return i;return -1;}
     if(scene_picker){for(i=0;i<6 && scene_top+i<=AW_MAP_COUNT;i++)if(inside(44,55+i*19,232,19))return scene_top+i;return -1;}
     if(frontend){for(i=0;i<4;i++)if(inside(12,front_top()+i*front_height(),front_width()-8,front_height()))return i;return -1;}
     for(i=0;i<6;i++)if(inside(44,ROW_Y+i*ROW_H,232,ROW_H))return i;
@@ -119,16 +119,18 @@ void M_Keydown(int key){
     }
     if(graphics){
         if(key==K_ESCAPE){graphics=0;selection=frontend?2:4;return;}
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)selection=(selection+(key==K_UPARROW?5:1))%6;
+        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)selection=(selection+(key==K_UPARROW?6:1))%7;
         if(selection==0 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
         if(selection==3 && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
         if(selection==4 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
+        if(selection==5 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==1)AW_SetDrawDistance(540);
             else if(selection==2)AW_UIFrameToggle();
             else if(selection==3){interface_options=1;selection=0;}
             else if(selection==4)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
-            else if(selection==5){graphics=0;selection=frontend?2:4;}
+            else if(selection==5)AW_RegionLoadingToggle();
+            else if(selection==6){graphics=0;selection=frontend?2:4;}
         }
         return;
     }
@@ -207,12 +209,13 @@ void M_Draw(void){
         label(44,168,232,19,"Back",1,selection==6);
     }else if(graphics){
         value=AW_DrawDistance();sprintf(line,"Fog distance: %ld",(long)value);
-        label(44,62,232,20,line,1,selection==0);
-        label(44,82,232,20,"Reset distance: 540",1,selection==1);
-        label(44,102,232,20,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off",1,selection==2);
-        label(44,122,232,20,"Interface...",1,selection==3);
-        sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());label(44,142,232,20,line,1,selection==4);
-        label(44,162,232,20,"Back",1,selection==5);
+        label(44,54,232,19,line,1,selection==0);
+        label(44,73,232,19,"Reset distance: 540",1,selection==1);
+        label(44,92,232,19,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off",1,selection==2);
+        label(44,111,232,19,"Interface...",1,selection==3);
+        sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());label(44,130,232,19,line,1,selection==4);
+        label(44,149,232,19,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen",1,selection==5);
+        label(44,168,232,19,"Back",1,selection==6);
     }else if(scene_picker){
         for(i=scene_top;i<=AW_MAP_COUNT && i<scene_top+6;i++)
             label(44,55+(i-scene_top)*19,232,19,AW_MapTitle(i),i==AW_MAP_COUNT || scene_available[i],selection==i);

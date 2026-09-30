@@ -1,12 +1,29 @@
 # Proposed approach: persistent world state and disk loading
 
-**Status: design proposal, not implemented.** v0.0.16 loads one prepared scene
-at a time and has no working save/load system. This proposal records a direction
-for extending that model without requiring the whole world to fit in RAM.
+**Status, 30 September 2026:** bounded character/world state and save/load are
+implemented; broader object persistence and background region streaming remain
+planned. Balmora replaces one resident BSP synchronously among 64 overlapping
+regions, carrying player state across the boundary. It does not keep two complete
+regions resident or prefetch the destination in the background.
 
-Current next-step specification: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md), including
-attribute/appearance fields, save-list management and original/OpenMW comparison
-gates. Save/Load remain disabled in the v0.0.20 maintenance build.
+Dev3 can hold the last rendered frame with a small top Loading box during these
+swaps; Options retains the previous black-screen method. This masks the blank
+transition, not the disk/decoding pause. Music servicing remains active.
+
+Owner playtest: Balmora exteriors now look okay overall and often run faster than
+Seyda Neen despite the city's size. Interiors remain a requested content priority.
+This performance observation is not yet a controlled comparison.
+
+Next investigation: measure disk reads, decoding, renderer/collision work, peak
+RAM and audio deadlines separately. Trial smaller Seyda Neen sub-cells; preserve
+opening routes, barriers, stable references and return spawns. Investigate bounded
+prefetch and shared resource ownership only within a measured memory budget:
+the current 11 MiB heap already approaches 10 MiB in a Strider region, so two full
+BSPs are not an assumed solution. Save dirty authoritative state before offloading
+runtime objects; release resources only when no active placement references them.
+
+The remainder records the broader design direction. See [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md)
+for the save format and remaining persistence acceptance gates.
 
 ## Separate base content from saved changes
 
@@ -117,3 +134,41 @@ file can be written and read.
 
 This is a proposed architecture for AmiWind. It does not claim full Morrowind
 script compatibility, completed persistence, or seamless world streaming.
+
+
+## Owner acceptance: 30 September 2026
+
+Balmora's v0.0.24-dev3 regions and sub-cells work surprisingly well in the
+owner's playtest. The accepted frozen-frame Loading... presentation is the
+current standard. This is a promising foundation for continuous travel across
+a larger game world without disruptive scene breaks. Preserve this result
+while extending coverage. Current loading is still synchronous and only one
+BSP is resident; asynchronous streaming remains future work.
+
+
+## Seyda Neen regions in dev4
+
+`seyda-regions.txt` extends the same shared-coordinate runtime to 30 regular
+regions, plus special `intro_docks.bsp` and `sncourt.bsp` areas. The first exterior
+entry pins the arrival pier during the ship/dock/office stages. Court selection
+uses its enclosed rotated footprint, including the ring barrel and door arrivals.
+Regular core size is 768 (outer partial cores are merged), overlap 896, hysteresis 96.
+Effective exterior viewing distance is capped at 540; player geometry is unchanged.
+
+The compactor keeps selected models whole, remaps referenced BSP structures and
+textures, and removes unmarked world faces. Inner source terrain collision and PVS
+are retained; coverage planes bound the region. Actor reference identities and
+restored positions use the same persistence path. Loading still replaces one BSP
+synchronously with the accepted frozen view/top box or optional black screen.
+
+The new files and nineteen collision-corrected Balmora regions change the save
+content fingerprint. Start a new game or Demo Game; dev3 saves are incompatible.
+
+## dev5 Seyda centre boundary
+
+The regular grid now has 25 regions. The town-centre core spans X=-768..1024 and
+Y=-768..474; the northern edge follows the reported bridge. Existing 96-unit
+hysteresis means northbound switching occurs past Y=570. Positions in the centre
+remain together. Intro pier and ring courtyard overrides retain their own rules.
+The final HDF crosses sn012/sn017 and back with both frozen-frame and black
+loading; no background or concurrent world loading is introduced.

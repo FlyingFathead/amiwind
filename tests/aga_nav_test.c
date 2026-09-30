@@ -2,12 +2,12 @@
 #include "quakedef.h"
 #include <assert.h>
 server_static_t svs;
-static int obstruct,no_backward,player_blocks;static float wall=1000;static eval_t moving,walkstep;
+static int obstruct,no_backward,player_blocks;static float wall=1000,highest_y;static eval_t moving,walkstep;
 static float identity(float f){return f;}
 float (*LittleFloat)(float)=identity;
 void Con_Printf(char *s,...){}
 eval_t *GetEdictFieldValue(edict_t *e,char *s){return !strcmp(s,"aw_moving")?&moving:&walkstep;}
-qboolean AW_ActorStep(edict_t *e,vec3_t delta,double dt){if(obstruct || (no_backward && delta[0]<0) || e->v.origin[0]+delta[0]>wall)return false;VectorAdd(e->v.origin,delta,e->v.origin);return true;}
+qboolean AW_ActorStep(edict_t *e,vec3_t delta,double dt){if(obstruct || (no_backward && delta[0]<0) || e->v.origin[0]+delta[0]>wall)return false;VectorAdd(e->v.origin,delta,e->v.origin);if(e->v.origin[1]>highest_y)highest_y=e->v.origin[1];return true;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){trace_t t;memset(&t,0,sizeof(t));t.fraction=obstruct || player_blocks?0:1;if(player_blocks)t.ent=svs.clients[0].edict;return t;}
 static void node(byte *p,float x,int degree,int next){float y=0;memcpy(p,&x,4);memcpy(p+4,&y,4);memcpy(p+8,&y,4);p[12]=degree;p[14]=next;}
 int main(void){
@@ -23,6 +23,14 @@ int main(void){
     actor.v.origin[0]=0;goal[0]=35;wall=36;assert(AW_NavStart(&actor,goal));
     for(i=0;i<100;i++){result=AW_NavStep(.1,0);if(result)break;}
     assert(result==1 && actor.v.origin[0]>30 && actor.v.origin[0]<=36);goal[0]=40;wall=1000;
+    /* An auxiliary endpoint beyond a clear nearby stop must not pull the
+     * escort sideways onto the steps. Preserve the route until its last leg. */
+    {float y=18;memcpy(grid+42,&y,4);assert(AW_NavDecode(grid,sizeof(grid)));}
+    memset(&actor,0,sizeof(actor));highest_y=0;goal[0]=35;
+    assert(AW_NavStart(&actor,goal));
+    for(i=0;i<100;i++){result=AW_NavStep(.1,0);if(result)break;}
+    assert(result==1 && highest_y<.01f);
+    node(grid+38,40,1,2);assert(AW_NavDecode(grid,sizeof(grid)));goal[0]=40;
     actor.v.origin[0]=8;no_backward=1;assert(AW_NavStart(&actor,goal));
     for(i=0;i<100;i++){result=AW_NavStep(.1,0);if(result)break;}
     assert(result==1 && actor.v.origin[0]>35);no_backward=0;

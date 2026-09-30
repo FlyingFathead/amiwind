@@ -86,6 +86,24 @@ static void eyeheight(void) {
     else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg eyeheight [offset]\n");return;}
     Con_Printf("Eye offset %.3f / above feet %.3f; collision unchanged.\n",(double)p->v.view_ofs[2],(double)(p->v.view_ofs[2]-p->v.mins[2]));
 }
+/* Compare live standing and point sweeps. In a flat calibration room the
+ * difference between their limits measures the effective physical box. */
+static void dimensions(void) {
+    edict_t *p=player();hull_t *h;vec3_t end;trace_t body,point;int axis,sign;
+    if(!p || !sv.worldmodel)return;
+    h=&sv.worldmodel->hulls[1];
+    Con_Printf("Player dimensions %.3f %.3f %.3f; BSP hull %.3f %.3f %.3f\n",
+        (double)(p->v.maxs[0]-p->v.mins[0]),(double)(p->v.maxs[1]-p->v.mins[1]),(double)(p->v.maxs[2]-p->v.mins[2]),
+        (double)(h->clip_maxs[0]-h->clip_mins[0]),(double)(h->clip_maxs[1]-h->clip_mins[1]),(double)(h->clip_maxs[2]-h->clip_mins[2]));
+    for(axis=0;axis<3;axis++)for(sign=-1;sign<=1;sign+=2){
+        VectorCopy(p->v.origin,end);end[axis]+=sign*128;
+        body=SV_Move(p->v.origin,p->v.mins,p->v.maxs,end,MOVE_NOMONSTERS,p);
+        point=SV_Move(p->v.origin,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
+        Con_Printf("Dimension axis %ld sign %ld body %.5f point %.5f solid %ld/%ld\n",
+            (long)axis,(long)sign,(double)body.endpos[axis],(double)point.endpos[axis],
+            (long)body.startsolid,(long)point.startsolid);
+    }
+}
 static void hands(void) {
     edict_t *p=player();if(!p)return;
     Con_Printf("hands state %ld goal %ld frame %ld / time %ld\n",field(p,"aw_hand_state"),field(p,"aw_hand_goal"),(long)p->v.weaponframe,(long)(sv.time*1000));
@@ -116,9 +134,10 @@ static void blockers(void) {
     }
 }
 void AW_DebugInit(void) {
-    AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
+    AW_InputDebugInit();AW_DoorAudioInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
+    Cmd_AddCommand("aw_dimensions",dimensions);
     Cmd_AddCommand("aw_blockers",blockers);
     Cmd_AddCommand("aw_npcs",npcs);Cmd_AddCommand("tcl",tcl);Cmd_AddCommand("aw_help",help);Cmd_AddCommand("help",help);
     Cmd_AddCommand("aw_view",view);Cmd_AddCommand("aw_recover",recover);Cmd_AddCommand("aw_pos",position);Cmd_AddCommand("aw_probe",probe);

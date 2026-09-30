@@ -36,6 +36,7 @@ int AW_StoryDoor(unsigned reference)
 {
     /* Stable placed-reference IDs, never model names shared by other doors. */
     if(!AW_StoryRestricted())return 1;
+    if(reference==119513)return 0; /* Registration entrance back to the pier. */
     if(reference==113889)return AW_Ring()>0;
     if(reference==119659)return AW_Package()>0;
     return 1;

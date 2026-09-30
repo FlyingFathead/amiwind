@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+server_t sv;server_static_t svs;
 #include "aw_save.h"
 #include <assert.h>
 #include <stdint.h>
@@ -9,6 +10,7 @@ void IN_AWClearButtons(void){}
 void AW_HeadClear(void){}
 int AW_HeadLoad(int a,int b){return 1;}
 void Con_Printf(char *s,...){}
+int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 int COM_FOpenFile(char *s,FILE **f){*f=NULL;return -1;}
 static void setup(void)
 {
@@ -24,13 +26,18 @@ static void setup(void)
 int main(void)
 {
     aw_character_t c;aw_save_t source,decoded,unchanged;byte raw[AW_SAVE_BYTES];int n,i;char out[64];
-    setup();memset(&c,0,sizeof(c));c.head=0;c.hair=1;
+    setup();assert(!AW_CharacterHors());
+    strcpy(aw_races[0].id,"Nord");strcpy(aw_classes[0].id,"Barbarian");strcpy(aw_births[0].id,"Charioteer");
+    assert(AW_CharacterHors());assert(!strcmp(aw_story.name,"Hors") && aw_character.valid && !aw_character.female);
+    assert(aw_story.stage==AW_STAGE_RELEASED && !AW_StoryRestricted() && AW_Ring() && AW_Package());
+    assert(AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87 && aw_character.maximum[0]==50);
+    memset(&c,0,sizeof(c));c.head=0;c.hair=1;
     assert(AW_CharacterRebuild(&c));assert(c.attributes[0]==50 && c.attributes[5]==50);
     assert(c.modifiers[5]==25 && c.maximum[0]==50 && c.maximum[1]==60 && c.maximum[2]==205);
     assert(c.skills[0]==30 && c.skills[1]==35);
     c.female=1;c.head=2;c.hair=3;assert(AW_CharacterRebuild(&c));assert(c.maximum[0]==60);
     c.head=0;assert(!AW_CharacterRebuild(&c));c.head=2;
-    aw_character=c;assert(AW_CharacterOpen(1));
+    aw_character=c;assert(AW_CharacterOpen(1));AW_CharacterMouse(0,0);
     for(i=0;i<5;i++)AW_CharacterKey(K_ENTER);
     assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey('n');assert(AW_CharacterActive() && !AW_CharacterDone());
@@ -39,9 +46,32 @@ int main(void)
     assert(AW_CharacterOpen(4));
     AW_CharacterKey(K_ENTER);assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey(K_ESCAPE);assert(AW_CharacterActive() && !AW_CharacterDone());
-    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(AW_CharacterActive() && !AW_CharacterDone());
-    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_RIGHTARROW);AW_CharacterKey(K_ENTER);
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_LEFTARROW);AW_CharacterKey(K_ENTER);
+    assert(AW_CharacterActive() && !AW_CharacterDone());
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);
     assert(!AW_CharacterActive() && AW_CharacterDone()==4 && !AW_CharacterDone());
+    for(i=1;i<=3;i++){
+        int presses;assert(AW_CharacterOpen(i));
+        for(presses=0;presses<(i==1?5:1);presses++)AW_CharacterKey(K_ENTER);
+        assert(AW_CharacterActive());AW_CharacterKey(K_ENTER);
+        assert(!AW_CharacterActive() && AW_CharacterDone()==i);
+    }
+    /* Birthsign arrows and WASD cycle values; pointer motion cannot consume keys. */
+    aw_birth_count=3;aw_births[1]=aw_births[0];aw_births[2]=aw_births[0];
+    aw_character.birth=0;assert(AW_CharacterOpen(3));
+    AW_CharacterKey(K_RIGHTARROW);AW_CharacterMouse(7,0);
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(aw_character.birth==1);
+    assert(AW_CharacterOpen(3));AW_CharacterKey(K_LEFTARROW);
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(aw_character.birth==0);
+    assert(AW_CharacterOpen(3));AW_CharacterKey('d');
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(aw_character.birth==1);
+    assert(AW_CharacterOpen(3));AW_CharacterKey('a');
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(aw_character.birth==0);
+    /* Click the right Sex arrow, then Choose; no keyboard row assumptions. */
+    aw_character.female=0;aw_character.head=0;aw_character.hair=1;
+    assert(AW_CharacterOpen(1));AW_CharacterMouse(85,22);AW_CharacterKey(K_MOUSE1);
+    AW_CharacterMouse(-85,106);AW_CharacterKey(K_MOUSE1);AW_CharacterKey(K_ENTER);
+    assert(aw_character.female==1 && !AW_CharacterActive());
     AW_StoryReset(1);assert(AW_StoryRestricted());assert(!AW_StoryTransition(AW_STAGE_OFFICE));
     assert(AW_CourtyardRingAvailable() && AW_CourtyardTakeRing());
     assert(AW_Ring()==1 && !AW_CourtyardTakeRing());
@@ -78,7 +108,11 @@ int main(void)
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0);
     assert(AW_SaveDecode(raw,n,&decoded));assert(!strcmp(decoded.scene,"addamasartus"));
     assert(decoded.actors[0].scene==15 && decoded.actors[0].reference==42);
-    source.actors[0].scene=16;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
+    strcpy(source.scene,"balmora");source.actors[0].scene=16;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0);
+    assert(AW_SaveDecode(raw,n,&decoded));assert(!strcmp(decoded.scene,"balmora"));
+    assert(decoded.actors[0].scene==16);
+    source.actors[0].scene=17;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
     strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;
     source.character.current[0]=NAN;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
