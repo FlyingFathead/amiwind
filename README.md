@@ -1,7 +1,5 @@
 <p align="center">
   <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind — A Commodore Amiga demake of Morrowind">
-**Source reconciliation:** see [notes](docs/RECONCILE-v0.0.25-rc1.md).
-
 </p>
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
