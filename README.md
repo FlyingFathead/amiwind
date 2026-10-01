@@ -6,12 +6,13 @@
 
 ## Current state of the project
 
-**v0.0.25-rc7 — placement, navigation and cave-lighting checkpoint**
+**v0.0.25-rc8 — torch crash correction**
 
-This complete rc6 update adds original-game region names to the map and optional
-compass, confirmed map teleport (`dbg tp map`), and a [placeholder torch](docs/TORCH.md)
-(**F**, then **V**). It corrects initial actor contact and the fog-off pale sky
-background path. Water rendering is unchanged.
+This complete rc7 update corrects a reproduced invalid node access when **F**
+then **V** activates the [placeholder torch](docs/TORCH.md). Converted scenery
+is lit through its visible faces. An emulator retest is still required before
+final release. Original-game region labels, map teleport and strict actor-contact
+fitting remain available.
 
 A completed rc3 terrain run can be reused through
 [engine/image recovery](docs/IMAGE_RECOVERY.md). Build receipts retain timing,
@@ -29,7 +30,7 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[candidate scope and validation](docs/RELEASE-v0.0.25-rc7.md).
+[candidate scope and validation](docs/RELEASE-v0.0.25-rc8.md).
 
 rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
 original shoreline samples that coarse terrain had submerged. A normal-view

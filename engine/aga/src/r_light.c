@@ -36,6 +36,50 @@ void R_DlightOrigin(const dlight_t *light,vec3_t origin)
     }
 }
 
+/* AmiWind, 2026-10-02: converted brush models keep visible faces separately
+ * from their collision nodes. A non-colliding model has a negative leaf root;
+ * even a positive collision root can have no face references. Neither is a
+ * render tree. Use this model's validated face range, never world surfaces. */
+void R_MarkBrushLights(model_t *model)
+{
+    int first, count, i, k, axis;
+    float distance, delta, radius;
+    vec3_t origin;
+    msurface_t *surface;
+    dlight_t *light;
+
+    if(!model || !model->surfaces)return;
+    first=model->firstmodelsurface;count=model->nummodelsurfaces;
+    if(first<0 || count<=0 || first>model->numsurfaces ||
+       count>model->numsurfaces-first)return;
+    for(k=0;k<MAX_DLIGHTS;k++){
+        light=&cl_dlights[k];radius=light->radius;
+        if(light->die<cl.time || radius<=0)continue;
+        R_DlightOrigin(light,origin);
+        /* Most visible models are outside the small carried light. Reject
+         * their local bounding boxes before visiting any surface. */
+        distance=0;
+        for(axis=0;axis<3;axis++){
+            delta=0;
+            if(origin[axis]<model->mins[axis])delta=model->mins[axis]-origin[axis];
+            else if(origin[axis]>model->maxs[axis])delta=origin[axis]-model->maxs[axis];
+            distance+=delta*delta;
+        }
+        if(distance>radius*radius)continue;
+        surface=model->surfaces+first;
+        for(i=0;i<count;i++,surface++){
+            if((surface->flags&SURF_DRAWTILED) || !surface->plane)continue;
+            distance=DotProduct(origin,surface->plane->normal)-surface->plane->dist;
+            if(distance>radius || distance< -radius)continue;
+            if(surface->dlightframe!=r_dlightframecount){
+                surface->dlightbits=0;
+                surface->dlightframe=r_dlightframecount;
+            }
+            surface->dlightbits|=1u<<k;
+        }
+    }
+}
+
 
 /*
 ==================
@@ -137,7 +181,7 @@ void R_PushDlights (void)
 	{
 		if (l->die < cl.time || !l->radius)
 			continue;
-		R_MarkLights ( l, 1<<i, cl.worldmodel->nodes );
+		R_MarkLights ( l, 1u<<i, cl.worldmodel->nodes );
 	}
 }
 

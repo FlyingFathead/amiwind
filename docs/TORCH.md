@@ -26,6 +26,26 @@ light contribution. Converted cave pieces need this same transform as world
 geometry. Other dynamic lights use the correction too; water rendering is
 unchanged.
 
+## rc7 crash and rc8 correction
+
+The owner reported a crash on F then V after successful rc7 image assembly.
+The old brush-lighting path treated a negative leaf root as a node-array offset.
+A host address-sanitized test reproduces the segmentation fault through the
+actual R_DrawBEntitiesOnList entry point. The earlier torch test exercised the
+light marker directly on a synthetic tree; it missed this render integration.
+
+rc8 marks each model's validated visible surface range. Converted mesh collision
+nodes are not a render tree: some roots are negative and positive roots may
+contain zero visible-face references. Simply skipping negative roots would leave
+scenery unlit. Position/rotation conversion remains in use, with local model-box
+and plane-distance rejection to limit lighting work. The world tree and tiled
+water/sky drawing paths are unchanged.
+
+Regression coverage includes the render entry point, negative and collision-only
+roots, a separate surface array, face-zero models, rotated/translated instances,
+out-of-range surface metadata, expiry, tiled-face exclusion and light slot 31.
+The fix still needs the same F-then-V sequence retested on the target emulator.
+
 ## Validation and limits
 
 Native tests exercise F/V state transitions through compiled project QuakeC,

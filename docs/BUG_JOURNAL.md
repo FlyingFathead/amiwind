@@ -8,6 +8,26 @@ exact implementation, native validation and unresolved limits. Host tests,
 cross-compilation and native playtesting are separate evidence. Preserve older
 records when a diagnosis changes.
 
+## rc7 torch activation crash (rc8 source correction)
+
+Reproduction reported by owner: raise fists with F, then press V; game crashes.
+The successful rc7 native/image build and CI did not detect it. Host reproduction
+calls the actual brush-render entry point with one active dynamic light and a
+converted-style model whose collision root is -5. rc7 faults in R_MarkLights
+while reading node contents before the node array. The retained bm015 fixture
+contains 42 negative-root brush models; this is valid generated geometry.
+
+Positive mesh collision trees can also contain no face references. rc8 therefore
+lights the model's own visible surface range instead of following either kind
+of collision root. Surface bounds, local light transforms, model-box rejection,
+plane distance and tiled-surface exclusion are retained or checked explicitly.
+The unsigned last-slot mask also avoids signed-shift undefined behavior.
+
+The new address/undefined-sanitized regression fails on rc7 and passes on the
+correction. It exercises R_DrawBEntitiesOnList, not just the standalone lighting
+helper. Emulator retest remains open. No geometry regeneration, actor waiver,
+water change or removal of the torch feature is used to bypass the fault.
+
 ## rc7: contact fitting, fog-off sky and cave lighting
 
 The 23 rc3 contact findings cover 15 placed references, including one outdoor

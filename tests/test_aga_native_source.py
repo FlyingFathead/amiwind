@@ -16,6 +16,11 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_torch_brush_rendering_with_leaf_and_collision_only_roots(self):
+        self.compile_run('aga_torch_brush_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_main.c','r_light.c','r_surf.c','mathlib.c')],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_compiled_hand_rules_extinguish_torch_and_preserve_fist_attack(self):
         compiler=os.environ.get('QCC_PATH') or shutil.which('qcc-host')
         if not compiler:

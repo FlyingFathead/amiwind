@@ -1,0 +1,137 @@
+{
+  "version": "0.0.25-rc8",
+  "date": "2026-10-02",
+  "status": "crash reproduced on rc7; source tests, native compile and asset-free image pass; emulator retest pending",
+  "baseline": {
+    "version": "0.0.25-rc7",
+    "archive": "AmiWind-v0.0.25-rc7-public-source.zip",
+    "sha256": "482f3ff8e52b4da552e9efd02d9487b210bdbcfb1e2748c6363bc4f796cd66ad"
+  },
+  "crash_reproduction": {
+    "reported_sequence": "F raises fists, then V crashes",
+    "host_result": "AddressSanitizer segmentation fault in R_MarkLights called by R_DrawBEntitiesOnList",
+    "fixture": "negative collision leaf root -5, visible brush surfaces, one active dynamic light",
+    "reproduction_log_sha256": "d17fff7839a5736c49e6a59fc15a8000e64faf395db128a991adb2549b95e2ea",
+    "emulator_reproduced_here": false
+  },
+  "source_tests": {
+    "status": "passed",
+    "tests": 380,
+    "skipped": 0,
+    "seconds": 21.659,
+    "log_sha256": "fb494b7733dbde02b789e513dc6432e88b9794500693abad61fe904d03b8428b",
+    "address_and_undefined_sanitizers": "brush-render crash regression passed",
+    "real_quakec_compiler": "pinned qcc-host",
+    "real_qbsp": "0.18.1"
+  },
+  "native_compile": {
+    "status": "passed",
+    "version": "0.0.25-rc8",
+    "binary_sha256": "d579805917081bef8644b2492d83ab5b561689e6346fb5e417b4acf3652d2bf4",
+    "bootcheck_sha256": "09867ee3382eccebe5d83fc73c7735445e61c06c0e7a665bc11bdf806e08c712",
+    "compiler_warning_lines": 78,
+    "jobs": 2,
+    "target": "68040/FPU AGA",
+    "host": "Linux"
+  },
+  "asset_free_image": {
+    "status": "passed",
+    "bytes": 8421376,
+    "sha256": "12de16da3de95e1323ec897010554c4bc1f6d0665afca19e4ecb02b47e137f69",
+    "elapsed_seconds": 7.014,
+    "payload_readback": "passed",
+    "game_assets_used": false,
+    "rom_used": false,
+    "emulator_boot": "not performed"
+  },
+  "owner_rc7_result": {
+    "source": "owner-provided console transcript",
+    "commit": "176524e0fc8f4f3e07163282d8f2a81e42a9cfce",
+    "ci_run": 36925716217,
+    "ci_conclusion": "success",
+    "image_started": "2026-10-01T23:49:33+03:00",
+    "image_finished": "2026-10-02T00:00:28+03:00",
+    "displayed_elapsed": "0 hrs 10 mins 55 secs",
+    "hdf_bytes": 3221258240,
+    "hdf_sha256": "20b63b78c95f5fbcba5b741bf7ee8dd14e7ff57c1cede4f0ce6fdcfc6837d1b8",
+    "strict_actor_gate": "passed, no waiver",
+    "subsequent_playtest": "torch activation crash reported"
+  },
+  "unchanged_from_rc7": [
+    "terrain generators",
+    "water rendering",
+    "actor fitting and strict audit",
+    "QuakeC",
+    "region names and map teleport"
+  ],
+  "rc8_full_game_image": {
+    "status": "not built here",
+    "reason": "storage insufficient for full scene staging, partitions and game HDF",
+    "emulator_torch_retest": "pending owner build and playtest"
+  },
+  "recovery": {
+    "scheduled_stages": [
+      "engine",
+      "image"
+    ],
+    "baseline": "original failed rc3 full run with completed terrain",
+    "terrain_regenerated": false,
+    "strict_actor_gate": true
+  },
+  "private_payload_delivered": false,
+  "build_environment": {
+    "python": "3.12.14",
+    "packages": [
+      {
+        "name": "numpy",
+        "version": "2.3.5"
+      },
+      {
+        "name": "scipy",
+        "version": "1.17.0"
+      },
+      {
+        "name": "Pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "PyFFI",
+        "version": "2.2.3"
+      },
+      {
+        "name": "fast-simplification",
+        "version": "0.2.0"
+      },
+      {
+        "name": "amitools",
+        "version": "0.8.1"
+      },
+      {
+        "name": "setuptools",
+        "version": "84.0.0"
+      }
+    ],
+    "worker_budget": 2,
+    "stage_scheduling": "dependency-aware",
+    "tools": [
+      {
+        "name": "make",
+        "detected": "4.3",
+        "status": "matching",
+        "sha256": "d78b8f1d099fbcfb6f2f49ab87223b9b68fb3956642f92d6ec6de812e8afa965"
+      },
+      {
+        "name": "m68k-amigaos-gcc",
+        "detected": "16.2.0b 20260825082934",
+        "status": "matching",
+        "sha256": "34119a3528cc5778967b8741eba490d8ae25829fcd89858f3be376f323a64cda"
+      },
+      {
+        "name": "vasmm68k_mot",
+        "detected": "2.0f",
+        "status": "newer",
+        "sha256": "3c5d4203377bd45f3ee1743cb24dd57cd94f570ab209cd9f9306e9826db29f15"
+      }
+    ]
+  }
+}

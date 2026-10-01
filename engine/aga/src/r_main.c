@@ -768,7 +768,7 @@ R_DrawBEntitiesOnList
 */
 void R_DrawBEntitiesOnList (void)
 {
-	int			i, j, k, clipflags;
+	int			i, j, clipflags;
 	vec3_t		oldorigin;
 	model_t		*clmodel;
 	float		minmaxs[6];
@@ -818,26 +818,10 @@ void R_DrawBEntitiesOnList (void)
 			// FIXME: stop transforming twice
 				R_RotateBmodel ();
 
-			// calculate dynamic lighting for bmodel if it's not an
-			// instanced model
-				if (clmodel->firstmodelsurface != 0)
-				{
-					for (k=0 ; k<MAX_DLIGHTS ; k++)
-					{
-						if ((cl_dlights[k].die < cl.time) ||
-							(!cl_dlights[k].radius))
-						{
-							continue;
-						}
-
-                        {
-                            dlight_t local=cl_dlights[k];
-                            R_DlightOrigin(&cl_dlights[k],local.origin);
-                            R_MarkLights (&local, 1<<k,
-                                clmodel->nodes + clmodel->hulls[0].firstclipnode);
-                        }
-					}
-				}
+            /* Mesh collision nodes need not contain the visible faces and
+             * their root may be a negative leaf index. Light the model's
+             * actual surface range after setting its local transform. */
+            R_MarkBrushLights(clmodel);
 
 			// if the driver wants polygons, deliver those. Z-buffering is on
 			// at this point, so no clipping to the world tree is needed, just

@@ -311,6 +311,7 @@ void R_cshift_f (void);
 void R_SplitEntityOnNode2 (mnode_t *node);
 void R_MarkLights (dlight_t *light, int bit, mnode_t *node);
 void R_DlightOrigin(const dlight_t *light,vec3_t origin);
+void R_MarkBrushLights(model_t *model);
 void R_EntityRotate(vec3_t vec);
 
 #if	!id68k

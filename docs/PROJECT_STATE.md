@@ -1,4 +1,4 @@
-# Current project state — 1 October 2026
+# Current project state — 2 October 2026
 
 **Top engineering priority:** reduce world-terrain build time and avoid
 unnecessary recompilation between runs. The [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md)
@@ -12,12 +12,20 @@ is recorded separately below.
 
 **Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
-**Current candidate: v0.0.25-rc7**, one complete source update from rc6.
-This adds original-data region labels, confirmed map teleport, initial actor
-contact fitting, outdoor sky background filling and a carried-light prototype.
-See [release notes](RELEASE-v0.0.25-rc7.md) and the
-[validation receipt](validation/rc7-source.json). Tests and an asset-free native
-build do not establish full game-image or emulator acceptance.
+**Current candidate: v0.0.25-rc8**, a complete torch-crash correction from rc7.
+The owner completed rc7 engine/image recovery with strict actor checking and no
+waiver: 2026-10-01 23:49:33 to 2026-10-02 00:00:28 +03:00, about 10m55s.
+The reported HDF is 3,221,258,240 bytes, SHA-256
+`20b63b78c95f5fbcba5b741bf7ee8dd14e7ff57c1cede4f0ce6fdcfc6837d1b8`.
+Source commit `176524e0fc8f4f3e07163282d8f2a81e42a9cfce` passed GitHub run
+36925716217; the owner verified the prerelease downloads. These are reported
+build/publication results, not a claim of successful runtime playtesting.
+
+Subsequent rc7 playtesting found an F-then-V crash. The host regression reproduces
+an invalid access through a negative collision-tree root in brush lighting.
+rc8 uses each model's visible face range instead. See [release notes](RELEASE-v0.0.25-rc8.md)
+and [validation](validation/rc8-source.json). Target torch retesting is pending;
+final release remains blocked until this regression is checked in the emulator.
 
 World-terrain profiling, reusable conversion results and reduced BSP/collision
 work are the top engineering priority. Native Windows/MSYS2 remains the

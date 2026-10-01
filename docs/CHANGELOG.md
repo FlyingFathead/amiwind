@@ -1,5 +1,15 @@
 # Development history
 
+## v0.0.25-rc8
+
+- Repair F-then-V crash caused by treating a scenery collision leaf as a node.
+- Light each brush model's visible faces, including non-colliding scenery and
+  collision trees with no face references; preserve local light transforms.
+- Reproduce rc7's fault through the render entry point with AddressSanitizer and
+  add a regression covering face ownership, bounds, expiry and tiled exclusions.
+- Record owner rc7 build/CI success separately from the subsequent runtime crash.
+- Retain engine/image-only recovery and strict actor checks. Target retest pending.
+
 ## v0.0.25-rc7
 
 - Fit initial NPC idle-mesh contact while retaining source coordinates and strict
