@@ -17,7 +17,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from mwad.paths import child_ci, ensure_external, inside, resolve_data_files, installed_game_path, is_wsl
+from mwad.paths import child_ci, ensure_external, inside, resolve_data_files, installed_game_path, is_wsl, is_game_input
 from mwad import input_check
 from mwad.progress import Progress, live_log, section
 import build_versions
@@ -450,9 +450,9 @@ def provenance(args, tools):
         "font_options": getattr(args, "font_options", None) or resolve_font_options(args),
         "input_check": getattr(args, "input_report", None),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
-        "input_sha256": {} if args.dry_run else hashes(args.data_files, lambda path: True),
+        "input_sha256": {} if args.dry_run else hashes(args.data_files, lambda path: is_game_input(path.relative_to(args.data_files))),
         "source_sha256": hashes(ROOT, lambda path:
-            (path.suffix in (".py", ".c", ".h", ".patch", ".qc", ".asm", ".sh") or path.name in ("Makefile", "VERSION", "pyproject.toml"))
+            (path.suffix in (".py", ".c", ".h", ".patch", ".qc", ".asm", ".sh", ".cfg") or path.name in ("Makefile", "VERSION", "pyproject.toml"))
             and path.relative_to(ROOT).parts[0] != "out"
             and "__pycache__" not in path.parts),
     }

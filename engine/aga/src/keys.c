@@ -29,13 +29,13 @@ int Key_AmigaRaw(int raw) {
     'o', 'p', K_F11, K_F12, 0, '0', '2', '3',
     'a', 's', 'd', 'f', 'g', 'h', 'j', 'k',
     'l', ';', '\'', K_ENTER, 0, '4', '5', '6',
-    K_SHIFT, 'z', 'x', 'c', 'v', 'b', 'n', 'm',
+    '<', 'z', 'x', 'c', 'v', 'b', 'n', 'm',
     ',', '.', '/', 0, '.', '7', '8', '9',
     K_SPACE, K_BACKSPACE, K_TAB, K_ENTER, K_ENTER, K_ESCAPE, K_F11,
     0, 0, 0, '-', 0, K_UPARROW, K_DOWNARROW, K_RIGHTARROW, K_LEFTARROW,
     K_F1, K_F2, K_F3, K_F4, K_F5, K_F6, K_F7, K_F8,
     K_F9, K_F10, '(', ')', '/', '*', '=', K_PAUSE,
-    K_SHIFT, K_SHIFT, 0, K_CTRL, K_ALT, K_ALT, 0, K_CTRL
+    K_SHIFT, K_SHIFT, 0, K_CTRL, K_ALT, K_ALT, 0, 0
 };
     raw&=0x7f;
     /* FS-UAE's classic layout sends PageDown as Right Amiga. The supplied
@@ -59,6 +59,7 @@ key up events are sent even if in console mode
 char	key_lines[32][MAXCMDLINE];
 int		key_linepos;
 int		shift_down=false;
+static int caps_down;
 int		key_lastpress;
 
 int		edit_line=0;
@@ -74,6 +75,18 @@ qboolean	menubound[256];	// if true, can't be rebound while in menu
 int		keyshift[256];		// key to map to if shift held down in console
 int		key_repeats[256];	// if > 1, it is autorepeating
 qboolean	keydown[256];
+
+/* Intuition qualifiers are authoritative, even after a lost key-up event.
+ * Values are from the NDK devices/inputevent.h; Amiga keys are not Ctrl.
+ * Called outside the input.device interrupt, before dispatching raw input. */
+void Key_AmigaQualifiers(unsigned int qualifier)
+{
+    int shift=(qualifier&3)!=0,control=(qualifier&8)!=0,alt=(qualifier&48)!=0;
+    if(keydown[K_SHIFT]!=shift || shift_down!=shift)Key_Event(K_SHIFT,shift);
+    if(keydown[K_CTRL]!=control)Key_Event(K_CTRL,control);
+    if(keydown[K_ALT]!=alt)Key_Event(K_ALT,alt);
+    caps_down=(qualifier&4)!=0;
+}
 
 typedef struct
 {
@@ -163,6 +176,7 @@ keyname_t keynames[] =
 
     {"MWHEELUP", K_MWHEELUP},
     {"MWHEELDOWN", K_MWHEELDOWN},
+    {"ALT+M", K_ALTM},
 
     {"SEMICOLON", ';'},	// because a raw semicolon seperates commands
 
@@ -536,6 +550,7 @@ void Key_WriteBindings (FILE *f)
 {
     int		i;
 
+    fprintf(f,"// AmiWind key bindings. Engine settings are in config.cfg.\nunbindall\n");
     for (i=0 ; i<256 ; i++)
         if (keybindings[i])
             if (*keybindings[i])
@@ -612,6 +627,7 @@ void Key_Init (void)
     keyshift[','] = '<';
     keyshift['.'] = '>';
     keyshift['/'] = '?';
+    keyshift['<'] = '>';
     keyshift[';'] = ':';
     keyshift['\''] = '"';
     keyshift['['] = '{';
@@ -647,6 +663,10 @@ void Key_Event (int key, qboolean down)
     char	*kb;
     char	cmd[1024];
 
+    /* A named chord uses the same editable binding and save path as keys.
+     * Console typing and modal panels keep the literal M. */
+    if(key=='m' && ((down && key_dest==key_game && keydown[K_ALT]) ||
+                   (!down && keydown[K_ALTM])))key=K_ALTM;
     keydown[key] = down;
 
     if (!down)
@@ -741,7 +761,7 @@ void Key_Event (int key, qboolean down)
         kb = keybindings[key];
         if (kb && kb[0] == '+')
         {
-            sprintf (cmd, "-%s %ld\n", kb+1, key);
+            sprintf (cmd, "-%s %ld\n", kb+1, (long)key);
             Cbuf_AddText (cmd);
         }
         if (keyshift[key] != key)
@@ -749,7 +769,7 @@ void Key_Event (int key, qboolean down)
             kb = keybindings[keyshift[key]];
             if (kb && kb[0] == '+')
             {
-                sprintf (cmd, "-%s %ld\n", kb+1, key);
+                sprintf (cmd, "-%s %ld\n", kb+1, (long)key);
                 Cbuf_AddText (cmd);
             }
         }
@@ -777,7 +797,7 @@ void Key_Event (int key, qboolean down)
         {
             if (kb[0] == '+')
             {	// button commands add keynum as a parm
-                sprintf (cmd, "%s %ld\n", kb, key);
+                sprintf (cmd, "%s %ld\n", kb, (long)key);
                 Cbuf_AddText (cmd);
             }
             else
@@ -792,7 +812,7 @@ void Key_Event (int key, qboolean down)
     if (!down)
         return;		// other systems only care about key down events
 
-    if (shift_down)
+    if ((key>='a' && key<='z') ? (shift_down!=caps_down) : shift_down)
     {
         key = keyshift[key];
     }
@@ -824,6 +844,8 @@ Key_ClearStates
 void Key_ClearStates (void)
 {
     int		i;
+    shift_down=false;
+    caps_down=false;
 
     for (i=0 ; i<256 ; i++)
     {

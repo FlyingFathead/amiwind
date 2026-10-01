@@ -17,7 +17,7 @@ static aw_save_t world,pending;
 static int loading,scheduled,content_ready;
 static double last_auto,settle;
 static byte content_id[32];
-static cvar_t autosaves={"aw_autosaves","3",true};
+static cvar_t autosaves={"aw_autosaves","5",true};
 static const char *actor_fields[]={"aw_hello_count","aw_manual_count","aw_hello_done"};
 static int make_directory(const char *directory)
 {

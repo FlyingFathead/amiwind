@@ -1,0 +1,13 @@
+{
+  "tiles": 330752,
+  "refined_tiles": 12871,
+  "sample_comparisons": 8268800,
+  "coarse_dry_samples_drowned": 13287,
+  "coarse_wet_samples_raised": 14470,
+  "rebuilt_wet_dry_mismatches": 0,
+  "shared_edges_checked": 25742,
+  "failures": [],
+  "seconds": 88.958,
+  "status": "passed",
+  "water_policy": "Surveyed exterior CELL water levels must all be zero; other levels fail conversion."
+}

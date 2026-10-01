@@ -29,12 +29,60 @@ char *ID = "$VER: AmiWind " AMIWIND_VERSION "\r\n";
 #include <proto/exec.h>
 #include <exec/memory.h>
 #include <proto/dos.h>
+#include <proto/intuition.h>
 #include <intuition/intuition.h>
+#include <intuition/intuitionbase.h>
+#include <devices/input.h>
+#include <devices/inputevent.h>
+#include <exec/interrupts.h>
 
 
 
 // External video window from vid_amiga.c
 extern struct Window *video_window;
+
+/* Intuition handles Left-Amiga+M before IDCMP_RAWKEY. Reserve M/N while our
+ * window is active, including console input and an accidentally held qualifier.
+ * Other applications and all other system shortcuts retain their events. */
+static struct MsgPort *guard_port;
+static struct IOStdReq *guard_io;
+static struct Interrupt guard_handler;
+static int guard_open,guard_added;
+struct InputEvent *AW_InputGuardEvents(struct InputEvent *events){
+    struct InputEvent *e;
+    if(video_window && IntuitionBase->FirstScreen==video_window->WScreen &&
+       (video_window->Flags&WFLG_WINDOWACTIVE))
+        for(e=events;e;e=e->ie_NextEvent)
+            if(e->ie_Class==IECLASS_RAWKEY && ((e->ie_Code&0x7f)==0x37 || (e->ie_Code&0x7f)==0x36))
+                e->ie_Qualifier&=~(IEQUALIFIER_LCOMMAND|IEQUALIFIER_RCOMMAND);
+    return events;
+}
+/* input.device supplies the event list in A0; the C compiler uses the stack. */
+extern void AW_InputGuardEntry(void);
+__asm__(".text\n.globl _AW_InputGuardEntry\n_AW_InputGuardEntry:\n"
+        "move.l %a0,-(%sp)\njsr _AW_InputGuardEvents\naddq.l #4,%sp\nrts\n");
+void AW_InputGuardShutdown(void){
+    if(guard_added){guard_io->io_Command=IND_REMHANDLER;guard_io->io_Data=&guard_handler;
+        DoIO((struct IORequest *)guard_io);guard_added=0;}
+    if(guard_open){CloseDevice((struct IORequest *)guard_io);guard_open=0;}
+    if(guard_io){DeleteIORequest((struct IORequest *)guard_io);guard_io=NULL;}
+    if(guard_port){DeleteMsgPort(guard_port);guard_port=NULL;}
+}
+void AW_InputGuardInit(void){
+    if(guard_added)return;
+    guard_port=CreateMsgPort();if(!guard_port)goto failed;
+    guard_io=(struct IOStdReq *)CreateIORequest(guard_port,sizeof(*guard_io));if(!guard_io)goto failed;
+    if(OpenDevice("input.device",0,(struct IORequest *)guard_io,0))goto failed;
+    guard_open=1;memset(&guard_handler,0,sizeof(guard_handler));
+    guard_handler.is_Node.ln_Type=NT_INTERRUPT;guard_handler.is_Node.ln_Pri=60;
+    guard_handler.is_Node.ln_Name="AmiWind screen keys";
+    guard_handler.is_Code=(VOID (*)())AW_InputGuardEntry;
+    guard_io->io_Command=IND_ADDHANDLER;guard_io->io_Data=&guard_handler;
+    if(DoIO((struct IORequest *)guard_io))goto failed;
+    guard_added=1;Con_Printf("M/N protected before Intuition; debug Alt+M shows desktop.\n");return;
+failed:
+    AW_InputGuardShutdown();Con_Printf("Screen key protection unavailable. Release the Amiga modifier if M/N changes screens.\n");
+}
 
 // Dedicated server flag (not used on Amiga but needed for host.c)
 qboolean isDedicated = FALSE;
@@ -44,7 +92,14 @@ int mouseX = 0;
 int mouseY = 0;
 qboolean mouse_has_moved = false;
 static cvar_t aw_input_trace={"aw_input_trace","0"};
-void AW_InputDebugInit(void){Cvar_RegisterVariable(&aw_input_trace);}
+static void desktop(void){
+    if(!AW_DebugOverlaysEnabled() || !video_window)return;
+    IN_AWClearButtons();Key_ClearStates();
+    ScreenToBack(video_window->WScreen);
+}
+void AW_InputDebugInit(void){
+    Cvar_RegisterVariable(&aw_input_trace);Cmd_AddCommand("aw_desktop",desktop);
+}
 
 #define RAWKEY_NM_WHEEL_UP      0x7A
 #define RAWKEY_NM_WHEEL_DOWN    0x7B
@@ -233,7 +288,13 @@ void Sys_SendKeyEvents(void) {
         ReplyMsg ((struct Message *)msg);
 
         switch (class) {
+        case IDCMP_ACTIVEWINDOW:
+        case IDCMP_INACTIVEWINDOW:
+            IN_AWClearButtons();Key_ClearStates();break;
         case IDCMP_RAWKEY:
+            Key_AmigaQualifiers(qualifier);
+            /* The complete qualifier mask preserves the other Shift/Alt key. */
+            if((code&0x7f)>=0x60 && (code&0x7f)<=0x67)break;
             if(aw_input_trace.value)Con_Printf("Input raw %ld qualifier %ld\n",(long)code,(long)qualifier);
             switch (code) {
                 case RAWKEY_NM_WHEEL_UP:
@@ -253,6 +314,7 @@ void Sys_SendKeyEvents(void) {
             break;
 
         case IDCMP_MOUSEBUTTONS:
+          Key_AmigaQualifiers(qualifier);
           switch (code) {
             case IECODE_LBUTTON:
               Key_Event (K_MOUSE1, true);

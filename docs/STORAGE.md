@@ -34,7 +34,13 @@ by itself make that file accessible through every Amiga-side driver.
 
 ## Current AGA image layout
 
-The v0.0.25-dev1 HDF is 3,221,258,240 bytes: two 1,536 MiB partitions plus
+The current v0.0.25-rc1 HDF is **3,489,693,696 bytes**: two **1,664 MiB**
+partitions plus a 32 KiB RDB cylinder. The payload is 2,711,140,228 bytes, with
+364,228,608 bytes free on AMIWIND and 368,716,288 on AW_WORLD0. All 10,622 files
+were independently read back and hashed. The refined shoreline data still fits
+below the same 2 GiB partition and 4 GiB device planning bounds.
+
+The historical v0.0.25-dev1 HDF is 3,221,258,240 bytes: two 1,536 MiB partitions plus
 a 32 KiB RDB cylinder. Its payload is 2,599,581,307 bytes; independent readback
 covers all 10,621 files. Native loading from the highest used disk range passed.
 
@@ -74,8 +80,8 @@ than duplicating them on both volumes. Videos still need adequate read throughpu
 and buffering during playback even if they are opened rarely.
 
 This is a preferred future packing policy, not the current implementation.
-v0.0.25-dev1 contains no expansion conversions; its base-game terrain alone is
-split across both volumes by measured payload size. Its combined 2,599,581,307-byte
+v0.0.25-rc1 contains no expansion conversions; its base-game terrain alone is
+split across both volumes by measured payload size. Its combined 2,711,140,228-byte
 payload cannot fit on one partition below 2 GiB. Reaching the preferred layout
 therefore requires further measured reductions or selective base-game overflow.
 Do not relabel the present terrain volume as an expansion partition.

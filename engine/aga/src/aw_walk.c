@@ -23,6 +23,18 @@ void AW_NoclipVelocity(vec3_t view, usercmd_t *cmd, float maximum, vec3_t out)
     VectorScale(out,speed,out);
 }
 
+void AW_NoclipDebugVelocity(vec3_t view,usercmd_t *cmd,float maximum,
+                           int fast,int shifted,float shift_scale,vec3_t out)
+{
+    usercmd_t flight=*cmd;
+    if(fast){
+        float factor=shifted?1:shift_scale;
+        flight.forwardmove*=factor;flight.sidemove*=factor;flight.upmove*=factor;
+    }
+    AW_NoclipVelocity(view,&flight,maximum,out);
+    if(fast){VectorScale(out,2,out);}
+}
+
 static qboolean support(edict_t *p, float depth, trace_t *t)
 {
     vec3_t end;

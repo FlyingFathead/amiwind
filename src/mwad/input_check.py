@@ -1,4 +1,10 @@
-"""Read-only preflight of an installed game tree and TES3 containers."""
+"""Read-only preflight of original installed TES3 files.
+
+Morrowind_*.zip/datafiles.zip uploads are remote-work transfer packages, not
+GOG or Steam installation inputs. Never require, extract, inspect or hash them.
+Resolve the named Morrowind.esm/Morrowind.bsa pair beneath the selected root,
+then read original assets from that installation's known folders/subfolders.
+"""
 from collections import Counter
 import hashlib
 import json
@@ -7,7 +13,7 @@ from pathlib import Path
 import struct
 
 from .audit import BSA
-from .paths import child_ci, ensure_external, installed_game_path, resolve_data_files
+from .paths import child_ci, ensure_external, installed_game_path, resolve_data_files, is_game_input, GAME_ASSET_TYPES
 from . import font_sources
 
 REFERENCE_DIR = Path(__file__).resolve().parents[2] / "config/input-reference"
@@ -43,6 +49,8 @@ def fingerprints(loose, stage, reference=None):
     reference = reference_files() if reference is None else reference
     result = {"matching": 0, "different": [], "missing": [], "optional_differences": [], "extra": 0}
     for name, expected in reference.items():
+        if not is_game_input(name):
+            continue
         core = name in ("morrowind.esm", "morrowind.bsa")
         if stage == "terrain" and not core:
             continue
@@ -95,7 +103,12 @@ def master_structure(path):
 
 
 def locate_data_files(selected, notify=None, choose=None, max_depth=4, max_dirs=2000):
-    """Find a core-file pair before inventory; never hash an arbitrary parent."""
+    """Find original ESM/BSA names beneath the selected root before inventory.
+
+    Do not use ZIPs: uploaded remote-work packages are not GOG/Steam install
+    inputs. No archive fallback is needed for an installed game; use its real
+    core pair and original asset folders. Never hash an arbitrary parent.
+    """
     say = notify or (lambda message: None)
     try:
         return resolve_data_files(selected)
@@ -144,15 +157,21 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
     data = locate_data_files(selected, notify=notify, choose=choose)
     errors, warnings, checks = [], [], []
     loose = {}
+    ignored_files = 0
     # os.walk gives explicit errors, unlike silently skipped unreadable folders.
     def walk_error(exc):
         raise exc
     for parent, dirs, files in os.walk(data, onerror=walk_error, followlinks=False):
+        if Path(parent) == data:
+            dirs[:] = [name for name in dirs if name.casefold() in GAME_ASSET_TYPES]
         for name in dirs:
             if (Path(parent) / name).is_symlink():
                 errors.append("Directory symlink is not scanned: " + str(Path(parent) / name))
         for name in files:
             candidate = Path(parent) / name
+            if not is_game_input(candidate.relative_to(data)):
+                ignored_files += 1
+                continue
             key = candidate.relative_to(data).as_posix().casefold()
             checked = ensure_external(candidate, "game input")
             if key in loose:
@@ -230,6 +249,7 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
         warnings.append(f"{len(known['optional_differences'])} optional files differ from the reference")
     return {"data_files": str(data), "selected_root": str(selected), "loose_files": len(loose),
             "loose_bytes": sum(item["bytes"] for item in loose.values()),
+            "ignored_non_game_files": ignored_files,
             "loose_categories": dict(categories), "archive_categories": dict(packed),
             "font_sources": font_report,
             "checks": checks, "warnings": warnings, "errors": errors, "fingerprints": known}
@@ -238,6 +258,8 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
 def display(report):
     print("Game inputs: " + report["data_files"])
     print(f"  Scanned {report['loose_files']} loose files ({report['loose_bytes']:,} bytes)")
+    if report.get("ignored_non_game_files"):
+        print(f"  Ignored {report['ignored_non_game_files']} unrelated files; these are not game inputs")
     known = report["fingerprints"]
     print(f"  [matching] {known['matching']} reference files: size and SHA-256")
     if known["extra"]:

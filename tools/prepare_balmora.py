@@ -80,11 +80,12 @@ def ground_assets(data, audit_path, palette):
             if source is None: raise ValueError('Missing terrain material ' + name)
             im = Image.open(io.BytesIO(bsa_read(bsa, source))).convert('RGB')
         else:
-            im = Image.new('RGB', (32, 32), (89, 85, 71))
+            im = Image.open(io.BytesIO(bsa_read(bsa, 'textures/_land_default.dds'))).convert('RGB')
         im = im.resize((32, 32), Image.Resampling.BOX).quantize(palette=pal, dither=Image.Dither.NONE)
         textures.append(('g' + key, 68, miptex('g' + key, im)))
     for name, color in [('stone', (80, 79, 70)), ('*water', (65, 87, 91)), ('sky', (102, 119, 136))]:
-        im = Image.new('RGB', (256, 128) if name == 'sky' else (64, 64), color)
+        im = (Image.open(io.BytesIO(bsa_read(bsa, 'textures/water/water00.dds'))).convert('RGB').resize((64, 64), Image.Resampling.BOX)
+              if name == '*water' else Image.new('RGB', (256, 128) if name == 'sky' else (64, 64), color))
         textures.append((name, 68, miptex(name, im.quantize(palette=pal, dither=Image.Dither.NONE))))
     return wad(textures)
 

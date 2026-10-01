@@ -12,19 +12,22 @@ static void (*map_command)(void),(*journal_command)(void);
 static int missing,corrupt,opens;static char drawn[16384];
 static byte pixels[320*200];
 static const char title[]="A long quest heading which must wrap completely within one journal page without losing text";
-static int heading_rows;
+static int heading_rows,marker_x=-1,marker_y=-1;
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
 void IN_AWClearButtons(void){}
 int AW_StoryRestricted(void){return 0;}
 int AW_ReaderActive(void){return 0;}
 int AW_CharacterActive(void){return 0;}
 int AW_GalleryActive(void){return 0;}
-int AW_WorldToSource(const char *name,const float *local,float *world){return 0;}
+int AW_WorldToSource(const char *name,const float *local,float *world){
+ int i;if(strcmp(name,"vf0000"))return 0;
+ for(i=0;i<3;i++)world[i]=local[i]*4;world[0]+=4096;world[2]+=2048;return 1;
+}
 void Con_Printf(char *s,...){}
 int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
 int AW_ConsoleCharWidth(void){return 4;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;}
-void AW_UIFill(int x,int y,int w,int h,int c){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
+void AW_UIFill(int x,int y,int w,int h,int c){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 void AW_UIBookBegin(void){}
@@ -59,7 +62,7 @@ int COM_FOpenFile(char *name,FILE **out){
     else assert(0);
     size=ftell(f)-base;fseek(f,base,SEEK_SET);return size;
 }
-static void draw(void){drawn[0]=0;heading_rows=0;assert(AW_WorldUIDraw());}
+static void draw(void){drawn[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
 int main(void){
     edict_t player;client_t client;int before;
     memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
@@ -73,6 +76,18 @@ int main(void){
     before=opens;draw();assert(strstr(drawn,"Cell 0,0"));
     AW_WorldUIKey('=',1);AW_WorldUIKey('p',1);AW_WorldUIKey('g',1);draw();
     assert(opens==before);AW_WorldUIKey('m',1);assert(!AW_WorldUIActive() && key_dest==key_game);
+    /* Keep zoom/pan on reopen, update the live position without disk reads,
+     * and preserve global position across a terrain XYZ rebase. */
+    map_command();draw();
+    {int x=marker_x,y=marker_y;
+     assert(x>=0 && y>=0);before=opens;player.v.origin[0]=128;player.v.origin[1]=64;draw();
+     assert(marker_x>x && marker_y<y && opens==before);
+     x=marker_x;y=marker_y;AW_WorldUIKey('m',1);map_command();draw();
+     assert(marker_x==x && marker_y==y);AW_WorldUIKey('m',1);
+     strcpy(sv.name,"vf0000");player.v.origin[0]-=1024;player.v.origin[2]-=512;
+     map_command();draw();assert(marker_x==x && marker_y==y && strstr(drawn,"XYZ 512 256 0"));
+     AW_WorldUIKey('m',1);strcpy(sv.name,"balmora");player.v.origin[0]=player.v.origin[1]=player.v.origin[2]=0;
+    }
     journal_command();draw();assert(strstr(drawn,"No dated journal"));AW_WorldUIKey('j',1);
     assert(AW_JournalAdd(&aw_state,"quest",1));assert(AW_JournalAdd(&aw_state,"quest",10));
     journal_command();draw();assert(strstr(drawn,"Another earned event."));

@@ -45,6 +45,7 @@ bad:
 }
 static terrain_region_t *source(const char *name){
     int i=AW_TerrainId(name);
+    if(i<0 && strcmp(name,"seyda") && strcmp(name,"balmora"))return NULL;
     if(!load_directory())return NULL;
     if(i>=0)return i<count?&regions[i]:NULL;
     for(i=0;i<2;i++)if(!strcmp(name,town_names[i]))return &towns[i];
@@ -56,6 +57,7 @@ static int inside(const float *point,const float *box,float margin){
 }
 int AW_WorldToSource(const char *name,const float *local,float *world){
     terrain_region_t *r=source(name);int k;if(!r)return 0;
+    for(k=0;k<3;k++)if(!isfinite(local[k]))return 0;
     for(k=0;k<3;k++)world[k]=(local[k]+r->origin[k])*4;
     return 1;
 }

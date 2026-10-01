@@ -1,12 +1,13 @@
 """Survey partitions and source-aligned terrain boundaries, without game data."""
 import json
+import copy
 from pathlib import Path
 import tempfile
 import unittest
 import sys
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from prepare_world_regions import plan, Terrain, map_text
+from prepare_world_regions import plan, Terrain, map_text, town_handoffs, terrain_triangles
 from world_volumes import balanced
 
 
@@ -40,6 +41,44 @@ class WorldRegionsTests(unittest.TestCase):
                 ox,oy,oz=entry['origin']
                 for x in range(entry['coverage'][0][0],entry['coverage'][1][0]+1,128):
                     self.assertEqual((x+ox)%128,0)
+
+    def test_shoreline_retains_small_dry_rise_and_matches_neighbour_edge(self):
+        terrain=Terrain.__new__(Terrain)
+        terrain.cells={(0,0):0};terrain.heights=np.full((1,65,65),-32,np.float32)
+        terrain.materials=np.ones((1,16,16),np.uint16)
+        terrain.heights[0,2,2]=32  # Original dry island lost by stride-four corners.
+        terrain.heights[0,1,4]=32  # Detail on the shared edge must match both sides.
+        self.assertTrue(terrain.shoreline_detail(0,0))
+        self.assertTrue(terrain.shoreline_detail(128,0))
+        fine=list(terrain_triangles(terrain,0,0));joined=list(terrain_triangles(terrain,128,0))
+        self.assertLess(len(fine),32)
+        self.assertIn([64,64,8], [point for tri in fine for point in tri])
+        def edge(triangles):
+            return {tuple(p) for tri in triangles for p in tri if p[0]==128 and 0<=p[1]<=128}
+        self.assertEqual(edge(fine),edge(joined))
+        self.assertEqual(len(edge(fine)),5)
+        # Sampling is global, so overlapping regions produce identical edges.
+        self.assertEqual(joined,list(terrain_triangles(terrain,128,0)))
+
+    def test_town_exits_stay_on_ground_inside_larger_sea_enclosure(self):
+        root=Path(__file__).resolve().parents[1]
+        areas=[]
+        for name,file in [('Seyda Neen','seyda_area.json'),('Balmora','balmora.json')]:
+            config=json.loads((root/'config'/file).read_text())
+            extent=2079 if name=='Seyda Neen' else 3072
+            origin=config['centre']
+            core=[[origin[k]+sign*extent*4 for k in range(2)] for sign in (-1,1)]
+            areas.append(dict(name=name,centre=origin,scale=.25,regions=[dict(core=core)]))
+        report=dict(areas=areas)
+        towns=town_handoffs(report)
+        self.assertEqual(towns[0]['core'],[[-1184,-1696],[1568,1440]])
+        self.assertEqual(towns[1]['core'],[[-2976,-2976],[2976,2976]])
+        for town in towns:
+            for k in range(2):
+                self.assertGreaterEqual(town['core'][0][k]-32,town['ground_bounds'][0][k]+64)
+                self.assertLessEqual(town['core'][1][k]+32,town['ground_bounds'][1][k]-64)
+        bad=copy.deepcopy(report);bad['areas'][0]['centre'][0]+=1
+        with self.assertRaisesRegex(ValueError,'transform'):town_handoffs(bad)
 
     def test_two_partition_balance_includes_boot_content(self):
         with tempfile.TemporaryDirectory() as tmp:

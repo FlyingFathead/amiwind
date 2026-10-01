@@ -155,6 +155,7 @@ def prepare(workspace,scene,out,jobs=None):
         path=normpath('textures/'+m['texture']); candidates=[str(Path(path).with_suffix('.dds')),path]
         source=next(p for p in candidates if p in bsa.entries)
         ground[int(key)]=Image.open(io.BytesIO(bsa_read(bsa,source))).convert('RGB').resize((32,32),Image.Resampling.BOX)
+    ground[0]=Image.open(io.BytesIO(bsa_read(bsa,'textures/_land_default.dds'))).convert('RGB').resize((32,32),Image.Resampling.BOX)
     samples=np.concatenate([t[:,:,:3].reshape(-1,3)[::4] for t in textures.values()]+[np.array(i).reshape(-1,3) for i in ground.values()])
     strip=Image.fromarray(samples.astype(np.uint8).reshape(1,-1,3),'RGB').quantize(colors=224)
     palette=strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
@@ -213,6 +214,7 @@ def prepare(workspace,scene,out,jobs=None):
     terrain_lumps=[(f'g{k}',68,miptex(f'g{k}',quantize(im))) for k,im in ground.items()]
     for n,c in [('stone',(80,79,70)),('*water',(65,87,91)),('sky',(102,119,136)),('clip',(0,0,0))]:
         im=Image.new('RGB',(64 if n!='sky' else 256,64 if n!='sky' else 128),c)
+        if n=='*water':im=Image.open(io.BytesIO(bsa_read(bsa,'textures/water/water00.dds'))).convert('RGB').resize((64,64),Image.Resampling.BOX)
         terrain_lumps.append((n,68,miptex(n,quantize(im))))
     (out/'town.wad').write_bytes(wad(terrain_lumps))
     brushes=[];extent=max(abs(v) for b in BOUNDS for v in b);step=128

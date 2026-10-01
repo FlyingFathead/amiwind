@@ -17,6 +17,7 @@ static int modal,mouse_x=160,mouse_y=100,drag,grid,zoom;
 static byte *map_data,*map_pixels;
 static int map_w,map_h,map_bounds[4],area_count,marker,map_ocean;
 static float map_x,map_y,player_x,player_y,player_z,map_step;
+static int map_view_ready;
 static char opened_scene[64];
 static struct {char id[16],title[32];float x,y,scale;} areas[8];
 typedef struct {
@@ -59,13 +60,28 @@ static void map_fit(void){
     map_step=(sx>sy?sx:sy)/(1<<zoom);
 }
 static void map_home(void){zoom=0;map_x=map_w*.5f;map_y=map_h*.5f;map_fit();}
+static void update_player(void){
+    int i;float world[3];edict_t *e;
+    marker=0;
+    if(!sv.active || !svs.clients || !(e=svs.clients[0].edict))return;
+    if(AW_WorldToSource(sv.name,e->v.origin,world)){
+        player_x=world[0];player_y=world[1];player_z=world[2];marker=1;return;
+    }
+    /* Legacy converted payloads predate AWR2. Their AWM1 transform is explicit. */
+    for(i=0;i<area_count;i++)if(!strcmp(sv.name,areas[i].id)){
+        player_x=e->v.origin[0]/areas[i].scale+areas[i].x;
+        player_y=e->v.origin[1]/areas[i].scale+areas[i].y;
+        player_z=e->v.origin[2]/areas[i].scale;marker=1;return;
+    }
+}
 static void map_player(void){
     if(!marker)return;
+    update_player();
     map_x=(player_x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
     map_y=(map_bounds[3]-player_y)*map_h/(map_bounds[3]-map_bounds[1]);
 }
 static void open_map(void){
-    FILE *f=NULL;int size,i,off;byte *p;edict_t *e;
+    FILE *f=NULL;int size,i,off;byte *p;
     if(!allowed())return;
     size=COM_FOpenFile("world/map.awm",&f);
     if(!f || size<32 || size>MAP_MAX)goto bad;
@@ -78,23 +94,17 @@ static void open_map(void){
     off=32+area_count*60;map_ocean=(int)u32(p+28);if(map_ocean<0 || map_ocean>255)goto bad;if(size!=off+map_w*map_h)goto bad;
     for(i=0;i<4;i++){map_bounds[i]=(int32_t)u32(p+8+i*4);if(map_bounds[i]<-2000000 || map_bounds[i]>2000000)goto bad;}
     if(map_bounds[2]<=map_bounds[0] || map_bounds[3]<=map_bounds[1])goto bad;
-    marker=0;e=svs.clients[0].edict;
+    marker=0;
     for(i=0;i<area_count;i++){
         p=map_data+32+i*60;if(!memchr(p,0,16) || !memchr(p+16,0,32))goto bad;
         memcpy(areas[i].id,p,16);memcpy(areas[i].title,p+16,32);areas[i].x=f32(p+48);areas[i].y=f32(p+52);areas[i].scale=f32(p+56);
         if(!(areas[i].scale>=.0009765625f && areas[i].scale<=100 && areas[i].x>=-2000000 && areas[i].x<=2000000 &&
              areas[i].y>=-2000000 && areas[i].y<=2000000))goto bad;
-        if(!strcmp(sv.name,areas[i].id)){
-            player_x=e->v.origin[0]/areas[i].scale+areas[i].x;
-            player_y=e->v.origin[1]/areas[i].scale+areas[i].y;
-            player_z=e->v.origin[2]/areas[i].scale;marker=1;
-        }
     }
-    if(AW_TerrainId(sv.name)>=0){
-        float source_point[3];
-        if(AW_WorldToSource(sv.name,e->v.origin,source_point)){player_x=source_point[0];player_y=source_point[1];player_z=source_point[2];marker=1;}
-    }
-    map_pixels=map_data+off;map_home();opened(1);
+    update_player();map_pixels=map_data+off;
+    if(!map_view_ready){map_home();map_view_ready=1;}else map_fit();
+    opened(1);
+    if(marker)Con_Printf("World map position: %ld %ld %ld (%s).\n",(long)player_x,(long)player_y,(long)player_z,sv.name);
     Con_Printf("World map: %ld bytes on demand; %s position.\n",(long)size,marker?"exterior":"no exterior");return;
  bad:
     if(f)fclose(f);
@@ -293,6 +303,7 @@ int AW_WorldUIKey(int key,int down){
 static void map_draw(void){
     int x,y,sx,sy,cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my;
     float left=map_x-156*map_step,top=map_y-77*map_step,px,py;byte *dst;char line[96];
+    update_player();
     AW_UIFill(0,0,320,200,AW_UIColor(15,20,23));
     for(x=0;x<312;x++)cols[x]=(int)floor(left+x*map_step);
     for(y=0;y<154;y++){
@@ -318,7 +329,8 @@ static void map_draw(void){
         px=(player_x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-player_y)*map_h/(map_bounds[3]-map_bounds[1]);
         mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
         if(mx>=9 && mx<311 && my>=24 && my<168){AW_UIFill(mx-4,my,9,1,AW_UIColor(255,255,255));AW_UIFill(mx,my-4,1,9,AW_UIColor(255,255,255));}
-        sprintf(line,"Cell %ld,%ld  Z %ld",(long)floor(player_x/8192),(long)floor(player_y/8192),(long)player_z);
+        sprintf(line,"Cell %ld,%ld XYZ %ld %ld %ld",(long)floor(player_x/8192),(long)floor(player_y/8192),
+            (long)player_x,(long)player_y,(long)player_z);
     }else strcpy(line,"Interior: no exterior position fix");
     text(8,5,"Vvardenfell",315);text(116,5,line,315);
     text(8,176,"Drag/arrows pan  Wheel +/- zoom",315);

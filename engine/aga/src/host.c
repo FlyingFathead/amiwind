@@ -267,10 +267,15 @@ void Host_WriteConfiguration (void)
             return;
         }
 
-        Key_WriteBindings (f);
-        Cvar_WriteVariables (f);
-
-        fclose (f);
+        {
+            FILE *keys;
+            const char *sep=!com_gamedir[0] || com_gamedir[strlen(com_gamedir)-1]==':'?"":"/";
+            keys=fopen(va("%s%skeymaps.cfg",com_gamedir,sep),"w");
+            if(keys){Key_WriteBindings(keys);fclose(keys);}
+            else {Con_Printf("Could not write keymaps.cfg; retaining bindings in config.cfg.\n");Key_WriteBindings(f);}
+        }
+        Cvar_WriteVariables(f);
+        fclose(f);
     }
 }
 

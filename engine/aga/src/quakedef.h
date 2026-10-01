@@ -354,6 +354,8 @@ int AW_NodeVisible(short *bounds);
 
 void AW_DebugInit(void);
 void AW_InputDebugInit(void);
+void AW_InputGuardInit(void);
+void AW_InputGuardShutdown(void);
 extern qboolean noclip_anglehack;
 int AW_ModelVisible(vec3_t origin,float radius);
 
@@ -364,6 +366,8 @@ void AW_MenuMouse(int dx,int dy);
 int AW_DebugCoordsEnabled(void);
 int AW_SeaLevelEnabled(void);
 void AW_NoclipVelocity(vec3_t view, usercmd_t *cmd, float maximum, vec3_t out);
+void AW_NoclipDebugVelocity(vec3_t view,usercmd_t *cmd,float maximum,
+                           int fast,int shifted,float shift_scale,vec3_t out);
 int AW_DebugOverlaysEnabled(void);
 void IN_AWClearButtons(void);
 

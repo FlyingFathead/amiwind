@@ -2,7 +2,7 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current development number: **v0.0.25-dev1 — terrain and interface fixes**.
+Current candidate: **v0.0.25-rc1 — terrain, shoreline and input corrections**.
 The development playable retains the 23 failed contact findings; it is not a
 passed production release. The owner's earlier v0.0.24 approval applies to that
 historical milestone only. Earlier archives and tags remain immutable.
@@ -13,9 +13,9 @@ includes, runtime/boot strings, receipts, presets and package filenames.
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.25-dev1-public-source.zip` | Complete repository under `amiwind/`. |
-| `AmiWind-v0.0.25-dev1-from-v0.0.24-source-patch.zip` | Added/changed public files and patch metadata, from the exact delivered v0.0.24 source ZIP. |
-| `AmiWind-v0.0.25-dev1-private-playable.zip` | Matching single two-partition HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.25-dev1/`. |
+| `AmiWind-v0.0.25-rc1-public-source.zip` | Complete repository under `amiwind/`. |
+| `AmiWind-v0.0.25-rc1-from-v0.0.25-dev1-source-patch.zip` | Added/changed public files and patch metadata, from the exact delivered v0.0.25-dev1 source ZIP. |
+| `AmiWind-v0.0.25-rc1-private-playable.zip` | Matching single two-partition HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.25-rc1/`. |
 
 Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
 their checksums belong in GitHub release assets. No private playable, ROM or
@@ -30,9 +30,9 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-The exact base is `AmiWind-v0.0.24-public-source.zip`, SHA-256
-`6c1b7d67f120fda08d09c78ad044b7250e8ba702b872e9d3cb3f3be0ef2fc043`.
-`docs/PATCH-v0.0.25-dev1.json` records the base, changed paths and removals.
+The exact base is `AmiWind-v0.0.25-dev1-public-source.zip`, SHA-256
+`784c9592da5f27831a7af6c9f51a488911605254dae5455a34ea9b8c2badd1f8`.
+`docs/PATCH-v0.0.25-rc1.json` records the base, changed paths and removals.
 Verify a clean application reproduces every file in the full source ZIP,
 including the package manifest. The two RC3 screenshots also require their
 explicit `.gitignore` exceptions; source checks now enforce that alongside the
@@ -138,8 +138,8 @@ Move selected base-game interiors only if needed; shops, guilds and quest hubs
 are not inherently rare. Keep expansion assets together for play within that
 expansion, and retain one copy of shared resources.
 
-This is the owner's future placement preference. The present v0.0.25-dev1 image
-uses two 1,536 MiB partitions with base-game terrain balanced between them; no
+This is the owner's future placement preference. The present v0.0.25-rc1 image
+uses two 1,664 MiB partitions with base-game terrain balanced between them; no
 expansion conversions are included. Its measured payload exceeds one 2 GiB
 partition, so further reductions or selective overflow are necessary before all
 main-game content can occupy partition 1. Two exactly 2 GiB partitions plus RDB

@@ -1,5 +1,27 @@
 # Development history
 
+## v0.0.25-rc2 — 1 October 2026
+
+- Reconcile original rc1 and checkpoints 001/004/006 without losing later modifier,
+  launcher and configurable five-autosave fixes.
+- Select original named containers and supported assets in known game folders;
+  ignore personal transfer ZIPs before validation/hashing.
+- Retain only the current dev1 journal screenshot; preserve owner cleanup.
+- Source-only handoff for local compilation; native rc2 acceptance remains open.
+
+## v0.0.25-rc1 — 1 October 2026
+
+- Move Seyda Neen's island handoff inside actual ground coverage; retain both
+  detailed town conversions and the frozen polymap's 2,526 region divisions.
+- Refine shoreline triangles where coarse sampling submerged original dry land;
+  correct ocean-only enclosure ceilings and restore original ground/water textures.
+- Show universal source XYZ and local XYZ, with a normal-view compass. Refresh
+  the map's player marker from the simulated position and retain zoom/pan on reopen.
+- Protect M/N console input from Amiga system screen shortcuts. Reserve deliberate
+  desktop access for debug Alt+M. Add Ctrl debug flight at twice Shift speed.
+- Separate editable keymaps from settings and maintain [KEYMAPS.md](KEYMAPS.md).
+- Defer unexplored-map masking; retain the 23 existing contact findings.
+
 ## v0.0.25-dev1 — 1 October 2026
 
 - Convert the surveyed island footprint into 2,526 terrain/water regions, using

@@ -19,5 +19,14 @@ int main(void) {
  cmd.upmove=-200;AW_NoclipVelocity(view,&cmd,320,out);assert(fabs(out[2]+200)<1);
  memset(&cmd,0,sizeof(cmd));AW_NoclipVelocity(view,&cmd,320,out);assert(magnitude(out)==0);
  cmd.forwardmove=2000;AW_NoclipVelocity(view,&cmd,320,out);assert(fabs(magnitude(out)-320)<1.6);
+ /* Ctrl equals twice Shift after the ordinary diagonal/cap rules. */
+ memset(&cmd,0,sizeof(cmd));view[0]=0;cmd.forwardmove=120;cmd.sidemove=120;
+ AW_NoclipDebugVelocity(view,&cmd,320,1,0,1.8,out);assert(fabs(magnitude(out)-432)<2.16);
+ cmd.forwardmove=216;cmd.sidemove=216;
+ AW_NoclipDebugVelocity(view,&cmd,320,1,1,1.8,out);assert(fabs(magnitude(out)-432)<2.16);
+ cmd.forwardmove=cmd.sidemove=0;cmd.upmove=200;
+ AW_NoclipDebugVelocity(view,&cmd,320,1,0,1.8,out);assert(fabs(out[2]-640)<3.2);
+ AW_NoclipDebugVelocity(view,&cmd,320,0,0,1.8,out);assert(fabs(out[2]-200)<1);
+ memset(&cmd,0,sizeof(cmd));AW_NoclipDebugVelocity(view,&cmd,320,1,0,1.8,out);assert(magnitude(out)==0);
  return 0;
 }

@@ -114,6 +114,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define K_MWHEELUP		239
 #define K_MWHEELDOWN	240
+#define K_ALTM          241
 
 
 
@@ -133,3 +134,4 @@ void Key_ClearStates (void);
 
 
 int Key_AmigaRaw(int raw);
+void Key_AmigaQualifiers(unsigned int qualifier);

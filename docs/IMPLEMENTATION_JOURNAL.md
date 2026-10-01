@@ -15,6 +15,8 @@ Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NE
 
 ## Index
 
+- [J031 — connected ground, shoreline samples and protected typing](#j031--connected-ground-shoreline-samples-and-protected-typing)
+
 - [J024 — initial NPC support and incomplete overlap collision](#j024--initial-npc-support-and-incomplete-overlap-collision)
 - [J025 — RC2 gallery and bounded geometry exceptions](#j025--rc2-gallery-and-bounded-geometry-exceptions-1-october-2026)
 - [J026 — completing the missing gallery appearances](#j026--completing-the-missing-gallery-appearances)
@@ -1053,3 +1055,71 @@ test, not a comparative speed result. See [storage policy](STORAGE.md) and
 The 23 known strict NPC contact findings remain, and the production image gate
 still fails on them. This package is a development playable, not production
 acceptance or a full-island route certification.
+
+## J031 — connected ground, shoreline samples and protected typing
+
+The owner reported disconnected Seyda Neen, flooded valleys, an apparently fixed
+map marker, missing global coordinates/compass and M/N exposing AmigaDOS, even
+while entering console text. The requested candidate is **v0.0.25-rc1**.
+
+Seyda's island boundary came from its larger sea/enclosure extents, beyond the
+actual ground. Derive the handoff from configured ground bounds and preserve a
+64-unit ground reserve after the exit margin. Keep both detailed towns and their
+existing region conversions. An initial native route places the player inside
+town, restores ordinary walking, then crosses north into terrain and walks back;
+noclip placement beyond the boundary is not evidence of a grounded handoff.
+
+The frozen source uses sea level zero. Every audited dev1 horizontal water face
+has global Z=0 after rebasing, so a varying water datum was not the cause found.
+Instead, stride-four terrain had submerged 10,282 originally dry samples. Use
+original heights to refine only triangles whose wet/dry classification changes,
+and decide shared edges from identical edge samples. The corrected sample audit
+has zero mismatches across 12,871 refined tiles. Keep the original polymap splits.
+Also raise ocean-only enclosure ceilings above water, give the compiler an air
+seed, and remove that seed from final entities. Remove unused large-actor hulls
+only in terrain-only maps; detailed town collision stays intact.
+
+The default material-zero and water colours were plain swatches despite original
+textures being available. Restore those textures using the existing palette.
+Town updates change only those miptex pixels; all nontexture BSP lumps remain
+byte-identical. The source offers no evidence for inventing a curvature correction.
+The old local pit report is not uniquely reproducible without its region ID.
+
+HUD and map now use the same source transform; `aw_pos` prints scene identity.
+At full-island scale, one screen pixel represents hundreds of local movement
+units. Retain map zoom/pan between opens, refresh the simulated position, show
+source XYZ and retain P-centering. The ordinary compass remains independent of
+debug overlays. Original-game unexplored-map masking is recorded as a TODO and
+explicitly deferred, as requested.
+
+M/N match Intuition's Left Amiga screen shortcuts. Filtering them only after
+IDCMP_RAWKEY arrives is too late. A priority-60 input handler removes that
+qualifier only for M/N when the active game window is on the front screen;
+debug Alt+M uses the documented `aw_desktop` command instead. Checking the front
+screen matters: ScreenToBack can leave the window's active flag set, so testing
+that flag alone also blocks the owner's way back to the game. The native probe
+checks map access, literal console `nm`, intentional screen-back and return.
+
+Keep bindings in `keymaps.cfg`, separate from settings, and maintain KEYMAPS.md
+alongside code changes. Reserved panel shortcuts remain explicit in the list.
+Ctrl debug noclip first computes the normal Shift velocity, then doubles it;
+this preserves the requested ratio after clamping and avoids diagonal bonuses.
+
+Full final candidate checks are recorded in [the release notes](RELEASE-v0.0.25-rc1.md).
+The 23 pre-existing contact findings remain failed; no gate or threshold was
+weakened. Retain the established partition-placement preference and loading-cost
+discussion in J030 and STORAGE.md; this candidate adds no expansion content.
+
+## J032 — rc1 source reconciliation, 1 October 2026
+
+Preserve both source histories and combine the reviewed runtime/packaging fixes.
+See RECONCILE-v0.0.25-rc1.md for chosen behavior, autosave configurability and
+validation boundaries. No long conversion or private download packaging is part
+of this source handoff.
+
+## J033 — rc2 local builder inputs, 1 October 2026
+
+Positive selection of the base ESM/BSA and known asset folders replaces scanning
+unrelated root files as inputs. Remote-work transfer ZIPs are not installation
+assets in GOG/Steam. Preserve original files and the owner's archives unchanged.
+See RELEASE-v0.0.25-rc2.md and BUG_JOURNAL.md for reproduction and validation.

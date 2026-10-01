@@ -9,6 +9,32 @@ import tempfile
 from pathlib import Path
 
 
+GAME_ASSET_TYPES = {
+    "meshes": {".nif", ".kf"},
+    "textures": {".dds", ".tga", ".bmp"},
+    "icons": {".dds", ".tga", ".bmp"},
+    "bookart": {".dds", ".tga", ".bmp", ".ttf"},
+    "fonts": {".fnt", ".tex", ".ttf"},
+    "sound": {".wav", ".mp3"},
+    "music": {".mp3"},
+    "splash": {".tga", ".dds", ".bmp"},
+    "video": {".bik"},
+}
+
+
+def is_game_input(relative):
+    """Named base containers and supported assets in their installed folders.
+
+    Remote-work ZIPs are not GOG/Steam game assets. Positive selection avoids
+    treating them, backup files or unrelated root content as installation data.
+    """
+    path = Path(relative)
+    parts = path.parts
+    if len(parts) == 1:
+        return path.name.casefold() in {"morrowind.esm", "morrowind.bsa"}
+    return path.suffix.casefold() in GAME_ASSET_TYPES.get(parts[0].casefold(), set())
+
+
 def source_root():
     root = Path(__file__).resolve().parents[2]
     return root if (root / "pyproject.toml").is_file() else None

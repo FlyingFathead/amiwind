@@ -122,3 +122,13 @@ the debug Hors character. It was captured with the matching 68040 executable in
 FS-UAE using the documented 2 MiB Chip / 16 MiB Z3 profile. No generated content,
 colour changes or compositing were used. Raw PCX, commands and native log are
 retained in the private evidence. Historical images remain unchanged.
+
+## v0.0.25-rc1 navigation captures — 1 October 2026
+
+The new README map and navigation HUD images come from the matching rc1 native
+runtime with the stated FS-UAE profile. They are exact nearest-neighbour 2x
+enlargements of 320x200 PCX frames, without colour changes or compositing. The
+Seyda view uses a diagnostic local camera at `0,100,90 / 90 / 12`; its source
+position is `-11264,-71280,360`. The map header and white cross use that position.
+The normal-view compass was also checked with debug overlays disabled. Raw
+frames and commands remain in the private evidence.

@@ -403,6 +403,31 @@ class BuildSetupTests(unittest.TestCase):
             self.assertEqual(report['fingerprints']['different'],['morrowind.bsa'])
             self.assertTrue(report['errors'])
 
+    def test_transfer_archives_are_ignored_but_real_video_conflicts_still_fail(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);data=root/'Data Files';synthetic_install(data)
+            reference={p.name.casefold():{'bytes':p.stat().st_size,'sha256':input_check.digest(p)} for p in data.iterdir()}
+            for name in ('Morrowind_Video.zip','Morrowind_video.zip','backup.ZIP',
+                         'Morrowind_fonts.zip','Morrowind_bookart.zip','Morrowind_icons.zip',
+                         'Morrowind_meshes.zip','Morrowind_music.zip','Morrowind_sound.zip',
+                         'Morrowind_splash.zip','Morrowind_textures.zip'):
+                (data/name).write_bytes(b'personal transfer archive, not a game input')
+            video=data/'Video';video.mkdir();(video/'mw_intro.bik').write_bytes(b'real loose video fixture')
+            report=input_check.inspect(root,'terrain',reference=reference)
+            self.assertEqual(report['errors'],[])
+            self.assertEqual(report['ignored_non_game_files'],11)
+            self.assertEqual(report['loose_files'],3)
+            self.assertEqual(report['loose_categories']['video'],1)
+            args=build.parser().parse_args(['--data-files',str(data)])
+            source=root/'source';source.mkdir();(source/'VERSION').write_text('fixture')
+            with patch.object(build,'ROOT',source):receipt=build.provenance(args,{})
+            self.assertIn('Video/mw_intro.bik',receipt['input_sha256'])
+            self.assertFalse(any(name.casefold().endswith('.zip') for name in receipt['input_sha256']))
+            (video/'MW_INTRO.BIK').write_bytes(b'conflicting actual video')
+            report=input_check.inspect(root,'terrain',reference=reference)
+            self.assertTrue(any('video/mw_intro.bik' in error for error in report['errors']))
+            self.assertFalse(any('zip' in error for error in report['errors']))
+
     def test_override_does_not_accept_truncated_containers(self):
         with tempfile.TemporaryDirectory() as temp:
             data=Path(temp)/'game';synthetic_install(data)

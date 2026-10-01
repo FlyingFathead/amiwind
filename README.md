@@ -1,12 +1,14 @@
 <p align="center">
   <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind — A Commodore Amiga demake of Morrowind">
+**Source reconciliation:** see [notes](docs/RECONCILE-v0.0.25-rc1.md).
+
 </p>
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
 ## Current state of the project
 
-**v0.0.25-dev1 — Vvardenfell terrain and interface fixes**
+**v0.0.25-rc2 — reconciled source and corrected local input discovery**
 
 The base-game island now has a playable terrain pass following the recovered
 polygon survey: **2,526 terrain regions**, with local coordinates rebased at
@@ -18,16 +20,23 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[development scope and validation](docs/RELEASE-v0.0.25-dev1.md).
+[candidate scope and validation](docs/RELEASE-v0.0.25-rc2.md).
+
+rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
+original shoreline samples that coarse terrain had submerged. A normal-view
+compass and GLOBAL/LOCAL XYZ aid navigation; the M marker uses the same source
+coordinates and keeps its zoom on reopen. Debug flight supports Ctrl at twice
+Shift speed. M/N console typing is protected; debug Alt+M exposes the desktop.
+Bindings have their own [keymap file and reference](docs/KEYMAPS.md).
 
 | Welcome to Balmora | Dagoth Ur, in the character gallery |
 | :---: | :---: |
 | ![Balmora bridge in v0.0.24](docs/images/amiwind-v0.0.24-balmora-bridge.png) | ![Dagoth Ur's gold mask in the native gallery](docs/images/amiwind-v0.0.24-dagoth.png) |
 | **Vvardenfell world map** | **Two-page progression journal** |
-| ![Vvardenfell world map](docs/images/amiwind-v0.0.24-map.png) | ![Dated progression journal](docs/images/amiwind-v0.0.25-dev1-journal.png) |
+| ![Vvardenfell map with source coordinates](docs/images/amiwind-v0.0.25-rc1-map.png) | ![Dated progression journal](docs/images/amiwind-v0.0.25-dev1-journal.png) |
 
-*Native FS-UAE captures at integer scale: corrected journal from v0.0.25-dev1;
-other views from v0.0.24. [Capture details](docs/GAMEPLAY_MEDIA.md).*
+*Native FS-UAE captures at integer scale: map from v0.0.25-rc1, journal from
+v0.0.25-dev1, town/gallery from v0.0.24. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
 Character creation follows the opening registration sequence: name, race,
 gender, head and hair, class, birthsign and a final review. The appearance
@@ -52,7 +61,7 @@ findings remain unresolved**, and the ordinary production image builder still
 stops on that audit. The owner accepted those findings for v0.0.24;
 release status does not turn the audit into a pass. Method 1 retains synchronous
 loading behind the frozen-frame Loading... box; method 2 read-ahead remains
-experimental. See [release notes and verification](docs/RELEASE-v0.0.25-dev1.md).
+experimental. See [release notes and verification](docs/RELEASE-v0.0.25-rc2.md).
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game
@@ -206,12 +215,12 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.25-dev1 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.25-rc2 configuration template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.25-dev1-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.25-dev1-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.25-rc2-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.25-rc2-WinUAE.uae) |
 
-1. Build `AmiWind-v0.0.25-dev1.hdf` from your own Morrowind installation using the
+1. Build `AmiWind-v0.0.25-rc2.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
    playable game image.
 2. Install an emulator from its official homepage above and save a local copy

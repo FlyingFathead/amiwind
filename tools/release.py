@@ -18,6 +18,7 @@ from mwad.paths import ensure_external
 from project_version import public_version, check_native_versions
 
 PROJECT = "amiwind"
+EXECUTABLES = {"build.sh", "tools/AmiWind-FS-UAE-launcher.py", "tools/run_fs_uae.py"}
 PROJECT_MEDIA = {"resources/media/AmiWind_logo_clear_background.png", "resources/media/AmiWind_wordmark.png"}
 IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
@@ -28,9 +29,10 @@ DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.23-dev5-windows.png")
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc1-{name}.png" for name in ("balmora", "mages"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc2-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc3-{name}.png" for name in ("dagoth", "balmora"))
-DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc4-{name}.png" for name in ("map", "journal"))
-DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river", "dagoth", "map", "journal"))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc4-{name}.png" for name in ("map",))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river", "dagoth", "map"))
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.25-dev1-journal.png")
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.25-rc1-{name}.png" for name in ("map", "navigation"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 
 
@@ -44,7 +46,7 @@ def allowed_files(root):
         p = PurePosixPath(name)
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
-        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA
+        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA
         native_aux = name in ("engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh"):
             raise ValueError(f"Unexpected distributable file type: {name}")
@@ -153,7 +155,7 @@ def create_candidate(root, path):
         for name in sorted(payload):
             info = zipfile.ZipInfo(f"{PROJECT}/{name}", date_time=zip_time)
             info.create_system = 3
-            info.external_attr = (0o100755 if name == "build.sh" else 0o100644) << 16
+            info.external_attr = (0o100755 if name in EXECUTABLES else 0o100644) << 16
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, payload[name], compresslevel=9)
     return manifest
@@ -177,6 +179,9 @@ def validate_candidate(root, archive_path):
             raise ValueError("Candidate manifest path mismatch")
         for name, data in content.items():
             actual = archive.read(f"{PROJECT}/{name}")
+            mode = archive.getinfo(f"{PROJECT}/{name}").external_attr >> 16
+            if (mode & 0o777) != (0o755 if name in EXECUTABLES else 0o644):
+                raise ValueError(f"Candidate permission mismatch: {name}")
             record = manifest["files"][name]
             if actual != data or record != {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}:
                 raise ValueError(f"Candidate content mismatch: {name}")

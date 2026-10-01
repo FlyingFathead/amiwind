@@ -147,7 +147,8 @@ Working ROM SHA-256: `{rom_info['sha256']}`.
             for name, data in sorted(payload.items()):
                 info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
                 info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o100644 << 16
+                info.create_system = 3
+                info.external_attr = (0o100755 if name.endswith(("/AmiWind-FS-UAE-launcher.py", "/run_fs_uae.py", "/build.sh")) else 0o100644) << 16
                 z.writestr(info, data)
         with zipfile.ZipFile(candidate) as z:
             if z.testzip() or set(z.namelist()) != set(payload):

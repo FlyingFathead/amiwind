@@ -1,0 +1,51 @@
+{
+  "version": "0.0.25-rc2",
+  "host_tests": {
+    "run": 334,
+    "passed": 333,
+    "skipped": 1
+  },
+  "test_command": "PYTHONPATH=src:tools python3 -m unittest discover -s tests",
+  "input_regression": "eleven ZIPs ignored; actual loose video retained; real video-name collision still rejected; ZIPs excluded from input hashes",
+  "native_rc2": "not compiled/run; local owner build",
+  "private_playable": "not delivered",
+  "autosaves": {
+    "default": 5,
+    "range": [
+      0,
+      16
+    ],
+    "setting": "aw_autosaves",
+    "saved_in": "id1/config.cfg"
+  },
+  "journal_images": [
+    "docs/images/amiwind-v0.0.25-dev1-journal.png"
+  ],
+  "actor_contact_findings_unresolved": 23,
+  "sources": [
+    {
+      "archive": "AmiWind-v0.0.25-dev1-public-source.zip",
+      "sha256": "784c9592da5f27831a7af6c9f51a488911605254dae5455a34ea9b8c2badd1f8"
+    },
+    {
+      "archive": "AmiWind-v0.0.25-rc1-public-source.zip",
+      "sha256": "75ee0f7abeae29881435e7dd43d4c6c20327ed9ea6a2d03e0b78aa43ea44eaca"
+    },
+    {
+      "archive": "AmiWind-v0.0.25-rc1-checkpoint-001-public-source(1).zip",
+      "sha256": "0729d2e36e13689b713bd0dd9ee375f86380d4afaa3141e3e735532300172995"
+    },
+    {
+      "archive": "AmiWind-v0.0.25-rc1-checkpoint-004-public-source(1).zip",
+      "sha256": "644428992cb79aac6ba7ad69b86645a17b455d1e9ef128cb28dbec413f499559"
+    },
+    {
+      "archive": "AmiWind-v0.0.25-rc1-checkpoint-006-public-source(1).zip",
+      "sha256": "48f7e08fcfc59b2bc589dcd24f8bacef26e917fc963b6cd4b4811ba0583dcb7f"
+    },
+    {
+      "archive": "AmiWind-v0.0.25-rc1-reconciled-public-source.zip",
+      "sha256": "3d14d4bd982a6286933d8e45d44957ef8b666f365a6f9aa72e783bfb4f702d71"
+    }
+  ]
+}

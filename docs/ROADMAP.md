@@ -1,9 +1,23 @@
 # Roadmap and implementation options
 
+## v0.0.25-rc1 regression work
+
+See [the consolidated dev1 feedback](FEEDBACK-v0.0.25-dev1.md). Priorities are
+Seyda Neen's grounded island handoff, trustworthy global coordinates/map marker,
+water/terrain verification, console M/N protection, normal compass and Ctrl flight.
+
+- [ ] Add original-game unexplored-area masking/fog of war to the world map,
+  driven by visited exterior locations and persisted with saves. Deferred;
+  explicitly outside the v0.0.25-rc1 implementation.
+- [ ] Review retained terrain compiler diagnostics: scale collision-only entity
+  seeds consistently and reduce near-coplanar portal clipping. Preserve native
+  collision and visibility checks when changing that pipeline.
+
 Current release: [v0.0.24 - Welcome to Balmora (and Vvardenfell!)](RELEASE-v0.0.24.md).
-Next work: resolve the retained placement findings and convert the surveyed
-base-game terrain into runtime areas, retaining original cells wherever measured
-budgets permit. Solstheim/Bloodmoon and Tribunal are outside this island pass.
+Current candidate: [v0.0.25-rc1](RELEASE-v0.0.25-rc1.md), correcting the first
+playable terrain pass. Next work includes retained placement findings, broader
+route playtesting and scenery beyond the detailed towns. Solstheim/Bloodmoon and
+Tribunal are outside this island pass.
 The [29 September plan](PLAN-2026-09-29.md) retains historical priorities.
 
 ## Balmora interiors and loading
@@ -34,22 +48,19 @@ ship-exit scene. Performance observations remain separate from measured claims.
   investigate the view-dependent distance-1000 speed-up. Keep the prison ship's
   interior cost separate. Background loading/prefetch remains future work.
 
-## Future world-coordinate HUD (investigate first; not v0.0.24 work)
+## World-coordinate HUD
 
 - [x] Establish a reversible transform from each runtime scene's local XYZ to
   original Morrowind world coordinates and exterior cell/grid coordinates.
   Check quarter-scale conversion, each area's origin and axis conventions,
   negative-cell boundaries, sub-cell copies and interior identity. Interiors
   must not invent an exterior location when the source has none.
-- [ ] After that investigation, add a small console-font XYZ display at the
-  upper right, matching the current AmiWind/debug text size. Define what the
-  proposed world-map "mini coords" represent before showing them.
-- [ ] Support `dbg global coords on/off`, `true/false`, and `1/0`, with the same
-  forms through `debug`. Store the setting in game configuration; once the
-  feature is implemented it should default to visible within `dbg hud on`.
-- [ ] Relate the display to the original exterior-cell grid and the whole-world
-  topographic/coverage planning map. Keep this separate from changing gameplay
-  coordinates or adding continuous world travel.
+- [x] rc1: compact console-font GLOBAL XYZ and LOCAL XYZ at bottom right,
+  retaining yaw/pitch. The existing `debug coords` switch controls both rows.
+- [x] Use the same source transform for HUD, map marker and exterior-cell index;
+  print exact scene identity through `aw_pos` for reproducible reports.
+- [ ] Consider separately configurable coordinate rows if requested; the current
+  paired display follows the owner's revised HUD request.
 
 ## World map, inventory and journal TODO (owner request, 1 October 2026)
 

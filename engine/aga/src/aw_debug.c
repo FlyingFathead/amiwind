@@ -4,6 +4,7 @@
 #include "quakedef.h"
 #include "aw_save.h"
 #include "aw_region.h"
+#include "aw_world.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -12,9 +13,13 @@ static edict_t *player(void) {
     return svs.clients[0].edict;
 }
 static void position(void) {
-    edict_t *p=player();if(!p)return;
+    edict_t *p=player();vec3_t global;if(!p)return;
     Con_Printf("position %ld %ld %ld / movement %ld\n",(long)p->v.origin[0],
         (long)p->v.origin[1],(long)p->v.origin[2],(long)p->v.movetype);
+    if(AW_WorldToSource(sv.name,p->v.origin,global))
+        Con_Printf("global %ld %ld %ld / scene %s / cell %ld,%ld\n",(long)global[0],
+            (long)global[1],(long)global[2],sv.name,(long)floor(global[0]/8192),(long)floor(global[1]/8192));
+    else Con_Printf("scene %s / no exterior coordinate transform\n",sv.name);
 }
 /* Reproducible local camera placement for visual regression captures. */
 static void view(void) {

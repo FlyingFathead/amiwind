@@ -14,6 +14,15 @@ areas. The position is derived from the current area's actual conversion origin
 and scale. Inside an interior the screen explicitly has no exterior position
 fix; it does not pretend interior coordinates are world coordinates.
 
+In rc1 the cross reads the simulated player's current source XYZ on each draw,
+using the same transform as the HUD. Zoom/pan survive closing and reopening the
+map; P centres the current position. The header includes live source XYZ, since
+ordinary walking may move less than one pixel at whole-island scale. The separate
+mouse pointer is not the white player cross. The map pauses ordinary play.
+
+**TODO, explicitly deferred:** original-game unexplored-map masking / discovery
+occlusion. rc1 keeps the entire island overview visible.
+
 The terrain is a reduced, palette-matched overview. The 489 by 512 pixel packet
 is **250,520 bytes**, including bounds, ocean colour and area transforms. It is
 allocated/read only when opened and freed on close. Rendering the open map does

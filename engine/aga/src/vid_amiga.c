@@ -342,7 +342,7 @@ void	VID_Init (unsigned char *palette)
   }
   Con_Printf ("Screen opened successfully\n");
 
-  idcmp = IDCMP_RAWKEY;
+  idcmp = IDCMP_RAWKEY | IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW;
   flags = WFLG_ACTIVATE | WFLG_BORDERLESS | WFLG_NOCAREREFRESH |
           WFLG_SIMPLE_REFRESH;
   // NovaCoder's input code always uses mouse
@@ -361,6 +361,7 @@ void	VID_Init (unsigned char *palette)
   }
 
   Con_Printf ("Window opened successfully\n");
+  AW_InputGuardInit();
 
   // Bring screen and window to front so they're visible
   ScreenToFront (video_screen);
@@ -486,6 +487,7 @@ void	VID_Shutdown (void)
   }
   if (video_window != NULL) {
     ClearPointer (video_window);
+    AW_InputGuardShutdown();
     CloseWindow (video_window);
     video_window = NULL;
   }

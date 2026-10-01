@@ -7,7 +7,7 @@ def folder_inventory(path):
         return {"present": False, "files": 0, "bytes": 0}
     count = size = 0
     for p in path.rglob("*"):
-        if p.is_file():
+        if p.suffix.casefold() in {'.wav', '.mp3'} and p.is_file():
             p = ensure_external(p, "audio input")
             count += 1
             size += p.stat().st_size

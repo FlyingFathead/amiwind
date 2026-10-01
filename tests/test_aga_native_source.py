@@ -44,6 +44,12 @@ class NativeSourceTests(unittest.TestCase):
             ('aw_scene.c', 'mathlib.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_modifier_qualifiers_lost_shift_caps_and_focus_reset(self):
+        self.compile_run("aga_modifier_state_test.c", [Path(SOURCE)/"src/keys.c"])
+
+    def test_configurable_map_desktop_flight_keys_and_literal_console_input(self):
+        self.compile_run("aga_keymap_test.c", [Path(SOURCE)/"src/keys.c"])
+
     def test_legacy_numeric_view_binds_preserve_custom_slots(self):
         self.compile_run('aga_controls_migration_test.c', [Path(SOURCE)/'src/keys.c'])
 

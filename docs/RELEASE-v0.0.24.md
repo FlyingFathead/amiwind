@@ -10,7 +10,7 @@ continuous whole-island 3D travel remains future work.
 | :---: | :---: |
 | ![Native Balmora bridge](images/amiwind-v0.0.24-balmora-bridge.png) | ![Native Dagoth Ur gallery view](images/amiwind-v0.0.24-dagoth.png) |
 | **Vvardenfell map** | **Progression journal** |
-| ![Native island map](images/amiwind-v0.0.24-map.png) | ![Native journal](images/amiwind-v0.0.24-journal.png) |
+| ![Native island map](images/amiwind-v0.0.24-map.png) | [Corrected journal screenshot (v0.0.25-dev1)](images/amiwind-v0.0.25-dev1-journal.png) |
 
 ## Explore, create, inspect
 

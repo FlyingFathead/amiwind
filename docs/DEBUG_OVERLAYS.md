@@ -1,6 +1,6 @@
 # Development overlays
 
-Runtime v0.0.23-dev3. Open the console with F10 or the key left of 1 (normally
+Runtime v0.0.25-rc1. Open the console with F10 or the key left of 1 (normally
 § on the Finnish layout). Boolean commands accept on/off, true/false and 1/0,
 case-insensitively. With no value they report their setting.
 
@@ -22,14 +22,20 @@ Crosshair, menus, dialogue/subtitles and loading
 feedback remain visible; they are not debug overlays. Commands are small
 resident handlers; no disk lookup is needed for these toggles.
 
-Coordinates use local converted units (one quarter of source world units) and
-report the simulated player origin, not eye height. DEG is yaw normalized to
-0..359 (0=+X, 90=+Y); P is view pitch in degrees. Neither is source compass data. The 12-pixel strip sits
-outside the 3D viewport. It must be included in the video update rectangle;
-merely drawing it into the chunky buffer leaves stale pixels on screen.
+The compact console-font rows show **GLOBAL XYZ** in original source units and
+**LOCAL XYZ** in converted scene units (one quarter scale). Both report the
+simulated player origin, not eye height. Exterior source coordinates are
+`(local + region_origin) * 4`, including the region's Z origin. Interior global
+coordinates are explicitly unavailable. DEG is engine yaw, normalized to 0..359
+(0=+X, 90=+Y); P is pitch. The normal HUD compass uses geographic north (+Y),
+clockwise bearings and eight direction labels. It remains visible with debug off.
 
-For a missing wall, record XYZ plus view direction. `aw_pos` prints the local
-position; `aw_view x y z yaw pitch` reproduces a camera while noclip is enabled.
+![GLOBAL and LOCAL coordinates with compass](images/amiwind-v0.0.25-rc1-navigation.png)
+
+For a missing wall, record both coordinate rows plus view direction. `aw_pos`
+prints local and global position, the scene name and source cell; local XYZ alone
+does not identify an island region. `aw_view x y z yaw pitch` reproduces a local
+camera in the same scene while noclip is enabled.
 For collision add `aw_blockers`. Use `aw_recover` to return to the safe spawn.
 The reserved strip slightly changes the viewport, so keep its setting identical
 for performance/visibility comparisons. Hiding overlays restores the view area.
@@ -38,26 +44,31 @@ The blue square was the cache-thrashing indicator, not a gameplay element. Its
 absence with showram disabled does not prove cache thrashing has stopped; retain
 profiles and model-load diagnostics during memory-budget changes.
 
-## Temporary sea-height reference
+## Sea-height visibility
 
 `amiwind_debug_sealevel on/off` defaults **on** and accepts the same boolean
-spellings. It shows/hides the demo's simple `*water` surface at local **Z=0**.
+spellings. It shows/hides the converted `*water` surface. The exterior datum is
+global **source Z=0**; in a rebased terrain region its local Z is `-origin.z`.
 This can help inspect the shoreline, low terrain and pier clearance. It does
 not change water contents, swimming, collision or terrain heights. It is
 independent of the overlay master; hiding text overlays does not remove the sea.
 
-The sea extends to +/-2048 local units; actual terrain still ends at +/-768.
-This is a temporary flat backdrop while basic rendering and interiors are built.
-It is not verified surrounding coastline, islands, an infinite ocean or world
-streaming. It cannot hide every exposed land edge. Replace it with proper nearby
-map coverage later; a host contour/topographic diagnostic should distinguish
-actual converted elevations, the sea datum and areas without source coverage.
+The old bounded demo backdrop is historical. The island conversion covers the
+frozen survey's 1,404 cells and 2,526 regions. rc1 preserves original shoreline
+samples where coarse triangulation changed land/water classification. See
+[WORLD_TERRAIN.md](WORLD_TERRAIN.md) for coverage and remaining limits.
 
 ## Flight and recall
 
 Noclip W/S follows the full view direction, including pitch; A/D strafe and
-Shift boosts speed. E/Q remains world up/down. No inertia on key release and
+Shift boosts speed. With debug enabled, Ctrl gives twice the Shift speed;
+Ctrl+Shift does not add a further multiplier. E/Q remains world up/down. No inertia on key release and
 no diagonal speed bonus. Safe collision re-entry is unchanged.
+
+M remains the map in debug/noclip, and M/N remain ordinary console letters.
+Alt+M deliberately exposes the desktop only with debug enabled. Default and
+personal bindings are separate from graphics/settings configuration; see the
+maintained [keyboard and command reference](KEYMAPS.md).
 
 `amiwind_debug_reset_location 0` returns to the validated Seyda Neen town spawn
 and restores walking. Other IDs are rejected without moving the player. From the ship this loads the town first; in town it uses the existing checked
@@ -282,3 +293,11 @@ character. `dbg door sounds on/off` controls authored opening/closing samples.
 with `-condebug`; turn it off after reproducing the birthsign input report.
 Frame CSV now also records server time and surface-order mode, separating
 movement/logic cost from world rendering. Shift+V stays unchanged.
+
+## Reconciled input and defaults
+
+Shift/Ctrl/Alt are refreshed from each native input qualifier, with Caps Lock
+limited to letters and focus changes clearing held input. Legacy personal
+keymap.cfg loads before keymaps.cfg. The maintained canonical reference is
+KEYMAPS.md. Autosave default is five; aw_autosaves 0..16 remains an archived
+setting in config.cfg and Options > Autosave history.

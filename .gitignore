@@ -149,7 +149,6 @@ AmiWind-launcher.json
 !/docs/images/amiwind-v0.0.24-rc3-balmora.png
 !/docs/images/amiwind-v0.0.24-rc3-dagoth.png
 !/docs/images/amiwind-v0.0.24-rc4-map.png
-!/docs/images/amiwind-v0.0.24-rc4-journal.png
 
 # Selected native v0.0.24 documentation captures.
 !/docs/images/amiwind-v0.0.24-balmora-bridge.png
@@ -159,3 +158,5 @@ AmiWind-launcher.json
 !/docs/images/amiwind-v0.0.24-map.png
 !/docs/images/amiwind-v0.0.24-journal.png
 !/docs/images/amiwind-v0.0.25-dev1-journal.png
+!/docs/images/amiwind-v0.0.25-rc1-map.png
+!/docs/images/amiwind-v0.0.25-rc1-navigation.png

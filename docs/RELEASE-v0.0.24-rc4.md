@@ -7,7 +7,7 @@ this content set and its journal assets have a new save fingerprint.
 
 | Whole-island overview | Two-page progression journal |
 | :---: | :---: |
-| ![Native Vvardenfell map](images/amiwind-v0.0.24-rc4-map.png) | ![Native two-page journal](images/amiwind-v0.0.24-rc4-journal.png) |
+| ![Native Vvardenfell map](images/amiwind-v0.0.24-rc4-map.png) | ![Native two-page journal](images/amiwind-v0.0.25-dev1-journal.png) |
 
 ## New in this checkpoint
 

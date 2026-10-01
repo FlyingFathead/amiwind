@@ -43,7 +43,8 @@ def startup_config(config):
     config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
         'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
-    return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\nbind t aw_wait\nbind F1 aw_quick_help\nbind m aw_worldmap\nbind j aw_journal\n'
+    config=re.sub(r'(?m)^(?:bind |unbindall)[^\n]*\n?', '', config)
+    return 'exec keymaps-default.cfg\naw_drawdistance 540\n'+config.rstrip()+'\n'
 
 def validate_quakec(path):
     """Reject incompatible compiler output before it reaches an Amiga image."""
@@ -163,6 +164,8 @@ def image(args):
     boot=out/'boot';shutil.copytree(scene/'id1',boot/'id1');(boot/'S').mkdir()
     cfg=boot/'id1/default.cfg'
     cfg.write_text(startup_config(cfg.read_text()))
+    shutil.copyfile(ROOT/'config/keymaps.cfg',boot/'id1/keymaps-default.cfg')
+    shutil.copyfile(ROOT/'config/game.cfg',boot/'id1/default-game.cfg')
     if args.data_files:
         from prepare_ui import convert as convert_ui
         from ui_palette import reserve as reserve_ui_palette
@@ -194,7 +197,7 @@ def image(args):
                                  boot/'id1/intro/opening.awt',movie_info['frames'])
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
-    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_startup\n')
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec default-game.cfg\nexec config.cfg\nexec keymap.cfg\nexec keymaps.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_startup\n')
     print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')

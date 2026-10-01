@@ -172,3 +172,13 @@ PyFFI 2.2.3 imports distutils, so the converter explicitly requires
 `setuptools>=68`. Build preflight and CI exercise the actual TES3 NIF reader
 with an in-memory synthetic write/read before conversion. This uses no game data.
 See [Python 3.12 changes](https://docs.python.org/3/whatsnew/3.12.html#distutils).
+
+## Original game inputs; remote-work archives are excluded
+
+The Morrowind_*.zip and datafiles.zip packages supplied for remote work are not
+GOG/Steam installation inputs. The builder never requires or extracts those ZIPs.
+Select the installation root or Data Files directory; discovery finds the original
+Morrowind.esm/Morrowind.bsa pair beneath it, then uses the original known asset
+folders and subfolders (Video, Sound, Music, Meshes, Textures, Fonts, BookArt,
+Icons and Splash). Name matching is case-insensitive. Only supported game asset
+types enter validation and build input hashes. Personal archives stay untouched.

@@ -68,7 +68,10 @@ executable yet. Read the source README and docs for scope and next steps.
     with zipfile.ZipFile(destination, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as out:
         with zipfile.ZipFile(source_archive) as source:
             for item in source.infolist():
-                out.writestr(prefix + item.filename, source.read(item))
+                import copy
+                member = copy.copy(item)
+                member.filename = prefix + item.filename
+                out.writestr(member, source.read(item))
         out.writestr(prefix + "README-PRIVATE.md", quickstart)
         out.writestr(prefix + "morrowind-amiga-workspace/workspace.json",
                      json.dumps({"format": 1, "project": PROJECT, "target": state.get("target", "a500")}, indent=2)+"\n")

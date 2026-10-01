@@ -1,5 +1,9 @@
 # Portable FS-UAE launcher
 
+The public `tools/AmiWind-FS-UAE-launcher.py` and private playable-root copy
+are executable on POSIX systems: `./AmiWind-FS-UAE-launcher.py`. The source
+archive preserves mode 0755; Windows can continue using `python` or `py`.
+
 `tools/AmiWind-FS-UAE-launcher.py` is a standalone Python 3.8+ helper for existing
 local images. It requires no Python packages. Install FS-UAE separately and
 provide your own playable HDF and suitable Kickstart ROM.

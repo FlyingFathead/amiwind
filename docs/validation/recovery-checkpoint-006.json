@@ -1,0 +1,57 @@
+{
+  "version": "0.0.25-rc1",
+  "checkpoint": "006",
+  "host_tests": {
+    "run": 333,
+    "skipped": 1,
+    "status": "passed"
+  },
+  "native_compile": {
+    "status": "passed",
+    "warnings": 82,
+    "baseline_warnings": 82,
+    "binary_sha256": "7e71df5d4108306d162823786b8e0cad961a66138bab40a4817124ecf223fae8",
+    "matches_current_runtime_source": true
+  },
+  "native_input": {
+    "status": "passed",
+    "m_map_retains_game": true,
+    "console_nm_literal": true,
+    "alt_m_desktop": true,
+    "system_return": true,
+    "method": "input.device event injection with Amiga qualifiers; FS-UAE 3.1.66"
+  },
+  "stuck_shift": {
+    "host_regression": "passed",
+    "native_extended_probe": "timed out; no native stuck-Shift pass claim"
+  },
+  "native_autosave_config": "aw_autosaves \"5\" observed",
+  "shoreline": {
+    "tiles": 330752,
+    "refined_tiles": 12871,
+    "sample_comparisons": 8268800,
+    "coarse_dry_samples_drowned": 13287,
+    "coarse_wet_samples_raised": 14470,
+    "rebuilt_wet_dry_mismatches": 0,
+    "shared_edges_checked": 25742,
+    "failures": [],
+    "seconds": 88.958,
+    "status": "passed",
+    "water_policy": "Surveyed exterior CELL water levels must all be zero; other levels fail conversion."
+  },
+  "terrain": {
+    "regions": 2526,
+    "hash_failures": [],
+    "max_bytes": 3249072,
+    "max_faces": 9790,
+    "max_clipnodes": 26286,
+    "seconds": 3.225
+  },
+  "pending": [
+    "native ordinary walking in both directions",
+    "native shoreline visual acceptance",
+    "quicksave ordering and generation browser",
+    "matching private HDF assembly",
+    "23 existing actor-contact findings"
+  ]
+}

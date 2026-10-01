@@ -1,8 +1,8 @@
 # AGA checkpoint build and controls
 
-The current v0.0.25-dev1 development runtime includes the detailed Seyda Neen and
+The current v0.0.25-rc1 candidate runtime includes the detailed Seyda Neen and
 Balmora areas plus the surveyed island's terrain/water regions. Other settlements
-are not populated yet. See [current scope](RELEASE-v0.0.25-dev1.md). The A500 runtime
+are not populated yet. See [current scope](RELEASE-v0.0.25-rc1.md). The A500 runtime
 remains a separate experiment; this profile is not stock-A1200 performance proof.
 
 ## Reference configuration
