@@ -1919,4 +1919,26 @@ void COM_InitFilesystem (void)
 
 	if (COM_CheckParm ("-proghack"))
 		proghack = true;
+
+#ifdef AMIGA
+    /* Optional terrain volumes are additional partitions in the same HDF.
+     * Append loose-file paths without changing the writable game directory. */
+    {
+        FILE *world_file=NULL;unsigned char header[5];int n;
+        searchpath_t **tail=&com_searchpaths;
+        n=COM_FOpenFile("world/volumes.awv",&world_file);
+        if(world_file){
+            if(n!=5 || fread(header,1,5,world_file)!=5 || memcmp(header,"AWV1",4) || header[4]<1 || header[4]>8){
+                fclose(world_file);Sys_Error("Invalid world volume manifest");
+            }
+            fclose(world_file);
+            while(*tail)tail=&(*tail)->next;
+            for(n=0;n<header[4];n++){
+                search=Hunk_Alloc(sizeof(searchpath_t));
+                sprintf(search->filename,"AW_WORLD%ld:id1",(long)n);
+                search->next=NULL;*tail=search;tail=&search->next;
+            }
+        }
+    }
+#endif
 }

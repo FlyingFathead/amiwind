@@ -1,5 +1,20 @@
 # Development history
 
+## v0.0.25-dev1 — 1 October 2026
+
+- Convert the surveyed island footprint into 2,526 terrain/water regions, using
+  the recovered polymap subdivisions and preserving detailed Seyda Neen and Balmora.
+- Share duplicate BSP lighting and visibility blocks without changing their
+  decoded contents; remove 382,833,220 bytes from the initial terrain build.
+- Balance the payload across two FFS partitions inside one self-contained HDF.
+  Document partition capacity, device addressing and the former 1 GiB build cap.
+- Centre and wrap journal headings on the left leaf; update the native screenshot.
+- Restore unassigned J/M bindings, gallery wheel/middle-button input and the
+  exact-model polygon allowance needed for Dagoth Ur. Repair the reported Balmora
+  terrain material in every affected town-region copy.
+- Retain the 23 known ground-contact findings. This is a development playable;
+  [scope and verification](RELEASE-v0.0.25-dev1.md) remain explicit.
+
 ## v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026
 
 - Owner-approved milestone release of RC4's game/features, with freshly compiled

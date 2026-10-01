@@ -18,7 +18,8 @@ The terrain is a reduced, palette-matched overview. The 489 by 512 pixel packet
 is **250,520 bytes**, including bounds, ocean colour and area transforms. It is
 allocated/read only when opened and freed on close. Rendering the open map does
 not read from disk. Ocean beyond the image has the same colour as the map's
-water; panning has a bounded ocean margin. This does not add new walkable regions.
+water; panning has a bounded ocean margin. The separate
+[terrain pass](WORLD_TERRAIN.md) supplies playable regions and their origins.
 
 ## J: earned journal entries in two facing pages
 
@@ -26,6 +27,11 @@ J, or `aw_journal`, opens the most recently earned entry in a two-page book.
 Left/right, Page Up/Down, wheel and the bottom page links turn pages, continuing
 to the previous/next earned entry at each entry boundary. Home/End selects the
 first/last entry. Long entries continue onto additional spreads.
+
+Headings are centred on the left leaf, never across the spine. Long titles wrap
+fully and move that page's body text down; the right leaf keeps its normal text
+area. Quest-index titles wrap too. Startup restores J and M when an older saved
+configuration leaves them unassigned, while retaining custom bindings.
 
 Tab or the **Quests** link opens the quest index. Select with arrows, wheel,
 Page Up/Down, the draggable scrollbar or mouse, then Enter/click to filter entries for that quest. Clicking

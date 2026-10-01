@@ -70,6 +70,12 @@ int main(void){
     strcpy(sv.name,"charplane");AW_GallerySpawn(&player);draw();assert(strstr(drawn,"#7 Dagoth Ur"));
     AW_GalleryKey('N',1,1,0);draw();assert(strstr(drawn,"#12 Dagoth Ur"));
     AW_GalleryKey('N',1,1,0);draw();assert(strstr(drawn,"Clagius Clanler"));
+    assert(AW_GalleryKey(K_MWHEELUP,1,0,0));draw();assert(strstr(drawn,"#12 Dagoth Ur"));
+    assert(AW_GalleryKey(K_MWHEELUP,0,0,0));draw();assert(strstr(drawn,"#12 Dagoth Ur"));
+    AW_GalleryKey(K_MWHEELDOWN,1,0,0);draw();assert(strstr(drawn,"Clagius Clanler"));
+    AW_GalleryKey(K_MOUSE2,1,0,0);assert(AW_GalleryModal());
+    AW_GalleryKey(K_MOUSE2,0,0,0);assert(AW_GalleryModal());
+    AW_GalleryKey(K_MOUSE2,1,0,0);assert(!AW_GalleryModal());
     AW_GalleryKey('B',1,1,0);draw();assert(strstr(drawn,"Base body"));
     argc=2;args[1]="DAGOTHUR";command();draw();assert(strstr(drawn,"#7 Dagoth Ur") && strstr(drawn,"2 matches"));
     args[1]="dagoth_ur_2";command();draw();assert(strstr(drawn,"#12 Dagoth Ur"));

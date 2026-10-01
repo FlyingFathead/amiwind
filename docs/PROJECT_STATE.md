@@ -1,23 +1,30 @@
 # Current project state — 1 October 2026
 
-**Current: v0.0.24 - Welcome to Balmora (and Vvardenfell!).** The owner
-approved the milestone release on 1 October 2026 following RC playtesting.
-This is a major milestone in mapping the whole base-game island, excluding
-Bloodmoon's Solstheim and Tribunal content. M shows the world map and exterior
-player location; J provides a two-page earned journal with saved history.
+**Current development: v0.0.25-dev1.** The recovered base-master survey drives
+2,526 terrain/water regions. Source positions survive boundaries through explicit
+local origins; both detailed towns, their interior conversions and characters
+remain in place. The map follows the player in terrain regions. New terrain
+outside Seyda Neen and Balmora has no converted scenery or actors yet.
 
-The full terrain/density survey fits existing town regions into source-world
-coordinates. It measures 1,405 scenery meshes and 134,865 placements, with no
-unresolved geometry or mismatched adjacent terrain heights. Playable 3D scenes
-remain the existing converted areas; the island inspection mesh is host-side.
-All 3,551 gallery assets and the character-creation sequence remain included.
+Journal headings occupy the left page and wrap in full. Older unassigned J/M
+bindings are repaired after saved configuration loads. The gallery supports wheel
+navigation in its model view and middle-click browser access; the FS-UAE preset
+passes the middle button through. Dagoth Ur's bounded, byte-checked model
+allowance is enabled at startup, including a one-time older-config migration.
+The reported Balmora material gap at `2663,-1107,211 / 14 / 27` uses the matching
+surrounding dirt-road material in every affected overlap copy.
 
-The owner accepted release with 23 strict contact findings still unresolved.
-The automated production placement gate remains failed and unchanged; the
-private release retains the failed receipt and rebuilds final-version binaries
-against the verified RC4 payload. Inventory, general dialogue/quest execution,
-whole-island walking and complete playthrough acceptance remain future work.
-See [release scope and evidence](RELEASE-v0.0.24.md).
+The single HDF has two 1.5 GiB FFS partitions. Lossless BSP sharing removes
+383 MB of duplicate terrain lighting/visibility data. Native high-offset disk
+reads and representative town/terrain and walking crossings passed.
+
+The 23 existing strict NPC contact findings remain unresolved and the ordinary
+production image gate remains unchanged. This is a development playable with
+those findings retained, not a new production acceptance. Inventory, general
+quest execution and complete playthrough acceptance remain future work.
+See [scope and validation](RELEASE-v0.0.25-dev1.md) and
+[terrain conversion](WORLD_TERRAIN.md). The last owner-approved milestone is
+[v0.0.24](RELEASE-v0.0.24.md).
 
 ## RC3 recovery baseline (historical)
 

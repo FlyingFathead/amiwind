@@ -112,3 +112,13 @@ Every image has an exact `.gitignore` exception, a documentation-media allowlist
 entry, and a source-package entry. The owner-run publishing helper also requires
 all packaged public files to be tracked before committing. Other private
 captures and converted assets remain excluded.
+
+## v0.0.25-dev1 corrected journal — 1 October 2026
+
+The README journal is a genuine 320x200 native frame, enlarged exactly 2x with
+nearest-neighbour sampling. The heading is centred within the left leaf and the
+Quests control stays clear of the spine. It shows the earned opening entry for
+the debug Hors character. It was captured with the matching 68040 executable in
+FS-UAE using the documented 2 MiB Chip / 16 MiB Z3 profile. No generated content,
+colour changes or compositing were used. Raw PCX, commands and native log are
+retained in the private evidence. Historical images remain unchanged.

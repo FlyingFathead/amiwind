@@ -2,8 +2,9 @@
 
 The first complete base-master survey places Seyda Neen and Balmora in a shared
 world coordinate system. It is a conversion plan and inspection dataset. The
-native **M** screen uses its island overview; the existing playable scenes remain
-the currently converted towns and interiors.
+native **M** screen uses its island overview. The v0.0.25-dev1
+[playable terrain pass](WORLD_TERRAIN.md) now consumes these subdivision candidates
+while retaining both detailed towns and their interiors.
 
 ## Measured baseline, 1 October 2026
 

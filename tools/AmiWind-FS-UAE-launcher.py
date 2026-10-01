@@ -36,6 +36,9 @@ PROFILE_VALUES = {
     'fast_memory': '0',
     'zorro_iii_memory': '16384',
     'joystick_port_1': 'none',
+    'middle_click_ungrab': '0',
+    'keyboard_key_pageup': 'action_key_68',
+    'keyboard_key_pagedown': 'action_key_69',
     'floppy_drive_volume': '0',
 }
 PROFILE_LABELS = (

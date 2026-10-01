@@ -2,10 +2,10 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number: **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**.
-The owner approved the final milestone on 1 October 2026 after RC playtesting,
-with the 23 contact findings retained as known issues. Earlier archives/tags stay
-immutable. See the explicit release decision below; the audit was not changed.
+Current development number: **v0.0.25-dev1 — terrain and interface fixes**.
+The development playable retains the 23 failed contact findings; it is not a
+passed production release. The owner's earlier v0.0.24 approval applies to that
+historical milestone only. Earlier archives and tags remain immutable.
 `VERSION` is the maintained version source for Python metadata, native build
 includes, runtime/boot strings, receipts, presets and package filenames.
 
@@ -13,9 +13,9 @@ includes, runtime/boot strings, receipts, presets and package filenames.
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.24-public-source.zip` | Complete repository under `amiwind/`. |
-| `AmiWind-v0.0.24-from-rc4-source-patch.zip` | Added/changed public files and patch metadata, from the exact delivered RC4 source ZIP. |
-| `AmiWind-v0.0.24-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24/`, following the delivered RC3 wrapper. |
+| `AmiWind-v0.0.25-dev1-public-source.zip` | Complete repository under `amiwind/`. |
+| `AmiWind-v0.0.25-dev1-from-v0.0.24-source-patch.zip` | Added/changed public files and patch metadata, from the exact delivered v0.0.24 source ZIP. |
+| `AmiWind-v0.0.25-dev1-private-playable.zip` | Matching single two-partition HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.25-dev1/`. |
 
 Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
 their checksums belong in GitHub release assets. No private playable, ROM or
@@ -30,9 +30,9 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-The exact base is `AmiWind-v0.0.24-rc4-public-source.zip`, SHA-256
-`bbff61e2562659ae7c32eea4027ed82d1dac5177b08a23535ba3223110af35e8`.
-`docs/PATCH-v0.0.24.json` records the base, changed paths and removals.
+The exact base is `AmiWind-v0.0.24-public-source.zip`, SHA-256
+`6c1b7d67f120fda08d09c78ad044b7250e8ba702b872e9d3cb3f3be0ef2fc043`.
+`docs/PATCH-v0.0.25-dev1.json` records the base, changed paths and removals.
 Verify a clean application reproduces every file in the full source ZIP,
 including the package manifest. The two RC3 screenshots also require their
 explicit `.gitignore` exceptions; source checks now enforce that alongside the
@@ -105,6 +105,56 @@ Public documentation and release assets use generic example paths. Keep owner
 usernames, machine names and local directory layouts in private handoff material.
 
 ## Amiga limitations
+
+### FFS partition capacity and hardfile capacity are different
+
+For the current Kickstart 3.1 / DOS1 FFS compatibility profile, plan partitions
+**below 2 GiB** and keep the complete device's addressed range **below 4 GiB**.
+One RDB `.hdf` can contain several such partitions; a 2 GiB partition bound is
+not a 2 GiB limit on the complete multi-partition hardfile. Verify the actual
+ROM, filesystem and device path, including native reads at the highest used
+offsets. These planning bounds do not certify arbitrary physical controllers.
+
+The older `build_aga.py` **1 GiB boot-partition cap was a project build setting**,
+not the FFS format limit. Do not describe it as an Amiga filesystem restriction.
+Keep that smaller boot partition only when its payload fits; use the available
+partition capacity deliberately when building the combined terrain image.
+
+Measure the converted runtime payload before deciding its disk layout. Original
+Morrowind installation size is not the converted-image size: overlapping BSPs
+duplicate terrain, collision and visibility tables, and converted audio/textures
+have different storage costs. Record payload bytes, partition sizes, free-space
+allowance and highest used device offset in the build receipt. Check avoidable
+duplication before expanding storage. Distinguish decimal GB from binary GiB
+(2 GiB = 2,147,483,648 bytes). See [storage profiles](STORAGE.md).
+
+### Preferred partition contents and performance
+
+If capacity eventually requires two larger partitions, prefer **partition 1 for
+the main Morrowind game**, including frequently visited interiors and shared
+resources, plus boot files, configuration and saves. Prefer **partition 2 for
+future Bloodmoon/Tribunal content, videos and less frequently used assets**.
+Move selected base-game interiors only if needed; shops, guilds and quest hubs
+are not inherently rare. Keep expansion assets together for play within that
+expansion, and retain one copy of shared resources.
+
+This is the owner's future placement preference. The present v0.0.25-dev1 image
+uses two 1,536 MiB partitions with base-game terrain balanced between them; no
+expansion conversions are included. Its measured payload exceeds one 2 GiB
+partition, so further reductions or selective overflow are necessary before all
+main-game content can occupy partition 1. Two exactly 2 GiB partitions plus RDB
+space would exceed 4 GiB; keep both partitions and the complete image below their
+respective planning bounds.
+
+Two partitions do not cause operating-system swapping on the plain KS 3.1
+baseline, and partition 2 in the same HDF has no inherent speed advantage.
+Extra filesystem buffers/handler state consume RAM, and filesystem work costs
+CPU time. Our current fallback search also checks primary paths before opening
+second-volume files. Once open, reads use that file handle. A future direct
+asset-to-volume index can avoid those failed lookups; it is not implemented.
+Scene reloads may pause on either partition. Measure load time, RAM, frame stalls
+and audio refill behavior before claiming a performance gain or no overhead.
+See [content placement and costs](STORAGE.md#preferred-future-content-placement).
 
 ### Legacy filesystem names: 30 bytes per component
 

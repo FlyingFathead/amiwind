@@ -11,12 +11,15 @@ keydest_t key_dest=key_game;int scr_copyeverything;
 static void (*map_command)(void),(*journal_command)(void);
 static int missing,corrupt,opens;static char drawn[16384];
 static byte pixels[320*200];
+static const char title[]="A long quest heading which must wrap completely within one journal page without losing text";
+static int heading_rows;
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
 void IN_AWClearButtons(void){}
 int AW_StoryRestricted(void){return 0;}
 int AW_ReaderActive(void){return 0;}
 int AW_CharacterActive(void){return 0;}
 int AW_GalleryActive(void){return 0;}
+int AW_WorldToSource(const char *name,const float *local,float *world){return 0;}
 void Con_Printf(char *s,...){}
 int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
 int AW_ConsoleCharWidth(void){return 4;}
@@ -26,8 +29,14 @@ void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 void AW_UIBookBegin(void){}
 void AW_UIBookEnd(void){}
+int AW_UIWidth(const char *s){return (int)strlen(s)*6;}
 void AW_UIText(int x,int y,const char *s,int c){strcat(drawn,s);}
-void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){strcat(drawn,s);}
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){
+    assert((x>=10 && x+w<=154) || (x>=166 && x+w<=302));
+    assert(AW_UIWidth(s)<=w);assert(y>=5 && y+h<=188);
+    if(x==14 && y>=26 && y<110 && h==14)heading_rows++;
+    strcat(drawn,s);
+}
 const char *AW_UILine(const char *p,int width,char *out,int capacity){int n=0;while(*p && n<width/6 && n<capacity-1)out[n++]=*p++;out[n]=0;return p;}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void fixed(FILE *f,const char *s,int n){int i;for(i=0;i<n;i++)fputc(i<(int)strlen(s)?s[i]:0,f);}
@@ -41,7 +50,7 @@ int COM_FOpenFile(char *name,FILE **out){
         word(f,(unsigned)-8192);word(f,(unsigned)-8192);word(f,8192);word(f,8192);word(f,1);word(f,5);
         fixed(f,"balmora",16);fixed(f,"Balmora",32);word(f,0);word(f,0);value=.25;memcpy(&bits,&value,4);word(f,bits);
         for(i=0;i<1024;i++)fputc(i&255,f);
-    }else if(!strcmp(name,"world/quests.awq")){fputs("AWQ1",f);word(f,1);fixed(f,"quest",64);fixed(f,"Known quest",96);
+    }else if(!strcmp(name,"world/quests.awq")){fputs("AWQ1",f);word(f,1);fixed(f,"quest",64);fixed(f,title,96);
     }else if(!strcmp(name,"world/journal.awj")){
         fputs("AWJ1",f);word(f,2);
         fixed(f,"quest",64);word(f,1);word(f,0);word(f,strlen(body)+1);
@@ -50,7 +59,7 @@ int COM_FOpenFile(char *name,FILE **out){
     else assert(0);
     size=ftell(f)-base;fseek(f,base,SEEK_SET);return size;
 }
-static void draw(void){drawn[0]=0;assert(AW_WorldUIDraw());}
+static void draw(void){drawn[0]=0;heading_rows=0;assert(AW_WorldUIDraw());}
 int main(void){
     edict_t player;client_t client;int before;
     memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
@@ -67,9 +76,12 @@ int main(void){
     journal_command();draw();assert(strstr(drawn,"No dated journal"));AW_WorldUIKey('j',1);
     assert(AW_JournalAdd(&aw_state,"quest",1));assert(AW_JournalAdd(&aw_state,"quest",10));
     journal_command();draw();assert(strstr(drawn,"Another earned event."));
+    assert(strstr(drawn,title) && heading_rows>1);
+    before=opens;AW_WorldUIMouse(40,-70);AW_WorldUIKey(K_MOUSE1,1);assert(opens==before); /* Right-page heading is not a quest link. */
+    AW_WorldUIMouse(-150,0);AW_WorldUIKey(K_MOUSE1,1);assert(opens>before); /* Left heading follows the quest. */
     AW_WorldUIKey(K_LEFTARROW,1);draw();assert(strstr(drawn,"Welcome Hors."));
     before=opens;draw();assert(opens==before); /* Drawing never fetches text. */
-    AW_WorldUIKey(K_TAB,1);draw();assert(strstr(drawn,"Quests in your journal"));
+    AW_WorldUIKey(K_TAB,1);draw();assert(strstr(drawn,"Quests") && strstr(drawn,title));
     AW_WorldUIKey(K_ENTER,1);draw();assert(strstr(drawn,"Another earned event."));
     AW_WorldUIKey(K_BACKSPACE,1);draw();assert(strstr(drawn,"2/2"));
     assert(!AW_WorldUIKey(K_F10,1));assert(!AW_WorldUIActive() && key_dest==key_game);

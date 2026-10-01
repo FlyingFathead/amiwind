@@ -30,6 +30,7 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc2-{name}.png" for na
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc3-{name}.png" for name in ("dagoth", "balmora"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc4-{name}.png" for name in ("map", "journal"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river", "dagoth", "map", "journal"))
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.25-dev1-journal.png")
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 
 

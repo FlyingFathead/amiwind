@@ -116,6 +116,19 @@
       "source_material": 0,
       "material": 8,
       "reason": "RC1 owner view 1144 -426 114 yaw225 pitch64: isolated default tile in the adjoining hill material"
+    },
+    {
+      "cell": [
+        -2,
+        -3
+      ],
+      "tile": [
+        13,
+        15
+      ],
+      "source_material": 0,
+      "material": 35,
+      "reason": "Owner view XYZ 2663 -1107 211, yaw 14 pitch 27: isolated default tile surrounded by WG_dirtroad_01"
     }
   ],
   "arrival_actor": "selvil sareloth",

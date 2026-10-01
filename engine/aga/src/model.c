@@ -25,8 +25,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 
-static cvar_t aw_allow_poly_budget_over={"aw_allow_poly_budget_over","0",true};
+static cvar_t aw_allow_poly_budget_over={"aw_allow_poly_budget_over","1",true};
 static cvar_t aw_poly_budget_over_cap={"aw_poly_budget_over_cap","auto",true};
+static cvar_t aw_gallery_defaults={"aw_gallery_defaults","0",true};
+/* Upgrade the previously disabled shipped setting once, after config.cfg.
+ * Later explicit opt-outs remain effective on subsequent launches. */
+static void AW_GalleryDefaults(void) {
+    if(aw_gallery_defaults.value>=1)return;
+    Cvar_SetValue("aw_allow_poly_budget_over",1);
+    Cvar_Set("aw_poly_budget_over_cap","auto");
+    Cvar_SetValue("aw_gallery_defaults",1);
+}
 /* Existing shared-vertex models retain their original 2000-vertex allowance.
  * Only the extension is governed by this converted-triangle cap. */
 int AW_AliasBudgetAllows(int vertices,int triangles) {
@@ -128,6 +137,7 @@ Mod_Init
 void Mod_Init (void)
 {
     Cvar_RegisterVariable(&aw_allow_poly_budget_over);Cvar_RegisterVariable(&aw_poly_budget_over_cap);
+    Cvar_RegisterVariable(&aw_gallery_defaults);Cmd_AddCommand("aw_gallery_migrate",AW_GalleryDefaults);
     memset (mod_novis, 0xff, sizeof(mod_novis));
 }
 

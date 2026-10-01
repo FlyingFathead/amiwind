@@ -3,6 +3,7 @@
  * 4 KiB colour table baked on the host; 32 KiB depth table rebuilt on setting changes.
  */
 #include "quakedef.h"
+#include "aw_maps.h"
 extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t aw_drawdistance;
@@ -14,7 +15,7 @@ static cvar_t aw_cull;
 int AW_DrawDistance(void) {
     /* This exterior's converted overlap is certified for the default range.
      * Keep the user's larger setting available to other scenes. */
-    if(sv.active && (!strcmp(sv.name,"balmora") || !strcmp(sv.name,"seyda")) && aw_drawdistance.value>540)return 540;
+    if(sv.active && (!strcmp(sv.name,"balmora") || !strcmp(sv.name,"seyda") || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>540)return 540;
     if(!(aw_drawdistance.value>=128))return 128;
     if(aw_drawdistance.value>4096)return 4096;
     return (int)aw_drawdistance.value;

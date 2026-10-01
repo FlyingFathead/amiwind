@@ -548,7 +548,7 @@ void Key_WriteBindings (FILE *f)
 Key_Init
 ===================
 */
-/* Remove only the old generated view-distance binds, preserving custom slots. */
+/* Restore defaults missing from older saved configurations, preserving custom slots. */
 void AW_ControlsMigrate(void)
 {
     int key;char *binding;
@@ -558,6 +558,8 @@ void AW_ControlsMigrate(void)
            !strcmp(binding,"aw_drawdistance 540") || !strcmp(binding,"aw_drawdistance 700") ||
            !strcmp(binding,"aw_drawdistance 1000")))Key_SetBinding(key,"");
     }
+    if(!keybindings['j'] || !*keybindings['j'])Key_SetBinding('j',"aw_journal");
+    if(!keybindings['m'] || !*keybindings['m'])Key_SetBinding('m',"aw_worldmap");
 }
 
 void Key_Init (void)

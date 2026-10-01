@@ -2,6 +2,7 @@
 """Launch an owned local HDF with the documented FS-UAE playtest preset."""
 import argparse
 import hashlib
+import importlib.util
 from pathlib import Path
 import os
 import shlex
@@ -117,6 +118,9 @@ def configuration(image, rom):
             raise ValueError(f'Expected exactly one {key} entry in {preset}')
         lines[matches[0]] = f'{key} = {value}'
         text = '\n'.join(lines) + '\n'
+    spec=importlib.util.spec_from_file_location('amiwind_portable_launcher',ROOT/'tools/AmiWind-FS-UAE-launcher.py')
+    launcher=importlib.util.module_from_spec(spec);spec.loader.exec_module(launcher)
+    text=launcher.configured_text(text,image,rom)
     return text.replace('# Replace ROM and HDF placeholders with your owned local files.',
                         '# Local paths filled by the launcher; ROM and HDF are not bundled.')
 

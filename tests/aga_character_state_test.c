@@ -142,7 +142,10 @@ int main(void)
     source.state.journal[0].quest=AW_STATE_VALUES;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
     source.state.journal[0].quest=0;source.state.journal[1]=source.state.journal[0];
     assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.state.journal_count=0;
-    source.actors[0].scene=AW_MAP_COUNT;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
+    source.actors[0].scene=AW_MapId("vf2525");
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && AW_SaveDecode(raw,n,&decoded));
+    assert(decoded.actors[0].scene==AW_MapId("vf2525"));
+    source.actors[0].scene=AW_SCENE_COUNT;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
     strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;
     source.character.current[0]=NAN;assert(!AW_SaveEncode(raw,sizeof(raw),&source));

@@ -16,6 +16,10 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_world_terrain_rebasing_and_bidirectional_town_crossings(self):
+        self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
         self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
@@ -178,6 +182,8 @@ class NativeSourceTests(unittest.TestCase):
 
     def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=()):
         tree = Path(SOURCE).resolve()
+        if any(p.name == "aw_scene.c" for p in sources):
+            sources = [*sources, tree/"src/aw_world.c"]
         if any(p.name == "world.c" for p in sources):
             sources = [*sources, tree/"src/aw_scenery.c"]
         with tempfile.TemporaryDirectory() as tmp:

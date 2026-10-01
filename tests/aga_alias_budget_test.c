@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
-static cvar_t *allow,*cap;
+static cvar_t *allow,*cap,*defaults;
+static void (*migrate)(void);
+void Cmd_AddCommand(char *s,void (*f)(void)){assert(!strcmp(s,"aw_gallery_migrate"));migrate=f;}
+void Cvar_Set(char *s,char *v){assert(!strcmp(s,"aw_poly_budget_over_cap"));cap->string=v;cap->value=atof(v);}
+void Cvar_SetValue(char *s,float v){if(!strcmp(s,"aw_allow_poly_budget_over"))allow->value=v;else defaults->value=v;}
 static const char *table;
 static int reads;
 int COM_FOpenFile(char *name,FILE **file){
@@ -15,12 +19,15 @@ static unsigned int checksum(const byte *raw,int size){
  return crc^0xffffffffU;
 }
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
-void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->name,"aw_allow_poly_budget_over"))allow=v;else cap=v;}
+void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->name,"aw_allow_poly_budget_over"))allow=v;else if(!strcmp(v->name,"aw_poly_budget_over_cap"))cap=v;else defaults=v;}
 int main(void){
  byte raw[84]={0};char record[200];
- Mod_Init();assert(allow && cap && allow->value==0 && !strcmp(cap->string,"auto"));
+ Mod_Init();assert(allow && cap && allow->value==1 && !strcmp(cap->string,"auto"));
  assert(AW_AliasBudgetAllows(1998,666));assert(AW_AliasBudgetAllows(2000,1000));
- assert(!AW_AliasBudgetAllows(2001,667));allow->value=1;
+ assert(AW_AliasBudgetAllows(2709,903));
+ allow->value=0;cap->string="700";cap->value=700;migrate();
+ assert(allow->value==1 && defaults->value==1 && !strcmp(cap->string,"auto"));
+ allow->value=0;migrate();assert(!AW_AliasBudgetAllows(2001,667));allow->value=1;
  assert(AW_AliasBudgetAllows(2331,777));assert(AW_AliasBudgetAllows(3072,1024));
  assert(!AW_AliasBudgetAllows(3073,1024));assert(!AW_AliasBudgetAllows(3072,1025));
  cap->string="777";cap->value=777;assert(!AW_AliasBudgetAllows(2332,777));

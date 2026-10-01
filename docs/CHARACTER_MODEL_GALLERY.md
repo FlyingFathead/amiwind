@@ -9,13 +9,13 @@ is to reveal conversion problems before actors are added to more towns.
 | Action | Control |
 | --- | --- |
 | Enter the gallery | `dbg gallery`, `dbg aw charplane`, `dbg modelgallery`, `dbg npcgallery` |
-| Browse friendly names | Tab or B |
+| Browse friendly names | Tab, B or middle-click |
 | Search the browser | Type case-insensitive keywords; Enter applies the filter |
 | Move through results | Arrows, wheel, Page Up/Down; Shift+Up/Down on classic Amiga keyboards |
 | Show a browser result | Enter after selecting it, or click its row |
 | Scroll with the pointer | Click or drag the right-hand scrollbar |
-| Close the browser | Tab or Escape |
-| Next / previous model | Shift+N / Shift+P |
+| Close the browser | Tab, Escape or middle-click |
+| Next / previous model | Wheel down/up or Shift+N / Shift+P |
 | Equipped / base body | Shift+B |
 | Exact source ID, display name or conversion number | Enter in the gallery |
 | Preview an available converted greeting | E |
@@ -29,7 +29,9 @@ conversion numbers as well. Exact-name lookup reports ambiguity and chooses the
 first stable number. Use the original ID to select a particular variant.
 
 The browser draws its own cursor and captures mouse motion from the camera.
-Wheel scrolling remains available. The FS-UAE preset explicitly maps host
+Wheel scrolling works in the browser and cycles models in the inspection view.
+The current preset sets `middle_click_ungrab = 0`; use F12+G to release mouse
+capture. See [FS-UAE middle-button settings](https://fs-uae.net/docs/options/middle-click-ungrab/). The FS-UAE preset explicitly maps host
 PageUp/PageDown to raw navigation codes 0x68/0x69; its unmodified classic layout
 maps those host keys to keypad ')' and Right Amiga instead. The engine also
 accepts standard extended Amiga page-key codes 0x48/0x49. See
@@ -95,10 +97,9 @@ allow up to 1,024 triangles (3,072 face-local vertices) for a recorded model;
 this does not force every model to grow. The original 777 trial is retained as
 a selectable restrictive cap.
 
-The engine defaults to `aw_allow_poly_budget_over false`. Use
-`aw_allow_poly_budget_over true` and `aw_poly_budget_over_cap auto` to use each
-listed model's recorded allowance. `auto` is the default cap setting, with the
-extension disabled by default. A numeric cap (666–1,024) adds
+The engine defaults to `aw_allow_poly_budget_over true` and
+`aw_poly_budget_over_cap auto` to use each
+listed model's recorded allowance. A numeric cap (666–1,024) adds
 an overall ceiling; for example `aw_poly_budget_over_cap 777`.
 Both settings persist. Existing shared-vertex models within 2,000 vertices keep
 their original allowance. Invalid cap values are rejected through the console;
@@ -163,3 +164,7 @@ at an exact authored key, outside the key range, or on a constant interval;
 other samples fail explicitly. These two static poses do not implement flight,
 scripted falls, AI or the full animation set. Other creatures retain their rest
 mesh until an inspected pose profile is added.
+
+The startup command `aw_gallery_migrate` enables the previously disabled shipped
+allowance once. The archived `aw_gallery_defaults` marker preserves subsequent
+explicit opt-outs. Exact model-byte checks and the 1,024-triangle ceiling still apply.

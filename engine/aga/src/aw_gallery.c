@@ -308,7 +308,7 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     if(page){
         if(key==K_MOUSE1 && !down){scroll_drag=0;return 1;}
         if(!down)return 1;
-        if(key==K_ESCAPE || key==K_TAB){close_browser();IN_AWClearButtons();return 1;}
+        if(key==K_ESCAPE || key==K_TAB || key==K_MOUSE2){close_browser();IN_AWClearButtons();return 1;}
         rows=page_rows();
         if(key==K_MOUSE1){
             int h=AW_ConsoleCharHeight(),top=22+3*h,height=rows*(2*h+2);
@@ -361,7 +361,12 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     if(key==K_ENTER){if(down){editing=1;query[0]=notice[0]=0;IN_AWClearButtons();}return 1;}
     if(key>='A' && key<='Z')key+='a'-'A';
     if(key=='e'){if(down)talk();return 1;}
-    if(key==K_TAB || (key=='b' && !shift)){if(down)open_browser();return 1;}
+    /* Amiga's middle button is K_MOUSE2; the right button is K_MOUSE3. */
+    if(key==K_TAB || key==K_MOUSE2 || (key=='b' && !shift)){if(down)open_browser();return 1;}
+    if(key==K_MWHEELUP || key==K_MWHEELDOWN){
+        if(down && select_entry(selected+(key==K_MWHEELDOWN?1:-1),NULL))reload();
+        return 1;
+    }
     if(shift && (key=='n' || key=='p' || key=='b')){
         if(!down)return 1;
         if(key=='b')body=!body;
@@ -392,7 +397,7 @@ void AW_GalleryDraw(void) {
     sprintf(text,"%ld/%ld #%ld %s",(long)(selected+1),(long)count,(long)current.number,current.name);line(0,text);
     line(1,current.id);
     sprintf(text,"%s: %ld x %ld x %ld units",body?"Base body":"Equipped",(long)current.size[0],(long)current.size[1],(long)current.size[2]);line(2,text);
-    line(3,"Shift+N/P: next/prev  F1: help");
+    line(3,"Wheel / Shift+N/P: next/prev  F1: help");
     if(editing){sprintf(text,"> %s_",query);line(5,text);}if(notice[0])line(6,notice);
     /* The reserved strip remains readable independently of target aim and HUD.
      * Paint after normal subtitles: the identity and browse controls persist. */

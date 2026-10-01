@@ -76,8 +76,9 @@ DEPENDENCIES = {
     'census': ('intro',), 'area': ('census',), 'balmora': ('area',),
     'balmora-interiors': ('balmora',), 'door-audio': ('balmora-interiors',), 'character': ('door-audio',),
     'reading': ('character',), 'opening-references': ('reading',),
+    'world-survey': (), 'world-terrain': ('opening-references', 'world-survey'),
     'music': (), 'engine': (),
-    'image': ('opening-references', 'music', 'engine', 'dialogue-lookup'),
+    'image': ('world-terrain', 'music', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
 

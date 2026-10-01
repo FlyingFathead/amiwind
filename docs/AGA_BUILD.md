@@ -1,8 +1,9 @@
 # AGA checkpoint build and controls
 
-Runtime v0.0.16 / based on checkpoint-017 contains bounded Seyda Neen and prison-ship scenes using an adapted
-AmiQuake renderer. It is not the whole Morrowind world, a quest engine or a
-stock-A1200 performance result. The A500 runtime remains a separate experiment.
+The current v0.0.25-dev1 development runtime includes the detailed Seyda Neen and
+Balmora areas plus the surveyed island's terrain/water regions. Other settlements
+are not populated yet. See [current scope](RELEASE-v0.0.25-dev1.md). The A500 runtime
+remains a separate experiment; this profile is not stock-A1200 performance proof.
 
 ## Reference configuration
 
@@ -19,13 +20,13 @@ Use 2 MiB Chip and 16 MiB Fast; the 4 MiB Quickstart preset is too small.
 See [WinUAE setup](WINUAE.md) for panel-by-panel instructions and
 [FS-UAE playtesting](FS-UAE-PLAYTESTING.md) for the Linux recipe/preset.
 
-The image boots directly to `Loading AmiWind v0.0.16...` and the runtime.
+The image boots through the versioned preflight into the logo and main menu.
 It does not load the Workbench desktop or use icon tooltypes. The executable
 no longer links `icon.library` or closes/reopens Workbench. It still uses AmigaOS libraries,
 filesystem, devices and screen management. Skipping the desktop does not
 remove those dependencies. This AGA executable does not support Kickstart 1.3.
 
-The owner-only package contains a 128 MiB FFS partition in an RDB HDF. Select
+The development package contains two FFS partitions in one RDB HDF. Select
 the image as an RDB hardfile on the UAE controller, using its stored geometry.
 WinUAE has not been tested here; the documented FS-UAE settings are the reference.
 Use a working copy of the image: exit writes profiling files to the filesystem.
@@ -34,6 +35,7 @@ Use a working copy of the image: exit writes profiling files to the filesystem.
 
 | Input | Action |
 | --- | --- |
+| J / M | Journal / world map during unrestricted gameplay |
 | W / A / S / D | Forward / strafe left / back / strafe right |
 | Mouse | Look; click inside the emulator window to capture |
 | Left / right arrow | Turn |
@@ -54,14 +56,15 @@ Use a working copy of the image: exit writes profiling files to the filesystem.
 
 Quake physics supplies walking, gravity and jump/water primitives. This is not
 a conversion of Morrowind's movement or combat rules. Terrain and building
-collision are approximate. Three NPCs have idle animations, turn toward you, and give bounded proximity/E
-voice auditions; they do not wander, fight or run quest dialogue. Only the prison
-ship hatch links are active; other interiors and quests are not implemented. See [player movement](PLAYER_MOVEMENT.md).
+collision are approximate. Converted town NPCs have bounded idle/greeting and
+dialogue behavior. They do not implement the complete original quest, combat or
+AI systems. Converted town interiors use the documented door links. See
+[player movement](PLAYER_MOVEMENT.md) and [current state](PROJECT_STATE.md).
 
 To quit, open the Escape menu, choose Exit and confirm. Wait for the shell
 prompt and filesystem writes to finish. Type
 `amiwind` and press Enter to restart. Run `AmiWindCheck` separately to print the versioned hardware/memory
-checks again. New, Save and Load are visible but disabled; Options → Graphics is active.
+checks again. The menu supports New Game and character save/load; Options → Graphics is active.
 See [hands/menu reference](OPENMW_REF_CONTROLS_MENU.md) and
 [debug overlays](DEBUG_OVERLAYS.md).
 

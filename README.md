@@ -6,24 +6,28 @@
 
 ## Current state of the project
 
-**v0.0.24 - Welcome to Balmora (and Vvardenfell!)**
+**v0.0.25-dev1 — Vvardenfell terrain and interface fixes**
 
-A major milestone in mapping the entire island of Vvardenfell: the original
-exterior cells, terrain and polygon-density survey now share one world map,
-with Balmora and Seyda Neen fitted into it. **M** opens that map and locates the
-player outdoors; **J** opens the two-page progression journal. This covers the
-base game, excluding Bloodmoon's Solstheim and Tribunal expansion content.
-The whole-island overview is implemented; playable 3D travel still uses the
-converted Seyda Neen and Balmora scenes.
+The base-game island now has a playable terrain pass following the recovered
+polygon survey: **2,526 terrain regions**, with local coordinates rebased at
+boundaries. **Detailed Seyda Neen and Balmora remain intact**, including their
+existing interiors and characters. Outside those towns this pass contains
+terrain and water; other settlements, scenery and actors remain future work.
+Bloodmoon and Tribunal expansion content are excluded.
+
+**J** opens the progression journal; **M** opens the island map. Older saved
+configurations regain these keys when unassigned. Journal headings stay centred
+on the left page and wrap onto multiple lines. See the
+[development scope and validation](docs/RELEASE-v0.0.25-dev1.md).
 
 | Welcome to Balmora | Dagoth Ur, in the character gallery |
 | :---: | :---: |
 | ![Balmora bridge in v0.0.24](docs/images/amiwind-v0.0.24-balmora-bridge.png) | ![Dagoth Ur's gold mask in the native gallery](docs/images/amiwind-v0.0.24-dagoth.png) |
 | **Vvardenfell world map** | **Two-page progression journal** |
-| ![Vvardenfell world map](docs/images/amiwind-v0.0.24-map.png) | ![Dated progression journal](docs/images/amiwind-v0.0.24-journal.png) |
+| ![Vvardenfell world map](docs/images/amiwind-v0.0.24-map.png) | ![Dated progression journal](docs/images/amiwind-v0.0.25-dev1-journal.png) |
 
-*Native v0.0.24 FS-UAE captures, shown at integer scale. Diagnostic camera
-placement; original renderer colours. [Capture details](docs/GAMEPLAY_MEDIA.md).*
+*Native FS-UAE captures at integer scale: corrected journal from v0.0.25-dev1;
+other views from v0.0.24. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
 Character creation follows the opening registration sequence: name, race,
 gender, head and hair, class, birthsign and a final review. The appearance
@@ -34,8 +38,8 @@ stage. Character choices and earned journal history persist in saves.
 records and all 3,551 converted model assets**. Search by friendly name or
 source ID, inspect equipped/base-body variants, and return to the captured game
 state. Dagoth Ur's protected mask geometry and original gold texture use an
-exact-model allowance: `aw_allow_poly_budget_over true` and
-`aw_poly_budget_over_cap auto`. [Gallery controls](docs/CHARACTER_MODEL_GALLERY.md).
+exact-model allowance, enabled by default with `aw_allow_poly_budget_over true`
+and `aw_poly_budget_over_cap auto`. Wheel cycles models; middle-click opens the browser. [Gallery controls](docs/CHARACTER_MODEL_GALLERY.md).
 
 Balmora has 64 overlapping exterior regions and 43 destination interiors,
 including Tharys Ancestral Tomb. Seyda Neen retains 25 regular regions, its
@@ -43,12 +47,12 @@ opening scenes and converted interiors. Aim at doors or residents and press
 **E**. NPC interaction currently provides bounded authored greetings. Full
 combat, quest simulation, services, schedules and inventory remain unfinished.
 
-This milestone ships with documented limits: **23 strict ground-contact audit
+This development build retains the documented limits: **23 strict ground-contact audit
 findings remain unresolved**, and the ordinary production image builder still
-stops on that audit. The owner approved this release with those known findings;
+stops on that audit. The owner accepted those findings for v0.0.24;
 release status does not turn the audit into a pass. Method 1 retains synchronous
 loading behind the frozen-frame Loading... box; method 2 read-ahead remains
-experimental. See [release notes and verification](docs/RELEASE-v0.0.24.md).
+experimental. See [release notes and verification](docs/RELEASE-v0.0.25-dev1.md).
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game
@@ -202,12 +206,12 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.24 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.25-dev1 configuration template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.24-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.24-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.25-dev1-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.25-dev1-WinUAE.uae) |
 
-1. Build `AmiWind-v0.0.24-dev1.hdf` from your own Morrowind installation using the
+1. Build `AmiWind-v0.0.25-dev1.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
    playable game image.
 2. Install an emulator from its official homepage above and save a local copy

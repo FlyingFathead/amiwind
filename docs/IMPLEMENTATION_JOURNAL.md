@@ -1004,3 +1004,52 @@ The owner's release decision accepts 23 existing contact findings as known
 issues. No audit result, threshold or classification changed, and the normal
 production image gate remains fail-closed. Release approval records acceptance
 of this milestone's scope; it does not grant future audit exceptions.
+
+## J030 - Island terrain, corrected UI and storage policy
+
+The v0.0.25-dev1 development build uses the recovered polygon survey and its
+subdivision estimates for 2,526 terrain/water regions. Preserve the detailed
+town conversions for **Seyda Neen AND Balmora**, including their existing
+interiors and actors. Outside those towns this is terrain coverage, not a
+completed conversion of every settlement, object or actor. Native checks cover
+ordinary walking between terrain regions, both town boundary directions and
+save/restore after reaching terrain through the normal town transition.
+
+Journal headings now centre within the left page and wrap onto additional rows;
+the public screenshot comes from the matching native runtime. Restore missing
+J/M bindings, the gallery's wheel and middle-button handling, and Dagoth Ur's
+bounded exact-model polygon allowance. The reported Balmora ground location now
+uses the surrounding dirt-road material in all affected detailed-region copies.
+
+The first terrain output was 2,220,222,432 bytes. Sharing identical BSP lighting
+and encoded visibility data removes 382,833,220 bytes without changing geometry,
+collision, light samples or visibility. The combined runtime payload is
+2,599,581,307 bytes. One self-contained RDB HDF currently uses two 1,536 MiB FFS
+partitions; the 1 GiB cap in the previous builder was a project setting, not an
+FFS limit. Every payload file was read back and hashed, and native reads at the
+highest used range on the second partition passed.
+
+The owner's preferred future layout is **partition 1 for the main Morrowind
+game**, with **partition 2 for future Bloodmoon/Tribunal, videos and content
+accessed less often**. Keep frequently visited interiors with the main game;
+move selected interiors only if capacity requires it. Expansion content becomes
+frequent during expansion play, so group its related assets. Keep shared assets
+deduplicated. This preference is recorded for future packing work: the present
+image has no expansion conversions and balances base-game terrain across both
+partitions. Fitting all base-game content on partition 1 still needs further
+size reduction or selective overflow. Plan below 2 GiB per partition and below
+4 GiB for the whole device, including RDB/alignment space and filesystem overhead.
+
+Two partitions in one HDF neither provide independent storage channels nor cause
+automatic RAM swapping on the plain KS 3.1 baseline. They do add filesystem
+handler/buffer memory and filesystem CPU work. The current fallback search tries
+the primary paths before second-volume files; subsequent reads use the opened
+handle. A future asset-to-volume index should avoid unnecessary failed lookups.
+Measure cold/warm load times, free RAM, CPU/frame stalls and audio refill behavior
+before claiming a placement benefit. High-offset read success is a correctness
+test, not a comparative speed result. See [storage policy](STORAGE.md) and
+[Amiga limitations](RELEASE_WORKFLOW.md#amiga-limitations).
+
+The 23 known strict NPC contact findings remain, and the production image gate
+still fails on them. This package is a development playable, not production
+acceptance or a full-island route certification.

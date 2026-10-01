@@ -136,6 +136,15 @@ def write_content_fingerprint(id1):
         asset=Path(id1)/name
         if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))
+    directory=Path(id1)/'world/regions.awr'
+    if directory.is_file():
+        fingerprint.update(b'world/regions.awr\0'+bytes.fromhex(digest(directory)))
+        raw=directory.read_bytes()
+        if raw[:4]!=b'AWR2' or len(raw)!=64+struct.unpack_from('<I',raw,4)[0]*52:
+            raise ValueError('Invalid world region directory')
+        for index in range(struct.unpack_from('<I',raw,4)[0]):
+            name=f'maps/vf{index:04d}.bsp'
+            fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(Path(id1)/name)))
     (Path(id1)/'save-content.bin').write_bytes(fingerprint.digest())
 
 
@@ -185,7 +194,7 @@ def image(args):
                                  boot/'id1/intro/opening.awt',movie_info['frames'])
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
-    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_startup\n')
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec config.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_startup\n')
     print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
@@ -236,10 +245,12 @@ def image(args):
     shutil.copyfile(music/'soundtrack.json',target/'soundtrack.json')
     (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n')
     # Leave filesystem metadata and future saves room; retain legacy-safe sizes.
+    from world_volumes import pack as pack_world_volumes
+    world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool)
     check_payload_names(boot)
     payload_bytes=sum(p.stat().st_size for p in boot.rglob('*') if p.is_file())
     partition_mib=max(128,((payload_bytes*6//5 + 16*1024*1024 + 127*1024*1024)//(128*1024*1024))*128)
-    if partition_mib>1024:raise ValueError('Boot payload exceeds supported image budget')
+    if partition_mib>=2048:raise ValueError('Boot partition must remain below 2 GiB')
     part=out/'partition.hdf';hdf=out/f'AmiWind-v{VERSION}.hdf'
     cmd=[args.xdftool,part,'create',f'size={partition_mib}Mi','+','format','AMIWIND','ffs','+','boot','install']
     for path in sorted((p for p in boot.rglob('*') if p.is_dir()),key=lambda p:len(p.parts)):
@@ -247,16 +258,22 @@ def image(args):
     for path in sorted(p for p in boot.rglob('*') if p.is_file()):cmd+=['+','write',path,path.relative_to(boot).as_posix()]
     run(cmd)
     root_check=check_image(part,normalize=True)
-    run([args.rdbtool,hdf,'create',f'chs={partition_mib*32+1},1,64','+','init','+','addimg',part,'name=DH0','bootable=1','pri=0'])
-    # Verify every payload via an independent read from the finished RDB image.
-    check=out/'readback.tmp'
-    for path in sorted(p for p in boot.rglob('*') if p.is_file()):
-        run([args.xdftool,hdf,'open','part=DH0','+','read',path.relative_to(boot).as_posix(),check])
-        if digest(check)!=digest(path):raise ValueError('HDF readback mismatch')
-        check.unlink()
-    check_image(hdf,partition="DH0")
+    total_mib=partition_mib+sum(p['bytes']//(1024*1024) for p in world_images)
+    if total_mib*1024*1024+32768>=4*1024**3:
+        raise ValueError('Combined legacy hardfile must remain below 4 GiB')
+    command=[args.rdbtool,hdf,'create',f'chs={total_mib*32+1},1,64','+','init',
+             '+','addimg',part,'name=DH0','bootable=1','pri=0']
+    for volume in world_images:
+        command+=['+','addimg',out/volume['file'],'name='+volume['partition'],'bootable=0']
+    run(command)
+    # Independently mount the finished RDB and hash every stored payload.
+    from world_volumes import verify_combined
+    boot_files=[dict(path=p.relative_to(boot).as_posix(),bytes=p.stat().st_size,sha256=digest(p))
+                for p in sorted(boot.rglob('*')) if p.is_file()]
+    layout=verify_combined(hdf,[dict(partition='DH0',volume='AMIWIND',files=boot_files),*world_images])
+    for volume in world_images:(out/volume['file']).unlink()
     part.unlink()
-    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p.stat().st_size for p in boot.rglob('*') if p.is_file()),'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':f'FFS, {partition_mib} MiB partition in RDB','legacy_root_check':root_check},indent=2)+'\n')
+    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':'DOS1 FFS partitions in one RDB HDF','legacy_root_check':root_check},indent=2)+'\n')
     print(hdf)
 
 def main():

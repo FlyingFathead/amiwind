@@ -7,6 +7,7 @@
 #include "aw_maps.h"
 #include "aw_story.h"
 #include "aw_region.h"
+#include "aw_world.h"
 #include "aw_character.h"
 #include "amiwind_version.h"
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
@@ -133,11 +134,12 @@ const char *AW_SceneWorldModel(const char *name) {
     }
     return NULL;
 }
-int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora");}
+int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora") && AW_TerrainId(sv.name)<0;}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
 static void read_links_for(const char *map) {
     FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
     if(!map_valid(map))return;
+    if(AW_TerrainId(map)>=0){count=0;loaded=0;return;}
     if(loaded && !strcmp(links_map,map))return;
     strcpy(links_map,map);loaded=1;count=0;
     sprintf(path,"doors-%s.txt",map);
@@ -387,7 +389,7 @@ void AW_SceneSpawn(edict_t *p) {
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
     } else {
         pending=0;
-        if(AW_Interior() || !strcmp(sv.name,"balmora"))AW_InteriorPlace(p,p->v.origin);
+        if(AW_Interior() || !strcmp(sv.name,"balmora") || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
     AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_GallerySpawn(p);region_crossing=0;
@@ -409,9 +411,13 @@ void AW_SceneTick(void) {
     }
     if(pending || !sv.active || cls.state!=ca_connected || cls.signon!=SIGNONS || key_dest!=key_game ||
        svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
-       p->v.health<=0 || (p->v.movetype!=MOVETYPE_WALK && p->v.movetype!=MOVETYPE_NOCLIP) ||
-       !AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
-    memset(&r,0,sizeof(r));strcpy(r.target,sv.name);VectorCopy(p->v.origin,r.arrival);r.yaw=p->v.angles[1];
+       p->v.health<=0 || (p->v.movetype!=MOVETYPE_WALK && p->v.movetype!=MOVETYPE_NOCLIP))return;
+    memset(&r,0,sizeof(r));
+    if(AW_StoryRestricted() || !AW_WorldDestination(sv.name,p->v.origin,r.target,r.arrival)){
+        if(!AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
+        strcpy(r.target,sv.name);VectorCopy(p->v.origin,r.arrival);
+    }
+    r.yaw=p->v.angles[1];
     VectorCopy(p->v.v_angle,crossing_angles);VectorCopy(p->v.velocity,crossing_velocity);crossing_movetype=p->v.movetype;
     region_crossing=1;
     AW_SetNextLoadingStyle(AW_RegionLoadingFrozen()?AW_LOADING_FROZEN:AW_LOADING_BLANK);
