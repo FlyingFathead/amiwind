@@ -1,0 +1,149 @@
+{
+  "version": "0.0.25-rc6",
+  "date": "2026-10-01",
+  "status": "source checkpoint; source tests, native compile and asset-free image passed",
+  "delivery": "complete source; direct update from rc3; includes all rc4/rc5 source changes and roadmap updates",
+  "baseline": {
+    "version": "0.0.25-rc3",
+    "archive": "AmiWind-v0.0.25-rc3-public-source.zip",
+    "sha256": "e39d16236e0e7c550518a63bd6c20cbfa2d39b247efeea1ba8405666359f0b44"
+  },
+  "source_tests": {
+    "status": "passed",
+    "tests": 373,
+    "skipped": 0,
+    "external_qbsp": "0.18.1",
+    "log_sha256": "d7309c2e04448d5a2ebbbd0f961e5cb8b0a6b8a2a6d97f3f980bd9faf802cd37"
+  },
+  "native_compile": {
+    "status": "passed",
+    "host": "Linux",
+    "compiler_jobs": 1,
+    "version": "0.0.25-rc6",
+    "binary_sha256": "63cf3e3d2bc2653c59f57ab33c9e210c38192c7f4b9f29d84537046e73efc00f",
+    "bootcheck_sha256": "fec0eeeef8c48d0a2f5f4343c9108d0fdae494afe9effa328463c6213813894f",
+    "compiler_warning_lines": 78,
+    "warning_note": "Warnings retained and counted; this checkpoint does not fix or suppress them.",
+    "parallel_validation": "not repeated; serial validation used because earlier parallel make output capture failed on the full system filesystem. Product parallel defaults unchanged."
+  },
+  "asset_free_image": {
+    "status": "passed",
+    "bytes": 8421376,
+    "sha256": "029bb8b2cadf588ab524011ccf1b095707bc500d5376838180d6dffb7891239d",
+    "elapsed_seconds": 12.794,
+    "timing_scope": "provenance, build stages and final output hashing; excludes prerequisites/setup and emulator launch",
+    "independent_output_hash_verified": true,
+    "payload_readback": "passed by image builder",
+    "game_assets_used": false,
+    "rom_used": false,
+    "emulator_boot": "not performed"
+  },
+  "full_game_build": {
+    "status": "not repeated for rc6",
+    "passed": false,
+    "prior_rc3_result": "21 stages passed then ENOSPC in world-terrain assembly; final image not reached",
+    "user_workstation_build": "reported complete rc3 private image with exact-report acceptance; strict actor gate failed",
+    "existing_actor_contact_findings": 23,
+    "production_gate_changed": false
+  },
+  "windows": {
+    "native_msys2": "untested; preferred future Windows route",
+    "wsl2": "untested; fallback",
+    "automatic_windows_setup": "not implemented"
+  },
+  "performance": {
+    "region_phase_profiling": "planned",
+    "persistent_cross_run_terrain_cache": "planned",
+    "gpu_backend": "not implemented",
+    "speedup_claimed": false
+  },
+  "private_payload_delivered": false,
+  "image_recovery": {
+    "world_ui_receipt_fix": "synthetic regression passed with regions.awr present",
+    "source_and_output_guards": "synthetic fixtures passed",
+    "entry_point": "two real subprocess stages in synthetic fixture; terrain not run",
+    "actual_retained_game_recovery": "owner reports rc3 private image assembly passed; rc6 full game image not run here",
+    "early_world_ui_validation": "before terrain on new full builds",
+    "early_actor_validation": "real retained rc3 scene reproduced all 23 strict failures before world terrain",
+    "known_findings_acceptance": "exact comparison passed on unchanged real retained payload; default strict gate still fails"
+  },
+  "compass": {
+    "default": "hidden",
+    "configuration": "aw_compass 0",
+    "command": "dbg compass on/off, 1/0, true/false",
+    "saved": true,
+    "validation": "native HUD/console regression tests and m68k compile passed; emulator not run"
+  },
+  "actor_contact": {
+    "status": "23 unintended placement cases remain unresolved",
+    "distinct_placed_references": 15,
+    "early_real_scene": "strict gate failed as expected before world terrain",
+    "retained_payload_exact_acceptance": "passed; raw audit remains failed",
+    "owner_reported_rc3_private_image": {
+      "assembly": "passed",
+      "production_gate_passed": false,
+      "elapsed_seconds": 144.664,
+      "bytes": 3221258240,
+      "sha256": "b99358fc5342b8c8dfc827d4db8353acd113daad1420853d8b2a4865080acb47",
+      "independently_read_here": false
+    },
+    "rc6_full_game_image": "not yet validated",
+    "emulator_test": "not performed"
+  },
+  "build_summary_inventory": {
+    "status": "passed in real native build",
+    "python": "3.12.14",
+    "packages": [
+      {
+        "name": "numpy",
+        "version": "2.3.5"
+      },
+      {
+        "name": "scipy",
+        "version": "1.17.0"
+      },
+      {
+        "name": "Pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "PyFFI",
+        "version": "2.2.3"
+      },
+      {
+        "name": "fast-simplification",
+        "version": "0.2.0"
+      },
+      {
+        "name": "amitools",
+        "version": "0.8.1"
+      },
+      {
+        "name": "setuptools",
+        "version": "84.0.0"
+      }
+    ],
+    "selected_tools": [
+      {
+        "name": "make",
+        "detected": "4.3",
+        "status": "matching",
+        "sha256": "d78b8f1d099fbcfb6f2f49ab87223b9b68fb3956642f92d6ec6de812e8afa965"
+      },
+      {
+        "name": "m68k-amigaos-gcc",
+        "detected": "16.2.0b 20260825082934",
+        "status": "matching",
+        "sha256": "34119a3528cc5778967b8741eba490d8ae25829fcd89858f3be376f323a64cda"
+      },
+      {
+        "name": "vasmm68k_mot",
+        "detected": "2.0f",
+        "status": "newer",
+        "sha256": "3c5d4203377bd45f3ee1743cb24dd57cd94f570ab209cd9f9306e9826db29f15"
+      }
+    ],
+    "worker_budget": 1,
+    "stage_scheduling": "serial"
+  }
+}

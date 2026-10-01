@@ -2,41 +2,39 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current candidate: **v0.0.25-rc3 — interior window conversion repair**.
-This is a source checkpoint. The native engine compiled and 21 real-input stages
-passed; whole-island terrain conversion and final image validation remain
-incomplete. The 23 historical actor-contact findings remain unresolved. Earlier
-archives and tags remain immutable. `VERSION` is the maintained version source.
+Current candidate: **v0.0.25-rc6 — complete source update from rc3**.
+It consolidates all intervening source and roadmap work. The native compiler
+and asset-free image checks are distinct from full game-image acceptance;
+see [rc6 validation](validation/rc6-source.json). Earlier archives and tags remain
+immutable. The owner performs all Git/GitHub publishing.
 
-## Deliverables and structure
+## Complete update package
 
-| Archive | Structure and purpose |
-| --- | --- |
-| `AmiWind-v0.0.25-rc3-public-source.zip` | Complete public source under `amiwind/`, including a generated package manifest. |
-| `AmiWind-v0.0.25-rc3-source-patch.zip` | Changed/new files relative to the uploaded rc2 snapshot, with application metadata and the same generated manifest. |
+`AmiWind-v0.0.25-rc6-complete-update.zip` is the single handoff download. It
+contains the complete public source ZIP, updater, checksums and apply/publish
+scripts. The handoff bundle is for local use. Its publication script uploads
+only the public source ZIP, source updater and their checksum file.
 
-`AmiWind-v0.0.25-rc3-SHA256SUMS` identifies both archives and the standalone
-source-update helper. No private playable is part of this checkpoint. Public
-release assets contain source and checksums only. A compiled engine is not
-proof of a completed conversion, image gate, or native playtest.
+`AmiWind-v0.0.25-rc6-public-source.zip` contains every maintained source file
+under `amiwind/`, including all documentation and a generated package manifest.
+No rc4/rc5 patch chain or separate roadmap overlay is required. No private
+playable, HDF, converted game data or ROM is included.
 
-The repository root is `amiwind/`. Native code is in `engine/aga/`, host
-conversion code in `src/mwad/`, commands in `tools/`, documentation in `docs/`,
-and presets in `resources/emulators/`. Keep build output outside the checkout.
-Preserve previous methods, fonts, hand variants and release archives.
+## Apply directly to rc3
 
-## Incremental updates
+Finish any running build before updating its source. Extract the complete
+source outside the checkout and use `tools/apply_source_update.py` with a new
+external backup directory. `docs/RECONCILE-BASES.json` accepts the rc3 bytes for
+paths changed by this update. `docs/PATCH-v0.0.25-rc6.json` records the exact rc3
+baseline and hashes; its name is historical metadata terminology, not a
+requirement to download or apply an incremental patch.
 
-The exact patch baseline and every baseline file hash are recorded in
-`docs/PATCH-v0.0.25-rc3.json`. `docs/RECONCILE-BASES.json` records the paths this
-checkpoint changes and the acceptable old bytes. Extract the patch outside the
-checkout, then use `tools/apply_source_update.py` with a new external backup
-directory. Overlapping edits are rejected before mutation; unrelated local
-changes are preserved. Do not blindly unzip over a working checkout.
-
-Verify that applying the patch to the exact baseline reproduces every maintained
-file in the full source archive. The generated package manifest is a release
-receipt, not tracked source. Always offer the full archive with the patch.
+Overlapping local edits stop before writes. Unrelated edits remain preserved
+and must be reconciled before exact release validation. Keep `.git`, game inputs,
+tools and build outputs separate. Do not blindly unzip over the working tree.
+Verify that the direct update reproduces every maintained file and executable
+mode in the complete source archive. The package manifest is generated evidence,
+not tracked source. Runtime version identity comes from `VERSION`.
 
 ## Release gate
 

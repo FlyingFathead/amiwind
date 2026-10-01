@@ -18,6 +18,9 @@ PYTHON_PACKAGES = ("setuptools>=68", "PyFFI==2.2.3", "numpy>=1.23", "Pillow>=9.1
 
 
 def supported_host():
+    if sys.platform == 'win32':
+        raise ValueError('Windows automatic setup is not implemented. Use --host-plan to inspect '
+                         'tools and read docs/WINDOWS_BUILD_ROADMAP.md for the experimental manual route.')
     if sys.platform != "linux":
         raise ValueError("Automatic host setup supports Ubuntu/Debian Linux, including WSL Ubuntu. See docs/LINUX_BUILD.md.")
     info = {}

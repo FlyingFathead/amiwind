@@ -292,3 +292,11 @@ Run the separate [world survey](WORLD_SURVEY.md) for cell-density analysis and
 the private atlas/terrain mesh. The usual production ground-contact gate still
 applies; the diagnostic RC4 package does not turn its 23 open findings into a
 passed production build.
+
+## Completion summary
+
+The builder prints start/end dates with timezone offsets, total build time,
+compiler-warning lines, output filename, GiB/bytes and SHA-256 inside terminal-width
+rules. Success is printed only after the stages and final output hashing pass.
+The same information is saved in the external run's `build-summary.json`.
+See [timing boundaries, warnings and failures](BUILD_OUTPUT.md).

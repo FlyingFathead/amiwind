@@ -22,6 +22,8 @@ from mwad import input_check
 from mwad.progress import Progress, live_log, section
 import build_versions
 from build_jobs import add_jobs, resolve_jobs
+from build_host import executable_path, find_executable, fallback_font, host_name, setup_plan
+from build_summary import BuildSummary
 from build_font_options import add_font_options, resolve_font_options
 from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources, check_quakec
 
@@ -41,8 +43,13 @@ def parser():
     p.add_argument("--install-sdk", action="store_true", help="Fetch the pinned Linux x86_64 Amiga SDK after confirmation; works alone or with --install-dependencies")
     p.add_argument("--tools-dir", type=Path, default=ROOT.parent / "amiwind-tools", help="External dependency environment parent (default: ../amiwind-tools)")
     p.add_argument("--versions", action="store_true", help="Compare available tools/packages with the recorded build reference, then exit")
+    p.add_argument("--host-plan", action="store_true", help="Read-only OS-specific tool inventory; no installation, tool execution or game data required")
+    p.add_argument("--fallback-font", type=Path, help="DejaVuSansMono.ttf for generated console graphics (default: tools/fonts or Linux system font)")
     p.add_argument("--check-inputs", action="store_true", help="Check the game installation without requiring build tools, then exit")
     p.add_argument("--dry-run", action="store_true", help="Actually compile the engine and create an asset-free boot-notice HDF; --plan only previews commands")
+    p.add_argument('--recover-image-from', type=Path, help='Recover an rc3 image-stage failure into a new run, reusing completed conversion; rebuild engine and image only')
+    p.add_argument('--allow-known-actor-ground-findings', type=Path,
+                   help='PRIVATE TEST ONLY: accept an exact reviewed actor-contact report; does not pass the production gate')
     p.add_argument("--autorun-fs-uae", action="store_true", help="Check FS-UAE and your ROM before setup, then launch the completed HDF using the documented preset")
     p.add_argument("--kickstart-file", "--kickstart", dest="kickstart_file", type=Path,
                    help="Owned ROM file or directory for --autorun-fs-uae (default: ~/.roms/; asks if missing interactively)")
@@ -76,8 +83,8 @@ def ask(value, prompt, interactive):
 def detected_sdk(args):
     """Find the SDK installed by our setup command, without writing anything."""
     candidate = ensure_external(args.tools_dir / "sdk", "SDK")
-    assembler = args.vasm or candidate / "bin/vasmm68k_mot"
-    required = (candidate / "bin/m68k-amigaos-gcc", assembler,
+    assembler = executable_path(args.vasm or candidate / "bin/vasmm68k_mot")
+    required = (executable_path(candidate / "bin/m68k-amigaos-gcc"), assembler,
                 candidate / "m68k-amigaos/ndk-include/exec/exec_lib.i")
     return candidate if all(path.is_file() for path in required) else None
 
@@ -90,6 +97,10 @@ def select_sdk(args, interactive=False, game_data=None, install_requested=False)
     if found:
         print(f"Using installed Amiga SDK: {found}")
         return found
+
+    if host_name() == 'windows':
+        raise ValueError('Windows SDK download is not implemented. Select an installed Windows SDK '
+                         'with --sdk; use --host-plan and docs/WINDOWS_BUILD_ROADMAP.md.')
 
     from fetch_toolchain import SPEC, fetch
     destination = ensure_external(args.tools_dir / "sdk", "SDK download directory")
@@ -184,7 +195,7 @@ def choose_installation(candidates):
 
 
 def executable(value, label, errors):
-    found = shutil.which(str(value)) if value else None
+    found = find_executable(value)
     if not found:
         errors.append(f"{label}: executable not found ({value or 'not supplied'})")
         return None
@@ -293,8 +304,11 @@ def prerequisites(args, interactive=False):
                 print("  [ok] AmiWind QuakeC compiled; program version and system-variable CRC match the engine.")
             except (OSError, ValueError, subprocess.SubprocessError) as exc:
                 errors.append(f"QuakeC compile check failed: {exc}")
-        if not Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf").is_file():
-            errors.append("Install fonts-dejavu-core (the scene builder uses DejaVuSansMono.ttf)")
+        try:
+            args.fallback_font = fallback_font(args.fallback_font, args.tools_dir)
+            tools['console-font'] = str(args.fallback_font)
+        except ValueError as exc:
+            errors.append(str(exc))
     args.version_report = build_versions.report(args, tools) if args.stage == "aga" else []
     if errors:
         raise ValueError("Prerequisites need attention:\n  - " + "\n  - ".join(errors) + "\nSee docs/LINUX_BUILD.md.")
@@ -351,7 +365,8 @@ def commands(args, tools, run):
         binary = run / "engine" / RUNTIME_BUILD_DIR / "build/AmiQuakeGCC"
         steps += [
             ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery", "--jobs", resolve_jobs(args.jobs))),
-            ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene", "--jobs", resolve_jobs(args.jobs))),
+            ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene", "--jobs", resolve_jobs(args.jobs),
+                           *(['--fallback-font', args.fallback_font] if args.fallback_font else []))),
             ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("npcs", tool("prepare_npcs.py", "--data-files", args.data_files, "--scene", run / "bsp-scene", "--out", run / "npc-scene", "--ffmpeg", tools["ffmpeg"])),
@@ -379,6 +394,12 @@ def commands(args, tools, run):
             ("opening-references", tool("prepare_opening_refs.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
             ("world-survey", tool("survey_vvardenfell.py", "--data-files", args.data_files,
                 "--out", run / "world-survey", "--jobs", resolve_jobs(args.jobs))),
+            ("world-ui", tool("prepare_world_ui.py", "--data-files", args.data_files,
+                "--survey", run / "world-survey", "--scene", run / "intro-scene")),
+            ("actor-contact", tool("check_scene_actors.py", "--scene", run / "intro-scene",
+                "--data-files", args.data_files, "--out", run / "actor-contact",
+                *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings]
+                  if getattr(args, "allow_known_actor_ground_findings", None) else []))),
             ("world-terrain", tool("prepare_world_regions.py", "--survey", run / "world-survey",
                 "--data-files", args.data_files, "--scene", run / "intro-scene",
                 "--out", run / "world-terrain", "--bindir", Path(tools['qbsp']).parent,
@@ -386,7 +407,7 @@ def commands(args, tools, run):
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
     return steps
@@ -468,8 +489,22 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     args = p.parse_args(argv)
     args._argv = argv
+    summary = None
     try:
+        if args.host_plan:
+            if args.autoinstall or args.install_dependencies or args.install_sdk or args.autorun_fs_uae:
+                raise ValueError('--host-plan cannot be combined with installation or launch modes')
+            print(json.dumps(setup_plan(args), indent=2))
+            return 0
+        if args.allow_known_actor_ground_findings:
+            if args.stage != 'aga' or args.dry_run:
+                raise ValueError('--allow-known-actor-ground-findings requires a real AGA image build')
+            from check_actor_ground import load_approved_report
+            args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.expanduser().resolve()
+            load_approved_report(args.allow_known_actor_ground_findings)
         args.font_options = resolve_font_options(args)
+        if args.recover_image_from and (args.stage != 'aga' or args.dry_run or args.host_plan or args.check_inputs or args.versions or args.install_dependencies or args.install_sdk):
+            raise ValueError('--recover-image-from requires an AGA build/check/plan, with a new run name')
         if sys.version_info < (3, 10):
             raise ValueError("Python 3.10 or newer is required")
         if args.yes and not args.autoinstall:
@@ -540,6 +575,11 @@ def main(argv=None):
                   " (" + args.font_options["selected_by"] +
                   "); preferred TTF conversion and dialogue/menu fonts unchanged.")
         tools = (dry_run_prerequisites if args.dry_run else prerequisites)(args, interactive=sys.stdin.isatty())
+        recovery = None
+        if args.recover_image_from:
+            from recover_image import inspect_run
+            with Progress('Checking retained rc3 conversion for image recovery'):
+                recovery = inspect_run(args, ROOT)
         run = ensure_external(args.workspace / "build" / args.name, "build run")
         print(f"Prerequisites passed. Scope: {'asset-free test compile' if args.dry_run else args.stage}; data: {args.data_files}")
         if args.check:
@@ -548,20 +588,45 @@ def main(argv=None):
         if run.exists():
             raise ValueError(f"Build already exists: {run}; choose a new --name")
         steps = dry_run_commands(args, run) if args.dry_run else commands(args, tools, run)
+        if recovery:
+            from recover_image import recovery_commands
+            steps = recovery_commands(steps, args.recover_image_from.resolve(), run)
+            args.serial_stages = True  # Two dependent stages; engine retains its job budget.
         if args.plan:
             for name, command in steps:
                 print(name + ": " + shlex.join(command))
             return 0
+        mode = 'AGA image recovery (retained rc3 conversion)' if recovery else 'asset-free dry run (not playable)' if args.dry_run else 'AGA conversion and image' if args.stage == 'aga' else 'terrain conversion'
+        summary = BuildSummary(run, VERSION, mode)
         with Progress("Recording input, tool and source checksums"):
             metadata = provenance(args, tools)
+        metadata['build_started_at'] = summary.started_at
+        summary.record_environment(metadata)
+        if recovery:
+            if metadata['input_sha256'] != recovery.pop('input_sha256'):
+                raise ValueError('Game inputs changed since rc3; refusing mixed-input recovery')
+            metadata['recovery'] = recovery
         print(f"Build run: {run}\nLive tool output follows; per-stage logs are saved in {run / 'logs'}.", flush=True)
         execute(steps, run, metadata)
         if args.dry_run:
             result = run / "image" / f"AmiWind-v{VERSION}-dry-run.hdf"
-            print(f"Asset-free test build complete: {result}\nNo game assets or ROMs were used. This is not a playable demo.")
+            print('No game assets or ROMs were used. This is not a playable demo.')
         else:
             result = run / "image" / f"AmiWind-v{VERSION}.hdf" if args.stage == "aga" else run / "work/generated/seyda-neen"
-            print(f"Build complete: {result}\nPrivate generated content: do not include it in the public source package.")
+            print('Private generated content: do not include it in the public source package.')
+        acceptance = None
+        if args.stage == 'aga' and not args.dry_run:
+            image_receipt = run/'image/build.json'
+            if image_receipt.is_file():
+                record = json.loads(image_receipt.read_text())
+                acceptance = record.get('actor_ground_audit')
+                name = record.get('hdf_file', result.name)
+                if Path(name).name != name:
+                    raise ValueError('Image receipt contains an unsafe HDF filename')
+                result = run/'image'/name
+            if args.allow_known_actor_ground_findings and acceptance is None:
+                raise ValueError('Private-test build is missing its actor acceptance receipt')
+        summary.finish('passed', result, actor_acceptance=acceptance)
         if emulator:
             from run_fs_uae import launch
             try:
@@ -571,8 +636,12 @@ def main(argv=None):
                 print(f'[warning] Build succeeded; FS-UAE launch skipped: {exc}. HDF retained: {result}')
         return 0
     except (KeyboardInterrupt, EOFError):
+        if summary and not summary.finished:
+            summary.finish('cancelled')
         p.exit(130, "\nCancelled.\n")
     except (OSError, ValueError, RuntimeError) as exc:
+        if summary and not summary.finished:
+            summary.finish('failed')
         p.exit(1, f"Error: {exc}\n")
 
 

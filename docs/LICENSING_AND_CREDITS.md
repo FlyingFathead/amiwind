@@ -100,3 +100,10 @@ into the Amiga runtime. The default readable interface glyphs are original AmiWi
 in an 8x8 atlas. The unchanged optional retro atlas is generated locally from
 the host DejaVu Sans Mono font. No Amiga ROM/system font is extracted and no
 Quake artwork is bundled. Keep dependency notices if distributing tools.
+
+## Proposed bundled QCC
+
+The [third-party compiler plan](THIRD_PARTY_COMPILERS.md) records the pinned
+GPL-2.0-or-later QCC source, licence/notices, proposed provider selection and
+corresponding-source requirements. QCC remains externally installed in rc5;
+no new third-party source or host compiler binary is bundled yet.

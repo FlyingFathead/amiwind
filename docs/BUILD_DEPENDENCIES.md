@@ -182,3 +182,10 @@ Morrowind.esm/Morrowind.bsa pair beneath it, then uses the original known asset
 folders and subfolders (Video, Sound, Music, Meshes, Textures, Fonts, BookArt,
 Icons and Splash). Name matching is case-insensitive. Only supported game asset
 types enter validation and build input hashes. Personal archives stay untouched.
+
+## Proposed bundled reference compiler
+
+See [third-party compilers](THIRD_PARTY_COMPILERS.md) for a proposed bundled QCC
+default and explicit external/download alternatives. The current bootstrap
+already reuses its managed compiler; vendoring would remove the QCC source
+download from fresh setups. This provider switch is not implemented in rc5.

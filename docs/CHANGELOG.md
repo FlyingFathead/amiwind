@@ -1,5 +1,61 @@
 # Development history
 
+## v0.0.25-rc6 — 1 October 2026
+
+- Default compass/heading HUD to hidden; add saved `aw_compass` and
+  `dbg compass on/off`, `1/0`, `true/false`.
+
+- Repair the image-stage world/journal receipt collision with `regions.awr`.
+  Keep exact file and payload-hash validation; cover mixed world-directory
+  contents with a regression test.
+- Run world UI generation/validation before world-terrain and provide bounded
+  rc3 image recovery using verified retained terrain, with all image gates intact.
+- Consolidate rc4 host helpers, rc5 build summaries and subsequent roadmap
+  updates into one complete source package that applies directly to rc3.
+- Include detected compiler/toolkit and Python/package versions, selected
+  executable identities and worker allocation in the final footer and JSON.
+- Audit compile order and worker scheduling in the toolkit roadmap, separating
+  code-confirmed constraints from unmeasured optimization proposals.
+- Make world-terrain build time the top engineering priority: phase profiling,
+  validated reuse across new run names and reduced duplicate BSP/collision work.
+- Prioritize native Windows/MSYS2 within the Windows roadmap; keep WSL2 as a
+  fallback. Correct the earlier WSL2-first proposal recorded for rc5 below.
+- Keep optional bundled QCC, GPU asset conversion and GPU-assisted QCC as future
+  investigations. No new acceleration backend or world-build speedup is claimed.
+- Include matching rc6 emulator templates, source receipt and direct-update
+  metadata. Preserve all earlier source and release records.
+
+## v0.0.25-rc5 — 1 October 2026
+
+- Add a terminal-width completion footer with local start/end timestamps and
+  timezone offsets, monotonic elapsed time, final file size in GiB/bytes and SHA-256.
+- Print success only after all selected stages and final output hashing pass.
+  Failed/cancelled runs show elapsed time without a completed-output claim.
+- Count recognized engine compiler-warning lines separately and retain details
+  in the stage log. Save the same summary beside the external build logs as JSON.
+- Document WSL2 Ubuntu as the first proposed Windows-host experiment; retain
+  separate, untested native Windows/MSYS2 acceptance.
+- Record bundled pinned QCC and switchable compiler providers as a proposal;
+  retain current external installation and selection behavior.
+- Pass 353 source tests and freshly compile the versioned Amiga engine/preflight
+  and asset-free test image on Linux. Full game conversion and Windows remain
+  separate, incomplete acceptance work.
+
+## v0.0.25-rc4 — 1 October 2026
+
+- Add host-aware executable and virtual-environment discovery plus a read-only
+  `--host-plan` inventory. Windows automatic setup remains unimplemented.
+- Pass the selected Python interpreter through the engine's GNU make invocation,
+  preserving spaces, quotes and literal dollar signs for the POSIX shell.
+- Add an explicit/managed console-font path and forward it to conversion and
+  provenance. Keep the existing Linux system-font fallback.
+- Add a single-path MSYS2 `cygpath` helper; Windows QCC integration remains future
+  work. Document compiler-runtime differences and staged Windows acceptance.
+- Keep C fixture temporary files inside the isolated test directory. Pass all
+  345 source tests, compile the rc4 engine/preflight and validate Linux QuakeC.
+- Record the prior rc3 full-build disk exhaustion separately from native
+  compilation. Full image and native Windows acceptance remain open.
+
 ## v0.0.25-rc3 — 1 October 2026
 
 - Restrict exterior window flattening to exterior scenes. Preserve the original
@@ -694,3 +750,13 @@ Earlier checkpoint notes follow unchanged.
 - Documented fan-tribute status, original-game requirement and GOG/Steam links.
 - Added a separate owner-only development bundle with external game data.
 - Recorded stereo music/channel-sharing and character sprite pipeline proposals.
+
+
+### rc6 image recovery follow-up
+
+- Run actual actor contact before expensive world terrain, and repeat it on the
+  final image payload. The 23 placement defects remain unresolved.
+- Add explicit exact-report private-test acceptance, preserving failed audits,
+  strict production defaults, changed-payload rejection and distinct HDF names.
+- Record owner-reported successful rc3 private assembly; retain rc6 game/runtime
+  validation limits. Include both rc3 hotfixes in the complete rc6 overlay.

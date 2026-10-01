@@ -8,6 +8,22 @@ exact implementation, native validation and unresolved limits. Host tests,
 cross-compilation and native playtesting are separate evidence. Preserve older
 records when a diagnosis changes.
 
+## AW25-09: image rejects world/journal receipt after terrain — v0.0.25-rc3
+
+The reported workstation run completed world-terrain in 4232.5 seconds, then
+image assembly failed with `Incomplete world/journal conversion receipt`.
+The world-UI writer swept `regions.awr` into a receipt whose validator correctly
+requires exactly four UI-owned files. rc6 enumerates only those four files;
+the terrain directory is preserved and strict hash/palette validation remains.
+A synthetic mixed-directory regression reproduces the condition and checks
+repeat generation and corrupted-journal rejection.
+
+New runs validate world UI before terrain. Checked rc3 image recovery verifies
+the retained terrain and rebuilds only engine/image into new staging. This
+does not waive actor-contact or filesystem gates, and no final game HDF has
+passed here. See [image recovery](IMAGE_RECOVERY.md). The Daedric font fallback
+warning preceding the error is separate from this receipt failure.
+
 ## AW25-08: area build aborts on window mounting — v0.0.25-rc2
 
 The full local build stopped in `prepare_area.py` with
@@ -70,3 +86,26 @@ already reads loose Video/mw_intro.bik and never requires a ZIP. Do not modify o
 rename the owner's archives. Synthetic regression covers both differently cased
 ZIPs, an actual loose video, archive-free input receipts and a real video conflict.
 No proprietary game files are needed for this host regression.
+
+
+## AW25-10 — actor contact blocks image assembly after terrain
+
+**Status: placement bugs unresolved; earlier detection and explicit private-test
+acceptance implemented in rc6.** The receipt fix exposed the existing 23 strict
+contact failures at the next image gate. Scheduling that gate only after the
+reported 4232.5-second world-terrain pass wasted time before a deterministic
+failure. A new actor-contact stage prepares an isolated copied payload and
+checks it before world-terrain. The final image still repeats the audit.
+
+The retained scene reproduces the same 23 findings, including one Balmora outdoor
+Dreamer, two Balmora interior residents, four Addamasartus actors, and eight
+Seyda references repeated across scenes. See [the contact record](NPC_GROUND_CONTACT.md).
+The owner's earlier Balmora floating reports were unintended placement bugs,
+which motivated this gate; intentional levitation is not their explanation.
+
+A narrow optional reviewed-report acceptance permits diagnostic HDF assembly.
+It compares the entire report and recorded geometry/model hashes, rejects
+changed findings and invalid metadata, retains the failed raw audit, labels the
+HDF `-private-test`, and records production_gate_passed=false. The owner reported
+a successful rc3 diagnostic assembly in 144.664 seconds, 3,221,258,240 bytes.
+This is not resolution of the 23 contact defects or proof of an rc6 game build.

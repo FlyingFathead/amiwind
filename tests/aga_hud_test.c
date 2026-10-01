@@ -20,8 +20,8 @@ server_t sv;
 server_static_t svs;
 entity_t cl_entities[MAX_EDICTS];
 cvar_t scr_showram={"showram","0"};
-cvar_t *settings[5];int settings_count;
-void (*command)(void),(*master)(void),(*ram)(void),(*sea)(void),(*fps)(void),(*hud_type)(void);
+cvar_t *settings[6];int settings_count;
+void (*command)(void),(*master)(void),(*ram)(void),(*sea)(void),(*fps)(void),(*hud_type)(void),(*compass_command)(void);
 int argc=2,fill_y=-1,text_y=-1,text_x=-1;
 char *arg="on",last[80];
 int Cmd_Argc(void) {return argc;}
@@ -29,8 +29,8 @@ char *Cmd_Argv(int n) {return arg;}
 void Con_Printf(char *fmt,...) {}
 int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
-void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<5;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
-void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;else if(!strcmp(name,"aw_debug_hud_type"))hud_type=fn;}
+void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<settings_count;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
+void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"amiwind_debug_compass"))compass_command=fn;else if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;else if(!strcmp(name,"aw_debug_hud_type"))hud_type=fn;}
 void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;if(y+h==vid.height)assert(x==88);assert(y+h==vid.height || (y==19 && h==10 && x==8 && w==80));}
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
 static int small_draws,compass_draws;static char global_line[80],local_line[80],bearing[24];
@@ -45,6 +45,12 @@ void AW_SmallString(int x,int y,const char *s){
 int main(void) {
  client_t local;edict_t player;
  Sbar_Init();assert(!AW_DebugCoordsEnabled() && !AW_DebugOverlaysEnabled());
+ assert(compass_command && settings_count==6 && !strcmp(settings[5]->name,"aw_compass"));
+ assert(settings[5]->archive && settings[5]->value==0);
+ vid.width=320;vid.height=200;cls.state=ca_connected;key_dest=key_game;
+ Sbar_Draw();assert(compass_draws==0); /* Default is hidden, even in gameplay. */
+ arg="on";master();Sbar_Draw();assert(compass_draws==0); /* Independent switch. */
+ small_draws=0;arg="on";compass_command();
  arg="on";master();assert(AW_DebugOverlaysEnabled() && AW_DebugCoordsEnabled());
  assert(AW_SeaLevelEnabled());arg="off";sea();assert(!AW_SeaLevelEnabled());arg="on";sea();
  command();assert(AW_DebugCoordsEnabled() && vid.recalc_refdef);
@@ -88,5 +94,14 @@ int main(void) {
  argc=2;arg="TrUe";master();assert(AW_DebugCoordsEnabled());
  arg="off";command();master();assert(!AW_DebugOverlaysEnabled());
  arg="1";master();assert(AW_DebugOverlaysEnabled() && AW_DebugCoordsEnabled());
+ {int i,n;char *values[]={"on","off","1","0","TrUe","FaLsE"};
+  for(i=0;i<6;i++){
+   argc=2;arg=values[i];scr_copyeverything=0;compass_command();assert(scr_copyeverything);
+   n=compass_draws;Sbar_Draw();assert(compass_draws==n+(i%2==0));
+  }
+  n=compass_draws;argc=1;compass_command();Sbar_Draw();assert(compass_draws==n);
+  argc=2;arg="invalid";compass_command();Sbar_Draw();assert(compass_draws==n);
+  argc=3;arg="on";compass_command();Sbar_Draw();assert(compass_draws==n);
+ }
  return 0;
 }

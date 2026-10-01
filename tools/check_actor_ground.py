@@ -161,9 +161,52 @@ def audit(maps):
                 rows=rows,errors=errors,payload_sha256=hashes)
 
 
-def require(maps, output):
-    report=audit(maps);Path(output).write_text(json.dumps(report,indent=2)+'\n')
-    if report['status']!='passed':raise ValueError(f"Actor placement gate failed: {len(report['errors'])} unresolved cases; see {output}")
+def load_approved_report(path):
+    """Read an explicit owner baseline; only ordinary contact findings qualify."""
+    raw = Path(path).read_bytes()
+    report = json.loads(raw)
+    if (report.get('format') != 1 or report.get('status') != 'failed'
+            or not report.get('errors') or not report.get('payload_sha256')
+            or report.get('tolerance') != {'minimum_gap': -.5, 'maximum_gap': 1.0, 'sole_band': .5}
+            or any(row.get('status') == 'invalid' for row in report.get('rows', []))
+            or any(error.get('error') != 'Initial mesh contact outside support tolerance'
+                   for error in report['errors'])):
+        raise ValueError('Approved report must contain only unresolved mesh-contact findings')
+    return report, hashlib.sha256(raw).hexdigest()
+
+
+def evidence(report, before_world=False):
+    # The early check has no vf terrain yet. Final image assembly compares every
+    # payload hash, including vf maps. Never reduce the final comparison to count.
+    view = dict(report)
+    if before_world:
+        view['payload_sha256'] = {name: value for name, value in report['payload_sha256'].items()
+                                 if not re.fullmatch(r'maps/vf[0-9]{4}\.bsp', name)}
+    return json.dumps(view, sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+
+def require(maps, output, allow_known=None, before_world=False):
+    approved = None
+    if allow_known:
+        if Path(allow_known).resolve() == Path(output).resolve():
+            raise ValueError('Approved actor report must be separate from the new audit output')
+        approved, approved_hash = load_approved_report(allow_known)
+    report = audit(maps)
+    raw = json.dumps(report, indent=2) + '\n'
+    Path(output).write_text(raw)
+    acceptance = {'status': 'passed', 'unresolved': len(report['errors']),
+                  'production_gate_passed': report['status'] == 'passed',
+                  'report_sha256': hashlib.sha256(raw.encode()).hexdigest(),
+                  'comparison_scope': 'before-world; vf payload not yet present' if before_world else 'complete packaged BSP/actor payload'}
+    if report['status'] != 'passed':
+        if approved is None:
+            raise ValueError(f"Actor placement gate failed: {len(report['errors'])} unresolved cases; see {output}")
+        if evidence(report, before_world) != evidence(approved, before_world):
+            raise ValueError(f'Actor report differs from approved baseline; refusing private-test waiver; see {output}')
+        acceptance.update(status='owner-accepted-known-findings', approved_report_sha256=approved_hash)
+        print(f"WARNING: PRIVATE TEST ONLY: {len(report['errors'])} unchanged actor-contact findings accepted explicitly. Production actor gate DID NOT PASS.", flush=True)
+    # Keep the on-disk audit unmodified and failed. Acceptance is separate evidence.
+    report['acceptance'] = acceptance
     return report
 
 

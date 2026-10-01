@@ -28,7 +28,8 @@ simulated player origin, not eye height. Exterior source coordinates are
 `(local + region_origin) * 4`, including the region's Z origin. Interior global
 coordinates are explicitly unavailable. DEG is engine yaw, normalized to 0..359
 (0=+X, 90=+Y); P is pitch. The normal HUD compass uses geographic north (+Y),
-clockwise bearings and eight direction labels. It remains visible with debug off.
+clockwise bearings and eight direction labels. When enabled with `dbg compass on`,
+it remains visible with debug off; rc6 defaults it to hidden.
 
 ![GLOBAL and LOCAL coordinates with compass](images/amiwind-v0.0.25-rc1-navigation.png)
 
@@ -301,3 +302,11 @@ limited to letters and focus changes clearing held input. Legacy personal
 keymap.cfg loads before keymaps.cfg. The maintained canonical reference is
 KEYMAPS.md. Autosave default is five; aw_autosaves 0..16 remains an archived
 setting in config.cfg and Options > Autosave history.
+
+
+The compass/heading HUD defaults to hidden in rc6. Use `dbg compass on` or
+`dbg compass off`; `1/0` and `true/false` are also accepted, case-insensitively.
+`dbg compass` alone reports the current setting. It remains independent of
+`dbg all`/`dbg hud`. The archived config variable is `aw_compass`, with shipped
+`config/game.cfg` default `aw_compass 0`; saved user settings override that
+default on startup. Invalid values leave the setting unchanged.

@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from build_host import find_executable
 
 REFERENCE = Path(__file__).with_name("build-reference.json")
 
@@ -18,14 +19,14 @@ def find_qcc(args):
     if args.qcc:
         return args.qcc
     candidates = [args.tools_dir / 'Quake-Tools/qcc-host', 'qcc-host', 'qcc', 'fteqcc']
-    return next((str(Path(shutil.which(str(value))).resolve()) for value in candidates if shutil.which(str(value))), None)
+    return next((found for value in candidates if (found := find_executable(value))), None)
 
 
 def find_quake_tools(args):
     if args.quake_tools:
         return args.quake_tools.expanduser().resolve()
     candidate = args.tools_dir / 'ericw/bin'
-    return candidate.resolve() if all(shutil.which(str(candidate/name)) for name in ('qbsp', 'vis', 'light')) else None
+    return candidate.resolve() if all(find_executable(candidate/name) for name in ('qbsp', 'vis', 'light')) else None
 
 
 def compare(detected, reference):
@@ -48,7 +49,7 @@ def compare(detected, reference):
 
 
 def probe(name, value, spec):
-    path = shutil.which(str(value)) if value else None
+    path = find_executable(value)
     row = {"name": name, "reference": spec["version"], "detected": None, "status": "missing"}
     if not path:
         return row
@@ -84,7 +85,7 @@ def probe(name, value, spec):
 
 def report(args, tools=None):
     reference = json.loads(REFERENCE.read_text())
-    rows = [{"name": "Python", "detected": platform.python_version(),
+    rows = [{"name": "Python", "kind": "interpreter", "detected": platform.python_version(),
              "reference": reference["python"],
              "status": compare(platform.python_version(), reference["python"])}]
     for name, version in reference["packages"].items():
@@ -92,7 +93,7 @@ def report(args, tools=None):
             detected = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
             detected = None
-        rows.append({"name": name, "detected": detected, "reference": version,
+        rows.append({"name": name, "kind": "package", "detected": detected, "reference": version,
                      "status": compare(detected, version)})
     values = dict(tools or {})
     for name in ("make", "cc", "ffmpeg", "xdftool", "rdbtool"):
@@ -107,7 +108,7 @@ def report(args, tools=None):
         values.setdefault(name, map_dir / name if map_dir else name)
     values.setdefault("qcc", find_qcc(args))
     for name, spec in reference["tools"].items():
-        rows.append(probe(name, values.get(name), spec))
+        rows.append({**probe(name, values.get(name), spec), "kind": "tool"})
     print("Versions compared with the recorded Linux reference:")
     for row in rows:
         print(f"  [{row['status']}] {row['name']}: {row['detected'] or 'not found'} (reference {row['reference']})")

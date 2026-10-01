@@ -35,7 +35,8 @@ def build(args):
     if (record.get('version') != VERSION or record.get('binary_sha256') != digest(engine)
             or not checker.is_file() or record.get('bootcheck_sha256') != digest(checker)):
         raise ValueError('Engine/preflight checker does not match the current versioned build receipt')
-    vasm = args.vasm or sdk / "bin/vasmm68k_mot"
+    from build_host import executable_path
+    vasm = executable_path(args.vasm or sdk / "bin/vasmm68k_mot")
     out.mkdir(parents=True, exist_ok=False)
     boot = out / "boot"
     (boot / "C").mkdir(parents=True)

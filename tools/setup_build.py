@@ -10,6 +10,7 @@ import sys
 from mwad.paths import ensure_external, inside
 from mwad.progress import section, setup_step
 import build_versions
+from build_host import venv_python
 from fetch_toolchain import SPEC
 from fetch_native import ERICW, QCC_COMMIT, QCC_URL
 from install_dependencies import HOST_PACKAGES, PYTHON_PACKAGES, missing_packages, supported_host
@@ -20,13 +21,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def use_environment(args, argv, force=False):
     """Use a previously created environment without shell activation."""
     venv = ensure_external(args.tools_dir / 'venv', 'Python environment')
-    python = venv/'bin/python'
+    python = venv_python(venv)
     if not (venv/'pyvenv.cfg').is_file() or not python.is_file():
         return
     if os.environ.get('AMIWIND_PYTHON') and not force:
         return
     # Keep the venv path, not the interpreter symlink target, for exec.
-    os.environ['PATH'] = str(venv/'bin') + os.pathsep + os.environ.get('PATH', '')
+    os.environ['PATH'] = str(python.parent) + os.pathsep + os.environ.get('PATH', '')
     current = Path(sys.prefix).resolve() == venv
     if current and not force:
         return

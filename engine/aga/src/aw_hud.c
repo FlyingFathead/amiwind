@@ -6,6 +6,7 @@ int sb_lines;
 static cvar_t coords = {"_aw_debug_coords", "0", true};
 static cvar_t overlays = {"_aw_debug_all", "0", true};
 static cvar_t fps = {"_aw_debug_fps", "0", true};
+static cvar_t show_compass = {"aw_compass", "0", true};
 static cvar_t hud_type = {"_aw_debug_hud_type", "2", true};
 extern int AW_FpsTenths(void);
 /* Exterior water at source Z=0; visibility only, not water physics. */
@@ -34,6 +35,9 @@ static void debug_all(void) {
     if(debug_toggle(&overlays,"amiwind_show_debug"))
         Cvar_SetValue(coords.name,overlays.value!=0);
 }
+static void debug_compass(void) {
+    if(debug_toggle(&show_compass,"dbg compass"))scr_copyeverything=1;
+}
 static void debug_fps(void) {debug_toggle(&fps,"amiwind_debug_fps");}
 static void debug_showfps(void) {if(Cmd_Argc()==1)Cvar_SetValue(fps.name,1);else debug_fps();}
 static void debug_ram(void) {debug_toggle(&scr_showram,"amiwind_debug_showram");}
@@ -50,6 +54,8 @@ void Sbar_Init(void) {
     Cvar_RegisterVariable(&sealevel);
     Cvar_RegisterVariable(&fps);
     Cvar_RegisterVariable(&hud_type);
+    Cvar_RegisterVariable(&show_compass);
+    Cmd_AddCommand("amiwind_debug_compass",debug_compass);
     Cmd_AddCommand("aw_debug_hud_type",debug_hud_type);
     Cmd_AddCommand("amiwind_debug_coords",debug_coords);Cmd_AddCommand("amiwind_debug_all",debug_all);
     Cmd_AddCommand("amiwind_show_debug",debug_all);
@@ -61,7 +67,7 @@ void Sbar_Changed(void) {}
 static void compass(void) {
     static const char *directions[]={"N","NE","E","SE","S","SW","W","NW"};
     char line[24];int heading;
-    if(cls.state!=ca_connected || key_dest!=key_game || AW_GalleryActive())return;
+    if(!show_compass.value || cls.state!=ca_connected || key_dest!=key_game || AW_GalleryActive())return;
     /* Runtime +Y is source north; engine yaw zero points east. */
     heading=(int)anglemod(90-cl.viewangles[YAW]+360);
     snprintf(line,sizeof(line),"%s %03ld",directions[((heading+22)/45)&7],(long)heading);

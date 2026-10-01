@@ -8,11 +8,21 @@
 
 ## Current state of the project
 
-**v0.0.25-rc3 — interior window conversion fix**
+**v0.0.25-rc6 — complete source update from rc3**
 
-This source checkpoint fixes rc2's `No supporting façade geometry` build abort.
-The native engine compiled and 21 conversion/build stages passed with owned
-game inputs. Whole-island conversion and final image validation remain incomplete.
+This complete source checkpoint combines the host-tool groundwork, build
+completion reporting and updated engineering roadmaps. It updates rc3 directly.
+It fixes the world/journal receipt failure after terrain conversion and supports
+[recovering image assembly](docs/IMAGE_RECOVERY.md) without rebuilding terrain.
+
+The builder now reports start/end timestamps, total elapsed time, compiler
+warning lines and the final file's size and SHA-256 in a terminal-width footer.
+The footer and JSON also record compiler/toolkit versions and Python packages.
+Success requires every selected stage and final output hashing to finish; see
+[build output](docs/BUILD_OUTPUT.md). rc4's host groundwork remains included.
+Native Windows/MSYS2 is **untested**; see the [roadmap](docs/WINDOWS_BUILD_ROADMAP.md).
+The prior Linux full rebuild stopped on disk exhaustion during world-terrain
+assembly; full game-image acceptance remains incomplete.
 
 The base-game island now has a playable terrain pass following the recovered
 polygon survey: **2,526 terrain regions**, with local coordinates rebased at
@@ -24,11 +34,11 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[candidate scope and validation](docs/RELEASE-v0.0.25-rc3.md).
+[candidate scope and validation](docs/RELEASE-v0.0.25-rc6.md).
 
 rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
 original shoreline samples that coarse terrain had submerged. A normal-view
-compass and GLOBAL/LOCAL XYZ aid navigation; the M marker uses the same source
+compass (off by default; `dbg compass on`) and GLOBAL/LOCAL XYZ aid navigation; the M marker uses the same source
 coordinates and keeps its zoom on reopen. Debug flight supports Ctrl at twice
 Shift speed. M/N console typing is protected; debug Alt+M exposes the desktop.
 Bindings have their own [keymap file and reference](docs/KEYMAPS.md).
@@ -60,12 +70,17 @@ opening scenes and converted interiors. Aim at doors or residents and press
 **E**. NPC interaction currently provides bounded authored greetings. Full
 combat, quest simulation, services, schedules and inventory remain unfinished.
 
+rc6 checks actor contact before world-terrain on new builds. An
+[explicit private-test recovery option](docs/IMAGE_RECOVERY.md) can accept an
+exact reviewed report while retaining failed production acceptance. The owner
+reported successful rc3 diagnostic assembly; rc6 full-game testing remains open.
+
 This development build retains the documented limits: **23 strict ground-contact audit
 findings remain unresolved**, and the ordinary production image builder still
 stops on that audit. The owner accepted those findings for v0.0.24;
 release status does not turn the audit into a pass. Method 1 retains synchronous
 loading behind the frozen-frame Loading... box; method 2 read-ahead remains
-experimental. See [release notes and verification](docs/RELEASE-v0.0.25-rc3.md).
+experimental. See [release notes and verification](docs/RELEASE-v0.0.25-rc6.md).
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game
@@ -194,7 +209,10 @@ and continues into the build. APT may also ask for your sudo password and packag
 confirmation. Use `--autoinstall --plan` to preview setup without installing.
 
 Start with [Linux build instructions](docs/LINUX_BUILD.md) or
-[Windows 11 / WSL](docs/WINDOWS_BUILD.md). Windows/WSL full builds remain untested.
+[Windows host options](docs/WINDOWS_BUILD.md). Native Windows/MSYS2 is the
+preferred [potential port](docs/WINDOWS_BUILD_ROADMAP.md); WSL2 is a fallback if
+native integration proves troublesome. Neither Windows route has a verified
+full build yet.
 The tool accepts your Morrowind installation root, checks required file sizes
 and known SHA-256 hashes, and reports dependency versions. Build outputs default
 to ignored `out/`.
@@ -243,9 +261,14 @@ and boots to a test notice; it is not the playable demo.
 
 ## Development
 
+Current engineering priority: [reduce world-terrain build times and avoid
+unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md), starting with phase
+profiling and verified reuse across builds. These improvements are planned.
+
 [Project state](docs/PROJECT_STATE.md) · [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
 [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
 [Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
+[Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) ·
 [Licensing and credits](docs/LICENSING_AND_CREDITS.md)
 
 Thanks to the Morrowind creators, the Amiga community, and the contributors whose

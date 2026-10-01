@@ -1,0 +1,81 @@
+{
+  "version": "0.0.25-rc5",
+  "date": "2026-10-01",
+  "status": "source checkpoint; native compile and asset-free image passed; full game image and Windows acceptance incomplete",
+  "base_archive": "AmiWind-v0.0.25-rc4-public-source.zip",
+  "base_archive_sha256": "32b6709340bf1b10f15b1cb0ce4d033238b5929fad0817a1f4307dbfacd7b081",
+  "host_tests": {
+    "status": "passed",
+    "tests": 353,
+    "skipped": 0,
+    "host": "Linux",
+    "external_qbsp": "0.18.1",
+    "log_sha256": "df45e33c9536633ce02e50157b27d7debf1e3df306e0765e34fda3159ae31a14",
+    "initial_attempt": "11 errors before rc5 emulator presets and synthetic successful-build fixture outputs were added. Final complete suite passes."
+  },
+  "build_summary_tests": {
+    "status": "passed",
+    "tests": 8,
+    "checks": [
+      "success timestamps and timezone offsets",
+      "monotonic elapsed time beyond 24 hours",
+      "streamed SHA-256 and byte size",
+      "terminal-width rules",
+      "warning-line counts",
+      "directory output semantics",
+      "failure and cancellation omit completed-output identity",
+      "unwritable receipt does not hide failure",
+      "subprocess success, failure and missing output through actual build entry point"
+    ]
+  },
+  "native_compile": {
+    "status": "passed",
+    "host": "Linux",
+    "cpu": "68040",
+    "hands": "3d",
+    "compiler_jobs": 1,
+    "compiler": "m68k-amigaos-gcc 16.2.0b 20260825082934",
+    "assembler": "vasm 2.0f",
+    "version_identity_verified": "0.0.25-rc5",
+    "engine_sources_identical_to_rc4": true,
+    "binary_sha256": "8a3c8022fd821b3e7ea3d9222017f265ae7e94a3cbedef68ac29f4e302199860",
+    "bootcheck_sha256": "aaf269bd851fb5faa074adcdd2a9887d428744a127e54338d647a59b990e7220",
+    "compiler_warning_lines": 78,
+    "warning_note": "Recognized diagnostic lines from this invocation; no warning fixes or suppressions. Historical counts are not a comparison baseline."
+  },
+  "asset_free_build": {
+    "status": "passed",
+    "stages": 2,
+    "image": "AmiWind-v0.0.25-rc5-dry-run.hdf",
+    "bytes": 8421376,
+    "sha256": "525a3a93b8e0aff22c1a85d6fe6f4528cfbe3d15a3aebf1662847624b7840476",
+    "summary_hash_matches_independent_file_hash": true,
+    "elapsed_seconds": 12.898,
+    "timing_scope": "provenance, build stages and final output hashing; excludes prerequisites/setup and emulator launch",
+    "payload_readback": "every packaged file verified by image builder",
+    "game_assets_used": false,
+    "rom_used": false,
+    "emulator_boot": "not performed"
+  },
+  "initial_parallel_attempt": {
+    "status": "failed",
+    "compiler_jobs": 4,
+    "stage": "engine",
+    "make_exit_status": 2,
+    "symptom": "GNU make parallel synchronized output produced no compiler diagnostics on an exhausted system filesystem; a minimal echo recipe also exits 2 with -j2 --output-sync=target, whereas -j1 passes. Root cause below make output capture not further isolated.",
+    "followup": "Fresh normal --jobs 1 dry-run succeeded. No compiler wrapper, source change or gate bypass was used."
+  },
+  "full_game_build": {
+    "status": "not performed for rc5",
+    "passed": false,
+    "previous_rc3_result": "21 stages passed; world-terrain failed on ENOSPC; final image not reached",
+    "remaining_actor_contact_findings": 23,
+    "production_gate_changed": false
+  },
+  "windows": {
+    "native_msys2": "untested",
+    "wsl2": "untested; proposed first Windows-host evaluation route",
+    "automatic_windows_setup": "not implemented"
+  },
+  "private_payload_delivered": false
+}

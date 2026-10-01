@@ -135,7 +135,7 @@ def _preview_model(task):
     return mi,raw,(path,[0,0],len(faces)),{'model':name,'kind':'mesh','source_triangles':len(f),'triangles':len(faces),'bytes':len(raw)}
 
 
-def prepare(workspace,scene,out,jobs=None):
+def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
     import numpy as np
     from PIL import Image,ImageDraw,ImageFont
     import fast_simplification
@@ -173,7 +173,7 @@ def prepare(workspace,scene,out,jobs=None):
         cmap.extend(quantize(Image.fromarray(rgb.astype(np.uint8),'RGB')).tobytes())
     (game/'gfx/colormap.lmp').write_bytes(cmap)
     # Original project graphics, generated from host fonts; no Quake artwork.
-    font=ImageFont.truetype('DejaVuSansMono.ttf',8);chars=Image.new('P',(128,128),0);chars.putpalette(palette);d=ImageDraw.Draw(chars)
+    font=ImageFont.truetype(str(fallback_font_path) if fallback_font_path else 'DejaVuSansMono.ttf',8);chars=Image.new('P',(128,128),0);chars.putpalette(palette);d=ImageDraw.Draw(chars)
     for c in range(256):
         if 32<=c%128<127:d.text(((c%16)*8,(c//16)*8-1),chr(c%128),font=font,fill=254)
     # Preserve the prior atlas byte-for-byte on disk; only one font is active.
@@ -303,4 +303,5 @@ map seyda
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True);p.add_argument('--scene',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
-    add_jobs(p);a=p.parse_args();prepare(a.workspace,a.scene,a.out,a.jobs)
+    p.add_argument('--fallback-font',type=Path,help='Explicit DejaVuSansMono.ttf path for generated console graphics')
+    add_jobs(p);a=p.parse_args();prepare(a.workspace,a.scene,a.out,a.jobs,a.fallback_font)

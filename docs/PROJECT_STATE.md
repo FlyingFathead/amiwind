@@ -1,12 +1,35 @@
 # Current project state — 1 October 2026
 
+**Top engineering priority:** reduce world-terrain build time and avoid
+unnecessary recompilation between runs. The [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md)
+puts `vfXXXX` phase profiling, persistent reuse and duplicate BSP/collision work
+ahead of Windows bring-up and speculative QCC acceleration. The workstation
+build completed world-terrain in 4232.5 seconds, then failed image assembly's
+world/journal receipt check. rc6 repairs that receipt and provides checked
+[image recovery](IMAGE_RECOVERY.md). The owner has since reported successful
+rc3 private-test assembly with 23 explicitly accepted contact findings. Full
+rc6 game assembly remains unverified and strict actor acceptance remains failed.
+
 **Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
-**Current candidate: v0.0.25-rc3**, an interior conversion repair to rc2.
-The native engine and 21 build stages passed with owned game inputs, including
-Seyda Neen area and Balmora interiors. This checkpoint records the run during
-whole-island terrain conversion; final image assembly
-and native rc3 playtesting have not passed. See the [build receipt](validation/rc3-source.json).
+**Current candidate: v0.0.25-rc6**, one complete source update directly from
+rc3. It includes rc4 host-tool groundwork, rc5 completion reporting and all
+subsequent roadmap decisions. Earlier rc4/rc5 patches are not prerequisites. All 373 source tests and a fresh
+Linux serial native compile plus asset-free HDF/readback pass; no full game
+build or performance improvement is claimed.
+See [the rc6 release notes](RELEASE-v0.0.25-rc6.md) and
+[validation receipt](validation/rc6-source.json) for the checks actually run.
+
+World-terrain profiling, reusable conversion results and reduced BSP/collision
+work are the top engineering priority. Native Windows/MSYS2 remains the
+preferred Windows direction, with WSL2 as a fallback. Both are untested.
+GPU asset conversion and GPU-assisted QCC remain proposals, not implemented
+acceleration. The configurable WSL2 RAM default is not a performance result.
+
+The prior rc3 Linux rebuild passed 21 stages, including area and Balmora
+interiors, then failed with `ENOSPC` while copying world-terrain BSPs into the
+final scene. The world-terrain stage did not pass; image assembly was not
+reached. That result is separate from the native compile and asset-free image checks for later checkpoints.
 
 The Seyda Neen boundary uses ground coverage, preserving detailed Seyda Neen AND
 Balmora. The frozen survey still supplies 2,526 terrain/water regions. Shoreline
@@ -14,7 +37,7 @@ triangles retain original wet/dry samples; the water datum remains source Z=0.
 Outside the two towns, other scenery, settlements and actors remain future work.
 
 Universal source XYZ, local XYZ and the map cross use the live simulated player
-position. The ordinary HUD has a compass. M/N typing is protected from the
+position. The optional compass/heading HUD defaults off; `dbg compass on` enables it. M/N typing is protected from the
 Amiga screen shortcuts; intentional desktop access is debug Alt+M. Ctrl debug
 noclip flight is twice Shift speed. Editable keymaps are separate from settings,
 with a maintained [control reference](KEYMAPS.md). Unexplored-map masking is a
@@ -23,7 +46,7 @@ TODO and is explicitly outside rc1.
 The 23 existing strict NPC contact findings remain unresolved and the ordinary
 production image gate remains unchanged. This candidate is not production
 acceptance. Inventory, general quest execution and complete playthrough
-acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc3.md)
+acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc6.md)
 and [terrain conversion](WORLD_TERRAIN.md). Published dev1 and v0.0.24 archives
 remain immutable.
 
@@ -243,9 +266,10 @@ trial. Match original Morrowind message/subtitle/dialogue box designs. The host
 font preview is not an accepted final layout or native implementation. Detailed
 choices and original input hashes are in UI_FONT_VARIANTS.md.
 
-Windows 11 build inquiry: current full-build instructions and toolchain are
-Linux-oriented. WSL2 with Ubuntu is the proposed first Windows-host route, not
-yet validated. Native Windows needs build/path/dependency work, including the
+Historical Windows 11 build inquiry (priority superseded by the current
+[roadmap](WINDOWS_BUILD_ROADMAP.md)): full-build instructions and toolchain were
+Linux-oriented. WSL2 with Ubuntu was initially proposed first, without
+validation. Native Windows needs build/path/dependency work, including the
 hard-coded Linux font check and external cross-toolchain provisioning. The
 Windows Morrowind installation supplies data files; Morrowind.exe is not executed
 by the conversion path. Do not claim a tested Windows/WSL full build yet.
@@ -332,3 +356,19 @@ fighting permission after hall acceptance, and persisted courtyard ring depletio
 The room audit reproduces94 unsupported old-map samples and restores all94 with
 the original room section. General loot/icons, Fargoth return dialogue and status
 effects are roadmap work, not completed gameplay.
+
+
+### Latest image recovery evidence
+
+The receipt-patched rc3 image reached QCC, then stopped on 23 known actor-contact
+findings. The owner subsequently reported successful private-test image assembly
+with exact-report acceptance: 144.664 seconds, 3,221,258,240 bytes, SHA-256
+`b99358fc5342b8c8dfc827d4db8353acd113daad1420853d8b2a4865080acb47`.
+The terrain was reused. This is an owner-reported rc3 diagnostic result; actor
+production acceptance remains false and no emulator result is recorded.
+
+rc6 keeps strict default acceptance, adds a separate explicitly requested
+private-test option, and runs actor contact before terrain on new builds. The
+retained rc3 scene reproduces all 23 at that early gate. Full rc6 game assembly
+still awaits validation; do not promote diagnostic acceptance to a production
+pass. All 373 source tests and a fresh native asset-free build pass.

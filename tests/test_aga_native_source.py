@@ -197,11 +197,12 @@ class NativeSourceTests(unittest.TestCase):
             generate_native(ROOT/'VERSION', Path(tmp))
             exe = Path(tmp) / 'check'
             cmd = ['cc', *cflags, *['-D'+d for d in defines], '-std=gnu89', '-ffunction-sections', '-fdata-sections',
+                   '-include', str(ROOT/'tests/aga_test_files.h'),
                    '-Wl,--gc-sections', '-I'+tmp, '-I'+str(tree/'src'), str(ROOT/'tests'/fixture),
                    *[str(p) for p in sources], '-lm', '-o', str(exe)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            result = subprocess.run([str(exe), *arguments], capture_output=True, text=True)
+            result = subprocess.run([str(exe), *arguments], cwd=tmp, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_rotated_platform_and_vacated_space(self):

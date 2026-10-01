@@ -14,6 +14,8 @@ from PIL import Image
 from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
 
+WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq')
+
 
 def fixed(value,size):
     raw=value.encode('ascii')
@@ -110,13 +112,13 @@ def prepare(data_files,survey,scene):
     receipt={'format':'AmiWind world UI 1','master_sha256':report['master_sha256'],
              'palette_sha256':hashlib.sha256(palette).hexdigest(),'journal_quests':quests,
              'journal_entries':(len(index)-8)//76,'journal_text_bytes':len(blob),'map_bytes':len(worldmap),
-             'files':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(dest.iterdir()) if p.name!='conversion.json'}}
+             'files':{name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in WORLD_UI_FILES}}
     (dest/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
     return receipt
 
 def validate(id1):
     dest=Path(id1)/'world';receipt=json.loads((dest/'conversion.json').read_text())
-    expected={'map.awm','journal.awj','entries.dat','quests.awq'}
+    expected=set(WORLD_UI_FILES)
     if receipt.get('format')!='AmiWind world UI 1' or set(receipt.get('files',{}))!=expected:
         raise ValueError('Incomplete world/journal conversion receipt')
     if receipt['palette_sha256']!=hashlib.sha256((Path(id1)/'gfx/palette.lmp').read_bytes()).hexdigest():
@@ -129,4 +131,5 @@ def validate(id1):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--data-files',type=Path,required=True);p.add_argument('--survey',type=Path,help='Reuse a complete survey; absent builds only the overview');p.add_argument('--scene',type=Path,required=True)
-    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.survey,a.scene),indent=2))
+    a=p.parse_args();prepare(a.data_files,a.survey,a.scene)
+    print(json.dumps(validate(a.scene/'id1'),indent=2))

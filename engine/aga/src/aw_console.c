@@ -25,6 +25,7 @@ static route_t routes[]={
     {"ui targetnames","aw_target_names_set","on/off (after creation)"},
     {"show fps","amiwind_debug_showfps","[on/off]"},
     {"coords","amiwind_debug_coords","on/off"},
+    {"compass","amiwind_debug_compass","on/off true/false 1/0 (default off)"},
     {"fps","amiwind_debug_fps","on/off"},
     {"all","amiwind_show_debug","on/off"},
     {"overlay","amiwind_show_debug","on/off true/false 1/0"},

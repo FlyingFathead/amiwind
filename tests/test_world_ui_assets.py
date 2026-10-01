@@ -1,5 +1,6 @@
 """Bounded map and journal packets from synthetic owned-data substitutes."""
 import json
+import hashlib
 from pathlib import Path
 import struct
 import sys
@@ -7,13 +8,37 @@ import tempfile
 import unittest
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from prepare_world_ui import journal_assets, quest_labels, map_asset
+from prepare_world_ui import journal_assets, quest_labels, map_asset, prepare, validate
 
 def sub(tag,value):return tag.encode()+struct.pack('<I',len(value))+value
 def record(tag,payload):return tag.encode()+struct.pack('<III',len(payload),0,0)+payload
 def journal(stage,text):return record('INFO',sub('DATA',struct.pack('<iibbbb',4,stage,-1,-1,-1,0))+sub('NAME',text))
 class WorldUIAssetsTests(unittest.TestCase):
     def master(self):return record('DIAL',sub('NAME',b'TEST_HelloWorld\0')+sub('DATA',b'\4'))
+    def test_prepare_and_validate_with_terrain_directory_present(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);data=root/'data';survey=root/'survey';scene=root/'scene'
+            data.mkdir();survey.mkdir();(scene/'id1/gfx').mkdir(parents=True)
+            world=scene/'id1/world';world.mkdir()
+            raw=self.master()+journal(1,b'First journal entry\0')
+            (data/'Morrowind.esm').write_bytes(raw)
+            (scene/'id1/gfx/palette.lmp').write_bytes(bytes(range(256))*3)
+            (survey/'world-survey.json').write_text(json.dumps({'master_sha256':hashlib.sha256(raw).hexdigest(),
+                'terrain_bounds':[-1,-1,1,1],'areas':[]}))
+            Image.new('RGBA',(8,8),(34,66,84,255)).save(survey/'terrain.png')
+            region=b'AWR2'+struct.pack('<I',0)+bytes(56)
+            (world/'regions.awr').write_bytes(region)
+            (world/'other-tool-output').mkdir()
+            receipt=prepare(data,survey,scene)
+            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq'})
+            self.assertEqual(validate(scene/'id1'),receipt)
+            self.assertEqual((world/'regions.awr').read_bytes(),region)
+            # Re-running on the same private staging tree remains valid.
+            self.assertEqual(prepare(data,survey,scene),receipt)
+            (world/'entries.dat').write_bytes(b'corrupt')
+            with self.assertRaisesRegex(ValueError,'World UI hash mismatch: entries.dat'):
+                validate(scene/'id1')
+
     def test_sorted_journal_offsets_and_original_identity(self):
         raw=self.master()+journal(10,b'Second\0')+journal(1,b'Hello %PCName.\0')
         index,blob,count=journal_assets(raw)

@@ -1,0 +1,72 @@
+{
+  "version": "0.0.25-rc4",
+  "date": "2026-10-01",
+  "status": "source-checkpoint; full image acceptance incomplete; Windows untested",
+  "base_archive": "AmiWind-v0.0.25-rc3-public-source.zip",
+  "base_archive_sha256": "e39d16236e0e7c550518a63bd6c20cbfa2d39b247efeea1ba8405666359f0b44",
+  "host_tests": {
+    "status": "passed",
+    "unique_tests": 345,
+    "passed": 345,
+    "skipped": 0,
+    "host": "Linux",
+    "external_qbsp": "0.18.1",
+    "log_sha256": "74f4f57b106610cad0204ee00a54b69bd8e7f114ead14dac9ae198b19512f9b9",
+    "initial_attempt": "16 failed assertions/subtests caused by C fixture writes to the exhausted system temporary filesystem. C fixtures now use the Python-selected temporary directory; no assertions removed."
+  },
+  "native_compile": {
+    "status": "passed",
+    "host": "Linux",
+    "cpu": "68040",
+    "hands": "3d",
+    "compiler_jobs": 4,
+    "compiler": "m68k-amigaos-gcc 16.2.0b 20260825082934",
+    "assembler": "vasm 2.0f",
+    "version_identity_verified": "0.0.25-rc4",
+    "engine_sources_identical_to_rc3": true,
+    "binary_sha256": "0c3ab01b1e278b2d1d8df55c9d9b8f33d84d93b6ca7a4b17ffb925efa398da7c",
+    "bootcheck_sha256": "76a0c3a4c18553018b88c814e6a20e5dd1e3c92585459244ef5d5543b2bd77e9",
+    "warnings": 36,
+    "warning_note": "Count from this invocation. No runtime warning fixes or suppressions were added; historical counts from other invocations are not a warning baseline.",
+    "runtime_boot_test": "not performed"
+  },
+  "quakec": {
+    "status": "passed",
+    "host": "Linux",
+    "compiler_sha256": "cfc585d9ff3cb30079d07a5300be6465a9107cb321dd0570c2f449f997067630",
+    "version": 6,
+    "crc": 5927,
+    "max_supported_opcode": 65
+  },
+  "console_font_control": {
+    "status": "byte-identical glyph raster with default and explicit Linux font",
+    "sha256": "a5d9bfec418b50255cdfc94743ae3fda80f2d7c0f234f5d3f7b3071cc015c7cc"
+  },
+  "previous_rc3_full_build": {
+    "passed_stage_count": 21,
+    "world_terrain": "failed with ENOSPC copying a generated BSP into the final scene",
+    "image": "not reached",
+    "full_build_passed": false,
+    "evidence": "Final process log; build-state receipt remained marked running after the error."
+  },
+  "rc4_full_build": {
+    "status": "not performed",
+    "full_build_passed": false,
+    "reason": "Exhausted disk capacity prevented complete conversion/image validation; source tests and native compile used separate temporary storage."
+  },
+  "windows": {
+    "status": "untested",
+    "host_helpers": "tested by simulation on Linux",
+    "cygpath": "argument and error handling mocked; actual MSYS2 cygpath not executed",
+    "qcc": "Windows build recipe and any portability patch remain pending",
+    "automatic_setup": "not implemented",
+    "full_build_passed": false
+  },
+  "remaining": [
+    "Windows toolchain bring-up and full build",
+    "Windows/WSL build and native runtime acceptance",
+    "Full rc4 Linux conversion/image validation",
+    "23 historical actor-contact findings"
+  ],
+  "private_payload_delivered": false
+}

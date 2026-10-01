@@ -26,7 +26,7 @@ char *Cmd_Argv(int i){return "";}
 int Cmd_Argc(void){return 0;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 int main(int argc,char **argv){
- byte raw[2057],before[3];const char *p;char line[9],temporary[]="/tmp/aw-ui-XXXXXX",path[128];int i;FILE *f;
+ byte raw[2057],before[3];const char *p;char line[9],temporary[]="aw-ui-XXXXXX",path[128];int i;FILE *f;
  directory=argc>1?argv[1]:".";
  memset(raw,0,sizeof(raw));memcpy(raw,"AWF1",4);raw[4]=16;raw[5]=18;raw[6]=1;
  assert(AW_UIValidateFont(raw,sizeof(raw)));raw[8+2]=32;raw[8+3]=32;assert(!AW_UIValidateFont(raw,sizeof(raw)));

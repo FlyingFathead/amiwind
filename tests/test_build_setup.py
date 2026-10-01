@@ -151,7 +151,9 @@ class BuildSetupTests(unittest.TestCase):
                 " f=p/name; f.parent.mkdir(parents=True,exist_ok=True); f.write_text('#!/bin/sh\\necho fixture\\n'); f.chmod(0o755)\n")
             def steps(args, run):
                 return [('fixture-build', [sys.executable, '-c',
-                         f'from pathlib import Path; Path({str(run/"finished")!r}).write_text("built")'])]
+                         f'from pathlib import Path; Path({str(run/"finished")!r}).write_text("built"); '
+                         f'p=Path({str(run/"image"/f"AmiWind-v{build.VERSION}-dry-run.hdf")!r}); '
+                         'p.parent.mkdir(); p.write_bytes(b"fixture output")'])]
             with patch.object(setup_build, 'proposal', return_value=([[sys.executable, '-c', create_sdk]], [], [])), \
                  patch.object(build, 'dry_run_commands', side_effect=steps), \
                  patch.object(build_versions, 'report', return_value=[]), \

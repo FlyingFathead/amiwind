@@ -80,3 +80,73 @@ class GroundGateTests(unittest.TestCase):
         self.put(actor()+actor());self.assertEqual(audit(self.maps)['status'],'failed')
         self.put(actor());(self.id1/'progs/test.mdl').write_bytes(b'bad')
         self.assertEqual(audit(self.maps)['status'],'failed')
+
+    def baseline(self):
+        self.put(actor(2))
+        path = self.id1/'approved.json'
+        path.write_text(json.dumps(audit(self.maps), indent=2)+'\n')
+        return path
+
+    def test_private_acceptance_keeps_failed_audit_and_exact_baseline(self):
+        approved = self.baseline(); before = approved.read_bytes()
+        output = self.id1/'new-report.json'
+        r = require(self.maps, output, approved)
+        self.assertEqual(r['status'], 'failed')
+        self.assertEqual(r['acceptance']['status'], 'owner-accepted-known-findings')
+        self.assertFalse(r['acceptance']['production_gate_passed'])
+        stored = json.loads(output.read_text())
+        self.assertEqual(stored, json.loads(before))
+        self.assertNotIn('acceptance', stored)
+        self.assertEqual(approved.read_bytes(), before)
+
+    def test_same_failure_count_with_changed_contact_is_rejected(self):
+        approved = self.baseline()
+        self.put(actor(2.1))
+        self.assertEqual(len(audit(self.maps)['errors']), 1)
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'new.json', approved)
+
+    def test_changed_payload_even_with_same_contacts_is_rejected(self):
+        approved = self.baseline()
+        self.put(actor(2)+'{\n"classname" "info_null"\n}\n')
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'new.json', approved)
+
+    def test_added_contact_failure_is_rejected(self):
+        approved = self.baseline()
+        self.put(actor(2)+actor(2, ref='456'))
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'new.json', approved)
+
+    def test_invalid_baseline_is_not_waivable(self):
+        self.put(actor(identifier='not-classified'))
+        approved = self.id1/'approved.json'
+        approved.write_text(json.dumps(audit(self.maps)))
+        with self.assertRaisesRegex(ValueError, 'only unresolved mesh-contact'):
+            require(self.maps, self.id1/'new.json', approved)
+
+    def test_baseline_cannot_be_overwritten_by_audit(self):
+        approved = self.baseline(); before = approved.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'separate'):
+            require(self.maps, approved, approved)
+        self.assertEqual(approved.read_bytes(), before)
+
+    def test_zero_findings_pass_without_waiver(self):
+        approved = self.baseline(); self.put(actor())
+        r = require(self.maps, self.id1/'new.json', approved)
+        self.assertEqual(r['acceptance']['status'], 'passed')
+        self.assertTrue(r['acceptance']['production_gate_passed'])
+        self.assertNotIn('approved_report_sha256', r['acceptance'])
+
+    def test_early_check_excludes_only_unbuilt_world_bsp_hashes(self):
+        approved = self.baseline()
+        r = json.loads(approved.read_text())
+        r['payload_sha256']['maps/vf0000.bsp'] = '0'*64
+        approved.write_text(json.dumps(r))
+        require(self.maps, self.id1/'early.json', approved, before_world=True)
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'final.json', approved)
+        r['payload_sha256']['maps/room.bsp'] = '1'*64
+        approved.write_text(json.dumps(r))
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'early.json', approved, before_world=True)

@@ -36,7 +36,7 @@ static void write_asset(const char *name,const byte *raw,int size) {
 }
 int main(int argc,char **argv) {
     byte raw[26625],before[3],small[3];
-    char temporary[]="/tmp/aw-paper-XXXXXX",path[1024]; int i,valid;
+    char temporary[]="aw-paper-XXXXXX",path[1024]; int i,valid;
     assert(argc==2); valid=!strcmp(argv[1],"valid"); allocation_failure=!strcmp(argv[1],"allocation");
     assert(mkdtemp(temporary)); directory=temporary;
     sprintf(path,"%s/gfx",directory); assert(!mkdir(path,0700));

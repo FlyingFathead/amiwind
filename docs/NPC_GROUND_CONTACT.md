@@ -121,3 +121,39 @@ hashes and all 23 unresolved contacts. This is a diagnostic distribution excepti
 not a successful placement gate. The normal `build_aga.py image` gate remains
 unchanged and rejects this payload until those findings are resolved. The stated
 all-placements guarantee applies to a passed production build, not this snapshot.
+
+
+## rc3 retained contact findings and rc6 early checking
+
+The retained payload audit reproduces 23 failing scene/actor cases covering 15
+placed references. All are classified as ground-standing; these are unintended
+contact/placement defects. Some cases repeat across the regular town, dock and
+courtyard scenes. They are not 23 different levitating characters.
+
+| Scene | Placed actors |
+| --- | --- |
+| Addamasartus | Mulvisie Othril (282952), Melar Baram (282953), Banalz (365484), Baadargo (365485) |
+| Balmora outdoors, owner bm015 | Dreamer (297839) |
+| Hlaalu Council | Mervs Uvayn (67638) |
+| Balmora Temple | Llarara Omayn (259838) |
+| Seyda Neen | Dock guard (172852), Erene Llenim (128960), Indrele Rathryon (128961), Vodunius Nuccius (128962), Eldafire (128963), Fargoth (128964), Imperial Guards (128965 and 128966) |
+
+The owner recalls earlier unintended floating NPCs outdoors in Balmora. The
+outdoor Dreamer finding is relevant evidence, but there is not yet a verified
+mapping from those earlier sightings to every current reference. The report
+also includes penetration and unsupported/blocked samples, not only floating.
+Three authored-dead placements were correctly reported separately as explicit
+exceptions; they are not among these 23 failures.
+
+The baker currently resolves support under the actor origin. The independent
+audit checks low vertices of the quantized mesh across initial idle poses.
+Those are different measurements: a supported origin does not prove supported
+feet over uneven geometry. Proper repair must address actual mesh/placement
+contact while preserving the strict checker, canonical overlap copies and
+bounded support correction. Do not classify standing NPCs as flying to pass.
+
+rc6 adds an actor-contact stage before world-terrain. It reproduces all 23 from
+the retained rc3 scene without compiling world terrain. The final image audit
+remains mandatory. An explicitly requested private-test baseline acceptance is
+documented in [image recovery](IMAGE_RECOVERY.md). It does not mark the strict
+gate passed, fix the placement defects or constitute production acceptance.

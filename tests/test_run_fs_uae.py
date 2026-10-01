@@ -214,12 +214,17 @@ class FsUaeTests(unittest.TestCase):
                  patch.object(build, 'commands', return_value=[]), \
                  patch.object(build, 'dry_run_commands', return_value=[]), \
                  patch.object(build, 'provenance', return_value={}), \
-                 patch.object(build, 'execute'), contextlib.redirect_stdout(io.StringIO()) as output:
+                 patch.object(build, 'execute') as execute, contextlib.redirect_stdout(io.StringIO()) as output:
                 argv = ['--autorun-fs-uae', '--workspace', tmp, '--name', 'fixture']
                 if dry_run:
                     argv.append('--dry-run')
-                self.assertEqual(build.main(argv), 0)
                 suffix = '-dry-run' if dry_run else ''
+                image = Path(tmp) / 'build/fixture/image' / f'AmiWind-v{build.VERSION}{suffix}.hdf'
+                def complete(*args):
+                    image.parent.mkdir(parents=True)
+                    image.write_bytes(b'synthetic completed HDF')
+                execute.side_effect = complete
+                self.assertEqual(build.main(argv), 0)
                 launch.assert_called_once_with(Path(tmp) / 'build/fixture/image' /
                     f'AmiWind-v{build.VERSION}{suffix}.hdf', '/fs-uae', Path('/owned.rom'))
                 self.assertIn('Build succeeded', output.getvalue())

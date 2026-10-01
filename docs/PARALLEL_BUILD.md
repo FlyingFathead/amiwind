@@ -73,3 +73,7 @@ all-CPU budget. BLAS/OpenMP libraries use one thread per process worker. Explici
 `--jobs N` remains an override for measured environments, and `--single-thread`
 remains available. Shared scene writes, final catalogues, HDF assembly and
 readback verification keep their required ordering.
+
+The final [build summary](BUILD_OUTPUT.md) measures total wall time across the
+pipeline, including overlapping work; it does not add stage durations together.
+Compiler warnings are counted from the completed engine log.

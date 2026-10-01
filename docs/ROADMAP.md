@@ -1,5 +1,41 @@
 # Roadmap and implementation options
 
+## Top engineering priority: world-terrain build time
+
+The reported full-world conversion takes an impractical part of an evening on
+the workstation. Prioritize making `vfXXXX` compilation and repeated builds
+practical before native Windows bring-up or speculative compiler acceleration.
+The [build/compiler toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) defines the work:
+
+1. Preserve the current run and measure individual phases, including both BSP
+   compilations per region. Record success or failure rather than assuming it.
+2. Reuse unchanged terrain across new build names using validated persistent
+   caching, correct overlap dependencies and selective invalidation.
+3. Reduce duplicate BSP/collision work; investigate a terrain-specific standing
+   hull builder and separately cached collision output.
+4. Optimize the measured CPU/I/O costs, then evaluate GPU work if justified.
+
+Keep collision, shoreline, memory/format budgets and image gates intact. Hand
+over one logical source checkpoint at a time; a profiling-only change must not
+alter generated content. First-build speed and incremental-build reuse need
+separate measurements. These improvements are planned, not implemented.
+
+## Windows build host, 1 October 2026
+
+Native Windows/MSYS2 is a potential future build host. It has not been tested
+with AmiWind and is not a supported build configuration. The
+[Windows build roadmap](WINDOWS_BUILD_ROADMAP.md) records the investigation,
+integration and validation milestones. Prioritize native Windows/MSYS2;
+WSL2 is a fallback if native integration proves troublesome and also needs a
+complete build record.
+
+## Build and compiler toolkit
+
+The separate [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) proposes phase profiling
+for `vfXXXX` conversion, measured CPU/storage improvements, optional GPU asset
+work and deferred GPU-assisted QCC research. These are future investigations,
+not implemented backends or measured speedups.
+
 ## v0.0.25-rc1 regression work
 
 See [the consolidated dev1 feedback](FEEDBACK-v0.0.25-dev1.md). Priorities are
@@ -13,8 +49,8 @@ water/terrain verification, console M/N protection, normal compass and Ctrl flig
   seeds consistently and reduce near-coplanar portal clipping. Preserve native
   collision and visibility checks when changing that pipeline.
 
-Current release: [v0.0.24 - Welcome to Balmora (and Vvardenfell!)](RELEASE-v0.0.24.md).
-Current candidate: [v0.0.25-rc1](RELEASE-v0.0.25-rc1.md), correcting the first
+Historical rc1 planning context: release [v0.0.24 - Welcome to Balmora (and Vvardenfell!)](RELEASE-v0.0.24.md).
+Candidate at that time: [v0.0.25-rc1](RELEASE-v0.0.25-rc1.md), correcting the first
 playable terrain pass. Next work includes retained placement findings, broader
 route playtesting and scenery beyond the detailed towns. Solstheim/Bloodmoon and
 Tribunal are outside this island pass.
