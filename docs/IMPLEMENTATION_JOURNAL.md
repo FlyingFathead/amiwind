@@ -976,3 +976,31 @@ check closes a panel by changing destination, then opens the journal; native
 HDF acceptance also requires both journal opens and identical journal pixels
 before/after quickload. Merely reaching the script's completion marker was
 insufficient evidence that each requested screen had appeared.
+
+## J029 - Final v0.0.24 milestone and release imagery
+
+On 1 October the owner approved **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**.
+The presentation now calls out the whole-island mapping milestone, character
+creation, the complete gallery, Dagoth Ur's gold mask, M and the two-page J journal.
+The scope remains base-game Vvardenfell, excluding Bloodmoon/Solstheim and Tribunal.
+Whole-island mapping and surveyed subdivision candidates do not imply continuous
+whole-island 3D travel.
+
+Restore the verified RC4 source and converted payload, build the runtime and
+hardware preflight from final VERSION, and retain the exact correspondence
+receipt. Independently read back every one of the 8,093 HDF payload files. Capture
+from a writable image copy, return from the gallery, then verify journal restoration
+through quickload. This final run passed 282 frames without surface/edge overflow.
+The delivered HDF hash remained unchanged. Preserve original pixels when converting
+PCX screenshots to documentation PNGs and explicitly track each selected image.
+
+The first composition script reached its screenshots but `quit` opened its
+confirmation menu; it did not produce a completed-run profile. The corrected
+harness enters the console before `quit`, requires the completion marker and
+profile, and checks the restored journal pixels. Keep the incomplete attempt
+separate rather than counting it as a passed run.
+
+The owner's release decision accepts 23 existing contact findings as known
+issues. No audit result, threshold or classification changed, and the normal
+production image gate remains fail-closed. Release approval records acceptance
+of this milestone's scope; it does not grant future audit exceptions.

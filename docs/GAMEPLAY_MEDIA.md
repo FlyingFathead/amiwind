@@ -80,3 +80,35 @@ adjustment, compositing or invented map/journal artwork is applied. The player
 is the debug Hors character in Balmora; the journal text is the actual opening
 entry granted by the existing captain-duty state transaction. The map depicts
 terrain coverage, not a claim that all shown land is already playable.
+
+## v0.0.24 final release captures - 1 October 2026
+
+Six new images come from a writable copy of the finished v0.0.24 HDF, running
+its source-matched production executable. The final run completed 282 frames
+with zero surface/edge overflow. Journal pixels before and after quickload
+match exactly; the deliverable image was verified unchanged. Raw PCX files,
+commands, native logs and the image receipt accompany the private package.
+
+The public PNGs are 640 by 400 nearest-neighbour enlargements of native 320 by
+200 frames, with no colour/brightness adjustment, generated imagery or
+compositing. Hands and the crosshair are disabled through existing runtime
+settings for the composition views. Camera placement is diagnostic, not evidence
+of natural walking to each position. Gallery steady daylight and the exact-model
+geometry opt-in are the existing documented settings, not screenshot-only code.
+
+| Capture | Camera origin / yaw / pitch |
+| --- | --- |
+| Balmora bridge | `214,-480,85 / 125 / 6` |
+| Balmora street | `-495,-501,142 / 75 / 0` |
+| Balmora riverfront | `232,282,65 / 223 / 4` |
+| Dagoth Ur mask, gallery record 122 | `0,26,13 / 270 / 0` |
+| Island map and journal | Restored Hors character in Balmora |
+
+| Streets and residents | Riverfront architecture |
+| :---: | :---: |
+| ![Balmora street](images/amiwind-v0.0.24-balmora-street.png) | ![Balmora riverfront](images/amiwind-v0.0.24-balmora-river.png) |
+
+Every image has an exact `.gitignore` exception, a documentation-media allowlist
+entry, and a source-package entry. The owner-run publishing helper also requires
+all packaged public files to be tracked before committing. Other private
+captures and converted assets remain excluded.

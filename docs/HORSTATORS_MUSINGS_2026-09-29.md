@@ -327,3 +327,22 @@ a two-page journal, opened with J, showing entries earned during play. It is
 small by design. The island overview and the journal's words stay on disk until
 they are needed. A map of the whole island is a useful first step; walking its
 length, with the right textures and no broken crossings, is the next proof.
+
+## 1 October 2026 - Welcome to Balmora (and Vvardenfell!)
+
+The island has become a measurable whole. Seyda Neen and Balmora gave us the
+workflow; the terrain and polygon-density survey now gives us a way to decide
+where to apply it next. Start with Morrowind's own cells, divide only where the
+measured workload demands it, and preserve the sense of an open world.
+
+This is a major milestone in mapping Vvardenfell, not the completion of every
+place on it. Solstheim and Tribunal are outside the present base-game scope.
+The map and two-page journal now belong to the Amiga runtime, while the next
+terrain conversions can build on a common coordinate system. Character creation
+and the complete model gallery give the project faces as well as geography;
+Dagoth Ur has earned a place on the main page, gold mask and all.
+
+The owner chose to close v0.0.24 as a milestone release after RC playtesting.
+Known placement findings remain written down and the strict audit remains
+failed. A release number records the work we are shipping; it does not erase
+the work still ahead.

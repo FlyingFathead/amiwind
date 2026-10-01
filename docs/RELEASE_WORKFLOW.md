@@ -2,10 +2,10 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current candidate is **v0.0.24-rc4**.
-The owner published v0.0.24-rc3 at commit `0d13122`; v0.0.23 remains the
-stable release. Stable v0.0.24, titled **Welcome to Balmora**, requires owner
-approval after RC playtesting. Earlier archives and tags remain immutable.
+Use one shared release number: **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**.
+The owner approved the final milestone on 1 October 2026 after RC playtesting,
+with the 23 contact findings retained as known issues. Earlier archives/tags stay
+immutable. See the explicit release decision below; the audit was not changed.
 `VERSION` is the maintained version source for Python metadata, native build
 includes, runtime/boot strings, receipts, presets and package filenames.
 
@@ -13,9 +13,9 @@ includes, runtime/boot strings, receipts, presets and package filenames.
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.24-rc4-public-source.zip` | Complete repository under `amiwind/`. |
-| `AmiWind-v0.0.24-rc4-from-rc3-source-patch.zip` | Added/changed public files and patch metadata, from the exact published RC3 source ZIP. |
-| `AmiWind-v0.0.24-rc4-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24-rc4/`, following the delivered RC3 wrapper. |
+| `AmiWind-v0.0.24-public-source.zip` | Complete repository under `amiwind/`. |
+| `AmiWind-v0.0.24-from-rc4-source-patch.zip` | Added/changed public files and patch metadata, from the exact delivered RC4 source ZIP. |
+| `AmiWind-v0.0.24-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24/`, following the delivered RC3 wrapper. |
 
 Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
 their checksums belong in GitHub release assets. No private playable, ROM or
@@ -30,9 +30,9 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-The exact base is `AmiWind-v0.0.24-rc3-public-source.zip`, SHA-256
-`0c4978995c0e2d6540cc57e6bb0183fa20dc8e73c1a8b087417c6b5ed494623e`.
-`docs/PATCH-v0.0.24-rc4.json` records the base, changed paths and removals.
+The exact base is `AmiWind-v0.0.24-rc4-public-source.zip`, SHA-256
+`bbff61e2562659ae7c32eea4027ed82d1dac5177b08a23535ba3223110af35e8`.
+`docs/PATCH-v0.0.24.json` records the base, changed paths and removals.
 Verify a clean application reproduces every file in the full source ZIP,
 including the package manifest. The two RC3 screenshots also require their
 explicit `.gitignore` exceptions; source checks now enforce that alongside the
@@ -190,3 +190,21 @@ same diagnostic boundary as RC2: full source, matching private playable image,
 failed placement audit and independent HDF readback. A complete gallery does not
 turn the remaining 23 contact findings into a passed production gate. Source
 checks and targeted native tests still apply. Publish as a prerelease.
+
+## v0.0.24 owner release decision - 1 October 2026
+
+The owner explicitly requested the final v0.0.24 release after the RC4 delivery,
+under the title **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**. The 23 strict
+contact findings remain known issues. Preserve their complete failed receipt;
+never label them passed, remove rows or broaden tolerances to match release status.
+The normal production image builder still stops on the audit. This milestone's
+private assembly reuses the hash-verified RC4 converted content and freshly
+builds the final-version runtime and preflight, then independently reads back
+and tests the finished image. This explicit release decision is not a standing
+permission to bypass future checks or hide new failures.
+
+Public presentation must distinguish whole-island mapping from playable scene
+coverage, and exclude Bloodmoon/Solstheim and Tribunal from that map's scope.
+Fresh native captures need exact `.gitignore` exceptions and source allowlist
+entries. The owner-run publisher verifies all expected public files are tracked
+before committing; it creates a normal release, without the prerelease flag.

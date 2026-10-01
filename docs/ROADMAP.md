@@ -1,8 +1,10 @@
 # Roadmap and implementation options
 
-Current work: [Vvardenfell map and journal RC4](RELEASE-v0.0.24-rc4.md), with final-release fixes in progress;
-[Strider and loading presentation](RELEASE-v0.0.24-dev3.md) remains the preceding checkpoint.
-The earlier [29 September plan](PLAN-2026-09-29.md) retains the preceding work.
+Current release: [v0.0.24 - Welcome to Balmora (and Vvardenfell!)](RELEASE-v0.0.24.md).
+Next work: resolve the retained placement findings and convert the surveyed
+base-game terrain into runtime areas, retaining original cells wherever measured
+budgets permit. Solstheim/Bloodmoon and Tribunal are outside this island pass.
+The [29 September plan](PLAN-2026-09-29.md) retains historical priorities.
 
 ## Balmora interiors and loading
 

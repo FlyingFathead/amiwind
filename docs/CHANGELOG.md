@@ -1,5 +1,19 @@
 # Development history
 
+## v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026
+
+- Owner-approved milestone release of RC4's game/features, with freshly compiled
+  final-version runtime and preflight identities.
+- Present the whole-island base-game map and density survey as a major mapping
+  milestone; explicitly exclude Solstheim/Bloodmoon and Tribunal content.
+- Feature character creation, Dagoth Ur, native Balmora/map/journal screenshots
+  and precise coverage on the main page. Exact image ignore exceptions and
+  release allowlists keep the public captures tracked.
+- Carry all 3,551 model assets and the RC palette, collision, targeting and
+  journal improvements. Retain 23 unresolved placement findings explicitly;
+  release approval does not change the automated audit result.
+- [Release notes](RELEASE-v0.0.24.md).
+
 ## v0.0.24-rc4 — 1 October 2026
 
 Whole-base-master terrain/geometry survey, private interactive atlas and terrain

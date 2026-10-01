@@ -1,20 +1,23 @@
 # Current project state — 1 October 2026
 
-**Current: v0.0.24-rc4, Vvardenfell map and journal candidate.** The native M
-screen shows the full base-master island and the exterior player's source-space
-position. J shows dated earned entries in two facing pages with a quest index.
-AWS2 preserves the entry history. A private terrain/density atlas and inspection
-mesh cover all 1,292 height grids; they do not add whole-island 3D travel.
+**Current: v0.0.24 - Welcome to Balmora (and Vvardenfell!).** The owner
+approved the milestone release on 1 October 2026 following RC playtesting.
+This is a major milestone in mapping the whole base-game island, excluding
+Bloodmoon's Solstheim and Tribunal content. M shows the world map and exterior
+player location; J provides a two-page earned journal with saved history.
 
-The survey measures all 1,405 scenery meshes and 134,865 placements, with zero
-unresolved geometry and zero terrain height seams. Its subdivision candidates
-remain subject to converted/native budgets. See [survey](WORLD_SURVEY.md),
-[UI limits](WORLD_MAP_AND_JOURNAL.md) and [RC4 evidence](RELEASE-v0.0.24-rc4.md).
+The full terrain/density survey fits existing town regions into source-world
+coordinates. It measures 1,405 scenery meshes and 134,865 placements, with no
+unresolved geometry or mismatched adjacent terrain heights. Playable 3D scenes
+remain the existing converted areas; the island inspection mesh is host-side.
+All 3,551 gallery assets and the character-creation sequence remain included.
 
-The owner's latest Balmora roaming found the stairs satisfactory. The strict
-23-contact-finding gate remains open; the earlier exact reports remain recorded
-independently. Inventory, general dialogue/quest execution and whole-island
-walkable conversion remain future work. This is not final v0.0.24 acceptance.
+The owner accepted release with 23 strict contact findings still unresolved.
+The automated production placement gate remains failed and unchanged; the
+private release retains the failed receipt and rebuilds final-version binaries
+against the verified RC4 payload. Inventory, general dialogue/quest execution,
+whole-island walking and complete playthrough acceptance remain future work.
+See [release scope and evidence](RELEASE-v0.0.24.md).
 
 ## RC3 recovery baseline (historical)
 

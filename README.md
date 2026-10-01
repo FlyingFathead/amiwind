@@ -6,47 +6,62 @@
 
 ## Current state of the project
 
-**v0.0.24-rc4 — Vvardenfell map and journal candidate.** M opens the island
-map; J opens the two-page progression journal. A whole-island terrain and
-polygon-density survey places the existing towns in common world coordinates.
-All 3,551 gallery models and RC3's colour/collision improvements remain.
-The playable scenes and strict placement limits are in the
-[RC4 notes](docs/RELEASE-v0.0.24-rc4.md).
+**v0.0.24 - Welcome to Balmora (and Vvardenfell!)**
 
-| Balmora streets | Along the river |
+A major milestone in mapping the entire island of Vvardenfell: the original
+exterior cells, terrain and polygon-density survey now share one world map,
+with Balmora and Seyda Neen fitted into it. **M** opens that map and locates the
+player outdoors; **J** opens the two-page progression journal. This covers the
+base game, excluding Bloodmoon's Solstheim and Tribunal expansion content.
+The whole-island overview is implemented; playable 3D travel still uses the
+converted Seyda Neen and Balmora scenes.
+
+| Welcome to Balmora | Dagoth Ur, in the character gallery |
 | :---: | :---: |
-| ![Balmora street in RC2](docs/images/amiwind-v0.0.24-rc2-balmora-street.png) | ![Balmora riverfront in RC2](docs/images/amiwind-v0.0.24-rc2-balmora-river.png) |
+| ![Balmora bridge in v0.0.24](docs/images/amiwind-v0.0.24-balmora-bridge.png) | ![Dagoth Ur's gold mask in the native gallery](docs/images/amiwind-v0.0.24-dagoth.png) |
+| **Vvardenfell world map** | **Two-page progression journal** |
+| ![Vvardenfell world map](docs/images/amiwind-v0.0.24-map.png) | ![Dated progression journal](docs/images/amiwind-v0.0.24-journal.png) |
 
-*Actual native RC2 captures in FS-UAE; diagnostic camera placement, with no
-colour adjustment or compositing. [Capture details](docs/GAMEPLAY_MEDIA.md).*
+*Native v0.0.24 FS-UAE captures, shown at integer scale. Diagnostic camera
+placement; original renderer colours. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
-RC1 passed targeted checks of 70 exterior entrance/return pairs and two internal
-Fighters Guild links. RC4 is an owner-testing checkpoint; the three RC2 walking stalls have a
-collision correction, while 23 strict foot-contact findings remain open. Stable
-**v0.0.24, Welcome to Balmora**, is still pending. v0.0.23 remains stable.
+Character creation follows the opening registration sequence: name, race,
+gender, head and hair, class, birthsign and a final review. The appearance
+screen has a rotating head preview; a birthsign is shown after its selection
+stage. Character choices and earned journal history persist in saves.
 
-Balmora uses 64 overlapping regions. Seyda Neen retains 25 regular regions,
-compact intro-pier and ring-courtyard scenes, thirteen town interiors,
-Addamasartus and the prison ship. Map replacement pauses behind the accepted
-frozen-frame Loading... box. Method 2 read-ahead is experimental; method 1 remains the default. Full combat,
-quests, NPC services and schedules remain unfinished.
+`dbg gallery` opens the inspection plane for **2,935 original NPC/creature
+records and all 3,551 converted model assets**. Search by friendly name or
+source ID, inspect equipped/base-body variants, and return to the captured game
+state. Dagoth Ur's protected mask geometry and original gold texture use an
+exact-model allowance: `aw_allow_poly_budget_over true` and
+`aw_poly_budget_over_cap auto`. [Gallery controls](docs/CHARACTER_MODEL_GALLERY.md).
 
-The accepted Strider, Quake 90-degree FOV, base player dimensions and race/sex
-view heights remain. Shift+V cycles distance; `dbg aw hors 0` creates a Nord /
-Barbarian / The Steed character after Census; `dbg tp balmora` supplies that
-character if none exists. `dbg tp` opens the destination picker. Aim at doors
-and press E; ordinary NPC greetings use the same target as their Talk hint.
+Balmora has 64 overlapping exterior regions and 43 destination interiors,
+including Tharys Ancestral Tomb. Seyda Neen retains 25 regular regions, its
+opening scenes and converted interiors. Aim at doors or residents and press
+**E**. NPC interaction currently provides bounded authored greetings. Full
+combat, quest simulation, services, schedules and inventory remain unfinished.
+
+This milestone ships with documented limits: **23 strict ground-contact audit
+findings remain unresolved**, and the ordinary production image builder still
+stops on that audit. The owner approved this release with those known findings;
+release status does not turn the audit into a pass. Method 1 retains synchronous
+loading behind the frozen-frame Loading... box; method 2 read-ahead remains
+experimental. See [release notes and verification](docs/RELEASE-v0.0.24.md).
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game
-files using the [Linux instructions](docs/LINUX_BUILD.md). Public CI produces
-asset-free checks; converted game data and ROMs stay private.
+files using the [Linux instructions](docs/LINUX_BUILD.md). Converted game data
+and ROMs stay private. Start a fresh character when moving from older content.
 
-Use owned TTF inputs for the preferred reading text; bitmap fonts remain a
-fallback. The gold UI also retains `dbg ui ink original` alongside the readable
-candidate. See [font options](docs/PAPER_FONT_OPTIONS.md),
-[map and journal](docs/WORLD_MAP_AND_JOURNAL.md), [world survey](docs/WORLD_SURVEY.md),
-[debug controls](docs/DEBUG_OVERLAYS.md), [model gallery](docs/CHARACTER_MODEL_GALLERY.md), [project state](docs/PROJECT_STATE.md)
+Shift+V cycles distance; `dbg aw hors 0` creates the Nord / Barbarian / The
+Steed test character after Census; `dbg tp balmora` travels to Balmora and
+supplies that character if absent. `dbg tp` opens the destination picker.
+
+See [map and journal](docs/WORLD_MAP_AND_JOURNAL.md),
+[world survey](docs/WORLD_SURVEY.md), [debug controls](docs/DEBUG_OVERLAYS.md),
+[project state](docs/PROJECT_STATE.md), [font options](docs/PAPER_FONT_OPTIONS.md)
 and [conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md).
 
 *For years, they thought the Nerevarine would never appear on the Commodore Amiga…*
@@ -187,10 +202,10 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.24-dev1 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.24 configuration template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.24-dev1-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.24-dev1-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.24-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.24-WinUAE.uae) |
 
 1. Build `AmiWind-v0.0.24-dev1.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
