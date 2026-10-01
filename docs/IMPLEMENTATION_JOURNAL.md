@@ -938,3 +938,41 @@ darker face at full brightness, ordinary scene lighting and several fog depths.
 Keep a source-texture sample and a matched native before/after view so geometry,
 UV seams, quantization and stale colour tables can be distinguished. A larger
 polygon budget is not a repair for a stale lookup table.
+
+## J028 — one island, measured cells and earned journal entries
+
+The whole-base-master survey measures 1,404 exterior records, 1,292 terrain
+grids and 134,865 placed scenery/item meshes. Full transformed bounds determine
+loading estimates; triangle centroids determine density. Their totals conserve
+34,924,945 placed source triangles. No source mesh remains unresolved, and no
+adjacent height edge differs. Existing area origins and region planners locate
+Balmora/Seyda Neen without copying arbitrary offsets into a separate atlas.
+
+The first candidate split counts are 1,078 whole cells, 314 at 2 by 2 and 12 at
+4 by 4, using the largest current region's source-geometry load as a screening
+ceiling. Terrain, collision, textures, actors, heap and native frame cost remain
+separate acceptance gates. The atlas never promotes a density colour to a
+runtime guarantee. Full height grids are retained; a 661,504-triangle terrain
+mesh is an inspection asset, not a playable island. See [survey](WORLD_SURVEY.md).
+
+The native map loads about 245 KiB only while open. The journal loads a bounded
+reader and retrieves one earned source entry at a time. Saved numeric quest
+indices are not chronological evidence: AWS2 adds explicit dated entry records,
+while old AWS1 decoding leaves unknown history empty. Journal grants are
+transactional at capacity, and replaying a stage does not duplicate its text.
+The two-page reader links to known quests; full dialogue-topic knowledge and
+general quest execution remain future work. See [UI and save limits](WORLD_MAP_AND_JOURNAL.md).
+
+Recurrence rules: keep source and runtime coordinates reversible, floor negative
+cell coordinates, preserve complete overlapping objects, validate converted
+region budgets, and never manufacture journal history from a final quest index.
+Map/journal assets remain private and are released from memory when closed.
+
+The finished-image UI sequence caught a command-driven modal cleanup error:
+`togglemenu` changed the key destination before the map panel could free its
+resources. The regular menu draw returned too early, so the next journal open
+was refused. Cleanup now runs before that destination check. The regression
+check closes a panel by changing destination, then opens the journal; native
+HDF acceptance also requires both journal opens and identical journal pixels
+before/after quickload. Merely reaching the script's completion marker was
+insufficient evidence that each requested screen had appeared.

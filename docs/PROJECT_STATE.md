@@ -1,5 +1,23 @@
 # Current project state — 1 October 2026
 
+**Current: v0.0.24-rc4, Vvardenfell map and journal candidate.** The native M
+screen shows the full base-master island and the exterior player's source-space
+position. J shows dated earned entries in two facing pages with a quest index.
+AWS2 preserves the entry history. A private terrain/density atlas and inspection
+mesh cover all 1,292 height grids; they do not add whole-island 3D travel.
+
+The survey measures all 1,405 scenery meshes and 134,865 placements, with zero
+unresolved geometry and zero terrain height seams. Its subdivision candidates
+remain subject to converted/native budgets. See [survey](WORLD_SURVEY.md),
+[UI limits](WORLD_MAP_AND_JOURNAL.md) and [RC4 evidence](RELEASE-v0.0.24-rc4.md).
+
+The owner's latest Balmora roaming found the stairs satisfactory. The strict
+23-contact-finding gate remains open; the earlier exact reports remain recorded
+independently. Inventory, general dialogue/quest execution and whole-island
+walkable conversion remain future work. This is not final v0.0.24 acceptance.
+
+## RC3 recovery baseline (historical)
+
 **AmiWind v0.0.24-rc3 — owner-requested recovery candidate.** All 2,935
 base-master NPC/creature records map to 3,551 successfully converted assets.
 There are 29 exact-model opt-in geometry allowances, bounded at 1,024 triangles.

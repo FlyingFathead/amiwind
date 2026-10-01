@@ -544,3 +544,10 @@ void AW_UICenteredLines(int x,int y,int w,int h,const char *text);
 const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity);
 
 const char *AW_SceneWorldModel(const char *name);
+
+/* On-demand map and earned journal. */
+void AW_WorldUIInit(void);
+int AW_WorldUIActive(void);
+int AW_WorldUIKey(int key,int down);
+void AW_WorldUIMouse(int dx,int dy);
+int AW_WorldUIDraw(void);

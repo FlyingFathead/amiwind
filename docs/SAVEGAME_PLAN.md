@@ -1,6 +1,8 @@
 # Save/load milestone: compact state and a manageable save list
 
-**Status:** AWS1 prototype implemented for the v0.0.21-dev1 opening slice,
+**Status:** the post-RC3 checkpoint adds AWS2 dated journal history, retaining
+AWS1 decoding without invented history. See [journal schema and limits](WORLD_MAP_AND_JOURNAL.md).
+The original AWS1 prototype was implemented for the v0.0.21-dev1 opening slice,
 with registration/release eligibility. Character folders, quicksave, four fixed
 manual slots, 0–16 autosaves (default 3) and dual validated generations are
 implemented. Native filesystem and failure acceptance are recorded with the

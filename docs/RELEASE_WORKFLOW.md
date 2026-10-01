@@ -2,8 +2,8 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current candidate is **v0.0.24-rc3**.
-The owner published v0.0.24-rc2 at commit `4767ded`; v0.0.23 remains the
+Use one shared release number. The current candidate is **v0.0.24-rc4**.
+The owner published v0.0.24-rc3 at commit `0d13122`; v0.0.23 remains the
 stable release. Stable v0.0.24, titled **Welcome to Balmora**, requires owner
 approval after RC playtesting. Earlier archives and tags remain immutable.
 `VERSION` is the maintained version source for Python metadata, native build
@@ -13,9 +13,9 @@ includes, runtime/boot strings, receipts, presets and package filenames.
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.24-rc3-public-source.zip` | Complete repository under `amiwind/`. |
-| `AmiWind-v0.0.24-rc3-from-rc2-source-patch.zip` | Added/changed public files and patch metadata, from the exact published RC2 source ZIP. |
-| `AmiWind-v0.0.24-rc3-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24-rc3/`, following the delivered RC2 wrapper. |
+| `AmiWind-v0.0.24-rc4-public-source.zip` | Complete repository under `amiwind/`. |
+| `AmiWind-v0.0.24-rc4-from-rc3-source-patch.zip` | Added/changed public files and patch metadata, from the exact published RC3 source ZIP. |
+| `AmiWind-v0.0.24-rc4-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24-rc4/`, following the delivered RC3 wrapper. |
 
 Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
 their checksums belong in GitHub release assets. No private playable, ROM or
@@ -30,11 +30,13 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-The exact base is `AmiWind-v0.0.24-rc2-public-source.zip`, SHA-256
-`e0e727b3b972f5d2b86c2fef79d4087fd1d53a02d484c7218e7f61c458dfb7c8`.
-`docs/PATCH-v0.0.24-rc3.json` records the base, changed paths and removals.
+The exact base is `AmiWind-v0.0.24-rc3-public-source.zip`, SHA-256
+`0c4978995c0e2d6540cc57e6bb0183fa20dc8e73c1a8b087417c6b5ed494623e`.
+`docs/PATCH-v0.0.24-rc4.json` records the base, changed paths and removals.
 Verify a clean application reproduces every file in the full source ZIP,
-including the package manifest. Unzip does not delete obsolete files; apply
+including the package manifest. The two RC3 screenshots also require their
+explicit `.gitignore` exceptions; source checks now enforce that alongside the
+media allowlist. Unzip does not delete obsolete files; apply
 only explicitly listed removals. Protect existing local changes first.
 Always provide the full source archive alongside the incremental.
 

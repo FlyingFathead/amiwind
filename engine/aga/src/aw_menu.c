@@ -199,7 +199,11 @@ static void cursor(void){
     AW_UIFill(mouse_x,mouse_y,2,6,colours[1]);AW_UIFill(mouse_x,mouse_y,6,2,colours[1]);
 }
 void M_Draw(void){
-    int i,xx,yy,value,knob,w;char line[64];if(key_dest!=key_menu)return;
+    int i,xx,yy,value,knob,w;char line[64];
+    /* A queued console/menu command may have changed destination without a
+     * key event. Let the on-demand panels release their state in that case. */
+    if(AW_WorldUIDraw())return;
+    if(key_dest!=key_menu)return;
     scr_copyeverything=1;
     if(AW_TravelDraw())return;
     if(AW_WaitDraw())return;

@@ -57,7 +57,8 @@ void IN_Move (usercmd_t *cmd) {
   // Consume pending movement while console is open without turning the player.
   mouse_has_moved = false;
   if(key_dest != key_game){
-    if(key_dest==key_menu)AW_MenuMouse(mouseX,mouseY);
+    if(AW_WorldUIActive())AW_WorldUIMouse(mouseX,mouseY);
+    else if(key_dest==key_menu)AW_MenuMouse(mouseX,mouseY);
     old_mouse_x=old_mouse_y=0;return;
   }
 

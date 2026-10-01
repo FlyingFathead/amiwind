@@ -11,6 +11,9 @@ kbutton_t in_strafe,in_mlook;
 cvar_t sensitivity={"sensitivity","1",false,1},lookstrafe,m_side,m_pitch,m_yaw,m_forward;
 void V_StopPitchDrift(void){}
 void AW_MenuMouse(int x,int y){}
+int AW_WorldUIActive(void){return 0;}
+void AW_WorldUIMouse(int x,int y){}
+int AW_WorldUIKey(int key,int down){return 0;}
 int AW_ReaderActive(void){return 0;}
 void AW_ReaderMouse(int x,int y){}
 int AW_CharacterActive(void){return 0;}

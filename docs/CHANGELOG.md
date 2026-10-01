@@ -1,5 +1,14 @@
 # Development history
 
+## v0.0.24-rc4 — 1 October 2026
+
+Whole-base-master terrain/geometry survey, private interactive atlas and terrain
+inspection mesh; native M map and J two-page journal with earned dated history,
+quest links and AWS2 saves. Assets load on demand and are freed on close.
+Includes screenshot-tracking validation. Whole-island 3D traversal, inventory
+and complete quest scripting remain future work; the 23 placement findings
+remain open. See [scope and evidence](RELEASE-v0.0.24-rc4.md).
+
 ## v0.0.24-rc3 — 1 October 2026
 
 Owner-requested recovery candidate: complete gallery conversion, bounded exact-model

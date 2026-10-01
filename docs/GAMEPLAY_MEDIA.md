@@ -70,3 +70,13 @@ captures from the RC3 engine, without colour correction or compositing. Debug
 camera placement is used; the gallery uses its documented steady daylight.
 The mask view enables the byte-specific geometry allowance. These document
 appearance and a tested view, not unrestricted gameplay acceptance.
+
+## RC4 island map and journal
+
+The RC4 map and journal images are native 320 by 200 UI captures shown at integer
+2x scale. The images come from the final writable-copy HDF run; native pixels are
+scaled by nearest-neighbour sampling without an emulator border. No colour
+adjustment, compositing or invented map/journal artwork is applied. The player
+is the debug Hors character in Balmora; the journal text is the actual opening
+entry granted by the existing captain-duty state transaction. The map depicts
+terrain coverage, not a claim that all shown land is already playable.

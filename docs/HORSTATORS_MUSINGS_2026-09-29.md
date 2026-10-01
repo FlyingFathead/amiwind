@@ -305,3 +305,25 @@ terrain and its polygon-density survey should guide expansion cell by cell,
 using smaller regions only where measured density requires them. Seyda Neen and
 Balmora have given us the beginnings of a repeatable conversion workflow; the
 next task is to make that knowledge travel with every new settlement.
+
+## 1 October: give the island a common map
+
+Balmora's stairs are behaving much better in the owner's latest roaming, and
+the obvious floating residents have stopped spoiling the streets. That is a
+welcome change in the feel of the place. The precise outstanding contact and
+wedge reports still belong in the investigation ledger; a pleasant walk and a
+complete placement audit answer different questions.
+
+The next leap is to see how these two towns belong to the island around them.
+The first survey now joins all 1,292 terrain grids, with Seyda Neen and Balmora
+fitted to the same source coordinates. The height edges agree. The geometry
+survey also gives us something better than guessing where the next city will
+need smaller regions: a map of actual placed meshes and their overlap costs.
+Start with Morrowind's cells, split where the evidence asks for it, and carry
+the lessons about doors, dwellings and grounded residents into each new area.
+
+There is now a beginning for the player's own record of that journey as well:
+a two-page journal, opened with J, showing entries earned during play. It is
+small by design. The island overview and the journal's words stay on disk until
+they are needed. A map of the whole island is a useful first step; walking its
+length, with the right textures and no broken crossings, is the next proof.

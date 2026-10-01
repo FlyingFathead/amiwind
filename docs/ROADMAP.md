@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-Current work: [Welcome to Balmora RC3](RELEASE-v0.0.24-rc3.md), with final-release fixes in progress;
+Current work: [Vvardenfell map and journal RC4](RELEASE-v0.0.24-rc4.md), with final-release fixes in progress;
 [Strider and loading presentation](RELEASE-v0.0.24-dev3.md) remains the preceding checkpoint.
 The earlier [29 September plan](PLAN-2026-09-29.md) retains the preceding work.
 
@@ -34,7 +34,7 @@ ship-exit scene. Performance observations remain separate from measured claims.
 
 ## Future world-coordinate HUD (investigate first; not v0.0.24 work)
 
-- [ ] Establish a reversible transform from each runtime scene's local XYZ to
+- [x] Establish a reversible transform from each runtime scene's local XYZ to
   original Morrowind world coordinates and exterior cell/grid coordinates.
   Check quarter-scale conversion, each area's origin and axis conventions,
   negative-cell boundaries, sub-cell copies and interior identity. Interiors
@@ -51,9 +51,10 @@ ship-exit scene. Performance observations remain separate from measured claims.
 
 ## World map, inventory and journal TODO (owner request, 1 October 2026)
 
-These are future gameplay features, separate from the v0.0.24 release fixes.
+The post-RC3 world/map/journal pass has started at the owner's request.
+[Current implementation and limits](WORLD_MAP_AND_JOURNAL.md).
 
-- [ ] **M: full-screen world map.** Show Morrowind and the player's current
+- [x] **M: basic full-screen Vvardenfell map.** Show Morrowind and the player's current
   position. Reuse the verified local-to-world transform described above; define
   how interior locations appear without inventing exterior coordinates. Provide
   a clear return to play, keyboard navigation and mouse pan/zoom where practical.
@@ -66,14 +67,15 @@ These are future gameplay features, separate from the v0.0.24 release fixes.
   equipment changes; opening either screen must capture input from the world.
 - [ ] Measure the map, preview model, item icons and UI memory on the reference
   Amiga profile. Load their resources on demand and release them on close.
-- [ ] **J: in-game progression journal.** Present an open book with a central
+- [x] **J: basic dated progression journal and quest links.** Present an open book with a central
   fold and two facing pages, page turning, dated entries and clickable topic/quest
   links. Provide keyboard navigation and a visible pointer, with a route back
-  from linked topics to the current spread. Preserve progression, entry order
-  and journal navigation across save/load. Follow the original journal's book
+  from linked topics to the current spread. Preserve progression and entry order across save/load. Follow the original journal's book
   presentation; use scrollbars for indexes or long topic lists where appropriate.
-  Investigate original journal records, quest stages and hyperlink rules before
-  selecting the runtime format; do not assume that the source format is XML.
+  Implemented: two-page earned entries, quest filter links and AWS2 history.
+  Pending: learned dialogue-topic links, saved reading position, larger quest
+  capacity and full original-script progression. Source journal data is DIAL/INFO,
+  not XML; the supplied master has no QSTN quest titles.
 
 
 ## Optional field-of-view control
@@ -128,16 +130,18 @@ method, then fit Seyda Neen and Balmora into that common world space. This
 terrain-first milestone does not imply that every settlement, interior or
 gameplay system is complete.
 
-- [ ] Catalogue the source exterior-cell grid, bounds, terrain heights, texture
+- [x] Catalogue the source exterior-cell grid, bounds, terrain heights, texture
   assignments and water; document the actual cell layout before choosing
   runtime boundaries. Produce a coverage view with both converted towns marked.
-- [ ] Produce a matching **polygon-density map ("polymapping")**: count source
-  and converted triangles per cell and smaller spatial tiles, including placed
+- [x] Produce a matching **source polygon-density map ("polymapping")**: count source
+  triangles per cell and smaller spatial tiles, including placed
   copies of buildings and other meshes. Show concentrated geometry as a heatmap
   alongside terrain and existing region boundaries. Use it to flag candidates
   for sub-cells, then confirm with visible geometry, collision cost, texture
   residency, peak heap use and transition measurements. Raw polygon count alone
-  is a screening tool, not a sufficient runtime budget.
+  is a screening tool, not a sufficient runtime budget. Whole-island converted
+  BSP costs remain pending; the first survey calibrates against the existing
+  89 town regions. See [measurements and private outputs](WORLD_SURVEY.md).
 - [ ] Convert and traverse terrain cell by cell, checking texture continuity,
   shared edges, player coordinates and return crossings. Reuse the current
   selectable loading methods and measure memory and stalls on the Amiga profile.

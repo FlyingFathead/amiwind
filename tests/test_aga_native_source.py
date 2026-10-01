@@ -16,6 +16,14 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_journal_history_dates_duplicates_and_capacity_transaction(self):
+        self.compile_run('aga_journal_state_test.c', [Path(SOURCE)/'src/aw_state.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
     def test_prefetch_byte_identity_cancellation_eviction_and_low_memory_fallback(self):
         self.compile_run('aga_stream_test.c', [Path(SOURCE)/'src/aw_stream.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])

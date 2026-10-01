@@ -98,3 +98,5 @@ int AW_UIVoiceStyle(void){return 1;}
 int AW_UIVoiceNames(void){return voices;}void AW_UIVoiceNamesToggle(void){voices=!voices;}
 int AW_UIDialogueMethod(void){return dialogue;}void AW_UIDialogueCycle(int step){dialogue=(dialogue-1+step+4)%4+1;}
 int AW_SceneUIOption(int n,int change){if(change)scene_options[n]=n?(scene_options[n]-1+change+3)%3+1:!scene_options[n];return scene_options[n];}
+
+int AW_WorldUIDraw(void){return 0;}

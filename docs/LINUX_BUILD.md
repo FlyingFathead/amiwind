@@ -272,3 +272,17 @@ Hashing runs once before conversion and may take time on a large installation.
 Do not change source files or tool binaries during a run. The receipt aids
 reproduction; it is not a hermetic environment or a promise of byte-identical HDF
 timestamps. See [CONVERSION_RECIPES.md](CONVERSION_RECIPES.md).
+
+## World map and journal assets
+
+The native image stage now prepares the on-demand world map and journal
+catalogue from `--data-files`, after the final UI palette is established. This
+terrain-only path does not run the full scenery-density survey. If original
+inputs are omitted, a matching converted `id1/world` directory and receipt must
+already exist. The image builder rejects stale palette/content hashes. These
+four world/journal assets participate in the save-content fingerprint.
+
+Run the separate [world survey](WORLD_SURVEY.md) for cell-density analysis and
+the private atlas/terrain mesh. The usual production ground-contact gate still
+applies; the diagnostic RC4 package does not turn its 23 open findings into a
+passed production build.

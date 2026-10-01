@@ -116,23 +116,39 @@ static void fields(aw_save_t *s)
         for(j=0;j<i;j++)if(a->reference==s->actors[j].reference && a->scene==s->actors[j].scene)error=1;
     }
 }
+static void journal_fields(aw_state_t *s)
+{
+    int i,j,n;aw_journal_entry_t *e;
+    integer(&s->journal_count,0,AW_JOURNAL_ENTRIES);if(error)return;
+    for(i=0;i<s->journal_count;i++){
+        e=&s->journal[i];integer(&e->quest,0,s->count[AW_JOURNAL]-1);
+        n=e->stage;integer(&n,1,2147483647);e->stage=n;
+        n=e->days;integer(&n,0,365000);e->days=n;
+        n=e->milliseconds;integer(&n,0,86399999);e->milliseconds=n;
+        for(j=0;j<i;j++)if(e->quest==s->journal[j].quest && e->stage==s->journal[j].stage)error=1;
+        if(error)return;
+    }
+}
 int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
 {
     aw_save_t copy=*state;uint32_t size=0,crc;
     if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
-    memset(out,0,capacity);fields(&copy);
+    memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
     if(error)return 0;
-    size=at;memcpy(out,"AWS1",4);at=4;word(&size);
+    size=at;memcpy(out,"AWS2",4);at=4;word(&size);
     crc=crc32(out+12,size-12);word(&crc);return size;
 }
 int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
 {
     aw_save_t candidate;uint32_t length=0,crc=0;
-    if(size<12 || size>AW_SAVE_BYTES || memcmp(data,"AWS1",4))return 0;
+    if(size<12 || size>AW_SAVE_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4)))return 0;
     writing=NULL;reading=data;at=4;end=size;error=0;word(&length);word(&crc);
     if(length!=(uint32_t)size || crc!=crc32(data+12,size-12))return 0;
     memset(&candidate,0,sizeof(candidate));fields(&candidate);
+    /* Older saves have quest indices but no chronological evidence. Do not
+     * fabricate earlier entries or dates when decoding them. */
+    if(!error && data[3]=='2')journal_fields(&candidate.state);
     if(error || at!=size)return 0;
     *out=candidate;return 1;
 }

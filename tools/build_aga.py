@@ -43,7 +43,7 @@ def startup_config(config):
     config,count=re.subn(r'(?m)^map (?:seyda|prison)\s*$',
         'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
-    return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\nbind t aw_wait\nbind F1 aw_quick_help\n'
+    return 'aw_drawdistance 540\n'+config.rstrip()+'\nbind F5 aw_quicksave\nbind F9 aw_quickload\nbind t aw_wait\nbind F1 aw_quick_help\nbind m aw_worldmap\nbind j aw_journal\n'
 
 def validate_quakec(path):
     """Reject incompatible compiler output before it reaches an Amiga image."""
@@ -127,6 +127,18 @@ def engine(args):
     (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n')
     print(binary)
 
+def write_content_fingerprint(id1):
+    from prepare_seyda_regions import regions as seyda_regions
+    fingerprint=hashlib.sha256()
+    from area_config import SCENES
+    from balmora_regions import config as balmora_config, regions as balmora_regions
+    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', *(f"maps/{r['name']}.bsp" for r in seyda_regions()), 'balmora-regions.txt', *(f"maps/{r['name']}.bsp" for r in balmora_regions(balmora_config())), 'progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj', 'world/entries.dat', 'world/quests.awq']:
+        asset=Path(id1)/name
+        if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
+        fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))
+    (Path(id1)/'save-content.bin').write_bytes(fingerprint.digest())
+
+
 def image(args):
     check_binary(args.engine.read_bytes())
     checker=args.bootcheck or args.engine.parent/'AmiWindCheck'
@@ -155,6 +167,9 @@ def image(args):
     # A copied old lighting table maps those colours back to grey sky pixels.
     from ui_palette import sync_lookups
     sync_lookups(boot/'id1',check=True)
+    from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
+    if args.data_files:prepare_world_ui(args.data_files,None,boot)
+    validate_world_ui(boot/'id1')
     logo=ROOT/'resources/media/AmiWind_wordmark.png'
     prepare_menu_logo(logo,boot/'id1/gfx/palette.lmp',boot/'id1/gfx/amiwind.awi')
     logo_stream=boot/'id1/intro/amiwind.awv'
@@ -206,14 +221,7 @@ def image(args):
     # BSP/MDL payload, and stop before fingerprinting or HDF creation on failure.
     from check_actor_ground import require as require_actor_ground
     require_actor_ground(boot/'id1/maps',out/'actor-initial-contact.json')
-    fingerprint=hashlib.sha256()
-    from area_config import SCENES
-    from balmora_regions import config as balmora_config, regions as balmora_regions
-    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', *(f"maps/{r['name']}.bsp" for r in seyda_regions()), 'balmora-regions.txt', *(f"maps/{r['name']}.bsp" for r in balmora_regions(balmora_config())), 'progs.dat', 'character/catalog.awc']:
-        asset=boot/'id1'/name
-        if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
-        fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))
-    (boot/'id1/save-content.bin').write_bytes(fingerprint.digest())
+    write_content_fingerprint(boot/'id1')
     manifest=json.loads((music/'soundtrack.json').read_text());groups=playlists(manifest['tracks'])
     opening_track=manifest['tracks'][4] if 4 in groups['explore'] else None
     if opening_track:

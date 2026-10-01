@@ -13,6 +13,14 @@ int AW_HeadLoad(int a,int b){return 1;}
 void Con_Printf(char *s,...){}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 int COM_FOpenFile(char *s,FILE **f){*f=NULL;return -1;}
+static void legacy_header(byte *raw,int size)
+{
+    uint32_t crc=0xffffffffU;int i,j;
+    memcpy(raw,"AWS1",4);
+    for(i=12;i<size;i++){crc^=raw[i];for(j=0;j<8;j++)crc=(crc>>1)^((crc&1)?0xedb88320U:0);}
+    crc^=0xffffffffU;
+    for(i=0;i<4;i++){raw[4+i]=(size>>(8*i))&255;raw[8+i]=(crc>>(8*i))&255;}
+}
 static void setup(void)
 {
     int i;
@@ -99,11 +107,15 @@ int main(void)
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>500 && n<2000);
     memset(&decoded,0x5a,sizeof(decoded));unchanged=decoded;
     for(i=0;i<n;i++){assert(!AW_SaveDecode(raw,i,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));}
-    assert(AW_SaveDecode(raw,n,&decoded));assert(AW_StateGet(&decoded.state,AW_GLOBAL,"amiwind:clock:days")==1);assert(decoded.position[0]==12.25 && decoded.character.maximum[0]==60);
+    assert(AW_SaveDecode(raw,n,&decoded));assert(decoded.state.journal_count==2 && decoded.state.journal[0].stage==1 && decoded.state.journal[1].stage==12);assert(AW_StateGet(&decoded.state,AW_GLOBAL,"amiwind:clock:days")==1);assert(decoded.position[0]==12.25 && decoded.character.maximum[0]==60);
     assert(decoded.story.hall==1 && AW_StateGet(&decoded.state,AW_GLOBAL,"amiwind:ref:172851:ring_taken")==1);
     assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
     assert(!AW_StateGet(&decoded.state,AW_ITEM,"bk_a1_1_caiuspackage")); /* Released saves may lack a former quest item. */
     for(i=12;i<n;i++){raw[i]^=1;assert(!AW_SaveDecode(raw,n,&decoded));raw[i]^=1;}
+    /* Legacy bytes have indices, no dates; decoding must not invent history. */
+    i=n-4-source.state.journal_count*16;legacy_header(raw,i);
+    assert(AW_SaveDecode(raw,i,&decoded) && !decoded.state.journal_count);
+    assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
     strcpy(source.scene,"addamasartus");source.actor_count=1;
     source.actors[0].reference=42;source.actors[0].scene=15;
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0);
@@ -120,6 +132,16 @@ int main(void)
     for(i=0;i<AW_SAVE_ACTORS;i++){source.actors[i]=source.actors[0];source.actors[i].scene=AW_MAP_COUNT-1;source.actors[i].reference=i+1;}
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && AW_SaveDecode(raw,n,&decoded));
     assert(decoded.actor_count==AW_SAVE_ACTORS && decoded.actors[AW_SAVE_ACTORS-1].reference==AW_SAVE_ACTORS);
+    for(i=0;i<AW_JOURNAL_ENTRIES;i++){
+        source.state.journal[i].quest=0;source.state.journal[i].stage=1000+i;
+        source.state.journal[i].days=i;source.state.journal[i].milliseconds=43200000;
+    }
+    source.state.journal_count=AW_JOURNAL_ENTRIES;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && n<AW_SAVE_BYTES && AW_SaveDecode(raw,n,&decoded));
+    assert(decoded.state.journal_count==AW_JOURNAL_ENTRIES && decoded.state.journal[255].stage==1255);
+    source.state.journal[0].quest=AW_STATE_VALUES;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
+    source.state.journal[0].quest=0;source.state.journal[1]=source.state.journal[0];
+    assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.state.journal_count=0;
     source.actors[0].scene=AW_MAP_COUNT;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
     strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;

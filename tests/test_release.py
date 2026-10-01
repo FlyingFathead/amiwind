@@ -27,7 +27,8 @@ class Release(unittest.TestCase):
             media.mkdir(parents=True)
             name = 'docs/images/amiwind-v0.0.23-dev2-port.gif'
             allowlist = root/'tools/release-files.json'
-            paths = json.loads(allowlist.read_text())
+            paths = json.loads(allowlist.read_text()) + ['.gitignore']
+            (root/'.gitignore').write_text('*.gif\n!/' + name + '\n')
             allowlist.write_text(json.dumps(paths + [name]) + '\n')
             (root/name).write_bytes(b'GIF89a\0')
             inspect_source(root)
@@ -41,6 +42,18 @@ class Release(unittest.TestCase):
             (root/other).write_bytes(b'GIF89a\0')
             with self.assertRaisesRegex(ValueError, 'Unexpected distributable'):
                 inspect_source(root)
+
+    def test_selected_screenshot_requires_tracking_exception(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'repo';fixture(root)
+            name='docs/images/amiwind-v0.0.24-rc3-dagoth.png'
+            (root/name).parent.mkdir(parents=True);(root/name).write_bytes(b'\x89PNG\r\n\x1a\n')
+            (root/'.gitignore').write_text('*.png\n')
+            listing=root/'tools/release-files.json'
+            listing.write_text(json.dumps(json.loads(listing.read_text())+[name,'.gitignore'])+'\n')
+            with self.assertRaisesRegex(ValueError,'gitignore exception'):inspect_source(root)
+            (root/'.gitignore').write_text('*.png\n!/'+name+'\n')
+            inspect_source(root)
 
     def test_unknown_content_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

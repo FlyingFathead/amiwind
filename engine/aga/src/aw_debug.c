@@ -159,7 +159,7 @@ static void blockers(void) {
     }
 }
 void AW_DebugInit(void) {
-    AW_GalleryInit();
+    AW_GalleryInit();AW_WorldUIInit();
     AW_StreamInit();
     AW_InputDebugInit();AW_DoorAudioInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);

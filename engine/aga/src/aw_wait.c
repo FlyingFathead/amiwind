@@ -7,9 +7,9 @@
 #include "aw_story.h"
 #include "aw_clock.h"
 static int modal,hours=1,help_page;
-static const char *help_commands[]={"+forward","+back","+moveleft","+moveright","+attack","+aw_use","impulse 202","aw_wait","aw_quicksave","aw_quickload","toggleconsole","aw_quick_help","togglemenu"};
-static const char *help_actions[]={"Move forward","Move back","Move left","Move right","Attack","Activate","Ready hands","Wait","Quicksave","Quickload","Console","Quick help","Pause menu"};
-#define HELP_COUNT 13
+static const char *help_commands[]={"+forward","+back","+moveleft","+moveright","+attack","+aw_use","impulse 202","aw_wait","aw_quicksave","aw_quickload","toggleconsole","aw_quick_help","togglemenu","aw_worldmap","aw_journal"};
+static const char *help_actions[]={"Move forward","Move back","Move left","Move right","Attack","Activate","Ready hands","Wait","Quicksave","Quickload","Console","Quick help","Pause menu","World map","Journal"};
+#define HELP_COUNT 15
 #define HELP_ROWS 7
 static void help_text(int x,int y,const char *s) {
     int w=AW_ConsoleCharWidth();

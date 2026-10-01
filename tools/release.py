@@ -28,6 +28,7 @@ DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.23-dev5-windows.png")
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc1-{name}.png" for name in ("balmora", "mages"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc2-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc3-{name}.png" for name in ("dagoth", "balmora"))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc4-{name}.png" for name in ("map", "journal"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 
 
@@ -83,6 +84,15 @@ def inspect_source(root):
     if (root / 'engine/aga').exists():
         check_native_versions(root)
     allowed = allowed_files(root)
+    # A ZIP may include an image that git add silently ignores. Require the
+    # repository's explicit per-media exception alongside the package allowlist.
+    media = set(allowed) & (DOCUMENTATION_IMAGES | DOCUMENTATION_CLIPS | PROJECT_MEDIA)
+    if media:
+        ignore = (root / '.gitignore').read_text().splitlines() if (root / '.gitignore').is_file() else []
+        exceptions = {line[1:].lstrip('/') for line in ignore if line.startswith('!')}
+        missing = sorted(media - exceptions)
+        if missing:
+            raise ValueError('Public media lacks explicit gitignore exception: ' + ', '.join(missing))
     found = set()
     for path in root.rglob("*"):
         parts = path.relative_to(root).parts

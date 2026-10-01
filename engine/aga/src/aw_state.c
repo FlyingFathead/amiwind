@@ -45,8 +45,25 @@ int AW_StateTest(const aw_state_t *state,int kind,const char *id,int comparison,
 }
 int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index)
 {
+    char name[64];int i,quest,known=0;int32_t days,ms;aw_journal_entry_t *entry;
+    if(!key(name,id))return 0;
     if(index<=AW_StateGet(state,AW_JOURNAL,id))return 1;
-    return AW_StateSet(state,AW_JOURNAL,id,index);
+    for(quest=0;quest<state->count[AW_JOURNAL];quest++)
+        if(!strcmp(state->values[AW_JOURNAL][quest].id,name))break;
+    for(i=0;i<state->journal_count;i++)
+        if(state->journal[i].quest==quest && state->journal[i].stage==index)known=1;
+    /* Never advance a quest while silently dropping its new history entry. */
+    if(!known && state->journal_count>=AW_JOURNAL_ENTRIES)return 0;
+    days=AW_StateGet(state,AW_GLOBAL,"amiwind:clock:days");
+    ms=AW_StateGet(state,AW_GLOBAL,"amiwind:clock:ms");
+    if(!AW_StateGet(state,AW_GLOBAL,"amiwind:clock:ready"))ms=32400000;
+    if(days<0 || days>365000 || ms<0 || ms>=86400000)return 0;
+    if(!AW_StateSet(state,AW_JOURNAL,id,index))return 0;
+    if(!known){
+        entry=&state->journal[state->journal_count++];
+        entry->quest=quest;entry->stage=index;entry->days=days;entry->milliseconds=ms;
+    }
+    return 1;
 }
 int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
 {
