@@ -594,6 +594,14 @@ void R_DrawEntitiesOnList (void)
 				if (lighting.ambientlight + lighting.shadelight > 192)
 					lighting.shadelight = 192 - lighting.ambientlight;
 
+                /* The isolated inspection plane promises steady daylight.
+                 * Rest-mesh exports do not yet carry animated vertex normals;
+                 * the world-light clamp otherwise makes every face half dark. */
+                if(AW_GalleryActive() && !strncmp(currententity->model->name,"gallery/",8)) {
+                    lighting.ambientlight=200;
+                    lighting.shadelight=0;
+                }
+
 				R_AliasDrawModel (&lighting);
 			}
 

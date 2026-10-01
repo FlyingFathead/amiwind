@@ -4,10 +4,20 @@
 #include "aw_save.h"
 server_t sv;server_static_t svs;client_state_t cl;viddef_t vid;
 vec3_t vec3_origin;
-keydest_t key_dest=key_game;int scr_copyeverything;
+int scr_copyeverything;
+int mouseX,mouseY;
+qboolean mouse_has_moved,noclip_anglehack;
+kbutton_t in_strafe,in_mlook;
+cvar_t sensitivity={"sensitivity","1",false,1},lookstrafe,m_side,m_pitch,m_yaw,m_forward;
+void V_StopPitchDrift(void){}
+void AW_MenuMouse(int x,int y){}
+int AW_ReaderActive(void){return 0;}
+void AW_ReaderMouse(int x,int y){}
+int AW_CharacterActive(void){return 0;}
+void AW_CharacterMouse(int x,int y){}
 static void (*command)(void);static int argc=1,bad,captures,region_selected;static char *args[4];
 static char queued[64],drawn[8192];
-static int opens,restores,missing_return;
+static int opens,restores,missing_return,many;
 static aw_character_t character;
 void Cmd_AddCommand(char *s,void (*f)(void)){command=f;}
 int Cmd_Argc(void){return argc;}
@@ -22,6 +32,10 @@ void AW_UIFill(int x,int y,int w,int h,int color){}
 int AW_UIColor(int r,int g,int b){return 0;}
 void AW_UIBox(int x,int y,int w,int h){}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
+int AW_UIScrollHit(int mx,int my,int x,int y,int height,int total,int visible,int top){
+ if(mx<x || mx>=x+10 || my<y || my>=y+height || total<=visible)return -1;
+ return my>=y+height-10?total-visible:0;
+}
 void S_LocalSound(char *s){}
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration){}
 eval_t *GetEdictFieldValue(edict_t *e,char *name){return NULL;}
@@ -39,7 +53,10 @@ int COM_FOpenFile(char *s,FILE **f){
         if(missing_return){*f=NULL;return -1;}
         *f=tmpfile();assert(*f);return 124;
     }
-    *f=tmpfile();assert(*f);fputs(bad?"AWG1 1\n1\tCREA\t../../bad\t-\t1\t2\t3\tx\tBad\n":catalog,*f);rewind(*f);return 1;
+    *f=tmpfile();assert(*f);
+    if(many){int i;fputs("AWG1 20\n",*f);for(i=1;i<=20;i++)fprintf(*f,"%d\tNPC_\tm0000000000000003\tm0000000000000004\t10\t8\t35\tresident%d\tResident %d\n",i,i,i);}
+    else fputs(bad?"AWG1 1\n1\tCREA\t../../bad\t-\t1\t2\t3\tx\tBad\n":catalog,*f);
+    rewind(*f);return 1;
 }
 static void draw(void){drawn[0]=0;AW_GalleryDraw();}
 int main(void){
@@ -69,6 +86,23 @@ int main(void){
     AW_GalleryKey(' ',1,0,0);AW_GalleryKey('D',1,0,0);AW_GalleryKey('A',1,0,0);
     AW_GalleryKey(K_ENTER,1,0,0);draw();assert(strstr(drawn,"2 matches"));
     AW_GalleryKey(K_DOWNARROW,1,0,0);AW_GalleryKey(K_ENTER,1,0,0);draw();assert(strstr(drawn,"#12 Dagoth Ur"));
+    many=1;AW_GalleryKey(K_TAB,1,0,0);assert(AW_GalleryModal());
+    {usercmd_t move;memset(&move,0,sizeof(move));cl.viewangles[0]=12;cl.viewangles[1]=91;
+     mouseX=25;mouseY=10;mouse_has_moved=true;IN_Move(&move);
+     assert(cl.viewangles[0]==12 && cl.viewangles[1]==91 && !mouse_has_moved);
+     assert(!move.forwardmove && !move.sidemove && !move.upmove);}
+    assert(Key_AmigaRaw(0x68)==K_PGUP && Key_AmigaRaw(0xe9)==K_PGDN);
+    AW_GalleryKey(Key_AmigaRaw(0x49),1,0,0);draw();assert(strstr(drawn,"Resident 7"));
+    AW_GalleryKey(Key_AmigaRaw(0xc8),1,0,0);draw();assert(strstr(drawn,"Resident 1"));
+    AW_GalleryKey(K_DOWNARROW,1,1,0);draw();assert(strstr(drawn,"Resident 7"));
+    AW_GalleryKey(K_END,1,0,0);draw();assert(strstr(drawn,"Resident 19") && strstr(drawn,"Resident 20"));
+    AW_GalleryKey(K_HOME,1,0,0);
+    AW_GalleryKey(K_MWHEELDOWN,1,0,0);AW_GalleryKey(K_ENTER,1,0,0);draw();assert(strstr(drawn,"#2 Resident 2"));
+    AW_GalleryKey(K_TAB,1,0,0);AW_GalleryMouse(-150,-52); // first row, second line
+    AW_GalleryKey(K_MOUSE1,1,0,0);draw();assert(!AW_GalleryModal() && strstr(drawn,"#1 Resident 1"));
+    AW_GalleryKey(K_TAB,1,0,0);AW_GalleryMouse(145,50); // scrollbar bottom
+    AW_GalleryKey(K_MOUSE1,1,0,0);AW_GalleryKey(K_MOUSE1,0,0,0);draw();assert(strstr(drawn,"Resident 15"));
+    AW_GalleryKey(K_ESCAPE,1,0,0);assert(!AW_GalleryModal());many=0;
     character.level=99;player.v.health=1;missing_return=1;queued[0]=0;
     AW_GalleryKey('x',1,0,1);assert(!queued[0] && !restores);
     missing_return=0;AW_GalleryKey('x',1,0,1);

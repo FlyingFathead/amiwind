@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -843,21 +843,7 @@ void Sys_SendKeyEvents(void)
   UWORD code;
   WORD mousex, mousey;
   struct IntuiMessage *msg;
-  static int xlate[0x68] = {
-    '`', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '0', '-', '=', '\\', 0, '0',
-    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',
-    'o', 'p', K_F11, K_F12, 0, '0', '2', '3',
-    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k',
-    'l', ';', '\'', K_ENTER, 0, '4', '5', '6',
-    K_SHIFT, 'z', 'x', 'c', 'v', 'b', 'n', 'm',
-    ',', '.', '/', 0, '.', '7', '8', '9',
-    K_SPACE, K_BACKSPACE, K_TAB, K_ENTER, K_ENTER, K_ESCAPE, K_F11,
-    0, 0, 0, '-', 0, K_UPARROW, K_DOWNARROW, K_RIGHTARROW, K_LEFTARROW,
-    K_F1, K_F2, K_F3, K_F4, K_F5, K_F6, K_F7, K_F8,
-    K_F9, K_F10, '(', ')', '/', '*', '=', K_PAUSE,
-    K_SHIFT, K_SHIFT, 0, K_CTRL, K_ALT, K_ALT, 0, K_CTRL
-  };
+
 
   if (video_window != NULL) {
     while ((msg = (struct IntuiMessage *)GetMsg (video_window->UserPort)) != NULL) {
@@ -868,14 +854,7 @@ void Sys_SendKeyEvents(void)
       ReplyMsg ((struct Message *)msg);
       switch (class) {
         case IDCMP_RAWKEY:
-          if ((code & 0x80) != 0) {
-            code &= ~0x80;
-            if (code < 0x68)
-              Key_Event (xlate[code], false);
-          } else {
-            if (code < 0x68)
-              Key_Event (xlate[code], true);
-          }
+          if(Key_AmigaRaw(code))Key_Event(Key_AmigaRaw(code),(code & 0x80)==0);
           break;
         case IDCMP_MOUSEBUTTONS:
           switch (code) {

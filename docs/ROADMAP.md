@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-Current work: [Welcome to Balmora RC1](RELEASE-v0.0.24-rc1.md);
+Current work: [Welcome to Balmora RC3](RELEASE-v0.0.24-rc3.md), with final-release fixes in progress;
 [Strider and loading presentation](RELEASE-v0.0.24-dev3.md) remains the preceding checkpoint.
 The earlier [29 September plan](PLAN-2026-09-29.md) retains the preceding work.
 
@@ -49,6 +49,33 @@ ship-exit scene. Performance observations remain separate from measured claims.
   topographic/coverage planning map. Keep this separate from changing gameplay
   coordinates or adding continuous world travel.
 
+## World map, inventory and journal TODO (owner request, 1 October 2026)
+
+These are future gameplay features, separate from the v0.0.24 release fixes.
+
+- [ ] **M: full-screen world map.** Show Morrowind and the player's current
+  position. Reuse the verified local-to-world transform described above; define
+  how interior locations appear without inventing exterior coordinates. Provide
+  a clear return to play, keyboard navigation and mouse pan/zoom where practical.
+- [ ] **I: inventory.** Show the player character beside their items, with
+  readable names, quantities, icons and equipment slots. Support mouse selection
+  and equipping/unequipping, with a visible cursor and keyboard alternatives,
+  following the original game's interaction style.
+- [ ] Connect equipped items to the character preview and persistent player
+  state. Verify slot compatibility, quantities and save/load before allowing
+  equipment changes; opening either screen must capture input from the world.
+- [ ] Measure the map, preview model, item icons and UI memory on the reference
+  Amiga profile. Load their resources on demand and release them on close.
+- [ ] **J: in-game progression journal.** Present an open book with a central
+  fold and two facing pages, page turning, dated entries and clickable topic/quest
+  links. Provide keyboard navigation and a visible pointer, with a route back
+  from linked topics to the current spread. Preserve progression, entry order
+  and journal navigation across save/load. Follow the original journal's book
+  presentation; use scrollbars for indexes or long topic lists where appropriate.
+  Investigate original journal records, quest stages and hyperlink rules before
+  selecting the runtime format; do not assume that the source format is XML.
+
+
 ## Optional field-of-view control
 
 - [ ] Consider an Options FOV slider, subject to measured performance acceptance.
@@ -93,6 +120,42 @@ Save design and pending comparison gates: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md).
 Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
 
 ## Next world-mapping milestone: entire-world terrain inspection
+
+**First world-expansion milestone after v0.0.24 (owner priority, 1 October):**
+build the Vvardenfell main-island topographic map from terrain and its original
+textures. Start with the source game's exterior cells and the existing loading
+method, then fit Seyda Neen and Balmora into that common world space. This
+terrain-first milestone does not imply that every settlement, interior or
+gameplay system is complete.
+
+- [ ] Catalogue the source exterior-cell grid, bounds, terrain heights, texture
+  assignments and water; document the actual cell layout before choosing
+  runtime boundaries. Produce a coverage view with both converted towns marked.
+- [ ] Produce a matching **polygon-density map ("polymapping")**: count source
+  and converted triangles per cell and smaller spatial tiles, including placed
+  copies of buildings and other meshes. Show concentrated geometry as a heatmap
+  alongside terrain and existing region boundaries. Use it to flag candidates
+  for sub-cells, then confirm with visible geometry, collision cost, texture
+  residency, peak heap use and transition measurements. Raw polygon count alone
+  is a screening tool, not a sufficient runtime budget.
+- [ ] Convert and traverse terrain cell by cell, checking texture continuity,
+  shared edges, player coordinates and return crossings. Reuse the current
+  selectable loading methods and measure memory and stalls on the Amiga profile.
+- [ ] Begin with source-cell-sized regions where they fit. Subdivide only after
+  geometry, visibility, collision or memory measurements show the need. Reuse
+  Balmora's overlap/ownership lessons and canonical actor placements.
+- [ ] Investigate logical boundaries in dense settlements, including Vivec:
+  bridges between city sections are candidate crossing points, subject to the
+  actual source-cell layout, sightlines and measured region budgets.
+- [ ] Integrate the existing Seyda Neen and Balmora regions without duplicate
+  terrain, shifted origins or broken door/return links. Compare ground height,
+  materials, water and collision along every join.
+- [ ] Turn the Seyda Neen/Balmora dwelling workflow into reusable conversion
+  stages: source-reference inventory, complete building/interior geometry,
+  entrance and return links, resident/outfit mapping, canonical initial support,
+  and independent packaged-data checks. Carry the documented distant-origin,
+  opening, stair and overlap lessons forward. Emit per-cell exception reports
+  for review instead of silently dropping troublesome dwellings or placements.
 
 - [ ] Export a topomesh of the **entire map's terrain**, with original exterior
   terrain coverage, global coordinates, source-cell IDs and a missing-data report.

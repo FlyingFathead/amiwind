@@ -11,8 +11,9 @@ is to reveal conversion problems before actors are added to more towns.
 | Enter the gallery | `dbg gallery`, `dbg aw charplane`, `dbg modelgallery`, `dbg npcgallery` |
 | Browse friendly names | Tab or B |
 | Search the browser | Type case-insensitive keywords; Enter applies the filter |
-| Move through results | Arrows, wheel, Page Up/Down, Home/End |
-| Show a browser result | Enter after selecting it |
+| Move through results | Arrows, wheel, Page Up/Down; Shift+Up/Down on classic Amiga keyboards |
+| Show a browser result | Enter after selecting it, or click its row |
+| Scroll with the pointer | Click or drag the right-hand scrollbar |
 | Close the browser | Tab or Escape |
 | Next / previous model | Shift+N / Shift+P |
 | Equipped / base body | Shift+B |
@@ -26,6 +27,13 @@ appears only for entries with a converted greeting. Repeated friendly names may
 represent different original records; the browser shows IDs and stable
 conversion numbers as well. Exact-name lookup reports ambiguity and chooses the
 first stable number. Use the original ID to select a particular variant.
+
+The browser draws its own cursor and captures mouse motion from the camera.
+Wheel scrolling remains available. The FS-UAE preset explicitly maps host
+PageUp/PageDown to raw navigation codes 0x68/0x69; its unmodified classic layout
+maps those host keys to keypad ')' and Right Amiga instead. The engine also
+accepts standard extended Amiga page-key codes 0x48/0x49. See
+[FS-UAE keyboard mapping](https://fs-uae.net/docs/keyboard-mapping/).
 
 ## Memory and return state
 
@@ -78,27 +86,30 @@ An optional private `--reviews` JSON maps a model key to `sha256`, `status`
 carries the decision into the next table. A changed asset returns to `unreviewed`;
 conversion success alone never means visual acceptance.
 
-## Optional 777-triangle trial
+## Optional per-model geometry allowance
 
 The original software alias renderer permits 2,000 vertices. The existing
 face-local texture layout consumes three vertices per triangle, so ordinary
 conversions retain their previous 666-triangle budget. The gallery converter can
-trial 777 triangles (2,331 vertices); this does not force every model to grow.
+allow up to 1,024 triangles (3,072 face-local vertices) for a recorded model;
+this does not force every model to grow. The original 777 trial is retained as
+a selectable restrictive cap.
 
 The engine defaults to `aw_allow_poly_budget_over false`. Use
 `aw_allow_poly_budget_over true` and `aw_poly_budget_over_cap auto` to use each
 listed model's recorded allowance. `auto` is the default cap setting, with the
-extension disabled by default. A numeric cap (666–777 in this first trial) adds
+extension disabled by default. A numeric cap (666–1,024) adds
 an overall ceiling; for example `aw_poly_budget_over_cap 777`.
 Both settings persist. Existing shared-vertex models within 2,000 vertices keep
 their original allowance. Invalid cap values are rejected through the console;
 programmatic invalid values cannot enable an oversized render.
 
 The ordinary draw path retains 2,000-vertex work arrays. Only an extended model
-uses the expanded draw frame: 14,564 additional bytes (about 14.2 KiB) for vertex
+uses the expanded draw frame: 47,168 additional bytes (about 46.1 KiB) for vertex
 work arrays, plus that asset's additional model/skin data. The 11 MiB engine arena
-is unchanged. Native stack and frame-time checks are required before this trial
-is accepted. The pre-experiment engine source is retained separately with a
+is unchanged. The measured native draw frames are 88,044 bytes for the original path and
+135,212 bytes for the extended path, within the unchanged 300,000-byte task
+stack. Focused native checks pass; physical-hardware performance remains open. The pre-experiment engine source is retained separately with a
 checksum so the exact original implementation remains recoverable.
 
 ## Per-model budget exceptions
@@ -128,3 +139,27 @@ failed catalogue entries, regenerates byte-specific allowances, and collects
 existing playable-resident greetings. Compile `charplane.map` with the same BSP,
 lighting and standing-hull pipeline used for the runtime. No catalogue/model data
 belongs in the public source ZIP. The gallery inspection table stays private.
+
+## RC3 conversion coverage and authored poses
+
+The base master contains 2,935 NPC/creature records (260 creature records),
+sharing 3,551 distinct equipped/base assets. All 3,551 convert in RC3; 29 require
+the opt-in allowance. The preceding RC2 had 25 failed conversions and three
+smaller trial allowances. No missing entry is hidden or replaced with a generic
+actor. Conversion success remains separate from individual visual acceptance.
+
+`config/gallery_model_quality.json` records targeted profiles. Dagoth Ur keeps
+all 240 mask, 47 crest and 30 neck-piece triangles; the complete model has 903
+triangles and uses 16-pixel face tiles to retain more of the original gold texture.
+Both source records share the same result. Gallery models receive steady daylight
+for inspection; normal scene lighting is unchanged. Skin-tone table repairs
+are documented in [the conversion journal](IMPLEMENTATION_JOURNAL.md#j027--pale-faces-mapped-back-to-sky-grey).
+
+Vivec uses the authored crossed-leg idle-loop key; the cliff racer uses its
+authored airborne idle entry. `gallery/poses.txt` carries their source-derived
+height offsets. The selected model reads that small table only when loaded;
+normal gameplay does not scan it. Nonlinear animation curves are accepted only
+at an exact authored key, outside the key range, or on a constant interval;
+other samples fail explicitly. These two static poses do not implement flight,
+scripted falls, AI or the full animation set. Other creatures retain their rest
+mesh until an inspected pose profile is added.

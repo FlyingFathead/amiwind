@@ -217,7 +217,7 @@ qboolean	Cvar_Command (void)
 
     if(!strcmp(v->name,"aw_poly_budget_over_cap") && Q_strcasecmp(Cmd_Argv(1),"auto")) {
         char *end;long cap=strtol(Cmd_Argv(1),&end,10);
-        if(*end || cap<666 || cap>777){Con_Printf("aw_poly_budget_over_cap requires auto or an integer from 666 to 777 triangles.\n");return true;}
+        if(*end || cap<666 || cap>1024){Con_Printf("aw_poly_budget_over_cap requires auto or an integer from 666 to 1024 triangles.\n");return true;}
     }
     if(AW_BooleanCvar(v->name)) {
         int value=AW_ParseBoolean(Cmd_Argv(1));

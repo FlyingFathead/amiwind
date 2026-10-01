@@ -17,6 +17,8 @@ Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NE
 
 - [J024 — initial NPC support and incomplete overlap collision](#j024--initial-npc-support-and-incomplete-overlap-collision)
 - [J025 — RC2 gallery and bounded geometry exceptions](#j025--rc2-gallery-and-bounded-geometry-exceptions-1-october-2026)
+- [J026 — completing the missing gallery appearances](#j026--completing-the-missing-gallery-appearances)
+- [J027 — pale faces mapped back to sky grey](#j027--pale-faces-mapped-back-to-sky-grey)
 
 - [Verified mapping at checkpoint-014](#verified-mapping-at-checkpoint-014)
 - [J001 — later pier faces disappeared](#j001--later-pier-faces-disappeared)
@@ -859,3 +861,80 @@ setup are measured separately from the complete visible transition. Across both
 directions, method 2 and larger buffers did not consistently beat method 1.
 Retain method 1 as the default and investigate lost return-prefetch reuse before
 raising default RAM costs. Do not present partial-loader time as the visible pause.
+
+## J026 — completing the missing gallery appearances
+
+**Symptom:** RC2 leaves 25 appearances unavailable, while three earlier failures
+fit its 777-triangle trial. **Confirmed cause:** protected torso/clothing panels
+keep more triangles than the nominal allocation. Shrinking the rest of the body
+does not reliably bring those shells below 777. A geometry-only scan finds that
+all 25 fit within 980–1,012 triangles at the normal 480-triangle allocation with
+shell protection retained. The geometry scan and complete conversion have slightly
+different final counts; the completed asset receipt is authoritative.
+
+**Change under final-release validation:** allow up to 1,024 triangles / 3,072
+face-local vertices through the existing opt-in and exact-model allowance table.
+Keep the original 2,000-vertex draw path and default-off extension. Reconvert all
+28 exceptions at the normal detail allocation. Compact the gallery atlas before
+MDL encoding so the intermediate texture does not breach the renderer's existing
+skin-height limit. Numeric caps, including 777, remain restrictive choices;
+`auto` admits only the explicitly recorded models within the hard ceiling.
+
+**Evidence so far:** all 3,551 distinct assets now convert; the allowance audit
+has 28 exceptions and zero unresolved models. All 28 loaded and rendered in the
+native 68040 reference run, followed by gallery return: 861 recorded frames,
+zero surface/edge overflow frames. This establishes availability and focused
+native rendering, not individual visual acceptance of the entire catalogue.
+The 47 host engine checks and six worker-budget tests pass. Final placement and
+walking acceptance remain separate gates.
+
+The worker planner also exposed a misleading memory estimate: a warm container
+could count several gigabytes of clean disk cache as unavailable RAM and choose
+one worker. Count reclaimable clean file cache while excluding tmpfs, dirty
+pages and writeback. Retain the host memory ceiling, CPU quota/affinity and
+quarter-headroom reserve. On this workspace that changes the estimate from one
+worker to five, without treating the resident tmpfs game assets as spare RAM.
+
+## J027 — pale faces mapped back to sky grey
+
+*…and then their faces turned ashen.* What looked like a rough low-polygon
+conversion was also a colour-pipeline fault. Fewer triangles and small texture
+tiles can soften facial detail, but they do not explain warm pixels turning
+blue-grey. The owner had seen the effect for a long time, especially on pale
+Nords and Bretons; darker skin concealed it more readily.
+
+**Symptom:** the owner reports longstanding grey blotches on pale faces, most
+noticeable on Nords and Bretons. The RC2 screenshot identifies Sjorvar Horse-Mouth.
+**Confirmed cause:** status-bar conversion repurposes palette indices 225–253,
+previously duplicate sky colours. Later NPC conversions legitimately choose those
+new warm entries, but the lighting and fog tables still describe the old sky
+bank. At lighting level zero, even index 228 (RGB 209,183,171) maps to index 224
+(RGB 102,119,136). The original facial texture itself is intact.
+
+**Correction under final-release validation:** rebuild the 29 affected columns
+of both lookup tables from the final palette. Preserve existing world-colour
+columns. Full brightness and zero fog preserve each new index; distance fog
+still converges on sky. Update existing palette receipts when reopening a build,
+and reject stale lookups at image packaging. This is offline work: table sizes,
+runtime RAM and per-pixel lookup cost do not increase.
+
+**Evidence:** a synthetic regression catches the warm-to-grey substitution,
+verifies unchanged columns and the final fog endpoint, and rejects malformed
+tables. All four palette checks pass. Matched native Sjorvar views show the warm
+skin restored; this does not certify every face, lighting condition or texture
+seam. RC3 is the first release candidate containing this correction.
+
+Dagoth Ur's separate mask and crest also receive an explicit geometry profile:
+retain their original 240 and 47 triangles, plus the 30-triangle neck piece.
+The resulting 903-triangle model uses the exact-model opt-in allowance, with
+its original gold texture. Both source records share that appearance. The
+isolated gallery is being checked with steady daylight for clearer inspection;
+ordinary scene lighting retains its existing rules.
+
+**Recurrence check:** treat palette, skins, lighting table and fog table as a
+matched set. After reserving or changing any palette bank, regenerate dependent
+lookup columns and verify their hashes before packaging. Test a pale face and a
+darker face at full brightness, ordinary scene lighting and several fog depths.
+Keep a source-texture sample and a matched native before/after view so geometry,
+UV seams, quantization and stale colour tables can be distinguished. A larger
+polygon budget is not a repair for a stale lookup table.

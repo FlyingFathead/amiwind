@@ -24,7 +24,7 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_alias_budget_test.c', [Path(SOURCE)/'src/model.c'])
 
     def test_gallery_lookup_variants_keys_bounds_and_return_scene(self):
-        self.compile_run('aga_gallery_test.c', [Path(SOURCE)/'src/aw_gallery.c'],
+        self.compile_run('aga_gallery_test.c', [Path(SOURCE)/'src'/n for n in ('aw_gallery.c','keys.c','in_amiga.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_npc_visible_head_close_target_and_bounded_ground_contact(self):

@@ -3,7 +3,7 @@
 """Find oversized gallery conversions and emit byte-specific model allowances.
 
 Normal models retain the original budget. Optional retries preserve the existing
-shell/extent protection and use only the tested 777-triangle ceiling. Cases
+shell/extent protection and use only the bounded 1,024-triangle ceiling. Cases
 beyond it remain explicit failures, never progressively crushed to get green.
 All reports and converted assets stay in the owner's private build directory.
 """
@@ -16,7 +16,7 @@ import sys
 import zlib
 from build_jobs import add_jobs
 from build_parallel import ordered_map
-from prepare_gallery import catalogue, convert_model, finish_catalogue
+from prepare_gallery import catalogue, convert_model, finish_catalogue, GALLERY_FACE_LIMIT, EXTENDED_PROFILE
 from mwad.paths import ensure_external
 
 
@@ -26,7 +26,7 @@ def model_allowance(key, raw, receipt):
     digest=hashlib.sha256(raw).hexdigest()
     if digest!=receipt.get('sha256'):raise ValueError('Model bytes differ from conversion receipt')
     if vertices<=2000:return None
-    if vertices>2331 or triangles>777:raise ValueError('Beyond tested renderer ceiling')
+    if vertices>GALLERY_FACE_LIMIT*3 or triangles>GALLERY_FACE_LIMIT:raise ValueError('Beyond renderer ceiling')
     return dict(model='gallery/'+key+'.mdl',vertices=vertices,triangles=triangles,
                 bytes=len(raw),crc32=f'{zlib.crc32(raw):08x}',sha256=digest,
                 reason='Normal conversion exceeds the alias budget while retaining protected geometry.',
@@ -44,7 +44,7 @@ def write_allowances(directory, results, entries, output):
             unresolved.append(dict(model=key,error=str(exc),records=owners));continue
         if exception:exception['records']=owners;exceptions.append(exception)
     Path(output).write_text('AWPB1\n'+''.join(f"{e['model']} {e['vertices']} {e['triangles']} {e['bytes']} {e['crc32']}\n" for e in exceptions))
-    return dict(format=1,normal_vertex_limit=2000,trial_triangle_ceiling=777,
+    return dict(format=1,normal_vertex_limit=2000,trial_triangle_ceiling=GALLERY_FACE_LIMIT,
                 exceptions=exceptions,unresolved=unresolved)
 
 
@@ -58,8 +58,9 @@ def main():
         path=directory/(key+'.json')
         result=json.loads(path.read_text()) if path.is_file() else dict(key=key,status='failed',error='Missing receipt')
         results[key]=result
-        if a.retry and result.get('status')!='ready' and 'Alias' in result.get('error',''):
-            tasks.append((str(a.data_files),str(directory),key,dict(spec,face_limit=777),palette))
+        upgrade=result.get('vertices',0)>2000 and result.get('geometry_profile')!=EXTENDED_PROFILE
+        if a.retry and (upgrade or (result.get('status')!='ready' and 'Alias' in result.get('error',''))):
+            tasks.append((str(a.data_files),str(directory),key,dict(spec,face_limit=GALLERY_FACE_LIMIT),palette))
     print(f'{len(tasks)} oversized models to retry; ordinary models retained.',flush=True)
     for result in ordered_map(convert_model,tasks,a.jobs):
         results[result['key']]=result

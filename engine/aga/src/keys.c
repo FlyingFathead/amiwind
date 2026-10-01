@@ -19,6 +19,35 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 #include "quakedef.h"
 
+/* Native raw keys, including extended PC/Amiga keyboard navigation.
+ * Values follow the SDK libraries/keymap.h definitions. */
+int Key_AmigaRaw(int raw) {
+    static const int xlate[0x68] = {
+    '`', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', '0', '-', '=', '\\', 0, '0',
+    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',
+    'o', 'p', K_F11, K_F12, 0, '0', '2', '3',
+    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k',
+    'l', ';', '\'', K_ENTER, 0, '4', '5', '6',
+    K_SHIFT, 'z', 'x', 'c', 'v', 'b', 'n', 'm',
+    ',', '.', '/', 0, '.', '7', '8', '9',
+    K_SPACE, K_BACKSPACE, K_TAB, K_ENTER, K_ENTER, K_ESCAPE, K_F11,
+    0, 0, 0, '-', 0, K_UPARROW, K_DOWNARROW, K_RIGHTARROW, K_LEFTARROW,
+    K_F1, K_F2, K_F3, K_F4, K_F5, K_F6, K_F7, K_F8,
+    K_F9, K_F10, '(', ')', '/', '*', '=', K_PAUSE,
+    K_SHIFT, K_SHIFT, 0, K_CTRL, K_ALT, K_ALT, 0, K_CTRL
+};
+    raw&=0x7f;
+    /* FS-UAE's classic layout sends PageDown as Right Amiga. The supplied
+     * preset instead uses its explicit unused-key actions 68/69. */
+    if(raw==0x48 || raw==0x68)return K_PGUP;
+    if(raw==0x49 || raw==0x69)return K_PGDN;
+    if(raw==0x70)return K_HOME;
+    if(raw==0x71)return K_END;
+    return raw<0x68?xlate[raw]:0;
+}
+
+
 /*
 
 key up events are sent even if in console mode

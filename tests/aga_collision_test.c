@@ -38,6 +38,30 @@ int main(void) {
  a[0]=80;a[1]=0;b[0]=80;b[1]=0;hit=SV_ClipMoveToEntity(&ent,a,mins,maxs,b);
  assert(hit.fraction==1); /* Former invisible collider must no longer exist. */
  {
+  /* Overlapping translated brush partitions used to spend the contact margin
+   * on the inner split, returning a point inside the outer platform. The next
+   * frame's stuck recovery then silently undid otherwise successful walking. */
+  trace_t standing;
+  memset(&ent,0,sizeof(ent));ent.v.modelindex=1;ent.v.solid=SOLID_BSP;ent.v.movetype=MOVETYPE_PUSH;
+  ent.v.origin[2]=37.59418f;
+  for(i=0;i<2;i++){
+   memset(&planes[i],0,sizeof(planes[i]));planes[i].type=2;planes[i].normal[2]=1;
+   nodes[i].planenum=i;nodes[i].children[1]=CONTENTS_SOLID;
+  }
+  planes[0].dist=50.828125f;planes[1].dist=50.859375f;
+  nodes[0].children[0]=1;nodes[1].children[0]=CONTENTS_EMPTY;
+  model.hulls[1].lastclipnode=1;
+  a[0]=b[0]=0;a[1]=b[1]=0;a[2]=89;b[2]=87;
+  hit=SV_ClipMoveToEntity(&ent,a,mins,maxs,b);
+  assert(!hit.startsolid && hit.fraction>0 && hit.fraction<1);
+  assert(hit.endpos[2]>88.47f && hit.endpos[2]<88.50f && hit.plane.normal[2]>.99f);
+  standing=SV_ClipMoveToEntity(&ent,hit.endpos,mins,maxs,hit.endpos);
+  assert(!standing.startsolid && !standing.allsolid);
+  /* A sweep starting inside may exit the union; never fabricate a surface. */
+  standing=SV_ClipMoveToEntity(&ent,b,mins,maxs,a);
+  assert(standing.startsolid && !standing.allsolid && standing.fraction==1);
+ }
+ {
   trace_t floor,exit;
   memset(&floor,0,sizeof floor);memset(&exit,0,sizeof exit);
   floor.fraction=.4;floor.endpos[2]=24;floor.plane.normal[2]=1;

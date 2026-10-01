@@ -15,7 +15,9 @@ class GalleryBudgetTests(unittest.TestCase):
         self.assertEqual(model_allowance('test',raw,receipt)['triangles'],765)
         raw[20]=1
         with self.assertRaisesRegex(ValueError,'receipt'):model_allowance('test',raw,receipt)
-        struct.pack_into('<ii',raw,60,2334,778);receipt['sha256']=hashlib.sha256(raw).hexdigest()
+        struct.pack_into('<ii',raw,60,3036,1012);receipt['sha256']=hashlib.sha256(raw).hexdigest()
+        self.assertEqual(model_allowance('test',raw,receipt)['triangles'],1012)
+        struct.pack_into('<ii',raw,60,3075,1025);receipt['sha256']=hashlib.sha256(raw).hexdigest()
         with self.assertRaisesRegex(ValueError,'ceiling'):model_allowance('test',raw,receipt)
         struct.pack_into('<ii',raw,60,1998,666);receipt['sha256']=hashlib.sha256(raw).hexdigest()
         self.assertIsNone(model_allowance('test',raw,receipt))

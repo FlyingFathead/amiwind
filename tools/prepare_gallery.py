@@ -13,6 +13,7 @@ import json
 import struct
 from pathlib import Path
 import sys
+from functools import lru_cache
 import numpy as np
 from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
@@ -28,11 +29,27 @@ from build_jobs import add_jobs
 
 _assets = None
 _skeletons = {}
+GALLERY_FACE_LIMIT = 1024
+EXTENDED_PROFILE = 'protected-480-v2'
+
+@lru_cache(maxsize=1)
+def quality_profiles():
+    path=Path(__file__).resolve().parents[1]/'config/gallery_model_quality.json'
+    report=json.loads(path.read_text())
+    if report.get('format')!=1:raise ValueError('Unknown gallery quality profile')
+    return report['profiles']
+
+def model_quality(spec):
+    return quality_profiles().get(normpath(spec.get('mesh',''))) if spec['kind']=='CREA' else None
 
 
-def creature_shapes(assets, mesh):
+def creature_shapes(assets, mesh, pose_event=None):
     """Sample the authored rest transforms, including skin inverse bind matrices."""
-    packet, materials, bounds, skipped = model_geometry(assets.read(normpath('meshes/' + mesh)), nif_reader(),repair_uv=True)
+    pose=None
+    if pose_event:
+        skeleton=Skeleton(assets,normpath('meshes/'+mesh))
+        pose=skeleton.pose(skeleton.events[pose_event])
+    packet, materials, bounds, skipped = model_geometry(assets.read(normpath('meshes/' + mesh)), nif_reader(),repair_uv=True,pose_world=pose)
     vertices, faces, _ = unpack_geometry(packet)
     v = np.array(vertices); f = np.array(faces, dtype=int); shapes = []; textures = {}
     for i, material in enumerate(materials):
@@ -64,13 +81,21 @@ def compact_atlas(raw):
 def convert_model(task):
     global _assets
     data, output, key, spec, palette = task
+    quality=model_quality(spec)
+    quality_id=hashlib.sha256(json.dumps(quality,sort_keys=True).encode()).hexdigest() if quality else ''
+    atlas_profile='face16-v1' if quality and quality.get('atlas_tile')==16 else 'face8-v1'
     face_limit=spec.get('face_limit',666)
+    if quality:face_limit=GALLERY_FACE_LIMIT
     path = Path(output) / (key + '.mdl'); receipt = path.with_suffix('.json')
     if path.is_file() and receipt.is_file():
         saved = json.loads(receipt.read_text())
         raw=path.read_bytes()
-        if saved.get('sha256') == hashlib.sha256(raw).hexdigest():
-            if saved.get('atlas_profile')!='face8-v1':
+        needs_upgrade=(face_limit==GALLERY_FACE_LIMIT and saved.get('vertices',0)>2000
+                       and saved.get('geometry_profile')!=EXTENDED_PROFILE)
+        needs_upgrade=needs_upgrade or saved.get('quality_profile','')!=quality_id
+        needs_upgrade=needs_upgrade or (atlas_profile=='face16-v1' and saved.get('atlas_profile')!=atlas_profile)
+        if not needs_upgrade and saved.get('sha256') == hashlib.sha256(raw).hexdigest():
+            if saved.get('atlas_profile')!=atlas_profile:
                 raw=compact_atlas(raw);path.write_bytes(raw)
                 saved.update(atlas_profile='face8-v1',bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
                 receipt.write_text(json.dumps(saved,indent=2)+'\n')
@@ -86,22 +111,32 @@ def convert_model(task):
             times, _ = skeleton.idle_times(1)
             shapes, materials, textures = assemble(_assets, appearance, skeleton, times)
         else:
-            shapes, materials, textures, source_repairs = creature_shapes(_assets, spec['mesh'])
+            shapes, materials, textures, source_repairs = creature_shapes(_assets, spec['mesh'],quality.get('pose_event') if quality else None)
         points = np.concatenate([s['positions'][0] for s in shapes]); low = points.min(0); high = points.max(0)
         # Gallery translation only: retain original scale and shape proportions.
         shift = np.array([(low[0]+high[0])/2, (low[1]+high[1])/2, low[2]])
         for shape in shapes: shape['positions'] -= shift
-        for budget in (480, 384, 320, 256, 192):
+        budgets=(quality['budget'],) if quality else ((480,) if face_limit==GALLERY_FACE_LIMIT else (480,384,320,256,192))
+        for budget in budgets:
             try:
-                frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget,face_limit=face_limit)
-                raw = compact_atlas(animated_mdl(frames, faces, uv, skin,vertex_limit=2331)); break
+                frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget,face_limit=face_limit,
+                    minimum_faces=quality['minimum_faces'] if quality else None)
+                # Compact before encoding: 1,024 face tiles become a 256x256
+                # skin. No oversized intermediate MDL or relaxed skin limit.
+                skin=skin.crop((0,0,skin.width,((len(faces)+31)//32)*16))
+                if atlas_profile=='face8-v1':
+                    skin=skin.resize((skin.width//2,skin.height//2),Image.Resampling.NEAREST);uv=uv//2
+                raw = animated_mdl(frames,faces,uv,skin,vertex_limit=GALLERY_FACE_LIMIT*3); break
             except ValueError as exc:
-                if 'Alias' not in str(exc) or budget == 192: raise
+                if 'Alias' not in str(exc) or budget == budgets[-1]: raise
         path.write_bytes(raw)
         result = dict(key=key, status='ready', source_bounds=[low.tolist(), high.tolist()],
                       dimensions=(high-low).tolist(), triangles=len(faces), vertices=frames.shape[1], bytes=len(raw),
-                      face_limit=face_limit,
-                      sha256=hashlib.sha256(raw).hexdigest(),atlas_profile='face8-v1',source_repairs=source_repairs)
+                      face_limit=face_limit,geometry_profile=EXTENDED_PROFILE if face_limit==GALLERY_FACE_LIMIT else 'normal-v1',
+                      quality_profile=quality_id,quality_settings=quality,
+                      gallery_lift=max(0,float(low[2])) if quality and quality.get('preserve_airborne') else 0,
+                      palette_sha256=hashlib.sha256(palette).hexdigest(),
+                      sha256=hashlib.sha256(raw).hexdigest(),atlas_profile=atlas_profile,source_repairs=source_repairs)
     except Exception as exc:
         result = dict(key=key, status='failed', error=type(exc).__name__ + ': ' + str(exc))
     receipt.write_text(json.dumps(result, indent=2) + '\n'); return result
@@ -204,6 +239,8 @@ def finish_catalogue(entries,results,out,palette,reviews=None):
         models_ = [k if r['status'] == 'ready' else '-' for k, r in zip(e['models'], e['variants'])]
         lines.append('\t'.join([str(e['number']), e['kind'], *models_, *(f'{v:.5f}' for v in e['dimensions']), safe_label(e['id']), safe_label(e['name'])]))
     (models/'catalog.txt').write_text('\n'.join(lines)+'\n', encoding='ascii')
+    (models/'poses.txt').write_text('AWGP1\n'+''.join(f"{key}\t{r['gallery_lift']:.5f}\n"
+        for key,r in sorted(results.items()) if r.get('status')=='ready' and r.get('gallery_lift',0)>0),encoding='ascii')
     (out/'gallery-audit.json').write_text(json.dumps(dict(entries=entries, models=results), indent=2)+'\n')
     inspection_table(entries,results,models/'inspection.tsv',reviews)
     gallery_map(out, palette)

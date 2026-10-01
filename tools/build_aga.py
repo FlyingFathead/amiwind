@@ -151,6 +151,10 @@ def image(args):
         except FileNotFoundError:
             print('[warning] Original font inputs missing; readable UI fallback retained.',flush=True)
     from prepare_logo import prepare_logo,prepare_menu_logo
+    # NPC skins can use the palette bank first introduced for status bars.
+    # A copied old lighting table maps those colours back to grey sky pixels.
+    from ui_palette import sync_lookups
+    sync_lookups(boot/'id1',check=True)
     logo=ROOT/'resources/media/AmiWind_wordmark.png'
     prepare_menu_logo(logo,boot/'id1/gfx/palette.lmp',boot/'id1/gfx/amiwind.awi')
     logo_stream=boot/'id1/intro/amiwind.awv'

@@ -14,6 +14,7 @@ static gallery_entry_t current;
 static int count,selected,body,editing,session,returning,help;
 static gallery_entry_t *page;
 static int page_indices[GALLERY_PAGE],page_top,page_count,page_total,page_selected,filtering;
+static int mouse_x,mouse_y,mouse_visible,scroll_drag;
 static char filter[96];
 static aw_save_t *back_state;
 typedef struct {char sound[96],text[2048];float duration;} gallery_voice_t;
@@ -24,6 +25,7 @@ static vec3_t back_origin,back_angles;
 static float back_move,back_health,back_hand_goal;
 
 int AW_GalleryActive(void){return sv.active && !strcmp(sv.name,"charplane");}
+int AW_GalleryModal(void){return AW_GalleryActive() && key_dest==key_game && (page || help || editing);}
 static void normalize(const char *in,char *out) {
     int n=0;unsigned char c;
     while((c=(unsigned char)*in++) && n<95){
@@ -127,7 +129,7 @@ static int keyword_match(const gallery_entry_t *e,const char *search) {
     }
     return 1;
 }
-static void close_browser(void){if(page){free(page);page=NULL;}filtering=0;}
+static void close_browser(void){if(page){free(page);page=NULL;}filtering=scroll_drag=mouse_visible=0;}
 static int read_page(int top) {
     FILE *f=NULL;char text[512],extra;gallery_entry_t e;int total,i,n=0;
     page_count=page_total=0;
@@ -147,8 +149,33 @@ static void open_browser(void) {
     if(!page)page=(gallery_entry_t *)malloc(sizeof(*page)*GALLERY_PAGE);
     if(!page){strcpy(notice,"Not enough memory for the gallery browser.");return;}
     help=editing=0;filter[0]=0;filtering=1;read_page(0);IN_AWClearButtons();
+    mouse_x=vid.width/2;mouse_y=vid.height/2;mouse_visible=1;scroll_drag=0;
 }
 static int page_rows(void){int n=(vid.height-76)/(2*AW_ConsoleCharHeight()+2);if(n<1)n=1;if(n>GALLERY_PAGE)n=GALLERY_PAGE;return n;}
+static int mouse_row(void) {
+    int h=AW_ConsoleCharHeight(),top=22+3*h,row;
+    if(mouse_x<6 || mouse_x>=vid.width-22 || mouse_y<top)return -1;
+    row=(mouse_y-top)/(2*h+2);
+    return row<page_count && row<page_rows()?row:-1;
+}
+static void scroll_mouse(void) {
+    int h=AW_ConsoleCharHeight(),top=22+3*h,height=page_rows()*(2*h+2),y=mouse_y,n;
+    if(y<top)y=top;
+    if(y>=top+height)y=top+height-1;
+    n=AW_UIScrollHit(vid.width-14,y,vid.width-18,top,height,page_total,page_rows(),page_top);
+    if(n>=0 && n!=page_top)read_page(n);
+}
+void AW_GalleryMouse(int dx,int dy) {
+    int row;
+    if(!AW_GalleryModal() || !page || (!dx && !dy))return;
+    mouse_visible=1;mouse_x+=dx;mouse_y+=dy;
+    if(mouse_x<0)mouse_x=0;
+    if(mouse_x>=vid.width)mouse_x=vid.width-1;
+    if(mouse_y<0)mouse_y=0;
+    if(mouse_y>=vid.height)mouse_y=vid.height-1;
+    if(scroll_drag){scroll_mouse();return;}
+    row=mouse_row();if(row>=0){page_selected=row;filtering=0;}
+}
 static void reload(void) {
     close_browser();read_voice();editing=help=0;key_dest=key_game;IN_AWClearButtons();Cbuf_InsertText("map charplane\n");
 }
@@ -214,12 +241,24 @@ static int gallery_budget(const char *path) {
     return 1;
 }
 /* Called before server baseline creation, while precaching is still legal. */
+static float model_lift(void) {
+    FILE *f=NULL;char line[96],*tab,*end;float lift=0,value;
+    if(COM_FOpenFile("gallery/poses.txt",&f)<0 || !f)return 0;
+    if(fgets(line,sizeof(line),f) && !strcmp(line,"AWGP1\n"))while(fgets(line,sizeof(line),f)){
+        tab=strchr(line,'\t');if(!tab)break;*tab++=0;
+        value=(float)strtod(tab,&end);
+        if((*end!='\n' && *end) || !(value>=0 && value<=1024))break;
+        if(!strcmp(line,current.model[body])){lift=value;break;}
+    }
+    fclose(f);return lift;
+}
 void AW_GalleryEntities(void) {
-    int i,j;edict_t *e;model_t *m;
+    int i,j;edict_t *e;model_t *m;float lift;
     if(strcmp(sv.name,"charplane") || !session)return;
     if(!strcmp(current.model[body],"-")){strcpy(notice,"Conversion failed; see the private gallery audit.");return;}
     sprintf(model_path[0],"gallery/%s.mdl",current.model[body]);
     sprintf(model_path[1],"gallery/f%s.mdl",current.model[body]+1);
+    lift=model_lift();
     for(j=0;j<2;j++){
         if(!gallery_budget(model_path[j])){if(!notice[0])strcpy(notice,"Selected model is missing or invalid.");continue;}
         m=Mod_ForName(model_path[j],false);
@@ -230,7 +269,7 @@ void AW_GalleryEntities(void) {
         e=ED_Alloc();e->v.model=ED_NewString(model_path[j])-pr_strings;e->v.modelindex=i;
         e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_NOT;
         if(!j)for(i=0;i<3;i++)current.size[i]=m->maxs[i]-m->mins[i];
-        e->v.origin[2]=j?0.35f:0.25f-m->mins[2];SV_LinkEdict(e,false);
+        e->v.origin[2]=j?0.35f:0.25f-m->mins[2]+lift;SV_LinkEdict(e,false);
     }
     Con_Printf("Gallery #%ld %s: %s (%s)\n",(long)current.number,current.id,current.name,body?"base body":"equipped");
 }
@@ -267,16 +306,28 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     if(key==K_F1){if(down){close_browser();editing=0;help=!help;IN_AWClearButtons();}return 1;}
     if(help){if(down && key==K_ESCAPE)help=0;return 1;}
     if(page){
+        if(key==K_MOUSE1 && !down){scroll_drag=0;return 1;}
         if(!down)return 1;
         if(key==K_ESCAPE || key==K_TAB){close_browser();IN_AWClearButtons();return 1;}
         rows=page_rows();
+        if(key==K_MOUSE1){
+            int h=AW_ConsoleCharHeight(),top=22+3*h,height=rows*(2*h+2);
+            n=AW_UIScrollHit(mouse_x,mouse_y,vid.width-18,top,height,page_total,rows,page_top);
+            if(n>=0){filtering=0;scroll_drag=mouse_y>=top+10 && mouse_y<top+height-10;if(n!=page_top)read_page(n);return 1;}
+            n=mouse_row();
+            if(n>=0){current=page[n];selected=page_indices[n];notice[0]=0;reload();}
+            else if(mouse_y>=10+h && mouse_y<14+2*h)filtering=1;
+            return 1;
+        }
+        if(shift && key==K_UPARROW)key=K_PGUP;
+        if(shift && key==K_DOWNARROW)key=K_PGDN;
         if(key==K_ENTER){
             if(filtering){read_page(0);filtering=0;}
             else if(page_count){current=page[page_selected];selected=page_indices[page_selected];notice[0]=0;reload();}
             return 1;
         }
         if(key==K_DOWNARROW || key==K_MWHEELDOWN){
-            if(filtering){filtering=0;return 1;}
+            if(filtering)filtering=0;
             if(page_top+page_selected+1<page_total){
                 if(page_selected+1<rows && page_selected+1<page_count)page_selected++;
                 else read_page(page_top+rows);
@@ -333,7 +384,7 @@ void AW_GalleryDraw(void) {
     char text[160];int y,h=AW_ConsoleCharHeight(),w=AW_ConsoleCharWidth(),i,rows;
     extern int scr_copyeverything;
     static const char *guide[]={"Character Model Gallery","Tab / B: browse friendly names","Type keywords; Enter: apply filter",
-        "Arrows / wheel / PgUp/PgDn: browse","Enter: show the selected character","Shift+N / Shift+P: next / previous",
+        "Arrows / wheel / PgUp/PgDn: browse","Shift+Up/Down: page on Amiga keys","Enter / click: show character","Shift+N / Shift+P: next / previous",
         "Shift+B: equipped / base body","Enter (in gallery): exact ID/name/#","WASD + mouse: inspect at true scale",
         "E: converted greeting, when available",
         "Ctrl+X: return to the captured game","F10: console; dbg gallery exit","F1 / Esc: close this help"};
@@ -367,7 +418,13 @@ void AW_GalleryDraw(void) {
         }
         AW_UIScrollbar(vid.width-18,22+3*h,rows*(2*h+2),page_total,rows,page_top);
         if(notice[0])text_at(8,vid.height-h-5,notice,(vid.width-16)/w);
-        else text_at(8,vid.height-h-5,"Type keywords; arrows/page keys browse",(vid.width-16)/w);
+        else text_at(8,vid.height-h-5,"Wheel/page keys; click to show",(vid.width-16)/w);
+        if(mouse_visible){
+            int ink=AW_UIColor(255,230,160),dark=AW_UIColor(0,0,0);
+            AW_UIFill(mouse_x,mouse_y,2,9,dark);AW_UIFill(mouse_x,mouse_y,7,2,dark);
+            AW_UIFill(mouse_x+1,mouse_y+1,1,7,ink);AW_UIFill(mouse_x+1,mouse_y+1,5,1,ink);
+            AW_UIFill(mouse_x+2,mouse_y+2,3,3,ink);
+        }
     }
     scr_copyeverything=1;
 }

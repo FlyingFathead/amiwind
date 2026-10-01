@@ -62,7 +62,7 @@ def bsa_read(bsa, name):
     return raw
 
 
-def model_geometry(raw, N, collision=False, repair_uv=False):
+def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
     import numpy as np
     if not raw.startswith(b'NetImmerse File Format, Version 4.0.0.2\n'):
         raise ValueError('Only base-game TES3 NIF 4.0.0.2 is supported')
@@ -73,6 +73,7 @@ def model_geometry(raw, N, collision=False, repair_uv=False):
     def collect(node, parent):
         if not isinstance(node, N.NiAVObject):return
         transform = np.array(node.get_transform().as_list()) @ parent
+        if pose_world and isinstance(node,N.NiNode):transform=pose_world(node.name.decode('cp1252'))
         worlds[id(node)] = transform
         for child in getattr(node, 'children', []):
             if child is not None:collect(child, transform)
@@ -83,7 +84,7 @@ def model_geometry(raw, N, collision=False, repair_uv=False):
         name = node.name.decode('cp1252')
         in_collision = in_collision or isinstance(node, N.RootCollisionNode) or name.casefold() == 'rootcollisionnode'
         hidden = hidden or bool(node.flags & 1)
-        transform = np.array(node.get_transform().as_list()) @ parent
+        transform = worlds[id(node)]
         if isinstance(node, N.NiTriShape) and (in_collision if collision else not hidden and not in_collision):
             g = node.data
             if g is None or not g.num_vertices or not g.num_triangles:

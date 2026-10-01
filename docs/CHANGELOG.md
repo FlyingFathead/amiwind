@@ -1,5 +1,14 @@
 # Development history
 
+## v0.0.24-rc3 — 1 October 2026
+
+Owner-requested recovery candidate: complete gallery conversion, bounded exact-model
+allowances up to 1,024 triangles, preserved Dagoth mask detail, two authored airborne
+inspection poses, repaired skin-tone lookup tables, gallery cursor/paging and a
+collision-trace correction for the three RC2 walking stalls. Adds the island
+terrain/polygon-density plan and M/I/J interface roadmap. The 23 strict ground
+contact findings remain open. See [scope and evidence](RELEASE-v0.0.24-rc3.md).
+
 ## v0.0.24-rc2 — 1 October 2026
 
 Interim owner-testing checkpoint: gallery browser/help/return, bounded per-model

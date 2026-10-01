@@ -34,9 +34,9 @@ int AW_AliasBudgetAllows(int vertices,int triangles) {
     if(vertices<1 || vertices>MAXALIASVERTS || triangles<1)return 0;
     if(vertices<=2000)return 1;
     if(!aw_allow_poly_budget_over.value)return 0;
-    if(!Q_strcasecmp(aw_poly_budget_over_cap.string,"auto"))cap=777;
+    if(!Q_strcasecmp(aw_poly_budget_over_cap.string,"auto"))cap=1024;
     else {
-        if(!(aw_poly_budget_over_cap.value>=666 && aw_poly_budget_over_cap.value<=777))return 0;
+        if(!(aw_poly_budget_over_cap.value>=666 && aw_poly_budget_over_cap.value<=1024))return 0;
         cap=(int)aw_poly_budget_over_cap.value;if(aw_poly_budget_over_cap.value!=cap)return 0;
     }
     return triangles<=cap && vertices<=cap*3;

@@ -221,7 +221,7 @@ void	R_ZDrawSubmodelPolys (model_t *clmodel);
 // Alias models
 //=========================================================
 
-#define MAXALIASVERTS		2331	/* 777 face-local triangles; measured gallery trial. */
+#define MAXALIASVERTS		3072	/* 1,024 face-local triangles; per-model opt-in. */
 #define ALIAS_Z_CLIP_PLANE	5
 
 extern int				numverts;

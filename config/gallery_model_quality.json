@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "profiles": {
+    "r/dagothr.nif": {
+      "id": "dagoth-mask-v1",
+      "reason": "Retain the original mask and crest geometry and gold texture detail.",
+      "budget": 1000,
+      "atlas_tile": 16,
+      "minimum_faces": {"Tri neckpart": 30, "Tri mask": 240, "Tri maskpart": 47}
+    },
+    "r/lordvivec.nif": {
+      "id": "vivec-authored-idle-v1",
+      "reason": "Use the authored crossed-leg idle loop pose and retain its height above the source origin.",
+      "budget": 480,
+      "minimum_faces": {},
+      "pose_event": "idle2: loop start",
+      "preserve_airborne": true
+    },
+    "r/cliffracer.nif": {
+      "id": "cliffracer-authored-idle-v1",
+      "reason": "Use the authored airborne idle entry pose, without approximating unsupported animation curves.",
+      "budget": 480,
+      "minimum_faces": {},
+      "pose_event": "idle: start",
+      "preserve_airborne": true
+    }
+  }
+}

@@ -12,12 +12,22 @@ def available_memory():
         rows=dict(line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())
         candidates.append(int(rows['MemAvailable'].split()[0])*1024)
     except (OSError,ValueError,KeyError,IndexError):pass
-    for limit_path,used_path in (
-        ('/sys/fs/cgroup/memory.max','/sys/fs/cgroup/memory.current'),
-        ('/sys/fs/cgroup/memory/memory.limit_in_bytes','/sys/fs/cgroup/memory/memory.usage_in_bytes')):
+    for limit_path,used_path,stat_path in (
+        ('/sys/fs/cgroup/memory.max','/sys/fs/cgroup/memory.current','/sys/fs/cgroup/memory.stat'),
+        ('/sys/fs/cgroup/memory/memory.limit_in_bytes','/sys/fs/cgroup/memory/memory.usage_in_bytes',None)):
         try:
             limit=int(Path(limit_path).read_text());used=int(Path(used_path).read_text())
-            if 0<limit<1<<60:candidates.append(max(0,limit-used))
+            reclaimable=0
+            if stat_path:
+                try:
+                    stats=dict(line.split() for line in Path(stat_path).read_text().splitlines())
+                    # Clean disk cache can be evicted. tmpfs, dirty pages and
+                    # writeback are not free worker memory. Keep the host's
+                    # MemAvailable ceiling and the separate worker reserve.
+                    reclaimable=max(0,int(stats['file'])-int(stats['shmem'])-
+                                    int(stats['file_dirty'])-int(stats['file_writeback']))
+                except (OSError,ValueError,KeyError):pass
+            if 0<limit<1<<60:candidates.append(max(0,limit-used+min(used,reclaimable)))
         except (OSError,ValueError):pass
     return min(candidates) if candidates else None
 

@@ -52,3 +52,18 @@ class JobTests(unittest.TestCase):
             return values[str(path)]
         with patch.object(Path,'read_text',read):
             self.assertEqual(available_memory(),1024**3)
+
+    def test_clean_disk_cache_is_reclaimable_but_tmpfs_and_dirty_pages_are_not(self):
+        mib=1024**2
+        values={'/proc/meminfo':'MemAvailable: 8388608 kB\n',
+                '/sys/fs/cgroup/memory.max':str(4096*mib),
+                '/sys/fs/cgroup/memory.current':str(4000*mib),
+                '/sys/fs/cgroup/memory.stat':
+                    f'file {3000*mib}\nshmem {1000*mib}\nfile_dirty {100*mib}\nfile_writeback {50*mib}\n'}
+        def read(path):
+            if str(path) not in values:raise OSError
+            return values[str(path)]
+        with patch.object(Path,'read_text',read):
+            self.assertEqual(available_memory(),1946*mib)
+            values['/sys/fs/cgroup/memory.stat']='file 123\n' # incomplete: conservative fallback
+            self.assertEqual(available_memory(),96*mib)

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Use the scene's redundant sky entries for original status-bar colours.
 
-No world texture, lighting lookup or console font is changed. Refuse a scene
-that already uses those slots instead of silently recolouring its geometry.
+Keep existing world pixels and their lighting unchanged. Rebuild the lookup
+columns for the new colours: later NPC conversions may legitimately use them.
+Refuse an unreserved scene that already uses those slots.
 """
 import hashlib,io,json,struct
 from pathlib import Path
@@ -10,6 +11,35 @@ from PIL import Image
 from player_hull import lumps
 
 RESERVED=set(range(225,254))
+
+def lookup_columns(palette, name):
+    """Exact nearest colours for the repurposed bank; no runtime work needed."""
+    import numpy as np
+    if len(palette)!=768:raise ValueError('Expected a 256-colour palette')
+    colours=np.frombuffer(palette,dtype=np.uint8).reshape(256,3).astype(float)
+    bank=colours[225:254]
+    if name=='colormap.lmp':
+        target=np.array([bank*max(.15,1-level/63) for level in range(64)])
+    elif name=='fog.lmp':
+        target=np.array([bank*(1-level/15)+colours[224]*(level/15) for level in range(16)])
+    else:raise ValueError('Unknown palette lookup '+name)
+    result=np.argmin(((target[:,:,None,:]-colours[None,None,:,:])**2).sum(3),axis=2).astype(np.uint8)
+    # Preserve exact authored indices at full light / no fog, including duplicates.
+    result[0]=np.arange(225,254,dtype=np.uint8)
+    return result
+
+def sync_lookups(game, check=False):
+    """Repair or verify only the 29 changed columns in both offline tables."""
+    game=Path(game);palette=(game/'gfx/palette.lmp').read_bytes();report={}
+    for name,rows in (('colormap.lmp',64),('fog.lmp',16)):
+        path=game/'gfx'/name;raw=path.read_bytes()
+        if len(raw)!=rows*256:raise ValueError('Invalid palette lookup size: '+name)
+        expected=bytearray(raw);columns=lookup_columns(palette,name)
+        for row in range(rows):expected[row*256+225:row*256+254]=columns[row].tobytes()
+        if check and raw!=expected:raise ValueError('Stale palette lookup: '+name)
+        if raw!=expected:path.write_bytes(expected)
+        report[name]=hashlib.sha256(expected).hexdigest()
+    return report
 
 def check_pixels(raw,label):
     if RESERVED.intersection(raw):raise ValueError('UI palette slots already used by '+label)
@@ -70,6 +100,8 @@ def reserve(data,game):
     if marker.exists():
         report=json.loads(marker.read_text())
         if hashlib.sha256(old).hexdigest()!=report['palette_sha256']:raise ValueError('UI palette receipt mismatch')
+        report['lookup_sha256']=sync_lookups(game)
+        marker.write_text(json.dumps(report,indent=2)+'\n')
         return report
     if len(old)!=768 or any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED):raise ValueError('Scene has no redundant UI palette bank')
     check_scene(game)
@@ -83,4 +115,5 @@ def reserve(data,game):
     report={'format':'AmiWind reserved UI palette 1','indices':[225,253],
             'world_pixels_unchanged':True,'console_font_unchanged':True,'sources':sources,
             'previous_palette_sha256':hashlib.sha256(old).hexdigest(),'palette_sha256':hashlib.sha256(new).hexdigest()}
+    report['lookup_sha256']=sync_lookups(game)
     marker.write_text(json.dumps(report,indent=2)+'\n');return report

@@ -41,13 +41,20 @@ class Assets:
             except KeyError:pass
         raise ValueError('Missing texture '+name)
 
-def blend_keys(times, values, time, quaternion=False):
+def blend_keys(times, values, time, quaternion=False, interpolation=1):
     """Clamp linear keys; spherical interpolation for unit quaternions (wxyz)."""
     if not len(times):raise ValueError('Empty key channel')
     hi=bisect.bisect_right(times,time)
     if hi==0:return values[0].copy()
     if hi==len(times):return values[-1].copy()
     lo=hi-1;u=(time-times[lo])/(times[hi]-times[lo]);a=values[lo];b=values[hi]
+    if interpolation!=1:
+        # A static inspection pose may use an exact authored key or a constant
+        # interval without approximating unsupported TBC/quadratic curves.
+        if abs(time-times[lo])<=1e-5:return a.copy()
+        if abs(time-times[hi])<=1e-5:return b.copy()
+        if np.allclose(a,b,rtol=0,atol=1e-7) or (quaternion and np.allclose(a,-b,rtol=0,atol=1e-7)):return a.copy()
+        raise ValueError('Nonlinear key interval needs its authored interpolation')
     if quaternion:
         a=a/np.linalg.norm(a);b=b/np.linalg.norm(b);dot=float(a@b)
         if dot<0:b=-b;dot=-dot
@@ -87,18 +94,19 @@ class Skeleton:
                 if isinstance(c,self.N.NiKeyframeController) and c.data:
                     d=c.data
                     if d.num_rotation_keys:
-                        if d.rotation_type!=1:raise ValueError('Unsupported rotation keys on required bone '+name)
+                        if d.rotation_type not in (1,2,3):raise ValueError('Unsupported rotation keys on required bone '+name)
                         channels['rotation']=([k.time for k in d.quaternion_keys],np.array([[k.value.w,k.value.x,k.value.y,k.value.z] for k in d.quaternion_keys]))
+                        channels['rotation_interpolation']=int(d.rotation_type)
                     for field,group in [('position',d.translations),('scale',d.scales)]:
                         if len(group.keys):
-                            if group.interpolation!=1:raise ValueError('Unsupported translation/scale keys on required bone '+name)
                             channels[field]=([k.time for k in group.keys],np.array([k.value.as_list() if field=='position' else k.value for k in group.keys]))
+                            channels[field+'_interpolation']=int(group.interpolation)
                 c=c.next_controller
             self.channels[name]=channels
         channels=self.channels[name]
-        if 'rotation' in channels:m[:3,:3]=quat_matrix(blend_keys(*channels['rotation'],time,True))*node.scale
-        if 'position' in channels:m[3,:3]=blend_keys(*channels['position'],time)
-        if 'scale' in channels:m[:3,:3]*=float(blend_keys(*channels['scale'],time))/node.scale
+        if 'rotation' in channels:m[:3,:3]=quat_matrix(blend_keys(*channels['rotation'],time,True,channels['rotation_interpolation']))*node.scale
+        if 'position' in channels:m[3,:3]=blend_keys(*channels['position'],time,interpolation=channels['position_interpolation'])
+        if 'scale' in channels:m[:3,:3]*=float(blend_keys(*channels['scale'],time,interpolation=channels['scale_interpolation']))/node.scale
         return m
     def pose(self,time):
         matrices={}
@@ -247,26 +255,34 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
         failed=quota;quota=max(quota+1,quota*2)
     return points, faces
 
-def bake(shapes,materials,textures,palette,budget=480,face_limit=666):
+def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None):
     """One topology shared by every frame, per-face tiny UV atlas patches."""
     from scipy.spatial import cKDTree
-    if not 64<=budget<=480:raise ValueError('Triangle budget must be 64..480')
-    if face_limit not in (666,777):raise ValueError('Unsupported alias face limit')
+    if face_limit not in (666,777,1024):raise ValueError('Unsupported alias face limit')
+    ceiling=face_limit if minimum_faces else 480
+    if not 64<=budget<=ceiling:raise ValueError('Triangle budget outside allowed profile')
+    minimum_faces=minimum_faces or {}
+    if set(minimum_faces)-{s.get('name','') for s in shapes}:raise ValueError('Missing protected model shape')
+    for s in shapes:
+        required=minimum_faces.get(s.get('name',''),0)
+        if not isinstance(required,int) or not 0<=required<=len(s['faces']):raise ValueError('Invalid protected shape budget')
     weights=np.array([len(s['faces'])*(1.7 if s['part']==0 else 1) for s in shapes],dtype=float);weights/=weights.sum()
-    quotas=np.array([min(120,len(s['faces'])) if s['part']==0 and len(s['positions'])>8 else 4 for s in shapes],int);remaining=budget-int(quotas.sum())
+    quotas=np.array([max(minimum_faces.get(s.get('name',''),0),min(120,len(s['faces'])) if s['part']==0 and len(s['positions'])>8 else 4) for s in shapes],int);remaining=budget-int(quotas.sum())
     if remaining<0:raise ValueError('Too many separate shapes for budget')
     quotas+=np.floor(weights*remaining).astype(int)
     actor_height = max(s['positions'][0,:,2].max() for s in shapes)-min(s['positions'][0,:,2].min() for s in shapes)
     skin=Image.new('RGB',(512,256));allframes=[];outfaces=[];outuv=[];fi=0
     for shape,quota in zip(shapes,quotas):
         orig=shape['positions'];faces=shape['faces'];p=orig[0]
+        exact=minimum_faces.get(shape.get('name',''),0)==len(faces)
         points,ix=np.unique(np.round(p,5),axis=0,return_inverse=True);ff=ix[faces]
+        if exact:points=p;ff=faces
         if len(ff)>quota:
             preserve_shell = shape['part']==3 and np.ptp(p[:,2]) >= .2*actor_height
             points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
         old_tri=p[faces];centres=old_tri.mean(axis=1);tree=cKDTree(centres)
         mat=materials[shape['material']];tex=textures.get(mat['texture_index'])
-        for face in ff:
+        for source_face,face in enumerate(ff):
             triangle=points[face];oi=int(tree.query(triangle.mean(axis=0))[1]);old=old_tri[oi]
             basis=np.column_stack((old[1]-old[0],old[2]-old[0]));coords=(triangle-old[0])@np.linalg.pinv(basis).T
             bary=np.column_stack((1-coords.sum(axis=1),coords));uv=bary@shape['uv'][faces[oi]]
@@ -278,6 +294,7 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666):
                 w=np.array([1-xy.sum(),*xy]);w=np.clip(w,0,1);w/=w.sum()
                 animated.append(np.einsum('v,fvc->fc',w,orig[:,faces[ti]])+(point-w@t))
             allframes.append(np.stack(animated,axis=1))
+            if exact:allframes[-1]=orig[:,face,:].copy()
             tile=np.zeros((16,16,3),np.uint8)
             # Sample the closest original surface per texel. Projecting an
             # entire decimated face onto one tiny source triangle crosses UV
@@ -295,6 +312,11 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666):
                 projected=np.einsum('nv,nvc->nc',bw,tri);dist=((projected-samples)**2).sum(1);take=dist<best
                 sampleuv[take]=np.einsum('nv,nvc->nc',bw,shape['uv'][faces[triids]])[take]
                 samplecolour[take]=np.einsum('nv,nvc->nc',bw,shape['colours'][faces[triids],:3])[take];best[take]=dist[take]
+            if exact:
+                # Protected shapes retain authored triangles and UV seams.
+                # Nearby folds must not lend their texture to the original face.
+                sampleuv=w@shape['uv'][faces[source_face]]
+                samplecolour=w@shape['colours'][faces[source_face],:3]
             if tex is None:colours=np.full((len(samples),3),220.)
             else:
                 px=np.floor(sampleuv[:,0]*tex.shape[1]).astype(int)%tex.shape[1];py=np.floor(sampleuv[:,1]*tex.shape[0]).astype(int)%tex.shape[0]
@@ -303,8 +325,8 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666):
             if fi>=face_limit:raise ValueError('Alias vertex budget exceeded')
             ty_required=((fi//32)+1)*16
             if ty_required>skin.height:
-                # Grow only within the declared model budget. Gallery's 777
-                # triangles need at most 400 rows before atlas compaction.
+                # Gallery compacts these tiles before MDL encoding, retaining
+                # the renderer's 480-row skin bound even for extended models.
                 larger=Image.new('RGB',(512,((face_limit+31)//32)*16));larger.paste(skin,(0,0));skin=larger
             tx=fi%32*16;ty=fi//32*16;skin.paste(Image.fromarray(tile),(tx,ty));outuv.extend([(tx,ty),(tx+15,ty),(tx,ty+15)])
             outfaces.append([fi*3,fi*3+2,fi*3+1]);fi+=1
@@ -314,7 +336,7 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666):
 def animated_mdl(frames,faces,uv,skin,vertex_limit=1999):
     if frames.ndim!=3 or frames.shape[2]!=3 or not np.isfinite(frames).all():raise ValueError('Invalid alias frames')
     nf,nv,_=frames.shape
-    if vertex_limit not in (1999,2331):raise ValueError('Unsupported alias vertex limit')
+    if vertex_limit not in (1999,2331,3072):raise ValueError('Unsupported alias vertex limit')
     if not 1<=nf<=32 or nv>vertex_limit or not len(faces):raise ValueError('Alias budget exceeded')
     if faces.min()<0 or faces.max()>=nv:raise ValueError('Alias face index')
     lo=frames.min(axis=(0,1));hi=frames.max(axis=(0,1));scale=np.maximum((hi-lo)/255,.0001)

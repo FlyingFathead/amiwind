@@ -81,3 +81,14 @@ class AliasFrames(unittest.TestCase):
         q=blend_keys([0,1],np.array([[1.,0,0,0],[-1.,0,0,0]]),.5,True)
         self.assertAlmostEqual(abs(q[0]),1)
         with self.assertRaises(ValueError):animated_mdl(frames,np.array([[0,1,3]]),uv,skin)
+
+    def test_nonlinear_pose_sampling_keeps_authored_keys(self):
+        import numpy as np
+        from npc_geometry import blend_keys
+        values=np.array([[0.,1,2],[4.,5,6]])
+        np.testing.assert_array_equal(blend_keys([0,1],values,0,interpolation=3),values[0])
+        np.testing.assert_array_equal(blend_keys([0,1],values,1,interpolation=3),values[1])
+        with self.assertRaisesRegex(ValueError,'authored interpolation'):
+            blend_keys([0,1],values,.5,interpolation=3)
+        q=np.array([[1.,0,0,0],[-1.,0,0,0]])
+        np.testing.assert_array_equal(blend_keys([0,1],q,.5,True,3),q[0])

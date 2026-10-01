@@ -61,3 +61,12 @@ positions, not proof of natural walking to those locations. No brightness, colou
 or content alterations were made. The directory-backed capture run checks the
 same binary and content later written to the HDF; the packaged-image boot check
 is a separate receipt. Raw captures and diagnostic views stay private.
+
+## RC3 captures — 1 October 2026
+
+The RC3 release adds a close gallery view of Dagoth Ur and a Balmora street
+view after the focused city-centre walking test. Both are native 320x200 FS-UAE
+captures from the RC3 engine, without colour correction or compositing. Debug
+camera placement is used; the gallery uses its documented steady daylight.
+The mask view enables the byte-specific geometry allowance. These document
+appearance and a tested view, not unrestricted gameplay acceptance.

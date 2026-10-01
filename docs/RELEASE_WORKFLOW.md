@@ -2,8 +2,8 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Use one shared release number. The current candidate is **v0.0.24-rc1**.
-The owner published v0.0.24-dev5 at commit `1e1823d`; v0.0.23 remains the
+Use one shared release number. The current candidate is **v0.0.24-rc3**.
+The owner published v0.0.24-rc2 at commit `4767ded`; v0.0.23 remains the
 stable release. Stable v0.0.24, titled **Welcome to Balmora**, requires owner
 approval after RC playtesting. Earlier archives and tags remain immutable.
 `VERSION` is the maintained version source for Python metadata, native build
@@ -13,9 +13,9 @@ includes, runtime/boot strings, receipts, presets and package filenames.
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.24-rc1-public-source.zip` | Complete repository under `amiwind/`. |
-| `AmiWind-v0.0.24-rc1-from-v0.0.24-dev5.zip` | Added/changed public files and patch metadata, from the exact published dev5 source ZIP. |
-| `AmiWind-v0.0.24-rc1-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24-rc1/`, following the delivered dev5 wrapper. |
+| `AmiWind-v0.0.24-rc3-public-source.zip` | Complete repository under `amiwind/`. |
+| `AmiWind-v0.0.24-rc3-from-rc2-source-patch.zip` | Added/changed public files and patch metadata, from the exact published RC2 source ZIP. |
+| `AmiWind-v0.0.24-rc3-private-playable.zip` | Matching HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.24-rc3/`, following the delivered RC2 wrapper. |
 
 Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
 their checksums belong in GitHub release assets. No private playable, ROM or
@@ -30,9 +30,9 @@ previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-The exact base is `AmiWind-v0.0.24-dev5-public-source.zip`, SHA-256
-`e52651a616e4f27f476d19e85623a05deebff7130b9a97b7438752cb7581aecb`.
-`docs/PATCH-v0.0.24-rc1.json` records the base, changed paths and removals.
+The exact base is `AmiWind-v0.0.24-rc2-public-source.zip`, SHA-256
+`e0e727b3b972f5d2b86c2fef79d4087fd1d53a02d484c7218e7f61c458dfb7c8`.
+`docs/PATCH-v0.0.24-rc3.json` records the base, changed paths and removals.
 Verify a clean application reproduces every file in the full source ZIP,
 including the package manifest. Unzip does not delete obsolete files; apply
 only explicitly listed removals. Protect existing local changes first.
@@ -169,3 +169,22 @@ full failed audit and native evidence in the private package. The ordinary sourc
 allowlist and whitespace checks still apply. Publish only public-source archives
 and their checksums, using the prerelease flag; never publish the playable HDF,
 ROM, model catalogue, converted assets or private inspection reports.
+
+## Palette and skin-tone consistency
+
+Before packaging, run `ui_palette.sync_lookups(game, check=True)` against the
+final game directory. The production image builder enforces this check. Palette
+reservation must update the dependent lighting and fog columns, including when
+reopening a previously converted payload. Retain the resulting table hashes in
+the private receipt. Use a pale-skinned resident as a native visual sentinel;
+check both nearby daylight and normal world lighting/fog. See the
+[ashen-face investigation](IMPLEMENTATION_JOURNAL.md#j027--pale-faces-mapped-back-to-sky-grey).
+This catches colour-table drift; it does not certify every face or texture seam.
+
+## RC3 recovery candidate boundary
+
+The owner requested RC3 before the final grounding work is complete. Retain the
+same diagnostic boundary as RC2: full source, matching private playable image,
+failed placement audit and independent HDF readback. A complete gallery does not
+turn the remaining 23 contact findings into a passed production gate. Source
+checks and targeted native tests still apply. Publish as a prerelease.

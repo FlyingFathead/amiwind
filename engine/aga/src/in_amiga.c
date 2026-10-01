@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -48,12 +48,12 @@ static int old_mouse_x = 0;
 static int old_mouse_y = 0;
 
 void IN_Move (usercmd_t *cmd) {
-    
+
   int mouse_x, mouse_y;
 
   if (!mouse_has_moved)
     return;
-    
+
   // Consume pending movement while console is open without turning the player.
   mouse_has_moved = false;
   if(key_dest != key_game){
@@ -63,6 +63,7 @@ void IN_Move (usercmd_t *cmd) {
 
   if(AW_ReaderActive()){AW_ReaderMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
   if(AW_CharacterActive()){AW_CharacterMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
+  if(AW_GalleryModal()){AW_GalleryMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
 
   if (m_filter.value)
   {
@@ -77,7 +78,7 @@ void IN_Move (usercmd_t *cmd) {
 
 	old_mouse_x = (mouseX << 2);
 	old_mouse_y = (mouseY << 2);
-	
+
 	mouse_x *= sensitivity.value;
 	mouse_y *= sensitivity.value;
 
@@ -102,6 +103,5 @@ void IN_Move (usercmd_t *cmd) {
       cmd->upmove -= m_forward.value * mouse_y;
     else
       cmd->forwardmove -= m_forward.value * mouse_y;
-  }    
+  }
 }
-

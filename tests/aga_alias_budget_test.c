@@ -21,7 +21,9 @@ int main(void){
  Mod_Init();assert(allow && cap && allow->value==0 && !strcmp(cap->string,"auto"));
  assert(AW_AliasBudgetAllows(1998,666));assert(AW_AliasBudgetAllows(2000,1000));
  assert(!AW_AliasBudgetAllows(2001,667));allow->value=1;
- assert(AW_AliasBudgetAllows(2331,777));assert(!AW_AliasBudgetAllows(2332,777));
+ assert(AW_AliasBudgetAllows(2331,777));assert(AW_AliasBudgetAllows(3072,1024));
+ assert(!AW_AliasBudgetAllows(3073,1024));assert(!AW_AliasBudgetAllows(3072,1025));
+ cap->string="777";cap->value=777;assert(!AW_AliasBudgetAllows(2332,777));
  assert(!AW_AliasBudgetAllows(2331,778));cap->string="700";cap->value=700;
  assert(AW_AliasBudgetAllows(2100,700));assert(!AW_AliasBudgetAllows(2103,701));
  cap->string="10000";cap->value=10000;assert(!AW_AliasBudgetAllows(2331,777));cap->string="700.5";cap->value=700.5;
@@ -33,6 +35,11 @@ int main(void){
  assert(!AW_AliasExceptionAllows("gallery/test.mdl",2295,765,raw,84));assert(reads==1);
  sprintf(record,"AWPB1\ngallery/test.mdl 2295 765 84 %08x\n",checksum(raw,84));table=record;
  assert(AW_AliasExceptionAllows("gallery/test.mdl",2295,765,raw,84));
+ sprintf(record,"AWPB1\ngallery/test.mdl 3036 1012 84 %08x\n",checksum(raw,84));
+ assert(AW_AliasExceptionAllows("gallery/test.mdl",3036,1012,raw,84));
+ cap->string="777";cap->value=777;assert(!AW_AliasExceptionAllows("gallery/test.mdl",3036,1012,raw,84));
+ cap->string="auto";
+ sprintf(record,"AWPB1\ngallery/test.mdl 2295 765 84 %08x\n",checksum(raw,84));
  assert(!AW_AliasExceptionAllows("gallery/other.mdl",2295,765,raw,84));
  raw[20]=1;assert(!AW_AliasExceptionAllows("gallery/test.mdl",2295,765,raw,84));raw[20]=0;
  assert(!AW_AliasExceptionAllows("gallery/test.mdl",2298,766,raw,84));

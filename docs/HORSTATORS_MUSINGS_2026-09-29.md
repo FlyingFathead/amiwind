@@ -245,3 +245,63 @@ means using those recorded allowances within the renderer's tested ceiling.
 RC2 gives us a useful checkpoint for more playtesting while the remaining model,
 foot-contact and walking cases are investigated. Keep those cases visible, retain
 the original renderer, and promote the final release only with clear evidence.
+
+### The late shift: leave nobody out — 1 October 2026
+
+After RC2 went up, the last request before bed was simple: every character model
+must make it into the gallery. A searchable list is useful, but an unavailable
+entry cannot show whether a robe, face or creature has survived conversion.
+The gallery earns its place when it lets us inspect the whole cast and keep a
+reliable record of what we have seen.
+
+There is something fitting about spending the last stretch before "Welcome to
+Balmora" making sure its residents can stand on their own feet. The streets
+already feel like a place. The remaining work is in the details that keep
+breaking that feeling: a floating resident, an invisible step, an outfit that
+costs a few more triangles than expected. Those deserve investigation while
+the original report is still easy to reproduce.
+
+Keep the difficult models intact where possible, give justified exceptions
+their own measured limits, and record the results without pretending that a
+successful conversion is a visual approval. The final release should leave us
+with both a more convincing Balmora and a process we can trust in the next town.
+The project title now states the ambition plainly: **AmiWind - Bringing TES III:
+Morrowind to Commodore Amiga**.
+
+### After Balmora: joining the island — 1 October 2026
+
+The next leap should be geographical: a terrain-and-texture map of Vvardenfell,
+cell by cell, with our two existing towns finding their place in it. Use
+Morrowind's own cells first. Smaller regions are a tool for places that need
+them, not a requirement to chop up every quiet stretch of countryside. A bridge
+in Vivec might make a natural crossing, but the source layout and measurements
+should decide that.
+
+Seyda Neen and Balmora have also taught us how to approach the next dwelling:
+keep its complete geometry, connect its doors, retain its residents and check
+the result against the packaged collision. Those lessons should become reusable
+steps, with exceptions brought into view rather than worked around invisibly.
+Once the terrain connects, a full-screen map on M and a proper character-and-
+equipment inventory on I will have a much larger world to serve.
+
+One final visual lesson arrived with the pale faces: the blight is an amusing
+excuse for grey blotches, but it is not a rendering fix. The palette and its
+lighting tables have to agree. Dagoth Ur deserves his gold mask, and the Nords
+and Bretons deserve their actual skin colours.
+
+
+### The ashen faces, and three familiar keys — 1 October, late night
+
+The pale faces had been wearing a little too much Vvardenfell ash. This time the
+Blight was innocent: new warm palette entries were still passing through old
+lighting and fog tables, which remembered them as sky grey. Repairing those
+columns restores their colour without spending more polygons or adding runtime
+work. There is still room to improve small faces and texture seams, but that is
+a separate problem from turning healthy Nords grey.
+
+The next interface milestones have familiar homes: M for the world map, I for
+inventory and equipment, and J for the quest journal. After v0.0.24, the island
+terrain and its polygon-density survey should guide expansion cell by cell,
+using smaller regions only where measured density requires them. Seyda Neen and
+Balmora have given us the beginnings of a repeatable conversion workflow; the
+next task is to make that knowledge travel with every new settlement.

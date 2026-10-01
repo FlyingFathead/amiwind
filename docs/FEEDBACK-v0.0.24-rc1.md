@@ -72,3 +72,9 @@ the same placed guard, and the unnamed lady report is a view of Balyn Omavel.
 Those camera reports remain individually retained. The strict broader audit still
 has 23 contact findings, and both the new city-centre and region walking stalls
 remain reproducible. See the RC2 release notes for exact acceptance boundaries.
+# RC2 owner follow-up — 1 October 2026, 02:30 Helsinki
+
+During further Balmora roaming in RC2, the owner reported that the city looked
+clean and no unintended floating residents had been found. This is positive
+playtest evidence for the reported Balmora placements; it is not an exhaustive
+inspection of every room or an override of the outstanding host contact audit.

@@ -212,21 +212,7 @@ void Sys_Error (char *error, ...)
 
 
 
-static int xlate[0x68] = {
-    '`', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '0', '-', '=', '\\', 0, '0',
-    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',
-    'o', 'p', K_F11, K_F12, 0, '0', '2', '3',
-    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k',
-    'l', ';', '\'', K_ENTER, 0, '4', '5', '6',
-    K_SHIFT, 'z', 'x', 'c', 'v', 'b', 'n', 'm',
-    ',', '.', '/', 0, '.', '7', '8', '9',
-    K_SPACE, K_BACKSPACE, K_TAB, K_ENTER, K_ENTER, K_ESCAPE, K_F11,
-    0, 0, 0, '-', 0, K_UPARROW, K_DOWNARROW, K_RIGHTARROW, K_LEFTARROW,
-    K_F1, K_F2, K_F3, K_F4, K_F5, K_F6, K_F7, K_F8,
-    K_F9, K_F10, '(', ')', '/', '*', '=', K_PAUSE,
-    K_SHIFT, K_SHIFT, 0, K_CTRL, K_ALT, K_ALT, 0, K_CTRL
-};
+
 
 
 void Sys_SendKeyEvents(void) {
@@ -261,12 +247,7 @@ void Sys_SendKeyEvents(void) {
 	break;
 
                 default:
-                    if ((code & ~IECODE_UP_PREFIX) >= 0x68) break;
-                    if (code & IECODE_UP_PREFIX) {
-		Key_Event(xlate[code & ~IECODE_UP_PREFIX], false);
-	} else {
-		Key_Event(xlate[code], true);
-	}
+                    if(Key_AmigaRaw(code))Key_Event(Key_AmigaRaw(code),(code & IECODE_UP_PREFIX)==0);
                     break;
             }
             break;

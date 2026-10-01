@@ -639,11 +639,10 @@ aw_hull_next:
 		{num=AW_ClipChild(node->children[1]);goto aw_hull_next;}
 #endif
 
-// put the crosspoint DIST_EPSILON pixels on the near side
-	if (t1 < 0)
-		frac = (t1 + DIST_EPSILON)/(t1-t2);
-	else
-		frac = (t1 - DIST_EPSILON)/(t1-t2);
+/* Traverse exact BSP partitions. Biasing every internal split can report an
+ * interior union plane as a surface (or consume the complete surface margin).
+ * Apply the contact margin once, on the complete sweep, after the hit. */
+    frac = t1/(t1-t2);
 	if (frac < 0)
 		frac = 0;
 	if (frac > 1)
@@ -668,13 +667,12 @@ aw_hull_next:
 	}
 #endif
 
-	if (SV_HullPointContents (hull, AW_ClipChild(node->children[side^1]), mid)
+    /* Starting inside an overlapping union must still search its far segment
+     * for an exit. The split itself can remain solid in the adjacent subtree. */
+	if (trace->allsolid || SV_HullPointContents (hull, AW_ClipChild(node->children[side^1]), mid)
 	!= CONTENTS_SOLID)
 // go past the node
 		return SV_RecursiveHullCheck (hull, AW_ClipChild(node->children[side^1]), midf, p2f, mid, p2, trace);
-
-	if (trace->allsolid)
-		return false;		// never got out of the solid area
 
 //==================
 // the other side of the node is solid, this is the impact point
@@ -688,22 +686,6 @@ aw_hull_next:
 	{
 		VectorSubtract (vec3_origin, plane->normal, trace->plane.normal);
 		trace->plane.dist = -plane->dist;
-	}
-
-	while (SV_HullPointContents (hull, hull->firstclipnode, mid)
-	== CONTENTS_SOLID)
-	{ // shouldn't really happen, but does occasionally
-		frac -= 0.1;
-		if (frac < 0)
-		{
-			trace->fraction = midf;
-			VectorCopy (mid, trace->endpos);
-			Con_DPrintf ("backup past 0\n");
-			return false;
-		}
-		midf = p1f + (p2f - p1f)*frac;
-		for (i=0 ; i<3 ; i++)
-			mid[i] = p1[i] + frac*(p2[i] - p1[i]);
 	}
 
 	trace->fraction = midf;
@@ -766,6 +748,19 @@ trace_t SV_ClipMoveToEntity (edict_t *ent, vec3_t start, vec3_t mins, vec3_t max
 
 // trace a line through the apropriate clipping hull
 	SV_RecursiveHullCheck (hull, hull->firstclipnode, 0, 1, start_l, end_l, &trace);
+    if(!trace.allsolid && trace.fraction<1) {
+        vec3_t delta;
+        float speed,margin;
+        VectorSubtract(end_l,start_l,delta);
+        speed=fabs(DotProduct(delta,trace.plane.normal));
+        if(speed>0) {
+            margin=DIST_EPSILON/speed;
+            trace.fraction-=margin;
+            if(trace.fraction<0)trace.fraction=0;
+            VectorMA(start_l,trace.fraction,delta,trace.endpos);
+        }
+    }
+
 
 /* AmiWind: static architectural brushes have non-zero yaw. */
 #if 1

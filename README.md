@@ -2,15 +2,15 @@
   <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind — A Commodore Amiga demake of Morrowind">
 </p>
 
-# AmiWind
+# AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
 ## Current state of the project
 
-**v0.0.24-rc2 — Welcome to Balmora test candidate.** This checkpoint adds the
-character model gallery, close-range NPC targeting and initial placement work,
-plus an opt-in area read-ahead experiment. It retains RC1's 43 destination
-interiors and original entrance links. Remaining model conversion, foot-contact
-and sticky-terrain findings are listed in the [RC2 notes](docs/RELEASE-v0.0.24-rc2.md).
+**v0.0.24-rc3 — Welcome to Balmora recovery candidate.** All 3,551 gallery
+model assets now convert. This checkpoint repairs pale-face colour mapping,
+adds gallery mouse/paging controls and improves Dagoth Ur's mask. It retains
+RC1's 43 destination interiors and entrance links. The remaining strict
+foot-contact gate and acceptance limits are in the [RC3 notes](docs/RELEASE-v0.0.24-rc3.md).
 
 | Balmora streets | Along the river |
 | :---: | :---: |
@@ -20,8 +20,8 @@ and sticky-terrain findings are listed in the [RC2 notes](docs/RELEASE-v0.0.24-r
 colour adjustment or compositing. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
 RC1 passed targeted checks of 70 exterior entrance/return pairs and two internal
-Fighters Guild links. RC2 is an interim owner-testing checkpoint; the new sticky
-walking reports and 23 strict foot-contact findings remain open. Stable
+Fighters Guild links. RC3 is an owner-testing checkpoint; the three RC2 walking stalls have a
+collision correction, while 23 strict foot-contact findings remain open. Stable
 **v0.0.24, Welcome to Balmora**, is still pending. v0.0.23 remains stable.
 
 Balmora uses 64 overlapping regions. Seyda Neen retains 25 regular regions,

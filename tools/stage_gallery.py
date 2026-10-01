@@ -27,7 +27,7 @@ def stage(gallery, id1):
             raise ValueError('Gallery receipt mismatch: '+key)
         for name in (key+'.mdl','f'+key[1:]+'.mdl'):
             shutil.copyfile(gallery/'gallery'/name,dest/name);copied+=1
-    for name in ('catalog.txt','inspection.tsv'):
+    for name in ('catalog.txt','inspection.tsv','poses.txt'):
         shutil.copyfile(gallery/'gallery'/name,dest/name)
     report=write_allowances(gallery/'gallery',audit['models'],audit['entries'],id1/'model-budgets.txt')
     voices={}
