@@ -8,13 +8,30 @@ import tempfile
 import unittest
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from prepare_world_ui import journal_assets, quest_labels, map_asset, prepare, validate
+from prepare_world_ui import journal_assets, quest_labels, map_asset, region_names, prepare, validate
 
 def sub(tag,value):return tag.encode()+struct.pack('<I',len(value))+value
 def record(tag,payload):return tag.encode()+struct.pack('<III',len(payload),0,0)+payload
 def journal(stage,text):return record('INFO',sub('DATA',struct.pack('<iibbbb',4,stage,-1,-1,-1,0))+sub('NAME',text))
 class WorldUIAssetsTests(unittest.TestCase):
     def master(self):return record('DIAL',sub('NAME',b'TEST_HelloWorld\0')+sub('DATA',b'\4'))
+    def test_region_names_follow_original_cell_assignments_and_display_names(self):
+        def region(identifier, name):
+            return record('REGN', sub('NAME', identifier)+sub('FNAM', name))
+        def cell(x, y, region, flags=0):
+            return record('CELL', sub('DATA',struct.pack('<Iii',flags,x,y))+sub('RGNN',region))
+        raw=(cell(3,0,b'Internal ID\0')+cell(-1,-2,b'OTHER\0')+cell(0,0,b'')
+             +cell(3,0,b'not-an-exterior-region\0',1)
+             +region(b'Internal ID\0',b'Original Display Name\0')
+             +region(b'other\0',b'Second Display Name\0'))
+        packet=region_names(raw)
+        self.assertEqual(packet[:12],b'ARN1'+struct.pack('<II',2,2))
+        self.assertEqual(packet[12:76].rstrip(b'\0'),b'Original Display Name')
+        self.assertEqual(list(struct.iter_unpack('<iiI',packet[140:])),[(-1,-2,1),(3,0,0)])
+        with self.assertRaisesRegex(ValueError,'missing REGN'):
+            region_names(cell(0,0,b'unknown'))
+        with self.assertRaisesRegex(ValueError,'Duplicate exterior'):
+            region_names(cell(0,0,b'')+cell(0,0,b''))
     def test_prepare_and_validate_with_terrain_directory_present(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);data=root/'data';survey=root/'survey';scene=root/'scene'
@@ -30,7 +47,7 @@ class WorldUIAssetsTests(unittest.TestCase):
             (world/'regions.awr').write_bytes(region)
             (world/'other-tool-output').mkdir()
             receipt=prepare(data,survey,scene)
-            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq'})
+            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq','region-names.awn'})
             self.assertEqual(validate(scene/'id1'),receipt)
             self.assertEqual((world/'regions.awr').read_bytes(),region)
             # Re-running on the same private staging tree remains valid.
@@ -63,7 +80,7 @@ class WorldUIAssetsTests(unittest.TestCase):
         paths=[*(f"maps/{s['map']}.bsp" for s in SCENES),'maps/intro_docks.bsp','maps/sncourt.bsp',
                'seyda-regions.txt',*(f"maps/{r['name']}.bsp" for r in seyda_regions()),
                'balmora-regions.txt',*(f"maps/{r['name']}.bsp" for r in regions(config())),
-               'progs.dat','character/catalog.awc','world/map.awm','world/journal.awj','world/entries.dat','world/quests.awq']
+               'progs.dat','character/catalog.awc','world/map.awm','world/journal.awj','world/entries.dat','world/quests.awq','world/region-names.awn']
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
             for name in paths:

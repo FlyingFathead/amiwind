@@ -1,242 +1,251 @@
 {
   "baselines": [
     {
-      "version": "0.0.25-rc3",
-      "archive": "AmiWind-v0.0.25-rc3-public-source.zip",
-      "sha256": "e39d16236e0e7c550518a63bd6c20cbfa2d39b247efeea1ba8405666359f0b44"
+      "version": "0.0.25-rc6",
+      "archive": "AmiWind-v0.0.25-rc6-public-source.zip",
+      "sha256": "203a46a5ec97b64a1a50d6d282918bcb47103ab3d415eee1fca76689df9b3b0c"
     }
   ],
   "touched": [
+    ".github/workflows/source-check.yml",
     "README.md",
     "VERSION",
-    "config/game.cfg",
+    "config/keymaps.cfg",
     "docs/BUG_JOURNAL.md",
-    "docs/BUILD_DEPENDENCIES.md",
-    "docs/BUILD_OUTPUT.md",
-    "docs/BUILD_TOOLKIT_ROADMAP.md",
     "docs/CHANGELOG.md",
+    "docs/CHARACTER_STATES.md",
     "docs/DEBUG_OVERLAYS.md",
     "docs/IMAGE_RECOVERY.md",
     "docs/KEYMAPS.md",
-    "docs/LICENSING_AND_CREDITS.md",
-    "docs/LINUX_BUILD.md",
-    "docs/LOCAL-RC4.md",
-    "docs/LOCAL-RC5.md",
-    "docs/LOCAL-RC6.md",
+    "docs/LOCAL-RC7.md",
     "docs/NPC_GROUND_CONTACT.md",
-    "docs/PARALLEL_BUILD.md",
-    "docs/PATCH-v0.0.25-rc4.json",
-    "docs/PATCH-v0.0.25-rc5.json",
-    "docs/PATCH-v0.0.25-rc6.json",
+    "docs/PATCH-v0.0.25-rc7.json",
     "docs/PROJECT_STATE.md",
     "docs/RECONCILE-BASES.json",
-    "docs/RELEASE-v0.0.25-rc4.md",
-    "docs/RELEASE-v0.0.25-rc5.md",
-    "docs/RELEASE-v0.0.25-rc6.md",
+    "docs/RELEASE-v0.0.25-rc7.md",
     "docs/RELEASE_WORKFLOW.md",
     "docs/ROADMAP.md",
-    "docs/THIRD_PARTY_COMPILERS.md",
-    "docs/WINDOWS_BUILD.md",
-    "docs/WINDOWS_BUILD_ROADMAP.md",
-    "docs/validation/rc4-source.json",
-    "docs/validation/rc5-source.json",
-    "docs/validation/rc6-source.json",
-    "engine/aga/src/aw_boolean.h",
+    "docs/TORCH.md",
+    "docs/WORLD_MAP_AND_JOURNAL.md",
+    "docs/validation/rc7-source.json",
+    "engine/aga/Makefile",
+    "engine/aga/qc/world.qc",
     "engine/aga/src/aw_console.c",
+    "engine/aga/src/aw_debug.c",
     "engine/aga/src/aw_hud.c",
-    "resources/emulators/AmiWind-v0.0.25-rc4-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc4-WinUAE.uae",
-    "resources/emulators/AmiWind-v0.0.25-rc5-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc5-WinUAE.uae",
-    "resources/emulators/AmiWind-v0.0.25-rc6-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc6-WinUAE.uae",
+    "engine/aga/src/aw_scene.c",
+    "engine/aga/src/aw_spawn.c",
+    "engine/aga/src/aw_torch.c",
+    "engine/aga/src/aw_wait.c",
+    "engine/aga/src/aw_world.c",
+    "engine/aga/src/aw_world.h",
+    "engine/aga/src/aw_worldui.c",
+    "engine/aga/src/cl_main.c",
+    "engine/aga/src/d_edge.c",
+    "engine/aga/src/quakedef.h",
+    "engine/aga/src/r_light.c",
+    "engine/aga/src/r_local.h",
+    "engine/aga/src/r_main.c",
+    "engine/aga/src/r_sky.c",
+    "engine/aga/src/r_surf.c",
+    "engine/aga/src/render.h",
+    "engine/aga/src/view.c",
+    "resources/emulators/AmiWind-v0.0.25-rc7-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.25-rc7-WinUAE.uae",
+    "tests/aga_background_test.c",
     "tests/aga_console_test.c",
     "tests/aga_hud_test.c",
-    "tests/aga_paper_font_test.c",
-    "tests/aga_test_files.h",
-    "tests/aga_ui_test.c",
+    "tests/aga_keymap_test.c",
+    "tests/aga_npc_contact_test.c",
+    "tests/aga_scene_test.c",
+    "tests/aga_sky_selection_test.c",
+    "tests/aga_spawn_test.c",
+    "tests/aga_torch_qc_test.c",
+    "tests/aga_torch_test.c",
+    "tests/aga_world_regions_test.c",
+    "tests/aga_worldui_test.c",
     "tests/test_actor_ground.py",
     "tests/test_aga_native_source.py",
-    "tests/test_build_host.py",
-    "tests/test_build_setup.py",
-    "tests/test_build_summary.py",
-    "tests/test_image_recovery.py",
-    "tests/test_run_fs_uae.py",
     "tests/test_world_ui_assets.py",
-    "tools/build.py",
+    "tools/actor_grounding.py",
+    "tools/audit_walkability.py",
     "tools/build_aga.py",
-    "tools/build_dry_run.py",
-    "tools/build_host.py",
-    "tools/build_parallel.py",
-    "tools/build_summary.py",
-    "tools/build_versions.py",
-    "tools/check_actor_ground.py",
-    "tools/check_scene_actors.py",
-    "tools/install_dependencies.py",
-    "tools/prepare_quake.py",
     "tools/prepare_world_ui.py",
-    "tools/recover_image.py",
-    "tools/release-files.json",
-    "tools/setup_build.py"
+    "tools/release-files.json"
   ],
   "removed": [],
   "known": {
+    ".github/workflows/source-check.yml": [
+      "1e0e028277bdc1c3ea5f5c942b4a7f9457e91af3a68a9dc80bb1aea468e11625"
+    ],
     "README.md": [
-      "aacb8cb32908e3d1e79ea6635c54e7ed615ec05b555eec11a01b9a0c5b8774f5"
+      "716b5a2b7017dbc809ebd2aea78749e1b0628f37558f6b37e75c84937ca83264"
     ],
     "VERSION": [
-      "8a1375f843f6a9dc4fc7797c42fe64e50c48d58d383228d7ad7886f0286100a4"
+      "3bbeed9f9cfc86915b1cd8dcbe7c8762d86b8d9d04f0af6c3120c63ab40f3ab0"
     ],
-    "config/game.cfg": [
-      "9932e73ad7a79c4baad0db01d532fb862f95aa86eb207514fea4f386e2ae0ca3"
+    "config/keymaps.cfg": [
+      "de2a3abaa3f8f68c157ee5a1fc8d94fa2f473cbab2b3b26d74eafcac09474c6c"
     ],
     "docs/BUG_JOURNAL.md": [
-      "fd3cdff4b3d7914d15972081b623f57daa73e3947c8dfc4645dd518f47b9b4c4"
-    ],
-    "docs/BUILD_DEPENDENCIES.md": [
-      "c364c035b987f8ccd60265e3f7e52e0809aa2375a1c54f59aec1c03dd50bfdf9"
+      "d91be7f0a1634c93d164668dd953fda3844af021ea1680ae78042eb826d9be81"
     ],
     "docs/CHANGELOG.md": [
-      "ff31fa8dce821c3f5c929f0d43e132d2ea7bbe87e58614aae65724138a1e03db"
+      "7765944859d81591c4a0e0710a2da495c54a893f277d0d7092f27631a26f5480"
     ],
     "docs/DEBUG_OVERLAYS.md": [
-      "aad37ba9ef57610c44dec21db2a049322da47becdaa329a48cef2fc3b961a5be"
+      "6eb5a29bc4ae08446a38c996cd615250520e449173df3ac1ac77f93ec37b34bc"
+    ],
+    "docs/IMAGE_RECOVERY.md": [
+      "0102fd202e3fd024a0b4c43c22adb5da52c4226adfa184e7bd7ae54ef6cd3f08"
     ],
     "docs/KEYMAPS.md": [
-      "dd63a15befc583a0381fc7410f1ef260fa31eb526c5548bc5d69b832ff1ff90d"
-    ],
-    "docs/LICENSING_AND_CREDITS.md": [
-      "de8869492c87be7387c6259f9e979bf55259e753a9f436a09d852be51aff4158"
-    ],
-    "docs/LINUX_BUILD.md": [
-      "dbb330b0bacdf718f46b3f9476f1094620097eea696c03bbe83ef7820b6812c6"
+      "1ed04e9c6fac038af080437f2e614f3fbe10066547da9b1491f6eeb48affbe7a"
     ],
     "docs/NPC_GROUND_CONTACT.md": [
-      "3d000d43e8ba1229f87a62b48890190f3bed8b4550c10316b739ed5b49eb05b6"
-    ],
-    "docs/PARALLEL_BUILD.md": [
-      "dde9757daaa83227b4b6f6b72f6e51ea05f7ac55c212f713e4f66387ecb0af93"
+      "3d569f14687894133f71d3832962f1087663e312dd09fe7680413241b0c1951e"
     ],
     "docs/PROJECT_STATE.md": [
-      "56305c155db8fe22558bf4ed8e18f2f6ac4d687ba43a2cb0173bb00afa95ba7b"
+      "849742cc802134301938de46310687e6adfc282d9ec0fee7b5459b94dbc55d22"
     ],
     "docs/RECONCILE-BASES.json": [
-      "804eaf489f57543e7a57df9a64d67eafc368e0c34c4658a1e10e7277362fa9db"
+      "1fc6ba784d1cf12bf813f09c82bafce69a218c663c337ec325aa8332b15f510a"
     ],
     "docs/RELEASE_WORKFLOW.md": [
-      "99b713adf62eaf4008863be209dc3921b37ec61ce0fd4973469024da0cabbb4a"
+      "1f9a8231acd587ffb93984a53fe2947e30013f729da10f791f874702fc86f833"
     ],
     "docs/ROADMAP.md": [
-      "6221689ad0149787a11d280d5c7042fcafde72b2de4f5cbb55102cb8053e9111"
+      "245ff43849276a98215f60950beca69c0b6895399a195afdb324abaacf22d738"
     ],
-    "docs/WINDOWS_BUILD.md": [
-      "ce7ae91074cc0bc3790c3eb66e3824914d237bc5c5a743550c0d3d3394b68ced"
+    "docs/WORLD_MAP_AND_JOURNAL.md": [
+      "af3b6fd5a4b8059cdee3e64a417b31a48413f48066765e607a02343a716f79b6"
     ],
-    "engine/aga/src/aw_boolean.h": [
-      "dbe584dac1d9959700ceaa83c0847e4fd483720f0c8b12ec16a86de8384fc245"
+    "engine/aga/Makefile": [
+      "4987b70d4b1c2762a27ba4edf8f3949296c8e2106f173c81f1ee544f8d4f8550"
+    ],
+    "engine/aga/qc/world.qc": [
+      "e7419e2cc98058335c7161854234fc823691e5d5045d6b2eefb4e2e3c5a1be5c"
     ],
     "engine/aga/src/aw_console.c": [
-      "8c3a7a3b7e006a7b9c62de4e160e48fde23e096e7f1aec54a5e84c053bc649ae"
+      "c76cd482b212d1dee0696bc762d957999761fe6546ec5773a2ae733c6dd532e3"
+    ],
+    "engine/aga/src/aw_debug.c": [
+      "5f476940502486c92f6a2c915a5e53dfba6ce864c84edaec5772a925f1f54e9b"
     ],
     "engine/aga/src/aw_hud.c": [
-      "e1520d0cd779981cbb51bd3ec2d2a4e648f414a9815d9fbf6bf04f06e555a54b"
+      "1ac2f9616848a55ed6d924b71758ab987bc797b9669d80501b03331ec2ef8468"
+    ],
+    "engine/aga/src/aw_scene.c": [
+      "1a7d3ac796c83200bb38254f395dc5aba69e2d06dac7837539b2d90a35927be9"
+    ],
+    "engine/aga/src/aw_spawn.c": [
+      "0460e5ac4e27864a4362d9bdc3effb738ef50fbd49a31b08b07cc2c36eb642fd"
+    ],
+    "engine/aga/src/aw_wait.c": [
+      "11615fb5b076bc7362bc6faa01b5975c2a079f8cef85f2c83038576ef9be4533"
+    ],
+    "engine/aga/src/aw_world.c": [
+      "a04430ea4dd18a3c8238af2473920a88cc258522d3e6ee66c711c093dee38aaf"
+    ],
+    "engine/aga/src/aw_world.h": [
+      "cb8a1f1e7b3aff68b56969d21b5e84ae7e3eacd46d566fb94b148263caff78e4"
+    ],
+    "engine/aga/src/aw_worldui.c": [
+      "97d66f2af5ea067cf4fe5ddcb61f51f7c9d10b0ae9a458ee1a8f907c093350fc"
+    ],
+    "engine/aga/src/cl_main.c": [
+      "80aea300625b8da0812e582ff996e0c0c9e4a5d17b9b9c2facfd168f0d0d89c8"
+    ],
+    "engine/aga/src/d_edge.c": [
+      "abf26a245feee66fa9ccc612a9b13b51af902c6feb57b07b5a7d36e3fcf819fd"
+    ],
+    "engine/aga/src/quakedef.h": [
+      "03645f742ebf94386b111e3448928303d15700cad04496bb8f153034d20d2a7b"
+    ],
+    "engine/aga/src/r_light.c": [
+      "f71db4a482b7c7f8ad37b02e12b2cb5eba856d026425de43b69c686dacf452d2"
+    ],
+    "engine/aga/src/r_local.h": [
+      "2aa3c0b21826d4baf934509e389a5e48ea3d03d9d70e69bde1bab6800606209f"
+    ],
+    "engine/aga/src/r_main.c": [
+      "1b067a45dbc1b6761e3249b8099d98702b31cccc1a2a4daa87479bc3f53369f8"
+    ],
+    "engine/aga/src/r_sky.c": [
+      "2c3d745122a6ff6c55cda7721f4b375d3211965cf49ecb75ac47fb040d63d4e7"
+    ],
+    "engine/aga/src/r_surf.c": [
+      "dcdc3cd5037c992346e9480f5c89da47b8fad5b44bee9bfd2cd043d02b18a1ea"
+    ],
+    "engine/aga/src/render.h": [
+      "c21a651dec5719f72241ca43dc0f9f4d34fbc7b77d7bbb2857ed86275eea4011"
+    ],
+    "engine/aga/src/view.c": [
+      "015c9f162cc2417c5c8906266a5ee829f58c526b93edbf5670c5285e05851d8e"
     ],
     "tests/aga_console_test.c": [
-      "742e115eeb8bf41f22cc8e9fbaf26c9536839ac627b9dc8e88853a7d34873067"
+      "c45c20ba5e937cb5681264a8af4cf18a827f652aae91004f85ec7787b65d7469"
     ],
     "tests/aga_hud_test.c": [
-      "31cc11284e38638509aeb7dd46e9a195617f91fc9015cc295ea6c8dbfd825fb5"
+      "63dac05824967348b47ae306912c2373cd530f13dc1b53957f040acb4ed3ec97"
     ],
-    "tests/aga_paper_font_test.c": [
-      "a4efa7c671c066596e34a71b7efadd6f604196bba3afcbded572a168faee0848"
+    "tests/aga_keymap_test.c": [
+      "fba3c8e4bb2db1a3fa85460c97185fc1490c12aba510806b1910c525d13c9a65"
     ],
-    "tests/aga_ui_test.c": [
-      "54e61b8a1a8101a6183980b8230fda5350959cdb75269f4541b8d9294fa3d043"
+    "tests/aga_npc_contact_test.c": [
+      "c9c7b22af5ec5e4c5f8a70dab74760db33480c34f79b6d26f7869a0108be7eac"
+    ],
+    "tests/aga_scene_test.c": [
+      "0db66bf556209910f8fd4758c486914a39a906cfb39132438d74153bc993babc"
+    ],
+    "tests/aga_spawn_test.c": [
+      "785901c0cfd38b2168be95241fbfa2e4ac2fe2f2e1ff65d3b5febd2c7aca3745"
+    ],
+    "tests/aga_world_regions_test.c": [
+      "686af4f17f7d414fa9d24af4ba28c20696c7a13d9d7169f82be24b4d8804bee1"
+    ],
+    "tests/aga_worldui_test.c": [
+      "f17ae53688f3da88c7d6e124a40c4e94d7c14c7b1c73062d212cc7826b5a31c9"
     ],
     "tests/test_actor_ground.py": [
-      "197db080ce9e0e3811fb4a09ed0d91c2561cfcdf1aeda91fc1b73db8e6a0dda5"
+      "f03074eac6d747afb921e8fdb3eb2583e4104fbe7053c1d9e5f3b64330d13524"
     ],
     "tests/test_aga_native_source.py": [
-      "71d1da1d93be3ffd195f72aa739aac6289d1dd8014ad7384528f498a355c7126"
-    ],
-    "tests/test_build_setup.py": [
-      "8f0a9a1d5eeef11429e27d8b9e6639300280ae9ab9042ad4644c798f8f6c2114"
-    ],
-    "tests/test_run_fs_uae.py": [
-      "8f3bdf7bbad0bc980b844b11d808bbfafdc188a1c7dd8d127748f280bbc57858"
+      "38d7f7fa52bcd0eb8ad6f79d8d578ab43306298ed226e5e05df1a6c654689580"
     ],
     "tests/test_world_ui_assets.py": [
-      "5dbe603a507f9bd4ef253230533538c0280e1bd189ea699a1645c759d0d038e6"
+      "e18e73f9c202e615a749bd29f84c0ca7a5c7979ebc0f2ea8a94c66af23c90071"
     ],
-    "tools/build.py": [
-      "fa57b2238f6d2c29199cec2fed256fc1741754d27834b5f51240c680d9294f2f"
+    "tools/actor_grounding.py": [
+      "ab123f5ccb48580fd7cb5b8ae15786fbb5a08e064324d545b666d1ed2a4f7179"
+    ],
+    "tools/audit_walkability.py": [
+      "f5ff61df8378de8f52781389619ab87d6b48bf5187c469e0a2e3d005dccf8d85"
     ],
     "tools/build_aga.py": [
-      "a6820a65da3c9c45bb22d113b90233ab9543a46b8e181c955d5e57a9656cc2ce",
-      "43f151a95d34d0fce93bcad0b772dc016079b9d71b494274cd1489e6ec99e3b5"
-    ],
-    "tools/build_dry_run.py": [
-      "8f040b1a722fe7eb29aa042e5846bc7b08c3147958b230129b49b26fd3b1f3f5"
-    ],
-    "tools/build_parallel.py": [
-      "3994a4c5081b1caaf4aec708d422e850066c2e4125a2392ab3a7ec7469c3844b"
-    ],
-    "tools/build_versions.py": [
-      "1b10d07295fa878a78b53d2f4f132e4b582915af327c9c00b0c4403b4c8c8912"
-    ],
-    "tools/check_actor_ground.py": [
-      "a6e4876bd3fc6c87784bb80ce27d280e709f4410d4ba0098643aca3d2da521d8",
-      "010f9293232b652361d26ef553d391f9a842457c51209ba5f93c868e7b1ff291"
-    ],
-    "tools/install_dependencies.py": [
-      "a12cbc95c2b5679bad5aa276b57219c401f9bf855a4c6458b6a626fb1daca47f"
-    ],
-    "tools/prepare_quake.py": [
-      "d51615269008fd747689baacc72dc98e4e8cc6ebee70da326e1c445f4fe7cb71"
+      "bb13910a7cfb82ee4b1f346f52b632e7a3a035c231fe12f1d6c22d99d5a8b46e"
     ],
     "tools/prepare_world_ui.py": [
-      "a125eeee082168ab1b01c28b697a5e38a77a84a7bc3739c9eab17a4c84e4370c",
-      "3f2aab812cfa617b12e644c4578b27f68360f5ab1d00edbd8a53fdb8a51704ab"
+      "80845d1e706c7351a3650a09135282fb8bb8352341ce45a6613654910f52bbfa"
     ],
     "tools/release-files.json": [
-      "2be5d71fff54443bb0f30d5ec81b9b3e68b26ccc24b8890a7827256edc9178b1"
-    ],
-    "tools/setup_build.py": [
-      "f293e2d0f2bb9038a6f6ae0479c2a7625cf9328152324f8e676b0384b4eb2b27"
+      "174f7e93432a03257629545cbbbce7b76d917ef660aee5384d7bfe413bd28ad7"
     ]
   },
   "may_be_absent": [
-    "docs/BUILD_OUTPUT.md",
-    "docs/BUILD_TOOLKIT_ROADMAP.md",
-    "docs/IMAGE_RECOVERY.md",
-    "docs/LOCAL-RC4.md",
-    "docs/LOCAL-RC5.md",
-    "docs/LOCAL-RC6.md",
-    "docs/PATCH-v0.0.25-rc4.json",
-    "docs/PATCH-v0.0.25-rc5.json",
-    "docs/PATCH-v0.0.25-rc6.json",
-    "docs/RELEASE-v0.0.25-rc4.md",
-    "docs/RELEASE-v0.0.25-rc5.md",
-    "docs/RELEASE-v0.0.25-rc6.md",
-    "docs/THIRD_PARTY_COMPILERS.md",
-    "docs/WINDOWS_BUILD_ROADMAP.md",
-    "docs/validation/rc4-source.json",
-    "docs/validation/rc5-source.json",
-    "docs/validation/rc6-source.json",
-    "resources/emulators/AmiWind-v0.0.25-rc4-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc4-WinUAE.uae",
-    "resources/emulators/AmiWind-v0.0.25-rc5-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc5-WinUAE.uae",
-    "resources/emulators/AmiWind-v0.0.25-rc6-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc6-WinUAE.uae",
-    "tests/aga_test_files.h",
-    "tests/test_build_host.py",
-    "tests/test_build_summary.py",
-    "tests/test_image_recovery.py",
-    "tools/build_host.py",
-    "tools/build_summary.py",
-    "tools/check_scene_actors.py",
-    "tools/recover_image.py"
+    "docs/CHARACTER_STATES.md",
+    "docs/LOCAL-RC7.md",
+    "docs/PATCH-v0.0.25-rc7.json",
+    "docs/RELEASE-v0.0.25-rc7.md",
+    "docs/TORCH.md",
+    "docs/validation/rc7-source.json",
+    "engine/aga/src/aw_torch.c",
+    "resources/emulators/AmiWind-v0.0.25-rc7-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.25-rc7-WinUAE.uae",
+    "tests/aga_background_test.c",
+    "tests/aga_sky_selection_test.c",
+    "tests/aga_torch_qc_test.c",
+    "tests/aga_torch_test.c"
   ],
   "executables": [
     "build.sh",

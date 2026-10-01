@@ -8,12 +8,17 @@ server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;viddef_t v
 aw_story_t aw_story;aw_character_t aw_character;
 aw_race_t aw_races[16];aw_class_t aw_classes[32];
 keydest_t key_dest=key_game;int scr_copyeverything;
-static void (*map_command)(void),(*journal_command)(void);
-static int missing,corrupt,opens;static char drawn[16384];
+static void (*map_command)(void),(*journal_command)(void),(*teleport_command)(void);
+static int missing,corrupt,opens,jumps,jump_available=1,red_pixels;static float destination[3];static char drawn[16384];
 static byte pixels[320*200];
 static const char title[]="A long quest heading which must wrap completely within one journal page without losing text";
-static int heading_rows,marker_x=-1,marker_y=-1;
-void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
+static int heading_rows,marker_x=-1,marker_y=-1,char_width=4,region_calls;
+static char footer[80];static int footer_left,footer_right;
+static const char *region_override;
+int Cmd_Argc(void){return 1;}
+const char *AW_RegionNameAt(const float *p){region_calls++;return region_override?region_override:p[0]<0?"West test region":"East test region";}
+int AW_MapTeleport(const float *p){int i;for(i=0;i<3;i++)destination[i]=p[i];if(!jump_available)return 0;jumps++;return 1;}
+void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_teleport_map"))teleport_command=fn;else if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
 void IN_AWClearButtons(void){}
 int AW_StoryRestricted(void){return 0;}
 int AW_ReaderActive(void){return 0;}
@@ -25,9 +30,11 @@ int AW_WorldToSource(const char *name,const float *local,float *world){
 }
 void Con_Printf(char *s,...){}
 int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
-int AW_ConsoleCharWidth(void){return 4;}
-void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;}
-void AW_UIFill(int x,int y,int w,int h,int c){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
+int AW_ConsoleCharWidth(void){return char_width;}
+void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;
+    if(y==188 && x>=96){n=strlen(footer);assert(n<79);if(!n)footer_left=x;footer[n]=c;footer[n+1]=0;footer_right=x+char_width;}
+}
+void AW_UIFill(int x,int y,int w,int h,int c){if(c==AW_UIColor(255,32,32))red_pixels++;assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 void AW_UIBookBegin(void){}
@@ -62,7 +69,7 @@ int COM_FOpenFile(char *name,FILE **out){
     else assert(0);
     size=ftell(f)-base;fseek(f,base,SEEK_SET);return size;
 }
-static void draw(void){drawn[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
+static void draw(void){drawn[0]=footer[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
 int main(void){
     edict_t player;client_t client;int before;
     memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
@@ -74,6 +81,11 @@ int main(void){
     corrupt=1;map_command();assert(!AW_WorldUIActive() && key_dest==key_game);corrupt=0;
     map_command();assert(AW_WorldUIActive() && key_dest==key_menu);
     before=opens;draw();assert(strstr(drawn,"Cell 0,0"));
+    assert(!strcmp(footer,"REGION: East test region") && footer_right==315);
+    AW_WorldUIKey(K_LEFTARROW,1);draw();assert(!strcmp(footer,"REGION: East test region"));
+    player.v.origin[0]=-16;draw();assert(!strcmp(footer,"REGION: West test region"));player.v.origin[0]=0;
+    char_width=8;region_override="A deliberately long region name from a synthetic game record";draw();
+    assert(footer_left>=96 && footer_right==315 && strstr(footer,"..."));char_width=4;region_override=NULL;
     AW_WorldUIKey('=',1);AW_WorldUIKey('p',1);AW_WorldUIKey('g',1);draw();
     assert(opens==before);AW_WorldUIKey('m',1);assert(!AW_WorldUIActive() && key_dest==key_game);
     /* Keep zoom/pan on reopen, update the live position without disk reads,
@@ -103,7 +115,29 @@ int main(void){
     assert(aw_state.journal_count==2 && AW_StateGet(&aw_state,AW_JOURNAL,"quest")==10);
     map_command();key_dest=key_game;assert(!AW_WorldUIDraw() && !AW_WorldUIActive());
     journal_command();assert(AW_WorldUIActive());AW_WorldUIKey('j',1);
-    strcpy(sv.name,"census");map_command();draw();assert(strstr(drawn,"no exterior position"));
+    strcpy(sv.name,"census");map_command();before=region_calls;draw();assert(strstr(drawn,"no exterior position"));
+    assert(!strcmp(footer,"REGION: unavailable") && region_calls==before);
     strcpy(sv.name,"seyda");assert(!AW_WorldUIDraw() && !AW_WorldUIActive());
+    /* Debug mode: exact title/instruction, red selected crosshair, explicit
+     * confirmation button, source coordinates stable across zoom and panning. */
+    assert(teleport_command);key_dest=key_console;teleport_command();
+    assert(AW_WorldUIActive() && key_dest==key_menu);AW_WorldUIKey(K_HOME,1);draw();
+    assert(strstr(drawn,"DEBUG TELEPORT") && strstr(drawn,"CLICK ON TARGET TO TELEPORT"));
+    assert(!strstr(drawn,"Esc closeTELEPORT") && jumps==0);
+    AW_WorldUIKey(K_ENTER,1);assert(jumps==0);
+    /* Initial pointer is 160,100. A click selects without moving the player. */
+    AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);red_pixels=0;draw();
+    assert(red_pixels==22 && strstr(drawn,"TELEPORT") && strstr(drawn,"test region") && jumps==0);
+    AW_WorldUIKey('=',1);AW_WorldUIKey(K_RIGHTARROW,1);draw();
+    AW_WorldUIMouse(120,90); /* confirmation button: 280,190 */
+    jump_available=0;AW_WorldUIKey(K_MOUSE1,1);draw();
+    assert(jumps==0 && AW_WorldUIActive() && strstr(drawn,"Destination unavailable"));
+    assert(fabs(destination[0])<.01 && fabs(destination[1]+436.9067)<.02);
+    jump_available=1;AW_WorldUIKey(K_MOUSE1,1);
+    assert(jumps==1 && !AW_WorldUIActive() && key_dest==key_game);
+    /* Reopening must discard the old destination. Escape cancels. */
+    teleport_command();AW_WorldUIKey(K_ENTER,1);assert(jumps==1);
+    AW_WorldUIKey(K_ESCAPE,1);assert(!AW_WorldUIActive());
+    map_command();draw();assert(!strstr(drawn,"DEBUG TELEPORT"));AW_WorldUIKey('m',1);
     return 0;
 }

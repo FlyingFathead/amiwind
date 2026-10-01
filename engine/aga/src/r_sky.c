@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -33,6 +33,18 @@ float		skytime;
 byte		*r_skysource;
 
 int r_skymade;
+int r_backgroundsky;
+/* Re-evaluate on every scene change, including exterior -> interior. The
+ * background is the loaded sky even when its distant box faces are culled. */
+void R_SetSkyBackground(model_t *model)
+{
+    int i;r_backgroundsky=0;
+    if(!model || !model->textures)return;
+    for(i=0;i<model->numtextures;i++)if(model->textures[i] &&
+        !strncmp(model->textures[i]->name,"sky",3)){
+        r_backgroundsky=1;return;
+    }
+}
 int r_skydirect;		// not used?
 
 
@@ -84,7 +96,7 @@ void R_InitSky (texture_t *mt)
 			}
 		}
 	}
-	
+
 	r_skysource = newsky;
 }
 
@@ -110,7 +122,7 @@ void R_MakeSky (void)
 
 	xlast = xshift;
 	ylast = yshift;
-	
+
 	pnewsky = (unsigned *)&newsky[0];
 
 	for (y=0 ; y<SKYSIZE ; y++)
@@ -272,9 +284,7 @@ void R_SetSkyFrame (void)
 	temp = SKYSIZE * s1 * s2;
 
 	skytime = cl.time - ((int)(cl.time / temp) * temp);
-	
+
 
 	r_skymade = 0;
 }
-
-

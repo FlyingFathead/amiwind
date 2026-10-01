@@ -134,7 +134,7 @@ def write_content_fingerprint(id1):
     fingerprint=hashlib.sha256()
     from area_config import SCENES
     from balmora_regions import config as balmora_config, regions as balmora_regions
-    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', *(f"maps/{r['name']}.bsp" for r in seyda_regions()), 'balmora-regions.txt', *(f"maps/{r['name']}.bsp" for r in balmora_regions(balmora_config())), 'progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj', 'world/entries.dat', 'world/quests.awq']:
+    for name in [*(f"maps/{s['map']}.bsp" for s in SCENES), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', *(f"maps/{r['name']}.bsp" for r in seyda_regions()), 'balmora-regions.txt', *(f"maps/{r['name']}.bsp" for r in balmora_regions(balmora_config())), 'progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj', 'world/entries.dat', 'world/quests.awq', 'world/region-names.awn']:
         asset=Path(id1)/name
         if not asset.is_file():raise ValueError('Required character-creation asset missing: '+name)
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(asset)))

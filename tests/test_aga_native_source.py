@@ -16,6 +16,31 @@ SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_compiled_hand_rules_extinguish_torch_and_preserve_fist_attack(self):
+        compiler=os.environ.get('QCC_PATH') or shutil.which('qcc-host')
+        if not compiler:
+            self.skipTest('set QCC_PATH to the validated host QCC')
+        from build_aga import validate_quakec
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp);qc=directory/'qc';qc.mkdir()
+            for name in ('defs.qc','world.qc','progs.src'):
+                shutil.copyfile(Path(SOURCE)/'qc'/name,qc/name)
+            result=subprocess.run([str(Path(compiler).resolve())],cwd=qc,capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            validate_quakec(directory/'progs.dat')
+            self.compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c'],
+                cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
+                arguments=[str(directory/'progs.dat')])
+
+    def test_torch_controls_bounded_light_surface_illumination_and_overlay(self):
+        self.compile_run('aga_torch_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_torch.c','cl_main.c','r_light.c','r_surf.c','r_bsp.c','mathlib.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_exterior_background_uses_sky_with_infinite_depth_and_interior_resets(self):
+        self.compile_run('aga_background_test.c', [Path(SOURCE)/'src/d_edge.c'])
+        self.compile_run('aga_sky_selection_test.c', [Path(SOURCE)/'src/r_sky.c'])
+
     def test_world_terrain_rebasing_and_bidirectional_town_crossings(self):
         self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])

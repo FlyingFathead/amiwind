@@ -1,5 +1,21 @@
 # Development history
 
+## v0.0.25-rc7
+
+- Fit initial NPC idle-mesh contact while retaining source coordinates and strict
+  final auditing; preserve certified positions in the runtime.
+- Resolve region names from original CELL/REGN data for the optional compass and
+  regular map footer. Add select-then-confirm `dbg tp map`.
+- Fill uncovered outdoor background with sky instead of the pale clear colour;
+  water rendering remains unchanged.
+- Add F-then-V placeholder torch, one bounded dynamic light and correct local
+  light coordinates on transformed cave pieces. Shift+V keeps draw distance.
+- Document original actor progression states separately from contact geometry.
+- Retain checked engine/image-only recovery from completed rc3 conversions.
+- Record source/native/placement evidence and untested runtime limits in the
+  [rc7 release notes](RELEASE-v0.0.25-rc7.md).
+
+
 ## v0.0.25-rc6 — 1 October 2026
 
 - Default compass/heading HUD to hidden; add saved `aw_compass` and

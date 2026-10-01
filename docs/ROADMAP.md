@@ -58,6 +58,15 @@ The [29 September plan](PLAN-2026-09-29.md) retains historical priorities.
 
 ## Balmora interiors and loading
 
+- [ ] Implement [character presence and progression](CHARACTER_STATES.md),
+  preserving original actor activation and movement conditions independently
+  of ground-contact acceptance. The [source progression review](NPC_GROUND_CONTACT.md#source-progression-review-1-october-2026)
+  confirms that the Balmora Dreamer is disabled at startup, Fargoth has an
+  externally scripted quest route, and the dock guard, Vodunius and freed slaves
+  have state-dependent movement or disappearance. Verify source-derived new-game
+  state, quest transitions, scene re-entry and save/restore. A passing geometric
+  audit does not close this behavior gap.
+
 - [x] Convert 43 original Balmora destination interiors, 93 NPC placements and
   80 living voice sets. Native checks cover all 70 exterior round trips and both
   same-room Fighters Guild links. Full services/quests/schedules remain future work.
@@ -916,8 +925,9 @@ Do not drop these items when handling the immediate geometry regression.
   controls, dialogue waits, door/menu transitions and disabled references.
 - [ ] Persist compact opening state across the already separate interior/exterior
   scenes; remove the disabled ship assembly on post-registration town loads.
-- [ ] Compare baked dim lighting with bounded AmiQuake-style dynamic lights for
-  torches; retain the static path and measure cache rebuild/audio costs.
+- [ ] Measure the rc7 F/V placeholder torch against the same dark cave camera;
+  one bounded dynamic light is implemented, but target cache/audio/FPS cost and
+  visual acceptance remain open. See [torch scope](TORCH.md).
 
 ### Adjustable visibility and appearance A/B
 

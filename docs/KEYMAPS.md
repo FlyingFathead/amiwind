@@ -1,4 +1,4 @@
-# Keyboard and command reference — v0.0.25-rc2
+# Keyboard and command reference — v0.0.25-rc7
 
 Maintain this list whenever a binding or reserved shortcut changes. The editable
 source defaults live in [`config/keymaps.cfg`](../config/keymaps.cfg). The image
@@ -25,6 +25,7 @@ bindings when it exits. Keep the shipped defaults for recovery.
 | Q | `+movedown` | Down in noclip |
 | Mouse 1 | `+attack` | Attack |
 | F | `impulse 202` | Draw / lower hands |
+| V | `aw_torch` | Toggle the placeholder torch while hands are raised |
 | M | `aw_worldmap` | Open world map, including debug/noclip |
 | J | `aw_journal` | Open journal |
 | T | `aw_wait` | Wait panel |
@@ -65,6 +66,9 @@ all remappable through gameplay bindings.
 | World map | Arrows, mouse drag | Pan |
 | World map | P | Centre on current player |
 | World map | Home / G | Fit island / toggle exterior-cell grid |
+| Debug teleport map | Left click | Select target; click TELEPORT to confirm |
+| Debug teleport map | Enter / Escape | Confirm selected target / cancel |
+| Debug teleport map | Right drag / arrows | Pan without selecting a target |
 | Journal | J, Escape | Close journal |
 | Gallery | Wheel / middle mouse | Navigate model view / return to browser |
 | Menus | Arrows, Enter, Escape | Select, activate, back |

@@ -3,7 +3,7 @@
 #include "aw_maps.h"
 #include "aw_world.h"
 #include <assert.h>
-static int opens;
+static int opens,missing_map,broken_names;
 void Con_Printf(char *fmt,...){}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void number(FILE *f,float value){unsigned n;memcpy(&n,&value,4);word(f,n);}
@@ -21,7 +21,19 @@ int COM_FOpenFile(char *name,FILE **out){
         }
         rewind(f);return 168;
     }
-    assert(!strncmp(name,"maps/",5));rewind(f);return 124;
+    if(!strcmp(name,"world/region-names.awn")){
+        char labels[128]={0};
+        /* A packed file has a nonzero member offset. Names deliberately differ
+         * from any town name; negative cells must use floor, not truncation. */
+        for(i=0;i<137;i++)fputc(0,f);
+        fputs(broken_names?"BAD!":"ARN1",f);word(f,2);word(f,3);
+        strcpy(labels,"Western test region");strcpy(labels+64,"Eastern test region");fwrite(labels,1,128,f);
+        word(f,(unsigned)-1);word(f,0);word(f,0);
+        word(f,0);word(f,0);word(f,1);
+        word(f,1);word(f,0);word(f,1);
+        fseek(f,137,SEEK_SET);return 176;
+    }
+    assert(!strncmp(name,"maps/",5));if(missing_map){fclose(f);*out=NULL;return -1;}rewind(f);return 124;
 }
 int main(void){
     float a[3]={240,0,40},b[3],c[3],source[3];char target[16];int before;
@@ -48,5 +60,20 @@ int main(void){
     assert(!AW_WorldDestination("census",a,target,b));
     assert(AW_WorldContains("vf0000",a));a[0]=1900;assert(!AW_WorldContains("vf0000",a));
     a[0]=NAN;assert(!AW_WorldDestination("vf0000",a,target,b));
+    source[0]=4000;source[1]=0;source[2]=NAN;
+    assert(AW_WorldMapTarget(source,target,b) && !strcmp(target,"vf0000") && b[0]==-24 && b[2]==0);
+    source[0]=0;assert(AW_WorldMapTarget(source,target,b) && !strcmp(target,"seyda"));
+    source[0]=16384;assert(AW_WorldMapTarget(source,target,b) && !strcmp(target,"balmora"));
+    source[0]=200000;assert(!AW_WorldMapTarget(source,target,b));
+    source[0]=0;missing_map=1;assert(!AW_WorldMapTarget(source,target,b));missing_map=0;
+    source[0]=NAN;assert(!AW_WorldMapTarget(source,target,b));
+    source[0]=-0.01f;assert(!strcmp(AW_RegionNameAt(source),"Western test region"));
+    before=opens;source[0]=-8192;assert(AW_RegionNameAt(source) && before==opens);
+    source[0]=0;assert(!strcmp(AW_RegionNameAt(source),"Eastern test region"));
+    before=opens;source[0]=8191;assert(AW_RegionNameAt(source) && opens==before);
+    source[0]=8192;assert(AW_RegionNameAt(source) && opens==before+1);
+    source[0]=16384;assert(!AW_RegionNameAt(source));
+    broken_names=1;source[0]=-1;assert(!AW_RegionNameAt(source));
+    source[0]=NAN;assert(!AW_RegionNameAt(source));
     return 0;
 }

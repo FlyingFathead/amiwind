@@ -65,3 +65,24 @@ qboolean AW_PlacePlayer(edict_t *p, vec3_t preferred)
         (long)point[0],(long)point[1],(long)point[2]);
     return true;
 }
+
+/* Explicit debug-map arrival: keep the chosen XY, find the highest walkable
+ * surface below the scene ceiling, and test the complete standing hull. A failed
+ * request must not install unchecked coordinates. */
+qboolean AW_MapPlace(edict_t *p,const float *xy)
+{
+    vec3_t top,bottom,point;
+    if(!p || !sv.worldmodel || !isfinite(xy[0]) || !isfinite(xy[1]) ||
+       fabs(xy[0])>=4000 || fabs(xy[1])>=4000)return false;
+    top[0]=bottom[0]=xy[0];top[1]=bottom[1]=xy[1];
+    top[2]=sv.worldmodel->maxs[2]-p->v.maxs[2]-4;
+    bottom[2]=sv.worldmodel->mins[2]-p->v.mins[2]+4;
+    if(top[2]>3990)top[2]=3990;
+    if(bottom[2]<-3990)bottom[2]=-3990;
+    if(!isfinite(top[2]) || !isfinite(bottom[2]) || top[2]<=bottom[2] ||
+       !floor_at(p,top,bottom,point))return false;
+    VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);
+    VectorCopy(vec3_origin,p->v.velocity);
+    p->v.flags=(int)p->v.flags & ~FL_ONGROUND;SV_LinkEdict(p,false);
+    return true;
+}

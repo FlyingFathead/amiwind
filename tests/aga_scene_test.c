@@ -49,7 +49,7 @@ void AW_SetNextLoadingStyle(aw_loading_style_t style){}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void Cvar_SetValue(char *s,float v){if(names_option && !strcmp(s,names_option->name))names_option->value=v;}
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
-static char queued[64];static eval_t goal;static int clear_buttons,events,occluded;
+static char queued[64];static eval_t goal,torch;static int clear_buttons,events,occluded;
 static void (*start_demo)(void),(*teleport)(void),(*scene)(void);static cvar_t *demo_option;
 static int command_argc;static char *command_args[3];
 static int opening_track=-1,ship_available=1,narrow_room;
@@ -78,6 +78,7 @@ double Sys_FloatTime(void){return 1;}
 int Hunk_LowMark(void){return 1000;}
 int Hunk_HighMark(void){return 0;}
 eval_t *GetEdictFieldValue(edict_t *p,char *name){
+ if(!strcmp(name,"aw_torch"))return &torch;
  if(!strcmp(name,"aw_intro_role"))return &role;
  if(!strcmp(name,"aw_voice"))return &voice;
  return &goal;
@@ -102,7 +103,7 @@ int main(void){
  edict_t p;client_t client;vec3_t arrival={0,0,77};memset(&p,0,sizeof(p));memset(&client,0,sizeof(client));
  sv.active=true;svs.maxclients=1;svs.clients=&client;client.edict=&p;strcpy(sv.name,"prison");
  cls.state=ca_connected;p.v.movetype=MOVETYPE_WALK;p.v.health=100;p.v.view_ofs[2]=30;goal._float=1;cl.viewangles[1]=90;
- assert(AW_Interior());
+ torch._float=1;assert(AW_Interior());
  cl.viewangles[1]=0;assert(!AW_SceneUse());cl.viewangles[1]=90;
  p.v.origin[1]=-100;assert(!AW_SceneUse());p.v.origin[1]=0;
  occluded=1;assert(!AW_SceneUse());occluded=0;
@@ -113,7 +114,8 @@ int main(void){
  realtime=10.41;AW_SceneTick();assert(!strcmp(queued,"map seyda\n") && clear_buttons==1);
  door_duration=0;
  assert(AW_SceneUse());assert(clear_buttons==1); /* held use cannot queue twice */
- strcpy(sv.name,"seyda");p.v.health=0;goal._float=0;AW_SceneSpawn(&p);
+ strcpy(sv.name,"seyda");p.v.health=0;goal._float=0;torch._float=0;AW_SceneSpawn(&p);
+ assert(torch._float==1); /* Equipped torch follows the raised hands through a door. */
  cls.signon=SIGNONS;AW_SceneTick();assert(audio_close==1);AW_SceneTick();assert(audio_close==1);
  assert(p.v.health==100 && goal._float==1 && events==2);assert(p.v.origin[2]>50 && p.v.origin[2]<51);
  assert(p.v.angles[1]==90 && p.v.fixangle);assert(!AW_Interior());
@@ -219,3 +221,5 @@ void AW_OpeningSpawn(void){}
 void AW_SaveCapture(void){}
 void AW_SaveSpawn(void){}
 void AW_SaveReset(void){}
+
+qboolean AW_MapPlace(edict_t *p,const float *xy){return false;}

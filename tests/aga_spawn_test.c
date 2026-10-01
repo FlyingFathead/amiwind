@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
+#include "aw_world.h"
+server_t sv;
 #include <stdarg.h>
 extern qboolean AW_FindSafeSpawn(edict_t *,vec3_t,vec3_t);
 extern qboolean AW_PlacePlayer(edict_t *,vec3_t);
@@ -41,5 +43,11 @@ int main(void) {
  assert(p.v.origin[2]==p.v.oldorigin[2]);
  VectorCopy(p.v.origin,saved);unavailable=1;
  assert(!AW_PlacePlayer(&p,preferred));assert(!memcmp(saved,p.v.origin,sizeof saved));
+ unavailable=0;{model_t world;memset(&world,0,sizeof world);world.maxs[2]=200;world.mins[2]=-50;sv.worldmodel=&world;
+ preferred[0]=50;preferred[1]=0;preferred[2]=NAN;
+ assert(AW_MapPlace(&p,preferred));assert(p.v.origin[0]==50 && p.v.origin[1]==0 && p.v.origin[2]>=24 && p.v.origin[2]<25);
+ VectorCopy(p.v.origin,saved);unavailable=1;assert(!AW_MapPlace(&p,preferred) && !memcmp(saved,p.v.origin,sizeof saved));
+ unavailable=0;preferred[0]=NAN;assert(!AW_MapPlace(&p,preferred));preferred[0]=4000;assert(!AW_MapPlace(&p,preferred));
+ }
  puts("blocked spawn, ledge rejection, grounded recovery and no-solution preservation passed");return 0;
 }

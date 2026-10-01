@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -24,6 +24,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 int	r_dlightframecount;
 
+/* AmiWind, 2026-10-01: the converted scenery uses translated/rotated brush
+ * instances. Reuse the render transform for both light marking and sampling. */
+void R_DlightOrigin(const dlight_t *light,vec3_t origin)
+{
+    VectorCopy(light->origin,origin);
+    if(currententity && currententity!=&cl_entities[0]){
+        VectorSubtract(origin,currententity->origin,origin);
+        if(currententity->angles[0] || currententity->angles[1] || currententity->angles[2])
+            R_EntityRotate(origin);
+    }
+}
+
 
 /*
 ==================
@@ -33,7 +45,7 @@ R_AnimateLight
 void R_AnimateLight (void)
 {
 	int			i,j,k;
-	
+
 //
 // light animations
 // 'm' is normal light, 'a' is no light, 'z' is double bright
@@ -49,7 +61,7 @@ void R_AnimateLight (void)
 		k = cl_lightstyle[j].map[k] - 'a';
 		k = k*22;
 		d_lightstylevalue[j] = k;
-	}	
+	}
 }
 
 
@@ -72,13 +84,13 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 	float		dist;
 	msurface_t	*surf;
 	int			i;
-	
+
 	if (node->contents < 0)
 		return;
 
 	splitplane = node->plane;
 	dist = DotProduct (light->origin, splitplane->normal) - splitplane->dist;
-	
+
 	if (dist > light->radius)
 	{
 		R_MarkLights (light, bit, node->children[0]);
@@ -89,7 +101,7 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 		R_MarkLights (light, bit, node->children[1]);
 		return;
 	}
-		
+
 // mark the polygons
 	surf = cl.worldmodel->surfaces + node->firstsurface;
 	for (i=0 ; i<node->numsurfaces ; i++, surf++)
@@ -155,7 +167,7 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 
 	if (node->contents < 0)
 		return -1;		// didn't hit anything
-	
+
 // calculate mid point
 
 // FIXME: optimize for axial
@@ -163,23 +175,23 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 	front = DotProduct (start, plane->normal) - plane->dist;
 	back = DotProduct (end, plane->normal) - plane->dist;
 	side = front < 0;
-	
+
 	if ( (back < 0) == side)
 		return RecursiveLightPoint (node->children[side], start, end);
-	
+
 	frac = front / (front-back);
 	mid[0] = start[0] + (end[0] - start[0])*frac;
 	mid[1] = start[1] + (end[1] - start[1])*frac;
 	mid[2] = start[2] + (end[2] - start[2])*frac;
-	
-// go down front side	
+
+// go down front side
 	r = RecursiveLightPoint (node->children[side], start, mid);
 	if (r >= 0)
 		return r;		// hit something
-		
+
 	if ( (back < 0) == side )
 		return -1;		// didn't hit anuthing
-		
+
 // check for impact on this node
 
 	surf = cl.worldmodel->surfaces + node->firstsurface;
@@ -189,17 +201,17 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 			continue;	// no lightmaps
 
 		tex = surf->texinfo;
-		
+
 		s = DotProduct (mid, tex->vecs[0]) + tex->vecs[0][3];
 		t = DotProduct (mid, tex->vecs[1]) + tex->vecs[1][3];;
 
 		if (s < surf->texturemins[0] ||
 		t < surf->texturemins[1])
 			continue;
-		
+
 		ds = s - surf->texturemins[0];
 		dt = t - surf->texturemins[1];
-		
+
 		if ( ds > surf->extents[0] || dt > surf->extents[1] )
 			continue;
 
@@ -224,10 +236,10 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 				lightmap += ((surf->extents[0]>>4)+1) *
 						((surf->extents[1]>>4)+1);
 			}
-			
+
 			r >>= 8;
 		}
-		
+
 		return r;
 	}
 
@@ -239,16 +251,16 @@ int R_LightPoint (vec3_t p)
 {
 	vec3_t		end;
 	int			r;
-	
+
 	if (!cl.worldmodel->lightdata)
 		return 255;
-	
+
 	end[0] = p[0];
 	end[1] = p[1];
 	end[2] = p[2] - 2048;
-	
+
 	r = RecursiveLightPoint (cl.worldmodel->nodes, p, end);
-	
+
 	if (r == -1)
 		r = 0;
 
@@ -257,4 +269,3 @@ int R_LightPoint (vec3_t p)
 
 	return r;
 }
-

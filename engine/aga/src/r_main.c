@@ -252,6 +252,7 @@ R_NewMap
 void R_NewMap (void)
 {
 	int		i;
+    R_SetSkyBackground(cl.worldmodel);
 
 // clear out efrags in case the level hasn't been reloaded
 // FIXME: is this one short?
@@ -829,8 +830,12 @@ void R_DrawBEntitiesOnList (void)
 							continue;
 						}
 
-						R_MarkLights (&cl_dlights[k], 1<<k,
-							clmodel->nodes + clmodel->hulls[0].firstclipnode);
+                        {
+                            dlight_t local=cl_dlights[k];
+                            R_DlightOrigin(&cl_dlights[k],local.origin);
+                            R_MarkLights (&local, 1<<k,
+                                clmodel->nodes + clmodel->hulls[0].firstclipnode);
+                        }
 					}
 				}
 

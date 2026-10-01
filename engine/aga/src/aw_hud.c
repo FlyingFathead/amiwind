@@ -66,11 +66,16 @@ void Sbar_Init(void) {
 void Sbar_Changed(void) {}
 static void compass(void) {
     static const char *directions[]={"N","NE","E","SE","S","SW","W","NW"};
-    char line[24];int heading;
+    char line[96];int heading,limit;const char *region=NULL;vec3_t source;
     if(!show_compass.value || cls.state!=ca_connected || key_dest!=key_game || AW_GalleryActive())return;
     /* Runtime +Y is source north; engine yaw zero points east. */
     heading=(int)anglemod(90-cl.viewangles[YAW]+360);
-    snprintf(line,sizeof(line),"%s %03ld",directions[((heading+22)/45)&7],(long)heading);
+    if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
+       AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,source))region=AW_RegionNameAt(source);
+    snprintf(line,sizeof(line),"%s %03ld / REGION: %s",directions[((heading+22)/45)&7],
+             (long)heading,region?region:"unavailable");
+    limit=(vid.width-96)/4;if(limit<0)limit=0;if(limit>95)limit=95;
+    if((int)strlen(line)>limit){line[limit]=0;if(limit>=3)memcpy(line+limit-3,"...",3);}
     AW_SmallString(vid.width-8-(int)strlen(line)*4,vid.height-26,line);
     scr_copyeverything=1;
 }

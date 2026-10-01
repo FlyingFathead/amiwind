@@ -25,10 +25,35 @@ occlusion. rc1 keeps the entire island overview visible.
 
 The terrain is a reduced, palette-matched overview. The 489 by 512 pixel packet
 is **250,520 bytes**, including bounds, ocean colour and area transforms. It is
-allocated/read only when opened and freed on close. Rendering the open map does
-not read from disk. Ocean beyond the image has the same colour as the map's
+allocated/read only when opened and freed on close. Map pixels stay in memory while open. The region-name lookup reads a small
+record on first use or a changed exterior cell and caches that result. Ocean beyond the image has the same colour as the map's
 water; panning has a bounded ocean margin. The separate
 [terrain pass](WORLD_TERRAIN.md) supplies playable regions and their origins.
+
+## Region name and debug teleport
+
+The regular map shows **REGION: <name>** at the bottom right beneath the map
+viewport. It uses the player's original source coordinates, not the mouse,
+view direction or panned map centre. The same name appears beside the optional
+compass/heading HUD. Original exterior CELL coordinates select CELL.RGNN; that
+identifier resolves through REGN.NAME to the original REGN.FNAM display name.
+Negative coordinates use floor division by the game's 8192-unit cell size.
+No region boundaries or names are invented. Missing data or interiors without
+an exterior coordinate fix display `unavailable`.
+
+`dbg tp map` opens **DEBUG TELEPORT** with **CLICK ON TARGET TO TELEPORT**.
+Click inside the map to select a destination and display a red crosshair. The
+**TELEPORT** button appears at the bottom right; clicking it confirms travel.
+Enter also confirms an existing selection; Escape cancels. Selection survives
+zoom/pan without changing its world coordinates. Right-drag or arrows pan this
+mode. The ordinary M map retains normal drag behavior and never teleports.
+
+The target is resolved to existing detailed-town or world-terrain coverage.
+Landing uses the actual standing collision hull, with a checked normal spawn
+and an explanatory message if the selected column is blocked. Highest supported
+surfaces can include roofs. Missing destinations fail without starting travel.
+This is a single-player debug aid, not unlocked in-world fast travel, discovery
+progression or a promise that every map pixel is a reachable destination.
 
 ## J: earned journal entries in two facing pages
 
@@ -82,7 +107,7 @@ content-fingerprint check still governs whether an old save can be loaded.
 
 Host tests cover negative-cell transforms, geometry conservation, full-object
 overlap, malformed asset bounds, disk-member-relative offsets, missing files,
-page/index navigation, panel exit, no draw-time disk reads, history ordering,
+page/index navigation, panel exit, cached map pixels and journal text, history ordering,
 duplicates, capacity transactions, corruption and legacy decoding. Native checks
 open the island map, pan/zoom/grid/player-centre, read the opening journal entry,
 follow the quest index, return to play and quickload the earned entry.

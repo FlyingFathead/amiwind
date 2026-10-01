@@ -310,3 +310,14 @@ The compass/heading HUD defaults to hidden in rc6. Use `dbg compass on` or
 `dbg all`/`dbg hud`. The archived config variable is `aw_compass`, with shipped
 `config/game.cfg` default `aw_compass 0`; saved user settings override that
 default on startup. Invalid values leave the setting unchanged.
+
+## rc7 navigation and cave lighting
+
+`dbg compass on` now displays heading plus the original game's region name at
+the player's coordinates. The compass remains off by default. The ordinary M
+map shows the same region below its viewport regardless of compass visibility.
+See [map lookup and teleport](WORLD_MAP_AND_JOURNAL.md#region-name-and-debug-teleport).
+
+`dbg tp map` selects a point with a red crosshair, then requires the TELEPORT
+button or Enter to confirm. Escape cancels. **F, then V** equips the temporary
+[carried torch](TORCH.md); Shift+V continues to cycle draw distance.

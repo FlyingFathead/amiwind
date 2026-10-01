@@ -69,10 +69,13 @@ class Scene:
                 raise ValueError('Invalid hull root')
             self.brushes.append((root, origin, axes(angles), e.get('aw_ref', e['model'])))
 
+    def _trace_brushes(self, start, end):
+        return self.brushes
+
     def trace(self, start, end):
         """First solid interval on a segment through each rotated standing hull."""
         best = None
-        for root, origin, basis, ref in self.brushes:
+        for root, origin, basis, ref in self._trace_brushes(start, end):
             a = tuple(dot(tuple(start[i]-origin[i] for i in range(3)), axis) for axis in basis)
             b = tuple(dot(tuple(end[i]-origin[i] for i in range(3)), axis) for axis in basis)
             stack = [(root, 0., 1., None, False)]; visits = 0; states = {}

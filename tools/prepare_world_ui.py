@@ -14,7 +14,47 @@ from PIL import Image
 from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
 
-WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq')
+WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn')
+
+
+def region_names(raw):
+    """Original exterior CELL coordinates -> RGNN ID -> REGN display name.
+
+    Keep the source names intact. A cell without RGNN has no known region;
+    neither a nearby region nor a generated vf map number supplies one.
+    """
+    regions = {}; cells = {}
+    for tag, flags, payload in records(raw):
+        if tag not in ('REGN', 'CELL'): continue
+        fields = {}
+        for key, value in subrecords(payload):
+            if tag == 'CELL' and key == 'FRMR': break
+            fields[key] = value
+        if 'DELE' in fields: continue
+        if tag == 'REGN':
+            identifier = string(fields['NAME']).casefold()
+            name = string(fields.get('FNAM', b''))
+            encoded = name.encode('cp1252')
+            if not encoded or len(encoded) >= 64 or any(c < 32 for c in encoded):
+                raise ValueError('Invalid original region display name')
+            if identifier in regions: raise ValueError('Duplicate original region ID')
+            regions[identifier] = encoded
+        else:
+            if len(fields.get('DATA', b'')) != 12: raise ValueError('Invalid CELL header')
+            cell_flags, x, y = struct.unpack('<Iii', fields['DATA'])
+            if cell_flags & 1: continue
+            if (x, y) in cells: raise ValueError('Duplicate exterior cell coordinate')
+            cells[x, y] = string(fields.get('RGNN', b'')).casefold()
+    names = sorted(regions)
+    if len(names) > 1024 or len(cells) > 65536: raise ValueError('Region catalogue exceeds runtime bounds')
+    indices = {name: i for i, name in enumerate(names)}
+    rows = []
+    for (x, y), identifier in sorted(cells.items()):
+        if not identifier: continue
+        if identifier not in indices: raise ValueError('CELL references missing REGN: '+identifier)
+        rows.append(struct.pack('<iiI', x, y, indices[identifier]))
+    return (b'ARN1' + struct.pack('<II', len(names), len(rows))
+            + b''.join(regions[name].ljust(64, b'\0') for name in names) + b''.join(rows))
 
 
 def fixed(value,size):
@@ -107,7 +147,8 @@ def prepare(data_files,survey,scene):
     index,blob,quests=journal_assets(master)
     labels=quest_labels(master,json.loads((Path(__file__).resolve().parents[1]/'config/journal_titles.json').read_text()))
     worldmap=map_asset(report,Image.open(survey/'terrain.png'),palette)
-    for name,raw in [('map.awm',worldmap),('journal.awj',index),('entries.dat',blob),('quests.awq',labels)]:
+    for name,raw in [('map.awm',worldmap),('journal.awj',index),('entries.dat',blob),('quests.awq',labels),
+                     ('region-names.awn',region_names(master))]:
         (dest/name).write_bytes(raw)
     receipt={'format':'AmiWind world UI 1','master_sha256':report['master_sha256'],
              'palette_sha256':hashlib.sha256(palette).hexdigest(),'journal_quests':quests,

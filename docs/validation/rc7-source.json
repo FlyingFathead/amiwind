@@ -1,0 +1,178 @@
+{
+  "version": "0.0.25-rc7",
+  "date": "2026-10-01",
+  "status": "source/native compile/asset-free image and strict retained actor fixture passed; full game image and emulator playtest not performed",
+  "baseline": {
+    "version": "0.0.25-rc6",
+    "archive": "AmiWind-v0.0.25-rc6-public-source.zip",
+    "sha256": "203a46a5ec97b64a1a50d6d282918bcb47103ab3d415eee1fca76689df9b3b0c"
+  },
+  "source_tests": {
+    "status": "passed",
+    "tests": 379,
+    "skipped": 0,
+    "log_sha256": "53f4ea14088ac8572ecdb730c47a979b1368f82ff01f8ea1608eed4e0869e590",
+    "real_quakec_compiler": "pinned qcc-host",
+    "real_qbsp": "0.18.1"
+  },
+  "native_compile": {
+    "status": "passed",
+    "version": "0.0.25-rc7",
+    "binary_sha256": "2be009536f6cb5c866af7d7ced5ad1d45ddf20fdd9074f4a1bce20dfb6eef8be",
+    "bootcheck_sha256": "584ce10a3d048b8f1ba047e2188b31187f27478af9c9b958748cb04a9b618aca",
+    "compiler_warning_lines": 78,
+    "jobs": 2,
+    "target": "68040/FPU AGA",
+    "host": "Linux"
+  },
+  "asset_free_image": {
+    "status": "passed",
+    "bytes": 8421376,
+    "sha256": "6fe54f9b09ee126b04c342a6858b806baaf2852c7bbb606b2692ac76ae73b733",
+    "elapsed_seconds": 7.406,
+    "payload_readback": "passed",
+    "game_assets_used": false,
+    "rom_used": false,
+    "emulator_boot": "not performed"
+  },
+  "actor_contact": {
+    "bake_seconds": 276.6406954069971,
+    "audit_seconds": 34.35517907499161,
+    "status": "passed",
+    "summary": {
+      "grounded": 158,
+      "explicit-exception": 3
+    },
+    "errors": 0,
+    "distinct_placements": 161,
+    "placement_copies": 1613,
+    "baseline_errors": 23,
+    "baseline_distinct_failing_references": 15,
+    "fit_cases": 23,
+    "fitted_references": [
+      "128960",
+      "128961",
+      "128962",
+      "128963",
+      "128964",
+      "128965",
+      "128966",
+      "172852",
+      "259838",
+      "282952",
+      "282953",
+      "297839",
+      "365484",
+      "365485",
+      "67638"
+    ],
+    "production_gate_waived": false,
+    "classification_policy_changed": false,
+    "audit_tolerance_unchanged": true,
+    "scope": "Retained converted scene fixture including canonical towns, interiors and intro; initial idle poses only",
+    "report_sha256": "e6c4786014e2f767f19e27c309b48da1c8597b379b913984e7b0268bcc42ac6c",
+    "support_report_sha256": "44f8b911e75257c5cb6845e7bb61a2c5da2d44ca2f310863f25451ff73f90ade",
+    "maximum_xy_correction": 29.5,
+    "runtime_validation": "native fixture preserves certified placement; actual Amiga scene/save re-entry not played"
+  },
+  "region_names": {
+    "source": "original exterior CELL.RGNN and REGN.NAME/FNAM, 8192-unit cells with negative floor",
+    "private_master_sha256": "5c3c8c2cbd20e25901b59b3ece33d36b7ef0e3d60ad8d11828bcc61a5ead1647",
+    "region_names": 9,
+    "assigned_exterior_cells": 1403,
+    "asset_bytes": 17424,
+    "asset_sha256": "31982fe9292a882c65ef7bb0767dabf8cfce80b24d8038b548cdde7040067c94",
+    "ui": "native HUD and regular map/footer tests passed; target visual check pending"
+  },
+  "map_teleport": {
+    "native_tests": "selection/confirmation/cancel/pan/zoom and collision landing helpers passed",
+    "emulator": "not tested"
+  },
+  "sky_background": {
+    "native_pixel_tests": "passed for outdoor sky fill and indoor reset",
+    "reported_red_mountain_camera": "not replayed",
+    "all_terrain_seams_fixed": false,
+    "water_rendering_changed": false
+  },
+  "torch": {
+    "native_tests": "compiled QuakeC hand transitions; one bounded light; actual surface illumination; rotated/translated model lighting; viewport clipping passed",
+    "emulator_visual_and_fps": "not tested",
+    "inventory_and_fuel": false
+  },
+  "character_progression": {
+    "source_review": "original NPC_, CELL, SCPT and dialogue-result records reviewed",
+    "dreamer_startup_and_quest_enable": "documented; not implemented",
+    "general_actor_presence_state_machine": "not implemented"
+  },
+  "full_game_image": {
+    "status": "not built for rc7",
+    "reason": "available storage insufficient for new scene, partitions and final game HDF; retained inputs preserved",
+    "production_image_pass_claimed": false
+  },
+  "recovery": {
+    "entry_point": "--recover-image-from completed-terrain failed rc3 run",
+    "scheduled_stages": [
+      "engine",
+      "image"
+    ],
+    "terrain_regenerated": false,
+    "guards": "existing synthetic provenance/integrity tests passed",
+    "rc7_end_to_end_game_recovery": "not executed here"
+  },
+  "private_payload_delivered": false,
+  "build_environment": {
+    "python": "3.12.14",
+    "packages": [
+      {
+        "name": "numpy",
+        "version": "2.3.5"
+      },
+      {
+        "name": "scipy",
+        "version": "1.17.0"
+      },
+      {
+        "name": "Pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "PyFFI",
+        "version": "2.2.3"
+      },
+      {
+        "name": "fast-simplification",
+        "version": "0.2.0"
+      },
+      {
+        "name": "amitools",
+        "version": "0.8.1"
+      },
+      {
+        "name": "setuptools",
+        "version": "84.0.0"
+      }
+    ],
+    "worker_budget": 2,
+    "stage_scheduling": "dependency-aware",
+    "tools": [
+      {
+        "name": "make",
+        "detected": "4.3",
+        "status": "matching",
+        "sha256": "d78b8f1d099fbcfb6f2f49ab87223b9b68fb3956642f92d6ec6de812e8afa965"
+      },
+      {
+        "name": "m68k-amigaos-gcc",
+        "detected": "16.2.0b 20260825082934",
+        "status": "matching",
+        "sha256": "34119a3528cc5778967b8741eba490d8ae25829fcd89858f3be376f323a64cda"
+      },
+      {
+        "name": "vasmm68k_mot",
+        "detected": "2.0f",
+        "status": "newer",
+        "sha256": "3c5d4203377bd45f3ee1743cb24dd57cd94f570ab209cd9f9306e9826db29f15"
+      }
+    ]
+  }
+}

@@ -310,6 +310,8 @@ void R_SetupFrame (void);
 void R_cshift_f (void);
 void R_SplitEntityOnNode2 (mnode_t *node);
 void R_MarkLights (dlight_t *light, int bit, mnode_t *node);
+void R_DlightOrigin(const dlight_t *light,vec3_t origin);
+void R_EntityRotate(vec3_t vec);
 
 #if	!id68k
 void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1);

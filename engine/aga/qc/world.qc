@@ -27,6 +27,7 @@ float(float value) floor = #36;
 .float aw_hand_punch;
 .float aw_hand_state;
 .float aw_hand_goal;
+.float aw_torch;
 .float aw_hand_started;
 .float aw_attack_latched;
 void(float state) aw_hand_begin = {
@@ -39,12 +40,13 @@ void() aw_hands_update = {
         self.impulse = 0;
         self.aw_hand_goal = 1 - self.aw_hand_goal;
     }
+    if (!self.aw_hand_goal || self.health <= 0) self.aw_torch = 0;
     if (self.aw_hand_state == 0 && self.aw_hand_goal) aw_hand_begin(1);
     if (self.aw_hand_state == 2 && !self.aw_hand_goal) aw_hand_begin(4);
     if (!self.button0) self.aw_attack_latched = 0;
     if (self.button0 && !self.aw_attack_latched) {
         self.aw_attack_latched = 1;
-        if (self.aw_hand_state == 2) aw_hand_begin(3);
+        if (self.aw_hand_state == 2 && !self.aw_torch) aw_hand_begin(3);
     }
     if (self.aw_hand_state == 0) { self.weaponmodel = ""; return; }
     self.weaponmodel = "progs/v_nord.mdl";
@@ -68,6 +70,9 @@ void() aw_hands_update = {
 .float aw_ground_mode; // 0 ground resident; 1 authored airborne/scripted exception
 .string aw_source_id;
 .float aw_authored_z;
+.vector aw_authored_origin;
+.float aw_ground_valid;
+.vector aw_ground_baked;
 .float aw_story_hidden;
 .float aw_walk_step;
 .float aw_moving;

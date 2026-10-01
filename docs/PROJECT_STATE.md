@@ -7,18 +7,17 @@ ahead of Windows bring-up and speculative QCC acceleration. The workstation
 build completed world-terrain in 4232.5 seconds, then failed image assembly's
 world/journal receipt check. rc6 repairs that receipt and provides checked
 [image recovery](IMAGE_RECOVERY.md). The owner has since reported successful
-rc3 private-test assembly with 23 explicitly accepted contact findings. Full
-rc6 game assembly remains unverified and strict actor acceptance remains failed.
+rc3 private-test assembly with 23 explicitly accepted contact findings. That rc3 result remains historical evidence. Current rc7 actor-fit validation
+is recorded separately below.
 
 **Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
-**Current candidate: v0.0.25-rc6**, one complete source update directly from
-rc3. It includes rc4 host-tool groundwork, rc5 completion reporting and all
-subsequent roadmap decisions. Earlier rc4/rc5 patches are not prerequisites. All 373 source tests and a fresh
-Linux serial native compile plus asset-free HDF/readback pass; no full game
-build or performance improvement is claimed.
-See [the rc6 release notes](RELEASE-v0.0.25-rc6.md) and
-[validation receipt](validation/rc6-source.json) for the checks actually run.
+**Current candidate: v0.0.25-rc7**, one complete source update from rc6.
+This adds original-data region labels, confirmed map teleport, initial actor
+contact fitting, outdoor sky background filling and a carried-light prototype.
+See [release notes](RELEASE-v0.0.25-rc7.md) and the
+[validation receipt](validation/rc7-source.json). Tests and an asset-free native
+build do not establish full game-image or emulator acceptance.
 
 World-terrain profiling, reusable conversion results and reduced BSP/collision
 work are the top engineering priority. Native Windows/MSYS2 remains the
@@ -43,12 +42,19 @@ noclip flight is twice Shift speed. Editable keymaps are separate from settings,
 with a maintained [control reference](KEYMAPS.md). Unexplored-map masking is a
 TODO and is explicitly outside rc1.
 
-The 23 existing strict NPC contact findings remain unresolved and the ordinary
-production image gate remains unchanged. This candidate is not production
-acceptance. Inventory, general quest execution and complete playthrough
-acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc6.md)
+The rc7 fitter addresses the previously reported 23 contact cases using the
+actual quantized idle mesh. The strict production audit remains unchanged;
+its measured result is recorded in the current validation receipt. Inventory, general quest execution and complete playthrough
+acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc7.md)
 and [terrain conversion](WORLD_TERRAIN.md). Published dev1 and v0.0.24 archives
 remain immutable.
+
+Source review also confirms a separate [character-state gap](CHARACTER_STATES.md):
+the converted Balmora Dreamer is disabled by original startup logic and appears
+later through a quest-conditioned enable transition. Contact acceptance does not
+verify that transition or justify unconditional new-game presence. Fargoth, the
+dock guard, Vodunius and the Addamasartus slaves likewise have progression-related
+behavior that must remain distinct from geometric placement correction.
 
 ## RC3 recovery baseline (historical)
 

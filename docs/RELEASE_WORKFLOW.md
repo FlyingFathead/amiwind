@@ -2,30 +2,30 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current candidate: **v0.0.25-rc6 — complete source update from rc3**.
+Current candidate: **v0.0.25-rc7 — complete source update from rc6**.
 It consolidates all intervening source and roadmap work. The native compiler
 and asset-free image checks are distinct from full game-image acceptance;
-see [rc6 validation](validation/rc6-source.json). Earlier archives and tags remain
+see [rc7 validation](validation/rc7-source.json). Earlier archives and tags remain
 immutable. The owner performs all Git/GitHub publishing.
 
 ## Complete update package
 
-`AmiWind-v0.0.25-rc6-complete-update.zip` is the single handoff download. It
+`AmiWind-v0.0.25-rc7-complete-update.zip` is the single handoff download. It
 contains the complete public source ZIP, updater, checksums and apply/publish
 scripts. The handoff bundle is for local use. Its publication script uploads
-only the public source ZIP, source updater and their checksum file.
+the public source ZIP, incremental source ZIP, source updater and checksums.
 
-`AmiWind-v0.0.25-rc6-public-source.zip` contains every maintained source file
+`AmiWind-v0.0.25-rc7-public-source.zip` contains every maintained source file
 under `amiwind/`, including all documentation and a generated package manifest.
 No rc4/rc5 patch chain or separate roadmap overlay is required. No private
 playable, HDF, converted game data or ROM is included.
 
-## Apply directly to rc3
+## Apply directly to rc6
 
 Finish any running build before updating its source. Extract the complete
 source outside the checkout and use `tools/apply_source_update.py` with a new
-external backup directory. `docs/RECONCILE-BASES.json` accepts the rc3 bytes for
-paths changed by this update. `docs/PATCH-v0.0.25-rc6.json` records the exact rc3
+external backup directory. `docs/RECONCILE-BASES.json` accepts the rc6 bytes for
+paths changed by this update. `docs/PATCH-v0.0.25-rc7.json` records the exact rc6
 baseline and hashes; its name is historical metadata terminology, not a
 requirement to download or apply an incremental patch.
 
@@ -35,6 +35,13 @@ tools and build outputs separate. Do not blindly unzip over the working tree.
 Verify that the direct update reproduces every maintained file and executable
 mode in the complete source archive. The package manifest is generated evidence,
 not tracked source. Runtime version identity comes from `VERSION`.
+
+Before tagging, push main and wait for the `source-check.yml` push workflow
+whose `headSha` equals the exact committed source revision. A queued run, a
+previous green commit or a cancelled/skipped/failed run is not acceptance.
+Only a completed successful run permits the source tag and prerelease. Download
+the uploaded assets and verify their checksums against the local package. The
+provided publication script performs this sequence; the owner executes it.
 
 ## Release gate
 

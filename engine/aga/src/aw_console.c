@@ -39,6 +39,7 @@ static route_t routes[]={
     {"sealevel","amiwind_debug_sealevel","on/off"},
     {"scene change","aw_scene_menu","(scene picker)"},
     {"scene","aw_scene","ship/town/balmora/<map name>"},
+    {"tp map","aw_teleport_map","select a destination on the world map"},
     {"tp menu","aw_scene_menu","(teleport picker)"},
     {"tp","aw_teleport","[balmora/seydaneen/prisonship/<map name>; no argument opens menu]"},
     {"eyeheight","aw_eyeheight","[offset above player origin]"},

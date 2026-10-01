@@ -8,21 +8,18 @@
 
 ## Current state of the project
 
-**v0.0.25-rc6 — complete source update from rc3**
+**v0.0.25-rc7 — placement, navigation and cave-lighting checkpoint**
 
-This complete source checkpoint combines the host-tool groundwork, build
-completion reporting and updated engineering roadmaps. It updates rc3 directly.
-It fixes the world/journal receipt failure after terrain conversion and supports
-[recovering image assembly](docs/IMAGE_RECOVERY.md) without rebuilding terrain.
+This complete rc6 update adds original-game region names to the map and optional
+compass, confirmed map teleport (`dbg tp map`), and a [placeholder torch](docs/TORCH.md)
+(**F**, then **V**). It corrects initial actor contact and the fog-off pale sky
+background path. Water rendering is unchanged.
 
-The builder now reports start/end timestamps, total elapsed time, compiler
-warning lines and the final file's size and SHA-256 in a terminal-width footer.
-The footer and JSON also record compiler/toolkit versions and Python packages.
-Success requires every selected stage and final output hashing to finish; see
-[build output](docs/BUILD_OUTPUT.md). rc4's host groundwork remains included.
-Native Windows/MSYS2 is **untested**; see the [roadmap](docs/WINDOWS_BUILD_ROADMAP.md).
-The prior Linux full rebuild stopped on disk exhaustion during world-terrain
-assembly; full game-image acceptance remains incomplete.
+A completed rc3 terrain run can be reused through
+[engine/image recovery](docs/IMAGE_RECOVERY.md). Build receipts retain timing,
+compiler/tool versions, warning counts, output size and SHA-256; see
+[build output](docs/BUILD_OUTPUT.md). Native Windows/MSYS2 remains **untested**;
+see the [roadmap](docs/WINDOWS_BUILD_ROADMAP.md).
 
 The base-game island now has a playable terrain pass following the recovered
 polygon survey: **2,526 terrain regions**, with local coordinates rebased at
@@ -34,7 +31,7 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[candidate scope and validation](docs/RELEASE-v0.0.25-rc6.md).
+[candidate scope and validation](docs/RELEASE-v0.0.25-rc7.md).
 
 rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
 original shoreline samples that coarse terrain had submerged. A normal-view
@@ -70,17 +67,16 @@ opening scenes and converted interiors. Aim at doors or residents and press
 **E**. NPC interaction currently provides bounded authored greetings. Full
 combat, quest simulation, services, schedules and inventory remain unfinished.
 
-rc6 checks actor contact before world-terrain on new builds. An
-[explicit private-test recovery option](docs/IMAGE_RECOVERY.md) can accept an
-exact reviewed report while retaining failed production acceptance. The owner
-reported successful rc3 diagnostic assembly; rc6 full-game testing remains open.
+Initial actor contact is checked before world-terrain and again on final image
+contents. The rc7 fitter checks the actual idle mesh, preserves authored
+coordinates and keeps the strict gate. Ground contact is separate from
+[quest-driven character presence](docs/CHARACTER_STATES.md), which remains
+incomplete. Dreamer startup visibility is a documented example.
 
-This development build retains the documented limits: **23 strict ground-contact audit
-findings remain unresolved**, and the ordinary production image builder still
-stops on that audit. The owner accepted those findings for v0.0.24;
-release status does not turn the audit into a pass. Method 1 retains synchronous
-loading behind the frozen-frame Loading... box; method 2 read-ahead remains
-experimental. See [release notes and verification](docs/RELEASE-v0.0.25-rc6.md).
+Native compilation and host tests do not establish a full playable-image or
+emulator pass. See [release evidence](docs/validation/rc7-source.json). Method 1
+retains synchronous loading behind the frozen-frame Loading... box; method 2
+read-ahead remains experimental.
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game

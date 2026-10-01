@@ -409,6 +409,9 @@ void AW_MusicTitle(void);
 #endif
 void AW_HandSpritesInit(void);
 void AW_HandSpritesDraw(void);
+void AW_TorchInit(void);
+void AW_TorchUpdate(void);
+void AW_TorchDraw(void);
 int AW_HandSpritesValidate(byte *data,unsigned long bytes);
 
 /* Original-style private-asset UI, independent of the console. */

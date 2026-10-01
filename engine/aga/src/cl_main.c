@@ -723,6 +723,7 @@ void CL_Init (void)
 	SZ_Alloc (&cls.message, 1024);
 
 	CL_InitInput ();
+	AW_TorchInit ();
 	/* No original Quake temporary-entity sounds in standalone content. */
 
 //

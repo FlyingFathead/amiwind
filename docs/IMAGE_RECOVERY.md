@@ -5,6 +5,8 @@ rc3 can finish the full terrain conversion and fail image assembly with
 included `regions.awr`, owned by world terrain, while its validator correctly
 expected only `map.awm`, `journal.awj`, `entries.dat` and `quests.awq`.
 rc6 records only those four generated files and retains strict validation.
+rc7 adds its own region-name table to the owned-file set; terrain output remains
+separate.
 The regression fixture includes a terrain directory, an unrelated subdirectory,
 repeat generation and a corrupted journal payload.
 
@@ -12,14 +14,15 @@ New full builds generate and validate world UI, then prepare a small copied
 actor payload and check its contact before world-terrain. The early check uses
 actual converted maps/models, creates the Seyda subregions, annotates source
 identities and applies the same grounding baker. It leaves the input scene
-untouched. The retained rc3 scene reproduces 23 strict failures at this stage.
+untouched. The rc6 baker reproduces 23 strict failures on the retained rc3 scene. The rc7
+mesh-aware fitter corrects initial placement before this unchanged audit.
 Final image assembly repeats the complete audit. Content fingerprinting,
 filesystem limits and image readback also remain required.
 
 ## Preserve and recover
 
 Keep the failed run, particularly `build-state.json`, `intro-scene`,
-`world-terrain`, `world-survey` and `music`. Apply the complete rc6 source update
+`world-terrain`, `world-survey` and `music`. Apply the complete rc7 source update
 after the original process has exited. Use a fresh output name:
 
 ```bash
@@ -28,7 +31,7 @@ bash build.sh \
   --data-files '/path/to/Morrowind/Data Files' \
   --tools-dir /path/to/amiwind-tools \
   --workspace /path/to/amiwind-tests \
-  --name rc6-image-recovery
+  --name rc7-image-recovery
 ```
 
 Repeat original non-default `--hands`, `--bitmap-paper-ink` or `--intro-captions`
@@ -52,14 +55,16 @@ and hashes. Completion time covers recovery provenance, engine/image work and
 final hashing, not the original terrain run or prerequisite recovery checks.
 
 Disk space is still required for the copied scene and image staging. Recovery
-provenance guards are covered by synthetic fixtures. A full rc6 game HDF has
-not been validated here. The owner reported a completed rc3 private-test HDF
+provenance guards are covered by synthetic fixtures. A full rc7 game HDF has
+not been validated here; consult the current [validation receipt](validation/rc7-source.json). The owner reported a completed rc3 private-test HDF
 from the image-only hotfix in 144.664 seconds; its actor gate remained failed.
 
 ## Explicit private-test acceptance
 
-The 23 actor findings are real unresolved contact defects. A strict recovery
-will stop on them. To test the rest of the image, an owner can explicitly pass:
+This option was introduced for the rc3/rc6 unresolved findings. It remains an
+explicit diagnostic mechanism, not the normal rc7 correction path. Do not pass
+the old report to a newly corrected payload. For a separately reviewed current
+failure report, the diagnostic option is:
 
 ```text
 --allow-known-actor-ground-findings /path/to/reviewed/actor-initial-contact.json

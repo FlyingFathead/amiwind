@@ -4,9 +4,9 @@
 server_t sv;
 char *pr_strings="\0aw_npc\0Resident";
 static edict_t entities[4];static model_t model;
-static float wall=1000,floor_z;static int blocked,steep;static eval_t mode;
+static float wall=1000,floor_z;static int blocked,steep;static eval_t mode,valid,baked;
 edict_t *EDICT_NUM(int n){assert(n>=0 && n<4);return &entities[n];}
-eval_t *GetEdictFieldValue(edict_t *e,char *name){return &mode;}
+eval_t *GetEdictFieldValue(edict_t *e,char *name){if(!strcmp(name,"aw_ground_mode"))return &mode;if(!strcmp(name,"aw_ground_valid"))return &valid;if(!strcmp(name,"aw_ground_baked"))return &baked;return NULL;}
 void SV_LinkEdict(edict_t *e,qboolean touch){}
 int AW_RegionGroundCoverage(const float *point){return 1;}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *skip){
@@ -39,5 +39,11 @@ int main(void){
     e->v.origin[2]=144;mode._float=1;assert(!AW_NPCFloor(e) && e->v.origin[2]==144);mode._float=0;
     steep=1;assert(!AW_NPCFloor(e) && e->v.origin[2]==144);steep=0;
     blocked=1;assert(!AW_NPCFloor(e) && e->v.origin[2]==144);
+    /* Preserve mesh-aware baked origin; moved and legacy actors still trace. */
+    blocked=0;e->v.origin[2]=125.5f;VectorCopy(e->v.origin,baked.vector);valid._float=1;
+    assert(AW_NPCFloor(e) && e->v.origin[2]==125.5f);
+    e->v.origin[0]+=1;assert(AW_NPCFloor(e) && e->v.origin[2]==126.25f);
+    VectorCopy(e->v.origin,baked.vector);e->v.origin[2]=144;valid._float=0;
+    assert(AW_NPCFloor(e) && e->v.origin[2]==126.25f);
     return 0;
 }

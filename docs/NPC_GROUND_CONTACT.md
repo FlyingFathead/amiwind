@@ -14,6 +14,15 @@ lists the ground residents currently converted and the other initial states.
 An unclassified source ID stops conversion; it never silently defaults to ground.
 Add classification during source/content intake, then automate the geometry work.
 
+Ground classification describes the required support **when an actor is active**.
+It is not an enabled-at-start flag, an AI schedule, or evidence that the actor
+belongs in every quest state. A placed CELL reference supplies an authored
+transform; local scripts, global startup scripts and dialogue results can change
+its visibility, AI package or position. Preserve those decisions separately from
+contact correction. A passing contact audit cannot certify quest-state fidelity.
+See [character states](CHARACTER_STATES.md) for the Dreamer's later activation,
+other confirmed lifecycle examples and the implementation requirements.
+
 `aw_ground_mode=0` means an initially grounded resident. Mode 1 preserves a
 documented flying, levitating, swimming, scripted airborne or authored dead state.
 Tarhiel's original ID is `agronian guy`; the controller `fallingScript` enables him
@@ -30,8 +39,8 @@ not change every instance of a source actor to hide one bad placement.
 
 1. Finish visible geometry and collision, including stairs, platforms and floors.
    Resolve each resident in its owning sub-cell, with that scene's full support
-   geometry. Use the bounded placement pass to propose its initial Z. Preserve
-   source reference, authored Z, support reference and any adjustment in evidence.
+   geometry. Use the bounded placement pass to fit the rendered initial idle soles. Preserve
+   source reference, authored XYZ, support reference and every adjustment in evidence.
 2. Write the canonical result into every overlap copy. Missing owners, inconsistent
    copies, unknown initial states and excessive or unsupported drops are errors.
    Do not repair a missing platform by snapping its occupant to terrain below.
@@ -66,12 +75,12 @@ scan and no need to keep the build reports or a second collision world in RAM.
 
 ## Runtime correction
 
-Once architectural brushes are linked, a ground NPC tests its feet point from
-8 units above the source position to 32 below. Accept only a non-solid starting
-point and walkable support. Keep a quarter-unit clearance. Apply the same check
-after restored NPC positions are loaded. A missing, steep, blocked or excessively
-distant floor keeps the original position for diagnosis. This limit is a safety
-bound, not evidence that the unresolved position is acceptable.
+rc7 preserves a host-certified initial point exactly when the current position
+matches `aw_ground_baked` within 0.001 unit. Re-snapping only its origin would
+undo mesh-aware correction. Moved/legacy residents still use the bounded origin
+probe from 8 units above to 32 below, accepting walkable non-solid support with
+a quarter-unit clearance. That fallback is not certification of arbitrary
+movement, other poses or runtime support changes.
 
 Balmora's distant render overlap contains some architecture with collision
 intentionally removed. Conversion therefore measures each resident against its
@@ -126,9 +135,10 @@ all-placements guarantee applies to a passed production build, not this snapshot
 ## rc3 retained contact findings and rc6 early checking
 
 The retained payload audit reproduces 23 failing scene/actor cases covering 15
-placed references. All are classified as ground-standing; these are unintended
-contact/placement defects. Some cases repeat across the regular town, dock and
-courtyard scenes. They are not 23 different levitating characters.
+placed references. All require ground support when active. These are contact
+defects in the converted idle placements, not evidence that every actor should
+be active at the beginning of a new game. Some cases repeat across the regular
+town, dock and courtyard scenes. They are not 23 different levitating characters.
 
 | Scene | Placed actors |
 | --- | --- |
@@ -145,7 +155,7 @@ also includes penetration and unsupported/blocked samples, not only floating.
 Three authored-dead placements were correctly reported separately as explicit
 exceptions; they are not among these 23 failures.
 
-The baker currently resolves support under the actor origin. The independent
+The rc3/rc6 baker resolves support under the actor origin. The independent
 audit checks low vertices of the quantized mesh across initial idle poses.
 Those are different measurements: a supported origin does not prove supported
 feet over uneven geometry. Proper repair must address actual mesh/placement
@@ -157,3 +167,54 @@ the retained rc3 scene without compiling world terrain. The final image audit
 remains mandatory. An explicitly requested private-test baseline acceptance is
 documented in [image recovery](IMAGE_RECOVERY.md). It does not mark the strict
 gate passed, fix the placement defects or constitute production acceptance.
+
+## Source progression review, 1 October 2026
+
+The retained base master was inspected directly: NPC_ records, the 15 original
+CELL reference numbers above, attached SCPT records, other scripts referring to
+those actor IDs and matching dialogue-result scripts. Master SHA-256:
+`5c3c8c2cbd20e25901b59b3ece33d36b7ef0e3d60ad8d11828bcc61a5ead1647`.
+This review covers the base master, not expansion, mod or saved-game overrides.
+
+| Actor | Original record/script evidence | Required distinction |
+| --- | --- | --- |
+| Dreamer, reference 297839 | `Startup` disables `Dreamer_Talker01`; its `dreamer_talkerEnable` script enables a disabled actor when `A2_2_6thHouse` is exactly 50. | The reference exists in the master but is not an unconditional new-game resident. Ground contact still matters when enabled. |
+| Fargoth, reference 128964 | Attached `LocalState` holds a local variable. Separate `lookoutScript` uses `MS_Lookout`, time and proximity checks, then changes sneak/wander state and issues a sequence of travel commands. Dialogue results can terminate that sequence. | Reading only the attached script misses the quest route; the authored CELL position is not his permanent runtime position. |
+| Dock guard, reference 172852 | `CharGenRaceNPC` sends him toward the plank and later the office door. `CharGenClassNPC` subsequently disables him with the boat objects. | Opening stages require different positions and eventual absence, not one permanently visible placement. |
+| Vodunius Nuccius, reference 128962 | `voduniusScript` disables him on a cell change once `MS_Nuccius` is at least 100. | A grounded resident must still disappear when the original progression requires it. |
+| Banalz and Baadargo, references 365484/365485 | Attached `slaveScript` distinguishes owned, for-sale, player-owned and freed states. It can issue follow/wander commands and disable a freed slave on cell change. | Preserve the source state transitions; this script capability alone does not establish that every branch is reachable for both individuals. |
+| Other nine references | No attached script on their NPC_ records; authored AI_W packages exist. Mervs has zero wander distance; the other eight have nonzero distance. | They are not all stationary. Absence of a local script does not prove absence of external script or dialogue effects. |
+
+The converted Dreamer is presently included as a resident, while the general
+runtime has no implementation of `Startup`/`dreamer_talkerEnable`. That is a
+separate visibility/progression gap. Do not describe grounding this actor as a
+complete repair of its original behavior, or use later quest state to excuse
+unsupported feet. The contact checker does not evaluate the quest state.
+
+Required follow-up is to retain source activation and movement provenance by
+placed reference, implement the relevant conditions using runtime quest/global
+state, and test new-game, transition, scene re-entry and save/restore behavior.
+Contact acceptance must remain separate and be rechecked for supported changes
+of position or pose. Do not bake one quest's moved position into every state.
+
+## rc7 mesh-aware correction
+
+The fitter first retains a valid origin-grounded point, then tries vertical
+adjustment. If needed it searches nearest-first over half-unit XY offsets within
+32 native units. Candidate support must stay in the same owning core and within
+16 units of the original supporting height; authored Z adjustment stays between
+-32 and +8 units. A sampled approach path rejects unsupported gaps, walls and
+steps over 4.5 units. Original coordinates remain in `aw_authored_origin` and
+`aw_authored_z`; every overlap copy receives the same result.
+
+Search uses conservative transformed model bounds to avoid tracing distant
+brushes. The independent final checker still reads the entire unfiltered scene
+and exactly the same mesh/tolerances. No actor is exempted or removed to pass.
+Some repairs need a small horizontal relocation, not just lowering the origin;
+those deltas are written to the private support report for inspection. These
+constraints do not replace future swept-body or semantic foot-placement tests.
+
+The current [validation receipt](validation/rc7-source.json) records measured
+strict results and elapsed host-check time. The original 23 findings and their
+source identities above remain historical evidence. Actual in-game positions,
+scene return/save behavior and later actor progression still need playtesting.

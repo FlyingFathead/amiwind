@@ -24,6 +24,10 @@ int main(void){
  FILE *f;char text[2048];size_t n;
  Key_Init();cls.state=ca_connected;key_dest=key_game;
  Key_SetBinding('m',"aw_worldmap");Key_SetBinding('n',"");
+ Key_SetBinding('v',"aw_torch");
+ queued[0]=0;tap('v');assert(!strcmp(queued,"aw_torch\n"));
+ queued[0]=0;Key_Event(K_SHIFT,true);tap('v');Key_Event(K_SHIFT,false);
+ assert(!strcmp(queued,"aw_viewdistance_cycle\n"));
  Key_SetBinding(K_ALTM,"aw_desktop");Key_SetBinding(K_CTRL,"+aw_fastflight");
  queued[0]=0;tap('m');assert(!strcmp(queued,"aw_worldmap\n"));
  queued[0]=0;Key_Event(K_ALT,true);tap('m');Key_Event(K_ALT,false);assert(!strcmp(queued,"aw_desktop\n"));

@@ -17,9 +17,9 @@ static char links_map[16];
 static double door_ready;
 static aw_scene_link_t opening_door;
 static unsigned door_close;
-static float health,hand_goal;
+static float health,hand_goal,torch_goal;
 static double started;
-static int region_crossing;
+static int region_crossing,map_jump;
 static vec3_t crossing_angles,crossing_velocity;
 static float crossing_movetype;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
@@ -56,9 +56,18 @@ static edict_t *travel_target(void);
  * Balmora's ground conversion leaves source feet up to 18 units above paving.
  * Bound correction to 32 units so a missing floor cannot move actors a storey. */
 int AW_NPCFloor(edict_t *e) {
-    vec3_t start,end;trace_t tr;eval_t *mode;
+    vec3_t start,end;trace_t tr;eval_t *mode,*valid,*baked;int k;
     mode=GetEdictFieldValue(e,"aw_ground_mode");if(mode && mode->_float)return 0;
     if(!AW_RegionGroundCoverage(e->v.origin))return 0;
+    /* The host fitted the actual rendered soles. A second origin-only snap
+     * would destroy that result. Preserve only the exact baked initial position;
+     * moved/restored legacy actors still use the bounded runtime fallback. */
+    valid=GetEdictFieldValue(e,"aw_ground_valid");baked=GetEdictFieldValue(e,"aw_ground_baked");
+    if(valid && valid->_float==1 && baked){
+        for(k=0;k<3;k++)if(!isfinite(baked->vector[k]) || !isfinite(e->v.origin[k]) ||
+            fabs(e->v.origin[k]-baked->vector[k])>.001f)break;
+        if(k==3){e->v.flags=(int)e->v.flags|FL_ONGROUND;SV_LinkEdict(e,false);return 1;}
+    }
     VectorCopy(e->v.origin,start);VectorCopy(start,end);start[2]+=8;end[2]-=32;
     tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,e);
     if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
@@ -190,10 +199,24 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
+    v=GetEdictFieldValue(p,"aw_torch");torch_goal=v?v->_float:0;
     IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
     Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
     sprintf(command,"map %s\n",next.target);
     if(immediate)Cbuf_InsertText(command);else Cbuf_AddText(command);
+}
+int AW_MapTeleport(const float *source_position) {
+    aw_scene_link_t r;edict_t *p;
+    if(pending || !sv.active || svs.maxclients!=1 || !svs.clients ||
+       !(p=svs.clients[0].edict) || cls.state!=ca_connected || p->v.health<=0 ||
+       AW_StoryRestricted())return 0;
+    memset(&r,0,sizeof(r));
+    if(!AW_WorldMapTarget(source_position,r.target,r.arrival))return 0;
+    r.yaw=p->v.v_angle[1];region_crossing=0;door_ready=0;door_close=0;
+    crossing_movetype=p->v.movetype;
+    load_scene(&r,1);
+    if(!pending)return 0;
+    map_jump=1;return 1;
 }
 /* Ray/slab intersection with converted model bounds. The model origin may
  * be buried in the ceiling or far from the visible handle/hatch surface. */
@@ -376,7 +399,17 @@ void AW_SceneSpawn(edict_t *p) {
     door_ready=0;
     if(!region_crossing)AW_UISubtitle("","",0);
     if(pending && !strcmp(sv.name,next.target)) {
-        if(region_crossing){
+        if(map_jump){
+            placed=AW_MapPlace(p,next.arrival);
+            if(!placed){
+                AW_InteriorPlace(p,p->v.origin);
+                Con_Printf("Debug teleport target has no clear standing surface; using scene spawn.\n");
+                AW_UISubtitle("DEBUG TELEPORT","Target blocked; using scene spawn.",5);
+            }
+            p->v.movetype=crossing_movetype==MOVETYPE_NOCLIP?MOVETYPE_NOCLIP:MOVETYPE_WALK;
+            noclip_anglehack=p->v.movetype==MOVETYPE_NOCLIP;
+            map_jump=0;
+        }else if(region_crossing){
             VectorCopy(next.arrival,p->v.origin);VectorCopy(next.arrival,p->v.oldorigin);
             VectorCopy(crossing_angles,p->v.angles);VectorCopy(crossing_velocity,p->v.velocity);
             p->v.movetype=crossing_movetype;p->v.fixangle=1;SV_LinkEdict(p,false);placed=1;
@@ -384,6 +417,7 @@ void AW_SceneSpawn(edict_t *p) {
         p->v.angles[0]=0;p->v.angles[1]=next.yaw;p->v.angles[2]=0;p->v.fixangle=1;
         if(region_crossing)VectorCopy(crossing_angles,p->v.angles);
         p->v.health=health;v=GetEdictFieldValue(p,"aw_hand_goal");if(v)v->_float=hand_goal;
+        v=GetEdictFieldValue(p,"aw_torch");if(v)v->_float=hand_goal?torch_goal:0;
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
@@ -392,7 +426,7 @@ void AW_SceneSpawn(edict_t *p) {
         if(AW_Interior() || !strcmp(sv.name,"balmora") || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_GallerySpawn(p);region_crossing=0;
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_GallerySpawn(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
 }
 void AW_SceneTick(void) {

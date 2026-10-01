@@ -4,7 +4,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
-from actor_grounding import fields, initial_state
+from actor_grounding import fields, initial_state, bake_ground
 from check_actor_ground import audit, require
 from player_hull import pack_lumps, PROFILE
 
@@ -80,6 +80,25 @@ class GroundGateTests(unittest.TestCase):
         self.put(actor()+actor());self.assertEqual(audit(self.maps)['status'],'failed')
         self.put(actor());(self.id1/'progs/test.mdl').write_bytes(b'bad')
         self.assertEqual(audit(self.maps)['status'],'failed')
+
+    def test_baker_fits_actual_model_feet_and_retains_authored_coordinates(self):
+        from check_actor_ground import entities
+        self.put(actor());(self.id1/'progs/test.mdl').write_bytes(alias(4))
+        report=bake_ground(self.maps)
+        self.assertEqual(report[0]['mesh_contact'],'fitted')
+        self.assertEqual(audit(self.maps)['status'],'passed')
+        before=(self.maps/'room.bsp').read_bytes();e=entities(before)[1]
+        self.assertEqual(e['aw_ground_valid'],'1')
+        self.assertEqual(e['aw_authored_origin'],'0.00000 0.00000 0.25000')
+        self.assertLess(float(e['origin'].split()[2]),0)
+        bake_ground(self.maps);self.assertEqual((self.maps/'room.bsp').read_bytes(),before)
+
+    def test_baker_cannot_certify_unsupported_actor(self):
+        self.put(actor(80))
+        report=bake_ground(self.maps)
+        self.assertNotIn('placed_origin',report[0])
+        self.assertEqual(audit(self.maps)['status'],'failed')
+        self.assertNotIn(b'"aw_ground_valid" "1"',(self.maps/'room.bsp').read_bytes())
 
     def baseline(self):
         self.put(actor(2))

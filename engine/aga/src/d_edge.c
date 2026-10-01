@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -37,6 +37,21 @@ extern void			R_RotateBmodel (void);
 extern void			R_TransformFrustum (void);
 
 vec3_t		transformed_modelorg;
+
+/* Fog and distance culling are independent. Uncovered exterior spans must
+ * sample the current sky, not the beige diagnostic clear colour. This does not
+ * extend the terrain draw distance or change turbulent-water rendering. */
+void D_DrawSolidSurface(surf_t *surface,int color);
+void D_DrawBackground(surf_t *surface)
+{
+    extern int r_backgroundsky;
+    d_zistepu=0;d_zistepv=0;d_ziorigin=-0.9f;
+    if(r_backgroundsky && r_skysource){
+        if(!r_skymade)R_MakeSky();
+        D_DrawSkyScans8(surface->spans);
+    }else D_DrawSolidSurface(surface,(int)r_clearcolor.value & 0xFF);
+    D_DrawZSpans(surface->spans);
+}
 
 /*
 ==============
@@ -88,7 +103,7 @@ void D_DrawSolidSurface (surf_t *surf, int color)
 	espan_t	*span;
 	byte	*pdest;
 	int		u, u2, pix;
-	
+
 	pix = (color<<24) | (color<<16) | (color<<8) | color;
 	for (span=surf->spans ; span ; span=span->pnext)
 	{
@@ -232,14 +247,7 @@ void D_DrawSurfaces (void)
 			}
 			else if (s->flags & SURF_DRAWBACKGROUND)
 			{
-			// set up a gradient for the background surface that places it
-			// effectively at infinity distance from the viewpoint
-				d_zistepu = 0;
-				d_zistepv = 0;
-				d_ziorigin = -0.9;
-
-				D_DrawSolidSurface (s, (int)r_clearcolor.value & 0xFF);
-				D_DrawZSpans (s->spans);
+                D_DrawBackground(s);
 			}
 			else if (s->flags & SURF_DRAWTURB)
 			{
@@ -340,4 +348,3 @@ void D_DrawSurfaces (void)
 		}
 	}
 }
-

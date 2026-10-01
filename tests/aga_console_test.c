@@ -111,6 +111,7 @@ int main(void){
  args[1]="16";args[2]="24";args[3]="48";color_command();assert(colour->value==7);
  argc=4;for(i=0;i<4;i++)args[i]=shortform[i];debug_command();
  assert(!strcmp(queued,"amiwind_debug_reset_location 0\n"));
+ argc=3;args[0]="dbg";args[1]="tp";args[2]="map";debug_command();assert(!strcmp(queued,"aw_teleport_map\n"));
  argc=2;args[0]="aw_console_font";args[1]="readable";draw_chars=atlas;
  memset(atlas,99,sizeof(atlas));font_command();assert(atlas[0]==99);
  font_size=8;font_command();assert(atlas[0]==99);

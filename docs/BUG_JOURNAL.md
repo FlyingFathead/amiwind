@@ -8,6 +8,27 @@ exact implementation, native validation and unresolved limits. Host tests,
 cross-compilation and native playtesting are separate evidence. Preserve older
 records when a diagnosis changes.
 
+## rc7: contact fitting, fog-off sky and cave lighting
+
+The 23 rc3 contact findings cover 15 placed references, including one outdoor
+Balmora Dreamer; they are not missing actors. Origin-only support differs from
+contact of the quantized idle mesh. rc7 fits the mesh within bounded placement
+constraints and preserves that certified point at runtime. The strict checker
+is unchanged. See [contact method and evidence](NPC_GROUND_CONTACT.md).
+
+The reported fog-off pale outdoor background matches the solid clear-colour
+path where far-culling leaves uncovered pixels. rc7 uses the existing sky for
+those pixels and restores normal solid background indoors. Native pixel tests
+cover this path; the precise Red Mountain camera still needs replay, and terrain
+holes are not declared fixed solely by changing their background.
+
+The F/V temporary torch uses existing dynamic lighting. A related renderer
+problem was exposed by translated/rotated cave models: light origins were in
+world coordinates where surface calculations required model-local coordinates.
+Both dynamic marking and accumulation now use the same model transform. Tests
+exercise actual surface lighting. No water-rendering code is changed; cave
+appearance and Amiga performance remain playtest tasks.
+
 ## AW25-09: image rejects world/journal receipt after terrain — v0.0.25-rc3
 
 The reported workstation run completed world-terrain in 4232.5 seconds, then
