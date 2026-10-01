@@ -24,6 +24,10 @@ directly; AmiWind reads the installed game tree. Tribunal, Bloodmoon and mod loa
 orders are not used. The optional base-game Video/mw_intro.bik and Splash artwork
 are converted when present.
 
+See [installed game layout](GAME_INPUT_LAYOUT.md) for the generic GOG directory
+topology, the master/archive files directly under `Data Files/`, and the
+distinction between installed assets and private transfer ZIPs.
+
 ## Bitmap paper readability (integrated in dev8)
 
 TTF remains the preferred source. When reading pages use the Bethesda bitmap
@@ -200,9 +204,9 @@ Only that installation is inventoried and hashed. Invalid inputs stop before
 dependency installation. Ctrl+C exits cleanly; if a build stage was running, its
 log and cancellation receipt remain in the separate output directory.
 
-The build reports twelve stages: setup, terrain verification, static scenery,
-scene conversion, BSP conversion, NPCs, hands, prison interior, dialogue lookup, music, native
-engine and HDF. It stops at the
+The full AGA build reports 23 stages, including both towns and their interiors,
+world terrain, character assets, audio, native compilation and HDF assembly.
+Independent stages can overlap within the shared worker budget. It stops at the
 first failed stage and records the command, timing and log path in
 `../amiwind-local/build/first-town/build-state.json`. Stage logs are in `logs/`.
 Output HDFs are under that run's `image/` directory. Original files are read in
@@ -213,7 +217,9 @@ location is included in source packages. Each build uses `build/<name>/`.
 Each run name is immutable. To retry, fix the reported dependency or conversion
 problem and choose a new name; automatic resume is not implemented. Preserve a
 successful image before experimenting. Disk conversion can be slow and requires
-more host space than the final 128 MiB partition, including SDKs and intermediates.
+space for the installed inputs, SDK, intermediate scenes, staged payload and
+final image at the same time. Keep build runs outside the source checkout and
+allow several times the final payload size; see [storage profiles](STORAGE.md).
 
 For a smaller host-only terrain test with no native toolchain:
 

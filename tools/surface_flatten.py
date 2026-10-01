@@ -12,14 +12,24 @@ from scipy.spatial import ConvexHull
 from scipy.ndimage import distance_transform_edt
 
 
-def load_profiles(path=None):
+def load_profiles(path=None, *, scene_kind='exterior'):
+    """Load only profiles approved for this scene's mounting geometry.
+
+    Exterior window meshes also occur inside rooms. Their exterior mounting
+    plane and outward wall test are not valid for those interior placements.
+    """
+    if scene_kind not in ('exterior', 'interior'):
+        raise ValueError('Unknown flattening scene kind: ' + str(scene_kind))
     path = Path(path) if path else Path(__file__).resolve().parents[1]/'config/surface-flattening.json'
     data = json.loads(path.read_text())
     result = {}
     for kind, settings in data['types'].items():
         if not isinstance(settings['flatten'], bool):
             raise ValueError('flatten must be true or false')
-        if settings['flatten']:
+        scenes = settings.get('scenes', ['exterior'])
+        if not isinstance(scenes, list) or any(s not in ('exterior', 'interior') for s in scenes):
+            raise ValueError('flatten scenes must contain exterior and/or interior')
+        if settings['flatten'] and scene_kind in scenes:
             for name, profile in settings['models'].items():
                 result[name] = {**profile, 'type': kind}
     return result

@@ -1,7 +1,7 @@
 # Local source build — rc2
 
 Use the reconciled public-source ZIP. Extract it into a fresh directory outside
-~/NeuralNetwork/amiwind; do not overlay either earlier source candidate blindly.
+/path/to/amiwind; do not overlay either earlier source candidate blindly.
 The release version remains 0.0.25-rc2. No private playable is delivered.
 
 Apply to the existing checkout with the extracted tools/apply_source_update.py, passing
@@ -16,11 +16,11 @@ Compile from the applied checkout or the separate extracted source:
 ```bash
 (
 set -euo pipefail
-cd "$HOME/NeuralNetwork/amiwind"
+cd /path/to/amiwind
 bash build.sh --autoinstall \
-  --data-files "/media/kahel/DUMP-2025-24-APR/Morrowind/Morrowind" \
-  --tools-dir "$HOME/NeuralNetwork/amiwind-tools" \
-  --workspace "$HOME/NeuralNetwork/amiwind-tests" \
+  --data-files "/path/to/Morrowind/Data Files" \
+  --tools-dir "/path/to/amiwind-tools" \
+  --workspace "/path/to/amiwind-tests" \
   --name "rc2-local-$(date +%Y%m%d-%H%M%S)"
 )
 ```

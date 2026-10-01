@@ -2,7 +2,12 @@
 
 **Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
-**Current candidate: v0.0.25-rc2**, following the owner's v0.0.25-dev1 feedback.
+**Current candidate: v0.0.25-rc3**, an interior conversion repair to rc2.
+The native engine and 21 build stages passed with owned game inputs, including
+Seyda Neen area and Balmora interiors. This checkpoint records the run during
+whole-island terrain conversion; final image assembly
+and native rc3 playtesting have not passed. See the [build receipt](validation/rc3-source.json).
+
 The Seyda Neen boundary uses ground coverage, preserving detailed Seyda Neen AND
 Balmora. The frozen survey still supplies 2,526 terrain/water regions. Shoreline
 triangles retain original wet/dry samples; the water datum remains source Z=0.
@@ -18,7 +23,7 @@ TODO and is explicitly outside rc1.
 The 23 existing strict NPC contact findings remain unresolved and the ordinary
 production image gate remains unchanged. This candidate is not production
 acceptance. Inventory, general quest execution and complete playthrough
-acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc2.md)
+acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc3.md)
 and [terrain conversion](WORLD_TERRAIN.md). Published dev1 and v0.0.24 archives
 remain immutable.
 

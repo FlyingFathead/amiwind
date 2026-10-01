@@ -29,5 +29,5 @@
     "tests/test_font_sources.py"
   ],
   "removed": [],
-  "application": "Extract from ~/NeuralNetwork/ so archive paths under amiwind/ overlay the existing checkout only after backing up local changes. No deletions are required."
+  "application": "Extract from /path/to/workspace/ so archive paths under amiwind/ overlay the existing checkout only after backing up local changes. No deletions are required."
 }

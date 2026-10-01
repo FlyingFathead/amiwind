@@ -8,6 +8,28 @@ exact implementation, native validation and unresolved limits. Host tests,
 cross-compilation and native playtesting are separate evidence. Preserve older
 records when a diagnosis changes.
 
+## AW25-08: area build aborts on window mounting — v0.0.25-rc2
+
+The full local build stopped in `prepare_area.py` with
+`ValueError: No supporting façade geometry`. The same failure was reproduced
+from the uploaded rc2 source using the original Census and Excise Warehouse
+cell. The Tradehouse also contains affected Nord window assets without an
+exterior house supporting mesh.
+
+The flattening profiles were selected by model name alone. Those exterior-named
+assets are reused inside rooms, where their exterior mounting plane and wall
+normal test do not apply. Profiles now explicitly select scene kinds; the
+shipped profiles approve exteriors only. The BSP converter uses the named-cell
+metadata supplied by every interior exporter and retains original interior
+window visuals and collision. The exterior support guard still rejects missing
+or incorrectly facing walls. Archive handles close on both success and failure.
+
+Regression coverage assembles a complete synthetic interior BSP with a window
+and no house. Its output must equal the explicitly unflattened conversion,
+including collision. The same unsupported exterior must still fail. The real
+Warehouse conversion passes with the fix. Full checkpoint verification is
+recorded separately; this result alone is not complete build acceptance.
+
 ## 1 October 2026: dev1 to rc1 recovery
 
 Detailed records and chronological validation:

@@ -153,15 +153,26 @@ def order_face_planes(lumps, face_planes):
 
 def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None,
                   references=None, prepared_models=None, retain_dressing=False, collision_bounds=None, collision_compiler=None, collision_cache=None):
+    with (scenery/'scenery.mwpak').open('rb') as archive:
+        return _append_meshes(src, out, scenery, palette, archive, centre, lighting,
+                              jobs, references, prepared_models, retain_dressing,
+                              collision_bounds, collision_compiler, collision_cache)
+
+
+def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
+                   references, prepared_models, retain_dressing, collision_bounds,
+                   collision_compiler, collision_cache):
     b=src.read_bytes();assert struct.unpack_from('<i',b)[0]==29
     lumps=[bytearray(b[o:o+s]) for o,s in [struct.unpack_from('<ii',b,4+k*8) for k in range(15)]]
     face_planes=[struct.unpack_from('<H',lumps[7],i)[0] for i in range(0,len(lumps[7]),20)]
-    index=json.loads((scenery/'scenery-index.json').read_text());archive=(scenery/'scenery.mwpak').open('rb')
+    index=json.loads((scenery/'scenery-index.json').read_text())
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
     texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[]
     from surface_flatten import load_profiles
-    flatten_profiles=load_profiles()
+    # Interior exporters record the named cell. Keep their authored window
+    # geometry unless a profile explicitly approves interior mounting too.
+    flatten_profiles=load_profiles(scene_kind='interior' if 'cell' in index else 'exterior')
     profiles={name:profile for group in index.get('groups',{}).values()
               for name,profile in group.get('visual_profiles',{}).items()}
     empty_leaf=next(i for i in range(len(lumps[10])//28) if struct.unpack_from('<i',lumps[10],i*28)[0]==-1)
@@ -344,7 +355,6 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
     for k,lump in enumerate(lumps):
      data+=bytes((-len(data))%4);struct.pack_into('<ii',header,4+8*k,124+len(data),len(lump));data+=lump
     out.write_bytes(header+data)
-    archive.close()
     result={'models':report,'selection':selection_report,
             'collision_compiler_fallbacks':collision_fallbacks,
             'groups':index.get('groups',{}),

@@ -1,5 +1,17 @@
 # Development history
 
+## v0.0.25-rc3 — 1 October 2026
+
+- Restrict exterior window flattening to exterior scenes. Preserve the original
+  window mesh and collision when the same asset is placed inside an interior.
+- Close scenery archives on conversion failures as well as successful returns.
+- Reproduce rc2's Warehouse failure, verify the repaired conversion, and confirm
+  exterior output is byte-identical with the same inputs.
+- Compile the native engine; pass 336 host tests and 21 real-input build stages.
+  Whole-island terrain conversion and final image validation remain incomplete.
+- Document the generic installed-game layout and remove account-specific path
+  examples from maintained documentation. Deliver public source only.
+
 ## v0.0.25-rc2 — 1 October 2026
 
 - Reconcile original rc1 and checkpoints 001/004/006 without losing later modifier,

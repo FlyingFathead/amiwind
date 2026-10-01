@@ -77,6 +77,14 @@ Use a reusable, non-destructive host conversion for approved surface types.
 explicit model profiles. Setting it to `false` retains the original visual mesh
 on rebuild. Original game files and collision geometry are never overwritten.
 
+As of v0.0.25-rc3, each type also declares its approved `scenes`. The shipped
+window profiles use `["exterior"]`; profiles without this field default to
+exteriors. Named interior cells retain their authored window visuals and
+collision. Exterior-named window assets also occur inside the Tradehouse and
+Warehouse, where an exterior house supporting wall does not exist. Applying
+the exterior mounting test there caused the rc2 area build to abort with
+`No supporting façade geometry`. Exterior mounting failures remain errors.
+
 The current implementation in `tools/surface_flatten.py` projects selected
 window geometry, depth-bakes its source textures into a small image, and emits
 a flat textured panel with the source's convex projected outline. Profiles name

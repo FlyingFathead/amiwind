@@ -28,7 +28,7 @@
     "tools/release-files.json"
   ],
   "removed_paths": [],
-  "application": "Back up local work, then extract the incremental ZIP from ~/NeuralNetwork/ so paths under amiwind/ overlay an exact dev6 source state. No deletions are required. Rebuild and boot the dry-run HDF before calling dev7 native-validated.",
+  "application": "Back up local work, then extract the incremental ZIP from /path/to/workspace/ so paths under amiwind/ overlay an exact dev6 source state. No deletions are required. Rebuild and boot the dry-run HDF before calling dev7 native-validated.",
   "notes": [
     "Historical release files and presets remain in the repository unchanged.",
     "The dry-run startup order is FailAt 10 -> AmiWindCheck -> AmiWindDryRun.",

@@ -2,43 +2,41 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current candidate: **v0.0.25-rc1 — terrain, shoreline and input corrections**.
-The development playable retains the 23 failed contact findings; it is not a
-passed production release. The owner's earlier v0.0.24 approval applies to that
-historical milestone only. Earlier archives and tags remain immutable.
-`VERSION` is the maintained version source for Python metadata, native build
-includes, runtime/boot strings, receipts, presets and package filenames.
+Current candidate: **v0.0.25-rc3 — interior window conversion repair**.
+This is a source checkpoint. The native engine compiled and 21 real-input stages
+passed; whole-island terrain conversion and final image validation remain
+incomplete. The 23 historical actor-contact findings remain unresolved. Earlier
+archives and tags remain immutable. `VERSION` is the maintained version source.
 
 ## Deliverables and structure
 
 | Archive | Structure and purpose |
 | --- | --- |
-| `AmiWind-v0.0.25-rc1-public-source.zip` | Complete repository under `amiwind/`. |
-| `AmiWind-v0.0.25-rc1-from-v0.0.25-dev1-source-patch.zip` | Added/changed public files and patch metadata, from the exact delivered v0.0.25-dev1 source ZIP. |
-| `AmiWind-v0.0.25-rc1-private-playable.zip` | Matching single two-partition HDF, supplied ROM, launcher, presets and private evidence under `AmiWind-v0.0.25-rc1/`. |
+| `AmiWind-v0.0.25-rc3-public-source.zip` | Complete public source under `amiwind/`, including a generated package manifest. |
+| `AmiWind-v0.0.25-rc3-source-patch.zip` | Changed/new files relative to the uploaded rc2 snapshot, with application metadata and the same generated manifest. |
 
-Each ZIP has a same-name `.sha256` sidecar. Only the two source archives and
-their checksums belong in GitHub release assets. No private playable, ROM or
-converted game assets may be included. Asset-free dry runs do not replace the
-playable HDF verification.
+`AmiWind-v0.0.25-rc3-SHA256SUMS` identifies both archives and the standalone
+source-update helper. No private playable is part of this checkpoint. Public
+release assets contain source and checksums only. A compiled engine is not
+proof of a completed conversion, image gate, or native playtest.
 
-The source repository has one root. Native AGA code is in `engine/aga/`, host
+The repository root is `amiwind/`. Native code is in `engine/aga/`, host
 conversion code in `src/mwad/`, commands in `tools/`, documentation in `docs/`,
-presets in `resources/emulators/`. Only core files and README belong at the root.
-Keep compiled output in ignored `out/` or a chosen external workspace. Preserve
-previous methods, fonts, hand variants and release archives.
+and presets in `resources/emulators/`. Keep build output outside the checkout.
+Preserve previous methods, fonts, hand variants and release archives.
 
 ## Incremental updates
 
-The exact base is `AmiWind-v0.0.25-dev1-public-source.zip`, SHA-256
-`784c9592da5f27831a7af6c9f51a488911605254dae5455a34ea9b8c2badd1f8`.
-`docs/PATCH-v0.0.25-rc1.json` records the base, changed paths and removals.
-Verify a clean application reproduces every file in the full source ZIP,
-including the package manifest. The two RC3 screenshots also require their
-explicit `.gitignore` exceptions; source checks now enforce that alongside the
-media allowlist. Unzip does not delete obsolete files; apply
-only explicitly listed removals. Protect existing local changes first.
-Always provide the full source archive alongside the incremental.
+The exact patch baseline and every baseline file hash are recorded in
+`docs/PATCH-v0.0.25-rc3.json`. `docs/RECONCILE-BASES.json` records the paths this
+checkpoint changes and the acceptable old bytes. Extract the patch outside the
+checkout, then use `tools/apply_source_update.py` with a new external backup
+directory. Overlapping edits are rejected before mutation; unrelated local
+changes are preserved. Do not blindly unzip over a working checkout.
+
+Verify that applying the patch to the exact baseline reproduces every maintained
+file in the full source archive. The generated package manifest is a release
+receipt, not tracked source. Always offer the full archive with the patch.
 
 ## Release gate
 

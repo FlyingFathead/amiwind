@@ -8,7 +8,11 @@
 
 ## Current state of the project
 
-**v0.0.25-rc2 — reconciled source and corrected local input discovery**
+**v0.0.25-rc3 — interior window conversion fix**
+
+This source checkpoint fixes rc2's `No supporting façade geometry` build abort.
+The native engine compiled and 21 conversion/build stages passed with owned
+game inputs. Whole-island conversion and final image validation remain incomplete.
 
 The base-game island now has a playable terrain pass following the recovered
 polygon survey: **2,526 terrain regions**, with local coordinates rebased at
@@ -20,7 +24,7 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[candidate scope and validation](docs/RELEASE-v0.0.25-rc2.md).
+[candidate scope and validation](docs/RELEASE-v0.0.25-rc3.md).
 
 rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
 original shoreline samples that coarse terrain had submerged. A normal-view
@@ -61,7 +65,7 @@ findings remain unresolved**, and the ordinary production image builder still
 stops on that audit. The owner accepted those findings for v0.0.24;
 release status does not turn the audit into a pass. Method 1 retains synchronous
 loading behind the frozen-frame Loading... box; method 2 read-ahead remains
-experimental. See [release notes and verification](docs/RELEASE-v0.0.25-rc2.md).
+experimental. See [release notes and verification](docs/RELEASE-v0.0.25-rc3.md).
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game

@@ -31,5 +31,5 @@
     "resources/emulators/AmiWind-v0.0.21-dev6-WinUAE.uae"
   ],
   "removed": [],
-  "application": "Extract from ~/NeuralNetwork/ so archive paths under amiwind/ overlay the existing dev5 checkout only after backing up local changes. No deletions are required. Rebuild the native runtime/HDF before calling dev6 playable-validated."
+  "application": "Extract from /path/to/workspace/ so archive paths under amiwind/ overlay the existing dev5 checkout only after backing up local changes. No deletions are required. Rebuild the native runtime/HDF before calling dev6 playable-validated."
 }

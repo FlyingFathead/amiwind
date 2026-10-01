@@ -65,7 +65,7 @@ Completed in the source workspace:
 
 A complete real Steam GOTY conversion has **not** been claimed from this sandbox.
 The next acceptance step is the owner's requested build from a separate
-`~/NeuralNetwork/tmp_amiwind_steam_compile/` source tree against the actual Steam
+`/path/to/workspace/tmp_amiwind_steam_compile/` source tree against the actual Steam
 installation.
 
 No gameplay, save-format or native renderer change is claimed relative to dev4.
