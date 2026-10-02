@@ -1,5 +1,7 @@
 # Bug register
 
+Native Windows build: [WIN-01 — intermittent Python geometry-worker queue failure (open)](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026).
+
 Keep reported symptoms separate from confirmed causes. A successful retry does
 not close an intermittent report. Historical passing checks remain valid for
 the runs they covered; they do not rule out these later incidents.
@@ -13,6 +15,9 @@ flag, first fixed version (or an em dash), and evidence/status below.
 
 | ID | Issue | Fixed (Y/N) | First fixed version | Verification / current status |
 | --- | --- | --- | --- | --- |
+| WIN-03 | Windows image-packing command exceeds process limit | Y | Windows working tree; release pending | Windows batching passed 1,100-file readback, four regressions and complete image readback/WinUAE game entry; [journal](BUG_JOURNAL.md#win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026) |
+| WIN-02 | Cancelled Windows stage leaves child workers alive | N | — | Process-tree cleanup candidate tested separately; integration pending; [journal](BUG_JOURNAL.md#win-02-cancelled-windows-stage-leaves-worker-descendants--open-2-october-2026) |
+| WIN-01 | Native Windows Python geometry-worker queue failure | N | — | Intermittent invalid semaphore handle; cause unknown; [journal](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026) |
 | AW-20260928-01 | Ship-exit intermittent freeze | N | — | Open; retry succeeded, cause unknown |
 | AW-20260928-02 | Dock/menu freeze and looping audio | N | — | Open; third run remained stable |
 | AW-20260928-03 | Silt Strider landing geometry | N | — | Expanded bounds and missing rock restored; Strider/Darvame now present; exact-view acceptance pending |

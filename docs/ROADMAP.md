@@ -1,5 +1,35 @@
 # Roadmap and implementation options
 
+## Current candidate: v0.0.26-rc1; final goal: Windows 11 and Docker builds
+
+The rc1 source candidate records the successful native Windows conversion,
+recovered HDF assembly and WinUAE game-entry smoke test. Final v0.0.26 also
+requires the Docker builder and its validation, with all normal game content,
+the full NPC gallery and validation gates.
+Keep Linux builds supported through the same portable converter; host-specific
+setup and launchers must not create a separate conversion implementation.
+
+- [x] Provision native Windows tools and compile the engine.
+- [x] Boot the asset-free test image in WinUAE 6.0.3 with an owned A1200 KS3.1 ROM.
+- [x] Correct archive path separators and generated Amiga script line endings;
+  preserve Linux's existing slash-separated identifiers and LF output.
+- [x] Finish full conversion and payload validation on Windows; corrected image
+  assembly and WinUAE prison-scene entry passed. See the
+  [recovered-build validation record](VALIDATION-WINDOWS-2026-10-02.md).
+- [x] Record timings, versions, warnings, output hashes and recovery limits.
+- [x] Prepare the v0.0.26-rc1 Windows source checkpoint.
+- [ ] Complete final v0.0.26 acceptance after Docker and Linux validation.
+- [ ] After a successful full native Windows build, implement and validate the
+  [Docker builder](DOCKER_BUILD_ROADMAP.md), with user-supplied game files,
+  persistent conversion/cache mounts and an initial 40 GiB free-space budget.
+- [ ] Prepare a source-only handoff for Linux validation and owner-run publishing.
+
+The Windows conversion plus corrected image-stage retry passed and entered the
+game in WinUAE. v0.0.26-rc1 packages this checkpoint; final v0.0.26 requires the
+planned Docker work and validation. This was a limited runtime smoke test. See the
+[Windows roadmap](WINDOWS_BUILD_ROADMAP.md) for current acceptance scope.
+
+
 ## TODO SOON: static asset gallery and cell-by-cell scenery
 
 - [ ] `dbg assetgallery`: browse original object IDs and inspect rocks, trees,
@@ -21,7 +51,7 @@ all required world assets even in an explicitly reduced debugging build.
 
 The reported full-world conversion takes an impractical part of an evening on
 the workstation. Prioritize making `vfXXXX` compilation and repeated builds
-practical before native Windows bring-up or speculative compiler acceleration.
+practical alongside the current native Windows validation, before speculative compiler acceleration.
 The [build/compiler toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) defines the work:
 
 1. Preserve the current run and measure individual phases, including both BSP
@@ -58,12 +88,48 @@ coverage and a populated asset catalogue do not establish scenery completeness.
 
 ## Windows build host, 1 October 2026
 
-Native Windows/MSYS2 is a potential future build host. It has not been tested
-with AmiWind and is not a supported build configuration. The
-[Windows build roadmap](WINDOWS_BUILD_ROADMAP.md) records the investigation,
-integration and validation milestones. Prioritize native Windows/MSYS2;
-WSL2 is a fallback if native integration proves troublesome and also needs a
-complete build record.
+Linux remains the established build foundation. Native Windows 11/MSYS2 is
+experimental: complete current-recipe conversion, corrected image assembly and
+a WinUAE prison-scene smoke test passed on 2 October 2026. Intermittent
+Windows worker failures remain open. The
+[Windows build roadmap](WINDOWS_BUILD_ROADMAP.md) records the current evidence,
+recovery limits and acceptance milestones. WSL2 is a separate Linux-host route
+and still needs its own complete build record.
+
+## Docker builder planned for v0.0.26
+
+Proposed on 2 October 2026; no container implementation or validation yet.
+See the [Docker builder roadmap](DOCKER_BUILD_ROADMAP.md) for input isolation,
+current disk measurements and the initial 40 GiB planning allowance.
+Offer an optional reproducible Linux build environment using the established
+Linux pipeline, with the same full-content defaults and validation gates. On
+Windows, this would be a Linux container through a supported Docker backend;
+it would not establish native Windows build reliability. Keep native Linux and
+experimental native Windows entry points maintained.
+
+- [ ] Package the toolchain and build dependencies with a recorded, tested version
+  set and image digest. Check redistribution terms before publishing an image.
+- [ ] Accept the user's existing Morrowind installation through a read-only
+  input mount; persist outputs and validated caches in separate writable mounts.
+  Exclude game data, ROMs, local builds and private notes from the Docker build
+  context and all published image layers.
+- [ ] Measure the current native build directory as a starting estimate, then
+  measure a complete container build. Report tool/image storage, input data,
+  shared caches, one run's intermediates, partition/final-image/readback copies
+  and peak temporary space separately, with a safety margin. Exclude historical
+  failed runs from the single-build requirement; include Docker image/build-cache
+  and VM-disk overhead in the container estimate.
+- [ ] Benchmark cold and cached builds, worker/CPU/RAM limits and mount I/O on
+  Linux and Windows. Verify persistent-cache invalidation, ownership and clean
+  cancellation, and produce the same content/validation receipts as normal builds.
+- [ ] Document installation, resource allocation, disk preflight, offline use
+  after provisioning, and a simple command that takes input and output paths.
+
+Host mounts keep large private assets and generated builds outside the builder
+image; they still consume host disk space. A tool-only image's download size is
+not the total space needed to build AmiWind. See Docker's
+[bind-mount documentation](https://docs.docker.com/engine/storage/bind-mounts/) and
+[Windows WSL 2 backend](https://docs.docker.com/desktop/features/wsl/).
 
 ## Build and compiler toolkit
 

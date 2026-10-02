@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert a bounded owned Seyda Neen scene to Quake-format intermediates."""
 import argparse, hashlib, io, json, math, struct, sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import ensure_external, read_workspace, resolve_data_files, child_ci
 from mwad.scene import read_asset, unpack_geometry
@@ -152,7 +152,7 @@ def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
     ground={};materials=json.loads((workspace/'generated/seyda-neen/materials.json').read_text())
     for key,m in materials.items():
         if not m.get('texture'):continue
-        path=normpath('textures/'+m['texture']); candidates=[str(Path(path).with_suffix('.dds')),path]
+        path=normpath('textures/'+m['texture']); candidates=[str(PurePosixPath(path).with_suffix('.dds')),path]
         source=next(p for p in candidates if p in bsa.entries)
         ground[int(key)]=Image.open(io.BytesIO(bsa_read(bsa,source))).convert('RGB').resize((32,32),Image.Resampling.BOX)
     ground[0]=Image.open(io.BytesIO(bsa_read(bsa,'textures/_land_default.dds'))).convert('RGB').resize((32,32),Image.Resampling.BOX)

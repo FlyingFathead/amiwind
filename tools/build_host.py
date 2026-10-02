@@ -107,7 +107,7 @@ def setup_plan(args):
                              for name, value in values.items()},
             'ndk_present': (sdk / 'm68k-amigaos/ndk-include/exec/exec_lib.i').is_file(),
             'fallback_font': font, 'fallback_font_issue': font_error,
-            'automatic_setup': 'not implemented for Windows; native tools require manual setup'
+            'automatic_setup': 'use setup-windows.cmd -Yes; -Plan previews and -Offline reuses cached tools'
                                if windows else 'Ubuntu/Debian setup via --autoinstall',
             'next_step': 'docs/WINDOWS_BUILD_ROADMAP.md' if windows else 'docs/LINUX_BUILD.md'}
 

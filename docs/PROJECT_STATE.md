@@ -1,9 +1,20 @@
 # Current project state — 2 October 2026
 
+**Current candidate: v0.0.26-rc1.** Native Windows 11 completed the current full
+conversion recipe and, after a Windows packing fix and image-stage retry,
+produced a verified HDF that entered the game in WinUAE. The full image used
+v0.0.25 runtime identity. Linux remains the established foundation; Windows is
+experimental with known worker/cancellation failures. Docker and user-input
+helpers are next, planned for final v0.0.26. See [rc1 scope](RELEASE-v0.0.26-rc1.md)
+and [Windows evidence](VALIDATION-WINDOWS-2026-10-02.md).
+
+## Earlier gameplay and performance checkpoints
+
 **Top engineering priority:** reduce world-terrain build time and avoid
 unnecessary recompilation between runs. The [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md)
 puts `vfXXXX` phase profiling, persistent reuse and duplicate BSP/collision work
-ahead of Windows bring-up and speculative QCC acceleration. The workstation
+as an ongoing priority alongside host support; speculative QCC acceleration
+remains future work. The workstation
 build completed world-terrain in 4232.5 seconds, then failed image assembly's
 world/journal receipt check. rc6 repairs that receipt and provides checked
 [image recovery](IMAGE_RECOVERY.md). The owner has since reported successful
@@ -12,7 +23,7 @@ is recorded separately below.
 
 **Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
-**Current release: v0.0.25**, completion-driven character-model scheduling and verified reuse,
+**Previous source release: v0.0.25**, completion-driven character-model scheduling and verified reuse,
 original-model torch and source-region HUD,
 including the rc8 crash correction. See [v0.0.25 scope](RELEASE-v0.0.25.md) and
 [validation](validation/v0.0.25-source.json). Target playtesting remains pending.

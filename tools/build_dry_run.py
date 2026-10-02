@@ -54,7 +54,7 @@ def build(args):
     raw = b'\x1b[0m\x1b[2J\x1b[H' + message.encode('ascii')
     lines = ["message:"] + ["        dc.b " + ','.join(map(str, raw[i:i+24])) for i in range(0, len(raw), 24)]
     lines.append("message_end:")
-    (out / "dryrun-message.i").write_text('\n'.join(lines) + '\n')
+    (out / "dryrun-message.i").write_text('\n'.join(lines) + '\n', newline='\n')
     notice = boot / "C/AmiWindDryRun"
     subprocess.run([str(vasm), '-m68000', '-Fhunkexe', '-kick1hunks', '-nosym',
                     '-I', str(sdk / 'm68k-amigaos/ndk-include'), '-I', str(out),
@@ -63,8 +63,8 @@ def build(args):
     shutil.copyfile(checker, boot / "C/AmiWindCheck")
     shutil.copyfile(engine, boot / "C/AmiWind")
     (boot / 'S/startup-sequence').write_text(
-        'FailAt 10\nSYS:C/AmiWindCheck\nSYS:C/AmiWindDryRun\n')
-    (boot / 'README.txt').write_text(message)
+        'FailAt 10\nSYS:C/AmiWindCheck\nSYS:C/AmiWindDryRun\n', newline='\n')
+    (boot / 'README.txt').write_text(message, newline='\n')
     shutil.copyfile(ROOT / 'engine/aga/COPYING', boot / 'COPYING')
     # Use Python module entry points so wrappers cannot select another Python.
     xdf = [sys.executable, '-m', 'amitools.tools.xdftool']
@@ -93,7 +93,7 @@ def build(args):
         'rom_included': False, 'hdf': image.name, 'hdf_sha256': digest(image),
         'payload': {p.relative_to(boot).as_posix(): digest(p) for p in payload},
         'validation': 'Amiga Hunk headers, filesystem metadata and every payload readback; emulator boot is a separate check'
-    }, indent=2) + '\n')
+    }, indent=2) + '\n', newline='\n')
     print(image)
     return image
 

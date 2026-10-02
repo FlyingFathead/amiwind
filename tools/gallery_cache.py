@@ -10,7 +10,7 @@ import importlib.metadata
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import platform
 import shutil
 import struct
@@ -99,7 +99,7 @@ class Dependencies:
                         texture = 'textures/' + texture
                     # Match Assets.texture's DDS-first fallback and detect newly
                     # added overrides even if the previous candidate was absent.
-                    names.update((str(Path(texture).with_suffix('.dds')), texture))
+                    names.update((str(PurePosixPath(texture).with_suffix('.dds')), texture))
             self.meshes[name] = sorted(names)
         return self.meshes[name]
 

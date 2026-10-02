@@ -1,5 +1,15 @@
 # Development history
 
+## 0.0.26-rc1
+
+Native Windows setup/build scripts and portable archive paths/Amiga line endings.
+Windows-only xdftool batching fixes the full-image command-length failure.
+Full conversion plus recovered image assembly passed, followed by WinUAE game
+entry; historical full-image evidence retains its v0.0.25 identity. Native
+Windows remains experimental, with intermittent worker and cancellation defects
+open. Linux is the established foundation. Docker and input helpers are planned
+for final v0.0.26. See [rc1 release notes](RELEASE-v0.0.26-rc1.md).
+
 ## 0.0.25
 
 Completion-order NPC gallery scheduling prevents queue stalls behind slow early

@@ -1,0 +1,57 @@
+{
+  "version": "0.0.26-rc1",
+  "date": "2026-10-02",
+  "status": "native Windows source/host checks and versioned asset-free build passed; Linux execution pending",
+  "baseline_commit": "3433922c40a48ffd20a0362ed58407298221686a",
+  "focused_windows_tests": {
+    "patterns": [
+      "test_build_host.py",
+      "test_build_windows*.py",
+      "test_setup_windows.py",
+      "test_host_asset_formats.py",
+      "test_release.py",
+      "test_project_version.py"
+    ],
+    "run": 40,
+    "passed": 38,
+    "skipped": 2,
+    "failures": 0,
+    "errors": 0,
+    "skip_reasons": [
+      "requires a POSIX make shell",
+      "real Linux/POSIX launcher integration"
+    ],
+    "log_sha256": "3b0a9edec1bf1e97dea2710c47ae4576b606979cf095413920f0e2b912a91c81"
+  },
+  "linux_comparison": {
+    "protected_source_exact": true,
+    "linux_ci_unchanged": true,
+    "portable_files_structurally_checked": 11,
+    "fresh_linux_execution": "not performed on Windows; publishing host/CI must validate"
+  },
+  "versioned_asset_free_build": {
+    "status": "passed",
+    "version": "0.0.26-rc1",
+    "elapsed_seconds": 5.531,
+    "warning_lines": 78,
+    "image_bytes": 8421376,
+    "image_sha256": "4fdf74a34079a9eda65fd59397e47d6f2eb2e7f9b7a884a496051592fceaf892",
+    "emulator_test": "not repeated for this asset-free rc1 image"
+  },
+  "full_windows_checkpoint": {
+    "runtime_version": "0.0.25",
+    "record": "../VALIDATION-WINDOWS-2026-10-02.md",
+    "conversion_stages_passed": 25,
+    "terrain_regions": 2526,
+    "gallery_models": 3551,
+    "image_assembly": "passed after WIN-03 fix and separately recorded retry",
+    "hdf_sha256": "37ec9c66924b1d7a61c0ec070cec7689535b14fa9c10a178462702d924ca4864",
+    "winuae": "6.0.3; prison scene/game entry, keyboard/name input, menus, clean exit passed"
+  },
+  "known_open_windows_issues": [
+    "WIN-01",
+    "WIN-02"
+  ],
+  "docker": "not implemented/validated; planned for final v0.0.26",
+  "private_payload_in_public_package": false
+}

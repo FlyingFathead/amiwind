@@ -1,0 +1,5 @@
+# Keep source hashes and shell scripts identical on Windows and Linux.
+* text=auto eol=lf
+# These historical generated definitions are stored as CRLF in Git.
+engine/aga/src/progdefs.q1 -text
+engine/aga/src/progdefs.q2 -text

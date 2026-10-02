@@ -5,7 +5,7 @@ import hashlib
 import io
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import struct
 import sys
 import time
@@ -242,7 +242,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                     if not path: continue
                     requested = normpath(path)
                     if not requested.startswith('textures/'): requested = 'textures/' + requested
-                    candidates = [str(Path(requested).with_suffix('.dds')), requested]
+                    candidates = [str(PurePosixPath(requested).with_suffix('.dds')), requested]
                     texture = next((p for p in candidates if p in bsa.entries), None)
                     if texture is None: raise ValueError('Missing base BSA texture: ' + requested)
                     if texture not in texture_ids:

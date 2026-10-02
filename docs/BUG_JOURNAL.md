@@ -1,5 +1,134 @@
 # Bug journal
 
+<a id="win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026"></a>
+## WIN-03: Windows image-packing command exceeds process limit — fixed in working tree, 2 October 2026
+
+1. **Type, cause, symptoms and impact.** Deterministic Windows host packaging
+   defect in the v0.0.25 Windows port. All 25 pre-image stages passed, including
+   all 3,551 NPC gallery models and 2,526 world regions. Image assembly reached
+   `tools/world_volumes.py:pack` and failed launching `xdftool.exe` with
+   `[WinError 206] The filename or extension is too long`. The generated terrain
+   partition command contained 6,618 arguments / 165,293 UTF-16 code units,
+   including its terminator, to write 1,651 files. This exceeds Windows'
+   32,767-unit CreateProcess command-line limit; the message does not mean an
+   individual game filename is too long. The boot-volume command has the same
+   scaling problem. This is separate from WIN-01's intermittent queue handles.
+
+2. **Reproduction and evidence.** A full native Windows build using normal game
+   content reaches this oversized partition command. Capturing its argument list
+   reproduced the size above; a harmless child-Python invocation with a 40,000
+   character argument independently reproduced WinError 206. The failed run and
+   completed conversions are retained. Its 1,925 instrumented worker lifecycles
+   reported no invalid handles; that single run does not close WIN-01.
+
+3. **Correction and validation.** `tools/build_windows_xdftool.py` splits the
+   command queue only between complete `+`-delimited operations, preserving file
+   order and paths. Each invocation is bounded to 24,000 UTF-16 units including
+   Windows quoting and the terminator. A failed batch stops assembly immediately;
+   an individually oversized operation is rejected before any image writes.
+   Only Windows world/boot packaging selects this helper. Linux's original
+   invocations, image contents and validation gates remain unchanged.
+   A real 1,100-file image test passed all byte-for-byte readbacks across five
+   commands; its original command was 116,774 units. Four regression tests cover
+   queue preservation, quoting/UTF-16 length, oversize rejection and failure
+   propagation. Full retained-conversion image assembly was retried into a
+   fresh output directory with all normal gates. The image retry passed in
+   433.078 seconds; both partitions passed complete readback, the actor gate had
+   zero unresolved findings, and WinUAE entered the prison scene. WIN-03's
+   correction is verified and included in v0.0.26-rc1.
+
+The image-only retry is a bounded local recovery after checking source changes
+and all retained terrain hashes. It is not general pipeline resume support and
+does not rewrite the failed full-run receipt as successful.
+
+## WIN-01: intermittent geometry worker queue failure — open, 2 October 2026
+
+1. **Type, symptoms, cause and impact.** Host-side parallel asset conversion
+   on Windows 11, official CPython 3.12.10, in the Windows port based on cloned
+   v0.0.25 commit `3433922c40a48ffd20a0362ed58407298221686a`.
+   Interior, Balmora and Census conversion have failed in geometry work
+   dispatched by `tools/prepare_mesh_bsp.py` through
+   `tools/build_parallel.py:ordered_map`. A worker raises
+   `OSError: [WinError 6] The handle is invalid` inside Python's
+   `multiprocessing/queues.py`, at `self._sem.release()` in `Queue.get`.
+   The queue's semaphore handle is invalid when released; why it became invalid
+   is **unknown**. The pool reports `BrokenProcessPool`, the stage fails, and
+   the builder cancels sibling work. The Amiga engine compiler passed in these
+   runs. This does not establish a compiler defect, memory exhaustion, or an
+   excessive worker count. Windows cancellation also left orphan workers;
+   process-tree cleanup needs a separate verified correction.
+
+2. **Reproduction and evidence.** Complete native conversion via `build.cmd`
+   with owned game inputs and `--jobs 24`. Three retained full-run attempts failed:
+   interior with 17 effective pool workers under a 24-worker total budget,
+   Balmora with 12 while the gallery had 12, and Census with 12 while a
+   separate 12-worker gallery was active.
+   Keep run receipts and the corresponding stage logs. Reproduction is
+   intermittent: an isolated 24-worker interior pass, eight rounds of a
+   24-worker synthetic geometry probe, and five repetitions of the first two
+   Balmora regions with 12 workers passed. The complete 64-region Balmora diagnostic, ten instrumented Census geometry
+   repetitions and three exact Census stage-command replays also passed.
+   The independent gallery completed all 3,551 models and payload validation
+   (790 reused, 2,761 freshly converted, zero failures). An instrumented full
+   run then passed every conversion stage with 1,925 worker lifecycles and no bad
+   handles, before failing separately at image packaging (WIN-03). Root cause
+   remains open; this passing conversion does not establish full-build reliability.
+
+3. **Fix or mitigation and validation.** No confirmed fix or reliable workaround
+   yet. Retain validated conversion caches and diagnose with separate output
+   directories. Close only identified orphan descendants of a failed build.
+   These are recovery measures, **not a fix**. Do not disable required content,
+   lower quality or waive validation gates. A future process-management fix
+   must be scoped to Windows, preserve Linux worker behavior, and be validated
+   under the failing workload and a complete build before closing this entry.
+
+See [Windows build and known issues](WINDOWS_BUILD.md#windows-build-and-known-issues).
+
+**Review findings.** The observed `Queue.get()` failure occurs after receiving
+the next task's serialized bytes and before decoding that task. The earlier
+tracebacks do not show whether the worker had already processed any tasks.
+Each Windows worker owns a duplicated semaphore handle: ordinary parent-side
+garbage collection, slow result consumption, or another pool closing its own
+handles does not by itself explain an invalid worker-local handle. Code review
+has not identified an executor-lifetime error in `ordered_map`.
+
+Instrumented full-run diagnostics now record handle type during deserialization,
+before/after worker standard-input cleanup, at worker entry, and on queue errors,
+with the number and identity of previously received work items. These records
+are private diagnostic artifacts, not release assets. Interpret a failure at
+startup separately from a handle becoming invalid after geometry work. A handle
+number reused for another kernel-object type would support a local close/reuse
+problem; that has not yet been observed. Standard-input cleanup was considered,
+but the tested interpreter's initial stdin uses `closefd=False`; it remains a
+low-confidence hypothesis, not an established cause.
+
+No automatic retry, alternate multiprocessing backend or reduced-content build
+has been adopted as a fix. If the failing handle was initially valid, a scoped
+[Windows native handle trace](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-htrace)
+can identify handle-open/close/invalid-reference call stacks. A passing run with
+different concurrency and cache state cannot alone identify the cause.
+
+## WIN-02: cancelled Windows stage leaves worker descendants — open, 2 October 2026
+
+1. **Type, cause, symptoms and impact.** Host process cleanup. Windows stage
+   cancellation currently calls `Popen.terminate()`/`kill()` on the immediate
+   process. Unlike the Linux process-group path, that does not terminate the
+   entire descendant tree. A cancelled gallery left twelve Python workers alive
+   after its parent exited, consuming resources or waiting indefinitely.
+   This is separate from WIN-01; it is not evidence of the semaphore root cause.
+2. **Reproduction.** Run independent conversion stages concurrently and cause
+   one to fail while another owns a worker pool. Inspect the cancelled stage's
+   descendants after its parent exits. A synthetic Windows parent/child fixture
+   can test this without game data or disrupting an active build.
+3. **Fix status.** A Windows-only process-tree termination candidate passed the
+   isolated parent/child test, including the virtual-environment launcher. It is
+   not integrated into the public scheduler. A separate candidate also passed a
+   synthetic scheduler forced-failure test; production integration and a full
+   failure-path build remain pending, so this issue remains unfixed. Linux process-group handling must remain unchanged.
+   Until integration, explicitly close only verified orphan build descendants.
+
+
+
 ## Intermittent inability to ready hands: unknown state (open)
 
 The owner reported F temporarily ceasing to raise/lower the hands. Debug mode

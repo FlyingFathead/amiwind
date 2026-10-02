@@ -2,25 +2,61 @@
 
 Official homepage and downloads: [WinUAE](https://www.winuae.net/).
 
+## Current Windows checkpoint, 2 October 2026
+
+The native Windows asset-free test image booted successfully in WinUAE 6.0.3
+with an owned complete A1200 Kickstart 3.1 ROM. The reference profile is **2 MiB
+Chip RAM, 16 MiB Z3 Fast RAM, 68040 with internal FPU and JIT**, fastest possible
+CPU speed, AGA/PAL and 24-bit addressing disabled. The subsequent full Windows-built HDF also reached the main menu, played the
+opening and entered the prison scene with Jiub; name entry and menu input worked,
+and a clean exit returned to AmigaDOS. See the
+[Windows validation record](VALIDATION-WINDOWS-2026-10-02.md) for the limited smoke-test scope.
+
+The first Windows-generated test image failed on its AmigaDOS startup script
+because it contained CRLF line endings. Writing LF fixed the test-image boot;
+this was a builder defect, not evidence of incorrect emulator settings. Historical
+owner configuration issues (RAM capacity, split ROM selection and real CPU speed)
+are described below and should not be confused with this defect.
+
+## Start directly from PowerShell
+
+WinUAE accepts `-f <config.uae>` (also `-config=<config.uae>`) and repeated
+`-s key=value` overrides. Load a private preset containing the owned ROM and a
+working HDF copy, then put overrides after `-f`:
+
+```powershell
+& 'C:\Program Files\WinUAE\winuae64.exe' `
+  -f 'C:\AmiWind\playtest\configs\my-amiwind.uae' `
+  -s use_gui=no -s cpu_speed=max
+```
+
+Replace the example config path with your saved private preset. `use_gui=no`
+starts emulation without the configuration dialog; the emulator window still
+opens. Individual ROM, RAM and disk settings can also be passed with `-s`, but a
+saved preset makes the complete tested configuration easier to reproduce.
+The upstream [command-line parser](https://github.com/tonioni/WinUAE/blob/master/main.cpp)
+implements these options. The installed WinUAE documentation also describes
+`-f` and `-config` under Command Line Parameters.
+
 ## Public versioned preset
 
-Load [AmiWind-v0.0.17-WinUAE.uae](../resources/emulators/AmiWind-v0.0.17-WinUAE.uae)
+Load [AmiWind-v0.0.26-rc1-WinUAE.uae](../resources/emulators/AmiWind-v0.0.26-rc1-WinUAE.uae)
 from WinUAE's Configurations panel. It sets the development machine below and
 opens the GUI. It deliberately leaves the ROM path empty and mounts no disk.
 In ROM, select your complete licensed A1200 Kickstart 3.1 ROM. In CD & Hard
-drives, add your locally generated `AmiWind-v0.0.17.hdf` as an RDB hardfile
+drives, add your locally generated `AmiWind-v0.0.26-rc1.hdf` as an RDB hardfile
 on the UAE controller, then save a private configured copy and Start.
 
 To produce the playable HDF, follow the [Linux](LINUX_BUILD.md) or
 [Windows / WSL build guide](WINDOWS_BUILD.md) with your own Morrowind files.
 The public source ZIP contains the preset, not a playable HDF or Kickstart ROM.
-The separate `AmiWind-v0.0.17-dry-run.hdf` boots only to a test notice.
+The separate `AmiWind-v0.0.26-rc1-dry-run.hdf` boots only to a test notice.
 
 The preset contains no personal Windows paths, device identifiers, ROMs or
 game data. Its description and filename identify the development version.
-It is configuration guidance for WinUAE 6.0.3 based on the prior owner config;
-local execution tests use FS-UAE 3.1.66. Do not treat it as proof of a local
-WinUAE run or stock A1200 speed. See [v0.0.16 validation](VALIDATION-v0.0.16.md)
+The preset describes the WinUAE 6.0.3 reference configuration. The current
+Windows smoke-test scope is recorded above; earlier Linux execution tests used
+FS-UAE 3.1.66. Neither establishes stock A1200 speed. See [v0.0.16 validation](VALIDATION-v0.0.16.md)
 for the tested machine and scope. Historical startup thresholds and owner
 reports remain below for comparison.
 

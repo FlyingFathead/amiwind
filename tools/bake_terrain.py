@@ -1,7 +1,7 @@
 """Bake coarse terrain colours from the owner's base-game texture pixels."""
 import io
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from mwad.audit import BSA, normpath
 from mwad.paths import child_ci
@@ -20,7 +20,7 @@ def bake_colours(data_files, area, grids, heights, out):
             name = normpath("textures/" + texture)
             if ".." in Path(name).parts or Path(name).is_absolute():
                 raise ValueError("Unsafe terrain texture path")
-            candidates = [str(Path(name).with_suffix(".dds")), name]
+            candidates = [str(PurePosixPath(name).with_suffix(".dds")), name]
             chosen = next((p for p in candidates if p in bsa.entries), None)
             if chosen is None:
                 raise ValueError(f"Missing base-game terrain texture: {texture}")

@@ -9,7 +9,7 @@ import io
 import math
 import struct
 from collections import OrderedDict
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import numpy as np
 from PIL import Image
 from mwad.audit import normpath
@@ -30,7 +30,7 @@ class Assets:
         if not name.startswith('textures/'):name='textures/'+name
         if name in self.textures:
             self.textures.move_to_end(name);return self.textures[name]
-        for candidate in (str(Path(name).with_suffix('.dds')),name):
+        for candidate in (str(PurePosixPath(name).with_suffix('.dds')),name):
             try:
                 image=np.array(Image.open(io.BytesIO(self.read(candidate))).convert('RGBA'))
                 if image.nbytes<=16*1024*1024:

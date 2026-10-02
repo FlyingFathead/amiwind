@@ -111,7 +111,7 @@ def check_quakec(compiler, hands='3d'):
             shutil.copyfile(ROOT/'engine/aga/qc'/name, qc/name)
         if hands == 'sprites':
             source = qc/'world.qc'
-            source.write_text(source.read_text().replace('progs/v_nord.mdl', 'progs/player.mdl'))
+            source.write_text(source.read_text().replace('progs/v_nord.mdl', 'progs/player.mdl'), newline='\n')
         result = subprocess.run([compiler], cwd=qc, stdin=subprocess.DEVNULL,
                                 capture_output=True, text=True, errors='replace', timeout=30)
         if result.returncode or not (directory/'progs.dat').is_file():
@@ -163,7 +163,7 @@ def engine(args):
     vasm=executable_path(args.vasm.resolve() if args.vasm else args.sdk.resolve()/'bin/vasmm68k_mot')
     run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',args.sdk.resolve()/'m68k-amigaos/ndk-include','-I',tree/'build/version','-o',checker,tree/'boot/bootcheck.asm'])
     check_binary(checker.read_bytes())
-    (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n')
+    (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n', newline='\n')
     print(binary)
 
 def write_content_fingerprint(id1):
@@ -210,7 +210,7 @@ def image(args):
     scene=ensure_external(args.scene,'AGA scene');music=ensure_external(args.music,'converted music');out=new_output(args.out)
     boot=out/'boot';shutil.copytree(scene/'id1',boot/'id1');(boot/'S').mkdir()
     cfg=boot/'id1/default.cfg'
-    cfg.write_text(startup_config(cfg.read_text()))
+    cfg.write_text(startup_config(cfg.read_text()), newline='\n')
     shutil.copyfile(ROOT/'config/keymaps.cfg',boot/'id1/keymaps-default.cfg')
     shutil.copyfile(ROOT/'config/game.cfg',boot/'id1/default-game.cfg')
     if args.data_files:
@@ -235,8 +235,8 @@ def image(args):
         gallery_report=omit_gallery(boot/'id1')
     else:
         gallery_report=stage_required(args.gallery,boot/'id1')
-    (out/'npc-gallery-staging.json').write_text(json.dumps(gallery_report,indent=2)+'\n')
-    (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n')
+    (out/'npc-gallery-staging.json').write_text(json.dumps(gallery_report,indent=2)+'\n', newline='\n')
+    (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n', newline='\n')
     from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
     if args.data_files:prepare_world_ui(args.data_files,None,boot)
     validate_world_ui(boot/'id1')
@@ -255,11 +255,11 @@ def image(args):
                                  boot/'id1/intro/opening.awt',movie_info['frames'])
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
-    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec default-game.cfg\nexec config.cfg\nexec keymap.cfg\nexec keymaps.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_startup\n')
+    (boot/'id1/quake.rc').write_text('exec default.cfg\nexec default-game.cfg\nexec config.cfg\nexec keymap.cfg\nexec keymaps.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_startup\n', newline='\n')
     print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
-    (boot/'S/startup-sequence').write_text('FailAt 10\nSYS:AmiWindCheck\nStack 300000\nSYS:AmiWind\n')
+    (boot/'S/startup-sequence').write_text('FailAt 10\nSYS:AmiWindCheck\nStack 300000\nSYS:AmiWind\n', newline='\n')
     for name in ['seyda.map','town.wad']:shutil.copyfile(scene/name,out/name)
     if (scene/'scene-ready.json').is_file():
         ready=json.loads((scene/'scene-ready.json').read_text())
@@ -277,23 +277,23 @@ def image(args):
     for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
     if args.hands=='sprites':
         if not (scene/'id1/gfx/hands.aws').is_file():raise ValueError('Bake hand sprites first')
-        q=qc/'world.qc';q.write_text(q.read_text().replace('progs/v_nord.mdl','progs/player.mdl'))
-    (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n');run([args.qcc],qc)
+        q=qc/'world.qc';q.write_text(q.read_text().replace('progs/v_nord.mdl','progs/player.mdl'), newline='\n')
+    (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n', newline='\n');run([args.qcc],qc)
     validate_quakec(boot/'id1/progs.dat')
     # Saved mutable state is only restored against this exact converted content.
     if args.data_files:
         from actor_grounding import annotate, bake_ground
         from mwad.paths import child_ci
         grounding=annotate(boot/'id1/maps',child_ci(args.data_files,'Morrowind.esm'))
-        (out/'actor-grounding.json').write_text(json.dumps(grounding,indent=2)+'\n')
-        (out/'actor-ground-support.json').write_text(json.dumps(bake_ground(boot/'id1/maps'),indent=2)+'\n')
+        (out/'actor-grounding.json').write_text(json.dumps(grounding,indent=2)+'\n', newline='\n')
+        (out/'actor-ground-support.json').write_text(json.dumps(bake_ground(boot/'id1/maps'),indent=2)+'\n', newline='\n')
     # Placement correction is not its own proof: independently read the final
     # BSP/MDL payload, and stop before fingerprinting or HDF creation on failure.
     from check_actor_ground import require as require_actor_ground
     actor_report = require_actor_ground(boot/'id1/maps', out/'actor-initial-contact.json',
                                        getattr(args, 'allow_known_actor_ground_findings', None))
     actor_acceptance = actor_report['acceptance']
-    (out/'actor-ground-acceptance.json').write_text(json.dumps(actor_acceptance, indent=2)+'\n')
+    (out/'actor-ground-acceptance.json').write_text(json.dumps(actor_acceptance, indent=2)+'\n', newline='\n')
     write_content_fingerprint(boot/'id1')
     manifest=json.loads((music/'soundtrack.json').read_text());groups=playlists(manifest['tracks'])
     opening_track=manifest['tracks'][4] if 4 in groups['explore'] else None
@@ -307,7 +307,7 @@ def image(args):
         if digest(source)!=track['sha256']:raise ValueError('Music manifest mismatch')
         shutil.copyfile(source,target/track['file'])
     shutil.copyfile(music/'soundtrack.json',target/'soundtrack.json')
-    (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n')
+    (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n', newline='\n')
     # Leave filesystem metadata and future saves room; retain legacy-safe sizes.
     from world_volumes import pack as pack_world_volumes
     world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool)
@@ -321,7 +321,11 @@ def image(args):
     for path in sorted((p for p in boot.rglob('*') if p.is_dir()),key=lambda p:len(p.parts)):
         cmd+=['+','makedir',path.relative_to(boot).as_posix()]
     for path in sorted(p for p in boot.rglob('*') if p.is_file()):cmd+=['+','write',path,path.relative_to(boot).as_posix()]
-    run(cmd)
+    if os.name == 'nt':
+        from build_windows_xdftool import run as run_xdftool
+        run_xdftool(cmd)
+    else:
+        run(cmd)
     root_check=check_image(part,normalize=True)
     total_mib=partition_mib+sum(p['bytes']//(1024*1024) for p in world_images)
     if total_mib*1024*1024+32768>=4*1024**3:
@@ -338,7 +342,7 @@ def image(args):
     layout=verify_combined(hdf,[dict(partition='DH0',volume='AMIWIND',files=boot_files),*world_images])
     for volume in world_images:(out/volume['file']).unlink()
     part.unlink()
-    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'actor_ground_audit':actor_acceptance,'npc_gallery':gallery_report,'torch':torch_report,'hdf_file':hdf.name,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':'DOS1 FFS partitions in one RDB HDF','legacy_root_check':root_check},indent=2)+'\n')
+    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'actor_ground_audit':actor_acceptance,'npc_gallery':gallery_report,'torch':torch_report,'hdf_file':hdf.name,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':'DOS1 FFS partitions in one RDB HDF','legacy_root_check':root_check},indent=2)+'\n', newline='\n')
     if not actor_acceptance['production_gate_passed']:
         print('PRIVATE TEST image assembled. Production actor gate DID NOT PASS; see actor-ground-acceptance.json.', flush=True)
     print(hdf)

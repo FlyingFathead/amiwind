@@ -15,6 +15,35 @@ permissions:
   contents: read
 
 jobs:
+  host-launcher-parity:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install synthetic asset-test dependencies
+        run: python -m pip install numpy Pillow
+      - name: Shared host contract and real Windows launcher checks
+        shell: pwsh
+        run: |
+          $env:PYTHONDONTWRITEBYTECODE = '1'
+          $env:PYTHONPATH = "${{ github.workspace }}/src" + [IO.Path]::PathSeparator + "${{ github.workspace }}/tools"
+          python -B -m unittest discover -s tests -p test_build_host.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p "test_build_windows*.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_setup_windows.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_host_asset_formats.py -v
+          exit $LASTEXITCODE
+
   source-and-dry-run:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

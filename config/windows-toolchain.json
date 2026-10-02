@@ -1,0 +1,53 @@
+{
+  "schema": "amiwind-windows-toolchain-v1",
+  "python": {
+    "version": "3.12.10",
+    "filename": "python-3.12.10-amd64.exe",
+    "url": "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe",
+    "bytes": 26964224,
+    "sha256": "67b5635e80ea51072b87941312d00ec8927c4db9ba18938f7ad2d27b328b95fb"
+  },
+  "msys2": {
+    "version": "2026-09-27",
+    "filename": "msys2-x86_64-20260927.exe",
+    "url": "https://github.com/msys2/msys2-installer/releases/download/2026-09-27/msys2-x86_64-20260927.exe",
+    "bytes": 85046168,
+    "sha256": "416d506c839a2da4bc184eeec8cbaaf1055ee698618228c62dfc4232a6970f0e"
+  },
+  "sdk": {
+    "version": "v16.2-rc11",
+    "filename": "m68k-amigaos-gcc-16.2-rc11-x86_64-w64-mingw32ucrt-setup.exe",
+    "url": "https://github.com/AmigaPorts/m68k-amigaos-gcc/releases/download/v16.2-rc11/m68k-amigaos-gcc-16.2-rc11-x86_64-w64-mingw32ucrt-setup.exe",
+    "bytes": 54326461,
+    "sha256": "5e6d76ef7a47473a3f6e645f867ccd2f1f4eab7553e2a4d9fd887da1f13dfd74",
+    "compiler_sha256": "d32d1832580cd74536b3a7f376b3f3b936af59d1a0cc44e63a538ab3dd8c5dd6",
+    "assembler_sha256": "720864d5cbacafa6f14c7cc660864e718aac515451d675ec270fbf212684d2db"
+  },
+  "ericw": {
+    "version": "v0.18.1",
+    "filename": "ericw-tools-v0.18.1-win64.zip",
+    "url": "https://github.com/ericwa/ericw-tools/releases/download/v0.18.1/ericw-tools-v0.18.1-win64.zip",
+    "bytes": 12780109,
+    "sha256": "a0f39c6faeb29cd08b267880cdcebb310f9938fef4cbbff07d1f6843c36e9cd3",
+    "directory": "ericw-tools-v0.18.1-win64"
+  },
+  "ffmpeg": {
+    "version": "9.0.1",
+    "filename": "ffmpeg-9.0.1-full_build.zip",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.1/ffmpeg-9.0.1-full_build.zip",
+    "bytes": 251427729,
+    "sha256": "2e8e28af97c2ae338ccef92e36da9b2a4cd21d0cad9dde093545606cb07f5b00",
+    "directory": "ffmpeg-9.0.1-full_build"
+  },
+  "python_constraints": [
+    "setuptools==84.0.0",
+    "PyFFI==2.2.3",
+    "numpy==2.5.3",
+    "Pillow==12.3.0",
+    "fast-simplification==0.2.0",
+    "scipy==1.18.1",
+    "amitools==0.8.1"
+  ],
+  "msys2_packages": ["make", "gcc", "mingw-w64-ucrt-x86_64-ttf-dejavu"],
+  "msys2_package_policy": "Signed rolling repositories; exact resolved package versions are recorded in the local setup receipt. Offline setup reuses an already provisioned MSYS2 installation."
+}

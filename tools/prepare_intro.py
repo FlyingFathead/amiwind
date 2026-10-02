@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Bake original actor talk/blink/walk poses and introductory speech privately."""
 import argparse,hashlib,json,math,re,shutil,struct,subprocess,sys,tempfile,wave
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.audit import BSA,records,subrecords,string
 from mwad.npc import load_master,outfit,text,first
@@ -25,7 +25,7 @@ def voice_convert(assets,source,target,ffmpeg='ffmpeg',speech=True,gain_db=0):
     try:raw=assets.read('sound/'+resolved)
     except KeyError:
         if Path(resolved).suffix.casefold()!='.wav':raise
-        resolved=str(Path(resolved).with_suffix('.mp3'));raw=assets.read('sound/'+resolved)
+        resolved=str(PurePosixPath(resolved).with_suffix('.mp3'));raw=assets.read('sound/'+resolved)
     with tempfile.TemporaryDirectory() as td:
         p=Path(td)/'source';p.write_bytes(raw)
         filters=['-af',f'volume={gain_db:g}dB'] if gain_db else []

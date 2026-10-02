@@ -2,11 +2,25 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current release: **v0.0.25**, a substantial development milestone. Known gameplay issues remain documented; a regular source release is
+Current candidate: **v0.0.26-rc1**, recording native Windows build/game-entry
+success with experimental support. Docker and input helpers are planned for
+final v0.0.26. Known gameplay issues remain documented; a source release is
 not a claim that the complete Morrowind game has been implemented or playtested.
 The owner performs all Git/GitHub publishing.
 
-## Complete update package
+## Current rc1 handoff
+
+The complete rc1 public-source ZIP contains every allowlisted source file and
+its generated package manifest. The separate private transfer kit contains the
+overlay/publishing helpers and checksums; do not upload that private kit.
+Overlay only after checking the exact cloned v0.0.25 base commit and preserving
+local work. Run Linux checks before publication. Push main from the publishing
+host and require a successful source-check workflow for that exact commit before
+creating the annotated v0.0.26-rc1 tag and a GitHub **prerelease**. Do not replace
+existing tags or mark this candidate as the latest stable release. Upload only
+the validated public-source ZIP and its checksum.
+
+## Historical v0.0.25 complete update package
 
 `AmiWind-v0.0.25-complete-update.zip` contains the complete public source ZIP,
 a source patch from rc10, updater, checksums and apply/recovery/publish scripts.

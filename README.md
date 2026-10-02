@@ -6,7 +6,30 @@
 
 ## Current state of the project
 
-**v0.0.25 — character build scheduling**
+**v0.0.26-rc1 — successful native Windows 11 build and WinUAE game entry**
+
+The complete current conversion recipe has now built on **native Windows 11**:
+all **3,551 NPC gallery models** and **2,526 world terrain regions**, with normal
+quality and validation gates. After fixing a Windows image-packing limit and
+retrying that final stage, the verified HDF booted in **WinUAE 6.0.3**, played the
+opening movie and entered Jiub's prison scene with keyboard/menu input working.
+The [validation record](docs/VALIDATION-WINDOWS-2026-10-02.md) preserves the failed
+original receipt and the successful recovery separately. The tested full image
+still displayed v0.0.25; rc1 packages the Windows port and those fixes under the
+new release version. This is a limited game-entry smoke test.
+
+**Linux remains the established build foundation. Native Windows is experimental:**
+intermittent Python worker failures and incomplete cancellation cleanup remain
+documented [known issues](docs/BUG_JOURNAL.md). Preserve failed-run logs and start
+a fresh run using validated model caches; general stage resume is not available.
+Use the [Windows setup/build scripts](docs/WINDOWS_BUILD.md) or the existing
+[Linux build path](docs/LINUX_BUILD.md).
+
+**Docker is next and is planned for the final v0.0.26 release**, with Windows and
+Linux helper scripts for supplying your own Morrowind installation. The container
+builder is not included or validated in rc1. It will contain only source/tools;
+game data, converted assets and ROMs remain user supplied and private. See the
+[Docker roadmap](docs/DOCKER_BUILD_ROADMAP.md) and [rc1 release notes](docs/RELEASE-v0.0.26-rc1.md).
 
 **F**, then **V** equips a [torch converted from the original game](docs/TORCH.md),
 with an animated grip and flame attached to its source emitter. The debug header
@@ -21,8 +44,8 @@ Amiga format and quality.
 A completed rc3 terrain run can be reused through
 [engine/image recovery](docs/IMAGE_RECOVERY.md). Build receipts retain timing,
 compiler/tool versions, warning counts, output size and SHA-256; see
-[build output](docs/BUILD_OUTPUT.md). Native Windows/MSYS2 remains **untested**;
-see the [roadmap](docs/WINDOWS_BUILD_ROADMAP.md).
+[build output](docs/BUILD_OUTPUT.md). The [Windows checkpoint](docs/VALIDATION-WINDOWS-2026-10-02.md)
+records successful full conversion, recovered image assembly and WinUAE game entry.
 
 The base-game island now has a playable terrain pass following the recovered
 polygon survey: **2,526 terrain regions**, with local coordinates rebased at
@@ -34,9 +57,9 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[release scope and validation](docs/RELEASE-v0.0.25.md).
+[v0.0.25 gameplay scope](docs/RELEASE-v0.0.25.md).
 
-rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
+v0.0.25-rc1 brought the Seyda Neen handoff inside its ground coverage and preserved
 original shoreline samples that coarse terrain had submerged. A normal-view
 compass (off by default; `dbg compass on`) and GLOBAL/LOCAL XYZ aid navigation; the M marker uses the same source
 coordinates and keeps its zoom on reopen. Debug flight supports Ctrl at twice
@@ -76,8 +99,8 @@ coordinates and keeps the strict gate. Ground contact is separate from
 [quest-driven character presence](docs/CHARACTER_STATES.md), which remains
 incomplete. Dreamer startup visibility is a documented example.
 
-Native compilation and host tests do not establish a full playable-image or
-emulator pass. See [release evidence](docs/validation/rc7-source.json). Method 1
+For the Windows build and limited emulator result, see the
+[current validation record](docs/VALIDATION-WINDOWS-2026-10-02.md). Method 1
 retains synchronous loading behind the frozen-frame Loading... box; method 2
 read-ahead remains experimental.
 
@@ -177,6 +200,11 @@ generated game images are private build outputs, not public source releases.
 
 ## Building and playing
 
+**Native Windows entry point (experimental):** `build.cmd` or `build.ps1`.
+Start with `.\setup-windows.cmd -Plan`, then `.\setup-windows.cmd -Yes`, and follow the
+[Windows setup guide](docs/WINDOWS_BUILD.md). Windows and Linux share the Python
+build pipeline; Windows setup is automated, while full-game validation remains open.
+
 **Quickest way to compile on Ubuntu/Debian Linux (or Ubuntu under WSL):**
 
 ```sh
@@ -211,7 +239,7 @@ Start with [Linux build instructions](docs/LINUX_BUILD.md) or
 [Windows host options](docs/WINDOWS_BUILD.md). Native Windows/MSYS2 is the
 preferred [potential port](docs/WINDOWS_BUILD_ROADMAP.md); WSL2 is a fallback if
 native integration proves troublesome. Neither Windows route has a verified
-full build yet.
+full game build yet; native Windows has passed the asset-free engine/HDF checkpoint.
 The tool accepts your Morrowind installation root, checks required file sizes
 and known SHA-256 hashes, and reports dependency versions. Build outputs default
 to ignored `out/`.
@@ -236,12 +264,12 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.25-rc2 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.26-rc1 configuration template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.25-rc2-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.25-rc2-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.26-rc1-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.26-rc1-WinUAE.uae) |
 
-1. Build `AmiWind-v0.0.25-rc2.hdf` from your own Morrowind installation using the
+1. Build `AmiWind-v0.0.26-rc1.hdf` from your own Morrowind installation using the
    build guide above. The source ZIP contains the tools and templates, not a
    playable game image.
 2. Install an emulator from its official homepage above and save a local copy
@@ -254,7 +282,8 @@ For manual setup or WinUAE, use the guides and steps below.
 
 The presets use A1200/AGA, 68040 with FPU, 2 MiB Chip and 16 MiB Z3 Fast RAM,
 with JIT and maximum CPU speed. The v0.0.16 playable image was tested with
-FS-UAE 3.1.66 on Linux; the WinUAE preset is configuration guidance.
+FS-UAE 3.1.66 on Linux. The Windows checkpoint reached the game in WinUAE 6.0.3
+using this hardware profile; see the [test scope](docs/VALIDATION-WINDOWS-2026-10-02.md).
 The public [dry-run build](docs/CI_DRY_RUN.md) contains no game assets or ROMs
 and boots to a test notice; it is not the playable demo.
 

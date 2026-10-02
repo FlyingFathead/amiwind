@@ -8,7 +8,7 @@ import hashlib
 import os
 import tempfile
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import struct
 import sys
@@ -152,7 +152,7 @@ def prepare(data_files,scene,bitmap_paper_ink="filled"):
             page('papers' if identifier=='chargen statssheet' else 'directions',string(f['FNAM']),string(f['TEXT']))
     kinds,_,topics=load_master(master)
     for i,(identifier,f) in enumerate(sorted(signs)):
-        path='textures/'+str(Path(string(f['TNAM']).replace('\\','/')).with_suffix('.dds'))
+        path='textures/'+str(PurePosixPath(string(f['TNAM']).replace('\\','/')).with_suffix('.dds'))
         art(path,f'birth{i:02d}.awi',(96,112))
         page(f'birth{i:02d}',string(f['FNAM']),string(f.get('DESC',b'')))
     art('textures/scroll.dds','paper.awi',(300,150))

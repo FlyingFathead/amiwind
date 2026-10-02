@@ -9,7 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from build_host import find_executable
+from build_host import find_executable, host_name
 
 REFERENCE = Path(__file__).with_name("build-reference.json")
 
@@ -114,6 +114,10 @@ def report(args, tools=None):
         print(f"  [{row['status']}] {row['name']}: {row['detected'] or 'not found'} (reference {row['reference']})")
         if row.get('path'):
             print(f"    {row['path']}")
+    for row in rows:
+        if host_name() == 'windows' and row['status'] == 'older':
+            print(f"WARNING: {row['name']} {row['detected']} is older than the original reference "
+                  f"{row['reference']}. It may work; compatibility must be validated.")
     print("Matching identifies the recorded version, not proof that this machine builds successfully.")
     print("Newer/older/unknown/alternative versions need validation; see docs/BUILD_DEPENDENCIES.md.")
     return rows

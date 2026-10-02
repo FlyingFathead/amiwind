@@ -72,7 +72,7 @@ References: [OpenMW repository](https://github.com/OpenMW/openmw),
 [OpenMW FAQ](https://openmw.org/faq/),
 [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html).
 
-This is a fan-made proof of concept by a Morrowind enjoyer. Please support
+This is a fan-made proof of concept by a Morrowind fan. Please support
 [Cloanto / Amiga Forever](https://www.amigaforever.com/) for licensed ROMs,
 and purchase Morrowind from the GOG or Steam links above. Existing legitimate
 copies can be supplied locally. No game or ROM download mechanism is provided.

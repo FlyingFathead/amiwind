@@ -3,6 +3,7 @@
 """Prepare terrain partitions for one legacy-compatible RDB hardfile."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -57,7 +58,11 @@ def pack(id1, out, version, xdftool, rdbtool=None):
             name='id1/maps/'+path.name
             command+=['+','write',str(path),name]
             files.append(dict(path=name,bytes=path.stat().st_size,sha256=digest(path)))
-        subprocess.run(command,check=True)
+        if os.name == 'nt':
+            from build_windows_xdftool import run as run_xdftool
+            run_xdftool(command)
+        else:
+            subprocess.run(command,check=True)
         check_image(part,normalize=True)
         from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
         from amitools.fs.ADFSVolume import ADFSVolume

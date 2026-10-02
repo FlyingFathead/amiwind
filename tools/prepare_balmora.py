@@ -6,7 +6,7 @@ import hashlib
 import io
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import struct
@@ -76,7 +76,7 @@ def ground_assets(data, audit_path, palette):
     for key, record in materials.items():
         if record['texture']:
             name = normpath('textures/' + record['texture'])
-            source = next((n for n in (str(Path(name).with_suffix('.dds')), name) if n in bsa.entries), None)
+            source = next((n for n in (str(PurePosixPath(name).with_suffix('.dds')), name) if n in bsa.entries), None)
             if source is None: raise ValueError('Missing terrain material ' + name)
             im = Image.open(io.BytesIO(bsa_read(bsa, source))).convert('RGB')
         else:
