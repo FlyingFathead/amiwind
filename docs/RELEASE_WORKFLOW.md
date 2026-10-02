@@ -2,13 +2,22 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current candidate: **v0.0.26-rc1**, recording native Windows build/game-entry
-success with experimental support. Docker and input helpers are planned for
-final v0.0.26. Known gameplay issues remain documented; a source release is
+Published checkpoint: **v0.0.26-rc1**, recording native Windows build/game-entry
+success with experimental support. Current candidate: **v0.0.26**, adding the
+Docker builder and private input/export helper. Final-version full conversion,
+export and WinUAE game entry passed locally. Hosted Docker, Linux and Windows
+CI must pass for the exact publication commit. Known gameplay issues remain
+documented; a source release is
 not a claim that the complete Morrowind game has been implemented or playtested.
 The owner performs all Git/GitHub publishing.
 
-## Current rc1 handoff
+## Historical rc1 handoff (published)
+
+The following describes the completed rc1 handoff. Its tag is immutable;
+final v0.0.26 must use its own snapshot, checksums, exact-commit CI evidence
+and release artifacts. Require Docker, Linux and Windows jobs to pass for
+the final pushed commit. Retain complete failed-step logs before stopping,
+and perform whitespace checks before commit and against the exact commit.
 
 The complete rc1 public-source ZIP contains every allowlisted source file and
 its generated package manifest. The separate private transfer kit contains the

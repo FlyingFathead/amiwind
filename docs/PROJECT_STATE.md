@@ -1,12 +1,21 @@
-# Current project state — 2 October 2026
+# Current project state â€” 2 October 2026
 
-**Current candidate: v0.0.26-rc1.** Native Windows 11 completed the current full
-conversion recipe and, after a Windows packing fix and image-stage retry,
-produced a verified HDF that entered the game in WinUAE. The full image used
-v0.0.25 runtime identity. Linux remains the established foundation; Windows is
-experimental with known worker/cancellation failures. Docker and user-input
-helpers are next, planned for final v0.0.26. See [rc1 scope](RELEASE-v0.0.26-rc1.md)
-and [Windows evidence](VALIDATION-WINDOWS-2026-10-02.md).
+**v0.0.26 full conversion and game-entry validation passed locally; hosted CI gates publication.** The
+final helper/export run on Windows 11 / Docker Desktop WSL 2 completed all 3,551
+NPC models and 2,526 terrain regions. The strict packaged actor-ground gate passed
+with zero unresolved findings. Its verified HDF is 3,489,693,696 bytes, SHA-256
+`da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`; Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run
+reported 78 warnings. WinUAE 6.0.3 played the opening
+movie, entered Jiub's prison scene and responded to Enter/Escape. Local wrapper
+validation passed 433 tests with 3 skips. See [v0.0.26 release notes](RELEASE-v0.0.26.md).
+
+The cold offline rc1-identity Docker run remains historical evidence: 35 minutes
+3 seconds, same HDF size, full conversion, strict actor-ground pass and WinUAE
+game-entry check. Linux remains the established foundation; native Windows stays
+experimental with known worker/cancellation failures. Hosted Docker CI and public
+publication remain pending. See [rc1 scope](RELEASE-v0.0.26-rc1.md),
+[Windows evidence](VALIDATION-WINDOWS-2026-10-02.md) and
+[Docker evidence](VALIDATION-DOCKER-2026-10-02.md).
 
 ## Earlier gameplay and performance checkpoints
 
@@ -27,7 +36,7 @@ is recorded separately below.
 original-model torch and source-region HUD,
 including the rc8 crash correction. See [v0.0.25 scope](RELEASE-v0.0.25.md) and
 [validation](validation/v0.0.25-source.json). Target playtesting remains pending.
-The regular, very brief fist blink every 1–2 seconds is still open. The
+The regular, very brief fist blink every 1â€“2 seconds is still open. The
 static asset gallery and broad scenery coverage remain future work.
 The owner completed rc7 engine/image recovery with strict actor checking and no
 waiver: 2026-10-01 23:49:33 to 2026-10-02 00:00:28 +03:00, about 10m55s.
@@ -45,7 +54,8 @@ final release remains blocked until this regression is checked in the emulator.
 
 World-terrain profiling, reusable conversion results and reduced BSP/collision
 work are the top engineering priority. Native Windows/MSYS2 remains the
-preferred Windows direction, with WSL2 as a fallback. Both are untested.
+preferred native Windows direction. The earlier untested status is superseded
+by the native Windows and Docker/WSL 2 results at the top of this document.
 GPU asset conversion and GPU-assisted QCC remain proposals, not implemented
 acceleration. The configurable WSL2 RAM default is not a performance result.
 
@@ -82,7 +92,7 @@ behavior that must remain distinct from geometric placement correction.
 
 ## RC3 recovery baseline (historical)
 
-**AmiWind v0.0.24-rc3 — owner-requested recovery candidate.** All 2,935
+**AmiWind v0.0.24-rc3 â€” owner-requested recovery candidate.** All 2,935
 base-master NPC/creature records map to 3,551 successfully converted assets.
 There are 29 exact-model opt-in geometry allowances, bounded at 1,024 triangles.
 Dagoth Ur retains the original mask/crest geometry and a larger texture atlas.
@@ -105,7 +115,7 @@ loading default. See [RC3 scope](RELEASE-v0.0.24-rc3.md).
 
 ## RC1 baseline (historical)
 
-**AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
+**AmiWind v0.0.24-rc1 â€” candidate for Welcome to Balmora.**
 
 Balmora now includes 43 destination interiors (42 city interiors plus Tharys
 Ancestral Tomb), 93 NPC placements (90 living and three authored corpses), and
@@ -288,7 +298,9 @@ pinned optional SDK download, reference-version reporting, WSL/GOG discovery and
 size/SHA-256 input checks. Outputs default to ignored out/. The asset-free CI
 workflow compiles an engine and a public boot-notice HDF; see CI_DRY_RUN.md.
 113 host tests, native compilation and a local notice-screen boot passed. Hosted
-CI, clean installation and Windows/WSL full conversion remain untested.
+CI, clean installation and Windows/WSL full conversion were untested at that
+historical checkpoint. Current host validation is recorded at the top; the
+113-test count is historical.
 
 Font/UI steering: prefer 16px or 14px Magic Cards with three ink shades plus
 transparency. Use 12px only where space demands it; reject the monochrome 12px
@@ -302,7 +314,8 @@ Linux-oriented. WSL2 with Ubuntu was initially proposed first, without
 validation. Native Windows needs build/path/dependency work, including the
 hard-coded Linux font check and external cross-toolchain provisioning. The
 Windows Morrowind installation supplies data files; Morrowind.exe is not executed
-by the conversion path. Do not claim a tested Windows/WSL full build yet.
+by the conversion path. That historical inquiry is superseded by the full
+Windows and Docker build evidence at the top of this document.
 
 Latest validated runtime: bounded Seyda Neen exterior and separate prison-ship
 interior, streaming18-track music selection, three idle exterior NPCs, Nord
@@ -344,7 +357,7 @@ rollback path. Never destructively replace an existing feature during experiment
   a bounded serialized-BSP audit found no broken edge loops or reversed windings.
   This does not prove the whole converter/render path correct.
 - Localized slowdown remains unassigned. Ship-only face suppression improved one
-  short view trial from10.52 to12.44FPS; closer fog700→400 improved a different
+  short view trial from10.52 to12.44FPS; closer fog700â†’400 improved a different
   short comparison from11.46 to17.21FPS. Preserve camera/settings and do not
   treat these accelerated-emulator numbers as hardware benchmarks.
 - Occasional music clicks/late updates remain. Underwater tint, exterior formation,
@@ -359,7 +372,7 @@ All recent owner coordinates and reusable LOD ideas are in SEYDA_NEEN_NEXT_STEPS
 OPTIMIZATION_HISTORY.md and the implementation journals preserve causes, trials
 and known limitations. Correctness must accompany performance measurements.
 
-## Final recovery handover update, 27 September 23:32–23:35 Helsinki
+## Final recovery handover update, 27 September 23:32â€“23:35 Helsinki
 
 The latest chosen NEXT-build fog/culling default is **540**, superseding the450
 proposal above. Current frozen dev2 still starts at700; live command:

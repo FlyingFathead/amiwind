@@ -1,9 +1,32 @@
 # Docker builder roadmap
+## Current evidence - 2 October 2026
 
-Status: **next after v0.0.26-rc1, planned for final v0.0.26**. Native Windows
-conversion, recovered HDF assembly and WinUAE game entry have passed. No Docker
-image, input helper or container build has yet been implemented or validated.
-The planned Windows validation backend is Docker Desktop with Hyper-V.
+The allowlisted source/tools image, runtime input/export helper and asset-free
+Docker CI job are implemented locally. The wrapper suite passed 433 tests with
+3 skips and compiled the asset-free Amiga image. The final v0.0.26 helper/export
+run passed all 3,551 NPC models, 2,526 terrain regions, strict actor-ground audit
+with zero unresolved findings and verified HDF assembly. Its 3,489,693,696-byte
+HDF has SHA-256 `da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`;
+Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run reported 78 warnings. WinUAE 6.0.3
+played the opening movie, entered Jiub's prison scene and responded to Enter/Escape.
+Exported image-layer inventory review passed: image payload 2,119,364,274 bytes,
+save archive 535,999,488 bytes, with no BSA, ESM, HDF, ROM or private input/build
+paths in image layers. Hosted Docker CI is required before publication.
+
+The earlier cold 35-minute-3-second run used rc1 identity; see its historical
+[validation record](VALIDATION-DOCKER-2026-10-02.md).
+
+The planning and native storage snapshots below are historical estimates; they
+do not override the current evidence or establish a measured Docker peak.
+
+
+Status: **local v0.0.26 helper/export validation passed; hosted CI and publication
+remain pending**. Native Windows conversion and WinUAE game entry also passed,
+with experimental Windows reliability limits still documented. The Docker
+builder, read-only input helper and dedicated CI job are implemented. The local
+wrapper suite passed 433 tests with 3 skips; full final-identity conversion,
+strict actor-ground validation, verified HDF export and WinUAE game entry passed.
+See [Docker builder](DOCKER_BUILD.md) and [v0.0.26 release notes](RELEASE-v0.0.26.md).
 The first implementation should wrap the established Linux pipeline with its
 full-content defaults and existing validation gates. Native Linux remains the
 foundation; native Windows 11 remains experimental. A Linux container build on

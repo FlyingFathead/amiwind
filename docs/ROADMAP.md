@@ -1,11 +1,17 @@
 # Roadmap and implementation options
 
-## Current candidate: v0.0.26-rc1; final goal: Windows 11 and Docker builds
+## v0.0.26 final local validation; hosted CI and publication pending
 
-The rc1 source candidate records the successful native Windows conversion,
-recovered HDF assembly and WinUAE game-entry smoke test. Final v0.0.26 also
-requires the Docker builder and its validation, with all normal game content,
-the full NPC gallery and validation gates.
+The final Docker helper/export run passed full conversion, strict actor-ground
+validation, verified HDF assembly and WinUAE game entry. All 3,551 NPC models and
+2,526 terrain regions passed; the HDF is 3,489,693,696 bytes with SHA-256
+`da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`. The cached
+run had conversion elapsed of 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing, and reported 78 warnings. The local wrapper suite
+passed 433 tests with 3 skips. Hosted Docker CI and public publication remain
+pending. See [release notes](RELEASE-v0.0.26.md).
+
+The earlier cold Docker run used rc1 identity and took 35 minutes 3 seconds; its
+separate evidence remains in [Docker validation](VALIDATION-DOCKER-2026-10-02.md).
 Keep Linux builds supported through the same portable converter; host-specific
 setup and launchers must not create a separate conversion implementation.
 
@@ -18,16 +24,23 @@ setup and launchers must not create a separate conversion implementation.
   [recovered-build validation record](VALIDATION-WINDOWS-2026-10-02.md).
 - [x] Record timings, versions, warnings, output hashes and recovery limits.
 - [x] Prepare the v0.0.26-rc1 Windows source checkpoint.
-- [ ] Complete final v0.0.26 acceptance after Docker and Linux validation.
-- [ ] After a successful full native Windows build, implement and validate the
-  [Docker builder](DOCKER_BUILD_ROADMAP.md), with user-supplied game files,
-  persistent conversion/cache mounts and an initial 40 GiB free-space budget.
+- [x] Complete the final v0.0.26 full conversion, strict actor-ground validation,
+  HDF assembly and WinUAE game-entry acceptance locally.
+- [x] Implement the [Docker builder](DOCKER_BUILD_ROADMAP.md), read-only private
+  game inputs and persistent Linux conversion/cache volumes.
+- [x] Complete cold offline Docker conversion and verified HDF assembly with all
+  NPC models, terrain regions and strict actor-ground validation.
+- [x] Play the opening movie and enter Jiub's prison scene from the Docker HDF
+  in WinUAE 6.0.3; verify Enter/Escape controls.
+- [x] Complete final v0.0.26 helper/export validation and WinUAE game-entry check.
+- [ ] Complete hosted Docker CI and owner-run publication.
+- [x] Review exported image layers; measured full-build peak storage remains open.
 - [ ] Prepare a source-only handoff for Linux validation and owner-run publishing.
 
-The Windows conversion plus corrected image-stage retry passed and entered the
-game in WinUAE. v0.0.26-rc1 packages this checkpoint; final v0.0.26 requires the
-planned Docker work and validation. This was a limited runtime smoke test. See the
-[Windows roadmap](WINDOWS_BUILD_ROADMAP.md) for current acceptance scope.
+Native Windows remains experimental, with worker and cancellation reliability
+limits documented in the [Windows roadmap](WINDOWS_BUILD_ROADMAP.md). The final
+Docker helper/export and WinUAE validation for v0.0.26 have passed locally; hosted
+CI and publication remain pending.
 
 
 ## TODO SOON: static asset gallery and cell-by-cell scenery
@@ -94,22 +107,25 @@ a WinUAE prison-scene smoke test passed on 2 October 2026. Intermittent
 Windows worker failures remain open. The
 [Windows build roadmap](WINDOWS_BUILD_ROADMAP.md) records the current evidence,
 recovery limits and acceptance milestones. WSL2 is a separate Linux-host route
-and still needs its own complete build record.
+and now has a [full Docker conversion record](VALIDATION-DOCKER-2026-10-02.md).
 
-## Docker builder planned for v0.0.26
+## Docker builder and v0.0.26 validation
 
-Proposed on 2 October 2026; no container implementation or validation yet.
-See the [Docker builder roadmap](DOCKER_BUILD_ROADMAP.md) for input isolation,
-current disk measurements and the initial 40 GiB planning allowance.
-Offer an optional reproducible Linux build environment using the established
-Linux pipeline, with the same full-content defaults and validation gates. On
-Windows, this would be a Linux container through a supported Docker backend;
-it would not establish native Windows build reliability. Keep native Linux and
-experimental native Windows entry points maintained.
+The builder, private input/export helper and local final-version validation are
+complete. The cached v0.0.26 helper/export run passed all conversions, the strict
+actor-ground gate, verified HDF assembly and WinUAE game entry. Hosted Docker CI
+and publication remain pending. See the [release notes](RELEASE-v0.0.26.md) and
+[Docker builder details](DOCKER_BUILD_ROADMAP.md). Full-build peak storage remains
+unmeasured; the 40 GiB figure is an initial planning allowance.
+The implemented optional Linux build environment wraps the established pipeline
+with the same full-content defaults and validation gates. Windows testing uses
+a Linux container through WSL 2; that result does not establish native Windows
+reliability. Native Linux and experimental native Windows entry points remain
+maintained alongside Docker.
 
 - [ ] Package the toolchain and build dependencies with a recorded, tested version
   set and image digest. Check redistribution terms before publishing an image.
-- [ ] Accept the user's existing Morrowind installation through a read-only
+- [x] Accept the user's existing Morrowind installation through a read-only
   input mount; persist outputs and validated caches in separate writable mounts.
   Exclude game data, ROMs, local builds and private notes from the Docker build
   context and all published image layers.

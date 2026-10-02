@@ -1,22 +1,25 @@
 <p align="center">
-  <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind — A Commodore Amiga demake of Morrowind">
+  <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind â€” A Commodore Amiga demake of Morrowind">
 </p>
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
 ## Current state of the project
 
-**v0.0.26-rc1 — successful native Windows 11 build and WinUAE game entry**
+**v0.0.26 full conversion and game-entry validation passed locally; hosted CI gates publication.**
+The final Docker helper/export run completed the full recipe on Windows 11 with
+Docker Desktop's WSL 2 Linux engine. All 3,551 NPC models and 2,526 terrain regions
+passed, including the strict packaged actor-ground gate with zero unresolved
+findings. The verified v0.0.26 HDF is 3,489,693,696 bytes with SHA-256
+`da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`; WinUAE 6.0.3
+played the opening movie, entered Jiub's prison scene and responded to Enter/Escape.
+Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run reported 78 warnings. The local wrapper
+suite passed 433 tests with 3 skips. See the [v0.0.26 release notes](docs/RELEASE-v0.0.26.md).
 
-The complete current conversion recipe has now built on **native Windows 11**:
-all **3,551 NPC gallery models** and **2,526 world terrain regions**, with normal
-quality and validation gates. After fixing a Windows image-packing limit and
-retrying that final stage, the verified HDF booted in **WinUAE 6.0.3**, played the
-opening movie and entered Jiub's prison scene with keyboard/menu input working.
-The [validation record](docs/VALIDATION-WINDOWS-2026-10-02.md) preserves the failed
-original receipt and the successful recovery separately. The tested full image
-still displayed v0.0.25; rc1 packages the Windows port and those fixes under the
-new release version. This is a limited game-entry smoke test.
+The earlier **cold rc1-identity** Docker conversion took 35 minutes 3 seconds and
+also passed the full content, strict actor-ground and WinUAE game-entry checks.
+It produced the same-sized HDF with rc1 identity; its evidence remains in the
+[Docker validation record](docs/VALIDATION-DOCKER-2026-10-02.md).
 
 **Linux remains the established build foundation. Native Windows is experimental:**
 intermittent Python worker failures and incomplete cancellation cleanup remain
@@ -25,10 +28,10 @@ a fresh run using validated model caches; general stage resume is not available.
 Use the [Windows setup/build scripts](docs/WINDOWS_BUILD.md) or the existing
 [Linux build path](docs/LINUX_BUILD.md).
 
-**Docker is next and is planned for the final v0.0.26 release**, with Windows and
-Linux helper scripts for supplying your own Morrowind installation. The container
-builder is not included or validated in rc1. It will contain only source/tools;
-game data, converted assets and ROMs remain user supplied and private. See the
+The [Docker build helper](docs/DOCKER_BUILD.md) takes your own Morrowind installation
+as private runtime input. Images contain only source/tools; game data, converted
+assets and ROMs stay outside image layers and public releases. The published rc1
+remains immutable. See the
 [Docker roadmap](docs/DOCKER_BUILD_ROADMAP.md) and [rc1 release notes](docs/RELEASE-v0.0.26-rc1.md).
 
 **F**, then **V** equips a [torch converted from the original game](docs/TORCH.md),
@@ -118,7 +121,7 @@ See [map and journal](docs/WORLD_MAP_AND_JOURNAL.md),
 [project state](docs/PROJECT_STATE.md), [font options](docs/PAPER_FONT_OPTIONS.md)
 and [conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md).
 
-*For years, they thought the Nerevarine would never appear on the Commodore Amiga…*
+*For years, they thought the Nerevarine would never appear on the Commodore Amigaâ€¦*
 
 *Well, those n'wahs were wrong! The prophecy said nothing about the frame rate.*
 
@@ -180,7 +183,7 @@ The setup model is similar to OpenMW: point the tools at your installed game
 folder. Conversion runs locally and writes to a separate workspace. This
 independent project is not an OpenMW release or an official Bethesda product.
 
-> **Public source package — no commercial game data or ROMs.** No Quake or
+> **Public source package â€” no commercial game data or ROMs.** No Quake or
 > Morrowind game data, reusable game artwork, music, voices, game
 > executables, Amiga Kickstart ROMs or Workbench files are included. This source
 > package includes the selected development screenshots and a short clip for documentation, but
@@ -203,7 +206,10 @@ generated game images are private build outputs, not public source releases.
 **Native Windows entry point (experimental):** `build.cmd` or `build.ps1`.
 Start with `.\setup-windows.cmd -Plan`, then `.\setup-windows.cmd -Yes`, and follow the
 [Windows setup guide](docs/WINDOWS_BUILD.md). Windows and Linux share the Python
-build pipeline; Windows setup is automated, while full-game validation remains open.
+build pipeline. Native Windows full conversion and WinUAE game entry passed;
+experimental reliability limits remain. The Docker helper/export also completed
+the full v0.0.26 conversion and WinUAE game-entry check. Hosted Docker CI and
+publication must follow hosted CI; see [release notes](docs/RELEASE-v0.0.26.md).
 
 **Quickest way to compile on Ubuntu/Debian Linux (or Ubuntu under WSL):**
 
@@ -236,10 +242,11 @@ and continues into the build. APT may also ask for your sudo password and packag
 confirmation. Use `--autoinstall --plan` to preview setup without installing.
 
 Start with [Linux build instructions](docs/LINUX_BUILD.md) or
-[Windows host options](docs/WINDOWS_BUILD.md). Native Windows/MSYS2 is the
-preferred [potential port](docs/WINDOWS_BUILD_ROADMAP.md); WSL2 is a fallback if
-native integration proves troublesome. Neither Windows route has a verified
-full game build yet; native Windows has passed the asset-free engine/HDF checkpoint.
+[Windows host options](docs/WINDOWS_BUILD.md). Native Windows/MSYS2 has completed a full
+conversion and WinUAE game-entry smoke test; its reliability limits remain
+[documented](docs/WINDOWS_BUILD_ROADMAP.md). The Linux Docker builder on WSL 2 has
+also completed full conversion and verified HDF assembly. These are separate
+host validation results; Linux remains the established build foundation.
 The tool accepts your Morrowind installation root, checks required file sizes
 and known SHA-256 hashes, and reports dependency versions. Build outputs default
 to ignored `out/`.
@@ -293,10 +300,10 @@ Current engineering priority: [reduce world-terrain build times and avoid
 unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md), starting with phase
 profiling and verified reuse across builds. These improvements are planned.
 
-[Project state](docs/PROJECT_STATE.md) · [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
-[Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
-[Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
-[Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) ·
+[Project state](docs/PROJECT_STATE.md) Â· [Open bug reports](docs/BUGS.md) Â· [Roadmap](docs/ROADMAP.md) Â·
+[Repository layout](docs/REPOSITORY_LAYOUT.md) Â· [Release workflow](docs/RELEASE_WORKFLOW.md) Â·
+[Changelog](docs/CHANGELOG.md) Â· [Build dependencies](docs/BUILD_DEPENDENCIES.md) Â·
+[Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) Â·
 [Licensing and credits](docs/LICENSING_AND_CREDITS.md)
 
 Thanks to the Morrowind creators, the Amiga community, and the contributors whose
