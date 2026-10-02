@@ -1,5 +1,42 @@
 #!/usr/bin/env python3
-"""Guided local build; private outputs stay in ignored out/ or a chosen workspace."""
+"""Guided local build; outputs stay in a private workspace.
+
+CAPACITY FIRST: before starting the build, verify enough usable storage for ALL
+required content, conversion intermediates, staging copies, temporary images,
+readback verification and a margin. Include filesystem/quota limits and shared
+RAM limits for memory-backed scratch. If capacity is insufficient, arrange it
+before expensive work; never omit NPC models or the gallery to make a build fit.
+
+All NPCs must be included and loadable by the engine for the game to be complete.
+NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
+requested debugging purposes. Build time and disk usage are not reasons to omit it.
+
+Normal builds and recovery MUST include the gallery; missing input/model/catalogue
+content is an error, never an automatic opt-out. Only the owner's explicit
+--no-npc-gallery permits debugging-only omission of inspection assets. It must
+never remove required game NPC content or change the normal default.
+
+Skipping NPC model creation together with the gallery is pointless and
+counterproductive for a complete build: all character models are still required
+in the final product. Exceptional debugging may temporarily isolate the gallery;
+it cannot reduce the final game's required content.
+
+BOTH GALLERIES REQUIRE OUTSIDE APPROVAL FOR EXCEPTIONS: the NPC gallery and
+upcoming static-asset gallery, including their model generation, catalogues,
+coverage, quality and validation, must not be disabled, reduced or bypassed
+without a specific documented case/scenario and explicit approval from the
+project owner. The builder or contributor cannot approve its own exception.
+Time pressure, storage pressure and convenience are not approval. Existing
+--no-npc-gallery support is only a mechanism for an owner-approved exceptional
+debugging case; its availability does not grant permission to use it.
+
+A complete game requires all of its NPC and other game assets intact, packaged
+and loadable by the engine. Skipping model/asset creation with either gallery is
+pointless and counterproductive: those assets are required in the final product
+anyway. A debugging exception cannot redefine a complete build. Loadable does not
+mean all assets must be resident in memory simultaneously. The static-asset
+gallery remains planned; this contract does not claim it is implemented.
+"""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -47,7 +84,7 @@ def parser():
     p.add_argument("--fallback-font", type=Path, help="DejaVuSansMono.ttf for generated console graphics (default: tools/fonts or Linux system font)")
     p.add_argument("--check-inputs", action="store_true", help="Check the game installation without requiring build tools, then exit")
     p.add_argument("--dry-run", action="store_true", help="Actually compile the engine and create an asset-free boot-notice HDF; --plan only previews commands")
-    p.add_argument('--recover-image-from', type=Path, help='Recover an rc3 image-stage failure into a new run, reusing completed conversion; rebuild engine and image only')
+    p.add_argument('--recover-image-from', type=Path, help='Recover an rc3 image-stage failure into a new run, reusing completed conversion; rebuild engine, gallery and image')
     p.add_argument('--allow-known-actor-ground-findings', type=Path,
                    help='PRIVATE TEST ONLY: accept an exact reviewed actor-contact report; does not pass the production gate')
     p.add_argument("--autorun-fs-uae", action="store_true", help="Check FS-UAE and your ROM before setup, then launch the completed HDF using the documented preset")
@@ -64,7 +101,10 @@ def parser():
     p.add_argument("--ffmpeg", default="ffmpeg")
     p.add_argument("--xdftool", default="xdftool")
     p.add_argument("--rdbtool", default="rdbtool")
-    p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: sprites currently Nord unarmed only")
+    p.add_argument('--gallery-cache', type=Path, help='Persistent NPC model cache (default: WORKSPACE/cache/npc-gallery-v1); gallery coverage remains mandatory')
+    p.add_argument('--gallery-seed-run', type=Path, help='Import completed compatible model pairs from a stopped rc9 build run')
+    p.add_argument("--no-npc-gallery", action="store_true", help="DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery included by default")
+    p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: Nord first-person hands and original carried torch")
     add_jobs(p)
     p.add_argument('--serial-stages', action='store_true',
                    help='Run stages in order while retaining each stage job limit (diagnostics)')
@@ -352,6 +392,12 @@ def dry_run_commands(args, run):
 
 
 def commands(args, tools, run):
+    """Include the NPC gallery in normal AGA builds for debugging/regressions.
+
+    Only explicit --no-npc-gallery removes it; absence is never inferred from
+    old scene contents. The opt-out is debugging-only: required game NPCs must
+    never be removed by it. Asset-free dry runs use their separate recipe.
+    """
     font_options = getattr(args, "font_options", None) or resolve_font_options(args)
     py = sys.executable
     def tool(name, *items):
@@ -376,6 +422,12 @@ def commands(args, tools, run):
             ("dialogue-lookup", tool("prepare_dialogue_lookup.py", "--data-files", args.data_files, "--out", run / "voice-lookup.json")),
             ("intro", tool("prepare_intro.py", "--jobs", resolve_jobs(args.jobs), "--data-files", args.data_files, "--scene", run / "interior-scene", "--out", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
             ("census", tool("prepare_census.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
+                "--jobs", resolve_jobs(args.jobs),
+                *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
+            ("npc-gallery", tool("build_gallery.py", "--data-files", args.data_files,
+                "--palette", run / "intro-scene/id1/gfx/palette.lmp", "--out", run / "npc-gallery",
+                "--cache", getattr(args, "gallery_cache", None) or args.workspace / "cache/npc-gallery-v1",
+                *(["--seed-run", args.gallery_seed_run] if getattr(args, "gallery_seed_run", None) else []),
                 "--jobs", resolve_jobs(args.jobs),
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("area", tool("prepare_area.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
@@ -407,9 +459,11 @@ def commands(args, tools, run):
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--data-files", args.data_files, "--hands", args.hands, "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
+    if args.no_npc_gallery:
+        steps = [(name, command) for name, command in steps if name != "npc-gallery"]
     return steps
 
 
@@ -427,7 +481,8 @@ def execute(steps, run, metadata):
     save()
     for number, (name, command) in enumerate(steps, 1):
         log = run / "logs" / f"{number:02}-{name}.log"
-        section(f"Build [{number}/{len(steps)}]: {name}")
+        title = name + " (pre-baking in-game character models...)" if name == "npc-gallery" else name
+        section(f"Build [{number}/{len(steps)}]: {title}")
         print(f"Log: {log}", flush=True)
         entry = {"name": name, "command": command, "status": "running", "log": str(log)}
         receipt["steps"].append(entry)
@@ -462,6 +517,7 @@ def provenance(args, tools):
                 for path in sorted(base.rglob("*")) if path.is_file() and accept(path)}
     return {
         "schema": "amiwind-build-receipt-v1", "runtime_version": VERSION,
+        "npc_gallery": "asset-free" if args.dry_run else ("disabled by --no-npc-gallery" if args.no_npc_gallery else "enabled"),
         "recipe": "asset-free-test-compile-v1" if args.dry_run else "seyda-neen-prison-v1" if args.stage == "aga" else "seyda-neen-terrain-v1",
         "stage": args.stage, "hands": args.hands if args.stage == "aga" else None,
         "python": sys.version, "data_files": str(args.data_files), "tools": tools,
@@ -489,6 +545,8 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     args = p.parse_args(argv)
     args._argv = argv
+    if args.no_npc_gallery:
+        print("WARNING: --no-npc-gallery is for debugging builds only. All NPC assets required by the game remain required; this flag omits only the inspection gallery.", flush=True)
     summary = None
     try:
         if args.host_plan:

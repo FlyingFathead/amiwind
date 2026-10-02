@@ -12,7 +12,12 @@ is recorded separately below.
 
 **Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
-**Current candidate: v0.0.25-rc8**, a complete torch-crash correction from rc7.
+**Current release: v0.0.25**, completion-driven character-model scheduling and verified reuse,
+original-model torch and source-region HUD,
+including the rc8 crash correction. See [v0.0.25 scope](RELEASE-v0.0.25.md) and
+[validation](validation/v0.0.25-source.json). Target playtesting remains pending.
+The regular, very brief fist blink every 1–2 seconds is still open. The
+static asset gallery and broad scenery coverage remain future work.
 The owner completed rc7 engine/image recovery with strict actor checking and no
 waiver: 2026-10-01 23:49:33 to 2026-10-02 00:00:28 +03:00, about 10m55s.
 The reported HDF is 3,221,258,240 bytes, SHA-256
@@ -386,3 +391,24 @@ private-test option, and runs actor contact before terrain on new builds. The
 retained rc3 scene reproduces all 23 at that early gate. Full rc6 game assembly
 still awaits validation; do not promote diagnostic acceptance to a production
 pass. All 373 source tests and a fresh native asset-free build pass.
+
+The rc9 default game recipe includes the previously omitted NPC gallery. The
+exceptional debugging-only `--no-npc-gallery` opt-out is recorded; a missing default catalogue is
+an error. Recovery now schedules engine, gallery and image while retaining terrain.
+
+**Outside approval is required for any exception affecting either gallery.**
+Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
+reduced or bypassed, including model/asset generation, catalogue coverage,
+quality and validation, without a specific documented case or scenario **and
+explicit approval from the project owner**. A builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience do not
+supply that approval. An opt-out flag is a mechanism for an approved exceptional
+debugging case, not permission to choose that exception independently.
+
+All NPCs and other game assets must remain intact, packaged and loadable by the
+engine for the complete game to function properly. Skipping their creation
+alongside either gallery is pointless and counterproductive: the final product
+requires those assets anyway. An exceptional debug build must be labelled
+incomplete and cannot redefine the complete game's required content. Runtime
+loading may be on demand; this does not require every asset to reside in RAM
+simultaneously. The static-asset gallery is still planned, not implemented.

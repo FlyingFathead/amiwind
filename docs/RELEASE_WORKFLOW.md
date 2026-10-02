@@ -2,46 +2,30 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Current candidate: **v0.0.25-rc7 — complete source update from rc6**.
-It consolidates all intervening source and roadmap work. The native compiler
-and asset-free image checks are distinct from full game-image acceptance;
-see [rc7 validation](validation/rc7-source.json). Earlier archives and tags remain
-immutable. The owner performs all Git/GitHub publishing.
+Current release: **v0.0.25**, a substantial development milestone. Known gameplay issues remain documented; a regular source release is
+not a claim that the complete Morrowind game has been implemented or playtested.
+The owner performs all Git/GitHub publishing.
 
 ## Complete update package
 
-`AmiWind-v0.0.25-rc7-complete-update.zip` is the single handoff download. It
-contains the complete public source ZIP, updater, checksums and apply/publish
-scripts. The handoff bundle is for local use. Its publication script uploads
-the public source ZIP, incremental source ZIP, source updater and checksums.
+`AmiWind-v0.0.25-complete-update.zip` contains the complete public source ZIP,
+a source patch from rc10, updater, checksums and apply/recovery/publish scripts.
+The public source ZIP contains every maintained file under `amiwind/` plus a
+generated package manifest. No private playable, HDF, game payload or ROM is
+included. Only source ZIPs, updater and checksums are uploaded to GitHub.
 
-`AmiWind-v0.0.25-rc7-public-source.zip` contains every maintained source file
-under `amiwind/`, including all documentation and a generated package manifest.
-No rc4/rc5 patch chain or separate roadmap overlay is required. No private
-playable, HDF, converted game data or ROM is included.
+Finish the current build before applying to the rc10 checkout. APPLY.sh verifies
+the complete kit, updates changed files with an external backup and validates
+the result against the complete source package. Overlapping local edits stop
+before writes; unrelated edits remain preserved and require review before exact
+release validation. Existing rc10 cache entries remain compatible. Recovery uses
+the same workspace/cache and retains the original completed rc3 terrain/music.
 
-## Apply directly to rc6
-
-Finish any running build before updating its source. Extract the complete
-source outside the checkout and use `tools/apply_source_update.py` with a new
-external backup directory. `docs/RECONCILE-BASES.json` accepts the rc6 bytes for
-paths changed by this update. `docs/PATCH-v0.0.25-rc7.json` records the exact rc6
-baseline and hashes; its name is historical metadata terminology, not a
-requirement to download or apply an incremental patch.
-
-Overlapping local edits stop before writes. Unrelated edits remain preserved
-and must be reconciled before exact release validation. Keep `.git`, game inputs,
-tools and build outputs separate. Do not blindly unzip over the working tree.
-Verify that the direct update reproduces every maintained file and executable
-mode in the complete source archive. The package manifest is generated evidence,
-not tracked source. Runtime version identity comes from `VERSION`.
-
-Before tagging, push main and wait for the `source-check.yml` push workflow
-whose `headSha` equals the exact committed source revision. A queued run, a
-previous green commit or a cancelled/skipped/failed run is not acceptance.
-Only a completed successful run permits the source tag and prerelease. Download
-the uploaded assets and verify their checksums against the local package. The
-provided publication script performs this sequence; the owner executes it.
+PUBLISH.sh stages the source allowlist, commits, pushes main and waits for a
+successful `source-check.yml` run whose `headSha` equals that exact commit. It
+then creates the annotated `v0.0.25` tag and a regular GitHub release (not a
+prerelease), downloads the uploaded assets and verifies their checksums and tag.
+Existing tags are never replaced. The owner runs the supplied Bash commands.
 
 ## Release gate
 

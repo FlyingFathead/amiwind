@@ -1,89 +1,91 @@
 {
   "baselines": [
     {
-      "version": "0.0.25-rc7",
-      "archive": "AmiWind-v0.0.25-rc7-public-source.zip",
-      "sha256": "482f3ff8e52b4da552e9efd02d9487b210bdbcfb1e2748c6363bc4f796cd66ad"
-    },
-    {
-      "commit": "690ecd4",
-      "scope": "README.md cleanup after rc7",
-      "sha256": "e314bdf79f85f943b93def0b04cc01177b947ecbc91a52f1ec2315762f68337f"
+      "version": "0.0.25-rc10",
+      "archive": "AmiWind-v0.0.25-rc10-public-source.zip",
+      "sha256": "ce7977b34595719758f84281a1e70d5ab8beda55d6da27f6376479794b62e5b0"
     }
   ],
   "touched": [
     "README.md",
     "VERSION",
-    "docs/BUG_JOURNAL.md",
+    "docs/BUILD_OUTPUT.md",
     "docs/CHANGELOG.md",
-    "docs/LOCAL-RC8.md",
-    "docs/PATCH-v0.0.25-rc8.json",
+    "docs/LOCAL-v0.0.25.md",
+    "docs/NPC_MODEL_CACHE.md",
+    "docs/PATCH-v0.0.25.json",
     "docs/PROJECT_STATE.md",
     "docs/RECONCILE-BASES.json",
-    "docs/RELEASE-v0.0.25-rc8.md",
-    "docs/TORCH.md",
-    "docs/validation/rc8-source.json",
-    "engine/aga/src/r_light.c",
-    "engine/aga/src/r_local.h",
-    "engine/aga/src/r_main.c",
-    "engine/aga/src/r_surf.c",
-    "resources/emulators/AmiWind-v0.0.25-rc8-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc8-WinUAE.uae",
-    "tests/aga_torch_brush_test.c",
-    "tests/test_aga_native_source.py",
+    "docs/RELEASE-v0.0.25.md",
+    "docs/RELEASE_WORKFLOW.md",
+    "docs/validation/v0.0.25-source.json",
+    "resources/emulators/AmiWind-v0.0.25-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.25-WinUAE.uae",
+    "tests/test_build_parallel.py",
+    "tests/test_gallery_cache.py",
+    "tools/build.py",
+    "tools/build_gallery.py",
+    "tools/build_parallel.py",
     "tools/release-files.json"
   ],
   "removed": [],
   "known": {
     "README.md": [
-      "4dc71d7e0932c8f0ed6ed46332a76d54d412a8631395df243d532d0d5a099f9d",
-      "e314bdf79f85f943b93def0b04cc01177b947ecbc91a52f1ec2315762f68337f"
+      "a406b44bca69bf5ce17167459c03bb04713ff431feb6b4ced446e706ec2c3482"
     ],
     "VERSION": [
-      "b9c0050e5b1bbea648e3745a24cb705d4888fa05203e3bdf60a7fc3598e0ee93"
+      "ab8adac1482ceb7c05e3b2b1b803ff30496556696fd0d6c5845b9963945ae483"
     ],
-    "docs/BUG_JOURNAL.md": [
-      "49b7ad7082a9e8f2d2a19c38d1591047d5dedb89cd23e0ec26e254b29d7df894"
+    "docs/BUILD_OUTPUT.md": [
+      "5f4551ed537124451ad16e9a55b31eb393a1c25c3090b5cb888c471bf08759e1"
     ],
     "docs/CHANGELOG.md": [
-      "6fb9288a10c71f4856531e4e735122de89220f8e404d45a23d099cef74d99bc4"
+      "c92246799f0ad578cf5b34dcb0d330beea95ff6c508a133a91ef22434f20dc5c"
     ],
+    "docs/LOCAL-v0.0.25.md": [],
+    "docs/NPC_MODEL_CACHE.md": [
+      "89c0663eb955dc7bcb142ef0aa1ce55107564ee462fc6eae5377c10d7740b451"
+    ],
+    "docs/PATCH-v0.0.25.json": [],
     "docs/PROJECT_STATE.md": [
-      "6cf294538bd33d226429177c8686faf5f6310b5b7314aeab10d7156ab60f3e84"
+      "24c9e8db81537b6b3b1d156fc372b505a0d51d4184b5b7455d2af4ad49573e23"
     ],
     "docs/RECONCILE-BASES.json": [
-      "5e94dff5800904a9e836c93e69d5084f443770a5f5521fac02dd41d2b4711fca"
+      "9d1f5c120f4c9c2d701ee6e479c3fdec83d5e4c437f2ed1d1e3301074210629d"
     ],
-    "docs/TORCH.md": [
-      "8b626c03277b3ca0dae12771281c94c027a4918c113d62344b12131ec149b888"
+    "docs/RELEASE-v0.0.25.md": [],
+    "docs/RELEASE_WORKFLOW.md": [
+      "4140d8d827fade4d9aa1e1a649201428514c8b79d8acdc6869dbd6064d52e2ec"
     ],
-    "engine/aga/src/r_light.c": [
-      "8a648513c4652a69da6e3b1264adee8754f5fd9671a9224890347976b7d8e05f"
+    "docs/validation/v0.0.25-source.json": [],
+    "resources/emulators/AmiWind-v0.0.25-FS-UAE.fs-uae": [],
+    "resources/emulators/AmiWind-v0.0.25-WinUAE.uae": [],
+    "tests/test_build_parallel.py": [
+      "72a50ad140fb44f9a0555d34a7e82db739d6b58f975f216d2df631dc5dd32949"
     ],
-    "engine/aga/src/r_local.h": [
-      "dad44457dae6008c2b1cbe4597e5d2f27474433c82f48d6bce994e9318971408"
+    "tests/test_gallery_cache.py": [
+      "24a77600d62e46b5c7c07720712f6911e7c137629d761870e3eab2feab49d2e3"
     ],
-    "engine/aga/src/r_main.c": [
-      "1f50f1799dad88199902e55cc227b2b1c70c240bf8a346e14f0c6aff890ececb"
+    "tools/build.py": [
+      "ad7d439b1234c56adb070abb69a1767ecfe522ec8b19b95e1cf7be7fb1574339"
     ],
-    "engine/aga/src/r_surf.c": [
-      "02519c6f38323f8f6e7de13288a5fe03c4247139c9b02a0c09c7e505c3f9a5ae"
+    "tools/build_gallery.py": [
+      "4ab9e5c9751bb74dfd132ec2118e6542428291ee4597eea247593c0bd93b37f5"
     ],
-    "tests/test_aga_native_source.py": [
-      "3d1db7c02ce6e3d720cf731f30e7ec3ded2842e8a821b5f1d84019127c86e946"
+    "tools/build_parallel.py": [
+      "b185832971a93ffc0d73095f3fb152e0fd59083cd54cb5344852d91ddfafcbf6"
     ],
     "tools/release-files.json": [
-      "c092863ed5248c359c0a4e19937bdb2736013e874224937f3a837c045b8faff9"
+      "01adcd5659fb7f5629c4d8dc8d3f9e488f7455d252b2be5b3e9201dc453b5b5a"
     ]
   },
   "may_be_absent": [
-    "docs/LOCAL-RC8.md",
-    "docs/PATCH-v0.0.25-rc8.json",
-    "docs/RELEASE-v0.0.25-rc8.md",
-    "docs/validation/rc8-source.json",
-    "resources/emulators/AmiWind-v0.0.25-rc8-FS-UAE.fs-uae",
-    "resources/emulators/AmiWind-v0.0.25-rc8-WinUAE.uae",
-    "tests/aga_torch_brush_test.c"
+    "docs/LOCAL-v0.0.25.md",
+    "docs/PATCH-v0.0.25.json",
+    "docs/RELEASE-v0.0.25.md",
+    "docs/validation/v0.0.25-source.json",
+    "resources/emulators/AmiWind-v0.0.25-FS-UAE.fs-uae",
+    "resources/emulators/AmiWind-v0.0.25-WinUAE.uae"
   ],
   "executables": [
     "build.sh",

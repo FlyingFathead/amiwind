@@ -1,5 +1,13 @@
 # Bug journal
 
+## Intermittent inability to ready hands: unknown state (open)
+
+The owner reported F temporarily ceasing to raise/lower the hands. Debug mode
+and the map were initial suspicions, but repeating both did not reproduce it.
+Do not label either as the cause. No reliable trigger or state capture exists
+yet. Track separately from the repeated visible-fist disappearance; the latter
+is the persistent and more immediately distracting visual defect.
+
 Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md).
 
 Record every reported regression here or in its linked version record. Include
@@ -7,6 +15,33 @@ affected version, symptom, reproduction, established cause (or explicitly unknow
 exact implementation, native validation and unresolved limits. Host tests,
 cross-compilation and native playtesting are separate evidence. Preserve older
 records when a diagnosis changes.
+
+## Torch grip and periodic fist disappearance — open, 2 October 2026
+
+Owner screenshots show the placeholder torch beside the fist, and the owner
+reports that the fists stay visible, blink completely off very briefly, and
+return immediately. This brief blink repeats roughly every 1–2 seconds;
+1–2 seconds is the interval between blinks, not the duration of invisibility.
+The symptom has been present since hands were first implemented. This is a longstanding
+bug, not a new torch regression; its period is not established as the
+2.67-second animation loop. The rc7/rc8 torch overlay was positioned independently of the animated hand.
+rc9 replaces it with the original torch mesh, authored grip and emitter-aligned
+flame. Emulator acceptance of that replacement remains pending. The eight baked idle frames are
+nonempty and a repeated actual QuakeC VM test retains the model across loop
+boundaries; the reported 3D rendering disappearance remains unreproduced.
+See [torch source findings and next checks](TORCH.md#original-model-replacement-and-reported-hand-flicker).
+Neither the grip nor flicker is declared fixed by the rc8 crash correction.
+
+## Scaled Seyda Neen flora omitted — open, 2 October 2026
+
+The retained rc3 regional maps contain only five of sixteen large Bitter Coast
+tree placements from the two named Seyda Neen cells. All sixteen reached the
+scenery index and their sprite files exist. The other eleven have non-unit
+source scales and are skipped by `prepare_quake.py`; that filter remains in rc8.
+The Seyda brush pass excludes flora, so it supplies no replacement. This is a
+placement omission, not merely delayed runtime loading. No fix is included in
+the delivered rc8 torch package. See the evidence and planned repair in
+[asset coverage](ASSET_CATALOGUE_AND_GALLERY.md#confirmed-omission-scaled-bitter-coast-trees).
 
 ## rc7 torch activation crash (rc8 source correction)
 
@@ -150,3 +185,13 @@ changed findings and invalid metadata, retains the failed raw audit, labels the
 HDF `-private-test`, and records production_gate_passed=false. The owner reported
 a successful rc3 diagnostic assembly in 144.664 seconds, 3,221,258,240 bytes.
 This is not resolution of the 23 contact defects or proof of an rc6 game build.
+
+## rc9: NPC gallery absent from normal images
+
+Owner reported `Gallery catalogue missing` on rc8. The standalone conversion and
+staging tools existed, but the normal builder never called them or compiled the
+inspection map. This was a build integration omission, not evidence that the
+original NPC records were absent. Add a default gallery stage and required payload
+checks before image success; expose only the explicit `--no-npc-gallery` opt-out.
+The full-world terrain remains reusable. Target gallery entry, browsing, selected
+models and return-to-game remain part of the rc9 playtest.

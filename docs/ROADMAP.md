@@ -1,5 +1,22 @@
 # Roadmap and implementation options
 
+## TODO SOON: static asset gallery and cell-by-cell scenery
+
+- [ ] `dbg assetgallery`: browse original object IDs and inspect rocks, trees,
+  mushrooms, plants, buildings and props beside a character for scale.
+- [ ] Import original CELL/FRMR static placements as separately rebuildable
+  scenery layers over retained `vfXXXX` terrain. Preserve source transforms,
+  share converted models, handle boundary overlap and collision explicitly.
+- [ ] Start with one audited cell and fix the confirmed scaled-tree omissions;
+  expand measured coverage cell by cell without rebuilding unrelated terrain.
+
+See [the asset/scenery plan](ASSET_CATALOGUE_AND_GALLERY.md). These are upcoming
+features. The NPC gallery is already an existing debugging/regression tool and
+is included in normal builds by default; only explicit debugging-only
+`--no-npc-gallery` omits the inspection feature. Required game NPCs are never
+removed. The future static-asset gallery must use the same default and preserve
+all required world assets even in an explicitly reduced debugging build.
+
 ## Top engineering priority: world-terrain build time
 
 The reported full-world conversion takes an impractical part of an evening on
@@ -19,6 +36,25 @@ Keep collision, shoreline, memory/format budgets and image gates intact. Hand
 over one logical source checkpoint at a time; a profiling-only change must not
 alter generated content. First-build speed and incremental-build reuse need
 separate measurements. These improvements are planned, not implemented.
+
+## Asset catalogue and placement completeness
+
+Open runtime regressions: replace the detached torch overlay with the original
+mesh in the authored hand pose, add bounded flame sprites at its emitter, and
+reproduce the reported 2.67-second fist disappearance in the 3D draw path. The
+[torch investigation](TORCH.md#original-model-replacement-and-reported-hand-flicker)
+keeps these separate from the rc8 dynamic-light crash correction.
+
+The [asset catalogue and gallery plan](ASSET_CATALOGUE_AND_GALLERY.md) starts
+with original object IDs, model/dependency lookup and per-reference coverage.
+The proposed `dbg assetgallery` will show a selected asset beside a character
+at game scale, including missing/unsupported conversion status. It is not
+implemented. Inventory the game's assets before trying to convert everything.
+
+A focused retained-scene audit confirms eleven of sixteen large Bitter Coast
+tree placements in the two named Seyda Neen cells are skipped by the existing
+non-unit-scale filter. Track this as a real conversion bug. Full-world terrain
+coverage and a populated asset catalogue do not establish scenery completeness.
 
 ## Windows build host, 1 October 2026
 
@@ -1297,3 +1333,11 @@ Procedure and RC1 evidence: [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md).
   test state and restore the entry snapshot on return to the game.
 - Friendly-name search is debug-only, read from disk on demand. No gallery
   catalogue work belongs in ordinary gameplay's frame loop.
+
+## Mutable NPC equipment
+
+[Character equipment and shared assets](CHARACTER_EQUIPMENT_ROADMAP.md) are
+required for partial corpse looting and equipment changes. rc10 caches existing
+appearance snapshots; it does not make fixed outfits the final runtime design.
+Preserve reusable source parts and per-actor state; do not pre-bake every outfit
+combination. Normal gallery coverage and owner-approval requirements remain.

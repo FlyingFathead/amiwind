@@ -87,6 +87,7 @@ class BuildSummary:
             'packages': [{'name': row['name'], 'version': row.get('detected')}
                          for row in rows if row.get('kind') == 'package'],
             'tools': native,
+            'npc_gallery': metadata.get('npc_gallery', 'not recorded'),
             'worker_budget': metadata.get('compiler_jobs'),
             'stage_scheduling': 'serial' if metadata.get('serial_stages') or metadata.get('compiler_jobs') == 1 else 'dependency-aware',
         }
@@ -132,6 +133,7 @@ class BuildSummary:
                  'Elapsed: ' + result['elapsed']]
         if self.environment:
             env = self.environment
+            lines.append('NPC gallery selection: ' + env.get('npc_gallery', 'not recorded'))
             lines.append('Python: ' + env['python'])
             if env['packages']:
                 lines.append('Python environment packages (not all required by every recipe):')

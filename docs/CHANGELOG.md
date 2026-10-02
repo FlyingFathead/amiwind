@@ -1,5 +1,32 @@
 # Development history
 
+## 0.0.25
+
+Completion-order NPC gallery scheduling prevents queue stalls behind slow early
+models. Cumulative reused/converted/failed progress and explicit stage headings.
+Stable export order and existing model-cache identities are preserved.
+
+## 0.0.25-rc10
+
+Persistent dependency-verified character model caching, compatible stopped-rc9
+model import, gallery capacity checks and explicit reuse statistics. Full NPC
+gallery coverage, protected geometry and runtime rendering remain unchanged.
+
+## v0.0.25-rc9
+
+- Convert the original torch, animated grip and source emitter-aligned flame;
+  share equipment attachment math between the mesh and flame anchors.
+- Preserve 3D/sprite hand options and the rc8 dynamic-light crash correction.
+- Add original-game region names to the version/world debug header.
+- Add original CELL grid/labels to the generated atlas as a separate toggle.
+- Document torch anatomy, the open hand blink/state reports, asset-gallery plans,
+  confirmed scaled-flora omissions and actual payload versus HDF capacity.
+- Restore NPC-gallery conversion, inspection-map compilation and verified staging
+  to normal builds. Enabled by default; `--no-npc-gallery` is debugging-only and
+  never removes required world NPCs. Check the gallery before world-terrain.
+- Keep checked recovery of engine, gallery and image with retained terrain and
+  strict actor checking.
+
 ## v0.0.25-rc8
 
 - Repair F-then-V crash caused by treating a scenery collision leaf as a node.

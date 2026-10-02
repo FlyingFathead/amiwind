@@ -1,5 +1,42 @@
 # Build AmiWind on Linux
 
+rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
+coverage and protected model quality remain mandatory.
+
+**Outside approval is required for any exception affecting either gallery.**
+Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
+reduced or bypassed, including model/asset generation, catalogue coverage,
+quality and validation, without a specific documented case or scenario **and
+explicit approval from the project owner**. A builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience do not
+supply that approval. An opt-out flag is a mechanism for an approved exceptional
+debugging case, not permission to choose that exception independently.
+
+All NPCs and other game assets must remain intact, packaged and loadable by the
+engine for the complete game to function properly. Skipping their creation
+alongside either gallery is pointless and counterproductive: the final product
+requires those assets anyway. An exceptional debug build must be labelled
+incomplete and cannot redefine the complete game's required content. Runtime
+loading may be on demand; this does not require every asset to reside in RAM
+simultaneously. The static-asset gallery is still planned, not implemented.
+
+**First prerequisite: sufficient build capacity.** Before starting, verify
+usable space for all required models/content, intermediates, staging copies,
+temporary images, final outputs, verification copies and a safety margin. Check
+the actual output filesystem and quota. RAM-backed scratch also consumes the
+process/container memory budget; it is not extra independent disk capacity.
+If space is insufficient, provide capacity before expensive conversion begins.
+Do not skip NPC models or gallery creation to make the build fit.
+
+**All NPCs must be included and loadable by the engine for the game to be complete.
+NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
+requested debugging purposes. Build time and disk usage are not reasons to omit it.**
+
+Skipping NPC model creation together with the gallery is pointless and
+counterproductive for a complete build: all character models are still required
+in the final product. Exceptional debugging may temporarily isolate the gallery;
+it cannot reduce the final game's required content.
+
 The guided builder converts a bounded Seyda Neen proof of concept and builds
 an experimental AGA HDF. It does not convert the complete game or promise stock
 A1200 performance. The current reference needs 040/FPU, AGA, 2 MiB Chip and
@@ -300,3 +337,26 @@ compiler-warning lines, output filename, GiB/bytes and SHA-256 inside terminal-w
 rules. Success is printed only after the stages and final output hashing pass.
 The same information is saved in the external run's `build-summary.json`.
 See [timing boundaries, warnings and failures](BUILD_OUTPUT.md).
+
+## NPC gallery default
+
+**Normal game builds MUST include the NPC gallery. Do not silently skip it for
+conversion time, disk size, missing inputs or an earlier build's omission.**
+All original NPCs/creatures and their required assets must be available to the
+engine for a complete game; the gallery provides required inspection/regression
+access. Missing gallery content fails the default build. See the
+[explicit build contract](CHARACTER_MODEL_GALLERY.md).
+
+Normal AGA builds include the original NPC/creature inspection gallery for
+`dbg npcgallery`, debugging and regression checks. Missing required gallery files
+fail the build. Use `--no-npc-gallery` only for exceptional, explicitly requested
+debugging that requires isolating the gallery; this choice is recorded. Gallery conversion does not require recompiling
+retained terrain. See [gallery build details](CHARACTER_MODEL_GALLERY.md).
+
+**Warning: gallery omission is for debugging builds only. All NPCs and their
+required assets remain necessary for a complete game. `--no-npc-gallery` skips
+inspection-only conversion/packaging; it must never remove world NPC placements,
+models, dialogue or other gameplay dependencies, or be advertised as a complete
+content profile. Normal builds include the NPC gallery for debugging and
+regression inspection. This requirement does not claim that every original
+world NPC has already been converted or placed by the current demake.**

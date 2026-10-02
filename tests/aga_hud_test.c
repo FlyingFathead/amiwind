@@ -24,7 +24,7 @@ cvar_t scr_showram={"showram","0"};
 cvar_t *settings[6];int settings_count;
 void (*command)(void),(*master)(void),(*ram)(void),(*sea)(void),(*fps)(void),(*hud_type)(void),(*compass_command)(void);
 int argc=2,fill_y=-1,text_y=-1,text_x=-1;
-char *arg="on",last[80];
+char *arg="on",last[128],title[128];
 int Cmd_Argc(void) {return argc;}
 char *Cmd_Argv(int n) {return arg;}
 void Con_Printf(char *fmt,...) {}
@@ -36,7 +36,7 @@ void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;if(y+h==vid.height)asser
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
 static int small_draws,compass_draws;static char global_line[80],local_line[80],bearing[96];
 void AW_SmallString(int x,int y,const char *s){
- if(y==8){assert(x==8);small_draws++;return;}
+ if(y==8){assert(x==8);strcpy(title,s);small_draws++;return;}
  assert(x>=88 && x+strlen(s)*4<=312);
  if(y==174){strcpy(bearing,s);compass_draws++;}
  else if(y==184)strcpy(global_line,s);
@@ -66,6 +66,7 @@ int main(void) {
  player.v.origin[0]=540;player.v.origin[1]=-200;player.v.origin[2]=65;
  Sbar_Draw();assert(!strcmp(local_line,"LOCAL XYZ: 540 -200 65 DEG:0 P:0"));
  assert(!strcmp(global_line,"GLOBAL XYZ: -9104 -72480 260"));
+ assert(strstr(title," Vvardenfell / Bitter Coast Region") && !strncmp(title,"AmiWind v",9));
  player.v.origin[0]=497;Sbar_Draw();assert(!strcmp(local_line,"LOCAL XYZ: 497 -200 65 DEG:0 P:0"));
  assert(!fps_draws);arg="on";fps();Sbar_Draw();assert(fps_draws==1);
  arg="off";ram();assert(!scr_showram.value);
@@ -78,8 +79,9 @@ int main(void) {
   for(i=0;i<5;i++){cl.viewangles[YAW]=yaw[i];Sbar_Draw();assert(!strncmp(bearing,expected[i],strlen(expected[i])));assert(strstr(bearing," / REGION: Bitter Coast Region"));}
   assert(compass_draws==n+5);key_dest=key_menu;Sbar_Draw();assert(compass_draws==n+5);key_dest=key_game;
  }
- strcpy(sv.name,"census");
+ strcpy(sv.name,"census");strcpy(cl.levelname,"Census and Excise Office");
  arg="1";master();assert(AW_DebugCoordsEnabled() && !scr_showram.value);
+ Sbar_Draw();assert(strstr(title," / Census and Excise Office") && !strstr(title,"Bitter Coast"));
  arg="on";ram();assert(scr_showram.value);
  arg="false";command();assert(!AW_DebugCoordsEnabled());
  arg="TrUe";command();assert(AW_DebugCoordsEnabled());

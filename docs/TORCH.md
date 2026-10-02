@@ -1,30 +1,93 @@
-# Placeholder carried torch
+# Carried torch
 
 Press **F** to raise the hands, then **V** (`aw_torch`) to toggle the torch.
-V can select it during the draw animation; illumination begins when the hands
-are fully raised. Press V again to put it away, or F to lower the hands and
-extinguish it. Shift+V retains the existing draw-distance shortcut. Personal
-key bindings may override the shipped V default.
+V can select it during the draw animation; illumination starts when the hands
+are raised. V puts it away; F lowers the hands and extinguishes it. Shift+V
+retains its draw-distance shortcut. Personal bindings can override V.
 
-This prototype combines a small palette-coloured shaft/flame overlay with one
-keyed, monochrome Quake dynamic light. Its radius flickers deterministically
-between 141 and 148 native units. The light originates at the view position;
-it is not a directional flashlight or a shadow-casting light. In particular,
-nearby thin walls do not guarantee light occlusion. The software renderer makes
-surfaces brighter; the flame colours do not turn the illumination orange.
+rc9 converts the original `torch` equipment mesh and an animated holding pose
+from the owner's installation. The old independent screen-space wooden shaft
+is removed. This remains temporary equipment: no inventory, fuel or durability.
 
-Torch selection is preserved through ordinary door and world-region crossings.
-Lowering the hands, death and leaving gameplay disable its light. The current
-save/new-game hand reset also resets torch selection. Punching is suppressed
-while the torch is equipped. The viewmodel visibility setting, chase camera
-and very wide FOV can hide the first-person overlay without changing whether
-the equipped torch illuminates the world.
+## Secrets of the original torch
 
-The renderer now transforms dynamic-light origins into each translated/rotated
-brush model's local coordinates, both when marking surfaces and building their
-light contribution. Converted cave pieces need this same transform as world
-geometry. Other dynamic lights use the correction too; water rendering is
-unchanged.
+The base master and its NIF/animation records supply the following information;
+none of the mesh, textures or animation data is redistributed in public source.
+
+| Source | Meaning and use |
+| --- | --- |
+| `LIGH` object ID `torch` | Resolves `MODL` to `l\light_torch10.nif`. |
+| Four visible mesh shapes | 35 + 3 + 100 + 100 = **238 triangles**, all retained. |
+| `ShadowBox` | Separate helper geometry; excluded from the carried model. |
+| `base_anim.1st.nif` | `torch: start` 46.0, `torch: stop` approximately 48.666668 seconds; eight sampled holding frames. |
+| `Shield Bone` | Left-hand equipment attachment, beneath `Bip01 L Hand`. |
+| `BoneOffset` | Authored grip translation, applied after equipment rotation. |
+| `Fire Emitter` | The flame's attachment point; transformed with the same mesh pose. |
+| `Smoke Emitter` | Original smoke origin, retained as a future effect reference. |
+| `AttachLight` | Authored light anchor, recorded alongside the flame anchor. |
+
+The easy-to-miss detail is that a **carried light rotates −90 degrees about its
+local X axis before BoneOffset translation and the animated Shield Bone**.
+Without that convention, the torch lies sideways even when its hand animation
+and named attachment are correct. It is not the mirrored `Left Hand` body-part
+attachment. The carried-light convention was cross-checked against OpenMW's
+[ActorAnimation attachment](https://github.com/OpenMW/openmw/blob/master/apps/openmw/mwrender/actoranimation.cpp)
+and [equipment transform](https://github.com/OpenMW/openmw/blob/master/components/sceneutil/attach.cpp).
+AmiWind uses its own row-vector NIF assembly code; no OpenMW implementation is
+bundled. The same helper transforms both geometry and emitter anchors.
+
+The converter layers the source torch animation on the left arm over the source
+unarmed idle pose. Sampling the entire skeleton at the torch timestamps also
+samples unrelated right-arm animation. The right arm therefore stays on the
+unarmed idle timeline. The common first-person camera transform moves the whole
+assembly forward four native units for the Quake near plane; it does not change
+the torch's position relative to the holding hand. NPC attachment must omit this
+player-camera adaptation.
+
+## Fire, smoke and the palette renderer
+
+The original fire controller names `tx_firealpha10.tga` and `Fire Emitter`;
+normal asset resolution also supports DDS replacements. Its source particle
+array has 16 entries, emission rate 6, speed 9 with random variation 2.25, and
+life 1.2 with variation about 0.3333 in the source controller's units.
+The smoke controller names `tx_smokealpha00.tga` and `Smoke Emitter`; its source
+array has 13 entries. These are source findings, not measured Amiga budgets.
+
+The current adaptation draws six small animated flame billboards from a 16×16
+conversion of the source fire texture. Its mask and normalized brightness feed
+a warm palette ramp and ordered transparency. The flame rises from the animated
+source emitter; it is not a fixed rectangle next to the fist. This is a bounded
+approximation of the original effect, not a complete NetImmerse particle-system
+port. Smoke remains deferred so its overdraw can be measured separately.
+
+One keyed monochrome Quake dynamic light has radius 141–148 native units. It
+stays at the safe eye position, rather than blindly placing a light through a
+nearby wall at the drawn torch tip. The recorded AttachLight anchor leaves room
+for a future collision-aware placement policy. The flame looks warm; surfaces
+receive brightness, not orange RGB light or shadow casting. Thin walls do not
+guarantee occlusion. Water rendering is unchanged.
+
+## Conversion and runtime
+
+`tools/prepare_torch.py` runs during image assembly, including engine/image-only
+recovery. It reads the owner's master, mesh, first-person animation and textures.
+The inspected base data produces 551 combined hand/torch triangles and 1,653
+vertices, below the existing 2,000-vertex small-model limit. Exact counts and
+checksums are recorded in the private build's `torch-conversion.json`.
+
+| Generated file | Purpose |
+| --- | --- |
+| `progs/v_torch.mdl` | Original mesh/materials combined with sampled hands. |
+| `gfx/torch.aws` | Matching holding frames for `--hands sprites`. |
+| `gfx/torch.awt` | Bounded big-endian emitter/light anchors, duration and fire texture. |
+
+The 716-byte AWT1 payload is checked at startup. The runtime switches only the
+first-person presentation while equipped; existing F/V and QuakeC state rules
+remain in use. Normal fist animation is unchanged. Torch selection survives
+ordinary door/region crossings; lowering, death and new-game/save hand resets
+extinguish it. Punching is suppressed while equipped. Missing metadata disables
+the torch with a rebuild message. Viewmodel hiding, chase view or very wide FOV
+can hide the held model while the equipped light remains active.
 
 ## rc7 crash and rc8 correction
 
@@ -46,16 +109,36 @@ roots, a separate surface array, face-zero models, rotated/translated instances,
 out-of-range surface metadata, expiry, tiled-face exclusion and light slot 31.
 The fix still needs the same F-then-V sequence retested on the target emulator.
 
-## Validation and limits
+## Original-model replacement and reported hand flicker
 
-Native tests exercise F/V state transitions through compiled project QuakeC,
-death/lowering, normal fist attacks, one-light reuse, viewport clipping,
-actual software surface illumination, and translated/rotated brush lighting.
-The 68040/FPU engine compiles with this feature. These checks do not establish
-Amiga frame rate, flame appearance, natural cave visibility or acceptable cache
-cost. Compare the same cave camera with the torch off/on on the target emulator
-before treating it as performance-accepted.
+The owner reports that fists stay visible, blink completely off very briefly,
+and return immediately. That brief blink repeats approximately every **1–2
+seconds**. This is the interval between blinks, not a 1–2-second disappearance.
+It has happened since hands were first implemented and is not a torch regression.
+The cause remains **unknown and open**.
 
-There is no inventory item, fuel, durability, NPC torch equipment, coloured
-lighting or original Morrowind torch model yet. Those remain future equipment
-and lighting work; this is an explicitly temporary visibility aid.
+The retained idle clip lasts 2.666672 seconds. All eight baked idle frames are
+nonempty. A run of the actual compiled QuakeC in the host interpreter retains
+the model and valid idle state through 20,000 updates over 140 seconds. Those
+checks do not reproduce the live display defect or establish the animation loop
+as its cause. Renderer checks with a synthetic framebuffer also do not cover
+Amiga display buffers, live protocol, camera movement and whole gameplay frames.
+
+A separate report described F temporarily failing to raise/lower hands. Repeating
+debug mode and map visits did not reproduce it; neither is a confirmed trigger.
+Keep this unknown-state report separate from the regular visibility blink.
+See the [bug journal](BUG_JOURNAL.md).
+
+## Shared equipment asset and acceptance
+
+Guards should eventually use the same original `torch` identity, mesh, materials
+and emitter nodes, attached through each NPC's authored skeleton. The player
+camera transform is not part of equipment identity. Night schedules, equipping,
+unequipping, inventory and light budgets for multiple guards remain future work.
+This checkpoint does not implement NPC torch schedules.
+
+Source tests, original-data conversion, host rendering and native compilation
+are separate from emulator acceptance. Before final release, replay F then V,
+V off/on, F lowering, a door crossing, a cave wall and camera turns. Check grip,
+flame alignment, absence of the old crash, cave brightness and performance.
+The recurring fist blink remains open until reproduced and corrected.

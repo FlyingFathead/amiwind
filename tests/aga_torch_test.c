@@ -9,7 +9,15 @@ byte *host_basepal;
 static edict_t player;static client_t client;
 static eval_t goal,state,torch;static int gallery,locked;
 static void (*command)(void);
-static byte pixels[336*210],pal[768];
+static byte pixels[336*210],pal[768],torch_assets[716];
+static model_t torch_model;
+int com_filesize;
+vec3_t vpn,vup,vright;
+float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
+byte *COM_LoadHunkFile(char *path){assert(!strcmp(path,"gfx/torch.awt"));com_filesize=sizeof(torch_assets);return torch_assets;}
+model_t *Mod_ForName(char *path,qboolean crash){assert(!strcmp(path,"progs/v_torch.mdl"));return &torch_model;}
+static void put32(byte *p,unsigned long n){p[0]=n>>24;p[1]=n>>16;p[2]=n>>8;p[3]=n;}
+
 extern unsigned blocklights[18*18];
 extern float entity_rotation[3][3];
 void R_AddDynamicLights(void);
@@ -34,13 +42,23 @@ int main(void)
     memset(&surface,0,sizeof(surface));memset(&plane,0,sizeof(plane));memset(&tex,0,sizeof(tex));
     client.edict=&player;svs.clients=&client;svs.maxclients=1;sv.active=true;
     cls.state=ca_connected;key_dest=key_game;cl.time=1;player.v.health=100;
-    AW_TorchInit();assert(command);
+    memcpy(torch_assets,"AWT1",4);torch_assets[5]=8;torch_assets[7]=16;put32(torch_assets+8,2667);
+    for(i=0;i<8;i++){put32(torch_assets+12+i*24,12*65536);put32(torch_assets+16+i*24,3*65536);}
+    for(i=204;i<716;i+=2){torch_assets[i]=220;torch_assets[i+1]=255;}
+    assert(AW_TorchAssetsValidate(torch_assets,716));assert(!AW_TorchAssetsValidate(torch_assets,715));
+    torch_assets[5]=9;assert(!AW_TorchAssetsValidate(torch_assets,716));torch_assets[5]=8;
+    put32(torch_assets+8,0);assert(!AW_TorchAssetsValidate(torch_assets,716));put32(torch_assets+8,2667);
+    put32(torch_assets+12,129*65536);assert(!AW_TorchAssetsValidate(torch_assets,716));put32(torch_assets+12,12*65536);
+    AW_TorchInit();AW_TorchLoadAssets();assert(command);torch_model.type=mod_alias;torch_model.numframes=8;
     command();assert(!torch._float); /* V alone cannot raise hands. */
     goal._float=1;state._float=1;command();assert(torch._float==1);
     AW_TorchUpdate();assert(!lights()); /* Wait for the drawn pose. */
     state._float=2;r_refdef.vieworg[2]=24;AW_TorchUpdate();assert(lights()==1);
     light=torchlight();assert(light && light->radius>=141 && light->radius<=148);
     assert(light->origin[2]==24 && light->minlight==16 && light->die>cl.time && light->decay==0);
+    AW_TorchViewModel();assert(cl.viewent.model==&torch_model && cl.viewent.frame==AW_TorchFrame());
+    for(i=0;i<10000;i++){cl.time=i*.007;assert(AW_TorchFrame()>=0 && AW_TorchFrame()<8);}
+    cl.time=1;
     /* Refresh reuses one keyed light and does not alter an unrelated light. */
     cl_dlights[4].key=123;cl_dlights[4].radius=30;cl_dlights[4].die=5;
     for(i=0;i<100;i++){cl.time+=.013;r_refdef.vieworg[0]=i;AW_TorchUpdate();}
@@ -83,11 +101,14 @@ int main(void)
     for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
     host_basepal=pal;vid.buffer=pixels;vid.width=320;vid.height=200;vid.rowbytes=336;
     r_refdef.vrect.x=17;r_refdef.vrect.y=11;r_refdef.vrect.width=240;r_refdef.vrect.height=145;
-    r_drawviewmodel.value=1;memset(pixels,255,sizeof(pixels));AW_TorchDraw();
+    r_drawviewmodel.value=1;vpn[0]=1;vright[1]=-1;vup[2]=1;
+    memset(r_refdef.vieworg,0,sizeof(vec3_t));memset(cl.viewent.origin,0,sizeof(vec3_t));memset(cl.viewent.angles,0,sizeof(vec3_t));
+    aliasxcenter=137;aliasycenter=90;aliasxscale=aliasyscale=120;
+    memset(pixels,255,sizeof(pixels));AW_TorchDraw();
     for(y=0;y<210;y++)for(x=0;x<336;x++)if(pixels[y*336+x]!=255){
         assert(x>=17 && x<257 && y>=11 && y<156);changed++;
     }
-    assert(changed>300);
+    assert(changed>5);
     memset(pixels,255,sizeof(pixels));chase_active.value=1;AW_TorchDraw();
     for(i=0;i<sizeof(pixels);i++)assert(pixels[i]==255);
     return 0;

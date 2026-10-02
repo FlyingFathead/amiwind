@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from build_parallel import ordered_map, execute_parallel, THREAD_LIMITS
+from build_parallel import completed_map, ordered_map, execute_parallel, THREAD_LIMITS
 from build_jobs import resolve_jobs
 
 
@@ -26,7 +26,51 @@ def fail(item):
     return item
 
 
+def wait_for_later_job(task):
+    number, marker = task
+    marker = Path(marker)
+    if number == 0:
+        deadline = time.monotonic() + 10
+        while not marker.exists():
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Later job was starved behind first task')
+            time.sleep(.01)
+    elif number == 8:
+        marker.write_text('later task ran')
+    return number
+
+
 class ParallelBuildTests(unittest.TestCase):
+    def test_completion_queue_refills_past_blocked_first_task(self):
+        # Two workers submit four initial tasks. Job 0 only unblocks after job 8,
+        # which must be submitted despite job 0 still running. ordered_map would
+        # stall until the timeout; merely reordering printed lines cannot pass.
+        with tempfile.TemporaryDirectory() as temp:
+            tasks = [(i, str(Path(temp)/'release')) for i in range(12)]
+            actual = list(completed_map(wait_for_later_job, tasks, 2))
+        self.assertCountEqual(actual, range(12))
+        self.assertNotEqual(actual[0], 0)
+
+    def test_completed_work_limits_workers_threads_and_stream_submission(self):
+        submitted = []
+        def items():
+            for i in range(30):
+                submitted.append(i)
+                yield i
+        stream = completed_map(work, items(), 3)
+        first = next(stream)
+        # A bounded pending window plus one completed batch, never the full list.
+        self.assertLessEqual(len(submitted), 12)
+        actual = [first, *stream]
+        self.assertCountEqual([r[0] for r in actual], [i*i for i in range(30)])
+        self.assertGreater(len({r[1] for r in actual}), 1)
+        self.assertLessEqual(len({r[1] for r in actual}), 3)
+        self.assertTrue(all(r[1] != os.getpid() and r[2] == THREAD_LIMITS for r in actual))
+        self.assertEqual(list(completed_map(abs, [-2, -1], 1)), [2, 1])
+        self.assertEqual(list(completed_map(abs, [], 2)), [])
+        with self.assertRaisesRegex(ValueError, 'worker failed'):
+            list(completed_map(fail, range(5), 2))
+
     def test_processes_keep_order_and_limit_nested_threads(self):
         result = list(ordered_map(work, range(9), 3))
         self.assertEqual([r[0] for r in result], [n*n for n in range(9)])

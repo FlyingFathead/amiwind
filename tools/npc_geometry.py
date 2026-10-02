@@ -121,6 +121,20 @@ class Skeleton:
         if b<=a:raise ValueError('Invalid idle range')
         return np.linspace(a,b,count,endpoint=False),(b-a)/count
 
+def rigid_attachment(part, offset):
+    """Equipment uses its attachment convention before the animated bone.
+
+    Carried TES3 lights rotate -90 degrees about X on Shield Bone; BoneOffset
+    is a translation AFTER that rotation (row-vector convention).
+    """
+    matrix=np.eye(4)
+    if part.get('carried_light'):
+        matrix[:3,:3]=((1,0,0),(0,0,-1),(0,1,0))
+    elif part['attach'].startswith('Left'):
+        matrix[0,0]=-1
+    matrix[3,:3]=offset
+    return matrix
+
 def assemble(assets, appearance, skeleton, times, face_samples=None):
     N=skeleton.N;shapes=[];materials=[];textures={};cache=assets.models
     poses=[skeleton.pose(float(t)) for t in times]
@@ -163,9 +177,8 @@ def assemble(assets, appearance, skeleton, times, face_samples=None):
                 if np.any(np.abs(weights-1)>.02):raise ValueError('Invalid skin weights '+name)
                 positions/=weights[None,:,None]
             else:
-                attach=part['attach'];mirror=np.eye(4);mirrored=attach.startswith('Left')
-                if mirrored:mirror[0,0]=-1
-                mirror[3,:3]=offset
+                attach=part['attach'];mirror=rigid_attachment(part,offset)
+                mirrored=attach.startswith('Left') and not part.get('carried_light')
                 if part['slot']==0 and face_samples is not None:
                     from npc_faces import sample_morph
                     if len(face_samples)!=len(poses):raise ValueError('Facial sample count mismatch')

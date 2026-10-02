@@ -20,14 +20,15 @@ int AW_CharacterActive(void){return 0;}
 void AW_CharacterMouse(int x,int y){}
 static void (*command)(void);static int argc=1,bad,captures,region_selected;static char *args[4];
 static char queued[64],drawn[8192];
-static int opens,restores,missing_return,many;
+static int opens,restores,missing_return,many,missing_catalog,disabled;
+static char printed[512];
 static aw_character_t character;
 void Cmd_AddCommand(char *s,void (*f)(void)){command=f;}
 int Cmd_Argc(void){return argc;}
 char *Cmd_Argv(int i){return i<argc?args[i]:"";}
 void IN_AWClearButtons(void){}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
-void Con_Printf(char *s,...){}
+void Con_Printf(char *s,...){va_list ap;va_start(ap,s);vsnprintf(printed,sizeof(printed),s,ap);va_end(ap);}
 int AW_SaveSnapshot(aw_save_t *out){captures++;out->character=character;return 1;}
 void AW_SaveSnapshotRestore(const aw_save_t *out){restores++;character=out->character;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
@@ -52,6 +53,11 @@ int COM_FOpenFile(char *s,FILE **f){
         "12\tCREA\tm0000000000000002\tm0000000000000002\t90\t40\t145\tdagoth_ur_2\tDagoth Ur\n"
         "3\tNPC_\tm0000000000000003\tm0000000000000004\t10\t8\t35\tclagius clanler\tClagius Clanler\n";
     opens++;
+    if(!strcmp(s,"gallery/catalog.txt") && missing_catalog){*f=NULL;return -1;}
+    if(!strcmp(s,"npc-gallery-disabled.txt")){
+        if(!disabled){*f=NULL;return -1;}
+        *f=tmpfile();assert(*f);return 1;
+    }
     if(!strncmp(s,"maps/",5)){
         if(missing_return){*f=NULL;return -1;}
         *f=tmpfile();assert(*f);return 124;
@@ -66,7 +72,10 @@ int main(void){
     edict_t player;client_t client;memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
     sv.active=true;strcpy(sv.name,"balmora");svs.maxclients=1;svs.clients=&client;client.edict=&player;
     player.v.origin[0]=800;player.v.origin[2]=57;player.v.movetype=MOVETYPE_WALK;cl.viewangles[1]=91;vid.width=320;vid.height=200;player.v.health=73;character.level=12;
-    args[0]="aw_charplane";AW_GalleryInit();assert(command);command();assert(captures==1 && !strcmp(queued,"map charplane\n"));
+    args[0]="aw_charplane";AW_GalleryInit();assert(command);
+    missing_catalog=1;command();assert(!captures && !queued[0] && strstr(printed,"catalogue missing"));
+    disabled=1;command();assert(!captures && !queued[0] && strstr(printed,"--no-npc-gallery"));
+    missing_catalog=disabled=0;command();assert(captures==1 && !strcmp(queued,"map charplane\n"));
     strcpy(sv.name,"charplane");AW_GallerySpawn(&player);draw();assert(strstr(drawn,"#7 Dagoth Ur"));
     AW_GalleryKey('N',1,1,0);draw();assert(strstr(drawn,"#12 Dagoth Ur"));
     AW_GalleryKey('N',1,1,0);draw();assert(strstr(drawn,"Clagius Clanler"));

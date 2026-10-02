@@ -27,12 +27,8 @@ def sample_clips(events):
         times.extend(np.linspace(a,b,count,endpoint=endpoint))
     return np.array(times),clips
 
-def prepare(data,scene,out):
-    data=ensure_external(data,'owned data');scene=ensure_external(scene,'source scene');out=ensure_external(out,'hands scene')
-    ready=json.loads((scene/'scene-ready.json').read_text())
-    if ready.get('hands'):raise ValueError('Scene already has hands')
-    kinds,_,_=load_master(data/'Morrowind.esm');assets=Assets(data,BSA(data/'Morrowind.bsa'))
-    skeleton=Skeleton(assets,'meshes/base_anim.1st.nif');times,clips=sample_clips(skeleton.events)
+def nord_parts(kinds):
+    """Select the same owned first-person appearance for hands and equipment."""
     parts=[]
     # First-person hands take precedence; original third-person arms fill gaps.
     for part,slots in [(5,(6,7)),(6,(8,9)),(7,(11,12)),(8,(13,14))]:
@@ -47,6 +43,15 @@ def prepare(data,scene,out):
         _,identifier,body=max(candidates,key=lambda c:(c[0],c[1]))
         for slot in slots:parts.append({'slot':slot,'attach':PART_NAMES[slot],'filter':PART_NAMES[slot],'id':identifier,'mesh':text(body,'MODL')})
     if not any(p['id'].endswith('.1st') for p in parts):raise ValueError('No Nord first-person hands')
+    return parts
+
+def prepare(data,scene,out):
+    data=ensure_external(data,'owned data');scene=ensure_external(scene,'source scene');out=ensure_external(out,'hands scene')
+    ready=json.loads((scene/'scene-ready.json').read_text())
+    if ready.get('hands'):raise ValueError('Scene already has hands')
+    kinds,_,_=load_master(data/'Morrowind.esm');assets=Assets(data,BSA(data/'Morrowind.bsa'))
+    skeleton=Skeleton(assets,'meshes/base_anim.1st.nif');times,clips=sample_clips(skeleton.events)
+    parts=nord_parts(kinds)
     # Viewmodel stays in camera units; race/world scaling is not applied twice.
     shapes,materials,textures=assemble(assets,{'parts':parts,'weight':1,'height':1},skeleton,times)
     camera=skeleton.pose(float(times[0]))('Camera')[3,:3]*.25

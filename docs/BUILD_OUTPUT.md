@@ -1,5 +1,28 @@
 # Build completion output
 
+rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
+coverage and protected model quality remain mandatory.
+
+## HDF capacity versus installed content
+
+The final HDF's byte size is its virtual disk capacity, including filesystem
+metadata and free space. It is not a count of converted game assets. The current
+full-world layout balances content across two partitions, each sized from its
+payload plus approximately 20 percent and 16 MiB of headroom, then rounded up
+to a 128 MiB boundary. Each partition stays below 2 GiB; the combined legacy
+hardfile stays below 4 GiB.
+
+The reported rc7 image is 3,221,258,240 bytes: two 1.5 GiB partitions plus
+32 KiB of disk-layout space. Its exact free space must be read from that build,
+not estimated from the container size. `image/build.json` records total
+`payload_bytes`, and per-partition `bytes`, `payload_bytes`, `free_bytes` and
+file counts after readback of the completed HDF. Capacity minus payload also
+includes filesystem overhead; use the recorded bitmap free bytes for available
+space. Allocated host-disk blocks, compressed download size and runtime RAM are
+different measurements again.
+
+## Completion footer
+
 From v0.0.25-rc5, `build.sh` / `tools/build.py` print a completion footer after the
 selected pipeline finishes. The first and last lines are dashes matching the
 terminal width (80 columns when no width is available). Long paths/checksums
@@ -111,3 +134,12 @@ print `Compilation finished without errors`. Their summary records
 `validation: private-test-only` and includes the actor acceptance receipt; the
 HDF name ends in `-private-test.hdf`. A completed execution status is distinct
 from passing the production contact gate. The raw contact report stays failed.
+
+The NPC stage heading reads `npc-gallery (pre-baking in-game character models...)`
+in both serial and parallel builds, including image recovery. The saved stage
+identifier and log filenames remain `npc-gallery` for recovery and cache compatibility.
+
+NPC gallery progress reports cumulative `reused`, successfully `converted`,
+`failed`, and `remaining` model counts, plus elapsed conversion seconds. The
+initial dependency/cache scan is reported separately. Completion counts reflect
+finished jobs immediately, rather than input-order results waiting on slow models.

@@ -412,6 +412,11 @@ void AW_HandSpritesDraw(void);
 void AW_TorchInit(void);
 void AW_TorchUpdate(void);
 void AW_TorchDraw(void);
+void AW_TorchLoadAssets(void);
+void AW_TorchViewModel(void);
+int AW_TorchFrame(void);
+int AW_TorchEquipped(void);
+int AW_TorchAssetsValidate(const byte *p,int size);
 int AW_HandSpritesValidate(byte *data,unsigned long bytes);
 
 /* Original-style private-asset UI, independent of the console. */

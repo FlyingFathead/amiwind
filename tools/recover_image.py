@@ -1,4 +1,41 @@
-"""Bounded rc3 image recovery; retained conversions are read, never rewritten."""
+"""Recover an rc3 image failure without rewriting retained conversions.
+
+CAPACITY FIRST: before starting the build, verify enough usable storage for ALL
+required content, conversion intermediates, staging copies, temporary images,
+readback verification and a margin. Include filesystem/quota limits and shared
+RAM limits for memory-backed scratch. If capacity is insufficient, arrange it
+before expensive work; never omit NPC models or the gallery to make a build fit.
+
+All NPCs must be included and loadable by the engine for the game to be complete.
+NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
+requested debugging purposes. Build time and disk usage are not reasons to omit it.
+
+Normal builds and recovery MUST include the gallery; missing input/model/catalogue
+content is an error, never an automatic opt-out. Only the owner's explicit
+--no-npc-gallery permits debugging-only omission of inspection assets. It must
+never remove required game NPC content or change the normal default.
+
+Skipping NPC model creation together with the gallery is pointless and
+counterproductive for a complete build: all character models are still required
+in the final product. Exceptional debugging may temporarily isolate the gallery;
+it cannot reduce the final game's required content.
+
+BOTH GALLERIES REQUIRE OUTSIDE APPROVAL FOR EXCEPTIONS: the NPC gallery and
+upcoming static-asset gallery, including their model generation, catalogues,
+coverage, quality and validation, must not be disabled, reduced or bypassed
+without a specific documented case/scenario and explicit approval from the
+project owner. The builder or contributor cannot approve its own exception.
+Time pressure, storage pressure and convenience are not approval. Existing
+--no-npc-gallery support is only a mechanism for an owner-approved exceptional
+debugging case; its availability does not grant permission to use it.
+
+A complete game requires all of its NPC and other game assets intact, packaged
+and loadable by the engine. Skipping model/asset creation with either gallery is
+pointless and counterproductive: those assets are required in the final product
+anyway. A debugging exception cannot redefine a complete build. Loadable does not
+mean all assets must be resident in memory simultaneously. The static-asset
+gallery remains planned; this contract does not claim it is implemented.
+"""
 import hashlib
 import json
 from pathlib import Path
@@ -79,23 +116,33 @@ def inspect_run(args, root):
             raise ValueError('Retained terrain output hash mismatch: ' + name)
     return {'from_run': str(old), 'original_state_sha256': digest(state_path),
             'terrain_receipt_sha256': digest(report_path), 'verified_regions': len(entries),
-            'scope': 'reuse completed rc3 conversion; rebuild versioned engine and image; preserve all image gates',
+            'scope': 'reuse completed rc3 conversion; rebuild versioned engine, required NPC gallery and image; preserve all image gates',
             'input_sha256': state['input_sha256']}
 
 
 def recovery_commands(steps, old, run):
-    """Use current known command construction; never execute commands from a receipt."""
+    """Rebuild the default gallery even when the retained scene omitted it.
+
+    Only --no-npc-gallery on the current image command permits omission. Use
+    current command construction; never execute commands from an old receipt.
+    """
     selected = []
     for name, original in steps:
-        if name not in ('engine', 'image'):
+        if name not in ('engine', 'npc-gallery', 'image'):
             continue
         command = list(original)
+        if name == 'npc-gallery':
+            command[command.index('--palette')+1] = str(old/'intro-scene/id1/gfx/palette.lmp')
         if name == 'image':
             for flag, path in [('--scene', old/'intro-scene'), ('--music', old/'music')]:
                 command[command.index(flag)+1] = str(path)
         selected.append((name, command))
-    if [name for name, _ in selected] != ['engine', 'image']:
-        raise ValueError('Expected engine then image recovery commands')
+    order = {'engine': 0, 'npc-gallery': 1, 'image': 2}
+    selected.sort(key=lambda step: order[step[0]])
+    image = next((command for name, command in selected if name == 'image'), [])
+    expected = ['engine', 'image'] if '--no-npc-gallery' in image else ['engine', 'npc-gallery', 'image']
+    if [name for name, _ in selected] != expected:
+        raise ValueError('Expected engine, required NPC gallery, then image recovery commands')
     # The normal command builder must keep all new output paths in the new run.
     for _, command in selected:
         output = Path(command[command.index('--out')+1]).resolve()

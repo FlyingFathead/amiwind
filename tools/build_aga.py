@@ -1,5 +1,42 @@
 #!/usr/bin/env python3
-"""Build the separate GPLv2 AGA runtime and an owner-only boot image."""
+"""Build the GPLv2 AGA runtime and an owner-only boot image.
+
+CAPACITY FIRST: before starting the build, verify enough usable storage for ALL
+required content, conversion intermediates, staging copies, temporary images,
+readback verification and a margin. Include filesystem/quota limits and shared
+RAM limits for memory-backed scratch. If capacity is insufficient, arrange it
+before expensive work; never omit NPC models or the gallery to make a build fit.
+
+All NPCs must be included and loadable by the engine for the game to be complete.
+NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
+requested debugging purposes. Build time and disk usage are not reasons to omit it.
+
+Normal builds and recovery MUST include the gallery; missing input/model/catalogue
+content is an error, never an automatic opt-out. Only the owner's explicit
+--no-npc-gallery permits debugging-only omission of inspection assets. It must
+never remove required game NPC content or change the normal default.
+
+Skipping NPC model creation together with the gallery is pointless and
+counterproductive for a complete build: all character models are still required
+in the final product. Exceptional debugging may temporarily isolate the gallery;
+it cannot reduce the final game's required content.
+
+BOTH GALLERIES REQUIRE OUTSIDE APPROVAL FOR EXCEPTIONS: the NPC gallery and
+upcoming static-asset gallery, including their model generation, catalogues,
+coverage, quality and validation, must not be disabled, reduced or bypassed
+without a specific documented case/scenario and explicit approval from the
+project owner. The builder or contributor cannot approve its own exception.
+Time pressure, storage pressure and convenience are not approval. Existing
+--no-npc-gallery support is only a mechanism for an owner-approved exceptional
+debugging case; its availability does not grant permission to use it.
+
+A complete game requires all of its NPC and other game assets intact, packaged
+and loadable by the engine. Skipping model/asset creation with either gallery is
+pointless and counterproductive: those assets are required in the final product
+anyway. A debugging exception cannot redefine a complete build. Loadable does not
+mean all assets must be resident in memory simultaneously. The static-asset
+gallery remains planned; this contract does not claim it is implemented.
+"""
 import argparse
 import hashlib
 import json
@@ -151,6 +188,11 @@ def write_content_fingerprint(id1):
 
 
 def image(args):
+    """Package the NPC gallery by default; fail if any required payload is absent.
+
+    The sole opt-out is explicit --no-npc-gallery, recorded in build.json and
+    the image itself. Asset-free boot-notice images use build_dry_run.py.
+    """
     if getattr(args, 'allow_known_actor_ground_findings', None):
         from check_actor_ground import load_approved_report
         args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.resolve()
@@ -184,6 +226,17 @@ def image(args):
     # A copied old lighting table maps those colours back to grey sky pixels.
     from ui_palette import sync_lookups
     sync_lookups(boot/'id1',check=True)
+    if not args.data_files:raise ValueError('Owned data files are required to convert the original carried torch')
+    from prepare_torch import prepare as prepare_torch
+    print('Converting original torch and first-person holding animation...',flush=True)
+    torch_report=prepare_torch(args.data_files,boot/'id1')
+    from build_gallery import stage_required, omit_gallery
+    if args.no_npc_gallery:
+        gallery_report=omit_gallery(boot/'id1')
+    else:
+        gallery_report=stage_required(args.gallery,boot/'id1')
+    (out/'npc-gallery-staging.json').write_text(json.dumps(gallery_report,indent=2)+'\n')
+    (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n')
     from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
     if args.data_files:prepare_world_ui(args.data_files,None,boot)
     validate_world_ui(boot/'id1')
@@ -285,7 +338,7 @@ def image(args):
     layout=verify_combined(hdf,[dict(partition='DH0',volume='AMIWIND',files=boot_files),*world_images])
     for volume in world_images:(out/volume['file']).unlink()
     part.unlink()
-    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'actor_ground_audit':actor_acceptance,'hdf_file':hdf.name,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':'DOS1 FFS partitions in one RDB HDF','legacy_root_check':root_check},indent=2)+'\n')
+    (out/'build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'actor_ground_audit':actor_acceptance,'npc_gallery':gallery_report,'torch':torch_report,'hdf_file':hdf.name,'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv','music_track':groups['title'],'new_game_map':'prison','new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,'new_game_music_track':4,'new_game_music_source':opening_track['source'] if opening_track else None},'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(boot/'AmiWindCheck'),'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,'music_tracks':len(manifest['tracks']),'heap_reservation_bytes':11*1024*1024,'tested_minimum':False,'filesystem':'DOS1 FFS partitions in one RDB HDF','legacy_root_check':root_check},indent=2)+'\n')
     if not actor_acceptance['production_gate_passed']:
         print('PRIVATE TEST image assembled. Production actor gate DID NOT PASS; see actor-ground-acceptance.json.', flush=True)
     print(hdf)
@@ -296,7 +349,10 @@ def main():
     add_jobs(e)
     i=sub.add_parser('image')
     i.add_argument('--allow-known-actor-ground-findings', type=Path, help='PRIVATE TEST ONLY: accept an exact previously reviewed contact audit; strict production gate remains failed')
-    i.add_argument('--data-files',type=Path,help='Owned original font and UI assets; absent retains fallback')
+    i.add_argument('--data-files',type=Path,required=True,help='Owned original game assets')
+    gallery_choice=i.add_mutually_exclusive_group(required=True)
+    gallery_choice.add_argument('--gallery',type=Path,help='Verified NPC gallery from build_gallery.py; normal default')
+    gallery_choice.add_argument('--no-npc-gallery',action='store_true',help='DEBUGGING ONLY: omit inspection gallery, never required game NPCs')
     i.add_argument('--intro-captions',type=Path,help='Private JSON title cards; first card becomes a switchable opening overlay')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
     for name in ['scene','music','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)

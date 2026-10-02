@@ -58,6 +58,7 @@ are not a complete simulation of their lifetime behavior.
 | Identity | Original object ID plus placed reference ID; two guards sharing one NPC_ record remain distinct placements. |
 | Presence | Enabled/disabled state and the source condition or event that changes it. |
 | Life and pose | Living, dead or another explicitly supported source state; independent of visibility. |
+| Inventory and equipment | Per-reference items and equipped slots; looting or changing equipment updates visible parts without changing another actor sharing the same assets. |
 | Movement | Current transform, AI package, destinations, local script variables and relevant timing. |
 | Contact | Support appropriate to the current active pose and position; grounded, swimming, flying or another evidenced state. |
 | Persistence | Changes survive scene unloading, overlap handoffs and save/restore without duplicating actors or resetting quests. |
@@ -70,6 +71,10 @@ converted standing pose. The [contact audit](NPC_GROUND_CONTACT.md) checks its
 declared geometric scope; it does not validate quest or schedule behavior.
 
 ## Implementation and verification roadmap
+
+The [equipment and shared-asset roadmap](CHARACTER_EQUIPMENT_ROADMAP.md) covers
+partial corpse looting, exposed body/clothing layers and persistence. Fixed
+gallery outfits do not implement those state transitions.
 
 - Retain source identity and activation/movement provenance during conversion,
   including externally targeted scripts and dialogue results. Record unsupported

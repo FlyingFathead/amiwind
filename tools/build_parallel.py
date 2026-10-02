@@ -1,6 +1,6 @@
 """Bounded, ordered process work and dependency-aware build scheduling."""
 from collections import deque
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from contextlib import contextmanager
 import json
 import multiprocessing
@@ -66,6 +66,43 @@ def ordered_map(function, items, jobs=None):
                 future.cancel()
 
 
+def completed_map(function, items, jobs=None):
+    """Yield independent work as it finishes, with a bounded submission window.
+
+    Refill freed slots before handing results to the caller. A slow early task
+    must not prevent later tasks from being submitted or reported. Callers must
+    restore stable key order before exporting catalogues or shared receipts.
+    Existing order-dependent conversion stages continue to use ordered_map.
+    """
+    count = resolve_jobs(jobs)
+    if count == 1:
+        yield from map(function, items)
+        return
+    items = iter(items)
+    with worker_environment(), ProcessPoolExecutor(
+            max_workers=count, mp_context=multiprocessing.get_context('spawn')) as pool:
+        pending = set()
+
+        def refill():
+            while len(pending) < 2 * count:
+                try:
+                    item = next(items)
+                except StopIteration:
+                    return
+                pending.add(pool.submit(function, item))
+
+        try:
+            refill()
+            while pending:
+                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                results = [future.result() for future in done]
+                refill()
+                yield from results
+        finally:
+            for future in pending:
+                future.cancel()
+
+
 # Scene stages copy or mutate their predecessor's tree. Keep that chain ordered;
 # only independent branches may overlap. Image assembly waits for every branch.
 DEPENDENCIES = {
@@ -77,9 +114,10 @@ DEPENDENCIES = {
     'balmora-interiors': ('balmora',), 'door-audio': ('balmora-interiors',), 'character': ('door-audio',),
     'reading': ('character',), 'opening-references': ('reading',),
     'world-survey': (), 'world-ui': ('opening-references', 'world-survey'),
-    'actor-contact': ('world-ui',), 'world-terrain': ('actor-contact',),
+    'npc-gallery': ('census',),
+    'actor-contact': ('world-ui',), 'world-terrain': ('actor-contact', 'npc-gallery'),
     'music': (), 'engine': (),
-    'image': ('world-terrain', 'music', 'engine', 'dialogue-lookup'),
+    'image': ('world-terrain', 'npc-gallery', 'music', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
 
@@ -91,6 +129,9 @@ def stage_dependencies(steps):
     result = {}
     for index, name in enumerate(names):
         deps = DEPENDENCIES.get(name, tuple(names[index - 1:index]))
+        # The sole optional branch requires an explicit builder opt-out.
+        if "npc-gallery" not in names:
+            deps = tuple(d for d in deps if d != "npc-gallery")
         missing = set(deps) - set(names)
         if missing:
             raise ValueError(f'{name}: missing dependencies {sorted(missing)}')
@@ -188,7 +229,8 @@ def execute_parallel(steps, run, metadata, root):
                 active[name] = {'process': process, 'writer': writer, 'reader': log.open(errors='replace'),
                                 'entry': entry, 'start': time.monotonic()}
                 free -= jobs
-                print(f'Build [{number}/{len(steps)}]: {name}, {jobs} worker(s). Log: {log}', flush=True)
+                title = name + " (pre-baking in-game character models...)" if name == "npc-gallery" else name
+                print(f'Build [{number}/{len(steps)}]: {title}, {jobs} worker(s). Log: {log}', flush=True)
                 save()
             for name, state in list(active.items()):
                 drain(state)

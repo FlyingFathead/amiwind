@@ -64,14 +64,20 @@ void Sbar_Init(void) {
     Cmd_AddCommand("amiwind_debug_fps",debug_fps);Cmd_AddCommand("amiwind_debug_showfps",debug_showfps);
 }
 void Sbar_Changed(void) {}
+static int current_region(const char **region) {
+    vec3_t source;*region=NULL;
+    if(cls.state!=ca_connected || !sv.active || svs.maxclients!=1 ||
+       !svs.clients || !svs.clients[0].edict ||
+       !AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,source))return 0;
+    *region=AW_RegionNameAt(source);return 1;
+}
 static void compass(void) {
     static const char *directions[]={"N","NE","E","SE","S","SW","W","NW"};
-    char line[96];int heading,limit;const char *region=NULL;vec3_t source;
+    char line[96];int heading,limit;const char *region=NULL;
     if(!show_compass.value || cls.state!=ca_connected || key_dest!=key_game || AW_GalleryActive())return;
     /* Runtime +Y is source north; engine yaw zero points east. */
     heading=(int)anglemod(90-cl.viewangles[YAW]+360);
-    if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
-       AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,source))region=AW_RegionNameAt(source);
+    current_region(&region);
     snprintf(line,sizeof(line),"%s %03ld / REGION: %s",directions[((heading+22)/45)&7],
              (long)heading,region?region:"unavailable");
     limit=(vid.width-96)/4;if(limit<0)limit=0;if(limit>95)limit=95;
@@ -80,14 +86,17 @@ static void compass(void) {
     scr_copyeverything=1;
 }
 void Sbar_Draw(void) {
-    char title[128];int limit,width=hud_type.value==1?8:4;
+    char title[128];const char *region;int limit,width=hud_type.value==1?8:4;
     if(key_dest==key_console)return;
     AW_UIHud();
     compass();
     if(!AW_DebugOverlaysEnabled())return;
-    snprintf(title,sizeof(title),"AMIWIND v" AMIWIND_VERSION " / %s",cl.levelname);
+    if(current_region(&region))
+        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " Vvardenfell / %s",region?region:"Region unavailable");
+    else
+        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " / %s",cl.levelname[0]?cl.levelname:"Location unavailable");
     limit=(vid.width-16)/width;if(limit<0)limit=0;if(limit>127)limit=127;
-    title[limit]=0;
+    if((int)strlen(title)>limit){title[limit]=0;if(limit>=3)memcpy(title+limit-3,"...",3);}
     if(width==8)Draw_String(8,8,title);else AW_SmallString(8,8,title);
     if(fps.value){
         char line[32];int n=AW_FpsTenths(),x=8;

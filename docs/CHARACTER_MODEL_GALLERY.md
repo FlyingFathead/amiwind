@@ -1,8 +1,60 @@
 # Character Model Gallery
 
+rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
+coverage and protected model quality remain mandatory.
+
+**Outside approval is required for any exception affecting either gallery.**
+Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
+reduced or bypassed, including model/asset generation, catalogue coverage,
+quality and validation, without a specific documented case or scenario **and
+explicit approval from the project owner**. A builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience do not
+supply that approval. An opt-out flag is a mechanism for an approved exceptional
+debugging case, not permission to choose that exception independently.
+
+All NPCs and other game assets must remain intact, packaged and loadable by the
+engine for the complete game to function properly. Skipping their creation
+alongside either gallery is pointless and counterproductive: the final product
+requires those assets anyway. An exceptional debug build must be labelled
+incomplete and cannot redefine the complete game's required content. Runtime
+loading may be on demand; this does not require every asset to reside in RAM
+simultaneously. The static-asset gallery is still planned, not implemented.
+
+**First prerequisite: sufficient build capacity.** Before starting, verify
+usable space for all required models/content, intermediates, staging copies,
+temporary images, final outputs, verification copies and a safety margin. Check
+the actual output filesystem and quota. RAM-backed scratch also consumes the
+process/container memory budget; it is not extra independent disk capacity.
+If space is insufficient, provide capacity before expensive conversion begins.
+Do not skip NPC models or gallery creation to make the build fit.
+
+**All NPCs must be included and loadable by the engine for the game to be complete.
+NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
+requested debugging purposes. Build time and disk usage are not reasons to omit it.**
+
+Skipping NPC model creation together with the gallery is pointless and
+counterproductive for a complete build: all character models are still required
+in the final product. Exceptional debugging may temporarily isolate the gallery;
+it cannot reduce the final game's required content.
+
 The gallery is an isolated debug inspection scene. It loads one selected model
 and its footprint square, at source scale, on a finite fogged plane. Its purpose
 is to reveal conversion problems before actors are added to more towns.
+
+**Build requirement: normal game builds and image recovery MUST include the NPC
+gallery. Do not skip it, change the default, or silently reduce its catalogue to
+save conversion time or disk space. Missing inputs/models are build failures.**
+
+A complete Morrowind implementation requires all original NPCs and creatures,
+with their required assets available to the engine. The gallery is the required
+way to inspect and regression-test that content; omitting it is not a valid
+content optimization. Share/cache converted assets with verified dependencies
+instead of removing coverage. The current demake does not yet place every original world reference.
+
+Only the owner's explicit `--no-npc-gallery` permits a **debugging-only** build
+without the inspection gallery. It must never remove required game NPCs, models,
+placements, dialogue or dependencies, and must never become the normal default.
+The future static-asset gallery must follow the same rule once implemented.
 
 ## Controls
 
@@ -130,16 +182,34 @@ a stale exception. Models beyond the current tested renderer ceiling remain
 reported failures. Neither automatic exception generation nor a higher polygon
 count constitutes visual acceptance; the inspection ledger remains authoritative.
 
-## Building and staging the private catalogue
+## Default NPC gallery: required unless explicitly disabled
 
-Run `prepare_gallery.py` with the owned Data Files, palette and external output
-folder. Then run `audit_gallery_budgets.py --retry` against that folder. The audit
-returns a nonzero result while any models remain unresolved; inspect the report.
-`stage_gallery.py --gallery PATH --id1 PATH` copies successful assets, preserves
-failed catalogue entries, regenerates byte-specific allowances, and collects
-existing playable-resident greetings. Compile `charplane.map` with the same BSP,
-lighting and standing-hull pipeline used for the runtime. No catalogue/model data
-belongs in the public source ZIP. The gallery inspection table stays private.
+Every normal AGA game build and image recovery includes the NPC/creature gallery.
+It is a debugging and regression-inspection tool, not optional content selected
+silently by the builder. A missing catalogue, selected model, footprint,
+inspection map or budget receipt fails the default build.
+
+Only the owner's explicit `--no-npc-gallery` flag permits an exceptional
+debugging build without it, for example to isolate a gallery-specific failure.
+This must not be used as a time/space optimization. The build receipt, final
+summary and image metadata record the choice; the console explains
+that the gallery was disabled. The separate asset-free CI/dry-run recipe does not
+contain owned game assets and therefore cannot include the game catalogue.
+
+The `npc-gallery` stage converts the complete source catalogue and compiles
+`charplane.bsp`, with bounded model-budget retries and byte-specific allowances.
+It reads the reserved scene palette after Census; its own files live in a separate
+output tree. World-terrain waits for it, exposing failures before the expensive
+island pass. Image assembly checks the required file inventory and every checksum,
+stages existing greetings, then verifies the final filesystem payload on readback.
+A gallery visual inspection is still required; conversion success is not visual
+approval of every model.
+
+Recovery reuses terrain and music but creates the missing gallery in the new run.
+The first recovery with this fix therefore has a substantial additional conversion
+stage. An older image's missing catalogue never implies an opt-out. rc10 uses a verified persistent model cache across runs while still assembling
+each new output independently. See [cache identity, compatible rc9 import and
+capacity checks](NPC_MODEL_CACHE.md).
 
 ## RC3 conversion coverage and authored poses
 
@@ -168,3 +238,22 @@ mesh until an inspected pose profile is added.
 The startup command `aw_gallery_migrate` enables the previously disabled shipped
 allowance once. The archived `aw_gallery_defaults` marker preserves subsequent
 explicit opt-outs. Exact model-byte checks and the 1,024-triangle ceiling still apply.
+
+**Warning: gallery omission is for debugging builds only. All NPCs and their
+required assets remain necessary for a complete game. `--no-npc-gallery` skips
+inspection-only conversion/packaging; it must never remove world NPC placements,
+models, dialogue or other gameplay dependencies, or be advertised as a complete
+content profile. Normal builds include the NPC gallery for debugging and
+regression inspection. This requirement does not claim that every original
+world NPC has already been converted or placed by the current demake.**
+
+## rc9 preservation check
+
+Dagoth Ur's `dagoth-mask-v1` profile, gallery converter, budget-audit tool and
+shared bake/MDL encoder remain unchanged from rc8. Re-conversion with the old
+and new source on the same owned input/palette produced byte-identical Dagoth Ur
+models: 903 triangles, 2,709 face-local vertices, 16-pixel atlas tiles. The mask,
+mask-part and neck minimums remain 240, 47 and 30 faces. Runtime allowance defaults,
+the `auto` cap and the 1,024-triangle ceiling are unchanged. The private SHA-256
+comparison is recorded in the rc9 validation receipt. Target visual retesting is
+still required, and no historical inspection approval is invented.

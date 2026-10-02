@@ -7,7 +7,7 @@
 #define AMIWIND_SPRITE_HANDS 0
 #endif
 #if AMIWIND_SPRITE_HANDS
-static byte *data;
+static byte *data,*torch_data;
 static unsigned long offsets[33];
 static int frames;
 static unsigned int u16(byte *p){return ((unsigned int)p[0]<<8)|p[1];}
@@ -33,11 +33,13 @@ int AW_HandSpritesValidate(byte *p,unsigned long bytes) {
     return 1;
 }
 void AW_HandSpritesInit(void) {
-    int i;extern int com_filesize;
+    int i,hands_bytes;extern int com_filesize;
     data=COM_LoadHunkFile("gfx/hands.aws");
     if(!data || !AW_HandSpritesValidate(data,com_filesize))Sys_Error("Invalid first-person sprite bake; rebuild with --hands sprites");
-    frames=u16(data+8);for(i=0;i<=frames;i++)offsets[i]=u32(data+12+4*i);
-    Con_Printf("First-person sprites: %ld bytes, %ld frames\n",(long)com_filesize,(long)frames);
+    hands_bytes=com_filesize;frames=u16(data+8);for(i=0;i<=frames;i++)offsets[i]=u32(data+12+4*i);
+    torch_data=COM_LoadHunkFile("gfx/torch.aws");
+    if(!torch_data || !AW_HandSpritesValidate(torch_data,com_filesize) || u16(torch_data+8)!=8)Sys_Error("Invalid original torch sprite bake");
+    Con_Printf("First-person sprites: %ld bytes, %ld frames\n",(long)hands_bytes,(long)frames);
 }
 void AW_HandSpritesDraw(void) {
     byte *p,*dst;int frame=cl.stats[STAT_WEAPONFRAME],y,r,x,n,k,xx,yy,sx,sy,scale,left,top;
@@ -45,7 +47,8 @@ void AW_HandSpritesDraw(void) {
     scale=r_refdef.vrect.width>=320?2:1;
     left=r_refdef.vrect.x+(r_refdef.vrect.width-160*scale)/2;
     top=r_refdef.vrect.y+r_refdef.vrect.height-100*scale;
-    p=data+offsets[frame];
+    if(AW_TorchEquipped()){frame=AW_TorchFrame();p=torch_data+u32(torch_data+12+4*frame);}
+    else p=data+offsets[frame];
     for(y=0;y<100;y++) {
         r=u16(p);p+=2;
         while(r--) {

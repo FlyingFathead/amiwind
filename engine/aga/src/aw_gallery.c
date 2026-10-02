@@ -91,7 +91,13 @@ static void talk(void) {
 static int select_entry(int index,const char *search) {
     FILE *f=NULL;char line[512],needle[96],id[96],name[96],extra;int total,i,matches=0,match_index=0,exact=0;
     gallery_entry_t e,match;long number=0;char *end;
-    if(COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f){strcpy(notice,"Gallery catalogue missing.");return 0;}
+    if(COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f){
+        f=NULL;
+        if(COM_FOpenFile("npc-gallery-disabled.txt",&f)>=0 && f){
+            fclose(f);strcpy(notice,"Gallery disabled by --no-npc-gallery.");
+        }else strcpy(notice,"Gallery catalogue missing; rebuild the image.");
+        return 0;
+    }
     if(!fgets(line,sizeof(line),f) || sscanf(line,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
     if(search){normalize(search,needle);if(!needle[0])goto bad;number=strtol(search,&end,10);if(*end)number=0;}
     index=(index%total+total)%total;

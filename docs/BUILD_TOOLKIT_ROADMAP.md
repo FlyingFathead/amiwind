@@ -1,5 +1,40 @@
 # Build and compiler toolkit roadmap
 
+rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
+coverage and protected model quality remain mandatory.
+
+**Outside approval is required for any exception affecting either gallery.**
+Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
+reduced or bypassed, including model/asset generation, catalogue coverage,
+quality and validation, without a specific documented case or scenario **and
+explicit approval from the project owner**. A builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience do not
+supply that approval. An opt-out flag is a mechanism for an approved exceptional
+debugging case, not permission to choose that exception independently.
+
+All NPCs and other game assets must remain intact, packaged and loadable by the
+engine for the complete game to function properly. Skipping their creation
+alongside either gallery is pointless and counterproductive: the final product
+requires those assets anyway. An exceptional debug build must be labelled
+incomplete and cannot redefine the complete game's required content. Runtime
+loading may be on demand; this does not require every asset to reside in RAM
+simultaneously. The static-asset gallery is still planned, not implemented.
+
+## Capacity before conversion
+
+Capacity is a prerequisite, not a content tradeoff. Verify the workspace can hold
+all required game content, conversion intermediates, staging copies, temporary
+and final images, readback copies and a margin before launching expensive work.
+Check filesystem/quota limits and the shared RAM budget of memory-backed scratch.
+Never skip NPC models or the mandatory gallery to compensate for missing space.
+All character models remain required in the final product.
+
+The current build does not provide a guaranteed whole-recipe peak-space estimate.
+Add an automatic preflight using recipe/output estimates, retained-input sizes
+and observed stage peaks, followed by checks before large allocations. A low-space
+failure must preserve completed results and explain the capacity needed. Do not
+turn it into an implicit reduced-content build or a gallery opt-out.
+
 Status: proposed future work, 1 October 2026. No GPU backend, new compiler
 provider, per-phase region profiler or performance improvement is implemented
 by this documentation update. Complete and preserve the current build before
@@ -11,6 +46,21 @@ portability; the [third-party compiler plan](THIRD_PARTY_COMPILERS.md) covers
 possible bundled QCC source and selectable compiler providers. Native
 Windows/MSYS2 is the preferred Windows development direction. WSL2 is a fallback
 if native integration proves troublesome. Both Windows routes remain untested.
+
+## Asset inventory and coverage receipts
+
+The [asset catalogue plan](ASSET_CATALOGUE_AND_GALLERY.md) separates original
+object/dependency lookup, converted output and placed-reference coverage.
+Implement its metadata inventory without regenerating world terrain. Carry
+stable reference identities through conversion and report explicit omission
+reasons. The confirmed scaled-flora omission demonstrates why a successful
+model conversion alone cannot certify scene completeness.
+
+Measure unique asset bytes, repeated chunk data, final partition payload and
+filesystem free space separately. Expanding scenery should use bounded runtime
+loading and dependency-aware conversion, not an eager all-assets resident set.
+The proposed `dbg assetgallery` is a consumer of this catalogue, not a substitute
+for checking source placements in the actual world.
 
 ## Top engineering priority: practical world build times
 
@@ -354,3 +404,20 @@ models and reproduces the 23 known contact failures from retained rc3 conversion
 Final image validation repeats both checks. This reduces wasted work before a
 known failure; it is not a terrain compiler speedup. The per-region profiling,
 caching, scheduler changes and GPU experiments above remain roadmap items.
+
+## Separately rebuildable scenery: near-term design target
+
+Preserve terrain while adding original CELL/FRMR static placements in a separate
+conversion and runtime layer. Record per-asset and per-cell dependencies so changes
+to a tree, rock or plant invalidate only affected scenery and overlap products.
+Prove terrain hashes unchanged on a scenery-only rebuild. See the
+[cell-by-cell scenery plan](ASSET_CATALOGUE_AND_GALLERY.md). This needs runtime
+loading/collision work and is not implemented by current image recovery.
+
+## Mutable NPC equipment
+
+[Character equipment and shared assets](CHARACTER_EQUIPMENT_ROADMAP.md) are
+required for partial corpse looting and equipment changes. rc10 caches existing
+appearance snapshots; it does not make fixed outfits the final runtime design.
+Preserve reusable source parts and per-actor state; do not pre-bake every outfit
+combination. Normal gallery coverage and owner-approval requirements remain.

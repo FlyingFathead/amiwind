@@ -1,5 +1,39 @@
 # Recover an rc3 image-stage failure
 
+**Outside approval is required for any exception affecting either gallery.**
+Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
+reduced or bypassed, including model/asset generation, catalogue coverage,
+quality and validation, without a specific documented case or scenario **and
+explicit approval from the project owner**. A builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience do not
+supply that approval. An opt-out flag is a mechanism for an approved exceptional
+debugging case, not permission to choose that exception independently.
+
+All NPCs and other game assets must remain intact, packaged and loadable by the
+engine for the complete game to function properly. Skipping their creation
+alongside either gallery is pointless and counterproductive: the final product
+requires those assets anyway. An exceptional debug build must be labelled
+incomplete and cannot redefine the complete game's required content. Runtime
+loading may be on demand; this does not require every asset to reside in RAM
+simultaneously. The static-asset gallery is still planned, not implemented.
+
+**First prerequisite: sufficient build capacity.** Before starting, verify
+usable space for all required models/content, intermediates, staging copies,
+temporary images, final outputs, verification copies and a safety margin. Check
+the actual output filesystem and quota. RAM-backed scratch also consumes the
+process/container memory budget; it is not extra independent disk capacity.
+If space is insufficient, provide capacity before expensive conversion begins.
+Do not skip NPC models or gallery creation to make the build fit.
+
+**All NPCs must be included and loadable by the engine for the game to be complete.
+NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
+requested debugging purposes. Build time and disk usage are not reasons to omit it.**
+
+Skipping NPC model creation together with the gallery is pointless and
+counterproductive for a complete build: all character models are still required
+in the final product. Exceptional debugging may temporarily isolate the gallery;
+it cannot reduce the final game's required content.
+
 rc3 can finish the full terrain conversion and fail image assembly with
 `Incomplete world/journal conversion receipt`. The world-UI receipt writer
 included `regions.awr`, owned by world terrain, while its validator correctly
@@ -21,8 +55,14 @@ filesystem limits and image readback also remain required.
 
 ## Preserve and recover
 
+**Recovery MUST include the NPC gallery by default, even when the retained run
+omitted it. Conversion time and disk size are not reasons to skip it.** All
+original NPCs/creatures and required assets remain necessary for a complete game;
+only explicit `--no-npc-gallery` permits a debugging-only inspection-gallery
+omission. It never removes required world NPC content.
+
 Keep the failed run, particularly `build-state.json`, `intro-scene`,
-`world-terrain`, `world-survey` and `music`. Apply the complete rc7 source update
+`world-terrain`, `world-survey` and `music`. Apply the complete rc10 source update
 after the original process has exited. Use a fresh output name:
 
 ```bash
@@ -31,14 +71,14 @@ bash build.sh \
   --data-files '/path/to/Morrowind/Data Files' \
   --tools-dir /path/to/amiwind-tools \
   --workspace /path/to/amiwind-tests \
-  --name rc7-image-recovery
+  --name rc10-image-recovery
 ```
 
 Repeat original non-default `--hands`, `--bitmap-paper-ink` or `--intro-captions`
 settings. Explicit SDK/tool options remain available. `--check` verifies
-prerequisites and retained terrain without building; `--plan` prints the two
+prerequisites and retained terrain without building; `--plan` prints the three default
 commands. Actual recovery also hashes current game inputs and compares them
-with the original run before either command runs.
+with the original run before any command runs.
 
 Recovery is limited to a failed rc3 full build with all 22 pre-image stages
 recorded as passed. It checks recorded source against the published rc3
@@ -47,11 +87,11 @@ published region directory and every published terrain BSP hash. It rejects
 missing/corrupt terrain or mixed game inputs. It never executes arbitrary
 command strings from the old receipt.
 
-The new run compiles the current versioned engine/preflight and assembles the
-image from retained scene/music outputs. No terrain conversion is scheduled.
+The new run compiles the current versioned engine/preflight, converts the required
+NPC gallery, then assembles the image from retained scene/music outputs. No terrain conversion is scheduled.
 The old run and failed image directory are preserved; the image builder copies
 its input scene into new staging. The new receipt records the recovery origin
-and hashes. Completion time covers recovery provenance, engine/image work and
+and hashes. Completion time covers recovery provenance, engine/gallery/image work and
 final hashing, not the original terrain run or prerequisite recovery checks.
 
 Disk space is still required for the copied scene and image staging. Recovery
@@ -89,3 +129,41 @@ terrain hashes; final image acceptance checks all hashes. Never change the
 baseline merely to get past an unexpected difference: inspect the new report.
 Keep the old run and reports if any later gate fails. No terrain conversion is
 required for another image recovery attempt.
+
+## Default NPC gallery: required unless explicitly disabled
+
+Every normal AGA game build and image recovery includes the NPC/creature gallery.
+It is a debugging and regression-inspection tool, not optional content selected
+silently by the builder. A missing catalogue, selected model, footprint,
+inspection map or budget receipt fails the default build.
+
+Only the owner's explicit `--no-npc-gallery` flag permits an exceptional
+debugging build without it, for example to isolate a gallery-specific failure.
+This must not be used as a time/space optimization. The build receipt, final
+summary and image metadata record the choice; the console explains
+that the gallery was disabled. The separate asset-free CI/dry-run recipe does not
+contain owned game assets and therefore cannot include the game catalogue.
+
+The `npc-gallery` stage converts the complete source catalogue and compiles
+`charplane.bsp`, with bounded model-budget retries and byte-specific allowances.
+It reads the reserved scene palette after Census; its own files live in a separate
+output tree. World-terrain waits for it, exposing failures before the expensive
+island pass. Image assembly checks the required file inventory and every checksum,
+stages existing greetings, then verifies the final filesystem payload on readback.
+A gallery visual inspection is still required; conversion success is not visual
+approval of every model.
+
+Recovery reuses terrain and music but creates the missing gallery in the new run.
+The first recovery with this fix therefore has a substantial additional conversion
+stage. An older image's missing catalogue never implies an opt-out. rc10 uses a verified persistent model cache across runs while still assembling
+each new output independently. See [cache identity, compatible rc9 import and
+capacity checks](NPC_MODEL_CACHE.md).
+
+
+**Warning: gallery omission is for debugging builds only. All NPCs and their
+required assets remain necessary for a complete game. `--no-npc-gallery` skips
+inspection-only conversion/packaging; it must never remove world NPC placements,
+models, dialogue or other gameplay dependencies, or be advertised as a complete
+content profile. Normal builds include the NPC gallery for debugging and
+regression inspection. This requirement does not claim that every original
+world NPC has already been converted or placed by the current demake.**

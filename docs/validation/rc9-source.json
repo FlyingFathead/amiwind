@@ -1,0 +1,246 @@
+{
+  "version": "0.0.25-rc9",
+  "status": "source, native builds, owned-data gallery/torch conversion and gallery disk readback passed; target playtest pending",
+  "source_tests": {
+    "status": "passed",
+    "tests": 388,
+    "skipped": 0,
+    "command": "PYTHONPATH=src:tools:tests python3 -m unittest discover -s tests -v",
+    "qcc_and_qbsp": "actual pinned tools exercised"
+  },
+  "native_builds": [
+    {
+      "hands": "3d",
+      "status": "passed",
+      "scope": "native Amiga engine and asset-free boot-notice disk; no game boot or target playtest",
+      "elapsed_seconds": 10.422,
+      "compiler_warning_lines": 78,
+      "binary_sha256": "4d815162758c301784e030352a16e4b8af39977ffecd647aef9c377d70b2572c",
+      "bootcheck_sha256": "1511e9eed7cabcd499154ced708598aead2fe8b01d0b45c6f03d9d14e6ff8956",
+      "asset_free_hdf": {
+        "bytes": 8421376,
+        "sha256": "03c57797f8fa46fc771cb5c05f74539bb6946509d77cd02f491d7338e5cf5987"
+      }
+    },
+    {
+      "hands": "sprites",
+      "status": "passed",
+      "scope": "native Amiga engine and asset-free boot-notice disk; no game boot or target playtest",
+      "elapsed_seconds": 7.049,
+      "compiler_warning_lines": 80,
+      "binary_sha256": "5e3394546e26023c8c789650a55c078dacbf963f685c44e2695f8ef0eb509648",
+      "bootcheck_sha256": "1511e9eed7cabcd499154ced708598aead2fe8b01d0b45c6f03d9d14e6ff8956",
+      "asset_free_hdf": {
+        "bytes": 8421376,
+        "sha256": "c2d335e508d037b4152aa373d66b07168cd9089290c18d30d0a5b50da36a29b6"
+      }
+    }
+  ],
+  "environment": {
+    "python": "3.12.14",
+    "packages": [
+      {
+        "name": "numpy",
+        "version": "2.3.5"
+      },
+      {
+        "name": "scipy",
+        "version": "1.17.0"
+      },
+      {
+        "name": "Pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "PyFFI",
+        "version": "2.2.3"
+      },
+      {
+        "name": "fast-simplification",
+        "version": "0.2.0"
+      },
+      {
+        "name": "amitools",
+        "version": "0.8.1"
+      },
+      {
+        "name": "setuptools",
+        "version": "84.0.0"
+      }
+    ],
+    "tools": [
+      {
+        "name": "make",
+        "detected": "4.3",
+        "sha256": "d78b8f1d099fbcfb6f2f49ab87223b9b68fb3956642f92d6ec6de812e8afa965"
+      },
+      {
+        "name": "m68k-amigaos-gcc",
+        "detected": "16.2.0b 20260825082934",
+        "sha256": "34119a3528cc5778967b8741eba490d8ae25829fcd89858f3be376f323a64cda"
+      },
+      {
+        "name": "vasmm68k_mot",
+        "detected": "2.0f",
+        "sha256": "3c5d4203377bd45f3ee1743cb24dd57cd94f570ab209cd9f9306e9826db29f15"
+      }
+    ]
+  },
+  "npc_gallery": {
+    "default": "included in normal builds and image recovery",
+    "explicit_opt_out": "--no-npc-gallery; only a documented exceptional debugging case with explicit project-owner approval; required world NPCs unchanged",
+    "source_records": 2935,
+    "distinct_models": 3551,
+    "model_allowances": 29,
+    "unresolved_models": 0,
+    "conversion_timing": {
+      "started_at": "2026-10-01T22:29:20.595964+00:00",
+      "finished_at": "2026-10-01T23:29:43.215365+00:00",
+      "elapsed_seconds": 3622.619,
+      "workers": 6,
+      "scope": "complete gallery conversion, bounded retries, catalogue/map creation and source-payload verification"
+    },
+    "gallery_receipt_sha256": "63ab97737654cdd34339a48f14d7dc6e47a92b0a92563fed38aeaa707679e11a",
+    "staging_and_disk_readback": {
+      "status": "passed",
+      "scope": "complete NPC gallery staged, packed into FFS/RDB, independently mounted and SHA-256 checked; not a full game HDF or emulator test",
+      "staged": {
+        "model_files": 7102,
+        "greetings": 0,
+        "exceptions": 29,
+        "unresolved": 0,
+        "status": "passed",
+        "records": 2935,
+        "models": 3551,
+        "files": 7107,
+        "payload_bytes": 230008390,
+        "visual_acceptance": "requires target playtest",
+        "receipt_sha256": "63ab97737654cdd34339a48f14d7dc6e47a92b0a92563fed38aeaa707679e11a"
+      },
+      "records": 2935,
+      "distinct_models": 3551,
+      "payload_files": 7109,
+      "payload_bytes": 230009164,
+      "allowances": 29,
+      "unresolved": 0,
+      "gallery_receipt_sha256": "63ab97737654cdd34339a48f14d7dc6e47a92b0a92563fed38aeaa707679e11a",
+      "dagoth_sha256": "75bf64539def7957b1e5cdea1be9323db2062e1122434af02cba6d6b0666f425",
+      "partition_readback": [
+        {
+          "partition": "DH0",
+          "volume": "AMIWIND",
+          "offset_bytes": 32768,
+          "bytes": 402653184,
+          "payload_bytes": 230009164,
+          "files": 7109,
+          "free_bytes": 164192768,
+          "highest_used_end_offset": 402685952,
+          "highest_file": "id1/gallery/md4cef69f2fea8967.mdl",
+          "readback": "passed"
+        }
+      ],
+      "hdf_bytes": 402685952,
+      "hdf_sha256": "078ec302b8dbca7b8b31b563523c39accc40520b85b7c0c380b3643f30254dcc",
+      "elapsed_seconds": 45.496
+    },
+    "visual_acceptance": "not claimed; target model inspection remains required"
+  },
+  "dagoth_ur": {
+    "model": "m26a54f32fb800152",
+    "old_converter_status": "ready",
+    "triangles": 903,
+    "old_sha256": "75bf64539def7957b1e5cdea1be9323db2062e1122434af02cba6d6b0666f425",
+    "new_sha256": "75bf64539def7957b1e5cdea1be9323db2062e1122434af02cba6d6b0666f425",
+    "byte_identical": true,
+    "vertices": 2709,
+    "bytes": 295476,
+    "source_records": [
+      "dagoth_ur_1",
+      "dagoth_ur_2"
+    ],
+    "quality_profile": "dagoth-mask-v1",
+    "protected_faces": {
+      "neck": 30,
+      "mask": 240,
+      "maskpart": 47
+    },
+    "atlas_tile": 16
+  },
+  "model_preservation": {
+    "unchanged_files_vs_rc8": {
+      "config/gallery_model_quality.json": "08c559ad3bc5932bfe8d3be73df67edac630bd7f00e9425358fbcf11a9045982",
+      "tools/prepare_gallery.py": "a3973868c9ccc1108d2414c52a03980cbd208d22a63fc9c6af0b2bf6a8e71de3",
+      "tools/audit_gallery_budgets.py": "69643338bfcde6f0e017a34651881e8626f5d1351a0ff73e8cafddd8343ebd67",
+      "engine/aga/src/model.c": "b8aaa0d08778882d20cc1c1b8f74b6651008164a56721841b9b807b065ba9464",
+      "engine/aga/src/r_alias.c": "fa44dfc6645b590f8309b1d4cd22eaf474215ce84c4af90921ea5aecc95ae496"
+    },
+    "unchanged_function_asts": [
+      "npc_geometry.bake",
+      "npc_geometry.animated_mdl"
+    ],
+    "ordinary_vertex_limit": 2000,
+    "extended_triangle_ceiling": 1024,
+    "extended_vertex_ceiling": 3072,
+    "default_allow_over_budget": true,
+    "default_over_budget_cap": "auto"
+  },
+  "original_torch": {
+    "format": "AmiWind carried source torch 1",
+    "source_id": "torch",
+    "source_mesh": "l\\light_torch10.nif",
+    "animation_layer": "authored torch left arm over authored unarmed idle",
+    "attachment": "Shield Bone",
+    "carried_light_rotation_x_degrees": -90,
+    "view_offset": [
+      4.0,
+      0.0,
+      0.0
+    ],
+    "source_flame_texture": "tx_firealpha10.tga",
+    "source_torch_triangles": 238,
+    "frames": 8,
+    "duration_seconds": 2.666667938232422,
+    "triangles": 551,
+    "vertices": 1653,
+    "opaque_pixels": [
+      1572,
+      1588,
+      1579,
+      1571,
+      1566,
+      1572,
+      1579,
+      1589
+    ],
+    "files": {
+      "progs/v_torch.mdl": "5d3b2aa33cbf733a55c4485cb5254554bde66cf0b8c193217f3324043fe2aa15",
+      "gfx/torch.awt": "1a4f749543badce1de804af606146d536f0a39368c49248b09fdc1e4ef55179c",
+      "gfx/torch.aws": "f79e01b8824ed528f8660900a7f1648cc2221af23de96fa0ea25983c5cec0a32"
+    },
+    "scope": "Original mesh/grip and emitter; bounded flame approximation, no smoke or inventory simulation",
+    "host_render": {
+      "frames": 32,
+      "nonblank_frames": 32,
+      "visible_pixels_min": 5373,
+      "visible_pixels_max": 5447,
+      "scope": "actual host software renderer with converted viewmodel; no target emulator claim"
+    }
+  },
+  "publication_workflow_fixture": {
+    "apply_script": "passed against temporary rc7 Git checkout",
+    "publication_script": "passed against local bare Git remote and simulated GitHub CLI",
+    "ci_failure": "stops before tag/release",
+    "ci_wrong_commit": "stops before tag/release",
+    "ci_exact_success": "tags exact checked commit and verifies downloaded assets in fixture",
+    "actual_github_ci": "not run here; owner executes publication script",
+    "recovery_wrapper": "default gallery preserved; explicit debug opt-out, paths with spaces and original captions forwarded correctly"
+  },
+  "limits": [
+    "Full rc9 owned-game HDF was not assembled here; owner recovery rebuilds engine/gallery/image with retained terrain and strict actor checking.",
+    "No rc9 target-emulator playtest was performed here. Native compile and host-render checks do not establish target runtime correctness.",
+    "Longstanding momentary fist visibility blink every roughly 1\u20132 seconds remains open.",
+    "Separate unreproduced loss of F toggle remains open.",
+    "Static-asset gallery and independently rebuildable per-cell scenery layers remain roadmap work.",
+    "No private game payload, generated model, HDF or ROM is included in the public source package."
+  ]
+}

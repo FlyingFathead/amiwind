@@ -6,13 +6,17 @@
 
 ## Current state of the project
 
-**v0.0.25-rc8 — torch crash correction**
+**v0.0.25 — character build scheduling**
 
-This complete rc7 update corrects a reproduced invalid node access when **F**
-then **V** activates the [placeholder torch](docs/TORCH.md). Converted scenery
-is lit through its visible faces. An emulator retest is still required before
-final release. Original-game region labels, map teleport and strict actor-contact
-fitting remain available.
+**F**, then **V** equips a [torch converted from the original game](docs/TORCH.md),
+with an animated grip and flame attached to its source emitter. The debug header
+shows the region from the game's own records. This includes the rc8 torch-crash
+correction; target playtesting is required before final release. The longstanding
+brief fist-visibility blink remains open.
+
+Character conversion now uses a [verified persistent host cache](docs/NPC_MODEL_CACHE.md).
+The full NPC gallery remains enabled by default; reused models retain the same
+Amiga format and quality.
 
 A completed rc3 terrain run can be reused through
 [engine/image recovery](docs/IMAGE_RECOVERY.md). Build receipts retain timing,
@@ -30,7 +34,7 @@ Bloodmoon and Tribunal expansion content are excluded.
 **J** opens the progression journal; **M** opens the island map. Older saved
 configurations regain these keys when unassigned. Journal headings stay centred
 on the left page and wrap onto multiple lines. See the
-[candidate scope and validation](docs/RELEASE-v0.0.25-rc8.md).
+[release scope and validation](docs/RELEASE-v0.0.25.md).
 
 rc1 brings the Seyda Neen handoff inside its ground coverage and preserves
 original shoreline samples that coarse terrain had submerged. A normal-view

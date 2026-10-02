@@ -643,8 +643,9 @@ void R_DrawViewModel (void)
 		return;
 
 #if AMIWIND_SPRITE_HANDS
-    AW_HandSpritesDraw();return;
+    AW_TorchViewModel();AW_HandSpritesDraw();return;
 #endif
+    AW_TorchViewModel();
 	VectorCopy (currententity->origin, r_entorigin);
 	VectorSubtract (r_origin, r_entorigin, modelorg);
 

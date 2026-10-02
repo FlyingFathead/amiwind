@@ -321,3 +321,14 @@ See [map lookup and teleport](WORLD_MAP_AND_JOURNAL.md#region-name-and-debug-tel
 `dbg tp map` selects a point with a red crosshair, then requires the TELEPORT
 button or Enter to confirm. Escape cancels. **F, then V** equips the temporary
 [carried torch](TORCH.md); Shift+V continues to cycle draw distance.
+
+## Version, world and original region
+
+The exterior debug header reads `AmiWind v<version> Vvardenfell / <region>`.
+The simulated player's coordinates are converted to original world coordinates,
+then to the source CELL and its RGNN region ID. Display text comes from that
+REGN record's FNAM, including the original wording. No nearest-region guessing
+or generated terrain IDs are used. The heading/compass remains separate.
+Interior headers show the level's original area name; unavailable exterior
+region data is labelled unavailable. Long headers are clipped with an ellipsis
+at the selected HUD font width. This does not change normal compass defaults.

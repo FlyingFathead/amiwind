@@ -1,0 +1,73 @@
+{
+  "version": "0.0.25",
+  "status": "source, scheduling, gallery reuse and native build checks passed",
+  "tests": {
+    "passed": 404,
+    "skipped": 0,
+    "log_sha256": "13c98c4673fcd03f27d71026621cd0649f65b6c7978943a66485554a59c5c53a"
+  },
+  "scheduling": {
+    "blocked_first_task_refill_test": "passed",
+    "bounded_submission_and_worker_thread_limits": "passed",
+    "failure_propagation": "passed",
+    "cumulative_counts_and_deterministic_export": "passed"
+  },
+  "npc_gallery": {
+    "status": "passed",
+    "records": 2935,
+    "models": 3551,
+    "byte_identical_non_map_payload_files": 7106,
+    "catalogue_and_audit_bytes_identical": true,
+    "cache_and_converter_sources_unchanged": true,
+    "reuse": {
+      "format": "AmiWind gallery reuse 1",
+      "hits": 3551,
+      "converted": 0,
+      "failed": 0,
+      "completed": 3551,
+      "scheduler": "bounded-completion-v1",
+      "imported_rc9": null,
+      "capacity": {
+        "verified_hits": 3551,
+        "misses": 0,
+        "output_estimate_bytes": 299907201,
+        "new_cache_estimate_bytes": 0
+      },
+      "dependency_and_model_seconds": 83.665,
+      "worker_seconds_sum": 1.802,
+      "scope": "host-only reuse; every model and catalogue entry remains required"
+    },
+    "map_sha256_equal": false,
+    "inspection_map": {
+      "faces": 464,
+      "geometry_and_attached_lighting_identical": true,
+      "difference": "threaded lightmap storage ordering and padding only"
+    }
+  },
+  "native_asset_free": {
+    "3d": {
+      "status": "passed",
+      "image": "AmiWind-v0.0.25-dry-run.hdf",
+      "bytes": 8421376,
+      "sha256": "7398d04e05ab177b32c2b54365a0900baecf59b59c7c93d59c13b77f9a4d8951",
+      "warning_lines": 78,
+      "warnings_match_rc10": true
+    },
+    "sprites": {
+      "status": "passed",
+      "image": "AmiWind-v0.0.25-dry-run.hdf",
+      "bytes": 8421376,
+      "sha256": "83812296afd69515a5f6736e3545df4e567e6a208e9441b07b21a57d2c18213a",
+      "warning_lines": 80,
+      "warnings_match_rc10": true
+    }
+  },
+  "full_game_hdf": "not assembled here for v0.0.25",
+  "target_emulator_playtest": "not performed here for this source snapshot",
+  "private_payload_in_public_package": false,
+  "unchanged_from_rc10": {
+    "model_converter": "byte-identical",
+    "cache_implementation_and_identity": "byte-identical",
+    "all_engine_source_files": "byte-identical"
+  }
+}

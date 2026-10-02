@@ -937,6 +937,7 @@ void Host_Init (quakeparms_t *parms)
         CDAudio_Init ();
         Sbar_Init ();
         AW_HandSpritesInit();
+        AW_TorchLoadAssets();
         CL_Init ();
 #ifdef _WIN32 // on non win32, mouse comes before video for security reasons
         IN_Init ();
