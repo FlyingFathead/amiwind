@@ -84,7 +84,9 @@ class WindowsSetupTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform == 'win32', 'PowerShell setup preview')
     def test_plan_needs_no_python_installation_or_writes(self):
         with tempfile.TemporaryDirectory() as tmp:
-            tools = Path(tmp) / 'new-tools'
+            # Preview needs a valid MSYS2 path, independent of TEMP aliases/spaces.
+            tools = Path(Path(tmp).anchor) / ('amiwind-plan-' + Path(tmp).name)
+            self.assertFalse(tools.exists())
             result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                                      '-File', str(setup_windows.ROOT / 'setup-windows.ps1'), '-Plan',
                                      '-ToolsDir', str(tools)], capture_output=True, text=True, timeout=30)

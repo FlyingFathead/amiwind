@@ -16,6 +16,10 @@ import build_versions
 
 
 class BuildHostTests(unittest.TestCase):
+    def assertSamePath(self, actual, expected):
+        """Discovery returns canonical paths; fixture paths may use 8.3 aliases."""
+        self.assertEqual(Path(actual).resolve(), Path(expected).resolve())
+
     def test_windows_explicit_tool_and_sdk_discovery(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -28,11 +32,31 @@ class BuildHostTests(unittest.TestCase):
                 path.touch(); path.chmod(0o755)
             args = build.parser().parse_args(['--tools-dir', temp])
             with patch.object(build_host, 'host_name', return_value='windows'):
-                self.assertEqual(build.detected_sdk(args), root/'sdk')
-                self.assertEqual(build_versions.find_quake_tools(args), root/'ericw/bin')
-                self.assertEqual(build_versions.find_qcc(args), str(root/'Quake-Tools/qcc-host.exe'))
+                self.assertSamePath(build.detected_sdk(args), root/'sdk')
+                self.assertSamePath(build_versions.find_quake_tools(args), root/'ericw/bin')
+                self.assertSamePath(build_versions.find_qcc(args), root/'Quake-Tools/qcc-host.exe')
             with patch.object(build_host, 'host_name', return_value='linux'):
                 self.assertIsNone(build.detected_sdk(args))
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows 8.3 path alias regression')
+    def test_discovery_with_short_temp_alias(self):
+        import ctypes
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        short_path = kernel.GetShortPathNameW
+        short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        short_path.restype = ctypes.c_uint32
+        with tempfile.TemporaryDirectory(prefix='amiwind-long-temp-path-') as directory:
+            output = ctypes.create_unicode_buffer(32768)
+            size = short_path(directory, output, len(output))
+            if not size:
+                raise ctypes.WinError(ctypes.get_last_error())
+            self.assertLess(size, len(output))
+            if Path(output.value) == Path(directory).resolve():
+                self.skipTest('This volume does not provide a distinct 8.3 alias')
+            # Keep the aliased input: exercise real font/SDK/map/QCC discovery.
+            with patch.object(tempfile, 'tempdir', output.value):
+                self.test_managed_font_and_explicit_missing_font()
+                self.test_windows_explicit_tool_and_sdk_discovery()
 
     def test_python_distribution_selects_venv_layout(self):
         for host, platform, expected in (('windows', 'win-amd64', 'Scripts/python.exe'),
@@ -47,7 +71,7 @@ class BuildHostTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); font = root/'fonts/DejaVuSansMono.ttf'
             font.parent.mkdir(); font.touch()
-            self.assertEqual(build_host.fallback_font(tools_dir=root), font)
+            self.assertSamePath(build_host.fallback_font(tools_dir=root), font)
             with self.assertRaisesRegex(ValueError, 'not found'):
                 build_host.fallback_font(root/'missing.ttf', root)
 

@@ -15,6 +15,7 @@ flag, first fixed version (or an em dash), and evidence/status below.
 
 | ID | Issue | Fixed (Y/N) | First fixed version | Verification / current status |
 | --- | --- | --- | --- | --- |
+| CI-01 | Windows short aliases mismatch resolved discovery paths in tests | N | Pending follow-up CI | Assertions corrected; local short-alias regression passed; hosted CI pending. See [journal](BUG_JOURNAL.md#ci-01-windows-short-path-aliases-fail-host-discovery-assertions). |
 | WIN-03 | Windows image-packing command exceeds process limit | Y | Windows working tree; release pending | Windows batching passed 1,100-file readback, four regressions and complete image readback/WinUAE game entry; [journal](BUG_JOURNAL.md#win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026) |
 | WIN-02 | Cancelled Windows stage leaves child workers alive | N | — | Process-tree cleanup candidate tested separately; integration pending; [journal](BUG_JOURNAL.md#win-02-cancelled-windows-stage-leaves-worker-descendants--open-2-october-2026) |
 | WIN-01 | Native Windows Python geometry-worker queue failure | N | — | Intermittent invalid semaphore handle; cause unknown; [journal](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026) |

@@ -1,5 +1,31 @@
 # Bug journal
 
+## CI-01: Windows short-path aliases fail host-discovery assertions
+
+1. **Cause, symptoms and impact.** In AmiWind v0.0.26-rc1, the Windows 2022
+   host-parity job failed two tests: managed-font discovery and SDK discovery.
+   The runner supplied an 8.3 short alias in its temporary-directory path.
+   Discovery correctly returned resolved long paths, while assertions compared
+   unresolved fixture paths. Both names referred to the same files. Linux source
+   checks, the asset-free Amiga build and Ubuntu host parity passed. The release
+   gate stopped before tagging. This failure does not establish a compiler or
+   asset-conversion defect.
+2. **Reproduction.** On Windows, create a temporary directory with a distinct
+   8.3 alias, set TEMP and TMP to that alias in a child process, then run
+   unittest discovery for test_build_host.py. Both failures reproduced locally.
+   An ordinary long-path temporary directory passed, masking this CI difference.
+3. **Correction and verification.** Resolve expected SDK, map-tool, QCC and font
+   paths before comparison. Keep short-path inputs in the fixtures to exercise
+   discovery. This also exposed a later setup-preview fixture passing an invalid
+   MSYS2 tools path containing a short alias or spaces. Preview now uses a unique
+   nonexistent path on the same drive with supported characters; it creates no
+   files there. No production or Linux launcher code changes. All four CI test
+   groups passed locally with short-path TEMP/TMP after correction (30 tests,
+   two POSIX-only skips). An explicit Windows 8.3 regression retains this case
+   in the suite; it skips only where the volume supplies no distinct short alias.
+   A new hosted Windows CI pass is still required before
+   tagging; a local regression pass alone is not release acceptance.
+
 <a id="win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026"></a>
 ## WIN-03: Windows image-packing command exceeds process limit — fixed in working tree, 2 October 2026
 
