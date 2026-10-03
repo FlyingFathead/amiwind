@@ -41,7 +41,7 @@ Negative coordinates use floor division by the game's 8192-unit cell size.
 No region boundaries or names are invented. Missing data or interiors without
 an exterior coordinate fix display `unavailable`.
 
-`dbg tp map` opens **DEBUG TELEPORT** with **CLICK ON TARGET TO TELEPORT**.
+`dbg tp map` (or `dbg map tp`) opens **DEBUG TELEPORT** with **CLICK ON TARGET TO TELEPORT**.
 Click inside the map to select a destination and display a red crosshair. The
 **TELEPORT** button appears at the bottom right; clicking it confirms travel.
 Enter also confirms an existing selection; Escape cancels. Selection survives
@@ -115,3 +115,26 @@ follow the quest index, return to play and quickload the earned entry.
 This is a working UI and persistence foundation. It does not implement all
 quests, dialogue trees, inventory/equipment, local maps or island-wide travel.
 The existing final-placement gate remains independent and unchanged.
+
+## v0.0.27-rc4 selector regression and rc5 source correction
+
+Owner playtesting of the rc4 prototype showed the In-Game Map Prototype title,
+a Debug button, a pale active selector button with an unreadable light label,
+and no Seyda Neen/Balmora settlement markers. The retained map payload includes
+two town landmarks; rc4 rendering hid the landmark loop outside Debug mode. The
+rc5 source now draws settlement landmarks in both modes and gives the selected
+button a dark text interior and contrasting border.
+
+The rc5 correction compiled in engine-002 and is included in the private
+candidate whose HDF readbacks passed. Target confirmation remains pending. The
+earlier rc4 HDF was not changed by the failed helper retries. This In-Game view
+remains a terrain overview prototype, not the complete original-game world/local
+map. Verify both button labels and selected states, retained markers in both
+modes, player marker and heading, map scales and interaction. See the tracked
+[selector regression](BUG_JOURNAL.md#map-reg-01-rc4-in-game-selector-hides-retained-settlement-markers-bug--regression).
+
+The rc5 candidate also includes the archived aw_region_loading_delay setting:
+two seconds by default, zero for immediate loading-screen presentation. It
+applies to automatic crossings only; startup and explicit travel are immediate.
+The delay begins at a safe checkpoint after blocking reads and is not a
+performance fix. See the [cell-changing policy](CELL_CHANGING.md).

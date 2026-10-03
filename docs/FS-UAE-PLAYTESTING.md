@@ -1,5 +1,31 @@
 # AmiWind playtesting with FS-UAE
 
+## Automatically generated image configurations
+
+Full-game assembly writes `AmiWind-v<VERSION>-WinUAE.uae` and
+`AmiWind-v<VERSION>-FS-UAE.fs-uae` beside the HDFs. The verified image receipt
+is the source of the drive list: load every required HDF simultaneously.
+The boot disk comes first; additional world disks are not interchangeable
+and do not require disk swapping.
+
+Supply `--kickstart-file /path/to/owned.rom` to the build to fill both local
+ROM paths, or select your licensed ROM in the emulator afterward. ROMs and
+playable images are private build outputs, never public source assets.
+Configurations use host-local absolute paths. After moving the image directory,
+keep `build.json` and every listed HDF together and regenerate the configurations
+on the destination host:
+
+```sh
+python tools/emulator_configs.py --image /path/to/AmiWind-v0.0.27-rc1.hdf --kickstart-file /path/to/owned.rom
+```
+
+The generator preserves a differing existing configuration instead of overwriting
+custom settings; move that configuration to a backup name before regenerating.
+The portable FS-UAE launcher updates moved paths with its existing backup workflow.
+Both FS-UAE launchers now use every drive listed in `build.json`. A missing required
+world disk stops configuration instead of silently launching an incomplete world.
+
+
 This guide describes a known-working FS-UAE configuration for playtesting AmiWind on Linux.
 
 Official homepage and downloads: [FS-UAE](https://fs-uae.net/).

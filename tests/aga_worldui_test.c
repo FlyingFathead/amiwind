@@ -15,6 +15,11 @@ static const char title[]="A long quest heading which must wrap completely withi
 static int heading_rows,marker_x=-1,marker_y=-1,char_width=4,region_calls;
 static char footer[80];static int footer_left,footer_right;
 static const char *region_override;
+/* Model the registered values used by the real panel; do not bypass mode logic. */
+static cvar_t *map_vars[2];static int map_var_count,debug_overlays=1;
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<2);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
+int AW_DebugOverlaysEnabled(void){return debug_overlays;}
 int Cmd_Argc(void){return 1;}
 const char *AW_RegionNameAt(const float *p){region_calls++;return region_override?region_override:p[0]<0?"West test region":"East test region";}
 int AW_MapTeleport(const float *p){int i;for(i=0;i<3;i++)destination[i]=p[i];if(!jump_available)return 0;jumps++;return 1;}
@@ -139,5 +144,12 @@ int main(void){
     teleport_command();AW_WorldUIKey(K_ENTER,1);assert(jumps==1);
     AW_WorldUIKey(K_ESCAPE,1);assert(!AW_WorldUIActive());
     map_command();draw();assert(!strstr(drawn,"DEBUG TELEPORT"));AW_WorldUIKey('m',1);
+    /* Both selectable map modes retain town labels; disabling debug selects
+     * In-Game and preserves its heading marker rather than bypassing cvars. */
+    Cvar_SetValue("aw_map_mode",1);map_command();AW_WorldUIKey(K_HOME,1);draw();
+    assert(strstr(drawn,"IN-GAME MAP PROTOTYPE") && strstr(drawn,"Balmora"));
+    AW_WorldUIKey('m',1);Cvar_SetValue("aw_map_mode",0);debug_overlays=0;
+    map_command();draw();assert(strstr(drawn,"IN-GAME MAP PROTOTYPE"));
+    assert(map_vars[0]->value==1);AW_WorldUIKey('m',1);debug_overlays=1;
     return 0;
 }

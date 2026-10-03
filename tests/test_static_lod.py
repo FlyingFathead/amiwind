@@ -49,6 +49,26 @@ class StaticLODTests(unittest.TestCase):
         self.assertEqual(report['preserved_materials'],[0])
         with self.assertRaises(ValueError):reduce_mesh(v,f,.08,{1})
 
+    def test_shared_material_rim_keeps_source_geometry_and_uvs(self):
+        import numpy as np
+        from static_lod import reduce_mesh
+        vertices = []
+        faces = []
+        for material in (0, 1):
+            base = len(vertices)
+            for y in range(5):
+                for x in range(5):
+                    vertices.append([x, y, material*y, x/4, y/4])
+            for y in range(4):
+                for x in range(4):
+                    a = base + y*5 + x
+                    faces.extend([[a, a+1, a+6, material], [a, a+6, a+5, material]])
+        v, f = np.array(vertices, float), np.array(faces)
+        reduced, triangles, report = reduce_mesh(v, f, .2, preserve_shared_seams=True)
+        self.assertEqual(report['preserved_materials'], [0, 1])
+        self.assertTrue(np.array_equal(reduced[triangles[:, :3]], v[f[:, :3]]))
+        self.assertEqual(len(triangles), len(f))
+
     def test_planar_materials_and_separate_parts_survive_reduction(self):
         import numpy as np
         from static_lod import reduce_mesh

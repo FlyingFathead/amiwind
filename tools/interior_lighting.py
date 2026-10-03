@@ -8,10 +8,19 @@ lighting parity; no per-frame light solve is added to the Amiga renderer.
 import numpy as np
 
 
-def bake_surface(polygon, axes, offset, rotation, origin, lighting):
-    uv=polygon@axes+offset
-    low=np.floor(uv.min(0)/16)*16;high=np.ceil(uv.max(0)/16)*16
-    size=((high-low)/16).astype(int)+1
+def bake_surface(polygon, axes, offset, rotation, origin, lighting, *, sample_grid=None):
+    # Audited repairs supply the exact grid of serialized BSP coordinates.
+    # Existing conversion callers retain their historical grid pending the
+    # separate cross-FPU precision correction.
+    if sample_grid is None:
+        uv=polygon@axes+offset
+        low=np.floor(uv.min(0)/16)*16;high=np.ceil(uv.max(0)/16)*16
+        size=((high-low)/16).astype(int)+1
+    else:
+        low=np.asarray(sample_grid[0],dtype=float)
+        size=np.asarray(sample_grid[1],dtype=int)
+        if low.shape!=(2,) or size.shape!=(2,) or not np.all(np.isfinite(low)):
+            raise ValueError('Invalid explicit lightmap grid')
     if np.any(size<1) or np.any(size>17):raise ValueError('Lightmap extent exceeds runtime budget')
     normal=np.cross(polygon[1]-polygon[0],polygon[2]-polygon[0]);normal/=np.linalg.norm(normal)
     matrix=np.vstack((axes.T,normal));distance=normal@polygon[0]

@@ -36,6 +36,28 @@ On memory-limited machines use a smaller explicit `--jobs` value. CPU detection
 is not a RAM-capacity guarantee; the retained base scene/model caches still need
 memory. Input/output bandwidth and uneven model sizes also limit scaling.
 
+## Final BSP optimizer jobs
+
+The normal image finalizer runs the BSP geometry/light/PVS optimizer after map
+regeneration and actor annotation, before actor-contact validation, the final heap
+gate and content fingerprinting. It uses six Python process workers by default.
+Candidates are prepared and checked in isolation; the source maps are committed
+only after the full candidate set validates. A worker failure preserves the
+original map set and stops finalization.
+
+The standalone `tools/optimize_world_maps.py` command exposes `--jobs N` for an
+explicit preparation-worker count and defaults to one. This is separate from the
+top-level build `--jobs`, which budgets concurrent pipeline work. The regular
+`tools/build_aga.py image` parser does not currently expose a separate
+`--optimizer-jobs` flag; its shared finalizer defaults to six, with an internal
+caller override when supplied. Do not assume either setting is a RAM guarantee;
+map staging and source caches still consume memory.
+
+The optimizer's nine focused tests pass, including serial/parallel output-oracle
+equality and preservation of original maps after worker failure. Finalizer heap-
+receipt tests also pass. These checks validate the source path, not completion of
+an assembled HDF, target load lifecycle, seams or gameplay performance.
+
 ## Progress and failure handling
 
 Concurrent log lines carry the stage name. Each stage keeps a separate complete

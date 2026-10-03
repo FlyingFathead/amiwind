@@ -2,12 +2,13 @@
  * Run the real mixer during a simulated blocking load and DMA ring wraps. */
 #include "quakedef.h"
 #include <assert.h>
-extern int sound_started,paintedtime,total_channels;
+extern int sound_started,paintedtime,total_channels,snd_blocked;
 extern cvar_t _snd_mixahead;
 extern channel_t channels[];
 client_static_t cls;client_state_t cl;
 static double clock_now=1;
-static int position,submits,refills,frames,late;
+static int position,submits,refills,frames,late,loading_updates;
+void SCR_LoadingUpdate(void){loading_updates++;}
 double Sys_FloatTime(void){return clock_now;}
 int SNDDMA_GetDMAPos(void){return position;}
 void SNDDMA_Submit(void){submits++;}
@@ -38,7 +39,10 @@ int main(void){
  }
  assert(refills==400 && submits==400 && frames>120000 && !late);
  was=paintedtime;S_LoadingUpdate();assert(paintedtime==was && submits==400);
- aw_loading_music=false;clock_now+=1;S_LoadingUpdate();assert(submits==400);
+ assert(loading_updates==401);
+ sound_started=0;S_LoadingUpdate();assert(loading_updates==402 && submits==400);sound_started=1;
+ snd_blocked=1;S_LoadingUpdate();assert(loading_updates==403 && submits==400);snd_blocked=0;
+ aw_loading_music=false;clock_now+=1;S_LoadingUpdate();assert(submits==400 && loading_updates==403);
  S_StopAllSounds(true);for(i=0;i<sizeof(buffer);i++)assert(!buffer[i]);
  return 0;
 }

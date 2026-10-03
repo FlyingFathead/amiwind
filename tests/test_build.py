@@ -43,14 +43,24 @@ class GuidedBuildTests(unittest.TestCase):
         self.assertLess(names.index("interior"), names.index("image"))
         self.assertLess(names.index("interior"), names.index("intro"))
         self.assertLess(names.index("intro"), names.index("image"))
+        self.assertLess(names.index("world-terrain"), names.index("world-scenery"))
+        self.assertLess(names.index("world-scenery-assets"), names.index("world-scenery"))
+        self.assertLess(names.index("world-scenery"), names.index("image"))
         commands = dict(steps)
         self.assertNotIn('--archive', commands['engine'])
-        self.assertIn('/private/run/engine/runtime/build/AmiQuakeGCC', commands['image'])
+        self.assertIn(str(Path('/private/run/engine/runtime/build/AmiQuakeGCC')), commands['image'])
         for stage in ("engine", "image"):
             command = commands[stage]
             self.assertEqual(command[command.index("--hands") + 1], "sprites")
         image = commands["image"]
-        self.assertEqual(image[image.index("--scene") + 1], "/private/run/intro-scene")
+        self.assertEqual(Path(image[image.index("--sdk") + 1]), Path("/sdk"))
+        self.assertEqual(Path(image[image.index("--scene") + 1]), Path("/private/run/intro-scene"))
+        self.assertEqual(Path(image[image.index("--world-scenery") + 1]), Path("/private/run/world-scenery"))
+        source = commands["world-scenery-assets"]
+        self.assertIn("--export-meshes", source)
+        overlay = commands["world-scenery"]
+        self.assertEqual(Path(overlay[overlay.index("--terrain") + 1]), Path("/private/run/world-terrain"))
+        self.assertEqual(Path(overlay[overlay.index("--scenery") + 1]), Path("/private/run/world-scenery-source/scenery"))
 
     def test_shell_wrapper_from_another_directory_and_space_path(self):
         with tempfile.TemporaryDirectory(prefix="amiwind build ") as tmp:

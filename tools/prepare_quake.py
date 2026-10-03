@@ -15,10 +15,11 @@ from build_parallel import ordered_map
 
 CENTRE=(-11264,-71680)
 SCALE=.25
-# TEMPORARY DEMO PLACEHOLDER: a larger flat sea hides the small slice boundary.
-# Replace with actual surrounding cells/coastline after the basics are stable.
-# This does not convert islands, add world streaming or promise an infinite sea.
-SEA_EXTENT=2048
+# Keep real LAND beyond the unchanged town handoff. The surrounding water/sky
+# enclosure contains that apron; it is not a substitute for missing terrain.
+TERRAIN_APRON=768
+GROUND_BOUNDS=tuple(tuple(v + (-TERRAIN_APRON if i == 0 else TERRAIN_APRON) for v in row) for i,row in enumerate(BOUNDS))
+SEA_EXTENT=max(abs(v) for row in GROUND_BOUNDS for v in row)+64
 
 
 def wad(lumps):
@@ -135,6 +136,37 @@ def _preview_model(task):
     return mi,raw,(path,[0,0],len(faces)),{'model':name,'kind':'mesh','source_triangles':len(f),'triangles':len(faces),'bytes':len(raw)}
 
 
+def town_ground_triangles(grids):
+    """Use the world sampler/grid at the handoff, retaining fine port ground."""
+    from prepare_world_regions import Terrain, terrain_triangles
+    import numpy as np
+    terrain = Terrain.__new__(Terrain)
+    terrain.cells = {tuple(g['cell']): i for i, g in enumerate(grids)}
+    terrain.heights = np.asarray([g['heights'] for g in grids], dtype=float)
+    terrain.materials = np.asarray([g['materials'] for g in grids], dtype=int)
+    ox, oy = (v*SCALE for v in CENTRE)
+    for y in range(GROUND_BOUNDS[0][1], GROUND_BOUNDS[1][1], 128):
+        for x in range(GROUND_BOUNDS[0][0], GROUND_BOUNDS[1][0], 128):
+            if 0 <= x < 896 and 256 <= y < 1024:
+                triangles = []
+                for yy in range(y, y+128, 32):
+                    for xx in range(x, x+128, 32):
+                        points = [[xx+ox+dx, yy+oy+dy, terrain.sample(xx+ox+dx, yy+oy+dy)[0]]
+                                  for dx,dy in ((0,0),(32,0),(32,32),(0,32))]
+                        triangles.extend([[points[i] for i in ids] for ids in ((0,1,2),(0,2,3))])
+            else:
+                triangles = terrain_triangles(terrain, x+ox, y+oy)
+            for tri in triangles:
+                material = terrain.sample(*(sum(p[k] for p in tri)/3 for k in (0,1)))[1]
+                yield [[p[0]-ox,p[1]-oy,p[2]] for p in tri], material
+
+
+def town_ground_brushes(grids):
+    return [brush(tri+[[p[0],p[1],-512] for p in tri],
+                  [(0,1,2),(3,4,5),(0,1,4),(1,2,5),(2,0,3)], 'g'+str(material))
+            for tri,material in town_ground_triangles(grids)]
+
+
 def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
     import numpy as np
     from PIL import Image,ImageDraw,ImageFont
@@ -217,31 +249,19 @@ def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
         if n=='*water':im=Image.open(io.BytesIO(bsa_read(bsa,'textures/water/water00.dds'))).convert('RGB').resize((64,64),Image.Resampling.BOX)
         terrain_lumps.append((n,68,miptex(n,quantize(im))))
     (out/'town.wad').write_bytes(wad(terrain_lumps))
-    brushes=[];extent=max(abs(v) for b in BOUNDS for v in b);step=128
-    tiles=[]
-    for y in range(BOUNDS[0][1],BOUNDS[1][1],step):
-        for x in range(BOUNDS[0][0],BOUNDS[1][0],step):
-            # Preserve original LAND vertices around the steep port approaches.
-            # Coarse interpolation here cut through the original ground/rocks.
-            detail=32 if 0<=x<896 and 256<=y<1024 else step
-            tiles.extend((xx,yy,detail) for yy in range(y,y+step,detail) for xx in range(x,x+step,detail))
-    for x,y,step in tiles:
-        corners=[];material=0
-        for dx,dy in [(0,0),(step,0),(step,step),(0,step)]:
-            z,material=terrain(CENTRE[0]+(x+dx)/SCALE,CENTRE[1]+(y+dy)/SCALE);corners.append([x+dx,y+dy,z*SCALE])
-        for ids in [(0,1,2),(0,2,3)]:
-            tri=[corners[i] for i in ids];pts=tri+[[p[0],p[1],-512] for p in tri]
-            brushes.append(brush(pts,[(0,1,2),(3,4,5),(0,1,4),(1,2,5),(2,0,3)],f'g{material}'))
-    # Extend only the simple sea/enclosure. Terrain and object selection keep
-    # their smaller bounds; this is a backdrop, not an archipelago conversion.
+    brushes=town_ground_brushes(grids)
+    extent=max(abs(v) for b in BOUNDS for v in b)
+    # The ground apron overlaps the world map beyond the unchanged town core.
+    # Keep the sky enclosure outside that real LAND, never in the view radius.
     sea=SEA_EXTENT
+    sky_top=max(512,max(p[2] for tri,_ in town_ground_triangles(grids) for p in tri)+256)
     brushes.append(box([-sea,-sea,-500],[sea,sea,0],'*water'))
     brushes+= [box([-sea-32,-sea-32,-544],[sea+32,sea+32,-512],'stone'),
-               box([-sea-32,-sea-32,512],[sea+32,sea+32,544],'sky'),
-               box([-sea-32,-sea-32,-512],[-sea,sea+32,512],'sky'),
-               box([sea,-sea-32,-512],[sea+32,sea+32,512],'sky'),
-               box([-sea,-sea-32,-512],[sea,-sea,512],'sky'),
-               box([-sea,sea,-512],[sea,sea+32,512],'sky')]
+               box([-sea-32,-sea-32,sky_top],[sea+32,sea+32,sky_top+32],'sky'),
+               box([-sea-32,-sea-32,-512],[-sea,sea+32,sky_top],'sky'),
+               box([sea,-sea-32,-512],[sea+32,sea+32,sky_top],'sky'),
+               box([-sea,-sea-32,-512],[sea,-sea,sky_top],'sky'),
+               box([-sea,sea,-512],[sea,sea+32,sky_top],'sky')]
     entities=[];refs=0
     for r in index['references']:
         mi=r['model_index']
@@ -297,7 +317,7 @@ r_maxedges 24576
 map seyda
 '''
     (game/'quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\n');(game/'default.cfg').write_text(config);(game/'autoexec.cfg').write_text('')
-    report={'format':'AmiWind Quake scene experiment','scale':SCALE,'centre':CENTRE,'extent':extent,'bounds':BOUNDS,'sea_extent':SEA_EXTENT,'references':refs,'models':reports,'spawn':spawn,
+    report={'format':'AmiWind Quake scene experiment','scale':SCALE,'centre':CENTRE,'extent':extent,'bounds':BOUNDS,'ground_bounds':GROUND_BOUNDS,'sea_extent':SEA_EXTENT,'references':refs,'models':reports,'spawn':spawn,
             'scope':'bounded LAND + reduced alias meshes + alpha tree sprites + approximate building clip brushes; no actors/interiors/quests; non-unit scale references currently omitted'}
     (out/'scene-report.json').write_text(json.dumps(report,indent=2)+'\n');print('references',refs,'brushes',len(brushes));return report
 

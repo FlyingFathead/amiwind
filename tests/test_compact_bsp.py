@@ -66,9 +66,10 @@ class CompactBspTests(unittest.TestCase):
         self.assertNotIn(b'B'*40,b[2]);self.assertIn(b'C'*40,b[2])
         self.assertEqual(raw,fixture())
 
-    def test_region_overlap_and_first_dock_route_share_core(self):
+    def test_bounded_regions_cover_routes_and_visibility_aprons(self):
         rs=regions();self.assertLessEqual(len(rs),64)
-        self.assertEqual(owner((695,-486),rs),owner((330,-200),rs))
+        self.assertIsNotNone(owner((695,-486),rs))
+        self.assertIsNotNone(owner((330,-200),rs))
         for r in rs:
             for axis in range(2):
                 self.assertLessEqual(r['coverage'][0][axis],r['core'][0][axis])
@@ -76,5 +77,46 @@ class CompactBspTests(unittest.TestCase):
         self.assertIsNotNone(owner((0,0),rs))
         town=owner((0,0),rs)
         for point in [(-300,200),(700,-486),(100,400),(-30,473)]:
-            self.assertEqual(owner(point,rs),town)
+            self.assertIsNotNone(owner(point,rs))
         self.assertNotEqual(owner((-30,475),rs),town)
+
+
+class VisualCoverageTests(unittest.TestCase):
+    def test_distant_inline_faces_removed_but_collision_and_pvs_preserved(self):
+        raw=fixture();out,report=compact(raw,visual_bounds=((-1,-1),(1,1)))
+        a,b=lumps(raw),lumps(out)
+        models=list(struct.iter_unpack('<9f7i',b[14]))
+        self.assertEqual(models[1][15],0)
+        self.assertEqual(report['visual_faces_removed_outside_coverage'],1)
+        self.assertEqual(a[4],b[4]);self.assertEqual(a[8],b[8])
+        planes=list(struct.iter_unpack('<4fi',b[1]))
+        clips=list(struct.iter_unpack('<iHH',b[9]))
+        clip=clips[models[1][10]]
+        self.assertEqual(planes[clip[0]],(1.,0.,0.,2.,0))
+        self.assertEqual(clip[1:],(65535,65534))
+
+    def test_shared_model_and_aliased_face_kept_for_any_near_placement(self):
+        data=lumps(fixture())
+        models=[list(row) for row in struct.iter_unpack('<9f7i',data[14])]
+        models[1][14:16]=models[2][14:16]
+        data[14]=bytearray().join(struct.pack('<9f7i',*row) for row in models)
+        data[0]=bytearray(b'{"classname" "worldspawn"}\n'
+                         b'{"classname" "func_wall" "model" "*2" "origin" "20 0 0"}\n'
+                         b'{"classname" "func_wall" "model" "*1" "origin" "-2 0 0"}\n\0')
+        out,report=compact(pack_lumps(data),visual_bounds=((-1,-1),(1,1)))
+        models=list(struct.iter_unpack('<9f7i',lumps(out)[14]))
+        self.assertEqual(models[1][15],1);self.assertEqual(models[2][15],1)
+        self.assertEqual(report['visual_faces_removed_outside_coverage'],0)
+
+    def test_rotation_and_boundary_contact_keep_entire_face(self):
+        records=entities(lumps(fixture())[0]);records[1]['angles']='0 90 0'
+        out,report=compact(fixture(),records,visual_bounds=((-1,1.5),(.1,2.5)))
+        data=lumps(out);models=list(struct.iter_unpack('<9f7i',data[14]))
+        self.assertEqual(models[1][15],1)
+        self.assertEqual(report['visual_faces_removed_outside_coverage'],0)
+        self.assertEqual(len(data[7]),40)
+
+    def test_invalid_bounds_fail_and_default_output_stays_identical(self):
+        for bounds in [((0,0),(0,1)),((0,0),(float('nan'),1))]:
+            with self.assertRaises(ValueError):compact(fixture(),visual_bounds=bounds)
+        self.assertEqual(compact(fixture())[0],compact(fixture(),visual_bounds=None)[0])

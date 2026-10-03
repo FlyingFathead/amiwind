@@ -238,17 +238,55 @@ void Sys_Error (char *error, ...)
 {
 	va_list		argptr;
 	char		text[1024];
-	int errorFileHandle;
+    BPTR errorFileHandle, errorLock;
+    LONG errorLength, verified, chunk, received;
+    char verifyBytes[64];
+    qboolean errorSaved = false;
+    char errorPath[512];
 
 
     va_start (argptr, error);
     vsprintf (text, error, argptr);
     va_end (argptr);
 
-    errorFileHandle = Sys_FileOpenWrite("ERROR.TXT");
+    /* Capture allocator state before shutdown releases caches and heap. */
+    AW_HeapAuditPhase(NULL,"fatal-exit");
+    /* DOS calls avoid the allocating stdio path during heap exhaustion.
+     * Resolve the file itself so the displayed path matches this launch's cwd. */
+    strcpy(errorPath,"ERROR.TXT (in the launch directory)");
+    errorLength = (LONG)strlen(text);
+    errorFileHandle = Open("ERROR.TXT",MODE_NEWFILE);
     if (errorFileHandle) {
-	Sys_FileWrite(errorFileHandle, text, strlen(text));
-	Sys_FileClose(errorFileHandle);
+        errorSaved = Write(errorFileHandle,text,errorLength) == errorLength;
+        if (!Close(errorFileHandle)) errorSaved = false;
+        if (errorSaved) {
+            /* Read back in small fixed chunks; never allocate another report.
+             * Require identical contents and EOF, not merely a successful open. */
+            errorFileHandle = Open("ERROR.TXT",MODE_OLDFILE);
+            if (!errorFileHandle) errorSaved = false;
+            else {
+                verified = 0;
+                while (errorSaved && verified < errorLength) {
+                    chunk = errorLength - verified;
+                    if (chunk > (LONG)sizeof(verifyBytes)) chunk = sizeof(verifyBytes);
+                    received = Read(errorFileHandle,verifyBytes,chunk);
+                    if (received != chunk || memcmp(verifyBytes,text+verified,chunk))
+                        errorSaved = false;
+                    else verified += chunk;
+                }
+                if (errorSaved && Read(errorFileHandle,verifyBytes,1) != 0)
+                    errorSaved = false;
+                if (!Close(errorFileHandle)) errorSaved = false;
+            }
+        }
+        if (errorSaved) {
+            errorLock = Lock("ERROR.TXT",ACCESS_READ);
+            if (errorLock) {
+                if (!NameFromLock(errorLock,errorPath,sizeof(errorPath)))
+                    strcpy(errorPath,"ERROR.TXT (in the launch directory)");
+                UnLock(errorLock);
+            }
+        }
     }
 
 	Host_Shutdown();
@@ -262,6 +300,24 @@ void Sys_Error (char *error, ...)
 
 
 	AW_PlatformClose();
+    /* Print after closing the game screen so AmigaDOS retains the reason.
+     * Only the fatal path runs this; ERROR.TXT remains the durable copy. */
+    PutStr("\n------------------------------------------------------\n"
+           "AmiWind v" AMIWIND_VERSION " crashed! Sorry! :-(\n"
+           "------------------------------------------------------\n"
+           "Crash cause: ");
+    PutStr(text[0] ? text : "No reason was provided.");
+    PutStr("\n\n");
+    if (errorSaved) {
+        PutStr("The crash report has been saved to ");
+        PutStr(errorPath);
+        PutStr("\n");
+    } else {
+        PutStr("Could not verify a complete ERROR.TXT in the launch directory.\n"
+               "Please copy the crash cause shown above.\n");
+    }
+    PutStr("------------------------------------------------------\n"
+           "To restart AmiWind, try typing: amiwind\n");
 	exit(EXIT_FAILURE);
 }
 

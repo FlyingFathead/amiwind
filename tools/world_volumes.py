@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Prepare terrain partitions for one legacy-compatible RDB hardfile."""
+"""Prepare terrain partitions for legacy-compatible RDB hardfiles."""
 import hashlib
 import json
 import os
@@ -25,6 +25,59 @@ def balanced(paths, boot_bytes, limit=PAYLOAD_LIMIT):
     return paths[:keep],rest
 
 
+def partition_batches(paths, boot_bytes, limit=PAYLOAD_LIMIT):
+    """Preserve the two-partition layout when it fits; otherwise use more volumes."""
+    paths = sorted(paths)
+    if not paths or not 0 <= boot_bytes <= limit:
+        raise ValueError('Invalid or oversized boot payload')
+    if any(p.stat().st_size > limit for p in paths):
+        raise ValueError('Individual world map exceeds the partition budget')
+    try:
+        kept, additional = balanced(paths, boot_bytes, limit)
+        return kept, [additional]
+    except ValueError:
+        pass
+    kept, batches, current = [], [], []
+    used = boot_bytes
+    filling_boot = True
+    for path in paths:
+        size = path.stat().st_size
+        if filling_boot and used + size <= limit:
+            kept.append(path)
+            used += size
+            continue
+        if filling_boot:
+            filling_boot = False
+            used = 0
+        if current and used + size > limit:
+            batches.append(current)
+            current, used = [], 0
+        current.append(path)
+        used += size
+    if current:
+        batches.append(current)
+    if len(batches) > 8:
+        raise ValueError('World payload exceeds the eight-volume runtime limit')
+    return kept, batches
+
+
+def hardfile_groups(boot_bytes, worlds, limit=4 * 1024**3):
+    """Group complete partitions into safe RDB drives, retaining a boot-first layout."""
+    if boot_bytes + 32768 >= limit:
+        raise ValueError('Boot partition exceeds the legacy hardfile limit')
+    groups, current, used = [], [], boot_bytes + 32768
+    for world in worlds:
+        if world['bytes'] + 32768 >= limit:
+            raise ValueError('World partition exceeds the legacy hardfile limit')
+        if used + world['bytes'] >= limit:
+            groups.append(current)
+            current, used = [], 32768
+        current.append(world)
+        used += world['bytes']
+    groups.append(current)
+    return groups
+
+
 def digest(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
@@ -38,12 +91,11 @@ def pack(id1, out, version, xdftool, rdbtool=None):
     count=struct.unpack_from('<I',raw,4)[0]
     if not 1<=count<=8192 or len(raw)!=64+count*52:raise ValueError('Invalid region directory count')
     paths=[id1/'maps'/f'vf{i:04d}.bsp' for i in range(count)]
-    # Balance all content across exactly two partitions. Some terrain stays on
-    # the boot volume; the remainder is found through one additional volume.
+    # Preserve the original two-partition layout when it fits. Larger worlds
+    # use additional bounded partitions discovered through volumes.awv.
     terrain_bytes=sum(p.stat().st_size for p in paths)
     boot_bytes=sum(p.stat().st_size for p in id1.parent.rglob('*') if p.is_file())-terrain_bytes
-    _,additional=balanced(paths,boot_bytes)
-    batches=[additional]
+    _,batches=partition_batches(paths,boot_bytes)
     images=[]
     for index, batch in enumerate(batches):
         volume=f'AW_WORLD{index}';part=out/f'world{index}-partition.hdf'

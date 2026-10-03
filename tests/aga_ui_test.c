@@ -7,7 +7,9 @@ viddef_t vid;refdef_t r_refdef;keydest_t key_dest;double realtime;double host_fr
 client_static_t cls;server_t sv;server_static_t svs;int scr_copyeverything;
 byte pal[768],glyphs[16384],frame[64004];byte *host_basepal=pal,*draw_chars=glyphs;
 static char *directory;
-static cvar_t *loading_parameter,*region_parameter;
+static cvar_t *loading_parameter,*region_parameter,*delay_parameter;
+static double loading_clock;
+double Sys_FloatTime(void){return loading_clock;}
 static int queued_prison;
 void AW_StoryReset(int new_game){}
 void AW_CharacterReset(void){}
@@ -17,7 +19,7 @@ int AW_MusicStartTrack(int track){assert(track==4);return 1;}
 void Cbuf_AddText(char *text){assert(!strcmp(text,"map prison\n"));queued_prison=1;}
 int COM_FOpenFile(char *name,FILE **f){char p[1024];int n;sprintf(p,"%s/%s",directory,name);*f=fopen(p,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);rewind(*f);return n;}
 void Con_Printf(char *fmt,...){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;else if(!strcmp(c->name,"aw_region_loading_delay"))delay_parameter=c;}
 int AW_LoadingScreen(void){return 1;}
 int AW_MenuFrontEnd(void){return 0;}
 void Cvar_SetValue(char *s,float v){if(region_parameter && !strcmp(s,region_parameter->name))region_parameter->value=v;}
@@ -82,6 +84,35 @@ int main(int argc,char **argv){
   assert(!AW_LoadingFrozen());AW_EndLoadingStyle();
   vid.buffer=frame+2;vid.rowbytes=320;vid.height=200;
  }
+ /* Short automatic crossings leave every live framebuffer byte untouched.
+  * Reconnect cannot restart the clock; completion cancels a pending display. */
+ assert(delay_parameter && delay_parameter->archive && delay_parameter->value==2);
+ memset(vid.buffer,137,64000);loading_clock=10;
+ AW_SetNextLoadingStyle(AW_LOADING_FROZEN);AW_SetNextLoadingDelay();AW_BeginLoadingStyle();
+ assert(AW_LoadingDelayed());AW_UILoading();
+ for(i=0;i<64000;i++)assert(vid.buffer[i]==137);
+ loading_clock=11.999;assert(!AW_LoadingDelayExpired());AW_BeginLoadingStyle();
+ loading_clock=12;assert(AW_LoadingDelayExpired());assert(!AW_LoadingDelayExpired());
+ AW_UILoading();assert(vid.buffer[150*320+88]==137);AW_EndLoadingStyle();
+ AW_SetNextLoadingStyle(AW_LOADING_BLANK);AW_SetNextLoadingDelay();AW_BeginLoadingStyle();
+ assert(AW_LoadingDelayed());AW_EndLoadingStyle();loading_clock=100;
+ assert(!AW_LoadingDelayed() && !AW_LoadingDelayExpired());
+ AW_BeginLoadingStyle();assert(!AW_LoadingDelayed());AW_EndLoadingStyle();
+ delay_parameter->value=0;AW_SetNextLoadingDelay();AW_BeginLoadingStyle();
+ assert(!AW_LoadingDelayed());AW_EndLoadingStyle();
+ delay_parameter->value=-1;AW_SetNextLoadingDelay();AW_BeginLoadingStyle();
+ assert(!AW_LoadingDelayed());AW_EndLoadingStyle();
+ delay_parameter->value=1000;AW_SetNextLoadingDelay();AW_BeginLoadingStyle();
+ loading_clock=159.999;assert(!AW_LoadingDelayExpired());
+ loading_clock=160;assert(AW_LoadingDelayExpired());AW_EndLoadingStyle();delay_parameter->value=2;
+ /* Automatic black mode gains its indicator after the deadline while
+  * explicit/movie blank mode below retains a completely black palette. */
+ memset(vid.buffer,137,64000);loading_clock=200;
+ AW_SetNextLoadingStyle(AW_LOADING_BLANK);AW_SetNextLoadingDelay();AW_BeginLoadingStyle();
+ AW_UILoading();for(i=0;i<64000;i++)assert(vid.buffer[i]==137);
+ loading_clock=202;assert(AW_LoadingDelayExpired());AW_UILoading();
+ assert(AW_UIMenuPalette()==host_basepal && vid.buffer[150*320+88]==0);
+ for(i=0;i<64000 && !vid.buffer[i];i++){}assert(i<64000);AW_EndLoadingStyle();
  /* Blank is a complete black frame/palette, then normal art resumes. */
  assert(loading_parameter && !strcmp(loading_parameter->string,"normal"));
  AW_SetNextLoadingStyle(AW_LOADING_BLANK);AW_BeginLoadingStyle();AW_BeginLoadingStyle();AW_UILoading();

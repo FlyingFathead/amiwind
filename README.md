@@ -1,12 +1,88 @@
 <p align="center">
-  <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind â€” A Commodore Amiga demake of Morrowind">
+  <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind  -  A Commodore Amiga demake of Morrowind">
 </p>
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
-## Current state of the project
+## v0.0.27 — Rocks, Mushrooms, and Then Some
 
-**v0.0.26 full conversion and game-entry validation passed locally; hosted CI gates publication.**
+Vvardenfell is getting its rough edges back. **37,960 rocks and 816 giant
+mushrooms** now bring familiar silhouettes to the island's terrain: boulders
+along the coast, rocky hillsides, and those enormous mushroom canopies in the
+Ascadian Isles. Getting Morrowind onto an Amiga means making room for all of it.
+
+The mushroom caps are closed! All five giant-mushroom models retain their joined
+cap sections and original UVs, keeping the undersides, rims and textures together.
+The screenshots below show that work running in WinUAE.
+
+The **“and Then Some”** reaches beneath the scenery, too. This update brings
+bounded town-map work for Seyda Neen and Balmora, memory checks on the final map
+payloads, and preservation of held controls and player state during automatic
+cell changes. The map panel keeps its town markers, loading text waits two
+seconds by default, and an 18-track music catalogue is included. Image assembly
+generates both WinUAE and FS-UAE configurations, including multi-HDF layouts.
+
+Want to know what goes into putting a rock on an Amiga? Start with
+[What are rocks?](docs/WHAT_ARE_ROCKS.md), then explore the
+[v0.0.27 release notes](docs/RELEASE-v0.0.27.md).
+
+**Heavy development is still under way.** Expect surprising performance and
+stability dips as we bring more of the world together, measure its costs, and
+optimize. Memory estimates and build checks help us catch problems; they do not
+replace walking through the game. Please be patient—and keep the playtest
+reports coming. The In-Game map is still a terrain-overview prototype; the full
+video catalogue and condition-aware voiced dialogue remain on the roadmap.
+
+See the [memory notes](docs/MEMORY_ALLOCATION.md),
+[cell-changing checklist](docs/CELL_CHANGING.md),
+[bug journal](docs/BUG_JOURNAL.md) and [roadmap](docs/ROADMAP.md) for the details.
+Original-game assets, converted proprietary content and ROMs are not distributed
+with AmiWind; you provide your own legally obtained files.
+
+### v0.0.27 — Rocks, Mushrooms, and Then Some: playtest screenshots
+
+These Ascadian Isles screenshots were captured in WinUAE during the rc2
+playtest: closed caps, joined rims and textured undersides. They show the mushroom
+work that carries into v0.0.27; town-boundary testing is tracked separately.
+
+| Closed cap and rim | Giant mushrooms on the hillside |
+| --- | --- |
+| ![Closed giant-mushroom cap in rc2](docs/images/amiwind-v0.0.27-rc2-mushroom-cap.png) | ![Ascadian Isles giant mushrooms in rc2](docs/images/amiwind-v0.0.27-rc2-ascadian-mushrooms.png) |
+
+![Joined mushroom underside in rc2](docs/images/amiwind-v0.0.27-rc2-mushroom-underside.png)
+
+Rc3 adds a surrounding LAND apron at the Seyda Neen handoff and preserves
+held controls during automatic cell/sub-cell changes. The transition regression
+checks noclip, health, hands and torch state. See [cell changing](docs/CELL_CHANGING.md);
+Rc3 assembly, filesystem readback, both emulator mounts and independent HDF
+checksums passed. Owner boundary/input acceptance remains pending.
+
+Large outputs automatically split into simultaneously mounted HDFs, each below
+4 GiB with filesystem partitions below 2 GiB. Every assembled image emits both
+WinUAE and FS-UAE configurations listing all disks, plus their paths in the final
+[build output](docs/BUILD_OUTPUT.md). Rc3 uses two HDFs; this is not disk swapping.
+`dbg map tp` and `dbg tp map` both open the world-map teleport picker.
+
+### Assemble first, measure, then optimize
+
+The current goal is to bring the authored landscape and required gameplay state
+together so we can test a complete, representative workload. The present disk
+footprint and conversion cost are a working baseline, not the intended final
+optimized design. Town subdivisions remain necessary for frame cost.
+
+Further work will measure duplicated geometry/textures in cell overlap, then
+investigate shared model/texture storage, deduplication of identical edge data,
+conversion-cache reuse and safer mesh reduction. Mirroring is an option only
+where it preserves authored geometry, placement, UVs and collision. Optimization
+must retain closed mushroom seams and continuous terrain handoffs. Track actual
+payload bytes separately from HDF capacity/free-space headroom, and compare
+resident memory, loading time and FPS. See the [optimization roadmap](docs/ROADMAP.md#assemble-first-then-optimize-the-measured-world).
+
+**Latest published release: [v0.0.26](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.26).**
+The following v0.0.26 results describe that released baseline, not a new rc3
+Docker or Linux validation run.
+
+**v0.0.26 full conversion, game entry and hosted CI passed; publication completed.**
 The final Docker helper/export run completed the full recipe on Windows 11 with
 Docker Desktop's WSL 2 Linux engine. All 3,551 NPC models and 2,526 terrain regions
 passed, including the strict packaged actor-ground gate with zero unresolved
@@ -54,7 +130,9 @@ The base-game island now has a playable terrain pass following the recovered
 polygon survey: **2,526 terrain regions**, with local coordinates rebased at
 boundaries. **Detailed Seyda Neen and Balmora remain intact**, including their
 existing interiors and characters. Outside those towns this pass contains
-terrain and water; other settlements, scenery and actors remain future work.
+terrain and water in the v0.0.26 baseline. The v0.0.27 candidate adds the rock
+and giant-mushroom families described above; other settlement scenery and
+actors remain future work.
 Bloodmoon and Tribunal expansion content are excluded.
 
 **J** opens the progression journal; **M** opens the island map. Older saved
@@ -121,7 +199,7 @@ See [map and journal](docs/WORLD_MAP_AND_JOURNAL.md),
 [project state](docs/PROJECT_STATE.md), [font options](docs/PAPER_FONT_OPTIONS.md)
 and [conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md).
 
-*For years, they thought the Nerevarine would never appear on the Commodore Amigaâ€¦*
+*For years, they thought the Nerevarine would never appear on the Commodore Amiga...*
 
 *Well, those n'wahs were wrong! The prophecy said nothing about the frame rate.*
 
@@ -183,7 +261,7 @@ The setup model is similar to OpenMW: point the tools at your installed game
 folder. Conversion runs locally and writes to a separate workspace. This
 independent project is not an OpenMW release or an official Bethesda product.
 
-> **Public source package â€” no commercial game data or ROMs.** No Quake or
+> **Public source package  -  no commercial game data or ROMs.** No Quake or
 > Morrowind game data, reusable game artwork, music, voices, game
 > executables, Amiga Kickstart ROMs or Workbench files are included. This source
 > package includes the selected development screenshots and a short clip for documentation, but
@@ -309,3 +387,5 @@ profiling and verified reuse across builds. These improvements are planned.
 Thanks to the Morrowind creators, the Amiga community, and the contributors whose
 work made this experiment possible. The earlier A500 track, previous methods,
 fonts and hand-rendering alternatives remain available in the source and history.
+
+Development changes must follow the [project rules](docs/PROJECT_RULES.md), including required Linux and Windows compatibility.

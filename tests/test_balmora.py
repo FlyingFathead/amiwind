@@ -38,7 +38,13 @@ class BalmoraTests(unittest.TestCase):
                     target = owner(p, entries, i, s['hysteresis'])
                     if target is None: continue
                     self.assertNotEqual(target, i)
-                    self.assertEqual(owner(centre, entries, target, s['hysteresis']), i)
+                    # A short measured core can fit within its neighbour's
+                    # hysteresis. Returning into that band intentionally retains
+                    # the current map; core ownership itself remains unique.
+                    self.assertEqual(owner(centre, entries), i)
+                    a,b=entries[target]['core']
+                    sticky=all(a[k]-s['hysteresis'] <= centre[k] <= b[k]+s['hysteresis'] for k in range(2))
+                    self.assertEqual(owner(centre, entries, target, s['hysteresis']), target if sticky else i)
 
     def test_long_object_is_included_when_origin_is_outside_region(self):
         s = config(); entries = regions(s); s['centre']=[0,0]; s['scale']=1

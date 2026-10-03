@@ -19,6 +19,27 @@ HEADER = struct.Struct(">4sHHHHII12x")
 PIXELS = WIDTH * HEIGHT
 MAX_FRAMES = 18000
 
+# Stable debug playback IDs. New source files do not renumber existing entries.
+VIDEO_CATALOG = (
+    (1, "bethesda_logo", "bethesda logo.bik"),
+    (2, "bm_bearhunt1", "bm_bearhunt1.bik"),
+    (3, "bm_bearhunt2", "bm_bearhunt2.bik"),
+    (4, "bm_ceremony1", "bm_ceremony1.bik"),
+    (5, "bm_ceremony2", "bm_ceremony2.bik"),
+    (6, "bm_endgame", "bm_endgame.bik"),
+    (7, "bm_frostgiant1", "bm_frostgiant1.bik"),
+    (8, "bm_frostgiant2", "bm_frostgiant2.bik"),
+    (9, "bm_wereend", "bm_wereend.bik"),
+    (10, "bm_werewolf1", "bm_werewolf1.bik"),
+    (11, "bm_werewolf2", "bm_werewolf2.bik"),
+    (12, "mw_cavern", "mw_cavern.bik"),
+    (13, "mw_credits", "mw_credits.bik"),
+    (14, "mw_end", "mw_end.bik"),
+    (15, "mw_intro", "mw_intro.bik"),
+    (16, "mw_logo", "mw_logo.bik"),
+    (17, "mw_menu", "mw_menu.bik"),
+)
+
 
 def digest(path):
     h = hashlib.sha256()
@@ -52,13 +73,16 @@ def validate(path):
             "width": w, "height": h}
 
 
-def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=None, font=None):
+def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=None, font=None,
+                  output_name="mw_intro.awv"):
     source = Path(source).resolve()
     if not source.is_file():
         raise ValueError("Supply the owned Data Files/Video/mw_intro.bik file")
     output = ensure_external(output, "movie conversion")
     output.mkdir(parents=True, exist_ok=False)
-    target = output / "mw_intro.awv"
+    if not isinstance(output_name, str) or not output_name.endswith(".awv") or Path(output_name).name != output_name:
+        raise ValueError("Video output name must be a simple .awv filename")
+    target = output / output_name
     width, height = size
     if size not in ((160, 100), (320, 200)):
         raise ValueError("Choose 320x200 or the retained 160x100 conversion")
@@ -133,6 +157,110 @@ def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=Non
         result.update(title_cards=cards, title_cards_sha256=digest(captions), font_sha256=digest(font))
     (output / "video-conversion.json").write_text(json.dumps(result, indent=2) + "\n")
     return result
+
+
+def _video_sources(data_files):
+    roots = [p for p in Path(data_files).rglob("*") if p.is_dir() and p.name.casefold() == "video"]
+    result = {}
+    for root in roots:
+        for source in root.iterdir():
+            if source.is_file() and source.suffix.casefold() == ".bik":
+                key = source.name.casefold()
+                if key in result:
+                    raise ValueError("Duplicate loose video filename: " + source.name)
+                result[key] = source
+    return result
+
+
+def prepare_video_catalog(data_files, intro_dir, ffmpeg="ffmpeg"):
+    """Convert the fixed loose-video catalogue; missing or failed optional clips are recorded and skipped."""
+    from shutil import copyfile
+
+    intro_dir = ensure_external(intro_dir, "video catalogue")
+    sources = _video_sources(data_files)
+    movie = intro_dir / "mw_intro.awv"
+    video_dir = intro_dir / "video"
+    rows = []
+    manifest = ["AWVC1"]
+    for number, name, source_name in VIDEO_CATALOG:
+        source = sources.get(source_name.casefold())
+        if number == 15:
+            if movie.is_file():
+                info = validate(movie)
+                row = {"id": number, "name": name, "source": source_name,
+                       "status": "reused_intro", "path": "intro/mw_intro.awv",
+                       "bytes": movie.stat().st_size, "frames": info["frames"]}
+                rows.append(row)
+                manifest.append(f"{number} {name} intro/mw_intro.awv")
+            else:
+                rows.append({"id": number, "name": name, "source": source_name, "status": "missing"})
+            continue
+        if source is None:
+            rows.append({"id": number, "name": name, "source": source_name, "status": "missing"})
+            continue
+        destination = video_dir / f"{number:02}.awv"
+        try:
+            with tempfile.TemporaryDirectory(prefix="amiwind-video-catalogue-", dir=intro_dir) as temporary:
+                converted_dir = Path(temporary) / "converted"
+                info = prepare_video(source, converted_dir, ffmpeg, (160, 100),
+                                     output_name=f"{number:02}.awv")
+                video_dir.mkdir(parents=True, exist_ok=True)
+                copyfile(converted_dir / f"{number:02}.awv", destination)
+            row = {"id": number, "name": name, "source": source.name, "status": "converted",
+                   "path": f"intro/video/{number:02}.awv", "bytes": destination.stat().st_size,
+                   "frames": info["frames"], "sha256": info["sha256"],
+                   "source_sha256": info["source_sha256"]}
+            rows.append(row)
+            manifest.append(f"{number} {name} intro/video/{number:02}.awv")
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            if destination.exists():
+                destination.unlink()
+            rows.append({"id": number, "name": name, "source": source.name,
+                         "status": "skipped_conversion_error", "error": str(error)[:240]})
+            print(f"[warning] Optional video skipped: {name} ({error})", flush=True)
+    catalogue_path = intro_dir / "videos.awl"
+    catalogue_path.write_text("\n".join(manifest) + "\n", encoding="ascii", newline="\n")
+    return {"format": "AWVC1", "status": "complete_with_skips" if any(
+                row["status"].startswith("skipped") for row in rows) else "complete",
+            "resolution": [160, 100], "fps": FPS, "rate": RATE,
+            "catalogue": "intro/videos.awl", "entries": rows,
+            "converted_count": sum(row["status"] in ("converted", "reused_intro") for row in rows),
+            "missing_count": sum(row["status"] == "missing" for row in rows),
+            "skipped_count": sum(row["status"].startswith("skipped") for row in rows),
+            "bytes": sum(row.get("bytes", 0) for row in rows)}
+
+
+def validate_video_catalog(id1):
+    """Validate catalogue syntax, stable IDs/paths and every staged AWV payload."""
+    id1 = Path(id1)
+    path = id1 / "intro/videos.awl"
+    lines = path.read_text(encoding="ascii").splitlines()
+    if not lines or lines[0] != "AWVC1":
+        raise ValueError("Invalid video catalogue header")
+    allowed = {number: name for number, name, _ in VIDEO_CATALOG}
+    seen = set()
+    previous = 0
+    entries = []
+    for line in lines[1:]:
+        parts = line.split(" ")
+        if len(parts) != 3:
+            raise ValueError("Malformed video catalogue row")
+        try:
+            number = int(parts[0])
+        except ValueError as error:
+            raise ValueError("Malformed video catalogue ID") from error
+        name, relative = parts[1:]
+        expected = "intro/mw_intro.awv" if number == 15 else f"intro/video/{number:02}.awv"
+        if (number not in allowed or name != allowed[number] or relative != expected
+                or number <= previous or number in seen):
+            raise ValueError("Invalid video catalogue entry")
+        info = validate(id1 / relative)
+        seen.add(number)
+        previous = number
+        entries.append({"id": number, "name": name, "path": relative, **info,
+                        "bytes": (id1 / relative).stat().st_size})
+    return {"format": "AWVC1", "entries": entries,
+            "count": len(entries), "bytes": sum(entry["bytes"] for entry in entries)}
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -98,6 +98,10 @@ void *Hunk_AllocName (int size, char *name);
 
 void *Hunk_HighAllocName (int size, char *name);
 
+void AW_HeapAuditBegin(void);
+void AW_HeapAuditReport(const char *scene);
+void AW_HeapAuditPhase(const char *scene,const char *phase);
+
 int	Hunk_LowMark (void);
 void Hunk_FreeToLowMark (int mark);
 
@@ -126,6 +130,3 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name);
 // wasn't enough room.
 
 void Cache_Report (void);
-
-
-

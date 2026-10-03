@@ -65,7 +65,7 @@ def _prepare_model(task):
                   for prefix in prefixes}
          if any(not values for values in matched.values()):raise ValueError('Missing preserved structural shape in '+name)
          keep={i for values in matched.values() for i in values}
-         visual_v,visual_f,lod=reduce_mesh(v,f,profile['ratio'],keep)
+         visual_v,visual_f,lod=reduce_mesh(v,f,profile['ratio'],keep,profile.get('preserve_shared_seams',False))
         if profile.get('flatten'):
          from surface_flatten import bake_panel
          texture_records=extras[0]
@@ -385,7 +385,7 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
     for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'],'seyda.bsp'),(light,['-minlight','100'],'seyda.bsp')]:
         subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable!=qbsp else []),*options,target],cwd=out,check=True)
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
-    rebuild_world_hull(base,out/'seyda.map',qbsp)
+    rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True)
     result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs)
     shutil.copyfile(out/'seyda.bsp',out/'id1/maps/seyda.bsp')
     result['format']='AmiWind compiled mesh BSP29'

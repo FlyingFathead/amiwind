@@ -94,7 +94,13 @@ def build(args):
         'payload': {p.relative_to(boot).as_posix(): digest(p) for p in payload},
         'validation': 'Amiga Hunk headers, filesystem metadata and every payload readback; emulator boot is a separate check'
     }, indent=2) + '\n', newline='\n')
-    print(image)
+    from emulator_configs import write_configs, print_outputs
+    configs = write_configs(image, getattr(args, 'kickstart_file', None))
+    receipt = out / 'dry-run-build.json'
+    record = json.loads(receipt.read_text(encoding='utf-8'))
+    record['emulator_configs'] = configs
+    receipt.write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8',newline='\n')
+    print_outputs(image)
     return image
 
 
@@ -103,6 +109,7 @@ def main():
     for name in ('sdk', 'engine', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--vasm', type=Path)
+    p.add_argument('--kickstart-file', type=Path)
     try:
         build(p.parse_args())
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:

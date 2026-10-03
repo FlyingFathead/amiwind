@@ -61,7 +61,15 @@ def graft_hull(target, collision):
     a[0]=a[0].replace(b'"classname" "worldspawn"',b'"classname" "worldspawn"\n"aw_hull" "'+PROFILE.encode()+b'"',1)
     return pack_lumps(a)
 
-def rebuild_world_hull(base, map_path, qbsp):
+def rebuild_world_hull(base, map_path, qbsp, discard_stock_hulls=False):
     collision=map_path.parent/'standing-collision.map';collision.write_text(scaled_map(map_path.read_text()))
     subprocess.run([str(Path(qbsp).resolve()),'-nopercent',collision.name],cwd=collision.parent,check=True)
-    base.write_bytes(graft_hull(base.read_bytes(),collision.with_suffix('.bsp').read_bytes()))
+    raw=base.read_bytes()
+    if discard_stock_hulls:
+        # Towns use the source-sized standing player, like streamed world maps.
+        # Remove superseded/default Quake actor hulls before grafting that hull.
+        from compact_bsp import compact
+        data=lumps(raw)
+        for offset in (40,44,48):struct.pack_into('<i',data[14],offset,-1)
+        raw,_=compact(pack_lumps(data))
+    base.write_bytes(graft_hull(raw,collision.with_suffix('.bsp').read_bytes()))

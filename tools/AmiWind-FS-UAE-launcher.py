@@ -146,6 +146,8 @@ def natural_key(name):
 def select_image(root, requested=None, ask=False):
     if requested:
         path = local_path(requested, root)
+        if re.search(r'-world-[0-9]+\.hdf$', path.name, re.IGNORECASE):
+            raise ValueError('Select the boot HDF, not an additional world disk.')
         # An explicit working copy may use the optional -play suffix.
         match = IMAGE_NAME.fullmatch(re.sub(r'-play\.hdf$', '.hdf', path.name, flags=re.IGNORECASE))
         if not match:
@@ -156,6 +158,7 @@ def select_image(root, requested=None, ask=False):
         for path in root.iterdir():
             match = IMAGE_NAME.fullmatch(path.name)
             excluded = path.name.lower().endswith(('-play.hdf', '-backup.hdf', '-dry-run.hdf'))
+            excluded = excluded or bool(re.search(r'-world-[0-9]+\.hdf$', path.name, re.IGNORECASE))
             if match and path.is_file() and not excluded:
                 choices.append((version_key(match.group(1)), path, match.group(1)))
         if not choices:
@@ -233,6 +236,41 @@ def select_rom(root, requested=None):
     return rom
 
 
+def image_disks(image):
+    """Read a verified image layout; never silently drop required world drives."""
+    image = Path(image).resolve()
+    receipt = image.parent / 'build.json'
+    if not receipt.is_file():
+        if list(image.parent.glob(image.stem + '-world-*.hdf')):
+            raise ValueError('Multi-HDF images require their build.json layout receipt.')
+        return [image]
+    record = json.loads(receipt.read_text(encoding='utf-8'))
+    if record.get('hdf_file') != image.name:
+        raise ValueError('Selected HDF does not match build.json.')
+    entries = record.get('hdf_files')
+    if entries is None:
+        return [image]  # Legacy single-HDF receipt.
+    if not isinstance(entries, list) or not 1 <= len(entries) <= 9:
+        raise ValueError('Invalid HDF layout in build.json.')
+    disks, names = [], set()
+    for i, entry in enumerate(entries):
+        name = entry.get('file', '')
+        if not name or any(c in name for c in '/\\:\r\n\0') or not name.endswith('.hdf') or name.casefold() in names:
+            raise ValueError('Unsafe or duplicate HDF filename in build.json.')
+        disk = image.parent / name
+        if disk.is_symlink() or not disk.is_file():
+            raise ValueError('Required HDF missing or symlinked: ' + name)
+        if entry.get('readback') != 'passed' or disk.stat().st_size != entry.get('bytes'):
+            raise ValueError('Required HDF does not match its verified layout: ' + name)
+        if bool(entry.get('bootable')) != (i == 0):
+            raise ValueError('HDF layout must have one boot drive first.')
+        disks.append(disk)
+        names.add(name.casefold())
+    if disks[0] != image:
+        raise ValueError('Primary HDF must be first in build.json.')
+    return disks
+
+
 def configured_text(text, image, rom):
     parser = configparser.ConfigParser(interpolation=None, delimiters=('=',), strict=True)
     try:
@@ -245,6 +283,10 @@ def configured_text(text, image, rom):
     values = dict(PROFILE_VALUES)
     values.update({'kickstart_file': str(rom), 'hard_drive_0': str(image),
                    'hard_drive_0_type': 'hdf'})
+    disks = image_disks(image)
+    managed_layout = (Path(image).parent / 'build.json').is_file()
+    for i, disk in enumerate(disks):
+        values.update({f'hard_drive_{i}': str(disk), f'hard_drive_{i}_type': 'hdf'})
     # Preserve unrelated custom settings/comments. Core AmiWind machine-profile
     # values, paths and HDF type are managed so repeat playtests cannot silently
     # fall back to a slow or incompatible emulator profile.
@@ -268,6 +310,8 @@ def configured_text(text, image, rom):
         match = re.match(r'^\s*([^#;\s][^=]*?)\s*=\s*(.*?)\s*$', line.rstrip('\r\n')) if inside else None
         if match:
             key = match.group(1).lower()
+            if managed_layout and re.fullmatch(r'hard_drive_[0-9]+(?:_.*)?', key) and key not in values:
+                continue  # Remove stale drives/settings from the previous verified layout.
             if key == 'uae_address_space_24':
                 if '\n' in parser[sections[0]].get(key, ''):
                     raise ValueError('Managed configuration entries must use a single line: ' + key)

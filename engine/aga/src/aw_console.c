@@ -9,6 +9,7 @@ extern int scr_copyeverything;
 extern byte *draw_chars;
 typedef struct {char *words,*command,*arguments;} route_t;
 static route_t routes[]={
+    {"ost play","aw_music_play","00..98 / original music filename stem (spaces as underscores)"},
     {"gallery","aw_charplane","[number/name/ID; next/previous/body/browse/help/exit]"},
     {"aw charplane","aw_charplane","[number/name/ID; next/previous/body/exit]"},
     {"modelgallery","aw_charplane","[number/name/ID]"},
@@ -35,11 +36,13 @@ static route_t routes[]={
     {"render order","aw_surface_order","1 legacy / 2 mesh intersections (default)"},
     {"aw hors","aw_debug_hors","0 (new Hors, Nord / Barbarian / Steed, after Census)"},
     {"hud","amiwind_show_debug","on/off true/false 1/0 (overlay alias)"},
+    {"heap","aw_heap_audit","(current hunk clearance and load peak)"},
     {"showram","amiwind_debug_showram","on/off"},
     {"sealevel","amiwind_debug_sealevel","on/off"},
     {"scene change","aw_scene_menu","(scene picker)"},
     {"scene","aw_scene","ship/town/balmora/<map name>"},
     {"tp map","aw_teleport_map","select a destination on the world map"},
+    {"map tp","aw_teleport_map","select a destination on the world map (alias)"},
     {"tp menu","aw_scene_menu","(teleport picker)"},
     {"tp","aw_teleport","[balmora/seydaneen/prisonship/<map name>; no argument opens menu]"},
     {"eyeheight","aw_eyeheight","[offset above player origin]"},
@@ -162,8 +165,10 @@ void AW_ConsoleBackground(int lines) {
         memset(vid.conbuffer+y*vid.conrowbytes,ink,vid.conwidth);
     scr_copyeverything=1;
 }
+static void heap_audit(void){AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);}
 void AW_ConsoleInit(void) {
     Cvar_RegisterVariable(&colour);
+    Cmd_AddCommand("aw_heap_audit",heap_audit);
     Cmd_AddCommand("debug",dispatch);Cmd_AddCommand("dbg",dispatch);
     Cmd_AddCommand("amiwind",dispatch);
     Cmd_AddCommand("aw_console_color",set_colour);

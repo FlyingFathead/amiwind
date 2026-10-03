@@ -3,7 +3,9 @@
 #include <assert.h>
 #include "aw_story.h"
 #include "aw_character.h"
+#include "aw_region.h"
 aw_character_t aw_character;
+void AW_HeapAuditReport(const char *scene){}
 qboolean noclip_anglehack;
 static float door_duration;static int audio_open,audio_close;
 float AW_DoorSound(unsigned ref,int close){if(close)audio_close++;else audio_open++;return door_duration;}
@@ -35,7 +37,7 @@ void AW_UITextBox(int a,int b,int c,int d,const char *s,int e){strcat(drawn,s);s
 int AW_IntroPromptActive(void){return prompt;}
 int AW_UIVoiceAimOnly(void){return voice_aim;}
 int AW_CharacterActive(void){return 0;}
-void AW_GallerySpawn(edict_t *p){}
+void AW_GallerySpawn(edict_t *p){AW_RegionWorldModel(sv.name,0);}
 void AW_StreamTick(const char *path){}
 float AW_StreamLookahead(void){return 1.5f;}
 int AW_CellChangeMethod(void){return 1;}
@@ -46,6 +48,8 @@ float AW_CharacterEyeHeight(void){return 0;}
 int AW_ReaderActive(void){return 0;}
 int AW_RegionLoadingFrozen(void){return 1;}
 void AW_SetNextLoadingStyle(aw_loading_style_t style){}
+static int requested_loading_delays;
+void AW_SetNextLoadingDelay(void){requested_loading_delays++;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void Cvar_SetValue(char *s,float v){if(names_option && !strcmp(s,names_option->name))names_option->value=v;}
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
@@ -62,6 +66,7 @@ char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 int COM_FOpenFile(char *name,FILE **f){
  const char *s="AWD3\nprison seyda 1 -5 35 25 5 45 35 0 0 77 90\tSeyda Neen\nprison evil;quit 2 -5 35 25 5 45 35 0 0 77 90\tInvalid\nprison seyda 3 nan 35 25 5 45 35 0 0 77 90\tInvalid\nseyda - 4 -5 35 25 5 45 35 0 0 0 90\tCensus and Excise Office\nseyda census 474482 -5 235 25 5 245 35 0 0 77 90\tOther doorway\nseyda census 113893 -5 235 25 5 245 35 12 34 77 90\tRegistration entrance\n";
+ if(!strcmp(name,"seyda-regions.txt"))s="AWBR1 2 96 540 0 0 77 90 0 0 77 90\nsn000 -1024 -1024 1024 1024 -2048 -2048 2048 2048\nsn001 1024 -1024 2048 1024 128 -2048 2944 2048\n";
  if(!strcmp(name,"doors-balmora.txt") || !strcmp(name,"scene-doors-balmora.txt"))s="AWD3\nbalmora bmcaius 42 -5 35 25 5 45 35 22 44 77 90\tCaius Cosades House\n";
  if(!strcmp(name,"maps/prison.bsp") && !ship_available){*f=NULL;return -1;}
 #ifdef BALMORA_AVAILABLE
@@ -70,6 +75,7 @@ int COM_FOpenFile(char *name,FILE **f){
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
 }
 void Con_Printf(char *fmt,...){}
+void Sys_Error(char *fmt,...){abort();}
 void Cbuf_AddText(char *s){strcpy(queued,s);}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
 void IN_AWClearButtons(void){clear_buttons++;}
@@ -212,6 +218,27 @@ int main(void){
  command_args[1]="BaLmOrA";teleport();assert(!strcmp(queued,"map balmora\n"));
  strcpy(sv.name,"balmora");AW_SceneSpawn(&p);
 #endif
+ assert(requested_loading_delays==0); /* Explicit travel stays immediate. */
+ /* An automatic sub-cell transition preserves held input and player goals.
+  * Ordinary doors/teleports above must still clear input deliberately. */
+ strcpy(sv.name,"seyda");p.v.movetype=MOVETYPE_NOCLIP;p.v.health=73;
+ goal._float=1;torch._float=1;key_dest=key_game;cls.signon=SIGNONS;
+ aw_character.current[1]=33;aw_character.current[2]=44;aw_character.level=7;
+ aw_story.stage=AW_STAGE_RELEASED;p.v.origin[0]=0;p.v.origin[1]=300;
+ assert(AW_RegionSelect("seyda",p.v.origin,0));AW_RegionWorldModel("seyda",0);
+ p.v.origin[0]=1200;p.v.velocity[0]=42;p.v.v_angle[0]=12;p.v.v_angle[1]=34;
+ queued[0]=0;
+ {int before=clear_buttons;AW_SceneTick();
+  assert(!strcmp(queued,"map seyda\n") && clear_buttons==before);
+  assert(requested_loading_delays==1);
+  p.v.health=100;goal._float=0;torch._float=0;p.v.movetype=MOVETYPE_WALK;
+  AW_SceneSpawn(&p);
+  assert(p.v.health==73 && goal._float==1 && torch._float==1);
+  assert(aw_character.current[1]==33 && aw_character.current[2]==44 && aw_character.level==7);
+  assert(AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
+  assert(p.v.movetype==MOVETYPE_NOCLIP && p.v.velocity[0]==42);
+  assert(p.v.origin[0]==1200 && p.v.angles[0]==12 && p.v.angles[1]==34);
+ }
  return 0;
 }
 

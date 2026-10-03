@@ -1086,7 +1086,10 @@ void SV_SpawnServer (char *server)
 //
 // set up the new server
 //
+    AW_HeapAuditPhase(sv.worldmodel?sv.worldmodel->name:sv.name,"outgoing");
     Host_ClearMemory ();
+    AW_HeapAuditBegin();
+    AW_HeapAuditPhase(server,"after-unload");
 
     memset (&sv, 0, sizeof(sv));
 
@@ -1135,6 +1138,7 @@ void SV_SpawnServer (char *server)
         const char *variant=AW_SceneWorldModel(server);
         if(variant)strcpy(sv.modelname,variant);
     }
+    AW_HeapAuditPhase(sv.modelname,"before-bsp");
     AW_StreamLoadBegin(sv.modelname);aw_world_start=Sys_FloatTime();
     sv.worldmodel = Mod_ForName (sv.modelname, false);
     aw_world_time=Sys_FloatTime()-aw_world_start;
@@ -1146,6 +1150,7 @@ void SV_SpawnServer (char *server)
         return;
     }
     sv.models[1] = sv.worldmodel;
+    AW_HeapAuditPhase(sv.modelname,"after-bsp");
 
 //
 // clear world interaction links
@@ -1191,6 +1196,7 @@ void SV_SpawnServer (char *server)
     ED_LoadFromFile (sv.worldmodel->entities);
     AW_GalleryEntities();
     aw_actors_time=Sys_FloatTime()-aw_actors_start;
+    AW_HeapAuditPhase(sv.modelname,"after-actors");
 
     sv.active = true;
 

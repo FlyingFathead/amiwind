@@ -1337,6 +1337,7 @@ void Host_Spawn_f (void)
 		PR_ExecuteProgram (pr_global_struct->PutClientInServer);
         AW_SceneSpawn(sv_player);
 	}
+    AW_HeapAuditPhase(sv.worldmodel?sv.worldmodel->name:sv.name,"after-restore");
 
 
 // send all current names, colors, and frag counts

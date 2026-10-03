@@ -109,3 +109,20 @@ were linked. The cut-off town tree was a signed sprite-depth comparison against
 the background. Neither required changing the accepted rock mesh or terrain.
 See [dev3 feedback trials](FEEDBACK-v0.0.23-dev3.md) for the discarded culling
 experiment and the final fixes. Preserve structural rocks when optimizing LAND.
+
+## v0.0.27-rc2: Rocks and Mushrooms
+
+The world overlay uses the existing topomap and authored exterior placements:
+37,960 rocks and 816 giant mushrooms, covered across 2,526 retained regions.
+Town sub-cell maps remain deliberate frame-cost controls. Small collectible
+mushrooms are excluded. See [candidate scope](RELEASE-v0.0.27-rc2.md).
+
+The giant-mushroom playtest exposed another structural reduction problem.
+Original cap sections use different materials but share joining positions.
+Simplifying those sections independently moved or removed rim vertices, opening
+visible gaps. All five giant-mushroom models were checked. Rc2 preserves joined
+sections and their original UVs; rock reduction is unchanged. This conservative
+exception increases mushroom triangles while retaining the source silhouette.
+Final BSP budgets passed; corrected-image visual and frame-cost acceptance is
+still required. Boundary-constrained reduction is a future optimization, not a
+reason to ship open caps. See GEO-01 in the [bug journal](BUG_JOURNAL.md).

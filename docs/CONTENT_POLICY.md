@@ -7,7 +7,7 @@ support the original work by purchasing it from
 [Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
 
 The source repository and its checked source archive contain project code,
-configuration, documentation, five selected development screenshots and synthetic
+configuration, documentation, explicitly selected development screenshots and synthetic
 test generators. The screenshots illustrate development and are not reusable
 runtime assets. The archive does not contain
 id Software or Bethesda game files, extracted assets, converted game assets,
@@ -37,8 +37,9 @@ does not claim OpenMW compatibility and does not bundle OpenMW or Hunter code.
 External workspaces remain supported. The guided builder now defaults to ignored
 `amiwind/out/`; this directory is excluded from all source packages. Converted
 sprites, terrain, textures and audio remain private build outputs. The owner
-selected five specific screenshots for README documentation; only those named
-PNG files are approved in the source packager. Their contents are not covered
+selected specific screenshots for README documentation, including three rc2
+Rocks and Mushrooms views; only filenames in tools/release-files.json are
+approved in the source packager. Their contents are not covered
 by the project code licence.
 
 Path checks reject private inputs/outputs beneath distributable source paths,
@@ -58,7 +59,7 @@ licence/notices and meet corresponding-source obligations when distributed.
 Audit dependencies and individual file notices before that integration ships.
 The engine licence does not grant redistribution rights to Bethesda's assets.
 
-Apart from the five selected README screenshots, public packaging excludes
+Apart from the explicitly selected documentation screenshots, public packaging excludes
 derived screenshots, sprites, terrain packets,
 PCM/MP3 audio, game databases/archives, game executables and Kickstart bytes as
 well as the originals. Private build archives are never public release inputs.

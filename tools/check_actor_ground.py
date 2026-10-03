@@ -193,10 +193,10 @@ def require(maps, output, allow_known=None, before_world=False):
         approved, approved_hash = load_approved_report(allow_known)
     report = audit(maps)
     raw = json.dumps(report, indent=2) + '\n'
-    Path(output).write_text(raw)
+    Path(output).write_bytes(raw.encode('utf-8'))
     acceptance = {'status': 'passed', 'unresolved': len(report['errors']),
                   'production_gate_passed': report['status'] == 'passed',
-                  'report_sha256': hashlib.sha256(raw.encode()).hexdigest(),
+                  'report_sha256': hashlib.sha256(raw.encode('utf-8')).hexdigest(),
                   'comparison_scope': 'before-world; vf payload not yet present' if before_world else 'complete packaged BSP/actor payload'}
     if report['status'] != 'passed':
         if approved is None:

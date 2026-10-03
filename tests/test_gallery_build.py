@@ -42,6 +42,30 @@ class GalleryBuildTests(unittest.TestCase):
             self.assertEqual((id1/'maps/charplane.bsp').read_bytes(),b'synthetic-map')
             self.assertTrue((id1/'gallery'/('f'+key[1:]+'.mdl')).is_file())
 
+    def test_legacy_crlf_allowances_preserve_verified_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);gallery,receipt,key=self.fixture(root);id1=root/'id1'
+            budgets=gallery/'model-budgets.txt'
+            budgets.write_bytes(b'AWPB1\r\n')
+            receipt['files']['model-budgets.txt']={'bytes':budgets.stat().st_size,'sha256':sha(budgets)}
+            (gallery/'gallery-build.json').write_text(json.dumps(receipt))
+            (id1/'gfx').mkdir(parents=True);(id1/'maps').mkdir()
+            (id1/'gfx/palette.lmp').write_bytes(bytes(768))
+            self.assertEqual(stage_required(gallery,id1)['status'],'passed')
+            self.assertEqual((id1/'model-budgets.txt').read_bytes(),b'AWPB1\r\n')
+
+    def test_authenticated_but_inconsistent_allowances_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);gallery,receipt,key=self.fixture(root);id1=root/'id1'
+            budgets=gallery/'model-budgets.txt'
+            budgets.write_bytes(b'AWPB1\ninvalid allowance\n')
+            receipt['files']['model-budgets.txt']={'bytes':budgets.stat().st_size,'sha256':sha(budgets)}
+            (gallery/'gallery-build.json').write_text(json.dumps(receipt))
+            (id1/'gfx').mkdir(parents=True);(id1/'maps').mkdir()
+            (id1/'gfx/palette.lmp').write_bytes(bytes(768))
+            with self.assertRaisesRegex(ValueError,'regenerated model allowances differ'):
+                stage_required(gallery,id1)
+
     def test_missing_model_and_incomplete_receipt_cannot_pass(self):
         with tempfile.TemporaryDirectory() as temp:
             gallery,receipt,key=self.fixture(Path(temp))

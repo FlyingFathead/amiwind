@@ -22,16 +22,26 @@ def light_ranges(data):
     selected=surfedges[indices]
     points=vertices[edges[np.abs(selected),(selected<0).astype(int)]]
     vectors=np.repeat(texinfo[[f[4] for f in faces]].astype(np.float64),counts,axis=0)
-    # CalcSurfaceExtents stores the projected value in a float before rounding.
-    uv=((points[:,None,:]*vectors[:,:,:3]).sum(2)+vectors[:,:,3]).astype(np.float32)
-    low=np.floor(np.minimum.reduceat(uv,starts,axis=0)/16)
-    high=np.ceil(np.maximum.reduceat(uv,starts,axis=0)/16)
-    dims=np.maximum(1,high-low).astype(int)+1
+    # Float rounding at a 16-unit boundary can change the referenced sample
+    # count. Preserve the longer ORIGINAL byte prefix under both plausible C
+    # evaluation policies: wide intermediates with a final float store, and
+    # binary32 after every product/add. This changes no UV or runtime extent.
+    wide=((points[:,None,:]*vectors[:,:,:3]).sum(2)+vectors[:,:,3]).astype(np.float32)
+    products=points.astype(np.float32)[:,None,:]*vectors[:,:,:3].astype(np.float32)
+    narrow=((products[:,:,0]+products[:,:,1])+products[:,:,2])+vectors[:,:,3].astype(np.float32)
+    sample_counts=[]
+    for uv in (wide,narrow):
+        if not np.all(np.isfinite(uv)):raise ValueError('Non-finite lightmap UV')
+        low=np.floor(np.minimum(999999.,np.minimum.reduceat(uv,starts,axis=0))/16)
+        high=np.ceil(np.maximum(-99999.,np.maximum.reduceat(uv,starts,axis=0))/16)
+        dims=np.maximum(1,high-low).astype(np.int64)+1
+        sample_counts.append(dims[:,0]*dims[:,1])
+    preserved_samples=np.maximum(*sample_counts)
     result=[]
     for i,face in enumerate(faces):
         if face[-1]<0:continue
-        styles=sum(s!=255 for s in face[5:9])
-        size=int(dims[i,0]*dims[i,1])*styles
+        styles=next((j for j,s in enumerate(face[5:9]) if s==255),4)
+        size=int(preserved_samples[i])*styles
         offset=face[-1]
         if not styles or size<1 or offset+size>len(data[8]):
             raise ValueError('Lightmap sample bounds')
@@ -80,5 +90,5 @@ def deduplicate(raw):
     return result,dict(bytes_before=len(raw),bytes_after=len(result),
                        lighting_before=before[8],lighting_after=len(light),
                        visibility_before=before[4],visibility_after=len(vis),
-                       lightmap_samples='byte-identical',visibility_rows='byte-identical',
+                       lightmap_samples='byte-identical under narrow and wide UV intermediate policies',visibility_rows='byte-identical',
                        geometry_and_collision='unchanged')

@@ -5,6 +5,7 @@ select another tree for an explicit comparison.
 No proprietary data or Amiga SDK is needed for these collision/culling checks.
 """
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
+@unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
     def test_torch_brush_rendering_with_leaf_and_collision_only_roots(self):
@@ -173,6 +175,10 @@ class NativeSourceTests(unittest.TestCase):
     def test_underwater_palette_and_independent_damage(self):
         self.compile_run('aga_palette_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])
 
+    def test_large_visibility_load_uses_one_allocation_and_preserves_bytes(self):
+        self.compile_run("aga_bsp_byte_load_test.c", [],
+                         cflags=["-O2", "-fwhole-program"])
+
     def test_scene_links_preserve_state_and_find_hatch_floor(self):
         self.compile_run("aga_scene_test.c", [ROOT/"engine/aga/src/aw_scene.c", ROOT/"engine/aga/src/aw_region.c", ROOT/"engine/aga/src/aw_story.c", ROOT/"engine/aga/src/aw_state.c", Path(SOURCE)/"src/mathlib.c"])
 
@@ -230,6 +236,15 @@ class NativeSourceTests(unittest.TestCase):
                    '-include', str(ROOT/'tests/aga_test_files.h'),
                    '-Wl,--gc-sections', '-I'+tmp, '-I'+str(tree/'src'), str(ROOT/'tests'/fixture),
                    *[str(p) for p in sources], '-lm', '-o', str(exe)]
+            if os.name == 'nt':
+                target = subprocess.run(['cc', '-dumpmachine'], capture_output=True,
+                                        text=True).stdout
+                if 'cygwin' in target or 'msys' in target:
+                    # GCC translates source paths, but cc1's -include/-I paths
+                    # need MSYS mount syntax when invoked from native Python.
+                    cmd = [re.sub(r'^(-I)?([A-Za-z]):/',
+                                  lambda m: (m[1] or '') + '/' + m[2].lower() + '/',
+                                  arg.replace('\\', '/')) for arg in cmd]
             result = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(exe), *arguments], cwd=tmp, capture_output=True, text=True)

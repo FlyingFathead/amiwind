@@ -20,7 +20,7 @@ def entity_bytes(records):
                       for e in records)+'\n\0').encode('ascii')
 
 
-def compact(raw, records=None, prune_world=False):
+def compact(raw, records=None, prune_world=False, visual_bounds=None):
     data=lumps(raw)
     if records is None: records=entities(data[0])
     records=[dict(e) for e in records]
@@ -52,6 +52,47 @@ def compact(raw, records=None, prune_world=False):
     if prune_world:
         visible={m[0] for m in src[11]}
         faces={f for f in faces if not world_first<=f<world_first+world_count or f in visible}
+    # Keep complete polygons that intersect the certified visible coverage.
+    # Inline brush models can span well beyond a region; selecting the whole
+    # model need not retain its distant visual faces. Collision trees stay intact.
+    visual_removed=0
+    if visual_bounds is not None:
+        from audit_walkability import axes
+        import math
+        low,high=visual_bounds
+        if len(low)!=2 or len(high)!=2 or not all(math.isfinite(v) for v in (*low,*high)) or any(low[i]>=high[i] for i in range(2)):
+            raise ValueError('Expected finite nonempty XY visual bounds')
+        placements={m:[] for m in models if m}
+        for e in records:
+            if e.get('model','').startswith('*'):
+                m=int(e['model'][1:])
+                if not m:continue
+                origin=tuple(map(float,e.get('origin','0 0 0').split()))
+                angles=tuple(map(float,e.get('angles','0 0 0').split()))
+                if len(origin)!=3 or len(angles)!=3 or not all(math.isfinite(v) for v in (*origin,*angles)):
+                    raise ValueError('Invalid visual placement')
+                placements[m].append((origin,axes(angles)))
+        tested=set();visible_faces=set()
+        for m in models:
+            if not m:continue
+            first,count=src[14][m][14:16]
+            for f in range(first,first+count):
+                if f not in faces:continue
+                tested.add(f)
+                face=src[7][f];points=[]
+                for se in src[13][face[2]:face[2]+face[3]]:
+                    edge=src[12][abs(se[0])]
+                    points.append(src[3][edge[0 if se[0]>=0 else 1]])
+                visible=False
+                for origin,basis in placements[m]:
+                    world=[[origin[i]+sum(v[j]*basis[j][i] for j in range(3)) for i in range(2)] for v in points]
+                    if world and all(max(v[i] for v in world)>=low[i] and min(v[i] for v in world)<=high[i] for i in range(2)):
+                        visible=True;break
+                if visible:visible_faces.add(f)
+        # Aliased models may share a face range. Keep a face if ANY retained
+        # placement needs it; never prune a marked world face through an alias.
+        remove=tested-visible_faces-set(range(world_first,world_first+world_count))
+        faces-=remove;visual_removed=len(remove)
     faces=sorted(faces)
     def mapping(values):return {v:i for i,v in enumerate(values)}
     nf=mapping(faces); nn=mapping(nodes); nc=mapping(clips)
@@ -105,5 +146,6 @@ def compact(raw, records=None, prune_world=False):
     result=pack_lumps(out)
     report={'bytes_before':len(raw),'bytes_after':len(result),'models_before':len(src[14]),'models_after':len(models),
             'faces_before':len(src[7]),'faces_after':len(faces),'clipnodes_before':len(src[9]),'clipnodes_after':len(clips),
+            'visual_faces_removed_outside_coverage':visual_removed,'visual_bounds':visual_bounds,
             'world_collision':'unchanged','world_visibility':'PVS unchanged; unmarked faces pruned' if prune_world else 'unchanged','retained_models':models}
     return result,report

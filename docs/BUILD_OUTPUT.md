@@ -7,10 +7,12 @@ coverage and protected model quality remain mandatory.
 
 The final HDF's byte size is its virtual disk capacity, including filesystem
 metadata and free space. It is not a count of converted game assets. The current
-full-world layout balances content across two partitions, each sized from its
+full-world layout creates as many world partitions as needed, each sized from its
 payload plus approximately 20 percent and 16 MiB of headroom, then rounded up
 to a 128 MiB boundary. Each partition stays below 2 GiB; the combined legacy
-hardfile stays below 4 GiB.
+hardfile stays below 4 GiB. When the complete partition set will not fit,
+additional HDFs are created automatically and recorded in `hdf_files`.
+All drives must remain mounted together.
 
 The reported rc7 image is 3,221,258,240 bytes: two 1.5 GiB partitions plus
 32 KiB of disk-layout space. Its exact free space must be read from that build,
@@ -58,6 +60,32 @@ hashing failure makes the build fail. The HDF is read in 1 MiB chunks; hashing
 does not load the whole image into RAM. A detected change to the file during
 hashing also rejects success. The digest identifies the complete file, including
 filesystem metadata; it is not a promise of reproducible bytes across builds.
+
+## HDFs and emulator runners
+
+From v0.0.27-rc2, full and asset-free image assembly generates both configuration
+formats beside the HDFs. Each configuration mounts every required disk from the
+verified layout; the boot drive comes first. An optional owned Kickstart path
+is applied locally. Without it, select your own ROM before starting the emulator.
+Docker exports also receive configurations with host-local paths.
+
+The final terminal-width footer includes:
+
+```text
+--------------------------------------------------------------------------------
+Your .hdf file(s):
+1. <output>/AmiWind-v<version>.hdf
+2. <output>/AmiWind-v<version>-world-01.hdf
+
+FS-UAE and WinUAE runners:
+1. FS-UAE: <output>/AmiWind-v<version>-FS-UAE.fs-uae
+2. WinUAE: <output>/AmiWind-v<version>-WinUAE.uae
+--------------------------------------------------------------------------------
+```
+
+Only disks actually required are listed. Saved build summaries include the same
+artifact paths; `image/build.json` retains per-drive size, SHA-256, partitions
+and readback results. Local paths and ROMs are not public release payloads.
 
 ## Timing
 

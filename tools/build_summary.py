@@ -100,6 +100,12 @@ class BuildSummary:
         if status == 'passed':
             with Progress('Checking final output size and SHA-256'):
                 identity = output_identity(output)
+        artifacts = None
+        if identity and Path(identity['path']).suffix == '.hdf':
+            image = Path(identity['path'])
+            if (image.parent/'build.json').is_file() or (image.parent/'dry-run-build.json').is_file():
+                from emulator_configs import output_paths
+                artifacts = output_paths(image)
         try:
             warnings = compiler_warnings(self.run)
         except OSError:
@@ -111,7 +117,7 @@ class BuildSummary:
                   'started_at': self.started_at, 'finished_at': timestamp(),
                   'elapsed_seconds': round(elapsed, 3), 'elapsed': duration(elapsed),
                   'timing_scope': 'provenance, build stages and final output hashing; excludes prerequisites/setup and emulator launch',
-                  'output': identity, 'compiler_warnings': warnings,
+                  'output': identity, 'artifacts': artifacts, 'compiler_warnings': warnings,
                   'build_environment': self.environment,
                   'actor_ground_audit': actor_acceptance,
                   'validation': 'private-test-only' if diagnostic else 'selected-pipeline'}
@@ -172,5 +178,8 @@ class BuildSummary:
         if save_error:
             lines.append('Summary save warning: ' + save_error)
         section('\n'.join(lines))
+        if artifacts:
+            from emulator_configs import print_outputs
+            print_outputs(Path(identity['path']))
         self.finished = True
         return result

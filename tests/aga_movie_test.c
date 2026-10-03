@@ -25,6 +25,9 @@ void S_StopAllSounds(qboolean clear){clears++;}
 void IN_AWClearButtons(void){}
 void AW_IntroBegin(void){starts++;}
 void CDAudio_Pause(void){pauses++;}
+void CDAudio_Resume(void){}
+void Key_ClearStates(void){}
+void V_UpdatePalette(void){}
 int COM_FOpenFile(char *path,FILE **out){
     if(!strcmp(path,"intro/opening.awt")){
         if(!card_length){*out=NULL;return -1;}

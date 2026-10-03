@@ -18,13 +18,23 @@ def rock_profile(name, triangles):
 from mesh_geometry import connected_components
 
 
-def reduce_mesh(vertices, faces, ratio, preserve_materials=()):
+def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_seams=False):
     import fast_simplification
     if not 0 < ratio <= 1:
         raise ValueError('Invalid static LOD ratio')
     preserve_materials=set(preserve_materials)
     if not preserve_materials.issubset(set(faces[:,3])):
         raise ValueError('Preserved material is absent from mesh')
+    if preserve_shared_seams:
+        # Independently simplified materials cannot maintain a shared rim.
+        # Keep both adjoining sections, including source UVs, until a boundary-
+        # constrained reducer is available. Position identity ignores UV splits.
+        owners = {}
+        for material in set(faces[:, 3]):
+            points = vertices[faces[faces[:, 3] == material, :3], :3].reshape(-1, 3)
+            for point in points:
+                owners.setdefault(tuple(point), set()).add(int(material))
+        preserve_materials.update(m for group in owners.values() if len(group) > 1 for m in group)
     out_v, out_f = [], []
     groups=0
     for material in sorted(set(faces[:,3])):

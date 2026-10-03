@@ -85,6 +85,10 @@ class WorldUIAssetsTests(unittest.TestCase):
             root=Path(temp)
             for name in paths:
                 target=root/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(name.encode())
+            for filename,entries in [('seyda-regions.txt',seyda_regions()),('balmora-regions.txt',regions(config()))]:
+                rows=['AWBR1 '+str(len(entries))+' 96 540 0 0 64 90 0 0 64 90']
+                rows.extend(' '.join(map(str,[r['name'],*r['core'][0],*r['core'][1],*r['coverage'][0],*r['coverage'][1]])) for r in entries)
+                (root/filename).write_text('\n'.join(rows)+'\n')
             write_content_fingerprint(root);before=(root/'save-content.bin').read_bytes()
             self.assertEqual(len(before),32)
             (root/'world/entries.dat').write_bytes(b'changed earned text')

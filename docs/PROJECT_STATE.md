@@ -1,6 +1,49 @@
-# Current project state â€” 2 October 2026
+# Current project state - 3 October 2026
 
-**v0.0.26 full conversion and game-entry validation passed locally; hosted CI gates publication.** The
+## Stable release: v0.0.27 - Rocks, Mushrooms, and Then Some
+
+The owner approved v0.0.27 as stable, based on the repaired rc5 build. The
+engine compiled, the image was assembled, and both HDF filesystem readbacks
+passed. The complete actor-ground gate passed with zero unresolved findings;
+the static target-ABI heap gate passed for all 2,717 maps, with 135,952 bytes
+of worst-case post-reserve margin under the unchanged 3 MiB non-map allowance
+and 2 MiB safety reserve.
+
+The rc5 map selector correction is included: settlement markers draw in both
+Debug and In-Game modes, with readable selected-button styling. The In-Game
+view remains a terrain overview prototype, not a complete original-game
+world/local map. The package includes all 18 catalogued OST tracks and 124 alias
+rows. Target playback verification remains a separate runtime check. Video conversion/runtime and
+condition-aware voiced dialogue remain future work.
+
+Owner approval is complete. This does not imply a target heap lifecycle trace,
+FPS improvement, full route playthrough, or exhaustive crossing/state/map-UI
+validation. The original rc3 heap-crash repair is a packaged host-validated
+candidate, not a claim that every route has been target-verified. See
+[release notes](RELEASE-v0.0.27.md), [memory policy](MEMORY_ALLOCATION.md),
+[cell-changing checklist](CELL_CHANGING.md), and [bug journal](BUG_JOURNAL.md).
+
+The earlier rc1/rc2/rc3/rc4 entries below are historical candidate records;
+their former publication-blocked status is superseded by this owner-approved
+stable v0.0.27 state. Keep their evidence intact.
+## AmiWind v0.0.27-rc2 - Rocks and Mushrooms
+
+The local correction candidate is assembled. All 2,526 world regions cover
+37,960 original exterior rocks and 816 giant mushrooms. All five giant-mushroom
+models retain exact source geometry and UVs on joined material sections to
+correct the cap gaps reported in rc1. Full world overlay, strict actor contact
+(zero unresolved), complete NPC gallery and filesystem/HDF verification passed.
+The two generated emulator configurations mount both HDFs simultaneously.
+
+Corrected-image owner playtest, texture/boundary acceptance, fresh Linux/Docker
+pipeline validation and hosted CI remain pending. The published baseline is
+v0.0.26. See [rc2 notes](RELEASE-v0.0.27-rc2.md),
+[What are rocks?](WHAT_ARE_ROCKS.md) and [known issues](BUG_JOURNAL.md).
+
+## Published v0.0.26 baseline
+
+
+**v0.0.26 full conversion, game entry, hosted CI and publication completed.** The
 final helper/export run on Windows 11 / Docker Desktop WSL 2 completed all 3,551
 NPC models and 2,526 terrain regions. The strict packaged actor-ground gate passed
 with zero unresolved findings. Its verified HDF is 3,489,693,696 bytes, SHA-256
@@ -13,7 +56,7 @@ The cold offline rc1-identity Docker run remains historical evidence: 35 minutes
 3 seconds, same HDF size, full conversion, strict actor-ground pass and WinUAE
 game-entry check. Linux remains the established foundation; native Windows stays
 experimental with known worker/cancellation failures. Hosted Docker CI and public
-publication remain pending. See [rc1 scope](RELEASE-v0.0.26-rc1.md),
+publication completed for v0.0.26; they remain pending for v0.0.27-rc2. See [rc1 scope](RELEASE-v0.0.26-rc1.md),
 [Windows evidence](VALIDATION-WINDOWS-2026-10-02.md) and
 [Docker evidence](VALIDATION-DOCKER-2026-10-02.md).
 

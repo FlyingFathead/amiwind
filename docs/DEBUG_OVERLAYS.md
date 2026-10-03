@@ -318,7 +318,7 @@ the player's coordinates. The compass remains off by default. The ordinary M
 map shows the same region below its viewport regardless of compass visibility.
 See [map lookup and teleport](WORLD_MAP_AND_JOURNAL.md#region-name-and-debug-teleport).
 
-`dbg tp map` selects a point with a red crosshair, then requires the TELEPORT
+`dbg tp map` (or `dbg map tp`) selects a point with a red crosshair, then requires the TELEPORT
 button or Enter to confirm. Escape cancels. **F, then V** equips the temporary
 [carried torch](TORCH.md); Shift+V continues to cycle draw distance.
 

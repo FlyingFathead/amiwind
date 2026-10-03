@@ -1,5 +1,6 @@
 """Initial-placement gate against small independent BSP/MDL fixtures."""
 import json
+import hashlib
 from pathlib import Path
 import struct
 import tempfile
@@ -156,6 +157,9 @@ class GroundGateTests(unittest.TestCase):
         self.assertEqual(r['acceptance']['status'], 'passed')
         self.assertTrue(r['acceptance']['production_gate_passed'])
         self.assertNotIn('approved_report_sha256', r['acceptance'])
+        saved = (self.id1/'new.json').read_bytes()
+        self.assertNotIn(b'\r', saved)
+        self.assertEqual(hashlib.sha256(saved).hexdigest(), r['acceptance']['report_sha256'])
 
     def test_early_check_excludes_only_unbuilt_world_bsp_hashes(self):
         approved = self.baseline()

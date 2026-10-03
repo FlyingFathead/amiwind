@@ -127,6 +127,18 @@ def main(argv=None):
             raise RuntimeError(f"Full conversion exited {state['ExitCode']}; see full-build.log")
         logged(docker + ['cp', f'{container}:/work/build/{args.name}', str(output)],
                output / 'export.log')
+        # Container paths are not host paths. Generate separate host-local configs
+        # without overwriting the retained container configurations.
+        from emulator_configs import write_configs, print_outputs
+        image_dir = output / args.name / 'image'
+        image_receipt = image_dir / 'build.json'
+        image_record = json.loads(image_receipt.read_text(encoding='utf-8'))
+        name = image_record['hdf_file']
+        if Path(name).name != name:
+            raise ValueError('Unsafe exported HDF filename')
+        image_record['emulator_configs'] = write_configs(image_dir/name, config_suffix='-Host')
+        image_receipt.write_text(json.dumps(image_record,indent=2)+'\n',encoding='utf-8',newline='\n')
+        receipt['artifacts'] = print_outputs(image_dir/name)
         receipt['status'] = 'passed'
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
         receipt['status'] = 'failed'

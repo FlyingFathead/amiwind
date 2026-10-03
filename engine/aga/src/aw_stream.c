@@ -14,7 +14,7 @@ static size_t filled,consumed,capacity;
 static int complete,failed;
 static double read_seconds;
 static double worst_read,transition_started;
-static int transition_pending,transition_ready;
+static int transition_pending,transition_ready,heap_first_present;
 extern size_t (*aw_load_prefetch_copy)(const char *,long,byte *,size_t);
 extern double (*aw_load_clock)(void);
 extern long aw_load_disk_bytes,aw_load_disk_calls;
@@ -79,6 +79,7 @@ static size_t copy(const char *name,long offset,byte *out,size_t bytes) {
     memcpy(out,data+offset,n);consumed+=n;return n;
 }
 void AW_StreamLoadBegin(const char *name) {
+    heap_first_present=1;
     if(input){fclose(input);input=NULL;}
     if(strcmp(name,path) || AW_CellChangeMethod()!=2)cancel();
     consumed=0;aw_load_disk_bytes=aw_load_disk_calls=0;
@@ -102,6 +103,9 @@ void AW_StreamTransitionReady(void) {if(transition_pending)transition_ready=1;}
 /* Called after video presentation, before selecting the next scene. */
 void AW_StreamPresented(void) {
     FILE *f;
+    if(heap_first_present && cls.state==ca_connected && cls.signon==SIGNONS && cl.worldmodel){
+        AW_HeapAuditPhase(cl.worldmodel->name,"first-presented");heap_first_present=0;
+    }
     if(!transition_pending || !transition_ready || cls.state!=ca_connected || cls.signon!=SIGNONS || !cl.worldmodel)return;
     f=fopen("cell-visible-profile.tsv","a");
     if(f){fprintf(f,"%s\t%d\t%.6f\t%lu\t%.2f\n",cl.worldmodel->name,AW_CellChangeMethod(),

@@ -1,5 +1,31 @@
 # WinUAE setup
 
+## Automatically generated image configurations
+
+Full-game assembly writes `AmiWind-v<VERSION>-WinUAE.uae` and
+`AmiWind-v<VERSION>-FS-UAE.fs-uae` beside the HDFs. The verified image receipt
+is the source of the drive list: load every required HDF simultaneously.
+The boot disk comes first; additional world disks are not interchangeable
+and do not require disk swapping.
+
+Supply `--kickstart-file /path/to/owned.rom` to the build to fill both local
+ROM paths, or select your licensed ROM in the emulator afterward. ROMs and
+playable images are private build outputs, never public source assets.
+Configurations use host-local absolute paths. After moving the image directory,
+keep `build.json` and every listed HDF together and regenerate the configurations
+on the destination host:
+
+```sh
+python tools/emulator_configs.py --image /path/to/AmiWind-v0.0.27-rc1.hdf --kickstart-file /path/to/owned.rom
+```
+
+The generator preserves a differing existing configuration instead of overwriting
+custom settings; move that configuration to a backup name before regenerating.
+The portable FS-UAE launcher updates moved paths with its existing backup workflow.
+Both FS-UAE launchers now use every drive listed in `build.json`. A missing required
+world disk stops configuration instead of silently launching an incomplete world.
+
+
 Official homepage and downloads: [WinUAE](https://www.winuae.net/).
 
 ## Current Windows checkpoint, 2 October 2026
@@ -26,7 +52,7 @@ working HDF copy, then put overrides after `-f`:
 
 ```powershell
 & 'C:\Program Files\WinUAE\winuae64.exe' `
-  -f 'C:\AmiWind\playtest\configs\my-amiwind.uae' `
+  -f 'C:\path\to\my-amiwind.uae' `
   -s use_gui=no -s cpu_speed=max
 ```
 
@@ -215,3 +241,15 @@ Configuration option reference: the emulator project's
 On exit, wait at least 10 seconds at the DOS prompt before shutting down the
 emulator. The runtime writes `MWBOOT:MWPROFILE.BIN`; the filesystem may still
 have buffered metadata after the program returns.
+
+## Audio snapping investigation
+
+Local v0.0.27-rc1 playtesting reported occasional snapping in WinUAE, while the
+owner did not hear the same symptom in earlier Linux FS-UAE runs. This does not
+isolate the engine, emulator backend or host audio driver. The reference config
+uses `sound_max_buff=16384`; a separate local A/B config tries `32768`. A larger
+buffer trades response latency for more buffering; improvement remains unverified.
+Compare the same track/scene and note whether snaps coincide with map loads.
+The game audio pipeline and Linux preset are unchanged by this experiment.
+WinUAE parses this setting in its [config source](https://github.com/tonioni/WinUAE/blob/master/cfgfile.cpp)
+and applies it in its [Windows audio backend](https://github.com/tonioni/WinUAE/blob/master/od-win32/sounddep/sound.cpp).

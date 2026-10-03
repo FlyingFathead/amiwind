@@ -43,7 +43,7 @@ def write_allowances(directory, results, entries, output):
         except (ValueError,OSError) as exc:
             unresolved.append(dict(model=key,error=str(exc),records=owners));continue
         if exception:exception['records']=owners;exceptions.append(exception)
-    Path(output).write_text('AWPB1\n'+''.join(f"{e['model']} {e['vertices']} {e['triangles']} {e['bytes']} {e['crc32']}\n" for e in exceptions))
+    Path(output).write_text('AWPB1\n'+''.join(f"{e['model']} {e['vertices']} {e['triangles']} {e['bytes']} {e['crc32']}\n" for e in exceptions), encoding='utf-8', newline='\n')
     return dict(format=1,normal_vertex_limit=2000,trial_triangle_ceiling=GALLERY_FACE_LIMIT,
                 exceptions=exceptions,unresolved=unresolved)
 

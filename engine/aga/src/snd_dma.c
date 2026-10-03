@@ -165,7 +165,6 @@ void S_Startup (void)
 	}
 
 	sound_started = 1;
-	aw_load_audio_tick = S_LoadingUpdate;
 }
 
 
@@ -177,6 +176,8 @@ S_Init
 void S_Init (void)
 {
 
+    /* Presentation progress must also run with -nosound or failed DMA. */
+    aw_load_audio_tick = S_LoadingUpdate;
 	Con_Printf("\nSound Initialization\n");
 
 	if (COM_CheckParm("-nosound"))
@@ -882,11 +883,16 @@ void S_LoadingUpdate(void)
     static double previous;
     static int servicing;
     double now;
-    if(!aw_loading_music || !sound_started || snd_blocked || servicing)return;
-    now=Sys_FloatTime();
-    if(now>=previous && now-previous<0.02)return;
-    previous=now;servicing=1;
-    CDAudio_Update();S_Update_();
+    if(!aw_loading_music || servicing)return;
+    servicing=1;
+    if(sound_started && !snd_blocked){
+        now=Sys_FloatTime();
+        if(!(now>=previous && now-previous<0.02)){
+            previous=now;
+            CDAudio_Update();S_Update_();
+        }
+    }
+    SCR_LoadingUpdate();
     servicing=0;
 }
 

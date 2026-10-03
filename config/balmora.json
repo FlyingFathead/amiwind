@@ -134,5 +134,37 @@
   "arrival_actor": "selvil sareloth",
   "entity_budget": 1000,
   "model_budget": 220,
-  "collision_margin": 224
+  "collision_margin": 224,
+  "region_core_overrides": {
+    "bm000": [
+      [
+        -3072,
+        -3072
+      ],
+      [
+        -1536,
+        -2304
+      ]
+    ],
+    "bm001": [
+      [
+        -768,
+        -640
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "bm027": [
+      [
+        -768,
+        -768
+      ],
+      [
+        0,
+        -640
+      ]
+    ]
+  }
 }

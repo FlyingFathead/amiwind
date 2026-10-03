@@ -7,11 +7,14 @@ import json
 import math
 from pathlib import Path
 import struct
+import os
+import shutil
 from itertools import product
 from audit_walkability import axes
 from compact_bsp import compact, entities
 from player_hull import lumps
 from prepare_intro_docks import derive
+from prepare_quake import GROUND_BOUNDS
 
 CORE=768
 OVERLAP=896
@@ -22,22 +25,57 @@ BOUNDS=((-2079,-2079),(2079,2079))
 COURTYARD=(-128,-384,512,256)
 
 
+LAYOUT = Path(__file__).resolve().parents[1]/'config/seyda-bounded-regions.json'
+
+
+def validate_layout(settings):
+    if settings.get('format') != 'AmiWind Seyda bounded layout 1':
+        raise ValueError('Unknown bounded Seyda layout')
+    if (settings.get('overlap'), settings.get('hysteresis'), settings.get('draw_distance')) != (OVERLAP,HYSTERESIS,DRAW_DISTANCE):
+        raise ValueError('Seyda visibility/hysteresis policy changed')
+    if settings.get('bounds') != [list(v) for v in BOUNDS]:
+        raise ValueError('Seyda ownership bounds changed')
+    entries = settings['regions']
+    if not 1 <= len(entries) <= 64:
+        raise ValueError('Invalid native Seyda region count')
+    for index, entry in enumerate(entries):
+        if entry['name'] != f'sn{index:03d}':
+            raise ValueError('Region names must follow runtime directory order')
+        core = entry['core']
+        if len(core)!=2 or any(len(p)!=2 for p in core) or not all(math.isfinite(v) for p in core for v in p):
+            raise ValueError('Invalid finite core coordinates')
+        if any(not BOUNDS[0][i] <= core[0][i] < core[1][i] <= BOUNDS[1][i] for i in range(2)):
+            raise ValueError('Core outside ownership bounds')
+        coverage = [[min(core[0][i],max(GROUND_BOUNDS[0][i],core[0][i]-OVERLAP)) for i in range(2)],
+                    [max(core[1][i],min(GROUND_BOUNDS[1][i],core[1][i]+OVERLAP)) for i in range(2)]]
+        if entry['coverage'] != coverage:
+            raise ValueError('Coverage differs from the required 896-unit apron')
+    # Every rectangle tile induced by all cuts must have exactly one owner.
+    cuts = [sorted({BOUNDS[0][i],BOUNDS[1][i]} | {e['core'][j][i] for e in entries for j in (0,1)}) for i in range(2)]
+    for x0,x1 in zip(cuts[0],cuts[0][1:]):
+        for y0,y1 in zip(cuts[1],cuts[1][1:]):
+            point = ((x0+x1)/2,(y0+y1)/2)
+            count = sum(all(e['core'][0][i] <= point[i] < e['core'][1][i] for i in range(2)) for e in entries)
+            if count != 1:
+                raise ValueError('Seyda ownership hole or overlapping cores')
+    if OVERLAP < math.sqrt(2)*DRAW_DISTANCE+HYSTERESIS+32:
+        raise ValueError('Insufficient visibility/hysteresis coverage')
+    return entries
+
+
 def regions():
-    # Keep the town/arrival route in one core; north boundary is the bridge
-    # reported by the owner at Y474. Outskirts retain smaller rectangular cores.
-    # Coverage still includes the complete draw-distance and hysteresis margin.
-    xs=[BOUNDS[0][0],-1536,-768,1024,1792,BOUNDS[1][0]]
-    ys=[BOUNDS[0][1],-1536,-768,474,1242,BOUNDS[1][1]]
-    out=[]
-    for y0,y1 in zip(ys,ys[1:]):
-        for x0,x1 in zip(xs,xs[1:]):
-            core=[[x0,y0],[x1,y1]]
-            out.append({'name':f'sn{len(out):03d}','core':core,
-                        'coverage':[[max(BOUNDS[0][i],core[0][i]-OVERLAP) for i in range(2)],
-                                    [min(BOUNDS[1][i],core[1][i]+OVERLAP) for i in range(2)]]})
-    if len(out)>64:raise ValueError('Too many Seyda Neen regions')
-    if OVERLAP<math.sqrt(2)*DRAW_DISTANCE+HYSTERESIS+32:raise ValueError('Insufficient region overlap')
-    return out
+    return validate_layout(json.loads(LAYOUT.read_text(encoding='utf-8')))
+
+
+def default_region(entries):
+    return next(e for e in entries if all(e['core'][0][i] <= 0 < e['core'][1][i] for i in range(2)))
+
+
+def directory_text(entries):
+    rows=['AWBR1 '+ ' '.join(map(str,[len(entries),HYSTERESIS,DRAW_DISTANCE,0,0,64,90,0,0,64,90]))]
+    for entry in entries:
+        rows.append(' '.join(map(str,[entry['name'],*entry['core'][0],*entry['core'][1],*entry['coverage'][0],*entry['coverage'][1]])))
+    return '\n'.join(rows)+'\n'
 
 
 def select(raw, bounds, polygon=None):
@@ -67,36 +105,77 @@ def select(raw, bounds, polygon=None):
     return kept
 
 
-def convert(source, destination):
-    source=Path(source);destination=Path(destination);destination.mkdir(parents=True,exist_ok=True)
-    raw=source.read_bytes();entries=regions();reports=[]
-    for e in entries:
-        masked,mask_report=derive(raw,(*e['coverage'][0],*e['coverage'][1]))
-        converted,report=compact(masked,select(raw,e['coverage']),prune_world=True)
-        (destination/(e['name']+'.bsp')).write_bytes(converted)
-        reports.append(dict(e,**report))
-    # Special intro scenes use the same compactor. They contain complete nearby
-    # models; the dock mask keeps the established silhouette and route bounds.
-    for name,bounds in [('intro_docks',None),('sncourt',COURTYARD)]:
-        masked,mask_report=derive(raw) if bounds is None else derive(raw,bounds)
-        low_high=((-240,-1100),(1120,620)) if bounds is None else (bounds[:2],bounds[2:])
-        polygon=[(440+680*math.cos(i*math.pi/4),-240+860*math.sin(i*math.pi/4)) for i in range(8)] if bounds is None else None
-        selected=select(masked,low_high,polygon)
-        converted,report=compact(masked,selected,prune_world=True)
-        (destination/(name+'.bsp')).write_bytes(converted)
-        reports.append(dict(name=name,mask=mask_report,**report))
-    # The regular default is the existing town-centre start. Door/ship arrivals
-    # select their region from the actual arrival point before map loading.
-    rows=['AWBR1 '+ ' '.join(map(str,[len(entries),HYSTERESIS,DRAW_DISTANCE,0,0,64,90,0,0,64,90]))]
-    for e in entries:rows.append(' '.join(map(str,[e['name'],*e['core'][0],*e['core'][1],*e['coverage'][0],*e['coverage'][1]])))
-    (destination.parent/'seyda-regions.txt').write_text('\n'.join(rows)+'\n')
-    report={'source_sha256':hashlib.sha256(raw).hexdigest(),'regular_regions':len(entries),
-            'outer_core_target':CORE,'town_core':[[-768,-768],[1024,474]],'north_bridge_y':474,'overlap':OVERLAP,'hysteresis':HYSTERESIS,'draw_distance':DRAW_DISTANCE,
-            'world_terrain':'coverage faces retained; source collision plus outer coverage planes; PVS retained','regions':reports}
-    (destination.parent/'seyda-regions.json').write_text(json.dumps(report,indent=2)+'\n')
+def convert(source, destination, *, source_map, palette, ericw_bin,
+            target_sizes=None, threads=1, work_dir=None):
+    """Generate actual bounded terrain/PVS; never retain the full-town world.
+
+    This normal build step invokes the configured terrain tools when called.
+    Source-only/fixture checks must mock the builder, not launch those tools.
+    All region generation finishes before the runtime map set is installed.
+    """
+    from prepare_bounded_world import build_candidate
+    source=Path(source);destination=Path(destination)
+    destination.mkdir(parents=True,exist_ok=True)
+    entries=regions();raw=source.read_bytes()
+    work=Path(work_dir) if work_dir else destination.parent/'seyda-bounded-work'
+    work.mkdir(parents=True,exist_ok=False)
+    # Keep the complete scene available throughout generation and outside maps/.
+    original=work/'source-town.bsp';original.write_bytes(raw)
+    palette=Path(palette);source_map=Path(source_map)
+    reports=[];outputs={}
+    def build(name, coverage, core=None):
+        result=build_candidate(source_map,original,original,palette,coverage,work/name,
+                               ericw_bin,target_sizes,core=core,threads=threads)
+        output=Path(result['candidate_path'])
+        if hashlib.sha256(output.read_bytes()).hexdigest()!=result['candidate_sha256']:
+            raise ValueError('Bounded candidate receipt mismatch: '+name)
+        return output,result
+    for entry in entries:
+        output,result=build(entry['name'],entry['coverage'],entry['core'])
+        outputs[entry['name']]=output
+        reports.append(dict(name=entry['name'],core=entry['core'],coverage=entry['coverage'],bounded=result))
+    # Keep established special map names, route/courtyard selection, actor
+    # pruning and standing-hull boundaries. Only their parent world is replaced
+    # by a genuinely bounded terrain BSP before applying those existing masks.
+    for name,bounds in [('intro_docks',(-240,-1100,1120,620)),('sncourt',COURTYARD)]:
+        coverage=[list(bounds[:2]),list(bounds[2:])]
+        output,result=build(name,coverage)
+        masked,mask_report=derive(output.read_bytes(),bounds)
+        polygon=[(440+680*math.cos(i*math.pi/4),-240+860*math.sin(i*math.pi/4)) for i in range(8)] if name=='intro_docks' else None
+        converted,selection=compact(masked,select(masked,coverage,polygon),prune_world=True)
+        final=work/name/'special.bsp';final.write_bytes(converted)
+        outputs[name]=final
+        reports.append(dict(name=name,coverage=coverage,bounded=result,mask=mask_report,selection=selection,
+                            final_sha256=hashlib.sha256(converted).hexdigest()))
+    fallback=default_region(entries)['name']
+    outputs['seyda']=outputs[fallback]
+    for name,output in outputs.items():
+        temporary=destination/(name+'.bsp.staging')
+        shutil.copyfile(output,temporary)
+        os.replace(temporary,destination/(name+'.bsp'))
+    (destination.parent/'seyda-regions.txt').write_text(directory_text(entries),encoding='ascii',newline='\n')
+    report={'format':'AmiWind bounded Seyda regions 1','regular_regions':len(entries),
+            'source_sha256':hashlib.sha256(raw).hexdigest(),
+            'source_map_sha256':hashlib.sha256(source_map.read_bytes()).hexdigest(),
+            'palette_sha256':hashlib.sha256(palette.read_bytes()).hexdigest(),
+            'layout_sha256':hashlib.sha256(LAYOUT.read_bytes()).hexdigest(),
+            'complete_source_preserved':str(original),'fallback_alias':fallback,
+            'overlap':OVERLAP,'hysteresis':HYSTERESIS,'draw_distance':DRAW_DISTANCE,
+            'world_terrain':'independently compiled bounded LAND/PVS with complete intersecting triangles',
+            'special_routes':'existing names, selection masks and standing boundaries retained',
+            'acceptance':'final actor/heap gates and target transition playtest required','regions':reports}
+    (destination.parent/'seyda-regions.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     return report
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('source',type=Path);p.add_argument('destination',type=Path)
-    a=p.parse_args();r=convert(a.source,a.destination);print(f"Prepared {r['regular_regions']} Seyda regions plus dock and courtyard scenes.")
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('source',type=Path);p.add_argument('destination',type=Path)
+    p.add_argument('--source-map',type=Path,required=True)
+    p.add_argument('--palette',type=Path,required=True)
+    p.add_argument('--ericw-bin',type=Path,required=True)
+    p.add_argument('--threads',type=int,default=1)
+    a=p.parse_args()
+    r=convert(a.source,a.destination,source_map=a.source_map,palette=a.palette,
+              ericw_bin=a.ericw_bin,threads=a.threads)
+    print(f"Prepared {r['regular_regions']} bounded regions plus special scenes and fallback.")

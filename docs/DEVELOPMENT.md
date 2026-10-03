@@ -251,3 +251,22 @@ LAND/topomap alone is insufficient where placed rocks or structures cover the
 ground. Audit source references, complete transforms and low-poly coverage before
 patching a hole. Follow [What are rocks?](WHAT_ARE_ROCKS.md), including native
 before/after views, compound-rotation tests and separate collision checks.
+
+## Further terrain/detail direction — planned, not starting now
+
+Continue the present conversion approach and add finer runtime sub-cell division
+as measured high-cost regions, especially settlements, require it. Mark failing
+heap/headroom regions and profile the actual payload before splitting; preserve
+visibility/collision overlaps and gameplay continuity.
+
+Future content follows a deliberate [world-detail/topology ladder](WORLD_DETAIL_LADDER.md):
+rocks/mushrooms, trees/roots/stumps, marsh vegetation, early Seyda Neen shorelines,
+terrain formations, paths/roads, natural entrances and regional sets. Keep
+interactive micro-clutter separate. This is a future TODO, not current expansion
+work; current release targets and heap/transition acceptance remain in force.
+
+## Compiler diagnostics requirement
+
+Add explicit configuration options for troubleshooting and record their effective
+settings in build evidence. See [Compiler Troubleshooting](COMPILER_TROUBLESHOOTING.md)
+for implemented tools, proposed controls and the production acceptance boundary.

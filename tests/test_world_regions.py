@@ -91,3 +91,40 @@ class WorldRegionsTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class SeydaHandoffGroundTests(unittest.TestCase):
+    def test_apron_covers_draw_distance_without_moving_handoff(self):
+        from prepare_quake import BOUNDS, GROUND_BOUNDS
+        from prepare_seyda_regions import DRAW_DISTANCE, regions
+        for axis in range(2):
+            self.assertGreaterEqual(BOUNDS[0][axis]+64-GROUND_BOUNDS[0][axis], DRAW_DISTANCE)
+            self.assertGreaterEqual(GROUND_BOUNDS[1][axis]-(BOUNDS[1][axis]-64), DRAW_DISTANCE)
+        east = next(r for r in regions() if r['core'][0][0] <= 1024 < r['core'][1][0] and r['core'][0][1] <= -768 < r['core'][1][1])
+        self.assertGreaterEqual(east['coverage'][1][0],1600+DRAW_DISTANCE)
+        self.assertEqual(len(regions()),64)
+        for region in regions():
+            for axis in range(2):
+                self.assertLessEqual(region['coverage'][0][axis],region['core'][0][axis])
+                self.assertGreaterEqual(region['coverage'][1][axis],region['core'][1][axis])
+
+    def test_handoff_triangles_match_world_heights_and_materials(self):
+        from prepare_quake import town_ground_triangles, CENTRE, SCALE
+        from prepare_world_regions import Terrain, terrain_triangles
+        import numpy as np
+        grids=[dict(cell=[x,y],heights=[[8*(ix+iy) for ix in range(65)] for iy in range(65)],
+                    materials=[[1+(ix//2) for ix in range(16)] for iy in range(16)])
+               for y in range(-10,-7) for x in range(-3,0)]
+        # Check a tile crossing the reported eastern handoff, including UV material identity.
+        ox,oy=(v*SCALE for v in CENTRE)
+        actual=[(tri,material) for tri,material in town_ground_triangles(grids)
+                if all(1536<=p[0]<=1664 and 0<=p[1]<=128 for p in tri)]
+        terrain=Terrain.__new__(Terrain)
+        terrain.cells={tuple(g['cell']):i for i,g in enumerate(grids)}
+        terrain.heights=np.asarray([g['heights'] for g in grids],float)
+        terrain.materials=np.asarray([g['materials'] for g in grids],int)
+        expected=[]
+        for tri in terrain_triangles(terrain,1536+ox,oy):
+            material=terrain.sample(*(sum(p[k] for p in tri)/3 for k in (0,1)))[1]
+            expected.append(([[p[0]-ox,p[1]-oy,p[2]] for p in tri],material))
+        self.assertEqual(actual,expected)

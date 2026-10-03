@@ -1,14 +1,83 @@
 # Roadmap and implementation options
 
-## v0.0.26 final local validation; hosted CI and publication pending
+## Assemble first, then optimize the measured world
+
+The immediate objective is complete authored rock/giant-mushroom coverage and
+correct cell handoffs, creating a representative baseline we can playtest and
+profile. This is not a claim that the present output size or conversion cost is
+already optimized. Keep the existing FPS subdivisions while assembling content.
+
+- Require target-ABI memory estimates after mapping changes and before image
+  assembly, plus runtime load/crossing profiling during playtests. Much of the
+  current world is still terrain with rocks and giant mushrooms, yet already
+  has heap/headroom failures; later content must not be added without renewed
+  accounting. Additional HDFs do not increase the engine heap. See
+  [memory allocation and the mandatory headroom policy](MEMORY_ALLOCATION.md).
+- Measure source input, converted payload, duplicated overlap data, allocated
+  HDF capacity/headroom, conversion time, peak/resident memory, loading stalls
+  and actual game FPS separately. Record comparable scenes and build profiles.
+- Investigate shared converted models/textures and identical boundary geometry
+  deduplication across neighbouring cells. Preserve source-reference identity,
+  position/rotation/scale, material/UV data and collision. Shared storage must
+  still allow bounded residency and reliable map loading.
+- Consider mirroring/reuse only where geometry and texture/collision semantics
+  permit it; do not mirror the authored landscape as a substitute for original
+  placements. These are investigation options, not implemented size savings.
+- Reduce overlap duplication without removing the visible/collision margin
+  needed for draw distance, hysteresis and diagonal views. Keep Seyda Neen and
+  Balmora transition correctness as regression gates; see the growing
+  [cell-change continuity checklist](CELL_CHANGING.md).
+- Refine seam-preserving LOD, texture storage and conversion-cache reuse after
+  measuring their contribution. Closed mushroom joins and original UVs remain
+  requirements; the earlier independently reduced caps are not acceptable.
+- Publish before/after size, memory, build-time, loading and FPS measurements.
+  Optimization must improve a measured cost while preserving placements,
+  appearance, gameplay state and collision. No savings target is promised yet.
+
+
+## Implemented: generate both emulator configurations during image assembly
+
+The normal full-game, dry-run and Docker build paths now emit versioned FS-UAE
+`.fs-uae` and WinUAE `.uae` configurations from the verified `build.json` HDF
+list. Asset-free images also receive both formats. The v0.0.27-rc4 templates were missing; matching rc4 asset-free presets were
+added from the unchanged rc3 presets, and the writer selects the version-matched
+template while preserving the user's ROM selection policy.
+
+- [x] DONE: implemented in v0.0.27-rc3 — mount all required HDFs together, with
+  the boot HDF first, and retain compatibility with the previous single-HDF
+  layout.
+- [x] DONE: implemented in v0.0.27-rc3 — support an optional owner-supplied
+  `--kickstart-file`; otherwise leave ROM selection empty. Never distribute or
+  download ROMs.
+- [x] DONE: implemented in v0.0.27-rc3 — validate the HDF list, unsafe/missing
+  paths and stale mount handling in configuration hooks; print both config paths
+  and all HDF paths in build summaries/footers, with Docker paths rebased for the
+  host.
+
+- [x] DONE: implemented in v0.0.27-rc4 — add matching asset-free FS-UAE and
+  WinUAE presets based on unchanged rc3 templates; select the version-matched
+  preset during build.
+
+Windows validation: configuration tests pass 11/11. The Windows `run_fs_uae`
+suite reports 12 passed, 1 error in the symlink case unavailable on this Windows
+setup, and 1 failure in the POSIX-stub launcher test that cannot execute here.
+This does not establish all-host runner parity.
+
+- [ ] Run actual FS-UAE multi-drive gameplay from the generated configuration
+  and validate every disk, boot order and paths. Configuration generation tests
+  do not prove emulator playability.
+
+The missing-template regression and repair are recorded in the
+[bug journal](BUG_JOURNAL.md). Linux execution/parity remains a separate check.
+
+## v0.0.26 released - validated Windows and Docker builds
 
 The final Docker helper/export run passed full conversion, strict actor-ground
 validation, verified HDF assembly and WinUAE game entry. All 3,551 NPC models and
 2,526 terrain regions passed; the HDF is 3,489,693,696 bytes with SHA-256
 `da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`. The cached
 run had conversion elapsed of 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing, and reported 78 warnings. The local wrapper suite
-passed 433 tests with 3 skips. Hosted Docker CI and public publication remain
-pending. See [release notes](RELEASE-v0.0.26.md).
+passed 433 tests with 3 skips. Hosted source, Linux/Windows parity and Docker CI passed; v0.0.26 is published. See [release notes](RELEASE-v0.0.26.md).
 
 The earlier cold Docker run used rc1 identity and took 35 minutes 3 seconds; its
 separate evidence remains in [Docker validation](VALIDATION-DOCKER-2026-10-02.md).
@@ -33,15 +102,43 @@ setup and launchers must not create a separate conversion implementation.
 - [x] Play the opening movie and enter Jiub's prison scene from the Docker HDF
   in WinUAE 6.0.3; verify Enter/Escape controls.
 - [x] Complete final v0.0.26 helper/export validation and WinUAE game-entry check.
-- [ ] Complete hosted Docker CI and owner-run publication.
+- [x] Complete hosted Docker CI and owner-run publication.
 - [x] Review exported image layers; measured full-build peak storage remains open.
-- [ ] Prepare a source-only handoff for Linux validation and owner-run publishing.
+- [x] Deliver the source-only handoff for Linux validation and owner-run publishing.
 
 Native Windows remains experimental, with worker and cancellation reliability
 limits documented in the [Windows roadmap](WINDOWS_BUILD_ROADMAP.md). The final
-Docker helper/export and WinUAE validation for v0.0.26 have passed locally; hosted
-CI and publication remain pending.
+Docker helper/export and WinUAE validation for v0.0.26 passed locally; hosted CI
+and owner-run Linux publication completed successfully.
 
+
+## Upcoming patch targets
+
+### v0.0.27 - Rocks, Mushrooms, and Then Some
+
+The working title now includes terrain handovers and state continuity, memory
+watching/profiling with mandatory headroom, bounded town subdivision, and private
+polycount heatmaps generated from user-provided assets. These items have separate
+implementation and validation status; the title does not claim a repaired HDF.
+
+Place all individual rock formations and giant mushroom scenery on the map of
+Vvardenfell, using their original base-game CELL/FRMR placements. Exclude small
+collectible mushrooms. Audit every relevant asset and reference; retain original
+position, full rotation, scale, textures and collision, including formations
+that overlap cell boundaries and cover gaps in the LAND height field.
+
+Use measured low-poly representations that preserve silhouettes and terrain
+coverage. Follow [What are rocks?](WHAT_ARE_ROCKS.md), including its existing
+64-triangle rock target and the Seyda Neen silt-strider port compound-rotation
+regression. Full-world terrain generation alone does not prove scenery coverage.
+This patch is under investigation; complete scenery coverage is not yet proven.
+
+### v0.0.28 - The Road(s) More or Less Travelled
+
+Map all Vvardenfell roadways and their original textures. Audit how each road is
+represented by LAND materials, placed meshes or both before choosing a conversion
+path. Preserve authored routes, junctions, bridges and continuity across source
+cell boundaries. This is a planned follow-up to Rocks and Mushrooms.
 
 ## TODO SOON: static asset gallery and cell-by-cell scenery
 
@@ -1423,3 +1520,225 @@ required for partial corpse looting and equipment changes. rc10 caches existing
 appearance snapshots; it does not make fixed outfits the final runtime design.
 Preserve reusable source parts and per-actor state; do not pre-bake every outfit
 combination. Normal gallery coverage and owner-approval requirements remain.
+
+## v0.0.27 delivery order: repaired playtest first
+
+The immediate acceptance target is a repaired, reproducible playtest package. Keep
+Vivec inactive and do not broaden the playtest scope before this gate is complete.
+The normal converter now emits bounded Seyda maps and the repaired three-rectangle
+Balmora layout. The complete 2,717-map optimizer, actor/contact and static heap
+gates passed; final image assembly and all HDF filesystem readbacks also passed.
+Owner target acceptance, cold/warm lifecycle and runtime heap measurements remain
+pending; estimates are not runtime results.
+
+- The ordinary converter generates a 64-region Seyda Neen layout alongside its
+  docks, court and fallback entries. Its 67-map static estimate passes, and the
+  complete 2,717-map optimizer, actor/contact and heap gates now pass. The final
+  private image and both HDF readbacks also pass; target playtesting remains
+  pending. Do not confuse the historical 25-region layout with this generated
+  result or call 64 regions a proven minimum. Preserve the 3 MiB non-map
+  allowance, 2 MiB safety reserve, 896-unit coverage apron, collision/state
+  guarantees and required content.- A separate three-rectangle Balmora layout now merges adjacent cheap outer
+  regions and divides the former oversized area while preserving the 64-slot
+  format, 896-unit coverage apron, hysteresis and 3+2 MiB reserves. Its three
+  static peaks are 3,087,760, 5,971,920 and 5,615,520 bytes. The complete
+  saved-ABI audit now passes 65/65 entries and covers all 1,488 source references
+  with none lost; the worst fallback is 6,155,504 bytes with 135,952 bytes of
+  post-reserve margin. This remains static evidence: 5 MiB is a planning target,
+  and image/target acceptance is pending.
+
+The `bm027` replacement uses a 128-unit lower core with 96-unit hysteresis; an
+adjacent region may remain active as the player crosses the small core's center
+within that band. Half-open core ownership remains unique, and switching
+thresholds are unchanged. Visual coverage keeps its 896-unit apron while physical
+collision coverage uses the existing 224-unit apron. Test both directions around
+the split/merge, including rapid noclip and held Ctrl+Shift, for terrain/scenery
+continuity and collision. These transitions have not passed target playtesting.
+
+- Run the final heap gate after subcell regeneration and actor annotation, against
+  the exact maps that will be fingerprinted and packaged. Record map receipts,
+  report/input hashes, runtime fields as pending until measured, and the exact
+  engine/loader/configuration identity in the build receipt.
+- Build the matching engine and HDF/configuration set from those audited maps.
+  Then run the exact playtest entry and record transitions, held input, collision,
+  player/actor/equipment state, cold/warm loads, first presentation and warmed
+  gameplay. A static estimate, host allocator test, source compile or HDF build
+  alone does not accept the playable repair.
+- The memory workflow is **Heap Watcher → Profiler → Optimizer**: detect pressure,
+  explain its source and phase, then change actual payload/representation and
+  re-audit. Keep estimates distinct from target runtime observations. The
+  5 MiB figure is a planning target; the 6 MiB BSP ceiling and 3+2 MiB reserves
+  remain the policy. Optimization/source checks are not packaged acceptance.
+- A matched full-VIS experiment may inform later visual/performance work, but is
+  optional and does not block the repaired playtest. Compare equal inputs and
+  settings; do not attribute missing scenery to VIS or accept extra visibility
+  cost without measurement.
+
+Historical memory evidence remains in [memory allocation](MEMORY_ALLOCATION.md),
+[heap watcher and `build.json` receipt fields](HEAP_WATCHER.md#build-receipts-used-free-and-growth-margin),
+[bounded-world candidate notes](BOUNDED_WORLD_CANDIDATES.md), and the
+[world-detail/topology ladder](WORLD_DETAIL_LADDER.md). The 28-map baseline
+included town overlays, special town maps and interiors; the separate
+21-candidate trial had 6 passes and 15 failures (9 Seyda Neen and 6 Balmora
+overlay/exterior subcells). Those counts describe different scopes and must not
+be presented as a refreshed 28-map result or as proof that every town overlay
+fails. Candidate failures guide profiling; they do not alone establish which
+retained resource caused pressure.
+
+## Reusable polygon-heavy town residency
+
+Future dense settlements require actual payload reduction and bounded subdivision,
+not merely more region records. Smaller cores alone can retain shared parent
+terrain/PVS and may increase crossing frequency. Preserve the 896-unit apron,
+current draw/hysteresis behavior, unchanged reserves, complete textured models,
+collision and gameplay state unless matched evidence justifies a separately
+reviewed change. Keep shared-border terrain/UVs continuous and test crossings in
+both directions, including actors, swept collision and levitation.
+
+Use the normal preparation path to select boundaries from measured per-region
+payload, content density, visibility data and geometry/collision costs. Require
+per-map receipts and full-cycle profiling before packaging; check region-count
+limits and transition rate alongside heap. Adaptive subdivision is a planning
+helper, not acceptance by itself. Keep total-town background counts/provenance
+separate from per-map converted geometry: verify coverage and content directly.
+No single central prototype, collision-only reduction or visual-face pruning
+proves a complete town layout is safe. See the [bounded-town candidate workflow](BOUNDED_WORLD_CANDIDATES.md).
+
+## Map panel: complete the Debug / In-Game selector after repaired playtest
+
+The source prototype exposes aw_map_mode and aw_map_debug_available with
+selection controls and debug-policy checks. The rc5 engine compile and private
+candidate image include the marker/contrast correction and passed HDF readback.
+Nine source checks pass; updated Linux native behavior fixtures have not been
+executed and owner target acceptance remains pending. Complete this feature after
+the repaired playtest gate. See [world map and journal](WORLD_MAP_AND_JOURNAL.md)
+for the interaction contract and progress checkpoint.
+
+- Present obvious Debug and In-Game mode buttons with a visible selected state.
+  Respect the configured default and aw_map_debug_available so debug-only
+  controls cannot appear or activate in the regular mode.
+- Finish the Debug map and In-Game map as distinct, tested views. The In-Game
+  view needs its player-heading triangle, crosshair, verified original-game
+  location markers, two useful map scales, click-to-zoom, and navigation/pan.
+  Preserve the established marker identities and world-coordinate transforms.
+  Validate axes, interiors, cell changes, teleport and levitation.
+- Read and decode only verified owner-provided map inputs on demand. Keep
+  proprietary map art and icons out of public source and release artifacts.
+  Bound input reads, decoded buffers, cache/switching peaks; release inactive
+  views and test open/switch/close.
+- Add original-game unexplored-area fog/masking as a later milestone, driven by
+  visited exterior locations and saved exploration state; it is not a repaired
+  playtest prerequisite.
+- Accept only after normal build integration from a matching source checkpoint,
+  correct engine/configuration generation, input/modal behavior, persistence as
+  specified, and target checks. The existing terrain overview/crosshair does
+  not alone complete the In-Game map.
+
+## Dialogue, music and video import/runtime milestones
+
+These are required later content/runtime workstreams, not completed features and
+not a reason to delay the repaired playtest. Keep all original and converted
+proprietary audio/video assets private; public changes may contain source logic,
+asset-free manifests/schemas and documentation only.
+
+### Variable voiced dialogue
+
+The current runtime is a bounded generic HELLO audition, not full voiced dialogue.
+Implement applicable voiced lines with their original event conditions and ordered
+selection semantics. Ambient HELLO/IDLE behavior is distinct from conversation
+GREET; do not substitute uniform random selection or treat a static topic match as
+a runtime trigger. Verify condition evaluation, speaker/context, priority,
+repeat/cooldown and return-to-game state against owned records and a documented
+reference implementation. Convert/import all applicable voice lines into
+playtest-selectable resources, then test representative states and failure paths.
+See [voiced dialogue research](VOICED_DIALOGUE.md); it documents evidence and
+remaining work, not completion.
+
+### Music
+
+Compare existing converted and packaged music against the complete available
+owner-provided source inventory so individual missing tracks are visible even
+when totals happen to match. The observed inventory contains 18 MP3 tracks; verify
+all 18 individually through the normal conversion/package pipeline. Include any
+additional expansion tracks found in the owned source inventory. Preserve the
+current music playstyle and playback routine; this is a completeness requirement,
+not a playback redesign. Record source identifiers/hashes, converted and packaged
+counterparts, missing optional files and conversion failures separately. Keep
+original and converted audio private. Acceptance requires per-item completeness
+and regression checks of the existing playback behavior.
+### Optional video catalogue and playback
+
+Compare converted and packaged files against the complete owned video inventory,
+then convert/import every available clip through the normal conversion/compile
+pipeline, including Tribunal and Bloodmoon files if present. The observed source
+inventory has 17 Bink files; individual converted/package completeness is not yet
+verified. The catalogue helper has only syntax-level validation. There is no
+completed all-video conversion or accepted runtime integration.
+
+The planned stable catalogue IDs and `dbg playvid` interface are not active. Debug
+playback wiring is paused after automatic review did not approve the attempted
+change; resume only through an approved implementation route. Acceptance requires
+safe missing/invalid-resource handling, bounded buffers, palette/audio ownership,
+skip and normal completion, and restoration of the same scene/player/actor state
+without advancing the opening script or reloading the map. Verify each source,
+converted and packaged identity/hash plus omissions and failures. Original and
+converted media remain private. Story-event triggers are separate future work;
+the partial New Game intro path does not satisfy catalogue completeness.
+
+## Visual quality, visibility and performance follow-up
+
+Keep coverage completeness, VIS, draw-distance culling, fog, LOD and resident
+memory as separate investigations. A full-VIS comparison is optional; visibility
+compilation currently precedes appended scenery, so those placements cannot act
+as blockers in that build order. Investigate suitable static occluders only with
+matched visual and memory evidence. VIS cannot create missing terrain, textures
+or placements.
+
+The reported Red Mountain blank/white horizon with fog disabled has no confirmed
+cause. Reproduce it on a named build, position, direction, draw-distance and fog
+setting before proposing a repair. The observation that a requested 1000-unit
+Balmora distance felt faster is not a measured effective distance or diagnosis;
+record requested and effective range, frame timings, culling/rejection counts,
+clipped/drawn surfaces and cache/I/O activity. Fog palette behavior is distinct
+from distance culling, and culling must not be described as unloading assets
+without evidence.
+
+Later LOD work must use full 3D distance and bounds, including levitation,
+undersides, cliffs and vertical town spaces. Preserve collision and gameplay
+state, use bounded resource ownership and measured hysteresis, and test seams and
+transitions. LOD is not a substitute for complete source coverage or a promised
+memory/FPS saving.
+
+## Later mapping: Vivec remains inactive
+
+Vivec is mapping/planning work only. Do not add it to runtime registration,
+build configuration, the repaired playtest or active gameplay code until after
+that playtest and a later explicit scope decision. Any future slice must account
+for stacked spaces, cantons, bridges, water, interiors, collision, seams, actors,
+levitation and bidirectional crossings, with bounded measured payloads and the
+same unchanged reserves. Keep source game assets private.
+Full-VIS comparison status (3 October 2026): optional experiment stopped to free
+CPU for the repair playtest; inputs/logs and the tool's periodically saved state
+were preserved privately. Resumption is unverified and no final comparison is
+accepted. Retain this as deferred research, not a normal-build prerequisite.
+
+### Mandatory follow-up: building geometry and collision audit
+
+Owner-confirmed MUST-DO, 3 October 2026, scheduled after the current repair
+playtest. Profile source versus converted house/building geometry, polygon counts,
+loading/resident memory and frame costs. Investigate decorative details, internal
+or genuinely unseen surfaces, exact mesh sharing and collision representation
+without assuming those elements are redundant. Preserve doors/windows/openings,
+walkable spaces, original UV/material intent, silhouettes and collision. Accept
+measured savings only after matched visual and gameplay regression checks. Use
+matched original-versus-candidate A/B geometry captures and measurements at the
+same camera, region and load state so reduced faces or collision cost are not
+confused with culling, fog or changed residency.
+This is mandatory follow-up, not a prerequisite that delays this playtest.
+Building-audit example: Harry recalls particularly high polygon counts on some Seyda Neen buildings, including arches. Measure curved tessellation, decorative surfaces and collision cost; preserve arch openings, silhouette and original UVs. This is an observation to profile, not established redundant geometry.
+Building-audit hypothesis, Harry's “it just works!” observation: original meshes
+may include substantial geometry hidden or unused in normal views. Determine
+which surfaces genuinely lack required consumers before removing anything;
+occluded geometry can still matter for levitation/other angles, interiors,
+collision or visibility. Source polygon totals are not visible-frame totals.
+Do not present unnecessary-face counts or removable savings as established yet.

@@ -28,6 +28,7 @@ from prepare_area import build_resident, entity
 from player_hull import lumps, pack_lumps, rebuild_world_hull
 from surface_flatten import load_profiles
 from actor_grounding import fields as grounding_fields
+from bound_balmora_visuals import bound_visuals
 
 
 def write_json(path, value):
@@ -286,7 +287,9 @@ def prepare(data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None
                                collision_compiler=qbsp,collision_cache=out/'collision-cache')
         if report['unique_models'] > settings['model_budget']:
             raise ValueError(entry['name'] + ': inline model budget exceeded')
-        report.update(region=entry, references=selected)
+        bounded, visual_report = bound_visuals((root / 'scene.bsp').read_bytes(), entry['coverage'])
+        (root / 'scene.bsp').write_bytes(bounded)
+        report.update(region=entry, references=selected, visual_coverage=visual_report)
         write_json(root / 'conversion.json', report); reports.append(report)
         print('Balmora region ready:', entry['name'], report['instances'], report['clipnodes'], flush=True)
     # Publish converted payloads only after every region passes its limits.

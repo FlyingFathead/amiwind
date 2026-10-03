@@ -20,6 +20,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Z_zone.c
 
 #include "quakedef.h"
+#ifdef AMIGA
+#include <proto/exec.h>
+#include <exec/memory.h>
+#include "amiwind_version.h"
+#define AW_HEAP_VERSION AMIWIND_VERSION
+#define AW_HEAP_OS_METRICS 1
+#else
+#define AW_HEAP_VERSION "host-fixture"
+#define AW_HEAP_OS_METRICS 0
+#endif
+
+static void AW_HeapAuditFailed(const char *,int,int);
 
 #define	DYNAMIC_SIZE	0xc000
 
@@ -145,8 +157,15 @@ void *Z_Malloc (int size)
 
 Z_CheckHeap ();	// DEBUG
 	buf = Z_TagMalloc (size, 1);
-	if (!buf)
+	if (!buf) {
+        memblock_t *block;int largest=0,available;
+        for(block=mainzone->blocklist.next;block!=&mainzone->blocklist;block=block->next){
+            if(!block->tag && block->size>largest)largest=block->size;
+        }
+        available=largest-(int)sizeof(memblock_t)-4;if(available<0)available=0;
+        AW_HeapAuditFailed("zone",size,available);
 		Sys_Error ("Z_Malloc: failed on allocation of %i bytes",size);
+    }
 	Q_memset (buf, 0, size);
 
 	return buf;
@@ -277,6 +296,73 @@ int		hunk_size;
 
 int		hunk_low_used;
 int		hunk_high_used;
+
+/* Event-driven diagnostics: no per-frame scan or write. Cache counters describe
+ * logical allocations; moving a cache block does not create another live asset. */
+static int aw_heap_load_peak,aw_heap_largest_request;
+static int aw_cache_bytes,aw_cache_peak,aw_cache_largest_request;
+static unsigned long aw_cache_evictions,aw_cache_moves,aw_heap_transition;
+static int aw_cache_preserve_free;
+static char aw_heap_scene[MAX_QPATH]="startup",aw_heap_phase[32]="startup";
+static char aw_heap_peak_label[32]="baseline",aw_heap_failed_arena[16]="none";
+static int aw_heap_failed_request,aw_heap_failed_available;
+static void AW_HeapAuditPeak(void) {
+    int used=hunk_low_used+hunk_high_used;
+    if(used>aw_heap_load_peak)aw_heap_load_peak=used;
+}
+static void AW_HeapAuditAllocated(int bytes,const char *name) {
+    int previous=aw_heap_load_peak;
+    if(bytes>aw_heap_largest_request)aw_heap_largest_request=bytes;
+    AW_HeapAuditPeak();
+    if(aw_heap_load_peak>previous){strncpy(aw_heap_peak_label,name?name:"unknown",31);aw_heap_peak_label[31]=0;}
+}
+static void AW_HeapAuditFailed(const char *arena,int request,int available) {
+    strncpy(aw_heap_failed_arena,arena,15);aw_heap_failed_arena[15]=0;
+    aw_heap_failed_request=request;aw_heap_failed_available=available;
+}
+void AW_HeapAuditBegin(void) {
+    aw_heap_transition++;aw_heap_load_peak=hunk_low_used+hunk_high_used;
+    aw_heap_largest_request=aw_cache_largest_request=0;aw_cache_peak=aw_cache_bytes;
+    aw_cache_evictions=aw_cache_moves=0;
+    strcpy(aw_heap_peak_label,"baseline");strcpy(aw_heap_failed_arena,"none");
+    aw_heap_failed_request=aw_heap_failed_available=0;
+}
+void AW_HeapAuditPhase(const char *scene,const char *phase) {
+    FILE *f;memblock_t *block;int used,clearance,peak_clearance,zone_free=0,zone_largest=0;
+    char previous_phase[32];
+    unsigned long fast_free=0,fast_largest=0,chip_free=0,chip_largest=0;
+    if(!hunk_base || hunk_size<=0)return;
+    strcpy(previous_phase,aw_heap_phase);
+    if(scene && *scene){strncpy(aw_heap_scene,scene,sizeof(aw_heap_scene)-1);aw_heap_scene[sizeof(aw_heap_scene)-1]=0;}
+    if(phase && *phase){strncpy(aw_heap_phase,phase,sizeof(aw_heap_phase)-1);aw_heap_phase[sizeof(aw_heap_phase)-1]=0;}
+    used=hunk_low_used+hunk_high_used;clearance=hunk_size-used;
+    AW_HeapAuditPeak();peak_clearance=hunk_size-aw_heap_load_peak;
+    if(mainzone){
+        for(block=mainzone->blocklist.next;block!=&mainzone->blocklist;block=block->next){
+            if(!block->tag){zone_free+=block->size;if(block->size>zone_largest)zone_largest=block->size;}
+        }
+    }
+#ifdef AMIGA
+    fast_free=AvailMem(MEMF_FAST);fast_largest=AvailMem(MEMF_FAST|MEMF_LARGEST);
+    chip_free=AvailMem(MEMF_CHIP);chip_largest=AvailMem(MEMF_CHIP|MEMF_LARGEST);
+#endif
+    Con_Printf("Heap %s %s: low %ld high %ld peak %ld / %ld, gap %ld peak gap %ld; cache %ld peak %ld, zone largest %ld\n",
+        aw_heap_scene,aw_heap_phase,(long)hunk_low_used,(long)hunk_high_used,
+        (long)aw_heap_load_peak,(long)hunk_size,(long)clearance,(long)peak_clearance,
+        (long)aw_cache_bytes,(long)aw_cache_peak,(long)zone_largest);
+    if(peak_clearance<2097152)Con_Printf("WARNING: hunk-gap safety below 2 MiB. Region requires memory review.\n");
+    f=fopen("heap-audit.log","a");
+    if(f){
+        fprintf(f,"format=AWH1 transition=%lu scene=%s phase=%s previous_phase=%s version=%s budget=%d low=%d high=%d used=%d load_peak=%d clearance=%d peak_clearance=%d peak_label=%s largest_hunk_request=%d cache_bytes=%d cache_peak=%d largest_cache_request=%d cache_evictions=%lu cache_moves=%lu zone_free=%d zone_largest=%d os_metrics=%d fast_free=%lu fast_largest=%lu chip_free=%lu chip_largest=%lu failed_arena=%s failed_request=%d failed_available=%d safety=2097152 status=%s\n",
+            aw_heap_transition,aw_heap_scene,aw_heap_phase,previous_phase,AW_HEAP_VERSION,hunk_size,hunk_low_used,hunk_high_used,
+            used,aw_heap_load_peak,clearance,peak_clearance,aw_heap_peak_label,aw_heap_largest_request,
+            aw_cache_bytes,aw_cache_peak,aw_cache_largest_request,aw_cache_evictions,aw_cache_moves,
+            zone_free,zone_largest,AW_HEAP_OS_METRICS,fast_free,fast_largest,chip_free,chip_largest,
+            aw_heap_failed_arena,aw_heap_failed_request,aw_heap_failed_available,
+            peak_clearance<2097152?"LOW_HEADROOM":"HUNK_GAP_CLEAR");fclose(f);
+    }
+}
+void AW_HeapAuditReport(const char *scene) {AW_HeapAuditPhase(scene,"snapshot");}
 
 qboolean	hunk_tempactive;
 int		hunk_tempmark;
@@ -409,12 +495,15 @@ void *Hunk_AllocName (int size, char *name)
 
 	size = sizeof(hunk_t) + ((size+15)&~15);
 
-	if (hunk_size - hunk_low_used - hunk_high_used < size)
+	if (hunk_size - hunk_low_used - hunk_high_used < size) {
+        AW_HeapAuditFailed("low-hunk",size,hunk_size-hunk_low_used-hunk_high_used);
 		Sys_Error ("Hunk_Alloc %s: need %ld bytes, free %ld of %ld",name,
 			(long)size,(long)(hunk_size-hunk_low_used-hunk_high_used),(long)hunk_size);
+    }
 
 	h = (hunk_t *)(hunk_base + hunk_low_used);
 	hunk_low_used += size;
+    AW_HeapAuditAllocated(size,name);
 
 	Cache_FreeLow (hunk_low_used);
 
@@ -501,11 +590,13 @@ void *Hunk_HighAllocName (int size, char *name)
 
 	if (hunk_size - hunk_low_used - hunk_high_used < size)
 	{
+		AW_HeapAuditFailed("high-hunk",size,hunk_size-hunk_low_used-hunk_high_used);
 		Con_Printf ("Hunk_HighAlloc: failed on %i bytes\n",size);
 		return NULL;
 	}
 
 	hunk_high_used += size;
+    AW_HeapAuditAllocated(size,name);
 	Cache_FreeHigh (hunk_high_used);
 
 	h = (hunk_t *)(hunk_base + hunk_size - hunk_high_used);
@@ -586,13 +677,16 @@ void Cache_Move ( cache_system_t *c)
 		Q_memcpy ( new+1, c+1, c->size - sizeof(cache_system_t) );
 		new->user = c->user;
 		Q_memcpy (new->name, c->name, sizeof(new->name));
+		aw_cache_moves++;aw_cache_preserve_free=1;
 		Cache_Free (c->user);
+        aw_cache_preserve_free=0;
 		new->user->data = (void *)(new+1);
 	}
 	else
 	{
 //		Con_Printf ("cache_move failed\n");
 
+		aw_cache_evictions++;
 		Cache_Free (c->user);		// tough luck...
 	}
 }
@@ -638,8 +732,10 @@ void Cache_FreeHigh (int new_high_hunk)
 			return;		// nothing in cache at all
 		if ( (byte *)c + c->size <= hunk_base + hunk_size - new_high_hunk)
 			return;		// there is space to grow the hunk
-		if (c == prev)
+		if (c == prev) {
+			aw_cache_evictions++;
 			Cache_Free (c->user);	// didn't move out of the way
+        }
 		else
 		{
 			Cache_Move (c);	// try to move it
@@ -686,8 +782,10 @@ cache_system_t *Cache_TryAlloc (int size, qboolean nobottom)
 
 	if (!nobottom && cache_head.prev == &cache_head)
 	{
-		if (hunk_size - hunk_high_used - hunk_low_used < size)
+		if (hunk_size - hunk_high_used - hunk_low_used < size) {
+            AW_HeapAuditFailed("cache",size,hunk_size-hunk_low_used-hunk_high_used);
 			Sys_Error ("Cache_TryAlloc: %i is greater then free hunk", size);
+        }
 
 		new = (cache_system_t *) (hunk_base + hunk_low_used);
 		memset (new, 0, sizeof(*new));
@@ -830,6 +928,7 @@ void Cache_Free (cache_user_t *c)
 		Sys_Error ("Cache_Free: not allocated");
 
 	cs = ((cache_system_t *)c->data) - 1;
+    if(!aw_cache_preserve_free)aw_cache_bytes-=cs->size;
 
 	cs->prev->next = cs->next;
 	cs->next->prev = cs->prev;
@@ -880,6 +979,7 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 		Sys_Error ("Cache_Alloc: size %i", size);
 
 	size = (size + sizeof(cache_system_t) + 15) & ~15;
+    if(size>aw_cache_largest_request)aw_cache_largest_request=size;
 
 // find memory for it
 	while (1)
@@ -890,6 +990,7 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 			strncpy (cs->name, name, sizeof(cs->name)-1);
 			c->data = (void *)(cs+1);
 			cs->user = c;
+            aw_cache_bytes+=size;if(aw_cache_bytes>aw_cache_peak)aw_cache_peak=aw_cache_bytes;
 			break;
 		}
 
@@ -897,6 +998,7 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 		if (cache_head.lru_prev == &cache_head)
 			Sys_Error ("Cache_Alloc: out of memory");
 													// not enough memory at all
+		aw_cache_evictions++;
 		Cache_Free ( cache_head.lru_prev->user );
 	}
 

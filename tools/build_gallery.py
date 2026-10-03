@@ -127,6 +127,13 @@ def stage_required(gallery, id1):
     report = stage(gallery, id1)
     if report['unresolved']:
         raise ValueError('NPC gallery model budget audit failed')
+    # Legacy receipts may describe CRLF; verify regenerated allowances before
+    # preserving their authenticated source bytes for exact package validation.
+    original = (gallery/'model-budgets.txt').read_bytes()
+    generated = (id1/'model-budgets.txt').read_bytes()
+    if original.replace(b'\r\n', b'\n') != generated.replace(b'\r\n', b'\n'):
+        raise ValueError('NPC gallery regenerated model allowances differ')
+    shutil.copyfile(gallery/'model-budgets.txt', id1/'model-budgets.txt')
     (id1/'maps').mkdir(exist_ok=True)
     shutil.copyfile(gallery/'maps/charplane.bsp', id1/'maps/charplane.bsp')
     (id1/"npc-gallery-disabled.txt").unlink(missing_ok=True)

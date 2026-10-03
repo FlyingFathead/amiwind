@@ -121,29 +121,30 @@ def inspect_run(args, root):
 
 
 def recovery_commands(steps, old, run):
-    """Rebuild the default gallery even when the retained scene omitted it.
-
-    Only --no-npc-gallery on the current image command permits omission. Use
-    current command construction; never execute commands from an old receipt.
-    """
+    """Rebuild scenery overlays, the versioned engine, gallery, and image."""
     selected = []
     for name, original in steps:
-        if name not in ('engine', 'npc-gallery', 'image'):
+        if name not in ('engine', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'image'):
             continue
         command = list(original)
         if name == 'npc-gallery':
+            command[command.index('--palette')+1] = str(old/'intro-scene/id1/gfx/palette.lmp')
+        if name == 'world-scenery':
+            command[command.index('--terrain')+1] = str(old/'world-terrain')
             command[command.index('--palette')+1] = str(old/'intro-scene/id1/gfx/palette.lmp')
         if name == 'image':
             for flag, path in [('--scene', old/'intro-scene'), ('--music', old/'music')]:
                 command[command.index(flag)+1] = str(path)
         selected.append((name, command))
-    order = {'engine': 0, 'npc-gallery': 1, 'image': 2}
+    order = {'engine': 0, 'world-scenery-assets': 1, 'world-scenery': 2,
+             'npc-gallery': 3, 'image': 4}
     selected.sort(key=lambda step: order[step[0]])
     image = next((command for name, command in selected if name == 'image'), [])
-    expected = ['engine', 'image'] if '--no-npc-gallery' in image else ['engine', 'npc-gallery', 'image']
+    expected = (['engine', 'world-scenery-assets', 'world-scenery', 'image']
+                if '--no-npc-gallery' in image else
+                ['engine', 'world-scenery-assets', 'world-scenery', 'npc-gallery', 'image'])
     if [name for name, _ in selected] != expected:
-        raise ValueError('Expected engine, required NPC gallery, then image recovery commands')
-    # The normal command builder must keep all new output paths in the new run.
+        raise ValueError('Expected engine, scenery source export and overlay, required NPC gallery, then image recovery commands')
     for _, command in selected:
         output = Path(command[command.index('--out')+1]).resolve()
         if run.resolve() not in output.parents or old.resolve() in output.parents:

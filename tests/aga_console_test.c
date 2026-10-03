@@ -48,6 +48,8 @@ int main(void){
  char *missing[]={"debug","reset"};
  char *help[]={"debug","help"};
  char *picker[]={"dbg","scene","change"};
+ char *tp_map[]={"dbg","tp","map"};
+ char *map_tp[]={"dbg","map","tp"};
  char *tp[]={"dbg","tp","balmora"};
  char *tp_menu[]={"amiwind","debug","tp","menu"};
  char *tp_bad[]={"dbg","tp","balmora;quit"};
@@ -76,6 +78,8 @@ int main(void){
  assert(!strcmp(output,"amiwind_debug_coords on\n"));
  assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1);
  assert(!strcmp(output,"aw_scene_menu\n"));
+ assert(AW_DebugTranslate(3,tp_map,output,sizeof(output))==1 && !strcmp(output,"aw_teleport_map\n"));
+ assert(AW_DebugTranslate(3,map_tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport_map\n"));
  assert(AW_DebugTranslate(2,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport\n"));
  assert(AW_DebugTranslate(3,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport balmora\n"));
  tp[2]="seydaneen";
@@ -123,3 +127,7 @@ int main(void){
  assert(AW_ConsoleCharWidth()==8); /* HUD cannot change console mode. */
  return 0;
 }
+
+void AW_HeapAuditReport(const char *scene){}
+
+server_t sv;

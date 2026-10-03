@@ -16,6 +16,9 @@ static byte background[64776],loading_background[64776];
 static int loading_state,loading_next;
 static cvar_t loading_style={"aw_loading_style","normal",false};
 static cvar_t region_loading={"aw_region_loading","1",true};
+static cvar_t region_loading_delay={"aw_region_loading_delay","2",true};
+static double next_loading_delay,loading_delay,loading_started;
+static int next_loading_region,loading_region;
 
 /* Shared proportional scrollbar for menus and future dialogue/topic panes.
  * Geometry is bounded; drawing and hit testing use the same ten-pixel rail. */
@@ -129,6 +132,22 @@ int AW_UIBackground(void) {
 }
 void AW_SetNextLoadingStyle(aw_loading_style_t style) {
     next_loading_style=style>=AW_LOADING_NORMAL && style<=AW_LOADING_FROZEN?style:AW_LOADING_NORMAL;
+    next_loading_delay=0;next_loading_region=0;
+}
+void AW_SetNextLoadingDelay(void) {
+    double seconds=region_loading_delay.value;
+    /* NaN/negative means immediate; positive infinity/large values cap at 60. */
+    if(!(seconds>=0))seconds=0;
+    if(seconds>60)seconds=60;
+    next_loading_delay=seconds;next_loading_region=1;
+}
+int AW_LoadingDelayed(void){return loading_active && loading_delay>0;}
+int AW_LoadingDelayExpired(void) {
+    double now;
+    if(!AW_LoadingDelayed())return 0;
+    now=Sys_FloatTime();
+    if(now-loading_started<loading_delay)return 0;
+    loading_delay=0;return 1;
 }
 int AW_RegionLoadingFrozen(void){return region_loading.value!=0;}
 void AW_RegionLoadingToggle(void){Cvar_SetValue(region_loading.name,!AW_RegionLoadingFrozen());}
@@ -152,13 +171,19 @@ void AW_BeginLoadingStyle(void) {
                 vid.buffer+row*vid.rowbytes,vid.width);
         }else {loading_frozen=0;loading_blank=1;}
     }
+    loading_region=next_loading_region;next_loading_region=0;
+    loading_delay=next_loading_delay;next_loading_delay=0;
+    loading_started=loading_delay>0?Sys_FloatTime():0;
     next_loading_style=-1;loading_active=1;loading_state=0;
 }
 void AW_EndLoadingStyle(void) {
     loading_active=loading_blank=loading_state=loading_frozen=0;
+    loading_delay=loading_started=next_loading_delay=0;next_loading_style=-1;
+    loading_region=next_loading_region=0;
 }
 void AW_UILoading(void) {
     int row,n,w,h,x;char path[40];
+    if(AW_LoadingDelayed())return;
     if(loading_frozen && !AW_LoadingFrozen()){loading_frozen=0;loading_blank=1;}
     if(loading_frozen){
         for(row=0;row<vid.height;row++)memcpy(vid.buffer+row*vid.rowbytes,
@@ -167,7 +192,14 @@ void AW_UILoading(void) {
         AW_UIBox(x,6,w,h);AW_UITextBox(x+4,10,w-8,h-8,"Loading...",-1);
         return;
     }
-    if(loading_blank){AW_UIFill(0,0,vid.width,vid.height,0);return;}
+    if(loading_blank){
+        AW_UIFill(0,0,vid.width,vid.height,loading_region?AW_UIColor(0,0,0):0);
+        if(loading_region){
+            w=AW_UIWidth("Loading...")+20;h=AW_UIHeight()+8;x=(vid.width-w)/2;
+            AW_UIBox(x,6,w,h);AW_UITextBox(x+4,10,w-8,h-8,"Loading...",-1);
+        }
+        return;
+    }
     if(!loading_state){
         sprintf(path,"gfx/loading%02ld.awb",(long)loading_next);
         n=read_asset(path,loading_background,sizeof(loading_background));
@@ -184,7 +216,7 @@ void AW_UILoading(void) {
 byte *AW_UIMenuPalette(void){
     if(AW_LoadingScreen()){
         if(AW_LoadingFrozen())return NULL;
-        if(loading_blank)return loading_black_palette;
+        if(loading_blank)return loading_region?host_basepal:loading_black_palette;
         if(loading_state==1)return loading_background+8;
         if(background_state==1)return background+8;
     }
@@ -655,6 +687,7 @@ void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_readable);Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cvar_RegisterVariable(&loading_style);
     Cvar_RegisterVariable(&region_loading);
+    Cvar_RegisterVariable(&region_loading_delay);
     Cvar_RegisterVariable(&dialogue_method);Cvar_RegisterVariable(&dialogue_layout);
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);

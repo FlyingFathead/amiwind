@@ -196,11 +196,19 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     if(pending || !map_valid(link->target))return;
     if(!AW_RegionSelect(link->target,link->arrival,intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
+    if(region_crossing){
+        AW_SetNextLoadingStyle(AW_RegionLoadingFrozen()?AW_LOADING_FROZEN:AW_LOADING_BLANK);
+        AW_SetNextLoadingDelay();
+    }
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
     health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
     v=GetEdictFieldValue(p,"aw_torch");torch_goal=v?v->_float:0;
-    IN_AWClearButtons();AW_MusicSceneEvent("scene-leave");
+    /* Automatic residency changes retain live held controls. Key releases and
+     * focus-loss clearing still run through the normal input path. Doors and
+     * explicit teleports keep their deliberate input boundary. */
+    if(!region_crossing)IN_AWClearButtons();
+    AW_MusicSceneEvent("scene-leave");
     Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
     sprintf(command,"map %s\n",next.target);
     if(immediate)Cbuf_InsertText(command);else Cbuf_AddText(command);
@@ -428,6 +436,7 @@ void AW_SceneSpawn(edict_t *p) {
     }
     AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_GallerySpawn(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
+    AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
 void AW_SceneTick(void) {
     aw_scene_link_t r;edict_t *p;
@@ -454,8 +463,8 @@ void AW_SceneTick(void) {
     r.yaw=p->v.angles[1];
     VectorCopy(p->v.v_angle,crossing_angles);VectorCopy(p->v.velocity,crossing_velocity);crossing_movetype=p->v.movetype;
     region_crossing=1;
-    AW_SetNextLoadingStyle(AW_RegionLoadingFrozen()?AW_LOADING_FROZEN:AW_LOADING_BLANK);
     load_scene(&r,1);
+    if(!pending)region_crossing=0;
 }
 static void scene_command(void) {
     aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];FILE *f=NULL;int i,size;

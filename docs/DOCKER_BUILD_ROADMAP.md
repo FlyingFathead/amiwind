@@ -132,3 +132,14 @@ mount the original game installation read-only. The wrapper should handle the
 container's fixed internal paths, worker budget and persistent cache automatically;
 users should not have to write Docker volume syntax. Reject input/output overlap.
 Record the image digest and build receipt; preserve normal failure exit codes.
+
+## Required pre-handoff Linux validation
+
+Run the complete Linux test suite and an asset-free Amiga compile gate inside the
+project Docker environment before every production handoff. Record commands,
+tool versions, logs, exit status, skips and failures. Focused tests do not replace
+the full suite. Report native Windows checks separately: Docker on Windows is a
+Linux build host, not native Windows validation. Do not create or execute native
+Windows helper binaries for this gate. Clean up only Docker/WSL resources started
+for the run and confirm prior state restoration. Publication is the owner's
+Linux-only step. Failed or unrun gates remain open.

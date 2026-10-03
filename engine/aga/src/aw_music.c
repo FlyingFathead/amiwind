@@ -109,6 +109,103 @@ void AW_MusicPaint(portable_samplepair_t *dst,int n) {
         at+=take;played+=take;dst+=take;n-=take;
     }
 }
+/* Explicit debug selection only: no catalogue scan or validation in the mixer.
+ * AWOST1 rows: decimal-ID group(0 explore/1 battle/2 special) token-alias.
+ * Generated aliases are case-insensitive filename/stem names with spaces '_'. */
+static int manual_id(const char *s,int *id) {
+    int n=0;if(!*s)return 0;
+    while(*s){if(*s<'0'||*s>'9')return 0;n=n*10+*s++-'0';if(n>98)return 0;}
+    *id=n;return 1;
+}
+static int manual_alias_char(int c) {
+    return (c>='a'&&c<='z') || (c>='A'&&c<='Z') ||
+           (c>='0'&&c<='9') || c=='_' || c=='.' || c=='-' || c=='+';
+}
+static int manual_lookup(const char *query,int *group) {
+    FILE *f;char path[MAX_OSPATH+64],line[160],*split,*alias,*end;
+    int numeric,wanted=-1,id,g,found=-1,found_group=-1;
+    numeric=manual_id(query,&wanted);
+    if(strlen(com_gamedir)+24>=sizeof(path))return -1;
+    strcpy(path,com_gamedir);strcat(path,"/music/catalogue.txt");
+    f=fopen(path,"r");if(!f)return -1;
+    if(!fgets(line,sizeof(line),f)){fclose(f);return -1;}
+    end=strpbrk(line,"\r\n");if(end)*end=0;
+    if(strcmp(line,"AWOST1")){fclose(f);return -1;}
+    while(fgets(line,sizeof(line),f)) {
+        if(strlen(line)==sizeof(line)-1){fclose(f);return -1;}
+        end=strpbrk(line,"\r\n");if(end)*end=0;
+        split=strchr(line,' ');if(!split){fclose(f);return -1;}
+        *split++=0;
+        if(!manual_id(line,&id) || split[0]<'0' || split[0]>'2' || split[1]!=' ') {fclose(f);return -1;}
+        g=split[0]-'0';alias=split+2;
+        if(!*alias || strlen(alias)>95){fclose(f);return -1;}
+        for(end=alias;*end;end++)if(!manual_alias_char(*end)){fclose(f);return -1;}
+        if((numeric && id==wanted) || (!numeric && !Q_strcasecmp(query,alias))) {
+            if(found>=0 && (found!=id || found_group!=g)){fclose(f);return -1;}
+            found=id;found_group=g;
+        }
+    }
+    if(ferror(f)){fclose(f);return -1;}
+    fclose(f);if(found>=0)*group=found_group;return found;
+}
+static int manual_preflight(int id) {
+    FILE *f;byte h[16];char path[MAX_OSPATH+64],name[12];
+    unsigned long frames,count,expected;long size;int ok;
+    if(id<0 || id>98 || strlen(com_gamedir)+24>=sizeof(path))return 0;
+    strcpy(name,"track00.mws");name[5]='0'+id/10;name[6]='0'+id%10;
+    strcpy(path,com_gamedir);strcat(path,"/music/");strcat(path,name);
+    f=fopen(path,"rb");if(!f)return 0;
+    if(fread(h,1,16,f)!=16 || memcmp(h,"MWA1",4) ||
+       h[6]!=32 || h[7]!=0 || (((int)h[4]<<8)|h[5])!=11015) {fclose(f);return 0;}
+    frames=be32(h+8);count=be32(h+12);
+    /* Bound arithmetic and signed Amiga stdio offsets before multiplication. */
+    if(!frames || count!=(frames-1)/FRAMES+1 || count>(0x7fffffffUL-16)/BYTES) {fclose(f);return 0;}
+    expected=16+count*BYTES;
+    ok=fseek(f,0,SEEK_END)==0;size=ok?ftell(f):-1;
+    fclose(f);return size>=0 && (unsigned long)size==expected;
+}
+static void music_play(void) {
+    char query[96];const char *word;int arg,n=0,id,g,i,old_mode;
+    if(Cmd_Argc()<2){Con_Printf("Usage: dbg ost play <00..98 or source_filename_stem>\n");return;}
+    for(arg=1;arg<Cmd_Argc();arg++) {
+        if(arg>1){if(n>=95)break;query[n++]='_';}
+        for(word=Cmd_Argv(arg);*word;word++) {
+            if(n>=95 || (!manual_alias_char(*word) && *word!=' ')) {
+                Con_Printf("OST name is invalid or too long; music unchanged.\n");return;
+            }
+            query[n++]=*word==' '?'_':*word;
+        }
+    }
+    if(arg<Cmd_Argc()){Con_Printf("OST name too long; music unchanged.\n");return;}
+    query[n]=0;
+    id=manual_lookup(query,&g);
+    if(id<0){Con_Printf("OST track unknown, ambiguous or catalogue unavailable; music unchanged.\n");return;}
+    if(counts[0]<1 || counts[1]<1 || !manual_preflight(id)) {
+        Con_Printf("OST stream missing/invalid or playlists unavailable; music unchanged.\n");return;
+    }
+    /* Preflight preserves playback on ordinary missing/invalid files. The
+     * existing opener reopens the file: concurrent replacement/media removal
+     * between these calls is not atomic and can still stop the old stream. */
+    old_mode=mode;if(g<2)mode=g;
+    if(!open_track(id,"manual-play")) {
+        mode=old_mode;Con_Printf("OST reopen failed after validation; stream may have changed.\n");return;
+    }
+    title_playing=0;available=1;paused=0;manual_changes++;fade=128;
+    if(g<2) {
+        /* Manual choice branches the group's Previous/Next history. Remove
+         * it from the current shuffle bag without reshuffling other tracks. */
+        length[mode]=cursor[mode]+1;
+        if(length[mode]==HISTORY){memmove(history[mode],history[mode]+1,(HISTORY-1)*sizeof(int));length[mode]--;}
+        cursor[mode]=length[mode];history[mode][length[mode]++]=id;
+        for(i=0;i<left[mode];i++)if(bags[mode][i]==id) {
+            memmove(bags[mode]+i,bags[mode]+i+1,(left[mode]-i-1)*sizeof(int));left[mode]--;break;
+        }
+    }
+    /* Special is one shot, outside world history. advance() resumes the
+     * existing group at EOF instead of enabling the title-loop path. */
+    Con_Printf("OST manual: track %02ld (%s)\n",(long)id,g==2?"special, then world playlist":g?"battle":"explore");
+}
+
 static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
     if(!available || title_playing)return;manual_changes++;fade=128;
@@ -167,6 +264,7 @@ int CDAudio_Init(void) {
     fclose(f);available=1;paused=0;mode=0;loading=-1;
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
     events=fopen("music-events.csv","w");if(events)fprintf(events,"time_ms,event,mode,track,file,played_frames,total_frames\n");
+    Cmd_AddCommand("aw_music_play",music_play);
     Cmd_AddCommand("aw_music_next",music_next);Cmd_AddCommand("aw_music_previous",music_previous);
     Cmd_AddCommand("aw_music_mode",music_mode);Cmd_AddCommand("aw_music_status",music_status);
     return advance("start")?0:-1;

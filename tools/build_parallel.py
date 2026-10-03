@@ -116,8 +116,10 @@ DEPENDENCIES = {
     'world-survey': (), 'world-ui': ('opening-references', 'world-survey'),
     'npc-gallery': ('census',),
     'actor-contact': ('world-ui',), 'world-terrain': ('actor-contact', 'npc-gallery'),
+    'world-scenery-assets': (),
+    'world-scenery': ('world-terrain', 'world-scenery-assets'),
     'music': (), 'engine': (),
-    'image': ('world-terrain', 'npc-gallery', 'music', 'engine', 'dialogue-lookup'),
+    'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
 

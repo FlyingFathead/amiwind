@@ -387,7 +387,8 @@ def dry_run_commands(args, run):
         ("engine", [sys.executable, str(ROOT / "tools/build_aga.py"), "engine", *common,
                     "--out", str(run / "engine"), "--hands", args.hands, "--jobs", str(resolve_jobs(args.jobs))]),
         ("dry-run-image", [sys.executable, str(ROOT / "tools/build_dry_run.py"), *common,
-                           "--engine", str(binary), "--out", str(run / "image")]),
+                           "--engine", str(binary), "--out", str(run / "image"),
+                           *(["--kickstart-file", str(args.kickstart_file)] if getattr(args,"kickstart_file",None) else [])]),
     ]
 
 
@@ -456,10 +457,17 @@ def commands(args, tools, run):
                 "--data-files", args.data_files, "--scene", run / "intro-scene",
                 "--out", run / "world-terrain", "--bindir", Path(tools['qbsp']).parent,
                 "--jobs", resolve_jobs(args.jobs))),
+            ("world-scenery-assets", tool("world_scenery.py", "--data-files", args.data_files,
+                "--out", run / "world-scenery-source", "--export-meshes",
+                "--jobs", resolve_jobs(args.jobs))),
+            ("world-scenery", tool("prepare_world_scenery.py", "--terrain", run / "world-terrain",
+                "--scenery", run / "world-scenery-source/scenery",
+                "--palette", run / "intro-scene/id1/gfx/palette.lmp",
+                "--out", run / "world-scenery", "--jobs", resolve_jobs(args.jobs))),
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
     if args.no_npc_gallery:
@@ -572,13 +580,14 @@ def main(argv=None):
         if sum((args.install_dependencies or args.install_sdk, args.versions, args.check_inputs)) > 1:
             raise ValueError("Use dependency/SDK setup, --versions or --check-inputs separately")
         emulator = None
-        if args.kickstart_file and not args.autorun_fs_uae:
-            raise ValueError('--kickstart-file requires --autorun-fs-uae')
+        if args.kickstart_file and args.stage != 'aga':
+            raise ValueError('--kickstart-file requires an AGA image build')
         if args.autorun_fs_uae:
             if args.stage != 'aga' or args.install_dependencies or args.install_sdk or args.versions or args.check_inputs:
                 raise ValueError('--autorun-fs-uae requires an AGA build; setup-only and inventory modes do not create an HDF')
             from run_fs_uae import prepare_launch
             emulator = prepare_launch(args.kickstart_file, interactive=sys.stdin.isatty() and not args.yes)
+            args.kickstart_file = emulator[1]
             # Keep an interactively selected/relative ROM across managed-venv re-exec.
             argv.extend(['--kickstart-file', str(emulator[1])])
             if args.check or args.plan:

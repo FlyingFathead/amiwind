@@ -670,6 +670,23 @@ SCR_BeginLoadingPlaque
 
 ================
 */
+/* Progress callbacks can run inside model/hunk loading. Draw only the
+ * retained pixels/UI here: never reenter SCR_UpdateScreen or the 3D renderer. */
+void SCR_LoadingUpdate (void)
+{
+    vrect_t vrect;
+    qboolean was_loading;
+    if(!AW_LoadingDelayed() || scr_skipupdate || block_drawing ||
+       cls.state==ca_dedicated || !scr_initialized || !con_initialized)return;
+    if(!AW_LoadingDelayExpired())return;
+    was_loading=scr_drawloading;scr_drawloading=true;
+    D_EnableBackBufferAccess();AW_UILoading();D_DisableBackBufferAccess();
+    V_UpdatePalette();
+    vrect.x=vrect.y=0;vrect.width=vid.width;vrect.height=vid.height;vrect.pnext=NULL;
+    VID_Update(&vrect);scr_fullupdate=0;
+    scr_drawloading=was_loading;
+}
+
 void SCR_BeginLoadingPlaque (void)
 {
     aw_loading_music = true;
@@ -690,7 +707,7 @@ void SCR_BeginLoadingPlaque (void)
     scr_drawloading = true;
     scr_fullupdate = 0;
     Sbar_Changed ();
-    SCR_UpdateScreen ();
+    if(!AW_LoadingDelayed())SCR_UpdateScreen ();
     scr_drawloading = false;
 
     scr_disabled_for_loading = true;
@@ -840,7 +857,10 @@ void SCR_UpdateScreen (void)
             Con_Printf ("load failed.\n");
         }
         else
+        {
+            SCR_LoadingUpdate();
             return;
+        }
     }
 
     if (cls.state == ca_dedicated)
@@ -859,6 +879,8 @@ void SCR_UpdateScreen (void)
     /* A map signs on over several frames. Quake's forced console used to
      * appear here, then slide away over the new world. Keep F10 available. */
     if(scr_drawloading || (!aw_transition_console.value && key_dest==key_game && (!cl.worldmodel || cls.signon!=SIGNONS))) {
+        SCR_LoadingUpdate();
+        if(AW_LoadingDelayed())return;
         con_forcedup=true;scr_conlines=scr_con_current=0;Con_ClearNotify();
         D_EnableBackBufferAccess();
         AW_UILoading();

@@ -62,14 +62,40 @@ def regions(settings):
     out = []
     for y in range(low[1], high[1], size):
         for x in range(low[0], high[0], size):
-            core = [[x, y], [x + size, y + size]]
+            name = f'bm{len(out):03d}'
+            core = settings.get('region_core_overrides', {}).get(name, [[x, y], [x + size, y + size]])
             margin = settings['overlap']
             coverage = [[max(low[i], core[0][i] - margin) for i in range(2)],
                         [min(high[i], core[1][i] + margin) for i in range(2)]]
             out.append({'name': f'bm{len(out):03d}', 'core': core, 'coverage': coverage})
     if len(out) > 64:
         raise ValueError('Region directory exceeds native capacity')
+    validate_partition(out, settings)
     return out
+
+
+
+def validate_partition(entries, settings):
+    """Exact rectangular tiling: no holes, overlap, invalid names or hidden slots."""
+    low, high = settings['bounds']
+    names = {e['name'] for e in entries}
+    if set(settings.get('region_core_overrides', {})) - names:
+        raise ValueError('Unknown region override')
+    area = 0
+    for i, entry in enumerate(entries):
+        a, b = entry['core']
+        if any(type(v) is not int for v in (*a, *b)) or any(
+                not low[k] <= a[k] < b[k] <= high[k] for k in range(2)):
+            raise ValueError('Invalid region core bounds')
+        if any((v-low[k]) % settings['terrain_step'] for point in (a,b) for k,v in enumerate(point)):
+            raise ValueError('Region core must align with terrain grid')
+        area += (b[0]-a[0])*(b[1]-a[1])
+        for other in entries[:i]:
+            c,d=other['core']
+            if all(max(a[k],c[k]) < min(b[k],d[k]) for k in range(2)):
+                raise ValueError('Region cores overlap')
+    if area != (high[0]-low[0])*(high[1]-low[1]):
+        raise ValueError('Region core coverage has a hole')
 
 
 def owner(point, entries, current=None, hysteresis=0):

@@ -668,6 +668,12 @@ void _Host_Frame (float time)
 // allow mice or other external controllers to add commands
     IN_Commands ();
 
+// Do not run queued commands or world simulation during debug playback.
+    if(AW_MovieDebugActive()) {
+        S_Update(vec3_origin,vec3_origin,vec3_origin,vec3_origin);
+        AW_MovieUpdate();SCR_UpdateScreen();host_framecount++;return;
+    }
+
 // process console commands
     Cbuf_Execute ();
 
