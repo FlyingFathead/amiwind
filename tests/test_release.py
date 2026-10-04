@@ -19,6 +19,27 @@ def fixture(root):
 
 
 class Release(unittest.TestCase):
+    def test_only_project_authored_source_graphic_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'repo'
+            fixture(root)
+            name = 'docs/images/amiwind-shared-sky-build-comparison.svg'
+            (root / name).parent.mkdir(parents=True)
+            (root / name).write_text('<svg xmlns="http://www.w3.org/2000/svg"/>\n')
+            listing = root / 'tools/release-files.json'
+            base = json.loads(listing.read_text())
+            listing.write_text(json.dumps(base + [name]) + '\n')
+            inspect_source(root)
+            (root / name).write_bytes(b'not text\0')
+            with self.assertRaisesRegex(ValueError, 'binary or oversized'):
+                inspect_source(root)
+            (root / name).unlink()
+            other = 'docs/images/unreviewed.svg'
+            (root / other).write_text('<svg/>\n')
+            listing.write_text(json.dumps(base + [other]) + '\n')
+            with self.assertRaisesRegex(ValueError, 'Unexpected distributable'):
+                inspect_source(root)
+
     def test_only_selected_bounded_documentation_clip_is_allowed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)/"repo"

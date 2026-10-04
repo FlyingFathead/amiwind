@@ -118,6 +118,8 @@ DEPENDENCIES = {
     'actor-contact': ('world-ui',), 'world-terrain': ('actor-contact', 'npc-gallery'),
     'world-scenery-assets': (),
     'world-scenery': ('world-terrain', 'world-scenery-assets'),
+    'world-flora-assets': ('intro',),
+    'world-flora': ('world-terrain', 'world-scenery', 'world-flora-assets'),
     'music': (), 'engine': (),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
@@ -134,6 +136,8 @@ def stage_dependencies(steps):
         # The sole optional branch requires an explicit builder opt-out.
         if "npc-gallery" not in names:
             deps = tuple(d for d in deps if d != "npc-gallery")
+        if name == 'image' and 'world-flora' in names:
+            deps = (*deps, 'world-flora')
         missing = set(deps) - set(names)
         if missing:
             raise ValueError(f'{name}: missing dependencies {sorted(missing)}')

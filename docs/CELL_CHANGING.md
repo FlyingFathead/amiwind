@@ -21,6 +21,10 @@ Do not mark a requirement complete merely because it is documented.
 | Health, hands raised, lit torch | Existing capture/restore verified by real transition harness | Raised/lowered hands and lit/unlit torch playtest |
 | Magicka/fatigue values, level, inventory state | Harness retains character values and inventory state through spawn | Full character HUD/equipment review; no claim of all stat fields tested |
 | Shared terrain and materials | Coverage and shared-world triangulation regressions pass; town compiled | Seyda Neen boundary playtest on the new image |
+| Shared sky, night layers and time | Saved clock drives sky/moons; source fixtures cover map/interior isolation | Native exterior/interior and saved-state transitions; no stale sky or palette |
+| Guard torch presentation | Original-class/inventory registry and saved clock determine bounded companion/light rendering | Native Imperial/Hlaalu cell crossings, on/off/auto, cache release/reload and lighting cost |
+| Sky and night gallery cameras | Renderer-only override; source tests restore camera and cancel on map change/disconnect | Native daycycle/nightgallery tour, here and exit checks without player movement or saved-clock change |
+| Coordinate arrival beneath ceiling shells | Four exact owned-hull failures reproduced and corrected by a bounded clear-start search | Native guard/Erene and pressure routes; distinguish a valid roof placement from ground contact |
 | Weapons, active effects, pursuit/combat | Transition requirements recorded | Implement and test when the corresponding gameplay systems exist |
 
 ## Required continuity
@@ -108,10 +112,13 @@ local X=1600 while its ground stopped at X=1664: only 64 units ahead against a
 
 The candidate correction adds a 768-unit real-ground apron, uses the streamed
 world sampler/triangulation/material choice outside the detailed port approach,
-and extends subdivision coverage without moving town ownership cores. The sky
-enclosure also follows measured surrounding hill height. The detailed Silt
-Strider approach retains fine ground samples. Outer coverage records must still
-enclose all subdivision cores, including the legacy outer edge strips.
+and extends subdivision coverage without moving town ownership cores. An older
+candidate also raised a per-cell sky enclosure to follow measured surrounding
+hill height; that part is superseded by the owner requirement to remove local
+sky-enclosure render geometry and use a separate shared/background sky path.
+The detailed Silt Strider approach retains fine ground samples. Outer coverage
+records must still enclose all subdivision cores, including the legacy outer
+edge strips.
 
 Test town-to-world and world-to-town crossings at the reported eastern exit,
 then other exits and diagonal views. Test internal town subdivisions and the

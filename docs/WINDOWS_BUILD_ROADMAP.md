@@ -1,9 +1,17 @@
 # Windows build roadmap
 
-## v0.0.26-rc1 checkpoint
+## Current baseline — published v0.0.27
+
+The published [v0.0.27 release](RELEASE-v0.0.27.md) passed all four hosted jobs:
+Windows and Linux launcher parity, Docker builder, and source/asset-free build.
+The complete Linux Docker suite and asset-free Amiga compile also passed before
+publication. These checks do not establish a full native Windows suite or an
+exhaustive v0.0.27 gameplay run. Native Windows remains experimental.
+
+## Historical v0.0.26-rc1 checkpoint
 
 **Linux is the established foundation; native Windows 11 remains experimental.**
-The complete current recipe converted on native Windows, produced a verified
+The complete recipe at that checkpoint converted on native Windows, produced a verified
 HDF after correcting/retrying image assembly, and entered Jiub's prison scene
 in WinUAE 6.0.3. See the [dated validation record](VALIDATION-WINDOWS-2026-10-02.md)
 and [rc1 release notes](RELEASE-v0.0.26-rc1.md) for exact provenance and limits.
@@ -22,11 +30,12 @@ reference versions; version drift warns and actual checks decide compatibility.
   retry have not established a fix. Retain failed receipts/logs.
 - **WIN-02, open:** cancellation has left worker descendants running. Integrate
   and validate Windows-specific cleanup without altering Linux process control.
-- **WIN-03, fixed in this candidate:** oversized Windows xdftool command lines
+- **WIN-03, fixed in published v0.0.26-rc1:** oversized Windows xdftool command lines
   are split into bounded operation batches; final image readback passed.
 - Exercise a new uninterrupted full run, broader gameplay, scene transitions,
   saves and audio. The smoke test confirms boot/game entry/basic input.
-- Validate Linux on Linux/CI. Preserve its launchers, scheduler, engine source,
+- Continue Linux validation for each changed source package. Published v0.0.27
+  passed its required Linux gates; preserve its launchers, scheduler, engine source,
   file formats, full-content defaults and normal gates. Portable BSA identifiers
   use forward slashes; generated Amiga text uses LF on both hosts.
 
@@ -34,18 +43,22 @@ Use the [bug journal](BUG_JOURNAL.md) for symptoms, reproduction, evidence and
 fix-versus-mitigation status. Fresh run names can reuse validated model caches;
 there is no generic resume of every finished stage and no measured retry rate.
 
-## Final v0.0.26: Docker next
+## Docker builder — implemented and validated
 
-Implement and validate the [Docker builder and input helpers](DOCKER_BUILD_ROADMAP.md)
-around the existing Linux pipeline. Users supply their own game files through
+The [Docker builder and input helpers](DOCKER_BUILD_ROADMAP.md) were implemented
+for v0.0.26. Full conversion, export and WinUAE game entry passed at that dated
+checkpoint; v0.0.26 and v0.0.27 each passed their hosted Docker publication gate.
+The helper uses the established Linux pipeline. Users supply their own game files through
 read-only runtime mounts, with persistent outputs/caches outside the image.
 Do not include original/converted game assets, HDFs or ROMs in image layers.
 Start with a provisional 40 GiB free-space allowance and revise from measured
-complete builds. Docker is absent from rc1 and is part of final-release scope.
+complete builds. The v0.0.26-rc1 prerelease predates Docker support; final
+v0.0.26 and published v0.0.27 include it.
 
 Native Windows does not require WSL. A Linux container on Windows is a separate
-host result; it cannot replace native Windows validation. WSL remains an optional,
-unvalidated fallback described in the [Windows notes](WINDOWS_BUILD.md).
+host result; it cannot replace native Windows validation. Docker Desktop on
+WSL2 has its own successful build evidence. The separate Ubuntu-under-WSL2
+route remains a trial described in the [Windows notes](WINDOWS_BUILD.md).
 
 ## Build performance
 

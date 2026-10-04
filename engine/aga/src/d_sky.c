@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "d_local.h"
+#include "aw_sky.h"
 
 #define SKY_SPAN_SHIFT	5
 #define SKY_SPAN_MAX	(1 << SKY_SPAN_SHIFT)
@@ -53,8 +54,8 @@ void D_Sky_uv_To_st (int u, int v, fixed16_t *s, fixed16_t *t)
 	VectorNormalize (end);
 
 	temp = skytime*skyspeed;	// TODO: add D_SetupFrame & set this there
-	*s = (int)((temp + 6*(SKYSIZE/2-1)*end[0]) * 0x10000);
-	*t = (int)((temp + 6*(SKYSIZE/2-1)*end[1]) * 0x10000);
+	*s = (int)((temp + r_sky_texture_scale*end[0]) * 0x10000);
+	*t = (int)((temp + r_sky_texture_scale*end[1]) * 0x10000);
 }
 
 #endif

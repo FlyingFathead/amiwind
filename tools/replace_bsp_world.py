@@ -9,6 +9,7 @@ coverage in the replacement. Palette and standing-hull markers are checked here.
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 
@@ -50,14 +51,14 @@ def texture_blobs(data):
     return result
 
 
-def merge_textures(base, source):
+def merge_textures(base, source, *, allow_indexed_surface_aliases=False):
     blobs = []; lookup = {}; names = {}; mappings = []
     for data in (base, source):
         mapping = []
         for blob in texture_blobs(data):
             if blob is not None:
                 name = blob[:16].split(b'\0', 1)[0]
-                if name in names and names[name] != blob:
+                if name in names and names[name] != blob and not (allow_indexed_surface_aliases and re.fullmatch(rb'surface\d+', name)):
                     raise ValueError('Texture name has differing pixels: '+repr(name))
                 names[name] = blob
             if blob not in lookup:
@@ -123,7 +124,7 @@ def verify_inline_rendering(source, target, retained_models, light_offset, parse
     return checked
 
 
-def replace_world(source_raw, base_raw, source_palette, base_palette):
+def replace_world(source_raw, base_raw, source_palette, base_palette, *, allow_indexed_surface_aliases=False):
     if len(source_palette) != 768 or source_palette != base_palette:
         raise ValueError('Source and replacement must use the same 768-byte palette')
     original = lumps(source_raw);source = lumps(source_raw);base = lumps(base_raw)
@@ -157,7 +158,7 @@ def replace_world(source_raw, base_raw, source_palette, base_palette):
     source[14][:64]=struct.pack(FORMATS[14],*dummy)
     inline_raw, reduction = compact(pack_lumps(source))
     inline=lumps(inline_raw);ir=rows(inline)
-    textures, (base_tex, inline_tex) = merge_textures(base[2],inline[2])
+    textures, (base_tex, inline_tex) = merge_textures(base[2],inline[2], allow_indexed_surface_aliases=allow_indexed_surface_aliases)
     out=[bytearray(v) for v in base]
     out[0]=bytearray(inline[0]);out[2]=textures
     out[8]=base[8]+inline[8]

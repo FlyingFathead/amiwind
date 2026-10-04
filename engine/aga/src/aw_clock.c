@@ -26,6 +26,10 @@ int AW_ClockAdvance(int milliseconds) {
     if(t>=DAY_MS){t-=DAY_MS;d++;}if(d>MAX_DAYS)return 0;
     AW_StateSet(&aw_state,AW_GLOBAL,days,d);AW_StateSet(&aw_state,AW_GLOBAL,ms,t);return 1;
 }
+int AW_ClockSetTime(int hour,int minute) {
+    if(hour<0 || hour>23 || minute<0 || minute>59 || !AW_ClockEnsure())return 0;
+    return AW_StateSet(&aw_state,AW_GLOBAL,ms,(hour*60+minute)*60000);
+}
 int AW_ClockSetHour(double hour) {
     if(!(hour>=0 && hour<24) || !AW_ClockEnsure())return 0;
     return AW_StateSet(&aw_state,AW_GLOBAL,ms,(int)(hour*3600000));

@@ -100,7 +100,7 @@ Owner still hears occasional clicks/pops in v0.0.15-dev1. Local FS-UAE final
 read_errors=0 and one synchronous source fill. No matched WinUAE audio capture
 is available, so these counters do not identify every reported click.
 
-Source inspection: 2 x 8,192-frame stereo source blocks, 4 KiB synchronous refill
+Source inspection for that historical report: 2 x 8,192-frame stereo source blocks, 4 KiB synchronous refill
 slices, a 32 KiB 8-bit stereo DMA ring, configured `_snd_mixahead 0.3` seconds.
 The ring can hold more than is routinely mixed ahead. A roughly 995 ms worst
 frame in the acceptance route exceeds that 300 ms margin. Source prefetch and
@@ -114,3 +114,16 @@ track under matched emulator settings. Consider bounded loader work and an audio
 producer task with safe buffer ownership. Do not perform filesystem reads in a
 hardware interrupt or assume raising the whole game's priority fixes starvation.
 Also distinguish host/UAE output-buffer underruns from emulated-side misses.
+
+## v0.0.28 music-only read-ahead candidate — 4 October 2026
+
+The current OST source queue has four 8,192-frame stereo blocks (64 KiB),
+with the same 4 KiB refill slices. The shared mixer schedule, DMA buffer,
+speech and guard voices are unchanged. Host suites and matching Amiga
+compiles pass. The owner initially rated the current WinUAE opening-session
+audio 5/5, then immediately reported remaining audible trouble, mostly at
+load-ins and in heavy scenes. That qualification supersedes the initial verdict.
+Publication proceeds with this known issue; further audio investigation is
+deferred until after publication. The audio issue stays open;
+read-ahead is a functionally tested mitigation, not a verified fix for clicks
+or a proven hardware/backend diagnosis. [Current diagnostics and scope](AUDIO.md).

@@ -1,14 +1,14 @@
 # Heap watcher: build estimates and complete scene lifecycles
 
-This is the memory review and implementation contract for the unreleased
-v0.0.27-rc3 repair. It extends [memory allocation](MEMORY_ALLOCATION.md) and
+This is the memory review and implementation contract introduced during the
+v0.0.27-rc3 repair and carried into published v0.0.27. It extends [memory allocation](MEMORY_ALLOCATION.md) and
 [cell changing](CELL_CHANGING.md). A planned metric or checkpoint below is not
 implemented merely because it appears here. Target runtime acceptance remains
 pending; the original rc3 playtest image is not repaired by these documents.
 
 ## Build receipts: used, free and growth margin
 
-Implemented in the unreleased rc3 repair builder on 3 October 2026:
+Implemented during the rc3 repair and included in published v0.0.27:
 `build.json.heap_watcher` summarizes the worst modeled map. The same summary is
 written to `heap-watcher.json` immediately after the map audit, before a failing
 headroom gate aborts packaging. A failed audit does not produce a ready image.
@@ -136,7 +136,7 @@ malloc transient; state that limitation or add matching allocation accounting.
 The failure path should preserve arena, requested size, available amount, map,
 stage and engine version without trying another large allocation.
 
-Implemented in the unreleased repair: low/high allocation peak and label, largest
+Implemented in v0.0.27: low/high allocation peak and label, largest
 request, logical cache current/peak bytes, pressure evictions, cache moves, zone
 free/largest block, and available/largest external Fast/Chip blocks. Automatic
 phases are outgoing, after-unload, before-BSP, after-BSP, after-actors and

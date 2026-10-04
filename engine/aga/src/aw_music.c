@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Original AmiWind MWA1 player. Two bounded PCM blocks, independent shuffled
+ * Original AmiWind MWA1 player. Four bounded PCM blocks, independent shuffled
  * groups and Previous/Next history. Owned audio remains outside the source tree.
  */
 #include "quakedef.h"
@@ -7,9 +7,10 @@
 #define FRAMES 8192
 #define BYTES (FRAMES*2)
 #define HISTORY 128
+#define MUSIC_BLOCKS 4
 static FILE *music;
-static signed char blocks[2][BYTES];
-static int active, at, valid[2], loading, loaded;
+static signed char blocks[MUSIC_BLOCKS][BYTES];
+static int active, at, valid[MUSIC_BLOCKS], loading, loaded;
 static unsigned long remaining, total, played, reads, bytes_read, errors, opens;
 static unsigned long completions, manual_changes, sync_fills;
 static int current=-1, mode, paused, available;
@@ -29,7 +30,7 @@ static void log_event(const char *why) {
 }
 void AW_MusicSceneEvent(const char *why) {log_event(why);}
 static void close_music(void) {
-    if(music)fclose(music);music=NULL;at=0;valid[0]=valid[1]=0;loaded=0;loading=-1;
+    if(music)fclose(music);music=NULL;at=0;memset(valid,0,sizeof(valid));loaded=0;loading=-1;
 }
 static int open_track(int id,const char *reason) {
     byte h[16];char path[MAX_OSPATH+64];unsigned long count;
@@ -78,10 +79,15 @@ static int advance(const char *reason) {
 }
 /* One 4 KiB read per service call. No heap allocation and no decoder on Amiga. */
 static int refill(void) {
-    int target,take;
+    int target,take,i;
     if(!music || !remaining)return 0;
-    target=valid[active]?1-active:active;
-    if(valid[target])return 0;
+    /* Preserve stream order while filling the first empty slot ahead of play.
+     * This queue belongs only to the OST; speech/SFX and DMA timing are unchanged. */
+    for(i=0;i<MUSIC_BLOCKS;i++){
+        target=(active+i)%MUSIC_BLOCKS;
+        if(!valid[target])break;
+    }
+    if(i==MUSIC_BLOCKS)return 0;
     if(loading<0){loading=target;loaded=0;}
     take=BYTES-loaded;if(take>4096)take=4096;
     if(fread(blocks[loading]+loaded,1,take,music)!=(size_t)take){errors++;log_event("read-error");close_music();available=0;return 0;}
@@ -91,12 +97,13 @@ static int refill(void) {
 }
 void CDAudio_Update(void) {if(available && !paused)refill();}
 void AW_MusicPaint(portable_samplepair_t *dst,int n) {
-    int i,take,l,r,gain=(int)(bgmvolume.value*256);
+    int i,take,l,r,next,gain=(int)(bgmvolume.value*256);
     if(!available || paused)return;
     while(n>0) {
         if(at>=valid[active]) {
             valid[active]=0;at=0;
-            if(valid[1-active] || loading==1-active)active=1-active;
+            next=(active+1)%MUSIC_BLOCKS;
+            if(valid[next] || loading==next)active=next;
             else if(!remaining && loading<0){completions++;log_event("complete");if(!advance("eof"))return;}
             if(!valid[active]) {sync_fills++;while(!valid[active] && refill()){}if(!valid[active])return;}
         }
@@ -213,7 +220,13 @@ static void music_previous(void) {
     open_track(history[mode][cursor[mode]],"previous");
 }
 static void music_mode(void) {if(title_playing)return;mode=!mode;if(available){manual_changes++;fade=128;advance("mode");}}
-static void music_status(void) {Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);}
+static void music_status(void) {
+    unsigned long queued=0;int i;
+    for(i=0;i<MUSIC_BLOCKS;i++)queued+=(unsigned long)valid[i];
+    if(queued>=(unsigned long)at)queued-=(unsigned long)at;
+    Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);
+    Con_Printf("OST read-ahead: %lu blocks / %lu bytes; queued %lu frames.\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks),queued);
+}
 void AW_MusicTitle(void) {
     if(!available)return;
     /* Startup branding and its destination menu share the same title stream. */
@@ -272,5 +285,5 @@ int CDAudio_Init(void) {
 void CDAudio_Shutdown(void) {
     FILE *f;int i;log_event("shutdown");close_music();if(events){fclose(events);events=NULL;}
     f=fopen("music-profile.txt","w");
-    if(f){fprintf(f,"read_slices=%lu\nbytes_read=%lu\nread_errors=%lu\ntrack_opens=%lu\nlast_track=%d\nnatural_completions=%lu\nmanual_changes=%lu\nsynchronous_fills=%lu\n",reads,bytes_read,errors,opens,current,completions,manual_changes,sync_fills);fprintf(f,"track_history=");for(i=0;i<opened_count;i++)fprintf(f,"%s%d",i?",":"",opened[i]);fprintf(f,"\n");fclose(f);}
+    if(f){fprintf(f,"read_slices=%lu\nbytes_read=%lu\nread_errors=%lu\ntrack_opens=%lu\nlast_track=%d\nnatural_completions=%lu\nmanual_changes=%lu\nsynchronous_fills=%lu\n",reads,bytes_read,errors,opens,current,completions,manual_changes,sync_fills);fprintf(f,"buffer_blocks=%lu\nbuffer_bytes=%lu\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks));fprintf(f,"track_history=");for(i=0;i<opened_count;i++)fprintf(f,"%s%d",i?",":"",opened[i]);fprintf(f,"\n");fclose(f);}
 }

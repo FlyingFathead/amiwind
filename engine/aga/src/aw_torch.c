@@ -23,8 +23,10 @@ int AW_TorchAssetsValidate(const byte *p,int size)
 void AW_TorchLoadAssets(void)
 {
     extern int com_filesize;
-    torch_assets=COM_LoadHunkFile("gfx/torch.awt");torch_model=NULL;torch_duration=0;
-    if(!AW_TorchAssetsValidate(torch_assets,com_filesize)){torch_assets=NULL;Con_Printf("Original torch assets unavailable; rebuild the image.\n");return;}
+    int source_size;
+    torch_assets=COM_LoadHunkFile("gfx/torch.awt");torch_model=NULL;torch_duration=0;source_size=com_filesize;
+    AW_GuardTorchLoadAssets(AW_TorchAssetsValidate(torch_assets,source_size)?torch_assets:NULL);
+    if(!AW_TorchAssetsValidate(torch_assets,source_size)){torch_assets=NULL;Con_Printf("Original torch assets unavailable; rebuild the image.\n");return;}
     torch_duration=(unsigned int)read32(torch_assets+8);
 }
 #define AW_TORCH_LIGHT (-0x415754)
@@ -74,7 +76,7 @@ static void toggle(void)
     if(!v->_float)extinguish();
     Con_Printf("Torch %s.\n",v->_float?"on":"off");
 }
-void AW_TorchInit(void){Cmd_AddCommand("aw_torch",toggle);}
+void AW_TorchInit(void){Cmd_AddCommand("aw_torch",toggle);AW_GuardTorchInit();}
 static int phase(void)
 {
     if(!isfinite(cl.time) || cl.time<0)return 0;
@@ -84,6 +86,7 @@ void AW_TorchUpdate(void)
 {
     static const float radius[8]={144,147,142,146,143,148,144,141};
     dlight_t *light;
+    AW_GuardTorchUpdate();
     if(!AW_TorchEquipped()){extinguish();return;}
     light=CL_AllocDlight(AW_TORCH_LIGHT);
     /* Eye position stays inside the player's clear view volume. Offsetting a

@@ -1,32 +1,147 @@
-# Current project state - 3 October 2026
+# Current project state — 4 October 2026
 
-## Stable release: v0.0.27 - Rocks, Mushrooms, and Then Some
+## In preparation: v0.0.28 — Trees and Grass, Day and Night
 
-The owner approved v0.0.27 as stable, based on the repaired rc5 build. The
-engine compiled, the image was assembled, and both HDF filesystem readbacks
-passed. The complete actor-ground gate passed with zero unresolved findings;
-the static target-ABI heap gate passed for all 2,717 maps, with 135,952 bytes
-of worst-case post-reserve margin under the unchanged 3 MiB non-map allowance
-and 2 MiB safety reserve.
+VERSION is 0.0.28; scoped local image015 native acceptance passed. Hosted CI, tag and public publication remain pending the owner's Linux step.
+v0.0.27 is the latest published release. Default V3 adds two cloud layers,
+red/gold sunset, purple twilight, blue hour and a moving sun, with clock-aligned
+fog/world tone and default-on sun/cloud controls. Foliage remains 19,984 unique
+placements (19,787 sprites across 76 types plus 197 meshes, 192 in Balmora),
+alongside 37,960 rocks and 816 joined mushrooms.
 
-The rc5 map selector correction is included: settlement markers draw in both
-Debug and In-Game modes, with readable selected-button styling. The In-Game
-view remains a terrain overview prototype, not a complete original-game
-world/local map. The package includes all 18 catalogued OST tracks and 124 alias
-rows. Target playback verification remains a separate runtime check. Video conversion/runtime and
-condition-aware voiced dialogue remain future work.
+The latest source gate, finalization011, passed at 17:45 EEST on 4 October 2026.
+It ran 824 tests per host: Linux 820 passed / 4 skipped and Windows 732 passed /
+92 skipped, with no failures or errors. Fresh actual Amiga cross-compiles on
+Windows and Linux Docker used the same 206 runtime sources and produced identical
+744,860-byte executables (SHA-256
+`a5aa451e297b517cd0d2e072c4e5ccc4eb39bf09e93c67eed72586b55265955b`). The 1,096
+frozen source files match across hosts, with no source drift. The target ABI was
+measured in Linux Docker, not with a Windows size probe.
 
-Owner approval is complete. This does not imply a target heap lifecycle trace,
-FPS improvement, full route playthrough, or exhaustive crossing/state/map-UI
-validation. The original rc3 heap-crash repair is a packaged host-validated
-candidate, not a claim that every route has been target-verified. See
-[release notes](RELEASE-v0.0.27.md), [memory policy](MEMORY_ALLOCATION.md),
-[cell-changing checklist](CELL_CHANGING.md), and [bug journal](BUG_JOURNAL.md).
+These gates include the full upper-sky star conversion, `dbg nightgallery`,
+the ceiling-start arrival correction, the latest cloud-speed change and
+64 KiB of music-only source read-ahead. Shared mixer timing, speech and
+guard voices are unchanged. The current WinUAE listening report still notes
+intermittent artifacts, mostly at load-ins and in heavy scenes. The audio issue
+remains open; publication proceeds with this known limitation, with further
+audio investigation deferred until after publication. See [WIN-05](BUG_JOURNAL.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+The compiler retains 86 warnings; these are successful builds, not warning-free
+builds. The earlier 816-test/739,156-byte result is
+superseded for this source. Compilation and host fixtures do not establish
+native image appearance, gameplay or performance acceptance.
 
-The earlier rc1/rc2/rc3/rc4 entries below are historical candidate records;
-their former publication-blocked status is superseded by this owner-approved
-stable v0.0.27 state. Keep their evidence intact.
-## AmiWind v0.0.27-rc2 - Rocks and Mushrooms
+Image015 assembly uses the exact matching engine and passes 10,766 payload
+readbacks plus three partition-ownership checks. The audit records 59 modeled
+reserve warnings and no modeled hard allocation-ceiling failures. These are
+estimates and file-verification results, not a production-memory pass. Earlier
+native startup, restored town ground and clock checks apply to a preceding image.
+
+Independent actual WinUAE acceptance of engine011/image015 passed within its
+declared scope. Two fresh cold-cache sessions exercised Imperial and Hlaalu
+guards: each admitted all three eligible actors with no frame/model skips or
+evictions, and boundary checks showed torches on at 20:01/05:59 and off at
+06:00/20:00. Bounded close captures confirmed subtle moving gold/ember particles.
+Five pressure maps completed without crashes or renderer overflow. All eight day
+and four night gallery stages were captured, independently caption-reviewed and
+restored. The 137 fresh native captures were preserved, alongside image014's
+historical captures and saves. All 10,766 image files and three partition
+ownership checks passed. This is a scoped native pass, not all-map, unrestricted
+world, or physical-hardware certification. The minimum logged peak clearance
+was 1,812,304 bytes at sn012, 284,848 bytes below the unchanged 2 MiB safety
+reference. That remains a reserve warning; the production memory gate did not
+pass. Intermittent music artifacts remain an owner-deferred known issue, and no
+clean-audio pass is claimed. Stable v0.0.28 is accepted locally within this
+scope; hosted CI, tag and public publication remain pending the owner's Linux
+publication step.
+
+The coherent 049/050 Seyda batch passes bounded host checks: all 64 maps repeat
+stably across 2,129,800 placed polygons; 12 NPC identities/support checks and
+1,696 standing probes across town cores plus the 32-unit guard pass. A seven-map
+float32 serialization correction replaces 13 faces and adds 1,776 bytes without
+changing collision/PVS/actor bindings. Prior 034/039 findings remain historical;
+29 old probes outside mapped town coverage are not current target defect proof.
+
+The 051 orientation repair reverses only 442,861 LAND edge loops across the
+64 maps. A matched-camera diagnostic and initial combined-engine WinUAE replay
+show restored brown ground. Initial New Game/movie skip/Jiub/name entry,
+default V3/cloud settings and clock freeze/invalid-time/resume checks passed.
+Image015 passed the tested day/night gallery, guard appearance, renderer-state restoration and session-stability checks within scope. Full ground/NPC routes and travel/save flows remain open. Historical V1 captures do not demonstrate the new effects. No whole-world canonical-culling or physical-hardware performance claim follows.
+
+See [stable preparation](RELEASE-v0.0.28.md), [sky controls](DAY_NIGHT_AND_SKY.md),
+[canonical terrain evidence](CANONICAL_TERRAIN_CULLING.md) and the
+[historical rc1 record](RELEASE-v0.0.28-rc1.md).
+
+## Published: v0.0.27 — Rocks, Mushrooms, and Then Some
+
+[AmiWind v0.0.27 is published as a stable release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.27)
+at commit `8da838784efa619a12da39d29095be4c0fe6e44d`. Official `main` and the
+peeled release tag were verified at that commit. The Linux publisher completed
+release creation and downloaded-asset verification; all four jobs in
+[CI run 37113138642](https://github.com/FlyingFathead/amiwind/actions/runs/37113138642)
+passed: Docker builder, Linux and Windows launcher parity, and source/asset-free
+build. See the [release record](RELEASE-v0.0.27.md#publication-and-source-validation--3-october-2026).
+
+The release adds 37,960 exterior rock placements and 816 giant mushrooms across
+2,526 world regions. All five giant-mushroom models retain joined cap geometry
+and original UVs; the corrected caps were accepted in the rc2 WinUAE playtest.
+Seyda Neen and Balmora now each have 64 bounded exterior cores, with the existing
+opening scenes and interiors retained. Held controls and player state are
+preserved by automatic-crossing logic; target crossing checks remain open.
+
+The repaired rc5 package passed the complete actor-ground gate with zero
+unresolved findings and static target-ABI heap estimates for all 2,717 maps.
+The smallest modeled post-reserve margin is 135,952 bytes under the unchanged
+3 MiB non-map allowance and 2 MiB safety reserve. The stable private image
+retains those maps, includes the final engine/boot checker and passed both HDF
+filesystem readbacks. The exact release source also passed 558 Linux Docker
+tests with 3 skips and the asset-free Amiga compile gate before publication.
+These are build and estimate results, not measured target heap or FPS.
+
+The rc5 map-selector correction is included: settlement markers draw in both
+Debug and In-Game modes, with readable selected-button styling. The repaired
+Linux world-UI fixture passed in the full suite; target map-panel verification
+remains pending. In-Game remains a terrain-overview prototype. The private
+playable package includes all 18 catalogued OST tracks and 124 alias rows;
+target playback verification is still open. Existing opening clips work through
+their established path; the complete 17-video catalogue and condition-aware
+voiced dialogue remain future work.
+
+## Current limits and next checks
+
+Publication does not establish a target heap lifecycle trace, FPS improvement,
+full playthrough, or exhaustive crossing/state/map-UI validation. The original
+rc3 heap crash has a packaged host-validated repair; it stays open until the
+exact route passes target lifecycle playtesting. Verify cold/warm loads, seams,
+collision and player/actor/equipment state in both crossing directions. The
+smallest modeled margin is not certification of headroom for later content.
+
+Linux remains the established build foundation. Native Windows remains
+experimental with worker/cancellation reliability limits. Required host support
+is shared across the pipeline; passing hosted launcher parity does not establish
+a complete native Windows suite or a full-game run on every host.
+
+Next work covers target playtests, memory and frame-cost profiling, the building
+geometry/collision audit, map completion and later dialogue/video integration.
+Build-time profiling and verified cache reuse remain priorities. Full-VIS
+comparison was stopped with a private checkpoint; it is deferred optional
+research with no completed comparison or verified resumption. Vivec remains
+inactive, and the static asset gallery remains planned.
+
+See [memory policy](MEMORY_ALLOCATION.md), [cell changes](CELL_CHANGING.md),
+[bug journal](BUG_JOURNAL.md), [roadmap](ROADMAP.md), and
+[release notes](RELEASE-v0.0.27.md). Original and converted proprietary assets,
+ROMs and playable/playtest packages remain private; the public release is source
+and documentation only.
+
+## Historical checkpoints
+
+The records below preserve what was known at each earlier checkpoint, including
+then-pending checks and historical priorities. References there to a “current”,
+“next” or unpublished release describe that checkpoint, not today's release
+status. The published v0.0.27 state above supersedes earlier publication gates;
+it does not retroactively establish unrecorded runtime acceptance.
+
+### AmiWind v0.0.27-rc2 - Rocks and Mushrooms
 
 The local correction candidate is assembled. All 2,526 world regions cover
 37,960 original exterior rocks and 816 giant mushrooms. All five giant-mushroom
@@ -40,7 +155,7 @@ pipeline validation and hosted CI remain pending. The published baseline is
 v0.0.26. See [rc2 notes](RELEASE-v0.0.27-rc2.md),
 [What are rocks?](WHAT_ARE_ROCKS.md) and [known issues](BUG_JOURNAL.md).
 
-## Published v0.0.26 baseline
+### Published v0.0.26 baseline — historical
 
 
 **v0.0.26 full conversion, game entry, hosted CI and publication completed.** The
@@ -60,7 +175,7 @@ publication completed for v0.0.26; they remain pending for v0.0.27-rc2. See [rc1
 [Windows evidence](VALIDATION-WINDOWS-2026-10-02.md) and
 [Docker evidence](VALIDATION-DOCKER-2026-10-02.md).
 
-## Earlier gameplay and performance checkpoints
+### Earlier gameplay and performance checkpoints
 
 **Top engineering priority:** reduce world-terrain build time and avoid
 unnecessary recompilation between runs. The [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md)
@@ -79,7 +194,7 @@ is recorded separately below.
 original-model torch and source-region HUD,
 including the rc8 crash correction. See [v0.0.25 scope](RELEASE-v0.0.25.md) and
 [validation](validation/v0.0.25-source.json). Target playtesting remains pending.
-The regular, very brief fist blink every 1â€“2 seconds is still open. The
+The regular, very brief fist blink every 1–2 seconds is still open. The
 static asset gallery and broad scenery coverage remain future work.
 The owner completed rc7 engine/image recovery with strict actor checking and no
 waiver: 2026-10-01 23:49:33 to 2026-10-02 00:00:28 +03:00, about 10m55s.
@@ -133,9 +248,9 @@ verify that transition or justify unconditional new-game presence. Fargoth, the
 dock guard, Vodunius and the Addamasartus slaves likewise have progression-related
 behavior that must remain distinct from geometric placement correction.
 
-## RC3 recovery baseline (historical)
+### RC3 recovery baseline (historical)
 
-**AmiWind v0.0.24-rc3 â€” owner-requested recovery candidate.** All 2,935
+**AmiWind v0.0.24-rc3 — owner-requested recovery candidate.** All 2,935
 base-master NPC/creature records map to 3,551 successfully converted assets.
 There are 29 exact-model opt-in geometry allowances, bounded at 1,024 triangles.
 Dagoth Ur retains the original mask/crest geometry and a larger texture atlas.
@@ -156,9 +271,9 @@ reports remain open. The candidate carries the failed contact audit; the normal
 production image gate still requires a complete pass. Method 1 remains the
 loading default. See [RC3 scope](RELEASE-v0.0.24-rc3.md).
 
-## RC1 baseline (historical)
+### RC1 baseline (historical)
 
-**AmiWind v0.0.24-rc1 â€” candidate for Welcome to Balmora.**
+**AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
 
 Balmora now includes 43 destination interiors (42 city interiors plus Tharys
 Ancestral Tomb), 93 NPC placements (90 living and three authored corpses), and
@@ -187,7 +302,7 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
 
-## Previous checkpoint notes
+### Previous checkpoint notes
 
 **AmiWind v0.0.24-dev4: Seyda Neen subdivision, opening controls and teleport shortcuts.**
 
@@ -224,7 +339,7 @@ synchronous. Balmora interiors, most services, combat, broader AI, day/night sky
 and blight remain unfinished. Full natural-opening and citywide walking acceptance
 are still open; focused checks do not close those items.
 
-## Historical context
+### Historical context
 
 The following describes the preceding v0.0.22 release.
 
@@ -322,7 +437,7 @@ the 540 fog/draw default. See RELEASE-v0.0.16.md for the completed validation
 record. The sections below preserve checkpoint-017 and consolidation history.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 
-## Project identity and build access, 28 September 2026
+### Project identity and build access, 28 September 2026
 
 The owner selected **amiwind** as the repository name and
 **https://github.com/FlyingFathead/amiwind** as the official project home.
@@ -376,7 +491,7 @@ See CHECKPOINT_017_VALIDATION.md for exact hashes, checks and limitations.
 Development source ZIP and private playable ZIP are immutable. Public source
 contains no game/ROM data; private recovery packages contain owner-supplied data.
 
-## Current priority
+### Historical priority — v0.0.16
 
 Owner requested complete development recovery before moving sessions. That recovery backup is complete. The v0.0.16 release
 updates build access, versioning, ordinary-water tint and the fog default. Next milestone is an opt-in reconstruction of the
@@ -390,7 +505,7 @@ Preserve existing readable/retro fonts, debug free-roam, scene links, hand paths
 ship method_001 and old checkpoints. New variants must be selectable and have a
 rollback path. Never destructively replace an existing feature during experiments.
 
-## Open issues and measured findings
+### Open issues and measured findings
 
 - Roof/beam spikes and position-specific disappearing structures remain open.
   Native distance-cull on/off tests at two report poses produce identical scene
@@ -400,7 +515,7 @@ rollback path. Never destructively replace an existing feature during experiment
   a bounded serialized-BSP audit found no broken edge loops or reversed windings.
   This does not prove the whole converter/render path correct.
 - Localized slowdown remains unassigned. Ship-only face suppression improved one
-  short view trial from10.52 to12.44FPS; closer fog700â†’400 improved a different
+  short view trial from10.52 to12.44FPS; closer fog700→400 improved a different
   short comparison from11.46 to17.21FPS. Preserve camera/settings and do not
   treat these accelerated-emulator numbers as hardware benchmarks.
 - Occasional music clicks/late updates remain. Underwater tint, exterior formation,
@@ -415,7 +530,7 @@ All recent owner coordinates and reusable LOD ideas are in SEYDA_NEEN_NEXT_STEPS
 OPTIMIZATION_HISTORY.md and the implementation journals preserve causes, trials
 and known limitations. Correctness must accompany performance measurements.
 
-## Final recovery handover update, 27 September 23:32â€“23:35 Helsinki
+### Final recovery handover update, 27 September 23:32–23:35 Helsinki
 
 The latest chosen NEXT-build fog/culling default is **540**, superseding the450
 proposal above. Current frozen dev2 still starts at700; live command:
@@ -429,7 +544,7 @@ and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
 with proof of this formation's geometry cause. Backup first; keep this open.
 
-## 28 September 15:50 owner follow-up
+### 28 September 15:50 owner follow-up
 
 The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
 the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).
@@ -444,7 +559,7 @@ the original room section. General loot/icons, Fargoth return dialogue and statu
 effects are roadmap work, not completed gameplay.
 
 
-### Latest image recovery evidence
+#### Historical image recovery evidence — v0.0.25 candidates
 
 The receipt-patched rc3 image reached QCC, then stopped on 23 known actor-contact
 findings. The owner subsequently reported successful private-test image assembly

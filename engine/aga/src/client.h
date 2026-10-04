@@ -93,7 +93,11 @@ typedef struct
 } beam_t;
 
 #define	MAX_EFRAGS		8192
+#define AW_EFRAG_PAGE_LINKS 1024
+#define AW_EFRAG_LIMIT 65536
 extern int aw_efrags_used,aw_efrags_peak;
+extern int aw_efrags_capacity;
+void R_ClearEfrags(qboolean release_pages);
 
 #define	MAX_MAPSTRING	2048
 #define	MAX_DEMOS		8

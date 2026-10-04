@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 330" role="img" aria-labelledby="title desc">
+  <title id="title">AmiWind shared sky: measured build comparison</title>
+  <desc id="desc">Across 2664 exterior maps, 301751 local sky enclosure render faces were removed and none remain. Aggregate disk storage including the one shared sky resource fell by 131.324 MiB. This is a build measurement, not a gameplay screenshot or a RAM or frame rate result.</desc>
+  <rect width="1000" height="330" rx="18" fill="#101d28"/>
+  <g font-family="sans-serif" fill="#eef6f7">
+    <text x="36" y="48" font-size="25" font-weight="bold">One sky, less geometry in each cell</text>
+    <text x="36" y="78" font-size="16" fill="#b5cbd4">Development build comparison · 2,664 exterior maps</text>
+    <text x="36" y="122" font-size="17">Local sky-enclosure render faces</text>
+    <text x="36" y="154" font-size="15" fill="#b5cbd4">Original</text>
+    <rect x="136" y="135" width="480" height="26" rx="5" fill="#efbd65"/>
+    <text x="631" y="154" font-size="18" font-weight="bold">301,751</text>
+    <text x="36" y="192" font-size="15" fill="#b5cbd4">After pass</text>
+    <circle cx="136" cy="185" r="5" fill="#71d8c2"/>
+    <text x="155" y="192" font-size="18" font-weight="bold" fill="#71d8c2">0 remaining</text>
+    <text x="762" y="148" font-size="34" font-weight="bold" fill="#71d8c2">131.324</text>
+    <text x="762" y="177" font-size="20">MiB smaller</text>
+    <text x="36" y="247" font-size="17">Map files + one shared sky resource, compared with the original exterior set.</text>
+    <text x="36" y="283" font-size="15" fill="#b5cbd4">Disk storage only · not RAM or FPS · playable-build acceptance remains open</text>
+  </g>
+</svg>

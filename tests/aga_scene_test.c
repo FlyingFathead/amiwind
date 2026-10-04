@@ -55,8 +55,9 @@ void Cvar_SetValue(char *s,float v){if(names_option && !strcmp(s,names_option->n
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 static char queued[64];static eval_t goal,torch;static int clear_buttons,events,occluded;
 static void (*start_demo)(void),(*teleport)(void),(*scene)(void);static cvar_t *demo_option;
-static int command_argc;static char *command_args[3];
+static int command_argc;static char *command_args[4];
 static int opening_track=-1,ship_available=1,narrow_room;
+static int world_map_unavailable,map_place_calls;static vec3_t last_map_arrival;
 static char notice[96];
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
 void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
@@ -65,6 +66,16 @@ int Cmd_Argc(void){return command_argc;}
 char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 int COM_FOpenFile(char *name,FILE **f){
+ if(!strcmp(name,"world/regions.awr")) {
+  unsigned count=1;float town0[7]={-2816,-17920,0,-1024,-1024,1024,1024};
+  float town1[7]={-5120,-3072,0,-1024,-1024,1024,1024};
+  float region[11]={50000,50000,0,-1024,-1024,1024,1024,-1920,-1920,1920,1920};
+  *f=tmpfile();assert(*f);fwrite("AWR2",1,4,*f);fwrite(&count,4,1,*f);
+  fwrite(town0,sizeof(town0),1,*f);fwrite(town1,sizeof(town1),1,*f);
+  fwrite("vf0000\0\0",1,8,*f);fwrite(region,sizeof(region),1,*f);rewind(*f);return 116;
+ }
+ if(!strcmp(name,"maps/seyda.bsp") && world_map_unavailable){*f=NULL;return -1;}
+
  const char *s="AWD3\nprison seyda 1 -5 35 25 5 45 35 0 0 77 90\tSeyda Neen\nprison evil;quit 2 -5 35 25 5 45 35 0 0 77 90\tInvalid\nprison seyda 3 nan 35 25 5 45 35 0 0 77 90\tInvalid\nseyda - 4 -5 35 25 5 45 35 0 0 0 90\tCensus and Excise Office\nseyda census 474482 -5 235 25 5 245 35 0 0 77 90\tOther doorway\nseyda census 113893 -5 235 25 5 245 35 12 34 77 90\tRegistration entrance\n";
  if(!strcmp(name,"seyda-regions.txt"))s="AWBR1 2 96 540 0 0 77 90 0 0 77 90\nsn000 -1024 -1024 1024 1024 -2048 -2048 2048 2048\nsn001 1024 -1024 2048 1024 128 -2048 2944 2048\n";
  if(!strcmp(name,"doors-balmora.txt") || !strcmp(name,"scene-doors-balmora.txt"))s="AWD3\nbalmora bmcaius 42 -5 35 25 5 45 35 22 44 77 90\tCaius Cosades House\n";
@@ -218,6 +229,24 @@ int main(void){
  command_args[1]="BaLmOrA";teleport();assert(!strcmp(queued,"map balmora\n"));
  strcpy(sv.name,"balmora");AW_SceneSpawn(&p);
 #endif
+ /* Coordinate arguments use the same checked transition and preserve state. */
+ command_argc=3;command_args[0]="aw_teleport";command_args[1]="-11264";command_args[2]="-71680";
+ /* The optional Hors fixture has no populated current-health preset. Check
+  * the real dead-player rejection, then establish an alive gameplay request. */
+ p.v.health=0;queued[0]=0;teleport();assert(!queued[0]);p.v.health=73;
+ queued[0]=0;teleport();assert(!strcmp(queued,"map seyda\n"));
+ strcpy(sv.name,"seyda");AW_SceneSpawn(&p);assert(map_place_calls==1 && last_map_arrival[0]==0 && last_map_arrival[1]==0);
+ assert(p.v.health==73 && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
+ {const char *badcoords[]={"nan","inf","1junk","0x10","1e9999","1e-9999","2000001","--1","1 2",""};unsigned i;
+ for(i=0;i<sizeof(badcoords)/sizeof(badcoords[0]);i++) {
+  command_args[1]=(char *)badcoords[i];queued[0]=0;teleport();
+  assert(!queued[0] && p.v.health==73);
+ }
+ command_args[1]="-11264";command_args[2]="-71680";world_map_unavailable=1;
+ queued[0]=0;teleport();assert(!queued[0] && p.v.health==73);
+ world_map_unavailable=0;command_argc=4;command_args[3]="extra";
+ queued[0]=0;teleport();assert(!queued[0] && p.v.health==73);
+ }
  assert(requested_loading_delays==0); /* Explicit travel stays immediate. */
  /* An automatic sub-cell transition preserves held input and player goals.
   * Ordinary doors/teleports above must still clear input deliberately. */
@@ -249,4 +278,4 @@ void AW_SaveCapture(void){}
 void AW_SaveSpawn(void){}
 void AW_SaveReset(void){}
 
-qboolean AW_MapPlace(edict_t *p,const float *xy){return false;}
+qboolean AW_MapPlace(edict_t *p,const float *xy){map_place_calls++;VectorCopy(xy,last_map_arrival);return true;}

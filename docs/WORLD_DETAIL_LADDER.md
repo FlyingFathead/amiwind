@@ -52,9 +52,10 @@ than postponing memory safety until later optimization. See
 
 A possible content progression is rocks/mushrooms → trees/roots → reeds and
 undergrowth → shorelines/marshes → cliffs/formations → roads/paths → entrances.
-It is not a fixed assignment of version numbers: the existing **v0.0.28 — The
-Road(s) More or Less Travelled** target remains recorded in the roadmap. Reconcile
-future scheduling explicitly rather than silently renaming that release.
+It is not a fixed assignment of version numbers: the planned **v0.0.28 — Trees
+and Grass, Day and Night** title is now recorded in the roadmap. The title does
+not imply that all graphics milestones are complete. Reconcile future scheduling
+explicitly rather than silently changing the planned release contents.
 
 ## Keep micro-clutter and interactive objects separate
 

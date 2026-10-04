@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -62,6 +63,23 @@ class GuidedBuildTests(unittest.TestCase):
         self.assertEqual(Path(overlay[overlay.index("--terrain") + 1]), Path("/private/run/world-terrain"))
         self.assertEqual(Path(overlay[overlay.index("--scenery") + 1]), Path("/private/run/world-scenery-source/scenery"))
 
+    def test_map_budget_policy_reaches_image_stage_only(self):
+        tools = {name: '/tools/' + name for name in
+                 ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
+        for extra, expected in (([], 'strict'), (['--map-budget-policy', 'warning'], 'warning')):
+            with self.subTest(expected=expected):
+                args = build.parser().parse_args(extra)
+                args.data_files = Path('/owned/Data Files')
+                args.sdk = Path('/sdk')
+                steps = dict(build.commands(args, tools, Path('/private/run')))
+                image = steps['image']
+                self.assertEqual(image.count('--map-budget-policy'), 1)
+                self.assertEqual(image[image.index('--map-budget-policy') + 1], expected)
+                for name, command in steps.items():
+                    if name != 'image':
+                        self.assertNotIn('--map-budget-policy', command)
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX shell launcher; Windows launcher is covered by test_build_windows')
     def test_shell_wrapper_from_another_directory_and_space_path(self):
         with tempfile.TemporaryDirectory(prefix="amiwind build ") as tmp:
             base = Path(tmp)

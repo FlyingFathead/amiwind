@@ -1,6 +1,7 @@
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import sys
 
@@ -52,6 +53,18 @@ def make_bsp():
 
 
 class WorldMapHeapEstimateTests(unittest.TestCase):
+    def test_static_link_pages_are_charged_after_model_loading(self):
+        with tempfile.TemporaryDirectory() as temp:
+            maps=Path(temp);(maps/'sn012.bsp').write_bytes(make_bsp())
+            before=heap.inspect_maps(maps,SIZES)['maps'][0]
+            # Isolate the final phase; sprite_heap tests real link traversal and
+            # exact page payload/alignment/header accounting independently.
+            with patch('sprite_heap.inspect_efrags',return_value={'resident_hunk_bytes':16416}):
+                after=heap.inspect_maps(maps,SIZES)['maps'][0]
+        self.assertEqual(after['resident_loader_bytes'],before['resident_loader_bytes']+16416)
+        self.assertEqual(after['peak_loader_bytes'],max(before['peak_loader_bytes'],after['resident_loader_bytes']))
+        self.assertEqual(after['estimated_total_bytes'],after['peak_loader_bytes']+after['baseline_reserve_bytes']+after['safety_headroom_bytes'])
+
     def test_estimates_decoded_target_allocations_and_direct_byte_loads(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'sn012.bsp'
@@ -70,6 +83,26 @@ class WorldMapHeapEstimateTests(unittest.TestCase):
         self.assertIn('lighting (direct byte load)', labels)
         self.assertIn('visibility (direct byte load)', labels)
         self.assertIn('hull0 clipnodes', labels)
+
+    def test_balmora_catalogue_adds_target_hunk_without_removing_bsp_payload(self):
+        raw=make_bsp();table=heap.lump_table(raw,Path('synthetic'))
+        table['entities']=b'{"classname" "func_wall"}\n'*3
+        header=bytearray(struct.pack('<i',29));body=bytearray();offset=heap.HEADER_SIZE
+        for name in heap.RECORDS:
+            lump=table[name];header.extend(struct.pack('<ii',offset if lump else 0,len(lump)))
+            body.extend(lump);offset+=len(lump)
+        sizes={**SIZES,'scenery':64}
+        with tempfile.TemporaryDirectory() as temp:
+            maps=Path(temp);(maps/'bm019.bsp').write_bytes(header+body)
+            (maps/'sn019.bsp').write_bytes(header+body)
+            report=heap.inspect_maps(maps,sizes)
+        a,b=report['maps']
+        expected=heap.hunk_alloc_bytes(3*64,sizes['hunk'])
+        self.assertEqual(a['scenery_catalogue']['placements'],3)
+        self.assertEqual(a['scenery_catalogue']['hunk_bytes'],expected)
+        self.assertEqual(a['peak_loader_bytes']-b['peak_loader_bytes'],expected)
+        self.assertEqual(a['resident_loader_bytes']-b['resident_loader_bytes'],expected)
+        self.assertEqual(b['scenery_catalogue']['placements'],0)
 
     def test_inspection_requires_positive_baseline_and_safety_headroom(self):
         with tempfile.TemporaryDirectory() as temp:

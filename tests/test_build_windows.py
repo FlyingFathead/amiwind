@@ -88,7 +88,7 @@ class WindowsBuildTests(unittest.TestCase):
             (root / 'tools/build_windows.py').write_text(
                 'import json, sys\nprint(json.dumps(sys.argv[1:]))\nsys.exit(19)\n', encoding='utf-8')
             env = dict(os.environ, AMIWIND_PYTHON=sys.executable)
-            expected = ['--data-files', 'C:\\AmiWind\\GOG Games\\Morrowind',
+            expected = ['--data-files', 'C:\\Example Games\\Morrowind',
                         '--name', 'literal-$value', '--jobs', '3']
             ps = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(root / 'build.ps1')]
             commands = [ps + expected,

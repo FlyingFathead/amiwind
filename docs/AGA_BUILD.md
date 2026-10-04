@@ -1,9 +1,10 @@
 # AGA checkpoint build and controls
 
-The current v0.0.25-rc1 candidate runtime includes the detailed Seyda Neen and
-Balmora areas plus the surveyed island's terrain/water regions. Other settlements
-are not populated yet. See [current scope](RELEASE-v0.0.25-rc1.md). The A500 runtime
-remains a separate experiment; this profile is not stock-A1200 performance proof.
+Published v0.0.27 includes detailed Seyda Neen and Balmora, the island's
+2,526 terrain regions, 37,960 exterior rocks and 816 giant mushrooms. Other
+settlements and wider gameplay remain incomplete. See [current scope and
+validation limits](RELEASE-v0.0.27.md). The A500 runtime remains a separate
+experiment; this accelerated AGA profile is not stock-A1200 performance proof.
 
 ## Reference configuration
 
@@ -26,10 +27,13 @@ no longer links `icon.library` or closes/reopens Workbench. It still uses AmigaO
 filesystem, devices and screen management. Skipping the desktop does not
 remove those dependencies. This AGA executable does not support Kickstart 1.3.
 
-The development package contains two FFS partitions in one RDB HDF. Select
-the image as an RDB hardfile on the UAE controller, using its stored geometry.
-WinUAE has not been tested here; the documented FS-UAE settings are the reference.
-Use a working copy of the image: exit writes profiling files to the filesystem.
+Private playable builds can span multiple RDB HDFs. Use the generated
+configuration and mount every disk listed in the build summary simultaneously,
+with the boot disk first. WinUAE uses RDB hardfiles on the UAE controller with
+their stored geometry. The dated [Windows tests](VALIDATION-WINDOWS-2026-10-02.md)
+and [v0.0.27 record](RELEASE-v0.0.27.md) distinguish game-entry checks from later
+build/readback results and still-pending target acceptance. Use working image
+copies: exiting the game writes profiling files to their filesystems.
 
 ## Controls
 
@@ -91,14 +95,17 @@ is enabled. `aw_probe` runs 441 floor sweeps and writes `collision-probe.csv`.
 The latter stalls the game and is not a normal performance workload. Use
 `aw_cull 0/1` and `aw_fog 0/1` to isolate distance rejection from shading.
 These are development tools, not save/load or final Morrowind controls.
-E is reserved for future activation in the planned modern control profile.
+**E** activates the targeted door or resident in the implemented interaction
+slice; see [the maintained keymap](KEYMAPS.md). Full gameplay remains incomplete.
 
 ## Host conversion
 
 Use the guided [Linux builder](LINUX_BUILD.md), which checks dependencies and
 runs setup, terrain, scenery, mesh conversion, music, engine and image assembly.
 Inputs and generated outputs must stay outside the public source checkout.
-For a manual conversion, after setup and terrain generation:
+The manual chain below records the earlier bounded-scene experiment. Use the
+guided full-content recipe above for a current complete build; these individual
+commands are a reference for the conversion stages after setup and terrain:
 
 ```sh
 python tools/prepare_scenery.py --workspace ../morrowind-amiga-workspace --out ../scenery
@@ -110,12 +117,15 @@ python tools/prepare_dialogue_lookup.py --data-files '/owned/Morrowind/Data File
 python tools/prepare_music.py --data-files '/owned/Morrowind/Data Files' --out ../music
 ```
 
-The converter currently reads base-game static NIF assets using PyFFI. It writes
+In that earlier bounded-scene recipe, the converter read base-game static NIF
+assets using PyFFI and wrote
 shared BSP submodels with 64-pixel material textures and original UV mappings,
 plus separate approximate multipart collision. Variants bake scale and pitch/
-roll; placements carry position and yaw. Foliage remains sprites. The report
-lists 155 placements / 55 model variants in the current bounded scene. Actor
-assembly uses the independent local NIF baker for three NPCs and Nord hands.
+roll; placements carried position and yaw. That experiment used foliage
+sprites and reported 155 placements / 55 model variants, three NPCs and Nord
+hands. These are historical example counts, not current world/gallery coverage.
+The current planned foliage policy retains mesh foliage in detailed Balmora;
+see the [roadmap](ROADMAP.md#todo-soon-static-asset-gallery-and-cell-by-cell-scenery).
 An OpenMW-based backend remains future work. The guided build also exports a
 private ordered [voice lookup](DIALOGUE_LOOKUPS.md); it is not loaded by the runtime yet.
 

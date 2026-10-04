@@ -18,6 +18,8 @@ from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from scenery_selection import load_groups, select_source_refs, validate_groups
 from area_config import BOUNDS, inside
+from exterior_visibility import (DRAW_MODES, VisibilityPolicyError, validate_policy,
+                                 select_exterior_faces, source_visibility_issues)
 
 
 def nif_reader():
@@ -78,13 +80,25 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
         for child in getattr(node, 'children', []):
             if child is not None:collect(child, transform)
     for root in data.roots:collect(root, np.eye(4))
-    def visit(node, parent, hidden=False, in_collision=False):
+    def visit(node, parent, hidden=False, in_collision=False, path="root[0]", inherited_stencil=None):
         if not isinstance(node, N.NiAVObject):
             return
         name = node.name.decode('cp1252')
         in_collision = in_collision or isinstance(node, N.RootCollisionNode) or name.casefold() == 'rootcollisionnode'
         hidden = hidden or bool(node.flags & 1)
         transform = worlds[id(node)]
+        stencil = inherited_stencil
+        local_stencils = [p for p in getattr(node, 'properties', [])
+                          if isinstance(p, getattr(N, 'NiStencilProperty', ()))]
+        if local_stencils:
+            p = local_stencils[-1]
+            stencil = {'draw_mode': int(p.draw_mode), 'stencil_enabled': bool(p.stencil_enabled),
+                       'property_flags': int(p.flags), 'origin_path': path,
+                       'ambiguous_properties': len(local_stencils) > 1}
+        if isinstance(node, N.NiTriShape) and not collision and (hidden or in_collision):
+            skipped.append({'shape': name, 'shape_path': path,
+                            'reason': 'collision_node' if in_collision else 'hidden_node',
+                            'triangles': int(node.data.num_triangles) if node.data else 0})
         if isinstance(node, N.NiTriShape) and (in_collision if collision else not hidden and not in_collision):
             g = node.data
             if g is None or not g.num_vertices or not g.num_triangles:
@@ -96,8 +110,17 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
                 if isinstance(p, N.NiTexturingProperty) and p.has_base_texture and p.base_texture.source:
                     texture = p.base_texture.source.file_name.decode('cp1252')
             material = len(materials)
+            visibility = dict(stencil) if stencil else {
+                'draw_mode': None, 'stencil_enabled': False, 'property_flags': None,
+                'origin_path': None, 'ambiguous_properties': False}
+            visibility['draw_mode_name'] = DRAW_MODES.get(visibility['draw_mode'],
+                'unspecified' if visibility['draw_mode'] is None else 'unknown')
+            visibility.update({'hidden': hidden, 'collision_node': in_collision,
+                               'runtime_policy': 'existing one-sided winding; metadata is not new raster support'})
             materials.append({'texture_source': texture, 'diffuse': diffuse, 'alpha': alpha,
-                              'source_shape': name})
+                              'source_shape': name, 'source_shape_path': path,
+                              'source_face_range': {'start': len(faces), 'count': int(g.num_triangles)},
+                              'source_visibility': visibility})
             start = len(vertices)
             hom = np.array([[v.x,v.y,v.z,1.] for v in g.vertices])
             positions = hom @ transform
@@ -132,11 +155,12 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
                 vertices.append([*map(float, position[:3]), *map(float,coords[i]),
                                  *[round(max(0., min(1., c)) * 255) for c in rgba]])
             faces.extend([start + a, start + b, start + c, material] for a, b, c in g.get_triangles())
-        for child in getattr(node, 'children', []):
+        for child_index, child in enumerate(getattr(node, 'children', [])):
             if child is not None:
-                visit(child, transform, hidden, in_collision)
-    for root in data.roots:
-        visit(root, np.eye(4))
+                visit(child, transform, hidden, in_collision,
+                      path + '/children[' + str(child_index) + ']', stencil)
+    for root_index, root in enumerate(data.roots):
+        visit(root, np.eye(4), path='root[' + str(root_index) + ']')
     if not vertices or not faces:
         raise ValueError('No supported visible static triangles')
     packet = pack_geometry(vertices, faces, len(materials))
@@ -164,7 +188,7 @@ def world_bounds(bounds, ref):
     return [points.min(axis=0).tolist(), points.max(axis=0).tolist()]
 
 
-def prepare(workspace, out, radius=11500, texture_size=64, jobs=None):
+def prepare(workspace, out, radius=11500, texture_size=64, jobs=None, visibility_policy=None):
     from PIL import Image
     workspace, state = read_workspace(workspace)
     data_files = resolve_data_files(state['data_files'])
@@ -176,7 +200,8 @@ def prepare(workspace, out, radius=11500, texture_size=64, jobs=None):
     # whose origins lie outside the playable rectangle.
     refs = [r for r in refs if r.get('scene_groups') or inside(r['position'], 512)]
     return export_refs(data_files,out,refs,groups,centre,radius,texture_size,
-                       metadata={'runtime_bounds': BOUNDS},jobs=jobs)
+                       metadata={'runtime_bounds': BOUNDS, 'scene_kind': 'exterior'},
+                       jobs=jobs,visibility_policy=visibility_policy)
 
 
 def _read_model(task):
@@ -199,8 +224,13 @@ def _read_model(task):
         return name, None, None, None, str(exc)
 
 
-def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None,jobs=None):
+def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None,jobs=None,
+                visibility_policy=None):
     from PIL import Image
+    if visibility_policy is not None:
+        validate_policy(visibility_policy)
+        if not metadata or metadata.get('scene_kind') != 'exterior':
+            raise VisibilityPolicyError('Visibility exclusions require explicit exterior context')
     out = ensure_external(out, 'scenery export'); out.mkdir(parents=True, exist_ok=False)
     bsa = BSA(child_ci(data_files, 'Morrowind.bsa'))
     profiles={name:profile for group in groups.values()
@@ -228,6 +258,11 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                 if error is not None:
                     raise ValueError(error)
                 packet, materials, bounds, skipped = result
+                visibility_selection = None
+                if visibility_policy is not None:
+                    visibility_selection = select_exterior_faces(visibility_policy, name,
+                        hashlib.sha256(raw).hexdigest(), materials, unpack_geometry(packet)[1],
+                        metadata['scene_kind'])
                 collision_record = None
                 if collision_result is not None:
                     cpacket, _, cbounds, cskipped = collision_result
@@ -259,8 +294,12 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                                         'vertices': len(unpack_geometry(packet)[0]), 'triangles': len(unpack_geometry(packet)[1]),
                                         'bounds': bounds, 'materials': materials, 'textures': sorted(set(texture_refs)),
                                         'collision': collision_record,
+                                        'source_visibility_issues': source_visibility_issues(materials),
+                                        'exterior_visibility': visibility_selection,
                                         'skipped_shapes': skipped, **put(f, packet)})
                 print('model',len(index['models']),'/',len(names),name,flush=True)
+            except VisibilityPolicyError:
+                raise
             except (ValueError, KeyError, struct.error) as e:
                 index['errors'].append({'source': name, 'error': str(e)})
     model_ids = {m['source']: i for i, m in enumerate(index['models'])}
@@ -289,6 +328,12 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
               'models': len(index['models']), 'textures': len(index['textures']), 'archive_bytes': archive.stat().st_size,
               'geometry_bytes': sum(m['bytes'] for m in index['models']),
               'collision_bytes': sum(m['bytes'] for m in collisions), 'errors': index['errors'],
+              'source_visibility_acceptance': {
+                  'status': 'incomplete' if any(m['source_visibility_issues'] for m in index['models']) else 'existing one-sided policy',
+                  'issues': [{'model': m['source'], **issue} for m in index['models'] for issue in m['source_visibility_issues']],
+                  'note': 'Metadata retained; alternate draw modes need explicit runtime/converter acceptance.'},
+              'exterior_visual_triangles_selected': sum(len(m['exterior_visibility']['excluded_packet_faces'])
+                  for m in index['models'] if m.get('exterior_visibility')),
               'camera_spheres': {str(d): resident_set(index, visible_refs(index, centre, d)) for d in (768,1536,2304,3840)},
               'note': 'Host geometry/cache accounting only. No Amiga frame-rate or disk-throughput claim. RGBA textures are an intermediate, not a Paula/AGA format.'}
     (out/'scenery-index.json').write_text(json.dumps(index,indent=2)+'\n')
@@ -301,7 +346,10 @@ def main():
     p.add_argument('--workspace',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--radius',type=int,choices=range(512,16385),default=11500)
     p.add_argument('--texture-size',type=int,choices=(32,64,128),default=64)
+    p.add_argument('--exterior-visibility-policy',type=Path,
+                   help='Optional reviewed model/hash-bound exterior visual exclusions; no production entries are bundled')
     add_jobs(p);a=p.parse_args()
-    print(json.dumps(prepare(a.workspace,a.out,a.radius,a.texture_size,a.jobs),indent=2))
+    policy=json.loads(a.exterior_visibility_policy.read_text(encoding='utf-8')) if a.exterior_visibility_policy else None
+    print(json.dumps(prepare(a.workspace,a.out,a.radius,a.texture_size,a.jobs,policy),indent=2))
 
 if __name__=='__main__': main()

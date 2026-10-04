@@ -191,8 +191,8 @@ void	Host_FindMaxClients (void)
         svs.maxclients = MAX_SCOREBOARD;
 
     svs.maxclientslimit = svs.maxclients;
-    if (svs.maxclientslimit < 4)
-        svs.maxclientslimit = 4;
+    /* AmiWind single-player needs one client and two loopback sockets.
+       Allocate only explicitly requested clients; do not reserve four unused slots. */
     svs.clients = Hunk_AllocName (svs.maxclientslimit*sizeof(client_t), "clients");
 
     if (svs.maxclients > 1)
@@ -490,6 +490,8 @@ not reinitialize anything.
 */
 void Host_ClearMemory (void)
 {
+    /* Drop every leaf/static pointer before freeing map-owned overflow pages. */
+    R_ClearEfrags(true);
     AW_SceneryClear();
     Con_DPrintf ("Clearing memory\n");
     D_FlushCaches ();

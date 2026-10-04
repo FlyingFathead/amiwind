@@ -10,7 +10,7 @@ rendering. Repeated disk reads can consume CPU time and compete with audio.
 
 | Profile | Intended storage | Status and limits |
 | --- | --- | --- |
-| Current AGA emulator baseline | RDB HDF, DOS1 FFS, UAE controller, A1200 KS 3.1 | v0.0.24 has a 1 GiB boot partition; this is a build setting, not the FFS limit. Terrain development balances content across two partitions inside one HDF. |
+| Current AGA emulator baseline | Simultaneously mounted RDB HDFs, DOS1 FFS, UAE controller, A1200 KS 3.1 | v0.0.27 private builds span two HDFs. Every device stays below 4 GiB and each filesystem partition below 2 GiB; generated configurations include all required disks. |
 | Historical A500 checkpoint-004 | Three 32 MiB OFS partitions, UAE controller, KS 1.3 | Earlier 1 MiB A500 prototype; not the current AGA image |
 | Physical A500 candidate | Named controller/driver plus a modest boot volume and asset files | Keep the entire addressed range below 4 GiB; choose smaller volumes where the actual controller requires them. Hardware not yet validated. |
 | Large UAE candidate | RDB boot partition plus separate asset area, potentially 8/16/32 GiB | Proposal only. Requires tested driver/API support for every offset used, and documented emulator version/settings. |
@@ -34,7 +34,21 @@ by itself make that file accessible through every Amiga-side driver.
 
 ## Current AGA image layout
 
-The current v0.0.25-rc1 HDF is **3,489,693,696 bytes**: two **1,664 MiB**
+Stable v0.0.27 private assembly uses two simultaneously mounted HDFs. The verified
+build receipt supplies the complete drive list to both FS-UAE and WinUAE
+configuration generation. Missing world disks stop configuration; this is not
+disk swapping. Both final HDF filesystem readbacks passed. The complete static
+heap gate covered 2,717 maps, but storage capacity does not add runtime heap or
+certify target gameplay. See [release evidence](RELEASE-v0.0.27.md) and
+[build output](BUILD_OUTPUT.md).
+
+Keep each HDF below 4 GiB and each partition below 2 GiB. Measure the current
+payload and allocated/free space separately; the earlier single-HDF sizes below
+are historical measurements, not the size of a current v0.0.27 build.
+
+## Historical v0.0.25 single-HDF layout
+
+The v0.0.25-rc1 HDF was **3,489,693,696 bytes**: two **1,664 MiB**
 partitions plus a 32 KiB RDB cylinder. The payload is 2,711,140,228 bytes, with
 364,228,608 bytes free on AMIWIND and 368,716,288 on AW_WORLD0. All 10,622 files
 were independently read back and hashed. The refined shoreline data still fits
@@ -44,7 +58,7 @@ The historical v0.0.25-dev1 HDF is 3,221,258,240 bytes: two 1,536 MiB partitions
 a 32 KiB RDB cylinder. Its payload is 2,599,581,307 bytes; independent readback
 covers all 10,621 files. Native loading from the highest used disk range passed.
 
-The island-terrain build uses one RDB HDF with two FFS partitions, each below
+That island-terrain build used one RDB HDF with two FFS partitions, each below
 2 GiB and the complete device below 4 GiB. The boot/save partition also carries
 some terrain; the second carries the rest. The packer balances actual payload
 bytes before adding filesystem/free-space allowance. There is no artificial
@@ -80,7 +94,8 @@ than duplicating them on both volumes. Videos still need adequate read throughpu
 and buffering during playback even if they are opened rarely.
 
 This is a preferred future packing policy, not the current implementation.
-v0.0.25-rc1 contains no expansion conversions; its base-game terrain alone is
+For the historical v0.0.25-rc1 measurement, there were no expansion conversions;
+its base-game terrain alone was
 split across both volumes by measured payload size. Its combined 2,711,140,228-byte
 payload cannot fit on one partition below 2 GiB. Reaching the preferred layout
 therefore requires further measured reductions or selective base-game overflow.

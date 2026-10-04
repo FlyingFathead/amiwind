@@ -1,6 +1,7 @@
 # Development overlays
 
-Runtime v0.0.25-rc1. Open the console with F10 or the key left of 1 (normally
+Runtime command reference, updated for the v0.0.28 candidate on 4 October 2026.
+Open the console with F10 or the key left of 1 (normally
 § on the Finnish layout). Boolean commands accept on/off, true/false and 1/0,
 case-insensitively. With no value they report their setting.
 
@@ -107,8 +108,9 @@ and lasts for the session; restart defaults to readable. Both atlases are stored
 on disk; one 16 KiB atlas remains active. A validated font switch uses a temporary
 16 KiB stack buffer, not a second permanently resident atlas.
 
-Planned `debug daycycle ...` commands are documented in
-[DAY_NIGHT_AND_SKY.md](DAY_NIGHT_AND_SKY.md); they are not available yet.
+`dbg daynightcycle on/off` controls automatic game-time advancement; `dbg sky
+on/off` independently controls sky/fog presentation. Both are implemented and
+default on. See [day/night controls and limits](DAY_NIGHT_AND_SKY.md).
 
 ## Compact console in checkpoint-016
 
@@ -156,6 +158,7 @@ Use these during play:
 | Command | Destination / action |
 | --- | --- |
 | `dbg tp` or `dbg tp menu` | Open the destination picker |
+| `dbg tp X Y` | Original Morrowind global XY; checked terrain/water arrival |
 | `dbg tp balmora` | Balmora exterior at the converted arrival point |
 | `dbg tp seydaneen` | Seyda Neen exterior at the checked town recall point |
 | `dbg tp prisonship` | Imperial Prison Ship interior |
@@ -203,8 +206,10 @@ Fog still starts at 40% of the selected depth and becomes opaque at 100%; BSP
 and model rejection use the same distance with the existing small safety margin.
 Changing it does not reload geometry or resize the heap. Only the existing
 32 KiB inverse-depth table is refreshed: 15 integer divisions and band fills
-replace 32,767 floating-point divisions. Per-pixel fog work and the culling
-checks themselves are unchanged. Potential savings come from rejected geometry,
+replace 32,767 floating-point divisions. That distance-setting optimization left
+per-pixel fog and culling work unchanged. The later day/night candidate adds cached
+color selection and direction-based sky haze without changing the depth bands.
+Potential savings from a shorter distance come from rejected geometry,
 not from making a menu value adjustable. Indoor visibility remains unchanged;
 setting the distance indoors affects the next exterior view.
 
@@ -257,12 +262,39 @@ converted source gain; the earlier extra 5 dB reduction is removed.
 - `dbg ui targetplace below/topright/hudleft`: place aimed NPC names.
   `dbg ui labels below/topright/hudleft`: independently place object/action labels.
 - `dbg timeofday`: show time/date; append an hour in [0,24), or `morning`,
-  `night`, `midday`, `day`, `evening`, `sunset`, `sunrise`. Sets the time on the
-  current date; does not render a different sky yet.
+  `night`, `midday`, `day`, `evening`, `sunset`, `sunrise`, `dawn`, `dusk`.
+  Preserves legacy evening=18:00 / sunset=19:00 aliases.
+- `dbg set time 0630`: exact four-digit HHMM, preserving date; rejects invalid
+  hours/minutes. Named snapshots: dawn=05:30, sunrise=06:00, morning=09:00,
+  midday=12:00, day=14:00, evening=17:00, sunset=18:00, dusk=19:00, night=00:00.
+- `dbg daynightcycle on/off` (true/false, 1/0): archived `aw_daynightcycle`,
+  default on. Off pauses automatic clock/cloud progression while preserving the
+  chosen timescale. Explicit `dbg set time`, `dbg timeofday` changes and T waits
+  still advance/set the same saved clock. On resumes without wall-time catch-up.
+- `dbg sky on/off` (true/false, 1/0): archived `aw_daynight`, default on.
+  Shared exterior sky and distance fog follow the saved clock; off restores the
+  original sky and baseline fog independently of the cycle switch. Interiors
+  retain their authored environment. The current candidate includes sun, original
+  night textures and both moons; regional weather remains follow-up work. `aw_timescale 0` also freezes
+  automatic time; 30 remains the default rate.
 - `aw_wait` opens the hours selector (T by default); `aw_quick_help` opens help
   (F1). `bind t aw_wait` and `bind F1 aw_quick_help` restore these defaults.
 
-See [dialogue and waiting](DIALOGUE_AND_WAIT.md) for semantics and limits.
+Boolean forms are case-insensitive; either switch without an argument reports
+its setting. Invalid values leave it unchanged. Shipped defaults are overridden by
+saved user configuration. For repeatable captures use `dbg daynightcycle off`,
+then `dbg set time 0630` (or another exact/named time); resume with
+`dbg daynightcycle on`. Automatic ticks now retain sub-millisecond fractions to
+avoid frame-rate-dependent drift; the saved world clock remains the only calendar.
+
+The earlier V1 Clear-profile sky/fog checkpoint replaced coarse ordered
+dithering with cached remaps; its approximately 8 KiB table growth and 63-method
+09:05 EEST fixture result are historical. The corrected V3/night/guard source
+passes full 822-test gates and matching Amiga compiles, including tiny-star,
+arrival and cloud-speed corrections. Native replay remains pending; earlier
+startup/default/clock results do not validate those changed bytes. See [day/night implementation and
+limits](DAY_NIGHT_AND_SKY.md), [current release evidence](RELEASE-v0.0.28.md) and
+[dialogue and waiting](DIALOGUE_AND_WAIT.md).
 
 `aw_show_speaker_name_during_voiceovers 0/1` controls voiced speaker identity
 (default 0). Options → Interface provides these same persisted settings.
@@ -290,8 +322,49 @@ type 1 keeps the legacy renderer for matched-camera comparisons.
 `dbg aw hors 0` resets to Hors (male Nord, Barbarian, The Steed), after Census in
 Seyda Neen square. `dbg tp balmora` creates Hors only without an existing
 character. `dbg door sounds on/off` controls authored opening/closing samples.
-`dbg input trace on/off` logs raw key/mouse events to the debug log when running
-with `-condebug`; turn it off after reproducing the birthsign input report.
+`dbg inputtrace on/off` logs raw key and mouse events in the console; with
+`-condebug` they also reach the debug log. It accepts `true/false` and `1/0`,
+case-insensitively. No argument reports its state. Tracing defaults off and is
+not an archived preference; `dbg input trace` remains an alias. Use
+`dbg inputtrace off` immediately after collecting the needed input evidence,
+because mouse motion produces many lines. Visual playtests and sky captures
+keep tracing off.
+
+`dbg daycycle gallery` previews eight sky stages in a camera tour, eight seconds
+each. On the tested Seyda Neen town map it uses the recorded scenic viewpoints;
+other exteriors use the current eye with changing look directions. Add `here` to
+keep the current view. The player is never moved. Escape, command repetition or `dbg daycycle gallery off`
+returns to real game time without changing the saved date or sky settings.
+`dbg nightgallery [here/off]` gives a four-stage 23:00 tour: current wide view,
+Masser, Secunda, then overhead stars, eight seconds each. Eye position never
+changes. Moon directions use the saved date and the renderer's orbit; a moon
+below the horizon is labelled and that stage keeps the current view. `here`
+keeps all camera angles unchanged too. Escape, repetition, `off`, completion or
+map change restores the normal view/time. Console/menu pauses the tour. Saved
+clock, date, player and sky settings remain untouched; clouds/scenery still
+occlude the sky. Native verification of this new command remains pending.
+
+`dbg skyspeed [0..100]` controls only cloud scrolling. The default multiplier
+`0.00333333333` is approximately one-three-hundredth of the old cloud speed
+and one third of the preceding `0.01` setting; `0` stops clouds and `1`
+restores the old speed. The sun and saved clock keep their existing rate. See [sky controls](DAY_NIGHT_AND_SKY.md).
+`dbg starsky on/off` controls the stars and nebula; `dbg nightsky on/off` controls
+the complete night layer including Masser and Secunda. Both also accept `1/0` and
+`true/false`, default on and save as `aw_starsky` and `aw_nightsky`. Query either
+without an argument. The master `dbg sky` switch and interior isolation still apply.
+Selected bright stars have gentle, sometimes cool-blue twinkle; the complete
+moon discs, including their unlit phases, occlude the stars.
+
+`dbg guardtorch on/off/auto` controls the current guard-torch candidate. On/off
+also accept `true/false` and `1/0`; `auto` clears the session override. The
+archived `guards_torch_cycle` setting defaults true and accepts those Boolean
+forms. Automatic use requires an original inventory torch and a validated
+exterior, strictly before 06:00 or after 20:00. `on` includes supported Imperial
+and Hlaalu guard records regardless of inventory or time; it does not equip
+unrelated NPC classes. Corpse/dead, swimming and asset-validity checks still
+apply. Final combined native acceptance is pending. See [guard torch policy,
+source rules and resource limits](TORCH.md#guard-torches-and-the-clock--implementation-in-progress).
+
 Frame CSV now also records server time and surface-order mode, separating
 movement/logic cost from world rendering. Shift+V stays unchanged.
 
@@ -319,7 +392,18 @@ map shows the same region below its viewport regardless of compass visibility.
 See [map lookup and teleport](WORLD_MAP_AND_JOURNAL.md#region-name-and-debug-teleport).
 
 `dbg tp map` (or `dbg map tp`) selects a point with a red crosshair, then requires the TELEPORT
-button or Enter to confirm. Escape cancels. **F, then V** equips the temporary
+button or Enter to confirm. Escape cancels.
+
+During play, `dbg tp -14231 -76109` uses original Morrowind global X/Y,
+without a Z argument. Decimal coordinates and exponents are accepted; invalid,
+non-finite, out-of-range or extra arguments leave state unchanged. Coordinates
+must resolve to an available converted destination. The existing checked map
+teleport route preserves player state and validates the standing hull at arrival.
+It places the feet above terrain, or above the actual BSP water surface when
+terrain is submerged. A blocked arrival uses the existing checked scene-spawn
+fallback and reports it. The four focused Linux native fixtures pass; emulator/target acceptance is pending.
+
+ **F, then V** equips the temporary
 [carried torch](TORCH.md); Shift+V continues to cycle draw distance.
 
 ## Version, world and original region

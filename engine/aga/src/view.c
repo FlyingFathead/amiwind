@@ -1001,6 +1001,19 @@ the entity origin, so any view position inside that will be valid
 */
 extern vrect_t	scr_vrect;
 
+/* Presentation camera changes last only for this renderer call. Restoring
+ * immediately also handles paused frames, cancellation and stereo passes. */
+void V_RenderCameraView(void)
+{
+    vec3_t origin,angles;int preview;
+    VectorCopy(r_refdef.vieworg,origin);VectorCopy(r_refdef.viewangles,angles);
+    preview=AW_DayGalleryView(r_refdef.vieworg,r_refdef.viewangles);
+    R_RenderView ();
+    if(preview){
+        VectorCopy(origin,r_refdef.vieworg);VectorCopy(angles,r_refdef.viewangles);
+    }
+}
+
 void V_RenderView (void)
 {
     if (con_forcedup)
@@ -1040,7 +1053,7 @@ void V_RenderView (void)
         r_refdef.viewangles[YAW] -= lcd_yaw.value;
         for (i=0 ; i<3 ; i++)
             r_refdef.vieworg[i] -= right[i]*lcd_x.value;
-        R_RenderView ();
+        V_RenderCameraView ();
 
         vid.buffer += vid.rowbytes>>1;
 
@@ -1049,7 +1062,7 @@ void V_RenderView (void)
         r_refdef.viewangles[YAW] += lcd_yaw.value*2;
         for (i=0 ; i<3 ; i++)
             r_refdef.vieworg[i] += 2*right[i]*lcd_x.value;
-        R_RenderView ();
+        V_RenderCameraView ();
 
         vid.buffer -= vid.rowbytes>>1;
 
@@ -1060,7 +1073,7 @@ void V_RenderView (void)
     }
     else
     {
-        R_RenderView ();
+        V_RenderCameraView ();
     }
 
 #ifndef GLQUAKE

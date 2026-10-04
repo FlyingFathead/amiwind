@@ -28,6 +28,11 @@ def compact(raw, records=None, prune_world=False, visual_bounds=None):
              9:'<iHH',10:'<ii6h2H4B',11:'<H',12:'<HH',13:'<i',14:'<9f7i'}
     src={i:[list(r) for r in struct.iter_unpack(fmt,data[i])] for i,fmt in formats.items()}
     kept={0}
+    pool_text=records[0].get('aw_render_pool') if records else None
+    pool_model=None
+    if pool_text is not None:
+        if not re.fullmatch(r'\*\d+',pool_text):raise ValueError('Invalid auxiliary render pool')
+        pool_model=int(pool_text[1:]);kept.add(pool_model)
     for e in records:
         if e.get('model','').startswith('*'): kept.add(int(e['model'][1:]))
     if not kept or min(kept)<0 or max(kept)>=len(src[14]): raise ValueError('Invalid brush model')
@@ -66,7 +71,7 @@ def compact(raw, records=None, prune_world=False, visual_bounds=None):
         for e in records:
             if e.get('model','').startswith('*'):
                 m=int(e['model'][1:])
-                if not m:continue
+                if not m or m==pool_model:continue
                 origin=tuple(map(float,e.get('origin','0 0 0').split()))
                 angles=tuple(map(float,e.get('angles','0 0 0').split()))
                 if len(origin)!=3 or len(angles)!=3 or not all(math.isfinite(v) for v in (*origin,*angles)):
@@ -74,7 +79,7 @@ def compact(raw, records=None, prune_world=False, visual_bounds=None):
                 placements[m].append((origin,axes(angles)))
         tested=set();visible_faces=set()
         for m in models:
-            if not m:continue
+            if not m or m==pool_model:continue
             first,count=src[14][m][14:16]
             for f in range(first,first+count):
                 if f not in faces:continue
@@ -132,6 +137,7 @@ def compact(raw, records=None, prune_world=False, visual_bounds=None):
     emit(14,rebuilt)
     for e in records:
         if e.get('model','').startswith('*'):e['model']='*'+str(remap_model[int(e['model'][1:])])
+    if pool_model is not None:records[0]['aw_render_pool']='*'+str(remap_model[pool_model])
     out[0]=bytearray(entity_bytes(records))
     total=struct.unpack_from('<i',data[2])[0]
     offsets=list(struct.unpack_from('<'+str(total)+'i',data[2],4))

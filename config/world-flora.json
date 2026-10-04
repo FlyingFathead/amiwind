@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "stage": "selection_only",
+  "scale_handling": "one_shared_sprite_image_with_original_instance_scale",
+  "mesh_exclusion": {
+    "enabled": true,
+    "coordinate_space": "tes3_source_xy",
+    "zone_source": "balmora_core",
+    "source_bounds": [
+      [
+        -32768,
+        -24576
+      ],
+      [
+        -8192,
+        0
+      ]
+    ],
+    "z": "unbounded",
+    "selection": "transformed_bounds_intersect"
+  },
+  "source_categories": [
+    "tree",
+    "grass",
+    "reeds",
+    "fern",
+    "bush",
+    "flora_log",
+    "stateful_flora"
+  ],
+  "deferred_orientation_categories": [
+    "ivy",
+    "lilypad"
+  ]
+}

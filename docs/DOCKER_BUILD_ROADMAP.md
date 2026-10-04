@@ -1,5 +1,14 @@
 # Docker builder roadmap
-## Current evidence - 2 October 2026
+
+## Current release evidence — 3 October 2026
+
+Published v0.0.27 passed the complete Linux Docker suite (558 tests, 3 skips)
+and asset-free Amiga compile before publication. Its hosted Docker, Linux/Windows
+launcher-parity and source/asset-free jobs all passed; publication and downloaded
+source-asset verification are complete. See [v0.0.27 release notes](RELEASE-v0.0.27.md).
+These results do not establish a new full-game conversion or target gameplay run.
+
+## Historical full-conversion evidence — v0.0.26, 2 October 2026
 
 The allowlisted source/tools image, runtime input/export helper and asset-free
 Docker CI job are implemented locally. The wrapper suite passed 433 tests with
@@ -20,14 +29,13 @@ The planning and native storage snapshots below are historical estimates; they
 do not override the current evidence or establish a measured Docker peak.
 
 
-Status: **local v0.0.26 helper/export validation passed; hosted CI and publication
-remain pending**. Native Windows conversion and WinUAE game entry also passed,
+Status: **v0.0.26 helper/export validation, hosted CI and publication completed**. Native Windows conversion and WinUAE game entry also passed,
 with experimental Windows reliability limits still documented. The Docker
 builder, read-only input helper and dedicated CI job are implemented. The local
 wrapper suite passed 433 tests with 3 skips; full final-identity conversion,
 strict actor-ground validation, verified HDF export and WinUAE game entry passed.
 See [Docker builder](DOCKER_BUILD.md) and [v0.0.26 release notes](RELEASE-v0.0.26.md).
-The first implementation should wrap the established Linux pipeline with its
+The implementation wraps the established Linux pipeline with its
 full-content defaults and existing validation gates. Native Linux remains the
 foundation; native Windows 11 remains experimental. A Linux container build on
 Windows is a separate build-host result, not a native Windows validation result.
@@ -109,7 +117,7 @@ installation requirements. Do not promise that containerization reduces space.
 Container implementation and validation follow rc1. Preserve local conversion
 outputs and validated caches during provisioning; do not move active workspaces. The 40 GiB figure is a free-space
 budget, not the published image size or an automatically imposed VM disk cap.
-See the [main roadmap](ROADMAP.md#docker-builder-planned-for-v0026),
+See the [main roadmap](ROADMAP.md#docker-builder-and-v0026-validation),
 [capacity requirements](BUILD_TOOLKIT_ROADMAP.md#capacity-before-conversion) and
 Docker's [Windows WSL 2 backend](https://docs.docker.com/desktop/features/wsl/).
 

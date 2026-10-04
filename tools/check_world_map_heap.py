@@ -50,7 +50,11 @@ DIRECT_IN_PLACE_LUMPS = {'clipnodes'}
 PROBE_TYPES = ('pointer', 'short', 'int', 'hunk', 'dvertex', 'dedge', 'dplane', 'dnode',
                'dclipnode', 'clipnode', 'dleaf', 'texinfo', 'dface', 'dmodel', 'mvertex',
                'medge', 'mplane', 'mtexinfo', 'msurface', 'mnode', 'mleaf',
-               'clipnode', 'texture', 'hull')
+               'clipnode', 'texture', 'hull', 'float', 'entity', 'efrag', 'efrag_page',
+               'msprite', 'mspriteframe', 'mspritegroup', 'mspriteframedesc',
+               'scenery', 'client', 'qsocket', 'signon_capacity', 'reliable_capacity', 'network_capacity',
+               'aliashdr', 'maliasframedesc', 'mdl', 'stvert', 'mtriangle',
+               'maliasskindesc', 'trivertx', 'cache_system')
 
 PROBE_SOURCE = r'''#include "quakedef.h"
 #include "model.h"
@@ -78,6 +82,37 @@ const unsigned int aw_size_mnode = sizeof(mnode_t);
 const unsigned int aw_size_mleaf = sizeof(mleaf_t);
 const unsigned int aw_size_texture = sizeof(texture_t);
 const unsigned int aw_size_hull = sizeof(hull_t);
+const unsigned int aw_size_float = sizeof(float);
+const unsigned int aw_size_entity = sizeof(entity_t);
+/* Same fields/order as aw_scenery_t; target compiler supplies alignment. */
+typedef struct { entity_t render; vec3_t mins,maxs; int modelindex; } aw_scenery_probe_t;
+const unsigned int aw_size_scenery = sizeof(aw_scenery_probe_t);
+const unsigned int aw_size_efrag = sizeof(efrag_t);
+/* Same fields/order as the map-lifetime overflow page in r_efrag.c. */
+typedef struct { void *next; efrag_t links[AW_EFRAG_PAGE_LINKS]; } aw_efrag_page_probe_t;
+const unsigned int aw_size_efrag_page = sizeof(aw_efrag_page_probe_t);
+const unsigned int aw_size_msprite = sizeof(msprite_t);
+const unsigned int aw_size_mspriteframe = sizeof(mspriteframe_t);
+const unsigned int aw_size_mspritegroup = sizeof(mspritegroup_t);
+const unsigned int aw_size_mspriteframedesc = sizeof(mspriteframedesc_t);
+const unsigned int aw_size_client = sizeof(client_t);
+const unsigned int aw_size_qsocket = sizeof(qsocket_t);
+const unsigned int aw_size_signon_capacity = sizeof(((server_t *)0)->signon_buf);
+const unsigned int aw_size_reliable_capacity = MAX_MSGLEN;
+const unsigned int aw_size_network_capacity = NET_MAXMESSAGE;
+const unsigned int aw_size_aliashdr = sizeof(aliashdr_t);
+const unsigned int aw_size_maliasframedesc = sizeof(maliasframedesc_t);
+const unsigned int aw_size_mdl = sizeof(mdl_t);
+const unsigned int aw_size_stvert = sizeof(stvert_t);
+const unsigned int aw_size_mtriangle = sizeof(mtriangle_t);
+const unsigned int aw_size_maliasskindesc = sizeof(maliasskindesc_t);
+const unsigned int aw_size_trivertx = sizeof(trivertx_t);
+/* Same field order as private cache_system_t in zone.c. */
+typedef struct aw_cache_probe_s {
+    int size; cache_user_t *user; char name[16];
+    struct aw_cache_probe_s *prev,*next,*lru_prev,*lru_next;
+} aw_cache_probe_t;
+const unsigned int aw_size_cache_system = sizeof(aw_cache_probe_t);
 '''
 
 
@@ -136,16 +171,27 @@ def compile_target_sizes(sdk):
         raise ValueError('Target ABI probe did not provide valid sizes: ' + ', '.join(missing))
     if (sizes.get('pointer'), sizes.get('short'), sizes.get('int'), sizes.get('hunk')) != (4, 2, 4, 16):
         raise ValueError('Unexpected Amiga ABI core sizes; refusing to estimate')
+    from sprite_heap import sprite_loader_profile, efrag_pool_profile
+    sprite_policy = sprite_loader_profile((ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
+    efrag_policy = efrag_pool_profile((ROOT / 'engine/aga/src/client.h').read_text(encoding='utf-8'))
+    sizes['sprite_streaming'] = sprite_policy['sprite_streaming']
     compiler_version = subprocess.run([str(compiler), '--version'], text=True,
                                       capture_output=True, check=True).stdout.splitlines()[0]
     return sizes, {'compiler': str(compiler), 'compiler_version': compiler_version,
                    'flags': command[1:command.index('-S')], 'target': 'm68k-amigaos, 68040/FPU, GNU89',
                    'probe_sha256': hashlib.sha256(PROBE_SOURCE.encode('ascii')).hexdigest(),
+                   'runtime_render_h_sha256': digest(ROOT / 'engine/aga/src/render.h'),
                    'runtime_model_h_sha256': digest(ROOT / 'engine/aga/src/model.h'),
                    'runtime_modelgen_h_sha256': digest(ROOT / 'engine/aga/src/modelgen.h'),
                    'runtime_quakedef_h_sha256': digest(ROOT / 'engine/aga/src/quakedef.h'),
                    'runtime_bspfile_h_sha256': digest(ROOT / 'engine/aga/src/bspfile.h'),
                    'runtime_model_c_sha256': digest(ROOT / 'engine/aga/src/model.c'),
+                   'sprite_loader_policy': sprite_policy,
+                   'efrag_pool_policy': efrag_policy,
+                   'runtime_client_h_sha256': digest(ROOT / 'engine/aga/src/client.h'),
+                   'runtime_r_efrag_c_sha256': digest(ROOT / 'engine/aga/src/r_efrag.c'),
+                   'runtime_cl_main_c_sha256': digest(ROOT / 'engine/aga/src/cl_main.c'),
+                   'runtime_host_c_sha256': digest(ROOT / 'engine/aga/src/host.c'),
                    'runtime_zone_c_sha256': digest(ROOT / 'engine/aga/src/zone.c')}
 
 
@@ -389,7 +435,52 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
         raise ValueError(f'No BSP maps found in {maps}')
     budget, budget_source = heap_capacity()
     reports = [estimate_bsp(path, sizes) for path in candidates]
-    for report in reports:
+    from guard_torch_heap import profile as guard_profile, map_cost as guard_cost, apply as apply_guard_cost
+    guards=guard_profile(maps.parent,sizes)
+    from sprite_heap import inspect_sprites, inspect_efrags, efrag_pool_profile
+    efrag_policy=efrag_pool_profile((ROOT/'engine/aga/src/client.h').read_text(encoding='utf-8'))
+    for report, path in zip(reports, candidates):
+        raw = path.read_bytes()
+        table = lump_table(raw, path)
+        entity_bytes = table['entities']
+        sprites = inspect_sprites(entity_bytes, maps.parent, sizes)
+        from scenery_admission import catalogue_count
+        captured = catalogue_count(path.stem, entity_bytes)
+        catalogue_bytes = hunk_alloc_bytes(captured * sizes['scenery'], sizes['hunk']) if captured else 0
+        report['scenery_catalogue'] = {'placements':captured,'hunk_bytes':catalogue_bytes,
+                                      'target_record_bytes':sizes.get('scenery'),
+                                      'live_edicts_released':captured,
+                                      'acceptance':'source allocation model; not measured live count'}
+        # Conservative overlap bound: retain catalogue through every map/model
+        # loading peak, including sprite input. Never subtract BSP allocations.
+        report['resident_loader_bytes'] += catalogue_bytes
+        report['peak_loader_bytes'] += catalogue_bytes
+        report['resident_bytes_at_peak'] += catalogue_bytes
+        report['classifier_allocation_failure_fallback_peak_bytes'] += catalogue_bytes
+        report['sprites'] = sprites
+        report['bsp_peak_loader_bytes'] = report['peak_loader_bytes']
+        if sprites['unique_sprite_models']:
+            sprite_peak = report['resident_loader_bytes'] + sprites['resident_hunk_bytes'] + sprites['temporary_input_peak_bytes']
+            report['resident_loader_bytes'] += sprites['resident_hunk_bytes']
+            if sprite_peak > report['peak_loader_bytes']:
+                report['peak_loader_bytes'] = sprite_peak
+                report['peak_section'] = 'sprite model load'
+                report['resident_bytes_at_peak'] = report['resident_loader_bytes']
+                report['temporary_input_bytes_at_peak'] = sprites['temporary_input_peak_bytes']
+            report['classifier_allocation_failure_fallback_peak_bytes'] = max(
+                report['classifier_allocation_failure_fallback_peak_bytes'], sprite_peak)
+        efrags=inspect_efrags(table,sprites,sizes,efrag_policy)
+        report['efrags']=efrags
+        report['resident_loader_bytes']+=efrags['resident_hunk_bytes']
+        if report['resident_loader_bytes']>report['peak_loader_bytes']:
+            report['peak_loader_bytes']=report['resident_loader_bytes']
+            report['peak_section']='static entity leaf links'
+            report['resident_bytes_at_peak']=report['resident_loader_bytes']
+            report['temporary_input_bytes_at_peak']=0
+        report['classifier_allocation_failure_fallback_peak_bytes']=max(
+            report['classifier_allocation_failure_fallback_peak_bytes']+efrags['resident_hunk_bytes'],
+            report['resident_loader_bytes'])
+        apply_guard_cost(report,guard_cost(entity_bytes,guards))
         required = report['peak_loader_bytes'] + baseline_reserve_bytes + safety_headroom_bytes
         report.update(baseline_reserve_bytes=baseline_reserve_bytes,
                       safety_headroom_bytes=safety_headroom_bytes,
@@ -406,7 +497,7 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
             'failing_maps': [r['map'] for r in reports if r['gate'] == 'fail'],
             'worst_map': worst['map'], 'worst_estimated_total_bytes': worst['estimated_total_bytes'],
             'minimum_estimated_clearance_bytes': min(r['estimated_clearance_bytes'] for r in reports),
-            'target_struct_sizes_bytes': sizes, 'maps': reports}
+            'target_struct_sizes_bytes': sizes, 'guard_torch_profile': guards, 'maps': reports}
 
 
 def audit_world_maps(maps, sdk, out, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,

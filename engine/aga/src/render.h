@@ -67,7 +67,11 @@ typedef struct entity_s
 	struct mnode_s			*topnode;		// for bmodels, first world node
 											//  that splits bmodel, or NULL if
 											//  not split
+    /* Appended: preserve prior entity member offsets used by assembly. */
+    float aw_sprite_scale; /* zero legacy/dynamic default means 1 */
 } entity_t;
+
+float R_SpriteEntityScale(const entity_t *ent);
 
 // !!! if this is changed, it must be changed in asm_draw.h too !!!
 typedef struct

@@ -5,7 +5,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
-from actor_grounding import fields, initial_state, bake_ground
+from actor_grounding import fields, initial_state, bake_ground, contact_interval_choice
 from check_actor_ground import audit, require
 from player_hull import pack_lumps, PROFILE
 
@@ -173,3 +173,24 @@ class GroundGateTests(unittest.TestCase):
         approved.write_text(json.dumps(r))
         with self.assertRaisesRegex(ValueError, 'differs from approved'):
             require(self.maps, self.id1/'early.json', approved, before_world=True)
+
+
+class NarrowContactIntervalTests(unittest.TestCase):
+    def test_real_sloped_sole_interval_remains_feasible(self):
+        # Measured Indrele idle sole constraints at authored XY on canonical LAND.
+        constraints = [(18.188406025462502, 19.688406025462502),
+                       (16.715283525462496, 18.215283525462496)]
+        low = max(pair[0] for pair in constraints)
+        high = min(pair[1] for pair in constraints)
+        selected = contact_interval_choice(low, high, 19.0)
+        self.assertIsNotNone(selected)
+        for lower, upper in constraints:
+            self.assertGreater(selected, lower)
+            self.assertLess(selected, upper)
+        self.assertIsNone(contact_interval_choice(2, 1, 1.5))
+
+    def test_ordinary_interval_keeps_existing_guard(self):
+        self.assertEqual(contact_interval_choice(0, 2, -1), .02)
+        self.assertEqual(contact_interval_choice(0, 2, 3), 1.98)
+        self.assertEqual(contact_interval_choice(1, 1, 0), 1)
+        self.assertIsNone(contact_interval_choice(0, float('inf'), 1))

@@ -1,4 +1,8 @@
-# AmiWind v0.0.23-dev2 corresponding runtime source
+# AmiWind AGA runtime source
+
+This is the maintained runtime source in the AmiWind repository. See
+[the published v0.0.27 scope](RELEASE-v0.0.27.md) for current release evidence;
+versioned implementation notes below retain their historical origins.
 
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 Portions are based on id Software Quake, Peter McGavin's Amiga work,

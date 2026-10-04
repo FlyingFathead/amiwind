@@ -101,7 +101,7 @@ void	VID_UnlockBuffer (void);
 
 #define	ON_EPSILON		0.1			// point on plane side epsilon
 
-#define	MAX_MSGLEN		8000		// max length of a reliable message
+#define MAX_MSGLEN 16380 /* Dense static foliage sign-on; loopback needs four extra bytes. */
 #define	MAX_DATAGRAM	1024		// max length of unreliable message
 
 //
@@ -409,6 +409,11 @@ void AW_MusicTitle(void);
 #endif
 void AW_HandSpritesInit(void);
 void AW_HandSpritesDraw(void);
+void AW_GuardTorchInit(void);
+void AW_GuardTorchLoadAssets(const byte *torch);
+void AW_GuardTorchUpdate(void);
+void AW_GuardTorchDraw(void);
+entity_t *AW_GuardTorchEntity(entity_t *entity);
 void AW_TorchInit(void);
 void AW_TorchUpdate(void);
 void AW_TorchDraw(void);
@@ -553,6 +558,9 @@ void AW_IntroDraw(void);
 
 void AW_WaitInit(void);
 void AW_WaitTick(void);
+int AW_DayGalleryClock(int actual_ms);
+int AW_DayGalleryView(float *origin,float *angles);
+void V_RenderCameraView(void);
 int AW_WaitKey(int key);
 int AW_WaitDraw(void);
 
@@ -567,3 +575,7 @@ int AW_WorldUIActive(void);
 int AW_WorldUIKey(int key,int down);
 void AW_WorldUIMouse(int dx,int dy);
 int AW_WorldUIDraw(void);
+
+/* Placement-specific render pool; no new network or collision entities. */
+void AW_RenderRangesNewMap(void);
+qboolean AW_RenderRangeView(entity_t *entity,int pass,model_t *view);

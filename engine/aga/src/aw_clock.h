@@ -4,5 +4,6 @@
 int AW_ClockEnsure(void);
 int AW_ClockAdvance(int milliseconds);
 int AW_ClockSetHour(double hour);
+int AW_ClockSetTime(int hour,int minute);
 void AW_ClockDate(int *year,int *month,int *day,int *hour,int *minute);
 #endif

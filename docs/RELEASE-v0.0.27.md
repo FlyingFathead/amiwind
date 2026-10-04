@@ -1,8 +1,9 @@
 # AmiWind v0.0.27 — Rocks, Mushrooms, and Then Some
 
-> **STABLE — OWNER APPROVED, 3 October 2026.** v0.0.27 is based on the rc5
-> repaired candidate. The engine/image build and filesystem readbacks passed.
-> The runtime and playtesting limits below remain documented follow-up work.
+> **Published stable release — 3 October 2026.**
+> [AmiWind v0.0.27 — Rocks, Mushrooms, and Then Some](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.27)
+> builds on the repaired rc5 candidate. Publication, hosted CI and release-asset
+> download verification are complete. The runtime limits below remain open.
 
 ## Scope and changes
 
@@ -26,7 +27,7 @@ ABI estimate and covers 1,488 of 1,488 source placements. Its worst entry has
 runtime allocation or proof of the complete image. The 5 MiB figure is a planning
 target; the 6 MiB modeled BSP ceiling, 3 MiB non-map allowance and 2 MiB safety
 reserve remain unchanged. Transition, seam, collision, content and target-playtest
-acceptance are still pending. The final private candidate image is assembled and its HDF files passed filesystem readback; runtime and target acceptance remain open.
+acceptance are still pending. The final stable private image is assembled and both HDF files passed filesystem readback; runtime and target acceptance remain open.
 
 ### Loading diagnostics and memory policy
 
@@ -46,8 +47,8 @@ Windows runner tests recorded platform-specific symlink and POSIX-stub errors;
 native Windows C-fixture execution is now explicitly skipped under the
 interpreter-first policy, not counted as a pass. The full Linux Docker suite and
 asset-free compile gate passed for the repaired source state (see the dated
-validation record below). Exact-commit hosted CI and actual FS-UAE multi-drive
-gameplay remain pending.
+validation record below). Exact-commit hosted CI has since passed for published
+v0.0.27. Actual FS-UAE multi-drive gameplay remains a separate pending check.
 
 The rc4 fatal-error report includes the version, error cause, log path/result and
 restart guidance. Source behavior and logging checks are documented separately;
@@ -56,8 +57,9 @@ a successful engine build alone does not establish target fatal-exit acceptance.
 ### Rc5 repairs and remaining target validation
 
 The rc5 source restores settlement markers in both Debug and In-Game modes and
-uses a readable selected-button treatment. Nine source checks pass; the matching
-engine compiled and the private candidate HDFs passed readback. Target
+uses a readable selected-button treatment. Nine focused source checks passed; the matching engine compiled and the private
+HDFs passed readback. The repaired Linux world-UI fixture subsequently passed in
+the complete 558-test Docker suite. Target
 confirmation of marker visibility, button states and the In-Game heading arrow
 remains pending. In-Game is still a terrain-overview prototype, not the complete
 original-game map.
@@ -68,16 +70,21 @@ explicit travel remain immediate. The delay begins at the next safe loading
 checkpoint after blocking reads; it does not interrupt disk operations or claim
 a performance improvement.
 
-The package includes all 18 catalogued OST tracks and 124 alias rows. The new
+The private playable package includes all 18 catalogued OST tracks and 124 alias rows. The new
 manual dbg ost play command accepts numeric IDs or original filename stems.
 Existing playback and mixer routines are unchanged. Target playback verification
 remains open.
-Video conversion and runtime support remain later work. See the
+Conversion and runtime integration of the complete 17-video catalogue remain
+later work; the existing opening logo and intro clips remain supported. See the
 [bug journal](BUG_JOURNAL.md) for the two corrected retry-helper incidents and
 their preserved safety behavior.
 ## Known limitations and deferred work
 
-- Final private HDF assembly, filesystem readback and static actor/contact/heap gates passed for the v0.0.27-rc5 candidate. Owner approval is complete. Cold/warm lifecycle and gameplay measurements remain unrecorded follow-up validation, not release-approval blockers.
+- The repaired rc5 candidate passed optimizer, actor/contact and static heap
+  gates for all 2,717 maps. Stable v0.0.27 private assembly retained those maps,
+  replaced the engine/boot checker and passed both HDF filesystem readbacks.
+  Cold/warm lifecycle and gameplay measurements remain open follow-up work;
+  publication does not establish target acceptance.
 - No target heap lifecycle trace, FPS improvement or complete playthrough is
   claimed. Static map estimates are not runtime measurements.
 - Town transitions, seams, collision, held input and player/actor/equipment state
@@ -88,7 +95,7 @@ their preserved safety behavior.
   content and full interaction parity remain future work.
 - Full condition-aware voiced dialogue is not implemented. The generic HELLO
   audition is limited; original event conditions and ordered line selection
-  remain required work. The package includes all 18 catalogued OST tracks and
+  remain required work. The private playable package includes all 18 catalogued OST tracks and
   124 alias rows, plus a manual number-or-filename-stem command. Target playback
   verification remains pending. The existing opening logo and intro clips remain supported; registration and
   playback for the 17 catalogued videos, including expansion content, remain
@@ -101,16 +108,29 @@ Original game assets, ROMs, converted proprietary media and playable HDFs are no
 included in the public source package. Users supply their own legally obtained
 game files and Kickstart ROM. This is a GPL-licensed source/tooling project.
 
-## Publication status
+## Publication and source validation — 3 October 2026
 
-**v0.0.27 release preparation, 3 October 2026.** The build and readback evidence is recorded above. No GitHub publication or remote tag is claimed by these documentation updates; publication remains owner-run.
-### Linux source validation — 3 October 2026
+[Stable v0.0.27 is published](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.27)
+at commit `8da838784efa619a12da39d29095be4c0fe6e44d`. Official `main` and the
+peeled `v0.0.27` tag were independently verified at that commit. The annotated
+tag object is `435ed2574c85128911999c08379a4650e9b1e471`.
 
-The repaired source state passed the full Linux suite inside Docker: 558 tests
-reported OK with 3 skips. The matching asset-free Amiga build exited 0 and
-produced both emulator configurations. The fixture corrections provide missing
-stubs for world-UI and movie test dependencies; native Windows C-fixture runs
-remain skipped under the interpreter-first policy and are not represented as
-Windows passes. No runtime or HDF content changed. The repaired source kit still
-requires regeneration, exact archive validation and owner-run Linux publication.
-These checks do not replace target playtesting or runtime acceptance.
+The publisher recorded all four jobs passing in
+[CI run 37113138642](https://github.com/FlyingFathead/amiwind/actions/runs/37113138642):
+Docker builder, Linux launcher parity, Windows launcher parity, and the
+source/asset-free build. The Linux publisher also completed release creation
+and downloaded-asset verification. The published public source ZIP has SHA-256
+`3b2b2ea9a9244e589cda11673027c7963bb565c29b7c5b9fc7dcf4152efab493`.
+The tag and published archive are immutable; later documentation corrections
+belong on the development branch.
+
+Before publication, the exact repaired source package passed the full Linux
+suite inside Docker: 558 tests reported OK with 3 skips. Its matching asset-free
+Amiga build exited 0 and produced both emulator configurations. The corrected
+world-UI and movie fixtures provide their required linked dependencies. Native
+Windows C-fixture execution remains explicitly skipped under the interpreter-
+first policy; a Linux pass is not a full native Windows suite pass.
+
+Source/build, publication and asset-download checks are complete for that
+release. They do not replace target playtesting, runtime memory measurements,
+or the open gameplay checks above. Playtest packages remain private.

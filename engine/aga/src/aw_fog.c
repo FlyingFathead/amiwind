@@ -4,6 +4,7 @@
  */
 #include "quakedef.h"
 #include "aw_maps.h"
+#include "aw_sky.h"
 extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t aw_drawdistance;
@@ -56,17 +57,31 @@ void AW_FogDepths(byte *table,int distance) {
     }
 }
 void AW_FogDraw(void) {
-    int distance,i,x,y,w,h;byte *pixels;short *z;
-    if(!colours || !aw_fog.value || AW_Interior())return;
+    int distance,i,x,y,w,h,level,fog;byte *pixels;short *z;
+    const byte *environment,*ramp;
+    float extent,u,v,step,ray[3],delta[3];int k;
+    if(AW_Interior())return;
+    environment=R_DayNightFogColours();ramp=environment?environment:colours;
+    fog=colours && aw_fog.value;
+    if(!fog && !environment)return;
     distance=AW_DrawDistance();
-    if(distance!=old_distance) {
-        old_distance=distance;AW_FogDepths(depths,distance);
-    }
-    w=r_refdef.vrect.width;h=r_refdef.vrect.height;
-    for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++) {
+    if(fog && distance!=old_distance){old_distance=distance;AW_FogDepths(depths,distance);}
+    w=r_refdef.vrect.width;h=r_refdef.vrect.height;extent=w>h?w:h;
+    if(extent<=0)return;
+    step=2.0f/extent;for(k=0;k<3;k++)delta[k]=vright[k]*step;
+    for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
         pixels=vid.buffer+y*vid.rowbytes+r_refdef.vrect.x;
         z=d_pzbuffer+y*d_zwidth+r_refdef.vrect.x;
-        for(x=0;x<w;x++) {i=z[x];if(i<0)i=0;pixels[x]=colours[(depths[i]<<8)+pixels[x]];}
+        u=(r_refdef.vrect.x-((int)vid.width>>1))*step;
+        v=(((int)vid.height>>1)-y)*step;
+        for(k=0;k<3;k++)ray[k]=vpn[k]+u*vright[k]+v*vup[k];
+        for(x=0;x<w;x++){
+            i=z[x];
+            if(i==AW_SKY_BACKGROUND_DEPTH){
+                if(environment)pixels[x]=R_DayNightSkyPixel(pixels[x],ray[0],ray[1],ray[2],fog);
+            }else if(fog){if(i<0)i=0;level=depths[i];pixels[x]=ramp[(level<<8)+pixels[x]];}
+            for(k=0;k<3;k++)ray[k]+=delta[k];
+        }
     }
 }
 

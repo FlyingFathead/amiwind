@@ -16,7 +16,7 @@ keep `build.json` and every listed HDF together and regenerate the configuration
 on the destination host:
 
 ```sh
-python tools/emulator_configs.py --image /path/to/AmiWind-v0.0.27-rc1.hdf --kickstart-file /path/to/owned.rom
+python tools/emulator_configs.py --image /path/to/AmiWind-v0.0.27.hdf --kickstart-file /path/to/owned.rom
 ```
 
 The generator preserves a differing existing configuration instead of overwriting
@@ -36,18 +36,19 @@ For repeated runs of existing images, use the
 [portable FS-UAE launcher](FS-UAE-LAUNCHER.md). It selects the latest numeric
 version/development suffix, remembers the ROM and repairs local config paths.
 
-## Current v0.0.21-dev7 preset
+## Current v0.0.27 preset
 
-Save a local copy of
-[AmiWind-v0.0.21-dev7-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.21-dev7-FS-UAE.fs-uae),
-replace its ROM and HDF placeholder paths, then launch it with FS-UAE.
+Prefer the matching generated configuration described above, which lists every
+required HDF. For manual setup, save a local copy of
+[AmiWind-v0.0.27-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae),
+set your ROM and all required HDF paths, then launch it with FS-UAE.
 To build the playable HDF from your Morrowind installation, use the
 [Linux](LINUX_BUILD.md) or [Windows / WSL build guide](WINDOWS_BUILD.md).
 The public source ZIP includes the preset, not game data, a playable HDF or
 a Kickstart ROM. A public dry-run HDF, when produced for the current version, boots only to a
-test notice. See [dev6 release notes](RELEASE-v0.0.21-dev7.md) for the new
-preflight scope and [v0.0.17 validation](VALIDATION-v0.0.17.md) for the earlier
-locally validated FS-UAE baseline.
+test notice. See [v0.0.27 release notes](RELEASE-v0.0.27.md) for current source
+and build evidence. Actual FS-UAE multi-drive gameplay remains pending;
+[v0.0.17 validation](VALIDATION-v0.0.17.md) records the earlier local baseline.
 
 ## Build and launch automatically
 
@@ -274,7 +275,7 @@ For compatibility or minimum-spec testing, use a separate emulator configuration
 ## Repository preset and validation note
 
 A matching example is supplied under
-[resources/emulators/AmiWind-v0.0.21-dev7-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.21-dev7-FS-UAE.fs-uae).
+[resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae).
 It explicitly disables 24-bit addressing and keyboard joystick emulation,
 selects the internal FPU and supplies placeholders for the owned ROM and HDF.
 The guide above carries forward the owner's working v0.0.12-dev1 recipe with

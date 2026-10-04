@@ -2,20 +2,21 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Published checkpoint: **v0.0.26-rc1**, recording native Windows build/game-entry
-success with experimental support. Current candidate: **v0.0.26**, adding the
-Docker builder and private input/export helper. Final-version full conversion,
-export and WinUAE game entry passed locally. Hosted Docker, Linux and Windows
-CI must pass for the exact publication commit. Known gameplay issues remain
-documented; a source release is
-not a claim that the complete Morrowind game has been implemented or playtested.
-The owner performs all Git/GitHub publishing.
+Current published release: **[v0.0.27 — Rocks, Mushrooms, and Then Some](RELEASE-v0.0.27.md)**,
+3 October 2026, commit `8da838784efa619a12da39d29095be4c0fe6e44d`.
+Exact-commit Docker, Linux/Windows launcher parity and source/asset-free CI passed;
+the Linux publisher completed release creation and downloaded-asset verification.
+Known gameplay issues remain documented. Publication does not establish a complete
+Morrowind implementation, target heap certification or an exhaustive playthrough.
+The owner performs Git/GitHub publishing. Existing tags and release archives stay
+immutable; later source/documentation corrections use normal follow-up commits.
 
 ## Historical rc1 handoff (published)
 
-The following describes the completed rc1 handoff. Its tag is immutable;
-final v0.0.26 must use its own snapshot, checksums, exact-commit CI evidence
-and release artifacts. Require Docker, Linux and Windows jobs to pass for
+The following preserves the completed v0.0.26-rc1 handoff procedure. Its tag
+is immutable; final v0.0.26 subsequently completed its own snapshot, checksums,
+exact-commit CI and release artifacts. The commands below describe that historical
+handoff and must not be rerun to replace an existing release. Require Docker, Linux and Windows jobs to pass for
 the final pushed commit. Retain complete failed-step logs before stopping,
 and perform whitespace checks before commit and against the exact commit.
 
@@ -268,3 +269,11 @@ coverage, and exclude Bloodmoon/Solstheim and Tribunal from that map's scope.
 Fresh native captures need exact `.gitignore` exceptions and source allowlist
 entries. The owner-run publisher verifies all expected public files are tracked
 before committing; it creates a normal release, without the prerelease flag.
+
+## Source ZIP portability
+
+When rebundling an audited source tree, preserve file bytes and each
+entry's Unix executable modes. Validate paths before extraction: reject
+absolute paths, parent traversal, symlinks, case collisions, Windows
+device names, alternate-stream colons and trailing dots or spaces.
+Hash checks do not establish executable-mode or pathname portability.

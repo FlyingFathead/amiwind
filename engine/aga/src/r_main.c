@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_sky.h"
 
 //define	PASSAGES
 
@@ -195,6 +196,7 @@ void R_Init (void)
 	Cmd_AddCommand ("pointfile", R_ReadPointFile_f);
 
 	AW_FogInit();
+    R_InitDayNight();
 	Cvar_RegisterVariable (&aw_drawdistance);
 	Cvar_RegisterVariable (&r_draworder);
     Cvar_RegisterVariable (&aw_depthslop);
@@ -253,6 +255,7 @@ void R_NewMap (void)
 {
 	int		i;
     R_SetSkyBackground(cl.worldmodel);
+    AW_RenderRangesNewMap();
 
 // clear out efrags in case the level hasn't been reloaded
 // FIXME: is this one short?
@@ -546,8 +549,9 @@ void R_DrawEntitiesOnList (void)
 
 	for (i=0 ; i<cl_numvisedicts ; i++)
 	{
-		currententity = cl_visedicts[i];
-        if(!AW_ModelVisible(currententity->origin,currententity->model->radius))continue;
+		currententity = AW_GuardTorchEntity(cl_visedicts[i]);
+        if(!currententity)continue;
+        if(!AW_ModelVisible(currententity->origin,currententity->model->radius * R_SpriteEntityScale(currententity)))continue;
 
 		if (currententity == &cl_entities[cl.viewentity])
 			continue;	// don't draw the player
@@ -769,7 +773,8 @@ R_DrawBEntitiesOnList
 */
 void R_DrawBEntitiesOnList (void)
 {
-	int			i, j, clipflags;
+	int			i, j, clipflags, range_pass;
+    model_t range_view;
 	vec3_t		oldorigin;
 	model_t		*clmodel;
 	float		minmaxs[6];
@@ -790,8 +795,13 @@ void R_DrawBEntitiesOnList (void)
 		{
 		case mod_brush:
 
-			clmodel = currententity->model;
-            if(!AW_ModelVisible(currententity->origin,clmodel->radius))continue;
+			for(range_pass=-1;;range_pass++){
+                if(range_pass<0)clmodel=currententity->model;
+                else {
+                    if(!AW_RenderRangeView(currententity,range_pass,&range_view))break;
+                    clmodel=&range_view;
+                }
+            if(!AW_ModelVisible(currententity->origin,clmodel->radius))break;
 
 		// see if the bounding box lets us trivially reject, also sets
 		// trivial accept status
@@ -875,6 +885,7 @@ void R_DrawBEntitiesOnList (void)
 				R_TransformFrustum ();
 			}
 
+            } /* common model followed by placement-specific pool ranges */
 			break;
 
 		default:
@@ -1039,6 +1050,7 @@ SetVisibilityByPassages ();
 		dp_time2 = Sys_FloatTime ();
 
 	AW_FogDraw();
+    AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
     AW_Mark(4);R_DrawViewModel();AW_EndMark(4);
 	if (r_dowarp)
 		D_WarpScreen ();

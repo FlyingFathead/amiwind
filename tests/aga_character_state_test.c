@@ -102,12 +102,16 @@ int main(void)
     memset(&source,0,sizeof(source));source.sequence=3;source.profile=4;
     source.character=c;source.story=aw_story;source.story.stage=AW_STAGE_RELEASED;
     source.story.hall=1;source.story.ship_disabled=1;source.story.captain=-1;
-    assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1));assert(AW_ClockEnsure() && AW_ClockAdvance(86400000));source.state=aw_state;
+    assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1));assert(AW_ClockEnsure() && AW_ClockAdvance(86400000));
+    assert(AW_ClockSetTime(23,59) && AW_ClockAdvance(12345));source.state=aw_state;
     strcpy(source.scene,"seyda");strcpy(source.label,"Manual 1");source.position[0]=12.25;
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>500 && n<2000);
     memset(&decoded,0x5a,sizeof(decoded));unchanged=decoded;
     for(i=0;i<n;i++){assert(!AW_SaveDecode(raw,i,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));}
     assert(AW_SaveDecode(raw,n,&decoded));assert(decoded.state.journal_count==2 && decoded.state.journal[0].stage==1 && decoded.state.journal[1].stage==12);assert(AW_StateGet(&decoded.state,AW_GLOBAL,"amiwind:clock:days")==1);assert(decoded.position[0]==12.25 && decoded.character.maximum[0]==60);
+    AW_StateReset();aw_state=decoded.state;
+    assert(AW_ClockEnsure() && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==86352345);
+    assert(AW_ClockAdvance(47655) && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days")==2 && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==0);
     assert(decoded.story.hall==1 && AW_StateGet(&decoded.state,AW_GLOBAL,"amiwind:ref:172851:ring_taken")==1);
     assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
     assert(!AW_StateGet(&decoded.state,AW_ITEM,"bk_a1_1_caiuspackage")); /* Released saves may lack a former quest item. */

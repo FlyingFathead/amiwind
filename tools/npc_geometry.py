@@ -268,19 +268,23 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
         failed=quota;quota=max(quota+1,quota*2)
     return points, faces
 
-def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None):
+def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None):
     """One topology shared by every frame, per-face tiny UV atlas patches."""
     from scipy.spatial import cKDTree
     if face_limit not in (666,777,1024):raise ValueError('Unsupported alias face limit')
     ceiling=face_limit if minimum_faces else 480
     if not 64<=budget<=ceiling:raise ValueError('Triangle budget outside allowed profile')
     minimum_faces=minimum_faces or {}
+    # Companion poses retain the original model's head topology/face quota.
+    if reference_frames is not None and (not isinstance(reference_frames,int) or
+            reference_frames<1 or any(reference_frames>len(s['positions']) for s in shapes)):
+        raise ValueError('Invalid reference frame count')
     if set(minimum_faces)-{s.get('name','') for s in shapes}:raise ValueError('Missing protected model shape')
     for s in shapes:
         required=minimum_faces.get(s.get('name',''),0)
         if not isinstance(required,int) or not 0<=required<=len(s['faces']):raise ValueError('Invalid protected shape budget')
     weights=np.array([len(s['faces'])*(1.7 if s['part']==0 else 1) for s in shapes],dtype=float);weights/=weights.sum()
-    quotas=np.array([max(minimum_faces.get(s.get('name',''),0),min(120,len(s['faces'])) if s['part']==0 and len(s['positions'])>8 else 4) for s in shapes],int);remaining=budget-int(quotas.sum())
+    quotas=np.array([max(minimum_faces.get(s.get('name',''),0),min(120,len(s['faces'])) if s['part']==0 and (reference_frames if reference_frames is not None else len(s['positions']))>8 else 4) for s in shapes],int);remaining=budget-int(quotas.sum())
     if remaining<0:raise ValueError('Too many separate shapes for budget')
     quotas+=np.floor(weights*remaining).astype(int)
     actor_height = max(s['positions'][0,:,2].max() for s in shapes)-min(s['positions'][0,:,2].min() for s in shapes)

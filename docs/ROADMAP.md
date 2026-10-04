@@ -1,10 +1,23 @@
 # Roadmap and implementation options
 
+## Current baseline — published v0.0.27, 3 October 2026
+
+[AmiWind v0.0.27 — Rocks, Mushrooms, and Then Some is published](RELEASE-v0.0.27.md).
+Its exact-commit hosted CI, public source release and downloaded-asset checks
+passed. Rock/giant-mushroom coverage, bounded town conversion, held-input
+preservation, map-marker repair and dual-emulator configuration generation are
+included. Private stable HDF assembly/readback and the full 2,717-map static gate
+passed; target heap, FPS, crossing and map-panel acceptance remain open.
+
+The immediate follow-up is to playtest and profile that released scope, then
+complete the map, condition-aware voices and video catalogue. Earlier versioned
+plans below preserve their original scope and evidence; they do not change the
+published baseline or certify an unperformed target check.
+
 ## Assemble first, then optimize the measured world
 
-The immediate objective is complete authored rock/giant-mushroom coverage and
-correct cell handoffs, creating a representative baseline we can playtest and
-profile. This is not a claim that the present output size or conversion cost is
+The released rock/giant-mushroom coverage and bounded town maps provide the
+baseline for target cell-handoff checks and profiling. This is not a claim that the present output size or conversion cost is
 already optimized. Keep the existing FPS subdivisions while assembling content.
 
 - Require target-ABI memory estimates after mapping changes and before image
@@ -61,14 +74,17 @@ template while preserving the user's ROM selection policy.
 Windows validation: configuration tests pass 11/11. The Windows `run_fs_uae`
 suite reports 12 passed, 1 error in the symlink case unavailable on this Windows
 setup, and 1 failure in the POSIX-stub launcher test that cannot execute here.
-This does not establish all-host runner parity.
+Those local failures remain historical evidence. Published v0.0.27 subsequently
+passed the hosted Linux and Windows launcher-parity jobs; that does not establish
+a full native Windows suite or actual emulator gameplay.
 
 - [ ] Run actual FS-UAE multi-drive gameplay from the generated configuration
   and validate every disk, boot order and paths. Configuration generation tests
   do not prove emulator playability.
 
 The missing-template regression and repair are recorded in the
-[bug journal](BUG_JOURNAL.md). Linux execution/parity remains a separate check.
+[bug journal](BUG_JOURNAL.md). The complete Linux Docker suite and asset-free
+compile passed for v0.0.27; actual multi-drive gameplay remains pending.
 
 ## v0.0.26 released - validated Windows and Docker builds
 
@@ -112,50 +128,75 @@ Docker helper/export and WinUAE validation for v0.0.26 passed locally; hosted CI
 and owner-run Linux publication completed successfully.
 
 
-## Upcoming patch targets
+## Release progress and planned follow-up
 
-### v0.0.27 - Rocks, Mushrooms, and Then Some
+### v0.0.27 — published: Rocks, Mushrooms, and Then Some
 
-The working title now includes terrain handovers and state continuity, memory
-watching/profiling with mandatory headroom, bounded town subdivision, and private
-polycount heatmaps generated from user-provided assets. These items have separate
-implementation and validation status; the title does not claim a repaired HDF.
+The release includes 37,960 exterior rocks and 816 giant mushrooms across 2,526
+world regions, using original base-game placements. Small collectible mushrooms
+are excluded. Joined mushroom sections retain source geometry and UVs; the closed
+caps were accepted in the rc2 WinUAE playtest. See [What are rocks?](WHAT_ARE_ROCKS.md).
 
-Place all individual rock formations and giant mushroom scenery on the map of
-Vvardenfell, using their original base-game CELL/FRMR placements. Exclude small
-collectible mushrooms. Audit every relevant asset and reference; retain original
-position, full rotation, scale, textures and collision, including formations
-that overlap cell boundaries and cover gaps in the LAND height field.
+Terrain handoffs, held-input preservation, bounded town maps and heap estimates
+are implemented, with separate runtime checks still open. The final private
+image passed its static gates and filesystem readbacks. The original rc3 load
+incident still requires exact-route target acceptance; publication and static
+estimates do not close it. See the [release evidence and limits](RELEASE-v0.0.27.md).
 
-Use measured low-poly representations that preserve silhouettes and terrain
-coverage. Follow [What are rocks?](WHAT_ARE_ROCKS.md), including its existing
-64-triangle rock target and the Seyda Neen silt-strider port compound-rotation
-regression. Full-world terrain generation alone does not prove scenery coverage.
-This patch is under investigation; complete scenery coverage is not yet proven.
+### v0.0.28 — Trees and Grass, Day and Night
 
-### v0.0.28 - The Road(s) More or Less Travelled
+The stable v0.0.28 identity is in preparation, not published. Default V3 sky,
+two cloud layers, moving sun and clock-aligned world tone are implemented.
+The corrected camera-tour/night/guard build passes 822-test host gates and
+matching 742,884-byte Amiga compiles, including tiny-star, arrival and slower-cloud
+changes and 64 KiB music-only source read-ahead. Shared mixer timing and
+guard voices are unchanged. Owner listening still reports intermittent
+audio artifacts, mostly at load-ins and in heavy scenes. Audio remains open;
+publication proceeds with the known issue and further audio investigation
+is deferred until after publication.
+The corrected image passes 10,766-file readback and three partition
+checks. Independent replay remains pending, including Balmora at night and
+both moon silhouettes. See the [current release record](RELEASE-v0.0.28.md).
 
-Map all Vvardenfell roadways and their original textures. Audit how each road is
-represented by LAND materials, placed meshes or both before choosing a conversion
-path. Preserve authored routes, junctions, bridges and continuity across source
-cell boundaries. This is a planned follow-up to Rocks and Mushrooms.
+- [x] Default-on automatic cycle using the persistent clock and explicit T waits.
+- [x] Default V3 and selectable V1/V2; independent default-on sun/cloud toggles.
+- [x] Source-reproducible owned-cloud conversion and seven-colour asset remap.
+- [x] Adjustable cloud speed, default `0.00333333333`; camera-tour gallery and `here` mode.
+- [x] Four-stage `dbg nightgallery [here/off]` using actual saved-date moon paths;
+  native appearance and cancellation acceptance remain pending.
+- [x] Bounded original stars/nebula and Masser/Secunda atlas; default-on
+  `dbg starsky` / `dbg nightsky`, with complete moon-disc star occlusion.
+- [x] Bounded coherent 64-map canonical repeat and actor-support host gates.
+- [x] Original-asset guard runtime and `guards_torch_cycle`, with
+  `dbg guardtorch on/off/auto`; host checks passed.
+- [x] Fresh matching Amiga builds, full host suites and image readback after
+  the latest tiny-star, arrival and cloud-speed changes.
+- [ ] Native one-pixel stars behind moons/clouds/foliage; additional night views
+  and Balmora at night, with actual final-build stills and GIF frames.
+- [ ] Verify Imperial and Hlaalu torch grip, timing, occlusion and cache/light cost on target.
+- [ ] Native startup, controls, travel/profile, terrain/NPC routes and lifecycle acceptance.
+- [ ] Fresh native V3/night views, gallery stills/GIF and visual/performance review.
+- [ ] Broader-world canonical-culling validation; no global certification yet.
+- [ ] Regional weather and precise lunar simulation.
+- [ ] Original-road survey, route/bridge and broader cell-join acceptance.
 
-## TODO SOON: static asset gallery and cell-by-cell scenery
+## Follow-up: static asset gallery and remaining scenery
 
-- [ ] `dbg assetgallery`: browse original object IDs and inspect rocks, trees,
-  mushrooms, plants, buildings and props beside a character for scale.
-- [ ] Import original CELL/FRMR static placements as separately rebuildable
-  scenery layers over retained `vfXXXX` terrain. Preserve source transforms,
-  share converted models, handle boundary overlap and collision explicitly.
-- [ ] Start with one audited cell and fix the confirmed scaled-tree omissions;
-  expand measured coverage cell by cell without rebuilding unrelated terrain.
+The current foliage conversion preserves detailed Balmora's mesh policy and
+uses shared sprites for admitted foliage elsewhere. This does not establish
+complete conversion or native appearance for every source reference. Keep
+deferred references and boundary copies explicit in build receipts.
 
-See [the asset/scenery plan](ASSET_CATALOGUE_AND_GALLERY.md). These are upcoming
-features. The NPC gallery is already an existing debugging/regression tool and
-is included in normal builds by default; only explicit debugging-only
-`--no-npc-gallery` omits the inspection feature. Required game NPCs are never
-removed. The future static-asset gallery must use the same default and preserve
-all required world assets even in an explicitly reduced debugging build.
+- [ ] `dbg assetgallery`: browse original IDs and inspect static assets beside
+  a character for scale, with visible unsupported/missing conversion status.
+- [ ] Extend original CELL/FRMR scenery beyond the admitted rock, mushroom and
+  foliage categories while preserving transforms, collision and boundary overlap.
+- [ ] Verify scaled and tilted foliage, distant silhouettes and cell joins in
+  native views. Finite captures cannot certify the full world's appearance.
+
+See [the asset/scenery plan](ASSET_CATALOGUE_AND_GALLERY.md). The NPC gallery is
+already included in normal builds; required game NPCs remain included even when
+its optional inspection facility is disabled.
 
 ## Top engineering priority: world-terrain build time
 
@@ -179,9 +220,10 @@ separate measurements. These improvements are planned, not implemented.
 
 ## Asset catalogue and placement completeness
 
-Open runtime regressions: replace the detached torch overlay with the original
-mesh in the authored hand pose, add bounded flame sprites at its emitter, and
-reproduce the reported 2.67-second fist disappearance in the 3D draw path. The
+The carried torch now uses the original mesh, authored hand pose and bounded
+flame sprites at its emitter; guard equipment extends that conversion separately.
+Native torch retesting and the reported brief fist blink recurring every 1–2
+seconds remain open. That interval is not the duration of the disappearance. The
 [torch investigation](TORCH.md#original-model-replacement-and-reported-hand-flicker)
 keeps these separate from the rc8 dynamic-light crash correction.
 
@@ -211,7 +253,7 @@ and now has a [full Docker conversion record](VALIDATION-DOCKER-2026-10-02.md).
 The builder, private input/export helper and local final-version validation are
 complete. The cached v0.0.26 helper/export run passed all conversions, the strict
 actor-ground gate, verified HDF assembly and WinUAE game entry. Hosted Docker CI
-and publication remain pending. See the [release notes](RELEASE-v0.0.26.md) and
+and publication completed for v0.0.26; the later v0.0.27 hosted gates also passed. See the [release notes](RELEASE-v0.0.26.md) and
 [Docker builder details](DOCKER_BUILD_ROADMAP.md). Full-build peak storage remains
 unmeasured; the 40 GiB figure is an initial planning allowance.
 The implemented optional Linux build environment wraps the established pipeline
@@ -637,17 +679,16 @@ UI while measuring lighting/frame cost. Current bright exterior tests are not
 evidence that low-light presentation works. See the
 [Seyda Neen journal](journals/SEYDA_NEEN.md).
 
-Add a day/night cycle later: persistent game time, exterior sky/fog/ambient
-transitions, supported local lights and separate interior lighting. Start with
-host-baked lighting/lookup candidates and measure memory traffic and update cost.
-Time progression, waiting/saving and time-dependent NPC/quest conditions need
-explicit behavior; changing screen brightness alone does not implement them.
-Include dawn/day/evening/dusk/night debug presets, exact-hour and freeze controls.
-Test locally converted night-sky textures as a low-cost backdrop, then moons/clouds
-within measured budgets. Include a small precomputed gradient sun disc, following
-audited original timing and correctly occluded by scenery. Add cheap warm
-dawn/dusk horizon gradients centered on that same solar direction. This is an impression of lighting, not global illumination.
-See [day/night and sky plan](DAY_NIGHT_AND_SKY.md); these commands are not implemented yet.
+The current candidate implements persistent time, waiting, exact and named debug
+time setting, automatic-cycle pause/resume and coordinated exterior sky/fog colors.
+It includes a moving occluded sun, the reduced original stars/nebula and both
+moons. Guard torches use original equipment and bounded automatic exterior
+timing, with passing host fixtures. Interior lighting remains separate. Combined native
+acceptance and memory/frame-cost measurements are pending. Regional weather,
+general NPC schedules and time-sensitive quest conditions require their own
+semantics; the existing wait dialog is a clock jump. See the
+[implemented controls and remaining sky work](DAY_NIGHT_AND_SKY.md) and
+[guard torch policy](TORCH.md).
 
 Record verified asset mappings, implementation ideas, rejected approaches and
 symptom/cause/fix/version/regression checks in the
@@ -1521,10 +1562,11 @@ appearance snapshots; it does not make fixed outfits the final runtime design.
 Preserve reusable source parts and per-actor state; do not pre-bake every outfit
 combination. Normal gallery coverage and owner-approval requirements remain.
 
-## v0.0.27 delivery order: repaired playtest first
+## v0.0.27 follow-up: target playtest and profiling
 
-The immediate acceptance target is a repaired, reproducible playtest package. Keep
-Vivec inactive and do not broaden the playtest scope before this gate is complete.
+The stable private playtest package is assembled; the public source release is
+published. The next acceptance work is target playtesting of that exact package.
+Keep Vivec inactive and retain the bounded release scope during those checks.
 The normal converter now emits bounded Seyda maps and the repaired three-rectangle
 Balmora layout. The complete 2,717-map optimizer, actor/contact and static heap
 gates passed; final image assembly and all HDF filesystem readbacks also passed.
@@ -1538,14 +1580,15 @@ pending; estimates are not runtime results.
   pending. Do not confuse the historical 25-region layout with this generated
   result or call 64 regions a proven minimum. Preserve the 3 MiB non-map
   allowance, 2 MiB safety reserve, 896-unit coverage apron, collision/state
-  guarantees and required content.- A separate three-rectangle Balmora layout now merges adjacent cheap outer
+  guarantees and required content.
+- A separate three-rectangle Balmora layout now merges adjacent cheap outer
   regions and divides the former oversized area while preserving the 64-slot
   format, 896-unit coverage apron, hysteresis and 3+2 MiB reserves. Its three
   static peaks are 3,087,760, 5,971,920 and 5,615,520 bytes. The complete
   saved-ABI audit now passes 65/65 entries and covers all 1,488 source references
   with none lost; the worst fallback is 6,155,504 bytes with 135,952 bytes of
   post-reserve margin. This remains static evidence: 5 MiB is a planning target,
-  and image/target acceptance is pending.
+  image/readback gates have passed, and target acceptance is pending.
 
 The `bm027` replacement uses a 128-unit lower core with 96-unit hysteresis; an
 adjacent region may remain active as the player crosses the small core's center
@@ -1609,8 +1652,9 @@ proves a complete town layout is safe. See the [bounded-town candidate workflow]
 The source prototype exposes aw_map_mode and aw_map_debug_available with
 selection controls and debug-policy checks. The rc5 engine compile and private
 candidate image include the marker/contrast correction and passed HDF readback.
-Nine source checks pass; updated Linux native behavior fixtures have not been
-executed and owner target acceptance remains pending. Complete this feature after
+Nine focused source checks passed; the repaired Linux native world-UI fixture
+subsequently passed in the complete 558-test Docker suite. Owner target acceptance
+remains pending. Complete this feature after
 the repaired playtest gate. See [world map and journal](WORLD_MAP_AND_JOURNAL.md)
 for the interaction contract and progress checkpoint.
 
@@ -1636,8 +1680,9 @@ for the interaction contract and progress checkpoint.
 
 ## Dialogue, music and video import/runtime milestones
 
-These are required later content/runtime workstreams, not completed features and
-not a reason to delay the repaired playtest. Keep all original and converted
+Voiced-dialogue conditions and the complete video catalogue remain later
+content/runtime work. The 18-track music package is complete; playback validation
+remains separate. Keep all original and converted
 proprietary audio/video assets private; public changes may contain source logic,
 asset-free manifests/schemas and documentation only.
 
@@ -1658,8 +1703,9 @@ remaining work, not completion.
 
 Compare existing converted and packaged music against the complete available
 owner-provided source inventory so individual missing tracks are visible even
-when totals happen to match. The observed inventory contains 18 MP3 tracks; verify
-all 18 individually through the normal conversion/package pipeline. Include any
+when totals happen to match. The observed inventory contains 18 MP3 tracks; all 18 and 124 alias rows are
+included in the private v0.0.27 playable package. Target playback checks remain
+open, including the number-or-filename-stem `dbg ost play` command. Include any
 additional expansion tracks found in the owned source inventory. Preserve the
 current music playstyle and playback routine; this is a completeness requirement,
 not a playback redesign. Record source identifiers/hashes, converted and packaged
@@ -1742,3 +1788,39 @@ which surfaces genuinely lack required consumers before removing anything;
 occluded geometry can still matter for levitation/other angles, interiors,
 collision or visibility. Source polygon totals are not visible-frame totals.
 Do not present unnecessary-face counts or removable savings as established yet.
+
+
+### Entity pressure and safe reclamation (proposed; not implemented)
+
+- [ ] Report true live entities, allocation high-water mark, reusable and quarantined free slots, and allocation failure origin separately.
+- [ ] Profile allocation lifetimes and ownership across loading, gameplay and unloading; distinguish edict availability from Hunk, cache and external memory.
+- [ ] Introduce checked admission only for proven optional callers that can accept rejection without gameplay side effects. Keep required-allocation recovery.
+- [ ] Evaluate subsystem-owned cleanup at safe lifecycle boundaries. Generic distance eviction of NPCs, scripts or collision remains unsafe; future virtualization requires protected identities, complete state and dependency handling.
+
+Renderer culling does not release gameplay slots. Existing static catalogue capture retains meshes and collision; its memory must still be budgeted. This work must not delay the current playable candidate or relax memory reserves.
+
+
+### Selective baked building panels (proposed A/B extension)
+
+- [ ] Extend the existing explicitly selected decorative-window panel baker to audited component/surface selections for eastern Seyda house, balcony and roof/overhang assemblies. Preserve structural depth, silhouette, openings, texture orientation and collision. Whole-building billboards are not the default.
+- [ ] Bake from owner-supplied inputs at conversion time. Public source may contain the converter, recipes and synthetic tests only; original and derived game assets remain private.
+- [ ] Preserve variant A and isolate variant B; compare matched viewpoints, surface boundaries, texture memory, collision, compiled BSP/heap costs and target frame times. Host face reduction does not establish a playable repair.
+
+The existing surface_flatten.py route currently selects exterior decorative windows, not complete shacks. A private exact-coplanar shack specimen reduced 1,113 faces to 1,100, which is insufficient to close the current heap incident.
+
+### Current compiled-density and building overlay diagnostics
+
+- [x] Refresh the private 64-owner polygon mosaic from hash-matched final maps,
+  with disjoint-core density and combined loading margins. Count placed compiled
+  polygon pieces separately from source triangles, resident memory, sprites and
+  collision planes; retain special routes outside the regular-core mosaic.
+- [x] Prepare a private overhead overlay combining the density background with
+  selected actual building placements and reference identities. This is a
+  diagnostic projection, not a target render or a complete town/walkability map.
+- [ ] Review the optional overlay tool and isolated wood-detail LOD prototype
+  against visual, collision and target-memory gates before integration. Neither
+  is an established fix. The bounded collision-containment trial saved zero
+  bytes; the current 29-map heap failure remains open before image assembly.
+
+Keep generated geometry/media private; record actual representation savings and
+preserve unchanged reserves. See WORLD-FLORA-HEAP-010 in the bug journal.

@@ -20,6 +20,7 @@ void(vector position, string sample, float volume, float attenuation) ambientsou
 void() changeyaw = #49;
 float(float value) floor = #36;
 .string aw_hull;
+.float aw_scale;
 .float aw_hand_idle;
 .float aw_eye_height;
 .float aw_hand_draw;
@@ -193,6 +194,14 @@ void() aw_static = {
     self.movetype = 0;
     self.solid = 0;
     setmodel(self,self.model);
+    makestatic(self);
+};
+/* Source aw_scale is validated by PF_makestatic before serialization. */
+void() aw_flora = {
+    precache_model(self.model);
+    self.movetype = 0;
+    self.solid = 0;
+    setmodel(self, self.model);
     makestatic(self);
 };
 void() aw_loop = {

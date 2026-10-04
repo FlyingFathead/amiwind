@@ -50,7 +50,13 @@ class LoadingDelaySourceTests(unittest.TestCase):
         self.assertIn('Cvar_RegisterVariable(&region_loading_delay)', body(ui, 'AW_UIInit'))
         config = (ROOT / 'config/game.cfg').read_text(encoding='utf-8')
         self.assertRegex(config, r'(?m)^aw_region_loading_delay 2$')
-        self.assertIn('0 = instantly; 2 = after two seconds', config)
+        self.assertIn('0 = instantly', config)
+        self.assertIn('2 = after two seconds', config)
+        # Cbuf splits unquoted semicolons before COM_Parse discards comments.
+        # Default comments must not turn their second clause into commands.
+        for line in config.splitlines():
+            if line.lstrip().startswith('//'):
+                self.assertNotIn(';', line)
 
     def test_extracted_clamps_are_finite_and_bounded(self):
         clamp = body(source('aw_ui.c'), 'AW_SetNextLoadingDelay')

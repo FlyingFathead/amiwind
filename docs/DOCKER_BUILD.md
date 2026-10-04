@@ -61,14 +61,18 @@ full-game Docker peak storage has not yet been measured.
 The `docker-builder` job builds the same allowlisted context, bootstraps tools,
 runs synthetic regressions and performs an asset-free Amiga compile. Diagnostic
 logs/receipts upload on success or failure. Existing native Linux and Windows
-checks remain separate. This new hosted job must pass before the final release;
+checks remain separate. The hosted Docker job passed for published v0.0.26
+and v0.0.27. Each later source release still requires its own exact-commit CI;
 local prototype success does not establish hosted CI success.
 
 The owner-input/export helper completed the full v0.0.26 conversion and exported
 the verified final-identity HDF. The strict actor-ground gate passed with zero
 unresolved findings; WinUAE game entry, opening movie and Enter/Escape controls
-passed. Hosted Docker CI is required before publication. See the
-[v0.0.26 release notes](RELEASE-v0.0.26.md) and
+passed. Those are dated full-game results. Published v0.0.27 subsequently
+passed all four hosted jobs, its full Linux Docker suite and asset-free compile,
+with release/download verification complete; these do not establish another
+full-game Docker conversion or target playthrough. See the
+[v0.0.26 record](RELEASE-v0.0.26.md), [current release](RELEASE-v0.0.27.md) and
 [Docker roadmap](DOCKER_BUILD_ROADMAP.md).
 
 ## Full private build (game-entry checkpoint passed)
@@ -114,6 +118,6 @@ gates with zero unresolved findings. Its verified v0.0.26 HDF is 3,489,693,696
 bytes, SHA-256 `da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`.
 Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run reported 78 warnings. WinUAE 6.0.3
 played the opening movie, entered Jiub's prison scene and responded to Enter/Escape.
-Hosted Docker CI is required before publication. Synthetic CI remains
-separate from owner-supplied full-game validation.
-Synthetic CI remains separate from this owner-supplied full-game validation.
+Hosted Docker CI subsequently passed for v0.0.26 and v0.0.27. Synthetic CI
+remains separate from this owner-supplied full-game validation; every future
+publication still requires its own exact-commit hosted result.

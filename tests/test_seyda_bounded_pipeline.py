@@ -54,9 +54,20 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
                 return {'candidate_path':str(target),'candidate_sha256':hashlib.sha256(raw).hexdigest(),
                         'heap_estimate':None,'world_collision_samples':{'fixture':True}}
             with patch('prepare_bounded_world.build_candidate',side_effect=builder), \
+                 patch('canonical_land_reference.CanonicalLand'), \
+                 patch('cull_bsp_terrain.cull_bsp',side_effect=lambda raw,policy,**kw:(raw,{'policy':policy,'unchanged':True,'fixture':True})), \
                  patch('subprocess.run',side_effect=AssertionError('No compiler allowed in source test')):
-                report=convert(source,maps,source_map=land,palette=palette,ericw_bin=root/'unused')
+                report=convert(source,maps,source_map=land,palette=palette,ericw_bin=root/'unused',
+                               canonical_land_source=root/'synthetic-land.npz',terrain_cull_config={'default':True,'overlap':.5,
+                                  'cells':{'Seyda Neen':{'overlap':1.}},
+                                  'subcells':{'sn000':{'enabled':False}},
+                                  'bsps':{'sn001.bsp':{'overlap':0.}}})
             self.assertEqual(len(calls),66)
+            first,second=report['regions'][:2]
+            self.assertFalse(first['bounded']['terrain_visual_cull']['policy']['enabled'])
+            self.assertEqual(first['bounded']['terrain_visual_cull']['policy']['overlap'],1.)
+            self.assertEqual(second['bounded']['terrain_visual_cull']['policy']['overlap'],0.)
+            self.assertEqual(second['bounded']['terrain_visual_cull']['policy']['overlap_provenance'],'bsps')
             self.assertEqual([name for name,_,_ in calls[:64]],[f'sn{i:03d}' for i in range(64)])
             self.assertEqual([name for name,_,_ in calls[64:]],['intro_docks','sncourt'])
             self.assertEqual(len(list(maps.glob('*.bsp'))),67)
@@ -71,7 +82,7 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
             source=maps/'seyda.bsp';raw=repeated_geometry();source.write_bytes(raw)
             with patch('prepare_bounded_world.build_candidate',side_effect=ValueError('terrain failure')):
                 with self.assertRaisesRegex(ValueError,'terrain failure'):
-                    convert(source,maps,source_map=root/'source.map',palette=root/'palette',ericw_bin=root/'unused')
+                    convert(source,maps,source_map=root/'source.map',palette=root/'palette',ericw_bin=root/'unused',terrain_visual_cull=False)
             self.assertEqual(source.read_bytes(),raw)
             self.assertEqual([p.name for p in maps.glob('*.bsp')],['seyda.bsp'])
 

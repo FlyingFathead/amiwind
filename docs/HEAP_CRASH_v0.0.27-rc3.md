@@ -1,7 +1,9 @@
 # Heap crash report: v0.0.27-rc3 Seyda Neen load
 
 Incident: CRASH-01. Status: **OPEN — no verified fixed build**.
-Recorded/updated: 3 October 2026.
+Recorded/updated: 3 October 2026. The repair source is included in published
+[v0.0.27](RELEASE-v0.0.27.md); the stable private image passed static gates and
+HDF readbacks. Exact-route target verification remains open.
 
 ## 1. Version, bug, location and circumstances
 
@@ -19,7 +21,8 @@ on-screen fatal reason. Detached-filesystem inspection recovered ERROR.TXT:
 Hunk_Alloc sn012: need 2767120 bytes, free 1682208 of 11534336
 ```
 
-Impact: the restart/load path cannot complete; this blocks release acceptance.
+Impact: the restart/load path failed in the original rc3 candidate and blocked
+its acceptance. Later publication does not retroactively close this target incident.
 Other headroom failures are identified by estimates, not claimed as reproduced
 crashes. See [all 28 map profiles](MAP_MEMORY_PROFILE.md).
 
@@ -56,7 +59,7 @@ therefore deterministic repetition across other configurations is not claimed.
 
 ## 3. How to fix, and what remains open
 
-The duplicate-copy repair is implemented in the unreleased rc3 working tree:
+The duplicate-copy repair was introduced during rc3 and is included in v0.0.27:
 visibility, lighting and entity byte lumps load directly into final hunk storage.
 No geometry, UV or collision simplification is involved in that loader correction.
 A real-loader regression checks the 2767103-byte visibility size, byte identity,
@@ -64,13 +67,14 @@ absence of a full temporary copy, pack-member-relative offsets and malformed/
 truncated input. The loader regression passed and the repaired Amiga engine
 compiled. Fatal exits also print their reason and retain ERROR.TXT when writable.
 
-**Those checks do not establish a complete fix for this incident.** sn012's
-section-stream estimate after the duplicate-copy repair is still 10860976 bytes
-at loading peak, before the current 3 MiB non-BSP reserve plus 2 MiB safety margin.
-It remains 4569520 bytes short under that policy. Eliminating the immediate
+**Those checks do not establish a complete fix for this incident.** The
+historical unbounded sn012 estimate after the loader-only repair was 10860976
+bytes at loading peak, before the 3 MiB non-BSP reserve and 2 MiB safety margin:
+4569520 bytes short under that policy. Later bounded town conversion and the
+complete 2,717-map package passed the unchanged static gate. Eliminating the immediate
 failed allocation does not prove later map, actor, cache or renderer work fits.
 
-To complete the fix:
+Repair and remaining verification steps:
 
 1. Reduce the actual runtime working set and/or loading peaks for heavy maps.
    Profile geometry, collision, textures, visibility and retained parent data;
@@ -79,12 +83,14 @@ To complete the fix:
    positive reserves. A second HDF supplies storage, not additional heap.
 3. Profile the entire outgoing/unload/new-load/restoration/first-frame cycle,
    including cache pressure, zone fragmentation and external Fast/Chip memory.
-4. Build a new playable candidate and reproduce this exact Jiub-to-Seyda path,
-   then test automatic crossings, both directions, restart and save/load.
+4. Use the assembled stable private image to repeat this exact Jiub-to-Seyda
+   route, then test automatic crossings, both directions, restart and save/load.
 5. Record the verified fixed version and target evidence only after acceptance.
 
-Repair candidate version: unreleased v0.0.27-rc3 working tree.
-Verified fixed version: **pending**. Replacement playable image: **pending**.
+Repair source version: published v0.0.27, following rc3/rc4/rc5 corrections.
+Replacement private image: assembled with both HDF filesystem readbacks passed.
+Verified target-fixed version: **pending**. No cold/warm lifecycle trace or
+exact-route target acceptance is recorded.
 
 A separate extra-HDF streaming lookup issue is documented as MEM-EXTRA-HDF in
 [the bug journal](BUG_JOURNAL.md); do not conflate its potential full-file

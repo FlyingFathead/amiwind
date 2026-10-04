@@ -1,4 +1,73 @@
-# Gameplay media — v0.0.23-dev2
+# Gameplay media
+
+## v0.0.28 — Trees and Grass, Day and Night
+
+Captured on 4 October 2026 from the release engine in WinUAE. Every PNG is a
+lossless conversion of a native 320×200 PCX frame: no repainting, color correction,
+sharpening or scaling. V3 is the shipped default. These are engine screenshots,
+not the private reference photographs used to discuss the sky.
+
+### From dawn to night
+
+| Dawn 05:30 | Sunrise 06:30 |
+| :---: | :---: |
+| ![Dawn 05:30 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-dawn.png) | ![Sunrise 06:30 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-sunrise.png) |
+
+| Midday 13:00 | Golden hour 17:00 |
+| :---: | :---: |
+| ![Midday 13:00 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-midday.png) | ![Golden hour 17:00 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-golden-hour.png) |
+
+| Red sunset 18:00 | Dusk 19:00 |
+| :---: | :---: |
+| ![Red sunset 18:00 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-red-sunset.png) | ![Dusk 19:00 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-dusk.png) |
+
+| Blue hour 20:15 | Night 23:00 |
+| :---: | :---: |
+| ![Blue hour 20:15 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-blue-hour.png) | ![Night 23:00 — Seyda Neen day gallery](images/amiwind-v0.0.28-v3-night.png) |
+
+![Eight-stage day gallery](images/amiwind-v0.0.28-day-gallery.gif)
+
+`dbg daycycle gallery` supplies the scenic views and captioned render times.
+The saved clock remains 13:17, and the saved player state is restored when the
+tour ends. The GIF selects one unchanged frame per stage, held for 1.4 seconds;
+it does not represent natural time progression or measured frame rate.
+
+### Night over Balmora
+
+| Wide view | Masser |
+| :---: | :---: |
+| ![Wide view — Balmora night gallery, render time 23:00](images/amiwind-v0.0.28-night-wide.png) | ![Masser — Balmora night gallery, render time 23:00](images/amiwind-v0.0.28-night-masser.png) |
+
+| Secunda | Overhead stars |
+| :---: | :---: |
+| ![Secunda — Balmora night gallery, render time 23:00](images/amiwind-v0.0.28-night-secunda.png) | ![Overhead stars — Balmora night gallery, render time 23:00](images/amiwind-v0.0.28-night-stars.png) |
+
+![Four-stage night gallery](images/amiwind-v0.0.28-night-gallery.gif)
+
+`dbg nightgallery` previews the wide view, Masser, Secunda and overhead stars
+at 23:00 on the saved date. This montage holds each selected native frame for
+1.8 seconds. The saved clock and player state remain unchanged. Tiny stars stay
+in the background behind the complete moon discs, clouds and opaque scenery.
+
+### Balmora streets at 23:00
+
+| Balmora at 23:00 | Balmora at 23:00 |
+| :---: | :---: |
+| ![Balmora at 23:00 — guard street](images/amiwind-v0.0.28-balmora-guard-street.png) | ![Balmora at 23:00 — street sky](images/amiwind-v0.0.28-balmora-street-sky.png) |
+
+| Balmora at 23:00 | Balmora at 23:00 |
+| :---: | :---: |
+| ![Balmora at 23:00 — moon rooftops](images/amiwind-v0.0.28-balmora-moon-rooftops.png) | ![Balmora at 23:00 — moons](images/amiwind-v0.0.28-balmora-moons.png) |
+
+These separate views use the actual 23:00 clock and a scripted camera. The
+streets are dark; the moon-rooftop view includes only a small roof silhouette.
+The original palette and exposure are preserved.
+
+The capture build passed the bounded independent native checks described in
+[the release notes](RELEASE-v0.0.28.md). This establishes the shown scenes and
+controls, not physical-hardware performance or an unrestricted world playthrough.
+
+## v0.0.23-dev2 captures — 29 September 2026
 
 Captured on 29 September 2026 from the actual compiled 68040 Amiga runtime in
 FS-UAE 3.1.66, using the unchanged A1200/AGA/PAL/2 MiB Chip/16 MiB Z3/JIT profile.
@@ -132,3 +201,36 @@ Seyda view uses a diagnostic local camera at `0,100,90 / 90 / 12`; its source
 position is `-11264,-71280,360`. The map header and white cross use that position.
 The normal-view compass was also checked with debug overlays disabled. Raw
 frames and commands remain in the private evidence.
+
+## v0.0.28-rc1 first day/night captures — 4 October 2026
+
+The three README images are actual game-produced 320×200 PCX frames, converted
+losslessly to PNG without resizing, color changes, compositing or generated
+content. They were captured from a writable copy of the private HDF in WinUAE
+6.0.3, using the A1200/AGA/PAL 68040/FPU/JIT profile with 2 MiB Chip and 16 MiB Z3
+RAM. Original HDFs, raw captures and native logs remain private.
+
+| Public image | In-game time |
+| --- | --- |
+| `amiwind-v0.0.28-rc1-sunrise.png` | 06:00 |
+| `amiwind-v0.0.28-rc1-sunset.png` | 18:00 |
+| `amiwind-v0.0.28-rc1-night.png` | 00:00 |
+
+All three use the same diagnostic camera, local origin `100,-180,180`, yaw 135,
+pitch 10. Automatic time is paused for these reproducible stills. The ordinary
+clock advance, pause/resume and saved-time restoration were tested separately;
+these photographs are not evidence of natural walking or cell transitions.
+
+This first implementation changes the shared sky and distant fog. It does not
+yet draw a sun, moons, stars or weather, or relight nearby world surfaces. Its
+palette bands and bright warm haze remain visible here. The experimental terrain
+candidate also has known neighbor-height and overlapping-resident contact
+errors: the images document current appearance, not accepted terrain or a
+finished release.
+
+The exact engine SHA-256 is
+`f19ea3089bfb73b3bea801334f51a76a722c54316f471d8d1271807347f3d2d2`;
+the photographed experimental map SHA-256 is
+`083040730dcd41112f3015e2c8604b08eb588dad33138b30bab80596c33dbd5d`.
+Only these three named documentation PNGs are added to the public media
+exceptions. Other captures, game assets, playable images and ROMs remain private.

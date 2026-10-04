@@ -303,18 +303,17 @@ void Sys_Error (char *error, ...)
     /* Print after closing the game screen so AmigaDOS retains the reason.
      * Only the fatal path runs this; ERROR.TXT remains the durable copy. */
     PutStr("\n------------------------------------------------------\n"
-           "AmiWind v" AMIWIND_VERSION " crashed! Sorry! :-(\n"
-           "------------------------------------------------------\n"
-           "Crash cause: ");
+           "AmiWind v" AMIWIND_VERSION " crashed!\n"
+           "Crash details: ");
     PutStr(text[0] ? text : "No reason was provided.");
     PutStr("\n\n");
     if (errorSaved) {
-        PutStr("The crash report has been saved to ");
+        PutStr("Crash log is at ");
         PutStr(errorPath);
         PutStr("\n");
     } else {
-        PutStr("Could not verify a complete ERROR.TXT in the launch directory.\n"
-               "Please copy the crash cause shown above.\n");
+        PutStr("Crash log could not be verified at ERROR.TXT (in the launch directory).\n"
+               "Please copy the crash details shown above.\n");
     }
     PutStr("------------------------------------------------------\n"
            "To restart AmiWind, try typing: amiwind\n");

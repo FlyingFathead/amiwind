@@ -1,5 +1,84 @@
 # Development history
 
+## 0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026
+
+- Selected stable release identity 0.0.28; scoped local native acceptance passed. Public publication remains pending.
+- V3 is default: stronger red/gold twilight, purple/blue hour, two original-cloud
+  layers, moving sun and fog-based world tone; independent sun/cloud toggles start on.
+- Added the original star/nebula and Masser/Secunda atlas, gentle star twinkle
+  behind full moon discs, and default-on `dbg starsky` / `dbg nightsky` controls.
+- Added `dbg daycycle gallery` camera tour, adjustable `dbg skyspeed` (default
+  0.00333333333), `dbg inputtrace`, and original-asset guard torches with
+  `guards_torch_cycle` / `dbg guardtorch on/off/auto`.
+- Corrected enlarged source stars with AWN2 point roles and full upper-sky
+  mapping: 163 original-source points behind visible nebula and complete moon
+  masks, with black-background gaps transparent. All sixteen moon tiles remain
+  unchanged; nebula uses original alpha.
+- Added `dbg nightgallery [here/off]`: four eight-second views at 23:00 on the
+  saved date, covering the current wide view, Masser, Secunda and overhead stars
+  without moving the player or changing saved time/settings.
+- Corrected coordinate-arrival traces starting in solid ceiling shells, with a
+  bounded same-XY clear-start search and unchanged standing/floor checks.
+- Expanded the OST source queue to four stereo PCM blocks (64 KiB), with
+  4 KiB refill slices and buffer-size diagnostics. Shared mixer timing,
+  speech and guard voices are unchanged. An initially positive owner
+  listening report was immediately qualified: audible artifacts remain,
+  mostly at load-ins and in heavy scenes. The music issue stays open, with
+  further investigation deferred until after publication; this is a
+  functionally tested mitigation.
+- Finalization011 host gates pass: 824 tests per host (Linux 820 pass/4 skip;
+  Windows 732 pass/92 skip) and identical 744,860-byte Amiga compiles from the
+  same 206 runtime sources. The 1,096 frozen source files match, and the Linux
+  Docker target-ABI gate passed.
+- Image014 cold guard-admission failure was corrected in build011. Independent
+  image015 WinUAE acceptance passed its scoped cold-guard, boundary, visible-particle,
+  five-map pressure, eight-stage day-gallery and four-stage night-gallery checks.
+  The 137 fresh captures, 10,766-file readback and three partition checks passed.
+  Minimum logged peak clearance was 1,812,304 bytes, below the unchanged 2 MiB
+  safety reference; production memory gate did not pass. Music artifacts remain
+  an owner-deferred known issue. Hosted CI, tag and publication remain pending.
+- Corrected reversed LAND edge winding across the bounded 64-map batch. Image015
+  passed all eight day and four night gallery stages, bounded sky inspection and
+  renderer-state restoration. Broader routes and unrestricted play remain outside
+  this native test scope.
+  Historical rc1/V1 captures retain attribution; v0.0.27 is still published.
+  See [stable preparation](RELEASE-v0.0.28.md).
+
+## 0.0.28-rc1 — Trees and Grass, Day and Night — candidate, 4 October 2026
+
+- Prepared original-placement world foliage with 76 shared sprite types;
+  preserved rocks, giant mushrooms and detailed Balmora mesh foliage.
+- Converted 2,664 exterior maps to one shared sky, removing 301,751 local sky
+  faces and saving 137,703,336 aggregate disk bytes against untouched inputs,
+  including the shared asset once.
+- Added persistent-clock sky/fog colors, default-on automatic day/night control,
+  fractional clock ticks and explicit exact/named time controls. T waits remain
+  available with the automatic cycle paused.
+- Corrected static foliage-link allocation/accounting and startup comment
+  separators; retained measured failed terrain trials and the current inspector.
+- Both host suites and Amiga compiles passed; normalized executables match byte
+  for byte. New HDF assembly/readback passed. Independent gameplay acceptance
+  and publication remain pending. See [candidate scope](RELEASE-v0.0.28-rc1.md).
+
+## 0.0.27 — Rocks, Mushrooms, and Then Some — 3 October 2026
+
+- Published stable source release with 37,960 exterior rock placements and 816
+  giant mushrooms across 2,526 world regions; joined mushroom caps preserve
+  source geometry and UVs.
+- Bounded Seyda Neen/Balmora town maps, held-input/player-state preservation at
+  automatic crossings, final-map heap estimates and loader memory corrections.
+- Retained settlement markers in both map modes, readable selector styling,
+  configurable two-second loading-text delay, and an 18-track music catalogue.
+- Generated WinUAE and FS-UAE configurations mount every required HDF together.
+- Complete Linux Docker suite and asset-free compile passed; all four exact-
+  commit hosted CI jobs and publisher downloaded-asset verification completed.
+- Target heap/FPS/crossing/map-panel acceptance remains open. The In-Game map is
+  a terrain-overview prototype; full condition-aware voices and the 17-video
+  catalogue remain future work. Playable packages stay private.
+
+See [the release evidence and limits](RELEASE-v0.0.27.md). Later editorial
+corrections clarify this release state without changing its tag or source asset.
+
 ## 0.0.26
 
 Tools/source-only Linux Docker builder using the established converter,

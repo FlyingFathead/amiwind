@@ -1,4 +1,20 @@
-# Playable Vvardenfell terrain — v0.0.25-rc1
+# Playable Vvardenfell terrain
+
+## Current scope — published v0.0.27
+
+The 2,526-region terrain foundation now carries 37,960 exterior rocks and 816
+giant mushrooms. Detailed Seyda Neen and Balmora use the later bounded town
+layouts; other settlements, vegetation and actors remain incomplete. Current
+private builds span two simultaneously mounted HDFs. Use their generated
+configuration and full drive list. See [v0.0.27 scope](RELEASE-v0.0.27.md),
+[current cell handoffs](CELL_CHANGING.md) and [storage](STORAGE.md).
+
+The following preserves the v0.0.25-rc1 terrain baseline, including its original
+town-boundary and single-HDF measurements. Later town coverage, subdivision and
+storage changes supersede those historical settings; the original evidence is
+retained without claiming additional target acceptance.
+
+## Historical v0.0.25-rc1 terrain baseline
 
 The first native terrain pass uses the original polygon survey and its proposed
 sub-cell divisions. It preserves the detailed Seyda Neen and Balmora conversions;

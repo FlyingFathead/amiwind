@@ -3,7 +3,7 @@
  * poisoned so the cache copy cannot accidentally retain a dangling pointer. */
 #include "quakedef.h"
 #include <assert.h>
-void Mod_LoadAliasModel(model_t *,void *);
+void Mod_LoadAliasModel(model_t *,void *,int);
 static byte arena[16384];static int used,cache_size;
 int r_pixbytes=1;
 unsigned short d_8to16table[256];
@@ -26,7 +26,7 @@ int main(void){
     p=raw+sizeof(*m)+sizeof(daliasskintype_t);for(i=0;i<16;i++)p[i]=i+1;p+=16;
     p+=3*sizeof(stvert_t);tri=(dtriangle_t *)p;tri->facesfront=1;tri->vertindex[1]=1;tri->vertindex[2]=2;p+=sizeof(*tri);
     p+=sizeof(daliasframetype_t);f=(daliasframe_t *)p;strcpy(f->name,"fixture");v=(trivertx_t *)(f+1);v[0].v[0]=3;v[1].v[1]=17;v[2].v[2]=42;
-    Mod_LoadAliasModel(&mod,raw);assert(used==0 && cache_size>16 && mod.type==mod_alias);
+    Mod_LoadAliasModel(&mod,raw,sizeof raw);assert(used==0 && cache_size>16 && mod.type==mod_alias);
     h=mod.cache.data;decoded=(mdl_t *)((byte *)h+h->model);assert(decoded->numframes==1 && decoded->numverts==3);
     skin=(maliasskindesc_t *)((byte *)h+h->skindesc);for(i=0;i<16;i++)assert(*((byte *)h+skin->skin+i)==i+1);
     v=(trivertx_t *)((byte *)h+h->frames[0].frame);assert(v[0].v[0]==3 && v[1].v[1]==17 && v[2].v[2]==42);

@@ -90,6 +90,24 @@ class WorldRegionsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'two-partition budget'):balanced(paths,4,11)
 
 
+
+class ContentPreservingRefinementTests(unittest.TestCase):
+    def test_parent_slots_and_append_only_siblings_tile_cores(self):
+        from prepare_world_regions import refine_entries
+        original=[dict(name=f'vf{i:04d}',cell=[i,0],divisions=1,subcell=[0,0],origin=[i*2048+1024,1024,384],core=[[-1024,-1024],[1024,1024]],coverage=[[-1920,-1920],[1920,1920]],converted={'sha256':'old'}) for i in range(3)]
+        result=refine_entries(original,[{'parent':'vf0001','cell':[1,0],'divisions':2,'reason':'reserve'}])
+        self.assertEqual([e['name'] for e in result],[f'vf{i:04d}' for i in range(6)])
+        self.assertEqual(result[0],original[0]);self.assertEqual(result[2],original[2])
+        children=[e for e in result if e.get('refinement')]
+        self.assertEqual([e['origin'][:2] for e in children],[[2560.,512.],[3584.,512.],[2560.,1536.],[3584.,1536.]])
+        self.assertEqual(sum((e['core'][1][0]-e['core'][0][0])*(e['core'][1][1]-e['core'][0][1]) for e in children),2048**2)
+        for e in children:
+            self.assertEqual(e['coverage'],[[-1408,-1408],[1408,1408]])
+            self.assertNotIn('converted',e)
+        self.assertIn('converted',original[1])
+        with self.assertRaisesRegex(ValueError,'parent differs'):
+            refine_entries(original,[{'parent':'vf0099','cell':[1,0],'divisions':2,'reason':'bad'}])
+
 if __name__=='__main__':unittest.main()
 
 

@@ -37,7 +37,7 @@ D_SpriteDrawSpans
 */
 void D_SpriteDrawSpans (sspan_t *pspan)
 {
-	int			count, spancount;
+	int			count, spancount,slowdepth,depthvalue;double pixelzi,endzi;
 	unsigned int		izistep;
 	unsigned int		izi;
 	byte		*pbase, *pdest;
@@ -57,7 +57,7 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 	zi8stepu = d_zistepu * 8;
 
 // we count on FP exceptions being turned off to avoid range problems
-	izistep = (unsigned int)(d_zistepu * 0x8000 * 0x10000);
+	izistep = fabs(d_zistepu)<1?(unsigned int)(int)(d_zistepu*2147483648.0):0;
 
 	do
 	{
@@ -78,7 +78,9 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 		zi = d_ziorigin + dv*d_zistepv + du*d_zistepu;
 		z = (float)0x10000 / zi;	// prescale to 16.16 fixed-point
 	// we count on FP exceptions being turned off to avoid range problems
-		izi = (unsigned int)(zi * 0x8000 * 0x10000);
+		pixelzi=zi;endzi=pixelzi+(pspan->count-1)*(double)d_zistepu;
+        slowdepth=!(pixelzi>=0 && pixelzi<=32767.0/32768 && endzi>=0 && endzi<=32767.0/32768);
+        izi=slowdepth?0:(unsigned int)(pixelzi*2147483648.0);
 
 		s = (int)(sdivz * z) + sadjust;
 		if (s > bbextents)
@@ -167,14 +169,15 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 				{
 					/* Background depth is negative. Preserve the signed comparison
                      * while retaining unsigned fixed-point accumulator wrap. */
-                    if (*pz <= (int)(izi >> 16))
+                    depthvalue=slowdepth?(!(pixelzi>0)?0:pixelzi>=32767.0/32768?32767:(int)(pixelzi*32768)):(int)(izi>>16);
+                    if (*pz <= depthvalue)
 					{
-						*pz = izi >> 16;
+						*pz = depthvalue;
 						*pdest = btemp;
 					}
 				}
 
-				izi += izistep;
+				izi += izistep;if(slowdepth)pixelzi+=d_zistepu;
 				pdest++;
 				pz++;
 				s += sstep;

@@ -106,7 +106,8 @@ def select(raw, bounds, polygon=None):
 
 
 def convert(source, destination, *, source_map, palette, ericw_bin,
-            target_sizes=None, threads=1, work_dir=None):
+            target_sizes=None, threads=1, work_dir=None, terrain_visual_cull=None,
+            terrain_cull_config=None, terrain_cull_overlap=None, canonical_land_source=None):
     """Generate actual bounded terrain/PVS; never retain the full-town world.
 
     This normal build step invokes the configured terrain tools when called.
@@ -114,6 +115,24 @@ def convert(source, destination, *, source_map, palette, ericw_bin,
     All region generation finishes before the runtime map set is installed.
     """
     from prepare_bounded_world import build_candidate
+    from terrain_visual_cull import resolve_policy
+    from cull_bsp_terrain import cull_bsp
+    if terrain_cull_config is None:
+        config_path=Path(__file__).resolve().parents[1]/'config/terrain-visual-cull.json'
+        terrain_cull_config=json.loads(config_path.read_text(encoding='utf-8'))
+    identities=[e['name'] for e in regions()]+['intro_docks','sncourt']
+    enabled=any(resolve_policy(terrain_cull_config,map_identity=name,cell_identity='Seyda Neen',
+        subcell_identity=name if name.startswith('sn') and name[2:].isdigit() else None,
+        force=terrain_visual_cull,overlap_force=terrain_cull_overlap)['enabled'] for name in identities)
+    canonical_origin=None
+    if enabled:
+        if canonical_land_source is None:
+            raise ValueError('Enabled Seyda culling requires --canonical-land-source; no local BSP fallback')
+        area=json.loads((Path(__file__).resolve().parents[1]/'config/seyda_area.json').read_text(encoding='utf-8'))
+        if area['scale']!=0.25:raise ValueError('Unsupported canonical source scale')
+        canonical_origin=[float(v)*area['scale'] for v in area['centre']]+[0.0]
+        from canonical_land_reference import CanonicalLand
+        CanonicalLand(canonical_land_source,canonical_origin)  # validate before any build or write
     source=Path(source);destination=Path(destination)
     destination.mkdir(parents=True,exist_ok=True)
     entries=regions();raw=source.read_bytes()
@@ -129,6 +148,26 @@ def convert(source, destination, *, source_map, palette, ericw_bin,
         output=Path(result['candidate_path'])
         if hashlib.sha256(output.read_bytes()).hexdigest()!=result['candidate_sha256']:
             raise ValueError('Bounded candidate receipt mismatch: '+name)
+        policy=resolve_policy(terrain_cull_config,map_identity=name,cell_identity='Seyda Neen',
+                              subcell_identity=name if name.startswith('sn') and name[2:].isdigit() else None,
+                              force=terrain_visual_cull,overlap_force=terrain_cull_overlap)
+        culled,cull_receipt=cull_bsp(output.read_bytes(),policy,terrain_reference=raw,
+            terrain_reference_metadata={'scope':'complete unculled town LAND; same compiled world coordinates',
+                'path':str(original),'sha256':hashlib.sha256(raw).hexdigest()},
+            canonical_land_source=canonical_land_source,canonical_origin=canonical_origin,require_canonical=True)
+        original_output=output
+        if not cull_receipt.get('unchanged'):
+            output=work/name/'terrain-culled.bsp'
+            if output.exists():raise ValueError('Terrain candidate output already exists')
+            output.write_bytes(culled)
+        (work/name/'terrain-cull.json').write_text(json.dumps(cull_receipt,indent=2)+'\n',encoding='utf-8')
+        if cull_receipt.get('acceptance','').startswith('INCOMPLETE'):
+            raise ValueError('Canonical cut diagnostic saved at '+str(output)+'; unresolved LAND render/physics alignment blocks region installation')
+        result={**result,'pre_cull_candidate_path':str(original_output),
+                'pre_cull_candidate_sha256':result['candidate_sha256'],
+                'candidate_path':str(output),'candidate_sha256':hashlib.sha256(culled).hexdigest(),
+                'terrain_visual_cull':cull_receipt,
+                'validation_scope':'Bounded-builder metrics are before terrain culling; final candidate gates required'}
         return output,result
     for entry in entries:
         output,result=build(entry['name'],entry['coverage'],entry['core'])
@@ -175,7 +214,14 @@ if __name__=='__main__':
     p.add_argument('--palette',type=Path,required=True)
     p.add_argument('--ericw-bin',type=Path,required=True)
     p.add_argument('--threads',type=int,default=1)
+    p.add_argument('--terrain-visual-cull',choices=('true','false'))
+    p.add_argument('--terrain-cull-overlap',type=float)
+    p.add_argument('--terrain-cull-config',type=Path)
+    p.add_argument('--canonical-land-source',type=Path)
     a=p.parse_args()
     r=convert(a.source,a.destination,source_map=a.source_map,palette=a.palette,
-              ericw_bin=a.ericw_bin,threads=a.threads)
+              ericw_bin=a.ericw_bin,threads=a.threads,
+              terrain_visual_cull=None if a.terrain_visual_cull is None else a.terrain_visual_cull=='true',
+              terrain_cull_overlap=a.terrain_cull_overlap,canonical_land_source=a.canonical_land_source,
+              terrain_cull_config=json.loads(a.terrain_cull_config.read_text(encoding='utf-8')) if a.terrain_cull_config else None)
     print(f"Prepared {r['regular_regions']} bounded regions plus special scenes and fallback.")

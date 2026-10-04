@@ -5,11 +5,13 @@ converted scenery's point-collision BSP nodes were expanded to renderer-sized
 `mnode_t` records, then copied into compact hull0 collision records. The scenery
 renderer uses its model's face range; it does not traverse those collision trees.
 
-The rc4 loader prototype keeps the complete original-index hull0 representation,
+The loader introduced during rc4 and included in v0.0.27 keeps the complete
+original-index hull0 representation,
 but expands only a strictly verified world-render node prefix. It changes no
 terrain, scenery faces, textures, collision planes, collision contents or model
-root indices. This is implemented and host-tested, but target gameplay and final
-image acceptance remain pending. The rc3 crash incident is not closed by this
+root indices. Host checks, the complete static map gate and final private HDF
+assembly/readback passed. Target gameplay acceptance remains pending; the rc3
+crash incident is not closed by this
 document. See [memory allocation](MEMORY_ALLOCATION.md) and
 [heap lifecycle profiling](HEAP_WATCHER.md).
 

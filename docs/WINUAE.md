@@ -66,17 +66,19 @@ implements these options. The installed WinUAE documentation also describes
 
 ## Public versioned preset
 
-Load [AmiWind-v0.0.26-rc1-WinUAE.uae](../resources/emulators/AmiWind-v0.0.26-rc1-WinUAE.uae)
+Prefer the matching configuration generated beside your HDFs: it mounts the
+complete verified disk list. For manual setup, load
+[AmiWind-v0.0.27-WinUAE.uae](../resources/emulators/AmiWind-v0.0.27-WinUAE.uae)
 from WinUAE's Configurations panel. It sets the development machine below and
 opens the GUI. It deliberately leaves the ROM path empty and mounts no disk.
 In ROM, select your complete licensed A1200 Kickstart 3.1 ROM. In CD & Hard
-drives, add your locally generated `AmiWind-v0.0.26-rc1.hdf` as an RDB hardfile
-on the UAE controller, then save a private configured copy and Start.
+drives, add every HDF listed in your build summary as an RDB hardfile on the
+UAE controller, with the boot disk first. Save a private configured copy and Start.
 
 To produce the playable HDF, follow the [Linux](LINUX_BUILD.md) or
 [Windows / WSL build guide](WINDOWS_BUILD.md) with your own Morrowind files.
 The public source ZIP contains the preset, not a playable HDF or Kickstart ROM.
-The separate `AmiWind-v0.0.26-rc1-dry-run.hdf` boots only to a test notice.
+The separate `AmiWind-v0.0.27-dry-run.hdf` boots only to a test notice.
 
 The preset contains no personal Windows paths, device identifiers, ROMs or
 game data. Its description and filename identify the development version.
@@ -92,8 +94,9 @@ expanded town and interiors use this larger heap; the hardware preset remains
 16 MiB Fast RAM.
 The historical 10 MiB contiguous threshold falsely rejected a usable fragmented
 pool; it is distinct from the current measured heap requirement. Type `amiwind` at the DOS prompt
-to restart; run `AmiWindCheck` separately for diagnostics. The current private checkpoint
-contains the tested KS3.1 ROM only, not every ROM listed in historical records.
+to restart; run `AmiWindCheck` separately for diagnostics. Historical private
+checkpoints used the tested KS3.1 ROM; supply your own licensed copy. The current
+public source and private stable playtest package do not include a ROM.
 
 ## Mouse works, but WASD cannot move at initial spawn
 

@@ -68,14 +68,19 @@ existing `mwad` command remain unchanged. Existing external workspaces bearing
 the legacy project identifier are still accepted. Both old and new source trees
 remain protected against placing private game data beneath them.
 
-## Validation
+## Historical repository-consolidation validation
 
-113 host tests passed, including dependency-consent, reference-checksum, WSL-path,
+The results below describe the original consolidation checkpoint. Current
+source/build/publication evidence is in [v0.0.27 release notes](RELEASE-v0.0.27.md).
+
+At that checkpoint, 113 host tests passed, including dependency-consent, reference-checksum, WSL-path,
 corruption and output-boundary cases. Native engine/preflight compilation passed
 with the reference GCC and both standalone vasm 1.9d and SDK vasm 2.0f. The
 asset-free HDF passed filesystem/payload readback and booted to its notice in
 FS-UAE with a privately supplied ROM. All 7,197 reference data hashes matched.
 
-GitHub-hosted execution, fresh package installation on a clean machine, a full
-fresh scene conversion and Windows/WSL execution have not been performed. The first consolidation did not include gameplay changes. See RELEASE-v0.0.16.md
-for the subsequent tint/default changes and the current validation record.
+At that checkpoint, GitHub-hosted execution, a clean-machine package setup,
+a fresh full scene conversion and Windows/WSL execution had not been performed.
+The consolidation itself did not change gameplay. See [v0.0.16](RELEASE-v0.0.16.md)
+for the subsequent tint/default changes. Later Windows, Docker and hosted CI
+results are recorded separately; those early unperformed checks are historical.

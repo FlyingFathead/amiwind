@@ -15,12 +15,29 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
 
+class GuardTorchRenderContractTests(unittest.TestCase):
+    def test_world_flames_share_camera_depth_and_precede_hands_and_water_warp(self):
+        renderer=(Path(SOURCE)/'src/r_main.c').read_text()
+        start=renderer.index('AW_FogDraw();')
+        self.assertLess(start,renderer.index('AW_GuardTorchDraw();',start))
+        self.assertLess(renderer.index('AW_GuardTorchDraw();',start),renderer.index('R_DrawViewModel();',start))
+        self.assertLess(renderer.index('R_DrawViewModel();',start),renderer.index('D_WarpScreen ();',start))
+        self.assertNotIn('AW_GuardTorchDraw();',(Path(SOURCE)/'src/aw_torch.c').read_text())
+        self.assertNotIn('AW_GuardTorchDraw();',(Path(SOURCE)/'src/view.c').read_text())
+        entity_start=renderer.index('void R_DrawEntitiesOnList')
+        self.assertLess(renderer.index('AW_GuardTorchEntity(',entity_start),renderer.index('R_AliasCheckBBox',entity_start))
+
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_guard_torches_source_registry_cycle_pose_lights_and_depth(self):
+        self.compile_run('aga_guard_torch_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_guard_torch.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
     def test_torch_brush_rendering_with_leaf_and_collision_only_roots(self):
         self.compile_run('aga_torch_brush_test.c', [Path(SOURCE)/'src'/n for n in
-            ('r_main.c','r_light.c','r_surf.c','mathlib.c')],
+            ('r_main.c','r_light.c','r_surf.c','mathlib.c','aw_render_ranges.c')],
             cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_compiled_hand_rules_extinguish_torch_and_preserve_fist_attack(self):
@@ -45,8 +62,40 @@ class NativeSourceTests(unittest.TestCase):
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_exterior_background_uses_sky_with_infinite_depth_and_interior_resets(self):
-        self.compile_run('aga_background_test.c', [Path(SOURCE)/'src/d_edge.c'])
+        self.compile_run('aga_background_test.c', [Path(SOURCE)/'src/d_edge.c', Path(SOURCE)/'src/d_part.c'])
         self.compile_run('aga_sky_selection_test.c', [Path(SOURCE)/'src/r_sky.c'])
+        self.compile_run('aga_sky_depth_test.c', [Path(SOURCE)/'src/d_scan.c'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_daynight_sky_phases_toggle_midnight_and_interior_isolation(self):
+        self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_night_source_stars_are_one_native_pixel_behind_art_world_and_moons(self):
+        self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+            arguments=['10'])
+        self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+            arguments=['11'])
+
+    def test_owned_night_atlas_moons_occlusion_twinkle_and_corruption(self):
+        for mode in range(6,10):
+            with self.subTest(mode=mode):
+                self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+                    ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+                    cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+                    arguments=[str(mode)])
+
+    def test_sky_cloud_roles_palette_marker_and_procedural_particle_compatibility(self):
+        for mode in range(1,6):
+            with self.subTest(mode=mode):
+                self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+                    ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+                    cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+                    arguments=[str(mode)])
 
     def test_world_terrain_rebasing_and_bidirectional_town_crossings(self):
         self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
@@ -63,6 +112,20 @@ class NativeSourceTests(unittest.TestCase):
     def test_prefetch_byte_identity_cancellation_eviction_and_low_memory_fallback(self):
         self.compile_run('aga_stream_test.c', [Path(SOURCE)/'src/aw_stream.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_sprite_scale_frame_bounds_leaf_membership_and_legacy_messages(self):
+        self.compile_run('aga_sprite_scale_test.c', [Path(SOURCE)/'src'/n for n in ('r_sprite.c','r_efrag.c','model.c','cl_parse.c','mathlib.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_sprite_stream_matches_generic_pixels_groups_and_bounded_pack_member(self):
+        self.compile_run('aga_sprite_stream_test.c', [Path(SOURCE)/'src/model.c'],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_sprite_stream_dispatch_precedes_full_file_staging(self):
+        source=(Path(SOURCE)/'src/model.c').read_text(encoding='utf-8')
+        self.assertIn('#define AW_STREAM_SPRITES 1',source)
+        self.assertLess(source.index('if(Mod_TryStreamSprite(mod))return mod;'),
+                        source.index('COM_LoadStackFile (mod->name'))
 
     def test_optional_alias_budget_default_cap_and_invalid_settings(self):
         self.compile_run('aga_alias_budget_test.c', [Path(SOURCE)/'src/model.c'])
@@ -100,10 +163,12 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_wait_cancel_bounds_calendar_and_debug_time(self):
         self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_wait.c','aw_clock.c','aw_state.c')])
+            ('aw_wait.c','aw_clock.c','aw_state.c','view.c','r_sky.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_scenery_cannot_displace_late_npcs_from_visible_list(self):
-        self.compile_run('aga_visible_entities_test.c', [Path(SOURCE)/'src/r_efrag.c'])
+        self.compile_run('aga_visible_entities_test.c', [Path(SOURCE)/'src/r_efrag.c', Path(SOURCE)/'src/mathlib.c'],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_loading_services_music_without_clearing_dma_or_loading_sfx(self):
         self.compile_run('aga_loading_audio_test.c', [Path(SOURCE)/'src'/n for n in
@@ -146,6 +211,10 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_movie_stream_clock_skip_and_bounds(self):
         self.compile_run("aga_movie_test.c", [ROOT/"engine/aga/src/aw_movie.c"])
+
+    def test_alias_decode_preserves_hot_cache_with_real_allocator(self):
+        self.compile_run("aga_alias_residency_test.c", [Path(SOURCE)/"src/model.c", Path(SOURCE)/"src/mathlib.c"],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all", "-Wl,--wrap=malloc"])
 
     def test_alias_staging_is_released_before_cache_allocation(self):
         self.compile_run("aga_alias_cache_test.c", [Path(SOURCE)/"src/model.c",Path(SOURCE)/"src/mathlib.c"])
@@ -221,6 +290,12 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_scenery_above_edict_limit_and_rotated_collision(self):
         self.compile_run('aga_scenery_test.c', [Path(SOURCE)/'src/world.c', Path(SOURCE)/'src/mathlib.c'])
+
+    def test_entity_exhaustion_recovers_or_fails_as_configured(self):
+        self.compile_run('aga_entity_exhaustion_test.c', [Path(SOURCE)/'src/pr_edict.c'])
+
+    def test_dense_flora_signon_round_trip_at_buffer_capacity(self):
+        self.compile_run('aga_flora_signon_test.c', [Path(SOURCE)/'src'/n for n in ('net_loop.c','common.c')])
 
     def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=()):
         tree = Path(SOURCE).resolve()

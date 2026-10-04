@@ -145,9 +145,12 @@ def town_ground_triangles(grids):
     terrain.heights = np.asarray([g['heights'] for g in grids], dtype=float)
     terrain.materials = np.asarray([g['materials'] for g in grids], dtype=int)
     ox, oy = (v*SCALE for v in CENTRE)
+    def fine_port_patch(x, y):
+        return 0 <= x < 896 and 256 <= y < 1024
+
     for y in range(GROUND_BOUNDS[0][1], GROUND_BOUNDS[1][1], 128):
         for x in range(GROUND_BOUNDS[0][0], GROUND_BOUNDS[1][0], 128):
-            if 0 <= x < 896 and 256 <= y < 1024:
+            if fine_port_patch(x, y):
                 triangles = []
                 for yy in range(y, y+128, 32):
                     for xx in range(x, x+128, 32):
@@ -155,7 +158,11 @@ def town_ground_triangles(grids):
                                   for dx,dy in ((0,0),(32,0),(32,32),(0,32))]
                         triangles.extend([[points[i] for i in ids] for ids in ((0,1,2),(0,2,3))])
             else:
-                triangles = terrain_triangles(terrain, x+ox, y+oy)
+                neighbours = ((x, y-128), (x+128, y), (x, y+128), (x-128, y))
+                required_edges = {edge for edge, neighbour in enumerate(neighbours)
+                                  if fine_port_patch(*neighbour)}
+                triangles = terrain_triangles(terrain, x+ox, y+oy,
+                                              required_edge_samples=required_edges)
             for tri in triangles:
                 material = terrain.sample(*(sum(p[k] for p in tri)/3 for k in (0,1)))[1]
                 yield [[p[0]-ox,p[1]-oy,p[2]] for p in tri], material

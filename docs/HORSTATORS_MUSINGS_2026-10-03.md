@@ -153,3 +153,12 @@ disk."
 
 **A second HDF, at the moment, is just a temporary swap. We bring stuff in, we take
 it out. We optimize, we adjust, we adapt. That's life.**
+
+
+## Out of sight, still on the guest list
+
+Could emergency distance culling keep the game running when its entity pool fills? That is Horstator's hypothesis, not an implemented recovery feature. An unseen object may still hold up the floor, receive a script event, open a door or pursue the player. Hiding it does not release its gameplay slot; deleting it can change the world.
+
+Reclamation will matter increasingly as the project grows. But somebody must know what owns each allocation, who still references it and when it can safely leave. In this engine, freeing an entity slot does not release the preallocated entity pool or resident BSP and model memory. Slots, caches and heap allocations need their own accounting.
+
+A bounded system for genuinely optional effects, with explicit ownership and safe cleanup, is worth investigating. Count the pressure first, profile the lifetimes, then optimize. The emergency exit remains a mitigation, not a fix.

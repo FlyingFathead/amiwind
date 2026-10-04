@@ -3,6 +3,7 @@ import struct
 import sys
 import unittest
 import tempfile
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from amiga_fs import legacy_root, check_payload_names
@@ -27,8 +28,11 @@ class LegacyRootTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, '30 bytes'):
                 check_payload_names(directory)
             bad.unlink()
-            (directory/'DOORS-bmhlaalucouncil.txt').touch()
-            with self.assertRaisesRegex(ValueError, 'collision'):
+            # Model a foreign case-sensitive source inventory even when the
+            # host filesystem merges names differing only in case.
+            entries=[directory/'doors-bmhlaalucouncil.txt', directory/'DOORS-bmhlaalucouncil.txt']
+            with patch.object(Path, 'rglob', return_value=entries), \
+                 self.assertRaisesRegex(ValueError, 'collision'):
                 check_payload_names(directory)
 
     def test_modern_marker_is_rejected_until_normalized(self):

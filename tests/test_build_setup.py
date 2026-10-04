@@ -1,5 +1,6 @@
 """Dependency consent, input corruption, discovery and version boundaries."""
 import contextlib
+import errno
 import hashlib
 import io
 import json
@@ -23,6 +24,18 @@ from build_aga import check_quakec, validate_quakec
 from mwad import input_check
 from mwad.paths import ensure_external, installed_game_path, is_wsl
 from test_workflow import synthetic_install
+
+
+def symlink_or_skip(link, target, **kwargs):
+    """Retain real symlink coverage wherever the host permits creation."""
+    try:
+        link.symlink_to(target, **kwargs)
+    except NotImplementedError as exc:
+        raise unittest.SkipTest('Host does not support symlink creation: ' + str(exc))
+    except OSError as exc:
+        if getattr(exc, 'winerror', None) == 1314 or exc.errno in (errno.EACCES, errno.EPERM, errno.ENOTSUP):
+            raise unittest.SkipTest('Host cannot create test symlinks: ' + str(exc))
+        raise
 
 
 class BuildSetupTests(unittest.TestCase):
@@ -76,6 +89,7 @@ class BuildSetupTests(unittest.TestCase):
             self.assertEqual([item[0] for item in downloads], ['sdk', 'ericw', 'qcc'])
             self.assertEqual(list(Path(temp).iterdir()), [])
 
+    @unittest.skipUnless(os.name == 'posix', 'POSIX executable script integration')
     def test_relative_tool_probe_uses_absolute_path_after_chdir(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd(), prefix='probe space ') as temp:
             tool = Path(temp)/'version-tool'
@@ -86,6 +100,7 @@ class BuildSetupTests(unittest.TestCase):
             self.assertEqual(result['status'], 'matching')
             self.assertEqual(result['path'], str(tool))
 
+    @patch.object(build, 'host_name', lambda: 'linux')
     def test_sdk_flag_works_alone_and_preview_decline_do_not_install(self):
         with tempfile.TemporaryDirectory() as temp:
             for extra, answer in ((['--plan'], 'yes'), ([], 'no')):
@@ -100,7 +115,8 @@ class BuildSetupTests(unittest.TestCase):
 
     def test_qcc_discovery_honors_explicit_compiler_and_finds_fte(self):
         with tempfile.TemporaryDirectory() as temp:
-            tool = Path(temp)/'fteqcc'; tool.write_text('fixture'); tool.chmod(0o755)
+            tool = Path(temp)/('fteqcc.cmd' if os.name == 'nt' else 'fteqcc')
+            tool.write_text('fixture'); tool.chmod(0o755)
             args = build.parser().parse_args(['--tools-dir', temp])
             with patch.dict(os.environ, {'PATH':temp}):
                 self.assertEqual(build_versions.find_qcc(args), str(tool))
@@ -109,6 +125,7 @@ class BuildSetupTests(unittest.TestCase):
                 args.qcc = '/explicit/compiler'
                 self.assertEqual(build_versions.find_qcc(args), '/explicit/compiler')
 
+    @unittest.skipUnless(os.name == 'posix', 'POSIX executable script integration')
     def test_disk_tools_use_help_without_claiming_package_version(self):
         with tempfile.TemporaryDirectory() as temp:
             tool = Path(temp)/'xdftool'
@@ -154,7 +171,11 @@ class BuildSetupTests(unittest.TestCase):
                          f'from pathlib import Path; Path({str(run/"finished")!r}).write_text("built"); '
                          f'p=Path({str(run/"image"/f"AmiWind-v{build.VERSION}-dry-run.hdf")!r}); '
                          'p.parent.mkdir(); p.write_bytes(b"fixture output")'])]
-            with patch.object(setup_build, 'proposal', return_value=([[sys.executable, '-c', create_sdk]], [], [])), \
+            # The synthetic SDK is inspected, never executed as a host compiler.
+            def find_fixture(value):
+                return sys.executable if str(value) == 'make' else str(value) if Path(value).is_file() else None
+            with patch.object(build, 'find_executable', side_effect=find_fixture), \
+                 patch.object(setup_build, 'proposal', return_value=([[sys.executable, '-c', create_sdk]], [], [])), \
                  patch.object(build, 'dry_run_commands', side_effect=steps), \
                  patch.object(build_versions, 'report', return_value=[]), \
                  patch.object(build.importlib.util, 'find_spec', return_value=object()), \
@@ -171,9 +192,10 @@ class BuildSetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             args = build.parser().parse_args(['--tools-dir', temp])
             venv = Path(temp)/'venv'; (venv/'bin').mkdir(parents=True)
-            (venv/'pyvenv.cfg').write_text('fixture'); (venv/'bin/python').symlink_to(sys.executable)
+            (venv/'pyvenv.cfg').write_text('fixture'); symlink_or_skip(venv/'bin/python', sys.executable)
             argv = ['--autoinstall', '--data-files', '/a game folder', '--workspace', '/separate output']
-            with patch.dict(os.environ, {}, clear=True), patch.object(setup_build.os, 'execve') as restart, \
+            with patch.object(setup_build, 'venv_python', return_value=venv/'bin/python'), \
+                 patch.dict(os.environ, {}, clear=True), patch.object(setup_build.os, 'execve') as restart, \
                  contextlib.redirect_stdout(io.StringIO()):
                 setup_build.use_environment(args, argv)
             self.assertEqual(restart.call_args.args[0], str(venv/'bin/python'))
@@ -193,6 +215,7 @@ class BuildSetupTests(unittest.TestCase):
                 compile.assert_not_called()
             self.assertFalse((root/'installed').exists())
 
+    @patch.object(build, 'host_name', lambda: 'linux')
     def test_sdk_checks_decline_and_plans_do_not_download(self):
         with tempfile.TemporaryDirectory() as temp:
             for flags, answers in ((['--check'], ['']), (['--check'], ['install', 'no']),
@@ -235,6 +258,7 @@ class BuildSetupTests(unittest.TestCase):
                             build.select_sdk(args, True)
                         self.assertFalse((args.tools_dir/'sdk').exists())
 
+    @patch.object(build, 'host_name', lambda: 'linux')
     def test_sdk_discovery_preserves_explicit_path_and_existing_directories(self):
         with tempfile.TemporaryDirectory() as temp:
             args = build.parser().parse_args(['--tools-dir', temp])
@@ -255,6 +279,7 @@ class BuildSetupTests(unittest.TestCase):
             fetch.assert_not_called()
             self.assertTrue((sdk/'bin/vasmm68k_mot').is_file())
 
+    @patch.object(build, 'host_name', lambda: 'linux')
     def test_ctrl_c_at_sdk_prompt_exits_quietly(self):
         with tempfile.TemporaryDirectory() as temp:
             err = io.StringIO()
@@ -304,13 +329,17 @@ class BuildSetupTests(unittest.TestCase):
                 build.prerequisites(args)
             fingerprints.assert_not_called(); sdk.assert_not_called()
 
-    def test_subdirectory_search_has_limits_and_ignores_symlinks(self):
+    def test_subdirectory_search_ignores_symlinks(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)/'search'; root.mkdir()
             other = Path(temp)/'game'; synthetic_install(other)
-            (root/'linked').symlink_to(other, target_is_directory=True)
+            symlink_or_skip(root/'linked', other, target_is_directory=True)
             with self.assertRaisesRegex(ValueError, 'No folder containing'):
                 input_check.locate_data_files(root)
+
+    def test_subdirectory_search_has_limits(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)/'search'; root.mkdir()
             deep = root/'one/two/three'; deep.parent.mkdir(parents=True); synthetic_install(deep)
             with self.assertRaisesRegex(ValueError, 'within 1 levels'):
                 input_check.locate_data_files(root, max_depth=1)
@@ -324,7 +353,7 @@ class BuildSetupTests(unittest.TestCase):
                 args.plan = plan
                 with patch.object(install_dependencies, 'supported_host'), \
                      patch.object(install_dependencies, 'missing_packages', return_value=['ffmpeg']), \
-                     patch.object(install_dependencies.os, 'geteuid', return_value=0), \
+                     patch.object(install_dependencies.os, 'geteuid', return_value=0, create=True), \
                      patch.object(install_dependencies.subprocess, 'check_output', return_value='3.12'), \
                      patch.object(install_dependencies.subprocess, 'run') as run, \
                      contextlib.redirect_stdout(io.StringIO()):
@@ -336,6 +365,7 @@ class BuildSetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='amiwind tools ') as temp:
             args = build.parser().parse_args(['--install-dependencies', '--tools-dir', str(Path(temp)/'tools')])
             with patch.object(install_dependencies, 'supported_host'), \
+                 patch.object(install_dependencies.os, 'geteuid', return_value=0, create=True), \
                  patch.object(install_dependencies, 'missing_packages', return_value=[]), \
                  patch.object(install_dependencies.subprocess, 'check_output', return_value='3.12'), \
                  patch.object(install_dependencies.subprocess, 'run') as run, \
@@ -369,7 +399,8 @@ class BuildSetupTests(unittest.TestCase):
                 self.assertEqual(build_versions.probe('tool', str(tool), spec)['status'], 'unknown')
 
     def test_wsl_translation_preserves_spaces_and_is_not_a_shell(self):
-        with patch('mwad.paths.is_wsl', return_value=True), \
+        with patch('mwad.paths.sys.platform', 'linux'), \
+             patch('mwad.paths.is_wsl', return_value=True), \
              patch('mwad.paths.subprocess.check_output', return_value='/mnt/c/GOG Games/Morrowind\n') as command:
             value = installed_game_path(r'C:\GOG Games\Morrowind')
         self.assertEqual(value, Path('/mnt/c/GOG Games/Morrowind'))
@@ -405,11 +436,11 @@ class BuildSetupTests(unittest.TestCase):
             self.assertEqual(report['fingerprints']['different'],['morrowind.bsa'])
             self.assertTrue(report['errors'])
 
-    def test_transfer_archives_are_ignored_but_real_video_conflicts_still_fail(self):
+    def test_transfer_archives_are_ignored_and_real_video_is_recorded(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);data=root/'Data Files';synthetic_install(data)
             reference={p.name.casefold():{'bytes':p.stat().st_size,'sha256':input_check.digest(p)} for p in data.iterdir()}
-            for name in ('Morrowind_Video.zip','Morrowind_video.zip','backup.ZIP',
+            for name in ('Morrowind_Video.zip','video-backup.zip','backup.ZIP',
                          'Morrowind_fonts.zip','Morrowind_bookart.zip','Morrowind_icons.zip',
                          'Morrowind_meshes.zip','Morrowind_music.zip','Morrowind_sound.zip',
                          'Morrowind_splash.zip','Morrowind_textures.zip'):
@@ -423,9 +454,20 @@ class BuildSetupTests(unittest.TestCase):
             args=build.parser().parse_args(['--data-files',str(data)])
             source=root/'source';source.mkdir();(source/'VERSION').write_text('fixture')
             with patch.object(build,'ROOT',source):receipt=build.provenance(args,{})
-            self.assertIn('Video/mw_intro.bik',receipt['input_sha256'])
+            self.assertIn(str(Path('Video')/'mw_intro.bik'),receipt['input_sha256'])
             self.assertFalse(any(name.casefold().endswith('.zip') for name in receipt['input_sha256']))
+
+    def test_case_conflicting_transfer_archives_are_ignored_but_real_video_conflicts_fail(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp); data=root/'Data Files'; synthetic_install(data)
+            reference={p.name.casefold():{'bytes':p.stat().st_size,'sha256':input_check.digest(p)} for p in data.iterdir()}
+            for name in ('Morrowind_Video.zip', 'Morrowind_video.zip'):
+                (data/name).write_bytes(b'personal transfer archive')
+            video=data/'Video'; video.mkdir()
+            (video/'mw_intro.bik').write_bytes(b'real loose video fixture')
             (video/'MW_INTRO.BIK').write_bytes(b'conflicting actual video')
+            if len(list(video.iterdir())) != 2:
+                self.skipTest('Case-sensitive filesystem required for distinct case-colliding files')
             report=input_check.inspect(root,'terrain',reference=reference)
             self.assertTrue(any('video/mw_intro.bik' in error for error in report['errors']))
             self.assertFalse(any('zip' in error for error in report['errors']))
@@ -437,14 +479,16 @@ class BuildSetupTests(unittest.TestCase):
             report=input_check.inspect(data,'terrain',allow_differences=True,reference={})
             self.assertTrue(any('overruns' in e for e in report['errors']))
 
-    def test_default_output_is_allowed_but_source_and_symlink_escape_are_not(self):
+    def test_default_output_is_allowed_but_source_is_not(self):
         self.assertEqual(build.parser().parse_args([]).workspace,build.ROOT/'out')
         self.assertEqual(ensure_external(build.ROOT/'out/build/example'),build.ROOT/'out/build/example')
         with self.assertRaises(ValueError):ensure_external(build.ROOT/'src/private')
+
+    def test_symlink_output_escape_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             fake=Path(temp)/'amiwind';fake.mkdir()
             (fake/'pyproject.toml').write_text('[project]\nname = "amiwind"\n')
-            (fake/'out').symlink_to(build.ROOT/'src',target_is_directory=True)
+            symlink_or_skip(fake/'out', build.ROOT/'src', target_is_directory=True)
             with self.assertRaises(ValueError):ensure_external(fake/'out/private')
 
     def test_dry_run_rejects_game_path_and_builds_no_conversion_stages(self):

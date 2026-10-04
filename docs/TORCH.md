@@ -131,14 +131,100 @@ See the [bug journal](BUG_JOURNAL.md).
 
 ## Shared equipment asset and acceptance
 
-Guards should eventually use the same original `torch` identity, mesh, materials
-and emitter nodes, attached through each NPC's authored skeleton. The player
-camera transform is not part of equipment identity. Night schedules, equipping,
-unequipping, inventory and light budgets for multiple guards remain future work.
-This checkpoint does not implement NPC torch schedules.
+The current guard-torch work reuses this original equipment identity through
+each NPC's authored skeleton. Its controls, source rules and bounded lighting
+policy are described below. The player camera transform is not part of NPC
+equipment. Image015 passed bounded native guard-admission, boundary and visible-particle checks. The 2 MiB safety-reference comparison remains a reserve warning.
 
 Source tests, original-data conversion, host rendering and native compilation
 are separate from emulator acceptance. Before final release, replay F then V,
 V off/on, F lowering, a door crossing, a cave wall and camera turns. Check grip,
 flame alignment, absence of the old crash, cave brightness and performance.
 The recurring fist blink remains open until reproduced and corrected.
+
+
+## Guard torches and the clock — scoped native verification passed
+
+The current runtime adds clock-driven torches to the converted Imperial guards
+in Seyda Neen and Hlaalu guards in Balmora. It identifies the original `Guard` and
+`Ordinator Guard` classes, never guesses from a displayed name, and reuses the
+original carried-light mesh, third-person left-hand pose and flame texture.
+
+| Control | Default | Effect |
+| --- | --- | --- |
+| `guards_torch_cycle true` | true | Enable automatic guard torch use; archived in configuration |
+| `guards_torch_cycle false` | — | Disable automatic use while retaining the explicit debug override |
+| `dbg guardtorch on` | — | Force torches on for all supported, eligible guard render records, including those without a source inventory torch |
+| `dbg guardtorch off` | — | Force guard torches off |
+| `dbg guardtorch auto` | auto | Clear the session override and resume the configured automatic policy |
+
+The setting and on/off forms also accept `1/0` and `true/false`. The debug
+override is a session diagnostic, not saved inventory. It affects guard types,
+not arbitrary NPCs, and still requires valid converted companion assets.
+
+Automatic use reads the actual saved world clock: **before 06:00 or after
+20:00**, with exactly 06:00 and 20:00 excluded. It requires a validated exterior,
+an original carryable inventory light using `l/light_torch10.nif` (including
+`torch_infinite_time`), and no active enemy/combat field. No interior ambient or
+regional weather state is guessed. Manual `on` bypasses the clock, inventory
+and exterior requirements; corpse/dead and swimming exclusions still apply.
+Ordinary NPCs with a default health value of zero are not mistaken for corpses.
+Waiting, setting time and restoring a save use the same clock. The sky gallery's
+presentation clock does not advance this equipment schedule.
+
+### Original pose and bounded runtime cost
+
+The converter samples the third-person `base_anim` torch interval
+97.2–99.8667 seconds on the left-clavicle descendants while retaining the actor's
+idle/talk/blink/walk frames and female animation override. Attachment follows
+Shield Bone, the carried-light −90-degree X rotation and BoneOffset. It omits
+the player's four-unit camera offset. Separate held-body and held-torch models
+preserve the base NPC model, map geometry and collision bytes.
+
+`gfx/guard-torches.awg` is the bounded AWG1 registry, with at most 32 source/model
+records, companion paths, original frame layout, inventory eligibility and
+per-frame flame anchors. Content-addressed `progs/gt_b_<hash>.mdl` and
+`progs/gt_t_<hash>.mdl` contain the companions; `gfx/guard-torches.json` records
+conversion provenance. These generated game assets remain private.
+
+The current original-data conversion contains nine referenced source/model
+records, eight distinct held-body companions and five shared torch models.
+Three town guard identities have automatic inventory eligibility; the six
+opening-sequence records are available through the explicit override. One is
+the captain, whose original class is `Ordinator Guard`. Converted payloads total
+2,813,448 bytes excluding the JSON provenance manifest; the registry is 4,148
+bytes. These are disk figures, not resident RAM: companions load on demand.
+Eight focused converter tests passed. The combined source subsequently passed
+the full Windows and Linux Docker gates, including the Linux native guard fixture.
+Those host checks do not establish native Amiga appearance or cache cost. Image014 exposed the cold alias-cache failure. The model-cache correction passed focused host tests and finalization011 gates. Its fixture changed from 41 alias loads / 40 evictions to 2 loads / 1 eviction while the actor, body and held item remained resident. The estimator now case-folds source IDs but preserves model paths. One mixed-case Imperial map counts five placements instead of two (+352,144 B); the checked Hlaalu map is unchanged. Five focused ledger tests and the Linux Docker target-ABI gate passed. Image015 passed cold admission and boundary checks for both guard factions, with three eligible actors admitted and no skips or evictions.
+
+The runtime limits are 32 visible torch-bearing guards and the nearest
+two dynamic lights within 384 native units, with a clear emitter-to-camera trace.
+Flames use the normal depth test. Light is the existing monochrome surface
+illumination, not coloured global lighting or full shadow casting. Fixed runtime
+arrays avoid per-frame allocation, but first-use model-cache loading has a real
+memory cost. Conversion and focused source tests are separate from final native
+equipping, grip, transition, occlusion, frame-cost and cache-pressure acceptance;
+those combined checks remain pending.
+
+### Primary-source use rules
+
+[OpenMW weather.cpp](https://raw.githubusercontent.com/OpenMW/openmw/master/apps/openmw/mwworld/weather.cpp)
+uses a strict time comparison: before sunrise or after sunset plus its duration,
+and no precipitation. With the original settings of sunrise 06:00, sunset 18:00
+and two-hour sunset duration, this is before 06:00 or after 20:00. Exactly 06:00
+and 20:00 are outside that interval. Ash storm is excluded from precipitation
+by that implementation. AmiWind currently has no regional precipitation system;
+the present exterior scope follows those original clear-weather times.
+
+[OpenMW actors.cpp](https://raw.githubusercontent.com/OpenMW/openmw/master/apps/openmw/mwmechanics/actors.cpp)
+selects an equippable inventory light. Outside combat it takes precedence in the
+left slot; during combat a preferred shield wins. Daytime puts the light away
+and restores a preferred shield. Swimming extinguishes/removes a held light.
+The player's remaining light lifetime is decremented; NPC lifetime is not.
+
+[OpenMW worldimp.cpp](https://raw.githubusercontent.com/OpenMW/openmw/master/apps/openmw/mwworld/worldimp.cpp)
+uses a separate interior policy: no-sleep cells suppress automatic use, and
+otherwise the ambient RGB sum must be at most 201. That interior policy requires
+authored data; a dark screenshot is not sufficient evidence. The new exterior
+guard feature must not claim full inventory, combat, weather or interior parity.

@@ -63,9 +63,10 @@ Activation puts Python, xdftool and rdbtool from the environment on PATH. It is
 not necessary to install the AmiWind project into global Python. The shell
 launcher delegates the actual work to Python under tools/.
 
-Automatic host setup supports Ubuntu/Debian, including Ubuntu under WSL. Native
-Windows package provisioning is not implemented. Python must already exist to
-launch this checker. Ubuntu 22.04+ provides a sufficiently recent system Python.
+The Linux `--autoinstall` path supports Ubuntu/Debian, including Ubuntu under
+WSL. Native Windows has separate `setup-windows.cmd` / `setup-windows.ps1`
+provisioning around the shared pipeline; see the [Windows guide](WINDOWS_BUILD.md).
+Python must already exist to launch this Linux checker. Ubuntu 22.04+ provides a sufficiently recent system Python.
 The `--autoinstall` route handles ericw-tools and the reference qcc as well.
 With a new tools directory it creates a fresh venv even if another active Python
 environment already has the dependencies. It provisions managed map tools and

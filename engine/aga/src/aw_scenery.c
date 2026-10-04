@@ -13,12 +13,22 @@ typedef struct {
 static aw_scenery_t *placements;
 static int count,capacity;
 
+/* Only the validated 64-map Balmora layout shares the alias catalogue.
+ * Prefix matching would capture unrelated/scripted map entities silently. */
+static int AW_SceneryMapEnabled(const char *name)
+{
+    if(!strcmp(name,"balmora"))return 1;
+    if(strlen(name)!=5 || name[0]!='b' || name[1]!='m' || name[2]!='0' ||
+       name[3]<'0' || name[3]>'6' || name[4]<'0' || name[4]>'9')return 0;
+    return name[3]!='6' || name[4]<='3';
+}
+
 void AW_SceneryClear(void) { placements=NULL;count=capacity=0; }
 void AW_SceneryBegin(const char *entities)
 {
     const char *p=entities;
     AW_SceneryClear();
-    if(strcmp(sv.name,"balmora"))return;
+    if(!AW_SceneryMapEnabled(sv.name))return;
     while((p=strstr(p,"\"classname\" \"func_wall\""))!=NULL){capacity++;p++;}
     if(capacity>1000)Host_Error("Balmora scenery catalogue exceeds 1000 placements");
     if(capacity)placements=Hunk_AllocName(capacity*sizeof(*placements),"scenery");
@@ -26,7 +36,7 @@ void AW_SceneryBegin(const char *entities)
 int AW_SceneryCapture(edict_t *e)
 {
     aw_scenery_t *p;model_t *model;vec3_t forward,right,up,corner;float v;int i,j,k;
-    if(strcmp(sv.name,"balmora") || !e->v.classname ||
+    if(!AW_SceneryMapEnabled(sv.name) || !e->v.classname ||
        strcmp(pr_strings+e->v.classname,"func_wall"))return 0;
     if(count>=capacity)Host_Error("Balmora scenery catalogue count mismatch");
     p=&placements[count++];p->modelindex=SV_ModelIndex(pr_strings+e->v.model);
@@ -48,7 +58,7 @@ int AW_SceneryCapture(edict_t *e)
 void AW_SceneryLink(void)
 {
     int i;
-    if(!sv.active || strcmp(sv.name,"balmora"))return;
+    if(!sv.active || !AW_SceneryMapEnabled(sv.name))return;
     if(cl_numvisedicts+count>MAX_VISEDICTS)Host_Error("Balmora visible entity budget exceeded");
     for(i=0;i<count;i++)cl_visedicts[cl_numvisedicts++]=&placements[i].render;
 }

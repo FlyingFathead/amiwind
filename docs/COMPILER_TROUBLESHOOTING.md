@@ -10,13 +10,13 @@ implemented**. Existing tools and private controls below have different status.
 
 | Group | Options / questions | Current implementation status |
 | --- | --- | --- |
-| Visibility | Matched `fast` versus full VIS; exact decoded-row checks; codec baseline/candidate comparisons | Bounded builder uses fast VIS; isolated full-VIS control running; new codec not implemented |
+| Visibility | Matched `fast` versus full VIS; exact decoded-row checks; codec baseline/candidate comparisons | Bounded builder uses fast VIS; isolated full-VIS control stopped/checkpointed on 3 October, with comparison incomplete and resumption unverified; new codec not implemented |
 | Render cost | Matched position/view/build; requested and effective distance; frame time; tested/rejected/clipped/drawn geometry; separate fog pass from culling | Balmora owner observation remains unprofiled; counter collection/control required |
 | Allocation | Per-map ordered peak/resident/temporary allocations, used/free, mandatory reserve and growth margin | Target-ABI estimator and final-payload gate implemented |
-| Node roles | World-render reachability, inline point-collision reachability, shared nodes, avoidable duplicate representations | Separate counting audit under investigation; zero face count alone is insufficient |
+| Node roles | World-render reachability, inline point-collision reachability, shared nodes, avoidable duplicate representations | Node-role audit and loader representation change included in v0.0.27; host checks passed, target gameplay pending; zero face count alone is insufficient |
 | Retention | Explain why terrain, visibility, textures, model parts and actors remain: view, crossing, collision/traces, simulation or dependency | Required future resource ledger; not complete |
 | Loader paths | Loose BSP, pack-member offset, additional-HDF search route, streamed versus whole-file fallback | Source/host regressions exist; packaged target coverage pending |
-| Scope | One map, selected cells, affected neighbors, dense views, teleport/restart, save loading | Offline bounded/adaptive candidates exist; complete target suite pending |
+| Scope | One map, selected cells, affected neighbors, dense views, teleport/restart, save loading | Normal bounded town layouts and complete static map gates passed for v0.0.27; complete target suite pending |
 | Runtime telemetry | Outgoing/unload/BSP/actors/restore/first presentation/gameplay, cache events, zone fragmentation, external Fast/Chip blocks | Event-driven watcher implemented; target trace acceptance pending |
 | Cache conditions | Cold and warm paths, bounded read-ahead mode and prefix size | Explicit comparative target experiments required |
 | Negative cases | Truncated/malformed sections, incompatible region directories, index limits, stale engine/loader receipt | Focused host/build checks exist; extend with each new format/path |

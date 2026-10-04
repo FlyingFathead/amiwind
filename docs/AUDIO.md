@@ -1,5 +1,34 @@
 # Streamed music and speech
 
+## Current AGA candidate: music-only read-ahead, 4 October 2026
+
+The v0.0.28 candidate keeps four 8,192-frame stereo PCM source blocks
+(64 KiB total), up from two blocks (32 KiB). Refills remain bounded to
+one 4 KiB read per service call. `music_status` reports the block count,
+buffer bytes and queued frames; `music-profile.txt` records `buffer_blocks`
+and `buffer_bytes` after normal shutdown.
+
+The PCM queue adds 32,768 static bytes; the complete executable's allocation
+totals are recorded separately in the bug journal. The shared mixer schedule,
+DMA buffer, speech and guard voices are unchanged. A proposed increase of shared
+`_snd_mixahead` from 0.1 to 0.25 seconds was withdrawn, with the original mixer
+source restored before compilation.
+
+The synthetic player fixture verifies 30,000 prebuffered stereo frames without
+another file read or synchronous fill, alongside track/tail/history checks.
+Both full host suites and matching Amiga compiles pass. The owner initially
+reported 5/5 audio in the current WinUAE opening session, then immediately
+qualified that impression because audible trouble remained, mostly at load-ins
+and in heavy scenes. The later report supersedes the initial verdict:
+**the audible issue remains OPEN**. Publication proceeds with this known
+limitation; further audio investigation is deferred until after publication. Additional
+read-ahead is a functionally tested mitigation, not a verified cure or a proven
+hardware/backend diagnosis. The complete attempts, corrected test oracle,
+memory accounting and listening chronology are in
+[WIN-05](BUG_JOURNAL.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+
+## Earlier audio design and implementation records
+
 Both target machines have Paula's four 8-bit DMA audio channels. DMA playback
 buffers must be in Chip RAM. The storage driver, refill scheduling and any
 software mixing still consume resources; DMA does not perform disk streaming.

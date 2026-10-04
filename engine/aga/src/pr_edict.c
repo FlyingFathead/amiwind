@@ -39,6 +39,8 @@ ddef_t *ED_FieldAtOfs (int ofs);
 qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s);
 
 cvar_t	nomonsters = {"nomonsters", "0"};
+/* Recover to the console instead of exiting on gameplay entity exhaustion. */
+cvar_t aw_ent_count_exceed_soft_fail = {"aw_ent_count_exceed_soft_fail", "1", true};
 cvar_t	gamecfg = {"gamecfg", "0"};
 cvar_t	scratch1 = {"scratch1", "0"};
 cvar_t	scratch2 = {"scratch2", "0"};
@@ -101,8 +103,19 @@ edict_t *ED_Alloc (void)
 		}
 	}
 
-	if (i == MAX_EDICTS)
-		Sys_Error ("ED_Alloc: no free edicts");
+	if (i >= MAX_EDICTS)
+    {
+        if (aw_ent_count_exceed_soft_fail.value)
+        {
+            Con_Printf("WARNING: entity limit exceeded in %s: %ld/%ld live slots. "
+                       "Ending this session safely; AmiWind remains open.\n",
+                       sv.name, (long)sv.num_edicts, (long)MAX_EDICTS);
+            key_dest = key_console;
+            Host_Error("Entity limit exceeded in %s (%ld/%ld); no free edicts",
+                       sv.name, (long)sv.num_edicts, (long)MAX_EDICTS);
+        }
+        Sys_Error("ED_Alloc: no free edicts");
+    }
 
 	sv.num_edicts++;
 	e = EDICT_NUM(i);
@@ -1073,6 +1086,7 @@ void PR_Init (void)
 	Cmd_AddCommand ("edicts", ED_PrintEdicts);
 	Cmd_AddCommand ("edictcount", ED_Count);
 	Cmd_AddCommand ("profile", PR_Profile_f);
+	Cvar_RegisterVariable (&aw_ent_count_exceed_soft_fail);
 	Cvar_RegisterVariable (&nomonsters);
 	Cvar_RegisterVariable (&gamecfg);
 	Cvar_RegisterVariable (&scratch1);

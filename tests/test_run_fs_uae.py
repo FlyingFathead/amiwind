@@ -1,7 +1,9 @@
 """Emulator launch boundaries; synthetic files and a harmless stub executable."""
 import contextlib
+import errno
 import hashlib
 import io
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +16,18 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import build
 import run_fs_uae as runner
 import setup_build
+
+
+def symlink_or_skip(link, target, **kwargs):
+    """Retain real symlink coverage wherever the host permits creation."""
+    try:
+        link.symlink_to(target, **kwargs)
+    except NotImplementedError as exc:
+        raise unittest.SkipTest('Host does not support symlink creation: ' + str(exc))
+    except OSError as exc:
+        if getattr(exc, 'winerror', None) == 1314 or exc.errno in (errno.EACCES, errno.EPERM, errno.ENOTSUP):
+            raise unittest.SkipTest('Host cannot create test symlinks: ' + str(exc))
+        raise
 
 
 class FsUaeTests(unittest.TestCase):
@@ -118,13 +132,21 @@ class FsUaeTests(unittest.TestCase):
             self.assertEqual(selected, rom)
             self.assertIn('byte-identical', output.getvalue())
 
-    def test_directory_scan_skips_subdirectories_and_symlinks(self):
+    def test_directory_scan_skips_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             (directory / 'nested').mkdir()
             rom = directory / 'nested/owned.rom'
             rom.write_bytes(b'R' * (512 * 1024))
-            (directory / 'linked.rom').symlink_to(rom)
+            symlink_or_skip(directory / 'linked.rom', rom)
+            with patch.object(runner, 'REFERENCE_ROM_SHA256', runner.rom_sha256(rom)), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self.assertIsNone(runner.select_rom(directory))
+
+    def test_directory_scan_skips_subdirectories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp); (directory / 'nested').mkdir()
+            rom = directory / 'nested/owned.rom'; rom.write_bytes(b'R' * (512 * 1024))
             with patch.object(runner, 'REFERENCE_ROM_SHA256', runner.rom_sha256(rom)), \
                  contextlib.redirect_stdout(io.StringIO()):
                 self.assertIsNone(runner.select_rom(directory))
@@ -140,6 +162,7 @@ class FsUaeTests(unittest.TestCase):
             prompt.assert_not_called()
             self.assertEqual(selected, rom)
 
+    @unittest.skipUnless(os.name == 'posix', 'POSIX executable script integration')
     def test_launch_uses_documented_preset_and_preserves_space_paths(self):
         with tempfile.TemporaryDirectory(prefix='amiwind launch ') as tmp:
             base = Path(tmp)

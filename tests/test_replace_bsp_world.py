@@ -89,6 +89,19 @@ class ReplaceBspWorldTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'terminal contents'):
             replace_world(pack_lumps(source),base,PALETTE,PALETTE)
 
+    def test_generated_indexed_aliases_preserve_complete_pixels_and_uvs(self):
+        source=lumps(fixture(True));base=lumps(fixture())
+        for data in (source,base):
+            data[2][8:24]=b'surface99'+bytes(7)
+        base[2][-1]^=1
+        source=pack_lumps(source);base=pack_lumps(base)
+        with self.assertRaisesRegex(ValueError,'differing pixels'):
+            replace_world(source,base,PALETTE,PALETTE)
+        result,_=replace_world(source,base,PALETTE,PALETTE,allow_indexed_surface_aliases=True)
+        self.assertEqual(face_semantics(source,1),face_semantics(result,1))
+        self.assertEqual(face_semantics(base,0),face_semantics(result,0))
+        self.assertEqual(len(texture_blobs(lumps(result)[2])),2)
+
     def test_same_texture_name_with_different_pixels_is_rejected(self):
         source=fixture(True);base=lumps(fixture());base[2][-1]^=1
         with self.assertRaisesRegex(ValueError,'differing pixels'):

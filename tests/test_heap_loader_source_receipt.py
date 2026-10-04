@@ -43,6 +43,16 @@ class HeapLoaderSourceReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, r'stale.*src/zone\.h'):
                 build_aga.verify_heap_loader_source_receipt({'source_sha256': hashes}, source)
 
+    def test_static_link_limits_allocation_and_lifetime_reject_stale_receipts(self):
+        for relative in ('src/client.h', 'src/r_efrag.c', 'src/cl_main.c', 'src/host.c'):
+            with self.subTest(source=relative), tempfile.TemporaryDirectory() as temp:
+                source = Path(temp)
+                hashes = self.make_sources(source)
+                self.assertIn(relative, hashes)
+                (source / relative).write_text('changed static leaf-link policy', encoding='utf-8')
+                with self.assertRaisesRegex(ValueError, 'stale'):
+                    build_aga.verify_heap_loader_source_receipt({'source_sha256': hashes}, source)
+
     def test_map_audit_receipt_records_sources_and_runs_estimator(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

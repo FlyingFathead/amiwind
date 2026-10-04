@@ -58,7 +58,8 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
     mesh=append_meshes(base,out/'scene.bsp',cache/'scenery',palette,
                        centre=settings['centre'],jobs=threads,references=selected,
                        retain_dressing=True,collision_bounds=collision_coverage(entry,settings),
-                       collision_compiler=exe('qbsp'),collision_cache=out/'collision-cache')
+                       collision_compiler=exe('qbsp'),collision_cache=out/'collision-cache',
+                       map_identity=entry['name'],cell_identity=','.join(map(str,entry['cell'])) if entry.get('cell') else None,subcell_identity=entry['name'] if entry.get('subcell') is not None else None)
     if mesh['unique_models']>settings['model_budget']:
         raise ValueError('New region exceeds model budget')
     data=lumps((out/'scene.bsp').read_bytes())

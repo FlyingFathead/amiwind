@@ -41,6 +41,58 @@ vec3_t		r_emins, r_emaxs;
 
 entity_t	*r_addent;
 
+/* Keep the original BSS pool; dense maps add bounded low-Hunk pages only while
+ * linking static entities. Client resets reuse pages until the map Hunk dies. */
+typedef struct aw_efrag_page_s {
+    struct aw_efrag_page_s *next;
+    efrag_t links[AW_EFRAG_PAGE_LINKS];
+} aw_efrag_page_t;
+static aw_efrag_page_t *aw_efrag_pages;
+int aw_efrags_capacity = MAX_EFRAGS;
+
+static void R_ResetEfragBlock(efrag_t *links, int count, qboolean reuse)
+{
+    int i;
+    for (i=0; i<count; i++)
+        if (links[i].leaf) links[i].leaf->efrags = NULL;
+    memset(links, 0, count*sizeof(*links));
+    if (!reuse) return;
+    for (i=0; i<count-1; i++) links[i].entnext = &links[i+1];
+    links[count-1].entnext = cl.free_efrags;
+    cl.free_efrags = links;
+}
+
+void R_ClearEfrags(qboolean release_pages)
+{
+    aw_efrag_page_t *page;
+    cl.free_efrags = NULL;
+    cl.num_statics = 0;
+    lastlink = NULL;
+    r_addent = NULL;
+    r_pefragtopnode = NULL;
+    aw_efrags_used = 0;
+    aw_efrags_capacity = MAX_EFRAGS;
+    R_ResetEfragBlock(cl_efrags, MAX_EFRAGS, true);
+    for (page=aw_efrag_pages; page; page=page->next) {
+        R_ResetEfragBlock(page->links, AW_EFRAG_PAGE_LINKS, !release_pages);
+        if (!release_pages) aw_efrags_capacity += AW_EFRAG_PAGE_LINKS;
+    }
+    if (release_pages) aw_efrag_pages = NULL;
+    memset(cl_static_entities, 0, sizeof(cl_static_entities));
+}
+
+static void R_GrowEfrags(void)
+{
+    aw_efrag_page_t *page;
+    if (aw_efrags_capacity > AW_EFRAG_LIMIT-AW_EFRAG_PAGE_LINKS)
+        Host_Error("Static entity leaf-link limit exceeded (%d efrags)", AW_EFRAG_LIMIT);
+    page = Hunk_AllocName(sizeof(*page), "efrags");
+    page->next = aw_efrag_pages;
+    aw_efrag_pages = page;
+    R_ResetEfragBlock(page->links, AW_EFRAG_PAGE_LINKS, true);
+    aw_efrags_capacity += AW_EFRAG_PAGE_LINKS;
+}
+
 
 /*
 ================
@@ -114,8 +166,8 @@ void R_SplitEntityOnNode (mnode_t *node)
 		ef = cl.free_efrags;
 		if (!ef)
 		{
-			Con_Printf ("Too many efrags!\n");
-			return;		// no free fragments...
+            R_GrowEfrags();
+            ef = cl.free_efrags;
 		}
 		cl.free_efrags = cl.free_efrags->entnext;
 		aw_efrags_used++;
@@ -218,6 +270,7 @@ void R_AddEfrags (entity_t *ent)
 
 	r_addent = ent;
 
+	ent->efrag = NULL;
 	lastlink = &ent->efrag;
 	r_pefragtopnode = NULL;
 
@@ -225,8 +278,9 @@ void R_AddEfrags (entity_t *ent)
 
 	for (i=0 ; i<3 ; i++)
 	{
-		r_emins[i] = ent->origin[i] + entmodel->mins[i];
-		r_emaxs[i] = ent->origin[i] + entmodel->maxs[i];
+        float scale = R_SpriteEntityScale(ent);
+        r_emins[i] = ent->origin[i] + entmodel->mins[i] * scale;
+        r_emaxs[i] = ent->origin[i] + entmodel->maxs[i] * scale;
 	}
 
 	R_SplitEntityOnNode (cl.worldmodel->nodes);

@@ -14,6 +14,22 @@ int main(int argc,char **argv) {
     assert(argc==3);strcpy(com_gamedir,argv[1]);
     if(!strcmp(argv[2],"invalid")) {assert(CDAudio_Init()==-1);return 0;}
     assert(CDAudio_Init()==0);rng=42;
+    if(!strcmp(argv[2],"buffered")) {
+        unsigned long initial_reads;
+        assert(MUSIC_BLOCKS==4 && sizeof(blocks)==65536);
+        assert(open_track(11,"buffer-test"));
+        for(j=0;j<20;j++)CDAudio_Update();
+        assert(valid[0]==8192 && valid[1]==8192 && valid[2]==8192 && valid[3]==8192);
+        initial_reads=reads;assert(initial_reads==16);
+        /* Three full blocks plus the fourth tail play with no filesystem read. */
+        for(j=0;j<30000;j++){
+            memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);
+            assert(sample.left==((signed char)((j*3+11*17)%256))*256);
+            assert(sample.right==((signed char)((j*7+11*31)%256))*256);
+        }
+        assert(reads==initial_reads && sync_fills==0 && errors==0);
+        CDAudio_Shutdown();return 0;
+    }
     if(!strcmp(argv[2],"notifications")) {
         assert(track_notices==0);
         music_next();music_previous();music_mode();assert(track_notices==0);

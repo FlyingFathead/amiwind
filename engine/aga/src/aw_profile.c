@@ -46,7 +46,7 @@ void AW_ProfileFrame(void) {
 void AW_ProfileClose(void) {
     FILE *f;if(logfile){fclose(logfile);logfile=NULL;}if(stalls){fclose(stalls);stalls=NULL;}
     f=fopen("frame-profile.txt","w");
-    if(f)fprintf(f,"efrag_peak=%d\nefrag_capacity=%d\n",aw_efrags_peak,MAX_EFRAGS);
+    if(f)fprintf(f,"efrag_peak=%d\nefrag_capacity=%d\nefrag_limit=%d\n",aw_efrags_peak,aw_efrags_capacity,AW_EFRAG_LIMIT);
     if(f)fprintf(f,"surface_overflow_frames=%lu\nedge_overflow_frames=%lu\nmax_surfaces_seen=%d\nmax_edges_seen=%d\n",surface_overflow_frames,edge_overflow_frames,r_maxsurfsseen,r_maxedgesseen);
     if(f)fprintf(f,"audio_warmup_updates=%lu\naudio_warmup_missed_frames=%lu\n",audio_warmup,warmup_frames);
     if(f){fprintf(f,"frames=%d\nelapsed_ms=%ld\nworst_frame_us=%ld\nheap_used_bytes=%d\n",frames,(long)(sum*1000),(long)(worst*1000000),Hunk_LowMark()+Hunk_HighMark());fprintf(f,"audio_late_updates=%lu\nmissed_audio_frames=%lu\nfree_chip_bytes=%lu\nfree_fast_bytes=%lu\n",audio_late,missed_frames,AvailMem(MEMF_CHIP),AvailMem(MEMF_FAST));fprintf(f,"world_ms=%ld\nentities_ms=%ld\nc2p_ms=%ld\naudio_ms=%ld\n",(long)(stages[0]*1000),(long)(stages[1]*1000),(long)(stages[2]*1000),(long)(stages[3]*1000));fprintf(f,"hands_ms=%ld\nserver_ms=%ld\n",(long)(stages[4]*1000),(long)(stages[5]*1000));fclose(f);}

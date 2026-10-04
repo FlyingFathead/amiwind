@@ -1,7 +1,7 @@
 # Windows build entry points and WSL notes
 
 **Linux is the established build baseline. Native Windows 11 building is
-experimental.** A complete current-recipe conversion and verified HDF, followed by WinUAE game
+experimental.** A complete conversion of the then-current recipe and verified HDF, followed by WinUAE game
 entry, passed on 2 October 2026 after correcting/retrying image assembly.
 See [the validation record](VALIDATION-WINDOWS-2026-10-02.md) for scope and timing.
 Intermittent Python worker failures remain open; this success does not establish
@@ -247,23 +247,26 @@ Windows SDK compile, full game conversion or emulator boot.
 
 ## Preferred direction: native Windows/MSYS2
 
-The Windows roadmap prioritizes native Windows/MSYS2 tooling around the shared
-Python builder. Compiler, dependency and path integration still need validation.
+The native Windows/MSYS2 route uses the shared Python builder. Its dependency
+setup, Amiga compilation, full conversion and recovered image/game-entry checks
+passed at the dated checkpoint above; intermittent reliability limits remain.
 For an initial read-only inventory, run `py -3 tools\build.py --host-plan`.
 The inventory does not install dependencies or certify a working build.
 
 WSL2 is an optional fallback if native Windows compilation proves troublesome.
-This priority supersedes the rc5 proposal to try WSL2 first. Neither route has
-an AmiWind performance measurement or a verified complete build.
+The earlier rc5 proposal to try WSL2 first is historical. Native Windows and
+Docker on WSL2 have separate full-build evidence; neither result is a complete
+performance characterization or proof of reliable operation for every recipe.
 
 ## Fallback: Ubuntu under WSL2
 
 Use these trial notes only when evaluating that fallback. WSL2 Ubuntu can reuse
 the existing Linux dependencies and build recipes.
-The notes below describe how to try the Linux builder inside WSL2. A complete
-Windows/WSL build has not been validated. Linux validation is recorded per
-checkpoint; see the [current release notes](RELEASE-v0.0.25-rc6.md) for its completed
-stages and remaining limitations.
+The notes below describe the separate Ubuntu-under-WSL2 route; a complete
+full-game run through this specific route is not recorded here. Docker Desktop
+with its WSL2 backend has completed a full conversion, as recorded in
+[Docker validation](VALIDATION-DOCKER-2026-10-02.md). See the
+[current release notes](RELEASE-v0.0.27.md) for later source/CI evidence and limits.
 
 1. Install Ubuntu using [Microsoft's WSL guide](https://learn.microsoft.com/windows/wsl/install).
    Choose a named distribution with `wsl --list --online`. For an Ubuntu 24.04
@@ -316,7 +319,7 @@ Memory, CPU and swap settings affect all WSL2 distributions. If
 restarting with `wsl --shutdown`, finish all WSL work first: it stops every
 running distribution. Use `free -h`, `nproc` and `df -h` inside Ubuntu, and also
 check free space on the Windows volume holding the distro's virtual disk.
-The [roadmap](WINDOWS_BUILD_ROADMAP.md#fallback-only-wsl2-ubuntu)
+The [roadmap](WINDOWS_BUILD_ROADMAP.md)
 records the fallback conditions and remaining acceptance work.
 
 From the source directory inside Ubuntu, first try a new asset-free run:
@@ -339,12 +342,14 @@ separate checkpoint; Windows FS-UAE autorun is not implemented by these commands
 
 ## Run the result on Windows
 
-Install [WinUAE](https://www.winuae.net/) and use the
-[v0.0.25-rc6 WinUAE template](../resources/emulators/AmiWind-v0.0.25-rc6-WinUAE.uae)
-with the [WinUAE setup guide](WINUAE.md). Copy the completed HDF from WSL to a
-Windows folder, select that HDF and your own **A1200 Kickstart 3.1 ROM**, and
-save the configuration. The template includes the accelerated AGA/68040/FPU
-settings. Compilation itself needs no ROM.
+Install [WinUAE](https://www.winuae.net/) and prefer the matching configuration
+generated beside your images; it lists every required HDF. For manual setup,
+use the [v0.0.27 template](../resources/emulators/AmiWind-v0.0.27-WinUAE.uae)
+with the [WinUAE guide](WINUAE.md). If moving a WSL build to Windows, keep
+`build.json` and all listed HDFs together, then regenerate or update their host
+paths. Select your own **A1200 Kickstart 3.1 ROM** and save the private
+configuration. The template includes the accelerated AGA/68040/FPU settings.
+Compilation itself needs no ROM.
 
 Alternatively, if Linux FS-UAE and GUI support work in your WSL installation,
 you can request automatic configuration and launch:
@@ -398,7 +403,7 @@ Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction Stop |
 Write-Host "Saved: $report"
 ```
 
-### Full conversion passed; image packing needs bounded Windows commands
+### Historical WinError 206: bounded Windows image commands implemented
 
 An instrumented v0.0.25 Windows-port run passed all pre-image stages, including
 the complete gallery and all 2,526 terrain regions. It then failed at image

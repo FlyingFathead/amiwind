@@ -60,6 +60,15 @@ def annotate(maps, master):
     return report
 
 
+def contact_interval_choice(low, high, preferred):
+    """Keep a numerical inset without discarding a narrow feasible sole interval."""
+    import math
+    if not all(math.isfinite(v) for v in (low, high, preferred)) or low > high:
+        return None
+    inset = min(.02, (high-low)/4)
+    return min(high-inset, max(low+inset, preferred))
+
+
 def bake_ground(maps):
     """Fit rendered idle soles to converted support, preserving authored inputs.
 
@@ -160,11 +169,11 @@ def bake_ground(maps):
             for local in samples:
                 hit=s.floor([candidate[0]+local[0],candidate[1]+local[1],support['height']+local[2]+8],24)
                 if hit['status']!='supported':low=math.inf;break
-                low=max(low,hit['height']-local[2]-.48)
-                high=min(high,hit['height']-local[2]+.98)
+                low=max(low,hit['height']-local[2]-.5)
+                high=min(high,hit['height']-local[2]+1.0)
                 if low>high:break
             if low>high:continue
-            candidate[2]=min(high,max(low,original[2]))
+            candidate[2]=contact_interval_choice(low,high,original[2])
             candidate=[round(v,5) for v in candidate]
             if not contact(s,candidate,samples) or not path_clear(s,original,candidate,center['height']):continue
             result.update(placed_origin=candidate,placed_z=candidate[2],mesh_contact='fitted',attempts=attempt,

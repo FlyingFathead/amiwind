@@ -66,6 +66,49 @@ qboolean AW_PlacePlayer(edict_t *p, vec3_t preferred)
     return true;
 }
 
+/* Debug-map arrival over water uses the actual contents boundary in this local
+ * BSP frame, never an assumed global z=0. Leave movement/state unchanged if the
+ * surface or the complete standing hull cannot be checked. */
+static qboolean map_water_surface(edict_t *p,vec3_t top,vec3_t point)
+{
+    vec3_t probe;trace_t t;float low,high,middle;int contents,i;
+    VectorCopy(point,probe);probe[2]+=p->v.mins[2];
+    contents=SV_PointContents(probe);
+    if(contents==CONTENTS_EMPTY)return true;
+    if(contents!=CONTENTS_WATER)return false;
+    low=probe[2];high=top[2]+p->v.mins[2];probe[2]=high;
+    if(high<=low || SV_PointContents(probe)!=CONTENTS_EMPTY)return false;
+    for(i=0;i<20;i++) {
+        middle=(low+high)*.5f;
+        if(middle==low || middle==high)break;
+        probe[2]=middle;contents=SV_PointContents(probe);
+        if(contents==CONTENTS_WATER)low=middle;
+        else if(contents==CONTENTS_EMPTY)high=middle;
+        else return false;
+    }
+    point[2]=high-p->v.mins[2]+.25f;
+    if(!isfinite(point[2]))return false;
+    t=SV_Move(point,p->v.mins,p->v.maxs,point,MOVE_NORMAL,p);
+    probe[2]=point[2]+p->v.mins[2];
+    return !t.startsolid && !t.allsolid && SV_PointContents(probe)==CONTENTS_EMPTY;
+}
+
+/* Render bounds include the solid ceiling shell; subtracting the player's
+ * head height alone can leave the trace seed inside that shell. Find a clear
+ * standing-hull seed at the SAME XY, within a bounded 128-unit band. A solid
+ * column fails closed; this never relaxes the floor/clearance acceptance. */
+static qboolean map_clear_start(edict_t *p,vec3_t top,vec3_t bottom)
+{
+    trace_t trace;float initial=top[2];int step;
+    for(step=0;step<=32;step++){
+        top[2]=initial-step*4;
+        if(top[2]<=bottom[2])return false;
+        trace=SV_Move(top,p->v.mins,p->v.maxs,top,MOVE_NORMAL,p);
+        if(!trace.startsolid && !trace.allsolid)return true;
+    }
+    return false;
+}
+
 /* Explicit debug-map arrival: keep the chosen XY, find the highest walkable
  * surface below the scene ceiling, and test the complete standing hull. A failed
  * request must not install unchecked coordinates. */
@@ -80,7 +123,8 @@ qboolean AW_MapPlace(edict_t *p,const float *xy)
     if(top[2]>3990)top[2]=3990;
     if(bottom[2]<-3990)bottom[2]=-3990;
     if(!isfinite(top[2]) || !isfinite(bottom[2]) || top[2]<=bottom[2] ||
-       !floor_at(p,top,bottom,point))return false;
+       !map_clear_start(p,top,bottom) || !floor_at(p,top,bottom,point) ||
+       !map_water_surface(p,top,point))return false;
     VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);
     VectorCopy(vec3_origin,p->v.velocity);
     p->v.flags=(int)p->v.flags & ~FL_ONGROUND;SV_LinkEdict(p,false);

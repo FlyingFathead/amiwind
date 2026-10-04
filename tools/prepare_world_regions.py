@@ -76,6 +76,44 @@ def digest(path):
         return hashlib.file_digest(f, 'sha256').hexdigest()
 
 
+
+def refine_entries(entries, refinements):
+    """Keep existing map indices; replace a parent slot and append its siblings.
+
+    Cores tile the same global area. Coverage retains the full original apron;
+    source scenery is selected again by full transformed bounds, never clipped
+    out of the census. Original survey and completed output stay immutable.
+    """
+    import copy
+    result=copy.deepcopy(entries)
+    if [e['name'] for e in result] != [f'vf{i:04d}' for i in range(len(result))]:
+        raise ValueError('Refinement requires sequential world map indices')
+    for rule in refinements:
+        matches=[i for i,e in enumerate(result) if e['cell']==rule['cell']]
+        if not matches:continue  # Synthetic surveys can omit this source cell.
+        if len(matches)!=1:raise ValueError('Refinement parent must be an unsplit cell')
+        slot=matches[0];parent=result[slot]
+        if parent['name']!=rule['parent'] or parent['divisions']!=1:
+            raise ValueError('Refinement parent differs from measured layout')
+        n=rule['divisions']
+        if n not in (2,4,8):raise ValueError('Invalid refinement divisions')
+        size=2048//n;children=[]
+        for y in range(n):
+            for x in range(n):
+                child=copy.deepcopy(parent)
+                for field in ('converted','input_sha256','storage'):child.pop(field,None)
+                child.update(name=parent['name'] if not children else f'vf{len(result)+len(children)-1:04d}',
+                    divisions=n,subcell=[x,y],
+                    origin=[parent['origin'][0]-1024+size*(x+.5),parent['origin'][1]-1024+size*(y+.5),parent['origin'][2]],
+                    core=[[-size//2,-size//2],[size//2,size//2]],
+                    coverage=[[-size//2-OVERLAP,-size//2-OVERLAP],[size//2+OVERLAP,size//2+OVERLAP]],
+                    refinement={'parent':parent['name'],'reason':rule['reason'],
+                                'source_content_policy':'original membership; unchanged mesh profiles and collision; no reserve reduction'})
+                children.append(child)
+        result[slot]=children[0];result.extend(children[1:])
+    if len(result)>8192:raise ValueError('World directory exceeds bounded runtime capacity')
+    return result
+
 def plan(survey):
     report = json.loads((survey / 'world-survey.json').read_text())
     if report['format'] != 'AmiWind world survey 1' or report['terrain']['height_seams']:
@@ -100,7 +138,8 @@ def plan(survey):
                     geometry_screen=cell['screen']))
     if len(entries) > 8192:
         raise ValueError('World directory exceeds bounded runtime capacity')
-    return report, entries
+    refinements=json.loads((Path(__file__).resolve().parents[1]/'config/world-region-refinements.json').read_text(encoding='utf-8'))
+    return report, refine_entries(entries,refinements['regions'])
 
 
 class Terrain:
@@ -152,17 +191,23 @@ class Terrain:
         return False
 
 
-def terrain_triangles(terrain, x, y):
-    """Insert only shoreline samples that change wet/dry classification.
+def terrain_triangles(terrain, x, y, required_edge_samples=()):
+    """Insert shoreline samples and required coarse/fine boundary samples.
+
+    Required edges are south (0), east (1), north (2), and west (3).
+    Their original intermediate heights are kept even on entirely dry ground.
 
     Shared edges are decided solely from their original heights, independently
     of either tile's interior. This keeps neighbouring and overlapping meshes
     watertight without uniformly multiplying the BSP/collision workload.
     """
+    required_edge_samples = frozenset(required_edge_samples)
+    if any(type(edge) is not int or edge not in range(4) for edge in required_edge_samples):
+        raise ValueError("Required terrain edges must be integers from 0 through 3")
     point = lambda xx, yy: [xx, yy, terrain.sample(xx, yy)[0]]
     corners = [point(x+dx, y+dy) for dx, dy in ((0,0),(STEP,0),(STEP,STEP),(0,STEP))]
     triangles = [[corners[i] for i in ids] for ids in ((0,1,2),(0,2,3))]
-    if not terrain.shoreline_detail(x, y):
+    if not required_edge_samples and not terrain.shoreline_detail(x, y):
         yield from triangles
         return
 
@@ -192,7 +237,7 @@ def terrain_triangles(terrain, x, y):
     for i in range(4):
         a, b = corners[i], corners[(i+1)%4]
         edge = [point(a[0]+(b[0]-a[0])*j/4, a[1]+(b[1]-a[1])*j/4) for j in (1,2,3)]
-        if any((p[2]>=0)!=(a[2]+(b[2]-a[2])*j/4>=0) for j,p in enumerate(edge,1)):
+        if i in required_edge_samples or any((p[2]>=0)!=(a[2]+(b[2]-a[2])*j/4>=0) for j,p in enumerate(edge,1)):
             for p in edge:
                 insert(p)
     pending = [point(x+dx,y+dy) for dy in (32,64,96) for dx in (32,64,96)]

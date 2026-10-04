@@ -13,6 +13,7 @@ from mwad.scene import read_asset, unpack_geometry
 from scenery_selection import select_runtime_refs
 from static_lod import reduce_mesh, rock_profile
 from prepare_scenery import reference_rotation
+from exterior_visibility import apply_exterior_selection, VisibilityPolicyError
 
 
 def bounded_planes(points, equations):
@@ -57,7 +58,14 @@ def _prepare_model(task):
     name = m['source']
     with Path(archive_path).open('rb') as archive:
         vv,ff,_=unpack_geometry(read_asset(archive,m));v=np.array(vv);f=np.array(ff)
-        lod={};visual_v,visual_f=v,f
+        visual_f=apply_exterior_selection(f,m)
+        lod={};visual_v=v
+        if m.get('exterior_visibility'):
+         lod['exterior_visibility']={'source_triangles':len(f),'visible_triangles':len(visual_f),
+                                    'excluded_triangles':len(f)-len(visual_f),
+                                    'collision':'original input unchanged'}
+        if len(visual_f)!=len(f) and profile.get('flatten'):
+         raise VisibilityPolicyError('Combine flattening and source exclusions only after explicit pipeline validation')
         if profile.get('ratio'):
          prefixes=profile.get('preserve_shape_prefixes',[])
          matched={prefix:[i for i,mat in enumerate(m['materials'])
@@ -65,7 +73,8 @@ def _prepare_model(task):
                   for prefix in prefixes}
          if any(not values for values in matched.values()):raise ValueError('Missing preserved structural shape in '+name)
          keep={i for values in matched.values() for i in values}
-         visual_v,visual_f,lod=reduce_mesh(v,f,profile['ratio'],keep,profile.get('preserve_shared_seams',False))
+         visual_v,visual_f,details=reduce_mesh(v,visual_f,profile['ratio'],keep,profile.get('preserve_shared_seams',False))
+         lod.update(details)
         if profile.get('flatten'):
          from surface_flatten import bake_panel
          texture_records=extras[0]
@@ -81,10 +90,16 @@ def _prepare_model(task):
          cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
          collision_v,collision_f=np.array(cv),np.array(cf)
          lod['collision']='authored RootCollisionNode, approximate convex conversion'
-        pieces=(shell_collision_parts(collision_v,collision_f) if profile.get("hollow_collision") else collision_parts(collision_v,collision_f,2))
+        pieces=[] if profile.get("collision_none") else (shell_collision_parts(collision_v,collision_f) if profile.get("hollow_collision") else collision_parts(collision_v,collision_f,2))
+        if profile.get("collision_none"):lod["collision"] = "explicit nonsolid source/category policy"
         if profile.get('exact_collision_bevels'):
          lod['collision_bevels'] = 'exact standing-box convex sum'
-    polys = surface_polygons(visual_v, visual_f)
+    if profile.get('collision_only'):
+        # Sprite foliage retains source collision without a duplicate visible mesh.
+        polys = []
+        lod['representation'] = 'collision_only'
+    else:
+        polys = surface_polygons(visual_v, visual_f)
     texsize = profile.get('texture_size', 64)
     if texsize not in (16, 32, 64):
         raise ValueError('Unsupported static texture size')
@@ -152,20 +167,35 @@ def order_face_planes(lumps, face_planes):
 
 
 def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs=None,
-                  references=None, prepared_models=None, retain_dressing=False, collision_bounds=None, collision_compiler=None, collision_cache=None):
+                  references=None, prepared_models=None, retain_dressing=False, collision_bounds=None, collision_compiler=None, collision_cache=None, terrain_visual_cull=None, terrain_cull_config=None,
+                  map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None, legacy_terrain_preview=False):
     with (scenery/'scenery.mwpak').open('rb') as archive:
         return _append_meshes(src, out, scenery, palette, archive, centre, lighting,
                               jobs, references, prepared_models, retain_dressing,
-                              collision_bounds, collision_compiler, collision_cache)
+                              collision_bounds, collision_compiler, collision_cache, terrain_visual_cull,
+                              terrain_cull_config, map_identity, cell_identity, subcell_identity, terrain_cull_overlap, legacy_terrain_preview)
 
 
 def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
                    references, prepared_models, retain_dressing, collision_bounds,
-                   collision_compiler, collision_cache):
+                   collision_compiler, collision_cache, terrain_visual_cull, terrain_cull_config,
+                   map_identity, cell_identity, subcell_identity, terrain_cull_overlap, legacy_terrain_preview):
     b=src.read_bytes();assert struct.unpack_from('<i',b)[0]==29
     lumps=[bytearray(b[o:o+s]) for o,s in [struct.unpack_from('<ii',b,4+k*8) for k in range(15)]]
     face_planes=[struct.unpack_from('<H',lumps[7],i)[0] for i in range(0,len(lumps[7]),20)]
     index=json.loads((scenery/'scenery-index.json').read_text())
+    from terrain_visual_cull import ground_from_bsp, resolve_policy, cull_surfaces
+    config_path=Path(__file__).resolve().parents[1]/'config/terrain-visual-cull.json'
+    if terrain_cull_config is None:
+        terrain_cull_config=json.loads(config_path.read_text(encoding='utf-8')) if config_path.exists() else {}
+    identity=map_identity or (out.parent.name if out.name=='scene.bsp' else out.stem)
+    cull_policy=resolve_policy(terrain_cull_config,map_identity=identity,
+                             cell_identity=cell_identity or index.get('cell'),
+                             subcell_identity=subcell_identity,force=terrain_visual_cull,overlap_force=terrain_cull_overlap)
+    # Production assembly stays unculled. Authoritative direct LAND processing
+    # runs last, after every terrain/building/scenery component is present.
+    terrain,terrain_receipt=ground_from_bsp(b,overlap=cull_policy['overlap']) if legacy_terrain_preview and cull_policy['enabled'] and 'cell' not in index else (None,{'stage':'deferred final canonical pass','unculled_seed_preserved':True})
+    cull_reports=[]
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
     texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[]
@@ -278,6 +308,11 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     mount_references(index,selected,models,centre,SCALE)
     from visual_offsets import apply_visual_offsets, visual_key
     apply_visual_offsets(index,selected)
+    placement_groups={}
+    for ref in selected:
+        key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
+        origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
+        placement_groups.setdefault(key,[]).append((origin,-ref['rotation_radians'][2]*180/math.pi))
     def placement_tasks():
      seen=set()
      for ref in selected:
@@ -311,6 +346,9 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
         instance_models[variant]=len(lumps[14])//64;lumps[14]+=header
        entities.append(entity(instance_models[variant],origin,yaw,ref['number']));continue
       surfaces,worldparts,lo,hi=next(placements);part_cache[key]=worldparts
+      if terrain is not None and terrain.prisms:
+       surfaces,cull_counts=cull_surfaces(surfaces,terrain,placement_groups[key])
+       cull_reports.append({'model':name,'reference':ref['number'],**cull_counts})
       subset=resident_parts(worldparts,ref);variant=(key,subset)
       firstface=len(lumps[7])//20;vmap={};emap={}
       def vertex(p):
@@ -356,6 +394,11 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
      data+=bytes((-len(data))%4);struct.pack_into('<ii',header,4+8*k,124+len(data),len(lump));data+=lump
     out.write_bytes(header+data)
     result={'models':report,'selection':selection_report,
+            'terrain_visual_cull':{'policy':cull_policy,'terrain':terrain_receipt,'models':cull_reports,
+                                  'collision':'unchanged original components and hull generation',
+                                  'shared_geometry':'unculled assembly; final canonical pass owns placement variants',
+                                  'legacy_preview':bool(legacy_terrain_preview),
+                                  'acceptance':'Legacy preview is not canonical production acceptance' if legacy_terrain_preview else 'Deferred to final canonical source pass'},
             'collision_compiler_fallbacks':collision_fallbacks,
             'groups':index.get('groups',{}),
             'faces':len(lumps[7])//20,'vertices':len(lumps[3])//12,
@@ -369,7 +412,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 
-def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
+def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None):
     scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
     scenery=ensure_external(scenery,'scenery input')
     shutil.copytree(scene,out)
@@ -386,7 +429,7 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
         subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable!=qbsp else []),*options,target],cwd=out,check=True)
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
     rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True)
-    result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs)
+    result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs,terrain_visual_cull=terrain_visual_cull,terrain_cull_config=terrain_cull_config,map_identity=map_identity,cell_identity=cell_identity,subcell_identity=subcell_identity,terrain_cull_overlap=terrain_cull_overlap)
     shutil.copyfile(out/'seyda.bsp',out/'id1/maps/seyda.bsp')
     result['format']='AmiWind compiled mesh BSP29'
     result['standing_hull_profile']=PROFILE
@@ -398,8 +441,14 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ['scene','out','scenery','qbsp','vis','light']:p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--terrain-visual-cull',choices=('true','false'),default=None)
+    p.add_argument('--terrain-cull-config',type=Path)
+    p.add_argument('--terrain-cull-overlap',type=float)
+    p.add_argument('--map-identity')
+    p.add_argument('--cell-identity')
+    p.add_argument('--subcell-identity')
     add_jobs(p);a=p.parse_args()
-    try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs),indent=2))
+    try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs,None if a.terrain_visual_cull is None else a.terrain_visual_cull=='true',json.loads(a.terrain_cull_config.read_text(encoding='utf-8')) if a.terrain_cull_config else None,a.map_identity,a.cell_identity,a.subcell_identity,a.terrain_cull_overlap),indent=2))
     except (OSError,ValueError,subprocess.CalledProcessError) as e:p.exit(1,str(e)+'\n')
 
 if __name__=='__main__':main()

@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -172,7 +172,7 @@ void Turbulent8 (espan_t *pspan)
 	fixed16_t		snext, tnext;
 	float			sdivz, tdivz, zi, z, du, dv, spancountminus1;
 	float			sdivz16stepu, tdivz16stepu, zi16stepu;
-	
+
 	r_turb_turb = r_turb_sintable;
 
 	r_turb_sstep = 0;	// keep compiler happy
@@ -758,16 +758,16 @@ D_DrawZSpans
 */
 void D_DrawZSpans (espan_t *pspan)
 {
-	int				count, doublecount, izistep;
-	int				izi;
+	int				count, doublecount;unsigned int izistep;
+	unsigned int izi;
 	short			*pdest;
 	unsigned		ltemp;
-	double			zi;
+	double zi,endzi;
 	float			du, dv;
 
 // FIXME: check for clamping/range problems
 // we count on FP exceptions being turned off to avoid range problems
-	izistep = (int)(d_zistepu * 0x8000 * 0x10000);
+	izistep = 0;
 
 	do
 	{
@@ -781,7 +781,18 @@ void D_DrawZSpans (espan_t *pspan)
 
 		zi = d_ziorigin + dv*d_zistepv + du*d_zistepu;
 	// we count on FP exceptions being turned off to avoid range problems
-		izi = (int)(zi * 0x8000 * 0x10000);
+        /* Reserve negative depth values for renderer classifications. Keep the
+         * ordinary fast fixed-point loop; clamp only near/invalid crossing spans. */
+        endzi=zi+(count-1)*(double)d_zistepu;
+        if(!(zi>=0 && zi<=32767.0/32768 && endzi>=0 && endzi<=32767.0/32768)){
+            while(count-->0){
+                *pdest++=!(zi>0)?0:zi>=32767.0/32768?32767:(short)(zi*32768);
+                zi+=d_zistepu;
+            }
+            continue;
+        }
+        izistep=count>1?(unsigned int)(int)(d_zistepu*2147483648.0):0;
+        izi=(unsigned int)(zi*2147483648.0);
 
 		if ((long)pdest & 0x02)
 		{

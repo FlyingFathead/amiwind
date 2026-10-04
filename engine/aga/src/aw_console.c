@@ -17,7 +17,19 @@ static route_t routes[]={
     {"reset location","amiwind_debug_reset_location","0"},
     {"ui font","aw_ui_select","16/14/12/fallback"},
     {"ui ink","aw_ui_ink","original/readable"},
-    {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise]"},
+    {"set time","aw_set_time","HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn"},
+    {"daycycle gallery","aw_daycycle_gallery","[here/off] (eight-stage camera tour; here keeps this view; Esc returns)"},
+    {"nightgallery","aw_nightgallery","[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)"},
+    {"daynightcycle","aw_daynightcycle","on/off true/false 1/0 (automatic time; explicit set/wait still work)"},
+    {"skyspeed","aw_skyspeed_set","[0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed)"},
+    {"skytype","aw_sky_type_set","1/2/3 or V1/V2/V3 (V3 extra stronk default)"},
+    {"sun","aw_sun","on/off true/false 1/0 (default on, clock still advances)"},
+    {"clouds","aw_clouds","on/off true/false 1/0 (default on, independent of sun)"},
+    {"guardtorch","aw_guardtorch","[on/off/auto] (all guard torches; auto follows guards_torch_cycle)"},
+    {"starsky","aw_starsky","on/off true/false 1/0 (stars and nebula; default on)"},
+    {"nightsky","aw_nightsky","on/off true/false 1/0 (night layer including moons; default on)"},
+    {"sky","aw_daynight","on/off true/false 1/0 (sky/fog presentation; time control is separate)"},
+    {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn]"},
     {"ui preview","aw_ui_preview",""},
     {"ui layout","aw_dialogue_layout","1 legacy / 2 full width / 3 padded content (default)"},
     {"ui dialogue","aw_dialogue_method","1/2/3/4 (default 3)"},
@@ -30,7 +42,8 @@ static route_t routes[]={
     {"fps","amiwind_debug_fps","on/off"},
     {"all","amiwind_show_debug","on/off"},
     {"overlay","amiwind_show_debug","on/off true/false 1/0"},
-    {"input trace","aw_input_trace","on/off (raw keys and mouse events)"},
+    {"inputtrace","aw_input_trace","on/off true/false 1/0 (raw keys and mouse events; default off)"},
+    {"input trace","aw_input_trace","on/off true/false 1/0 (alias; default off)"},
     {"door sounds","aw_door_sounds","on/off (default on)"},
     {"hud type","aw_debug_hud_type","1 original / 2 compact (default)"},
     {"render order","aw_surface_order","1 legacy / 2 mesh intersections (default)"},
@@ -44,7 +57,7 @@ static route_t routes[]={
     {"tp map","aw_teleport_map","select a destination on the world map"},
     {"map tp","aw_teleport_map","select a destination on the world map (alias)"},
     {"tp menu","aw_scene_menu","(teleport picker)"},
-    {"tp","aw_teleport","[balmora/seydaneen/prisonship/<map name>; no argument opens menu]"},
+    {"tp","aw_teleport","[X Y original Morrowind global XY / balmora / seydaneen / prisonship / <map name>; no argument opens menu]"},
     {"eyeheight","aw_eyeheight","[offset above player origin]"},
     {"dimensions","aw_dimensions",""},
     {"pos","aw_pos",""},{"blockers","aw_blockers",""},
@@ -80,6 +93,7 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
             word+=n;if(*word==' ')word++;j++;
         }
         if(*word)continue;
+        if(!strcmp(routes[i].command,"aw_teleport") && argc-j>2)return 0;
         used=(int)strlen(routes[i].command);
         if(used+2>capacity)return 0;
         strcpy(out,routes[i].command);

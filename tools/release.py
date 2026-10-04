@@ -34,7 +34,32 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-{name}.png" for name i
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.25-dev1-journal.png")
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.25-rc1-{name}.png" for name in ("map", "navigation"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.27-rc2-{name}.png" for name in ("mushroom-cap", "ascadian-mushrooms", "mushroom-underside"))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.28-rc1-{name}.png" for name in ("sunrise", "sunset", "night"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
+DOCUMENTATION_IMAGES.update({
+    'docs/images/amiwind-v0.0.28-balmora-guard-street.png',
+    'docs/images/amiwind-v0.0.28-balmora-moon-rooftops.png',
+    'docs/images/amiwind-v0.0.28-balmora-moons.png',
+    'docs/images/amiwind-v0.0.28-balmora-street-sky.png',
+    'docs/images/amiwind-v0.0.28-night-masser.png',
+    'docs/images/amiwind-v0.0.28-night-secunda.png',
+    'docs/images/amiwind-v0.0.28-night-stars.png',
+    'docs/images/amiwind-v0.0.28-night-wide.png',
+    'docs/images/amiwind-v0.0.28-v3-blue-hour.png',
+    'docs/images/amiwind-v0.0.28-v3-dawn.png',
+    'docs/images/amiwind-v0.0.28-v3-dusk.png',
+    'docs/images/amiwind-v0.0.28-v3-golden-hour.png',
+    'docs/images/amiwind-v0.0.28-v3-midday.png',
+    'docs/images/amiwind-v0.0.28-v3-night.png',
+    'docs/images/amiwind-v0.0.28-v3-red-sunset.png',
+    'docs/images/amiwind-v0.0.28-v3-sunrise.png',
+})
+DOCUMENTATION_CLIPS.update({
+    'docs/images/amiwind-v0.0.28-day-gallery.gif',
+    'docs/images/amiwind-v0.0.28-night-gallery.gif',
+})
+# Project-authored text graphic; retain bounded UTF-8 source validation.
+DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
 
 
 def allowed_files(root):
@@ -47,8 +72,8 @@ def allowed_files(root):
         p = PurePosixPath(name)
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
-        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA
-        native_aux = name in ("engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS
+        native_aux = name in ("tools/polycount_inspector.html", "tests/test_polycount_markup.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)

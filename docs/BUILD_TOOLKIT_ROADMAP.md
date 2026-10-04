@@ -45,7 +45,13 @@ output assembly. The [Windows roadmap](WINDOWS_BUILD_ROADMAP.md) covers host
 portability; the [third-party compiler plan](THIRD_PARTY_COMPILERS.md) covers
 possible bundled QCC source and selectable compiler providers. Native
 Windows/MSYS2 is the preferred Windows development direction. WSL2 is a fallback
-if native integration proves troublesome. Both Windows routes remain untested.
+if native integration proves troublesome. Native Windows and Docker Desktop
+on WSL2 have separate dated full-build/game-entry evidence; see the
+[Windows record](VALIDATION-WINDOWS-2026-10-02.md) and
+[Docker record](VALIDATION-DOCKER-2026-10-02.md). The separate Ubuntu-under-WSL2
+route remains a trial. Published [v0.0.27](RELEASE-v0.0.27.md) also passed hosted
+launcher parity and source/build CI; these checks do not certify full gameplay
+or resolve native Windows worker/cancellation issues.
 
 ## Asset inventory and coverage receipts
 

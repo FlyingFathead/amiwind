@@ -4,46 +4,120 @@
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
-## v0.0.27 — Rocks, Mushrooms, and Then Some
+## v0.0.28 — Trees and Grass, Day and Night
 
-Vvardenfell is getting its rough edges back. **37,960 rocks and 816 giant
-mushrooms** now bring familiar silhouettes to the island's terrain: boulders
-along the coast, rocky hillsides, and those enormous mushroom canopies in the
-Ascadian Isles. Getting Morrowind onto an Amiga means making room for all of it.
+Trees along the road, reeds by the water, grass around the rocks. Vvardenfell's
+scenery is filling out beneath red-and-gold sunsets, purple twilight and a cool
+blue hour. The new night layer brings back original stars, nebulae, Masser and
+Secunda, while guards prepare their torches for the night watch. All of it works
+through a shared indexed sky designed for the Amiga renderer.
 
-The mushroom caps are closed! All five giant-mushroom models retain their joined
-cap sections and original UVs, keeping the undersides, rims and textures together.
-The screenshots below show that work running in WinUAE.
+**The v0.0.28 release build has passed its bounded independent WinUAE playtest.**
+Fresh Windows and Linux builds produce the same Amiga executable. The release
+adds foliage, a shared sky, tiny background stars, both moons and timed guard
+torches. Explore the new skies below and see the
+[release notes](docs/RELEASE-v0.0.28.md) for verified scope and known limitations.
+Source publication is completed through the separately gated release workflow.
 
-The **“and Then Some”** reaches beneath the scenery, too. This update brings
-bounded town-map work for Seyda Neen and Balmora, memory checks on the final map
-payloads, and preservation of held controls and player state during automatic
-cell changes. The map panel keeps its town markers, loading text waits two
-seconds by default, and an 18-track music catalogue is included. Image assembly
-generates both WinUAE and FS-UAE configurations, including multi-HDF layouts.
+| Sunrise 06:30 | Red sunset 18:00 | Blue hour 20:15 |
+| :---: | :---: | :---: |
+| ![Sunrise 06:30 — Seyda Neen day gallery](docs/images/amiwind-v0.0.28-v3-sunrise.png) | ![Red sunset 18:00 — Seyda Neen day gallery](docs/images/amiwind-v0.0.28-v3-red-sunset.png) | ![Blue hour 20:15 — Seyda Neen day gallery](docs/images/amiwind-v0.0.28-v3-blue-hour.png) |
 
-Want to know what goes into putting a rock on an Amiga? Start with
-[What are rocks?](docs/WHAT_ARE_ROCKS.md), then explore the
-[v0.0.27 release notes](docs/RELEASE-v0.0.27.md).
+| Masser | Secunda | Balmora at 23:00 |
+| :---: | :---: | :---: |
+| ![Masser — Balmora night gallery, render time 23:00](docs/images/amiwind-v0.0.28-night-masser.png) | ![Secunda — Balmora night gallery, render time 23:00](docs/images/amiwind-v0.0.28-night-secunda.png) | ![Balmora at 23:00 — street sky](docs/images/amiwind-v0.0.28-balmora-street-sky.png) |
 
-**Heavy development is still under way.** Expect surprising performance and
-stability dips as we bring more of the world together, measure its costs, and
-optimize. Memory estimates and build checks help us catch problems; they do not
-replace walking through the game. Please be patient—and keep the playtest
-reports coming. The In-Game map is still a terrain-overview prototype; the full
-video catalogue and condition-aware voiced dialogue remain on the roadmap.
+![From dawn to night: eight native V3 gallery stages](docs/images/amiwind-v0.0.28-day-gallery.gif)
 
+*Real 320×200 Amiga frames captured in WinUAE. The GIF is an eight-stage
+montage with edited timing; the screenshots retain their native pixels.
+[All day and night stills, plus both GIFs](docs/GAMEPLAY_MEDIA.md#v0028--trees-and-grass-day-and-night).*
+
+- **More of the original scenery.** The prepared world includes **19,984 unique
+  foliage placements**: 19,787 sprite placements across 76 shared types and 197
+  mesh placements, including 192 in Balmora. The landscape retains **37,960 rock
+  placements** and **816 giant mushrooms**, with joined mushroom geometry.
+  These count original source placements; neighboring map copies do not add
+  unique instances.
+- **One sky across exterior cells.** The default V3 presentation brings red and
+  gold sunsets, purple twilight and a cool blue hour, with two scrolling cloud
+  layers and a moving sun. Sky, distant fog and a subtle exterior world tone
+  follow the persistent clock; interiors keep their own lighting.
+- **Time you can control.** The cycle starts enabled. Press **T** to wait, use
+  `dbg set time sunrise` or `dbg set time 1830` to choose a moment, and
+  `dbg daynightcycle off` / `on` to pause or resume automatic time. The new
+  `dbg daycycle gallery` tours eight sky stages; `dbg nightgallery` previews
+  the night sky, Masser, Secunda and overhead stars. Both preserve player position
+  and saved time, with `here` for a fixed view and `off` to return.
+- **Torchlight for the night watch.** The new guard-torch runtime equips supported
+  Imperial guards in Seyda Neen and Hlaalu guards in Balmora from their original
+  equipment and poses. `guards_torch_cycle` follows the saved clock;
+  `dbg guardtorch on/off/auto` provides an explicit override. Independent native
+  checks confirm cold loading, dawn/dusk switching and subtle animated flame
+  particles for both guard types. Heavy-scene memory reserves remain limited.
+  [Source rules and current acceptance](docs/TORCH.md).
+- **Better tools to see what costs memory.** The 3D Map Inspector and build
+  comparisons expose stored geometry, placed geometry and per-map loading
+  estimates. The Seyda Neen terrain winding repair restores the missing textured
+  ground; broader world geometry and performance work remains ongoing.
+
+Press **F10** for the console, or **Shift+F10** for fullscreen. The separate
+`dbg sky off` / `on` control switches the sky/fog effect while time keeps passing.
+`dbg sun off` / `on` and `dbg clouds off` / `on` control the two features
+independently; both start enabled. These switches also accept `1/0` and
+`true/false`. Saved settings can override the shipped defaults.
+
+The pictures above come from the stable V3 default and native night layer.
+Historical V1 prototype captures remain in the [capture record](docs/GAMEPLAY_MEDIA.md).
+The local converter also converts the original star/nebula textures and both
+moons into a compact night layer. Some bright stars twinkle gently in cool blue,
+behind the moons and clouds. `dbg starsky` toggles stars/nebula and
+`dbg nightsky` toggles that whole layer; both default on and accept the same
+boolean forms. `dbg skyspeed` adjusts cloud motion, with a calmer
+`0.00333333333` default. Original-source stars are tiny background points behind
+the nebula, clouds, scenery and complete moon silhouettes.
+The night gallery and Balmora night views have been checked in WinUAE. Regional
+weather and full nearby-world lighting remain follow-up work. Read the
+[sky and clock guide](docs/DAY_NIGHT_AND_SKY.md) for controls and current scope.
+
+The shared-sky build comparison removed **301,751 local sky faces across
+2,664 exterior maps**. Those compared maps plus one shared sky resource saved
+**131.324 MiB of disk storage** against their untouched inputs. This measures
+the sky conversion alone; subsequent terrain repairs and each loaded map have
+separate storage, RAM and frame-cost checks.
+
+![Build comparison: 301,751 local sky faces removed across 2,664 exterior maps; 131.324 MiB aggregate disk saving](docs/images/amiwind-shared-sky-build-comparison.svg)
+
+*Project-authored build comparison. [Measurement scope](docs/DAY_NIGHT_AND_SKY.md).*
+
+## AmiWind 3D Map Inspector
+
+**Geometry analysis and optimization planning**
+
+The standalone [AmiWind 3D Map Inspector](docs/POLYCOUNT_INSPECTOR.md) helps
+inspect converted BSP geometry and plan optimization work. It is one component
+in the aspirational **AmiWind Map Optimization Toolkit** direction, not a claim
+that a complete automatic optimizer or runtime profiler is finished. The
+bounded hidden-surface pass remains experimental, and verified house examples
+currently produce no cuts. Read its [development roadmap](docs/BUILD_TOOLKIT_ROADMAP.md)
+and [exterior hidden-surface status](docs/EXTERIOR_HIDDEN_SURFACES.md).
+The [Map Optimization Toolkit overview](docs/AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md)
+and [measured findings](docs/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md) distinguish
+completed representation savings from open geometry and target gates.
 See the [memory notes](docs/MEMORY_ALLOCATION.md),
 [cell-changing checklist](docs/CELL_CHANGING.md),
+[sky and background rendering](docs/DAY_NIGHT_AND_SKY.md#existing-renderer-background-and-sky-enclosure-geometry),
+[terrain-culling status](docs/TERRAIN_VISUAL_CULL.md),
 [bug journal](docs/BUG_JOURNAL.md) and [roadmap](docs/ROADMAP.md) for the details.
 Original-game assets, converted proprietary content and ROMs are not distributed
-with AmiWind; you provide your own legally obtained files.
+with AmiWind; you provide your own legally obtained files. Playable builds and
+playtest packages containing those assets stay private.
 
 ### v0.0.27 — Rocks, Mushrooms, and Then Some: playtest screenshots
 
 These Ascadian Isles screenshots were captured in WinUAE during the rc2
 playtest: closed caps, joined rims and textured undersides. They show the mushroom
-work that carries into v0.0.27; town-boundary testing is tracked separately.
+work that carries into the published v0.0.27 release.
 
 | Closed cap and rim | Giant mushrooms on the hillside |
 | --- | --- |
@@ -51,101 +125,48 @@ work that carries into v0.0.27; town-boundary testing is tracked separately.
 
 ![Joined mushroom underside in rc2](docs/images/amiwind-v0.0.27-rc2-mushroom-underside.png)
 
-Rc3 adds a surrounding LAND apron at the Seyda Neen handoff and preserves
-held controls during automatic cell/sub-cell changes. The transition regression
-checks noclip, health, hands and torch state. See [cell changing](docs/CELL_CHANGING.md);
-Rc3 assembly, filesystem readback, both emulator mounts and independent HDF
-checksums passed. Owner boundary/input acceptance remains pending.
+### Explore the growing world
 
-Large outputs automatically split into simultaneously mounted HDFs, each below
-4 GiB with filesystem partitions below 2 GiB. Every assembled image emits both
-WinUAE and FS-UAE configurations listing all disks, plus their paths in the final
-[build output](docs/BUILD_OUTPUT.md). Rc3 uses two HDFs; this is not disk swapping.
-`dbg map tp` and `dbg tp map` both open the world-map teleport picker.
+Walk the base-game island's terrain, head into the detailed streets of Seyda
+Neen and Balmora, or take a detour through the character gallery. Rocks and
+giant mushrooms join terrain and water across the wider world. This release
+adds foliage; other settlement scenery and wider-world actors remain
+incomplete. Bloodmoon and
+Tribunal world content are outside the current playable scope.
 
-### Assemble first, measure, then optimize
+Both towns use 64 exterior subdivision cores to keep individual maps bounded.
+Balmora includes 43 destination interiors, including Tharys Ancestral Tomb;
+Seyda Neen keeps its opening scenes and converted interiors. Aim at doors or
+residents and press **E**. NPC interaction currently provides bounded authored
+greetings. Full combat, quest simulation, services, schedules and inventory remain
+unfinished. See [character-state limitations](docs/CHARACTER_STATES.md).
 
-The current goal is to bring the authored landscape and required gameplay state
-together so we can test a complete, representative workload. The present disk
-footprint and conversion cost are a working baseline, not the intended final
-optimized design. Town subdivisions remain necessary for frame cost.
+Character creation follows the opening registration sequence: name, race,
+gender, head and hair, class, birthsign and a final review. The appearance
+screen has a rotating head preview. Character choices and earned journal history
+persist in saves. Start a fresh character when moving from older content.
 
-Further work will measure duplicated geometry/textures in cell overlap, then
-investigate shared model/texture storage, deduplication of identical edge data,
-conversion-cache reuse and safer mesh reduction. Mirroring is an option only
-where it preserves authored geometry, placement, UVs and collision. Optimization
-must retain closed mushroom seams and continuous terrain handoffs. Track actual
-payload bytes separately from HDF capacity/free-space headroom, and compare
-resident memory, loading time and FPS. See the [optimization roadmap](docs/ROADMAP.md#assemble-first-then-optimize-the-measured-world).
-
-**Latest published release: [v0.0.26](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.26).**
-The following v0.0.26 results describe that released baseline, not a new rc3
-Docker or Linux validation run.
-
-**v0.0.26 full conversion, game entry and hosted CI passed; publication completed.**
-The final Docker helper/export run completed the full recipe on Windows 11 with
-Docker Desktop's WSL 2 Linux engine. All 3,551 NPC models and 2,526 terrain regions
-passed, including the strict packaged actor-ground gate with zero unresolved
-findings. The verified v0.0.26 HDF is 3,489,693,696 bytes with SHA-256
-`da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`; WinUAE 6.0.3
-played the opening movie, entered Jiub's prison scene and responded to Enter/Escape.
-Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run reported 78 warnings. The local wrapper
-suite passed 433 tests with 3 skips. See the [v0.0.26 release notes](docs/RELEASE-v0.0.26.md).
-
-The earlier **cold rc1-identity** Docker conversion took 35 minutes 3 seconds and
-also passed the full content, strict actor-ground and WinUAE game-entry checks.
-It produced the same-sized HDF with rc1 identity; its evidence remains in the
-[Docker validation record](docs/VALIDATION-DOCKER-2026-10-02.md).
-
-**Linux remains the established build foundation. Native Windows is experimental:**
-intermittent Python worker failures and incomplete cancellation cleanup remain
-documented [known issues](docs/BUG_JOURNAL.md). Preserve failed-run logs and start
-a fresh run using validated model caches; general stage resume is not available.
-Use the [Windows setup/build scripts](docs/WINDOWS_BUILD.md) or the existing
-[Linux build path](docs/LINUX_BUILD.md).
-
-The [Docker build helper](docs/DOCKER_BUILD.md) takes your own Morrowind installation
-as private runtime input. Images contain only source/tools; game data, converted
-assets and ROMs stay outside image layers and public releases. The published rc1
-remains immutable. See the
-[Docker roadmap](docs/DOCKER_BUILD_ROADMAP.md) and [rc1 release notes](docs/RELEASE-v0.0.26-rc1.md).
+**J** opens the two-page progression journal; **M** opens the island map. Older
+saved configurations regain these keys when unassigned. Journal headings stay
+centred on the left page and wrap onto multiple lines. The map marker follows
+source coordinates and keeps its zoom on reopen. See
+[map and journal](docs/WORLD_MAP_AND_JOURNAL.md).
 
 **F**, then **V** equips a [torch converted from the original game](docs/TORCH.md),
 with an animated grip and flame attached to its source emitter. The debug header
-shows the region from the game's own records. This includes the rc8 torch-crash
-correction; target playtesting is required before final release. The longstanding
-brief fist-visibility blink remains open.
+shows the region from the game's own records. The earlier torch-crash correction
+is included; its target retest and the brief fist-visibility blink remain tracked
+in the [bug journal](docs/BUG_JOURNAL.md).
 
-Character conversion now uses a [verified persistent host cache](docs/NPC_MODEL_CACHE.md).
-The full NPC gallery remains enabled by default; reused models retain the same
-Amiga format and quality.
+`dbg gallery` opens the inspection plane for **2,935 original NPC/creature
+records and all 3,551 converted model assets**. Search by friendly name or source
+ID, inspect equipped/base-body variants, and return to the captured game state.
+Dagoth Ur's protected mask geometry and original gold texture use an exact-model
+allowance, enabled by default with `aw_allow_poly_budget_over true` and
+`aw_poly_budget_over_cap auto`. Wheel cycles models; middle-click opens the
+browser. [Gallery controls](docs/CHARACTER_MODEL_GALLERY.md).
 
-A completed rc3 terrain run can be reused through
-[engine/image recovery](docs/IMAGE_RECOVERY.md). Build receipts retain timing,
-compiler/tool versions, warning counts, output size and SHA-256; see
-[build output](docs/BUILD_OUTPUT.md). The [Windows checkpoint](docs/VALIDATION-WINDOWS-2026-10-02.md)
-records successful full conversion, recovered image assembly and WinUAE game entry.
-
-The base-game island now has a playable terrain pass following the recovered
-polygon survey: **2,526 terrain regions**, with local coordinates rebased at
-boundaries. **Detailed Seyda Neen and Balmora remain intact**, including their
-existing interiors and characters. Outside those towns this pass contains
-terrain and water in the v0.0.26 baseline. The v0.0.27 candidate adds the rock
-and giant-mushroom families described above; other settlement scenery and
-actors remain future work.
-Bloodmoon and Tribunal expansion content are excluded.
-
-**J** opens the progression journal; **M** opens the island map. Older saved
-configurations regain these keys when unassigned. Journal headings stay centred
-on the left page and wrap onto multiple lines. See the
-[v0.0.25 gameplay scope](docs/RELEASE-v0.0.25.md).
-
-v0.0.25-rc1 brought the Seyda Neen handoff inside its ground coverage and preserved
-original shoreline samples that coarse terrain had submerged. A normal-view
-compass (off by default; `dbg compass on`) and GLOBAL/LOCAL XYZ aid navigation; the M marker uses the same source
-coordinates and keeps its zoom on reopen. Debug flight supports Ctrl at twice
-Shift speed. M/N console typing is protected; debug Alt+M exposes the desktop.
-Bindings have their own [keymap file and reference](docs/KEYMAPS.md).
+### Earlier glimpses of Vvardenfell
 
 | Welcome to Balmora | Dagoth Ur, in the character gallery |
 | :---: | :---: |
@@ -156,48 +177,64 @@ Bindings have their own [keymap file and reference](docs/KEYMAPS.md).
 *Native FS-UAE captures at integer scale: map from v0.0.25-rc1, journal from
 v0.0.25-dev1, town/gallery from v0.0.24. [Capture details](docs/GAMEPLAY_MEDIA.md).*
 
-Character creation follows the opening registration sequence: name, race,
-gender, head and hair, class, birthsign and a final review. The appearance
-screen has a rotating head preview; a birthsign is shown after its selection
-stage. Character choices and earned journal history persist in saves.
+### Finding your way around
 
-`dbg gallery` opens the inspection plane for **2,935 original NPC/creature
-records and all 3,551 converted model assets**. Search by friendly name or
-source ID, inspect equipped/base-body variants, and return to the captured game
-state. Dagoth Ur's protected mask geometry and original gold texture use an
-exact-model allowance, enabled by default with `aw_allow_poly_budget_over true`
-and `aw_poly_budget_over_cap auto`. Wheel cycles models; middle-click opens the browser. [Gallery controls](docs/CHARACTER_MODEL_GALLERY.md).
+Shift+V cycles view distance. The optional compass is off by default;
+`dbg compass on` enables it. GLOBAL/LOCAL XYZ aid navigation, and Ctrl debug
+flight runs at twice Shift speed. M/N console typing is protected; debug Alt+M
+exposes the desktop. Bindings have their own
+[keymap file and reference](docs/KEYMAPS.md).
 
-Balmora has 64 overlapping exterior regions and 43 destination interiors,
-including Tharys Ancestral Tomb. Seyda Neen retains 25 regular regions, its
-opening scenes and converted interiors. Aim at doors or residents and press
-**E**. NPC interaction currently provides bounded authored greetings. Full
-combat, quest simulation, services, schedules and inventory remain unfinished.
+`dbg aw hors 0` creates the Nord / Barbarian / The Steed test character after
+Census; `dbg tp balmora` travels to Balmora and supplies that character if absent.
+`dbg tp` opens the destination picker. `dbg map tp` and `dbg tp map` open the
+world-map teleport picker. See [debug controls](docs/DEBUG_OVERLAYS.md).
 
-Initial actor contact is checked before world-terrain and again on final image
-contents. The rc7 fitter checks the actual idle mesh, preserves authored
-coordinates and keeps the strict gate. Ground contact is separate from
-[quest-driven character presence](docs/CHARACTER_STATES.md), which remains
-incomplete. Dreamer startup visibility is a documented example.
+Automatic cell changes preserve held input and gameplay state in the transition
+checks; doors and explicit travel retain their own loading behavior. The default
+loader replaces maps synchronously. At automatic crossings, Loading... waits
+two seconds by default; startup and explicit travel remain immediate.
+Experimental read-ahead does not establish seamless background
+streaming. Exact crossing, collision and state checks remain on the
+[target playtest checklist](docs/CELL_CHANGING.md).
 
-For the Windows build and limited emulator result, see the
-[current validation record](docs/VALIDATION-WINDOWS-2026-10-02.md). Method 1
-retains synchronous loading behind the frozen-frame Loading... box; method 2
-read-ahead remains experimental.
+### Making room for Morrowind
+
+The current world is a baseline for measuring and optimizing content, memory,
+loading time and frame cost. Town subdivisions remain necessary; their static
+heap estimates do not certify runtime safety or FPS. Future changes must retain
+closed mushroom seams, original placement and UVs, collision, and continuous
+terrain handoffs. See the [optimization roadmap](docs/ROADMAP.md#assemble-first-then-optimize-the-measured-world).
+
+Large outputs automatically split into simultaneously mounted HDFs, each below
+4 GiB with filesystem partitions below 2 GiB. This is not disk swapping, and more
+disk capacity does not add runtime memory. Generated emulator configurations
+list every required disk; the paths are also recorded in the
+[build output](docs/BUILD_OUTPUT.md).
+
+Character conversion uses a [verified persistent host cache](docs/NPC_MODEL_CACHE.md).
+The full NPC gallery remains enabled by default; reused models retain the same
+Amiga format and quality. [Image recovery](docs/IMAGE_RECOVERY.md) can reuse
+compatible, validated conversion output. General stage resume is not available.
 
 The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
-16 MiB Z3 RAM**. Stock A1200 performance is unproven. Build with owned game
-files using the [Linux instructions](docs/LINUX_BUILD.md). Converted game data
-and ROMs stay private. Start a fresh character when moving from older content.
+16 MiB Z3 RAM**. Stock A1200 and physical-hardware performance are unproven.
+Linux remains the established build foundation. Native Windows is experimental,
+with intermittent worker and cancellation failures recorded in the
+[Windows guide](docs/WINDOWS_BUILD.md) and [bug journal](docs/BUG_JOURNAL.md).
 
-Shift+V cycles distance; `dbg aw hors 0` creates the Nord / Barbarian / The
-Steed test character after Census; `dbg tp balmora` travels to Balmora and
-supplies that character if absent. `dbg tp` opens the destination picker.
+The [Docker build helper](docs/DOCKER_BUILD.md) takes your own Morrowind
+installation as private runtime input. Images contain source and tools; game
+data, converted assets and ROMs stay outside image layers and public releases.
+The [v0.0.27 release notes](docs/RELEASE-v0.0.27.md) record the published
+baseline's build and CI evidence. Earlier full-conversion and game-entry results remain in the dated
+[Windows](docs/VALIDATION-WINDOWS-2026-10-02.md) and
+[Docker](docs/VALIDATION-DOCKER-2026-10-02.md) records and
+[v0.0.26 release notes](docs/RELEASE-v0.0.26.md).
 
-See [map and journal](docs/WORLD_MAP_AND_JOURNAL.md),
-[world survey](docs/WORLD_SURVEY.md), [debug controls](docs/DEBUG_OVERLAYS.md),
-[project state](docs/PROJECT_STATE.md), [font options](docs/PAPER_FONT_OPTIONS.md)
-and [conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md).
+See [world survey](docs/WORLD_SURVEY.md), [project state](docs/PROJECT_STATE.md),
+[font options](docs/PAPER_FONT_OPTIONS.md) and
+[conversion lessons](docs/BALMORA_CONVERSION_LESSONS.md) for more.
 
 *For years, they thought the Nerevarine would never appear on the Commodore Amiga...*
 
@@ -213,8 +250,8 @@ Thanks to: **ChaosWhisperer**
 > *May the wind be on your back!*
 
 A fan-made tribute, free and open-source conversion tools, and an experimental
-Amiga runtime. We are working toward a small, walkable slice of Vvardenfell;
-this is a proof of concept, not a finished Morrowind port. The A500 experiment
+Amiga runtime. The growing playable world combines an island-wide terrain/scenery pass with
+detailed starting towns, while much of Morrowind's gameplay remains unfinished. The A500 experiment
 is preserved alongside the accelerated AGA development track.
 **Official project repository:** [FlyingFathead/amiwind](https://github.com/FlyingFathead/amiwind).
 **Repository root: `amiwind/`.** This directory contains the conversion tools,
@@ -284,10 +321,11 @@ generated game images are private build outputs, not public source releases.
 **Native Windows entry point (experimental):** `build.cmd` or `build.ps1`.
 Start with `.\setup-windows.cmd -Plan`, then `.\setup-windows.cmd -Yes`, and follow the
 [Windows setup guide](docs/WINDOWS_BUILD.md). Windows and Linux share the Python
-build pipeline. Native Windows full conversion and WinUAE game entry passed;
-experimental reliability limits remain. The Docker helper/export also completed
-the full v0.0.26 conversion and WinUAE game-entry check. Hosted Docker CI and
-publication must follow hosted CI; see [release notes](docs/RELEASE-v0.0.26.md).
+build pipeline. Earlier native Windows full conversion and WinUAE game-entry
+checks passed; experimental reliability limits remain. The published v0.0.27
+passed Linux/Windows launcher CI, Docker builder CI and the source/asset-free
+build job. See the [release notes](docs/RELEASE-v0.0.27.md) for the scope of each
+check; these results do not certify a full v0.0.27 gameplay run on either host.
 
 **Quickest way to compile on Ubuntu/Debian Linux (or Ubuntu under WSL):**
 
@@ -349,19 +387,21 @@ subsequent launches. See the [launcher guide](docs/FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.26-rc1 configuration template |
+| Emulator / official homepage | Host platforms | AmiWind setup | Historical v0.0.28-rc1 template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.26-rc1-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.26-rc1-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.28-rc1-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.28-rc1-WinUAE.uae) |
 
-1. Build `AmiWind-v0.0.26-rc1.hdf` from your own Morrowind installation using the
-   build guide above. The source ZIP contains the tools and templates, not a
-   playable game image.
-2. Install an emulator from its official homepage above and save a local copy
-   of its AmiWind configuration template.
+1. Build the v0.0.28 source in preparation from your own Morrowind installation using the guide
+   above. Keep every HDF listed in the build summary together. The source ZIP
+   contains tools and templates; playable images are private build outputs.
+2. Install an emulator from its official homepage above. Prefer the matching
+   configuration generated beside your HDFs: it lists every required disk. The
+   historical rc1 templates above provide a starting point for manual setup;
+   final configurations are regenerated with the final v0.0.28 HDF paths.
 3. Follow the matching setup guide to select your licensed **A1200 Kickstart
-   3.1 ROM** and the built HDF. WinUAE uses an RDB hardfile on the UAE controller;
-   FS-UAE uses the ROM and HDF paths in the configuration file.
+   3.1 ROM** and all the built HDFs. WinUAE uses RDB hardfiles on the UAE
+   controller; FS-UAE uses the ROM and HDF paths in its configuration file.
 4. Start emulation and click inside the window to capture the mouse. Use
    **WASD** to move and the mouse to look; see [controls and setup](docs/AGA_BUILD.md).
 
@@ -374,14 +414,15 @@ and boots to a test notice; it is not the playable demo.
 
 ## Development
 
-Current engineering priority: [reduce world-terrain build times and avoid
-unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md), starting with phase
-profiling and verified reuse across builds. These improvements are planned.
+The next work is to playtest and profile the expanded world: memory across
+loads and crossings, town geometry, scenery continuity and frame cost. Build-time
+profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
+remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md).
 
-[Project state](docs/PROJECT_STATE.md) Â· [Open bug reports](docs/BUGS.md) Â· [Roadmap](docs/ROADMAP.md) Â·
-[Repository layout](docs/REPOSITORY_LAYOUT.md) Â· [Release workflow](docs/RELEASE_WORKFLOW.md) Â·
-[Changelog](docs/CHANGELOG.md) Â· [Build dependencies](docs/BUILD_DEPENDENCIES.md) Â·
-[Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) Â·
+[Project state](docs/PROJECT_STATE.md) · [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
+[Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
+[Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
+[Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) ·
 [Licensing and credits](docs/LICENSING_AND_CREDITS.md)
 
 Thanks to the Morrowind creators, the Amiga community, and the contributors whose
@@ -389,3 +430,18 @@ work made this experiment possible. The earlier A500 track, previous methods,
 fonts and hand-rendering alternatives remain available in the source and history.
 
 Development changes must follow the [project rules](docs/PROJECT_RULES.md), including required Linux and Windows compatibility.
+
+### Inspect converted geometry locally
+
+The development toolkit now includes a standalone
+[Polycount Inspector](docs/POLYCOUNT_INSPECTOR.md). Open
+[the local viewer](tools/polycount_inspector.html) to explore polygon edges,
+optional local base textures and spatial vertex-density hotspots. Isolate an
+object, compare components, or inspect from above and export a private planning
+polygon. The built-in synthetic scene demonstrates the tool without game assets.
+
+Viewer counts and display filters help investigate geometry; they do not measure
+Amiga memory, change the converter or establish a gameplay fix. Your converted
+scenes, textures and captures remain private.
+
+Read [Hidden in Dirt: Seyda Neen's graphics performance bottlenecks](docs/HIDDEN_IN_DIRT.md) for measured geometry experiments and the checks behind the next town optimization.

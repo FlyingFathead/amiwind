@@ -12,6 +12,10 @@ static void (*command)(void);
 static byte pixels[336*210],pal[768],torch_assets[716];
 static model_t torch_model;
 int com_filesize;
+void AW_GuardTorchInit(void){}
+void AW_GuardTorchLoadAssets(const byte *torch){assert(torch);}
+void AW_GuardTorchUpdate(void){}
+void AW_GuardTorchDraw(void){}
 vec3_t vpn,vup,vright;
 float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
 byte *COM_LoadHunkFile(char *path){assert(!strcmp(path,"gfx/torch.awt"));com_filesize=sizeof(torch_assets);return torch_assets;}

@@ -175,9 +175,12 @@ is installed without confirmation. A managed environment is selected automatical
 `AMIWIND_PYTHON` keeps an explicit interpreter choice until a confirmed setup needs
 to switch to its newly prepared environment. No game files or ROMs are downloaded.
 
-Windows 11 users: see [Windows and WSL instructions](WINDOWS_BUILD.md). Native
-Windows input inventory is supported by the Python entry point; the full native
-build remains a Linux/WSL route and has not been validated on Windows/WSL yet.
+Windows 11 users: use `setup-windows.cmd` / `setup-windows.ps1` and
+`build.cmd` / `build.ps1` with the [Windows guide](WINDOWS_BUILD.md). The shared
+pipeline has completed native Windows conversion, corrected image assembly and
+WinUAE game entry at the [dated checkpoint](VALIDATION-WINDOWS-2026-10-02.md).
+Native Windows remains experimental. Docker Desktop on WSL2 has separate build
+evidence; ordinary Ubuntu-under-WSL2 is still a separately documented trial.
 
 ## 2. External native tools
 

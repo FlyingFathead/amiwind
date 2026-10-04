@@ -3,6 +3,7 @@
  * time. This is not inventory, quest persistence or original opening logic.
  */
 #include "quakedef.h"
+#include <errno.h>
 #include "aw_save.h"
 #include "aw_maps.h"
 #include "aw_story.h"
@@ -523,7 +524,31 @@ static void hors_command(void) {
     memset(&r,0,sizeof(r));strcpy(r.target,"seyda");r.arrival[2]=64;r.yaw=90;
     Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");load_scene(&r,1);
 }
+static int teleport_coordinate(const char *text,float *result) {
+    char *end;double value;const char *p;
+    if(!text || !*text || strlen(text)>32)return 0;
+    for(p=text;*p;p++)if(!((*p>='0' && *p<='9') || *p=='+' || *p=='-' ||
+                         *p=='.' || *p=='e' || *p=='E'))return 0;
+    errno=0;value=strtod(text,&end);
+    if(end==text || *end || errno==ERANGE || !isfinite(value) || fabs(value)>2000000)return 0;
+    *result=(float)value;return isfinite(*result);
+}
 static void teleport_command(void) {
+    vec3_t source;
+    if(Cmd_Argc()==3) {
+        if(!teleport_coordinate(Cmd_Argv(1),&source[0]) ||
+           !teleport_coordinate(Cmd_Argv(2),&source[1])) {
+            Con_Printf("Usage: dbg tp X Y (original Morrowind global coordinates)\n");return;
+        }
+        source[2]=0;
+        if(!AW_MapTeleport(source))
+            Con_Printf("Coordinate teleport unavailable; player state unchanged.\n");
+        return;
+    }
+    if(Cmd_Argc()>3) {
+        Con_Printf("Usage: dbg tp X Y, dbg tp <name>, or dbg tp map\n");return;
+    }
+
     if(Cmd_Argc()==1 && sv.active){Cbuf_InsertText("aw_scene_menu\n");return;}
     scene_command();
 }

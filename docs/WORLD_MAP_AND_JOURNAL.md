@@ -125,15 +125,16 @@ two town landmarks; rc4 rendering hid the landmark loop outside Debug mode. The
 rc5 source now draws settlement landmarks in both modes and gives the selected
 button a dark text interior and contrasting border.
 
-The rc5 correction compiled in engine-002 and is included in the private
-candidate whose HDF readbacks passed. Target confirmation remains pending. The
+The rc5 correction compiled in engine-002 and is included in stable v0.0.27;
+the private HDF readbacks passed. The repaired Linux native world-UI fixture
+also passed in the full 558-test Docker suite. Target confirmation remains pending. The
 earlier rc4 HDF was not changed by the failed helper retries. This In-Game view
 remains a terrain overview prototype, not the complete original-game world/local
 map. Verify both button labels and selected states, retained markers in both
 modes, player marker and heading, map scales and interaction. See the tracked
 [selector regression](BUG_JOURNAL.md#map-reg-01-rc4-in-game-selector-hides-retained-settlement-markers-bug--regression).
 
-The rc5 candidate also includes the archived aw_region_loading_delay setting:
+Stable v0.0.27 also includes the archived aw_region_loading_delay setting from rc5:
 two seconds by default, zero for immediate loading-screen presentation. It
 applies to automatic crossings only; startup and explicit travel are immediate.
 The delay begins at a safe checkpoint after blocking reads and is not a

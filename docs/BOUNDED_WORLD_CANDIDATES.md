@@ -74,6 +74,11 @@ acceptance. The helper does not infer or silently shrink it.
 
 ## Evidence and remaining acceptance
 
+The prototype measurements below are historical. The later normal-converter
+bounded layouts carried into v0.0.27 passed the complete static map gates and
+private image assembly/readbacks. Target lifecycle checks remain open; see
+[the current release record](RELEASE-v0.0.27.md).
+
 The central 512-unit core with its 896-unit apron still required 6,929,680 bytes,
 638,224 above the BSP ceiling, despite a genuine smaller world and removal of
 complete distant models. A 128-unit central core narrowly passed by 24,112 bytes;
@@ -90,7 +95,7 @@ The western `sn010` prototype compiled with the certified sea strip intact and
 passed all world collision samples, with a 1,111,184-byte modeled BSP peak. These
 are candidate measurements, not a claim that rc3's playable image is repaired.
 
-Before delivery, run the final complete runtime-map audit, verify new core
+For each later changed layout, run the final complete runtime-map audit, verify new core
 coverage/adjacency and actor state handovers, assemble the actual image pair,
 then inspect target heap lifecycle logs from outgoing scene through unload,
 new load, restoration and first presented frames. Traverse the reported Seyda

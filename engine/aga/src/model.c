@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include <limits.h>
+
+#define AW_STREAM_SPRITES 1
 
 static cvar_t aw_allow_poly_budget_over={"aw_allow_poly_budget_over","1",true};
 static cvar_t aw_poly_budget_over_cap={"aw_poly_budget_over_cap","auto",true};
@@ -99,8 +102,9 @@ static size_t AW_LoadRead(byte *data,size_t bytes,FILE *file) {
 }
 
 void Mod_LoadSpriteModel (model_t *mod, void *buffer);
+int Mod_TryStreamSprite (model_t *mod);
 void Mod_LoadBrushModel (model_t *mod, void *buffer);
-void Mod_LoadAliasModel (model_t *mod, void *buffer);
+void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes);
 /* Small converted aliases use transient host heap for their file image.
  * Holding the file in the high hunk while decoding into the low hunk evicts
  * other visible actors from the cache between them. No resident RAM increase. */
@@ -376,6 +380,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
     unsigned *buf;
     byte	stackbuf[1024];		// avoid dirtying the cache heap
     void *alias_file;
+    int alias_bytes;
 
     if (mod->type == mod_alias)
     {
@@ -399,6 +404,9 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 // load the file
 //
     if(AW_TryStreamBrush(mod))return mod;
+#if AW_STREAM_SPRITES
+    if(Mod_TryStreamSprite(mod))return mod;
+#endif
     alias_file=AW_AliasFile(mod->name);
     buf=alias_file?alias_file:(unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
     if (!buf)
@@ -411,6 +419,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // allocate a new model
 //
+    alias_bytes=alias_file?aw_alias_file_bytes:com_filesize;
     COM_FileBase (mod->name, loadname);
 
     loadmodel = mod;
@@ -431,7 +440,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
             if(crash)Host_Error("Model exceeds the active polygon budget");
             return NULL;
         }
-        Mod_LoadAliasModel (mod, buf);
+        Mod_LoadAliasModel (mod, buf, alias_bytes);
         break;
 
     case IDSPRITEHEADER:
@@ -1560,6 +1569,92 @@ ALIAS MODELS
 ==============================================================================
 */
 
+/* Decode small aliases without growing the low hunk through hot cache blocks.
+ * Cache_FreeLow relocates by address, not LRU; releasing hunk staging only
+ * after decoding is too late to prevent a visible actor/torch reload cycle.
+ * Preserve the old 16-byte block padding and offsets, including zero tail
+ * padding, so target cache budgets do not change. No resident staging slab. */
+#define AW_ALIAS_STAGING_LIMIT (512*1024)
+static byte *aw_alias_stage;
+static int aw_alias_stage_used,aw_alias_stage_size;
+static int AW_AliasSum(size_t *total,int count,size_t unit) {
+    if(count<0 || unit>(size_t)INT_MAX || (size_t)count>((size_t)INT_MAX-*total)/unit)return 0;
+    *total+=(size_t)count*unit;return 1;
+}
+static int AW_AliasBlock(size_t *total,size_t bytes) {
+    size_t block;
+    if(bytes>(size_t)INT_MAX-31)return 0;
+    block=16+((bytes+15)&~(size_t)15);
+    if(*total>(size_t)INT_MAX-block)return 0;
+    *total+=block;return 1;
+}
+static const byte *AW_AliasTake(const byte **at,size_t *left,size_t bytes) {
+    const byte *p=*at;if(bytes>*left)return NULL;
+    *at+=bytes;*left-=bytes;return p;
+}
+/* Validate all lengths before allocation, including grouped skins/frames.
+ * The decoder uses the same allocation sequence as this sizing pass. */
+static int AW_AliasStageBytes(const void *buffer,int bytes) {
+    const byte *at=buffer,*p;const mdl_t *m;size_t left,total=0,header=0,skinbytes;
+    int skins,width,height,verts,tris,frames,i,j,count,type;float interval;
+    if(bytes<(int)sizeof(mdl_t) || (r_pixbytes!=1 && r_pixbytes!=2))return 0;
+    left=bytes;p=AW_AliasTake(&at,&left,sizeof(mdl_t));m=(const mdl_t *)p;
+    if(LittleLong(m->ident)!=IDPOLYHEADER || LittleLong(m->version)!=ALIAS_VERSION)return 0;
+    skins=LittleLong(m->numskins);width=LittleLong(m->skinwidth);height=LittleLong(m->skinheight);
+    verts=LittleLong(m->numverts);tris=LittleLong(m->numtris);frames=LittleLong(m->numframes);
+    if(skins<1 || width<1 || (width&3) || height<1 || height>MAX_LBM_HEIGHT ||
+       verts<1 || verts>MAXALIASVERTS || tris<1 || frames<1)return 0;
+    skinbytes=0;if(!AW_AliasSum(&skinbytes,height,(size_t)width) || skinbytes>(size_t)INT_MAX/r_pixbytes)return 0;
+    if(!AW_AliasSum(&header,1,sizeof(aliashdr_t)) || !AW_AliasSum(&header,frames-1,sizeof(maliasframedesc_t)) ||
+       !AW_AliasSum(&header,1,sizeof(mdl_t)) || !AW_AliasSum(&header,verts,sizeof(stvert_t)) ||
+       !AW_AliasSum(&header,tris,sizeof(mtriangle_t)) || !AW_AliasBlock(&total,header))return 0;
+    header=0;if(!AW_AliasSum(&header,skins,sizeof(maliasskindesc_t)) || !AW_AliasBlock(&total,header))return 0;
+    for(i=0;i<skins;i++){
+        p=AW_AliasTake(&at,&left,sizeof(daliasskintype_t));if(!p)return 0;
+        type=LittleLong(((const daliasskintype_t *)p)->type);count=1;
+        if(type==ALIAS_SKIN_GROUP){
+            p=AW_AliasTake(&at,&left,sizeof(daliasskingroup_t));if(!p)return 0;
+            count=LittleLong(((const daliasskingroup_t *)p)->numskins);if(count<1 || (size_t)count>left/sizeof(float))return 0;
+            header=sizeof(maliasskingroup_t);
+            if(!AW_AliasSum(&header,count-1,sizeof(maliasskindesc_t)) || !AW_AliasBlock(&total,header) ||
+               !AW_AliasBlock(&total,(size_t)count*sizeof(float)))return 0;
+            for(j=0;j<count;j++){p=AW_AliasTake(&at,&left,sizeof(daliasskininterval_t));
+                interval=LittleFloat(((const daliasskininterval_t *)p)->interval);if(!(interval>0) || !isfinite(interval))return 0;}
+        }else if(type!=ALIAS_SKIN_SINGLE)return 0;
+        if((size_t)count>left/skinbytes)return 0;
+        for(j=0;j<count;j++)if(!AW_AliasTake(&at,&left,skinbytes) || !AW_AliasBlock(&total,skinbytes*r_pixbytes))return 0;
+    }
+    header=0;if(!AW_AliasSum(&header,verts,sizeof(stvert_t)) || !AW_AliasSum(&header,tris,sizeof(dtriangle_t)) ||
+       !AW_AliasTake(&at,&left,header))return 0;
+    for(i=0;i<frames;i++){
+        p=AW_AliasTake(&at,&left,sizeof(daliasframetype_t));if(!p)return 0;
+        type=LittleLong(((const daliasframetype_t *)p)->type);count=1;
+        if(type==ALIAS_GROUP){
+            p=AW_AliasTake(&at,&left,sizeof(daliasgroup_t));if(!p)return 0;
+            count=LittleLong(((const daliasgroup_t *)p)->numframes);if(count<1 || (size_t)count>left/sizeof(float))return 0;
+            header=sizeof(maliasgroup_t);
+            if(!AW_AliasSum(&header,count-1,sizeof(maliasgroupframedesc_t)) || !AW_AliasBlock(&total,header) ||
+               !AW_AliasBlock(&total,(size_t)count*sizeof(float)))return 0;
+            for(j=0;j<count;j++){p=AW_AliasTake(&at,&left,sizeof(daliasinterval_t));
+                interval=LittleFloat(((const daliasinterval_t *)p)->interval);if(!(interval>0) || !isfinite(interval))return 0;}
+        }else if(type!=ALIAS_SINGLE)return 0;
+        header=sizeof(daliasframe_t)+(size_t)verts*sizeof(trivertx_t);
+        if((size_t)count>left/header)return 0;
+        for(j=0;j<count;j++){
+            p=AW_AliasTake(&at,&left,header);
+            if(!memchr(((const daliasframe_t *)p)->name,0,16) || !AW_AliasBlock(&total,(size_t)verts*sizeof(trivertx_t)))return 0;
+        }
+    }
+    return (int)total;
+}
+static void *AW_AliasAlloc(int bytes,char *name) {
+    byte *p;size_t block;
+    if(!aw_alias_stage)return Hunk_AllocName(bytes,name);
+    block=16+(((size_t)bytes+15)&~(size_t)15);
+    if(bytes<0 || block>(size_t)(aw_alias_stage_size-aw_alias_stage_used))Sys_Error("Alias staging size mismatch");
+    p=aw_alias_stage+aw_alias_stage_used;memset(p,0,block);aw_alias_stage_used+=(int)block;return p;
+}
+
 /*
 =================
 Mod_LoadAliasFrame
@@ -1585,7 +1680,7 @@ void * Mod_LoadAliasFrame (void * pin, int *pframeindex, int numv,
     }
 
     pinframe = (trivertx_t *)(pdaliasframe + 1);
-    pframe = Hunk_AllocName (numv * sizeof(*pframe), loadname);
+    pframe = AW_AliasAlloc (numv * sizeof(*pframe), loadname);
 
     *pframeindex = (byte *)pframe - (byte *)pheader;
 
@@ -1627,7 +1722,7 @@ void * Mod_LoadAliasGroup (void * pin, int *pframeindex, int numv,
 
     numframes = LittleLong (pingroup->numframes);
 
-    paliasgroup = Hunk_AllocName (sizeof (maliasgroup_t) +
+    paliasgroup = AW_AliasAlloc (sizeof (maliasgroup_t) +
             (numframes - 1) * sizeof (paliasgroup->frames[0]), loadname);
 
     paliasgroup->numframes = numframes;
@@ -1643,7 +1738,7 @@ void * Mod_LoadAliasGroup (void * pin, int *pframeindex, int numv,
 
     pin_intervals = (daliasinterval_t *)(pingroup + 1);
 
-    poutintervals = Hunk_AllocName (numframes * sizeof (float), loadname);
+    poutintervals = AW_AliasAlloc (numframes * sizeof (float), loadname);
 
     paliasgroup->intervals = (byte *)poutintervals - (byte *)pheader;
 
@@ -1685,7 +1780,7 @@ void * Mod_LoadAliasSkin (void * pin, int *pskinindex, int skinsize,
     byte	*pskin, *pinskin;
     unsigned short	*pusskin;
 
-    pskin = Hunk_AllocName (skinsize * r_pixbytes, loadname);
+    pskin = AW_AliasAlloc (skinsize * r_pixbytes, loadname);
     pinskin = (byte *)pin;
     *pskinindex = (byte *)pskin - (byte *)pheader;
 
@@ -1731,7 +1826,7 @@ void * Mod_LoadAliasSkinGroup (void * pin, int *pskinindex, int skinsize,
 
     numskins = LittleLong (pinskingroup->numskins);
 
-    paliasskingroup = Hunk_AllocName (sizeof (maliasskingroup_t) +
+    paliasskingroup = AW_AliasAlloc (sizeof (maliasskingroup_t) +
             (numskins - 1) * sizeof (paliasskingroup->skindescs[0]),
             loadname);
 
@@ -1741,7 +1836,7 @@ void * Mod_LoadAliasSkinGroup (void * pin, int *pskinindex, int skinsize,
 
     pinskinintervals = (daliasskininterval_t *)(pinskingroup + 1);
 
-    poutskinintervals = Hunk_AllocName (numskins * sizeof (float),loadname);
+    poutskinintervals = AW_AliasAlloc (numskins * sizeof (float),loadname);
 
     paliasskingroup->intervals = (byte *)poutskinintervals - (byte *)pheader;
 
@@ -1772,7 +1867,7 @@ void * Mod_LoadAliasSkinGroup (void * pin, int *pskinindex, int skinsize,
 Mod_LoadAliasModel
 =================
 */
-void Mod_LoadAliasModel (model_t *mod, void *buffer)
+void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
 {
     int					i;
     mdl_t				*pmodel, *pinmodel;
@@ -1789,6 +1884,10 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
     int					start, end, total;
     void *copy;
 
+    total=AW_AliasStageBytes(buffer,bytes);
+    if(!total)Sys_Error("Mod_LoadAliasModel: malformed or truncated alias");
+    aw_alias_stage=total<=AW_ALIAS_STAGING_LIMIT?malloc(total):NULL;
+    aw_alias_stage_used=0;aw_alias_stage_size=total;
     start = Hunk_LowMark ();
 
     pinmodel = (mdl_t *)buffer;
@@ -1808,7 +1907,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
             LittleLong (pinmodel->numverts) * sizeof (stvert_t) +
             LittleLong (pinmodel->numtris) * sizeof (mtriangle_t);
 
-    pheader = Hunk_AllocName (size, loadname);
+    pheader = AW_AliasAlloc (size, loadname);
     pmodel = (mdl_t *) ((byte *)&pheader[1] +
             (LittleLong (pinmodel->numframes) - 1) *
              sizeof (pheader->frames[0]));
@@ -1871,7 +1970,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 
     pskintype = (daliasskintype_t *)&pinmodel[1];
 
-    pskindesc = Hunk_AllocName (numskins * sizeof (maliasskindesc_t),
+    pskindesc = AW_AliasAlloc (numskins * sizeof (maliasskindesc_t),
                                 loadname);
 
     pheader->skindesc = (byte *)pskindesc - (byte *)pheader;
@@ -1987,12 +2086,17 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 //
 // move the complete, relocatable alias model to the cache
 //
-    end = Hunk_LowMark ();
-    total = end - start;
-
-    /* Release the decoded staging allocation before growing the cache. */
-    copy=total<=512*1024?malloc(total):NULL;
-    if(copy){memcpy(copy,pheader,total);Hunk_FreeToLowMark(start);}
+    if(aw_alias_stage){
+        if(aw_alias_stage_used!=aw_alias_stage_size)Sys_Error("Alias staging size mismatch");
+        total=aw_alias_stage_used;copy=aw_alias_stage;
+        aw_alias_stage=NULL;aw_alias_stage_used=aw_alias_stage_size=0;
+    }else{
+        end = Hunk_LowMark ();
+        total = end - start;
+        /* Allocation failure/large aliases retain the original hunk path. */
+        copy=total<=AW_ALIAS_STAGING_LIMIT?malloc(total):NULL;
+        if(copy){memcpy(copy,pheader,total);Hunk_FreeToLowMark(start);}
+    }
     Cache_Alloc (&mod->cache, total, loadname);
     if(mod->cache.data)memcpy(mod->cache.data,copy?copy:(void *)pheader,total);
     if(copy)free(copy);else Hunk_FreeToLowMark(start);
@@ -2115,6 +2219,202 @@ void * Mod_LoadSpriteGroup (void * pin, mspriteframe_t **ppframe)
 Mod_LoadSpriteModel
 =================
 */
+static float Mod_SpriteFrameRadius(const mspriteframe_t *frame)
+{
+    float x = (fabs(frame->left) > fabs(frame->right) ? fabs(frame->left) : fabs(frame->right));
+    float y = (fabs(frame->up) > fabs(frame->down) ? fabs(frame->up) : fabs(frame->down));
+    return sqrt(x*x + y*y);
+}
+
+/* The small source readers keep the PAK member's base/end as hard bounds.
+ * No decoded sprite input buffer is assembled alongside resident pixels. */
+#define AW_SPRITE_PIXEL_CHUNK 2048
+
+static int AW_SpriteRead(FILE *file,long base,long end,void *data,size_t bytes)
+{
+    long position=ftell(file);
+    if(position<base || position>end || bytes>(size_t)(end-position))return 0;
+    return AW_LoadRead((byte *)data,bytes,file)==bytes;
+}
+
+static int AW_SpriteError(FILE *file,model_t *mod,const char *reason)
+{
+    if(file)fclose(file);
+    Sys_Error("Mod_LoadSpriteModel: %s: %s",reason,mod->name);
+    return 0;
+}
+
+static mspriteframe_t *AW_StreamSpriteFrame(FILE *file,long base,long end,model_t *mod)
+{
+    dspriteframe_t disk;
+    mspriteframe_t *frame;
+    unsigned short *out16;
+    byte chunk[AW_SPRITE_PIXEL_CHUNK];
+    size_t pixels,allocation,done,take,i;
+    long position;
+    int width,height,origin[2],bpp;
+    if(!AW_SpriteRead(file,base,end,&disk,sizeof(disk)))
+        {AW_SpriteError(file,mod,"truncated frame header");return NULL;}
+    width=LittleLong(disk.width);height=LittleLong(disk.height);
+    if(width<1 || height<1 || (size_t)width>(size_t)INT_MAX/(size_t)height)
+        {AW_SpriteError(file,mod,"invalid frame dimensions");return NULL;}
+    pixels=(size_t)width*(size_t)height;
+    bpp=r_pixbytes;
+    if((bpp!=1 && bpp!=2) || pixels>(size_t)INT_MAX/(size_t)bpp ||
+       pixels*bpp>INT_MAX-sizeof(*frame))
+        {AW_SpriteError(file,mod,"frame allocation overflow or invalid pixel depth");return NULL;}
+    position=ftell(file);
+    if(position<base || position>end || pixels>(size_t)(end-position))
+        {AW_SpriteError(file,mod,"truncated frame pixels");return NULL;}
+    allocation=sizeof(*frame)+pixels*bpp;
+    frame=Hunk_AllocName((int)allocation,loadname);
+    Q_memset(frame,0,(int)(sizeof(*frame)+pixels));
+    origin[0]=LittleLong(disk.origin[0]);origin[1]=LittleLong(disk.origin[1]);
+    if(origin[0]>INT_MAX-width || origin[1]<INT_MIN+height)
+        {AW_SpriteError(file,mod,"frame origin bounds overflow");return NULL;}
+    frame->width=width;frame->height=height;
+    frame->up=origin[1];frame->down=origin[1]-height;
+    frame->left=origin[0];frame->right=width+origin[0];
+    if(bpp==1){
+        if(!AW_SpriteRead(file,base,end,frame->pixels,pixels))
+            {AW_SpriteError(file,mod,"short frame pixel read");return NULL;}
+    }else{
+        out16=(unsigned short *)frame->pixels;
+        for(done=0;done<pixels;done+=take){
+            take=pixels-done;if(take>sizeof(chunk))take=sizeof(chunk);
+            if(!AW_SpriteRead(file,base,end,chunk,take))
+                {AW_SpriteError(file,mod,"short frame pixel read");return NULL;}
+            for(i=0;i<take;i++)out16[done+i]=d_8to16table[chunk[i]];
+        }
+    }
+    return frame;
+}
+
+/* Return zero only for a non-IDSP member so the established generic loader can
+ * retain its existing fallback/search behavior. A recognized but malformed
+ * sprite is a load error, after closing the exact loose-file or PAK handle. */
+int Mod_TryStreamSprite(model_t *mod)
+{
+    FILE *file=NULL;
+    dsprite_t header;
+    msprite_t *sprite;
+    dspriteframetype_t type_disk;
+    dspritegroup_t group_disk;
+    dspriteinterval_t interval_disk;
+    int filebytes,ident,numframes,i,j,frametype,group_frames,size;
+    long base,end,position;
+    size_t group_size,interval_bytes;
+    filebytes=COM_FOpenFile(mod->name,&file);
+    if(!file)return 0;
+    if(filebytes<4){fclose(file);return 0;}
+    base=ftell(file);
+    if(base<0 || (long)filebytes>LONG_MAX-base){fclose(file);return 0;}
+    end=base+(long)filebytes;
+    if(!AW_SpriteRead(file,base,end,&ident,sizeof(ident))){fclose(file);return 0;}
+    if(LittleLong(ident)!=IDSPRITEHEADER){fclose(file);return 0;}
+    header.ident=ident;
+    if(filebytes<(int)sizeof(header) ||
+       !AW_SpriteRead(file,base,end,(byte *)&header+sizeof(ident),sizeof(header)-sizeof(ident)))
+        return AW_SpriteError(file,mod,"truncated sprite header");
+    if(LittleLong(header.version)!=SPRITE_VERSION){
+        int version=LittleLong(header.version);fclose(file);file=NULL;
+        Sys_Error("%s has wrong version number (%ld should be %ld)",mod->name,version,SPRITE_VERSION);
+        return 0;
+    }
+    numframes=LittleLong(header.numframes);
+    if(numframes<1 || numframes>(INT_MAX-(int)sizeof(*sprite))/(int)sizeof(mspriteframedesc_t)+1)
+        return AW_SpriteError(file,mod,"invalid frame count");
+    if(LittleLong(header.width)<1 || LittleLong(header.height)<1)
+        return AW_SpriteError(file,mod,"invalid sprite dimensions");
+    if(LittleLong(header.type)<SPR_VP_PARALLEL_UPRIGHT ||
+       LittleLong(header.type)>SPR_VP_PARALLEL_ORIENTED ||
+       LittleLong(header.synctype)<ST_SYNC || LittleLong(header.synctype)>ST_RAND)
+        return AW_SpriteError(file,mod,"invalid sprite header fields");
+    position=ftell(file);
+    if(position<base || position>end ||
+       (size_t)numframes>(size_t)(end-position)/(sizeof(type_disk)+sizeof(dspriteframe_t)+1))
+        return AW_SpriteError(file,mod,"frame count exceeds member bounds");
+
+    if(!isfinite(LittleFloat(header.boundingradius)))
+        return AW_SpriteError(file,mod,"invalid sprite bounding radius");
+    if(!isfinite(LittleFloat(header.beamlength)))
+        return AW_SpriteError(file,mod,"invalid sprite beam length");
+    COM_FileBase(mod->name,loadname);loadmodel=mod;mod->needload=NL_PRESENT;
+    size=sizeof(*sprite)+(numframes-1)*sizeof(mspriteframedesc_t);
+    sprite=Hunk_AllocName(size,loadname);mod->cache.data=sprite;
+    sprite->type=LittleLong(header.type);sprite->maxwidth=LittleLong(header.width);
+    sprite->maxheight=LittleLong(header.height);sprite->beamlength=LittleFloat(header.beamlength);
+    sprite->numframes=numframes;mod->synctype=LittleLong(header.synctype);
+    mod->mins[0]=mod->mins[1]=-sprite->maxwidth/2;
+    mod->maxs[0]=mod->maxs[1]=sprite->maxwidth/2;
+    mod->mins[2]=-sprite->maxheight/2;mod->maxs[2]=sprite->maxheight/2;
+    mod->numframes=numframes;mod->flags=0;
+    for(i=0;i<numframes;i++){
+        int raw_type;
+        if(!AW_SpriteRead(file,base,end,&type_disk,sizeof(type_disk)))
+            return AW_SpriteError(file,mod,"truncated frame type");
+        raw_type=LittleLong(type_disk.type);frametype=raw_type;
+        if(frametype!=SPR_SINGLE && frametype!=SPR_GROUP)
+            return AW_SpriteError(file,mod,"invalid frame type");
+        sprite->frames[i].type=frametype;
+        if(frametype==SPR_SINGLE){
+            sprite->frames[i].frameptr=AW_StreamSpriteFrame(file,base,end,mod);
+            if(!sprite->frames[i].frameptr)return 0;
+            continue;
+        }
+        if(!AW_SpriteRead(file,base,end,&group_disk,sizeof(group_disk)))
+            return AW_SpriteError(file,mod,"truncated group header");
+        group_frames=LittleLong(group_disk.numframes);position=ftell(file);
+        if(group_frames<1 || position<base || position>end ||
+           (size_t)group_frames>(size_t)(end-position)/
+             (sizeof(interval_disk)+sizeof(dspriteframe_t)+1) ||
+           (size_t)(group_frames-1)>(INT_MAX-sizeof(mspritegroup_t))/sizeof(mspriteframe_t * ) ||
+           (size_t)group_frames>INT_MAX/sizeof(float))
+            return AW_SpriteError(file,mod,"invalid or truncated group frame count");
+        group_size=sizeof(mspritegroup_t)+(size_t)(group_frames-1)*sizeof(mspriteframe_t *);
+        interval_bytes=(size_t)group_frames*sizeof(float);
+        {
+            mspritegroup_t *group=Hunk_AllocName((int)group_size,loadname);
+            float *intervals=Hunk_AllocName((int)interval_bytes,loadname);
+            group->numframes=group_frames;group->intervals=intervals;
+            sprite->frames[i].frameptr=(mspriteframe_t *)group;
+            for(j=0;j<group_frames;j++){
+                float value;
+                if(!AW_SpriteRead(file,base,end,&interval_disk,sizeof(interval_disk)))
+                    return AW_SpriteError(file,mod,"truncated group intervals");
+                value=LittleFloat(interval_disk.interval);
+                if(!isfinite(value) || value<=0.0f)
+                    return AW_SpriteError(file,mod,"invalid group interval");
+                intervals[j]=value;
+            }
+            for(j=0;j<group_frames;j++){
+                group->frames[j]=AW_StreamSpriteFrame(file,base,end,mod);
+                if(!group->frames[j])return 0;
+            }
+        }
+    }
+    position=ftell(file);
+    if(position!=end)return AW_SpriteError(file,mod,"trailing or unread sprite bytes");
+    fclose(file);file=NULL;
+    mod->radius=0;
+    for(i=0;i<numframes;i++){
+        if(sprite->frames[i].type==SPR_SINGLE){
+            float radius=Mod_SpriteFrameRadius(sprite->frames[i].frameptr);
+            if(radius>mod->radius)mod->radius=radius;
+        }else{
+            mspritegroup_t *group=(mspritegroup_t *)sprite->frames[i].frameptr;
+            for(j=0;j<group->numframes;j++){
+                float radius=Mod_SpriteFrameRadius(group->frames[j]);
+                if(radius>mod->radius)mod->radius=radius;
+            }
+        }
+    }
+    if(!isfinite(mod->radius) || mod->radius<=0)
+        return AW_SpriteError(file,mod,"invalid sprite frame radius");
+    for(i=0;i<3;i++){mod->mins[i]=-mod->radius;mod->maxs[i]=mod->radius;}
+    mod->type=mod_sprite;
+    return 1;
+}
 void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 {
     int					i;
@@ -2184,6 +2484,26 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
         }
     }
 
+    mod->radius = 0;
+    for (i = 0; i < numframes; i++) {
+        if (psprite->frames[i].type == SPR_SINGLE) {
+            float radius = Mod_SpriteFrameRadius(psprite->frames[i].frameptr);
+            if (radius > mod->radius) mod->radius = radius;
+        } else {
+            mspritegroup_t *group = (mspritegroup_t *)psprite->frames[i].frameptr;
+            int j;
+            for (j = 0; j < group->numframes; j++) {
+                float radius = Mod_SpriteFrameRadius(group->frames[j]);
+                if (radius > mod->radius) mod->radius = radius;
+            }
+        }
+    }
+    if (!isfinite(mod->radius) || mod->radius <= 0)
+        Sys_Error("Invalid sprite frame radius: %s", mod->name);
+    for (i = 0; i < 3; i++) {
+        mod->mins[i] = -mod->radius;
+        mod->maxs[i] = mod->radius;
+    }
     mod->type = mod_sprite;
 }
 

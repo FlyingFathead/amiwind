@@ -1,5 +1,6 @@
 """Portable launcher tests with synthetic disks/ROMs and a fake emulator."""
 import contextlib
+import errno
 import hashlib
 import importlib.util
 import io
@@ -17,6 +18,18 @@ SCRIPT = Path(__file__).resolve().parents[1] / 'tools/AmiWind-FS-UAE-launcher.py
 spec = importlib.util.spec_from_file_location('portable_launcher', SCRIPT)
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
+
+
+def symlink_or_skip(link, target, **kwargs):
+    """Retain real symlink coverage wherever the host permits creation."""
+    try:
+        link.symlink_to(target, **kwargs)
+    except NotImplementedError as exc:
+        raise unittest.SkipTest('Host does not support symlink creation: ' + str(exc))
+    except OSError as exc:
+        if getattr(exc, 'winerror', None) == 1314 or exc.errno in (errno.EACCES, errno.EPERM, errno.ENOTSUP):
+            raise unittest.SkipTest('Host cannot create test symlinks: ' + str(exc))
+        raise
 
 
 class LauncherTests(unittest.TestCase):
@@ -271,7 +284,7 @@ class LauncherTests(unittest.TestCase):
             target = self.root / 'target'
             target.write_text('{}' if name.endswith('.json') else '[config]\n')
             link = self.root / name
-            link.symlink_to(target)
+            symlink_or_skip(link, target)
             before = target.read_bytes()
             self.assertEqual(self.run_main(['--configure-only'])[0], 1)
             self.assertEqual(target.read_bytes(), before)

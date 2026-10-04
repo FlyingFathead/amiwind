@@ -105,6 +105,14 @@ def parser():
     p.add_argument('--gallery-seed-run', type=Path, help='Import completed compatible model pairs from a stopped rc9 build run')
     p.add_argument("--no-npc-gallery", action="store_true", help="DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery included by default")
     p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: Nord first-person hands and original carried torch")
+    p.add_argument('--tree-sprites', action='store_true',
+                   help='STAGED v0.0.28: original tree/grass sprite + collision overlay; requires matching runtime and memory/coverage acceptance')
+    p.add_argument('--map-budget-policy', choices=('strict', 'warning'), default='strict',
+                   help='Private playtest only: warning permits modeled reserve allowance excess; actual allocation limits and other checks remain enforced')
+    from hidden_surface_build import add_options as add_hidden_surface_options
+    add_hidden_surface_options(p)
+    from exterior_sky_build import add_options as add_exterior_sky_options
+    add_exterior_sky_options(p)
     add_jobs(p)
     p.add_argument('--serial-stages', action='store_true',
                    help='Run stages in order while retaining each stage job limit (diagnostics)')
@@ -470,6 +478,31 @@ def commands(args, tools, run):
             ("image", tool("build_aga.py", "image", *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
+    if getattr(args, 'tree_sprites', False):
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        flora_steps = [
+            ('world-flora-assets', tool('prepare_tree_sprites.py', '--data-files', args.data_files,
+                '--palette', run / 'intro-scene/id1/gfx/palette.lmp',
+                '--out', run / 'world-flora-assets', '--jobs', resolve_jobs(args.jobs))),
+            ('world-flora', tool('prepare_world_flora.py', '--terrain', run / 'world-terrain',
+                '--base', run / 'world-scenery', '--flora', run / 'world-flora-assets',
+                '--palette', run / 'intro-scene/id1/gfx/palette.lmp',
+                '--out', run / 'world-flora', '--jobs', resolve_jobs(args.jobs), '--collision-packing', 'adaptive')),
+        ]
+        steps[image_index:image_index] = flora_steps
+        steps = [(name, command + ['--world-flora', str(run / 'world-flora'),
+                      '--town-flora-source-index', str(run / 'scenery/scenery-index.json'),
+                      '--town-flora-scene-report', str(run / 'alias-scene/scene-report.json'),
+                      '--balmora-cache', str(run / 'balmora-work')] if name == 'image' else command)
+                 for name, command in steps]
+    if args.stage == 'aga':
+        image_options = ['--hidden-surface-cull', getattr(args, 'hidden_surface_cull', 'true'),
+                         '--local-skybox', getattr(args, 'local_skybox', 'false'),
+                         '--map-budget-policy', getattr(args, 'map_budget_policy', 'strict')]
+        if getattr(args, 'shared_sky_source', None) is not None:
+            image_options += ['--shared-sky-source', str(args.shared_sky_source.resolve())]
+        steps = [(name, command + image_options if name == 'image' else command)
+                 for name, command in steps]
     if args.no_npc_gallery:
         steps = [(name, command) for name, command in steps if name != "npc-gallery"]
     return steps
@@ -530,8 +563,18 @@ def provenance(args, tools):
         "stage": args.stage, "hands": args.hands if args.stage == "aga" else None,
         "python": sys.version, "data_files": str(args.data_files), "tools": tools,
         "version_comparison": getattr(args, "version_report", []),
+        "hidden_surface_cull": {"enabled": getattr(args, "hidden_surface_cull", "true") == "true",
+                                "stage": "final serialized static exterior surfaces",
+                                "scope": "certified hidden surfaces; not all-interior acceptance"},
+        "exterior_sky": {"local_skybox": getattr(args, "local_skybox", "false") == "true",
+                         "shared_sky_source": str(args.shared_sky_source.resolve()) if getattr(args, "shared_sky_source", None) else None,
+                         "stage": "final serialized exterior sky before hidden surfaces and compaction",
+                         "unknown_maps": "preserved and recorded"},
         "compiler_jobs": resolve_jobs(args.jobs),
         "serial_stages": args.serial_stages,
+        'world_flora': {'requested': bool(getattr(args, 'tree_sprites', False)),
+                        'status': 'staged opt-in' if getattr(args, 'tree_sprites', False) else 'not_requested',
+                        'policy_sha256': sha256(ROOT / 'config/world-flora.json') if getattr(args, 'tree_sprites', False) else None},
         "font_options": getattr(args, "font_options", None) or resolve_font_options(args),
         "input_check": getattr(args, "input_report", None),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
@@ -568,6 +611,8 @@ def main(argv=None):
             from check_actor_ground import load_approved_report
             args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.expanduser().resolve()
             load_approved_report(args.allow_known_actor_ground_findings)
+        if args.tree_sprites and (args.stage != 'aga' or args.dry_run):
+            raise ValueError('--tree-sprites requires a real staged AGA image build')
         args.font_options = resolve_font_options(args)
         if args.recover_image_from and (args.stage != 'aga' or args.dry_run or args.host_plan or args.check_inputs or args.versions or args.install_dependencies or args.install_sdk):
             raise ValueError('--recover-image-from requires an AGA build/check/plan, with a new run name')
@@ -636,7 +681,7 @@ def main(argv=None):
             return 1 if report["errors"] else 0
         args.name = args.name or datetime.now(timezone.utc).strftime("build-%Y%m%d-%H%M%S")
         if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}", args.name):
-            raise ValueError("--name must be 1–64 letters, digits, dots, hyphens or underscores")
+            raise ValueError("--name must be 1Ã¢â‚¬â€œ64 letters, digits, dots, hyphens or underscores")
         if args.stage == "aga" and not args.dry_run:
             print("Bitmap paper ink: " + args.font_options["bitmap_paper_ink"] +
                   " (" + args.font_options["selected_by"] +

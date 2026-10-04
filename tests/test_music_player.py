@@ -46,6 +46,9 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
                 (p / "music" / f"track{number:02}.mws").write_bytes(pack_stream(pcm))
             playlist = p / "music/playlist.txt"
             playlist.write_text("4 0 4 11 42\n2 42 83\n")
+            long_pcm = bytes(v for i in range(41000) for v in ((i*3+11*17)%256, (i*7+11*31)%256))
+            (p / "music/track11.mws").write_bytes(pack_stream(long_pcm))
+            subprocess.run([str(exe), str(p), "buffered"], cwd=p, check=True, timeout=10)
             subprocess.run([str(exe), str(p), "notifications"], cwd=p, check=True, timeout=10)
             subprocess.run([str(exe), str(p), "normal"], cwd=p, check=True, timeout=10)
             events = (p / "music-events.csv").read_text().splitlines()

@@ -61,7 +61,8 @@ def convert_region(task):
             report = append_meshes(source, local / 'scene.bsp', local, palette,
                                    centre=[x / .25 for x in entry['origin'][:2]], jobs=1,
                                    references=[r['number'] for r in selected], prepared_models=_MODELS,
-                                   retain_dressing=True, collision_bounds=entry['coverage'])
+                                   retain_dressing=True, collision_bounds=entry['coverage'],
+                                   map_identity=entry['name'],cell_identity=','.join(map(str,entry['cell'])) if entry.get('cell') else None,subcell_identity=entry['name'] if entry.get('subcell') is not None else None)
         if report['instances'] != len(selected):
             raise ValueError('Scenery placement count mismatch: ' + entry['name'])
         if report['unique_models'] > 240 or report['instances'] > 550:

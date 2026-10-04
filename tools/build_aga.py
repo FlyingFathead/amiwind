@@ -67,6 +67,11 @@ HEAP_LOADER_SOURCE_PATHS = (
     'Makefile',
     'src/model.c', 'src/model.h', 'src/zone.c', 'src/zone.h',
     'src/common.c', 'src/sys_amiga.c',
+    'src/aw_guard_torch.c', 'src/aw_torch.c',
+    'src/aw_scenery.c', 'src/pr_edict.c', 'src/aw_scene.c', 'src/aw_spawn.c', 'src/aw_console.c',
+    'src/render.h', 'src/r_sprite.c', 'src/r_efrag.c', 'src/r_main.c',
+    'src/cl_parse.c', 'src/cl_main.c', 'src/client.h', 'src/pr_cmds.c', 'src/protocol.h', 'qc/world.qc',
+    'src/quakedef.h', 'src/server.h', 'src/net.h', 'src/host.c', 'src/net_main.c', 'src/net_loop.c',
 )
 RUNTIME_BUILD_DIR='runtime'
 CC_FLAGS=' -std=gnu89 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types'
@@ -103,6 +108,35 @@ def heap_watcher_summary(report, report_path):
         'runtime_log': 'heap-audit.log',
         'acceptance': report['acceptance'],
     }
+
+def apply_map_budget_policy(report, policy='strict', receipt_path=None):
+    """Opt in to modeled reserve warnings; never waive loader/allocation errors."""
+    if policy not in ('strict', 'warning'):
+        raise ValueError('Map budget policy must be strict or warning')
+    ceiling = report['heap_budget_bytes']
+    if ceiling <= 0 or report['baseline_reserve_bytes'] <= 0 or report['safety_headroom_bytes'] <= 0:
+        raise ValueError('Invalid heap ceiling or reserve data')
+    hard_failures = [row['map'] for row in report['maps'] if row['peak_loader_bytes'] >= ceiling]
+    failures = list(report['failing_maps'])
+    status = ('estimate_allocation_ceiling_failed' if hard_failures else
+              'estimate_warning_needs_adjustment' if failures and policy == 'warning' else
+              'estimate_failed' if failures else 'estimate_passed')
+    decision = {'policy': policy, 'status': status,
+                'modeled_allowance_passed': not failures,
+                'private_assembly_allowed': not hard_failures and (not failures or policy == 'warning'),
+                'production_memory_gate_passed': not failures and not hard_failures,
+                'heap_budget_bytes': ceiling,
+                'baseline_reserve_bytes': report['baseline_reserve_bytes'],
+                'safety_headroom_bytes': report['safety_headroom_bytes'],
+                'allowance_failures': failures, 'allocation_ceiling_failures': hard_failures,
+                'runtime_validation': 'pending; runtime allocation errors remain fatal',
+                'scope': 'modeled reserve allowance only; assets, geometry, collision and all other gates unchanged'}
+    if receipt_path is not None:
+        Path(receipt_path).write_text(json.dumps(decision, indent=2) + '\n', encoding='utf-8', newline='\n')
+    if not decision['private_assembly_allowed']:
+        raise ValueError('World-map heap clearance estimate failed: ' + status + '; ' + ', '.join(hard_failures or failures))
+    return decision
+
 
 def new_output(path):
     path=ensure_external(path,'AGA build')
@@ -356,6 +390,12 @@ def write_content_fingerprint(id1):
         for index in range(struct.unpack_from('<I',raw,4)[0]):
             name=f'maps/vf{index:04d}.bsp'
             fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(Path(id1)/name)))
+    from prepare_guard_torches import fingerprint_entries
+    def optional_asset(name):
+        path=Path(id1)/name
+        return path.read_bytes() if path.is_file() else None
+    for name,hash_value in fingerprint_entries(optional_asset):
+        fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
     (Path(id1)/'save-content.bin').write_bytes(fingerprint.digest())
 
 
@@ -369,6 +409,11 @@ def image(args):
         from check_actor_ground import load_approved_report
         args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.resolve()
         load_approved_report(args.allow_known_actor_ground_findings)
+    if getattr(args, 'world_flora', None):
+        for field in ('town_flora_source_index', 'town_flora_scene_report', 'balmora_cache'):
+            value = getattr(args, field, None)
+            if not value or not Path(value).exists():
+                raise ValueError('Complete flora image requires --' + field.replace('_', '-'))
     check_binary(args.engine.read_bytes())
     checker=args.bootcheck or args.engine.parent/'AmiWindCheck'
     check_binary(checker.read_bytes())
@@ -382,8 +427,18 @@ def image(args):
     if build_mode!=args.hands:raise ValueError('Image hands choice must match engine build')
     scene=ensure_external(args.scene,'AGA scene');music=ensure_external(args.music,'converted music');out=new_output(args.out)
     boot=out/'boot';shutil.copytree(scene/'id1',boot/'id1');(boot/'S').mkdir()
+    terrain = getattr(args, 'world_terrain', None)
+    if terrain:
+        from install_world_terrain import install as install_world_terrain
+        terrain_acceptance = install_world_terrain(terrain, boot/'id1')
+        (out/'world-terrain-staging.json').write_text(json.dumps(terrain_acceptance,indent=2)+'\n',encoding='utf-8',newline='\n')
     world_scenery_acceptance=install_world_scenery(args.world_scenery,boot/'id1')
     (out/'world-scenery-staging.json').write_text(json.dumps(world_scenery_acceptance,indent=2)+'\n',encoding='utf-8',newline='\n')
+    flora = getattr(args, 'world_flora', None)
+    if flora:
+        from install_world_flora import install as install_world_flora
+        flora_acceptance = install_world_flora(flora, boot/'id1', world_scenery_acceptance)
+        (out/'world-flora-staging.json').write_text(json.dumps(flora_acceptance, indent=2)+'\n', encoding='utf-8', newline='\n')
     cfg=boot/'id1/default.cfg'
     cfg.write_text(startup_config(cfg.read_text()), newline='\n')
     shutil.copyfile(ROOT/'config/keymaps.cfg',boot/'id1/keymaps-default.cfg')
@@ -458,6 +513,33 @@ def image(args):
         repair_balmora_maps(boot/'id1/maps', cache=args.balmora_cache,
                            palette=boot/'id1/gfx/palette.lmp', ericw_bin=args.qbsp.parent,
                            work_dir=out/'bounded-balmora', threads=4)
+    if flora:
+        from install_town_flora import install as install_town_flora
+        from prepare_quake import CENTRE
+        from balmora_regions import config as balmora_config, regions as balmora_regions
+        town_palette = args.scene/'id1/gfx/palette.lmp'
+        seyda_origin = [CENTRE[0]*.25, CENTRE[1]*.25, 0.]
+        actual = json.loads((boot/'id1/seyda-regions.json').read_text(encoding='utf-8'))
+        seyda_entries = [{**entry, 'origin':seyda_origin} for entry in actual['regions']]
+        towns = {'seyda':install_town_flora(boot, flora, town_palette,
+            entries=seyda_entries, town_source_index=args.town_flora_source_index,
+            town_scene_report=args.town_flora_scene_report, work_dir=out/'town-flora-seyda')}
+        shutil.copyfile(boot/'id1/maps'/(actual['fallback_alias']+'.bsp'), boot/'id1/maps/seyda.bsp')
+        settings = balmora_config()
+        balmora_origin = [v*settings['scale'] for v in settings['centre']]+[0.]
+        towns['balmora'] = install_town_flora(boot, flora, town_palette,
+            entries=[{**entry, 'origin':balmora_origin} for entry in balmora_regions(settings)],
+            town_source_index=args.balmora_cache/'scenery/scenery-index.json',
+            work_dir=out/'town-flora-balmora')
+        # Match the installed runtime directory's named fallback alias.
+        rows=(boot/'id1/balmora-regions.txt').read_text(encoding='ascii').splitlines()
+        point=tuple(map(float,rows[0].split()[4:6]))
+        fallback=next(row.split()[0] for row in rows[1:] if
+            float(row.split()[1]) <= point[0] < float(row.split()[3]) and
+            float(row.split()[2]) <= point[1] < float(row.split()[4]))
+        shutil.copyfile(boot/'id1/maps'/(fallback+'.bsp'), boot/'id1/maps/balmora.bsp')
+        flora_acceptance['towns'] = {name:{k:v for k,v in result.items() if k!='maps'} for name,result in towns.items()}
+        (out/'world-flora-staging.json').write_text(json.dumps(flora_acceptance,indent=2)+'\n',encoding='utf-8',newline='\n')
     qc=out/'qc';qc.mkdir()
     for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
     if args.hands=='sprites':
@@ -473,6 +555,35 @@ def image(args):
         (out/'actor-grounding.json').write_text(json.dumps(grounding,indent=2)+'\n', newline='\n')
         (out/'actor-ground-support.json').write_text(json.dumps(bake_ground(boot/'id1/maps'),indent=2)+'\n', newline='\n')
     return finalize_image(args)
+
+
+def staged_exterior_map_names(id1):
+    """Explicit runtime directories identify exterior cells; sky is not a classifier."""
+    id1 = Path(id1)
+    names = {name for name in ('seyda', 'balmora', 'intro_docks', 'sncourt')
+             if (id1 / 'maps' / (name + '.bsp')).is_file()}
+    for table, prefix in (('seyda-regions.txt', 'sn'), ('balmora-regions.txt', 'bm')):
+        directory = id1 / table
+        if directory.is_file():
+            names.update(Path(name).stem for name in town_region_map_names(directory, prefix))
+    directory = id1 / 'world/regions.awr'
+    if directory.is_file():
+        raw = directory.read_bytes()
+        if len(raw) < 64 or raw[:4] != b'AWR2':
+            raise ValueError('Invalid world region directory for hidden-surface pass')
+        count = struct.unpack_from('<I', raw, 4)[0]
+        if len(raw) != 64 + count * 52:
+            raise ValueError('World region count mismatch for hidden-surface pass')
+        names.update(f'vf{index:04d}' for index in range(count))
+    return names
+
+
+def staged_interior_map_names(id1):
+    """Only explicit authored scene catalogue interior classifications apply."""
+    from area_config import SCENES
+    id1 = Path(id1)
+    return {scene["map"] for scene in SCENES if scene.get("interior") is True
+            and (id1 / "maps" / (scene["map"] + ".bsp")).is_file()}
 
 
 def finalize_image(args):
@@ -502,6 +613,33 @@ def finalize_image(args):
     torch_report=json.loads((out/'torch-conversion.json').read_text())
     world_scenery_acceptance=json.loads((out/'world-scenery-staging.json').read_text())
     movie=boot/'id1/intro/mw_intro.awv'
+    # Owned cloud conversion/palette reservation is source-reproducible and runs
+    # before map/contact/heap gates and content fingerprints. Explicit shared
+    # sources and local-skybox debug retain their caller-owned behavior.
+    from prepare_shared_sky_assets import prepare_staged_sky
+    sky_asset_preparation = prepare_staged_sky(boot / 'id1',
+        getattr(args, 'data_files', None), out / 'sky-asset-preparation',
+        shared_sky_source=getattr(args, 'shared_sky_source', None),
+        local_skybox=getattr(args, 'local_skybox', 'false'))
+    from prepare_guard_torches import prepare as prepare_guard_torches
+    guard_torches = prepare_guard_torches(args.data_files, boot / 'id1')
+    (out/'guard-torch-conversion.json').write_text(json.dumps(guard_torches,indent=2)+'\n', newline='\n')
+    # Apply explicit sky policy after every mesh/overlay, before all final gates.
+    from exterior_sky_build import configure_staged_maps
+    exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
+    exterior_sky = configure_staged_maps(boot / 'id1',
+        exterior_maps=staged_exterior_map_names(boot / 'id1'),
+        interior_maps=staged_interior_map_names(boot / 'id1'),
+        local_skybox=getattr(args, 'local_skybox', 'false'),
+        shared_sky_source=sky_asset_preparation['shared_sky_source'],
+        work_dir=exterior_sky_path.parent)
+    # Run after all meshes/overlays, before compaction, contact/heap and fingerprints.
+    from hidden_surface_build import cull_staged_maps, enabled_value
+    hidden_surface_path = out / 'hidden-surface-cull' / 'hidden-surfaces.json'
+    hidden_surfaces = cull_staged_maps(boot / 'id1/maps', hidden_surface_path.parent,
+        staged_exterior_map_names(boot / 'id1'),
+        enabled=enabled_value(getattr(args, 'hidden_surface_cull', 'true')),
+        jobs=getattr(args, 'optimizer_jobs', 6))
     # Finish immutable BSP sharing before contact/heap gates and fingerprinting.
     # This step is interpreted Python only; it never creates a native helper.
     from optimize_world_maps import optimize_maps, verify_optimized_maps, bind_heap_report
@@ -523,13 +661,16 @@ def finalize_image(args):
     bind_heap_report(optimization, world_heap, world_heap_path, optimization_path)
     heap_watcher=heap_watcher_summary(world_heap,world_heap_path)
     (out/'heap-watcher.json').write_text(json.dumps(heap_watcher,indent=2)+'\n',encoding='utf-8',newline='\n')
-    if world_heap['failing_maps']:
-        raise ValueError(f"World-map heap clearance estimate failed for {len(world_heap['failing_maps'])} maps; "
-                         f"worst {world_heap['worst_map']} has estimated clearance "
-                         f"{world_heap['minimum_estimated_clearance_bytes']} bytes; see {world_heap_path}")
-    print(f"World-map heap estimate passed: {world_heap['passing_maps']}/{world_heap['map_count']} maps; "
-          f"minimum estimated clearance {world_heap['minimum_estimated_clearance_bytes']} bytes "
-          f"after baseline and safety reserves. This is not target validation.",flush=True)
+    budget_policy_path = out / 'map-budget-policy.json'
+    budget_decision = apply_map_budget_policy(world_heap,
+        getattr(args, 'map_budget_policy', 'strict'), budget_policy_path)
+    heap_watcher['status'] = budget_decision['status']
+    heap_watcher['budget_policy'] = budget_decision
+    (out/'heap-watcher.json').write_text(json.dumps(heap_watcher,indent=2)+'\n',encoding='utf-8',newline='\n')
+    prefix = '[warning: needs adjustment]' if world_heap['failing_maps'] else 'World-map heap estimate passed:'
+    print(f"{prefix} {world_heap['passing_maps']}/{world_heap['map_count']} maps clear the modeled allowance; "
+          f"minimum clearance {world_heap['minimum_estimated_clearance_bytes']} bytes after unchanged baseline "
+          f"and safety reserves. Policy={budget_decision['policy']}; runtime validation pending.",flush=True)
     verify_optimized_maps(boot/'id1/maps', optimization)
     write_content_fingerprint(boot/'id1')
     manifest=json.loads((music/'soundtrack.json').read_text());groups=playlists(manifest['tracks'])
@@ -555,7 +696,7 @@ def finalize_image(args):
     payload_bytes=sum(p.stat().st_size for p in boot.rglob('*') if p.is_file())
     partition_mib=max(128,((payload_bytes*6//5 + 16*1024*1024 + 127*1024*1024)//(128*1024*1024))*128)
     if partition_mib>=2048:raise ValueError('Boot partition must remain below 2 GiB')
-    suffix = '' if actor_acceptance['production_gate_passed'] else '-private-test'
+    suffix = '' if actor_acceptance['production_gate_passed'] and budget_decision['production_memory_gate_passed'] else '-private-test'
     part=out/'partition.hdf';hdf=out/f'AmiWind-v{VERSION}{suffix}.hdf'
     cmd=[args.xdftool,part,'create',f'size={partition_mib}Mi','+','format','AMIWIND','ffs','+','boot','install']
     for path in sorted((p for p in boot.rglob('*') if p.is_dir()),key=lambda p:len(p.parts)):
@@ -597,13 +738,33 @@ def finalize_image(args):
     build_json={
         'version':VERSION,'hands':args.hands,'actor_ground_audit':actor_acceptance,
         'npc_gallery':gallery_report,'world_scenery':world_scenery_acceptance,
+        'world_flora':json.loads((out/'world-flora-staging.json').read_text(encoding='utf-8')) if (out/'world-flora-staging.json').is_file() else {'status':'not_requested'},
+        'sky_asset_preparation':sky_asset_preparation,
+        'guard_torches':guard_torches,
+        'exterior_sky':{'local_skybox':exterior_sky['local_skybox'],
+            'report':str(exterior_sky_path.relative_to(out)),
+            'report_sha256':digest(exterior_sky_path),'status':exterior_sky['status'],
+            'map_count':len(exterior_sky['maps']),
+            'removed_sky_faces':exterior_sky['removed_sky_faces'],
+            'unknown_maps_preserved':exterior_sky['unknown_maps_preserved'],
+            'shared_resource_source':exterior_sky['shared_resource_source'],
+            'shared_resource_sha256':exterior_sky['shared_resource_sha256']},
+        'hidden_surface_cull':{'enabled':hidden_surfaces['enabled'],
+            'report':str(hidden_surface_path.relative_to(out)),
+            'report_sha256':digest(hidden_surface_path),'status':hidden_surfaces['status'],
+            'removed_stored_faces':hidden_surfaces['removed_stored_faces'],
+            'file_bytes_saved':hidden_surfaces['file_bytes_saved'],
+            'acceptance':hidden_surfaces['acceptance']},
         'heap_watcher':heap_watcher,
         'world_map_optimization':{
             'report':optimization_path.name,'report_sha256':digest(optimization_path),
             'map_count':optimization['map_count'],'file_bytes_saved':optimization['file_bytes_saved'],
             'acceptance':optimization['acceptance']},
         'world_map_heap':{
-            'status':'estimate_passed','report':world_heap_path.name,
+            'status':budget_decision['status'],'budget_policy':budget_decision['policy'],
+            'policy_receipt':budget_policy_path.name,'policy_receipt_sha256':digest(budget_policy_path),
+            'production_memory_gate_passed':budget_decision['production_memory_gate_passed'],
+            'runtime_validation':'pending','report':world_heap_path.name,
             'report_sha256':digest(world_heap_path),'map_count':world_heap['map_count'],
             'minimum_estimated_clearance_bytes':world_heap['minimum_estimated_clearance_bytes'],
             'baseline_reserve_bytes':world_heap['baseline_reserve_bytes'],
@@ -638,15 +799,24 @@ def main():
     e=sub.add_parser('engine');e.add_argument('--cpu',choices=['68020','68040'],default='68040');e.add_argument('--archive',type=Path,help='Optional legacy provenance check; source is always engine/aga in this repository');e.add_argument('--out',type=Path,required=True);e.add_argument('--sdk',type=Path,required=True);e.add_argument('--vasm',type=Path,help='68000 preflight assembler; defaults to the SDK vasm')
     add_jobs(e)
     i=sub.add_parser('image')
+    from hidden_surface_build import add_options as add_hidden_surface_options
+    add_hidden_surface_options(i)
+    from exterior_sky_build import add_options as add_exterior_sky_options
+    add_exterior_sky_options(i)
     i.add_argument('--kickstart-file',type=Path,help='Optional owned ROM for generated local emulator configurations; never bundled or downloaded')
     i.add_argument('--sdk',type=Path,required=True,help='AmigaPorts SDK used to compile the exact target ABI heap profile')
+    i.add_argument('--map-budget-policy', choices=['strict', 'warning'], default='strict', help='Explicit private warning policy for modeled reserve allowance only; runtime allocation ceiling and all other gates stay unchanged')
     i.add_argument('--allow-known-actor-ground-findings', type=Path, help='PRIVATE TEST ONLY: accept an exact previously reviewed contact audit; strict production gate remains failed')
     i.add_argument('--data-files',type=Path,required=True,help='Owned original game assets')
     gallery_choice=i.add_mutually_exclusive_group(required=True)
     gallery_choice.add_argument('--gallery',type=Path,help='Verified NPC gallery from build_gallery.py; normal default')
     gallery_choice.add_argument('--no-npc-gallery',action='store_true',help='DEBUGGING ONLY: omit inspection gallery, never required game NPCs')
     i.add_argument('--intro-captions',type=Path,help='Private JSON title cards; first card becomes a switchable opening overlay')
+    i.add_argument('--world-terrain',type=Path,help='Complete validated refined terrain receipt and runtime directory, staged before scenery')
     i.add_argument('--world-scenery',type=Path,required=True,help='Complete validated full-world rock and giant-mushroom overlay directory')
+    i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')
+    i.add_argument('--town-flora-source-index',type=Path,help='Exact original Seyda scenery reference bindings for flora installation')
+    i.add_argument('--town-flora-scene-report',type=Path,help='Original alias conversion model mapping; required with --world-flora')
     i.add_argument('--balmora-cache',type=Path,help='Complete owned Balmora preparation cache for measured layout repair before final actor/heap audits')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
     for name in ['scene','music','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)

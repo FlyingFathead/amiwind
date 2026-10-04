@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
+#include "aw_sky.h"
 
 #if !id68k
 static
@@ -44,11 +45,16 @@ vec3_t		transformed_modelorg;
 void D_DrawSolidSurface(surf_t *surface,int color);
 void D_DrawBackground(surf_t *surface)
 {
-    extern int r_backgroundsky;
+    extern int r_backgroundsky;espan_t *span;short *z;int i;
     d_zistepu=0;d_zistepv=0;d_ziorigin=-0.9f;
     if(r_backgroundsky && r_skysource){
         if(!r_skymade)R_MakeSky();
         D_DrawSkyScans8(surface->spans);
+        for(span=surface->spans;span;span=span->pnext){
+            z=d_pzbuffer+span->v*d_zwidth+span->u;
+            for(i=0;i<span->count;i++)z[i]=AW_SKY_BACKGROUND_DEPTH;
+        }
+        return;
     }else D_DrawSolidSurface(surface,(int)r_clearcolor.value & 0xFF);
     D_DrawZSpans(surface->spans);
 }

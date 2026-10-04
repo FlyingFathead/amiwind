@@ -1,0 +1,23 @@
+{
+  "format": "AmiWind bounded world refinements 1",
+  "regions": [
+    {
+      "parent": "vf0698",
+      "cell": [
+        -4,
+        -4
+      ],
+      "divisions": 2,
+      "reason": "v0.0.28-rc1 flora overlay model-slot/storage reserve failure; preserve all original scenery"
+    },
+    {
+      "parent": "vf0791",
+      "cell": [
+        -3,
+        2
+      ],
+      "divisions": 2,
+      "reason": "v0.0.28-rc1 flora overlay clipnode reserve failure; preserve all original collision"
+    }
+  ]
+}

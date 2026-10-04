@@ -1,5 +1,34 @@
 # Memory allocation and heap clearance
 
+Current release status, 3 October 2026: [v0.0.27 is published](RELEASE-v0.0.27.md).
+Its final private package passed the complete 2,717-map static heap gate and
+both HDF filesystem readbacks. The worst modeled margin is 135,952 bytes after
+the unchanged 3 MiB non-map allowance and 2 MiB safety reserve. No target heap
+lifecycle or performance certification follows from these build results;
+CRASH-01 remains open for exact-route target verification.
+
+## Current v0.0.28 candidate accounting — 4 October 2026
+
+The earlier combined image's matching-ABI audit records 58 modeled reserve warnings and
+no modeled hard allocation-ceiling failures. The target ABI was measured with
+the selected Amiga compiler in Linux Docker. All 10,766 image payloads and three
+partition ownership checks passed; file readback does not establish live memory
+clearance. The original stars/moons use fixed renderer storage, while guard
+companions add first-use model-cache loading. Their disk bytes are not resident
+RAM, and finite light/guard caps are not performance measurements. The newer
+AWN2 point mask adds 2,048 fixed bytes plus a version flag. With the night gallery,
+the corrected target has 648,636 CODE, 11,260 DATA and 1,395,360 BSS bytes:
+2,055,256 total. Its BSS is 2,056 bytes larger than the preceding night/guard
+engine, including the point mask, version flag and gallery mode. Corrected-image
+readback and accounting are complete; actual live pressure is still pending.
+Slower cloud phase is not itself a measured CPU saving.
+
+Treat this as a private playtest candidate with explicit reserve warnings.
+Native cold/warm loads, guard-cache pressure, transitions and high-pressure
+routes remain acceptance work; no reserve policy, hard heap ceiling or reference
+emulator memory setting was lowered to obtain these results. See the
+[current release record](RELEASE-v0.0.28.md).
+
 ## Mandatory: LEAVE HEADROOM
 
 Always leave headroom. A map that only just fits is not acceptable. Audit the
@@ -94,7 +123,7 @@ allocated a second resident copy in the low hunk. The second allocation failed.
 The held-input preservation change does not allocate this map data. The loader's
 double-buffer behavior predates rc3; its first introducing version is unverified.
 
-Repair candidate: the unreleased v0.0.27-rc3 working tree loads byte-only
+Repair introduced during rc3 and included in v0.0.27: the loader reads byte-only
 visibility, lighting and entities directly into final storage. This preserves
 bytes and avoids the extra complete input copy. The real loader regression uses
 the failing 2767103-byte size, checks byte identity and absence of temporary
@@ -105,9 +134,11 @@ inspect the detached filesystem with host tools when needed.
 
 Verified fixed version: pending. Eliminating the failing second copy is not
 proof that subsequent nodes, hulls, actors and renderer allocations fit.
-The corrected target-ABI estimate for sn012 is 10803456 resident loader bytes
-and a 10860976-byte loading peak, before non-BSP reserve or safety margin.
-It therefore fails the current headroom policy. Publication remains blocked.
+The historical unbounded sn012 estimate after the loader-only correction was
+10803456 resident bytes and a 10860976-byte loading peak, before non-BSP reserve
+or safety margin. That candidate failed policy. Later bounded town maps and
+the final 2,717-map package pass the static gate; published v0.0.27 still requires
+the exact target lifecycle test before this incident can be closed.
 
 ## Separate loader trap: extra-HDF search paths
 
@@ -122,11 +153,11 @@ This is a separate issue from sn012's duplicate visibility allocation.
 Affected code: inspected v0.0.27-rc3 working tree and multi-HDF layout. First
 introducing version: unverified. Target occurrence: not yet reproduced; this is
 confirmed path-analysis evidence, not a claimed observed target crash.
-Repair candidate: unreleased rc3 working tree uses COM_FOpenFile and the normal
+The repair introduced during rc3 and included in v0.0.27 uses COM_FOpenFile and the normal
 search order, then streams sections relative to the returned member's starting
 offset. This includes mounted volumes and pack-file members without assuming
-BSP offsets are absolute file offsets. Verified fixed version: pending compilation,
-regression checks and target multi-volume playtest.
+BSP offsets are absolute file offsets. Loader regressions and Amiga compilation
+passed; a verified target-fixed version still requires multi-volume playtesting.
 
 Keep build estimates tied to the actual loader path. Until streaming is verified,
 account for the complete-file fallback or fail acceptance; do not assume a second
@@ -169,7 +200,7 @@ when prioritizing repairs; do not load or ignore them based on filenames alone.
 
 ## Audit while crossing cells
 
-The unreleased runtime records the hunk load peak after old-map memory is
+The v0.0.27 runtime records the hunk load peak after old-map memory is
 cleared, then reports use/clearance at scene spawn, including automatic sub-cell
 loads. Allocation paths update the peak; no per-frame polling is added. A
 transition or explicit diagnostic appends `heap-audit.log` when writable.
@@ -178,8 +209,8 @@ identifies the resident world model where available.
 
 A peak clearance below 2 MiB prints a LOW_HEADROOM warning. This is a diagnostic,
 not a crash recovery or replacement for the build gate. It covers hunk storage,
-not total OS memory or every malloc allocation. Runtime auditing requires a new
-engine build; older playtest disks do not contain it.
+not total OS memory or every malloc allocation. Runtime auditing is included
+in the v0.0.27 engine; older playtest disks may predate it.
 
 ## Profile, then reduce or subdivide
 
@@ -309,10 +340,12 @@ Apply the same checks when architecture, vegetation, actors or gameplay systems
 are added to any future settlement. Also measure frame cost; a heap pass alone
 cannot establish tolerable performance.
 
-The unreleased rc3 builder now runs its final map heap gate **after** Seyda
+The builder introduced this order during rc3 and retains it in v0.0.27: the
+final map heap gate runs **after** Seyda
 subcell regeneration and actor annotation, before content fingerprinting and HDF
 packaging. This prevents clearance evidence from referring to maps that are
-subsequently replaced. Runtime acceptance and the repaired playtest remain pending.
+subsequently replaced. The stable private image is assembled and read back;
+runtime acceptance remains pending.
 
 ### Measured adaptive subdivision prototype
 
@@ -401,8 +434,8 @@ gate.
 For bounded Seyda, the ordinary converter emitted 64 core maps plus the docks,
 court and fallback entries: 67/67 estimates pass. The worst estimated peak is
 5,884,944 bytes and the smallest post-reserve growth margin is 406,512 bytes.
-This is generated normal-converter output, but final actor/contact/fingerprint
-checks, image assembly and target transitions remain pending.
+The later complete actor/contact and final heap gates, image assembly and HDF
+readbacks passed for this normal-converter output. Target transitions remain pending.
 
 For Balmora, a 64-core non-overlapping partition plus the fallback has 65/65
 static estimate passes. The source-to-region check covers all 1,488 references
@@ -424,8 +457,8 @@ may remain active while the player crosses that core's center within the
 hysteresis band; half-open core ownership is still unique and switch thresholds
 were not changed. Test seam, scenery and collision continuity across the split
 and merge in both directions, including rapid noclip and held controls. No target
-transition or FPS result is claimed. The image/actor/final heap gate and playtest
-remain pending; this is not closure of the v0.0.27 load incident.
+transition or FPS result is claimed. The later image/actor/final heap gates
+passed; target playtesting remains pending, so the load incident remains open.
 
 ## Transactional exact-sharing candidates — 3 October 2026
 
@@ -465,14 +498,14 @@ safety margin are:
 | `bmmages.bsp` | 5,688,464 B | 602,992 B | pass |
 | `bmtemple.bsp` | 5,905,872 B | 385,584 B | pass |
 
-These are estimate-only results using reused ABI sizes, not a fresh engine
-allocation probe, full-map acceptance, HDF build or target playtest. No claim
-that the earlier 28 failing maps are all fixed follows from a three-map pass.
-The final packaged payload still requires its receipt-bound full-map gate and
-runtime profiling. The matched `vis -fast` versus full-VIS CPU comparison is
-still running with 12 threads; no comparative result is available. Do not infer
-an FPS or memory benefit before the matched run completes.
+These three-map numbers use saved ABI sizes; they are not a fresh allocation
+probe or target playtest. Subsequent final packaging separately passed the
+receipt-bound optimizer/actor/heap gates for all 2,717 maps and both HDF readbacks.
+Runtime profiling remains pending. The matched `vis -fast` versus full-VIS
+experiment was stopped on 3 October with its inputs, logs and saved state
+preserved privately. It is deferred optional research; resumption is unverified
+and no comparative FPS or memory result is available.
 
-See [the corresponding bug-journal record](BUG_JOURNAL.md#mem-geometry-01-transactional-exact-sharing-candidates)
+See [the corresponding bug-journal record](BUG_JOURNAL.md#mem-geometry-01-transactional-geometrylight-sharing-candidates)
 for the version/cause/fix/status distinction. The rc3 duplicate-visibility-copy
 incident remains open until the repaired trip and lifecycle pass on target.

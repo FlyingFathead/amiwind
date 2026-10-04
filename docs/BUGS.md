@@ -1,5 +1,11 @@
 # Bug register
 
+Current v0.0.28 status: the corrected source passes 822-test host gates and
+matching actual Amiga compiles. Its image passes all 10,766 payload readbacks
+and three partition checks. Independent native acceptance remains pending;
+no final release or publication is implied. See
+[stable status](RELEASE-v0.0.28.md) and [terrain evidence](CANONICAL_TERRAIN_CULLING.md).
+
 Native Windows build: [WIN-01 — intermittent Python geometry-worker queue failure (open)](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026).
 
 Keep reported symptoms separate from confirmed causes. A successful retry does
@@ -15,8 +21,12 @@ flag, first fixed version (or an em dash), and evidence/status below.
 
 | ID | Issue | Fixed (Y/N) | First fixed version | Verification / current status |
 | --- | --- | --- | --- | --- |
-| CI-01 | Windows short aliases mismatch resolved discovery paths in tests | N | Pending follow-up CI | Assertions corrected; local short-alias regression passed; hosted CI pending. See [journal](BUG_JOURNAL.md#ci-01-windows-short-path-aliases-fail-host-discovery-assertions). |
-| WIN-03 | Windows image-packing command exceeds process limit | Y | Windows working tree; release pending | Windows batching passed 1,100-file readback, four regressions and complete image readback/WinUAE game entry; [journal](BUG_JOURNAL.md#win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026) |
+| SKY-GROUND-28 | Rebuilt LAND faces invisible; clouds scroll too fast | N | — | Native winding repair restores ground in bounded town views; current cloud multiplier is 0.00333333333. Final route/motion acceptance pending; [journal](BUG_JOURNAL.md#sky-ground-28-pale-ground-and-excessive-cloud-speed-open). |
+| SKY-STARS-28 | Enlarged stars cover original night artwork | N | — | AWN2 point roles limit stars to one pixel behind nebula and full moon masks. Focused fixtures pass; native views pending; [journal](BUG_JOURNAL.md#sky-stars-28-enlarged-stars-and-night-layer-ordering-open). |
+| ARRIVAL-CEILING-28 | Coordinate arrivals start inside solid ceiling shell | N | — | Bounded clear-start search passes four actual owned hull cases; dynamic/native routes pending; [journal](BUG_JOURNAL.md#arrival-ceiling-28-coordinate-arrivals-blocked-by-solid-ceiling-shell-open). |
+| DOC-STATE-01 | Published release documentation retained stale candidate/current-version claims | N | Main-branch correction pending | Local editorial repair; published v0.0.27 tag/assets preserved. See [journal](BUG_JOURNAL.md#doc-state-01-published-v0027-described-as-an-unpublished-candidate-documentation-bug). |
+| CI-01 | Windows short aliases mismatch resolved discovery paths in tests | Y | v0.0.26-rc1 | Assertions corrected; local short-alias regression and subsequent hosted Windows parity passed. See [journal](BUG_JOURNAL.md#ci-01-windows-short-path-aliases-fail-host-discovery-assertions). |
+| WIN-03 | Windows image-packing command exceeds process limit | Y | v0.0.26-rc1 | Windows batching passed 1,100-file readback, four regressions and complete image readback/WinUAE game entry; [journal](BUG_JOURNAL.md#win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026) |
 | WIN-02 | Cancelled Windows stage leaves child workers alive | N | — | Process-tree cleanup candidate tested separately; integration pending; [journal](BUG_JOURNAL.md#win-02-cancelled-windows-stage-leaves-worker-descendants--open-2-october-2026) |
 | WIN-01 | Native Windows Python geometry-worker queue failure | N | — | Intermittent invalid semaphore handle; cause unknown; [journal](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026) |
 | AW-20260928-01 | Ship-exit intermittent freeze | N | — | Open; retry succeeded, cause unknown |

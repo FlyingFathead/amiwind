@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "aw_sky.h"
 server_t sv;
 #include <assert.h>
 static int inside;
@@ -17,15 +18,28 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_fog_distanc
 cvar_t aw_drawdistance={"aw_drawdistance","700",0,0,700};
 void Cvar_SetValue(char *name,float value){assert(!strcmp(name,"aw_drawdistance"));aw_drawdistance.value=value;}
 vec3_t vpn={.70710678f,.70710678f,0},r_origin={0,0,0};
+vec3_t vright,vup;
+const unsigned char *R_DayNightFogColours(void){return NULL;}
+unsigned char R_DayNightSkyPixel(unsigned char c,float x,float y,float z,int fog){return c;}
 void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);}
-byte *COM_LoadHunkFile(char *p){return NULL;}
+static byte fog_colours[4096];
+viddef_t vid;refdef_t r_refdef;short *d_pzbuffer;unsigned int d_zwidth;
+byte *COM_LoadHunkFile(char *p){return fog_colours;}
 int main(void) {
  int distances[6]={128,400,540,700,1400,4096},i,j,expected;byte fog[32770];
  short edge_visible[6]={790,-110,-10,810,-90,10};
  short distant[6]={1000,1000,-10,1020,1020,10};
  short crosses_far[6]={490,490,-10,530,530,10};
  vec3_t door={800,-100,0},far_door={1000,1000,0};
- AW_FogInit();AW_CullBegin();
+ {
+  byte pixels[5]={7,7,7,7,7};short z[5]={AW_SKY_BACKGROUND_DEPTH,-1,0,32767,128};
+  for(i=0;i<4096;i++)fog_colours[i]=i>>8;
+  vid.buffer=pixels;vid.rowbytes=5;d_pzbuffer=z;d_zwidth=5;r_refdef.vrect.width=5;r_refdef.vrect.height=1;
+  AW_FogInit();AW_FogDraw();
+  assert(pixels[0]==7);assert(pixels[1]==15 && pixels[2]==15);assert(pixels[3]==0);assert(pixels[4]!=7);
+  inside=1;memset(pixels,7,sizeof pixels);AW_FogDraw();for(i=0;i<5;i++)assert(pixels[i]==7);inside=0;
+ }
+ AW_CullBegin();
  assert(AW_NodeVisible(edge_visible)); /* old radius-aligned cube dropped this */
  assert(!AW_NodeVisible(distant));
  assert(AW_NodeVisible(crosses_far));
