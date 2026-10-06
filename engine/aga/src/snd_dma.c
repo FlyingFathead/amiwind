@@ -128,6 +128,7 @@ void S_SoundInfo_f(void)
     Con_Printf("0x%x dma buffer\n", shm->buffer);
 	Con_Printf("%5d total_channels\n", total_channels);
 	Con_Printf("loading music: %d\n", aw_loading_music);
+    S_SceneVoiceReport();
 	for (i=0; i<total_channels; ++i) {
 		channel_t *ch=&channels[i];
 		if (ch->sfx)
@@ -256,6 +257,7 @@ void S_Init (void)
 
 void S_Shutdown(void)
 {
+    S_CancelSceneVoice();
 
 	if (!sound_started)
 		return;
@@ -550,6 +552,7 @@ void S_StopSound(int entnum, int entchannel)
 void S_StopAllSounds(qboolean clear)
 {
 	int		i;
+    if(!S_PreserveSceneVoice())S_CancelSceneVoice();
     AW_SpeechStop(-1,-1);
 
 	if (!sound_started)
@@ -569,6 +572,7 @@ void S_StopAllSounds(qboolean clear)
 
 void S_StopAllSoundsC (void)
 {
+    S_CancelSceneVoice();
 	S_StopAllSounds (true);
 }
 
@@ -747,6 +751,7 @@ void S_Update(vec3_t origin, vec3_t forward, vec3_t right, vec3_t up)
 	channel_t	*ch;
 	channel_t	*combine;
 
+	if(AW_MovieDebugActive()){S_Update_();return;}
 	if (!sound_started || (snd_blocked > 0))
 		return;
 
@@ -831,6 +836,18 @@ void S_Update(vec3_t origin, vec3_t forward, vec3_t right, vec3_t up)
 
 void GetSoundtime(void)
 {
+#ifdef AMIGA
+    int samples = SNDDMA_GetSamples();
+    if(samples<soundtime){
+        /* Device/time reset or the ring-aligned long-session epoch rollover:
+         * old channel deadlines and queued PCM belong to the previous clock. */
+        paintedtime=samples;
+        S_CancelSceneVoice();
+        S_StopAllSounds(false);
+        S_ClearBuffer();
+    }
+    soundtime=samples;
+#else
 	int		samplepos;
 	static	int		buffers;
 	static	int		oldsamplepos;
@@ -854,12 +871,14 @@ void GetSoundtime(void)
 		{	// time to chop things off to avoid 32 bit limits
 			buffers = 0;
 			paintedtime = fullsamples;
+            S_CancelSceneVoice();
 			S_StopAllSounds (true);
 		}
 	}
 	oldsamplepos = samplepos;
 
 	soundtime = buffers*fullsamples + samplepos/shm->channels;
+#endif
 #endif
 }
 
@@ -876,7 +895,8 @@ void S_ExtraUpdate (void)
 }
 
 /* The loader calls this on the main task between bounded reads/decode batches.
- * Music has its own FILE and static buffers. Never load an SFX cache here:
+ * Music has its own FILE/buffers; detached speech owns a bounded PCM copy.
+ * Never load an SFX cache here:
  * that could replace a model's live temporary hunk allocation. */
 void S_LoadingUpdate(void)
 {
@@ -907,6 +927,8 @@ void S_Update_(void)
 
 // Updates DMA time
 	GetSoundtime();
+
+    if(AW_MovieDebugPending())return;
 
 // check to make sure that we haven't overshot
 	if (paintedtime < soundtime)

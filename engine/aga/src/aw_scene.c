@@ -3,6 +3,7 @@
  * time. This is not inventory, quest persistence or original opening logic.
  */
 #include "quakedef.h"
+#include "aw_hand_state.h"
 #include <errno.h>
 #include "aw_save.h"
 #include "aw_maps.h"
@@ -10,6 +11,7 @@
 #include "aw_region.h"
 #include "aw_world.h"
 #include "aw_character.h"
+#include "aw_harvest_runtime.h"
 #include "amiwind_version.h"
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
 static aw_scene_link_t links[128];static int count,loaded,pending;
@@ -18,11 +20,20 @@ static char links_map[16];
 static double door_ready;
 static aw_scene_link_t opening_door;
 static unsigned door_close;
-static float health,hand_goal,torch_goal;
+static float health;
+static aw_hand_snapshot_t hand_snapshot;
+static double hand_torch_time;
+static int hand_clock_ready;
 static double started;
 static int region_crossing,map_jump;
 static vec3_t crossing_angles,crossing_velocity;
 static float crossing_movetype;
+/* Local camera state outlives CL_ClearState during an implicit map handoff.
+ * Restore after the legacy signon angle packets, which round to byte angles. */
+static int crossing_view_ready;
+static qboolean crossing_nodrift;
+static float crossing_pitchvel,crossing_driftmove;
+static double crossing_laststop;
 static cvar_t early_game_demo_start_1={"early_game_demo_start_1","1"};
 static cvar_t intro_docks_variant={"intro_docks_variant","2",true};
 static cvar_t target_names={"aw_target_names","1",true};
@@ -130,7 +141,8 @@ const char *AW_SceneTargetName(void) {
     if(!target_names.value || key_dest!=key_game || pending || AW_CharacterActive() ||
        AW_ReaderActive() || AW_IntroPromptActive() ||
        (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
-    driver=travel_target();return driver?pr_strings+driver->v.netname:npc_hint();
+    driver=travel_target();if(driver)return pr_strings+driver->v.netname;
+    {const char *npc=npc_hint();return npc?npc:AW_HarvestHint();}
 }
 const char *AW_SceneWorldModel(const char *name) {
     FILE *f=NULL;const char *region;
@@ -193,7 +205,7 @@ static void read_links_for(const char *map) {
 }
 static void read_links(void){read_links_for(sv.name);}
 static void load_scene(aw_scene_link_t *link,int immediate) {
-    edict_t *p=svs.clients[0].edict;eval_t *v;char command[32];
+    edict_t *p=svs.clients[0].edict;char command[32];
     if(pending || !map_valid(link->target))return;
     if(!AW_RegionSelect(link->target,link->arrival,intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
@@ -203,8 +215,10 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     }
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
-    health=p->v.health;v=GetEdictFieldValue(p,"aw_hand_goal");hand_goal=v?v->_float:0;
-    v=GetEdictFieldValue(p,"aw_torch");torch_goal=v?v->_float:0;
+    health=p->v.health;
+    if(!AW_HandSnapshotCapture(&hand_snapshot,p,sv.time))
+        Con_Printf("Hand transition state unavailable; destination rules will initialize hands.\n");
+    hand_torch_time=AW_TorchAnimationTime();hand_clock_ready=0;
     /* Automatic residency changes retain live held controls. Key releases and
      * focus-loss clearing still run through the normal input path. Doors and
      * explicit teleports keep their deliberate input boundary. */
@@ -212,6 +226,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     AW_MusicSceneEvent("scene-leave");
     Con_Printf("Loading AmiWind v" AMIWIND_VERSION ": %s...\n",next.target);
     sprintf(command,"map %s\n",next.target);
+    if(region_crossing)S_BeginSceneVoice();
     if(immediate)Cbuf_InsertText(command);else Cbuf_AddText(command);
 }
 int AW_MapTeleport(const float *source_position) {
@@ -308,14 +323,19 @@ int AW_TravelDraw(void) {
     AW_UITextBox(26,44,268,16,line,-1);
     for(i=0;i<travel_count;i++){
         sprintf(line,"%s%s",i==travel_choice?"> ":"  ",travel_return?(i?"Cancel":"Seyda Neen"):travel_names[i]);
-        AW_UITextBox(40,63+i*17,240,17,line,-1);
+        if(AW_UIMode()==2){
+            int y=61+i*18;
+            AW_UIBox(40,y,240,18);
+            if(i==travel_choice)AW_UIFill(43,y+3,234,12,AW_UIColor(54,47,32));
+            AW_UITextBox(44,y,232,18,line,-1);
+        }else AW_UITextBox(40,63+i*17,240,17,line,-1);
     }
     AW_UITextBox(26,153,268,16,travel_message?travel_message:"Arrows: select  Enter: choose",-1);
     AW_UITextBox(26,170,268,14,"Esc: cancel",-1);
     AW_UISmallEnd();return 1;
 }
 int AW_SceneUse(void) {
-    int i;float duration;FILE *f=NULL;char path[40];if(pending || door_ready)return 1;if(travel_use())return 1;i=aimed_door();if(i<0)return 0;
+    int i;float duration;FILE *f=NULL;char path[40];if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && AW_HarvestUse())return 1;i=aimed_door();if(i<0)return 0;
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     sprintf(path,"maps/%s.bsp",links[i].target);
@@ -347,6 +367,7 @@ void AW_SceneDraw(void) {
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
     driver=travel_target();
     if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
+    else if(!npc_hint() && (name=AW_HarvestHint())!=NULL){action="E: Pick";npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
         i=aimed_door();
         if(i>=0){
@@ -403,9 +424,35 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
     }
     Con_Printf("Interior spawn blocked; use dbg noclip to inspect.\n");return 0;
 }
+/* An explicit debug scene restart owns no old door/cell arrival or voice tail. */
+void AW_SceneCancelTransition(void) {
+    pending=region_crossing=map_jump=crossing_view_ready=0;
+    door_ready=0;door_close=0;S_CancelSceneVoice();
+    memset(&hand_snapshot,0,sizeof(hand_snapshot));hand_clock_ready=0;
+    AW_TorchResetAnimation();
+}
+void AW_SceneSignon(void) {
+    if(hand_clock_ready){
+        hand_clock_ready=0;
+        if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
+           cls.state==ca_connected && !cls.demoplayback && cls.signon==SIGNONS &&
+           !strcmp(sv.name,next.target))AW_TorchRestoreAnimation(hand_torch_time);
+        else AW_TorchResetAnimation();
+    }
+    if(!crossing_view_ready)return;
+    crossing_view_ready=0;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict ||
+       cls.state!=ca_connected || cls.demoplayback || cls.signon!=SIGNONS ||
+       strcmp(sv.name,next.target)){S_CancelSceneVoice();return;}
+    VectorCopy(crossing_angles,cl.viewangles);
+    cl.nodrift=crossing_nodrift;cl.pitchvel=crossing_pitchvel;
+    cl.driftmove=crossing_driftmove;cl.laststop=cl.time+crossing_laststop;
+    S_EndSceneVoice();
+}
 void AW_SceneSpawn(edict_t *p) {
-    eval_t *v;int placed=0;float eye;
-    door_ready=0;
+    int placed=0;float eye;
+    if(region_crossing && (!pending || strcmp(sv.name,next.target)))S_CancelSceneVoice();
+    crossing_view_ready=0;hand_clock_ready=0;door_ready=0;
     if(!region_crossing)AW_UISubtitle("","",0);
     if(pending && !strcmp(sv.name,next.target)) {
         if(map_jump){
@@ -424,18 +471,26 @@ void AW_SceneSpawn(edict_t *p) {
             p->v.movetype=crossing_movetype;p->v.fixangle=1;SV_LinkEdict(p,false);placed=1;
         }else placed=AW_InteriorPlace(p,next.arrival);
         p->v.angles[0]=0;p->v.angles[1]=next.yaw;p->v.angles[2]=0;p->v.fixangle=1;
-        if(region_crossing)VectorCopy(crossing_angles,p->v.angles);
-        p->v.health=health;v=GetEdictFieldValue(p,"aw_hand_goal");if(v)v->_float=hand_goal;
-        v=GetEdictFieldValue(p,"aw_torch");if(v)v->_float=hand_goal?torch_goal:0;
+        if(region_crossing){
+            VectorCopy(crossing_angles,p->v.angles);
+            VectorCopy(crossing_angles,p->v.v_angle);
+            crossing_view_ready=1;
+        }
+        p->v.health=health;
+        /* Host_Spawn_f serializes weapon model/frame immediately after this
+         * callback, before the first visible arrival or QC player tick. */
+        if(AW_HandSnapshotRestore(&hand_snapshot,p,sv.time))hand_clock_ready=1;
+        else {AW_TorchResetAnimation();Con_Printf("Hand transition state not restored.\n");}
+        memset(&hand_snapshot,0,sizeof(hand_snapshot));
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
     } else {
-        pending=0;
+        pending=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
         if(AW_Interior() || !strcmp(sv.name,"balmora") || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_GallerySpawn(p);region_crossing=map_jump=0;
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_HarvestSpawn();AW_GallerySpawn(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
     AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
@@ -462,7 +517,12 @@ void AW_SceneTick(void) {
         strcpy(r.target,sv.name);VectorCopy(p->v.origin,r.arrival);
     }
     r.yaw=p->v.angles[1];
-    VectorCopy(p->v.v_angle,crossing_angles);VectorCopy(p->v.velocity,crossing_velocity);crossing_movetype=p->v.movetype;
+    /* The displayed local view can differ from the last rounded movement
+     * packet. Preserve it and its drift policy across the client-state reset. */
+    VectorCopy(cl.viewangles,crossing_angles);
+    crossing_nodrift=cl.nodrift;crossing_pitchvel=cl.pitchvel;
+    crossing_driftmove=cl.driftmove;crossing_laststop=cl.laststop-cl.time;
+    VectorCopy(p->v.velocity,crossing_velocity);crossing_movetype=p->v.movetype;
     region_crossing=1;
     load_scene(&r,1);
     if(!pending)region_crossing=0;
@@ -569,6 +629,7 @@ static void demo_start(void) {
     }
 }
 void AW_SceneInit(void) {
+    AW_HarvestInit();
     Cmd_AddCommand("aw_debug_hors",hors_command);
     Cvar_RegisterVariable(&intro_docks_variant);
     Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);

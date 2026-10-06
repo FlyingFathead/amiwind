@@ -72,11 +72,29 @@ void R_AddDynamicLights (void)
 	int			i;
 	int			smax, tmax;
 	mtexinfo_t	*tex;
+    float sn, tn, ss, tt, st, perpendicular;
+    float s_world=1, t_world=1, t_skew=0, ds, dt;
 
 	surf = r_drawsurf.surf;
 	smax = (surf->extents[0]>>4)+1;
 	tmax = (surf->extents[1]>>4)+1;
 	tex = surf->texinfo;
+
+    /* Imported UVs may be scaled or skewed. Radius and plane distance are
+     * world units, so undo the in-plane UV basis before applying Quake's
+     * cheap distance approximation. Compute this once per surface, not per
+     * light sample. A singular mapping retains the legacy finite fallback. */
+    sn=DotProduct(tex->vecs[0],surf->plane->normal);
+    tn=DotProduct(tex->vecs[1],surf->plane->normal);
+    ss=DotProduct(tex->vecs[0],tex->vecs[0])-sn*sn;
+    tt=DotProduct(tex->vecs[1],tex->vecs[1])-tn*tn;
+    st=DotProduct(tex->vecs[0],tex->vecs[1])-sn*tn;
+    if(isfinite(ss) && isfinite(tt) && isfinite(st) && ss>0 && tt>0){
+        perpendicular=tt-st*st/ss;
+        if(perpendicular>tt*0.000001f){
+            s_world=1.0f/sqrt(ss);t_world=1.0f/sqrt(perpendicular);t_skew=st/ss;
+        }
+    }
 
 	for (lnum=0 ; lnum<MAX_DLIGHTS ; lnum++)
 	{
@@ -108,18 +126,20 @@ void R_AddDynamicLights (void)
 
 		for (t = 0 ; t<tmax ; t++)
 		{
-			td = local[1] - t*16;
-			if (td < 0)
-				td = -td;
 			for (s=0 ; s<smax ; s++)
 			{
-				sd = local[0] - s*16;
-				if (sd < 0)
-					sd = -sd;
+                ds=local[0]-s*16;dt=fabs((local[1]-t*16-ds*t_skew)*t_world);
+                ds=fabs(ds*s_world);
+                /* Tiny valid bases and large offsets can produce non-finite
+                 * or out-of-int-range distances. Reject before conversion;
+                 * the normal torch range takes this same cheap early-out. */
+                if(!(ds<minlight && dt<minlight) || ds>=2147483648.0f || dt>=2147483648.0f)
+                    continue;
+                sd=ds;td=dt;
 				if (sd > td)
-					dist = sd + (td>>1);
+					dist = (float)sd + (td>>1);
 				else
-					dist = td + (sd>>1);
+					dist = (float)td + (sd>>1);
 				if (dist < minlight)
 #ifdef QUAKE2
 				{
@@ -348,6 +368,18 @@ void R_DrawSurface (void)
 R_DrawSurfaceBlock8_mip0
 ================
 */
+/* Lightmap values are bounded to 0..255*64. Cast unsigned samples before
+ * subtraction: otherwise a decreasing gradient wraps to a huge positive
+ * step, then overflows during interpolation. Round negative steps down
+ * explicitly, matching arithmetic right shift without shifting negatives. */
+static int R_LightStep(int end, int start, int shift)
+{
+    int delta = end - start;
+    if (delta >= 0)
+        return delta >> shift;
+    return -((-delta + (1 << shift) - 1) >> shift);
+}
+
 void R_DrawSurfaceBlock8_mip0 (void)
 {
 	int	v;
@@ -368,14 +400,14 @@ void R_DrawSurfaceBlock8_mip0 (void)
 		lightleft = r_lightptr[0];
 		lightright = r_lightptr[1];
 		r_lightptr += r_lightwidth;
-		lightleftstep = (r_lightptr[0] - lightleft) >> 4;
-		lightrightstep = (r_lightptr[1] - lightright) >> 4;
+		lightleftstep = R_LightStep((int)r_lightptr[0], lightleft, 4);
+		lightrightstep = R_LightStep((int)r_lightptr[1], lightright, 4);
 
 		for (i=0 ; i<16 ; i++)
 		{
 			int b, lightstep, light;
 
-			lightstep = (lightleft - lightright) >> 4;
+			lightstep = R_LightStep(lightleft, lightright, 4);
 
 			light = lightright;
 
@@ -422,14 +454,14 @@ void R_DrawSurfaceBlock8_mip1 (void)
 		lightleft = r_lightptr[0];
 		lightright = r_lightptr[1];
 		r_lightptr += r_lightwidth;
-		lightleftstep = (r_lightptr[0] - lightleft) >> 3;
-		lightrightstep = (r_lightptr[1] - lightright) >> 3;
+		lightleftstep = R_LightStep((int)r_lightptr[0], lightleft, 3);
+		lightrightstep = R_LightStep((int)r_lightptr[1], lightright, 3);
 
 		for (i=0 ; i<8 ; i++)
 		{
 			int b, lightstep, light;
 
-			lightstep = (lightleft - lightright) >> 3;
+			lightstep = R_LightStep(lightleft, lightright, 3);
 
 			light = lightright;
 
@@ -476,14 +508,14 @@ void R_DrawSurfaceBlock8_mip2 (void)
 		lightleft = r_lightptr[0];
 		lightright = r_lightptr[1];
 		r_lightptr += r_lightwidth;
-		lightleftstep = (r_lightptr[0] - lightleft) >> 2;
-		lightrightstep = (r_lightptr[1] - lightright) >> 2;
+		lightleftstep = R_LightStep((int)r_lightptr[0], lightleft, 2);
+		lightrightstep = R_LightStep((int)r_lightptr[1], lightright, 2);
 
 		for (i=0 ; i<4 ; i++)
 		{
 			int b, lightstep, light;
 
-			lightstep = (lightleft - lightright) >> 2;
+			lightstep = R_LightStep(lightleft, lightright, 2);
 
 			light = lightright;
 
@@ -530,14 +562,14 @@ void R_DrawSurfaceBlock8_mip3 (void)
 		lightleft = r_lightptr[0];
 		lightright = r_lightptr[1];
 		r_lightptr += r_lightwidth;
-		lightleftstep = (r_lightptr[0] - lightleft) >> 1;
-		lightrightstep = (r_lightptr[1] - lightright) >> 1;
+		lightleftstep = R_LightStep((int)r_lightptr[0], lightleft, 1);
+		lightrightstep = R_LightStep((int)r_lightptr[1], lightright, 1);
 
 		for (i=0 ; i<2 ; i++)
 		{
 			int b, lightstep, light;
 
-			lightstep = (lightleft - lightright) >> 1;
+			lightstep = R_LightStep(lightleft, lightright, 1);
 
 			light = lightright;
 

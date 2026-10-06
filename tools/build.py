@@ -472,10 +472,11 @@ def commands(args, tools, run):
                 "--scenery", run / "world-scenery-source/scenery",
                 "--palette", run / "intro-scene/id1/gfx/palette.lmp",
                 "--out", run / "world-scenery", "--jobs", resolve_jobs(args.jobs))),
+            ("media", tool("prepare_media_assets.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "media", "--jobs", resolve_jobs(args.jobs))),
             ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
             ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
     if getattr(args, 'tree_sprites', False):

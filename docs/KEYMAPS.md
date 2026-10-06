@@ -1,5 +1,15 @@
 # Keyboard and command reference — v0.0.25-rc7
 
+## v0.0.29 F/V regression gate
+
+The 4 October owner playtest reports F no longer raising hands and V printing
+torch on/off without visible hands or a working torch, especially in debug play.
+The cause is unconfirmed. Controls below remain the required behavior, not an
+acceptance claim. See [TORCH-INPUT-29](BUG_JOURNAL.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
+and the [full input/state/visibility/light matrix](TORCH.md#v0029-required-hands-and-light-acceptance-matrix).
+Do not replace personal bindings or bypass intentional story restrictions to
+hide the failure. Capture the active bindings and input destination first.
+
 Maintain this list whenever a binding or reserved shortcut changes. The editable
 source defaults live in [`config/keymaps.cfg`](../config/keymaps.cfg). The image
 builder installs them as `id1/keymaps-default.cfg`. Personal bindings live in

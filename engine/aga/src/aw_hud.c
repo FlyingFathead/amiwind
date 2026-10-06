@@ -2,6 +2,7 @@
 #include "quakedef.h"
 #include "amiwind_version.h"
 #include "aw_world.h"
+#include "aw_clock.h"
 int sb_lines;
 static cvar_t coords = {"_aw_debug_coords", "0", true};
 static cvar_t overlays = {"_aw_debug_all", "0", true};
@@ -71,12 +72,21 @@ static int current_region(const char **region) {
        !AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,source))return 0;
     *region=AW_RegionNameAt(source);return 1;
 }
+static const char *directions[]={"N","NE","E","SE","S","SW","W","NW"};
+static int compass_heading(void) {
+    /* Runtime +Y is source north; engine yaw zero points east. */
+    return (int)anglemod(90-cl.viewangles[YAW]+360);
+}
+static void coordinate_line(char *line,int y) {
+    int limit=(vid.width-96)/4;
+    if(limit<=0)return;
+    if((int)strlen(line)>limit){line[limit]=0;if(limit>=3)memcpy(line+limit-3,"...",3);}
+    AW_SmallString(vid.width-8-(int)strlen(line)*4,y,line);
+}
 static void compass(void) {
-    static const char *directions[]={"N","NE","E","SE","S","SW","W","NW"};
     char line[96];int heading,limit;const char *region=NULL;
     if(!show_compass.value || cls.state!=ca_connected || key_dest!=key_game || AW_GalleryActive())return;
-    /* Runtime +Y is source north; engine yaw zero points east. */
-    heading=(int)anglemod(90-cl.viewangles[YAW]+360);
+    heading=compass_heading();
     current_region(&region);
     snprintf(line,sizeof(line),"%s %03ld / REGION: %s",directions[((heading+22)/45)&7],
              (long)heading,region?region:"unavailable");
@@ -104,7 +114,8 @@ void Sbar_Draw(void) {
         Draw_Fill(x,19,80,10,255);Draw_String(x+4,20,line);
     }
     if(AW_DebugCoordsEnabled() && cls.state==ca_connected && cl.viewentity>0 && cl.viewentity<MAX_EDICTS) {
-        char line[80];vec_t *p=cl_entities[cl.viewentity].origin;vec3_t global;int x;
+        char line[80],clock[16];vec_t *p=cl_entities[cl.viewentity].origin;vec3_t global;
+        int year,month,day,hour,minute,heading;
         /* Report the simulated player in local play, before view interpolation. */
         if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
             p=svs.clients[0].edict->v.origin;
@@ -113,12 +124,24 @@ void Sbar_Draw(void) {
         if(sv.active && AW_WorldToSource(sv.name,p,global))
             snprintf(line,sizeof(line),"GLOBAL XYZ: %ld %ld %ld",(long)global[0],(long)global[1],(long)global[2]);
         else strcpy(line,"GLOBAL XYZ: unavailable (interior)");
-        x=vid.width-8-(int)strlen(line)*4;if(x<88)x=88;
-        AW_SmallString(x,vid.height-16,line);
-        snprintf(line,sizeof(line),"LOCAL XYZ: %ld %ld %ld DEG:%ld P:%ld",(long)p[0],(long)p[1],(long)p[2],
-            (long)anglemod(cl.viewangles[YAW]),(long)cl.viewangles[PITCH]);
-        x=vid.width-8-(int)strlen(line)*4;if(x<88)x=88;
-        AW_SmallString(x,vid.height-8,line);
+        if(hud_type.value!=1){
+            strcpy(clock," TIME --:--");
+            if(AW_ClockEnsure()){
+                AW_ClockDate(&year,&month,&day,&hour,&minute);
+                snprintf(clock,sizeof(clock)," TIME %02d:%02d",hour,minute);
+            }
+            strncat(line,clock,sizeof(line)-strlen(line)-1);
+        }
+        coordinate_line(line,vid.height-16);
+        if(hud_type.value==1)
+            snprintf(line,sizeof(line),"LOCAL XYZ: %ld %ld %ld DEG:%ld P:%ld",(long)p[0],(long)p[1],(long)p[2],
+                (long)anglemod(cl.viewangles[YAW]),(long)cl.viewangles[PITCH]);
+        else {
+            heading=compass_heading();
+            snprintf(line,sizeof(line),"LOCAL XYZ: %ld %ld %ld %s %03ld P:%ld",(long)p[0],(long)p[1],(long)p[2],
+                directions[((heading+22)/45)&7],(long)heading,(long)cl.viewangles[PITCH]);
+        }
+        coordinate_line(line,vid.height-8);
         /* This strip is outside scr_vrect; the normal viewport-only update
          * would leave its old pixels on the Amiga screen. */
         scr_copyeverything=1;

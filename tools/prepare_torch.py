@@ -15,7 +15,7 @@ from mwad.audit import BSA, normpath, records, subrecords
 from mwad.npc import load_master, text
 from mwad.paths import child_ci, ensure_external
 from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, rigid_attachment
-from prepare_hands import nord_parts
+from prepare_hands import nord_parts, appearance_parts
 from prepare_hand_sprites import decode_mdl, render_frame, pack_frame
 
 FRAMES = 8
@@ -87,22 +87,50 @@ def flame_texture(data, N, assets, palette):
     alpha=(pixels[:,:,3].astype(float)*strength).astype(np.uint8)
     return matches[0],np.stack((indices,alpha),axis=2).tobytes()
 
-def prepare(data_files,id1):
+def view_parts(parts, upper_arms='hidden'):
+    """Keep distal grip geometry; proximal fallback arms are optional.
+
+    The common forward camera adaptation can reveal disconnected upper-arm
+    tips through the alias near plane, even during the authored idle cycle.
+    This first-person torch policy does not alter skeletons or world actors.
+    """
+    if upper_arms not in ('hidden', 'legacy'):
+        raise ValueError('Unknown first-person torch upper-arm profile')
+    return [part for part in parts if upper_arms == 'legacy' or part['slot'] not in (13, 14)]
+
+
+class TorchSource:
+    """One bounded owned-data cache shared by a batch of appearance bakes."""
+    def __init__(self,data_files):
+        self.data_files=ensure_external(data_files,'owned data')
+        master=child_ci(self.data_files,'Morrowind.esm')
+        archive=child_ci(self.data_files,'Morrowind.bsa')
+        self.kinds,_,_=load_master(master);record=None
+        for kind,flags,payload in records(master.read_bytes()):
+            if kind!='LIGH':continue
+            fields=list(subrecords(payload))
+            if text(fields,'NAME').casefold()=='torch':
+                record=None if any(tag=='DELE' for tag,_ in fields) else fields
+        if record is None:raise ValueError('Original torch light record missing')
+        self.mesh=text(record,'MODL')
+        self.assets=Assets(self.data_files,BSA(archive))
+        self.skeleton=TorchSkeleton(self.assets,'meshes/base_anim.1st.nif')
+
+    def for_data(self,data_files):
+        if self.data_files!=ensure_external(data_files,'owned data'):
+            raise ValueError('Torch source cache belongs to different owned data')
+        return self.kinds,self.assets,self.mesh,self.skeleton
+
+
+def prepare(data_files,id1,upper_arms='hidden',race='nord',female=False,topology='reduced',source=None):
     data_files=ensure_external(data_files,'owned data');id1=ensure_external(id1,'torch output')
-    master=child_ci(data_files,'Morrowind.esm');archive=child_ci(data_files,'Morrowind.bsa')
-    kinds,_,_=load_master(master);record=None
-    for kind,flags,payload in records(master.read_bytes()):
-        if kind!='LIGH':continue
-        fields=list(subrecords(payload))
-        if text(fields,'NAME').casefold()=='torch':
-            record=None if any(tag=='DELE' for tag,_ in fields) else fields
-    if record is None:raise ValueError('Original torch light record missing')
-    mesh=text(record,'MODL');assets=Assets(data_files,BSA(archive))
-    skeleton=TorchSkeleton(assets,'meshes/base_anim.1st.nif')
+    if source is None:source=TorchSource(data_files)
+    if not isinstance(source,TorchSource):raise ValueError('Invalid torch source cache')
+    kinds,assets,mesh,skeleton=source.for_data(data_files)
     start=skeleton.events['torch: start'];stop=skeleton.events['torch: stop']
     if not np.isfinite([start,stop]).all() or not 0<stop-start<60:raise ValueError('Invalid torch animation')
     times=np.linspace(start,stop,FRAMES,endpoint=False)
-    parts=nord_parts(kinds)
+    parts=view_parts(appearance_parts(kinds,race,female),upper_arms)
     # Carried lights use the original left-hand Shield Bone attachment. Unlike
     # mirrored left body parts this rigid equipment mesh must not be mirrored.
     torch_part={'slot':10,'attach':'Shield Bone','filter':'','id':'torch','mesh':mesh,'carried_light':True}
@@ -115,7 +143,12 @@ def prepare(data_files,id1):
     for s in shapes:s['positions']=camera_space(s['positions'],camera)
     palette=(id1/'gfx/palette.lmp').read_bytes()
     protected={s['name']:len(s['faces']) for s in torch_shapes}
-    frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=620,minimum_faces=protected)
+    if topology=='source':
+        from hand_geometry import bake_source_hands
+        frames,faces,uv,skin=bake_source_hands(shapes,materials,textures,palette)
+    elif topology=='reduced':
+        frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=620,minimum_faces=protected)
+    else:raise ValueError('Unknown hand topology profile')
     raw=animated_mdl(frames,faces,uv,skin)
     # Resolve emitter through exactly the rigid transform used by assemble.
     model=assets.models[normpath('meshes/'+mesh)];nodes=source_nodes(model,skeleton.N)
@@ -142,7 +175,7 @@ def prepare(data_files,id1):
     sprites=struct.pack('>4s4H',b'AWS1',160,100,FRAMES,0)+struct.pack('>9I',*offsets)+b''.join(payload)
     (id1/'gfx/torch.aws').write_bytes(sprites)
     report={'format':'AmiWind carried source torch 1','source_id':'torch','source_mesh':mesh,
-            'animation_layer':'authored torch left arm over authored unarmed idle','attachment':'Shield Bone','carried_light_rotation_x_degrees':-90,'view_offset':VIEW_OFFSET.tolist(),'source_flame_texture':texname,'source_torch_triangles':sum(protected.values()),
+            'first_person_upper_arms':upper_arms,'hand_topology':topology,'race':race,'female':female,'animation_layer':'authored torch left arm over authored unarmed idle','attachment':'Shield Bone','carried_light_rotation_x_degrees':-90,'view_offset':VIEW_OFFSET.tolist(),'source_flame_texture':texname,'source_torch_triangles':sum(protected.values()),
             'frames':FRAMES,'duration_seconds':float(stop-start),'triangles':len(faces),'vertices':len(decoded[0]),
             'opaque_pixels':[int((p!=255).sum()) for p in rendered],
             'files':{n:hashlib.sha256((id1/n).read_bytes()).hexdigest() for n in ('progs/v_torch.mdl','gfx/torch.awt','gfx/torch.aws')},
@@ -151,4 +184,5 @@ def prepare(data_files,id1):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--data-files',type=Path,required=True);p.add_argument('--id1',type=Path,required=True)
-    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.id1),indent=2))
+    p.add_argument('--upper-arms',choices=('hidden','legacy'),default='hidden',help='First-person proximal arm visibility, legacy restores the original conversion')
+    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.id1,a.upper_arms),indent=2))

@@ -1,10 +1,9 @@
 # Bug register
 
-Current v0.0.28 status: the corrected source passes 822-test host gates and
-matching actual Amiga compiles. Its image passes all 10,766 payload readbacks
-and three partition checks. Independent native acceptance remains pending;
-no final release or publication is implied. See
-[stable status](RELEASE-v0.0.28.md) and [terrain evidence](CANONICAL_TERRAIN_CULLING.md).
+Current work is the [v0.0.29 immediate fixlist](PLAN-v0.0.29.md), following
+published v0.0.28. New owner reports and source candidates below remain open
+until their own native acceptance; historical passes do not close later reports.
+The published release and its immutable artifacts are not modified by this work.
 
 Native Windows build: [WIN-01 — intermittent Python geometry-worker queue failure (open)](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026).
 
@@ -21,6 +20,31 @@ flag, first fixed version (or an em dash), and evidence/status below.
 
 | ID | Issue | Fixed (Y/N) | First fixed version | Verification / current status |
 | --- | --- | --- | --- | --- |
+| PERF-READAHEAD-29 | Performance: cell crossing pauses and premature read-ahead cancellation | N | — | Source candidate now predicts the first crossed region; 4 focused source fixtures, target object compile, and integration suite pass. The 1.070–1.149s baseline is a ready/presentation-callback estimate, not proven first-world-frame time. Patched native timing and improvement remain unverified. See [report](performance/CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md) and [journal](BUG_JOURNAL.md#perf-readahead-29-cell-crossing-pauses-and-premature-prefetch-cancellation). |
+| CHAR-CONFIRM-BORDER-29 | In-game Go back / Choose actions lack OK-style frames | N | — | Dev4 source candidate adds mode2 frames and inset focus to shared character confirmations and travel choices; legacy UI and main/Esc menus preserved. Native appearance pending. |
+| TRANSITION-VIEW-29 | Automatic cell handoff forgets mouse orientation | N | — | Exact live view/drift restore candidate passes focused Linux cases; native route/input acceptance pending. |
+| VIEW-AUTOCENTER-29 | Walking recenters pitch during free-look; reported orientation reset persists | N | — | An original-engine walk trial showed HUD pitch P:0 after a -10 aim command while still before the next sub-cell threshold; no immediate pre-walk angle readback exists. The default-off option, explicit-centerview path, and no-event guard pass focused Docker fixtures; candidate native acceptance and the yaw cause remain open. See [journal](BUG_JOURNAL.md#view-autocenter-29-forward-motion-recenters-free-look-open). |
+| TRANSITION-VOICE-29 | Automatic cell handoff cuts active speech | N | — | Bounded detached PCM candidate passes sanitized actual mixer tests; memory/audible native acceptance pending. |
+| TERRAIN-TRAP-29 | v0.0.29-dev1: Player reportedly stuck on rocks beside structures | N | — | Global -21794,-17467,545; screenshot reviewed, exact map/collision/transition cause and runtime reproduction pending. |
+| TORCH-INPUT-29 | F cannot raise hands; V only prints torch state | N | — | P1 metadata cause reproduced; all 2,532 corrected world maps pass readback and sampled native F/V checks pass. Full state/save/light matrix remains open. |
+| LIGHT-GRADIENT-29 | Unsigned light gradients overflow during surface interpolation | N | — | Source arithmetic repair passes sanitized final-pixel tests across all four mips; native acceptance pending. |
+| TORCH-LIGHT-29 | Torch flames look weak and provide little immediate light | N | — | Owner reports torches look weak/dying and night darkness swallows the scene; requests a brighter near-white/yellow core and stronger immediate light while preserving dark unlit nights. AW_FogDraw is a candidate contributor, not a confirmed cause. No fix/acceptance; distinct from intermittent guard-torch visibility. |
+| GUARD-TORCH-CYCLE-29 | Guard torch intermittently absent during night-cycle observation | N | — | Owner first observed a nearby guard without a visible torch, then saw the same guard carrying one after reapproaching during the same night. Trigger and cause unverified; do not treat as a confirmed lost cycle. |
+| INTERIOR-LIGHT-29 | Interiors lack convincing local illumination | N | — | P2 source-light and bounded renderer study requested; cause/coverage not yet audited. |
+| SKY-NIGHT-COVER-29 | Dense night clouds rarely reveal moons/stars | N | — | Owner accepted the current night-sky appearance on 5 October 2026. Preserve that look as the visual regression baseline; exact active config and broader weather/region/performance coverage remain unrecorded or pending. See [journal](BUG_JOURNAL.md#sky-night-cover-29-owner-appearance-acceptance-5-october-2026). |
+| HUD-STATS-29 | Health uses fixed 100; other bars hardcoded full | N | — | P2 independent current/max candidate passes actual pixel checks; native acceptance pending. |
+| CONSOLE-CAPS-29 | FS-UAE F10 Caps Lock appears stuck | N | — | v0.0.29-dev1 owner report; toggling on/off is an observed workaround. Modifier/focus cause unconfirmed. |
+| CONSOLE-WHEEL-29 | FS-UAE console wheel starts working then reports unbound | N | — | v0.0.29-dev1 recurring owner report; preserve initial success then MWHEELUP fallback. Event-routing cause and fix unconfirmed. |
+| MODAL-WORLD-29 | Head/race and journal backgrounds consume world work | N | — | Independent saved aw_modal_freeze/aw_modal_black defaults1; original name entry excluded. Soundtrack/UI stay live; revised Linux fixtures and cross-host Amiga binary parity pass; native acceptance pending. |
+| SHACK-VISIBILITY-29 | v0.0.29-dev1: Shack near Seyda Neen no longer renders as before | N | — | Owner-reported development regression at global -12917,-71290,98; active chunk, matched baseline and cause unconfirmed. |
+| SEYDA-TRANSITION-29 | v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen | N | — | Owner report; reproduce exact crossing and residency/collision state. Fewer sub-cells requested for study, not an established fix. |
+| INLAND-SHORE-29 | v0.0.29-dev1: Angular/jagged inland shoreline | N | — | Owner-reported view at global -39785,-30636,379; compare authored LAND/water intersection with conversion. Cause unknown; preserve water placement/height. |
+| HORIZON-POP-29 | Ashlands horizon pops or breaks up while turning | N | — | Owner qualitatively reports distant outlines load better in dev3; preserve that as a comparison baseline; occasional fill gaps remain. Opaque-rock far-culling is attributed and an exact probe helps one sample, but OFF baselines differ in 17,565/48,640 pixels (36.11%). Horizon gaps, popping, matched-view replay, and performance remain open. |
+| MAP-TELEPORT-28 | F10 map teleport intermittently fails | N | — | Shared handler and hidden-HUD correction pass C checks; both aliases open the same picker in sampled native replay. Landing/full-state acceptance pending. |
+| MAP-SPOTS-28 | In-game map screen has white/yellow spots | N | — | AWM1 palette remap omission found; pixel/ocean remap candidate passes focused Windows/Linux checks. Target map pending. |
+| MAP-VIEW-SWITCH-28 | Mouse cannot switch DEBUG / IN-GAME map views | N | — | Overlay and event-order fixes pass focused C checks/Amiga builds. Emulator replay shows oversized guest deltas; manual mouse acceptance pending. |
+| MAP-RIGHT-DRAG-29 | Advertised right-drag does not pan teleport map | N | — | Amiga right/middle mismatch reproduced; local two-button fix passes fixtures and builds. Manual native acceptance pending. |
+| TREE-PILLAR-28 | Sprite-tree roots extend into unintended striped pillars | N | — | Scaled/authored-origin sampling mismatch reproduced: 90/105 bad pixels before; seven raster cases pass after. Native tree acceptance pending. |
 | SKY-GROUND-28 | Rebuilt LAND faces invisible; clouds scroll too fast | N | — | Native winding repair restores ground in bounded town views; current cloud multiplier is 0.00333333333. Final route/motion acceptance pending; [journal](BUG_JOURNAL.md#sky-ground-28-pale-ground-and-excessive-cloud-speed-open). |
 | SKY-STARS-28 | Enlarged stars cover original night artwork | N | — | AWN2 point roles limit stars to one pixel behind nebula and full moon masks. Focused fixtures pass; native views pending; [journal](BUG_JOURNAL.md#sky-stars-28-enlarged-stars-and-night-layer-ordering-open). |
 | ARRIVAL-CEILING-28 | Coordinate arrivals start inside solid ceiling shell | N | — | Bounded clear-start search passes four actual owned hull cases; dynamic/native routes pending; [journal](BUG_JOURNAL.md#arrival-ceiling-28-coordinate-arrivals-blocked-by-solid-ceiling-shell-open). |

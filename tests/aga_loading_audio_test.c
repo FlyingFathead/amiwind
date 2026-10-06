@@ -17,6 +17,8 @@ void AW_AudioLate(int n){late+=n;}
 void AW_SpeechStop(int a,int b){}
 void Q_memset(void *p,int value,int n){memset(p,value,n);}
 int AW_MovieActive(void){return 0;}
+int AW_MovieDebugActive(void){return 0;}
+int AW_MovieDebugPending(void){return 0;}
 void AW_MoviePaint(portable_samplepair_t *p,int n,int start){assert(0);}
 void AW_MusicPaint(portable_samplepair_t *p,int n){int i;for(i=0;i<n;i++){p[i].left=321;p[i].right=-321;}frames+=n;}
 sfxcache_t *S_LoadSound(sfx_t *s){assert(0);return NULL;}

@@ -4,6 +4,7 @@
 #define AW_REGION_MAX 64
 typedef struct {char name[8];float low[2],high[2],cover_low[2],cover_high[2];} aw_region_t;
 int AW_RegionOwner(const aw_region_t *,int,const float *,int,float);
+int AW_RegionNextOwner(const aw_region_t *,int,const float *,const float *,int,float,float);
 int AW_RegionSelect(const char *,const float *,int);
 const char *AW_RegionWorldModel(const char *,int);
 int AW_RegionCrossing(const float *,int);

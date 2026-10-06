@@ -5,6 +5,7 @@
 #include <assert.h>
 aw_story_t aw_story;
 server_t sv;server_static_t svs;keydest_t key_dest=key_game;
+int AW_UIMode(void){return 2;}
 void IN_AWClearButtons(void){}
 void Con_Printf(char *s,...){}
 int COM_FOpenFile(char *s,FILE **f){*f=NULL;return -1;}

@@ -9,6 +9,10 @@
 #include "aw_state.h"
 #include "aw_boolean.h"
 #include <stdint.h>
+#ifdef AMIGA
+#include <proto/exec.h>
+#include <exec/memory.h>
+#endif
 extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t r_drawentities;
@@ -32,13 +36,14 @@ typedef struct {
     edict_t *actor;
     vec3_t flame;
     float distance;
-    int active;
+    int active,light_test,light_key;
 } guard_visible_t;
 static guard_asset_t guard_assets[GUARD_TYPES];
 static guard_visible_t guards[GUARD_VISIBLE];
 static int guard_count,visible_count,override=-1;
 static const byte *flame_pixels;
 static int last_aliases,last_eligible,last_frames,last_models,last_evicted;
+static int last_lights,last_light_range,last_light_contents,last_light_trace,last_light_untested;
 static const char *last_gate="not rendered";
 static cvar_t guards_torch_cycle={"guards_torch_cycle","1",true};
 static unsigned read16(const byte *p){return ((unsigned)p[0]<<8)|p[1];}
@@ -113,7 +118,7 @@ invalid:
 }
 static void command(void)
 {
-    int value,i,active=0;
+    int value,i,active=0,lights=0;
     if(Cmd_Argc()==2){
         value=!Q_strcasecmp(Cmd_Argv(1),"auto")?-1:AW_ParseBoolean(Cmd_Argv(1));
         if(value<0 && Q_strcasecmp(Cmd_Argv(1),"auto")){
@@ -126,6 +131,10 @@ static void command(void)
     for(i=0;i<visible_count;i++)if(guards[i].active)active++;
     Con_Printf("Last guard frame: %s; aliases %d, eligible %d, admitted %d, frame skips %d, model skips %d, evicted %d.\n",
         last_gate,last_aliases,last_eligible,active,last_frames,last_models,last_evicted);
+    for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].key<=GUARD_LIGHT_KEY &&
+        cl_dlights[i].key>GUARD_LIGHT_KEY-GUARD_LIGHTS && cl_dlights[i].radius>0 && cl_dlights[i].die>=cl.time)lights++;
+    Con_Printf("Guard lights: active %d; last selected %d/2, outside range %d, contents rejects %d, trace rejects %d, untested/budget %d.\n",
+        lights,last_lights,last_light_range,last_light_contents,last_light_trace,last_light_untested);
 }
 void AW_GuardTorchInit(void)
 {
@@ -181,16 +190,27 @@ static int models(guard_asset_t *a)
     if(cl.time<a->retry_after && cl.time>=a->retry_after-3)return 0;
     /* The owned conversion ledger bounds each complete pair below 1 MiB.
      * Keep 2 MiB of hunk clearance for cache/staging and probe 1 MiB of
-     * external malloc space before the ordinary alias loader is entered.
+     * external Fast RAM on the target before the ordinary alias loader is entered.
      * This is optional equipment admission, not a general OOM guarantee. */
     probe=NULL;
-    if(hunk_size-hunk_low_used-hunk_high_used>=2*1024*1024)probe=malloc(1024*1024);
+    if(hunk_size-hunk_low_used-hunk_high_used>=2*1024*1024){
+#ifdef AMIGA
+        /* The SDK malloc failure path can trap before returning NULL. */
+        probe=AllocMem(1024*1024,MEMF_FAST|MEMF_PUBLIC);
+#else
+        probe=malloc(1024*1024);
+#endif
+    }
     if(!probe){
         a->retry_after=cl.time+3;
         if(!a->warned){Con_Printf("Guard torch deferred: low memory; original pose retained.\n");a->warned=1;}
         return 0;
     }
+#ifdef AMIGA
+    FreeMem(probe,1024*1024);
+#else
     free(probe);
+#endif
     if(!body_ready)a->body_model=Mod_ForName(a->body,false);
     if(!held_ready)a->held_model=Mod_ForName(a->held,false);
 validate:
@@ -211,8 +231,16 @@ entity_t *AW_GuardTorchEntity(entity_t *entity)
         g=&guards[i];
         if(entity!=&g->body && entity!=&g->held)continue;
         if(!g->active || !Cache_Check(&g->body.model->cache) || !Cache_Check(&g->held.model->cache)){
+            int light;
             if(g->active)last_evicted++;
-            g->active=0;clear_lights();
+            g->active=0;
+            /* A later alias load may evict only this pair. Other admitted
+             * guards and the player's independent light remain valid. */
+            if(g->light_key)for(light=0;light<MAX_DLIGHTS;light++)
+                if(cl_dlights[light].key==g->light_key){
+                    cl_dlights[light].radius=0;cl_dlights[light].die=-1;
+                }
+            g->light_key=0;
             return entity==&g->body?g->original:NULL;
         }
         return entity;
@@ -226,6 +254,7 @@ void AW_GuardTorchUpdate(void)
     edict_t *actor;entity_t *ent;trace_t trace;dlight_t *light;
     restore_list();clear_lights();
     last_aliases=last_eligible=last_frames=last_models=last_evicted=0;
+    last_lights=last_light_range=last_light_contents=last_light_trace=last_light_untested=0;
     last_gate="inactive";
     if(!guard_count || !flame_pixels || override==0 || !r_drawentities.value || !sv.active ||
         cls.state!=ca_connected || svs.maxclients!=1 || cl.intermission || AW_GalleryActive())return;
@@ -239,7 +268,7 @@ void AW_GuardTorchUpdate(void)
         last_eligible++;
         if(ent->frame<0 || ent->frame>=a->frames){last_frames++;continue;}
         if(!models(a)){last_models++;continue;}
-        g=&guards[visible_count++];g->original=ent;g->actor=actor;g->active=1;
+        g=&guards[visible_count++];g->original=ent;g->actor=actor;g->active=1;g->light_test=0;g->light_key=0;
         g->body=*ent;g->body.model=a->body_model;g->held=*ent;g->held.model=a->held_model;
         frame=ent->frame;AngleVectors(ent->angles,forward,right,up);
         for(j=0;j<3;j++)g->flame[j]=ent->origin[j]+a->emitter[frame][0]*forward[j]-
@@ -252,21 +281,33 @@ void AW_GuardTorchUpdate(void)
         best=-1;distance=GUARD_LIGHT_RANGE;
         for(i=0;i<visible_count;i++){
             if(i==chosen[0] || guards[i].distance>=distance)continue;
-            g=&guards[i];if(SV_PointContents(g->flame)!=CONTENTS_EMPTY)continue;
+            g=&guards[i];
+            if(SV_PointContents(g->flame)!=CONTENTS_EMPTY){g->light_test=1;continue;}
             trace=SV_Move(g->flame,vec3_origin,vec3_origin,r_refdef.vieworg,MOVE_NOMONSTERS,g->actor);
-            if(trace.startsolid || trace.allsolid || trace.fraction<1)continue;
+            if(trace.startsolid || trace.allsolid || trace.fraction<1){g->light_test=2;continue;}
+            g->light_test=3;
             best=i;distance=g->distance;
         }
         if(best<0)break;chosen[j]=best;g=&guards[best];light=CL_AllocDlight(GUARD_LIGHT_KEY-j);
-        VectorCopy(g->flame,light->origin);light->radius=144;light->minlight=16;
+        g->light_key=GUARD_LIGHT_KEY-j;
+        VectorCopy(g->flame,light->origin);light->radius=AW_TorchLightRadius();light->minlight=16;
         light->die=cl.time+.1;light->decay=0;
+        last_lights++;
+    }
+    for(i=0;i<visible_count;i++){
+        g=&guards[i];
+        if(g->distance>=GUARD_LIGHT_RANGE)last_light_range++;
+        else if(g->light_test==1)last_light_contents++;
+        else if(g->light_test==2)last_light_trace++;
+        else if(!g->light_test)last_light_untested++;
     }
 }
 void AW_GuardTorchDraw(void)
 {
     static const int threshold[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
-    int i,k,n,x,y,xx,yy,px,py,j,alpha,z;float age,depth,cx,cy,size;vec3_t delta;
+    int i,k,n,x,y,xx,yy,px,py,j,alpha,z,core;float age,depth,cx,cy,size;vec3_t delta;
     if(!flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
+    core=AW_TorchFlameCoreColor();
     for(i=0;i<visible_count;i++)for(k=0;k<3;k++){
         if(!guards[i].active)continue;
         age=(float)fmod(cl.time*.833333+k/3.0,1.0);if(!isfinite(age) || age<0)age=0;
@@ -286,7 +327,7 @@ void AW_GuardTorchDraw(void)
                 py>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
             j=((yy*16/n)*16+xx*16/n)*2;alpha=(int)(flame_pixels[j+1]*(1-age*.6f));
             if(alpha>threshold[(py&3)*4+(px&3)]*16+7 && d_pzbuffer[py*d_zwidth+px]<=z){
-                vid.buffer[py*vid.rowbytes+px]=flame_pixels[j];d_pzbuffer[py*d_zwidth+px]=z;
+                vid.buffer[py*vid.rowbytes+px]=AW_TorchFlameColor(flame_pixels[j],j,age,core);d_pzbuffer[py*d_zwidth+px]=z;
             }
         }
     }

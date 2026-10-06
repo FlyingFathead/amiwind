@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <devices/audio.h>
 
 
-static long twice_real_speed;
+static double real_speed;
 
 static struct MsgPort *audio_mp = NULL;
 static struct IOAudio *audio_io = NULL;
@@ -41,11 +41,11 @@ static UWORD period;
 struct channel_info {
   struct MsgPort *audio_mp;
   struct IOAudio *audio_io;
-  float starttime;
+  double starttime;
   BOOL sound_in_progress;
 };
 
-// max number of Amiga sound channels 
+// max number of Amiga sound channels
 static struct channel_info channel_info[4] = {
   {NULL, NULL, 0.0, FALSE},
   {NULL, NULL, 0.0, FALSE},
@@ -67,7 +67,7 @@ static void stopsound (int cnum)
 {
   if (!audio_is_open)
     return;
-    
+
   if (channel_info[cnum].sound_in_progress) {
     AbortIO ((struct IORequest *)channel_info[cnum].audio_io);
     WaitPort (channel_info[cnum].audio_mp);
@@ -85,7 +85,7 @@ static int startsound (int cnum, char *buffer, int length)
 
   if (!audio_is_open)
     return 1;
-    
+
   stopsound (cnum);
   c = &channel_info[cnum];
   c->audio_io->ioa_Request.io_Command = CMD_WRITE;
@@ -98,7 +98,7 @@ static int startsound (int cnum, char *buffer, int length)
   BeginIO ((struct IORequest *)c->audio_io);
   c->starttime = Sys_FloatTime();
   c->sound_in_progress = TRUE;
-  
+
   return cnum;
 }
 
@@ -129,7 +129,7 @@ qboolean SNDDMA_Init(void)
     }
 
     memset((void*)shm, 0, sizeof(dma_t));
-    
+
     // Determine the sample buffer size. We want it to store enough data for
     // at least 1/16th of a second (though at most 8192 samples). Note
     // that it must be a power of two. So e.g. at 22050 Hz, we request a
@@ -138,23 +138,23 @@ qboolean SNDDMA_Init(void)
     while ((sampleCount * 16) > (AMIGA_SOUND_FREQUENCY * 2)) {
         sampleCount >>= 1;
     }
-  
+
     sampleCount = sampleCount * 32; /* 32 KiB stereo DMA ring. */
-     
+
     if ((shm->buffer = AllocMem (sampleCount, MEMF_CHIP | MEMF_CLEAR)) == NULL) {
         Sys_Error ("Could not allocate enough CHIP memory for the sound buffer");
     }
-    
+
     shm->channels = 2;
     shm->speed = AMIGA_SOUND_FREQUENCY;
     shm->samplebits = 8;
     shm->samples = sampleCount / (shm->samplebits / 8);
     shm->submission_chunk = 1;
-    
+
     if ((audio_mp = CreateMsgPort()) == NULL) {
         Sys_Error ("Native CreateMsgPort() failed");
     }
-    
+
     if ((audio_io = (struct IOAudio *)AllocMem(sizeof(struct IOAudio), MEMF_PUBLIC | MEMF_CLEAR)) == NULL) {
         Sys_Error ("Could not allocate enough memory for the IOAudio");
     }
@@ -169,9 +169,9 @@ qboolean SNDDMA_Init(void)
     if (OpenDevice (AUDIONAME, 0, (struct IORequest *)audio_io, 0) != 0) {
         Sys_Error("OpenDevice(\"audio.device\") failed");
     }
-      
+
     audio_is_open = TRUE;
-    
+
     for (i = 0; i < shm->channels; i++) {
         c = &channel_info[i];
         if ((c->audio_mp = CreateMsgPort ()) == NULL ||
@@ -179,27 +179,43 @@ qboolean SNDDMA_Init(void)
                                              MEMF_PUBLIC | MEMF_CLEAR)) == NULL) {
             Sys_Error ("CreateMsgPort() or AllocMem() failed");
         }
-        
+
         *c->audio_io = *audio_io;
         c->audio_io->ioa_Request.io_Message.mn_ReplyPort = c->audio_mp;
         c->audio_io->ioa_Request.io_Unit = (struct Unit *)(1 << i);
     }
-    
+
     if ((GfxBase->DisplayFlags & REALLY_PAL) == 0)
       clock_constant = 3579545;   /* NTSC */
     else
-      clock_constant = 3546895;   /* PAL */        
-    
+      clock_constant = 3546895;   /* PAL */
+
     period = ((clock_constant << 1) + shm->speed) / ((shm->speed) << 1);
 
-    twice_real_speed = 2 * clock_constant / period;
+    real_speed = (double)clock_constant / period;
 
     startsound (0, shm->buffer, sampleCount >> 1);
     startsound (1, shm->buffer + (sampleCount >> 1), sampleCount >> 1);
-    
-    Con_Printf ("Using Native 8 bit Stereo Audio\n"); 
+
+    Con_Printf ("Using Native 8 bit Stereo Audio\n");
 
     return true;
+}
+
+/* The audio device keeps looping while the game is busy. Derive an absolute
+ * sample-pair clock from the same EClock estimate used by this driver, not
+ * from how many ring wraps the mixer happened to observe. The rare epoch
+ * rollover is a multiple of the ring length and fits signed mixer counters. */
+int SNDDMA_GetSamples(void) {
+    double frames;
+    if (!shm || !shm->buffer || !channel_info[0].sound_in_progress)
+        return 0;
+    frames = (Sys_FloatTime() - channel_info[0].starttime) * real_speed;
+    if (!(frames >= 0) || !isfinite(frames))
+        return 0;
+    if (frames >= 1073741824.0)
+        frames = fmod(frames,1073741824.0);
+    return (int)frames;
 }
 
 int SNDDMA_GetDMAPos(void) {
@@ -209,8 +225,8 @@ int SNDDMA_GetDMAPos(void) {
     }
 
 
-    shm->samplepos = ((int)((Sys_FloatTime() - channel_info[0].starttime) * twice_real_speed)) & (sampleCount - 1);
-    
+    shm->samplepos = (SNDDMA_GetSamples() * shm->channels) & (sampleCount - 1);
+
 
     return shm->samplepos;
 }
@@ -219,46 +235,46 @@ void SNDDMA_Shutdown(void) {
 
     int i;
 
-    
-    
+
+
     if (audio_is_open) {
         if (shm != NULL) {
           for (i = 0; i < shm->channels; i++)
             stopsound (i);
-            
-          audio_io->ioa_Request.io_Unit = (struct Unit *)((1 << shm->channels) - 1);  
+
+          audio_io->ioa_Request.io_Unit = (struct Unit *)((1 << shm->channels) - 1);
         }
-        
+
         CloseDevice ((struct IORequest *)audio_io);
         audio_is_open = FALSE;
     }
-    
+
     for (i = 0; i < 4; i++) {
         if (channel_info[i].audio_io != NULL) {
           FreeMem (channel_info[i].audio_io, sizeof(struct IOAudio));
           channel_info[i].audio_io = NULL;
         }
-        
+
         if (channel_info[i].audio_mp != NULL) {
           DeleteMsgPort (channel_info[i].audio_mp);
           channel_info[i].audio_mp = NULL;
         }
     }
-    
+
     if (audio_io != NULL) {
         FreeMem (audio_io, sizeof(struct IOAudio));
         audio_io = NULL;
     }
-    
+
     if (audio_mp != NULL) {
         DeleteMsgPort (audio_mp);
         audio_mp = NULL;
-    }    
-    
+    }
+
     if (shm != NULL) {
         if (shm->buffer != NULL) {
             FreeMem (shm->buffer, sampleCount);
-            
+
         shm->buffer = NULL;
     }
 
@@ -274,4 +290,3 @@ void SNDDMA_Submit (void)
 {
     // NovaCoder's version doesn't need explicit submit - audio handled in startsound
 }
-

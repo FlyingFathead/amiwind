@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+/* This synthetic scenery map has no harvest catalogue or reference fields. */
+int COM_FOpenFile(char *name,FILE **out){(void)name;*out=NULL;return -1;}
+void Con_Printf(char *fmt,...){(void)fmt;}
+eval_t *GetEdictFieldValue(edict_t *e,char *name){(void)e;(void)name;return NULL;}
+
 #include <assert.h>
 #include <stdarg.h>
 server_t sv;char *pr_strings="\0func_wall\0*1";

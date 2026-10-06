@@ -258,6 +258,7 @@ void CDAudio_Play(byte track,qboolean looping) {(void)track;(void)looping;paused
 void CDAudio_Stop(void) {paused=1;}
 void CDAudio_Pause(void) {paused=1;}
 void CDAudio_Resume(void) {paused=0;}
+int CDAudio_IsPaused(void) {return paused!=0;}
 int CDAudio_Init(void) {
     FILE *f;char path[MAX_OSPATH+64];int g,n,i,j,id;
     sprintf(path,"%s/music/playlist.txt",com_gamedir);f=fopen(path,"r");if(!f)return -1;

@@ -54,10 +54,13 @@ PROBE_TYPES = ('pointer', 'short', 'int', 'hunk', 'dvertex', 'dedge', 'dplane', 
                'msprite', 'mspriteframe', 'mspritegroup', 'mspriteframedesc',
                'scenery', 'client', 'qsocket', 'signon_capacity', 'reliable_capacity', 'network_capacity',
                'aliashdr', 'maliasframedesc', 'mdl', 'stvert', 'mtriangle',
-               'maliasskindesc', 'trivertx', 'cache_system')
+               'maliasskindesc', 'trivertx', 'cache_system',
+               'harvest_proxy_static', 'harvest_catalogue_extension',
+               'harvest_plant_capacity', 'harvest_model_capacity')
 
 PROBE_SOURCE = r'''#include "quakedef.h"
 #include "model.h"
+#include "aw_harvest.h"
 typedef struct { int sentinel; int size; char name[8]; } aw_hunk_probe_t;
 const unsigned int aw_size_pointer = sizeof(void *);
 const unsigned int aw_size_short = sizeof(short);
@@ -113,6 +116,29 @@ typedef struct aw_cache_probe_s {
     struct aw_cache_probe_s *prev,*next,*lru_prev,*lru_next;
 } aw_cache_probe_t;
 const unsigned int aw_size_cache_system = sizeof(aw_cache_probe_t);
+/* Match the dedicated proxy arrays/pointers and AWH4 catalogue extension.
+ * These are static Fast RAM, not Hunk allocations. Report them separately,
+ * then conservatively debit the map admission allowance by the same amount. */
+#ifdef AW_HARVEST_MODELS
+typedef struct {
+    entity_t proxies[AW_HARVEST_PLANTS];
+    model_t *models[AW_HARVEST_MODELS];
+    unsigned char submitted[AW_HARVEST_PLANTS];
+    const aw_harvest_t *catalogue; aw_state_t *state; int capacity_warning;
+} aw_harvest_proxy_probe_t;
+const unsigned int aw_size_harvest_proxy_static = sizeof(aw_harvest_proxy_probe_t);
+const unsigned int aw_size_harvest_catalogue_extension =
+    sizeof(((aw_harvest_t *)0)->representation) + sizeof(((aw_harvest_t *)0)->models) +
+    sizeof(((aw_harvest_t *)0)->model) +
+    AW_HARVEST_PLANTS * sizeof(((aw_harvest_plant_t *)0)->scale);
+const unsigned int aw_size_harvest_plant_capacity = AW_HARVEST_PLANTS;
+const unsigned int aw_size_harvest_model_capacity = AW_HARVEST_MODELS;
+#else
+const unsigned int aw_size_harvest_proxy_static = 0;
+const unsigned int aw_size_harvest_catalogue_extension = 0;
+const unsigned int aw_size_harvest_plant_capacity = 0;
+const unsigned int aw_size_harvest_model_capacity = 0;
+#endif
 '''
 
 
@@ -163,11 +189,14 @@ def compile_target_sizes(sdk):
                 current = label.group(1)
                 continue
             value = re.match(r'^\s*\.long\s+([0-9]+)\s*$', line)
+            if current and re.match(r'^\s*\.(?:skip|space|zero)\s+4\s*$', line):
+                sizes[current] = 0
+                current = None
             if current and value:
                 sizes[current] = int(value.group(1))
                 current = None
     missing = sorted(set(PROBE_TYPES) - set(sizes))
-    if missing or any(size <= 0 for size in sizes.values()):
+    if missing or any(size <= 0 for key, size in sizes.items() if not key.startswith('harvest_')):
         raise ValueError('Target ABI probe did not provide valid sizes: ' + ', '.join(missing))
     if (sizes.get('pointer'), sizes.get('short'), sizes.get('int'), sizes.get('hunk')) != (4, 2, 4, 16):
         raise ValueError('Unexpected Amiga ABI core sizes; refusing to estimate')
@@ -192,7 +221,10 @@ def compile_target_sizes(sdk):
                    'runtime_r_efrag_c_sha256': digest(ROOT / 'engine/aga/src/r_efrag.c'),
                    'runtime_cl_main_c_sha256': digest(ROOT / 'engine/aga/src/cl_main.c'),
                    'runtime_host_c_sha256': digest(ROOT / 'engine/aga/src/host.c'),
-                   'runtime_zone_c_sha256': digest(ROOT / 'engine/aga/src/zone.c')}
+                   'runtime_zone_c_sha256': digest(ROOT / 'engine/aga/src/zone.c'),
+                   'runtime_aw_harvest_h_sha256': digest(ROOT / 'engine/aga/src/aw_harvest.h'),
+                   'runtime_aw_harvest_proxy_c_sha256': digest(ROOT / 'engine/aga/src/aw_harvest_proxy.c')
+                       if (ROOT / 'engine/aga/src/aw_harvest_proxy.c').is_file() else None}
 
 
 def lump_table(raw, path):
@@ -437,6 +469,8 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
     reports = [estimate_bsp(path, sizes) for path in candidates]
     from guard_torch_heap import profile as guard_profile, map_cost as guard_cost, apply as apply_guard_cost
     guards=guard_profile(maps.parent,sizes)
+    from harvest_heap import profile as harvest_profile, apply as apply_harvest_cost
+    harvest=harvest_profile(maps.parent,sizes)
     from sprite_heap import inspect_sprites, inspect_efrags, efrag_pool_profile
     efrag_policy=efrag_pool_profile((ROOT/'engine/aga/src/client.h').read_text(encoding='utf-8'))
     for report, path in zip(reports, candidates):
@@ -481,7 +515,9 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
             report['classifier_allocation_failure_fallback_peak_bytes']+efrags['resident_hunk_bytes'],
             report['resident_loader_bytes'])
         apply_guard_cost(report,guard_cost(entity_bytes,guards))
-        required = report['peak_loader_bytes'] + baseline_reserve_bytes + safety_headroom_bytes
+        apply_harvest_cost(report,harvest)
+        required = (report['peak_loader_bytes'] + baseline_reserve_bytes + safety_headroom_bytes +
+                    report['additional_static_allowance_bytes'])
         report.update(baseline_reserve_bytes=baseline_reserve_bytes,
                       safety_headroom_bytes=safety_headroom_bytes,
                       estimated_total_bytes=required,
@@ -497,7 +533,8 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
             'failing_maps': [r['map'] for r in reports if r['gate'] == 'fail'],
             'worst_map': worst['map'], 'worst_estimated_total_bytes': worst['estimated_total_bytes'],
             'minimum_estimated_clearance_bytes': min(r['estimated_clearance_bytes'] for r in reports),
-            'target_struct_sizes_bytes': sizes, 'guard_torch_profile': guards, 'maps': reports}
+            'target_struct_sizes_bytes': sizes, 'guard_torch_profile': guards,
+            'harvest_external_profile': harvest, 'maps': reports}
 
 
 def audit_world_maps(maps, sdk, out, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,

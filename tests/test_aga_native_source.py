@@ -30,6 +30,39 @@ class GuardTorchRenderContractTests(unittest.TestCase):
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_harvest_original_loot_transaction_capacity_and_save_persistence(self):
+        self.compile_run('aga_harvest_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_harvest.c', 'aw_state.c', 'aw_save_codec.c')],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_harvest_exact_brush_binding_occlusion_hide_and_crossings(self):
+        self.compile_run('aga_harvest_runtime_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_harvest.c', 'aw_harvest_runtime.c', 'aw_state.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'])
+
+    def test_named_headselection_scene_setup_and_registration_resume(self):
+        self.compile_run('aga_debug_scene_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_opening.c', 'aw_story.c', 'aw_state.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_scene_voice_tail_survives_memory_clear_and_mixing(self):
+        self.compile_run('aga_scene_voice_test.c', [Path(SOURCE)/'src'/n for n in
+            ('snd_dma.c', 'snd_mix.c', 'aw_speech.c', 'mathlib.c')],
+            cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all',
+                    '-Wl,--wrap=malloc'])
+
+    def test_original_name_entry_and_follow_guard_prompt_keep_world_context(self):
+        self.compile_run('aga_modal_intro_test.c', [Path(SOURCE)/'src/aw_ui.c'],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_modal_policy_host_services_and_client_clock(self):
+        for client in (False, True):
+            with self.subTest(client=client):
+                self.compile_run('aga_modal_world_test.c', [Path(SOURCE)/'src'/n for n in
+                    ('aw_ui.c', 'cl_main.c' if client else 'host.c', 'mathlib.c')],
+                    defines=['MODAL_CLIENT'] if client else [],
+                    cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
     def test_guard_torches_source_registry_cycle_pose_lights_and_depth(self):
         self.compile_run('aga_guard_torch_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_guard_torch.c','mathlib.c')],
@@ -45,6 +78,14 @@ class NativeSourceTests(unittest.TestCase):
         if not compiler:
             self.skipTest('set QCC_PATH to the validated host QCC')
         from build_aga import validate_quakec
+        # Bind the fixture from the engine table, not the QC declaration: a
+        # mistaken QC index must exercise the wrong real ABI behavior and fail.
+        builtin_source=(Path(SOURCE)/'src/pr_cmds.c').read_text()
+        table=builtin_source.split('builtin_t pr_builtin[] =',1)[1].split('#ifdef QUAKE2',1)[0]
+        table=re.sub(r'/\*.*?\*/|//[^\n]*','',table,flags=re.S)
+        builtin_names=re.findall(r'\bPF_\w+\b',table)
+        rint_index=builtin_names.index('PF_rint');floor_index=builtin_names.index('PF_floor')
+        self.assertEqual((rint_index,floor_index),(36,37))
         with tempfile.TemporaryDirectory() as tmp:
             directory=Path(tmp);qc=directory/'qc';qc.mkdir()
             for name in ('defs.qc','world.qc','progs.src'):
@@ -52,9 +93,23 @@ class NativeSourceTests(unittest.TestCase):
             result=subprocess.run([str(Path(compiler).resolve())],cwd=qc,capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             validate_quakec(directory/'progs.dat')
-            self.compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c'],
+            self.compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c', Path(SOURCE)/'src/aw_torch.c'],
                 cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
+                defines=[f'TEST_RINT_BUILTIN_INDEX={rint_index}',f'TEST_FLOOR_BUILTIN_INDEX={floor_index}'],
                 arguments=[str(directory/'progs.dat')])
+            # A control compiled with the historical wrong number must fail
+            # against this same engine-derived fixture mapping.
+            world=qc/'world.qc'
+            world.write_text(world.read_text().replace('floor = #37;','floor = #36;'))
+            result=subprocess.run([str(Path(compiler).resolve())],cwd=qc,capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            with self.assertRaisesRegex(AssertionError,'Hand sequence 1 sample 2: frame 9 expected 8'):
+                # Keep the expected failure out of the outer test's subTest collector.
+                NativeSourceTests().compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c',Path(SOURCE)/'src/aw_torch.c'],
+                    defines=[f'TEST_RINT_BUILTIN_INDEX={rint_index}',f'TEST_FLOOR_BUILTIN_INDEX={floor_index}'],
+                    cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
+                    arguments=[str(directory/'progs.dat')])
+
 
     def test_torch_controls_bounded_light_surface_illumination_and_overlay(self):
         self.compile_run('aga_torch_test.c', [Path(SOURCE)/'src'/n for n in
@@ -68,24 +123,43 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_daynight_sky_phases_toggle_midnight_and_interior_isolation(self):
         self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
-            ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_night_source_stars_are_one_native_pixel_behind_art_world_and_moons(self):
         self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
-            ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
             arguments=['10'])
         self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
-            ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
             arguments=['11'])
+
+    def test_cloud_veil_preserves_classic_and_invalidates_composer_cache(self):
+        for mode in (12,13):
+            with self.subTest(mode=mode):
+                self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+                    ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+                    cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+                    arguments=[str(mode)])
+
+    def test_cloud_control_v2_legacy_rollback_protected_twilight_and_coverage(self):
+        self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+            arguments=['14'])
+
+    def test_guard_lights_change_world_and_rotated_brush_final_pixels(self):
+        self.compile_run('aga_guard_light_surface_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_guard_torch.c','r_light.c','r_surf.c','r_bsp.c','d_surf.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_owned_night_atlas_moons_occlusion_twinkle_and_corruption(self):
         for mode in range(6,10):
             with self.subTest(mode=mode):
                 self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+                    ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
                     cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
                     arguments=[str(mode)])
 
@@ -93,7 +167,7 @@ class NativeSourceTests(unittest.TestCase):
         for mode in range(1,6):
             with self.subTest(mode=mode):
                 self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('r_sky.c','aw_fog.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+                    ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
                     cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
                     arguments=[str(mode)])
 
@@ -101,9 +175,51 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_alias_near_quad_clips_every_screen_edge(self):
+        self.compile_run('aga_alias_clip_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_aclip.c','r_alias.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_torch_stride_depth_and_actual_alias_transform(self):
+        self.compile_run('aga_viewmodel_bob_test.c', [Path(SOURCE)/'src'/n for n in
+            ('view.c','r_alias.c','r_sprite.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
-        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c')],
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c','aw_save_codec.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
+        cases = ('same_batch_tabs', 'sequential_clamp', 'game_accumulation',
+                 'signed_game', 'filter', 'modal_reset', 'ui_routes', 'bounds')
+        for standard, selected in (('gnu89', cases),
+                                   ('gnu99', ('signed_game', 'filter', 'bounds'))):
+            with self.subTest(standard=standard):
+                self.compile_run('aga_mouse_event_test.c', [Path(SOURCE)/'src'/n for n in
+                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_state.c', 'aw_save_codec.c')],
+                    cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
+                    standard=standard, argument_sets=[(case,) for case in selected])
+
+    def test_world_ui_drag_cancels_on_focus_loss_without_lost_release(self):
+        # Compile the real shared native focus-case body without Amiga SDK I/O.
+        # The fixture uses actual Key_ClearStates and IN_AWClearButtons routines.
+        source = (Path(SOURCE)/'src/sys_amiga.c').read_text()
+        branches = re.findall(
+            r'case IDCMP_ACTIVEWINDOW:\s*case IDCMP_INACTIVEWINDOW:\s*(.*?)break;',
+            source, re.S)
+        self.assertEqual(len(branches), 1, 'native focus case must be unambiguous')
+        cases = ('focus_left', 'focus_right', 'focus_middle', 'focus_journal',
+                 'normal_left', 'normal_right', 'normal_middle', 'close_reopen',
+                 'selection_preserved', 'cursor_preserved', 'game_motion_discarded')
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = Path(tmp)/'focus.c'
+            adapter.write_text('#include "quakedef.h"\nvoid AW_TestFocusEvent(void){'
+                               + branches[0].strip() + '}\n')
+            self.compile_run('aga_map_focus_test.c',
+                [*[Path(SOURCE)/'src'/n for n in
+                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_state.c')], adapter],
+                cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
+                argument_sets=[(case,) for case in cases])
 
     def test_journal_history_dates_duplicates_and_capacity_transaction(self):
         self.compile_run('aga_journal_state_test.c', [Path(SOURCE)/'src/aw_state.c'],
@@ -116,6 +232,11 @@ class NativeSourceTests(unittest.TestCase):
     def test_sprite_scale_frame_bounds_leaf_membership_and_legacy_messages(self):
         self.compile_run('aga_sprite_scale_test.c', [Path(SOURCE)/'src'/n for n in ('r_sprite.c','r_efrag.c','model.c','cl_parse.c','mathlib.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_sprite_scaled_authored_origins_match_pixels_and_occlusion(self):
+        self.compile_run('aga_sprite_mapping_test.c',
+            [Path(SOURCE)/'src'/n for n in ('r_sprite.c','d_sprite.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_sprite_stream_matches_generic_pixels_groups_and_bounded_pack_member(self):
         self.compile_run('aga_sprite_stream_test.c', [Path(SOURCE)/'src/model.c'],
@@ -249,7 +370,7 @@ class NativeSourceTests(unittest.TestCase):
                          cflags=["-O2", "-fwhole-program"])
 
     def test_scene_links_preserve_state_and_find_hatch_floor(self):
-        self.compile_run("aga_scene_test.c", [ROOT/"engine/aga/src/aw_scene.c", ROOT/"engine/aga/src/aw_region.c", ROOT/"engine/aga/src/aw_story.c", ROOT/"engine/aga/src/aw_state.c", Path(SOURCE)/"src/mathlib.c"])
+        self.compile_run("aga_scene_test.c", [ROOT/"engine/aga/src/aw_scene.c", ROOT/"engine/aga/src/aw_region.c", ROOT/"engine/aga/src/aw_story.c", ROOT/"engine/aga/src/aw_state.c", Path(SOURCE)/"src/mathlib.c", Path(SOURCE)/"src/cl_main.c", Path(SOURCE)/"src/view.c"])
 
     def test_first_person_sprite_span_bounds(self):
         self.compile_run("aga_hand_sprites_test.c", [ROOT/"engine/aga/src/aw_hand_sprites.c"], ["AMIWIND_SPRITE_HANDS=1"])
@@ -286,7 +407,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_strider_available_destination_and_return(self):
         self.compile_run('aga_scene_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_scene.c', 'aw_region.c', 'aw_story.c', 'aw_state.c', 'mathlib.c')], ['BALMORA_AVAILABLE'])
+            ('aw_scene.c', 'aw_region.c', 'aw_story.c', 'aw_state.c', 'mathlib.c', 'cl_main.c', 'view.c')], ['BALMORA_AVAILABLE'])
 
     def test_scenery_above_edict_limit_and_rotated_collision(self):
         self.compile_run('aga_scenery_test.c', [Path(SOURCE)/'src/world.c', Path(SOURCE)/'src/mathlib.c'])
@@ -297,17 +418,25 @@ class NativeSourceTests(unittest.TestCase):
     def test_dense_flora_signon_round_trip_at_buffer_capacity(self):
         self.compile_run('aga_flora_signon_test.c', [Path(SOURCE)/'src'/n for n in ('net_loop.c','common.c')])
 
-    def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=()):
+    def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=(),
+                    standard='gnu89', argument_sets=None):
         tree = Path(SOURCE).resolve()
         if any(p.name == "aw_scene.c" for p in sources):
             sources = [*sources, tree/"src/aw_world.c"]
         if any(p.name == "world.c" for p in sources):
             sources = [*sources, tree/"src/aw_scenery.c"]
+        if any(p.name in ("aw_scene.c", "aw_scenery.c") for p in sources):
+            sources = [*sources, tree/"src/aw_harvest.c", tree/"src/aw_harvest_runtime.c"]
+            if not any(p.name == "aw_state.c" for p in sources):
+                sources.append(tree/"src/aw_state.c")
+        if any(p.name == "aw_harvest_runtime.c" for p in sources):
+            if not any(p.name == "aw_harvest_proxy.c" for p in sources):
+                sources.append(tree/"src/aw_harvest_proxy.c")
         with tempfile.TemporaryDirectory() as tmp:
             from project_version import generate_native
             generate_native(ROOT/'VERSION', Path(tmp))
             exe = Path(tmp) / 'check'
-            cmd = ['cc', *cflags, *['-D'+d for d in defines], '-std=gnu89', '-ffunction-sections', '-fdata-sections',
+            cmd = ['cc', *cflags, *['-D'+d for d in defines], '-std='+standard, '-ffunction-sections', '-fdata-sections',
                    '-include', str(ROOT/'tests/aga_test_files.h'),
                    '-Wl,--gc-sections', '-I'+tmp, '-I'+str(tree/'src'), str(ROOT/'tests'/fixture),
                    *[str(p) for p in sources], '-lm', '-o', str(exe)]
@@ -322,14 +451,16 @@ class NativeSourceTests(unittest.TestCase):
                                   arg.replace('\\', '/')) for arg in cmd]
             result = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            result = subprocess.run([str(exe), *arguments], cwd=tmp, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for argv in argument_sets if argument_sets is not None else (arguments,):
+                with self.subTest(arguments=argv):
+                    result = subprocess.run([str(exe), *argv], cwd=tmp, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_rotated_platform_and_vacated_space(self):
         self.compile_run('aga_collision_test.c', [Path(SOURCE)/'src/world.c', Path(SOURCE)/'src/mathlib.c'])
 
     def test_far_plane_matches_fog_depth(self):
-        self.compile_run('aga_culling_test.c', [ROOT/'engine/aga/src/aw_fog.c'])
+        self.compile_run('aga_culling_test.c', [ROOT/'engine/aga/src/aw_fog.c',ROOT/'engine/aga/src/aw_horizon.c'])
 
     def test_nearby_door_depth_order(self):
         self.compile_run('aga_depth_test.c', [Path(SOURCE)/'src/r_edge.c'])

@@ -7,7 +7,7 @@ import numpy as np
 
 BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
       156:(158,(250,104,45)),140:(138,(255,174,66)),83:(82,(255,232,160)),221:(223,(153,38,79))}
-OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awm','.awn','.awq','.awr','.awt','.awg'}
+OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg'}
 RAW_LMP={'font-readable.lmp':16384,'font-retro.lmp':16384}
 QPIC_LMP={'conback.lmp','loading.lmp','pause.lmp'}
 EXPECTED_PALETTE='a0f74c36edc83962b99cd254026659466b1932898636f8ccc1a814a06cb7986c'
@@ -53,6 +53,21 @@ def spans(raw,rel):
                     _,_,w,h=get('<4i',at);at+=16;need(w>0 and h>0,'Invalid sprite frame')
                 add(at,w*h);at+=w*h
         if ext=='.spr':need(at==n,'Trailing sprite bytes')
+    elif ext=='.awm':
+        # AWM1 terrain pixels and its ocean fill index share the global palette.
+        # Town identities/transforms are metadata, not palette references.
+        magic,w,h,x0,y0,x1,y1,count,ocean=get('<4sHH4iII',0)
+        need(magic==b'AWM1' and 1<=w<=512 and 1<=h<=512 and count<=8,'Unsupported world map')
+        need(-2000000<=x0<x1<=2000000 and -2000000<=y0<y1<=2000000,'Invalid world map bounds')
+        start=32+60*count
+        need(ocean<=255 and n==start+w*h,'Invalid world map pixel length/index')
+        for i in range(count):
+            at=32+60*i
+            need(b'\0' in raw[at:at+16] and b'\0' in raw[at+16:at+48],'Invalid world map area name')
+            x,y,scale=get('<3f',at+48)
+            need(-2000000<=x<=2000000 and -2000000<=y<=2000000 and .0009765625<=scale<=100,'Invalid world map transform')
+        add(28,1)  # Validated uint32 index: its other three bytes are zero.
+        add(start,w*h)
     elif ext in ('.awi','.awu'):
         need(raw[:4]==(b'AWI1' if ext=='.awi' else b'AWU1'),'Unknown image version');w,h=get('<2H',4);need(n==8+w*h,'Image size mismatch');add(8,w*h)
     elif ext=='.awh':
@@ -146,6 +161,18 @@ def convert(source,output,expected_palette=None,changed_only=False):
         counts=np.zeros(256,dtype=np.int64)
         for at,size in parts:counts+=np.bincount(np.frombuffer(raw[at:at+size],np.uint8),minlength=256)
         total+=counts;rows.append({'path':rel,'input_sha256':sha(raw),'bytes':len(raw),'spans':parts,'classification':reason,'pixels':int(counts.sum()),'remapped_pixels':int(sum(counts[i] for i in BANK))})
+    # Validate the old world-map receipt before writing anything, then bind it
+    # to the remapped map and palette. This never repairs an already-stale input.
+    world_receipt=None
+    if (source/'world/conversion.json').is_file():
+        from prepare_world_ui import validate as validate_world_ui
+        world_receipt=validate_world_ui(source)
+        original=(source/'world/map.awm').read_bytes();remapped=bytearray(original)
+        for at,size in spans(original,'world/map.awm')[0]:
+            remapped[at:at+size]=original[at:at+size].translate(mapping)
+        world_receipt['sky_overlay_source_palette_sha256']=sha(palette)
+        world_receipt['palette_sha256']=sha(new)
+        world_receipt['files']['map.awm']=sha(remapped)
     output.mkdir(parents=True)
     for row in rows:
         path=source/row['path'];raw=path.read_bytes();need(sha(raw)==row['input_sha256'],'Input changed after preflight')
@@ -154,6 +181,8 @@ def convert(source,output,expected_palette=None,changed_only=False):
         rel=row['path']
         if rel=='gfx/palette.lmp':dest=new
         elif rel in ('gfx/colormap.lmp','gfx/fog.lmp'):dest=lookup(raw,palette,new,64 if 'colormap' in rel else 16,rel)
+        elif rel=='world/conversion.json' and world_receipt is not None:
+            dest=(json.dumps(world_receipt,indent=2)+'\n').encode('utf-8')
         elif rel=='gfx/ui-palette.json':
             marker=json.loads(raw);need(marker['palette_sha256']==sha(palette),'Stale UI marker');marker['palette_sha256']=sha(new);marker['sky_overlay_source_palette_sha256']=sha(palette)
             marker['lookup_sha256']={name:sha(lookup((source/'gfx'/name).read_bytes(),palette,new,count,name)) for name,count in [('colormap.lmp',64),('fog.lmp',16)]}

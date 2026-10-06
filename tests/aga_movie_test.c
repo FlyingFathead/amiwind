@@ -2,16 +2,19 @@
 #include "quakedef.h"
 #include "sound.h"
 #include <assert.h>
-viddef_t vid;int soundtime,paintedtime;keydest_t key_dest;
-static int titles,music_samples;static cvar_t *overlay;
+viddef_t vid;int soundtime,paintedtime,sound_started,snd_blocked;keydest_t key_dest;
+static int titles,music_samples,paused,begins,ends,flushes;static cvar_t *overlay;
+static void (*playvid_command)(void);
+static char *cmdargs[2];static int cmdargc;
 void AW_MusicTitle(void){titles++;}
+int Q_strcasecmp(char *a,char *b){unsigned char x,y;do{x=(unsigned char)*a++;y=(unsigned char)*b++;if(tolower(x)!=tolower(y))return (int)tolower(x)-(int)tolower(y);}while(x&&y);return 0;}
 void AW_MusicPaint(portable_samplepair_t *dst,int n){int i;music_samples+=n;for(i=0;i<n;i++)dst[i].left=1234;}
 void Cvar_RegisterVariable(cvar_t *c){overlay=c;c->value=atof(c->string);}
 static byte card[16+768+64000];static int card_length;
 static int menus;void Cbuf_AddText(char *s){assert(!strcmp(s,"aw_main_menu\n"));menus++;}
 volatile dma_t *shm;static dma_t device;
 cvar_t volume={"volume","1",false,false,1};
-static byte file[800+128000+2205];static int length,starts,clears,pauses;
+static byte file[800+128000+2205];static int length,starts,clears,pauses;static FILE *last_media_file;
 double Sys_FloatTime(void){return soundtime/11025.0;}
 void Con_Printf(char *s,...){
     static int finished;
@@ -24,17 +27,28 @@ void Con_Printf(char *s,...){
 void S_StopAllSounds(qboolean clear){clears++;}
 void IN_AWClearButtons(void){}
 void AW_IntroBegin(void){starts++;}
-void CDAudio_Pause(void){pauses++;}
-void CDAudio_Resume(void){}
+void CDAudio_Pause(void){pauses++;paused=1;}
+void CDAudio_Resume(void){paused=0;}
+int CDAudio_IsPaused(void){return paused;}
+void S_MovieAudioBegin(void){begins++;}
+void S_MovieAudioEnd(void){ends++;}
+void S_ClearBuffer(void){flushes++;}
+int Cmd_Argc(void){return cmdargc;}
+char *Cmd_Argv(int n){return n<cmdargc?cmdargs[n]:"";}
+void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"playvid"))playvid_command=fn;}
 void Key_ClearStates(void){}
 void V_UpdatePalette(void){}
 int COM_FOpenFile(char *path,FILE **out){
+    if(!strcmp(path,"intro/videos.awl")){
+        const char *list="AWVC1\n1 mw_logo intro/video/01.awv\n";int n=(int)strlen(list);
+        *out=tmpfile();assert(*out);fwrite(list,1,n,*out);rewind(*out);return n;
+    }
     if(!strcmp(path,"intro/opening.awt")){
         if(!card_length){*out=NULL;return -1;}
         *out=tmpfile();assert(*out);fwrite(card,1,card_length,*out);rewind(*out);return card_length;
     }
     if(!length){*out=NULL;return -1;}
-    *out=tmpfile();assert(*out);assert(fwrite(file,1,length,*out)==length);rewind(*out);return length;
+    *out=tmpfile();assert(*out);assert(fwrite(file,1,length,*out)==length);rewind(*out);last_media_file=*out;return length;
 }
 static void fixture(void){
     memset(file,0,sizeof(file));memcpy(file,"AWV1",4);file[5]=160;file[7]=100;file[9]=10;
@@ -44,7 +58,7 @@ static void fixture(void){
 }
 int main(void){
     byte pixels[64002];portable_samplepair_t paint[16];int i;
-    AW_MovieInit();assert(overlay && overlay->value==1);
+    AW_MovieInit();assert(overlay && overlay->value==1 && playvid_command);
     device.speed=11025;shm=&device;soundtime=paintedtime=100;
     assert(!AW_MovieStart() && !AW_MovieActive());
     fixture();length--;assert(!AW_MovieStart());fixture();file[20]=1;assert(!AW_MovieStart());
@@ -86,6 +100,29 @@ int main(void){
     assert(AW_MoviePalette()[0]==42 && pixels[1]==15);
     AW_MovieKey(K_ESCAPE,1);card[11]=3;
     assert(AW_MovieStart());assert(AW_MoviePalette()[0]==42);AW_MovieKey(K_ESCAPE,1);
-    file[4]=2;assert(!AW_MovieStart());
-    puts("movie header bounds, PCM, frame clock, draw bounds, EOF and Esc passed");return 0;
+    fixture();file[4]=2;assert(!AW_MovieStart());
+    /* Pending debug playback waits for queued DMA audio, then owns the mixer. */
+    fixture();sound_started=1;snd_blocked=0;paused=0;soundtime=200;paintedtime=300;
+    cmdargc=2;cmdargs[0]="playvid";cmdargs[1]="1";playvid_command();
+    assert(AW_MovieActive() && AW_MovieDebugActive() && AW_MovieDebugPending());
+    assert(!paused && begins==0 && ends==0 && AW_MoviePalette()==NULL);
+    memset(pixels,0x5a,sizeof(pixels));AW_MovieDraw();assert(pixels[1]==0x5a);
+    soundtime=250;AW_MovieUpdate();assert(AW_MovieDebugPending() && begins==0 && !paused);
+    soundtime=paintedtime=300;AW_MovieUpdate();assert(!AW_MovieDebugPending() && begins==1 && paused && flushes==1);
+    soundtime=paintedtime=500;assert(AW_MovieKey(K_ESCAPE,1) && !AW_MovieActive());
+    assert(ends==1 && !paused);
+    paused=1;soundtime=paintedtime=600;playvid_command();AW_MovieUpdate();
+    assert(AW_MovieDebugActive() && !AW_MovieDebugPending() && paused);
+    AW_MovieKey(K_ESCAPE,1);assert(!AW_MovieActive() && paused && ends==2);
+    paused=0;key_dest=key_console;soundtime=paintedtime=800;playvid_command();AW_MovieUpdate();
+    assert(AW_MovieDebugActive() && paused);
+    soundtime=3005;AW_MovieUpdate();assert(!AW_MovieActive() && !paused && key_dest==key_console && ends==3);
+    key_dest=key_console;soundtime=paintedtime=4000;playvid_command();AW_MovieUpdate();
+    assert(AW_MovieDebugActive() && paused && last_media_file);
+#ifndef _WIN32
+    assert(freopen("/dev/null","rb",last_media_file)==last_media_file);
+    AW_MoviePaint(paint,1,4000);assert(AW_MovieActive());
+    AW_MovieUpdate();assert(!AW_MovieActive() && !paused && key_dest==key_console && ends==4);
+#endif
+    puts("movie headers, PCM, frame clock, bounds, EOF, Esc, debug command, drained start, completion/error return and music pause restore passed");return 0;
 }

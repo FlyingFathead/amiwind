@@ -345,7 +345,7 @@ void Sys_SendKeyEvents(void) {
         switch (class) {
         case IDCMP_ACTIVEWINDOW:
         case IDCMP_INACTIVEWINDOW:
-            IN_AWClearButtons();Key_ClearStates();break;
+            AW_WorldUICancelDrag();IN_AWClearButtons();Key_ClearStates();break;
         case IDCMP_RAWKEY:
             Key_AmigaQualifiers(qualifier);
             /* The complete qualifier mask preserves the other Shift/Alt key. */
@@ -396,9 +396,7 @@ void Sys_SendKeyEvents(void) {
 
         case IDCMP_MOUSEMOVE:
           if(aw_input_trace.value)Con_Printf("Input mouse %ld %ld qualifier %ld\n",(long)mousex,(long)mousey,(long)qualifier);
-          mouseX = mousex;
-          mouseY = mousey;
-          mouse_has_moved = true;
+          IN_AWMouseEvent(mousex, mousey);
           break;
 
         default:

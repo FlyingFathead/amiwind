@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 extern int mouseX;
 extern int mouseY;
 extern qboolean mouse_has_moved;
+extern qboolean V_ExplicitPitchCentering (void);
 
 cvar_t	m_filter = {"m_filter","1"};
 
@@ -47,38 +48,74 @@ void IN_Commands (void)
 static int old_mouse_x = 0;
 static int old_mouse_y = 0;
 
+/* Intuition supplies signed WORD deltas. Bound the accumulated total too:
+ * x4 scaling is [-131072,131068], and the filter sum fits a 32-bit int. */
+static int IN_AWMouseBound(int value) {
+  if(value < -32768)return -32768;
+  if(value > 32767)return 32767;
+  return value;
+}
+static int IN_AWMouseSum(int pending, int delta) {
+  pending=IN_AWMouseBound(pending);delta=IN_AWMouseBound(delta);
+  if(delta>0 && pending>32767-delta)return 32767;
+  if(delta<0 && pending< -32768-delta)return -32768;
+  return pending+delta;
+}
+void IN_AWMouseReset(void) {
+  mouseX=mouseY=0;mouse_has_moved=false;
+  old_mouse_x=old_mouse_y=0;
+}
+void IN_AWMouseEvent(int dx, int dy) {
+  dx=IN_AWMouseBound(dx);dy=IN_AWMouseBound(dy);
+  /* UI movement must precede the next button in the SAME Intuition batch.
+   * Apply each delta separately so clamping and drag order are preserved. */
+  if(key_dest!=key_game){
+    IN_AWMouseReset();
+    if(AW_WorldUIActive())AW_WorldUIMouse(dx,dy);
+    else if(key_dest==key_menu)AW_MenuMouse(dx,dy);
+    return;
+  }
+  if(AW_ReaderActive()){IN_AWMouseReset();AW_ReaderMouse(dx,dy);return;}
+  if(AW_CharacterActive()){IN_AWMouseReset();AW_CharacterMouse(dx,dy);return;}
+  if(AW_GalleryModal()){IN_AWMouseReset();AW_GalleryMouse(dx,dy);return;}
+  mouseX=IN_AWMouseSum(mouse_has_moved?mouseX:0,dx);
+  mouseY=IN_AWMouseSum(mouse_has_moved?mouseY:0,dy);
+  mouse_has_moved=true;
+}
+
 void IN_Move (usercmd_t *cmd) {
 
-  int mouse_x, mouse_y;
+  int mouse_x, mouse_y, dx, dy;
 
-  if (!mouse_has_moved)
+  if (!mouse_has_moved) {
+    /* +mlook is explicit input even when the user has not moved the mouse. */
+    if (key_dest == key_game && !AW_ReaderActive() &&
+        !AW_CharacterActive() && !AW_GalleryModal() &&
+        (in_mlook.state & 1) && !V_ExplicitPitchCentering())
+      V_StopPitchDrift ();
     return;
+  }
 
-  // Consume pending movement while console is open without turning the player.
-  mouse_has_moved = false;
-  if(key_dest != key_game){
-    if(AW_WorldUIActive())AW_WorldUIMouse(mouseX,mouseY);
-    else if(key_dest==key_menu)AW_MenuMouse(mouseX,mouseY);
+  dx=mouseX;dy=mouseY;mouseX=mouseY=0;mouse_has_moved=false;
+  /* Only gameplay deltas reach here. A context change discards them; it
+   * must not reinterpret old view movement as motion in a newly opened UI. */
+  if(key_dest!=key_game || AW_ReaderActive() || AW_CharacterActive() || AW_GalleryModal()){
     old_mouse_x=old_mouse_y=0;return;
   }
 
-  if(AW_ReaderActive()){AW_ReaderMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
-  if(AW_CharacterActive()){AW_CharacterMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
-  if(AW_GalleryModal()){AW_GalleryMouse(mouseX,mouseY);old_mouse_x=old_mouse_y=0;return;}
-
   if (m_filter.value)
   {
-    mouse_x = ((mouseX << 2) + old_mouse_x) * 0.5;
-    mouse_y = ((mouseY << 2) + old_mouse_y) * 0.5;
+    mouse_x = ((dx * 4) + old_mouse_x) * 0.5;
+    mouse_y = ((dy * 4) + old_mouse_y) * 0.5;
   }
   else
   {
-   mouse_x = (mouseX << 2);
-   mouse_y = (mouseY << 2);
+   mouse_x = (dx * 4);
+   mouse_y = (dy * 4);
   }
 
-	old_mouse_x = (mouseX << 2);
-	old_mouse_y = (mouseY << 2);
+	old_mouse_x = (dx * 4);
+	old_mouse_y = (dy * 4);
 
 	mouse_x *= sensitivity.value;
 	mouse_y *= sensitivity.value;

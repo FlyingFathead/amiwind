@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_torch.h"
 #include <assert.h>
 server_t sv;server_static_t svs;viddef_t vid;refdef_t r_refdef;
 cvar_t r_drawviewmodel={"r_drawviewmodel","1"},chase_active;
@@ -9,16 +10,36 @@ byte *host_basepal;
 static edict_t player;static client_t client;
 static eval_t goal,state,torch;static int gallery,locked;
 static void (*command)(void);
+static cvar_t *radius_setting,*flame_setting;
+static int setting_argc=1;static char *setting_value="";
+static void (*set_radius)(void),(*set_flame)(void);
+int Cmd_Argc(void){return setting_argc;}
+char *Cmd_Argv(int n){return n==1?setting_value:"";}
+int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_torch_radius"))radius_setting=c;else flame_setting=c;}
+void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_torch_radius"))radius_setting->value=value;else flame_setting->value=value;}
+int AW_UIColor(int r,int g,int b){
+    if(r==255 && g==244 && b==214)return 254;
+    if(r==255 && g==255 && b==232)return 253;
+    if(r==255 && g==232 && b==112)return 252;
+    assert(r==248 && g==154 && b==48);return 251;
+}
+
 static byte pixels[336*210],pal[768],torch_assets[716];
+static byte hand_assets[716],legacy_pixels[sizeof(pixels)];
+static int hand_size=716,hand_missing,guard_loads;
 static model_t torch_model;
 int com_filesize;
 void AW_GuardTorchInit(void){}
-void AW_GuardTorchLoadAssets(const byte *torch){assert(torch);}
+void AW_GuardTorchLoadAssets(const byte *torch){assert(torch==torch_assets);guard_loads++;}
 void AW_GuardTorchUpdate(void){}
 void AW_GuardTorchDraw(void){}
 vec3_t vpn,vup,vright;
 float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
-byte *COM_LoadHunkFile(char *path){assert(!strcmp(path,"gfx/torch.awt"));com_filesize=sizeof(torch_assets);return torch_assets;}
+byte *COM_LoadHunkFile(char *path){
+    if(!strcmp(path,"gfx/hand-torch.awt")){com_filesize=hand_size;return hand_missing?NULL:hand_assets;}
+    assert(!strcmp(path,"gfx/torch.awt"));com_filesize=sizeof(torch_assets);return torch_assets;
+}
 model_t *Mod_ForName(char *path,qboolean crash){assert(!strcmp(path,"progs/v_torch.mdl"));return &torch_model;}
 static void put32(byte *p,unsigned long n){p[0]=n>>24;p[1]=n>>16;p[2]=n>>8;p[3]=n;}
 
@@ -34,7 +55,11 @@ eval_t *GetEdictFieldValue(edict_t *e,char *name){
 }
 int AW_GalleryActive(void){return gallery;}
 int AW_IntroImpulse(int impulse){return locked?0:impulse;}
-void Cmd_AddCommand(char *name,void (*fn)(void)){assert(!strcmp(name,"aw_torch"));command=fn;}
+void Cmd_AddCommand(char *name,void (*fn)(void)){
+    if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;
+    else if(!strcmp(name,"aw_torch_flame_set"))set_flame=fn;
+    else {assert(!strcmp(name,"aw_torch"));command=fn;}
+}
 void Con_Printf(char *format,...){}
 static int lights(void){int i,n=0;for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].radius>0)n++;return n;}
 static dlight_t *torchlight(void){int i;for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].key< -1)return &cl_dlights[i];return NULL;}
@@ -53,7 +78,25 @@ int main(void)
     torch_assets[5]=9;assert(!AW_TorchAssetsValidate(torch_assets,716));torch_assets[5]=8;
     put32(torch_assets+8,0);assert(!AW_TorchAssetsValidate(torch_assets,716));put32(torch_assets+8,2667);
     put32(torch_assets+12,129*65536);assert(!AW_TorchAssetsValidate(torch_assets,716));put32(torch_assets+12,12*65536);
-    AW_TorchInit();AW_TorchLoadAssets();assert(command);torch_model.type=mod_alias;torch_model.numframes=8;
+    AW_TorchInit();AW_TorchLoadAssets();assert(command && set_radius && set_flame);
+    assert(radius_setting->archive && flame_setting->archive && AW_TorchLightRadius()==192);
+    assert(AW_TorchFlameCoreColor()==-1);
+    setting_argc=2;setting_value="240";set_radius();assert(AW_TorchLightRadius()==240);
+    setting_value="nan";set_radius();assert(AW_TorchLightRadius()==240);
+    setting_value="289";set_radius();assert(AW_TorchLightRadius()==240);
+    setting_value="31";set_radius();assert(AW_TorchLightRadius()==240);
+    radius_setting->value=999;assert(AW_TorchLightRadius()==288);
+    radius_setting->value=-1;assert(AW_TorchLightRadius()==32);
+    radius_setting->value=NAN;assert(AW_TorchLightRadius()==192);
+    setting_value="144";set_radius();assert(AW_TorchLightRadius()==144);
+    setting_value="brightbase";set_flame();assert(AW_TorchFlameCoreColor()==254);
+    for(i=0;i<256;i++){
+        int core=(i%16>=5 && i%16<=10 && i/16>=8);
+        assert(AW_TorchFlameColor(7,i*2,0,254)==(core?254:7));
+        assert(AW_TorchFlameColor(7,i*2,.5f,254)==7);
+        assert(AW_TorchFlameColor(7,i*2,0,-1)==7);
+    }
+    setting_value="classic";set_flame();assert(AW_TorchFlameCoreColor()==-1);torch_model.type=mod_alias;torch_model.numframes=8;
     command();assert(!torch._float); /* V alone cannot raise hands. */
     goal._float=1;state._float=1;command();assert(torch._float==1);
     AW_TorchUpdate();assert(!lights()); /* Wait for the drawn pose. */
@@ -77,6 +120,10 @@ int main(void)
     r_drawsurf.surf=&surface;memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();
     assert(blocklights[0]>0 && blocklights[3]>0);
     expected=blocklights[0];
+    /* Greater reach must increase actual ground-surface light, not just flames. */
+    setting_value="192";set_radius();AW_TorchUpdate();
+    memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();assert(blocklights[0]>expected);
+    setting_value="144";set_radius();AW_TorchUpdate();
     /* Same light/face relationship after moving and yaw-rotating an instance.
      * The world light stays unchanged; translated cave pieces receive light. */
     memset(&brush,0,sizeof(brush));brush.origin[0]=1000;brush.origin[1]=2000;brush.origin[2]=3000;
@@ -112,7 +159,48 @@ int main(void)
     for(y=0;y<210;y++)for(x=0;x<336;x++)if(pixels[y*336+x]!=255){
         assert(x>=17 && x<257 && y>=11 && y<156);changed++;
     }
-    assert(changed>5);
+    assert(changed>5);memcpy(legacy_pixels,pixels,sizeof(pixels));
+    /* Pair-specific duration, anchor and texture selection; legacy restoration
+     * reproduces every framebuffer byte and never changes guard light data. */
+    memcpy(hand_assets,torch_assets,sizeof(hand_assets));put32(hand_assets+8,1000);
+    for(i=0;i<8;i++)put32(hand_assets+16+i*24,0);
+    for(i=204;i<716;i+=2)hand_assets[i]=180;
+    assert(AW_TorchLoadHandAssets());assert(guard_loads==1);
+    AW_TorchUseHandAssets(1);assert(AW_TorchFrame()==(int)(fmod(cl.time,1.0)*8));
+    memset(pixels,255,sizeof(pixels));AW_TorchDraw();changed=0;
+    for(i=0;i<sizeof(pixels);i++)if(pixels[i]!=255){assert(pixels[i]==180);changed++;}
+    assert(changed>5 && memcmp(pixels,legacy_pixels,sizeof(pixels)));
+    AW_TorchUseHandAssets(0);memset(pixels,255,sizeof(pixels));AW_TorchDraw();
+    assert(!memcmp(pixels,legacy_pixels,sizeof(pixels)));
+    AW_TorchUseHandAssets(1);AW_TorchViewModel();assert(cl.viewent.frame==AW_TorchFrame());
+    memset(pixels,255,sizeof(pixels));AW_TorchDraw();assert(!memcmp(pixels,legacy_pixels,sizeof(pixels)));
+    hand_size=715;assert(!AW_TorchLoadHandAssets());AW_TorchUseHandAssets(1);
+    memset(pixels,255,sizeof(pixels));AW_TorchDraw();assert(!memcmp(pixels,legacy_pixels,sizeof(pixels)));
+    hand_size=716;hand_assets[0]='X';assert(!AW_TorchLoadHandAssets());
+    hand_assets[0]='A';hand_missing=1;assert(!AW_TorchLoadHandAssets());
+    assert(guard_loads==1);
+    /* Optional sparks use the real framebuffer and obey offset viewport/row
+     * padding. Phase is game-time based: repeated frozen draws are identical.
+     * Returning to classic restores every original pixel and light setting. */
+    {
+        byte spark_pixels[sizeof(pixels)];double saved_time=cl.time;
+        int spark_colours[3]={0,0,0},step;
+        setting_value="sparks";set_flame();assert(flame_setting->value==3);
+        for(step=0;step<80;step++){
+            cl.time=step*.02;memset(pixels,255,sizeof pixels);AW_TorchDraw();
+            memcpy(spark_pixels,pixels,sizeof pixels);AW_TorchDraw();
+            assert(!memcmp(spark_pixels,pixels,sizeof pixels));
+            for(y=0;y<210;y++)for(x=0;x<336;x++)if(pixels[y*336+x]!=255){
+                assert(x>=17 && x<257 && y>=11 && y<156);
+                if(pixels[y*336+x]>=251 && pixels[y*336+x]<=253)spark_colours[pixels[y*336+x]-251]++;
+            }
+        }
+        assert(spark_colours[0] && spark_colours[1] && spark_colours[2]);
+        cl.time=saved_time;setting_value="classic";set_flame();
+        memset(pixels,255,sizeof pixels);AW_TorchDraw();
+        assert(!memcmp(pixels,legacy_pixels,sizeof pixels));
+        assert(radius_setting->value==144 && guard_loads==1);
+    }
     memset(pixels,255,sizeof(pixels));chase_active.value=1;AW_TorchDraw();
     for(i=0;i<sizeof(pixels);i++)assert(pixels[i]==255);
     return 0;

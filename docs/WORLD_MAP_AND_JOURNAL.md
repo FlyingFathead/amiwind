@@ -1,5 +1,22 @@
 # World map and progression journal
 
+## Open map reports - 4 October 2026
+
+The owner reports three post-release v0.0.28 map issues: both F10 command aliases
+`dbg tp map` / `dbg map tp` failed (a later `dbg tp map` retry worked), the
+IN-GAME MAP PROTOTYPE screen has many
+white/yellow spots, and mouse clicks do not switch DEBUG / IN-GAME views.
+The screenshot confirms the affected map screen but not the dots' meaning.
+Source inspection has since found an incorrect visible-HUD gate and an omitted
+AWM1 palette remap. The v0.0.29 candidates preserve checked teleport arrivals,
+explicit map/story availability and map area metadata. Twenty-three focused
+interpreted checks pass on Windows and Linux, with two actual C world-UI/console
+fixtures passing on Linux. Fresh target map/click/teleport acceptance remains
+pending; the published image has not changed. See
+[MAP-TELEPORT-28](BUG_JOURNAL.md#map-teleport-28-map-teleport-commands-fail-from-f10-open)
+and [MAP-SPOTS-28](BUG_JOURNAL.md#map-spots-28-whiteyellow-spots-on-the-default-map-open),
+plus [MAP-VIEW-SWITCH-28](BUG_JOURNAL.md#map-view-switch-28-mouse-cannot-switch-map-views-open).
+
 The post-RC3 development checkpoint adds two on-demand screens. They use the
 normal single-player menu pause, leave music servicing active, capture mouse
 movement and return to play without changing the player's location.
@@ -46,7 +63,8 @@ Click inside the map to select a destination and display a red crosshair. The
 **TELEPORT** button appears at the bottom right; clicking it confirms travel.
 Enter also confirms an existing selection; Escape cancels. Selection survives
 zoom/pan without changing its world coordinates. Right-drag or arrows pan this
-mode. The ordinary M map retains normal drag behavior and never teleports.
+mode. The ordinary M map retains left-drag panning. Its v0.0.29 debug-HUD
+mode also supports the explicitly confirmed right-click workflow below.
 
 The target is resolved to existing detailed-town or world-terrain coverage.
 Landing uses the actual standing collision hull, with a checked normal spawn
@@ -139,3 +157,54 @@ two seconds by default, zero for immediate loading-screen presentation. It
 applies to automatic crossings only; startup and explicit travel are immediate.
 The delay begins at a safe checkpoint after blocking reads and is not a
 performance fix. See the [cell-changing policy](CELL_CHANGING.md).
+
+## v0.0.29 focus cancellation candidate
+
+Losing window focus during map or journal dragging can lose the button-up event.
+The candidate now cancels the held drag on focus loss and gain while preserving
+the panel, cursor, map view and any selected teleport destination. Normal map
+left-drag and teleport right/middle-drag retain their behavior.
+
+The Linux source fixture reproduces four baseline lost-release failures and
+passes all eleven candidate checks, including ordinary release, close/reopen,
+selection preservation and discarded pending gameplay motion. Native focus and
+capture transitions remain unverified. This is distinct from map-tab pointer
+delivery and does not establish a fix for that report. See
+[MAP-FOCUS-DRAG-29](BUG_JOURNAL.md#map-focus-drag-29-map-or-journal-keeps-dragging-after-focus-returns-open).
+
+## v0.0.29 lava and weather map study
+
+Survey source-authored lava references and transformed coverage before adding
+a debug-world-map lava overlay. Do not confuse the unwanted palette dots with
+POIs or lava. Expose missing/unresolved survey coverage. Ash/blight regions and
+transition boundaries also require original CELL/REGN/script evidence, not a
+guessed distance from Red Mountain. These are planned studies; see
+[v0.0.29 work list](PLAN-v0.0.29.md#weather-storms-and-lava-study).
+
+
+## v0.0.29 click marker and debug-HUD destination selection
+
+Opening M chooses Debug when the debug HUD is enabled and debug maps are
+available; otherwise it chooses In-Game. The tabs remain selectable. The
+independent `aw_map_debug_available` setting remains authoritative, and explicit
+`dbg tp map` / `dbg map tp` commands continue to work with the HUD hidden.
+
+In the ordinary M map, left click places or moves one cyan diamond marker.
+Dragging beyond three virtual pixels pans instead of placing a marker; focus
+loss cancels a pending click. The marker uses original world coordinates,
+survives map reopening and normal save/load, and never moves the player.
+Press C or click CLEAR to remove it. It occupies three bounded existing global
+state entries; insufficient capacity refuses the whole update with a message.
+
+With the debug HUD enabled and the Debug tab selected, right click selects a
+red destination crosshair. A TELEPORT button appears over the bottom-right map
+area. Click that button or press Enter to confirm; selecting alone does not
+travel. Switching tabs or closing the map cancels the pending destination.
+This uses the same destination/placement checks as the explicit command.
+The cyan user marker and red teleport selection are independent.
+
+Focused source tests cover coordinate bounds, marker save/load, capacity refusal,
+click versus drag, focus cancellation, mode selection and confirmation. Native
+acceptance on the matching development build remains pending. With the default
+`aw_modal_freeze 1`, these menu screens freeze world simulation and skip the
+underlying 3D draw while UI input and soundtrack servicing continue.

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import struct
 import subprocess
 import sys
@@ -18,6 +19,39 @@ WIDTH, HEIGHT, FPS, RATE = 320, 200, 10, 11025
 HEADER = struct.Struct(">4sHHHHII12x")
 PIXELS = WIDTH * HEIGHT
 MAX_FRAMES = 18000
+
+
+def ffprobe_for(ffmpeg):
+    """Resolve ffprobe alongside the selected ffmpeg, then from PATH."""
+    executable = shutil.which(str(ffmpeg))
+    candidate = Path(executable or ffmpeg)
+    suffix = '.exe' if candidate.suffix.casefold() == '.exe' else ''
+    sibling = candidate.with_name('ffprobe' + suffix)
+    if sibling.is_file():
+        return str(sibling)
+    fallback = shutil.which('ffprobe' + suffix)
+    if fallback:
+        return fallback
+    raise ValueError('ffprobe is required to distinguish silent video from audio decode failure')
+
+
+def has_audio_stream(source, ffmpeg='ffmpeg'):
+    probe = ffprobe_for(ffmpeg)
+    result = subprocess.run([probe, '-v', 'error', '-select_streams', 'a:0',
+                             '-show_entries', 'stream=codec_type',
+                             '-of', 'default=noprint_wrappers=1:nokey=1', str(source)],
+                            check=True, capture_output=True, text=True)
+    return any(line.strip().casefold() == 'audio' for line in result.stdout.splitlines())
+
+
+def write_silence(path, samples):
+    with Path(path).open('xb') as output:
+        block = b'\0' * min(65536, samples)
+        remaining = samples
+        while remaining:
+            count = min(len(block), remaining)
+            output.write(block[:count])
+            remaining -= count
 
 # Stable debug playback IDs. New source files do not renumber existing entries.
 VIDEO_CATALOG = (
@@ -110,10 +144,16 @@ def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=Non
         if tail or not 1 <= frames <= MAX_FRAMES:
             raise ValueError("Expected a nonempty movie no longer than 30 minutes")
         samples = (frames * RATE + FPS - 1) // FPS
-        subprocess.run([ffmpeg, "-v", "error", "-nostdin", "-i", str(source), "-vn",
-                        "-t", str(frames / FPS), "-ac", "1", "-ar", str(RATE),
-                        "-af", "aresample=osf=u8:dither_method=triangular",
-                        "-f", "s8", str(pcm)], check=True)
+        silent_source = not has_audio_stream(source, ffmpeg)
+        if silent_source:
+            write_silence(pcm, samples)
+        else:
+            subprocess.run([ffmpeg, "-v", "error", "-nostdin", "-i", str(source), "-vn",
+                            "-t", str(frames / FPS), "-ac", "1", "-ar", str(RATE),
+                            "-af", "aresample=osf=u8:dither_method=triangular",
+                            "-f", "s8", str(pcm)], check=True)
+            if not pcm.is_file() or pcm.stat().st_size == 0:
+                raise ValueError('Audio stream decoder produced no PCM samples')
         # A fixed palette avoids flashing between frames. Sample the whole movie
         # at bounded cost instead of building it from the opening black frame.
         picks = sorted({i * (frames - 1) // 255 for i in range(256)})
@@ -152,7 +192,8 @@ def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=Non
     result.update(format="AWV1", source=source.name, width=width, height=height, fps=FPS,
                   rate=RATE, channels=1, bits=8, palette="fixed 256 colours",
                   bytes=target.stat().st_size, sha256=digest(target),
-                  source_sha256=digest(source))
+                  source_sha256=digest(source),
+                  audio_status='synthesized_silence' if silent_source else 'source_stream_converted')
     if captions:
         result.update(title_cards=cards, title_cards_sha256=digest(captions), font_sha256=digest(font))
     (output / "video-conversion.json").write_text(json.dumps(result, indent=2) + "\n")

@@ -47,13 +47,13 @@ OBJDIR = obj
 SRCS = \
 	amiga_stubs.c \
 	aw_debug.c aw_clock.c aw_wait.c \
-	aw_ui.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c \
+	aw_ui.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c \
 	aw_spawn.c aw_scenery.c aw_region.c aw_gallery.c aw_stream.c \
-	aw_walk.c aw_world.c aw_torch.c aw_guard_torch.c \
+	aw_walk.c aw_world.c aw_torch.c aw_guard_torch.c aw_hand_models.c \
 	aw_music.c \
 	aw_profile.c aw_render_ranges.c \
 	aw_platform.c \
-	aw_fog.c \
+	aw_fog.c aw_horizon.c \
 	chase.c \
 	cl_demo.c \
 	cl_input.c \

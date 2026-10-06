@@ -187,3 +187,48 @@ The bounded AWSFX1 catalogue stores paths, volumes and durations. Native
 command. Transition openings play before the map change (at most a one-second
 lead-in); their closing sample plays after sign-on. The existing Census hall
 action plays the opening sample without adding a close action.
+
+## 5 October: long-stall playback clock recovery, next development source
+
+The owner reports renewed crackling in the dev2 WinUAE playtest, with much less
+in FS-UAE. This renews WIN-05 investigation; it does not establish whether the
+remaining noise comes from guest deadlines, OST reads or the host audio backend.
+The delivered WinUAE template explicitly sets `sound_output=exact`, stereo,
+44,100 Hz, `sound_max_buff=16384`, anti interpolation and emulated filtering.
+The delivered FS-UAE template does not pin sound frequency, buffer or backend.
+Those presets are not a controlled comparison of effective host sound settings;
+current UI overrides and FS-UAE defaults were not measured. No preset was changed.
+
+A separate, reproducible guest accounting bug was found in `GetSoundtime`.
+The 32 KiB stereo DMA ring holds 16,384 sample pairs, approximately 1.487 seconds
+at the PAL playback rate. The old clock counted only an observed backwards ring
+position. A stall spanning one or more complete wraps could therefore lose
+elapsed time and falsely report no late mixing. In the real-mixer synthetic
+fixture, a 16,584-frame gap lost 16,384 elapsed frames and reported zero late
+frames instead of 15,482. A 32,968-frame gap lost 32,768 frames and also reported
+zero. A shorter 1,323-frame gap correctly reported 221 late frames.
+
+The next source candidate obtains elapsed sample pairs directly from the
+Amiga driver's existing EClock-based estimate, retaining fractional Paula rate
+and double-precision start time. This is an absolute clock estimate, not a new
+hardware DMA-position reader. Its signed-counter epoch is a multiple of the
+ring length. On an epoch/device-time reset, old channel deadlines are cancelled,
+stale mixed PCM is cleared, and the existing mixer primes the current cursor.
+The ordinary 0.1-second mix-ahead, DMA size, four-block OST queue and world
+rendering gates are unchanged. This cannot undo sound already missed during a
+stall or establish that every crackle has the same cause.
+
+Four focused Linux Docker methods pass: actual mixer refill/recovery and late
+accounting across 50 ms, 120 ms and longer multi-wrap gaps; clock reset and epoch
+cancellation even during loading; the actual driver with synthetic PAL/NTSC
+device calls, long unpolled intervals and shutdown; existing loading and speech
+preservation. The unchanged scheduler fails the three long-gap and both reset
+cases. New fixtures use undefined-behavior and float-cast-overflow sanitizers.
+Both changed C files compile for Amiga 68040; `snd_amiga.c` retains three
+pointer-signedness warnings at the existing audio-device buffer interfaces,
+while `snd_dma.c` reports none in this bounded compile.
+
+The original owner listening report remains OPEN. This is a tested source
+recovery/accounting repair for a future build; sealed dev2 artifacts are
+unchanged. Matched native listening and frame/music profiles remain pending.
+Low late-update counts from the old clock cannot rule out long guest stalls.

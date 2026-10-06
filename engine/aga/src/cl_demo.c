@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -89,12 +89,12 @@ Handles recording and playback of demos, on top of NET_ code
 */
 int CL_GetMessage (void)
 {
-	int		r, i;
-	float	f;
-	
+    int r, i, size;
+    float angles[3];
+
 	if	(cls.demoplayback)
 	{
-	// decide if it is time to grab the next message		
+	// decide if it is time to grab the next message
 		if (cls.signon == SIGNONS)	// allways grab until fully connected
 		{
 			if (cls.timedemo)
@@ -112,36 +112,40 @@ int CL_GetMessage (void)
 					return 0;		// don't need another message yet
 			}
 		}
-		
-	// get the next message
-		fread (&net_message.cursize, 4, 1, cls.demofile);
-		VectorCopy (cl.mviewangles[0], cl.mviewangles[1]);
-		for (i=0 ; i<3 ; i++)
-		{
-			r = fread (&f, 4, 1, cls.demofile);
-			cl.mviewangles[0][i] = LittleFloat (f);
-		}
-		
-		net_message.cursize = LittleLong (net_message.cursize);
-		if (net_message.cursize > MAX_MSGLEN)
-			Sys_Error ("Demo message > MAX_MSGLEN");
-		r = fread (net_message.data, net_message.cursize, 1, cls.demofile);
-		if (r != 1)
-		{
-			CL_StopPlayback ();
-			return 0;
-		}
-	
+
+    /* Never byte-swap a stale host-order length after EOF. In particular,
+     * on a big-endian target a previous size of 1 becomes 0x01000000. */
+        if (fread (&size, sizeof(size), 1, cls.demofile) != 1) {
+            CL_StopPlayback ();
+            return 0;
+        }
+        size = LittleLong (size);
+        if (size <= 0 || size > MAX_MSGLEN) {
+            Con_Printf ("Invalid demo message size\n");
+            CL_StopPlayback ();
+            return 0;
+        }
+        if (fread (angles, sizeof(angles), 1, cls.demofile) != 1 ||
+            fread (net_message.data, size, 1, cls.demofile) != 1) {
+            Con_Printf ("Truncated demo message\n");
+            CL_StopPlayback ();
+            return 0;
+        }
+        net_message.cursize = size;
+        VectorCopy (cl.mviewangles[0], cl.mviewangles[1]);
+        for (i=0 ; i<3 ; i++)
+            cl.mviewangles[0][i] = LittleFloat (angles[i]);
+
 		return 1;
 	}
 
 	while (1)
 	{
 		r = NET_GetMessage (cls.netcon);
-		
+
 		if (r != 1 && r != 2)
 			return r;
-	
+
 	// discard nop keepalive message
 		if (net_message.cursize == 1 && net_message.data[0] == svc_nop)
 			Con_Printf ("<-- server to client keepalive\n");
@@ -151,7 +155,7 @@ int CL_GetMessage (void)
 
 	if (cls.demorecording)
 		CL_WriteDemoMessage ();
-	
+
 	return r;
 }
 
@@ -228,16 +232,16 @@ void CL_Record_f (void)
 		Con_Printf ("Forcing CD track to %i\n", cls.forcetrack);
 	}
 	else
-		track = -1;	
+		track = -1;
 
 	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
-	
+
 //
 // start the map up
 //
 	if (c > 2)
 		Cmd_ExecuteString ( va("map %s", Cmd_Argv(2)), src_command);
-	
+
 //
 // open the demo file
 //
@@ -253,7 +257,7 @@ void CL_Record_f (void)
 
 	cls.forcetrack = track;
 	fprintf (cls.demofile, "%i\n", cls.forcetrack);
-	
+
 	cls.demorecording = true;
 }
 
@@ -265,11 +269,27 @@ CL_PlayDemo_f
 play [demoname]
 ====================
 */
+/* The text track header is bounded independently of binary messages. */
+static int CL_ReadDemoTrack(FILE *file, int *track)
+{
+    int c, negative=0, digits=0;
+    unsigned long value=0, limit;
+    c=getc(file);
+    if(c=='-'){negative=1;c=getc(file);}
+    limit=negative?2147483648UL:2147483647UL;
+    while(c!='\n') {
+        if(c<'0' || c>'9' || ++digits>10 || value>(limit-(c-'0'))/10)
+            return 0;
+        value=value*10+(c-'0');c=getc(file);
+    }
+    if(!digits)return 0;
+    *track=negative && value?-(int)(value-1)-1:(int)value;
+    return 1;
+}
+
 void CL_PlayDemo_f (void)
 {
 	char	name[256];
-	int c;
-	qboolean neg = false;
 
 	if (cmd_source != src_command)
 		return;
@@ -284,7 +304,7 @@ void CL_PlayDemo_f (void)
 // disconnect from server
 //
 	CL_Disconnect ();
-	
+
 //
 // open the demo file
 //
@@ -302,18 +322,10 @@ void CL_PlayDemo_f (void)
 
 	cls.demoplayback = true;
 	cls.state = ca_connected;
-	cls.forcetrack = 0;
-
-	while ((c = getc(cls.demofile)) != '\n')
-		if (c == '-')
-			neg = true;
-		else
-			cls.forcetrack = cls.forcetrack * 10 + (c - '0');
-
-	if (neg)
-		cls.forcetrack = -cls.forcetrack;
-// ZOID, fscanf is evil
-//	fscanf (cls.demofile, "%i\n", &cls.forcetrack);
+    if (!CL_ReadDemoTrack(cls.demofile, &cls.forcetrack)) {
+        Con_Printf ("Invalid demo track header\n");
+        CL_StopPlayback ();
+    }
 }
 
 /*
@@ -326,9 +338,9 @@ void CL_FinishTimeDemo (void)
 {
 	int		frames;
 	float	time;
-	
+
 	cls.timedemo = false;
-	
+
 // the first frame didn't count
 	frames = (host_framecount - cls.td_startframe) - 1;
 	time = realtime - cls.td_starttime;
@@ -355,13 +367,17 @@ void CL_TimeDemo_f (void)
 		return;
 	}
 
-	CL_PlayDemo_f ();
-	
+    /* A manual timing run must not re-enter the startup demo loop when its
+     * final disconnect arrives, even before any live connection was made. */
+    cls.demonum = -1;
+    CL_PlayDemo_f ();
+    if (!cls.demoplayback)
+        return;
+
 // cls.td_starttime will be grabbed at the second frame of the demo, so
 // all the loading time doesn't get counted
-	
+
 	cls.timedemo = true;
 	cls.td_startframe = host_framecount;
 	cls.td_lastframe = -1;		// get a new message this frame
 }
-

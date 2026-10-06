@@ -309,8 +309,10 @@ def _overlay_candidate(source, out, flora, index, receipt, entry, palette,
             collision_none = next(r['source_collision']['mode'] == 'nonsolid' for r in refs if r['model_index'] == mi)
             profile = {'texture_size': 32, 'collision_only': mode == 'collision_only', 'collision_none': collision_none}
             if mode == 'mesh':profile['ratio'] = min(1., 120 / max(1, model['triangles']))
+            if mode == 'mesh' and any(r.get('kind') == 'small_mushroom' for r in refs if r['model_index'] == mi):
+                profile['preserve_shared_seams'] = True
             profiles[model['source']] = profile
-            key = (str(packet.resolve()), mi, mode, collision_none)
+            key = (str(packet.resolve()), mi, mode, collision_none, bool(profile.get('preserve_shared_seams')))
             if key not in _CACHE:
                 _, _CACHE[key] = _prepare_model((mi, model, profile, packet, index['textures']))
             prepared[mi] = _CACHE[key]
@@ -363,6 +365,8 @@ def _overlay_candidate(source, out, flora, index, receipt, entry, palette,
     report = {'name': entry['name'], 'reserve_metrics':metrics, 'admission':admission_contract(admission_profile), 'base_sha256': base_hash, 'sha256': hashlib.sha256(final).hexdigest(),
               'bytes': len(final), 'bsp_models': models, 'entities': len(blocks), 'static_entities': static,
               'sprite_types': len(precaches), 'sprite_instances': len(sprite_refs),
+              'mesh_pending_interaction_instances': sum(r['requires_interaction'] for r in selected),
+              'interaction_status': 'not_implemented' if any(r['requires_interaction'] for r in selected) else 'not_required',
               'sprite_pixel_bytes': sum(a['pixel_bytes'] for a in assets.values() if a['sprite_asset_name'] in precaches),
               'nodes': len(data[5]) // 24, 'clipnodes': len(data[9]) // 8,
               'source_references': source_records, 'retained_content': verification,

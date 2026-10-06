@@ -14,6 +14,18 @@
 #define BOOK_LINES 9
 #define BOOK_WIDTH 132
 static int modal,mouse_x=160,mouse_y=100,drag,grid,zoom;
+static int marker_click;
+static float marker_drag_x,marker_drag_y;
+static const char *marker_message;
+/* Existing global codec persists these three bounded facts without a schema change. */
+static const char *const marker_keys[3]={"amiwind:map:marker:x","amiwind:map:marker:y","amiwind:map:marker:ready"};
+#define TELEPORT_X 244
+#define TELEPORT_W 72
+#define TELEPORT_H 15
+#define CLEAR_X 244
+#define CLEAR_Y 174
+#define CLEAR_W 72
+#define CLEAR_H 10
 static byte *map_data,*map_pixels;
 static int map_w,map_h,map_bounds[4],area_count,marker,map_ocean;
 static float map_x,map_y,player_x,player_y,player_z,map_step;
@@ -48,9 +60,11 @@ static void cursor(void){
 static void close_panel(void){
     free(map_data);map_data=map_pixels=NULL;free(book);book=NULL;
     if(modal && key_dest==key_menu)key_dest=key_game;
-    modal=drag=teleport_mode=teleport_selected=0;teleport_message=NULL;IN_AWClearButtons();
+    modal=drag=marker_click=teleport_mode=teleport_selected=0;teleport_message=marker_message=NULL;IN_AWClearButtons();
 }
 int AW_WorldUIActive(void){return modal!=0;}
+/* A button released outside the window must not leave a modal drag held. */
+void AW_WorldUICancelDrag(void){drag=marker_click=0;}
 static int allowed(void){
     return !modal && key_dest==key_game && sv.active && svs.maxclients==1 && svs.clients &&
         svs.clients[0].edict && cls.state==ca_connected && !AW_StoryRestricted() &&
@@ -85,7 +99,8 @@ static void map_player(void){
     map_x=(player_x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
     map_y=(map_bounds[3]-player_y)*map_h/(map_bounds[3]-map_bounds[1]);
 }
-static int map_debug_enabled(void){return aw_map_debug_available.value!=0 && AW_DebugOverlaysEnabled();}
+/* Hiding the HUD diagnostics must not disable explicit map commands/tabs. */
+static int map_debug_enabled(void){return aw_map_debug_available.value!=0;}
 static int map_in_game(void){
     if(aw_map_mode.value<0 || aw_map_mode.value>1)Cvar_SetValue(aw_map_mode.name,0);
     if(!map_debug_enabled() && aw_map_mode.value<1)Cvar_SetValue(aw_map_mode.name,1);
@@ -123,23 +138,85 @@ static void open_map(void){
     free(map_data);map_data=map_pixels=NULL;
     Con_Printf("World map missing, invalid, or not enough memory.\n");
 }
+/* M follows the current HUD preference; explicit teleport remains independent. */
+static void open_normal_map(void){
+    if(!allowed())return;
+    Cvar_SetValue(aw_map_mode.name,AW_DebugOverlaysEnabled() && map_debug_enabled()?0:1);
+    open_map();
+}
+static int normal_teleport_enabled(void){
+    return !teleport_mode && map_debug_enabled() && !map_in_game() && AW_DebugOverlaysEnabled();
+}
+static int teleport_button_y(void){return teleport_mode?184:156;}
+static int teleport_button_hit(void){
+    int y=teleport_button_y();
+    return teleport_selected && (teleport_mode || normal_teleport_enabled()) &&
+        mouse_x>=TELEPORT_X && mouse_x<TELEPORT_X+TELEPORT_W && mouse_y>=y && mouse_y<y+TELEPORT_H;
+}
+static int clear_button_hit(void){
+    return mouse_x>=CLEAR_X && mouse_x<CLEAR_X+CLEAR_W && mouse_y>=CLEAR_Y && mouse_y<CLEAR_Y+CLEAR_H;
+}
+/* Both picks use the exact AWM1 texture-to-original-source transform. */
+static int map_source_at(float point[3]){
+    float px=map_x-156*map_step+(mouse_x-4)*map_step;
+    float py=map_y-77*map_step+(mouse_y-19)*map_step;
+    if(mouse_x<4 || mouse_x>=316 || mouse_y<19 || mouse_y>=173 ||
+       px<0 || px>=map_w || py<0 || py>=map_h)return 0;
+    point[0]=map_bounds[0]+px*(map_bounds[2]-map_bounds[0])/map_w;
+    point[1]=map_bounds[3]-py*(map_bounds[3]-map_bounds[1])/map_h;
+    point[2]=0;return 1;
+}
+static int custom_marker(float point[3]){
+    if(AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[2])!=1)return 0;
+    point[0]=AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[0]);
+    point[1]=AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[1]);point[2]=0;
+    return point[0]>=map_bounds[0] && point[0]<map_bounds[2] && point[1]>map_bounds[1] && point[1]<=map_bounds[3];
+}
+static void place_marker(void){
+    float point[3];int i,j,missing=0;int32_t x,y;
+    if(!map_source_at(point)){marker_message="Outside map bounds";return;}
+    /* Preflight all keys: a full global table must not partially move a marker. */
+    for(i=0;i<3;i++){
+        for(j=0;j<aw_state.count[AW_GLOBAL];j++)if(!strcmp(aw_state.values[AW_GLOBAL][j].id,marker_keys[i]))break;
+        if(j==aw_state.count[AW_GLOBAL])missing++;
+    }
+    if(missing>AW_STATE_VALUES-aw_state.count[AW_GLOBAL]){
+        marker_message="Marker not saved: globals full";Con_Printf("Map marker: global state capacity exhausted.\n");return;
+    }
+    x=minmax((int)floor(point[0]+.5f),map_bounds[0],map_bounds[2]-1);
+    y=minmax((int)floor(point[1]+.5f),map_bounds[1]+1,map_bounds[3]);
+    AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[0],x);
+    AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[1],y);
+    AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[2],1);marker_message=NULL;
+}
+static void clear_marker(void){
+    /* Clearing an absent marker must not consume another global slot. */
+    if(AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[2]))AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[2],0);
+    marker_message="Marker cleared";marker_click=0;
+}
 static void open_teleport_map(void){
     keydest_t previous=key_dest;
-    if(!map_debug_enabled() || modal || Cmd_Argc()!=1 || (key_dest!=key_game && key_dest!=key_console))return;
-    key_dest=key_game;open_map();
+    if(Cmd_Argc()!=1){Con_Printf("Usage: dbg tp map / dbg map tp\n");return;}
+    if(!map_debug_enabled()){
+        Con_Printf("Debug map disabled by aw_map_debug_available.\n");return;
+    }
+    if(modal || (key_dest!=key_game && key_dest!=key_console)){
+        Con_Printf("Close the current panel before opening the teleport map.\n");return;
+    }
+    key_dest=key_game;
+    if(!allowed()){
+        key_dest=previous;
+        Con_Printf("Teleport map requires active single-player gameplay outside story/reader/gallery panels.\n");return;
+    }
+    open_map();
     if(modal!=1){key_dest=previous;return;}
     teleport_mode=1;teleport_selected=0;teleport_message=NULL;
     mouse_x=160;mouse_y=100;
 }
 static void select_teleport_point(void){
-    float px=map_x-156*map_step+(mouse_x-4)*map_step;
-    float py=map_y-77*map_step+(mouse_y-19)*map_step;
     const char *region;
-    teleport_selected=0;
-    if(px<0 || px>=map_w || py<0 || py>=map_h){teleport_message="Outside map bounds";return;}
-    teleport_point[0]=map_bounds[0]+px*(map_bounds[2]-map_bounds[0])/map_w;
-    teleport_point[1]=map_bounds[3]-py*(map_bounds[3]-map_bounds[1])/map_h;
-    teleport_point[2]=0;
+    teleport_selected=0;marker_message=NULL;
+    if(!map_source_at(teleport_point)){teleport_message="Outside map bounds";return;}
     region=AW_RegionNameAt(teleport_point);
     strncpy(teleport_region,region?region:"Region unavailable",sizeof(teleport_region)-1);
     teleport_region[sizeof(teleport_region)-1]=0;
@@ -255,11 +332,18 @@ static void open_journal(void){
     quest_titles();book->filter=-1;load_entry(aw_state.journal_count-1);opened(2);
     Con_Printf("Journal: %ld earned entries; reader %ld bytes.\n",(long)aw_state.journal_count,(long)sizeof(*book));
 }
-void AW_WorldUIInit(void){Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_map);Cmd_AddCommand("aw_journal",open_journal);}
+void AW_WorldUIInit(void){Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
     if(!modal || key_dest!=key_menu)return;
-    if(modal==1 && drag){map_x-=dx*map_step;map_y-=dy*map_step;}
+    if(modal==1 && drag){
+        if(marker_click){
+            marker_drag_x+=dx;marker_drag_y+=dy;
+            if(marker_drag_x*marker_drag_x+marker_drag_y*marker_drag_y>9){
+                map_x-=marker_drag_x*map_step;map_y-=marker_drag_y*map_step;marker_click=0;
+            }
+        }else{map_x-=dx*map_step;map_y-=dy*map_step;}
+    }
     mouse_x=minmax(mouse_x+dx,0,319);mouse_y=minmax(mouse_y+dy,0,199);
     if(modal==2 && book->index_mode && drag){
         top=AW_UIScrollHit(306,minmax(mouse_y,40,165),304,40,126,aw_state.count[AW_JOURNAL],(book->index_end-book->index_top),book->index_top);
@@ -277,11 +361,19 @@ int AW_WorldUIKey(int key,int down){
     int n;
     if(!modal)return 0;
     if(key_dest!=key_menu){close_panel();return 0;}
-    if(!down){if(key==K_MOUSE1 || key==K_MOUSE2)drag=0;return 1;}
+    if(!down){
+        if(modal==1 && key==K_MOUSE1 && marker_click){
+            marker_click=0;if(!teleport_mode && !teleport_button_hit())place_marker();
+        }
+        if((modal==1 && key==drag) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)))drag=0;
+        return 1;
+    }
     if(key==K_F10 || key=='`'){close_panel();return 0;}
     if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J'))){close_panel();return 1;}
     if(modal==1){
+        if(key!=K_MOUSE1 && key!=K_MOUSE2 && key!=K_MOUSE3)marker_click=0;
         if(key==K_MOUSE1 && !teleport_mode && mouse_y>=1 && mouse_y<16){
+            marker_click=drag=teleport_selected=0;teleport_message=NULL;
             if(mouse_x>=4 && mouse_x<66 && map_debug_enabled())Cvar_SetValue(aw_map_mode.name,0);
             else if(mouse_x>=250 && mouse_x<316)Cvar_SetValue(aw_map_mode.name,1);
             return 1;
@@ -296,13 +388,29 @@ int AW_WorldUIKey(int key,int down){
         if(key=='p')map_player();
         if(key=='g' && !map_in_game())grid=!grid;
         if(teleport_mode){
-            if(key==K_MOUSE2 && mouse_y>=19 && mouse_y<173)drag=1;
+            /* Amiga sends right as MOUSE3 and middle as MOUSE2. Keep both
+             * secondary buttons usable here without changing global bindings. */
+            if((key==K_MOUSE2 || key==K_MOUSE3) && mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)drag=key;
             if(key==K_ENTER)confirm_teleport();
             if(key==K_MOUSE1){
                 if(mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)select_teleport_point();
-                else if(mouse_x>=244 && mouse_x<316 && mouse_y>=184 && mouse_y<199)confirm_teleport();
+                else if(teleport_button_hit())confirm_teleport();
             }
-        }else if(key==K_MOUSE1){if(mouse_y>=19 && mouse_y<173)drag=1;else if(mouse_y>=184)close_panel();}
+        }else{
+            if(key=='c' || key=='C')clear_marker();
+            if(normal_teleport_enabled()){
+                if(key==K_MOUSE3 && !drag && !teleport_button_hit())select_teleport_point();
+                if(key==K_ENTER)confirm_teleport();
+            }
+            if(key==K_MOUSE1){
+                marker_click=drag=0;
+                if(teleport_button_hit())confirm_teleport();
+                else if(clear_button_hit())clear_marker();
+                else if(mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173){
+                    drag=K_MOUSE1;marker_click=1;marker_drag_x=marker_drag_y=0;
+                }else if(mouse_y>=184)close_panel();
+            }
+        }
     }else if(book->index_mode){
         n=aw_state.count[AW_JOURNAL];
         AW_UIBookBegin();index_layout();AW_UIBookEnd();
@@ -362,6 +470,12 @@ static void map_mode_button(int x,int width,const char *label,int active,int ena
     if(active)AW_UIFill(x+1,2,width-2,12,AW_UIColor(35,43,47));
     text(x+3,4,label,x+width-2);
 }
+static void teleport_button_draw(int gold){
+    int y=teleport_button_y();
+    AW_UIFill(TELEPORT_X,y,TELEPORT_W,TELEPORT_H,gold);
+    AW_UIFill(TELEPORT_X+1,y+1,TELEPORT_W-2,TELEPORT_H-2,AW_UIColor(29,23,17));
+    text(TELEPORT_X+(TELEPORT_W-8*AW_ConsoleCharWidth())/2,y+4,"TELEPORT",TELEPORT_X+TELEPORT_W-1);
+}
 static void map_draw(void){
     int x,y,sx,sy,cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
     float left=map_x-156*map_step,top=map_y-77*map_step,px,py,angle,dx,dy;byte *dst;char line[96];
@@ -403,33 +517,41 @@ static void map_draw(void){
         else sprintf(line,"Cell %ld,%ld XYZ %ld %ld %ld",(long)floor(player_x/8192),(long)floor(player_y/8192),
             (long)player_x,(long)player_y,(long)player_z);
     }else strcpy(line,in_game?"No exterior position fix":"Interior: no exterior position fix");
+    if(custom_marker(source)){
+        int cyan=AW_UIColor(48,240,240),ox,oy;
+        px=(source[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
+        py=(map_bounds[3]-source[1])*map_h/(map_bounds[3]-map_bounds[1]);
+        mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
+        /* A clipped cyan diamond remains distinct from the red teleport cross. */
+        for(oy=-4;oy<=4;oy++)for(ox=-4;ox<=4;ox++)if(abs(ox)+abs(oy)==4 || (!ox && !oy))
+            if(mx+ox>=4 && mx+ox<316 && my+oy>=19 && my+oy<173)AW_UIFill(mx+ox,my+oy,1,1,cyan);
+    }
+    if(teleport_selected && (teleport_mode || normal_teleport_enabled())){
+        px=(teleport_point[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
+        py=(map_bounds[3]-teleport_point[1])*map_h/(map_bounds[3]-map_bounds[1]);
+        mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
+        for(i=-5;i<=5;i++){
+            if(mx+i>=4 && mx+i<316 && my>=19 && my<173)AW_UIFill(mx+i,my,1,1,AW_UIColor(255,32,32));
+            if(mx>=4 && mx<316 && my+i>=19 && my+i<173)AW_UIFill(mx,my+i,1,1,AW_UIColor(255,32,32));
+        }
+    }
     if(teleport_mode){
         text(8,1,"DEBUG TELEPORT",315);
         text(8,10,"CLICK ON TARGET TO TELEPORT",315);
         if(teleport_selected){
-            px=(teleport_point[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
-            py=(map_bounds[3]-teleport_point[1])*map_h/(map_bounds[3]-map_bounds[1]);
-            mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
-            for(i=-5;i<=5;i++){
-                if(mx+i>=4 && mx+i<316 && my>=19 && my<173)AW_UIFill(mx+i,my,1,1,AW_UIColor(255,32,32));
-                if(mx>=4 && mx<316 && my+i>=19 && my+i<173)AW_UIFill(mx,my+i,1,1,AW_UIColor(255,32,32));
-            }
             sprintf(line,"XY %ld %ld / %s",(long)teleport_point[0],(long)teleport_point[1],teleport_region);
             text(8,176,teleport_message?teleport_message:line,315);
-            AW_UIFill(244,184,72,15,gold);AW_UIFill(245,185,70,13,AW_UIColor(29,23,17));
-            text(244+(72-8*AW_ConsoleCharWidth())/2,188,"TELEPORT",315);
+            teleport_button_draw(gold);
         }else if(teleport_message)text(8,176,teleport_message,315);
         text(8,188,"R-drag/arrows pan +/- zoom Esc close",240);
     }else{
-        if(in_game){text(77,5,"IN-GAME MAP PROTOTYPE",315);text(8,176,"Prototype: terrain overview; local map pending",315);
+        if(in_game){text(77,5,"IN-GAME MAP PROTOTYPE",315);
             text(8,188,"Pan/zoom  P player  M/Esc close",315);}
         else{text(77,5,"DEBUG MAP",315);text(116,5,line,315);}
         map_mode_button(4,62,"DEBUG",!in_game,map_debug_enabled());
         map_mode_button(250,66,"IN-GAME",in_game,1);
         if(!in_game){
             width=AW_ConsoleCharWidth();
-            text(8,176,width<=4?"Drag/arrows pan  Wheel +/- zoom  P player G grid":
-                 "Pan: drag  +/- zoom  M/Esc close",315);
             text(8,188,width<=4?"Home fit M/Esc close":"P/G/Home",88);
             /* The player's original CELL determines the region, never map pan or
              * the pointer. Interiors have no exterior coordinate fix. */
@@ -440,6 +562,13 @@ static void map_draw(void){
             if((int)strlen(line)>limit){line[limit]=0;memcpy(line+limit-3,"...",3);}
             text(315-(int)strlen(line)*width,188,line,315);
         }
+        text(8,176,marker_message?marker_message:
+            (normal_teleport_enabled() && teleport_message?teleport_message:
+             AW_ConsoleCharWidth()<=4?(normal_teleport_enabled()?"Click mark / R-click target / drag pan / +/- zoom":"Click mark / drag pan / +/- zoom / P player"):
+             (normal_teleport_enabled()?"L mark / drag / R target":"Click mark / drag pan / +/-")),240);
+        AW_UIFill(CLEAR_X,CLEAR_Y,CLEAR_W,CLEAR_H,AW_UIColor(35,43,47));
+        text(CLEAR_X+4,CLEAR_Y+1,"C CLEAR",CLEAR_X+CLEAR_W-1);
+        if(normal_teleport_enabled() && teleport_selected)teleport_button_draw(gold);
     }
 }
 static void journal_draw(void){

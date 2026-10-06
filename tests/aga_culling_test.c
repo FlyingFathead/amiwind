@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include "aw_sky.h"
-server_t sv;
+server_t sv;client_state_t cl;
+float xcenter,ycenter,xscale,yscale;
 #include <assert.h>
 static int inside;
 int AW_Interior(void){return inside;}

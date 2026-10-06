@@ -56,6 +56,82 @@ class BuildSummaryTests(unittest.TestCase):
         self.assertEqual(build_summary.duration(90061), '25 hrs 01 mins 01 secs')
         self.assertEqual(build_summary.duration(59.99), '0 hrs 00 mins 59 secs')
 
+    def media_report(self, root, location, videos=None, expected=17):
+        path = root / location / 'media-coverage.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        row = videos or {'included': 17, 'available_sources': 17,
+                         'missing_source': 0, 'missing_output': 0}
+        categories = {name: {'included': 0, 'available_sources': 0,
+                             'missing_source': 0, 'missing_output': 0}
+                      for name in ('videos', 'music', 'voices', 'effects')}
+        categories['videos'] = row
+        path.write_text(json.dumps({'expected_known_videos': expected,
+                                    'categories': categories}), encoding='utf-8')
+        return path
+
+    def test_media_coverage_final_report_is_preferred_and_gotv_claim_is_gated(self):
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            root = Path(temp)
+            self.media_report(root, 'media', expected=0)
+            final = self.media_report(root, 'image')
+            output = root / 'image' / 'AmiWind-v0.0.29-dev3.hdf'
+            output.write_bytes(b'RDSK')
+            result = build_summary.BuildSummary(root, 'test', 'AGA image').finish('passed', output)
+            self.assertEqual(result['coverage_scope'], 'final-staged-image')
+            self.assertEqual(result['media_coverage']['path'], str(final))
+            self.assertIn('All 17 Morrowind GOTY videos found and included', captured.getvalue())
+            self.assertEqual(json.loads((root / 'build-summary.json').read_text())['coverage_scope'], 'final-staged-image')
+
+    def test_staged_report_on_failed_build_never_claims_final_video_completeness(self):
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            root = Path(temp)
+            self.media_report(root, 'image')
+            output = root / 'image' / 'partial.hdf'
+            output.write_bytes(b'RDSK')
+            result = build_summary.BuildSummary(root, 'test', 'AGA image').finish('failed', output)
+            self.assertEqual(result['coverage_scope'], 'staged-payload-only')
+            self.assertNotIn('All 17 Morrowind GOTY videos found and included', captured.getvalue())
+
+    def test_dry_run_hdf_does_not_qualify_as_final_image(self):
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            root = Path(temp)
+            self.media_report(root, 'image')
+            output = root / 'image' / 'AmiWind-v0.0.29-dry-run.hdf'
+            output.write_bytes(b'RDSK')
+            result = build_summary.BuildSummary(root, 'test', 'AGA image').finish('passed', output)
+            self.assertEqual(result['coverage_scope'], 'staged-payload-only')
+            self.assertNotIn('All 17 Morrowind GOTY videos found and included', captured.getvalue())
+
+    def test_conversion_only_and_missing_coverage_scopes_are_explicit(self):
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            root = Path(temp)
+            report = self.media_report(root, 'media')
+            result = build_summary.BuildSummary(root, 'test', 'AGA image').finish('failed')
+            self.assertEqual(result['coverage_scope'], 'conversion-only')
+            self.assertEqual(result['media_coverage']['path'], str(report))
+            self.assertNotIn('All 17 Morrowind GOTY videos found and included', captured.getvalue())
+        for mode, scope, message in (('terrain conversion', 'not-applicable', 'Media coverage not applicable'),
+                                     ('AGA image', 'not-recorded', 'Media coverage not recorded')):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+                result = build_summary.BuildSummary(Path(temp), 'test', mode).finish('failed')
+                self.assertIsNone(result['media_coverage'])
+                self.assertEqual(result['coverage_scope'], scope)
+                self.assertIn(message, captured.getvalue())
+
+    def test_missing_media_sources_and_missing_outputs_are_reported_separately(self):
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            root = Path(temp)
+            self.media_report(root, 'media', videos={'included': 4, 'available_sources': 7,
+                               'missing_source': 2, 'missing_output': 3}, expected=17)
+            output = root / 'sample.hdf'
+            output.write_bytes(b'RDSK')
+            result = build_summary.BuildSummary(root, 'test', 'AGA image').finish('passed', output)
+            text = captured.getvalue()
+            self.assertEqual(result['coverage_scope'], 'conversion-only')
+            self.assertIn('Missing media sources: videos=2', text)
+            self.assertIn('Missing converted/staged media outputs: videos=3', text)
+            self.assertNotIn('All 17 Morrowind GOTY videos found and included', text)
+
     def test_inventory_uses_detected_versions_and_only_selected_tools(self):
         metadata = {'compiler_jobs': 12, 'tools': {'qcc': '/tools/qcc', 'make': '/tools/make', 'console-font': '/font.ttf'},
                     'tool_sha256': {'qcc': 'a'*64, 'make': 'b'*64},

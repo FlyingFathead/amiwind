@@ -14,7 +14,11 @@ static edict_t actors[40];static eval_t source[40];
 static byte registry[20000],torch[716],pixels[336*210];static short depths[320*200];
 static int registry_size,argc_=1,clock_ms,exterior=1,gallery,liquid,blocked_x=-1;
 static const char *argument="";static cvar_t *cycle;static void(*cmd)(void);
-static model_t base,body,held;static int model_loads,broken_model;
+static float universal_radius=192;
+float AW_TorchLightRadius(void){return universal_radius;}
+int AW_TorchFlameCoreColor(void){return -1;}
+byte AW_TorchFlameColor(byte original,int texel,float age,int core){return original;}
+static model_t base,body,held,body_b,held_b;static int model_loads,broken_model;
 int hunk_size=8*1024*1024,hunk_low_used,hunk_high_used;
 void *Cache_Check(cache_user_t *c){return c->data;}
 static void put16(byte*p,unsigned n){p[0]=n>>8;p[1]=n;}
@@ -24,6 +28,7 @@ static int add_record(int at,const char *id,int automatic,int frames)
     int i;byte*p=registry+at;memset(p,0,260+frames*12);
     strcpy((char*)p,id);strcpy((char*)p+64,"progs/original.mdl");strcpy((char*)p+128,"progs/heldbody.mdl");
     strcpy((char*)p+192,"progs/heldtorch.mdl");put16(p+256,frames);put16(p+258,automatic);
+    if(!strcmp(id,"guard_b")){strcpy((char*)p+128,"progs/heldbody_b.mdl");strcpy((char*)p+192,"progs/heldtorch_b.mdl");}
     for(i=0;i<frames;i++){put32(p+260+i*12+8,25*65536);}
     put32(p+260+7*12,2*65536);put32(p+260+7*12+4,3*65536);
     return at+260+frames*12;
@@ -46,7 +51,7 @@ edict_t *EDICT_NUM(int n){assert(n>=0 && n<40);return &actors[n];}
 eval_t *GetEdictFieldValue(edict_t*e,char*n){assert(!strcmp(n,"aw_source_id"));return &source[e-actors];}
 int SV_PointContents(vec3_t p){return liquid?CONTENTS_WATER:CONTENTS_EMPTY;}
 trace_t SV_Move(vec3_t a,vec3_t lo,vec3_t hi,vec3_t b,int type,edict_t*skip){trace_t t;assert(type==MOVE_NOMONSTERS);assert(skip>=actors && skip<actors+40);memset(&t,0,sizeof t);t.fraction=(int)a[0]==blocked_x?0:1;return t;}
-model_t *Mod_ForName(char*name,qboolean crash){model_t *m;assert(!crash);model_loads++;if(!strcmp(name,"progs/heldbody.mdl")){if(broken_model)return NULL;m=&body;}else{assert(!strcmp(name,"progs/heldtorch.mdl"));m=&held;}strcpy(m->name,name);m->cache.data=m;m->needload=false;return m;}
+model_t *Mod_ForName(char*name,qboolean crash){model_t *m;assert(!crash);model_loads++;if(!strcmp(name,"progs/heldbody.mdl")){if(broken_model)return NULL;m=&body;}else if(!strcmp(name,"progs/heldbody_b.mdl"))m=&body_b;else if(!strcmp(name,"progs/heldtorch_b.mdl"))m=&held_b;else{assert(!strcmp(name,"progs/heldtorch.mdl"));m=&held;}strcpy(m->name,name);m->cache.data=m;m->needload=false;return m;}
 dlight_t *CL_AllocDlight(int key){int i;for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].key==key)break;if(i==MAX_DLIGHTS){for(i=0;i<MAX_DLIGHTS;i++)if(!cl_dlights[i].radius)break;}assert(i<MAX_DLIGHTS);memset(&cl_dlights[i],0,sizeof cl_dlights[i]);cl_dlights[i].key=key;return &cl_dlights[i];}
 static int lights(void){int i,n=0;for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].radius>0 && cl_dlights[i].key<0)n++;return n;}
 static int light_x(int x){int i;for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].radius>0 && (int)cl_dlights[i].origin[0]==x)return 1;return 0;}
@@ -57,7 +62,7 @@ static int changed(void){int i,n=0;for(i=0;i<320*200;i++)if(pixels[(i/320)*336+i
 int main(void)
 {
     int i,oldloads;
-    strcpy(base.name,"progs/original.mdl");base.type=body.type=held.type=mod_alias;base.numframes=body.numframes=held.numframes=8;
+    strcpy(base.name,"progs/original.mdl");base.type=body.type=held.type=body_b.type=held_b.type=mod_alias;base.numframes=body.numframes=held.numframes=body_b.numframes=held_b.numframes=8;
     sv.active=1;sv.num_edicts=40;svs.maxclients=1;cls.state=ca_connected;cl.time=1;
     make_registry(8);for(i=204;i<716;i+=2){torch[i]=220;torch[i+1]=255;}
     AW_GuardTorchInit();assert(cycle && cycle->archive && cycle->value==1 && cmd);
@@ -132,6 +137,25 @@ int main(void)
     hunk_size=1024*1024;oldloads=model_loads;AW_GuardTorchUpdate();
     assert(cl_numvisedicts==1 && model_loads==oldloads && !lights());
     hunk_size=8*1024*1024;cl.time+=4;AW_GuardTorchUpdate();assert(cl_numvisedicts==2);
+    /* Evict one independently cached guard pair after lights were selected.
+     * Only its assigned light is invalid; a second guard and player survive. */
+    make_registry(8);body.numframes=held.numframes=8;AW_GuardTorchLoadAssets(torch);
+    npc(1,18,80);npc(2,26,100);scene(2);set_command("on");AW_GuardTorchUpdate();
+    assert(lights()==2 && light_x(80) && light_x(100) && cl_numvisedicts==4);
+    assert(cl_visedicts[1]->model==&body_b && cl_visedicts[3]->model==&held_b);
+    body.cache.data=NULL;
+    assert(AW_GuardTorchEntity(cl_visedicts[0])==&cl_entities[1]);
+    assert(lights()==1 && !light_x(80) && light_x(100));
+    assert(!AW_GuardTorchEntity(cl_visedicts[2]));
+    assert(AW_GuardTorchEntity(cl_visedicts[1])==cl_visedicts[1]);
+    assert(AW_GuardTorchEntity(cl_visedicts[3])==cl_visedicts[3]);
+    assert(cl_dlights[MAX_DLIGHTS-1].key==700 && cl_dlights[MAX_DLIGHTS-1].radius==30);
+    held_b.cache.data=NULL;
+    assert(!AW_GuardTorchEntity(cl_visedicts[3]) && !lights());
+    assert(AW_GuardTorchEntity(cl_visedicts[1])==&cl_entities[2]);
+    assert(cl_dlights[MAX_DLIGHTS-1].radius==30);
+    /* Restore the one-actor fixture for subsequent invalid-data checks. */
+    scene(1);set_command("auto");AW_GuardTorchUpdate();
     /* Malformed registry/model, truncation and extra bytes all fail closed. */
     registry_size--;AW_GuardTorchLoadAssets(torch);AW_GuardTorchUpdate();assert(cl_numvisedicts==1&&!lights());
     make_registry(8);registry_size++;AW_GuardTorchLoadAssets(torch);AW_GuardTorchUpdate();assert(cl_numvisedicts==1);

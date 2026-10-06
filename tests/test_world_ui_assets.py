@@ -78,8 +78,8 @@ class WorldUIAssetsTests(unittest.TestCase):
         from prepare_seyda_regions import regions as seyda_regions
         from balmora_regions import config, regions
         paths=[*(f"maps/{s['map']}.bsp" for s in SCENES),'maps/intro_docks.bsp','maps/sncourt.bsp',
-               'seyda-regions.txt',*(f"maps/{r['name']}.bsp" for r in seyda_regions()),
-               'balmora-regions.txt',*(f"maps/{r['name']}.bsp" for r in regions(config())),
+               'seyda-regions.txt','balmora-regions.txt',*(f"maps/{r['name']}.bsp" for r in seyda_regions()),
+               *(f"maps/{r['name']}.bsp" for r in regions(config())),
                'progs.dat','character/catalog.awc','world/map.awm','world/journal.awj','world/entries.dat','world/quests.awq','world/region-names.awn']
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
@@ -91,10 +91,45 @@ class WorldUIAssetsTests(unittest.TestCase):
                 (root/filename).write_text('\n'.join(rows)+'\n')
             write_content_fingerprint(root);before=(root/'save-content.bin').read_bytes()
             self.assertEqual(len(before),32)
+            # Empty optional catalogues preserve the exact pre-harvest stream.
+            legacy=hashlib.sha256()
+            for name in paths:
+                legacy.update(name.encode('ascii')+b'\0'+hashlib.sha256((root/name).read_bytes()).digest())
+            self.assertEqual(before,legacy.digest())
+            a=root/'harvest-intro_docks.txt';b=root/'harvest-sncourt.txt'
+            a.write_bytes(b'AWH2 0 0 0\n')
+            write_content_fingerprint(root);one=(root/'save-content.bin').read_bytes()
+            self.assertNotEqual(before,one)
+            a.write_bytes(b'AWH1 0 0 0\n')
+            write_content_fingerprint(root);changed=(root/'save-content.bin').read_bytes()
+            self.assertNotEqual(one,changed)
+            b.write_bytes(b'AWH2 0 0 0\n')
+            write_content_fingerprint(root);two=(root/'save-content.bin').read_bytes()
+            self.assertNotEqual(changed,two)
+            a.unlink();a.write_bytes(b'AWH1 0 0 0\n')
+            write_content_fingerprint(root);self.assertEqual(two,(root/'save-content.bin').read_bytes())
+            a.unlink();b.unlink()
+            write_content_fingerprint(root);self.assertEqual(before,(root/'save-content.bin').read_bytes())
             (root/'world/entries.dat').write_bytes(b'changed earned text')
             write_content_fingerprint(root);self.assertNotEqual(before,(root/'save-content.bin').read_bytes())
             (root/'world/map.awm').unlink()
             with self.assertRaisesRegex(ValueError,'Required'):write_content_fingerprint(root)
+
+    def test_harvest_fingerprint_rejects_invalid_catalogue_envelopes(self):
+        from build_aga import harvest_fingerprint_entries
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);(root/'maps').mkdir();(root/'maps/test.bsp').write_bytes(b'map')
+            path=root/'harvest-test.txt'
+            for raw in (b'',b'AWH3 0 0 0\n',b'AWH2 65 0 0\n',b'AWH2 0 0 25\n',
+                        b'AWH2 0 0 0\nextra\n',b'AWH2 0 0 0\0\n',b'\xff',b'x'*65537):
+                path.write_bytes(raw)
+                with self.subTest(raw=raw[:40]),self.assertRaises(ValueError):harvest_fingerprint_entries(root)
+            path.write_bytes(b'AWH2 0 0 0\n')
+            self.assertEqual(harvest_fingerprint_entries(root),[(path.name,hashlib.sha256(path.read_bytes()).hexdigest())])
+            (root/'maps/test.bsp').unlink()
+            with self.assertRaisesRegex(ValueError,'matching map'):harvest_fingerprint_entries(root)
+            path.unlink();(root/'harvest-bad name.txt').write_bytes(b'AWH2 0 0 0\n')
+            with self.assertRaisesRegex(ValueError,'path'):harvest_fingerprint_entries(root)
 
     def test_map_source_bounds_aspect_area_transform_and_ocean_colour(self):
         report={'terrain_bounds':[-2,-3,2,5],'areas':[{'name':'Balmora','centre':[-20,-12],'scale':.25}]}

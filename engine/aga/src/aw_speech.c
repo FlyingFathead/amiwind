@@ -39,9 +39,16 @@ void AW_SpeechStart(int entity,int channel,const char *sound,int start,int lengt
     }
     latest=slot;
 }
+void AW_SpeechShiftTiming(int elapsed,int start_time) {
+    int i;if(elapsed<=0)return;
+    for(i=0;i<4;i++)if(voices[i].end>start_time){voices[i].start+=elapsed;voices[i].end+=elapsed;}
+}
 double AW_SpeechRemaining(void) {
-    aw_voice_t *v;if(latest<0)return 0;v=&voices[latest];
-    return v->end>soundtime && v->speed>0?(double)(v->end-soundtime)/v->speed:0;
+    aw_voice_t *v;double remaining=S_SceneVoiceRemaining(),live;
+    if(latest<0)return remaining;
+    v=&voices[latest];
+    live=v->end>soundtime && v->speed>0?(double)(v->end-soundtime)/v->speed:0;
+    return live>remaining?live:remaining;
 }
 int AW_SpeechPose(int entity,int current,int frames,const char *model) {
     int i,index,phase;aw_voice_t *v;

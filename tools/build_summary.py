@@ -52,6 +52,102 @@ def compiler_warnings(run):
     return {'count': count, 'logs': [str(p) for p in logs]}
 
 
+MEDIA_CATEGORIES = ('videos', 'music', 'voices', 'effects')
+MEDIA_COUNT_FIELDS = ('included', 'missing_source', 'missing_output', 'available_sources')
+
+
+def read_media_coverage(run, status, output_identity, mode):
+    """Read the staged media census without implying a completed-image claim.
+
+    Image coverage is written while the payload is staged, before final HDF
+    readback. A failed or cancelled run therefore remains payload-only even if
+    the image-side report exists.
+    """
+    run = Path(run)
+    image_report = run / 'image' / 'media-coverage.json'
+    conversion_report = run / 'media' / 'media-coverage.json'
+    if image_report.is_file():
+        path = image_report
+        image_path = Path(output_identity.get('path', '')) if output_identity else None
+        completed_image = (status == 'passed' and output_identity is not None
+                           and output_identity.get('kind') == 'file'
+                           and image_path.parent.resolve() == (run / 'image').resolve()
+                           and image_path.suffix.lower() == '.hdf'
+                           and not image_path.name.casefold().endswith(('-dry-run.hdf', '-play.hdf')))
+        scope = 'final-staged-image' if completed_image else 'staged-payload-only'
+    elif conversion_report.is_file():
+        path, scope = conversion_report, 'conversion-only'
+    else:
+        mode_key = str(mode).casefold().replace('-', ' ')
+        return None, ('not-applicable' if 'terrain' in mode_key or 'asset free' in mode_key else 'not-recorded')
+    try:
+        with path.open(encoding='utf-8') as source:
+            report = json.load(source)
+        if not isinstance(report, dict):
+            raise ValueError('coverage report must be a JSON object')
+        categories = report.get('categories')
+        if not isinstance(categories, dict):
+            raise ValueError('coverage report has no categories object')
+        normalized = {}
+        for name in MEDIA_CATEGORIES:
+            row = categories.get(name)
+            if not isinstance(row, dict):
+                normalized[name] = None
+                continue
+            counts = {}
+            for field in MEDIA_COUNT_FIELDS:
+                value = row.get(field)
+                counts[field] = value if type(value) is int and value >= 0 else None
+            normalized[name] = counts
+        summary = {'path': str(path), 'format': report.get('format'),
+                   'status': report.get('status'), 'expected_known_videos': report.get('expected_known_videos'),
+                   'categories': normalized}
+        return summary, scope
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
+        return {'path': str(path), 'error': str(error), 'categories': None}, scope
+
+
+def media_coverage_lines(coverage, scope):
+    if coverage is None:
+        if scope == 'not-recorded':
+            return ['Media coverage not recorded']
+        if scope == 'not-applicable':
+            return ['Media coverage not applicable']
+        return ['Media coverage not recorded']
+    lines = ['Media coverage scope: ' + scope]
+    if coverage.get('error'):
+        lines.append('Media coverage could not be read: ' + coverage['error'])
+        return lines
+    categories = coverage.get('categories') or {}
+    source_gaps, output_gaps = [], []
+    source_unknown, output_unknown = False, False
+    for name in MEDIA_CATEGORIES:
+        row = categories.get(name)
+        if row is None:
+            lines.append('  ' + name + ': counts not recorded')
+            source_unknown = output_unknown = True
+            continue
+        lines.append('  {name}: included={included} | available_sources={available_sources} | missing_source={missing_source} | missing_output={missing_output}'.format(name=name, **row))
+        if row['missing_source']:
+            source_gaps.append(name + '=' + str(row['missing_source']))
+        elif row['missing_source'] is None:
+            source_unknown = True
+        if row['missing_output']:
+            output_gaps.append(name + '=' + str(row['missing_output']))
+        elif row['missing_output'] is None:
+            output_unknown = True
+    source_status = ', '.join(source_gaps) if source_gaps else ('not determined (incomplete counts)' if source_unknown else 'none recorded')
+    output_status = ', '.join(output_gaps) if output_gaps else ('not determined (incomplete counts)' if output_unknown else 'none recorded')
+    lines.append('Missing media sources: ' + source_status)
+    lines.append('Missing converted/staged media outputs: ' + output_status)
+    videos = categories.get('videos')
+    if (scope == 'final-staged-image' and coverage.get('expected_known_videos') == 17
+            and videos and videos['included'] == 17 and videos['available_sources'] == 17
+            and videos['missing_source'] == 0 and videos['missing_output'] == 0):
+        lines.append('All 17 Morrowind GOTY videos found and included')
+    return lines
+
+
 class BuildSummary:
     def __init__(self, run, version, mode):
         self.run = Path(run)
@@ -100,6 +196,7 @@ class BuildSummary:
         if status == 'passed':
             with Progress('Checking final output size and SHA-256'):
                 identity = output_identity(output)
+        media_coverage, coverage_scope = read_media_coverage(self.run, status, identity, self.mode)
         artifacts = None
         if identity and Path(identity['path']).suffix == '.hdf':
             image = Path(identity['path'])
@@ -118,6 +215,7 @@ class BuildSummary:
                   'elapsed_seconds': round(elapsed, 3), 'elapsed': duration(elapsed),
                   'timing_scope': 'provenance, build stages and final output hashing; excludes prerequisites/setup and emulator launch',
                   'output': identity, 'artifacts': artifacts, 'compiler_warnings': warnings,
+                  'media_coverage': media_coverage, 'coverage_scope': coverage_scope,
                   'build_environment': self.environment,
                   'actor_ground_audit': actor_acceptance,
                   'validation': 'private-test-only' if diagnostic else 'selected-pipeline'}
@@ -173,6 +271,7 @@ class BuildSummary:
                           'SHA-256: ' + (identity['sha256'] or 'not applicable to a directory')])
         else:
             lines.append('Output: no completed output verified')
+        lines.extend(media_coverage_lines(media_coverage, coverage_scope))
         if saved:
             lines.append('Summary: ' + str(saved))
         if save_error:

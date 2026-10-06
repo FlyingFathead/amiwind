@@ -2,6 +2,7 @@
 #include "quakedef.h"
 #include <assert.h>
 int soundtime;client_state_t cl;entity_t cl_entities[MAX_EDICTS];
+double S_SceneVoiceRemaining(void){return 0;}
 static byte timing[37];static int available=1;
 int COM_FOpenFile(char *s,FILE **f){
     if(!available){*f=NULL;return -1;}*f=tmpfile();assert(*f);fwrite(timing,1,sizeof(timing),*f);rewind(*f);return sizeof(timing);

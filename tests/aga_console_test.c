@@ -36,6 +36,26 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
 int main(void){
  char output[160];byte atlas[16384];int i;
  char *compass[]={"dbg","compass","true"};
+ {
+  char *tracker[]={"dbg","shroomtracker","reset"};
+  assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
+  assert(!AW_DebugTranslate(3,tracker,output,sizeof(output))); /* Query only, no reset. */
+  tracker[0]="debug";assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1);
+  assert(!AW_DebugTranslate(2,tracker,output,8));
+ }
+
+ {
+  char *radius[]={"dbg","torch","radius","192"};
+  char *flame[]={"dbg","torch","flame","brightbase"};
+  assert(AW_DebugTranslate(4,radius,output,sizeof(output))==1 && !strcmp(output,"aw_torch_radius_set 192\n"));
+  assert(AW_DebugTranslate(4,flame,output,sizeof(output))==1 && !strcmp(output,"aw_torch_flame_set brightbase\n"));
+ }
+ {
+  char *scene[]={"dbg","tpscene","headselection"};
+  assert(AW_DebugTranslate(2,scene,output,sizeof(output))==1 && !strcmp(output,"aw_tpscene\n"));
+  assert(AW_DebugTranslate(3,scene,output,sizeof(output))==1 && !strcmp(output,"aw_tpscene headselection\n"));
+  scene[2]="headselection;quit";assert(!AW_DebugTranslate(3,scene,output,sizeof(output)));
+ }
  char *exact[]={"dbg","set","time","0630"};
  char *sky[]={"dbg","sky","off"};
  char *skytype[]={"dbg","skytype","2"};
@@ -72,6 +92,7 @@ int main(void){
  char *fog[]={"dbg","fog","distance","400"};
  char *distance[]={"debug","draw","distance","500"};
  char *view[]={"debug","view","-20","30","40","90","-60"};
+ char *playvid[]={"dbg","playvid","15"};
  assert(AW_DebugTranslate(2,nightgallery,output,sizeof(output))==1 && !strcmp(output,"aw_nightgallery\n"));
  assert(AW_DebugTranslate(3,nightgallery,output,sizeof(output))==1 && !strcmp(output,"aw_nightgallery here\n"));
  nightgallery[2]="off";assert(AW_DebugTranslate(3,nightgallery,output,sizeof(output))==1 && !strcmp(output,"aw_nightgallery off\n"));
@@ -109,6 +130,35 @@ int main(void){
  }
  assert(AW_DebugTranslate(4,exact,output,sizeof(output))==1 && !strcmp(output,"aw_set_time 0630\n"));
  assert(AW_DebugTranslate(3,sky,output,sizeof(output))==1 && !strcmp(output,"aw_daynight off\n"));
+ {
+  char *cloudtype[]={"dbg","cloudtype","veil"};
+  assert(AW_DebugTranslate(2,cloudtype,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_type_set\n"));
+  assert(AW_DebugTranslate(3,cloudtype,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_type_set veil\n"));
+  cloudtype[2]="classic";
+  assert(AW_DebugTranslate(3,cloudtype,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_type_set classic\n"));
+  cloudtype[2]="veil;quit";assert(!AW_DebugTranslate(3,cloudtype,output,sizeof(output)));
+ }
+ {
+  char *control[]={"dbg","cloudcontrol","new"};
+  char *night[]={"dbg","nightclouds","partial"};
+  char *day[]={"dbg","dayclouds","60"};
+  char *mode[]={"dbg","nightskymode","clear"};
+  assert(AW_DebugTranslate(2,mode,output,sizeof(output))==1 && !strcmp(output,"aw_nightsky_mode_set\n"));
+  assert(AW_DebugTranslate(3,mode,output,sizeof(output))==1 && !strcmp(output,"aw_nightsky_mode_set clear\n"));
+  mode[2]="legacy";assert(AW_DebugTranslate(3,mode,output,sizeof(output))==1 && !strcmp(output,"aw_nightsky_mode_set legacy\n"));
+  mode[2]="0";assert(AW_DebugTranslate(3,mode,output,sizeof(output))==1 && !strcmp(output,"aw_nightsky_mode_set 0\n"));
+  mode[2]="1";assert(AW_DebugTranslate(3,mode,output,sizeof(output))==1 && !strcmp(output,"aw_nightsky_mode_set 1\n"));
+  mode[2]="clear;quit";assert(!AW_DebugTranslate(3,mode,output,sizeof(output)));
+  assert(AW_DebugTranslate(2,control,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_control_set\n"));
+  assert(AW_DebugTranslate(3,control,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_control_set new\n"));
+  control[2]="legacy";
+  assert(AW_DebugTranslate(3,control,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_control_set legacy\n"));
+  assert(AW_DebugTranslate(2,night,output,sizeof(output))==1 && !strcmp(output,"aw_night_clouds_set\n"));
+  assert(AW_DebugTranslate(3,night,output,sizeof(output))==1 && !strcmp(output,"aw_night_clouds_set partial\n"));
+  assert(AW_DebugTranslate(2,day,output,sizeof(output))==1 && !strcmp(output,"aw_day_clouds_set\n"));
+  assert(AW_DebugTranslate(3,day,output,sizeof(output))==1 && !strcmp(output,"aw_day_clouds_set 60\n"));
+  day[2]="60;quit";assert(!AW_DebugTranslate(3,day,output,sizeof(output)));
+ }
  assert(AW_DebugTranslate(3,skytype,output,sizeof(output))==1 && !strcmp(output,"aw_sky_type_set 2\n"));
  skytype[2]="V3";assert(AW_DebugTranslate(3,skytype,output,sizeof(output))==1 && !strcmp(output,"aw_sky_type_set V3\n"));
  assert(AW_DebugTranslate(3,gallery,output,sizeof(output))==1 && !strcmp(output,"aw_charplane exit\n"));
@@ -126,6 +176,13 @@ int main(void){
  assert(AW_DebugTranslate(1,picker,output,sizeof(output))==2);
  assert(AW_DebugTranslate(7,view,output,sizeof(output))==1);
  assert(!strcmp(output,"aw_view -20 30 40 90 -60\n"));
+ assert(AW_DebugTranslate(3,playvid,output,sizeof(output))==1);
+ assert(!strcmp(output,"playvid 15\n"));
+ playvid[2]="01";assert(AW_DebugTranslate(3,playvid,output,sizeof(output))==1);
+ assert(!strcmp(output,"playvid 01\n"));
+ playvid[2]="mw_logo";assert(AW_DebugTranslate(3,playvid,output,sizeof(output))==1);
+ assert(!strcmp(output,"playvid mw_logo\n"));
+ playvid[2]="../quit";assert(!AW_DebugTranslate(3,playvid,output,sizeof(output)));
  assert(AW_DebugTranslate(3,abbr,output,sizeof(output))==1);
  assert(!strcmp(output,"amiwind_debug_coords on\n"));
  assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1);

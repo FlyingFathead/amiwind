@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_sky.h"
+#include "aw_hand_models.h"
 
 //define	PASSAGES
 
@@ -650,6 +651,7 @@ void R_DrawViewModel (void)
     AW_TorchViewModel();AW_HandSpritesDraw();return;
 #endif
     AW_TorchViewModel();
+    AW_HandModelsApply();
 	VectorCopy (currententity->origin, r_entorigin);
 	VectorSubtract (r_origin, r_entorigin, modelorg);
 

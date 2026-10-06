@@ -110,5 +110,22 @@ int main(void){
     clean();AW_UIBox(0,152,320,48);AW_UICenteredLines(0,152,320,48,"AAAA\nBB");
     assert(vid.buffer[164*320+149]==AW_UIColor(223,199,144));
     assert(vid.buffer[180*320+155]==AW_UIColor(223,199,144));
+    /* Bounded pickup summaries may exceed the former 2048-byte buffer. */
+    {char long_message[2600];long_message[0]=0;
+     for(i=0;i<500;i++)strcat(long_message,"AAAA\n");strcat(long_message,"Z");
+     Cvar_SetValue("aw_dialogue_box_layout",3);r_refdef.vrect.height=152;realtime=0;
+     AW_UISubtitle("",long_message,100);realtime=99.99;clean();AW_UIDraw();
+     assert(framed(150,176) && !framed(149,176));}
+    /* Pickup-only animation toggle never changes ordinary dialogue policy. */
+    realtime=200;host_frametime=1;clean();AW_UIDraw();
+    host_frametime=0;Cvar_SetValue("aw_animate_item_pickups",0);
+    AW_UIPickupNotice("C",3);clean();AW_UIDraw();assert(framed(150,176));
+    realtime=204;clean();AW_UIDraw();assert(!changed(150,176));
+    Cvar_SetValue("aw_animate_item_pickups",1);
+    AW_UIPickupNotice("C",3);clean();AW_UIDraw();assert(!changed(150,176));
+    host_frametime=1;clean();AW_UIDraw();assert(framed(150,176));
+    realtime=208;clean();AW_UIDraw();host_frametime=0;
+    Cvar_SetValue("aw_animate_item_pickups",0);
+    AW_UISubtitle("","C",3);clean();AW_UIDraw();assert(!changed(150,176));
     return 0;
 }

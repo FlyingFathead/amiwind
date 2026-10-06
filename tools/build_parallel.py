@@ -120,8 +120,8 @@ DEPENDENCIES = {
     'world-scenery': ('world-terrain', 'world-scenery-assets'),
     'world-flora-assets': ('intro',),
     'world-flora': ('world-terrain', 'world-scenery', 'world-flora-assets'),
-    'music': (), 'engine': (),
-    'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'engine', 'dialogue-lookup'),
+    'media': (), 'music': (), 'engine': (),
+    'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
 

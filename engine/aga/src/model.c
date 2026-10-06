@@ -277,6 +277,17 @@ Mod_FindName
 
 ==================
 */
+/* Read-only admission query for bounded optional shared assets. This must use
+ * the same reuse rule as Mod_FindName and must not touch the cache LRU. */
+qboolean Mod_CanFindName(const char *name)
+{
+    int i;
+    if(!name || !name[0])return false;
+    if(mod_numknown<MAX_MOD_KNOWN)return true;
+    for(i=0;i<mod_numknown;i++)
+        if(!strcmp(mod_known[i].name,name) || mod_known[i].needload==NL_UNREFERENCED)return true;
+    return false;
+}
 model_t *Mod_FindName (char *name)
 {
     int		i;

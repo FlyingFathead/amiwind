@@ -1,0 +1,355 @@
+{
+  "schema": "amiwind-asset-coverage-history-v1",
+  "updated_utc": "2026-10-06T06:01:51.253243+00:00",
+  "scope": "Inspected standard Morrowind/Tribunal/Bloodmoon archives and loose overrides; source paths are not placements",
+  "source_inventory": {
+    "unit": "unique_canonical_paths",
+    "counts": {
+      "voices": 6447,
+      "effects": 717,
+      "music": 18,
+      "videos": 17,
+      "meshes": 7319,
+      "animations": 162,
+      "textures": 4783,
+      "icons": 1427,
+      "fonts": 8,
+      "other": 45
+    },
+    "total": 20943,
+    "current_bytes_revalidated_against_conversion": null
+  },
+  "snapshots": [
+    {
+      "version": "0.0.29-dev3",
+      "stage": "packaged",
+      "recorded_utc": "2026-10-05T18:28:35Z",
+      "image_output_files": 10766,
+      "image_output_bytes": 4482669937,
+      "artifact_counts": {
+        "(none)": 3,
+        ".awb": 13,
+        ".awc": 1,
+        ".awf": 16,
+        ".awg": 1,
+        ".awh": 275,
+        ".awi": 15,
+        ".awj": 1,
+        ".awm": 1,
+        ".awn": 3,
+        ".awq": 1,
+        ".awr": 1,
+        ".aws": 2,
+        ".awt": 1,
+        ".awu": 1,
+        ".awv": 3,
+        ".bin": 1,
+        ".bsp": 2723,
+        ".cfg": 4,
+        ".dat": 2,
+        ".json": 9,
+        ".lip": 23,
+        ".lmp": 10,
+        ".mdl": 7268,
+        ".mws": 18,
+        ".rc": 1,
+        ".spr": 102,
+        ".tsv": 1,
+        ".txt": 109,
+        ".wad": 1,
+        ".wav": 156
+      },
+      "verified_subsets": {
+        "gallery_model_keys": 3551,
+        "gallery_character_records": 2935,
+        "head_hair_parts": 275,
+        "soundtrack_source_tracks": 18
+      },
+      "whole_source_conversion_counts": null,
+      "whole_runtime_acceptance_counts": null,
+      "note": "Older bounded audio/video outputs; not the complete later media batch."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "staged_conversion",
+      "recorded_utc": "2026-10-05T18:28:35Z",
+      "recorded_media_conversion_counts": {
+        "voices": 6447,
+        "effects": 717,
+        "music": 18,
+        "videos": 17
+      },
+      "missing_referenced_media_sources": {
+        "voices": 7,
+        "effects": 2,
+        "music": 0,
+        "videos": 0
+      },
+      "failed_media_outputs": {
+        "voices": 0,
+        "effects": 0,
+        "music": 0,
+        "videos": 0
+      },
+      "packaged_source_counts": null,
+      "whole_runtime_acceptance_counts": null,
+      "note": "Recorded conversion batch; no completed dev4 package claimed."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "diagnostic_conversion",
+      "recorded_utc": "2026-10-05T18:45:39Z",
+      "label": "More mushrooms!",
+      "source_scope": "Six original Luminous Russula references from the base master",
+      "diagnostic_only": true,
+      "converted_original_placements": 6,
+      "converted_original_models": 3,
+      "placement_unit": "unique original master/cell/reference identities",
+      "model_unit": "unique original model paths",
+      "mesh_pending_interaction_instances": 6,
+      "decorative_sprite_instances": 0,
+      "packaged_original_placements": null,
+      "native_accepted_original_placements": null,
+      "harvest_accepted_original_placements": null,
+      "native_acceptance": "not_run",
+      "harvest_interaction": "not_implemented",
+      "retained_base": "synthetic",
+      "focused_docker_tests_passed": 28,
+      "note": "Actual exporter and mesh-overlay sample; no current playable map changed. Existing defaults retained; explicit opt-in. This does not resolve the rock-surface regression."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "source_candidate",
+      "recorded_utc": "2026-10-05T19:15:36Z",
+      "source_installed_utc": "2026-10-05T19:12:06Z",
+      "label": "Direct mushroom pickup",
+      "diagnostic_original_placements": 6,
+      "diagnostic_original_models": 3,
+      "placement_unit": "unique original master/cell/FRMR identities",
+      "content_nodes": 2,
+      "content_edges": 7,
+      "delivered_playtest_new_placements": 0,
+      "native_accepted_harvest_placements": 0,
+      "native_acceptance": "not_run",
+      "whole_world_harvest_coverage": null,
+      "harvest_interaction": "source_implemented_and_fixture_tested",
+      "default_behavior": "direct_original_contents_transfer_then_hide",
+      "respawn": "disabled_first_stage",
+      "pickup_sound": "unselected",
+      "classic_container_ui": "deferred",
+      "focused_docker_tests_passed": 12,
+      "m68k_object_compilation": "passed",
+      "retained_geometry_base": "synthetic_diagnostic",
+      "note": "Same six earlier diagnostic placements; no new playable region or HDF. Saved seed/level prevents retry rerolls; full transfer precedes hide. Native/map integration pending."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "native_diagnostic",
+      "recorded_utc": "2026-10-05T19:15:36Z",
+      "diagnostic_closed_utc": "2026-10-05T19:06:16Z",
+      "label": "Optional race/sex first-person hands",
+      "race_sex_model_pairs": 20,
+      "generated_mdl_files": 40,
+      "selection_catalogues": 1,
+      "emitter_sidecars": 1,
+      "diagnostic_image_hash_verified_files": 42,
+      "delivered_playtest_new_files": 0,
+      "production_default_changed": false,
+      "native_observed": {
+        "nord_punches": 6,
+        "nord_torch_on_off": true,
+        "argonian_selection": "demo_playback",
+        "complete_demo_eof": true
+      },
+      "complete_live_race_sex_acceptance": null,
+      "open": [
+        "Live beast punch/torch",
+        "Punch framing and self-occlusion",
+        "Every race/sex combination",
+        "Physical target cost"
+      ],
+      "note": "Diagnostic image only, not a replacement for any sealed package. Model pairs and MDL files are distinct units from original source mesh paths."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "source_candidate_and_static_preview",
+      "recorded_utc": "2026-10-05T19:30:34Z",
+      "label": "Selected mushroom pickup cue and owner-reviewed static preview",
+      "selected_pickup_cue": {
+        "source_files": 1,
+        "converted_outputs": 1,
+        "missing_source": 0,
+        "failed_outputs": 0,
+        "packaged_outputs": 0,
+        "runtime_source_fixture": "passed",
+        "native_audible_acceptance": "not_run"
+      },
+      "mushroom_preview": {
+        "source_models": 3,
+        "preview": "owner_said_static_preview_looks_great",
+        "native_appearance_acceptance": "not_run",
+        "packaged_placements": 0
+      },
+      "original_map_placements": {
+        "status": "owner_confirmed_retained_original_placements",
+        "delivered_new_placements": 0,
+        "native_placement_acceptance": "not_run",
+        "interaction_prompt": "requested_name_plus_(E:_Pick)",
+        "prompt_implementation": "pending"
+      },
+      "note": "Source/runtime fixture and static preview feedback are separate from package readback and native gameplay/audio acceptance."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "source_census_and_persistence_candidate",
+      "recorded_utc": "2026-10-05T20:40:44.860086+00:00",
+      "label": "Global small-mushroom state foundation",
+      "source_scope": "Standalone base master, numeric small-mushroom family",
+      "original_placements": 2083,
+      "exterior_placements": 934,
+      "interior_placements": 1149,
+      "original_models": 8,
+      "diagnostic_converted_placements": 6,
+      "diagnostic_converted_models": 3,
+      "global_saved_placement_capacity": 4096,
+      "runtime_map_placement_capacity": 24,
+      "maximum_region_origin_count": 75,
+      "origin_count_is_mesh_overlap_lower_bound": true,
+      "delivered_playtest_new_placements": 0,
+      "native_accepted_harvest_placements": 0,
+      "whole_world_harvest_coverage": null,
+      "deduplicated_source_tests_passed": 94,
+      "target_objects_compiled": 6,
+      "note": "Storage source integrated; no new map/HDF/package acceptance. Inventory remains32 item types. Further map admission, mesh/memory/performance and native pickup/save gates required."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "actual_map_harvest_candidate",
+      "recorded_utc": "2026-10-05T20:56:48.369925+00:00",
+      "unique_original_placements": 6,
+      "original_models": 3,
+      "map_count": 9,
+      "resident_map_copies": 54,
+      "changed_or_new_payload_files": 19,
+      "payload_bytes": 14152292,
+      "target_heap_estimates_passed": 9,
+      "worst_estimated_clearance_bytes": 1908464,
+      "seam_checks_passed": 28,
+      "fingerprint_checks_passed": 19,
+      "delivered_playtest_new_placements": 0,
+      "native_accepted_harvest_placements": 0,
+      "note": "Private candidate only; all-world map admission and native interaction remain pending."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "reconciled_media_payload",
+      "recorded_utc": "2026-10-05T21:11:19.138554+00:00",
+      "files": 7202,
+      "bytes": 394812125,
+      "revalidated_original_sources": 7199,
+      "categories": {
+        "videos": {
+          "included": 17,
+          "missing_source": 0,
+          "missing_output": 0,
+          "available_sources": 17
+        },
+        "music": {
+          "included": 18,
+          "missing_source": 0,
+          "missing_output": 0,
+          "available_sources": 18
+        },
+        "voices": {
+          "included": 6447,
+          "missing_source": 7,
+          "missing_output": 0,
+          "available_sources": 6447
+        },
+        "effects": {
+          "included": 717,
+          "missing_source": 2,
+          "missing_output": 0,
+          "available_sources": 717
+        }
+      },
+      "existing_story_intro_preserved": true,
+      "packaged": false,
+      "runtime_event_acceptance": null,
+      "note": "Recorded original hashes and final staged hashes verified; no new discovery completeness or full runtime claim."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "town_harvest_admission_failed",
+      "recorded_utc": "2026-10-05T21:44:29.394789+00:00",
+      "unique_original_placements": 6,
+      "additional_candidate_maps": 32,
+      "additional_resident_copies": 174,
+      "new_intro_allowance_deficit_bytes": 87328,
+      "admitted": false,
+      "delivered_playtest_new_placements": 0,
+      "native_accepted_harvest_placements": 0,
+      "note": "Shared-model representation under investigation; distance hiding does not release BSP geometry."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "caius_cached_interior_coverage_gap",
+      "recorded_utc": "2026-10-05T21:44:29.394789+00:00",
+      "source_references": 57,
+      "nonempty_model_paths": 42,
+      "ordinary_bottle_placements": 4,
+      "placed_skooma_potion_records_in_cache": 0,
+      "container_inventory_inspected": false,
+      "newly_converted": 0,
+      "packaged_coverage": null,
+      "native_acceptance": null,
+      "note": "Cached census only. Small-item selection defers ordinary bottles, pipe and loose moon sugar. Room registration is not complete clutter coverage."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "assembled_with_bounded_native_checks",
+      "recorded_utc": "2026-10-06T06:01:51.253243+00:00",
+      "media_available_source_files": {
+        "voices": 6447,
+        "effects": 717,
+        "music": 18,
+        "videos": 17
+      },
+      "media_converted_files": {
+        "voices": 6447,
+        "effects": 717,
+        "music": 18,
+        "videos": 17
+      },
+      "missing_original_audio_references": {
+        "voices": 7,
+        "effects": 2
+      },
+      "available_source_conversion_failures": 0,
+      "new_batch_videos_in_image": 16,
+      "retained_prior_intro_videos": 1,
+      "whole_runtime_acceptance_counts": null,
+      "mushrooms": {
+        "unit": "unique_original_placements",
+        "installed": 6,
+        "town_catalogues_shared_alias": 32,
+        "world_maps_embedded_brush": 9,
+        "native_accepted_pickups": 1,
+        "native_item_quantity": 1,
+        "native_repeat_return_save_load_checked": true,
+        "native_empty_outcome_checked": false,
+        "worldwide": false
+      },
+      "linux_tests": {
+        "run": 953,
+        "passed": 949,
+        "skipped": 4,
+        "failures": 0,
+        "errors": 0
+      },
+      "native_groups_passed": 4,
+      "note": "Runtime and converters match the dev4 development snapshot; README/release/coverage documentation updated for the public source prerelease. All-input conversion is not complete per-event playback acceptance."
+    }
+  ],
+  "history_policy": "Append a dated snapshot when status changes. Preserve previous snapshots; null means unknown. Older version denominators were not reconstructed."
+}

@@ -10,6 +10,7 @@ qboolean mouse_has_moved,noclip_anglehack;
 kbutton_t in_strafe,in_mlook;
 cvar_t sensitivity={"sensitivity","1",false,1},lookstrafe,m_side,m_pitch,m_yaw,m_forward;
 void V_StopPitchDrift(void){}
+qboolean V_ExplicitPitchCentering(void){return false;}
 void AW_MenuMouse(int x,int y){}
 int AW_WorldUIActive(void){return 0;}
 void AW_WorldUIMouse(int x,int y){}
@@ -106,7 +107,7 @@ int main(void){
     AW_GalleryKey(K_DOWNARROW,1,0,0);AW_GalleryKey(K_ENTER,1,0,0);draw();assert(strstr(drawn,"#12 Dagoth Ur"));
     many=1;AW_GalleryKey(K_TAB,1,0,0);assert(AW_GalleryModal());
     {usercmd_t move;memset(&move,0,sizeof(move));cl.viewangles[0]=12;cl.viewangles[1]=91;
-     mouseX=25;mouseY=10;mouse_has_moved=true;IN_Move(&move);
+     IN_AWMouseEvent(25,10);IN_Move(&move);
      assert(cl.viewangles[0]==12 && cl.viewangles[1]==91 && !mouse_has_moved);
      assert(!move.forwardmove && !move.sidemove && !move.upmove);}
     assert(Key_AmigaRaw(0x68)==K_PGUP && Key_AmigaRaw(0xe9)==K_PGDN);

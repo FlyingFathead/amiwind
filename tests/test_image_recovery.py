@@ -32,7 +32,7 @@ class ImageRecoveryTests(unittest.TestCase):
                'data_files':str(data),'font_options':args.font_options,
                'source_sha256':{'tools/example.py':'a'*64},'input_sha256':{'Morrowind.esm':'b'*64},
                'steps':[{'name':name,'status':'failed' if name=='image' else 'passed','command':command}
-                        for name,command in steps if name not in ('world-ui', 'actor-contact', 'npc-gallery', 'world-scenery-assets', 'world-scenery')]}
+                        for name,command in steps if name not in ('world-ui', 'actor-contact', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'media')]}
         (old/'build-state.json').write_text(json.dumps(state))
         (source/'docs/PATCH-v0.0.25-rc6.json').write_text(json.dumps({'base_files':{'tools/example.py':{'sha256':'a'*64}}}))
         areas=[]
@@ -64,7 +64,7 @@ class ImageRecoveryTests(unittest.TestCase):
             self.assertEqual(report['verified_regions'],1)
             self.assertEqual(snapshot(),before)
             selected=recovery_commands(steps,args.recover_image_from,root/'next')
-            self.assertEqual([n for n,_ in selected],['engine','world-scenery-assets','world-scenery','npc-gallery','image'])
+            self.assertEqual([n for n,_ in selected],['engine','world-scenery-assets','world-scenery','npc-gallery','media','image'])
             overlay=selected[2][1]
             self.assertEqual(overlay[overlay.index('--terrain')+1],str(root/'old/world-terrain'))
             self.assertEqual(overlay[overlay.index('--palette')+1],str(root/'old/intro-scene/id1/gfx/palette.lmp'))
@@ -72,7 +72,7 @@ class ImageRecoveryTests(unittest.TestCase):
             self.assertEqual(gallery[gallery.index('--palette')+1],str(root/'old/intro-scene/id1/gfx/palette.lmp'))
             self.assertEqual(gallery[gallery.index('--cache')+1],str(args.workspace/'cache/npc-gallery-v1'))
             self.assertNotIn('--seed-run',gallery)
-            image=selected[4][1]
+            image=dict(selected)['image']
             self.assertEqual(image[image.index('--world-scenery')+1],str(root/'next/world-scenery'))
             self.assertEqual(image[image.index('--gallery')+1],str(root/'next/npc-gallery'))
             self.assertEqual(image[image.index('--scene')+1],str(root/'old/intro-scene'))
@@ -86,7 +86,7 @@ class ImageRecoveryTests(unittest.TestCase):
             args.gallery_seed_run=root/'stopped rc9 run'
             tools={n:'/tools/'+n for n in ('qbsp','vis','light','qcc','ffmpeg','xdftool','rdbtool')}
             selected=recovery_commands(build.commands(args,tools,root/'next'),root/'old',root/'next')
-            self.assertEqual([n for n,_ in selected],['engine','world-scenery-assets','world-scenery','npc-gallery','image'])
+            self.assertEqual([n for n,_ in selected],['engine','world-scenery-assets','world-scenery','npc-gallery','media','image'])
             gallery=dict(selected)['npc-gallery']
             self.assertEqual(gallery[gallery.index('--cache')+1],str(args.gallery_cache))
             self.assertEqual(gallery[gallery.index('--seed-run')+1],str(args.gallery_seed_run))
@@ -148,7 +148,7 @@ class ImageRecoveryTests(unittest.TestCase):
             self.assertIn('--no-npc-gallery',dict(steps)['image'])
             self.assertNotIn('npc-gallery',stage_dependencies(steps)['image'])
             selected=recovery_commands(steps,root/'old',root/'next')
-            self.assertEqual([name for name,_ in selected],['engine','world-scenery-assets','world-scenery','image'])
+            self.assertEqual([name for name,_ in selected],['engine','world-scenery-assets','world-scenery','media','image'])
             missing_flag=[(name,[x for x in command if x!='--no-npc-gallery']) for name,command in steps]
             with self.assertRaisesRegex(ValueError,'required NPC gallery'):
                 recovery_commands(missing_flag,root/'old',root/'next')

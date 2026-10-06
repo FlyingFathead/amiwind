@@ -21,6 +21,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+#ifdef AMIGA
+#include <proto/exec.h>
+#include <exec/memory.h>
+#endif
+
 #ifdef _WIN32
 #include "winquake.h"
 #else
@@ -364,14 +369,184 @@ CHANNEL MIXING
 void SND_PaintChannelFrom8 (channel_t *ch, sfxcache_t *sc, int endtime);
 void SND_PaintChannelFrom16 (channel_t *ch, sfxcache_t *sc, int endtime);
 
+/* A scene handoff owns a copy of the unpainted part of speech. The ordinary
+ * cache, sfx and entity arrays can all disappear while the loader runs.
+ * At most four allocations, including their sample headers, total 128 KiB.
+ * Keep already queued DMA samples and gains; never restart or re-spatialize
+ * the detached voice using a new map's entity numbers. */
+#define SCENE_VOICE_SLOTS 4
+#define SCENE_VOICE_BYTES (128 * 1024)
+typedef struct {
+    sfxcache_t *sample;
+    channel_t channel;
+    int next, end, speed;
+    unsigned bytes;
+} scene_voice_t;
+static scene_voice_t scene_voices[SCENE_VOICE_SLOTS];
+static unsigned scene_voice_bytes,scene_voice_peak,scene_voice_rejected;
+static int scene_voice_handoff;
+static int movie_audio_paused,movie_audio_painted_start,movie_audio_sound_start;
+extern int sound_started,soundtime;
+
+/* The target SDK malloc can trap before returning NULL. These short-lived
+ * copies must fail normally and must never fall back to hardware Chip RAM. */
+static void *scene_voice_alloc(unsigned bytes)
+{
+#ifdef AMIGA
+    return AllocMem((ULONG)bytes,MEMF_FAST|MEMF_PUBLIC);
+#else
+    return malloc(bytes);
+#endif
+}
+static void scene_voice_free(void *sample,unsigned bytes)
+{
+#ifdef AMIGA
+    FreeMem(sample,(ULONG)bytes);
+#else
+    (void)bytes;
+    free(sample);
+#endif
+}
+static void scene_voice_release(scene_voice_t *v)
+{
+    if(v->sample){scene_voice_free(v->sample,v->bytes);scene_voice_bytes-=v->bytes;}
+    v->sample=NULL;v->bytes=0;
+}
+void S_MovieAudioBegin(void)
+{
+    if(movie_audio_paused)return;
+    movie_audio_paused=1;movie_audio_painted_start=paintedtime;movie_audio_sound_start=soundtime;
+}
+void S_MovieAudioEnd(void)
+{
+    int i,painted_elapsed,sound_elapsed;
+    channel_t *ch;scene_voice_t *v;
+    if(!movie_audio_paused)return;
+    painted_elapsed=paintedtime-movie_audio_painted_start;
+    sound_elapsed=soundtime-movie_audio_sound_start;
+    if(painted_elapsed<0)painted_elapsed=0;
+    if(sound_elapsed<0)sound_elapsed=0;
+    for(i=0,ch=channels;i<total_channels;i++,ch++)
+        if(ch->sfx && ch->end>movie_audio_painted_start)ch->end+=painted_elapsed;
+    for(i=0;i<SCENE_VOICE_SLOTS;i++){
+        v=&scene_voices[i];if(!v->sample)continue;
+        v->next+=painted_elapsed;v->end+=sound_elapsed;
+    }
+    AW_SpeechShiftTiming(sound_elapsed,movie_audio_sound_start);
+    movie_audio_paused=0;
+}
+void S_CancelSceneVoice(void)
+{
+    int i;
+    for(i=0;i<SCENE_VOICE_SLOTS;i++)scene_voice_release(&scene_voices[i]);
+    memset(scene_voices,0,sizeof(scene_voices));scene_voice_handoff=0;
+}
+int S_PreserveSceneVoice(void)
+{
+    return scene_voice_handoff && aw_loading_music;
+}
+void S_EndSceneVoice(void)
+{
+    scene_voice_handoff=0;
+}
+double S_SceneVoiceRemaining(void)
+{
+    int i;double remaining=0,d;
+    for(i=0;i<SCENE_VOICE_SLOTS;i++){
+        scene_voice_t *v=&scene_voices[i];
+        if(v->end>soundtime && v->speed>0){
+            d=(double)(v->end-soundtime)/v->speed;
+            if(d>remaining)remaining=d;
+        }
+    }
+    return remaining;
+}
+void S_SceneVoiceReport(void)
+{
+    int i,n=0;
+    for(i=0;i<SCENE_VOICE_SLOTS;i++)if(scene_voices[i].end>soundtime)n++;
+    Con_Printf("Scene voices: %d tails, %lu/%lu owned bytes, peak %lu, refused %lu, handoff %d\n",
+        n,(unsigned long)scene_voice_bytes,(unsigned long)SCENE_VOICE_BYTES,
+        (unsigned long)scene_voice_peak,(unsigned long)scene_voice_rejected,scene_voice_handoff);
+}
+void S_BeginSceneVoice(void)
+{
+    int i,j,remaining;unsigned bytes;channel_t *ch;sfxcache_t *sc;
+    scene_voice_t *v;const char *reason;
+    if(!sound_started || !shm || shm->speed<=0){S_CancelSceneVoice();return;}
+    scene_voice_handoff=1;
+    for(i=0;i<SCENE_VOICE_SLOTS;i++)if(scene_voices[i].end<=soundtime){
+        scene_voice_release(&scene_voices[i]);memset(&scene_voices[i],0,sizeof(scene_voices[i]));
+    }
+    for(i=NUM_AMBIENTS;i<NUM_AMBIENTS+MAX_DYNAMIC_CHANNELS;i++){
+        ch=&channels[i];
+        if(!ch->sfx || (strncmp(ch->sfx->name,"npc/",4) && strncmp(ch->sfx->name,"intro/",6)))continue;
+        if(ch->end<=paintedtime || (!ch->leftvol && !ch->rightvol))continue;
+        reason="unavailable or unsupported cached sample";
+        /* No S_LoadSound: loading here could evict another live cache entry. */
+        sc=Cache_Check(&ch->sfx->cache);
+        if(!sc || sc->loopstart!=-1 || sc->stereo || sc->speed!=shm->speed ||
+           (sc->width!=1 && sc->width!=2) || ch->pos<0 || ch->pos>=sc->length ||
+           ch->leftvol<0 || ch->rightvol<0 || ch->leftvol>65535 || ch->rightvol>65535)goto refused;
+        remaining=sc->length-ch->pos;
+        /* Both clocks must describe the same nonlooping, already-playing tail. */
+        if(ch->end-paintedtime!=remaining)goto refused;
+        reason="128 KiB total tail budget exceeded";
+        if(remaining>(SCENE_VOICE_BYTES-(int)sizeof(*sc))/sc->width)goto refused;
+        bytes=sizeof(*sc)+(unsigned)remaining*sc->width;
+        if(bytes>SCENE_VOICE_BYTES-scene_voice_bytes)goto refused;
+        reason="four detached voice slots occupied";
+        for(j=0;j<SCENE_VOICE_SLOTS;j++)if(!scene_voices[j].end)break;
+        if(j==SCENE_VOICE_SLOTS)goto refused;
+        v=&scene_voices[j];reason="tail allocation failed";
+        v->sample=(sfxcache_t *)scene_voice_alloc(bytes);if(!v->sample)goto refused;
+        memcpy(v->sample,sc,sizeof(*sc));v->sample->length=remaining;
+        memcpy(v->sample->data,sc->data+(size_t)ch->pos*sc->width,(size_t)remaining*sc->width);
+        memset(&v->channel,0,sizeof(v->channel));
+        v->channel.leftvol=ch->leftvol;v->channel.rightvol=ch->rightvol;
+        v->next=paintedtime;v->end=ch->end;v->speed=sc->speed;v->bytes=bytes;
+        scene_voice_bytes+=bytes;if(scene_voice_bytes>scene_voice_peak)scene_voice_peak=scene_voice_bytes;
+        AW_SpeechStop(ch->entnum,ch->entchannel);
+        ch->sfx=NULL; /* Ownership moves exactly once, including repeated crossings. */
+        continue;
+refused:
+        scene_voice_rejected++;
+        Con_Printf("Scene voice not retained (%s): %s\n",reason,ch->sfx->name);
+    }
+}
+static void S_PaintSceneVoice(int start,int end)
+{
+    int i,count,skip;scene_voice_t *v;
+    for(i=0;i<SCENE_VOICE_SLOTS;i++){
+        v=&scene_voices[i];if(!v->sample)continue;
+        if(!shm || v->speed!=shm->speed || start<v->next){
+            scene_voice_release(v);v->end=0;continue;
+        }
+        /* A DMA underrun advances the audio clock; don't replay missed samples. */
+        skip=start-v->next;
+        count=v->sample->length-v->channel.pos;
+        if(skip>=count){scene_voice_release(v);continue;}
+        v->channel.pos+=skip;
+        count=v->sample->length-v->channel.pos;
+        if(count>end-start)count=end-start;
+        if(v->sample->width==1)SND_PaintChannelFrom8(&v->channel,v->sample,count);
+        else SND_PaintChannelFrom16(&v->channel,v->sample,count);
+        v->next=end;
+        if(v->channel.pos==v->sample->length)scene_voice_release(v);
+    }
+}
+
+
 void S_PaintChannels(int endtime)
 {
 	int	i;
 	int	end;
+    int debug_movie;
 	channel_t *ch;
 	sfxcache_t	*sc;
 	int		ltime, count;
 
+	debug_movie=AW_MovieDebugActive();
 	while (paintedtime < endtime)
 	{
 	// if paintbuffer is smaller than DMA buffer
@@ -383,11 +558,12 @@ void S_PaintChannels(int endtime)
 		Q_memset(paintbuffer, 0, (end - paintedtime) * sizeof(portable_samplepair_t));
 
 	if(AW_MovieActive())AW_MoviePaint(paintbuffer,end-paintedtime,paintedtime);
-    else AW_MusicPaint(paintbuffer, end-paintedtime);
+    else if(!debug_movie)AW_MusicPaint(paintbuffer, end-paintedtime);
+    if(!debug_movie)S_PaintSceneVoice(paintedtime,end);
 
 	// paint in the channels.
 		ch = channels;
-		for (i=0; !aw_loading_music && i<total_channels ; i++, ch++)
+		for (i=0; !debug_movie && !aw_loading_music && i<total_channels ; i++, ch++)
 		{
 			if (!ch->sfx)
 				continue;

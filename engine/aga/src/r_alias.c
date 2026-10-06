@@ -113,7 +113,7 @@ qboolean R_AliasCheckBBox (void)
     pmodel = currententity->model;
     /* Reject wholly off-screen aliases before a cache miss can read the model
      * from disk. The exact animated bbox still handles every surviving model. */
-    if(!AW_AliasSphereVisible(currententity->origin,pmodel->radius))return false;
+    if(!AW_AliasSphereVisible(currententity->origin,pmodel->radius * R_SpriteEntityScale(currententity)))return false;
     pahdr = Mod_Extradata (pmodel);
     pmdl = (mdl_t *)((byte *)pahdr + pahdr->model);
 
@@ -363,13 +363,13 @@ void R_AliasSetUpTransform (int trivial_accept)
     angles[YAW] = currententity->angles[YAW];
     AngleVectors (angles, alias_forward, alias_right, alias_up);
 
-    tmatrix[0][0] = pmdl->scale[0];
-    tmatrix[1][1] = pmdl->scale[1];
-    tmatrix[2][2] = pmdl->scale[2];
+    tmatrix[0][0] = pmdl->scale[0] * R_SpriteEntityScale(currententity);
+    tmatrix[1][1] = pmdl->scale[1] * R_SpriteEntityScale(currententity);
+    tmatrix[2][2] = pmdl->scale[2] * R_SpriteEntityScale(currententity);
 
-    tmatrix[0][3] = pmdl->scale_origin[0];
-    tmatrix[1][3] = pmdl->scale_origin[1];
-    tmatrix[2][3] = pmdl->scale_origin[2];
+    tmatrix[0][3] = pmdl->scale_origin[0] * R_SpriteEntityScale(currententity);
+    tmatrix[1][3] = pmdl->scale_origin[1] * R_SpriteEntityScale(currententity);
+    tmatrix[2][3] = pmdl->scale_origin[2] * R_SpriteEntityScale(currententity);
 
 // TODO: can do this with simple matrix rearrangement
 

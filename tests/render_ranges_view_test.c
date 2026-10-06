@@ -30,7 +30,7 @@ int main(void)
     original.mins[0]=-4;original.maxs[0]=5;original.radius=7;original.hulls[0]=31;
     pool.firstmodelsurface=70;pool.nummodelsurfaces=20;pool.radius=100000;
     record.model=&original;record.count=1;record.ranges[0].start=3;record.ranges[0].count=4;record.origin[0]=10;record.angles[1]=359.8f;
-    entity.model=&original;entity.origin[0]=10.125f;entity.angles[1]=0;
+    entity.model=&original;entity.origin[0]=10.125f;entity.angles[1]=-1.40625f; /* actual MSG_WriteAngle/ReadAngle for359.8 */
     aw_records=&record;aw_pool=&pool;saved=original;
     assert(AW_RenderRangeView(&entity,0,&view));
     assert(view.firstmodelsurface==73 && view.nummodelsurfaces==4);

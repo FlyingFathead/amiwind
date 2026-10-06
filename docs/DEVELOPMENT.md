@@ -270,3 +270,16 @@ work; current release targets and heap/transition acceptance remain in force.
 Add explicit configuration options for troubleshooting and record their effective
 settings in build evidence. See [Compiler Troubleshooting](COMPILER_TROUBLESHOOTING.md)
 for implemented tools, proposed controls and the production acceptance boundary.
+
+
+## Emulator development access
+
+See [FS-UAE development access](FS-UAE-DEVELOPMENT.md) for guest memory and
+register inspection, breakpoints, serial-terminal access, save-state/capture
+limits and a proposed repeatable testing workflow. Stock interfaces and optional
+patched backends are distinguished; unattended runtime validation is pending.
+
+## Headless development container
+
+See [FS-UAE in Docker](FS-UAE-DOCKER.md) for a persistent container,
+private virtual display, screenshots, console debugger and backup steps.

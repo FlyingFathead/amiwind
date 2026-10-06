@@ -36,6 +36,8 @@ typedef struct efrag_s
 } efrag_t;
 
 
+/* Local render proxy flag only; never sent through the entity protocol. */
+#define AW_EF_ALIAS_SCALE 0x40000000
 typedef struct entity_s
 {
 	qboolean				forcelink;		// model changed
@@ -68,7 +70,7 @@ typedef struct entity_s
 											//  that splits bmodel, or NULL if
 											//  not split
     /* Appended: preserve prior entity member offsets used by assembly. */
-    float aw_sprite_scale; /* zero legacy/dynamic default means 1 */
+    float aw_sprite_scale; /* Tagged aliases may also use this; legacy default is 1. */
 } entity_t;
 
 float R_SpriteEntityScale(const entity_t *ent);

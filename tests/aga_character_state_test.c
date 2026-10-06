@@ -8,6 +8,35 @@ server_t sv;server_static_t svs;
 #include "aw_clock.h"
 keydest_t key_dest=key_game;
 void IN_AWClearButtons(void){}
+viddef_t vid;int scr_copyeverything;double host_frametime=.02;
+static byte frame[340*207+2];
+static float head_angle;static int black_background=1,ui_mode=1,ok_drawn,ok_focused;
+int AW_UIMode(void){return ui_mode;}
+int AW_ModalBlackBackground(void){return black_background;}
+void AW_HeadDraw(int x,int y,int w,int h,float angle){head_angle=angle;}
+int AW_UIColor(int r,int g,int b){return r==0 && g==0 && b==0?0:1;}
+void AW_UIFill(int x,int y,int w,int h,int color){
+    int row;if(x==251 && y==169 && w==54 && h==16)ok_focused++;assert(x>=0 && y>=0 && x+w<=vid.width && y+h<=vid.height);
+    for(row=y;row<y+h;row++)memset(vid.buffer+row*vid.rowbytes+x,color,w);
+}
+void AW_UIBox(int x,int y,int w,int h){}
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int color){if(!strcmp(s,"OK")){assert(x==248 && y==166 && w==60 && h==22);ok_drawn++;}}
+void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
+void AW_BirthArt(int index,int x,int y){}
+static void draw_covered(void){
+    int x,y;memset(frame,0x5a,sizeof(frame));scr_copyeverything=0;
+    AW_CharacterDraw();assert(scr_copyeverything && frame[0]==0x5a && frame[sizeof(frame)-1]==0x5a);
+    for(y=0;y<vid.height;y++)for(x=0;x<vid.rowbytes;x++){
+        byte value=vid.buffer[y*vid.rowbytes+x];
+        if(x>=vid.width)assert(value==0x5a);
+        else if(x<2 || x>=318 || y<2 || y>=198)assert(value==0);
+        else assert(value!=0x5a);
+    }
+    /* Switchback restores the original exposed background around the panel. */
+    black_background=0;memset(frame,0x5a,sizeof(frame));AW_CharacterDraw();
+    assert(vid.buffer[0]==0x5a && vid.buffer[(vid.height-1)*vid.rowbytes]==0x5a);
+    black_background=1;
+}
 void AW_HeadClear(void){}
 int AW_HeadLoad(int a,int b){return 1;}
 void Con_Printf(char *s,...){}
@@ -35,6 +64,7 @@ static void setup(void)
 int main(void)
 {
     aw_character_t c;aw_save_t source,decoded,unchanged;byte raw[AW_SAVE_BYTES];int n,i;char out[64];
+    vid.width=333;vid.height=207;vid.rowbytes=340;vid.buffer=frame+1;
     setup();assert(!AW_CharacterHors());
     strcpy(aw_races[0].id,"Nord");strcpy(aw_classes[0].id,"Barbarian");strcpy(aw_births[0].id,"Charioteer");
     assert(AW_CharacterHors());assert(!strcmp(aw_story.name,"Hors") && aw_character.valid && !aw_character.female);
@@ -47,22 +77,25 @@ int main(void)
     c.female=1;c.head=2;c.hair=3;assert(AW_CharacterRebuild(&c));assert(c.maximum[0]==60);
     c.head=0;assert(!AW_CharacterRebuild(&c));c.head=2;
     aw_character=c;assert(AW_CharacterOpen(1));AW_CharacterMouse(0,0);
+    draw_covered();assert(head_angle>0);{float before=head_angle;draw_covered();assert(head_angle>before);}
     for(i=0;i<5;i++)AW_CharacterKey(K_ENTER);
+    draw_covered();
     assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey('n');assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey(K_ENTER);AW_CharacterKey('y');
     assert(!AW_CharacterActive() && AW_CharacterDone()==1);
     assert(AW_CharacterOpen(4));
-    AW_CharacterKey(K_ENTER);assert(AW_CharacterActive() && !AW_CharacterDone());
+    for(i=0;i<5;i++){draw_covered();AW_CharacterKey(K_RIGHTARROW);}
+    AW_CharacterKey(K_ENTER);draw_covered();assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey(K_ESCAPE);assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey(K_ENTER);AW_CharacterKey(K_LEFTARROW);AW_CharacterKey(K_ENTER);
     assert(AW_CharacterActive() && !AW_CharacterDone());
     AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);
     assert(!AW_CharacterActive() && AW_CharacterDone()==4 && !AW_CharacterDone());
     for(i=1;i<=3;i++){
-        int presses;assert(AW_CharacterOpen(i));
+        int presses;assert(AW_CharacterOpen(i));draw_covered();
         for(presses=0;presses<(i==1?5:1);presses++)AW_CharacterKey(K_ENTER);
-        assert(AW_CharacterActive());AW_CharacterKey(K_ENTER);
+        assert(AW_CharacterActive());draw_covered();AW_CharacterKey(K_ENTER);
         assert(!AW_CharacterActive() && AW_CharacterDone()==i);
     }
     /* Birthsign arrows and WASD cycle values; pointer motion cannot consume keys. */
@@ -81,6 +114,37 @@ int main(void)
     assert(AW_CharacterOpen(1));AW_CharacterMouse(85,22);AW_CharacterKey(K_MOUSE1);
     AW_CharacterMouse(-85,106);AW_CharacterKey(K_MOUSE1);AW_CharacterKey(K_ENTER);
     assert(aw_character.female==1 && !AW_CharacterActive());
+    /* V1 above retains its broad footer. V2 adds an exact visible hit box. */
+    ui_mode=2;
+    for(i=1;i<=4;i++){
+        assert(AW_CharacterOpen(i));ok_drawn=0;draw_covered();assert(ok_drawn);
+        /* Footer hints are not an invisible accept button in V2. */
+        AW_CharacterMouse(0,i==1?128:0);AW_CharacterKey(K_MOUSE1);
+        assert(AW_CharacterActive() && !AW_CharacterDone());
+        AW_CharacterMouse(160,0);AW_CharacterKey(K_MOUSE1);
+        assert(AW_CharacterActive() && !AW_CharacterDone()); /* Confirmation, not a bypass. */
+        AW_CharacterKey(K_ENTER);assert(!AW_CharacterActive() && AW_CharacterDone()==i);
+    }
+    assert(AW_CharacterOpen(1));
+    for(i=0;i<4;i++)AW_CharacterKey(K_ENTER);
+    ok_focused=0;draw_covered();assert(ok_focused && AW_CharacterActive());
+    AW_CharacterKey(K_ENTER);AW_CharacterKey('n');assert(AW_CharacterActive());
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(AW_CharacterDone()==1);
+    /* Mouse right/bottom borders are exclusive; only the visible OK accepts. */
+    assert(AW_CharacterOpen(2));AW_CharacterMouse(208,0);AW_CharacterKey(K_MOUSE1);
+    AW_CharacterMouse(-1,12);AW_CharacterKey(K_MOUSE1);
+    assert(AW_CharacterActive() && !AW_CharacterDone());
+    AW_CharacterMouse(0,-1);AW_CharacterKey(K_MOUSE1);AW_CharacterKey(K_ENTER);
+    assert(AW_CharacterDone()==2);
+    /* Review's subedit returns to review, with no premature final acceptance. */
+    assert(AW_CharacterOpen(4));AW_CharacterKey('r');
+    AW_CharacterMouse(160,128);AW_CharacterKey(K_MOUSE1);
+    assert(AW_CharacterActive() && !AW_CharacterDone());
+    AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);assert(AW_CharacterDone()==4);
+    /* Switching back uses the original footer without losing selection. */
+    assert(AW_CharacterOpen(1));ui_mode=1;ok_drawn=0;draw_covered();assert(!ok_drawn);
+    AW_CharacterMouse(0,128);AW_CharacterKey(K_MOUSE1);AW_CharacterKey(K_ENTER);
+    assert(AW_CharacterDone()==1);
     AW_StoryReset(1);assert(AW_StoryRestricted());assert(!AW_StoryTransition(AW_STAGE_OFFICE));
     assert(AW_CourtyardRingAvailable() && AW_CourtyardTakeRing());
     assert(AW_Ring()==1 && !AW_CourtyardTakeRing());

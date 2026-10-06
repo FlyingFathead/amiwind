@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -23,5 +23,6 @@ void CDAudio_Play(byte track, qboolean looping);
 void CDAudio_Stop(void);
 void CDAudio_Pause(void);
 void CDAudio_Resume(void);
+int CDAudio_IsPaused(void);
 void CDAudio_Shutdown(void);
 void CDAudio_Update(void);

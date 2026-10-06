@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -97,6 +97,14 @@ void S_StaticSound (sfx_t *sfx, vec3_t origin, float vol, float attenuation);
 void S_StopSound (int entnum, int entchannel);
 void S_StopAllSounds(qboolean clear);
 void S_ClearBuffer (void);
+/* Implicit scene transitions only. Detached voices own their samples and have
+ * no old-map entity/cache association. Explicit stop/disconnect cancels them. */
+void S_BeginSceneVoice(void);
+void S_EndSceneVoice(void);
+void S_CancelSceneVoice(void);
+int S_PreserveSceneVoice(void);
+double S_SceneVoiceRemaining(void);
+void S_SceneVoiceReport(void);
 void S_Update (vec3_t origin, vec3_t v_forward, vec3_t v_right, vec3_t v_up);
 void S_ExtraUpdate (void);
 
@@ -106,6 +114,8 @@ void S_ClearPrecache (void);
 void S_BeginPrecaching (void);
 void S_EndPrecaching (void);
 void S_PaintChannels(int endtime);
+void S_MovieAudioBegin(void);
+void S_MovieAudioEnd(void);
 void S_InitPaintChannels (void);
 
 // picks a channel based on priorities, empty slots, number of channels
@@ -119,6 +129,10 @@ qboolean SNDDMA_Init(void);
 
 // gets the current DMA position
 int SNDDMA_GetDMAPos(void);
+#ifdef AMIGA
+// Absolute sample pairs within the Amiga driver's ring-aligned clock epoch.
+int SNDDMA_GetSamples(void);
+#endif
 
 // shutdown the DMA xfer.
 void SNDDMA_Shutdown(void);
@@ -162,6 +176,7 @@ extern	cvar_t volume;
 extern qboolean	snd_initialized;
 
 extern int		snd_blocked;
+extern int		sound_started;
 
 void S_LocalSound (char *s);
 sfxcache_t *S_LoadSound (sfx_t *s);

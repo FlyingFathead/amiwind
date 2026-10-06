@@ -23,8 +23,15 @@ static route_t routes[]={
     {"daynightcycle","aw_daynightcycle","on/off true/false 1/0 (automatic time; explicit set/wait still work)"},
     {"skyspeed","aw_skyspeed_set","[0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed)"},
     {"skytype","aw_sky_type_set","1/2/3 or V1/V2/V3 (V3 extra stronk default)"},
+    {"cloudtype","aw_cloud_type_set","classic/veil or 1/2 (classic default)"},
+    {"cloudcontrol","aw_cloud_control_set","legacy/new or 1/2 (legacy also disables midnight clearing)"},
+    {"nightskymode","aw_nightsky_mode_set","legacy/clear or 0/1 (midnight clear default, return by 04:00)"},
+    {"nightclouds","aw_night_clouds_set","auto/clear/partial/overcast (night-only, stable game-day prototype)"},
+    {"dayclouds","aw_day_clouds_set","0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected"},
     {"sun","aw_sun","on/off true/false 1/0 (default on, clock still advances)"},
     {"clouds","aw_clouds","on/off true/false 1/0 (default on, independent of sun)"},
+    {"torch radius","aw_torch_radius_set","[32..288] (player + admitted guard lights; default 192, classic 144)"},
+    {"torch flame","aw_torch_flame_set","classic/brightbase/sparks or 1/2/3 (classic default)"},
     {"guardtorch","aw_guardtorch","[on/off/auto] (all guard torches; auto follows guards_torch_cycle)"},
     {"starsky","aw_starsky","on/off true/false 1/0 (stars and nebula; default on)"},
     {"nightsky","aw_nightsky","on/off true/false 1/0 (night layer including moons; default on)"},
@@ -50,10 +57,12 @@ static route_t routes[]={
     {"aw hors","aw_debug_hors","0 (new Hors, Nord / Barbarian / Steed, after Census)"},
     {"hud","amiwind_show_debug","on/off true/false 1/0 (overlay alias)"},
     {"heap","aw_heap_audit","(current hunk clearance and load peak)"},
+    {"shroomtracker","aw_shroomtracker","(picked mushrooms in this save; excludes empty plants)"},
     {"showram","amiwind_debug_showram","on/off"},
     {"sealevel","amiwind_debug_sealevel","on/off"},
     {"scene change","aw_scene_menu","(scene picker)"},
     {"scene","aw_scene","ship/town/balmora/<map name>"},
+    {"tpscene","aw_tpscene","[list/headselection] (fresh debug scene; resets unsaved progress)"},
     {"tp map","aw_teleport_map","select a destination on the world map"},
     {"map tp","aw_teleport_map","select a destination on the world map (alias)"},
     {"tp menu","aw_scene_menu","(teleport picker)"},
@@ -63,6 +72,7 @@ static route_t routes[]={
     {"pos","aw_pos",""},{"blockers","aw_blockers",""},
     {"npcs","aw_npcs",""},{"hands","aw_hands",""},
     {"npcfloors","aw_npc_floors","(read-only ground-contact report)"},
+    {"playvid","playvid","<1..17 / 01..17 / catalogue name> (drains queued game audio first)"},
     {"view","aw_view","x y z yaw pitch"},
     {"probe","aw_probe","(slow floor audit)"},
     {"noclip","noclip",""},{"recover","aw_recover",""},
@@ -94,6 +104,7 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
         }
         if(*word)continue;
         if(!strcmp(routes[i].command,"aw_teleport") && argc-j>2)return 0;
+        if(!strcmp(routes[i].command,"aw_shroomtracker") && argc!=j)return 0;
         used=(int)strlen(routes[i].command);
         if(used+2>capacity)return 0;
         strcpy(out,routes[i].command);

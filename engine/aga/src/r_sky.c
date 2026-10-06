@@ -58,14 +58,22 @@ static cvar_t sky_daynight={"aw_daynight","1",true};
 static cvar_t sky_type={"aw_sky_type","3",true};
 static cvar_t sky_cloud_speed={"aw_skyspeed","0.00333333333",true};
 static cvar_t sky_sun_enabled={"aw_sun","1",true},sky_clouds={"aw_clouds","1",true};
-static int sky_frame_type=3,sky_table_type=-1,sky_made_type=-1,sky_made_clouds=-1,sky_made_night=-1;
+static cvar_t sky_cloud_type={"aw_cloud_type","1",true};
+static cvar_t sky_night_clouds={"aw_night_clouds","0",true};
+static cvar_t sky_cloud_control={"aw_cloud_control","1",true};
+static cvar_t sky_day_clouds={"aw_day_clouds","100",true};
+static cvar_t sky_nightsky_mode={"aw_nightsky_mode","1",true};
+static int sky_frame_type=3,sky_table_type=-1,sky_made_type=-1,sky_made_clouds=-1,sky_made_cloud_type=-1,sky_made_night=-1,sky_made_cloud_density=-1;
+static int sky_night_cloud_density=16,sky_made_coverage_roles=-1;
 /* V2/V3 use indexed cloud roles/luminance. The world-direction remap and
  * two small ramps use 8192 static bytes, plus 256 bytes for cloud roles. */
 static byte sky_gradient[16*256],sky_glow[8*256],sun_halo[8*256];
 /* Palette-bank signature and disjoint source layers are the version marker.
  * Legacy assets retain their old indexed interpretation. No inferred alpha. */
 static byte sky_cloud_role[256];
-static int sky_cloud_roles,sky_bank_ready;
+/* Night-only roles preserve the legacy day/twilight validator and scale. */
+static byte sky_night_cloud_role[256];
+static int sky_cloud_roles,sky_night_cloud_roles,sky_night_roles_active,sky_coverage_roles_active,sky_bank_ready;
 static const byte sky_bank_indices[7]={222,133,95,156,140,83,221};
 static const byte sky_bank_rgb[7][3]={{100,69,138},{52,73,110},{210,50,34},
     {250,104,45},{255,174,66},{255,232,160},{153,38,79}};
@@ -104,10 +112,157 @@ static void R_SkyCloudRoles(const byte *src)
     }
     sky_cloud_roles=cloud && base;
 }
+/* Separate validator for the deep-night coverage controllers. The owned
+ * shared sky uses 254 as an opaque left-layer cloud color; legacy daytime
+ * validation intentionally continues to reject it, preserving its fallback.
+ * This map only gates night overlays and deep-night veil removal. */
+static void R_SkyNightCloudRoles(const byte *src)
+{
+    int x,y,layer,cloud=0,base=0;byte c;
+    sky_night_cloud_roles=0;memset(sky_night_cloud_role,0,sizeof sky_night_cloud_role);
+    if(!host_basepal || !src)return;
+    for(y=0;y<128;y++)for(x=0;x<128;x++)for(layer=0;layer<2;layer++){
+        c=src[y*256+x+layer*128];
+        if(!c){if(layer)return;continue;}
+        if(c==224){if(!layer)return;base=1;continue;}
+        if(c==255 || (c>=225 && c!=254))return;
+        if(c==254 && layer)return;
+        if(c==222 || c==133 || c==95 || c==156 || c==140 || c==83 || c==221)return;
+        if(layer){if(c!=2 && c!=4 && c!=5)return;sky_night_cloud_role[c]=2;}
+        else{if(c==2 || c==4 || c==5)return;sky_night_cloud_role[c]=1;}
+        cloud=1;
+    }
+    sky_night_cloud_roles=cloud && base;
+}
 
 static float sky_sun[3];
 static int sky_sun_visible,sky_sun_ms=-1,sky_sun_colour=-1,sky_glow_strength,sky_warm_side;
 static int R_SkyType(void){return sky_type.value==1?1:sky_type.value==2?2:3;}
+static int R_SkyCloudType(void);
+static int R_SkyDayCloudPercent(void);
+static int R_SkyCloudControl(void){return sky_cloud_control.value==2?2:1;}
+static int R_SkyNightCloudTarget(int days)
+{
+    float mode=sky_night_clouds.value;int day;
+    if(mode==1)return 0;
+    if(mode==2)return 8;
+    if(mode==3)return 16;
+    if(days<0 || days>365000)return 16; /* Invalid/unavailable date fails closed to overcast. */
+    day=days%8;
+    switch(day){
+    case 0:case 1:case 3:case 4:return 0;
+    case 2:case 5:case 7:return 8;
+    default:return 16;
+    }
+}
+static int R_SkyStoredDay(void)
+{
+    int i;
+    for(i=0;i<aw_state.count[AW_GLOBAL];i++)
+        if(!strcmp(aw_state.values[AW_GLOBAL][i].id,"amiwind:clock:days"))
+            return aw_state.values[AW_GLOBAL][i].value;
+    return -1;
+}
+static int R_SkyBaselineCloudDensity(int milliseconds,int days,int active)
+{
+    int daytime=R_SkyCloudType()==2?4:16,target,factor=0,minute,policy_day,dayfactor,daytarget;
+    if(R_SkyCloudControl()!=2)return daytime;
+    if(!active || milliseconds<0 || milliseconds>=86400000)return daytime;
+    minute=milliseconds/60000;
+    if(minute>=540 && minute<600)dayfactor=minute-540;
+    else if(minute>=600 && minute<=840)dayfactor=60;
+    else if(minute>840 && minute<900)dayfactor=900-minute;
+    else dayfactor=0;
+    if(dayfactor){
+        daytarget=(daytime*R_SkyDayCloudPercent()+50)/100;
+        return (daytime*(60-dayfactor)+daytarget*dayfactor+30)/60;
+    }
+    if(minute>=1320 && minute<1335)factor=minute-1320;
+    else if(minute>=1335 || minute<225)factor=15;
+    else if(minute>=225 && minute<240)factor=240-minute;
+    else return daytime; /* Preserve the complete 04:00..22:00 day/twilight coverage. */
+    policy_day=days;
+    if(minute<240 && days>0)policy_day=days-1; /* Keep one weather choice across midnight. */
+    target=R_SkyNightCloudTarget(policy_day);
+    return (daytime*(15-factor)+target*factor+7)/15;
+}
+/* The midnight clearing window is an AmiWind presentation policy, independent
+ * of the legacy/V2 selectors. Invalid direct writes use the shipped default. */
+static int R_SkyNightMode(void){return sky_nightsky_mode.value==0?0:1;}
+static int R_SkyNightClearFactor(int milliseconds,int active)
+{
+    int minute;
+    if(!R_SkyNightMode() || !active || milliseconds<0 || milliseconds>=86400000)return 0;
+    minute=milliseconds/60000;
+    if(minute>=1380)return minute-1380;
+    if(minute<=180)return 60;
+    if(minute<240)return 240-minute;
+    return 0;
+}
+static int R_SkyClockCloudDensity(int milliseconds,int days,int active)
+{
+    int baseline=R_SkyBaselineCloudDensity(milliseconds,days,active);
+    int factor=R_SkyNightClearFactor(milliseconds,active);
+    return (baseline*(60-factor)+30)/60;
+}
+static void R_SkyNightModeCommand(void)
+{
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2){
+        if(!strcmp(s,"legacy") || !strcmp(s,"0"))Cvar_SetValue(sky_nightsky_mode.name,0);
+        else if(!strcmp(s,"clear") || !strcmp(s,"1"))Cvar_SetValue(sky_nightsky_mode.name,1);
+        else{Con_Printf("Usage: dbg nightskymode legacy/clear or 0/1\n");return;}
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg nightskymode legacy/clear or 0/1\n");return;}
+    Con_Printf("Night sky mode: %s\n",R_SkyNightMode()?"midnight clear; fade 23:00..00:00, clear until 03:00, return by 04:00":"retained cloud coverage policy");
+}
+static void R_SkyNightCloudCommand(void)
+{
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2){
+        if(!strcmp(s,"auto"))Cvar_SetValue(sky_night_clouds.name,0);
+        else if(!strcmp(s,"clear"))Cvar_SetValue(sky_night_clouds.name,1);
+        else if(!strcmp(s,"partial"))Cvar_SetValue(sky_night_clouds.name,2);
+        else if(!strcmp(s,"overcast"))Cvar_SetValue(sky_night_clouds.name,3);
+        else{Con_Printf("Usage: dbg nightclouds auto/clear/partial/overcast\n");return;}
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg nightclouds auto/clear/partial/overcast\n");return;}
+    Con_Printf("Night clouds: %s (%s)\n",sky_night_clouds.value==1?"clear":sky_night_clouds.value==2?"partial":sky_night_clouds.value==3?"overcast":"auto",R_SkyCloudControl()==2?"active":"inactive under legacy cloud control");
+}
+static int R_SkyDayCloudPercent(void)
+{
+    float value=sky_day_clouds.value;
+    return value>=0 && value<=100 && value==(int)value?(int)value:100;
+}
+static void R_SkyDayCloudCommand(void)
+{
+    char *s=Cmd_Argv(1),*end;long value;
+    if(Cmd_Argc()==2){
+        value=strtol(s,&end,10);
+        if(end==s || *end || value<0 || value>100){Con_Printf("Usage: dbg dayclouds 0..100 (core 10:00..14:00; dawn/sunset protected)\n");return;}
+        Cvar_SetValue(sky_day_clouds.name,(float)value);
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg dayclouds 0..100 (core 10:00..14:00; dawn/sunset protected)\n");return;}
+    Con_Printf("Day cloud coverage: %ld%% (%s; 10:00..14:00 core, 09:00..10:00/14:00..15:00 fade; dawn/sunset protected)\n",(long)R_SkyDayCloudPercent(),R_SkyCloudControl()==2?"active":"inactive under legacy cloud control");
+}
+static void R_SkyCloudControlCommand(void)
+{
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2){
+        if(!strcmp(s,"legacy") || !strcmp(s,"1")){Cvar_SetValue(sky_cloud_control.name,1);Cvar_SetValue(sky_nightsky_mode.name,0);}
+        else if(!strcmp(s,"new") || !strcmp(s,"2"))Cvar_SetValue(sky_cloud_control.name,2);
+        else{Con_Printf("Usage: dbg cloudcontrol legacy/new or 1/2\n");return;}
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg cloudcontrol legacy/new or 1/2\n");return;}
+    Con_Printf("Cloud control V%ld: %s\n",(long)R_SkyCloudControl(),R_SkyCloudControl()==1?"legacy V0.0.28 base; night/day selectors inactive":"new prototype; night/day selectors active");
+    Con_Printf("Midnight clearing: %s (dbg nightskymode legacy/clear)\n",R_SkyNightMode()?"on":"off");
+}
+static void R_SkyCloudTypeCommand(void)
+{
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2){
+        if(!strcmp(s,"classic") || !strcmp(s,"1"))Cvar_SetValue(sky_cloud_type.name,1);
+        else if(!strcmp(s,"veil") || !strcmp(s,"2"))Cvar_SetValue(sky_cloud_type.name,2);
+        else{Con_Printf("Usage: dbg cloudtype classic/veil or 1/2\n");return;}
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg cloudtype classic/veil or 1/2\n");return;}
+    Con_Printf("Cloud type: %s\n",R_SkyCloudType()==2?"veil":"classic");
+}
 static void R_SkyTypeCommand(void)
 {
     char *s=Cmd_Argv(1);
@@ -123,6 +278,24 @@ static double R_SkyCloudSpeed(void)
 {
     return sky_cloud_speed.value>=0 && sky_cloud_speed.value<=100?
         (double)sky_cloud_speed.value:0.00333333333;
+}
+static int R_SkyCloudType(void){return sky_cloud_type.value==2?2:1;}
+static int R_SkyVeilKeep(int x,int y,int density)
+{
+    static const byte ordered[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
+    return ordered[((y&3)<<2)|(x&3)]<density;
+}
+/* The source sky has no alpha channel. A bounded ordered mask drops opaque
+ * cloud samples so the original sky beneath shows at the selected density. */
+static byte R_SkyVeilComposite(byte base,int ofs,int x,int y,int density)
+{
+    int bx=(x+((int)(skytime*skyspeed)))&SKYMASK;
+    int by=(y+((int)(skytime*skyspeed)))&SKYMASK;
+    if((sky_coverage_roles_active && sky_night_cloud_roles?sky_night_cloud_role[base]:
+        (sky_cloud_roles?sky_cloud_role[base]:0))==2 &&
+       !R_SkyVeilKeep(bx+2,by+1,density))base=224;
+    if(bottommask[ofs]==0 && !R_SkyVeilKeep(bx,by,density))return base;
+    return (byte)((base&bottommask[ofs])|bottomsky[ofs]);
 }
 static void R_SkySpeedCommand(void)
 {
@@ -225,6 +398,16 @@ static void R_NightFrame(int milliseconds,int days)
 {
     int a=sky_phase>>10,b=(sky_phase>>6)&15,mix=sky_phase&63,m,k;
     double hour=milliseconds/3600000.0,horizontal;
+    int midnight=R_SkyNightClearFactor(milliseconds,1)>0;
+    sky_night_cloud_density=R_SkyClockCloudDensity(milliseconds,days,1);
+    /* The independent midnight mode validates opaque 254 as well. Outside
+     * its window, preserve the existing V1/V2 role policy byte for byte. */
+    sky_night_roles_active=midnight || (R_SkyCloudControl()==2 &&
+        (milliseconds>=22*3600000 || milliseconds<4*3600000));
+    sky_coverage_roles_active=(midnight || (R_SkyCloudControl()==2 &&
+        ((milliseconds>=9*3600000 && milliseconds<15*3600000) ||
+         milliseconds>=22*3600000 || milliseconds<4*3600000))) &&
+        sky_night_cloud_density<(R_SkyCloudType()==2?4:16);
     sky_night_strength=sky_night_loaded && sky_nightsky.value>0?((a==3?32-mix:0)+(b==3?mix:0))*15/32:0;
     if(hour>=5 && hour<20.5)sky_night_strength=0;
     if(!sky_night_strength)return;
@@ -277,7 +460,11 @@ static byte R_NightPixel(byte base,byte source,float x,float y,float z)
     if(!sky_night_strength || z<=0)return base;
     /* Validated cloud-role indices are opaque. Sky samples never cross the
      * terrain/sprite semantic depth boundary, even with geometry fog disabled. */
-    if(sky_clouds.value>0 && (!sky_cloud_roles || sky_cloud_role[source]))return base;
+    if(sky_clouds.value>0){
+        if(sky_night_roles_active){
+            if(!sky_night_cloud_roles || sky_night_cloud_role[source])return base;
+        }else if(!sky_cloud_roles || sky_cloud_role[source])return base;
+    }
     length=fabs(x)+fabs(y)+z;if(!(length>0) || !isfinite(length))return base;
     ix=(int)(63.5f+63.0f*x/length);iy=(int)(63.5f-63.0f*y/length);
     level=(int)(z/length*96);if(level>sky_night_strength)level=sky_night_strength;
@@ -327,10 +514,17 @@ void R_InitDayNight(void)
     int i,j,r,g,b,dr,dg,db,best,distance,best_distance;
     Cvar_RegisterVariable(&sky_daynight);Cvar_RegisterVariable(&sky_type);
     Cvar_RegisterVariable(&sky_sun_enabled);Cvar_RegisterVariable(&sky_clouds);
-    Cvar_RegisterVariable(&sky_cloud_speed);
+    Cvar_RegisterVariable(&sky_cloud_speed);Cvar_RegisterVariable(&sky_cloud_type);
+    Cvar_RegisterVariable(&sky_night_clouds);Cvar_RegisterVariable(&sky_cloud_control);
+    Cvar_RegisterVariable(&sky_day_clouds);Cvar_RegisterVariable(&sky_nightsky_mode);
     Cvar_RegisterVariable(&sky_starsky);Cvar_RegisterVariable(&sky_nightsky);
     Cmd_AddCommand("aw_sky_type_set",R_SkyTypeCommand);
     Cmd_AddCommand("aw_skyspeed_set",R_SkySpeedCommand);
+    Cmd_AddCommand("aw_cloud_type_set",R_SkyCloudTypeCommand);
+    Cmd_AddCommand("aw_night_clouds_set",R_SkyNightCloudCommand);
+    Cmd_AddCommand("aw_cloud_control_set",R_SkyCloudControlCommand);
+    Cmd_AddCommand("aw_day_clouds_set",R_SkyDayCloudCommand);
+    Cmd_AddCommand("aw_nightsky_mode_set",R_SkyNightModeCommand);
     sky_bank_ready=R_SkyPaletteBank();
     if(!host_basepal)return;
     for(i=0;i<4096;i++){
@@ -646,7 +840,8 @@ static void R_InitSkyPixels(const byte *src)
 {
 	int i,j;
 
-    R_SkyCloudRoles(src);r_sky_texture_scale=sky_cloud_roles?128:378;
+    R_SkyCloudRoles(src);R_SkyNightCloudRoles(src);
+    r_sky_texture_scale=sky_cloud_roles?128:378;
     sky_table_phase=-2;sky_table_type=-1;
 
 	for (i=0 ; i<128 ; i++)
@@ -702,8 +897,8 @@ void R_MakeSky (void)
 	xshift = skytime*skyspeed;
 	yshift = skytime*skyspeed;
 
-	if ((xshift == sky_xlast) && (yshift == sky_ylast) && sky_phase==sky_phase_last && sky_made_type==sky_frame_type && sky_made_clouds==clouds && sky_made_night==(sky_night_strength>0)){r_skymade=1;return;}
-    sky_phase_last=sky_phase;sky_made_type=sky_frame_type;sky_made_clouds=clouds;sky_made_night=sky_night_strength>0;
+	if ((xshift == sky_xlast) && (yshift == sky_ylast) && sky_phase==sky_phase_last && sky_made_type==sky_frame_type && sky_made_clouds==clouds && sky_made_cloud_type==R_SkyCloudType() && sky_made_cloud_density==sky_night_cloud_density && sky_made_night==(sky_night_strength>0) && sky_made_coverage_roles==sky_coverage_roles_active){r_skymade=1;return;}
+    sky_phase_last=sky_phase;sky_made_type=sky_frame_type;sky_made_clouds=clouds;sky_made_cloud_type=R_SkyCloudType();sky_made_cloud_density=sky_night_cloud_density;sky_made_night=sky_night_strength>0;sky_made_coverage_roles=sky_coverage_roles_active;
 
 	sky_xlast = xshift;
 	sky_ylast = yshift;
@@ -711,6 +906,19 @@ void R_MakeSky (void)
     if(!clouds){
         int colour=sky_phase>=0 && sky_frame_type==1 && !sky_night_strength?sky_tint[224]:224;
         for(y=0;y<SKYSIZE;y++)memset(newsky+y*256,colour,SKYSIZE);
+        r_skymade=1;return;
+    }
+
+    if(R_SkyCloudType()==2 || sky_night_cloud_density<16){
+        int tint=sky_phase>=0 && (sky_phase>0 || (sky_cloud_roles && sky_bank_ready)) && sky_frame_type==1 && !sky_night_strength;
+        for(y=0;y<SKYSIZE;y++){
+            baseofs=((y+yshift)&SKYMASK)*131;
+            for(x=0;x<SKYSIZE;x++){
+                ofs=baseofs+((x+xshift)&SKYMASK);
+                newsky[y*256+x]=R_SkyVeilComposite(newsky[y*256+x+128],ofs,x,y,sky_night_cloud_density);
+                if(tint)newsky[y*256+x]=sky_tint[newsky[y*256+x]];
+            }
+        }
         r_skymade=1;return;
     }
 
@@ -795,7 +1003,7 @@ R_SetSkyFrame
 void R_SetSkyFrame (void)
 {
 	int		g, s1, s2;
-	float	temp;double environment_time;int clock_ready,clock_ms=0;
+	float	temp;double environment_time;int clock_ready,clock_ms=0,clock_days=-1;
 
 	skyspeed = iskyspeed;
 	skyspeed2 = iskyspeed2;
@@ -809,8 +1017,9 @@ void R_SetSkyFrame (void)
     environment_time=realtime;
     clock_ready=AW_ClockEnsure();
     if(clock_ready){
+        clock_days=R_SkyStoredDay();
         clock_ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
-        environment_time=(double)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days")*86400.0+clock_ms/1000.0;
+        environment_time=(double)(clock_days<0?0:clock_days)*86400.0+clock_ms/1000.0;
     }
     clock_ms=AW_DayGalleryClock(clock_ms);
     sky_frame_type=R_SkyType();
@@ -819,8 +1028,11 @@ void R_SetSkyFrame (void)
     if(sky_phase>=0){
         if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type)R_SkyColourTables(sky_phase);
         R_SkySunFrame(clock_ms);
-        R_NightFrame(clock_ms,AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days"));
-    }else{sky_sun_visible=0;sky_night_strength=0;}
+        R_NightFrame(clock_ms,clock_days);
+    }else{
+        sky_sun_visible=0;sky_night_strength=0;sky_night_roles_active=0;sky_coverage_roles_active=0;
+        sky_night_cloud_density=!clock_ready && sky_exterior && sky_daynight.value>0?16:(R_SkyCloudType()==2?4:16);
+    }
     /* At default clock scale, legacy travel is 240 texels per real second.
      * The cloud-only multiplier defaults to 1/300 (0.8 texels/sec). It never
      * affects sun/colour timing, and gallery previews leave cloud time alone.

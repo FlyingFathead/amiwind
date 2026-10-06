@@ -20,6 +20,16 @@ static int confirming,confirm_yes;
 static int mouse_x=160,mouse_y=90,mouse_visible;
 static aw_character_t choice;
 static float rotation;
+/* Version 1 retains the original footer and hit strip. Version 2 shares this
+ * one rectangle between drawing, focus and pointer activation. */
+#define OK_X 248
+#define OK_Y 166
+#define OK_W 60
+#define OK_H 22
+static int over_ok(void) {
+    return mouse_x>=OK_X && mouse_x<OK_X+OK_W &&
+        mouse_y>=OK_Y && mouse_y<OK_Y+OK_H;
+}
 static const char *attributes[]={"Strength","Intelligence","Willpower","Agility","Speed","Endurance","Personality","Luck"};
 static const char *skills[]={"Block","Armorer","Medium armor","Heavy armor","Blunt weapon","Long blade","Axe","Spear","Athletics","Enchant","Destruction","Alteration","Illusion","Conjuration","Mysticism","Restoration","Alchemy","Unarmored","Security","Sneak","Acrobatics","Light armor","Short blade","Marksman","Mercantile","Speechcraft","Hand to hand"};
 
@@ -245,7 +255,7 @@ void AW_CharacterMouse(int dx,int dy)
     if(mouse_y>199)mouse_y=199;
     if(confirming){if(mouse_y>=143 && mouse_y<166)confirm_yes=mouse_x>=160;return;}
     if(menu==1 && mouse_x<198 && mouse_y>=38 && mouse_y<126)row=(mouse_y-38)/22;
-    if(mouse_y>=166)row=4;
+    if(AW_UIMode()==2?over_ok():mouse_y>=166)row=4;
 }
 int AW_CharacterKey(int key)
 {
@@ -273,7 +283,9 @@ int AW_CharacterKey(int key)
             else if(mouse_x>=171 && mouse_x<=193)change(1);
             return 1;
         }
-        if(mouse_y>=166 && mouse_y<187){if(menu==1)row=4;key=K_ENTER;}
+        if(AW_UIMode()==2 && over_ok()){row=4;key=K_ENTER;}
+        else if(AW_UIMode()==2 && mouse_y>=166)return 1;
+        else if(AW_UIMode()!=2 && mouse_y>=166 && mouse_y<187){if(menu==1)row=4;key=K_ENTER;}
         else if(menu==1 && mouse_x>=200){rotation+=.4f;return 1;}
         else if(menu==1)return 1;
         else {change(mouse_x<100?-1:1);return 1;}
@@ -289,7 +301,8 @@ int AW_CharacterKey(int key)
     if(key==']')rotation+=.2f;
     if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){
         if(menu==1)row=(row+(key==K_UPARROW?4:1))%5;
-        else change(key==K_UPARROW?-1:1);
+        else if(AW_UIMode()==2 && key==K_TAB)row=row==4?0:4;
+        else {row=0;change(key==K_UPARROW?-1:1);}
     }
     if(key==K_ENTER){
         if(menu==1 && row<4){row++;return 1;}
@@ -303,6 +316,10 @@ void AW_CharacterDraw(void)
 {
     int i,j,y,index,gold,muted;char line[96];
     if(!menu || key_dest!=key_game)return;
+    /* All head/race/class/review pages and confirmations share blackout. */
+    if(AW_ModalBlackBackground())
+        AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+    scr_copyeverything=1;
     gold=AW_UIColor(223,199,144);muted=AW_UIColor(120,109,87);
     AW_UIBox(2,2,316,196);
     if(menu==4)sprintf(line,"Review your character (page %ld/5)",(long)page+1);
@@ -351,7 +368,17 @@ void AW_CharacterDraw(void)
         }
         AW_UITextBox(12,143,296,19,"R: race  C: class  B: birthsign",muted);
     }
+    if(AW_UIMode()==2){
+        AW_UISmallBegin();
+        AW_UITextBox(10,166,230,22,menu==4?"Arrows: pages  Enter: OK":menu==1?"Enter: next/OK  LMB: rotate":"Arrows: choose  Enter: OK",gold);
+        AW_UISmallEnd();
+        AW_UIBox(OK_X,OK_Y,OK_W,OK_H);
+        if(row==4 || (mouse_visible && over_ok()))
+            AW_UIFill(OK_X+3,OK_Y+3,OK_W-6,OK_H-6,AW_UIColor(54,47,32));
+        AW_UITextBox(OK_X,OK_Y,OK_W,OK_H,"OK",gold);
+    }else {
     AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   LMB: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
+    }
     if(confirming){
         AW_UIBox(16,48,288,126);AW_UISmallBegin();
         AW_UITextBox(24,53,272,20,"Really choose this character?",gold);
@@ -370,7 +397,10 @@ void AW_CharacterDraw(void)
             if(menu==3 || menu==4)
                 AW_UITextBox(24,117,272,18,aw_births[choice.birth].name,gold);
         }
-        AW_UIFill(confirm_yes?164:44,143,112,23,AW_UIColor(54,47,32));
+        if(AW_UIMode()==2){
+            AW_UIBox(44,143,112,23);AW_UIBox(164,143,112,23);
+            AW_UIFill((confirm_yes?164:44)+3,146,106,17,AW_UIColor(54,47,32));
+        }else AW_UIFill(confirm_yes?164:44,143,112,23,AW_UIColor(54,47,32));
         AW_UITextBox(44,143,112,23,"Go back",gold);
         AW_UITextBox(164,143,112,23,"Choose",gold);AW_UISmallEnd();
     }

@@ -293,6 +293,7 @@ void Host_Map_f (void)
 #endif
 	if (!sv.active)
 	{
+        S_CancelSceneVoice();
 		SCR_EndLoadingPlaque();
 		return;
 	}

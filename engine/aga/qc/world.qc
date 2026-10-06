@@ -18,7 +18,9 @@ float() droptofloor = #34;
 float(vector value) vectoyaw = #13;
 void(vector position, string sample, float volume, float attenuation) ambientsound = #74;
 void() changeyaw = #49;
-float(float value) floor = #36;
+// Builtin #36 is rint; animation indices need floor at #37.
+float(float value) floor = #37;
+void(entity client, string text) sprint = #24;
 .string aw_hull;
 .float aw_scale;
 .float aw_hand_idle;
@@ -40,6 +42,19 @@ void() aw_hands_update = {
     if (self.impulse == 202) {
         self.impulse = 0;
         self.aw_hand_goal = 1 - self.aw_hand_goal;
+    }
+    // A missing region stamp must not leave an invisible raising state that
+    // accepts V forever but can never equip its model or light.
+    if (self.aw_hand_goal || self.aw_hand_state) {
+        if (!(world.aw_hand_idle > 0 && world.aw_hand_idle <= 60 &&
+              world.aw_hand_draw > 0 && world.aw_hand_draw <= 60 &&
+              world.aw_hand_lower > 0 && world.aw_hand_lower <= 60 &&
+              world.aw_hand_punch > 0 && world.aw_hand_punch <= 60)) {
+            self.aw_hand_goal = 0; self.aw_torch = 0; aw_hand_begin(0);
+            self.weaponmodel = "";
+            sprint(self,"Hands unavailable: invalid animation timings; rebuild converted maps.\n");
+            return;
+        }
     }
     if (!self.aw_hand_goal || self.health <= 0) self.aw_torch = 0;
     if (self.aw_hand_state == 0 && self.aw_hand_goal) aw_hand_begin(1);

@@ -1,6 +1,53 @@
 # Roadmap and implementation options
 
-## Current baseline — published v0.0.27, 3 October 2026
+## Current work: v0.0.29, following published v0.0.28
+
+[v0.0.28 is published](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.28).
+The owner's 4 October post-release reports are collected in the active
+[v0.0.29 immediate fixes and follow-up plan](PLAN-v0.0.29.md). Priority is the
+recurring player F/V failure, map controls/palette, tree-root sampling, horizon
+visibility, real stat bars, guard/interior local light and night cloud coverage.
+Debug HUD V2, optional veil clouds, ash/blight/NPC reactions, lava/debug-map
+coverage and the later god-mode switch are tracked there with acceptance gates.
+Source candidates remain separate from target-verified fixes. Earlier plans
+below are historical scope/evidence, not a substitute for this active list.
+
+### Asset coverage accounting
+
+The dated [asset coverage report](ASSET_COVERAGE.md) separates available source
+files, converted output, packaged output, runtime acceptance and geographic
+coverage. Update it when omissions are discovered or resolved and reconcile it
+with each development handoff. Unknown source-to-output coverage remains unknown;
+file counts are not whole-game completion percentages.
+
+### Media source gaps and separate soundtrack events
+
+The 5 October media import found nine unresolved original audio references
+(seven INFO voice paths and two SOUN paths). Track each source identity,
+archive/loose resolution, override/deletion state and actual event eligibility
+before choosing any fix. Missing original input is distinct from failed
+conversion or an unwired runtime event; never substitute unrelated dialogue.
+
+Three imported videos (`mw_credits.bik`, `mw_logo.bik`, `mw_menu.bik`) have no
+embedded audio stream. Duration-matched silent PCM is a conversion fallback,
+not a decision to mute the presentation. OpenMW 0.48 source explicitly starts
+separate title music before its configured logo, and only pauses other audio
+for movies that have an audio stream. Its menu background uses a different
+filename, so the exact `mw_menu.bik` event mapping remains open.
+
+- [ ] Resolve or explicitly classify each of the nine missing references with
+  source and playback evidence.
+- [ ] Verify logo, credits and menu music selection/ownership, including loop,
+  skip, completion and return paths; preserve continuous music through ordinary
+  full-screen modal views.
+- [ ] Complete matching image readback and target playback checks before
+  claiming imported media is playable through every intended event.
+
+The exact reference list, pinned source evidence and investigation checklist are
+in [missing media references](MEDIA_MISSING_REFERENCES.md). This is follow-up
+work; it is not included merely because a previous playtest archive exists.
+
+## Historical baseline — published v0.0.27, 3 October 2026
 
 [AmiWind v0.0.27 — Rocks, Mushrooms, and Then Some is published](RELEASE-v0.0.27.md).
 Its exact-commit hosted CI, public source release and downloaded-asset checks
@@ -177,7 +224,7 @@ both moon silhouettes. See the [current release record](RELEASE-v0.0.28.md).
 - [ ] Native startup, controls, travel/profile, terrain/NPC routes and lifecycle acceptance.
 - [ ] Fresh native V3/night views, gallery stills/GIF and visual/performance review.
 - [ ] Broader-world canonical-culling validation; no global certification yet.
-- [ ] Regional weather and precise lunar simulation.
+- [ ] Regional weather and precise lunar simulation; see the [pinned weather and blight source study](WEATHER_AND_BLIGHT_STUDY.md).
 - [ ] Original-road survey, route/bridge and broader cell-join acceptance.
 
 ## Follow-up: static asset gallery and remaining scenery
@@ -1740,9 +1787,16 @@ as blockers in that build order. Investigate suitable static occluders only with
 matched visual and memory evidence. VIS cannot create missing terrain, textures
 or placements.
 
-The reported Red Mountain blank/white horizon with fog disabled has no confirmed
-cause. Reproduce it on a named build, position, direction, draw-distance and fog
-setting before proposing a repair. The observation that a requested 1000-unit
+For the inspected Ashlands central peak, source attribution now identifies an
+opaque `terrain_rock_rm_18` static rejected by whole-model distance culling.
+LAND-only fill is insufficient; a bounded heightfield remesh fails 44 of 48
+sampled views, with a worst top-silhouette error of 13 pixels at 128x60. Keep
+other blank/white-horizon reports separate. Next compare source-preserving rock
+geometry/proxies at fixed pose, yaw/pitch, time, draw distance and fog, retaining
+near depth protection, seams and resource budgets. No complete fix is accepted;
+see the [active horizon study](PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
+
+The observation that a requested 1000-unit
 Balmora distance felt faster is not a measured effective distance or diagnosis;
 record requested and effective range, frame timings, culling/rejection counts,
 clipped/drawn surfaces and cache/I/O activity. Fog palette behavior is distinct
@@ -1824,3 +1878,40 @@ The existing surface_flatten.py route currently selects exterior decorative wind
 
 Keep generated geometry/media private; record actual representation savings and
 preserve unchanged reserves. See WORLD-FLORA-HEAP-010 in the bug journal.
+
+The dedicated [Study lanterns and torch lighting more](LANTERNS_AND_TORCH_LIGHTING.md)
+covers wall-mounted torches, lantern fixtures and carried lights; authored
+placements/attachments; indoor static/dynamic lighting; the guard day/night
+cycle; and measured local illumination rather than flame sprites alone.
+
+## Future combat milestone: Time to Fight!
+
+This is future roadmap work, not a mandatory v0.0.29 fix or implemented mode.
+Survey the original Vivec Arena Pit interior and its exact CELL, placements,
+actors, collision and entry/exit routes from owned game data. Study original
+duel eligibility and the Redoran Hortator/Bolvyn Venim quest records alongside
+OpenMW behavior; do not turn the owner's remembered worthiness duel into an
+invented universal quest rule. The exact cell identity and state conditions
+must be verified before implementation.
+
+Prototype a separate `dbg arenafight` mode for hostile-NPC combat. Encounters
+must be bounded, explicitly entered, resettable and safely exitable. Isolate
+test actor hostility, health/equipment, deaths, reputation and script state;
+never corrupt main-quest flags or silently progress a live quest. Define how
+the player's existing state is preserved/restored and refuse unsafe contexts.
+Measure actor/animation/light budgets and validate encounter completion,
+abort/reset, save restrictions and return travel before expanding combat scope.
+
+## Main-quest milestone: Just an Old Man with a Skooma Problem
+
+Planned follow-up: meet Caius Cosades and progress toward Hasphat's Dwemer
+puzzle-box request. Verify the original dialogue, quest conditions and any
+recorded voice references before implementing them; available audio conversion
+alone does not establish dialogue playback or quest completion.
+
+Use Caius's house as a bounded interior test. Convert low-poly skooma bottles
+and appropriate original clutter at their source placements, preserving
+silhouette, material seams, collision and interaction identity. Compare the
+interior with the original-data OpenMW reference, then check target rendering,
+memory and traversal. These are planned tasks, not completed quest or interior
+coverage, and do not block a smaller verified development playtest.

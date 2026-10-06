@@ -21,25 +21,27 @@ from build_parallel import ordered_map
 from world_flora_policy import load_policy, placement, selection_receipt, stable_sprite_name
 
 
-def normalized_model(model):
+def normalized_model(model, include_small_mushrooms=False):
     model = model.replace('\\', '/').casefold().removeprefix('meshes/')
     stem = model.rsplit('/', 1)[-1]
-    if not model.endswith('.nif') or 'street' in stem or not any(t in stem for t in ('tree', 'trunk', 'stump', 'grass', 'reed', 'fern', 'bush', 'shrub', 'weed', 'log')):
+    from world_flora import flora_kind
+    small = include_small_mushrooms and flora_kind(model) == 'small_mushroom'
+    if not model.endswith('.nif') or 'street' in stem or not (small or any(t in stem for t in ('tree', 'trunk', 'stump', 'grass', 'reed', 'fern', 'bush', 'shrub', 'weed', 'log'))):
         raise ValueError('Expected tree/trunk/stump NIF model: ' + model)
     stable_sprite_name(model)  # reject unsafe paths
     return model
 
 
-def select_census(census, models=None):
+def select_census(census, models=None, include_small_mushrooms=False):
     """A requested subset is explicit; missing models and bad refs fail."""
     master_hash = census.get('master_sha256') or census.get('source_sha256')
     references = census.get('references', census.get('placements'))
     if not master_hash or not isinstance(references, list) or not references:
         raise ValueError('Expected a hashed nonempty exterior reference census')
-    requested = {normalized_model(m) for m in models} if models else None
+    requested = {normalized_model(m, include_small_mushrooms) for m in models} if models else None
     result = []
     for ref in references:
-        model = normalized_model(ref['model'])
+        model = normalized_model(ref['model'], include_small_mushrooms)
         if requested is not None and model not in requested:
             continue
         if ref.get('deleted'):
@@ -66,7 +68,7 @@ def collision_metadata(raw, N, kind):
         mode, reason = 'nonsolid', 'authored NC/NCO marker'
     elif authored:
         mode, reason = 'authored', 'authored RootCollisionNode; approximate convex conversion'
-    elif kind in ('grass', 'reeds', 'fern', 'bush', 'stateful_flora'):
+    elif kind in ('grass', 'reeds', 'fern', 'bush', 'stateful_flora', 'small_mushroom'):
         mode, reason = 'nonsolid', 'explicit ground-vegetation policy; no authored collision node'
     else:
         mode, reason = 'visual_fallback', 'tree/log without authored node; existing approximate visual convex fallback'
@@ -98,7 +100,7 @@ def validate_sprite(raw):
             'bytes': len(raw)}
 
 
-def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, policy_path=None):
+def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, policy_path=None, include_small_mushrooms=False):
     import numpy as np
     from mwad.scene import read_asset
     from prepare_scenery import export_refs
@@ -106,6 +108,9 @@ def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, 
     data = resolve_data_files(Path(data_files))
     out = ensure_external(Path(out), 'private shared tree sprite output')
     policy = load_policy(policy_path)
+    if include_small_mushrooms:
+        policy['source_categories'] = list(dict.fromkeys([*policy.get('source_categories', ['tree']), 'small_mushroom']))
+    include_small_mushrooms = 'small_mushroom' in policy.get('source_categories', [])
     if census_path is None:
         from world_flora import inventory
         census = inventory(child_ci(data, 'Morrowind.esm').read_bytes(), policy.get('source_categories', ['tree']))
@@ -113,7 +118,7 @@ def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, 
     else:
         census_raw = Path(census_path).read_bytes()
         census = json.loads(census_raw.decode('utf-8-sig'))
-    master_hash, refs = select_census(census, models)
+    master_hash, refs = select_census(census, models, include_small_mushrooms)
     unique_reference_numbers(refs)
     master = child_ci(data, 'Morrowind.esm')
     if hashlib.sha256(master.read_bytes()).hexdigest() != master_hash:
@@ -189,7 +194,9 @@ def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, 
         raise ValueError('Tree sprite coverage or stable asset identity mismatch')
     receipt = {'format': 'AmiWind shared tree sprite bake 1', 'runtime_activation': False,
                'runtime_instance_scale_support': 'pending engine integration and target validation',
-               'diagnostic_subset': models is not None, 'master_sha256': master_hash,
+               'diagnostic_subset': models is not None or bool(census.get('diagnostic_subset')), 'master_sha256': master_hash,
+               'small_mushrooms_opt_in': include_small_mushrooms,
+               'harvest_interaction_status': 'not_implemented',
                'census_sha256': hashlib.sha256(census_raw).hexdigest(),
                'palette_sha256': hashlib.sha256(palette).hexdigest(),
                'policy': policy, 'source_counts': census.get('counts', {}),
@@ -217,9 +224,11 @@ def main():
     parser.add_argument('--census', type=Path, help='Optional private diagnostic census; normal builds inventory --data-files automatically')
     parser.add_argument('--model', action='append', help='Explicit diagnostic model subset, repeatable')
     parser.add_argument('--policy', type=Path)
+    parser.add_argument('--include-small-mushrooms', action='store_true',
+                        help='Opt in to small Bitter Coast mushrooms; CONT meshes retain metadata, harvesting remains pending')
     add_jobs(parser)
     args = parser.parse_args()
-    receipt = prepare(args.data_files, args.census, args.palette, args.out, args.jobs, args.model, args.policy)
+    receipt = prepare(args.data_files, args.census, args.palette, args.out, args.jobs, args.model, args.policy, args.include_small_mushrooms)
     print('SHARED TREE SPRITES', receipt['unique_models'], 'models;', receipt['selection']['original_instances'],
           'original placements; runtime activation pending', flush=True)
 

@@ -1,6 +1,35 @@
 # Trees and Grass, Day and Night
 
-Image015 passed scoped native acceptance on 4 October 2026. Hosted CI, tag and public publication remain pending; all-map and physical-hardware acceptance are not claimed.
+## v0.0.29 sky follow-up
+
+- **Night coverage:** dense cloud cover can hide moons, stars and nebula. A
+  source-level cause is now confirmed: the legacy shared cloud-role validator
+  rejects palette-role index 254, so the night overlay cannot use that role
+  through the legacy mask. The v0.0.29 candidate adds a separate validated
+  night-role map and keeps the legacy cloud-role mask, scaling and tint path
+  intact. The dev3 source adds default-on midnight clearing independent of cloud
+  control V1/V2, with the retained coverage available explicitly. Synthetic rendered-sky fixtures pass the candidate modes and protected
+  legacy comparisons. The bounded native indexed-frame result below passes
+  for one dry exterior pose; broader visual/performance acceptance remains
+  open. Keep clouds, sky switches and moon/star/world occlusion in the
+  comparison. See
+  [SKY-NIGHT-COVER-29](BUG_JOURNAL.md#sky-night-cover-29-frequent-dense-night-clouds-hide-celestial-views-open).
+- **Optional veil cloud type:** preserve existing cloud/sky types and defaults;
+  add a separate sparse, rasterized/ordered-transparent variant. Keep cloud
+  speed, clock, sun, interiors and toggles intact, with bounded rendering cost.
+  This experiment alone does not establish a night-coverage policy correction.
+- **Ash/blight study:** derive region probabilities and boundaries from owned
+  CELL/REGN data and scripts; examine OpenMW transitions and NPC face-shielding.
+  Red Mountain's requested treatment is strongly red sky and windblown ash,
+  including source-supported storms outside Ghostfence. Exact affected
+  settlements and NPC triggers remain a study, not an implemented claim.
+
+See the complete [v0.0.29 fix and feature list](PLAN-v0.0.29.md), including lava
+fields and their debug-map representation. Existing sky behavior below is kept
+for comparison; weather/lava source data and derived artwork are not included
+in the public repository.
+
+v0.0.28 was published on 4 October 2026 after scoped native acceptance and hosted CI. The v0.0.29 follow-up below does not alter that release or claim all-map/physical-hardware acceptance.
 
 ## Native playtest blockers and preview — 4 October 2026
 
@@ -994,3 +1023,98 @@ meshes, extracted pixels and private paths stay out of this public documentation
 and repository. The audited source categories are sky layers, time-of-day color
 profiles, regional weather probabilities and weather effects; public source does
 not contain their game art.
+
+## Protected sunrise and sunset baseline for v0.0.29
+
+The owner explicitly likes the v0.0.28 sunrise/sunset clouds and asks that they
+remain unchanged, or change as little as possible. Preserve classic dawn, dusk,
+golden-hour and twilight cloud appearance as the visual baseline. Night-coverage
+changes must stay outside those protected windows and pass byte-identity
+comparisons against the retained classic path. Do not let a global coverage
+change quietly alter those skies.
+
+Daytime clouds may be too dense. Keep the new daytime veil optional, preserving
+existing types/defaults; do not silently replace the liked cloud art. Night
+clear/partial/overcast policy remains a separate bounded change, with continuous
+transitions that do not damage protected dawn/dusk or moon/star depth ordering.
+
+## Additive cloud controls: v0.0.29 development candidate
+
+The base defaults remain `aw_cloud_control 1` (legacy) and `aw_cloud_type 1`
+(classic). The dev3 source also enables independent `aw_nightsky_mode 1` as
+described below. `dbg cloudcontrol legacy` selects the retained base and turns
+midnight clearing off, restoring the prior cloud coverage. The controls keep
+the original cloud artwork.
+
+| Console command | Meaning |
+| --- | --- |
+| `dbg cloudcontrol legacy/new` or `1/2` | Select the base coverage policy. Legacy/1 also disables midnight clearing. No argument reports both policies. |
+| `dbg nightskymode legacy/clear` or `0/1` | Retain the base coverage or enable the independent midnight clearing window (default clear). |
+| `dbg cloudtype classic/veil` or `1/2` | Independently select the original clouds or a sparse ordered-mask veil. |
+| `dbg dayclouds 0..100` | Set daytime coverage in the new controller. Default 100; only 10:00-14:00 has the full adjustment, fading in/out during 09:00-10:00 and 14:00-15:00. |
+| `dbg nightclouds auto/clear/partial/overcast` | Set deep-night coverage in the new controller. Changes fade in during 22:00-22:15 and out during 03:45-04:00. |
+
+Day and night selectors report that they are inactive while legacy control is
+selected. The ordinary `dbg clouds` master switch still applies. Dawn, dusk,
+sunrise and sunset retain their approved classic intensity; reducing daytime
+coverage does not apply a global reduction. An explicitly selected veil is a
+separate appearance option, so use classic when comparing protected views.
+
+The automatic night choice is currently a deterministic eight-game-day
+prototype (four clear, three partial and one overcast), keyed to the evening
+date so it remains stable across midnight. It is not original regional weather
+simulation. Night visibility still depends on the actual moon positions, atlas,
+world occlusion and existing night/stars switches.
+
+Sanitized real-renderer fixtures cover legacy round trips, protected twilight,
+day/night boundaries, command validation, cache invalidation and moon/star
+occlusion. A bounded native comparison now records lossless engine-generated
+indexed frames in one dry exterior view, with the saved clock frozen at 23:00,
+sky type 3, classic clouds and optional cloud-control V2. The 320x152 viewport
+contains 32,614 depth-classified sky pixels, 16,017 geometry pixels and nine
+crosshair pixels. Relative to clear coverage, partial changes 9,232 sky pixels,
+overcast changes 13,774, and disabling the night layer changes 10,867. None of
+those comparisons changes a geometry or crosshair pixel. Clear restores and
+all corresponding depth masks are byte-identical, with the same palette.
+
+This establishes the sampled control response and depth separation for that
+fixed dry-exterior view. It does not establish all-region or moving-view
+occlusion, water behavior, native frame cost or physical-hardware acceptance.
+Balmora and broader visual coverage remain open. That comparison predates the independent dev3 midnight mode. Protected
+dawn/dusk and existing v0.0.28 artifacts are unchanged; **Fixed: N** remains
+the incident status.
+
+## Dev3 midnight clearing mode — source candidate, 5 October 2026
+
+`aw_nightsky_mode 1` is the archived and shipped default. Every game night,
+cloud coverage fades from the selected base policy toward clear between 23:00
+and 00:00, stays clear through 03:00, then returns to that policy by 04:00.
+The entire 04:00–23:00 interval retains the existing coverage and pixel path.
+Sunrise, sunset, sky colors, cloud scrolling, moon orbits and depth occlusion
+are unchanged. This is an intentional AmiWind presentation schedule, not a
+claim that original Morrowind weather forces every midnight sky clear.
+
+The mode works with either `aw_cloud_control` version. `dbg nightskymode legacy`
+or `aw_nightsky_mode 0` removes only this midnight override. For the complete
+prior coverage policy, `dbg cloudcontrol legacy` also sets the midnight mode
+to zero. Use `dbg nightskymode clear` to restore the new default. The optional
+classic/veil choice remains separate. Saved settings override shipped defaults.
+Invalid command arguments leave the setting unchanged; invalid direct values
+use the default clear mode.
+
+Night-role validation covers opaque index 254 without changing the legacy
+daytime validator. Both authored cloud layers clear through the actual tile
+composer. A remaining cloud texel still occludes stars and moons; the mode does
+not bypass sky/world depth or enable either the stars or night-layer switches.
+Interior, master-sky-off and invalid-clock fallbacks retain their prior paths.
+
+Sanitized real-renderer tests exercise the default, all eight old weather days,
+both base controllers, all three sky styles and classic/veil cloud types.
+The protected interval has 13,692 whole-tile comparisons at every minute,
+with matching directional sky-pixel checks. Window boundaries, monotonic
+coverage transitions, commands, cache restoration, master switches and invalid
+values are covered. Independent old/new renderer builds also match the existing
+protected-view output. Both changed C files compile for Amiga 68040 in Linux
+Docker. Native visual and frame-cost acceptance for this mode remain pending;
+the previously frozen dev3 integration and sealed dev2 artifacts do not contain
+this later source change.

@@ -4,6 +4,8 @@
 #include "quakedef.h"
 #include <assert.h>
 int AW_SceneUse(void){return 0;}
+static int mouse_resets;
+void IN_AWMouseReset(void){mouse_resets++;}
 extern void IN_AWUseDown(void), IN_AWUseUp(void);
 extern int in_impulse;
 extern kbutton_t in_up, in_attack, in_forward, in_mlook;
@@ -24,6 +26,7 @@ int main(void) {
     in_forward.state=in_attack.state=in_mlook.state=1;in_impulse=202;
     IN_AWClearButtons();assert(!in_forward.state && !in_attack.state && !in_up.state && !in_impulse);
     assert(in_mlook.state==1);
+    assert(mouse_resets==1);
     return 0;
 }
 

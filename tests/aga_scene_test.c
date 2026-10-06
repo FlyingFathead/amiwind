@@ -4,14 +4,21 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_region.h"
+#include "aw_harvest_runtime.h"
 aw_character_t aw_character;
 void AW_HeapAuditReport(const char *scene){}
 qboolean noclip_anglehack;
+kbutton_t in_mlook;
 static float door_duration;static int audio_open,audio_close;
 float AW_DoorSound(unsigned ref,int close){if(close)audio_close++;else audio_open++;return door_duration;}
 int AW_CharacterHors(void){aw_character.valid=1;strcpy(aw_story.name,"Hors");return 1;}
 keydest_t key_dest=key_game;double realtime;
-char *pr_strings="\0aw_npc\0Fargoth\0worldspawn\0Darvame Hleran\0Selvil Sareloth";
+#define ORIGINAL_STRINGS "\0aw_npc\0Fargoth\0worldspawn\0Darvame Hleran\0Selvil Sareloth\0progs/v_nord.mdl"
+char *pr_strings=ORIGINAL_STRINGS "\0func_wall\0*1";
+static int harvest_fixture;
+static eval_t harvest_reference;
+static model_t harvest_world,harvest_model;
+static char object_name[80];
 static cvar_t *names_option;
 static edict_t target;static int target_trace;
 static int voice_aim,prompt,travel_trace;
@@ -21,15 +28,22 @@ static eval_t role,voice;
 static ddef_t deadline_global;
 static float globals[1];float *pr_globals=globals;
 viddef_t vid;refdef_t r_refdef;int scr_copyeverything;
+/* This fixture's harvest representation is inline brush only. */
+qboolean Mod_CanFindName(const char *name){(void)name;assert(0);return false;}
+model_t *Mod_ForName(char *name,qboolean crash){(void)name;(void)crash;assert(0);return NULL;}
 edict_t *EDICT_NUM(int n){return &target;}
 ddef_t *ED_FindGlobal(char *name){return &deadline_global;}
 int AW_UISpeakerAtRight(void){return 0;}
-void AW_UIObjectName(const char *name,int style){}
+void AW_UIObjectName(const char *name,int style){if(name)strcpy(object_name,name);}
+void S_LocalSound(char *name){}
 int AW_IntroUse(void){return 0;}
 int AW_OpeningHint(const char **name,const char **action){return 0;}
 int AW_ConsoleCharHeight(void){return 8;}
 int AW_ConsoleCharWidth(void){return 8;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(hint);assert(n<79);hint[n]=c;hint[n+1]=0;}
+int AW_UIMode(void){return 2;}
+int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
+void AW_UIFill(int x,int y,int w,int h,int c){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
 void AW_UIBox(int a,int b,int c,int d){}
 void AW_UISmallBegin(void){}
 void AW_UISmallEnd(void){}
@@ -52,24 +66,58 @@ static int requested_loading_delays;
 void AW_SetNextLoadingDelay(void){requested_loading_delays++;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void Cvar_SetValue(char *s,float v){if(names_option && !strcmp(s,names_option->name))names_option->value=v;}
-server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
-static char queued[64];static eval_t goal,torch;static int clear_buttons,events,occluded;
+server_t sv;server_static_t svs;
+/* Use the real client reset, final signon and pitch-drift routines. */
+entity_t cl_temp_entities[MAX_TEMP_ENTITIES];beam_t cl_beams[MAX_BEAMS];
+double host_frametime=.02;
+cvar_t cl_forwardspeed={"cl_forwardspeed","200",false,false,200};
+extern cvar_t v_centermove,v_centerspeed;
+extern void V_DriftPitch(void);
+static int signon_finished;
+static int scene_voice_begins,scene_voice_ends,scene_voice_cancels,scene_voice_armed;
+void S_BeginSceneVoice(void){scene_voice_begins++;scene_voice_armed=1;}
+void S_EndSceneVoice(void){assert(scene_voice_armed);scene_voice_ends++;scene_voice_armed=0;}
+void S_CancelSceneVoice(void){scene_voice_cancels++;scene_voice_armed=0;}
+void Host_ClearMemory(void){}
+void R_ClearEfrags(qboolean preserve){}
+void SZ_Clear(sizebuf_t *buf){buf->cursize=0;}
+void MSG_WriteByte(sizebuf_t *buf,int value){}
+void MSG_WriteString(sizebuf_t *buf,char *value){}
+void Cache_Report(void){}
+void SCR_EndLoadingPlaque(void){signon_finished++;}
+void Con_DPrintf(char *fmt,...){}
+char *va(char *fmt,...){return "";}
+/* Legacy spawn angle packets arrive before final signon. Model their actual
+ * integer/byte round trip, including signed yaw, then call real client signon. */
+static void finish_signon(edict_t *p){
+ int i;
+ for(i=0;i<3;i++)cl.viewangles[i]=(signed char)(((int)p->v.angles[i]*256/360)&255)*(360.0f/256);
+ cls.signon=3;CL_SignonReply();
+ cls.signon=SIGNONS;CL_SignonReply();
+}
+static char queued[64];static eval_t goal,torch,hand_state,hand_started,attack_latched;static int clear_buttons,events,occluded;
 static void (*start_demo)(void),(*teleport)(void),(*scene)(void);static cvar_t *demo_option;
 static int command_argc;static char *command_args[4];
 static int opening_track=-1,ship_available=1,narrow_room;
 static int world_map_unavailable,map_place_calls;static vec3_t last_map_arrival;
 static char notice[96];
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
+void AW_UIPickupNotice(const char *text,double duration){AW_UISubtitle("",text,duration);}
 void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
 void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;else if(!strcmp(name,"aw_teleport"))teleport=fn;else if(!strcmp(name,"aw_scene"))scene=fn;}
 int Cmd_Argc(void){return command_argc;}
 char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 int COM_FOpenFile(char *name,FILE **f){
+ if(!strcmp(name,"harvest-vf0000.txt") && harvest_fixture){
+  const char *s="AWH2 1 1 1\n0 0 0 0 0 original_item\tOriginal item name\n0 0 2\n"
+    "aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 *1 11 0 1 40 0 30 0 0 0 Luminous Russula\n";
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
  if(!strcmp(name,"world/regions.awr")) {
   unsigned count=1;float town0[7]={-2816,-17920,0,-1024,-1024,1024,1024};
   float town1[7]={-5120,-3072,0,-1024,-1024,1024,1024};
-  float region[11]={50000,50000,0,-1024,-1024,1024,1024,-1920,-1920,1920,1920};
+  float region[11]={-512,-17920,0,-256,-1024,1024,1024,-1920,-1920,1920,1920};
   *f=tmpfile();assert(*f);fwrite("AWR2",1,4,*f);fwrite(&count,4,1,*f);
   fwrite(town0,sizeof(town0),1,*f);fwrite(town1,sizeof(town1),1,*f);
   fwrite("vf0000\0\0",1,8,*f);fwrite(region,sizeof(region),1,*f);rewind(*f);return 116;
@@ -94,11 +142,27 @@ void AW_MusicSceneEvent(const char *s){events++;}
 double Sys_FloatTime(void){return 1;}
 int Hunk_LowMark(void){return 1000;}
 int Hunk_HighMark(void){return 0;}
+static double torch_offset;
+static int torch_restores;
+double AW_TorchAnimationTime(void){return cl.time+torch_offset;}
+void AW_TorchRestoreAnimation(double time){torch_offset=time-cl.time;torch_restores++;}
+void AW_TorchResetAnimation(void){torch_offset=0;}
+char *ED_NewString(char *text){
+ const char *hands="progs/v_nord.mdl";char *at=pr_strings+1;
+ assert(!strcmp(text,hands));
+ while(strcmp(at,hands))at+=strlen(at)+1;
+ return at;
+}
 eval_t *GetEdictFieldValue(edict_t *p,char *name){
+ if(!strcmp(name,"aw_ref") && harvest_fixture){harvest_reference._float=42;return &harvest_reference;}
+ if(!strcmp(name,"aw_hand_goal"))return &goal;
+ if(!strcmp(name,"aw_hand_state"))return &hand_state;
+ if(!strcmp(name,"aw_hand_started"))return &hand_started;
+ if(!strcmp(name,"aw_attack_latched"))return &attack_latched;
  if(!strcmp(name,"aw_torch"))return &torch;
  if(!strcmp(name,"aw_intro_role"))return &role;
  if(!strcmp(name,"aw_voice"))return &voice;
- return &goal;
+ return NULL;
 }
 qboolean AW_PlacePlayer(edict_t *p,vec3_t v){return false;}
 void SV_LinkEdict(edict_t *p,qboolean touch){}
@@ -106,6 +170,7 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
  if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
+ if(harvest_fixture && occluded){t.fraction=.1f;return t;}
  if(type==MOVE_NOMONSTERS){if(occluded)t.fraction=.3f;return t;}
  if(narrow_room){
   if(a[2]>88 || a[2]<66){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
@@ -117,8 +182,9 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  return t;
 }
 int main(void){
- edict_t p;client_t client;vec3_t arrival={0,0,77};memset(&p,0,sizeof(p));memset(&client,0,sizeof(client));
+ int i;edict_t p;client_t client;vec3_t arrival={0,0,77};memset(&p,0,sizeof(p));memset(&client,0,sizeof(client));
  sv.active=true;svs.maxclients=1;svs.clients=&client;client.edict=&p;strcpy(sv.name,"prison");
+ sv.model_precache[1]="progs/v_nord.mdl";
  cls.state=ca_connected;p.v.movetype=MOVETYPE_WALK;p.v.health=100;p.v.view_ofs[2]=30;goal._float=1;cl.viewangles[1]=90;
  torch._float=1;assert(AW_Interior());
  cl.viewangles[1]=0;assert(!AW_SceneUse());cl.viewangles[1]=90;
@@ -136,6 +202,8 @@ int main(void){
  cls.signon=SIGNONS;AW_SceneTick();assert(audio_close==1);AW_SceneTick();assert(audio_close==1);
  assert(p.v.health==100 && goal._float==1 && events==2);assert(p.v.origin[2]>50 && p.v.origin[2]<51);
  assert(p.v.angles[1]==90 && p.v.fixangle);assert(!AW_Interior());
+ finish_signon(&p);assert(cl.viewangles[0]==0 && cl.viewangles[1]==90);
+ assert(!cl.nodrift); /* A door keeps the authored arrival policy. */
  assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>50 && p.v.origin[2]<51);
  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;queued[0]=0;
  assert(AW_SceneUse());assert(!strcmp(notice,"Interior not found."));
@@ -248,26 +316,136 @@ int main(void){
  queued[0]=0;teleport();assert(!queued[0] && p.v.health==73);
  }
  assert(requested_loading_delays==0); /* Explicit travel stays immediate. */
+ assert(!scene_voice_begins && !scene_voice_ends && !scene_voice_cancels);
  /* An automatic sub-cell transition preserves held input and player goals.
   * Ordinary doors/teleports above must still clear input deliberately. */
  strcpy(sv.name,"seyda");p.v.movetype=MOVETYPE_NOCLIP;p.v.health=73;
  goal._float=1;torch._float=1;key_dest=key_game;cls.signon=SIGNONS;
+ hand_state._float=2;hand_started._float=.25f;attack_latched._float=1;sv.time=121; /* Raised for over60s. */
+ p.v.weaponmodel=ED_NewString("progs/v_nord.mdl")-pr_strings;p.v.weaponframe=3;
  aw_character.current[1]=33;aw_character.current[2]=44;aw_character.level=7;
  aw_story.stage=AW_STAGE_RELEASED;p.v.origin[0]=0;p.v.origin[1]=300;
  assert(AW_RegionSelect("seyda",p.v.origin,0));AW_RegionWorldModel("seyda",0);
  p.v.origin[0]=1200;p.v.velocity[0]=42;p.v.v_angle[0]=12;p.v.v_angle[1]=34;
+ cl.viewangles[0]=12.625f;cl.viewangles[1]=359.875f;cl.viewangles[2]=0;
+ cl.time=120;cl.laststop=119.5;cl.nodrift=true;cl.pitchvel=0;cl.driftmove=.075f;
  queued[0]=0;
  {int before=clear_buttons;AW_SceneTick();
   assert(!strcmp(queued,"map seyda\n") && clear_buttons==before);
   assert(requested_loading_delays==1);
+  CL_ClearState();assert(cl.viewangles[0]==0 && !cl.nodrift);
   p.v.health=100;goal._float=0;torch._float=0;p.v.movetype=MOVETYPE_WALK;
+  hand_state._float=hand_started._float=attack_latched._float=0;
+  p.v.weaponmodel=p.v.weaponframe=0;sv.time=2;
+  VectorCopy(vec3_origin,p.v.v_angle);
   AW_SceneSpawn(&p);
   assert(p.v.health==73 && goal._float==1 && torch._float==1);
+  assert(hand_state._float==2 && attack_latched._float==1 && hand_started._float== -118.75f);
+  assert(p.v.weaponframe==3 && !strcmp(pr_strings+p.v.weaponmodel,"progs/v_nord.mdl"));
   assert(aw_character.current[1]==33 && aw_character.current[2]==44 && aw_character.level==7);
   assert(AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
   assert(p.v.movetype==MOVETYPE_NOCLIP && p.v.velocity[0]==42);
-  assert(p.v.origin[0]==1200 && p.v.angles[0]==12 && p.v.angles[1]==34);
+  assert(p.v.origin[0]==1200 && p.v.angles[0]==12.625f && p.v.angles[1]==359.875f);
+  assert(p.v.v_angle[0]==12.625f && p.v.v_angle[1]==359.875f);
+  cl.time=2;finish_signon(&p);assert(AW_TorchAnimationTime()==120);
+  assert(cl.viewangles[0]==12.625f && cl.viewangles[1]==359.875f);
+  assert(cl.nodrift && cl.pitchvel==0 && cl.driftmove==.075f && cl.laststop==1.5);
+  /* With no new mouse event, the loaded view must not begin recentering. */
+  v_centermove.value=.15f;v_centerspeed.value=500;cl.onground=true;
+  V_DriftPitch();V_DriftPitch();assert(cl.viewangles[0]==12.625f && cl.pitchvel==0);
+  /* A later mouse delta is not overwritten by a repeated ready notification. */
+  cl.viewangles[0]+=1;cl.viewangles[1]-=2;AW_SceneSignon();
+  assert(cl.viewangles[0]==13.625f && cl.viewangles[1]==357.875f);
  }
+ /* Repeated reverse crossings preserve arbitrary fractional/wrapped headings,
+  * both walking/noclip and an explicitly active pitch-centering policy. */
+ {static float views[6][2]={{-69.875f,.125f},{79.875f,181.375f},
+    {-23.0625f,-.375f},{.375f,720.875f},{42.125f,265.625f},{-.625f,91.0625f}};
+  int i,before=clear_buttons;
+  for(i=0;i<6;i++){
+   p.v.origin[0]=i%2?1200:0;p.v.origin[1]=300;
+   p.v.movetype=i%2?MOVETYPE_NOCLIP:MOVETYPE_WALK;
+   p.v.v_angle[0]=p.v.v_angle[1]=0;
+   cl.viewangles[0]=views[i][0];cl.viewangles[1]=views[i][1];
+   cl.time=90;cl.laststop=90;cl.nodrift=i!=5;cl.pitchvel=i==5?25:0;cl.driftmove=.05f;
+   queued[0]=0;AW_SceneTick();assert(!strcmp(queued,"map seyda\n"));
+   CL_ClearState();VectorCopy(vec3_origin,p.v.v_angle);AW_SceneSpawn(&p);
+   cl.time=4;finish_signon(&p);
+   assert(cl.viewangles[0]==views[i][0] && cl.viewangles[1]==views[i][1]);
+   assert(p.v.v_angle[0]==views[i][0] && p.v.v_angle[1]==views[i][1]);
+   assert(p.v.movetype==(i%2?MOVETYPE_NOCLIP:MOVETYPE_WALK));
+   assert(cl.nodrift==(i!=5) && cl.pitchvel==(i==5?25:0));
+   assert(cl.driftmove==.05f && cl.laststop==4 && clear_buttons==before);
+  }
+ }
+ /* Legacy centering already in progress remains active after loading when opted in. */
+ extern cvar_t aw_auto_center;
+ aw_auto_center.value=1;cl.onground=true;cl.idealpitch=0;noclip_anglehack=false;
+ V_DriftPitch();assert(cl.viewangles[0]==-.125f && cl.pitchvel==35);
+ aw_auto_center.value=0;
+ /* The exterior-world route rebases coordinates; view preservation is the same
+  * in both directions as for a same-name town subdivision. */
+ p.v.origin[0]=2200;p.v.origin[1]=300;
+ cl.viewangles[0]=-31.125f;cl.viewangles[1]=287.625f;cl.nodrift=true;
+ queued[0]=0;AW_SceneTick();assert(!strcmp(queued,"map vf0000\n"));
+ CL_ClearState();strcpy(sv.name,"vf0000");AW_SceneSpawn(&p);finish_signon(&p);
+ assert(p.v.origin[0]==-104 && p.v.origin[1]==300);
+ assert(cl.viewangles[0]==-31.125f && cl.viewangles[1]==287.625f);
+ p.v.origin[0]=-1500;queued[0]=0;AW_SceneTick();assert(!strcmp(queued,"map seyda\n"));
+ CL_ClearState();strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);
+ assert(p.v.origin[0]==804 && p.v.origin[1]==300);
+ assert(cl.viewangles[0]==-31.125f && cl.viewangles[1]==287.625f);
+ /* An explicit named teleport following a crossing keeps its destination yaw
+  * and level pitch. It must not inherit the saved streaming camera. */
+ command_argc=2;command_args[0]="aw_teleport";command_args[1]="census";teleport();
+ assert(!strcmp(queued,"map census\n"));CL_ClearState();
+ strcpy(sv.name,"census");AW_SceneSpawn(&p);finish_signon(&p);
+ assert(cl.viewangles[0]==0 && cl.viewangles[1]==90 && !cl.nodrift);
+ /* A failed/mismatched arrival discards the implicit camera snapshot. */
+ strcpy(sv.name,"seyda");p.v.origin[0]=0;p.v.origin[1]=300;
+ assert(AW_RegionSelect("seyda",p.v.origin,0));AW_RegionWorldModel("seyda",0);
+ p.v.origin[0]=1200;cl.viewangles[0]=22.5f;cl.viewangles[1]=121.75f;
+ queued[0]=0;AW_SceneTick();assert(!strcmp(queued,"map seyda\n"));
+ CL_ClearState();strcpy(sv.name,"prison");AW_SceneSpawn(&p);
+ cl.viewangles[0]=-10;cl.viewangles[1]=75;AW_SceneSignon();
+ assert(cl.viewangles[0]==-10 && cl.viewangles[1]==75);
+ assert(signon_finished>=11);
+ assert(scene_voice_begins==10 && scene_voice_ends==9 && scene_voice_cancels==1);
+ assert(!scene_voice_armed);
+ /* A deliberate scene restart invalidates queued hand/equipment restoration. */
+ strcpy(sv.name,"seyda");p.v.origin[0]=0;p.v.origin[1]=300;
+ assert(AW_RegionSelect("seyda",p.v.origin,0));AW_RegionWorldModel("seyda",0);
+ p.v.origin[0]=1200;cls.signon=SIGNONS;goal._float=1;torch._float=1;
+ hand_state._float=2;hand_started._float=(float)sv.time;AW_SceneTick();
+ AW_SceneCancelTransition();
+ goal._float=torch._float=hand_state._float=attack_latched._float=0;
+ p.v.weaponmodel=p.v.weaponframe=0;AW_SceneSpawn(&p);finish_signon(&p);
+ assert(!goal._float && !torch._float && !hand_state._float && !p.v.weaponmodel);
+ assert(AW_TorchAnimationTime()==cl.time && torch_restores>0);
+ /* Original plant FNAM and the Talk-style action row share actual pickup
+  * eligibility, and vanish after the transaction. */
+ harvest_fixture=1;target_trace=travel_trace=0;occluded=0;narrow_room=0;
+ memset(&target,0,sizeof(target));memset(&harvest_model,0,sizeof(harvest_model));
+ strcpy(harvest_world.name,"maps/vf0000.bsp");sv.worldmodel=&harvest_world;
+ sv.models[1]=&harvest_model;harvest_model.type=mod_brush;
+ for(i=0;i<3;i++){harvest_model.mins[i]=-2;harvest_model.maxs[i]=2;}
+ target.v.classname=sizeof(ORIGINAL_STRINGS);target.v.model=sizeof(ORIGINAL_STRINGS)+10;
+ target.v.modelindex=1;target.v.origin[0]=40;target.v.origin[2]=30;
+ memset(p.v.origin,0,sizeof(p.v.origin));p.v.view_ofs[2]=30;p.v.movetype=MOVETYPE_WALK;
+ memset(cl.viewangles,0,sizeof(cl.viewangles));cls.state=ca_connected;sv.num_edicts=2;
+ key_dest=key_game;names_option->value=1;aw_story.stage=AW_STAGE_RELEASED;
+ AW_StateReset();AW_HarvestBegin();AW_HarvestSpawn();
+ hint[0]=object_name[0]=0;AW_SceneDraw();
+ assert(!strcmp(hint,"(E: Pick)") && !strcmp(object_name,"Luminous Russula"));
+ assert(!strcmp(AW_SceneTargetName(),"Luminous Russula"));
+ occluded=1;hint[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());occluded=0;
+ /* Existing named NPC targeting wins without consuming the plant. */
+ target.v.classname=1;target.v.netname=8;target_trace=1;voice.string=8;role._float=0;
+ hint[0]=0;AW_SceneDraw();assert(!strcmp(hint,"(E: Talk)"));assert(!AW_SceneUse());
+ target_trace=0;target.v.classname=sizeof(ORIGINAL_STRINGS);target.v.netname=0;
+ assert(AW_SceneUse());assert(!strcmp(notice,"Picked up 2 Original item name."));
+ hint[0]=object_name[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());
+ puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;
 }
 

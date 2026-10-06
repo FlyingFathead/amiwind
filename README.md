@@ -4,6 +4,92 @@
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
+## v0.0.29-dev4 — WIP: More Mushrooms! (...and fixes)
+
+**More exciting features and bug fixes —** small mushrooms to pick, steadier
+free-look, clearer nights and a growing list of repairs across Vvardenfell.
+This is a development preview; **v0.0.28 remains the latest stable release**.
+
+### The hotlist: changes since v0.0.28
+
+- **Pick your first small mushrooms.** Six original Luminous Russula placements
+  form the dev4 pilot. Aim for the name and **E: Pick**, collect the ingredient,
+  and the mushroom disappears. Shared placement identity, hidden inventory and
+  sparse saved state keep tested pickups from returning across map changes or
+  save/load. `dbg shroomtracker` reports collected mushrooms.
+- **Pickup feedback and joined mushroom meshes.** The original item sound and
+  rectangular notification accompany successful collection; the notification
+  animation is configurable. Conversion preserves shared mesh seams. This
+  pilot is the starting point for worldwide picking.
+- **Free-look stays where you put it.** Legacy automatic pitch centering while
+  walking is disabled by default. `aw_auto_center 1` retains the old behavior;
+  explicit centering remains available. Other reported orientation resets are
+  still being investigated.
+- **Lighter full-screen UI.** Head/race selection and blocking journal, map and
+  reading overlays can freeze world work behind a black background while the
+  soundtrack and interface keep running. The live background remains selectable;
+  the original name-entry scene keeps its existing behavior.
+- **Character-menu improvements.** UI mode 2 adds clickable, keyboard-focused
+  **OK** buttons. Confirmation and travel choices gain matching framed buttons.
+  `dbg tpscene headselection` skips directly to appearance selection for testing.
+- **Map and HUD repairs.** Map palette fixes remove unwanted bright dots;
+  debug-map selection, teleport aliases, secondary-button panning and tab/input
+  handling have been revised. Health, magicka and fatigue use independent values,
+  with heading and time available in the debug HUD. Broader mouse checks continue.
+- **Hands and carried equipment.** The periodic unarmed idle blink has a corrected
+  animation frame range, and repaired world-map metadata restores sampled F/V
+  hand/torch controls. Transition view, equipment and voice continuity have new
+  preservation paths. Quickload still puts equipment away in dev4; its separate
+  save-format fix is coming next.
+- **More useful torchlight.** Surface-light interpolation is repaired; player
+  and admitted guard lights have a configurable radius, default 192 instead of 144.
+  Optional bright-base and spark flame styles are available, and torch depth bob
+  is disabled by default. Guard-light cache handling is improved; intermittent
+  guard visibility and dim lighting remain on the investigation list.
+- **A clearer midnight sky.** The new default clears clouds around 00:00–03:00
+  and brings them back toward 04:00, revealing stars and both moons. Legacy cloud
+  behavior stays selectable. The improved night appearance has playtest approval.
+- **Scenery repairs.** Indrele Rathryon's shack walls are restored. Tree-root
+  sampling and distant terrain presentation have improvements, with occasional
+  horizon gaps and popping still being worked on. The experimental terrain
+  horizon renderer remains opt-in.
+- **Movies: 17/17 available source videos converted.** The builder includes the
+  discovered movie catalogue. Dev4 retains its higher-resolution intro alongside
+  the other new outputs; checking every in-game movie event and soundtrack is
+  still in progress.
+- **Music: 18/18 available tracks converted.** The complete inspected soundtrack
+  set is included in the builder's media output.
+- **Voices: 6,447/6,447 available files converted.** Seven additional referenced
+  voice sources are missing from the inspected installation and reported as such.
+- **Sound effects: 717/717 available files converted.** Two additional referenced
+  effects are missing. All four categories have zero failed conversions for
+  available inputs; event wiring, listening checks and crackling fixes continue.
+  These counts describe conversion from a local game installation; the public
+  source archive contains no original game media.
+- **Better development tools.** New public guides cover headless FS-UAE and
+  OpenMW reference runs in Docker, machine-state inspection and repeatable
+  comparisons. Asset coverage, allocation checks and a documented cell-transition
+  profiling investigation help track what is present and what still costs time.
+
+### What's cooking next
+
+- **More Mushrooms, worldwide:** compact original-placement data, shared models
+  and persistent picking across exterior cells and mushroom-containing interiors.
+  Interior rooms and connecting door routes still need integration.
+- **More complete saves and hands:** restore equipment intent on quickload,
+  improve hand mesh joins/detail and add race-specific first-person hands.
+- **Smoother exploration:** measure and improve cell read-ahead/loading pauses,
+  close remaining horizon gaps, and continue torch, audio and input fixes.
+- **A clearer build report:** distinguish source assets, converted output,
+  installed/reachable placements and missing or unsupported content at each build.
+- **Later milestones:** Caius Cosades and the Dwemer puzzle box, richer interiors,
+  and a combat-testing arena remain on the roadmap.
+
+Dev4 is a **development prerelease**, with a small mushroom pilot rather than
+worldwide coverage. See the [dev4 notes](docs/RELEASE-v0.0.29-dev4.md) for tests,
+known issues and exact scope, plus the [active plan](docs/PLAN-v0.0.29.md).
+There are no new dev4 pictures yet; the gallery below is from v0.0.28.
+
 ## v0.0.28 — Trees and Grass, Day and Night
 
 Trees along the road, reeds by the water, grass around the rocks. Vvardenfell's
@@ -419,7 +505,8 @@ loads and crossings, town geometry, scenery continuity and frame cost. Build-tim
 profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
 remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md).
 
-[Project state](docs/PROJECT_STATE.md) · [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
+[Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
+[Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
 [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
 [Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
 [Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) ·

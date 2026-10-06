@@ -136,7 +136,8 @@ R_SetupAndDrawSprite
 float R_SpriteEntityScale(const entity_t *ent)
 {
     /* Existing dynamic and legacy entities are zero-initialized. */
-    return ent && ent->model && ent->model->type == mod_sprite &&
+    return ent && ent->model && (ent->model->type == mod_sprite ||
+           (ent->model->type == mod_alias && (ent->effects & AW_EF_ALIAS_SCALE))) &&
            ent->aw_sprite_scale > 0 ? ent->aw_sprite_scale : 1;
 }
 

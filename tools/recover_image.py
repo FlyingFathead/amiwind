@@ -124,7 +124,7 @@ def recovery_commands(steps, old, run):
     """Rebuild scenery overlays, the versioned engine, gallery, and image."""
     selected = []
     for name, original in steps:
-        if name not in ('engine', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'image'):
+        if name not in ('engine', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'media', 'image'):
             continue
         command = list(original)
         if name == 'npc-gallery':
@@ -137,12 +137,13 @@ def recovery_commands(steps, old, run):
                 command[command.index(flag)+1] = str(path)
         selected.append((name, command))
     order = {'engine': 0, 'world-scenery-assets': 1, 'world-scenery': 2,
-             'npc-gallery': 3, 'image': 4}
+             'npc-gallery': 3, 'media': 4, 'image': 5}
     selected.sort(key=lambda step: order[step[0]])
     image = next((command for name, command in selected if name == 'image'), [])
-    expected = (['engine', 'world-scenery-assets', 'world-scenery', 'image']
+    media_stage = ['media'] if any(name == 'media' for name, _ in steps) else []
+    expected = (['engine', 'world-scenery-assets', 'world-scenery', *media_stage, 'image']
                 if '--no-npc-gallery' in image else
-                ['engine', 'world-scenery-assets', 'world-scenery', 'npc-gallery', 'image'])
+                ['engine', 'world-scenery-assets', 'world-scenery', 'npc-gallery', *media_stage, 'image'])
     if [name for name, _ in selected] != expected:
         raise ValueError('Expected engine, scenery source export and overlay, required NPC gallery, then image recovery commands')
     for _, command in selected:

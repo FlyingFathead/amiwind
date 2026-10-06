@@ -15,6 +15,51 @@ typedef struct aw_range_record_s {
 } aw_range_record_t;
 static aw_range_record_t *aw_records;
 static model_t *aw_pool;
+
+/* MSG_WriteAngle truncates WHOLE DEGREES before its integer8-bit scale.
+ * In particular -153.735168 becomes -151.875 after MSG_ReadAngle, exceeding
+ * the old1.5-degree tolerance. Mirror that exact legacy wire value; the real
+ * common.c writer/reader is exercised by the range identity regression. */
+#define AW_RANGE_ANGLE_EPSILON (1.0f/8192.0f)
+static float AW_RangeWireAngle(float angle)
+{
+    int code=(((int)angle*256/360)&255);
+    if(code>=128)code-=256;
+    return code*(360.0f/256.0f);
+}
+static qboolean AW_RangeAngleNear(float left,float right,float epsilon)
+{
+    double delta;
+    if(!isfinite(left) || !isfinite(right))return false;
+    delta=fmod((double)left-right,360.0);
+    if(delta>180)delta-=360;
+    if(delta< -180)delta+=360;
+    return fabs(delta)<=epsilon;
+}
+static qboolean AW_RangeAngleMatches(float source,float received)
+{
+    if(!(source>=-360000 && source<=360000) || !isfinite(received))return false;
+    /* Preserve exact authored transforms for local callers; network entities
+     * must match the actual quantized value, not a broad angular tolerance. */
+    return AW_RangeAngleNear(source,received,AW_RANGE_ANGLE_EPSILON) ||
+        AW_RangeAngleNear(AW_RangeWireAngle(source),received,AW_RANGE_ANGLE_EPSILON);
+}
+static qboolean AW_RangeAnglesOverlap(float a,float b)
+{
+    float qa=AW_RangeWireAngle(a),qb=AW_RangeWireAngle(b);
+    float epsilon=2*AW_RANGE_ANGLE_EPSILON;
+    return AW_RangeAngleNear(a,b,epsilon) || AW_RangeAngleNear(a,qb,epsilon) ||
+        AW_RangeAngleNear(qa,b,epsilon) || AW_RangeAngleNear(qa,qb,epsilon);
+}
+static qboolean AW_RangeSameOutput(const aw_range_record_t *a,const aw_range_record_t *b)
+{
+    int i;
+    if(a->count!=b->count)return false;
+    for(i=0;i<a->count;i++)
+        if(a->ranges[i].start!=b->ranges[i].start || a->ranges[i].count!=b->ranges[i].count)return false;
+    return true;
+}
+
 /* This bounded tokenizer avoids COM_Parse's unbounded com_token writes. */
 static char *AW_RangeToken(char *p,char *out,int size)
 {
@@ -47,8 +92,7 @@ void AW_RenderRangesNewMap(void)
     vec3_t origin,angles;
     aw_render_range_t parsed[AW_RANGE_LIMIT];
     aw_range_record_t *record,*prior;
-    int entity=0,n,k,j,records=0,total_ranges=0,bytes=0;
-    float delta;
+    int entity=0,n,k,records=0,total_ranges=0,bytes=0;
     aw_records=NULL;aw_pool=NULL;
     if(!cl.worldmodel || !cl.worldmodel->entities)return;
     p=cl.worldmodel->entities;
@@ -90,13 +134,10 @@ void AW_RenderRangesNewMap(void)
             if(prior->model!=record->model)continue;
             for(k=0;k<3;k++){
                 if(fabs(prior->origin[k]-origin[k])>.5)break;
-                delta=fmod(prior->angles[k]-angles[k],360.0);
-                if(delta>180)delta-=360;if(delta< -180)delta+=360;
-                if(fabs(delta)>3)break;
+                if(!AW_RangeAnglesOverlap(prior->angles[k],angles[k]))break;
             }
             if(k!=3)continue;
-            if(prior->count!=n)Sys_Error("Ambiguous render range placement");
-            for(j=0;j<n;j++)if(prior->ranges[j].start!=parsed[j].start || prior->ranges[j].count!=parsed[j].count)Sys_Error("Conflicting render range placement");
+            if(!AW_RangeSameOutput(prior,record))Sys_Error("Conflicting render range placement");
         }
         record->next=aw_records;aw_records=record;
     }
@@ -104,22 +145,23 @@ void AW_RenderRangesNewMap(void)
 }
 qboolean AW_RenderRangeView(entity_t *entity,int pass,model_t *view)
 {
-    aw_range_record_t *r;int k;float delta;
-    if(!aw_records || pass<0 || !entity || !entity->model || !view)return false;
+    aw_range_record_t *r,*match=NULL;int k;
+    if(!aw_records || !aw_pool || pass<0 || !entity || !entity->model || !view)return false;
     for(r=aw_records;r;r=r->next){
         if(r->model!=entity->model)continue;
         for(k=0;k<3;k++){
-            if(fabs(r->origin[k]-entity->origin[k])>.25)break;
-            delta=fmod(r->angles[k]-entity->angles[k],360.0);
-            if(delta>180)delta-=360;if(delta< -180)delta+=360;
-            if(fabs(delta)>1.5)break; /* Quake's network angles use 8 bits. */
+            if(!(fabs(r->origin[k]-entity->origin[k])<=.25))break;
+            if(!AW_RangeAngleMatches(r->angles[k],entity->angles[k]))break;
         }
         if(k!=3)continue;
-        if(pass>=r->count)return false;
-        *view=*entity->model;
-        view->firstmodelsurface=aw_pool->firstmodelsurface+r->ranges[pass].start;
-        view->nummodelsurfaces=r->ranges[pass].count;
-        return true;
+        /* Never choose a conflicting range merely because it occurs first.
+         * Identical duplicate outputs remain harmless and supported. */
+        if(match && !AW_RangeSameOutput(match,r))return false;
+        match=r;
     }
-    return false;
+    if(!match || pass>=match->count)return false;
+    *view=*entity->model;
+    view->firstmodelsurface=aw_pool->firstmodelsurface+match->ranges[pass].start;
+    view->nummodelsurfaces=match->ranges[pass].count;
+    return true;
 }

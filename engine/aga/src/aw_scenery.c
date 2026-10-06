@@ -4,6 +4,7 @@
  * residency is bounded by the current overlapping exterior sub-cell BSP.
  */
 #include "quakedef.h"
+#include "aw_harvest_runtime.h"
 extern void AW_MergeCollisionTrace(trace_t *,trace_t *,edict_t *);
 typedef struct {
     entity_t render;
@@ -27,7 +28,7 @@ void AW_SceneryClear(void) { placements=NULL;count=capacity=0; }
 void AW_SceneryBegin(const char *entities)
 {
     const char *p=entities;
-    AW_SceneryClear();
+    AW_SceneryClear();AW_HarvestBegin();
     if(!AW_SceneryMapEnabled(sv.name))return;
     while((p=strstr(p,"\"classname\" \"func_wall\""))!=NULL){capacity++;p++;}
     if(capacity>1000)Host_Error("Balmora scenery catalogue exceeds 1000 placements");
@@ -38,6 +39,7 @@ int AW_SceneryCapture(edict_t *e)
     aw_scenery_t *p;model_t *model;vec3_t forward,right,up,corner;float v;int i,j,k;
     if(!AW_SceneryMapEnabled(sv.name) || !e->v.classname ||
        strcmp(pr_strings+e->v.classname,"func_wall"))return 0;
+    if(AW_HarvestProtect(e))return 0;
     if(count>=capacity)Host_Error("Balmora scenery catalogue count mismatch");
     p=&placements[count++];p->modelindex=SV_ModelIndex(pr_strings+e->v.model);
     model=sv.models[p->modelindex];

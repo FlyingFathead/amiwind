@@ -14,13 +14,17 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import cell_data, normpath, records, string, subrecords
 
-CATEGORIES = ('tree', 'grass', 'reeds', 'fern', 'bush', 'flora_log', 'stateful_flora')
+CATEGORIES = ('tree', 'grass', 'reeds', 'fern', 'bush', 'flora_log', 'stateful_flora', 'small_mushroom')
 
 
 def flora_kind(model):
     stem = normpath(model).rsplit('/', 1)[-1]
     if 'street' in stem or not stem.endswith('.nif'):
         return None
+    # The small Bitter Coast models are distinct from the giant static
+    # formations. Selection remains explicit through the census categories.
+    if stem.startswith('flora_bc_mushroom_') and stem.removeprefix('flora_bc_mushroom_').removesuffix('.nif').isdigit():
+        return 'small_mushroom'
     if 'ivy' in stem:
         return 'ivy'
     if 'lilypad' in stem:

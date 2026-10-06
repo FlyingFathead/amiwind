@@ -68,6 +68,8 @@ HEAP_LOADER_SOURCE_PATHS = (
     'src/model.c', 'src/model.h', 'src/zone.c', 'src/zone.h',
     'src/common.c', 'src/sys_amiga.c',
     'src/aw_guard_torch.c', 'src/aw_torch.c',
+    'src/aw_harvest.c', 'src/aw_harvest.h', 'src/aw_harvest_runtime.c', 'src/aw_harvest_runtime.h',
+    'src/aw_harvest_proxy.c', 'src/aw_harvest_proxy.h',
     'src/aw_scenery.c', 'src/pr_edict.c', 'src/aw_scene.c', 'src/aw_spawn.c', 'src/aw_console.c',
     'src/render.h', 'src/r_sprite.c', 'src/r_efrag.c', 'src/r_main.c',
     'src/cl_parse.c', 'src/cl_main.c', 'src/client.h', 'src/pr_cmds.c', 'src/protocol.h', 'qc/world.qc',
@@ -373,6 +375,61 @@ def town_region_map_names(directory, prefix):
         names.append('maps/'+name+'.bsp')
     return names
 
+def harvest_fingerprint_entries(id1):
+    """Bind optional pickup contents to saves, preserving the legacy namespace.
+
+    Check the bounded catalogue envelope here; the native parser and original
+    source/placement admission still own semantic validation. Hash every byte.
+    """
+    root=Path(id1);result=[];catalogue_kind=None;global_index=None;model_files={}
+    for path in sorted(root.glob('harvest-*.txt'),key=lambda item:item.name):
+        match=re.fullmatch(r'harvest-([a-z0-9_]{1,24})\.txt',path.name)
+        if not match or path.is_symlink() or not path.is_file():
+            raise ValueError('Invalid harvest catalogue path: '+path.name)
+        if not (root/'maps'/(match[1]+'.bsp')).is_file():
+            raise ValueError('Harvest catalogue has no matching map: '+path.name)
+        if not 0 < path.stat().st_size <= 65536:
+            raise ValueError('Harvest catalogue exceeds runtime byte bound: '+path.name)
+        raw=path.read_bytes()
+        try:text=raw.decode('ascii')
+        except UnicodeDecodeError:
+            raise ValueError('Harvest catalogue is not ASCII: '+path.name) from None
+        lines=text.splitlines()
+        header=re.fullmatch(r'AWH([1234]) ([0-9]+) ([0-9]+) ([0-9]+)(?: ([0-9]+) ([0-9a-f]{64}))?(?: ([0-9]+))?',lines[0]) if lines else None
+        if not header or any(ord(c)<32 and c not in '\r\n\t' for c in text):
+            raise ValueError('Invalid harvest catalogue envelope: '+path.name)
+        version,nodes,edges,plants,slots,identity,models=header.groups()
+        indexed=version in ('3','4')
+        if indexed != (slots is not None):
+            raise ValueError('Invalid harvest catalogue envelope: '+path.name)
+        counts=tuple(map(int,(nodes,edges,plants)))
+        external=version=='4'
+        if external != (models is not None):
+            raise ValueError('Invalid external harvest catalogue envelope: '+path.name)
+        models=int(models) if external else 0
+        if (external and not 1<=models<=8) or any(n>limit for n,limit in zip(counts,(64,256,24))) or len(lines)!=1+sum(counts)+models:
+            raise ValueError('Invalid harvest catalogue counts: '+path.name)
+        if catalogue_kind is not None and catalogue_kind!=indexed:
+            raise ValueError('Mixed legacy and indexed harvest catalogues: '+path.name)
+        catalogue_kind=indexed
+        if indexed:
+            index=(int(slots),identity)
+            if not 1<=index[0]<=4096 or identity=='0'*64:
+                raise ValueError('Invalid harvest global index: '+path.name)
+            if global_index is not None and global_index!=index:
+                raise ValueError('Mismatched harvest global index: '+path.name)
+            global_index=index
+        result.append((path.name,hashlib.sha256(raw).hexdigest()))
+        if external:
+            from harvest_alias import model_entries
+            for name,hash_value in model_entries(root,lines[1:1+models]):
+                if name in model_files and model_files[name]!=hash_value:
+                    raise ValueError('Conflicting external harvest model binding: '+name)
+                model_files[name]=hash_value
+    result.extend(sorted(model_files.items()))
+    return result
+
+
 def write_content_fingerprint(id1):
     fingerprint=hashlib.sha256()
     from area_config import SCENES
@@ -395,6 +452,8 @@ def write_content_fingerprint(id1):
         path=Path(id1)/name
         return path.read_bytes() if path.is_file() else None
     for name,hash_value in fingerprint_entries(optional_asset):
+        fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
+    for name,hash_value in harvest_fingerprint_entries(id1):
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
     (Path(id1)/'save-content.bin').write_bytes(fingerprint.digest())
 
@@ -586,6 +645,37 @@ def staged_interior_map_names(id1):
             and (id1 / "maps" / (scene["map"] + ".bsp")).is_file()}
 
 
+def require_complete_media_outputs(media_coverage):
+    """Fail image creation when an available original has no validated output.
+
+    Missing original sources remain separate coverage warnings; they are not
+    treated as failed conversions.
+    """
+    categories = media_coverage.get('categories') if isinstance(media_coverage, dict) else None
+    if not isinstance(categories, dict):
+        raise ValueError('Media coverage report is missing category counts')
+    expected_categories = ('videos', 'music', 'voices', 'effects')
+    missing = {}
+    for category in expected_categories:
+        counts = categories.get(category)
+        if not isinstance(counts, dict):
+            raise ValueError('Media coverage report is missing counts for ' + category)
+        count = counts.get('missing_output')
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise ValueError('Media coverage report has an invalid missing_output count for ' + category)
+        if count:
+            missing[category] = count
+    if missing:
+        details = ', '.join(f'{category}={count}' for category, count in missing.items())
+        raise ValueError(
+            'Available original media lacks validated converted output: ' + details +
+            '. Missing original sources are warnings and are tracked separately; '
+            'see media-coverage.json for the retained coverage counts.'
+        )
+    if media_coverage.get('status') != 'complete':
+        raise ValueError('Media coverage status is not complete; see media-coverage.json')
+    return True
+
 def finalize_image(args):
     """Finalize an already prepared private image stage through every normal gate.
 
@@ -621,6 +711,10 @@ def finalize_image(args):
         getattr(args, 'data_files', None), out / 'sky-asset-preparation',
         shared_sky_source=getattr(args, 'shared_sky_source', None),
         local_skybox=getattr(args, 'local_skybox', 'false'))
+    # The sky reservation remaps AWM1 pixels and rebinds their receipt. Check the
+    # final palette contract, including reuse/custom-sky paths, before packaging.
+    from prepare_world_ui import validate as validate_world_ui
+    validate_world_ui(boot / 'id1')
     from prepare_guard_torches import prepare as prepare_guard_torches
     guard_torches = prepare_guard_torches(args.data_files, boot / 'id1')
     (out/'guard-torch-conversion.json').write_text(json.dumps(guard_torches,indent=2)+'\n', newline='\n')
@@ -640,6 +734,13 @@ def finalize_image(args):
         staged_exterior_map_names(boot / 'id1'),
         enabled=enabled_value(getattr(args, 'hidden_surface_cull', 'true')),
         jobs=getattr(args, 'optimizer_jobs', 6))
+    # Regional map generation can replace a worldspawn after hands conversion.
+    # Stamp all final maps from the same authored animation report before gates.
+    from hand_metadata import stamp_staged_hands
+    hand_source = json.loads((Path(args.scene)/'scene-ready.json').read_text())['hands']
+    hand_metadata = stamp_staged_hands(boot/'id1', hand_source,
+        staged_exterior_map_names(boot/'id1') | staged_interior_map_names(boot/'id1'))
+    (out/'hand-metadata.json').write_text(json.dumps(hand_metadata,indent=2)+'\n', newline='\n')
     # Finish immutable BSP sharing before contact/heap gates and fingerprinting.
     # This step is interpreted Python only; it never creates a native helper.
     from optimize_world_maps import optimize_maps, verify_optimized_maps, bind_heap_report
@@ -688,6 +789,16 @@ def finalize_image(args):
     from music_catalogue import write_catalogue
     music_catalogue = write_catalogue(target/'soundtrack.json', target/'catalogue.txt')
     (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n', newline='\n')
+    # Reconcile source inventory with the bytes actually staged for the image.
+    from prepare_media_assets import stage_catalogue
+    intro_receipt_path = scene/'intro-conversion.json'
+    intro_receipt = json.loads(intro_receipt_path.read_text()).get('movie') if intro_receipt_path.is_file() else None
+    media_coverage = stage_catalogue(args.media, boot/'id1', manifest, intro_receipt)
+    media_coverage_path = out/'media-coverage.json'
+    media_coverage_path.write_text(json.dumps(media_coverage,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # Missing original inputs remain warnings, but every available source must
+    # have a validated converted output before any image packing begins.
+    require_complete_media_outputs(media_coverage)
     # Leave filesystem metadata and future saves room; retain legacy-safe sizes.
     verify_heap_loader_source_receipt(engine_record)
     from world_volumes import pack as pack_world_volumes
@@ -741,6 +852,7 @@ def finalize_image(args):
         'world_flora':json.loads((out/'world-flora-staging.json').read_text(encoding='utf-8')) if (out/'world-flora-staging.json').is_file() else {'status':'not_requested'},
         'sky_asset_preparation':sky_asset_preparation,
         'guard_torches':guard_torches,
+        'hand_metadata':hand_metadata,
         'exterior_sky':{'local_skybox':exterior_sky['local_skybox'],
             'report':str(exterior_sky_path.relative_to(out)),
             'report_sha256':digest(exterior_sky_path),'status':exterior_sky['status'],
@@ -780,6 +892,8 @@ def finalize_image(args):
         'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),
         'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(checker),
         'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,
+        'media_coverage':{'report':media_coverage_path.name,'sha256':digest(media_coverage_path),
+            'categories':media_coverage['categories'],'payload_readback':'passed'},
         'music_tracks':len(manifest['tracks']),'music_catalogue':music_catalogue,'heap_reservation_bytes':world_heap['heap_budget_bytes'],
         'tested_minimum':False,'filesystem':'DOS1 FFS partitions in legacy-safe RDB HDF drives',
         'legacy_root_check':root_check}
@@ -819,7 +933,7 @@ def main():
     i.add_argument('--town-flora-scene-report',type=Path,help='Original alias conversion model mapping; required with --world-flora')
     i.add_argument('--balmora-cache',type=Path,help='Complete owned Balmora preparation cache for measured layout repair before final actor/heap audits')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
-    for name in ['scene','music','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
+    for name in ['scene','music','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     for parser in (e,i):parser.add_argument('--hands',choices=['3d','sprites'],default='3d',help='Compile-time first-person renderer; retain both conversion paths')
     args=p.parse_args()
     # Resolve executables before subprocess cwd changes.

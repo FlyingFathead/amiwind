@@ -108,3 +108,20 @@ engine receipt to the current source, audit every final runtime map and exercise
 through intro/town travel, both-direction cell crossings, water and point traces,
 standing collision, torch lighting, actor restoration, first frames and gameplay.
 Keep the 3 MiB baseline plus 2 MiB safety reserve and the 5 MiB map planning target.
+
+## Dev4 transition smoothness follow-up
+
+Profile visible stalls before choosing low-level optimization. The existing
+`aw_stream.c` records disk bytes/calls/time, decode time, world/actor preparation,
+total load time and time to the first presented frame in separate TSV traces.
+Method 2 is a bounded BSP-prefix read-ahead experiment (8 KiB per tick, configurable
+128/256/512 KiB cache and 0.5-4 second lookahead), not concurrent scene construction
+or a seamless cell swap. Method 1 remains the reference.
+
+Compare identical routes and build/assets with read-ahead off/on, including cold
+and warm runs, memory peaks and worst visible stalls. Then consider preloading
+reused resources, incremental decode or fewer repeated allocations according to
+the measured bottleneck. Assembly is a candidate only for a measured hot loop;
+it does not itself eliminate blocking disk I/O or destructive scene teardown.
+View angles, hands/torch state, active speech and the soundtrack must retain their
+continuity throughout an optimized handoff. No new latency improvement is claimed.

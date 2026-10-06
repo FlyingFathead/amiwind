@@ -6,9 +6,16 @@
 #include "aw_save.h"
 #include "aw_story.h"
 #include "aw_character.h"
+#include "aw_region.h"
 static int active,pending,jiub_state,guard_state,upper_state,prompt,unlocked,failed;
 static double elapsed,jiub_timer,guard_timer,upper_timer,deck_timer;
 static int deck_state;
+/* Named test entry points, not arbitrary map/command strings. Add future
+ * transports here with their own setup and regression fixture. */
+typedef struct {const char *name,*map;} debug_scene_t;
+static const debug_scene_t debug_scenes[]={{"headselection","seyda"},{NULL,NULL}};
+static const debug_scene_t *debug_scene;
+static int debug_scene_ready;
 #define player_name aw_story.name
 static edict_t *roles[9];
 static edict_t *player(void){return svs.clients[0].edict;}
@@ -41,6 +48,7 @@ static int travel(float x,float y,float z) {
     if(!AW_NavStart(roles[2],goal)){failure("No connected guard route");return 0;}return 1;
 }
 void AW_IntroBegin(void) {
+    debug_scene=NULL;debug_scene_ready=0;
     AW_StoryReset(1);AW_CharacterReset();AW_SaveReset();
     pending=1;active=0;deck_state=0;deck_timer=0;IN_AWClearButtons();key_dest=key_game;
     if(!AW_MusicStartTrack(4))Con_Printf("Selected opening track unavailable.\n");
@@ -54,9 +62,65 @@ void AW_IntroBegin(void) {
 static void new_game(void) {
     FILE *f=NULL;
     if(COM_FOpenFile("intro/chargenname1.txt",&f)<0 || !f){Con_Printf("Convert owned introductory assets before starting a new game.\n");return;}
-    fclose(f);active=prompt=pending=0;CL_Disconnect();
+    fclose(f);debug_scene=NULL;debug_scene_ready=0;active=prompt=pending=0;CL_Disconnect();
     IN_AWClearButtons();key_dest=key_game;
     if(!AW_MovieStart())AW_IntroBegin();
+}
+static void debug_scene_command(void) {
+    const debug_scene_t *scene;FILE *f=NULL;char path[48],command[48];int size;
+    vec3_t dock={587.5f,-353.25f,31.5f};
+    if(cmd_source!=src_command)return; /* Never accept a remote client request. */
+    if(Cmd_Argc()==1 || (Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"list"))){
+        Con_Printf("dbg tpscene <scene>: transport to a fresh test scene. Unsaved progress is reset.\n");
+        for(scene=debug_scenes;scene->name;scene++)Con_Printf(" %s\n",scene->name);
+        return;
+    }
+    for(scene=debug_scenes;scene->name;scene++)if(!Q_strcasecmp(Cmd_Argv(1),(char *)scene->name))break;
+    if(Cmd_Argc()!=2 || !scene->name){Con_Printf("Unknown scene; use dbg tpscene list.\n");return;}
+    if(cls.state==ca_dedicated || cls.demoplayback || svs.maxclients!=1 ||
+       (cls.state==ca_connected && !sv.active) || AW_MovieActive() ||
+       AW_ReaderActive() || AW_GalleryModal()){
+        Con_Printf("Use tpscene from the local main menu or game, outside video/reader/gallery playback.\n");return;
+    }
+    sprintf(path,"maps/%s.bsp",scene->map);size=COM_FOpenFile(path,&f);
+    if(f)fclose(f);
+    if(!f || size<124 || !AW_CharacterLoad()){
+        Con_Printf("Debug scene needs the converted map and character catalogue; current game retained.\n");return;
+    }
+    if(!AW_RegionSelect(scene->map,dock,1)){
+        Con_Printf("Debug dock region unavailable; current game retained.\n");return;
+    }
+    AW_SceneCancelTransition();
+    AW_StoryReset(1);AW_CharacterReset();AW_SaveReset();
+    strcpy(player_name,"Scene Tester");
+    AW_StoryTransition(AW_STAGE_DOCK);aw_story.dock=30;
+    active=pending=prompt=failed=deck_state=0;deck_timer=0;unlocked=1;
+    debug_scene=scene;debug_scene_ready=0;
+    IN_AWClearButtons();key_dest=key_game;
+    /* Host_Map_f preserves the existing soundtrack; no movie/music restart. */
+    AW_EndLoadingStyle();AW_SetNextLoadingStyle(AW_LOADING_BLANK);AW_BeginLoadingStyle();
+    sprintf(command,"map %s",scene->map);
+    Cmd_ExecuteString(command,src_command);
+    if(!sv.active){debug_scene=NULL;debug_scene_ready=0;aw_story.dock=-1;
+        Con_Printf("Debug scene map load failed; no scene acceptance claimed.\n");}
+}
+static int debug_scene_spawn(void) {
+    vec3_t start;edict_t *guard=roles[5];
+    if(!debug_scene)return 0;
+    debug_scene_ready=0;
+    if(strcmp(sv.name,debug_scene->map) || !guard || !AW_BarrierLoad() || !AW_NavLoad(sv.name))goto failed;
+    /* Anchor to the converted dock guard, not an unrelated town-centre spawn.
+     * The ordinary hull/ground check validates this nearby test viewpoint. */
+    VectorCopy(guard->v.origin,start);start[0]+=32;
+    start[2]+=guard->v.mins[2]-player()->v.mins[2];
+    if(!AW_InteriorPlace(player(),start))goto failed;
+    player()->v.angles[0]=0;player()->v.angles[1]=180;player()->v.angles[2]=0;
+    player()->v.fixangle=1;debug_scene_ready=1;
+    return 1;
+failed:
+    debug_scene=NULL;aw_story.dock=-1;
+    failure("Debug scene requires the dock guard, navigation, barriers and a clear arrival");
+    return 1;
 }
 void AW_IntroSpawn(void) {
     int i,role;edict_t *e;eval_t *v;vec3_t start={15.25,-33.75,22.875};
@@ -65,6 +129,7 @@ void AW_IntroSpawn(void) {
     memset(roles,0,sizeof(roles));
     for(i=1;i<sv.num_edicts;i++){e=EDICT_NUM(i);if(e->free)continue;v=GetEdictFieldValue(e,"aw_intro_role");role=v?(int)v->_float:0;
         if(role>0 && role<9)roles[role]=e;}
+    if(debug_scene_spawn())return;
     if(!pending){
         active=aw_story.stage==AW_STAGE_SHIP && !strcmp(sv.name,"prison");prompt=0;
         AW_NavLoad(sv.name);
@@ -82,6 +147,16 @@ void AW_IntroSpawn(void) {
 void AW_IntroTick(void) {
     double dt;int result;
     if(!sv.active || sv.paused || key_dest!=key_game || AW_CharacterActive())return;
+    if(debug_scene){
+        if(!debug_scene_ready || cls.state!=ca_connected || cls.signon!=SIGNONS)return;
+        debug_scene=NULL;debug_scene_ready=0;
+        if(strcmp(sv.name,"seyda") || !AW_CharacterOpen(1)){
+            aw_story.dock=-1;failure("Debug head-selection preview unavailable");return;
+        }
+        AW_StoryTransition(AW_STAGE_RACE);aw_story.dock=40;aw_story.dock_timer=0;
+        Con_Printf("Debug scene headselection ready. Accept to continue the dock registration flow.\n");
+        return;
+    }
     if(AW_OpeningTick())return;
     if(!strcmp(sv.name,"seyda") && roles[4] && !aw_story.ship_disabled){
         /* CharGenBoatNPC: timer advances only nearby, after speech ends. */
@@ -159,4 +234,4 @@ static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / p
         (long)AW_StateGet(&aw_state,AW_GLOBAL,"CharGenState"),
         (long)AW_StateGet(&aw_state,AW_JOURNAL,"A1_1_FindSpymaster"),
         (long)AW_Papers(),(long)AW_Ring(),(long)AW_Package());}
-void AW_IntroInit(void){AW_MovieInit();Cmd_AddCommand("aw_new_game",new_game);Cmd_AddCommand("aw_intro_status",status);}
+void AW_IntroInit(void){AW_MovieInit();Cmd_AddCommand("aw_new_game",new_game);Cmd_AddCommand("aw_intro_status",status);Cmd_AddCommand("aw_tpscene",debug_scene_command);}

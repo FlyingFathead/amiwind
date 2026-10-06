@@ -45,6 +45,9 @@ cvar_t	cl_bob = {"cl_bob","0.02", false};
 cvar_t	cl_bobcycle = {"cl_bobcycle","0.6", false};
 cvar_t	cl_bobup = {"cl_bobup","0.5", false};
 
+/* Torch V1 keeps Quake forward depth bob;0 avoids revealing clipped arm ends. */
+cvar_t aw_torch_depth_bob = {"aw_torch_depth_bob","0", true};
+
 cvar_t	v_kicktime = {"v_kicktime", "0.5", false};
 cvar_t	v_kickroll = {"v_kickroll", "0.6", false};
 cvar_t	v_kickpitch = {"v_kickpitch", "0.6", false};
@@ -139,17 +142,16 @@ float V_CalcBob (void)
 //=============================================================================
 
 
+cvar_t	aw_auto_center = {"aw_auto_center", "0", true};
 cvar_t	v_centermove = {"v_centermove", "0.15", false};
 cvar_t	v_centerspeed = {"v_centerspeed","500"};
 
 
-void V_StartPitchDrift (void)
+static void V_BeginPitchDrift (qboolean explicit_request)
 {
 #if 1
-    if (cl.laststop == cl.time)
-    {
+    if (cl.laststop == cl.time && !explicit_request)
         return;		// something else is keeping it from drifting
-    }
 #endif
     if (cl.nodrift || !cl.pitchvel)
     {
@@ -159,8 +161,33 @@ void V_StartPitchDrift (void)
     }
 }
 
+static qboolean v_explicit_pitch_center;
+
+void V_StartPitchDrift (void)
+{
+    /* lookspring is legacy automatic recentering; keep it opt-in. */
+    if (aw_auto_center.value)
+    {
+        V_BeginPitchDrift (false);
+        v_explicit_pitch_center = false;
+    }
+}
+
+void V_CenterView_f (void)
+{
+    /* An explicit centerview command remains available with auto-center off. */
+    V_BeginPitchDrift (true);
+    v_explicit_pitch_center = !cl.nodrift && cl.pitchvel > 0;
+}
+
+qboolean V_ExplicitPitchCentering (void)
+{
+    return v_explicit_pitch_center;
+}
+
 void V_StopPitchDrift (void)
 {
+    v_explicit_pitch_center = false;
     cl.laststop = cl.time;
     cl.nodrift = true;
     cl.pitchvel = 0;
@@ -187,12 +214,41 @@ void V_DriftPitch (void)
     {
         cl.driftmove = 0;
         cl.pitchvel = 0;
+        v_explicit_pitch_center = false;
+        return;
+    }
+
+    if (v_explicit_pitch_center && cl.pitchvel <= 0)
+        v_explicit_pitch_center = false;
+
+    /* Mouse-look is free-look unless the player explicitly requested center view. */
+    if ((in_mlook.state & 1) && !v_explicit_pitch_center)
+    {
+        cl.nodrift = true;
+        cl.driftmove = 0;
+        cl.pitchvel = 0;
+        return;
+    }
+
+    /* This is legacy Quake behaviour; stop automatic centering immediately
+     * when disabled, including a drift already in progress. Explicit
+     * centerview is tracked separately and is allowed to finish. */
+    if (!aw_auto_center.value && !v_explicit_pitch_center)
+    {
+        cl.nodrift = true;
+        cl.driftmove = 0;
+        cl.pitchvel = 0;
         return;
     }
 
 // don't count small mouse motion
     if (cl.nodrift)
     {
+        if (!aw_auto_center.value)
+        {
+            cl.driftmove = 0;
+            return;
+        }
         if ( fabs(cl.cmd.forwardmove) < cl_forwardspeed.value)
             cl.driftmove = 0;
         else
@@ -210,6 +266,7 @@ void V_DriftPitch (void)
     if (!delta)
     {
         cl.pitchvel = 0;
+        v_explicit_pitch_center = false;
         return;
     }
 
@@ -236,6 +293,8 @@ void V_DriftPitch (void)
         }
         cl.viewangles[PITCH] -= move;
     }
+    if (!cl.pitchvel)
+        v_explicit_pitch_center = false;
 }
 
 
@@ -872,7 +931,7 @@ void V_CalcRefdef (void)
     int			i;
     vec3_t		forward, right, up;
     vec3_t		angles;
-    float		bob;
+    float		bob, depth_bob;
     static float oldz = 0;
 
     V_DriftPitch ();
@@ -936,9 +995,15 @@ void V_CalcRefdef (void)
     VectorCopy (ent->origin, view->origin);
     view->origin[2] += cl.viewheight;
 
+    /* The authored torch includes proximal arm geometry behind the alias near
+     * plane. Forward stride bob reveals those cut ends, especially running.
+     * Retain eye/vertical bob and the shared model/emitter transform. Only
+     * explicit legacy mode moves the equipped torch in view-local depth. */
+    depth_bob = (!AW_TorchEquipped() || aw_torch_depth_bob.value == 1) ? bob : 0;
+
     for (i=0 ; i<3 ; i++)
     {
-        view->origin[i] += forward[i]*bob*0.4;
+        view->origin[i] += forward[i]*depth_bob*0.4;
 //		view->origin[i] += right[i]*bob*0.4;
 //		view->origin[i] += up[i]*bob*0.8;
     }
@@ -1096,11 +1161,12 @@ void V_Init (void)
 {
     Cmd_AddCommand ("v_cshift", V_cshift_f);
     Cmd_AddCommand ("bf", V_BonusFlash_f);
-    Cmd_AddCommand ("centerview", V_StartPitchDrift);
+    Cmd_AddCommand ("centerview", V_CenterView_f);
 
     Cvar_RegisterVariable (&lcd_x);
     Cvar_RegisterVariable (&lcd_yaw);
 
+    Cvar_RegisterVariable (&aw_auto_center);
     Cvar_RegisterVariable (&v_centermove);
     Cvar_RegisterVariable (&v_centerspeed);
 
@@ -1125,6 +1191,7 @@ void V_Init (void)
     Cvar_RegisterVariable (&cl_bob);
     Cvar_RegisterVariable (&cl_bobcycle);
     Cvar_RegisterVariable (&cl_bobup);
+    Cvar_RegisterVariable (&aw_torch_depth_bob);
 
     Cvar_RegisterVariable (&v_kicktime);
     Cvar_RegisterVariable (&v_kickroll);

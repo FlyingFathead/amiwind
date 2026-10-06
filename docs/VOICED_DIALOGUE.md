@@ -129,3 +129,17 @@ text or audio is reproduced here.
 OpenMW source links above are public and support the stated implementation
 behavior. Bethesda's original engine source is not available to this project.
 OpenMW details should not be presented as verified original-engine internals.
+
+## Automatic cell-handoff voice continuity candidate
+
+The v0.0.29 source candidate preserves already-playing NPC/intro voice tails
+across implicit streaming teardown, without restarting the line or retaining
+map-owned cache/entity/lip references. At most four detached tails share128KiB,
+including PCM headers; refusal paths are explicit. Existing gain and background
+music buffering are unchanged. Source mixer tests pass, but audible target
+continuity and worst-case memory acceptance remain open. See
+[TRANSITION-VOICE-29](BUG_JOURNAL.md#transition-voice-29-active-speech-stops-during-automatic-cell-handoff-open).
+
+Modal background freeze/blackout is independent of audio. Character selection,
+journals and other blocking overlays keep the soundtrack serviced continuously;
+only an explicit music stop or shutdown should intentionally interrupt it.

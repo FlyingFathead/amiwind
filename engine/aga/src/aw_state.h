@@ -4,6 +4,13 @@
 #include <stdint.h>
 #define AW_STATE_VALUES 32
 #define AW_JOURNAL_ENTRIES 256
+/* Dedicated placement facts, not quest/global slots. A catalogue digest binds
+ * dense indices to full original identities; no respawn in the first stage. */
+#define AW_HARVEST_SLOTS 4096
+typedef struct {
+    uint32_t slots;unsigned char catalogue[32];
+    uint32_t facts[AW_HARVEST_SLOTS];
+} aw_harvest_state_t;
 enum aw_value_kind { AW_GLOBAL, AW_JOURNAL, AW_ITEM };
 enum aw_compare { AW_EQ, AW_NE, AW_GT, AW_GE, AW_LT, AW_LE };
 typedef struct {char id[64];int32_t value;} aw_value_t;
@@ -11,6 +18,7 @@ typedef struct {int quest;int32_t stage,days,milliseconds;} aw_journal_entry_t;
 typedef struct {
     int count[3];aw_value_t values[3][AW_STATE_VALUES];
     int journal_count;aw_journal_entry_t journal[AW_JOURNAL_ENTRIES];
+    aw_harvest_state_t harvest;
 } aw_state_t;
 extern aw_state_t aw_state;
 void AW_StateReset(void);

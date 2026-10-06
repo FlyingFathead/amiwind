@@ -352,11 +352,17 @@ void D_SpriteCalculateGradients (void)
 {
 	vec3_t		p_normal, p_saxis, p_taxis, p_temp1;
 	float		distinv;
+    float sprite_scale_inv = 1.0f / R_SpriteEntityScale(currententity);
 
 	TransformVector (r_spritedesc.vpn, p_normal);
 	TransformVector (r_spritedesc.vright, p_saxis);
 	TransformVector (r_spritedesc.vup, p_taxis);
 	VectorInverse (p_taxis);
+
+    /* The poster is scaled in R_SetupAndDrawSprite; texels must follow the
+       same transform. Keep the plane normal unscaled so depth is unchanged. */
+    VectorScale(p_saxis, sprite_scale_inv, p_saxis);
+    VectorScale(p_taxis, sprite_scale_inv, p_taxis);
 
 	distinv = 1.0 / (-DotProduct (modelorg, r_spritedesc.vpn));
 
@@ -378,10 +384,12 @@ void D_SpriteCalculateGradients (void)
 
 	TransformVector (modelorg, p_temp1);
 
-	sadjust = ((fixed16_t)(DotProduct (p_temp1, p_saxis) * 0x10000 + 0.5)) -
-			(-(cachewidth >> 1) << 16);
-	tadjust = ((fixed16_t)(DotProduct (p_temp1, p_taxis) * 0x10000 + 0.5)) -
-			(-(sprite_height >> 1) << 16);
+    /* SPR frame origins can be base-anchored or asymmetric. A centered
+       offset samples outside the frame and smears its clamped edge texels. */
+    sadjust = (fixed16_t)((DotProduct(p_temp1, p_saxis) -
+                         r_spritedesc.pspriteframe->left) * 65536.0f + 0.5f);
+    tadjust = (fixed16_t)((DotProduct(p_temp1, p_taxis) +
+                         r_spritedesc.pspriteframe->up) * 65536.0f + 0.5f);
 
 // -1 (-epsilon) so we never wander off the edge of the texture
 	bbextents = (cachewidth << 16) - 1;

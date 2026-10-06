@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import unittest
 import json
+import shlex
 import struct
 from pathlib import Path
 
@@ -21,6 +22,7 @@ class VideoTests(unittest.TestCase):
                             "ffv1", "-c:a", "pcm_s16le", str(source)], check=True)
             result = prepare_video(source, root / "out")
             self.assertEqual(result["frames"], 4)
+            self.assertEqual(result["audio_status"], "source_stream_converted")
             self.assertEqual((result["width"], result["height"]), (320, 200))
             low = prepare_video(source, root / "low", size=(160, 100))
             self.assertEqual((low["width"], low["height"]), (160, 100))
@@ -39,6 +41,42 @@ class VideoTests(unittest.TestCase):
             path.write_bytes(path.read_bytes()[:-1])
             with self.assertRaisesRegex(ValueError, "Truncated"):
                 validate(path)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "requires ffmpeg and ffprobe")
+    def test_silent_video_gets_exact_silent_pcm_without_losing_duration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "silent.mkv"
+            subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-f", "lavfi", "-i",
+                            "testsrc2=size=320x180:rate=10", "-t", "0.4", "-c:v", "ffv1",
+                            "-an", str(source)], check=True)
+            result = prepare_video(source, root / "silent-out")
+            self.assertEqual(result["audio_status"], "synthesized_silence")
+            self.assertEqual(result["frames"], 4)
+            self.assertEqual(result["seconds"], 0.4)
+            self.assertEqual(result["samples"], 4410)
+            payload = (root / "silent-out/mw_intro.awv").read_bytes()
+            audio_start = 32 + 768 + result["frames"] * result["width"] * result["height"]
+            self.assertEqual(payload[audio_start:], bytes(result["samples"]))
+            self.assertEqual(validate(root / "silent-out/mw_intro.awv")["seconds"], 0.4)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "requires ffmpeg and ffprobe")
+    def test_present_but_failing_audio_decode_is_not_replaced_with_silence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "audio.mkv"
+            subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-f", "lavfi", "-i",
+                            "testsrc2=size=320x180:rate=10", "-f", "lavfi", "-i",
+                            "sine=frequency=440:sample_rate=11025", "-t", "0.4", "-c:v",
+                            "ffv1", "-c:a", "pcm_s16le", str(source)], check=True)
+            wrapper = root / "ffmpeg-fail-audio.sh"
+            wrapper.write_text('#!/bin/sh\nfor arg do\n  if [ "$arg" = "-vn" ]; then\n'
+                               '    echo "injected audio decode failure" >&2\n    exit 41\n  fi\ndone\n'
+                               'exec ' + shlex.quote(shutil.which("ffmpeg")) + ' "$@"\n', encoding="utf-8")
+            wrapper.chmod(0o755)
+            with self.assertRaises(subprocess.CalledProcessError) as error:
+                prepare_video(source, root / "failed-out", ffmpeg=str(wrapper))
+            self.assertEqual(error.exception.returncode, 41)
 
     def test_logo_hold_and_switchable_opening_card(self):
         from prepare_logo import prepare_logo, prepare_opening_card

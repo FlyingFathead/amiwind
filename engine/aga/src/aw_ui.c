@@ -3,6 +3,7 @@
  * Console font/atlas are independent and remain unchanged.
  */
 #include "quakedef.h"
+#include "aw_character.h"
 extern byte *draw_chars;
 extern int scr_copyeverything;
 static byte font_storage[26624],book_font[26624],skin[4104];
@@ -63,14 +64,52 @@ static cvar_t ui_readable={"aw_ui_readable","1",true};
 static cvar_t ui_font={"aw_ui_font","14",true};
 static cvar_t ui_hud={"aw_ui_hud","1",true};
 static cvar_t ui_frame={"aw_ui_frame","0",true};
+static cvar_t modal_freeze={"aw_modal_freeze","1",true};
+static cvar_t modal_black={"aw_modal_black","1",true};
+static cvar_t ui_mode={"aw_ui_mode","2",true};
+
+/* Inspect current ownership instead of setting sv.paused: nested menus and an
+ * existing explicit pause survive close/cancel/load. Original name entry,
+ * follow-guard prompts, subtitles and the sky gallery keep their world context. */
+static int modal_world_active(void) {
+    return key_dest==key_menu || AW_CharacterActive() || AW_ReaderActive() ||
+        AW_GalleryModal();
+}
+static int modal_world_ready(void) {
+    /* Sign-on and remote/demo traffic must keep progressing. */
+    return modal_world_active() && sv.active && svs.maxclients==1 &&
+        cls.state==ca_connected && cls.signon==SIGNONS &&
+        !cls.demoplayback && !AW_MovieActive();
+}
+int AW_ModalWorldFrozen(void) {
+    return modal_freeze.value!=0 && modal_world_ready();
+}
+/* Only the explicit legacy value selects V1; invalid values use V2. */
+int AW_UIMode(void) {return ui_mode.value==1?1:2;}
+int AW_ModalBlackBackground(void) {return modal_black.value!=0;}
+int AW_ModalWorldHidden(void) {
+    /* Blackout is independent of simulation pause. An opaque background can
+     * skip world drawing without a saved framebuffer; with black disabled,
+     * draw the existing background using the selected world-clock policy. */
+    return AW_ModalBlackBackground() && modal_world_ready() && !cl.intermission;
+}
+void AW_ModalFrame(void) {
+    static int was_frozen,was_hidden;
+    int frozen=AW_ModalWorldFrozen(),hidden=AW_ModalWorldHidden();
+    if(frozen || frozen!=was_frozen)IN_AWClearButtons();
+    if(frozen!=was_frozen || hidden!=was_hidden)scr_fullupdate=0;
+    was_frozen=frozen;was_hidden=hidden;
+}
 static cvar_t dialogue_method={"aw_dialogue_box_display_method","3",true};
 static cvar_t dialogue_layout={"aw_dialogue_box_layout","3",true};
 static cvar_t voice_names={"aw_show_speaker_name_during_voiceovers","0",true};
 static cvar_t voice_style={"aw_voice_dialogue_display_style","2",true};
 static int subtitle_voice;
+static int subtitle_pickup;
+static cvar_t animate_item_pickups={"aw_animate_item_pickups","1",true};
 static unsigned subtitle_revision;
 static int ink[3],black,muted;
-static char subtitle[2048],speaker[80];
+static char subtitle[4096],speaker[80];
 static double subtitle_until,subtitle_started;
 static float panel_position;
 static int u16(const byte *p){return p[0]+(p[1]<<8);}
@@ -422,12 +461,15 @@ void AW_UIOuterFrame(void) {
 int AW_UIFrameEnabled(void){return ui_frame.value!=0;}
 void AW_UIFrameToggle(void){Cvar_SetValue(ui_frame.name,!ui_frame.value);scr_copyeverything=1;}
 void AW_UISubtitle(const char *name,const char *text,double duration) {
-    subtitle_voice=0;subtitle_revision++;
+    subtitle_voice=subtitle_pickup=0;subtitle_revision++;
     strncpy(speaker,name,sizeof(speaker)-1);speaker[sizeof(speaker)-1]=0;
     strncpy(subtitle,text,sizeof(subtitle)-1);subtitle[sizeof(subtitle)-1]=0;
     if(duration<0)duration=0;
     if(duration>120)duration=120;
     subtitle_started=realtime;subtitle_until=realtime+duration;
+}
+void AW_UIPickupNotice(const char *text,double duration) {
+    AW_UISubtitle("",text,duration);subtitle_pickup=1;
 }
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration) {
     AW_UISubtitle(name,text,duration);subtitle_voice=1;
@@ -447,13 +489,20 @@ void AW_UIBar(int x,int y,int w,int h,int color,float fraction) {
         else AW_UIFill(x+2,y+2,fill,h-4,AW_UIColor(color==0?170:35,color==2?160:35,color==1?170:35));}
 }
 void AW_UIHud(void) {
-    float health=100;int y=vid.height-26;
+    float current[3]={100,100,100},maximum[3]={100,100,100};
+    int i,y=vid.height-26;
     initialize();if(cls.state!=ca_connected)return;
     if(r_refdef.vrect.y+r_refdef.vrect.height<vid.height)
         AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
     if(!ui_hud.value)return;
-    if(sv.active && svs.clients && svs.clients[0].edict)health=svs.clients[0].edict->v.health;
-    AW_UIBar(8,y,75,7,0,health/100);AW_UIBar(8,y+8,75,7,1,1);AW_UIBar(8,y+16,75,7,2,1);
+    /* Each stat owns its current/max values. In particular, 55/55 is full.
+     * Read live single-player health without healing or rewriting save state. */
+    if(aw_character.valid)for(i=0;i<3;i++){
+        current[i]=aw_character.current[i];maximum[i]=aw_character.maximum[i];
+    }
+    if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
+        current[0]=svs.clients[0].edict->v.health;
+    for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
     scr_copyeverything=1;
 }
 /* Names are bounded text over the world, with no panel/background fill. */
@@ -615,6 +664,7 @@ void AW_UIDraw(void) {
     if(!legacy && maxlines>3)maxlines=3;
 
     target=subtitle_until>realtime && subtitle[0]?1:0;step=host_frametime*6;
+    if(subtitle_pickup && !animate_item_pickups.value)panel_position=target;
     if(panel_position<target){panel_position+=step;if(panel_position>target)panel_position=target;}
     if(panel_position>target){panel_position-=step;if(panel_position<target)panel_position=target;}
     if(panel_position<=0)return;
@@ -685,12 +735,14 @@ void AW_UIDraw(void) {
 static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original borders and three ink shades. The console keeps its own font.",12);}
 void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_readable);Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
+    Cvar_RegisterVariable(&modal_freeze);Cvar_RegisterVariable(&modal_black);Cvar_RegisterVariable(&ui_mode);
     Cvar_RegisterVariable(&loading_style);
     Cvar_RegisterVariable(&region_loading);
     Cvar_RegisterVariable(&region_loading_delay);
     Cvar_RegisterVariable(&dialogue_method);Cvar_RegisterVariable(&dialogue_layout);
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);
+    Cvar_RegisterVariable(&animate_item_pickups);
     Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);
     Cmd_AddCommand("aw_ui_ink",ink_command);Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

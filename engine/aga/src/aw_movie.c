@@ -15,24 +15,26 @@ static byte *opening_card;
 static long card_first,card_end;
 static cvar_t intro_text_overlay={"aw_intro_text_overlay","1",true};
 static void playvid(void);
-void AW_MovieInit(void){Cvar_RegisterVariable(&intro_text_overlay);}
+void AW_MovieInit(void){Cvar_RegisterVariable(&intro_text_overlay);Cmd_AddCommand("playvid",playvid);}
 static FILE *video,*audio;
 static long frames,samples,audio_start,clock_start,shown,pcm_start,pcm_count;
 static int broken,branding,width,height,pixels;
-static int debug_return_dest,debug_music_paused;
+static int debug_return_dest,debug_music_paused,debug_pending,debug_drain_until;
 static long pictures,dropped;
 static double started;
 static unsigned long be32(byte *p){return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3];}
 static void close_movie(void){
+    debug_pending=0;
     if(video)fclose(video);if(audio)fclose(audio);video=audio=NULL;
     if(buffers)free(buffers);buffers=NULL;
     if(opening_card)free(opening_card);
     opening_card=NULL;
 }
 int AW_MovieActive(void){return buffers!=NULL;}
-int AW_MovieDebugActive(void){return buffers!=NULL && branding==2;}
-static int card_visible(void){return buffers && opening_card && intro_text_overlay.value && shown>=card_first && shown<card_end;}
-byte *AW_MoviePalette(void){return card_visible()?opening_card:(buffers?buffers->palette:NULL);}
+int AW_MovieDebugActive(void){return debug_pending || (buffers!=NULL && branding==2);}
+int AW_MovieDebugPending(void){return debug_pending;}
+static int card_visible(void){return buffers && !debug_pending && opening_card && intro_text_overlay.value && shown>=card_first && shown<card_end;}
+byte *AW_MoviePalette(void){return card_visible()?opening_card:(buffers && !debug_pending?buffers->palette:NULL);}
 static void load_opening_card(void){
     FILE *f=NULL;byte h[16];long n;
     n=COM_FOpenFile("intro/opening.awt",&f);if(!f)return;
@@ -51,12 +53,14 @@ static void finish(const char *why){
     if(branding==2){
         IN_AWClearButtons();Key_ClearStates();
         key_dest=debug_return_dest;
-        CDAudio_Resume();
+        S_MovieAudioEnd();
+        if(debug_music_paused)CDAudio_Pause();else CDAudio_Resume();
         V_UpdatePalette();
         Con_Printf("Debug video ended (%s); returned to the current scene.\n",why);
         return;
     }
-    if(!branding)S_StopAllSounds(true);IN_AWClearButtons();
+    if(!branding)S_StopAllSounds(true);
+    IN_AWClearButtons();
     if(branding==1)Cbuf_AddText("aw_main_menu\n");else AW_IntroBegin();
     /* Con_Printf may refresh a disconnected client's screen. Select the
      * intro loading style before that refresh can request normal artwork. */
@@ -85,10 +89,11 @@ static int start_movie(char *path,int brand){
     if(branding!=2)S_StopAllSounds(true);
     if(branding==1)AW_MusicTitle();
     else if(branding==0){CDAudio_Pause();load_opening_card();}
-    else {debug_music_paused=0;CDAudio_Pause();}
+    else {debug_pending=1;debug_drain_until=paintedtime;}
     clock_start=paintedtime;
     shown=0;pcm_start=pcm_count=0;broken=0;pictures=1;dropped=0;started=Sys_FloatTime();
-    Con_Printf("Video: %ld frames; %s skips.\n",frames,branding==1?"Space/Enter/Esc":"Esc");return 1;
+    if(branding!=2)Con_Printf("Video: %ld frames; %s skips.\n",frames,branding==1?"Space/Enter/Esc":"Esc");
+    return 1;
 invalid:
     close_movie();Con_Printf("Video invalid or unavailable; skipping optional movie.\n");return 0;
 }
@@ -97,7 +102,7 @@ void AW_MovieStartup(void){
     IN_AWClearButtons();key_dest=key_game;
     if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText("aw_main_menu\n");
 }
-static int catalogue_path(const char *request,char *out,int capacity){
+static int catalogue_path(char *request,char *out,int capacity){
     FILE *f=NULL;char line[128],name[32],file[64],expected[64];int size,id,n,previous=0,wanted=-1,i,numeric=1;
     if(!request || !*request)return 0;
     for(i=0;request[i];i++)if(request[i]<'0'||request[i]>'9'){numeric=0;break;}
@@ -114,7 +119,8 @@ static int catalogue_path(const char *request,char *out,int capacity){
         else {strcpy(expected,"intro/video/00.awv");expected[12]='0'+id/10;expected[13]='0'+id%10;}
         if(strcmp(file,expected))goto bad;
         if((numeric && id==wanted) || (!numeric && !Q_strcasecmp(request,name))){
-            if(strlen(file)+1>capacity)goto bad;strcpy(out,file);
+            if(strlen(file)+1>capacity)goto bad;
+            strcpy(out,file);
         }
         previous=id;
     }
@@ -125,7 +131,7 @@ bad:
 }
 static void playvid(void){
     char path[64];
-    if(Cmd_Argc()!=2){Con_Printf("Usage: dbg playvid <1..17 / 01..17 / catalogue name>\n");return;}
+    if(Cmd_Argc()!=2){Con_Printf("Usage: debug playvid <1..17 / 01..17 / catalogue name>\n");return;}
     path[0]=0;
     if(!catalogue_path(Cmd_Argv(1),path,sizeof(path))){Con_Printf("Video is absent or the optional catalogue is invalid.\n");return;}
     debug_return_dest=key_dest;
@@ -134,6 +140,14 @@ static void playvid(void){
 }
 void AW_MovieUpdate(void){
     long position,frame;if(!buffers)return;
+    if(debug_pending){
+        if(sound_started && shm && snd_blocked<=0 && soundtime<debug_drain_until)return;
+        if(sound_started && shm && snd_blocked<=0){if(soundtime>paintedtime)paintedtime=soundtime;S_ClearBuffer();clock_start=soundtime;}
+        else clock_start=paintedtime;
+        S_MovieAudioBegin();debug_music_paused=CDAudio_IsPaused();CDAudio_Pause();
+        shown=0;pcm_start=pcm_count=0;broken=0;pictures=1;dropped=0;started=Sys_FloatTime();
+        debug_pending=0;Con_Printf("Video: %ld frames; Esc skips.\n",frames);return;
+    }
     if(broken){finish("read error");return;}
     position=soundtime-clock_start;if(position<0)position=0;
     if(position>=samples){finish("complete");return;}
@@ -147,7 +161,7 @@ void AW_MovieUpdate(void){
 }
 void AW_MoviePaint(portable_samplepair_t *dst,int count,int first_sample){
     long position=first_sample-clock_start,take;int i,gain=(int)(volume.value*256);
-    if(!buffers || broken)return;
+    if(!buffers || broken || debug_pending)return;
     if(branding==1){AW_MusicPaint(dst,count);return;}
     while(count>0 && position<samples){
         if(position<0){dst++;position++;count--;continue;}
@@ -162,7 +176,7 @@ void AW_MoviePaint(portable_samplepair_t *dst,int count,int first_sample){
 }
 void AW_MovieDraw(void){
     int x,y;byte *row,*src;
-    if(!buffers || !vid.buffer || vid.width!=320 || vid.height!=200)return;
+    if(!buffers || debug_pending || !vid.buffer || vid.width!=320 || vid.height!=200)return;
     for(y=0;y<200;y++){
         row=vid.buffer+y*vid.rowbytes;
         if(card_visible()){memcpy(row,opening_card+768+y*320,320);continue;}
@@ -173,6 +187,10 @@ void AW_MovieDraw(void){
 }
 int AW_MovieKey(int key,int down){
     if(!buffers)return 0;
+    if(debug_pending && down && key==K_ESCAPE){
+        close_movie();IN_AWClearButtons();Key_ClearStates();key_dest=debug_return_dest;V_UpdatePalette();
+        Con_Printf("Debug video cancelled before playback.\n");return 1;
+    }
     if(down && (key==K_ESCAPE || (branding==1 && (key==K_ENTER || key==K_SPACE))))finish("skipped");
     return 1;
 }

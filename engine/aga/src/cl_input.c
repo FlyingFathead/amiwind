@@ -141,7 +141,7 @@ void IN_AWClearButtons(void) {
       &in_lookdown,&in_moveleft,&in_moveright,&in_strafe,&in_speed,&in_use,
       &in_jump,&in_attack,&in_up,&in_down,&in_klook,&in_fastflight};
     int i;for(i=0;i<sizeof(buttons)/sizeof(buttons[0]);i++)memset(buttons[i],0,sizeof(kbutton_t));
-    in_impulse=0;
+    in_impulse=0;IN_AWMouseReset();
 }
 
 void IN_DownDown(void) {KeyDown(&in_down);}

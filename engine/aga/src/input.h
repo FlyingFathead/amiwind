@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -26,9 +26,12 @@ void IN_Shutdown (void);
 void IN_Commands (void);
 // oportunity for devices to stick commands on the script buffer
 
+/* Signed relative events from Intuition, delivered in queue order. */
+void IN_AWMouseEvent(int dx, int dy);
+void IN_AWMouseReset(void);
+
 void IN_Move (usercmd_t *cmd);
 // add additional movement on top of the keyboard move cmd
 
 void IN_ClearStates (void);
 // restores all button and position states to defaults
-

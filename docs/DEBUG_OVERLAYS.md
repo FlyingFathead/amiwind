@@ -1,5 +1,66 @@
 # Development overlays
 
+## Named debug scenes and character UI versions (v0.0.29 candidate)
+
+From the local main menu or game, open F10 and enter
+`dbg tpscene headselection`. `tpscene` means transport/teleport to a named scene;
+it is intended for repeatable testing without replaying the intro. Use
+`dbg tpscene` or `dbg tpscene list` to list implemented destinations. The first
+destination is `headselection`; future scenes need explicit setup and tests.
+This is separate from geographic `dbg tp` and does not accept arbitrary commands.
+
+This starts a **fresh disposable character-creation session** named Scene Tester.
+It resets unsaved in-memory story/character progress and save-session bookkeeping;
+it does not delete or overwrite disk saves. It loads the local dock scene, checks
+guard/navigation/barrier/arrival prerequisites, waits for sign-on and opens the
+real appearance UI. Acceptance resumes the ordinary dock registration flow.
+It skips the movie, Jiub name prompt and initial escort/dialogue waits. It does
+not finish registration, grant quest items or unlock all story gates. The normal
+New Game path and original name-entry screen remain unchanged. Video/reader/
+gallery playback, remote sessions and invalid names are refused. Missing assets
+are reported instead of being represented as a successful scene arrival.
+
+`aw_ui_mode 2` is the saved **default** for appearance, class, birthsign and review.
+It adds a framed bottom-right OK button on the footer row. In appearance, Enter
+advances Race -> Sex -> Face -> Hair -> OK; the next Enter opens confirmation.
+The mouse can activate OK directly. It uses the same validation and confirmation
+as Enter; review subedits return to review first. Footer hints are not click targets.
+`aw_ui_mode 1` restores the previous full-width footer and its input behavior.
+Saved configuration overrides the default; `config/game.cfg` also selects V2.
+These modes do not change `aw_modal_freeze`, `aw_modal_black` or music policy.
+
+Source changes and synthetic checks are distinct from native acceptance. The
+owner has accepted the preceding appearance/class blackout/freeze presentation;
+the new OK buttons and scene shortcut still need a matching target build check.
+
+## v0.0.29 navigation and character-HUD work
+
+Requested default **Debug HUD V2** retains global/local coordinates and adds
+eight-point geographic heading (N, NE, E, SE, S, SW, W, NW) and saved-world-clock
+**24-hour HH:MM**. Preserve V1 and the independent normal compass switch; verify
+native-width layout and distinguish raw engine yaw from compass bearing.
+This is candidate work until the matching HUD fixtures and native view pass.
+
+Health, magicka and fatigue must show independent current/max fractions; the
+health denominator currently uses fixed 100. See
+[HUD-STATS-29](BUG_JOURNAL.md#hud-stats-29-healthy-character-appears-partly-depleted-open).
+The later requested `dbg god on/off` (`true/false`, `1/0`) is separately planned;
+do not imply that this command or its save semantics are already implemented.
+Recurring F/V hand readiness in debug play is tracked independently in
+[TORCH-INPUT-29](BUG_JOURNAL.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open).
+
+## Open map-teleport regression - 4 October 2026
+
+The owner reports that both `dbg tp map` and `dbg map tp` no longer work from
+F10 in the post-release v0.0.28 playtest; a later `dbg tp map` retry worked.
+Both aliases route to `aw_teleport_map` in the source. The report remains
+intermittent and open. The instructions below describe the
+intended behavior, not final target verification. Source diagnosis found an
+incorrect dependency on visible HUD overlays; a v0.0.29 candidate removes it,
+preserving explicit map/story gates. Actual C fixtures pass; exact owner-state
+replay and native acceptance remain pending.
+See [MAP-TELEPORT-28](BUG_JOURNAL.md#map-teleport-28-map-teleport-commands-fail-from-f10-open).
+
 Runtime command reference, updated for the v0.0.28 candidate on 4 October 2026.
 Open the console with F10 or the key left of 1 (normally
 § on the Finnish layout). Boolean commands accept on/off, true/false and 1/0,
@@ -416,3 +477,50 @@ or generated terrain IDs are used. The heading/compass remains separate.
 Interior headers show the level's original area name; unavailable exterior
 region data is labelled unavailable. Long headers are clipped with an ellipsis
 at the selected HUD font width. This does not change normal compass defaults.
+
+## HUD source-candidate evidence, 4 October 2026
+
+The source candidate now uses independent stat current/max values, with
+live single-player health authoritative where applicable and safe invalid-max
+handling. Actual UI pixel tests cover 55/55 full, independent half/quarter bars,
+live health, zero, overheal and invalid maxima, without character-state mutation.
+Default Debug HUD V2 now adds eight-point compass/numeric bearing, pitch and
+saved-clock `HH:MM` (`--:--` when unavailable), retaining V1 raw DEG behavior.
+Bounded 320-wide layout and the focused HUD/UI/sprite runner methods pass 3/3
+on Linux. Native display, save/load and gameplay acceptance remain pending.
+
+## Modal background controls
+
+The v0.0.29 candidate keeps the existing live 3D background selectable and makes
+background freeze plus black coverage the new default. `config/game.cfg` exposes
+two independent saved numeric switches, each defaulting to1:
+
+| Setting | 1 | 0 |
+| --- | --- | --- |
+| `aw_modal_freeze` | Suspend background world simulation and client world clocks during blocking overlays | Keep background world work running |
+| `aw_modal_black` | Paint the modal background black and skip hidden world drawing | Draw the existing 3D background |
+
+New default:
+
+```text
+aw_modal_freeze 1
+aw_modal_black 1
+```
+
+Restore the existing live-background method:
+
+```text
+aw_modal_freeze 0
+aw_modal_black 0
+```
+
+Head/race selection, subsequent character pages, journals and other blocking
+overlays use this policy. The original name-entry prompt keeps its prior behavior.
+UI/head animation and soundtrack servicing continue with either mode or mixed
+settings; modal freezing never issues a music stop. Closing a modal or changing
+black coverage requests a fresh world redraw. Existing explicit pause ownership
+and deliberate wait/rest clock changes remain separate.
+
+User values saved in `id1/config.cfg` override `config/game.cfg` defaults at
+startup. These controls are source-tested candidates; native visual, music and
+performance acceptance remains recorded in [MODAL-WORLD-29](BUG_JOURNAL.md#modal-world-29-world-work-continues-behind-character-creation-open).

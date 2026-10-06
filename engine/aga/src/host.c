@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // host.c -- coordinates spawning and killing of local servers
 
 #include "quakedef.h"
+#include "aw_hand_models.h"
+#include "aw_harvest_runtime.h"
 #include "aw_save.h"
 #include "r_local.h"
 
@@ -493,8 +495,10 @@ void Host_ClearMemory (void)
     /* Drop every leaf/static pointer before freeing map-owned overflow pages. */
     R_ClearEfrags(true);
     AW_SceneryClear();
+    AW_HarvestClear();
     Con_DPrintf ("Clearing memory\n");
     D_FlushCaches ();
+    AW_HandModelsReset();
     Mod_ClearAll ();
     if (host_hunklevel)
         Hunk_FreeToLowMark (host_hunklevel);
@@ -578,7 +582,7 @@ void _Host_ServerFrame (void)
 
 // move things around and think
 // always pause in single player if in console or menus
-    if (!sv.paused && (svs.maxclients > 1 || key_dest == key_game) )
+    if (!sv.paused && !AW_ModalWorldFrozen() && (svs.maxclients > 1 || key_dest == key_game) )
         SV_Physics ();
 }
 
@@ -630,7 +634,7 @@ void Host_ServerFrame (void)
 
 // move things around and think
 // always pause in single player if in console or menus
-    if (!sv.paused && (svs.maxclients > 1 || key_dest == key_game) )
+    if (!sv.paused && !AW_ModalWorldFrozen() && (svs.maxclients > 1 || key_dest == key_game) )
         SV_Physics ();
 
 // send all messages to the clients
@@ -684,6 +688,8 @@ void _Host_Frame (float time)
         AW_MovieUpdate();SCR_UpdateScreen();host_framecount++;return;
     }
 
+    /* Keep input/audio/presentation time live while world clocks stand still. */
+    AW_ModalFrame();
     NET_Poll();
 
 // if running the server locally, make intentions now
@@ -726,6 +732,8 @@ void _Host_Frame (float time)
     if (host_speeds.value)
         time1 = Sys_FloatTime ();
 
+    /* Modal freeze/blackout never gate soundtrack or mixer servicing.
+     * Stopping music belongs to an explicit music stop or shutdown. */
     CDAudio_Update();
     S_ExtraUpdate();
     SCR_UpdateScreen ();
@@ -740,16 +748,16 @@ void _Host_Frame (float time)
     if (cls.signon == SIGNONS)
     {
         S_Update (r_origin, vpn, vright, vup);
-        CL_DecayLights ();
+        if(!AW_ModalWorldFrozen())CL_DecayLights ();
     }
     else
         S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
 
     AW_EndMark(3);
-    AW_IntroTick();
-    AW_WaitTick();
+    if(!AW_ModalWorldFrozen())AW_IntroTick();
+    if(!AW_ModalWorldFrozen())AW_WaitTick();
     AW_SaveTick();
-    AW_SceneTick();
+    if(!AW_ModalWorldFrozen())AW_SceneTick();
     CDAudio_Update();
     AW_ProfileFrame();
 
@@ -946,6 +954,7 @@ void Host_Init (quakeparms_t *parms)
         Sbar_Init ();
         AW_HandSpritesInit();
         AW_TorchLoadAssets();
+        AW_HandModelsLoad();
         CL_Init ();
 #ifdef _WIN32 // on non win32, mouse comes before video for security reasons
         IN_Init ();

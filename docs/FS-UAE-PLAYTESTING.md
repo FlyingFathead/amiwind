@@ -292,3 +292,16 @@ settings as well as the startup log.
 Reference: [FS-UAE CPU options](https://fs-uae.net/docs/options/cpu/).
 
 Historical hotfix preset: [AmiWind-v0.0.15-dev2-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.15-dev2-FS-UAE.fs-uae). Same machine settings; structural ship repair and debug scene picker.
+
+
+## Emulator development access
+
+See [FS-UAE development access](FS-UAE-DEVELOPMENT.md) for guest memory and
+register inspection, breakpoints, serial-terminal access, save-state/capture
+limits and a proposed repeatable testing workflow. Stock interfaces and optional
+patched backends are distinguished; unattended runtime validation is pending.
+
+## Headless development container
+
+See [FS-UAE in Docker](FS-UAE-DOCKER.md) for a persistent container,
+private virtual display, screenshots, console debugger and backup steps.

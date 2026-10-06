@@ -48,13 +48,15 @@ static int path(char *out,int capacity,uint32_t profile,int slot,int generation)
 }
 static int read_file(uint32_t profile,int slot,int generation,aw_save_t *state)
 {
-    char filename[384];byte raw[AW_SAVE_BYTES];FILE *f;int n,extra,ok;
+    char filename[384];byte *raw;FILE *f;int n,extra,ok;
     if(!path(filename,sizeof(filename),profile,slot,generation))return 0;
     f=fopen(filename,"rb");if(!f)return 0;
-    n=fread(raw,1,sizeof(raw),f);extra=fgetc(f);ok=!ferror(f) && extra==EOF;
+    raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw){fclose(f);return 0;}
+    n=fread(raw,1,AW_SAVE_BYTES,f);extra=fgetc(f);ok=!ferror(f) && extra==EOF;
     fclose(f);
-    return ok && AW_SaveDecode(raw,n,state) && state->profile==profile &&
+    ok=ok && AW_SaveDecode(raw,n,state) && state->profile==profile &&
         content() && !memcmp(state->content,content_id,32);
+    free(raw);return ok;
 }
 static int newest(uint32_t profile,int slot,aw_save_t *state)
 {
@@ -190,7 +192,7 @@ static int make_profile(void)
 }
 int AW_SaveWrite(int slot)
 {
-    byte raw[AW_SAVE_BYTES];aw_save_t check;char filename[384],label[32];
+    byte *raw;aw_save_t check;char filename[384],label[32];
     FILE *f;int n,side,ok,i;edict_t *p;
     if(!AW_SaveAllowed() || slot<0 || slot>20 || !content() || !make_profile()){
         Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
@@ -203,11 +205,13 @@ int AW_SaveWrite(int slot)
     world.sequence++;
     sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
     memset(world.label,0,sizeof(world.label));strcpy(world.label,label);
-    n=AW_SaveEncode(raw,sizeof(raw),&world);if(!n){Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
+    /* Keep larger serialized storage off the fixed Amiga task stack. */
+    raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw)return 0;
+    n=AW_SaveEncode(raw,AW_SAVE_BYTES,&world);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
     side=newest(world.profile,slot,&check);side=side==0?1:0;
-    if(!path(filename,sizeof(filename),world.profile,slot,side))return 0;
-    f=fopen(filename,"wb");if(!f)return 0;
-    ok=fwrite(raw,1,n,f)==(size_t)n;
+    if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
+    f=fopen(filename,"wb");if(!f){free(raw);return 0;}
+    ok=fwrite(raw,1,n,f)==(size_t)n;free(raw);
     if(fflush(f))ok=0;
     if(fclose(f))ok=0;
     if(!ok || !read_file(world.profile,slot,side,&check) || check.sequence!=world.sequence){

@@ -5,10 +5,13 @@
 #include "quakedef.h"
 #include "aw_maps.h"
 #include "aw_sky.h"
+#include "aw_horizon.h"
 extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t aw_drawdistance;
 static cvar_t aw_fog={"aw_fog","1",true};
+/* Source candidate: retain classic rendering until target cost/visual acceptance. */
+static cvar_t aw_terrain_horizon={"aw_terrain_horizon","0",true};
 static byte *colours;
 static byte depths[32768];
 static int old_distance;
@@ -44,7 +47,7 @@ static void cycle_distance(void) {
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
@@ -83,6 +86,7 @@ void AW_FogDraw(void) {
             for(k=0;k<3;k++)ray[k]+=delta[k];
         }
     }
+    if(fog && aw_terrain_horizon.value==1)AW_HorizonDraw(ramp[15<<8],distance);
 }
 
 /* Far clipping uses the same forward depth as palette fog. Radial/cubic

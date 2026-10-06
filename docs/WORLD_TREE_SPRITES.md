@@ -1,5 +1,18 @@
 # World tree sprites and the Balmora comparison zone
 
+## Open sprite-root regression - 4 October 2026
+
+An owner screenshot from the post-release v0.0.28 playtest shows an unintended
+vertically striped pillar beneath a sprite-tree trunk on a slope. The exact
+placement still needs target replay. A source reproduction found a scale and
+authored-origin mismatch between projected geometry and sprite texture gradients.
+The old rasterizer produced 90 incorrect pixels of 105 checked; the corrected
+v0.0.29 candidate passes seven real projection/raster cases. Assets, transforms
+and collision are unchanged. Native root/contact acceptance remains pending. Do not treat earlier sprite conversion
+checks as acceptance of this root/contact defect; preserve original intended
+roots when investigating. See
+[TREE-PILLAR-28](BUG_JOURNAL.md#tree-pillar-28-unintended-pillar-beneath-sprite-tree-roots-open).
+
 Development after v0.0.27; not yet an enabled world-wide runtime feature.
 
 Use the original source placements, positions and scales. Bake one shared sprite

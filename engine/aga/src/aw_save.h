@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "aw_story.h"
 #include "aw_character.h"
-#define AW_SAVE_BYTES 32768
+#define AW_SAVE_BYTES 65536
 #define AW_SAVE_ACTORS 256
 typedef struct {
     uint32_t reference;

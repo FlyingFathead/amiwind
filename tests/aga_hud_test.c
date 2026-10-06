@@ -4,6 +4,11 @@
 void AW_UIHud(void){}
 int AW_Interior(void){return 0;}
 int AW_FpsTenths(void){return 123;}
+static int clock_ok=1,clock_hour=23,clock_minute=59;
+int AW_ClockEnsure(void){return clock_ok;}
+void AW_ClockDate(int *y,int *m,int *d,int *h,int *n){
+ *y=427;*m=8;*d=16;*h=clock_hour;*n=clock_minute;
+}
 int fps_draws;
 float anglemod(float v){return v-floorf(v/360)*360;}
 int AW_GalleryActive(void){return 0;}
@@ -59,15 +64,31 @@ int main(void) {
  cl_entities[1].origin[0]=-12;cl_entities[1].origin[1]=42;cl_entities[1].origin[2]=66;
  Sbar_Draw();assert(fill_y==182 && !strcmp(bearing,"E 090 / REGION: unavailable"));
  assert(small_draws==1);arg="1";hud_type();Sbar_Draw();assert(small_draws==1);arg="2";hud_type();Sbar_Draw();assert(small_draws==2);
- assert(!strcmp(local_line,"LOCAL XYZ: -12 42 66 DEG:0 P:0") && scr_copyeverything);
+ assert(!strcmp(local_line,"LOCAL XYZ: -12 42 66 E 090 P:0") && scr_copyeverything);
  assert(strstr(global_line,"unavailable"));
  memset(&local,0,sizeof(local));memset(&player,0,sizeof(player));
  sv.active=true;strcpy(sv.name,"seyda");svs.maxclients=1;svs.clients=&local;local.edict=&player;
  player.v.origin[0]=540;player.v.origin[1]=-200;player.v.origin[2]=65;
- Sbar_Draw();assert(!strcmp(local_line,"LOCAL XYZ: 540 -200 65 DEG:0 P:0"));
- assert(!strcmp(global_line,"GLOBAL XYZ: -9104 -72480 260"));
+ Sbar_Draw();assert(!strcmp(local_line,"LOCAL XYZ: 540 -200 65 E 090 P:0"));
+ assert(!strcmp(global_line,"GLOBAL XYZ: -9104 -72480 260 TIME 23:59"));
  assert(strstr(title," Vvardenfell / Bitter Coast Region") && !strncmp(title,"AmiWind v",9));
- player.v.origin[0]=497;Sbar_Draw();assert(!strcmp(local_line,"LOCAL XYZ: 497 -200 65 DEG:0 P:0"));
+ player.v.origin[0]=497;Sbar_Draw();assert(!strcmp(local_line,"LOCAL XYZ: 497 -200 65 E 090 P:0"));
+ /* V2 carries the clock and all eight compass headings even if the separate
+  * compass is disabled; V1 retains its legacy raw engine yaw and no clock. */
+ {
+  int i;const char *expected[]={"N 000","NE 045","E 090","SE 135","S 180","SW 225","W 270","NW 315"};
+  arg="off";compass_command();
+  for(i=0;i<8;i++){cl.viewangles[YAW]=90-i*45;Sbar_Draw();assert(strstr(local_line,expected[i]));}
+  clock_hour=0;clock_minute=0;Sbar_Draw();assert(strstr(global_line,"TIME 00:00"));
+  clock_hour=9;clock_minute=7;Sbar_Draw();assert(strstr(global_line,"TIME 09:07"));
+  clock_ok=0;Sbar_Draw();assert(strstr(global_line,"TIME --:--"));clock_ok=1;
+  cl.viewangles[YAW]=0;arg="1";hud_type();Sbar_Draw();
+  assert(!strcmp(local_line,"LOCAL XYZ: 497 -200 65 DEG:0 P:0"));assert(!strstr(global_line,"TIME"));
+  arg="2";hud_type();Sbar_Draw();assert(strstr(local_line,"E 090"));
+  player.v.origin[0]=10000000;player.v.origin[1]=-10000000;Sbar_Draw();
+  assert(strlen(global_line)<=54 && strlen(local_line)<=54);
+  player.v.origin[0]=497;player.v.origin[1]=-200;arg="on";compass_command();
+ }
  assert(!fps_draws);arg="on";fps();Sbar_Draw();assert(fps_draws==1);
  arg="off";ram();assert(!scr_showram.value);
  arg="0";master();assert(!AW_DebugOverlaysEnabled() && !AW_DebugCoordsEnabled());

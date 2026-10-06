@@ -44,7 +44,7 @@ class ExteriorSkyTests(unittest.TestCase):
     def test_direct_image_parser_preserves_defaults_and_override(self):
         import build_aga
         required = ['--sdk', '/sdk', '--data-files', '/owned', '--no-npc-gallery', '--world-scenery', '/scenery']
-        for key in ('scene', 'music', 'engine', 'out', 'qcc', 'qbsp', 'vis', 'light', 'xdftool', 'rdbtool'):
+        for key in ('scene', 'music', 'media', 'engine', 'out', 'qcc', 'qbsp', 'vis', 'light', 'xdftool', 'rdbtool'):
             required += ['--' + key, '/' + key]
         for extra, expected in (([], 'false'), (['--local-skybox', 'true'], 'true')):
             with patch('sys.argv', ['build_aga.py', 'image', *required, *extra]), patch.object(build_aga, 'image') as image:

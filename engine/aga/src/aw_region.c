@@ -28,6 +28,51 @@ int AW_RegionOwner(const aw_region_t *r,int n,const float *point,int previous,fl
                        point[1]>=r[i].low[1] && point[1]<=r[i].high[1])return i;
     return -1;
 }
+/* Predict the first residency change, not the far end of the lookahead.
+ * Narrow cores can be skipped by endpoint projection before hysteresis releases
+ * the current region, which used to discard the prefix actually needed next. */
+int AW_RegionNextOwner(const aw_region_t *r,int n,const float *point,
+    const float *velocity,int previous,float margin,float seconds)
+{
+    int i,k,id,best=-1,edge,best_edge=1;
+    double inverse[2],exit_time=seconds,first=seconds,entry,leave,a,b,t;
+    if(!r || !point || !velocity || n<1 || n>AW_REGION_MAX || previous<0 || previous>=n ||
+       !isfinite(margin) || margin<0 || !isfinite(seconds) || seconds<=0)return -1;
+    for(k=0;k<2;k++)if(!isfinite(point[k]) || !isfinite(velocity[k]))return -1;
+    if((double)velocity[0]*velocity[0]+(double)velocity[1]*velocity[1]<16)return -1;
+    id=AW_RegionOwner(r,n,point,previous,margin);
+    if(id!=previous)return id; /* A crossing is already due this frame. */
+    for(k=0;k<2;k++){
+        inverse[k]=velocity[k]?1.0/(double)velocity[k]:0;
+        if(!velocity[k])continue;
+        t=((velocity[k]>0?(double)r[previous].high[k]+margin:
+            (double)r[previous].low[k]-margin)-point[k])*inverse[k];
+        if(t<exit_time)exit_time=t;
+    }
+    if(exit_time>=seconds)return -1; /* The inclusive retention box is not left. */
+    for(i=0;i<n;i++){
+        if(i==previous)continue;
+        entry=exit_time;leave=seconds;edge=0;
+        for(k=0;k<2;k++){
+            if(!velocity[k]){
+                if(point[k]<r[i].low[k] || point[k]>r[i].high[k])break;
+                if(point[k]==r[i].high[k])edge=1;
+            }else{
+                a=((double)r[i].low[k]-point[k])*inverse[k];
+                b=((double)r[i].high[k]-point[k])*inverse[k];
+                if(a>b){t=a;a=b;b=t;}
+                if(a>entry)entry=a;
+                if(b<leave)leave=b;
+            }
+            if(entry>=leave)break; /* Corner touches have no travel interval. */
+        }
+        /* At a shared parallel edge prefer the half-open owner, retaining the
+         * inclusive outer-world fallback used by AW_RegionOwner. */
+        if(k==2 && entry<leave && (entry<first ||
+            (entry==first && edge<best_edge))){best=i;first=entry;best_edge=edge;}
+    }
+    return best;
+}
 static int area_id(const char *name){return !strcmp(name,"balmora")?0:!strcmp(name,"seyda")?1:-1;}
 static int read_regions(int area)
 {
@@ -100,12 +145,10 @@ int AW_RegionCrossing(const float *point,int intro)
     return id>=0 && id!=a->current;
 }
 const char *AW_RegionAhead(const float *point,const float *velocity,int intro,float seconds) {
-    int area=area_id(sv.name),id,k;float projected[3];aw_region_area_t *a;static char next[40];
+    int area=area_id(sv.name),id;aw_region_area_t *a;static char next[40];
     if(area<0 || intro || !read_regions(area))return NULL;
     a=&areas[area];if(a->kind || a->current<0)return NULL;
-    if(velocity[0]*velocity[0]+velocity[1]*velocity[1]<16)return NULL;
-    for(k=0;k<3;k++)projected[k]=point[k]+velocity[k]*seconds;
-    id=AW_RegionOwner(a->regions,a->count,projected,a->current,a->hysteresis);
+    id=AW_RegionNextOwner(a->regions,a->count,point,velocity,a->current,a->hysteresis,seconds);
     if(id<0 || id==a->current)return NULL;
     sprintf(next,"maps/%s.bsp",a->regions[id].name);return next;
 }

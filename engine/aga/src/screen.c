@@ -943,13 +943,17 @@ void SCR_UpdateScreen (void)
     D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in
                                     //  for linear writes all the time
 
-    VID_LockBuffer ();
-
-    V_RenderView ();
-
-    VID_UnlockBuffer ();
+    if(!AW_ModalWorldHidden()) {
+        VID_LockBuffer ();
+        V_RenderView ();
+        VID_UnlockBuffer ();
+    }
 
     D_EnableBackBufferAccess ();	// of all overlay stuff if drawing directly
+    if(AW_ModalWorldHidden()) {
+        AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+        scr_copyeverything=true;
+    }
 
     if (scr_drawdialog)
     {

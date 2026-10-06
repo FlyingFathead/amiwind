@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_main.c  -- client main loop
 
 #include "quakedef.h"
+#include "aw_harvest_runtime.h"
 
 // we need to declare some mouse variables here, because the menu system
 // references them even when on a unix system.
@@ -122,6 +123,7 @@ void CL_Disconnect (void)
 
 void CL_Disconnect_f (void)
 {
+	S_CancelSceneVoice ();
 	CL_Disconnect ();
 	if (sv.active)
 		Host_ShutdownServer (false);
@@ -196,6 +198,7 @@ Con_DPrintf ("CL_SignonReply: %i\n", cls.signon);
 		break;
 
 	case 4:
+		AW_SceneSignon ();
 		SCR_EndLoadingPlaque ();		// allow normal screen updates
 		break;
 	}
@@ -628,7 +631,7 @@ int CL_ReadFromServer (void)
 	int		ret;
 
 	cl.oldtime = cl.time;
-	cl.time += host_frametime;
+	if(!AW_ModalWorldFrozen())cl.time += host_frametime;
 
 	do
 	{
@@ -645,10 +648,15 @@ int CL_ReadFromServer (void)
 	if (cl_shownet.value)
 		Con_Printf ("\n");
 
-	CL_RelinkEntities ();
-    AW_SceneryLink();
-	AW_SpeechRelink();
-	CL_UpdateTEnts ();
+    /* Still consume messages above, but do not animate/rebuild hidden world
+     * entities. Audio mixing and speech servicing remain in the host frame. */
+    if(!AW_ModalWorldFrozen()) {
+        CL_RelinkEntities ();
+        AW_SceneryLink();
+        AW_HarvestLink();
+        AW_SpeechRelink();
+        CL_UpdateTEnts ();
+    }
 
 //
 // bring the links up to date

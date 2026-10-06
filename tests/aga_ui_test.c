@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "aw_character.h"
+aw_character_t aw_character;
 #include <assert.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -27,6 +29,14 @@ void Cmd_AddCommand(char *s,void(*f)(void)){}
 char *Cmd_Argv(int i){return "";}
 int Cmd_Argc(void){return 0;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
+static void check_hud_bars(int health,int magicka,int fatigue) {
+ int row,x,n,expected[3];expected[0]=health;expected[1]=magicka;expected[2]=fatigue;
+ memset(vid.buffer,137,64000);AW_UIHud();
+ for(row=0;row<3;row++){
+  n=0;for(x=10;x<81;x++)if(vid.buffer[(176+row*8)*320+x]!=0)n++;
+  assert(n==expected[row]);
+ }
+}
 int main(int argc,char **argv){
  byte raw[2057],before[3];const char *p;char line[9],temporary[]="aw-ui-XXXXXX",path[128];int i;FILE *f;
  directory=argc>1?argv[1]:".";
@@ -44,6 +54,28 @@ int main(int argc,char **argv){
  for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
  memset(frame,137,sizeof(frame));vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=frame+2;
  AW_UIInit();AW_UIBox(-12,-12,80,80);AW_UIBox(300,190,80,80);
+ /* Real HUD pixels: full non-100 stats, independent fractions, live health,
+  * invalid maxima, damage and overheal must not alter character state. */
+ {
+  client_t local;edict_t player;aw_character_t saved;
+  memset(&local,0,sizeof(local));memset(&player,0,sizeof(player));
+  cls.state=ca_connected;aw_character.valid=1;
+  aw_character.current[0]=aw_character.maximum[0]=55;
+  aw_character.current[1]=aw_character.maximum[1]=40;
+  aw_character.current[2]=aw_character.maximum[2]=180;
+  check_hud_bars(71,71,71);
+  aw_character.current[0]=27.5;aw_character.current[1]=10;aw_character.current[2]=90;
+  check_hud_bars(35,17,35);
+  sv.active=true;svs.maxclients=1;svs.clients=&local;local.edict=&player;
+  player.v.health=55;saved=aw_character;check_hud_bars(71,17,35);
+  assert(!memcmp(&saved,&aw_character,sizeof(saved)));
+  player.v.health=0;check_hud_bars(0,17,35);
+  player.v.health=100;check_hud_bars(71,17,35);
+  aw_character.maximum[0]=0;aw_character.maximum[1]=-1;aw_character.maximum[2]=NAN;
+  check_hud_bars(0,0,0);
+  aw_character.valid=0;sv.active=false;check_hud_bars(71,71,71);
+  svs.clients=NULL;cls.state=ca_disconnected;
+ }
  AW_UIScrollbar(276,54,133,9,7,0);AW_UIScrollbar(315,190,100,100,6,94);
  assert(AW_UIScrollHit(280,55,276,54,133,9,7,1)==0);
  assert(AW_UIScrollHit(280,186,276,54,133,9,7,1)==2);

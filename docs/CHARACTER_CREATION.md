@@ -212,3 +212,29 @@ select a row; arrow clicks change that row. Choose remains the confirmation
 default. The debug preset `dbg aw hors 0` uses normal catalogue rebuilding for
 a male Nord, Barbarian and The Steed (source ID `Charioteer`), then applies the
 post-Census quest/inventory state and starts in Seyda Neen square.
+
+## Character UI V2: completion controls and remaining artwork
+
+`aw_ui_mode 2` is the new default, retaining `aw_ui_mode 1` as the legacy layout.
+All four selection/review pages have a visible bottom-right OK control alongside
+their keyboard hints. Mouse OK and keyboard acceptance share the existing
+validation/confirmation path. The appearance selector exposes OK as the next
+focus after Hair. This does not alter the modal freeze/blackout flags or stop music.
+Use `dbg tpscene headselection` for a fresh test entry; see DEBUG_OVERLAYS.md for
+its unsaved-progress reset and prerequisites.
+
+Missing components requested on 5 October 2026:
+
+- Class illustrations: study the original class-selection assets and record-to-
+  texture mapping, then show the matching owned-converted illustration in V2.
+  Do not guess an image association or bundle proprietary art in public source.
+  Retain a readable text-only fallback and bounded memory/draw cost when art is
+  missing. Current class selection is functional but has no illustration panel.
+- Custom class creation: retain as explicit missing functionality alongside the
+  existing quiz follow-up. Specify specialization, favored attributes, major/
+  minor skills, validation and saved-character representation before claiming
+  support. Preset class selection is not custom-class creation.
+
+The owner confirmed appearance/head rotation and class selection work in the
+preceding target build. That observation does not verify the new V2 controls,
+class artwork or custom-class functionality.

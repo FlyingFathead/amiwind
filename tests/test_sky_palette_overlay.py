@@ -1,10 +1,58 @@
 # SPDX-License-Identifier: GPL-3.0-only
-import unittest,struct,tempfile
+import unittest,struct,tempfile,json,hashlib
 from pathlib import Path
 import numpy as np
 from sky_palette_overlay import spans,lookup,convert,BANK
 
 class Tests(unittest.TestCase):
+    def world_map(self):
+        header=b'AWM1'+struct.pack('<HH4iII',4,2,-8192,-8192,8192,8192,1,83)
+        town=b'Seyda Neen'.ljust(16,b'\0')+b'Settlement'.ljust(32,b'\0')+struct.pack('<3f',0,0,.25)
+        return header+town+bytes([83,140,156,95,133,221,222,42])
+
+    def test_map_palette_spans_preserve_town_metadata_and_reject_malformed(self):
+        raw=self.world_map()
+        self.assertEqual(spans(raw,'world/map.awm')[0],[(28,1),(92,8)])
+        for at,fmt,value in [(0,'4s',b'AWM2'),(4,'H',513),(24,'I',9),(28,'I',256),(88,'f',float('nan'))]:
+            broken=bytearray(raw);struct.pack_into('<'+fmt,broken,at,value)
+            with self.subTest(at=at),self.assertRaises(ValueError):spans(broken,'world/map.awm')
+        for broken in (raw[:31],raw[:-1],raw+b'!'):
+            with self.assertRaises(ValueError):spans(broken,'world/map.awm')
+
+    def test_world_map_overlay_rebinds_receipt_and_preserves_landmarks(self):
+        from prepare_world_ui import validate, WORLD_UI_FILES
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'source';(source/'gfx').mkdir(parents=True)
+            world=source/'world';world.mkdir()
+            palette=bytearray(v for i in range(256) for v in (i,i,i))
+            for i,(target,_) in BANK.items():palette[i*3:i*3+3]=palette[target*3:target*3+3]
+            (source/'gfx/palette.lmp').write_bytes(palette)
+            for name in WORLD_UI_FILES:(world/name).write_bytes(self.world_map() if name=='map.awm' else b'synthetic')
+            receipt={'format':'AmiWind world UI 1','palette_sha256':hashlib.sha256(palette).hexdigest(),
+                     'files':{name:hashlib.sha256((world/name).read_bytes()).hexdigest() for name in WORLD_UI_FILES}}
+            (world/'conversion.json').write_text(json.dumps(receipt),encoding='utf-8')
+            original={p.relative_to(source):p.read_bytes() for p in source.rglob('*') if p.is_file()}
+            report=convert(source,root/'output')
+            result=(root/'output/world/map.awm').read_bytes()
+            self.assertEqual(result[:28],self.world_map()[:28])
+            self.assertEqual(result[29:92],self.world_map()[29:92])
+            self.assertEqual(struct.unpack_from('<I',result,28)[0],82)
+            self.assertEqual(result[92:],bytes([82,138,158,94,113,223,223,42]))
+            corrected=validate(root/'output')
+            self.assertEqual(corrected['sky_overlay_source_palette_sha256'],receipt['palette_sha256'])
+            self.assertNotEqual(corrected['palette_sha256'],receipt['palette_sha256'])
+            self.assertEqual(report['bank']['83']['pixels'],2)
+            self.assertEqual(original,{p.relative_to(source):p.read_bytes() for p in source.rglob('*') if p.is_file()})
+            # Changed-only output must include both map bytes and their receipt.
+            convert(source,root/'overlay',changed_only=True)
+            self.assertEqual((root/'overlay/world/map.awm').read_bytes(),result)
+            self.assertTrue((root/'overlay/world/conversion.json').is_file())
+            receipt['files']['map.awm']='0'*64
+            (world/'conversion.json').write_text(json.dumps(receipt),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'World UI hash mismatch'):
+                convert(source,root/'rejected')
+            self.assertFalse((root/'rejected').exists())
+
     def test_mdl_group_header_unchanged(self):
         raw=bytearray(84);raw[:8]=struct.pack('<4si',b'IDPO',6);struct.pack_into('<3i',raw,48,1,2,2)
         raw+=struct.pack('<ii2f',1,2,.1,.2)+bytes([222,255,133,101])*2+bytes(64)
