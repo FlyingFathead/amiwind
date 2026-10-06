@@ -38,7 +38,9 @@ int COM_FOpenFile(char *name,FILE **out){
 int main(void){
     float a[3]={240,0,40},b[3],c[3],source[3];char target[16];int before;
     assert(AW_MapId("vf0000")==AW_MAP_COUNT);
-    assert(AW_MapId("vf8191")==AW_SCENE_COUNT-1);
+    /* Outdoor save IDs stay fixed when interior sections are appended. */
+    assert(AW_MapId("vf8191")==8251 && AW_INTERIOR_MAP_BASE==8252);
+    assert(!strcmp(AW_MapName(8251),"vf8191"));
     assert(AW_MapId("vf8192")==-1 && AW_MapId("vf12")==-1 && AW_MapId("vf001x")==-1);
     assert(!strcmp(AW_MapName(AW_MAP_COUNT+1),"vf0001"));
     assert(AW_WorldDestination("seyda",a,target,b));

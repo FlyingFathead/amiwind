@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import re
 import struct
+from alias_stream_heap import apply as alias_policy_apply, fallback as alias_fallback
 from prepare_guard_torches import fingerprint_entries
 
 # Runtime frees this admission probe before entering the ordinary alias loader.
@@ -28,11 +29,11 @@ def alias_cost(raw, sizes):
     alloc=lambda value:sizes['hunk']+align(value)
     header=alloc(sizes['aliashdr']+(nf-1)*sizes['maliasframedesc']+sizes['mdl']+nv*sizes['stvert']+nt*sizes['mtriangle'])
     decoded=header+alloc(sizes['maliasskindesc'])+alloc(w*h)+nf*alloc(nv*sizes['trivertx'])
-    return {'file_bytes':len(raw),'frames':nf,'vertices':nv,'triangles':nt,
+    return alias_policy_apply(raw,sizes,{'file_bytes':len(raw),'frames':nf,'vertices':nv,'triangles':nt,
             'decoded_hunk_bytes':decoded,'cache_bytes':align(decoded+sizes['cache_system']),
             'external_malloc_peak_bytes':len(raw)+decoded,
             'source_file_hunk_fallback_bytes':alloc(len(raw)+1),
-            'decoded_malloc_copy_supported':decoded<=512*1024,'source_malloc_supported':len(raw)<=512*1024}
+            'decoded_malloc_copy_supported':decoded<=512*1024,'source_malloc_supported':len(raw)<=512*1024})
 
 
 def profile(id1, sizes):
@@ -76,7 +77,7 @@ def map_cost(entity_bytes, prepared):
     # malloc fails, while decoded staging remains live if copy malloc fails.
     # Charge this on top of the entire active cache union, without assuming
     # either malloc succeeds or that old cache entries have been evicted first.
-    fallback=max((models[name]['decoded_hunk_bytes']+models[name]['source_file_hunk_fallback_bytes'] for name in active),default=0)
+    fallback=max((alias_fallback(models[name]) for name in active),default=0)
     return {'matching_guard_placements':placements,'active_model_union':sorted(active),
             'automatic_model_union':sorted(automatic),'active_cache_bytes':cached,
             'automatic_cache_bytes':sum(models[name]['cache_bytes'] for name in automatic),

@@ -3,8 +3,10 @@
  * the material has denser, mirrored or skewed UVs. Use the real accumulator. */
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_torch.h"
 #include <assert.h>
 client_state_t cl;
+cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
 dlight_t cl_dlights[MAX_DLIGHTS];
 entity_t cl_entities[MAX_EDICTS], *currententity;
 void R_EntityRotate(vec3_t point) { assert(0); }
@@ -55,6 +57,21 @@ int main(void)
     assert(sample(1,0,1,0,0,-1e30f)==0);
     assert(sample(1e20f,0,1e20f,0,16,16)==0);
     assert(sample(1,1,1e-8f,0,1e20f,1e20f)==0);
+    /* Real accumulator: player and both admitted guards share the scalar;
+     * unrelated lights and samples outside the radius retain their values. */
+    for(i=0;i<3;i++){
+        cl_dlights[0].key=i?AW_GUARD_TORCH_LIGHT_KEY-(i-1):AW_TORCH_LIGHT_KEY;
+        aw_torch_strength.value=.7f;baseline=sample(1,0,1,0,0,0);
+        assert(baseline>167*256);
+        aw_torch_strength.value=.35f;actual=sample(1,0,1,0,0,0);
+        assert(actual>0 && abs((int)(actual*2)-(int)baseline)<=1);
+        aw_torch_strength.value=0;assert(!sample(1,0,1,0,0,0));
+        aw_torch_strength.value=1;assert(sample(1,0,1,0,0,0)>baseline);
+        assert(!sample(1,0,1,0,200,0));
+        aw_torch_strength.value=NAN;assert(!sample(1,0,1,0,0,0));
+    }
+    cl_dlights[0].key=123;assert(sample(1,0,1,0,0,0)==167*256);
+    aw_torch_strength.value=.7f;
     puts("near-foot light, material density/skew/mirroring, range and singular controls passed");
     return 0;
 }

@@ -39,7 +39,7 @@ static void check(const char *path){
     model.lightdata=raw+head->lumps[LUMP_LIGHTING].fileofs;
     Mod_LoadFaces(&head->lumps[LUMP_FACES]);hash=1469598103934665603ULL;
     for(i=0;i<model.numsurfaces;i++){
-        surface=&model.surfaces[i];bytes(&surface->numedges,sizeof(int));bytes(&surface->flags,sizeof(int));
+        surface=&model.surfaces[i];{int value=surface->numedges;bytes(&value,sizeof(value));value=surface->flags;bytes(&value,sizeof(value));}
         bytes(surface->plane->normal,12);bytes(&surface->plane->dist,4);
         bytes(surface->texturemins,4);bytes(surface->extents,4);bytes(surface->styles,MAXLIGHTMAPS);
         bytes(surface->texinfo->vecs,32);bytes(surface->texinfo->texture->name,16);

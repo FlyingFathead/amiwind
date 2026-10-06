@@ -114,6 +114,15 @@ void Cvar_Set (char *var_name, char *value)
         return;
     }
 
+    /* Normalized sound/light levels use the ordinary archived config path.
+     * Clamp direct console/config input as well as their UI/command paths. */
+    if (!strcmp(var_name, "effectsvolume") || !strcmp(var_name, "dialoguevolume") ||
+        !strcmp(var_name, "aw_torch_strength"))
+    {
+        float gain = Q_atof(value);
+        if (!(gain >= 0)) value = "0";
+        else if (gain > 1) value = "1";
+    }
     changed = Q_strcmp(var->string, value);
 
     Z_Free (var->string);	// free the old value string

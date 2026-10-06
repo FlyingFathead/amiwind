@@ -8,6 +8,12 @@ int AW_RegionLoadingFrozen(void){return frozen_loading;}
 void AW_RegionLoadingToggle(void){frozen_loading=!frozen_loading;}
 static void (*picker)(void),(*front)(void);static char queued[64];
 static int mx=160,my=63;
+cvar_t volume={"volume","0.7",true,false,.7f},bgmvolume={"bgmvolume","1",true,false,1};
+cvar_t effectsvolume={"effectsvolume","0.75",true,false,.75f},dialoguevolume={"dialoguevolume","1",true,false,1};
+static int audio_sets,audio_draws;
+static int highlight_y,highlight_w,scroll_top,scroll_total;
+void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;assert(value>=0 && value<=1);for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
+void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 int AW_UIFrameEnabled(void){return gold_frame;}
 void AW_UIFrameToggle(void){gold_frame=!gold_frame;}
 int AW_DrawDistance(void){return distance;}
@@ -20,16 +26,38 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_scene_menu"
 void Cbuf_AddText(char *s){if(!strcmp(s,"quit\n"))quit++;else{strcpy(queued,s);changes++;}}
 int AW_UIBackground(void){return 1;}int AW_UILogo(int x,int y){assert(x==60 && y==10);return 1;}
 int AW_UIWidth(const char *s){return strlen(s)*7;}
-int AW_UIColor(int r,int g,int b){return 0;}
-void AW_UIFill(int x,int y,int w,int h,int c){}
-void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);}
+int AW_UIColor(int r,int g,int b){return r;}
+void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}}
+void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);scroll_top=top;scroll_total=total;}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
-void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);}
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);if(!strcmp(s,"Audio"))audio_draws++;}
 void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
 void AW_MusicTitle(void){}
 void AW_MenuMouse(int,int);
 static void open_pause(void){M_Menu_Main_f();mx=160;my=63;}
 static void click(int x,int y){AW_MenuMouse(x-mx,y-my);mx=x;my=y;M_Keydown(K_MOUSE1);}
+static void check_setup_endpoints(void){
+ int i,j,down[]={K_DOWNARROW,K_MWHEELDOWN,'s',K_TAB},up[]={K_UPARROW,K_MWHEELUP,'w'};
+ front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
+ for(j=0;j<4;j++){
+  for(i=0;i<24;i++)M_Keydown(down[j]);
+  M_Draw();assert(scroll_total==10 && scroll_top==3 && highlight_y==168 && highlight_w==230);
+  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==3 && highlight_y==149);
+  for(i=0;i<24;i++)M_Keydown(up[j%3]);
+  M_Draw();assert(scroll_top==0 && highlight_y==54 && highlight_w==230);
+  M_Keydown(K_DOWNARROW);M_Draw();assert(scroll_top==0 && highlight_y==73);
+ }
+ /* Reversing at either end works; the Interface subpanel shares the rule. */
+ M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
+ for(i=0;i<24;i++)M_Keydown(K_MWHEELUP);
+ M_Draw();assert(highlight_y==54 && highlight_w==232);
+ for(i=0;i<24;i++)M_Keydown(K_DOWNARROW);
+ M_Draw();assert(highlight_y==168 && highlight_w==232);
+ M_Keydown(K_UPARROW);M_Draw();assert(highlight_y==149);
+ for(i=0;i<24;i++)M_Keydown(K_UPARROW);
+ M_Keydown(K_DOWNARROW);M_Draw();assert(highlight_y==73);
+ M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
+}
 int main(void){
  vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;sv.active=true;
  M_Init();assert(picker && front);
@@ -54,10 +82,10 @@ int main(void){
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
  M_Draw();M_Keydown(K_ESCAPE);
- M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
  M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
- click(100,149+18);assert(frozen_loading); /* final pixel of the new loading row */
- click(100,168);M_Draw();assert(AW_CellChangeMethod()==2); /* loading method */
+ click(100,168+18);assert(frozen_loading); /* final pixel of the loading row */
+ M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(AW_CellChangeMethod()==2); /* scrolled loading method */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_StreamOption(1,0)==256);
  M_Keydown(K_RIGHTARROW);assert(AW_StreamOption(1,0)==512);
  M_Keydown(K_DOWNARROW);M_Draw();M_Keydown(K_ENTER); /* scrolled Back */
@@ -74,6 +102,7 @@ int main(void){
  missing=1;picker();M_Draw();M_Keydown(K_ENTER);assert(changes==4 && key_dest==key_game);missing=0;
  M_Menu_Quit_f();M_Draw();M_Keydown(K_ENTER);assert(!quit);M_Menu_Quit_f();M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);assert(quit==1);
  open_pause();AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw();
+ check_setup_endpoints();
  return 0;
 }
 

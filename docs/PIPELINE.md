@@ -1,5 +1,13 @@
 # Intended host-to-Amiga build pipeline
 
+## Geometry import validation update: 2026-10-06T20:06:10+03:00
+
+The RC1 Temple investigation confirmed that nearly collinear leading vertices
+can produce incorrect exported BSP planes despite retained source triangles.
+Use [the geometry import checks](MESH_TIPS_AND_TRICKS.md) and retain
+[the Temple regression](bugs/BALMORA-TEMPLE-GEOMETRY-29.md) for future imports.
+The repair candidate is Temple-only; the wider interior audit is read-only.
+
 The goal is one host-side build process: provide original Morrowind files, choose
 a hardware/storage profile, then generate a locally playable Amiga build. The
 host performs expensive preparation; the target runs a purpose-built native

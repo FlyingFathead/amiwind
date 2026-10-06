@@ -6,6 +6,9 @@
 #include "aw_character.h"
 #define AW_SAVE_BYTES 65536
 #define AW_SAVE_ACTORS 256
+#define AW_EQUIPMENT_DRAWN 1U
+#define AW_EQUIPMENT_TORCH 2U
+#define AW_EQUIPMENT_MASK (AW_EQUIPMENT_DRAWN|AW_EQUIPMENT_TORCH)
 typedef struct {
     uint32_t reference;
     int scene;
@@ -14,6 +17,7 @@ typedef struct {
 } aw_saved_actor_t;
 typedef struct {
     uint32_t sequence,profile;
+    uint32_t equipment; /* AWS4 intent flags; older saves default to hidden. */
     unsigned char content[32];
     char scene[16],label[32];
     float position[3],angles[3];

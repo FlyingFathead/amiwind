@@ -4,5 +4,6 @@
 int AW_HandModelsDecode(const unsigned char *data,int size);
 void AW_HandModelsLoad(void);
 void AW_HandModelsReset(void);
-void AW_HandModelsApply(void);
+/* Returns one only after selecting a complete, validated appearance. */
+int AW_HandModelsApply(void);
 #endif

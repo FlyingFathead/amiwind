@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include "aw_sky.h"
 #include "aw_hand_models.h"
+#include "aw_torch.h"
 
 //define	PASSAGES
 
@@ -207,6 +208,7 @@ void R_Init (void)
 	Cvar_RegisterVariable (&r_graphheight);
 	Cvar_RegisterVariable (&r_drawflat);
 	Cvar_RegisterVariable (&r_ambient);
+	R_InteriorLumaInit();
 	Cvar_RegisterVariable (&r_clearcolor);
 	Cvar_RegisterVariable (&r_waterwarp);
 	Cvar_RegisterVariable (&r_fullbright);
@@ -580,6 +582,14 @@ void R_DrawEntitiesOnList (void)
 
 				lighting.plightvec = lightvec;
 
+			/* Preserve the classic static-light baseline, including maps with
+			 * no lightdata (R_LightPoint returns 255), before adding local
+			 * lights. Clamping afterwards erased every torch on those maps. */
+				if (lighting.ambientlight > 128)
+					lighting.ambientlight = 128;
+				if (lighting.ambientlight + lighting.shadelight > 192)
+					lighting.shadelight = 192 - lighting.ambientlight;
+
 				for (lnum=0 ; lnum<MAX_DLIGHTS ; lnum++)
 				{
 					if (cl_dlights[lnum].die >= cl.time)
@@ -587,23 +597,28 @@ void R_DrawEntitiesOnList (void)
 						VectorSubtract (currententity->origin,
 										cl_dlights[lnum].origin,
 										dist);
-						add = cl_dlights[lnum].radius - Length(dist);
+						add = (cl_dlights[lnum].radius - Length(dist))*
+                            AW_TorchLightGain(cl_dlights[lnum].key,cl_dlights[lnum].radius,0);
 
-						if (add > 0)
-							lighting.ambientlight += add;
+						if (add > 0 && isfinite(add))
+						{
+							if (add >= 255 - lighting.ambientlight)
+								lighting.ambientlight = 255;
+							else
+								lighting.ambientlight += add;
+						}
 					}
 				}
 
-			// clamp lighting so it doesn't overbright as much
-				if (lighting.ambientlight > 128)
-					lighting.ambientlight = 128;
-				if (lighting.ambientlight + lighting.shadelight > 192)
-					lighting.shadelight = 192 - lighting.ambientlight;
+			/* Stay inside the alias renderer's 0..255 brightness range.
+			 * This never changes an actor without a positive local light. */
+				if (lighting.ambientlight + lighting.shadelight > 255)
+					lighting.shadelight = 255 - lighting.ambientlight;
 
                 /* The isolated inspection plane promises steady daylight.
                  * Rest-mesh exports do not yet carry animated vertex normals;
                  * the world-light clamp otherwise makes every face half dark. */
-                if(AW_GalleryActive() && !strncmp(currententity->model->name,"gallery/",8)) {
+                if(AW_GalleryActive() && !AW_TorchTestActive() && !strncmp(currententity->model->name,"gallery/",8)) {
                     lighting.ambientlight=200;
                     lighting.shadelight=0;
                 }
@@ -650,8 +665,9 @@ void R_DrawViewModel (void)
 #if AMIWIND_SPRITE_HANDS
     AW_TorchViewModel();AW_HandSpritesDraw();return;
 #endif
-    AW_TorchViewModel();
-    AW_HandModelsApply();
+    /* Resolve the optional current appearance before loading a legacy torch.
+     * Other frames/equipment remain ordinary cache-reloadable model metadata. */
+    if(!AW_HandModelsApply())AW_TorchViewModel();
 	VectorCopy (currententity->origin, r_entorigin);
 	VectorSubtract (r_origin, r_entorigin, modelorg);
 
@@ -683,7 +699,7 @@ void R_DrawViewModel (void)
 		radius_sq = dl->radius * dl->radius;
 
 		if (dist_sq < radius_sq) {
-			add = dl->radius - sqrt(dist_sq);
+			add = (dl->radius - sqrt(dist_sq))*AW_TorchLightGain(dl->key,dl->radius,0);
 			r_viewlighting.ambientlight += add;
 		}
 	}

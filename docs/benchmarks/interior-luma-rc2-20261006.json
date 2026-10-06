@@ -1,0 +1,33 @@
+{
+  "scope": "Census single-scene FS-UAE renderer timerefresh128frame rotations; not gameplay frame timing or physical Amiga, no disabled-build or night comparison",
+  "baseline_seconds": [
+    1.175745,
+    1.153869,
+    1.189768
+  ],
+  "interior1_2_seconds": [
+    1.195214,
+    1.189845,
+    1.148743
+  ],
+  "median_seconds_baseline": 1.175745,
+  "median_seconds_1_2": 1.189845,
+  "median_percent_delta": 1.199239631042448,
+  "median_ms_per_render_delta": 0.11015625000000001,
+  "config_defaults_saved": true,
+  "log_sha256": "4806089722dc26faf7ca3e5d0ab81ef7cd7fcfe86d73ee7de09f70b500e1a379",
+  "first_truncated_batch_excluded": true,
+  "limited_samples": 3,
+  "background_full_backup_active": true,
+  "recorded_at": "2026-10-06T19:04:30+00:00",
+  "version": "v0.0.29-rc2",
+  "engine_sha256": "c3a3a6243e01b0e96ce9b0a30aa39224d39601dd1a08d12b2e26b9d0af620194",
+  "measured_at_utc": "2026-10-06T18:56:18Z/2026-10-06T18:56:30Z",
+  "frames_per_rotation": 128,
+  "interior_scene": "census",
+  "torch_active": false,
+  "clock": "10:21",
+  "feature_enabled_in_both_cases": true,
+  "controls_disabled_benchmark": false,
+  "ram_overhead_measured": false
+}

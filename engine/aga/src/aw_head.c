@@ -28,7 +28,19 @@ int AW_HeadLoad(int head,int hair)
         faces[slot]=0;loaded[slot]=-1;f=NULL;
         sprintf(path,"character/h%03ld.awh",(long)ids[slot]);size=COM_FOpenFile(path,&f);
         if(!f)return 0;
-        n=size>=6 && size<=(int)sizeof(mesh[slot]) && fread(mesh[slot],1,size,f)==(size_t)size;
+        n=0;
+        if(size>=6 && size<=(int)sizeof(mesh[slot])){
+            int offset=0,take;
+            /* These UI meshes use fixed slots, independent of the model/SFX
+             * cache. Keep ordinary music and DMA serviced between bounded reads. */
+            CDAudio_Update();S_ExtraUpdate();
+            while(offset<size){
+                take=size-offset;if(take>4096)take=4096;
+                if(fread(mesh[slot]+offset,1,take,f)!=(size_t)take)break;
+                offset+=take;CDAudio_Update();S_ExtraUpdate();
+            }
+            n=offset==size;
+        }
         fclose(f);
         if(!n || !AW_HeadDecode(slot,mesh[slot],size))return 0;
         loaded[slot]=ids[slot];

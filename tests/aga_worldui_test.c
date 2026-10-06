@@ -181,7 +181,7 @@ static void marker_save_roundtrip(void)
     strcpy(aw_races[0].id,"race");strcpy(aw_classes[0].id,"class");strcpy(aw_births[0].id,"birth");
     strcpy(aw_parts[0].id,"head");strcpy(aw_parts[1].id,"hair");aw_parts[1].kind=1;
     assert(AW_StateSet(&aw_state,AW_GLOBAL,"chargenstate",-1));saved.state=aw_state;
-    length=AW_SaveEncode(bytes,sizeof(bytes),&saved);assert(length>0 && !memcmp(bytes,"AWS2",4));
+    length=AW_SaveEncode(bytes,sizeof(bytes),&saved);assert(length>0 && !memcmp(bytes,"AWS4",4));
     assert(AW_SaveDecode(bytes,length,&decoded));AW_StateReset();aw_state=decoded.state;
     assert(!memcmp(&aw_state,&saved.state,sizeof(aw_state)));
 }

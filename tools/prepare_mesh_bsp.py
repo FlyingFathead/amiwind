@@ -118,10 +118,30 @@ def _instance_key(ref, lighting):
     return (*key,ref['number']) if lighting and not lighting.get('shared_ambient') else key
 
 
+def _stable_face_normal(points):
+    """Use the whole Temple polygon; merged leading edges may be collinear.
+
+    Work relative to one vertex to avoid cancellation from large offsets.
+    Retain authored vertices: reject a warped surface rather than projecting
+    it or silently dropping geometry. The tolerance is in BSP world units.
+    """
+    relative=points-points[0]
+    area=np.cross(relative,np.roll(relative,-1,axis=0)).sum(axis=0)
+    magnitude=np.linalg.norm(area)
+    if not np.isfinite(relative).all() or not np.isfinite(magnitude) or magnitude<=1e-12:
+        raise ValueError('Degenerate Temple surface plane')
+    normal=area/magnitude
+    deviation=float(np.max(np.abs(relative@normal)))
+    if deviation>.05:
+        raise ValueError(f'Nonplanar Temple surface: {deviation:.6g} exceeds 0.05')
+    return normal
+
+
 def _prepare_placement(task):
     from scipy.spatial import ConvexHull
     from types import SimpleNamespace
-    ref, data, texsize, centre, lighting = task
+    ref, data, texsize, centre, lighting, *options = task
+    stable_planes=bool(options and options[0])
     v,f,polys,components,lod=data
     origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
     o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
@@ -132,7 +152,10 @@ def _prepare_placement(task):
     visual_delta=r @ np.asarray(ref.get("_visual_offset", [0,0,0]), dtype=float)*scale
     surfaces=[]
     for polygon,material,axes,offset,source_normal in polys:
-        q=polygon@r.T*scale+o;n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
+        q=polygon@r.T*scale+o
+        if stable_planes:n=_stable_face_normal(q)
+        else:
+            n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
         normal=r@source_normal
         q=q+normal*ref.get('_flatten_shift',0)+visual_delta
         if n@normal<0:q=q[::-1];n=-n
@@ -321,7 +344,8 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
        if key in seen:continue
        seen.add(key)
-       yield ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting
+       # Explicit Temple opt-in only; inferred filenames must not alter other maps.
+       yield ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting,map_identity=='bmtemple'
     # Geometry and lightmaps are private worker results. BSP offsets, shared
     # palettes and entity order are assigned by this single assembly writer.
     from contextlib import closing

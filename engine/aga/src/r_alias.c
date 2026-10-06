@@ -43,6 +43,10 @@ aliashdr_t			*paliashdr;
 finalvert_t			*pfinalverts;
 auxvert_t			*pauxverts;
 static float		ziscale;
+/* First-person fist geometry extends closer than the world alias near plane.
+ * Camera-space scaling preserves x/z and y/z while moving the effective fist
+ * near plane from 5 to 1.25. World models and the separate torch are unchanged. */
+static float aw_fist_clip_scale = 1.0f;
 static model_t		*pmodel;
 
 static vec3_t		alias_forward, alias_right, alias_up;
@@ -399,6 +403,21 @@ void R_AliasSetUpTransform (int trivial_accept)
 
     R_ConcatTransforms (viewmatrix, rotationmatrix, aliastransform);
 
+    aw_fist_clip_scale = 1.0f;
+    if (currententity == &cl.viewent && pmdl->numframes == 28 &&
+        (!strcmp(currententity->model->name, "progs/v_nord.mdl") ||
+         !strncmp(currententity->model->name, "progs/hands/", 12)))
+    {
+        int row, column;
+        aw_fist_clip_scale = 4.0f;
+        for (row = 0; row < 3; row++)
+            for (column = 0; column < 4; column++)
+                aliastransform[row][column] *= aw_fist_clip_scale;
+        /* Use the clipped path even if stale entity metadata says otherwise. */
+        currententity->trivial_accept = trivial_accept = 0;
+    }
+
+
 // do the scaling up of x and y to screen coordinates as part of the transform
 // for the unclipped case (it would mess up clipping in the clipped case).
 // Also scale down z, so 1/z is scaled 31 bits for free, and scale down x and y
@@ -532,7 +551,16 @@ void R_AliasProjectFinalVert (finalvert_t *fv, auxvert_t *av)
 // project points
     zi = 1.0 / av->fv[2];
 
-    fv->v[5] = zi * ziscale;
+    if (aw_fist_clip_scale != 1.0f)
+    {
+        float depth = zi * ziscale * aw_fist_clip_scale;
+        /* Preserve the usual viewmodel depth bias. Newly visible geometry
+         * nearer than three units saturates safely in the signed depth range. */
+        if (depth > 2147418112.0f) depth = 2147418112.0f;
+        fv->v[5] = depth;
+    }
+    else
+        fv->v[5] = zi * ziscale;
 
     fv->v[0] = (av->fv[0] * aliasxscale * zi) + aliasxcenter;
     fv->v[1] = (av->fv[1] * aliasyscale * zi) + aliasycenter;

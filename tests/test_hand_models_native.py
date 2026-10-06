@@ -10,6 +10,11 @@ import test_aga_native_source as native
 @unittest.skipUnless(shutil.which('cc'),'requires a C compiler')
 class HandModelsNative(unittest.TestCase):
     compile_run=native.NativeSourceTests.compile_run
+
     def test_race_sex_hand_model_pairs_preserve_frames_and_reset(self):
         self.compile_run('aga_hand_models_test.c',[Path(native.SOURCE)/'src/aw_hand_models.c'],
+                         cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_legacy_torch_cache_retirement_checks_exact_ownership(self):
+        self.compile_run('aga_torch_cache_retirement_test.c',[],
                          cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])

@@ -2,6 +2,7 @@
 #ifndef AW_HARVEST_PROXY_H
 #define AW_HARVEST_PROXY_H
 void AW_HarvestProxyClear(void);
+unsigned AW_HarvestProxyBytes(void);
 int AW_HarvestProxySpawn(const aw_harvest_t *,aw_state_t *,int,unsigned);
 void AW_HarvestProxyLink(void);
 entity_t *AW_HarvestProxyEntity(int);

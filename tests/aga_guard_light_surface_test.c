@@ -73,17 +73,31 @@ int main(void)
     vid.colormap=colourmap;cl.worldmodel=&world;r_framecount=10;
     D_InitCaches(cache_memory.data,sizeof cache_memory.data);
     for(mip=0;mip<4;mip++){pair(0,12,NULL);pair(128,12,NULL);pair(128,50,NULL);}
+    /* The shared scalar reaches the actual indexed surface output and cache,
+     * including immediate zero/restoration; neither guard count nor reach changes. */
+    for(mip=0;mip<4;mip++){
+        D_FlushCaches();r_refdef.ambientlight=0;memset(samples,12,sizeof samples);
+        set_command("off");render(off_pixels,NULL);
+        set_command("on");aw_torch_strength.value=0;render(on_pixels,NULL);
+        assert(lights()==1 && !difference(off_pixels,on_pixels));
+        aw_torch_strength.value=.35f;render(on_pixels,NULL);
+        assert(difference(off_pixels,on_pixels)>0);
+        aw_torch_strength.value=.7f;render(restored_pixels,NULL);
+        assert(difference(on_pixels,restored_pixels)>0);
+        for(i=0;i<(1024>>(2*mip));i++)assert(restored_pixels[i]>=on_pixels[i]);
+        assert(universal_radius==192 && lights()==1);
+    }
     /* A translated and yaw-rotated brush must match the world surface. */
     memset(&brush,0,sizeof brush);brush.origin[0]=100;brush.origin[1]=100;
     brush.angles[1]=90;entity_rotation[0][1]=1;entity_rotation[1][0]=-1;entity_rotation[2][2]=1;
     cl_entities[1].origin[0]=84;cl_entities[1].origin[1]=116;
     for(mip=0;mip<4;mip++)pair(128,50,&brush);mip=0;
-    /* Missing lightdata and fullbright intentionally bypass illumination;
+    /* Legacy missing lightdata and fullbright intentionally bypass illumination;
      * high baked light saturates. These controls prevent false conclusions. */
     cl_entities[1].origin[0]=cl_entities[1].origin[1]=16;currententity=&cl_entities[0];
-    D_FlushCaches();world.lightdata=NULL;set_command("off");render(off_pixels,NULL);
+    exterior=0;D_FlushCaches();world.lightdata=NULL;set_command("off");render(off_pixels,NULL);
     set_command("on");render(on_pixels,NULL);assert(!difference(off_pixels,on_pixels));
-    world.lightdata=samples;D_FlushCaches();r_fullbright.value=1;
+    exterior=1;world.lightdata=samples;D_FlushCaches();r_fullbright.value=1;
     set_command("off");render(off_pixels,NULL);set_command("on");render(on_pixels,NULL);
     assert(!difference(off_pixels,on_pixels));r_fullbright.value=0;
     D_FlushCaches();r_refdef.ambientlight=128;memset(samples,255,sizeof samples);

@@ -524,3 +524,60 @@ and deliberate wait/rest clock changes remain separate.
 User values saved in `id1/config.cfg` override `config/game.cfg` defaults at
 startup. These controls are source-tested candidates; native visual, music and
 performance acceptance remains recorded in [MODAL-WORLD-29](BUG_JOURNAL.md#modal-world-29-world-work-continues-behind-character-creation-open).
+
+## Mushroom pickup checkpoint (next v0.0.29 build)
+
+`dbg shroompicker` is the one-command pickup regression location for the
+**More Mushrooms!** release. During unrestricted single-player gameplay it uses
+the normal checked teleport route to original global XY **-10920, -75120**, then
+sets yaw **4** and pitch **64** after final signon. Close the console, target a
+Luminous Russula cap and press **E** when **E: Pick** appears. The default is spot1; the numbered extension is described below. It preserves character, equipment, inventory, harvest seed and picked
+facts; picked or empty placements remain absent. It does not respawn mushrooms.
+
+The location and picking were confirmed in dev4; the new shortcut is for the
+upcoming build, not the already published dev4 binary. In dev4 use these commands
+separately, waiting for the teleport to finish before setting the view:
+
+```text
+dbg tp -10920 -75120
+aw_aim 4 64
+```
+
+Use `dbg shroomtracker` before and after picking. Regression checks cover the
+original name/action prompt, actual ingredient quantity, disappearance, no repeat
+award, map return and save/load persistence. Use a fresh playtest save when testing
+the first pickup; reuse the same save when testing that the picked plant stays gone.
+This small cluster is a repeatable checkpoint, not proof of worldwide coverage.
+
+## Disk-backed debug catalogue and numbered mushroom checks (next build)
+
+The next source candidate reads `id1/debug-commands.txt` only when submitting a
+`dbg` command or requesting help. Opening the console and typing do not read it.
+The bounded reader keeps one row at a time and closes the file afterward; there
+is no permanent command-description table. Handler code and the engine's small
+registered-command list still occupy RAM. This is metadata loading, not executable
+code overlays, and the operating system may maintain its own disk cache.
+
+`dbg help` groups AUDIO, VIDEO, PLAYTESTING, WORLD / TRAVEL, SKY / LIGHTING,
+UI / CONSOLE, INPUT and DIAGNOSTICS, with a dashed line beneath each heading.
+The catalogue is limited to64 KiB and384 bytes per row including termination;
+malformed or missing metadata produces a diagnostic, while direct legacy
+handler names remain available. Both loose files and bounded packed members are
+supported. Normal image creation must include the matching catalogue.
+
+The earlier no-argument-only proposal is extended: `dbg shroompicker` and
+`dbg shroompicker 1` use the confirmed Seyda checkpoint; `2` through `10` select
+source-derived locations across the map; `dbg shroompicker list` lists their
+verification status. Destinations live in the separate4-KiB-bounded
+`id1/shroompicker.txt`. Slots2–10 are source-checked candidates, not yet accepted
+native standing/aiming locations. Checked teleport and map-identity validation
+remain mandatory; no command restores already-picked or empty plants.
+These additions are not retroactively present in the shipped dev4 binary.
+
+## Rc1 video-player aliases
+
+`dbg playvid 15` plays the original Morrowind intro when included. IDs `1..17`
+(also `01..17`) or an included catalogue name select other videos. The rc1
+candidate also accepts `dbg vidplay`, `dbg playvideo` and `dbg videoplay`, all
+routing to the same player and arguments. The current dev4 uses `dbg playvid`.
+The aliases are listed under VIDEO in the disk-backed debug catalogue.

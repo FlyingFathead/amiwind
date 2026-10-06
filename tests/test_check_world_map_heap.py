@@ -53,6 +53,17 @@ def make_bsp():
 
 
 class WorldMapHeapEstimateTests(unittest.TestCase):
+    def test_section_directory_static_cost_applies_without_a_section_catalogue(self):
+        with tempfile.TemporaryDirectory() as temp:
+            maps=Path(temp);(maps/'sn012.bsp').write_bytes(make_bsp())
+            before=heap.inspect_maps(maps,SIZES)['maps'][0]
+            after=heap.inspect_maps(maps,dict(SIZES,interior_section_static=728))['maps'][0]
+        self.assertEqual(after['interior_section_static_allowance_bytes'],728)
+        self.assertEqual(after['additional_static_allowance_bytes'],before['additional_static_allowance_bytes']+728)
+        self.assertEqual(after['peak_loader_bytes'],before['peak_loader_bytes'])
+        self.assertEqual(after['estimated_total_bytes'],before['estimated_total_bytes']+728)
+        self.assertEqual(after['estimated_clearance_bytes'],before['estimated_clearance_bytes']-728)
+
     def test_static_link_pages_are_charged_after_model_loading(self):
         with tempfile.TemporaryDirectory() as temp:
             maps=Path(temp);(maps/'sn012.bsp').write_bytes(make_bsp())

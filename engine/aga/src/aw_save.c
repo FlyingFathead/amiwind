@@ -3,6 +3,7 @@
  * Writing the inactive generation never renames or truncates the active one. */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_saved_equipment.h"
 #include "aw_region.h"
 #include "aw_maps.h"
 #ifdef AMIGA
@@ -64,7 +65,7 @@ static int newest(uint32_t profile,int slot,aw_save_t *state)
     if(b && (!a || other.sequence>state->sequence)){*state=other;return 1;}
     return a?0:-1;
 }
-static int scene_id(void){return AW_MapId(sv.name);}
+static int scene_id(void){return AW_MapLogicalId(sv.name);}
 static uint32_t actor_id(edict_t *e)
 {
     eval_t *v=GetEdictFieldValue(e,"aw_ref");
@@ -96,10 +97,11 @@ void AW_SaveCapture(void)
  * without touching a profile, manual slot or autosave generation. */
 int AW_SaveSnapshot(aw_save_t *snapshot)
 {
-    edict_t *p;
+    edict_t *p;uint32_t equipment;
     if(!snapshot || !sv.active || scene_id()<0 || loading || svs.maxclients!=1 ||
        !svs.clients || !(p=svs.clients[0].edict))return 0;
-    AW_SaveCapture();*snapshot=world;
+    if(!AW_SavedEquipmentCapture(&equipment,p,sv.time))return 0;
+    AW_SaveCapture();*snapshot=world;snapshot->equipment=equipment;
     snapshot->story=aw_story;snapshot->state=aw_state;snapshot->character=aw_character;
     VectorCopy(p->v.origin,snapshot->position);VectorCopy(cl.viewangles,snapshot->angles);
     strcpy(snapshot->scene,sv.name);return 1;
@@ -139,6 +141,8 @@ void AW_SaveSpawn(void)
         VectorCopy(world.position,e->v.origin);VectorCopy(world.position,e->v.oldorigin);
         VectorCopy(world.angles,e->v.angles);VectorCopy(world.angles,cl.viewangles);e->v.fixangle=1;
         VectorCopy(vec3_origin,e->v.velocity);e->v.health=aw_character.current[0];SV_LinkEdict(e,false);
+        if(!AW_SavedEquipmentRestore(world.equipment,e,sv.time))
+            Con_Printf("Saved equipment unavailable in this scene; hands remain hidden.\n");
         loading=0;scheduled=0;last_auto=realtime;Con_Printf("Game restored: %s.\n",aw_story.name);
     }else AW_SaveSchedule();
 }
@@ -193,11 +197,15 @@ static int make_profile(void)
 int AW_SaveWrite(int slot)
 {
     byte *raw;aw_save_t check;char filename[384],label[32];
-    FILE *f;int n,side,ok,i;edict_t *p;
+    FILE *f;int n,side,ok,i;edict_t *p;uint32_t equipment;
     if(!AW_SaveAllowed() || slot<0 || slot>20 || !content() || !make_profile()){
         Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
     }
-    AW_SaveCapture();p=svs.clients[0].edict;
+    p=svs.clients[0].edict;
+    if(!AW_SavedEquipmentCapture(&equipment,p,sv.time)){
+        Con_Printf("Save equipment validation failed; previous saves retained.\n");return 0;
+    }
+    AW_SaveCapture();world.equipment=equipment;
     world.story=aw_story;world.state=aw_state;world.character=aw_character;world.character.current[0]=p->v.health;
     VectorCopy(p->v.origin,world.position);VectorCopy(cl.viewangles,world.angles);world.angles[1]=anglemod(world.angles[1]);strcpy(world.scene,sv.name);
     memcpy(world.content,content_id,32);
@@ -263,7 +271,8 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity)
 {
     aw_save_t info;
     if(capacity<1)return 0;
-    if(newest(profile,slot,&info)<0){out[0]=0;return 0;}
+    /* Load stable character IDs before AWS1/2/3/4 decoding resolves save IDs. */
+    if(!AW_CharacterLoad() || newest(profile,slot,&info)<0){out[0]=0;return 0;}
     snprintf(out,capacity,"%s / %s / L%ld",info.story.name,info.scene,(long)info.character.level);return 1;
 }
 static int profile_entry(const char *directory,const char *entry,uint32_t *id,char name[32])

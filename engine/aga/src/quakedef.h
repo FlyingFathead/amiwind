@@ -495,6 +495,8 @@ int AW_NPCFloor(edict_t *actor);
 int AW_AliasBudgetAllows(int vertices,int triangles);
 int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const byte *raw,int bytes);
 int AW_GalleryActive(void);
+int AW_TorchTestActive(void);
+int AW_DebugTestInputActive(void);
 int AW_GalleryModal(void);
 void AW_GalleryMouse(int dx,int dy);
 void AW_GalleryInit(void);

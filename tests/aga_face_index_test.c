@@ -23,6 +23,7 @@ int main(void){
  for(n=0;n<3;n++){edges[n].v[0]=n;edges[n].v[1]=(n+1)%3;}
  tex.vecs[0][0]=tex.vecs[1][1]=1;tex.texture=&texture;strcpy(texture.name,"fixture");
  m.vertexes=vertices;m.edges=edges;m.surfedges=surfedges;m.texinfo=&tex;
+ m.numvertexes=3;m.numedges=3;m.numsurfedges=3;m.numtexinfo=1;
  m.numplanes=65536;m.planes=calloc(m.numplanes,sizeof(mplane_t));assert(m.planes);
  loadmodel=&m;mod_base=(byte *)&face;lump.fileofs=0;lump.filelen=sizeof(face);
  face.numedges=3;face.lightofs=-1;

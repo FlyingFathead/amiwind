@@ -1,0 +1,11 @@
+AWSP1
+1 1 0 seyda -10920 -75120 4 64 Luminous Russula - Seyda Neen
+2 0 209263 vf0238 -69889.742188 41599.218750 0.000000 60 Luminous Russula - Andasreth
+3 0 256413 vf0405 -56831.941406 -25571.326172 0.000000 60 Violet Coprinus - Ashurnibibi
+4 0 235153 vf0625 -34214.140625 14335.118164 0.000000 60 Luminous Russula - Bitter Coast Region
+5 0 267741 vf0595 -36777.929688 -57528.859375 0.000000 60 Luminous Russula - Bitter Coast Region
+6 0 231413 vf0298 -63075.691406 4060.986572 0.000000 60 Luminous Russula - Bitter Coast Region
+7 0 252867 vf0611 -33809.660156 -12523.824219 0.000000 60 Violet Coprinus - Bitter Coast Region
+8 0 210014 vf0549 -47829.941406 33209.617188 0.000000 60 Violet Coprinus - West Gash Region
+9 0 266313 vf0852 -12940.716797 -53748.683594 0.000000 60 Luminous Russula - Ascadian Isles Region
+10 0 257173 vf0398 -51996.210938 -44479.253906 0.000000 60 Luminous Russula - Bitter Coast Region

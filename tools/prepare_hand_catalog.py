@@ -13,6 +13,7 @@ from mwad.npc import first
 from mwad.paths import child_ci,ensure_external
 from prepare_hands import bake_appearance
 from prepare_torch import TorchSource,prepare as prepare_torch
+from prepare_hand_normals import normal_table,rewrite as rewrite_normals
 
 RECORD_SIZE=196
 
@@ -39,7 +40,13 @@ def pack_catalog(entries):
             output.extend(raw.ljust(64,b'\0'))
     return bytes(output)
 
-def prepare(data_files,palette_path,out,budget=320,topology='reduced'):
+def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mode='auto'):
+    if topology not in ('source','reduced') or normal_mode not in ('auto','legacy'):
+        raise ValueError('Unknown hand topology or lighting-normal mode')
+    # Source topology uses encoded surface normals; legacy reduction and an
+    # explicit rollback keep their previous index bytes. Geometry is untouched.
+    surface_normals=topology=='source' and normal_mode=='auto'
+    table=normal_table(Path(__file__).resolve().parents[1]/'engine/aga/src/anorms.h') if surface_normals else None
     data_files=ensure_external(data_files,'owned data')
     palette_path=ensure_external(palette_path,'palette');out=ensure_external(out,'hand catalogue output')
     if out.exists():raise ValueError('Hand catalogue output must be fresh')
@@ -58,6 +65,10 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced'):
         for female in (False,True):
             hand,torch=model_paths(race,female)
             raw,report=bake_appearance(assets,kinds,palette,race,female,budget,topology)
+            if surface_normals:
+                raw,normal_report=rewrite_normals(raw,table)
+                report['lighting_normals']=normal_report
+                report['sha256']=normal_report['output_sha256']
             if common_clips is None:common_clips=report['clips']
             elif report['clips']!=common_clips:raise ValueError('Hand timing differs between race models')
             (out/hand).write_bytes(raw);report['model']=hand
@@ -65,6 +76,13 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced'):
             (stage/'gfx/palette.lmp').write_bytes(palette)
             torch_report=prepare_torch(data_files,stage,race=race,female=female,topology=topology,source=source)
             torch_raw=(stage/'progs/v_torch.mdl').read_bytes();meta=(stage/'gfx/torch.awt').read_bytes()
+            if surface_normals:
+                torch_raw,normal_report=rewrite_normals(torch_raw,table)
+                torch_report['lighting_normals']=normal_report
+                torch_report['files']['progs/v_torch.mdl']=normal_report['output_sha256']
+                # The retained conversion-stage model and its manifest must
+                # describe the same final bytes as the installed catalogue.
+                (stage/'progs/v_torch.mdl').write_bytes(torch_raw)
             if common_torch is None:common_torch=meta
             elif meta!=common_torch:raise ValueError('Torch emitter metadata differs between race models')
             (out/torch).write_bytes(torch_raw)
@@ -74,7 +92,7 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced'):
                             'hand_bytes':len(raw),'torch_bytes':len(torch_raw)})
     (out/'gfx/hand-torch.awt').write_bytes(common_torch)
     catalog=pack_catalog(entries);(out/'gfx/hand-models.awh').write_bytes(catalog)
-    result={'format':'AWH1','budget':budget,'topology':topology,'entries':entries,'clips':common_clips,
+    result={'format':'AWH1','budget':budget,'topology':topology,'normal_mode':'surface' if surface_normals else 'legacy','entries':entries,'clips':common_clips,
             'catalog_sha256':hashlib.sha256(catalog).hexdigest(),'torch_metadata_sha256':hashlib.sha256(common_torch).hexdigest(),
             'torch_metadata':'gfx/hand-torch.awt',
             'scope':'Owned race/sex 3D hand and torch models. Install matching models, catalogue and shared torch metadata together; legacy v_nord remains available.'}
@@ -85,4 +103,5 @@ if __name__=='__main__':
     p.add_argument('--data-files',type=Path,required=True);p.add_argument('--palette',type=Path,required=True)
     p.add_argument('--out',type=Path,required=True);p.add_argument('--budget',type=int,choices=(320,480),default=320)
     p.add_argument('--topology',choices=('source','reduced'),default='reduced',help='Preserve authored topology or retain bounded legacy reduction')
-    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.palette,a.out,a.budget,a.topology),indent=2))
+    p.add_argument('--normal-mode',choices=('auto','legacy'),default='auto',help='Source topology uses surface lighting normals; legacy preserves original index bytes')
+    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.palette,a.out,a.budget,a.topology,a.normal_mode),indent=2))

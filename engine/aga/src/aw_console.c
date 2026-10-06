@@ -7,123 +7,137 @@
 static cvar_t colour={"_aw_console_colour","255",true};
 extern int scr_copyeverything;
 extern byte *draw_chars;
-typedef struct {char *words,*command,*arguments;} route_t;
-static route_t routes[]={
-    {"ost play","aw_music_play","00..98 / original music filename stem (spaces as underscores)"},
-    {"gallery","aw_charplane","[number/name/ID; next/previous/body/browse/help/exit]"},
-    {"aw charplane","aw_charplane","[number/name/ID; next/previous/body/exit]"},
-    {"modelgallery","aw_charplane","[number/name/ID]"},
-    {"npcgallery","aw_charplane","[number/name/ID]"},
-    {"reset location","amiwind_debug_reset_location","0"},
-    {"ui font","aw_ui_select","16/14/12/fallback"},
-    {"ui ink","aw_ui_ink","original/readable"},
-    {"set time","aw_set_time","HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn"},
-    {"daycycle gallery","aw_daycycle_gallery","[here/off] (eight-stage camera tour; here keeps this view; Esc returns)"},
-    {"nightgallery","aw_nightgallery","[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)"},
-    {"daynightcycle","aw_daynightcycle","on/off true/false 1/0 (automatic time; explicit set/wait still work)"},
-    {"skyspeed","aw_skyspeed_set","[0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed)"},
-    {"skytype","aw_sky_type_set","1/2/3 or V1/V2/V3 (V3 extra stronk default)"},
-    {"cloudtype","aw_cloud_type_set","classic/veil or 1/2 (classic default)"},
-    {"cloudcontrol","aw_cloud_control_set","legacy/new or 1/2 (legacy also disables midnight clearing)"},
-    {"nightskymode","aw_nightsky_mode_set","legacy/clear or 0/1 (midnight clear default, return by 04:00)"},
-    {"nightclouds","aw_night_clouds_set","auto/clear/partial/overcast (night-only, stable game-day prototype)"},
-    {"dayclouds","aw_day_clouds_set","0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected"},
-    {"sun","aw_sun","on/off true/false 1/0 (default on, clock still advances)"},
-    {"clouds","aw_clouds","on/off true/false 1/0 (default on, independent of sun)"},
-    {"torch radius","aw_torch_radius_set","[32..288] (player + admitted guard lights; default 192, classic 144)"},
-    {"torch flame","aw_torch_flame_set","classic/brightbase/sparks or 1/2/3 (classic default)"},
-    {"guardtorch","aw_guardtorch","[on/off/auto] (all guard torches; auto follows guards_torch_cycle)"},
-    {"starsky","aw_starsky","on/off true/false 1/0 (stars and nebula; default on)"},
-    {"nightsky","aw_nightsky","on/off true/false 1/0 (night layer including moons; default on)"},
-    {"sky","aw_daynight","on/off true/false 1/0 (sky/fog presentation; time control is separate)"},
-    {"timeofday","aw_timeofday","[0..23.999 or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn]"},
-    {"ui preview","aw_ui_preview",""},
-    {"ui layout","aw_dialogue_layout","1 legacy / 2 full width / 3 padded content (default)"},
-    {"ui dialogue","aw_dialogue_method","1/2/3/4 (default 3)"},
-    {"ui labels","aw_label_style","below/topright/hudleft"},
-    {"ui targetplace","aw_target_place","below/topright/hudleft"},
-    {"ui targetnames","aw_target_names_set","on/off (after creation)"},
-    {"show fps","amiwind_debug_showfps","[on/off]"},
-    {"coords","amiwind_debug_coords","on/off"},
-    {"compass","amiwind_debug_compass","on/off true/false 1/0 (default off)"},
-    {"fps","amiwind_debug_fps","on/off"},
-    {"all","amiwind_show_debug","on/off"},
-    {"overlay","amiwind_show_debug","on/off true/false 1/0"},
-    {"inputtrace","aw_input_trace","on/off true/false 1/0 (raw keys and mouse events; default off)"},
-    {"input trace","aw_input_trace","on/off true/false 1/0 (alias; default off)"},
-    {"door sounds","aw_door_sounds","on/off (default on)"},
-    {"hud type","aw_debug_hud_type","1 original / 2 compact (default)"},
-    {"render order","aw_surface_order","1 legacy / 2 mesh intersections (default)"},
-    {"aw hors","aw_debug_hors","0 (new Hors, Nord / Barbarian / Steed, after Census)"},
-    {"hud","amiwind_show_debug","on/off true/false 1/0 (overlay alias)"},
-    {"heap","aw_heap_audit","(current hunk clearance and load peak)"},
-    {"shroomtracker","aw_shroomtracker","(picked mushrooms in this save; excludes empty plants)"},
-    {"showram","amiwind_debug_showram","on/off"},
-    {"sealevel","amiwind_debug_sealevel","on/off"},
-    {"scene change","aw_scene_menu","(scene picker)"},
-    {"scene","aw_scene","ship/town/balmora/<map name>"},
-    {"tpscene","aw_tpscene","[list/headselection] (fresh debug scene; resets unsaved progress)"},
-    {"tp map","aw_teleport_map","select a destination on the world map"},
-    {"map tp","aw_teleport_map","select a destination on the world map (alias)"},
-    {"tp menu","aw_scene_menu","(teleport picker)"},
-    {"tp","aw_teleport","[X Y original Morrowind global XY / balmora / seydaneen / prisonship / <map name>; no argument opens menu]"},
-    {"eyeheight","aw_eyeheight","[offset above player origin]"},
-    {"dimensions","aw_dimensions",""},
-    {"pos","aw_pos",""},{"blockers","aw_blockers",""},
-    {"npcs","aw_npcs",""},{"hands","aw_hands",""},
-    {"npcfloors","aw_npc_floors","(read-only ground-contact report)"},
-    {"playvid","playvid","<1..17 / 01..17 / catalogue name> (drains queued game audio first)"},
-    {"view","aw_view","x y z yaw pitch"},
-    {"probe","aw_probe","(slow floor audit)"},
-    {"noclip","noclip",""},{"recover","aw_recover",""},
-    {"fog distance","aw_fog_distance","[128..1400 local units; default 540]"},
-    {"draw distance","aw_fog_distance","[128..1400 local units; default 540]"},
-    {"drawdistance","aw_fog_distance","[128..1400 local units; default 540]"},
-    {"fog","aw_fog","0/1"},{"cull","aw_cull","0/1"},
-    {"console bg color","aw_console_color","black/blue/gray or R G B"},
-    {"font","aw_console_font","readable/retro"},
-    {"console font","aw_console_size","small/normal"},
-    {NULL,NULL,NULL}
-};
-
-/* Validated tokens only; never splice arbitrary quoted command text. */
+/* Command/help metadata belongs on disk, not in a permanently resident table.
+ * Read on submitted dbg commands/help only; opening/typing does no catalogue I/O.
+ * Handler code and Quake's small registered-command list remain resident.
+ * Honor COM_FOpenFile's member size: FILE may point inside a larger PAK. */
+#define DEBUG_LINE 384
+#define DEBUG_BYTES 65536
+extern int con_linewidth;
+typedef struct {char *group,*words,*command,*arguments;} route_t;
+static int catalogue_line(FILE *f,int *left,char *line) {
+    int n=0,c;
+    if(!*left)return 0;
+    while(*left>0){
+        c=fgetc(f);--*left;
+        if(c==EOF)return -1;
+        if(c=='\n'){line[n]=0;return 1;}
+        if(c=='\r')continue;
+        if(c<32 || c>126 || n>=DEBUG_LINE-1)return -1;
+        line[n++]=(char)c;
+    }
+    line[n]=0;return 1;
+}
+static FILE *catalogue_open(int *left,char *line) {
+    FILE *f=NULL;*left=COM_FOpenFile("debug-commands.txt",&f);
+    if(!f || *left<6 || *left>DEBUG_BYTES ||
+       catalogue_line(f,left,line)!=1 || strcmp(line,"AWDC1")){
+        if(f)fclose(f);return NULL;
+    }
+    return f;
+}
+static int catalogue_route(char *line,route_t *r) {
+    char *p,*fields[4];int i,n;
+    fields[0]=line;
+    for(i=1;i<4;i++){
+        p=strchr(fields[i-1],'|');if(!p)return 0;
+        *p=0;fields[i]=p+1;
+    }
+    if(strchr(fields[3],'|') || !*fields[0] || strlen(fields[0])>31 ||
+       !*fields[1] || strlen(fields[1])>63 || !*fields[2] || strlen(fields[2])>63)return 0;
+    /* Catalogue command text cannot inject separators, quotes or new commands. */
+    for(i=1;i<=2;i++){
+        n=(int)strlen(fields[i]);
+        for(p=fields[i];*p;p++)if(!((*p>='a'&&*p<='z') ||
+            (*p>='0'&&*p<='9') || *p=='_' || (i==1 && *p==' ')))return 0;
+        if(fields[i][0]==' ' || fields[i][n-1]==' ' || strstr(fields[i],"  "))return 0;
+    }
+    r->group=fields[0];r->words=fields[1];r->command=fields[2];r->arguments=fields[3];
+    return 1;
+}
+static int route_match(char *words,int argc,char **argv,int start) {
+    int j=start,n;
+    while(*words && j<argc){
+        n=0;while(words[n] && words[n]!=' ')n++;
+        if((int)strlen(argv[j])!=n || Q_strncasecmp(words,argv[j],n))return 0;
+        words+=n;if(*words==' ')words++;j++;
+    }
+    return *words?0:j;
+}
+static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capacity) {
+    int used,n,k;char *token;
+    if(!strcmp(r->command,"aw_teleport") && argc-j>2)return 0;
+    if(!strcmp(r->command,"aw_shroomtracker") && argc!=j)return 0;
+    if(!strcmp(r->command,"aw_shroompicker")){
+        if(argc-j>1)return 0;
+        if(argc>j && strcmp(argv[j],"list")){
+            n=0;
+            for(token=argv[j];*token;token++){
+                if(*token<'0'||*token>'9' || n>10)return 0;
+                n=n*10+*token-'0';
+            }
+            if(n<1 || n>10)return 0;
+        }
+    }
+    used=(int)strlen(r->command);if(used+2>capacity)return 0;
+    strcpy(out,r->command);
+    for(;j<argc;j++){
+        token=argv[j];n=(int)strlen(token);
+        if(!n || used+n+3>capacity)return 0;
+        for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
+            (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
+            token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_'))return 0;
+        out[used++]=' ';memcpy(out+used,token,n);used+=n;
+    }
+    out[used++]='\n';out[used]=0;return 1;
+}
+/* Return -1 for missing/invalid catalogue, 0 for bad command, 1 translated,
+ * 2 help. Do not queue anything until the complete bounded scan validates. */
 int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
-    int start=1,i,j,n,k,used;char *word,*token;
+    int start=1,left,status,j,best=0,valid=0;FILE *f;route_t r;
+    char line[DEBUG_LINE],candidate[160];
+    if(capacity>0)out[0]=0;
     if(argc<1)return 0;
-    if(!Q_strcasecmp(argv[0],"amiwind")) {
+    if(!Q_strcasecmp(argv[0],"amiwind")){
         if(argc<2 || Q_strcasecmp(argv[1],"debug"))return 0;
         start=2;
-    } else if(Q_strcasecmp(argv[0],"debug") && Q_strcasecmp(argv[0],"dbg"))return 0;
+    }else if(Q_strcasecmp(argv[0],"debug") && Q_strcasecmp(argv[0],"dbg"))return 0;
     if(argc==start || (argc==start+1 && !Q_strcasecmp(argv[start],"help")))return 2;
-    for(i=0;routes[i].words;i++) {
-        word=routes[i].words;j=start;
-        while(*word && j<argc) {
-            n=0;while(word[n] && word[n]!=' ')n++;
-            if((int)strlen(argv[j])!=n || Q_strncasecmp(word,argv[j],n))break;
-            word+=n;if(*word==' ')word++;j++;
-        }
-        if(*word)continue;
-        if(!strcmp(routes[i].command,"aw_teleport") && argc-j>2)return 0;
-        if(!strcmp(routes[i].command,"aw_shroomtracker") && argc!=j)return 0;
-        used=(int)strlen(routes[i].command);
-        if(used+2>capacity)return 0;
-        strcpy(out,routes[i].command);
-        for(;j<argc;j++) {
-            token=argv[j];n=(int)strlen(token);
-            if(!n || used+n+3>capacity)return 0;
-            for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
-                (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
-                token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_'))return 0;
-            out[used++]=' ';memcpy(out+used,token,n);used+=n;
-        }
-        out[used++]='\n';out[used]=0;return 1;
+    f=catalogue_open(&left,line);if(!f)return -1;
+    while((status=catalogue_line(f,&left,line))>0){
+        if(!*line || *line=='#')continue;
+        if(!catalogue_route(line,&r)){status=-1;break;}
+        j=route_match(r.words,argc,argv,start);
+        if(!j || j<best)continue;
+        if(j==best){status=-1;break;}
+        best=j;valid=route_format(&r,argc,argv,j,candidate,sizeof(candidate));
     }
-    return 0;
+    fclose(f);
+    if(status<0)return -1;
+    if(!valid || (int)strlen(candidate)+1>capacity)return 0;
+    strcpy(out,candidate);return 1;
+}
+static void catalogue_error(void) {
+    Con_Printf("Debug catalogue missing/invalid: debug-commands.txt\n");
+    Con_Printf("Restore the matching build's file; legacy command names still work.\n");
 }
 static void help(void) {
-    int i;Con_Printf("AmiWind debug commands (PageUp scrolls)\n");
+    FILE *f;route_t r;int left,status,width=con_linewidth;
+    char line[DEBUG_LINE],group[32],separator[129];
+    f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
+    if(width<1)width=38;if(width>128)width=128;
+    memset(separator,'-',width);separator[width]=0;group[0]=0;
+    Con_Printf("AmiWind debug commands (PageUp scrolls)\n");
     Con_Printf("Prefix: debug / dbg / amiwind debug\n");
-    for(i=0;routes[i].words;i++)Con_Printf(" %s %s\n",routes[i].words,routes[i].arguments);
+    while((status=catalogue_line(f,&left,line))>0){
+        if(!*line || *line=='#')continue;
+        if(!catalogue_route(line,&r)){status=-1;break;}
+        if(strcmp(group,r.group)){
+            strcpy(group,r.group);Con_Printf("\n%s\n%s\n",group,separator);
+        }
+        Con_Printf(" %s %s\n",r.words,r.arguments);
+    }
+    fclose(f);if(status<0){catalogue_error();return;}
     Con_Printf(" help: this list; old names still work\n");
     Con_Printf("Toggle values: on/off true/false 1/0\n");
     Con_Printf("Noclip: look+WASD, E/Q vertical, Shift\n");
@@ -133,7 +147,7 @@ static void dispatch(void) {
     if(n>12){Con_Printf("Too many arguments; use debug help\n");return;}
     for(i=0;i<n;i++)argv[i]=Cmd_Argv(i);
     r=AW_DebugTranslate(n,argv,out,sizeof(out));
-    if(r==2)help();else if(r==1)Cbuf_InsertText(out);
+    if(r<0)catalogue_error();else if(r==2)help();else if(r==1)Cbuf_InsertText(out);
     else Con_Printf("Unknown debug command; use debug help\n");
 }
 static int integer(char *s,int maximum,int *out) {

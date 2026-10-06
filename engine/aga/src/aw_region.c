@@ -2,6 +2,8 @@
  * One resident BSP, shared exterior coordinates and bounded overlap. */
 #include "quakedef.h"
 #include "aw_region.h"
+#include "aw_section.h"
+#include "aw_maps.h"
 typedef struct {
     aw_region_t regions[AW_REGION_MAX];
     int count,loaded,current,requested,kind,requested_kind;
@@ -117,7 +119,7 @@ static int seyda_kind(const float *point,int intro,int previous)
 int AW_RegionSelect(const char *name,const float *point,int intro)
 {
     int area=area_id(name),id;aw_region_area_t *a;
-    if(area<0)return 1;
+    if(area<0)return AW_SectionSelect(name,point);
     if(!read_regions(area))return area==1; /* Legacy full Seyda payload. */
     a=&areas[area];id=AW_RegionOwner(a->regions,a->count,point,-1,0);
     if(id<0)return 0;
@@ -146,7 +148,8 @@ int AW_RegionCrossing(const float *point,int intro)
 }
 const char *AW_RegionAhead(const float *point,const float *velocity,int intro,float seconds) {
     int area=area_id(sv.name),id;aw_region_area_t *a;static char next[40];
-    if(area<0 || intro || !read_regions(area))return NULL;
+    if(area<0)return AW_SectionAhead(sv.name,point,velocity,seconds);
+    if(intro || !read_regions(area))return NULL;
     a=&areas[area];if(a->kind || a->current<0)return NULL;
     id=AW_RegionNextOwner(a->regions,a->count,point,velocity,a->current,a->hysteresis,seconds);
     if(id<0 || id==a->current)return NULL;
@@ -155,7 +158,8 @@ const char *AW_RegionAhead(const float *point,const float *velocity,int intro,fl
 int AW_RegionContains(const float *point)
 {
     int area=area_id(sv.name),k;const float *low,*high;aw_region_area_t *a;
-    if(area<0 || !read_regions(area))return 1;
+    if(area<0)return AW_SectionContains(sv.name,point);
+    if(!read_regions(area))return 1;
     a=&areas[area];if(a->current<0 || a->current>=a->count)return 0;
     low=a->kind==1?dock_low:a->kind==2?court_low:a->regions[a->current].cover_low;
     high=a->kind==1?dock_high:a->kind==2?court_high:a->regions[a->current].cover_high;

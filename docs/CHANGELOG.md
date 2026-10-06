@@ -1,5 +1,22 @@
 # Development history
 
+## v0.0.29-rc2: Let There Be (Just a Bit More) Light
+
+AmiWind v0.0.29-rc2 brings adjustable indoor brightness and improved torch controls, alongside the focused playtest repairs made since RC1.
+
+Options > Graphics now offers six brightness steps, from 1.0 to 1.5. Interior brightness defaults to 1.2 and includes static lighting on NPCs. Exterior brightness is a separate control and starts at 1.0. Both settings are saved. A value of 1.0 is the original baseline; 1.2 applies a single 20% gain before the renderer's existing limits. Torch lighting is handled separately.
+
+For console adjustment, use `dbg luma interior 1.3`. Existing interior-luma aliases remain available. Builds can omit the controls with `--disallow-luma-controls` or `--no-luma-controls`; explanatory console replies remain in those builds. Native performance verification is still pending, so no frame-time improvement or zero-cost claim is made here.
+
+The silent GIF below shows the approved torch off/on/off sequence recorded in the actual game. It uses the earlier tested follow-up candidate's original frames, with GIF palette quantization and timing rounding. It is functional evidence for that torch sequence, not a capture of the final RC2 package.
+
+![Torch off, on, and off in the test room](images/amiwind-v0.0.29-rc2-torch.gif)
+
+RC2 keeps the original RC1 Balmora Temple map. A narrowly scoped converter correction is included in source, but its diagnostic rebuild did not resolve the broader missing walls and floors. Those Temple geometry and collision reports remain open. The prison-guard Enter music jump, heavy-load audio crackles, and incomplete world/interior coverage also remain open.
+
+This is a release candidate for continued playtesting. Final source, package checksums, and delivery status belong with the completed release artifacts. Remote public-source publication is not claimed by this draft.
+
+
 ## 0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026
 
 - Selected stable release identity 0.0.28; scoped local native acceptance passed. Public publication remains pending.

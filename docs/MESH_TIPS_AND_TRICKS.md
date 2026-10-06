@@ -1,5 +1,70 @@
 # Mesh tips and tricks: expensive scenery
 
+## Packaged interior plane audit: 2026-10-06T20:11:15+03:00
+
+Read-only check of the sealed v0.0.29-rc1 package completed: all 58 gameplay
+interiors, 880,244 faces. Every scanned map matched its packaged SHA-256.
+There were 44 faces with vertex-to-stored-plane distance above 0.05 BSP units:
+
+| Map | Flagged faces | Maximum distance |
+| --- | ---: | ---: |
+| Balmora Temple | 13 | 31.4870 |
+| Prison ship interior | 23 | 0.72159 |
+| Census Office | 3 | 0.93969 |
+| Tradehouse | 4 | 0.93969 |
+| Warehouse | 1 | 0.93969 |
+
+The remaining 53 interiors had no failures of this specific threshold check.
+The auxiliary character plane was checked separately: 464 faces, no failures.
+All 2,723 packaged map names were accounted for: 58 interiors, 2,664 exterior
+maps outside this audit scope and one separately scanned auxiliary map. Two
+optional section names were absent from the package and were recorded as such.
+
+These additional 31 flagged faces are import-risk findings, not proof of the
+same root cause, visible holes or broken collision. Passing this plane check
+does not certify an entire interior. No map was modified. The repair remains
+limited to Balmora Temple. Future imports should retain this check alongside
+source coverage, native rendering and ordinary collision-route validation.
+
+## Temple plane defect and import risk: 2026-10-06T20:06:10+03:00
+
+Affected evidence: v0.0.29-rc1. This is a confirmed exported-face-plane defect,
+with a Temple-only repair candidate; the complete Temple geometry/collision
+failure remains open. First shipped fixed version: none.
+
+Merged polygons can begin with three nearly collinear vertices. The old
+placement exporter normalizes their cross product to construct the BSP plane,
+even though the merge stage carries a stable source normal. Tiny coordinate
+errors then produce a plane that does not contain the polygon's other vertices.
+The incorrect plane is already in the BSP before the engine loads it. Preserved
+mesh counts, bounds and triangle totals do not establish correct face planes.
+
+The sealed Temple has 13 faces with vertex-to-plane error above 0.05 BSP units.
+Examples: model 38 / face 7961 reaches 31.487 units, model 39 / face 8189 reaches
+27.110, and model 95 / face 23838 reaches 7.587. Replaying the exact cached source
+triangles through the production merge/split and old placement reproduces the
+bad planes in those models. This confirms a correctness failure; no speed or
+memory optimization has been demonstrated. Those 13 faces represent less than
+0.6% of total face area, so they cannot yet be claimed to explain every gap.
+
+The candidate uses a whole-polygon area normal and validates every vertex
+against its plane, without projecting or discarding source geometry. It rejects
+nonfinite, degenerate or nonplanar output. The production room builder opts in
+only for explicit map identity `bmtemple`. Focused validation passed 23 checks;
+all 13 measured errors disappeared in exact polygon replay, with worst float32
+error 0.000503 units across 35,190 inline faces. Non-Temple output controls remain
+byte-identical. A rebuilt-map native comparison and ordinary collision route
+are still required; this is not a full Temple repair acceptance.
+
+For future imports, audit original placements/triangles, merged polygons,
+serialized face planes and native visibility/collision separately. Validate
+finite normalized planes, whole-polygon area and maximum vertex-plane distance
+after serialization; retain face/model/reference identities and input hashes.
+Include near-collinear leading edges, large offsets, transforms, UV splits and
+intact control rooms in regression coverage. A read-only packaged-interior
+audit is in progress. Do not apply the Temple repair to other areas on the
+strength of this finding alone. See the [Temple issue](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
+
 Working findings through v0.0.24-dev3, 30 September 2026. Separate observed
 performance, source inspection and proposed fixes; update this record after
 native visual checks. A compiling mesh is not proof that its detail is useful.

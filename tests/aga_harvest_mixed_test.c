@@ -14,7 +14,7 @@ static void catalogue(int version)
         fprintf(f,"%s %d %d %s 11 %d 1 %d 0 0 0 0 0%s Synthetic plant\n",
                 key,i+1,42+i,version==4?"@0":(i?"*2":"*1"),i,i*20,version==4?" 1.25":"");
     }
-    n=(int)ftell(f);rewind(f);assert(AW_HarvestRead(f,n,&h));fclose(f);
+    n=(int)ftell(f);rewind(f);assert(AW_HarvestLoad(f,n,&h));fclose(f);
     assert(h.slots==2 && h.plants==2 && h.representation==(version==4?4:0));
 }
 int main(int argc,char **argv)
@@ -39,9 +39,9 @@ int main(int argc,char **argv)
         h.catalogue[0]^=1;assert(AW_HarvestPrepare(&h,0,&state,1,1)==-1);
         assert(!memcmp(&state,&before,sizeof(state)));
         catalogue(4);h.plant[0].scale=0;assert(!AW_HarvestValidate(&h));
-        catalogue(4);strcpy(h.plant[0].model,"@8");assert(!AW_HarvestValidate(&h));
+        catalogue(4);strcpy(HSTR(h.plant[0].model),"@8");assert(!AW_HarvestValidate(&h));
         catalogue(4);memset(h.model[0].digest,0,32);assert(!AW_HarvestValidate(&h));
-        catalogue(4);strcpy(h.model[0].path,"progs/harvest/../bad.mdl");assert(!AW_HarvestValidate(&h));
+        catalogue(4);h.model[0].path=AW_HarvestIntern(&h,"progs/harvest/../bad.mdl");assert(!AW_HarvestValidate(&h));
     }
     puts("AWH3/AWH4 picked and empty original facts survive bidirectional save/load/return without reroll");
     return 0;

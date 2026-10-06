@@ -306,6 +306,15 @@ void R_PrintTimes (void);
 void R_PrintDSpeeds (void);
 void R_AnimateLight (void);
 int R_LightPoint (vec3_t p);
+void R_InteriorLumaInit(void);
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+void R_InteriorLumaUpdate(void);
+float R_InteriorLumaFactor(void);
+int R_BrightnessStep(int outside);
+void R_BrightnessSetStep(int outside,int value);
+int R_InteriorBrightnessStep(void);
+void R_InteriorBrightnessSetStep(int value);
+#endif
 void R_SetupFrame (void);
 void R_cshift_f (void);
 void R_SplitEntityOnNode2 (mnode_t *node);

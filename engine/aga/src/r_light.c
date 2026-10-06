@@ -21,6 +21,115 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_sky.h"
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+#include "aw_interior_light_policy.h"
+extern int AW_TorchTestActive(void);
+/* Independent saved controls, one active factor and one existing light buffer.
+ * Compile-out builds retain only explanatory commands below. */
+/* RC2 brightness measurement, 2026-10-06: Census, FS-UAE, 3 alternating
+ * timerefresh pairs (128 rendered frames each), 1.0 versus 1.2 static light.
+ * Median rotation: 1.175745s -> 1.189845s (+1.199%, +0.110ms/render).
+ * This is a noisy renderer-only sample, not full gameplay or physical-Amiga
+ * performance, and does not compare controls-enabled with controls-disabled.
+ * Preserve cached surface-light work and independent NPC static-light scaling;
+ * do not infer zero CPU/RAM cost at factor 1.0 or multiply torch light twice.
+ * Method, raw samples and remaining checks: docs/INTERIOR_LIGHTING.md and
+ * docs/bugs/INTERIOR-LIGHT-29.md. Measurements apply to the recorded RC2 build.
+ */
+static cvar_t aw_interiorluma={"aw_interiorluma","1.2",true};
+static cvar_t aw_exteriorluma={"aw_exteriorluma","1.0",true};
+static cvar_t *luma_controls[]={&aw_interiorluma,&aw_exteriorluma};
+static float interior_luma_factor=1;
+static char interior_luma_scene[64],luma_checked_text[2][64];
+static int interior_luma_mode;
+static float luma_checked_value[2],luma_settings[2]={1.2f,1};
+static float R_LumaSetting(int outside)
+{
+    cvar_t *control=luma_controls[outside];char *end;double value;int invalid;
+    if(strcmp(control->string,luma_checked_text[outside]) || control->value!=luma_checked_value[outside]){
+        value=strtod(control->string,&end);
+        invalid=end==control->string || *end || !isfinite(value) || !isfinite(control->value);
+        if(invalid)value=outside?1:1.2;
+        if(value<0)value=0;if(value>4)value=4;
+        luma_settings[outside]=(float)value;
+        if(invalid || luma_settings[outside]!=control->value || strlen(control->string)>=64)
+            Cvar_SetValue(control->name,luma_settings[outside]);
+        strncpy(luma_checked_text[outside],control->string,63);luma_checked_text[outside][63]=0;
+        luma_checked_value[outside]=control->value;
+    }
+    return luma_settings[outside];
+}
+float R_InteriorLumaFactor(void){return interior_luma_factor;}
+void R_InteriorLumaUpdate(void)
+{
+    float effective;const char *scene=sv.active?sv.name:"";
+    if(strcmp(scene,interior_luma_scene)){
+        strncpy(interior_luma_scene,scene,63);interior_luma_scene[63]=0;
+        interior_luma_mode=AW_GameplayInteriorLightPolicy(scene,AW_Interior())?1:
+            (sv.active && R_SkyExterior() && strcmp(scene,"torchtest")?2:0);
+    }
+    effective=interior_luma_mode && !AW_TorchTestActive()?R_LumaSetting(interior_luma_mode-1):1;
+    if(effective!=interior_luma_factor){interior_luma_factor=effective;D_FlushCaches();}
+}
+static int R_InteriorStaticLight(int value)
+{
+    float scaled;if(interior_luma_factor==1)return value;
+    scaled=value*interior_luma_factor;
+    return scaled>=255?255:scaled<=0?0:(int)scaled;
+}
+int R_BrightnessStep(int outside)
+{
+    int value=(int)(R_LumaSetting(outside!=0)*10+.5f);
+    return value<10?10:value>15?15:value;
+}
+void R_BrightnessSetStep(int outside,int value)
+{
+    float setting;outside=outside!=0;
+    if(value<10)value=10;if(value>15)value=15;
+    setting=value*.1f;
+    if(fabs(R_LumaSetting(outside)-setting)<.00001f)return;
+    Cvar_SetValue(luma_controls[outside]->name,setting);R_InteriorLumaUpdate();
+}
+int R_InteriorBrightnessStep(void){return R_BrightnessStep(0);}
+void R_InteriorBrightnessSetStep(int value){R_BrightnessSetStep(0,value);}
+static void R_LumaCommand(int outside)
+{
+    char *end;double value;long configured,effective;const char *name=outside?"exterior":"interior";
+    if(Cmd_Argc()>2){Con_Printf("Usage: dbg luma %s [0..4]\n",name);return;}
+    if(Cmd_Argc()==2){
+        value=strtod(Cmd_Argv(1),&end);
+        if(end==Cmd_Argv(1) || *end || !isfinite(value)){
+            Con_Printf("%s luma requires a finite number (0..4).\n",name);return;
+        }
+        if(value<0)value=0;if(value>4)value=4;
+        Cvar_SetValue(luma_controls[outside]->name,(float)value);
+    }
+    R_InteriorLumaUpdate();configured=(long)(R_LumaSetting(outside)*1000+.5f);
+    effective=(long)(interior_luma_factor*1000+.5f);
+    Con_Printf("%sluma %ld.%03ld; effective %ld.%03ld (%s). Static light multiplier; 1.0 is baseline.\n",
+        name,configured/1000,configured%1000,effective/1000,effective%1000,
+        interior_luma_mode && !AW_TorchTestActive()?(interior_luma_mode==1?"gameplay interior":"gameplay exterior"):"baseline/excluded");
+}
+static void R_InteriorLumaCommand(void){R_LumaCommand(0);}
+static void R_ExteriorLumaCommand(void){R_LumaCommand(1);}
+void R_InteriorLumaInit(void)
+{
+    Cvar_RegisterVariable(&aw_interiorluma);Cvar_RegisterVariable(&aw_exteriorluma);
+    Cmd_AddCommand("aw_interiorluma_set",R_InteriorLumaCommand);
+    Cmd_AddCommand("aw_exteriorluma_set",R_ExteriorLumaCommand);
+}
+#else
+#define R_InteriorStaticLight(value) (value)
+static void R_InteriorLumaUnavailable(void){Con_Printf("Can't adjust interior luma: built without luma controls.\n");}
+static void R_ExteriorLumaUnavailable(void){Con_Printf("Can't adjust exterior luma: built without luma controls.\n");}
+void R_InteriorLumaInit(void)
+{
+    Cmd_AddCommand("aw_interiorluma_set",R_InteriorLumaUnavailable);
+    Cmd_AddCommand("aw_exteriorluma_set",R_ExteriorLumaUnavailable);
+}
+#endif
+
 
 int	r_dlightframecount;
 
@@ -297,7 +406,9 @@ int R_LightPoint (vec3_t p)
 	int			r;
 
 	if (!cl.worldmodel->lightdata)
-		return 255;
+		/* Match no-sample exterior surfaces instead of lighting actors fully
+		 * merely because this region omitted an unused lighting lump. */
+		return R_InteriorStaticLight(R_SkyExterior() ? r_refdef.ambientlight : 255);
 
 	end[0] = p[0];
 	end[1] = p[1];
@@ -311,5 +422,5 @@ int R_LightPoint (vec3_t p)
 	if (r < r_refdef.ambientlight)
 		r = r_refdef.ambientlight;
 
-	return r;
+	return R_InteriorStaticLight(r);
 }

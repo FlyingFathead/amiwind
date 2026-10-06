@@ -1,16 +1,33 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
+#include <stdarg.h>
 #include "aw_boolean.h"
 viddef_t vid;
 int scr_copyeverything;
+int con_linewidth=38;
 void Con_CheckResize(void){}
 void Draw_Character(int x,int y,int c){}
 byte *host_basepal;
 byte *draw_chars;
-static int font_size=-1;
+static int font_size=-1,catalogue_opens,catalogue_missing,catalogue_size_adjust;
+static const char *catalogue_path,*catalogue_override;
+static char printed[20000];
 int COM_FOpenFile(char *name,FILE **f){
- int i;if(font_size<0){*f=NULL;return -1;}
+ int i,n,c;FILE *source;
+ if(!strcmp(name,"debug-commands.txt")){
+  catalogue_opens++;*f=NULL;if(catalogue_missing)return -1;
+  *f=tmpfile();assert(*f);
+  for(i=0;i<137;i++)fputc(0xa5,*f); /* Simulate a PAK-member offset. */
+  if(catalogue_override){n=(int)strlen(catalogue_override);fputs(catalogue_override,*f);}
+  else {
+   source=fopen(catalogue_path,"rb");assert(source);n=0;
+   while((c=fgetc(source))!=EOF){fputc(c,*f);n++;}fclose(source);
+  }
+  if(!catalogue_size_adjust)fputs("NOT PART OF THIS PAK MEMBER\n",*f);
+  fseek(*f,137,SEEK_SET);return n+catalogue_size_adjust;
+ }
+ if(font_size<0){*f=NULL;return -1;}
  *f=tmpfile();assert(*f);for(i=0;i<font_size;i++)fputc(i%251,*f);
  rewind(*f);return font_size;
 }
@@ -23,7 +40,10 @@ int Cmd_Argc(void){return argc;}
 char *Cmd_Argv(int n){return n<argc?args[n]:"";}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 int Q_strncasecmp(char *a,char *b,int n){return strncasecmp(a,b,n);}
-void Con_Printf(char *fmt,...){}
+void Con_Printf(char *fmt,...){
+ va_list args;size_t n=strlen(printed);va_start(args,fmt);
+ vsnprintf(printed+n,sizeof(printed)-n,fmt,args);va_end(args);
+}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
 void Cvar_RegisterVariable(cvar_t *p){colour=p;p->value=atof(p->string);}
 void Cvar_SetValue(char *name,float v){assert(!strcmp(name,colour->name));colour->value=v;}
@@ -33,9 +53,10 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
  if(!strcmp(name,"dbg"))dbg_command=fn;
  if(!strcmp(name,"aw_console_font"))font_command=fn;
 }
-int main(void){
+int main(int count,char **values){
  char output[160];byte atlas[16384];int i;
  char *compass[]={"dbg","compass","true"};
+ assert(count==2);catalogue_path=values[1];
  {
   char *tracker[]={"dbg","shroomtracker","reset"};
   assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
@@ -43,12 +64,31 @@ int main(void){
   tracker[0]="debug";assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1);
   assert(!AW_DebugTranslate(2,tracker,output,8));
  }
+ {
+  char *picker[]={"dbg","shroompicker","reset"};
+  assert(AW_DebugTranslate(2,picker,output,sizeof(output))==1 && !strcmp(output,"aw_shroompicker\n"));
+  assert(!AW_DebugTranslate(3,picker,output,sizeof(output)));
+  assert(!AW_DebugTranslate(2,picker,output,8));
+  picker[0]="debug";assert(AW_DebugTranslate(2,picker,output,sizeof(output))==1);
+  picker[2]="1";assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1 && !strcmp(output,"aw_shroompicker 1\n"));
+  picker[2]="10";assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1);
+  picker[2]="list";assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1);
+  picker[2]="0";assert(!AW_DebugTranslate(3,picker,output,sizeof(output)));
+  picker[2]="11";assert(!AW_DebugTranslate(3,picker,output,sizeof(output)));
+  picker[2]="9999999999999999999999999999";assert(!AW_DebugTranslate(3,picker,output,sizeof(output)));
+  picker[2]="1;quit";assert(!AW_DebugTranslate(3,picker,output,sizeof(output)));
+ }
 
  {
   char *radius[]={"dbg","torch","radius","192"};
   char *flame[]={"dbg","torch","flame","brightbase"};
+  char *strength[]={"dbg","torch","strength","0.7"};
+  char *torchtest[]={"dbg","torchtest","npc","clagius","clanler"};
   assert(AW_DebugTranslate(4,radius,output,sizeof(output))==1 && !strcmp(output,"aw_torch_radius_set 192\n"));
   assert(AW_DebugTranslate(4,flame,output,sizeof(output))==1 && !strcmp(output,"aw_torch_flame_set brightbase\n"));
+  assert(AW_DebugTranslate(4,strength,output,sizeof(output))==1 && !strcmp(output,"aw_torch_strength_set 0.7\n"));
+  assert(AW_DebugTranslate(2,torchtest,output,sizeof(output))==1 && !strcmp(output,"aw_torchtest\n"));
+  assert(AW_DebugTranslate(5,torchtest,output,sizeof(output))==1 && !strcmp(output,"aw_torchtest npc clagius clanler\n"));
  }
  {
   char *scene[]={"dbg","tpscene","headselection"};
@@ -183,6 +223,16 @@ int main(void){
  playvid[2]="mw_logo";assert(AW_DebugTranslate(3,playvid,output,sizeof(output))==1);
  assert(!strcmp(output,"playvid mw_logo\n"));
  playvid[2]="../quit";assert(!AW_DebugTranslate(3,playvid,output,sizeof(output)));
+ {
+  const char *aliases[]={"playvid","vidplay","playvideo","videoplay"};int a;
+  for(a=0;a<4;a++){
+   playvid[1]=(char *)aliases[a];playvid[2]="15";
+   assert(AW_DebugTranslate(3,playvid,output,sizeof(output))==1 && !strcmp(output,"playvid 15\n"));
+   playvid[2]="mw_logo";
+   assert(AW_DebugTranslate(3,playvid,output,sizeof(output))==1 && !strcmp(output,"playvid mw_logo\n"));
+   playvid[2]="15;quit";assert(!AW_DebugTranslate(3,playvid,output,sizeof(output)));
+  }
+ }
  assert(AW_DebugTranslate(3,abbr,output,sizeof(output))==1);
  assert(!strcmp(output,"amiwind_debug_coords on\n"));
  assert(AW_DebugTranslate(3,picker,output,sizeof(output))==1);
@@ -212,7 +262,53 @@ int main(void){
  assert(AW_ParseBoolean("2")==-1 && AW_ParseBoolean("truth")==-1);
  assert(AW_BooleanCvar("aw_fog") && !AW_BooleanCvar("aw_drawdistance"));
  assert(!AW_BooleanCvar("aw_dialogue_box_layout") && !AW_BooleanCvar("aw_ui_font"));
+ {
+  char *indoor[]={"dbg","indoor","luma","1.1"};
+  char *interior[]={"dbg","interior","luma","1.3"};
+  char *legacy[]={"dbg","interiorluma","1.2"};
+  char *canonical[]={"dbg","luma","interior","1.3"};
+  char *outside[]={"dbg","luma","exterior","1.1"};
+  assert(AW_DebugTranslate(4,canonical,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set 1.3\n"));
+  assert(AW_DebugTranslate(4,outside,output,sizeof(output))==1 && !strcmp(output,"aw_exteriorluma_set 1.1\n"));
+  assert(AW_DebugTranslate(3,indoor,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set\n"));
+  assert(AW_DebugTranslate(4,indoor,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set 1.1\n"));
+  assert(AW_DebugTranslate(3,interior,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set\n"));
+  assert(AW_DebugTranslate(4,interior,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set 1.3\n"));
+  assert(AW_DebugTranslate(2,legacy,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set\n"));
+  assert(AW_DebugTranslate(3,legacy,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set 1.2\n"));
+ }
+ i=catalogue_opens;
  AW_ConsoleInit();assert(colour->value==255);assert(dbg_command==debug_command);
+ assert(i==catalogue_opens); /* Registering/opening does not load a catalogue. */
+ argc=2;args[0]="dbg";args[1]="help";printed[0]=0;debug_command();
+ assert(strstr(printed,"AUDIO\n--------------------------------------\n"));
+ assert(strstr(printed,"VIDEO\n--------------------------------------\n"));
+ assert(strstr(printed,"PLAYTESTING\n--------------------------------------\n"));
+ assert(strstr(printed,"shroompicker [1..10/list]"));
+ assert(!strstr(printed,"NOT PART"));
+ {
+  char *query[]={"dbg","sample"};char badline[500];
+  catalogue_override="AWDC1\nTEST|sample|aw_pos|first\n";
+  assert(AW_DebugTranslate(2,query,output,sizeof(output))==1 && !strcmp(output,"aw_pos\n"));
+  catalogue_override="AWDC1\nTEST|sample|aw_dimensions|changed on disk\n";
+  assert(AW_DebugTranslate(2,query,output,sizeof(output))==1 && !strcmp(output,"aw_dimensions\n"));
+  catalogue_override="AWDC1\nTEST|sample|aw_pos;quit|bad\n";
+  assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1 && !*output);
+  catalogue_override="AWDC1\nTEST|sample|aw_pos|ok\ninvalid trailing row\n";
+  assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1 && !*output);
+  catalogue_override="AWDC1\nTEST|sample|aw_pos|a\nTEST|sample|aw_view|duplicate\n";
+  assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1);
+  memset(badline,'x',sizeof(badline));memcpy(badline,"AWDC1\n",6);badline[499]=0;
+  catalogue_override=badline;assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1);
+  catalogue_override="AWDC0\n";assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1);
+  catalogue_override="AWDC1\nTEST|sample|aw_pos|ok\n";
+  catalogue_size_adjust=1;assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1);
+  catalogue_size_adjust=65536;assert(AW_DebugTranslate(2,query,output,sizeof(output))==-1);
+  catalogue_size_adjust=0;catalogue_override=NULL;catalogue_missing=1;
+  argc=2;args[1]="coords";strcpy(queued,"untouched");printed[0]=0;debug_command();
+  assert(!strcmp(queued,"untouched") && strstr(printed,"Debug catalogue missing/invalid"));
+  catalogue_missing=0;
+ }
  memset(pixels,17,sizeof(pixels));vid.conbuffer=pixels+4;
  vid.conwidth=8;vid.conrowbytes=12;vid.conheight=4;
  AW_ConsoleBackground(2);assert(scr_copyeverything);

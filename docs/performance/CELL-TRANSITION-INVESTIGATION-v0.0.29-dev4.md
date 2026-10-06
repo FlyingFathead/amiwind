@@ -43,6 +43,63 @@ causes of the remaining miss. In particular, a filled buffer may have become
 nonresident before the copy hook; that must be measured before changing its
 allocation policy or size.
 
+
+## Follow-on cache trace and allocator probe — 6 October 2026
+
+One functional, unmeasured diagnostic crossing now attributes a completed
+prefix miss. The destination was `maps/sn048.bsp`; the requested and prefetched
+path keys matched at load begin. The 256-entry event ring retained 40 entries,
+with no overwrite. It recorded all 131,072 prefix bytes being filled, then a
+high-hunk cache-move failure and free of the same 131,080-byte allocation
+(including its header). Two copy-phase misses followed, with no copy event and
+zero prefetched bytes consumed. The normal loader completed using 7,421,438
+read bytes across 549 calls. Normal load-completion cleanup happened afterward.
+
+This establishes one concrete eviction during loading, before the prefix copy.
+It is separate from the earlier prediction/cancellation bug. It does not
+measure frequency, first-world-frame latency, audio continuity or speedup.
+
+The allocator has a specific policy lead. Both low- and high-hunk reclamation
+use a relocation helper that excludes the gap below the first cache block.
+Low-hunk growth needs that exclusion; high-hunk growth can use that gap if it
+still fits above the low-hunk boundary. A bounded prototype retains the legacy
+`Cache_Move(cache_system_t *)` wrapper and adds a private policy helper used
+with bottom-gap admission only by `Cache_FreeHigh`.
+
+Source fixtures exercise the actual allocator: a fitting 256 KiB bottom gap,
+low-hunk exclusion, no-fit eviction, list/LRU consistency and preserved payload
+bytes. They pass. Control and candidate 68040 objects retain the same global
+defined symbols; the candidate adds 20 bytes of object code and no BSS. These
+checks do not establish that the observed native crossing had a suitable gap.
+
+To answer that remaining question, a separate trace-only diagnostic preserves
+legacy allocation behavior and records gap size and fit before the attempted
+move. Its 68040 engine link and Hunk checks pass. It shares every non-allocator
+object with a fresh control link. The full build retains existing warnings;
+the allocator object checks are clean. This diagnostic and the policy prototype
+are follow-on experiments outside the frozen development playtest.
+
+Next, capture the gap/fit event on the same functional route. If it fits, test
+the policy candidate and require relocation followed by actual prefix copying.
+Only then run a separate, balanced timing comparison with identical inputs and
+cache conditions. A larger prefix or a faster host does not replace this proof.
+The issue remains **Performance / Needs work; no accepted speedup**.
+
+## Gap-probe setup limitation — 6 October 2026
+
+A subsequent bounded southbound route reached the intended destination, but its
+recorded loading method was 1, with zero prefix capacity and zero bytes filled.
+The two-entry trace contained a target mismatch and load completion; it produced
+no gap/fit event. This attempt therefore does not answer whether the earlier
+evicted prefix could have been relocated. It is not evidence against the prior
+40-event eviction trace, and it provides no measured speedup.
+
+Before another allocator comparison, read back method 2, verify the requested
+prefix capacity and prediction target, and confirm a fill event before crossing.
+Then capture the high-hunk gap/fit event and copied-prefix counters on the same
+route. The diagnostic engine and tracked configuration/profile files were
+restored after this bounded run. No allocator-policy change is in dev4.
+
 ## Timing caveats
 
 The existing load profile records file-read, decode, world, actor, server-total, and prefix counters. These phases overlap: world and actor work includes reads and decode, so their durations must not be summed as if independent CPU phases. Read bytes and cache workloads also varied between samples.
@@ -87,3 +144,13 @@ Use an identical route and asset set, alternate candidate/baseline order, and re
 Extend the matched native route on the patched candidate and unchanged baseline beyond the initial two samples per direction. Include ordinary walking, both directions, narrow/corner boundaries, and repeated transitions. Confirm correct region selection and prefix use, actual destination-world presentation timing, frame cost and memory headroom, and preserved view/equipment/hand/torch state. Test active voice and music continuity during the same transitions. Keep the default unchanged until the data show a repeatable benefit without regressions.
 
 See the [performance bug entry](../BUG_JOURNAL.md#perf-readahead-29-cell-crossing-pauses-and-premature-prefetch-cancellation) for the project tracking status.
+
+## Scope clarification — 6 October 2026
+
+Loading screens on building entry and exit are acceptable. This investigation
+prioritizes pauses and jolts during continuous outdoor movement across exterior
+cell and sub-cell boundaries. Report and compare those crossing measurements
+separately from intentional door/interior map loads. Large interiors may later
+use [natural-boundary sections](../CELL_CHANGING.md#large-interiors-subdivision-at-natural-boundaries),
+whose internal handoffs must also preserve gameplay state and avoid frequent
+interruptions. That design does not demonstrate a present outdoor speedup.

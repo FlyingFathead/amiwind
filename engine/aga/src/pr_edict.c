@@ -812,6 +812,36 @@ ed should be a properly initialized empty edict.
 Used for initial level load and for savegames.
 ====================
 */
+/* Native render metadata stays in the BSP entity text for
+ * AW_RenderRangesNewMap. It is not a QuakeC field. Skip its value without
+ * copying a potentially 16-KiB range list into COM_Parse's 1-KiB token.
+ * The renderer remains responsible for validating the range/model identity. */
+static char *ED_SkipRenderMetadata(char *data, int capacity)
+{
+    int n=0,quoted;
+    for(;;){
+        while(*data && (unsigned char)*data<=32)data++;
+        if(data[0]=='/' && data[1]=='/'){
+            while(*data && *data!='\n')data++;
+            continue;
+        }
+        break;
+    }
+    if(!*data || *data=='{' || *data=='}')
+        Sys_Error("ED_ParseEntity: missing render metadata value");
+    quoted=*data=='"';if(quoted)data++;
+    while(*data && (quoted?*data!='"':(unsigned char)*data>32 &&
+          *data!='{' && *data!='}')){
+        if(++n>=capacity)Sys_Error("ED_ParseEntity: render metadata too long");
+        data++;
+    }
+    if(quoted){
+        if(*data!='"')Sys_Error("ED_ParseEntity: unclosed render metadata");
+        data++;
+    }
+    return data;
+}
+
 char *ED_ParseEdict (char *data, edict_t *ent)
 {
 	ddef_t		*key;
@@ -858,6 +888,14 @@ if (!strcmp(com_token, "light"))
 		{
 			keyname[n-1] = 0;
 			n--;
+		}
+
+		if (!strcmp(keyname,"aw_render_pool") || !strcmp(keyname,"aw_render_ranges"))
+		{
+			data = ED_SkipRenderMetadata(data,
+				!strcmp(keyname,"aw_render_pool") ? 64 : 16384);
+			init = true;
+			continue;
 		}
 
 	// parse value

@@ -4,6 +4,87 @@
 
 # AmiWind - Bringing TES III: Morrowind to Commodore Amiga
 
+AmiWind converts your own Morrowind installation for an experimental native
+Amiga runtime. Read the [FAQ](docs/FAQ.md) for the project vision, hardware
+and current scope, and [licensing and credits](docs/LICENSING_AND_CREDITS.md)
+for source provenance and what the public package contains.
+
+## v0.0.29 - Let There Be (Just a Bit More) Light
+
+Explore with adjustable interior brightness, clearer torchlight and improved
+first-person hands. Graphics settings now provide independent saved interior
+and exterior controls; the Census door guard and reported Seyda shack lighting
+jump have positive RC2 playtest results. Confirmation dialogs use framed buttons.
+
+This remains an experimental demake with incomplete world and gameplay coverage.
+Balmora Temple geometry holes and WinUAE music crackle/pauses remain known issues,
+alongside the hand-animation transition and memory/performance limits. See the
+[release notes](docs/RELEASE-v0.0.29.md) and [current tracker](docs/BUGS.md).
+
+## Earlier v0.0.29-rc1 playtest - More Mushrooms! (...and fixes)
+
+The **rc1 candidate is assembled** and has completed a bounded native FS-UAE
+playtest: Audio controls, independent dialogue/effects levels and mushroom
+pickup with save/reload were verified. Public source publication remains pending.
+Final **More Mushrooms** still depends on the world-coverage and regression gates
+in [the release plan](docs/PLAN-v0.0.29.md). The dev4 hotlist remains below.
+
+- **Broader mushroom coverage:** the current memory model admits 347 of 390
+  exterior maps. Forty-three maps and additional interior routes still need
+  work. These are admission results, not a claim that all placements have passed
+  in-game testing. See [asset coverage](docs/ASSET_COVERAGE.md).
+- **Less temporary and resident RAM:** compact persistent harvest state,
+  direct alias-model loading and exact edge/surface layouts preserve source
+  geometry while reducing allocations. Native peaks and outdoor transition
+  smoothness remain checks of their own.
+- **Race-specific first-person hands:** the candidate includes a source-topology
+  catalogue and corrected lighting normals, with legacy profiles retained. Bounded
+  native motion comparisons show no newly detached skin triangle; the paw-like
+  silhouette remains an appearance issue. Transparent sprite conversion is a
+  [future investigation](docs/FIRST_PERSON_HANDS.md#investigation-first-person-hands-rendered-as-sprites).
+- **Torch repairs:** nearby NPCs respond to local torchlight in bounded native
+  off/on tests, and all three tested flame styles are visible. The rc1 run also
+  captured held torchlight with a nearby NPC; broader actor coverage remains in
+  the [tracker](docs/BUGS.md).
+- **Audio work:** smaller, audio-serviced head-preview reads avoid a reproduced
+  starvation case under injected disk delay. The rc1 WinUAE playtester reports
+  no OST jump when entering appearance selection; a later RC2 WinUAE report
+  reopens that issue. A separate
+  Audio options screen with Master, Music, Effects and Dialogue sliders now has
+  native arrow-key and saved-setting checks, plus independent dialogue/effects
+  output checks. Broader listening and event coverage remain open.
+- **Faster regression checks:** disk-backed debug help, `dbg shroompicker`
+  locations and the `playvideo`, `videoplay`, `playvid` and `vidplay` aliases make
+  the playtest easier to exercise.
+
+### From the rc1 playtest
+
+| Aim and pick | Pickup feedback |
+| :---: | :---: |
+| ![Luminous Russula with the E: Pick prompt in rc1](docs/images/amiwind-v0.0.29-rc1-mushroom-prompt.png) | ![Picked up one Luminous Russula in rc1](docs/images/amiwind-v0.0.29-rc1-mushroom-pickup.png) |
+
+| Audio options | Torchlight at night |
+| :---: | :---: |
+| ![Master, Music, Effects and Dialogue sliders in rc1](docs/images/amiwind-v0.0.29-rc1-audio.png) | ![Nord hands, a held torch and a nearby NPC at night in rc1](docs/images/amiwind-v0.0.29-rc1-torch-night.png) |
+
+![Actual rc1 mushroom pickup sequence](docs/images/amiwind-v0.0.29-rc1-mushroom-pick.gif)
+
+These are actual frames and a six-second clip from the same rc1 run. A debug
+destination placed the player by the mushroom; the pickup and save/reload used
+ordinary controls. Two distinct plants were collected and remained picked after
+reload. See [capture details and earlier galleries](docs/GAMEPLAY_MEDIA.md) for
+the test scope and image processing. Broader audio and world checks remain open.
+
+<p align="center">
+  <img src="docs/images/amiwind-v0.0.29-rc1-high-elf-appearance.png" width="695" alt="High Elf male appearance selection in rc1, Face 1 of 6 and Hair 1 of 5">
+</p>
+<p align="center"><em>High Elf male appearance selection in WinUAE, v0.0.29-rc1.</em></p>
+
+This separate playtester-supplied screenshot is unchanged. The playtester
+confirms that entering appearance selection caused no OST jump in rc1; this
+records that earlier result. The later RC2 WinUAE playtest reopens entry
+audio continuity, so it remains in the current known issues.
+
 ## v0.0.29-dev4 — WIP: More Mushrooms! (...and fixes)
 
 **More exciting features and bug fixes —** small mushrooms to pick, steadier
@@ -192,7 +273,7 @@ and [measured findings](docs/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md) distinguis
 completed representation savings from open geometry and target gates.
 See the [memory notes](docs/MEMORY_ALLOCATION.md),
 [cell-changing checklist](docs/CELL_CHANGING.md),
-[sky and background rendering](docs/DAY_NIGHT_AND_SKY.md#existing-renderer-background-and-sky-enclosure-geometry),
+[sky and background rendering](docs/DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate),
 [terrain-culling status](docs/TERRAIN_VISUAL_CULL.md),
 [bug journal](docs/BUG_JOURNAL.md) and [roadmap](docs/ROADMAP.md) for the details.
 Original-game assets, converted proprietary content and ROMs are not distributed
@@ -505,7 +586,7 @@ loads and crossings, town geometry, scenery continuity and frame cost. Build-tim
 profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
 remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md).
 
-[Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
+[FAQ](docs/FAQ.md) · [Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
 [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
 [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
 [Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·

@@ -65,11 +65,13 @@ UPSTREAM_SHA256='43353034beb2a43b1af82c735f93c0a8bee8129c1b93d7ba152dd8e60ad3721
 RUNTIME_SOURCE=ROOT/'engine/aga'
 HEAP_LOADER_SOURCE_PATHS = (
     'Makefile',
-    'src/model.c', 'src/model.h', 'src/zone.c', 'src/zone.h',
+    'src/model.c', 'src/model_alias_stream.inc', 'src/model.h', 'src/zone.c', 'src/zone.h',
+    'src/r_draw.c', 'src/asm_draw.h',
     'src/common.c', 'src/sys_amiga.c',
     'src/aw_guard_torch.c', 'src/aw_torch.c',
     'src/aw_harvest.c', 'src/aw_harvest.h', 'src/aw_harvest_runtime.c', 'src/aw_harvest_runtime.h',
     'src/aw_harvest_proxy.c', 'src/aw_harvest_proxy.h',
+    'src/aw_section.c', 'src/aw_section.h', 'src/aw_maps.h', 'src/aw_region.c',
     'src/aw_scenery.c', 'src/pr_edict.c', 'src/aw_scene.c', 'src/aw_spawn.c', 'src/aw_console.c',
     'src/render.h', 'src/r_sprite.c', 'src/r_efrag.c', 'src/r_main.c',
     'src/cl_parse.c', 'src/cl_main.c', 'src/client.h', 'src/pr_cmds.c', 'src/protocol.h', 'qc/world.qc',
@@ -87,6 +89,9 @@ def heap_watcher_summary(report, report_path):
     safety = report['safety_headroom_bytes']
     worst = next(row for row in report['maps'] if row['map'] == report['worst_map'])
     peak = worst['peak_loader_bytes']
+    static = worst.get('additional_static_allowance_bytes',0)
+    external = worst.get('additional_external_allocation_allowance_bytes',0)
+    committed = peak + baseline + safety + static + external
     return {
         'schema_version': 1,
         'status': 'estimate_failed' if report['failing_maps'] else 'estimate_passed',
@@ -97,8 +102,10 @@ def heap_watcher_summary(report, report_path):
         'estimated_free_before_reserves_bytes': budget - peak,
         'non_map_reserve_bytes': baseline,
         'required_safety_headroom_bytes': safety,
-        'estimated_committed_with_reserves_bytes': peak + baseline + safety,
-        'estimated_growth_margin_after_reserves_bytes': budget - peak - baseline - safety,
+        'additional_static_allowance_bytes': static,
+        'additional_external_allocation_allowance_bytes': external,
+        'estimated_committed_with_reserves_bytes': committed,
+        'estimated_growth_margin_after_reserves_bytes': budget - committed,
         'map_count': report['map_count'],
         'over_budget_maps': list(report['failing_maps']),
         'report': Path(report_path).name,
@@ -144,6 +151,32 @@ def new_output(path):
     path=ensure_external(path,'AGA build')
     path.mkdir(parents=True,exist_ok=False)
     return path
+
+def stage_debug_catalogues(id1, debug_luma=False):
+    """Required on-disk metadata: fail the build instead of shipping broken dbg."""
+    files = [('debug-commands.txt', b'AWDC1'), ('shroompicker.txt', b'AWSP1')]
+    payloads = []
+    for name, magic in files:
+        raw = (ROOT/'config'/name).read_bytes()
+        if not raw or len(raw) > (65536 if name == 'debug-commands.txt' else 4096):
+            raise ValueError(f'Invalid debug catalogue size: {name}')
+        if raw.splitlines()[0] != magic:
+            raise ValueError(f'Invalid debug catalogue header: {name}')
+        payloads.append((name, raw))
+    for name, raw in payloads:
+        (Path(id1)/name).write_bytes(raw)
+    return {name: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+            for name, raw in payloads}
+
+
+def stage_game_config(id1, debug_luma=False):
+    """Keep disabled compile-time controls out of the production startup file."""
+    raw = (ROOT/'config/game.cfg').read_bytes()
+    if not debug_luma:
+        raw = b''.join(line for line in raw.splitlines(keepends=True)
+                       if not line.strip().startswith((b'aw_interiorluma ',b'aw_exteriorluma ')))
+    (Path(id1)/'default-game.cfg').write_bytes(raw)
+
 
 def startup_config(config):
     """Configure controls first; quake.rc selects the named start after autoexec."""
@@ -251,6 +284,42 @@ def stage_runtime(out, source=None):
     shutil.copyfile(ROOT/'tools/project_version.py', tree/'tools/project_version.py')
     return tree,hashes
 
+def world_coverage_build(record, kind):
+    """Bind evidence to the completed build receipt, excluding this footer.
+
+    Adapters use the same canonical identity before supplying --world-coverage.
+    Repeated footer generation cannot alter the build identity it describes.
+    """
+    from world_asset_coverage import digest as coverage_digest
+    if kind not in ('engine','image'):
+        raise ValueError('Unknown world coverage build kind')
+    binding={key:value for key,value in record.items() if key!='world_coverage'}
+    return dict(id='sha256:'+coverage_digest(dict(kind=kind,receipt=binding)),
+                kind=kind,version=record['version'])
+
+
+def write_world_coverage(out, kind, evidence_path=None):
+    """Always save and print coverage; absent evidence means unknown."""
+    from world_asset_coverage import report,terminal
+    out=Path(out)
+    receipt_path=out/('engine-build.json' if kind=='engine' else 'build.json')
+    record=json.loads(receipt_path.read_text(encoding='utf-8'))
+    build=world_coverage_build(record,kind)
+    evidence_raw=Path(evidence_path).read_bytes() if evidence_path is not None else None
+    evidence=json.loads(evidence_raw) if evidence_raw is not None else None
+    result=report(evidence,build=build)
+    report_path=out/'world-coverage.json'
+    if evidence_path is not None and Path(evidence_path).resolve()==report_path.resolve():
+        raise ValueError('Coverage input must differ from generated report')
+    report_path.write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8',newline='\n')
+    record['world_coverage']=dict(report=report_path.name,sha256=digest(report_path),
+        status=result['status'],build=build,
+        evidence_sha256=hashlib.sha256(evidence_raw).hexdigest() if evidence_raw is not None else None)
+    receipt_path.write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8',newline='\n')
+    print(terminal(result),end='',flush=True)
+    return result
+
+
 def engine(args):
     check_native_versions()
     # Optional legacy input only verifies provenance; it never replaces repo source.
@@ -259,16 +328,18 @@ def engine(args):
     tree,source_hashes=stage_runtime(out)
     env=os.environ.copy();env['PATH']=str(args.sdk.resolve()/'bin')+os.pathsep+env.get('PATH','')
     jobs=resolve_jobs(args.jobs)
+    debug_luma=bool(getattr(args,'debug_luma',True))
     print(f'Native compiler jobs: {jobs}',flush=True)
-    run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),make_python_assignment(),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0'),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
+    run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),make_python_assignment(),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0')+(' -DAMIWIND_DEBUG_LUMA=1' if debug_luma else ''),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
     binary=tree/('build/AmiQuakeGCC-NoFPU' if args.cpu=='68020' else 'build/AmiQuakeGCC')
     check_binary(binary.read_bytes())
     checker=tree/'build/AmiWindCheck'
     vasm=executable_path(args.vasm.resolve() if args.vasm else args.sdk.resolve()/'bin/vasmm68k_mot')
     run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',args.sdk.resolve()/'m68k-amigaos/ndk-include','-I',tree/'build/version','-o',checker,tree/'boot/bootcheck.asm'])
     check_binary(checker.read_bytes())
-    (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n', newline='\n')
+    (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'debug_luma':debug_luma,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker)},indent=2)+'\n', newline='\n')
     print(binary)
+    write_world_coverage(out,'engine',getattr(args,'world_coverage',None))
 
 def install_world_scenery(overlay, id1):
     """Validate a complete full-world overlay, then replace its terrain BSPs."""
@@ -375,13 +446,20 @@ def town_region_map_names(directory, prefix):
         names.append('maps/'+name+'.bsp')
     return names
 
-def harvest_fingerprint_entries(id1):
+def harvest_fingerprint_entries(id1, *, plant_capacity=None):
     """Bind optional pickup contents to saves, preserving the legacy namespace.
 
     Check the bounded catalogue envelope here; the native parser and original
     source/placement admission still own semantic validation. Hash every byte.
     """
     root=Path(id1);result=[];catalogue_kind=None;global_index=None;model_files={}
+    if plant_capacity is None:
+        source=(RUNTIME_SOURCE/'src/aw_harvest.h').read_text(encoding='utf-8')
+        bound=re.search(r'^\s*#define\s+AW_HARVEST_PLANTS\s+(\d+)\s*$',source,re.M)
+        if not bound:raise ValueError('Cannot identify runtime harvest placement bound')
+        plant_capacity=int(bound[1])
+    if type(plant_capacity) is not int or not 1<=plant_capacity<=4096:
+        raise ValueError('Invalid runtime harvest placement bound')
     for path in sorted(root.glob('harvest-*.txt'),key=lambda item:item.name):
         match=re.fullmatch(r'harvest-([a-z0-9_]{1,24})\.txt',path.name)
         if not match or path.is_symlink() or not path.is_file():
@@ -407,7 +485,7 @@ def harvest_fingerprint_entries(id1):
         if external != (models is not None):
             raise ValueError('Invalid external harvest catalogue envelope: '+path.name)
         models=int(models) if external else 0
-        if (external and not 1<=models<=8) or any(n>limit for n,limit in zip(counts,(64,256,24))) or len(lines)!=1+sum(counts)+models:
+        if (external and not 1<=models<=8) or any(n>limit for n,limit in zip(counts,(64,256,plant_capacity))) or len(lines)!=1+sum(counts)+models:
             raise ValueError('Invalid harvest catalogue counts: '+path.name)
         if catalogue_kind is not None and catalogue_kind!=indexed:
             raise ValueError('Mixed legacy and indexed harvest catalogues: '+path.name)
@@ -455,6 +533,9 @@ def write_content_fingerprint(id1):
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
     for name,hash_value in harvest_fingerprint_entries(id1):
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
+    from interior_sections import fingerprint_entries as section_fingerprint_entries
+    for name,hash_value in section_fingerprint_entries(id1):
+        fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
     (Path(id1)/'save-content.bin').write_bytes(fingerprint.digest())
 
 
@@ -501,7 +582,8 @@ def image(args):
     cfg=boot/'id1/default.cfg'
     cfg.write_text(startup_config(cfg.read_text()), newline='\n')
     shutil.copyfile(ROOT/'config/keymaps.cfg',boot/'id1/keymaps-default.cfg')
-    shutil.copyfile(ROOT/'config/game.cfg',boot/'id1/default-game.cfg')
+    stage_game_config(boot/'id1', debug_luma=engine_record.get('debug_luma',False))
+    stage_debug_catalogues(boot/'id1', debug_luma=engine_record.get('debug_luma',False))
     if args.data_files:
         from prepare_ui import convert as convert_ui
         from ui_palette import reserve as reserve_ui_palette
@@ -525,6 +607,10 @@ def image(args):
     else:
         gallery_report=stage_required(args.gallery,boot/'id1')
     (out/'npc-gallery-staging.json').write_text(json.dumps(gallery_report,indent=2)+'\n', newline='\n')
+    from build_torchtest import build as build_torchtest
+    torchtest_report=build_torchtest(boot/'id1/gfx/palette.lmp',boot/'id1/maps/torchtest.bsp',
+                                    out/'torchtest-build',args.qbsp,args.vis,args.light)
+    (out/'torchtest-staging.json').write_text(json.dumps(torchtest_report,indent=2)+'\n', newline='\n')
     (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n', newline='\n')
     from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
     if args.data_files:prepare_world_ui(args.data_files,None,boot)
@@ -847,8 +933,8 @@ def finalize_image(args):
     part.unlink()
     verify_heap_loader_source_receipt(engine_record)
     build_json={
-        'version':VERSION,'hands':args.hands,'actor_ground_audit':actor_acceptance,
-        'npc_gallery':gallery_report,'world_scenery':world_scenery_acceptance,
+        'version':VERSION,'hands':args.hands,'debug_luma':engine_record.get('debug_luma',False),'actor_ground_audit':actor_acceptance,
+        'npc_gallery':gallery_report,'torch_test':torchtest_report,'world_scenery':world_scenery_acceptance,
         'world_flora':json.loads((out/'world-flora-staging.json').read_text(encoding='utf-8')) if (out/'world-flora-staging.json').is_file() else {'status':'not_requested'},
         'sky_asset_preparation':sky_asset_preparation,
         'guard_torches':guard_torches,
@@ -907,11 +993,16 @@ def finalize_image(args):
         print('PRIVATE TEST image assembled. Production actor gate DID NOT PASS; see actor-ground-acceptance.json.', flush=True)
     from emulator_configs import print_outputs
     print_outputs(hdf)
+    write_world_coverage(out,'image',getattr(args,'world_coverage',None))
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     e=sub.add_parser('engine');e.add_argument('--cpu',choices=['68020','68040'],default='68040');e.add_argument('--archive',type=Path,help='Optional legacy provenance check; source is always engine/aga in this repository');e.add_argument('--out',type=Path,required=True);e.add_argument('--sdk',type=Path,required=True);e.add_argument('--vasm',type=Path,help='68000 preflight assembler; defaults to the SDK vasm')
     add_jobs(e)
+    luma=e.add_mutually_exclusive_group()
+    luma.add_argument('--disallow-luma-controls','--no-luma-controls',dest='debug_luma',action='store_false',help='Compile out brightness settings, scaling and menu; retain explanatory console messages')
+    luma.add_argument('--interior-brightness','--debug-luma',dest='debug_luma',action='store_true',help='Enable brightness controls (the default); legacy aliases retained')
+    e.set_defaults(debug_luma=True)
     i=sub.add_parser('image')
     from hidden_surface_build import add_options as add_hidden_surface_options
     add_hidden_surface_options(i)
@@ -934,7 +1025,9 @@ def main():
     i.add_argument('--balmora-cache',type=Path,help='Complete owned Balmora preparation cache for measured layout repair before final actor/heap audits')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
     for name in ['scene','music','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
-    for parser in (e,i):parser.add_argument('--hands',choices=['3d','sprites'],default='3d',help='Compile-time first-person renderer; retain both conversion paths')
+    for parser in (e,i):
+        parser.add_argument('--hands',choices=['3d','sprites'],default='3d',help='Compile-time first-person renderer; retain both conversion paths')
+        parser.add_argument('--world-coverage',type=Path,help='Optional normalized world coverage evidence bound to this exact build; absent evidence is reported as unknown')
     args=p.parse_args()
     # Resolve executables before subprocess cwd changes.
     for name in ['qcc','qbsp','vis','light','xdftool','rdbtool','engine','bootcheck']:

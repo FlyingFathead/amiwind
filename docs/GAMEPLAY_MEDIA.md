@@ -1,5 +1,59 @@
 # Gameplay media
 
+## v0.0.29-rc1 — More Mushrooms! (...and fixes)
+
+The mushroom, Audio menu and torch captures below were made on 6 October 2026
+from the assembled rc1 package in FS-UAE, using its
+bundled launcher and accelerated A1200/AGA/PAL 68040/FPU/JIT profile with 2 MiB
+Chip and 16 MiB Z3 RAM. One bounded run exercised the game and returned cleanly
+to AmigaDOS. These screenshots document that candidate; public source publication
+remains pending.
+
+| Mushroom ready to pick | Successful pickup |
+| :---: | :---: |
+| ![Luminous Russula and E: Pick prompt](images/amiwind-v0.0.29-rc1-mushroom-prompt.png) | ![Luminous Russula pickup notification](images/amiwind-v0.0.29-rc1-mushroom-pickup.png) |
+
+| Audio options | Night torchlight |
+| :---: | :---: |
+| ![Four independent Audio controls](images/amiwind-v0.0.29-rc1-audio.png) | ![Held torch, Nord hands and a nearby NPC at night](images/amiwind-v0.0.29-rc1-torch-night.png) |
+
+![Six-second rc1 mushroom pickup sequence](images/amiwind-v0.0.29-rc1-mushroom-pick.gif)
+
+The four 692×540 PNGs are unchanged emulator crop captures. No repainting,
+compositing, exposure or colour adjustment was applied. The six-second GIF is
+continuous footage from the same run, beginning at the mushroom prompt and
+ending after pickup. It is sampled at 10 fps, resized to 640×480 with nearest-
+neighbour sampling and encoded with a 128-colour palette without dithering. It
+has no audio and does not measure the game's frame rate.
+
+The Nord character uses the existing Hors debug preset. The night view uses
+`dbg set time night`; `dbg shroompicker 1` supplies the mushroom destination.
+These are reproducible test views, not evidence of walking the complete route.
+Ordinary E, F5 and F9 controls collected and saved two distinct overlapping
+plants, then restored their picked state and two ingredients. The second E
+picked a different plant; this run does not establish a same-plant duplicate
+negative or worldwide harvest coverage.
+
+The Audio menu visibly changed Master with Left/Right and returned to the right
+Options selection. Native sound checks separated dialogue and effects; the
+shown Master/Music/Effects/Dialogue levels of 100/100/50/25 were saved in the
+configuration. Broader listening and world acceptance remain open.
+
+### Appearance selection in WinUAE
+
+<p align="center">
+  <img src="images/amiwind-v0.0.29-rc1-high-elf-appearance.png" width="695" alt="High Elf male appearance selection in rc1, Face 1 of 6 and Hair 1 of 5">
+</p>
+<p align="center"><em>High Elf male appearance selection in WinUAE, v0.0.29-rc1.</em></p>
+
+This separate screenshot was supplied by the playtester on 6 October 2026.
+The original PNG is copied unchanged; centering is page layout only. It shows
+Face 1/6 and Hair 1/5. The playtester confirms no OST jump when entering this
+screen in rc1. This is reported acceptance of that entry path, not a complete
+audio verdict or acceptance of every appearance combination.
+
+Earlier release galleries below retain their original version attribution.
+
 ## v0.0.28 — Trees and Grass, Day and Night
 
 Captured on 4 October 2026 from the release engine in WinUAE. Every PNG is a

@@ -1568,7 +1568,7 @@ int             loadsize;
 byte *COM_LoadFile (char *path, int usehunk)
 {
 	int             h;
-	int             done,take;
+	int             done,take,limit;
 	byte    *buf;
 	char    base[32];
 	int             len;
@@ -1609,10 +1609,14 @@ byte *COM_LoadFile (char *path, int usehunk)
 	Draw_BeginDisc ();
 	for(done=0;done<len;done+=take) {
 		if(aw_load_audio_tick)aw_load_audio_tick();
-		take=len-done;if(take>16384)take=16384;
+		/* Match the loading music refill so slow asset reads cannot consume
+		 * most of the queued DMA time before the next service opportunity. */
+		limit=aw_loading_music?4096:16384;
+		take=len-done;if(take>limit)take=limit;
 		if(Sys_FileRead(h,buf+done,take)!=take)
 			Sys_Error("COM_LoadFile: short read for %s",path);
 	}
+	if(aw_load_audio_tick)aw_load_audio_tick();
 	COM_CloseFile (h);
 	Draw_EndDisc ();
 

@@ -688,8 +688,6 @@ void Key_Event (int key, qboolean down)
             return;	// ignore most autorepeats
         }
 
-        if (key >= 200 && !keybindings[key])
-            Con_Printf ("%s is unbound, hit F4 to set.\n", Key_KeynumToString (key) );
     }
 
     if (key == K_SHIFT)
@@ -793,6 +791,11 @@ void Key_Event (int key, qboolean down)
     || (key_dest == key_game && ( !con_forcedup || !consolekeys[key] ) ) )
     {
         kb = keybindings[key];
+        /* Console scroll and modal controls consume keys before this point.
+         * Warning earlier adds new console lines for every unbound wheel
+         * tick, including ticks already clamped at either scroll boundary. */
+        if (key >= 200 && !kb)
+            Con_Printf ("%s is unbound, hit F4 to set.\n", Key_KeynumToString (key) );
         if (kb)
         {
             if (kb[0] == '+')

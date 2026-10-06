@@ -1,5 +1,13 @@
 # Reusable conversion recipes
 
+## Geometry import validation update: 2026-10-06T20:06:10+03:00
+
+The RC1 Temple investigation confirmed that nearly collinear leading vertices
+can produce incorrect exported BSP planes despite retained source triangles.
+Use [the geometry import checks](MESH_TIPS_AND_TRICKS.md) and retain
+[the Temple regression](bugs/BALMORA-TEMPLE-GEOMETRY-29.md) for future imports.
+The repair candidate is Temple-only; the wider interior audit is read-only.
+
 For the consolidated Balmora problem/cause/implications/resolution reference,
 see [Balmora conversion lessons](BALMORA_CONVERSION_LESSONS.md). Its RC1 checklist
 link tracks the owner reports and remaining native acceptance gates.

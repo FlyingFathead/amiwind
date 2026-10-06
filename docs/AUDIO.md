@@ -1,5 +1,35 @@
 # Streamed music and speech
 
+## Loading-audio candidate evidence: 6 October 2026
+
+The next candidate limits loading-only asset reads to 4 KiB and services audio
+between reads. Steady gameplay reads retain their prior policy; no new audio
+buffer or global latency increase was added. Nine focused Linux Docker checks
+and a target compile/link passed before the subsequent door/test-scene changes.
+
+Actual loader/mixer/absolute-clock routines under deterministic synthetic I/O
+showed missed samples drop from 49,568 to zero at 32 KiB/s. At 25 KiB/s the
+candidate still missed 53,312 samples; keeping playback serviced also increased
+total load duration. These are synthetic source experiments, not WinUAE timings.
+Treat this as a mitigation candidate. Ship-to-deck crackle and guard-follow Enter
+jump remain open until target replay; appearance-selection entry already has
+separate owner RC1 acceptance.
+
+## RC1 playtester updates and next mix default: 6 October 2026
+
+Recorded 2026-10-06T13:09:20+00:00. The owner confirms **appearance-selection entry music is
+fixed on WinUAE in RC1**. The small Enter jump at the prison-ship follow-guard
+prompt remains, and the ship-to-deck load produces OST crackling. These are
+separate acceptance cases: AUDIO-APPEARANCE-29 is accepted, AUDIO-ENTER-29 and
+AUDIO-LOAD-29 remain open. Earlier native profiles did not reproduce the latter
+reports. See [the current matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026).
+
+The **next source candidate defaults Effects to 75%** for the requested mix.
+Master, Music and Dialogue defaults remain as before. Saved configuration loads
+after defaults and still overrides them. The delivered RC1 archive is unchanged;
+its user can select 75% through Audio now. Eight focused default-only Docker
+checks passed; next-package startup/persistence acceptance remains required.
+
 ## Current AGA candidate: music-only read-ahead, 4 October 2026
 
 The v0.0.28 candidate keeps four 8,192-frame stereo PCM source blocks
@@ -232,3 +262,44 @@ The original owner listening report remains OPEN. This is a tested source
 recovery/accounting repair for a future build; sealed dev2 artifacts are
 unchanged. Matched native listening and frame/music profiles remain pending.
 Low late-update counts from the old clock cannot rule out long guest stalls.
+
+## 6 October: sub-second music pause on Enter (investigation open)
+
+A reported regression in v0.0.29-dev4 is a sub-second soundtrack cut when
+Enter opens race/head selection and at the intro prompt "Enter to follow the
+guard." The earliest build that introduced it is unknown; independent native
+reproduction is pending. Reported negative cases are exiting character selection,
+Census attribute and starsign menus, and final confirmation. No cause or fix is
+claimed. Investigation is checking explicit stop/restart calls and whether
+Enter-triggered rendering/loading starves audio service. A world/graphics freeze
+is only a hypothesis; retain the intended world pause while music continues.
+Preserve soundtrack priority; do not mask the cut with a fade or global latency
+change.
+
+## RC1 Audio options candidate
+
+Open **Options → Audio** for **Master**, **Music**, **Effects** and **Dialogue**
+sliders. Left/Right adjusts the selected level by 5 percentage points; Shift
+uses 1-point steps. Home/End selects 0/100%, and the mouse can position or drag
+the slider. Back/Escape returns to Audio's row in Options.
+
+`volume` remains the master output and `bgmvolume` the music gain. The new
+archived `effectsvolume` and `dialoguevolume` gains default to 1 in the shipped
+RC1. For the next build, Effects defaults to 75% (`effectsvolume 0.75`);
+Master, Music and Dialogue defaults stay unchanged. This applies to fresh
+settings: saved `config.cfg` values load after gameplay defaults and retain the
+player's chosen levels. Existing RC1 packages are unchanged.
+
+Muted effects and voices keep advancing, and changing
+a level does not reopen a track, refill from disk or restart a sample. Detached
+speech tails retain Dialogue control across scene handoffs. Values are bounded
+to 0–1 through the normal configuration path.
+
+The intro movie has a premixed soundtrack; its components cannot be separated
+by these controls. It retains its existing master-volume behavior.
+
+Seven focused actual mixer/menu checks and the isolated 1,041-test suite pass,
+with zero failures/errors and four existing suite skips. The Amiga target links.
+These are source checks; final-package menu appearance, audible independence and
+saved-setting replay still require native acceptance. The separate Enter-music
+regression remains open; this feature does not establish its resolution.

@@ -30,6 +30,33 @@ class GuardTorchRenderContractTests(unittest.TestCase):
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_brightness_controls_six_steps_independent_sliders_and_return(self):
+        self.compile_run('aga_brightness_menu_test.c', [Path(SOURCE)/'src/aw_menu.c'],
+            defines=['AMIWIND_DEBUG_LUMA=1'],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_luma_disabled_commands_explain_build(self):
+        self.compile_run('aga_luma_disabled_test.c', [Path(SOURCE)/'src/r_light.c'])
+
+    def test_audio_options_keyboard_mouse_and_return_selection(self):
+        self.compile_run('aga_audio_menu_test.c', [Path(SOURCE)/'src/aw_menu.c'],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_audio_bus_levels_actual_pcm_and_archived_settings(self):
+        self.compile_run('aga_audio_levels_test.c', [Path(SOURCE)/'src'/n for n in
+            ('snd_dma.c','snd_mix.c','aw_speech.c','aw_music.c','cvar.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all','-Wl,--wrap=malloc'])
+
+    def test_head_preview_reads_service_real_mixer_and_preserve_failures(self):
+        self.compile_run('aga_head_audio_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_head.c','snd_dma.c','snd_mix.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all','-Wl,--wrap=fread'],
+            arguments=['sliced'])
+
+    def test_first_save_description_loads_character_catalogue(self):
+        self.compile_run('aga_save_frontmenu_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_save.c', 'aw_save_codec.c')])
+
     def test_harvest_original_loot_transaction_capacity_and_save_persistence(self):
         self.compile_run('aga_harvest_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_harvest.c', 'aw_state.c', 'aw_save_codec.c')],
@@ -113,7 +140,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_torch_controls_bounded_light_surface_illumination_and_overlay(self):
         self.compile_run('aga_torch_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_torch.c','cl_main.c','r_light.c','r_surf.c','r_bsp.c','mathlib.c')],
+            ('aw_torch.c','cl_main.c','r_light.c','r_surf.c','r_bsp.c','cvar.c','mathlib.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_exterior_background_uses_sky_with_infinite_depth_and_interior_resets(self):
@@ -252,7 +279,7 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_alias_budget_test.c', [Path(SOURCE)/'src/model.c'])
 
     def test_gallery_lookup_variants_keys_bounds_and_return_scene(self):
-        self.compile_run('aga_gallery_test.c', [Path(SOURCE)/'src'/n for n in ('aw_gallery.c','keys.c','in_amiga.c')],
+        self.compile_run('aga_gallery_test.c', [Path(SOURCE)/'src'/n for n in ('aw_gallery.c','aw_intro.c','aw_story.c','aw_state.c','keys.c','in_amiga.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_npc_visible_head_close_target_and_bounded_ground_contact(self):
@@ -385,7 +412,9 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run("aga_mesh_spans_test.c", [ROOT/"engine/aga/src/r_edge.c"])
 
     def test_console_dispatch_background_and_palette(self):
-        self.compile_run("aga_console_test.c", [ROOT/"engine/aga/src/aw_console.c", ROOT/"engine/aga/src/aw_console_glyphs.c"])
+        self.compile_run("aga_console_test.c", [ROOT/"engine/aga/src/aw_console.c", ROOT/"engine/aga/src/aw_console_glyphs.c"],
+            arguments=[str(ROOT/"config/debug-commands.txt")],
+            cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_noclip_pitch_vertical_stop_and_speed(self):
         self.compile_run("aga_noclip_test.c", [ROOT/"engine/aga/src/aw_walk.c", Path(SOURCE)/"src/mathlib.c"])
@@ -421,6 +450,8 @@ class NativeSourceTests(unittest.TestCase):
     def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=(),
                     standard='gnu89', argument_sets=None):
         tree = Path(SOURCE).resolve()
+        if any(p.name in ("aw_region.c", "aw_scene.c") for p in sources) and not any(p.name=="aw_section.c" for p in sources):
+            sources = [*sources, tree/"src/aw_section.c"]
         if any(p.name == "aw_scene.c" for p in sources):
             sources = [*sources, tree/"src/aw_world.c"]
         if any(p.name == "world.c" for p in sources):

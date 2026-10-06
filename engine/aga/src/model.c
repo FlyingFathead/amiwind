@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include <limits.h>
+#include <stddef.h>
 
 #define AW_STREAM_SPRITES 1
 
@@ -87,10 +88,13 @@ static void AW_LoadAudioTick(void) {
     if(aw_load_audio_tick)aw_load_audio_tick();
 }
 static size_t AW_LoadRead(byte *data,size_t bytes,FILE *file) {
-    size_t done=0,take,got;double started;
+    size_t done=0,take,got,limit;double started;
     while(done<bytes) {
         AW_LoadAudioTick();
-        take=bytes-done;if(take>16384)take=16384;
+        /* The OST also needs disk time between asset reads. Keep loading
+         * slices within one music refill; ordinary reads retain their size. */
+        limit=aw_loading_music?4096:16384;
+        take=bytes-done;if(take>limit)take=limit;
         started=aw_load_clock?aw_load_clock():0;
         got=fread(data+done,1,take,file);done+=got;
         if(aw_load_clock)aw_load_disk_seconds+=aw_load_clock()-started;
@@ -105,6 +109,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer);
 int Mod_TryStreamSprite (model_t *mod);
 void Mod_LoadBrushModel (model_t *mod, void *buffer);
 void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes);
+int Mod_TryStreamAlias (model_t *mod);
 /* Small converted aliases use transient host heap for their file image.
  * Holding the file in the high hunk while decoding into the low hunk evicts
  * other visible actors from the cache between them. No resident RAM increase. */
@@ -124,7 +129,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash);
 
 byte	mod_novis[MAX_MAP_LEAFS/8];
 
-#define	MAX_MOD_KNOWN	256
+#define	MAX_MOD_KNOWN	AW_EDGE_CACHE_MODEL_LIMIT
 model_t	mod_known[MAX_MOD_KNOWN];
 int		mod_numknown;
 
@@ -418,6 +423,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 #if AW_STREAM_SPRITES
     if(Mod_TryStreamSprite(mod))return mod;
 #endif
+    if(Mod_TryStreamAlias(mod))return mod;
     alias_file=AW_AliasFile(mod->name);
     buf=alias_file?alias_file:(unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
     if (!buf)
@@ -783,6 +789,7 @@ void Mod_LoadEdges (lump_t *l)
 
     loadmodel->edges = out;
     loadmodel->numedges = count;
+    loadmodel->edgecache=NULL;loadmodel->edgecache_count=0;
 
     for ( i=0 ; i<count ; i++, in++, out++)
     {
@@ -928,7 +935,7 @@ void Mod_LoadFaces (lump_t *l)
     dface_t		*in;
     msurface_t	*out;
     int			i, count, surfnum;
-    int			planenum, side;
+    int			planenum, side, firstedge, numedges;
 
     in = (void *)(mod_base + l->fileofs);
     if (l->filelen % sizeof(*in))
@@ -942,8 +949,12 @@ void Mod_LoadFaces (lump_t *l)
     for ( surfnum=0 ; surfnum<count ; surfnum++, in++, out++)
     {
         if(!(surfnum&127))AW_LoadAudioTick();
-        out->firstedge = LittleLong(in->firstedge);
-        out->numedges = LittleShort(in->numedges);
+        firstedge = LittleLong(in->firstedge);
+        numedges = LittleShort(in->numedges);
+        if(firstedge<0 || numedges<0 || firstedge>loadmodel->numsurfedges-numedges)
+            Sys_Error("Invalid BSP face edge span");
+        out->firstedge = firstedge;
+        out->numedges = numedges;
         out->flags = 0;
 
         /* BSP29 face plane indices occupy all 16 bits. LittleShort returns
@@ -1370,8 +1381,12 @@ void Mod_LoadSurfedges (lump_t *l)
     loadmodel->surfedges = out;
     loadmodel->numsurfedges = count;
 
-    for ( i=0 ; i<count ; i++)
+    for ( i=0 ; i<count ; i++) {
+        unsigned int index;
         out[i] = LittleLong (in[i]);
+        index=out[i]<0?0U-(unsigned int)out[i]:(unsigned int)out[i];
+        if(index>=(unsigned int)loadmodel->numedges)Sys_Error("Invalid signed surface edge index");
+    }
 }
 
 /*
@@ -1492,6 +1507,54 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
     Hunk_FreeToHighMark(mark);mod_base=NULL;
 }
 
+/* Immutable edge vertices keep their original IDs. Only the mutable world
+ * raster cache is sparse; a prefix also supports arbitrary unsorted BSPs. */
+static void AW_EdgeCacheService(int *work) {
+    if(++*work==256){*work=0;AW_LoadAudioTick();}
+}
+static void AW_EdgeCacheFace(model_t *mod,int index,int *limit,int *work) {
+    msurface_t *face;int i,edge;
+    AW_EdgeCacheService(work);
+    if(index<0 || index>=mod->numsurfaces)Sys_Error("Invalid edge cache face");
+    face=&mod->surfaces[index];
+    if(face->firstedge<0 || face->numedges<0 || face->firstedge>mod->numsurfedges-face->numedges)
+        Sys_Error("Invalid edge cache face range");
+    for(i=0;i<face->numedges;i++){
+        AW_EdgeCacheService(work);
+        edge=mod->surfedges[face->firstedge+i];
+        if(edge==INT_MIN)Sys_Error("Invalid edge cache index");
+        if(edge<0)edge=-edge;
+        if(edge>=mod->numedges)Sys_Error("Invalid edge cache index");
+        if(edge>=*limit)*limit=edge+1;
+    }
+}
+static void AW_InitEdgeCache(model_t *mod) {
+    int i,j,first,count,work=0,limit=mod->numedges?1:0;dmodel_t *world;
+    AW_LoadAudioTick();
+    if(mod->numsubmodels<1)Sys_Error("Missing world model for edge cache");
+    world=&mod->submodels[0];first=world->firstface;count=world->numfaces;
+    if(first<0 || count<0 || first>mod->numsurfaces-count)Sys_Error("Invalid world edge cache range");
+    for(i=first;i<first+count;i++)AW_EdgeCacheFace(mod,i,&limit,&work);
+    /* Include every retained render-node and leaf mark, even on generic BSPs
+     * whose ranges are not a dense prefix of the world's face list. */
+    for(i=0;i<mod->numnodes;i++){
+        AW_EdgeCacheService(&work);
+        first=mod->nodes[i].firstsurface;count=mod->nodes[i].numsurfaces;
+        if(first>mod->numsurfaces-count)Sys_Error("Invalid node edge cache range");
+        for(j=first;j<first+count;j++)AW_EdgeCacheFace(mod,j,&limit,&work);
+    }
+    for(i=0;i<mod->nummarksurfaces;i++){
+        ptrdiff_t index=mod->marksurfaces[i]-mod->surfaces;
+        AW_EdgeCacheService(&work);
+        if(index<0 || index>=mod->numsurfaces)Sys_Error("Invalid mark edge cache range");
+        AW_EdgeCacheFace(mod,(int)index,&limit,&work);
+    }
+    if(limit>INT_MAX/(int)sizeof(unsigned int))Sys_Error("Edge cache size overflow");
+    mod->edgecache_count=limit;
+    mod->edgecache=limit?Hunk_AllocName(limit*sizeof(unsigned int),loadname):NULL;
+    AW_LoadAudioTick();
+}
+
 void Mod_LoadBrushModel (model_t *mod, void *buffer)
 {
     int			i, j;
@@ -1531,6 +1594,7 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
     AW_LoadBrushSection(&header->lumps[LUMP_CLIPNODES],Mod_LoadClipnodes);
     AW_LoadBrushSection(&header->lumps[LUMP_ENTITIES],Mod_LoadEntities);
 
+    AW_InitEdgeCache(loadmodel);
     Mod_MakeHull0 ();
 
     mod->numframes = 2;		// regular and alternate animation
@@ -1665,6 +1729,8 @@ static void *AW_AliasAlloc(int bytes,char *name) {
     if(bytes<0 || block>(size_t)(aw_alias_stage_size-aw_alias_stage_used))Sys_Error("Alias staging size mismatch");
     p=aw_alias_stage+aw_alias_stage_used;memset(p,0,block);aw_alias_stage_used+=(int)block;return p;
 }
+
+#include "model_alias_stream.inc"
 
 /*
 =================

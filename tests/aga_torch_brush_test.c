@@ -8,6 +8,7 @@
 const char *__asan_default_options(void){return "detect_leaks=0";}
 
 client_state_t cl;
+cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
 dlight_t cl_dlights[MAX_DLIGHTS];
 entity_t cl_entities[MAX_EDICTS];
 entity_t *cl_visedicts[MAX_VISEDICTS];

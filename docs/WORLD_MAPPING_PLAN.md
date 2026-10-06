@@ -40,6 +40,8 @@ stable world position and state, not accumulate rounding drift between chunks.
 Interior cells are distinct named spaces with their own coordinates and door
 links; they are not grid tiles appended to exterior terrain.
 
+NPC movement across artificial interior subdivisions, walkable exterior cells and original teleport doors follows the behavior requirements in [NPC cell traversal](NPC_CELL_TRAVERSAL.md). This gameplay AI remains planned, not shipped.
+
 ## Source cells are not RAM allocation units
 
 Start with the owner's [Seyda Neen vicinity](SEYDA_NEEN_SCOPE.md). Inventory a

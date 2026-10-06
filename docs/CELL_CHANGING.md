@@ -220,3 +220,105 @@ interrupt or time out a blocking read to satisfy the delay. This changes screen
 presentation timing, not loader throughput, map residency or frame performance.
 Nine source checks pass and the rc5 candidate was packaged/read back; target
 crossing timing and owner playtesting remain pending.
+
+## Large interiors: subdivision at natural boundaries
+
+Development decision, 6 October 2026. This is the chosen optimization approach
+for oversized interiors; the new section routing and streaming are not yet
+implemented. Existing interiors that fit the target budget can remain one map.
+
+An original interior may contain enough geometry, texture mappings, collision
+data and models to exceed the Amiga map allowance. Subdivide such interiors at
+doorways, corridors, cave bends and other natural occlusion boundaries. Choose
+sections around the original room layout rather than imposing a small uniform
+grid that creates frequent interruptions while walking.
+
+Before choosing a split, inspect the final converted geometry with the
+[polygon inspector and heatmap](POLYCOUNT_INSPECTOR.md), alongside the
+[memory profile](MAP_MEMORY_PROFILE.md). Remove redundant geometry/plane/texture
+mapping data where correctness can be preserved. Polygon density alone does not
+predict memory use: collision structures, textures, model caches, loader peaks
+and overlapping coverage also contribute. Evaluate the complete resource cost
+of both sections, including their shared boundary area and existing reserves.
+
+Keep a single logical original interior identity across all physical sections.
+Original object references, quests, NPC state, inventory, and picked or empty
+mushroom facts must remain persistent when moving between sections or loading a
+save. Adding section IDs must preserve existing saved map identities. Doors must
+retain their original destinations and arrival positions.
+
+Internal handoffs must preserve view angles, held equipment and active voices;
+the soundtrack continues. Check collision and visibility in both directions,
+including backtracking. Read-ahead may prepare the likely next section, but an
+optimization is accepted only after measuring memory use and the visible pause
+on the target engine. A section that fits on its own can still fail during its
+loading peak or exhibit an unacceptable handoff.
+
+Explicit loading screens on entering or leaving a building are acceptable.
+The current transition performance priority is continuous outdoor movement:
+pauses and jolts at exterior cell/sub-cell boundaries. Interior subdivision should
+avoid introducing similarly frequent interruptions within a room or corridor.
+
+### Preferred subdivision points
+
+Doorways are the first choice for section boundaries in mines and other large
+interiors. Where there is no doorway, use a narrow passage, corridor turn or
+cave bend that limits visibility between sections. Include sufficient overlap
+for views through the opening and continuous collision; a doorway alone is not
+proof that the boundary is invisible or that the loading peak fits the budget.
+
+### Pursuit across section and cell boundaries
+
+The three boundary rules and actor eligibility distinctions are summarized in the [NPC cell-traversal guide](NPC_CELL_TRAVERSAL.md). They remain design requirements, not implemented gameplay AI.
+
+NPC pursuit must survive internal section and adjoining exterior cell changes.
+This is a design requirement, not a claim of implemented cross-cell combat AI.
+A streaming boundary must not reset aggression or make an active pursuer vanish.
+Track each actor by stable original reference identity, independent of the map's
+entity slot. Transfer health, equipment, combat target, aggression, position,
+movement intent and relevant combat timers without restarting the encounter.
+
+Associate each connection with traversable entry/exit points. Pursuers must reach
+and cross that connection by a valid route, then continue from the corresponding
+arrival point. Do not teleport them directly beside the player. Original teleport/loading doors are a different boundary type: by default,
+hostile NPCs must not follow the player out of a cave, tomb or other interior
+through its original exit. Preserve the original Morrowind behaviour. This must
+not prevent pursuit through artificial subdivisions of that same logical
+interior, or across adjoining walkable exterior cells. Friendly followers and
+explicit scripted transitions require their own rules; blocking hostile passage
+does not by itself clear the NPC's saved hostility or reset health. Ordinary
+non-teleport doors still need lock and actor-capability checks.
+
+Reference: OpenMW's [hostile-follower compatibility issue](https://gitlab.com/OpenMW/openmw/-/issues/5101)
+documents Morrowind leaving hostile followers behind at teleport doors, and the
+[teleport-door pathfinding discussion](https://gitlab.com/OpenMW/openmw/-/issues/4893)
+identifies that general navigation capability as outside the original game's
+feature set. These are reference findings; AmiWind pursuit still requires
+implementation and target testing.
+
+Maintain exactly one authoritative actor state during handoff; overlapping map
+sections must not create duplicate NPCs or duplicate attacks and drops. If the
+source section is unloaded, retain a bounded pursuit record and advance permitted
+travel until the actor can be instantiated at the destination entry. Detailed
+pathing through unloaded terrain remains an implementation decision; never assume
+a straight line is traversable. Save/load and returning across a boundary must
+retain the same actor state.
+
+Acceptance checks must cover pursuit in both directions, immediate backtracking,
+multiple pursuers, death during handoff, blocked connections, and save/load during
+pursuit. Include actor state and any overlap in the section's memory budget.
+
+
+### Dense ramps: subdivide first, then measure
+
+Evaluate the naturally divided mine sections before reducing ramp or other mesh
+polygon counts. Subdivision reduces resident geometry, but a dense object can
+still be expensive to render while visible. The inspector heatmap measures
+placed vertex concentration; its see-through wireframe also superimposes
+geometry at different depths. Neither alone establishes a frame-time bottleneck.
+
+Measure each section's complete memory cost, boundary overlap and loading peak,
+then profile representative visible views in the target engine. If those results
+still exceed the budget or frame-time target, simplify the specific costly meshes
+and repeat the measurements. Preserve walkable slopes, silhouette, collision,
+material boundaries and closed seams; do not indiscriminately decimate the mine.

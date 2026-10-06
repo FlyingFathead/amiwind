@@ -9,6 +9,7 @@
 #include "aw_maps.h"
 #include "aw_story.h"
 #include "aw_region.h"
+#include "aw_section.h"
 #include "aw_world.h"
 #include "aw_character.h"
 #include "aw_harvest_runtime.h"
@@ -26,6 +27,9 @@ static double hand_torch_time;
 static int hand_clock_ready;
 static double started;
 static int region_crossing,map_jump;
+/* 1: requested, 2: checked spawn awaiting the final signon angle packet. */
+static int shroompicker_view;
+static float shroompicker_pitch,shroompicker_yaw;
 static vec3_t crossing_angles,crossing_velocity;
 static float crossing_movetype;
 /* Local camera state outlives CL_ClearState during an implicit map handoff.
@@ -156,18 +160,17 @@ const char *AW_SceneWorldModel(const char *name) {
     }
     return NULL;
 }
-int AW_Interior(void) {return sv.active && AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora") && AW_TerrainId(sv.name)<0;}
+int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora") && AW_TerrainId(sv.name)<0));}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
 static void read_links_for(const char *map) {
     FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
     if(!map_valid(map))return;
-    if(AW_TerrainId(map)>=0){count=0;loaded=0;return;}
     if(loaded && !strcmp(links_map,map))return;
     strcpy(links_map,map);loaded=1;count=0;
     sprintf(path,"doors-%s.txt",map);
     COM_FOpenFile(path,&f);
     if(!f){sprintf(path,"scene-doors-%s.txt",map);COM_FOpenFile(path,&f);}
-    if(!f && strcmp(map,"balmora"))COM_FOpenFile("scene-doors.txt",&f);
+    if(!f && AW_MapId(map)<AW_MAP_COUNT && strcmp(map,"balmora"))COM_FOpenFile("scene-doors.txt",&f);
     if(f) {
         if(!fgets(line,sizeof(line),f)){fclose(f);return;}
         version=!strcmp(line,"AWD3\n")?3:!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
@@ -190,7 +193,7 @@ static void read_links_for(const char *map) {
         }
         fclose(f);return;
     }
-    if(!strcmp(map,"balmora"))return;
+    if(!strcmp(map,"balmora") || AW_MapId(map)>=AW_MAP_COUNT)return;
     if(COM_FOpenFile("scene-links.txt",&f)<0 || !f)return;
     while(count<128 && fgets(line,sizeof(line),f)) {
         memset(&r,0,sizeof(r));
@@ -213,6 +216,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
         AW_SetNextLoadingStyle(AW_RegionLoadingFrozen()?AW_LOADING_FROZEN:AW_LOADING_BLANK);
         AW_SetNextLoadingDelay();
     }
+    shroompicker_view=0;
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
     health=p->v.health;
@@ -426,12 +430,25 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
 }
 /* An explicit debug scene restart owns no old door/cell arrival or voice tail. */
 void AW_SceneCancelTransition(void) {
-    pending=region_crossing=map_jump=crossing_view_ready=0;
+    pending=region_crossing=map_jump=crossing_view_ready=shroompicker_view=0;
     door_ready=0;door_close=0;S_CancelSceneVoice();
     memset(&hand_snapshot,0,sizeof(hand_snapshot));hand_clock_ready=0;
     AW_TorchResetAnimation();
 }
 void AW_SceneSignon(void) {
+    if(shroompicker_view==2){
+        shroompicker_view=0;
+        if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
+           cls.state==ca_connected && !cls.demoplayback && cls.signon==SIGNONS &&
+           !strcmp(sv.name,next.target)){
+            edict_t *p=svs.clients[0].edict;
+            /* Apply after signon, not as a queued aw_aim that map loading can
+             * consume too early. Keep the exact tested downward viewing angle. */
+            cl.viewangles[0]=shroompicker_pitch;cl.viewangles[1]=shroompicker_yaw;cl.viewangles[2]=0;
+            VectorCopy(cl.viewangles,p->v.angles);VectorCopy(cl.viewangles,p->v.v_angle);
+            V_StopPitchDrift();
+        }
+    }
     if(hand_clock_ready){
         hand_clock_ready=0;
         if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
@@ -471,6 +488,11 @@ void AW_SceneSpawn(edict_t *p) {
             p->v.movetype=crossing_movetype;p->v.fixangle=1;SV_LinkEdict(p,false);placed=1;
         }else placed=AW_InteriorPlace(p,next.arrival);
         p->v.angles[0]=0;p->v.angles[1]=next.yaw;p->v.angles[2]=0;p->v.fixangle=1;
+        shroompicker_view=shroompicker_view && placed?2:0;
+        if(shroompicker_view){
+            p->v.angles[0]=shroompicker_pitch;p->v.angles[1]=shroompicker_yaw;
+            VectorCopy(p->v.angles,p->v.v_angle);
+        }
         if(region_crossing){
             VectorCopy(crossing_angles,p->v.angles);
             VectorCopy(crossing_angles,p->v.v_angle);
@@ -486,7 +508,7 @@ void AW_SceneSpawn(edict_t *p) {
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
     } else {
-        pending=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
+        pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
         if(AW_Interior() || !strcmp(sv.name,"balmora") || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
@@ -512,7 +534,9 @@ void AW_SceneTick(void) {
        svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
        p->v.health<=0 || (p->v.movetype!=MOVETYPE_WALK && p->v.movetype!=MOVETYPE_NOCLIP))return;
     memset(&r,0,sizeof(r));
-    if(AW_StoryRestricted() || !AW_WorldDestination(sv.name,p->v.origin,r.target,r.arrival)){
+    if(AW_SectionDestination(sv.name,p->v.origin,r.target)){
+        VectorCopy(p->v.origin,r.arrival);
+    }else if(AW_StoryRestricted() || !AW_WorldDestination(sv.name,p->v.origin,r.target,r.arrival)){
         if(!AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
         strcpy(r.target,sv.name);VectorCopy(p->v.origin,r.arrival);
     }
@@ -593,6 +617,80 @@ static int teleport_coordinate(const char *text,float *result) {
     if(end==text || *end || errno==ERANGE || !isfinite(value) || fabs(value)>2000000)return 0;
     *result=(float)value;return isfinite(*result);
 }
+typedef struct {int slot,verified;unsigned reference;char map[16],label[96];float x,y,yaw,pitch;} shroompicker_spot_t;
+static int shroompicker_line(char *line,shroompicker_spot_t *spot) {
+    int end=0,i;size_t length=strlen(line);
+    if(!length || line[length-1]!='\n')return 0;
+    line[--length]=0;
+    if(length && line[length-1]=='\r')line[--length]=0;
+    if(sscanf(line,"%d %d %u %15s %f %f %f %f %95[^\r\n]%n",&spot->slot,&spot->verified,
+       &spot->reference,spot->map,&spot->x,&spot->y,&spot->yaw,&spot->pitch,spot->label,&end)!=9 ||
+       end!=(int)length || spot->slot<1 || spot->slot>10 || spot->verified<0 || spot->verified>1 ||
+       (!spot->reference && spot->slot!=1) || !map_valid(spot->map) ||
+       !isfinite(spot->x) || !isfinite(spot->y) || fabs(spot->x)>2000000 || fabs(spot->y)>2000000 ||
+       !isfinite(spot->yaw) || spot->yaw<0 || spot->yaw>=360 ||
+       !isfinite(spot->pitch) || spot->pitch<-70 || spot->pitch>80)return 0;
+    for(i=0;spot->label[i];i++)if((unsigned char)spot->label[i]<32)return 0;
+    return 1;
+}
+static int shroompicker_getline(FILE *f,int *left,char *line,int capacity) {
+    int c,i=0;
+    while(*left>0 && i<capacity-1){
+        c=fgetc(f);if(c==EOF)return 0;--*left;line[i++]=(char)c;
+        if(c=='\n'){line[i]=0;return 1;}
+    }
+    return 0; /* An unterminated/oversized line cannot escape the member. */
+}
+static int shroompicker_read(int wanted,int list,shroompicker_spot_t *selected) {
+    FILE *f=NULL;char line[256];shroompicker_spot_t row;int size,left,seen=0,ok=1;long start;
+    size=COM_FOpenFile("shroompicker.txt",&f);
+    if(!f || size<8 || size>4096){if(f)fclose(f);return 0;}
+    start=ftell(f);left=size;
+    if(start<0 || !shroompicker_getline(f,&left,line,sizeof(line)) ||
+       (strcmp(line,"AWSP1\n") && strcmp(line,"AWSP1\r\n")))ok=0;
+    while(ok && left>0){
+        if(!shroompicker_getline(f,&left,line,sizeof(line)) || !shroompicker_line(line,&row) ||
+           (seen&(1<<(row.slot-1)))){ok=0;break;}
+        seen|=1<<(row.slot-1);if(row.slot==wanted)*selected=row;
+    }
+    if(ferror(f) || seen!=1023)ok=0;
+    if(ok && list){
+        left=size;
+        if(fseek(f,start,SEEK_SET) || !shroompicker_getline(f,&left,line,sizeof(line)))ok=0;
+        while(ok && left>0){
+            if(!shroompicker_getline(f,&left,line,sizeof(line)) || !shroompicker_line(line,&row)){ok=0;break;}
+            Con_Printf("%ld: %s [%s]\n",(long)row.slot,row.label,
+                row.verified?"playtested":"source checked; native unverified");
+        }
+    }
+    fclose(f);return ok;
+}
+static void shroompicker_command(void) {
+    vec3_t source,arrival;char target[16];shroompicker_spot_t spot;int slot=1,list=0;
+    if(Cmd_Argc()==2){
+        const char *arg=Cmd_Argv(1);
+        if(!strcmp(arg,"list"))list=1;
+        else if(!strcmp(arg,"10"))slot=10;
+        else if(arg[0]>='1' && arg[0]<='9' && !arg[1])slot=arg[0]-'0';
+        else slot=0;
+    }
+    if(Cmd_Argc()>2 || !slot){Con_Printf("Usage: dbg shroompicker [1-10|list]\n");return;}
+    if(!shroompicker_read(slot,list,&spot)){Con_Printf("Mushroom destinations missing or invalid: shroompicker.txt.\n");return;}
+    if(list)return;
+    source[0]=spot.x;source[1]=spot.y;source[2]=0;
+    if(!AW_WorldMapTarget(source,target,arrival) || strcmp(target,spot.map)){
+        Con_Printf("Mushroom destination map is missing or its source route changed.\n");return;
+    }
+    /* Use the normal checked global-XY route. Never reset the character,
+     * inventory, harvest seed or picked facts just to make a test plant appear. */
+    if(!AW_MapTeleport(source)){
+        Con_Printf("Mushroom test teleport unavailable; start unrestricted play first.\n");return;
+    }
+    next.yaw=spot.yaw;shroompicker_pitch=spot.pitch;shroompicker_yaw=spot.yaw;shroompicker_view=1;
+    Con_Printf("Mushroom spot %ld: %s [%s]. Aim and E: Pick.\n",(long)slot,spot.label,
+        spot.verified?"playtested":"source checked; native unverified");
+    Con_Printf("Standing surface checked on arrival. Picked/empty plants remain absent; dbg shroomtracker counts picks.\n");
+}
 static void teleport_command(void) {
     vec3_t source;
     if(Cmd_Argc()==3) {
@@ -639,5 +737,6 @@ void AW_SceneInit(void) {
     Cvar_RegisterVariable(&early_game_demo_start_1);
     Cmd_AddCommand("aw_scene",scene_command);
     Cmd_AddCommand("aw_teleport",teleport_command);
+    Cmd_AddCommand("aw_shroompicker",shroompicker_command);
     Cmd_AddCommand("aw_demo_start",demo_start);
 }

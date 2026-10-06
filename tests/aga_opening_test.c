@@ -7,6 +7,7 @@ server_t sv;server_static_t svs;double host_frametime=.1;
 aw_character_t aw_character;char *pr_strings;
 int pr_edict_size=sizeof(edict_t);client_state_t cl;
 static edict_t object,clerk;static eval_t reference;static int occluded,reads;
+static int obstructed,door_sounds,links,probes;
 edict_t *EDICT_NUM(int n){return n==1?&object:&clerk;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;return t;
@@ -28,9 +29,13 @@ int AW_ReaderOpen(const char *s,int n){reads++;return 1;}
 void AW_UISubtitle(const char *a,const char *b,double t){}
 void IN_AWClearButtons(void){}
 void Con_Printf(char *s,...){}
-float AW_DoorSound(unsigned ref,int close){return 0;}
+float AW_DoorSound(unsigned ref,int close){door_sounds++;return 0;}
 eval_t *GetEdictFieldValue(edict_t *e,char *s){return e==&object && !strcmp(s,"aw_ref")?&reference:NULL;}
-void SV_LinkEdict(edict_t *e,qboolean t){}
+void SV_LinkEdict(edict_t *e,qboolean t){links++;}
+trace_t SV_ClipMoveToEntity(edict_t *e,vec3_t a,vec3_t mi,vec3_t ma,vec3_t b){
+ trace_t tr;memset(&tr,0,sizeof(tr));assert(e==&object && e->v.angles[1]==-90);
+ assert(a==b);probes++;tr.startsolid=tr.allsolid=obstructed;tr.fraction=obstructed?0:1;return tr;
+}
 int SV_ModelIndex(char *s){return 0;}
 int main(void)
 {
@@ -84,7 +89,14 @@ int main(void)
         object.v.absmin[1]=-70;object.v.absmax[1]=70;
         object.v.absmin[2]=-70;object.v.absmax[2]=145;
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
+        obstructed=1;links=door_sounds=probes=0;
+        assert(AW_OpeningUse() && !aw_story.hall_open && object.v.angles[1]==90);
+        assert(!links && !door_sounds && probes==1);
+        assert(player.v.origin[0]==0 && player.v.origin[1]==0 && player.v.origin[2]==0);
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
+        obstructed=0;
         assert(AW_OpeningUse() && aw_story.hall_open && !AW_OpeningHint(&name,&action));
+        assert(links==1 && door_sounds==1 && object.v.angles[1]==-90);
         sv.models[1]=NULL;object.v.absmin[0]=object.v.absmax[0]=30;
         object.v.absmin[1]=object.v.absmax[1]=0;object.v.absmin[2]=13;
         reference._float=172851;object.v.absmax[2]=13;AW_StoryReset(0); /* No false empty outside tutorial stage. */

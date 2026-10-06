@@ -1,16 +1,259 @@
 # Roadmap and implementation options
 
-## Current work: v0.0.29, following published v0.0.28
+## HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026
 
-[v0.0.28 is published](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.28).
-The owner's 4 October post-release reports are collected in the active
-[v0.0.29 immediate fixes and follow-up plan](PLAN-v0.0.29.md). Priority is the
-recurring player F/V failure, map controls/palette, tree-root sampling, horizon
-visibility, real stat bars, guard/interior local light and night cloud coverage.
-Debug HUD V2, optional veil clouds, ash/blight/NPC reactions, lava/debug-map
-coverage and the later god-mode switch are tracked there with acceptance gates.
-Source candidates remain separate from target-verified fixes. Earlier plans
-below are historical scope/evidence, not a substitute for this active list.
+Open RC2 playtest report in **Bitter Coast**: only one of three nearby mushrooms
+could be eaten. The player tentatively identifies them as Luminous Russula but
+also asks whether the other two are different types. Species and interaction
+stage are unverified; do not assume that picking, harvesting and inventory
+consumption are the same failure.
+
+The original screenshot shows v0.0.29-rc2, global XYZ approximately
+**-15287 -59485 735**, game time **02:39**. Obtain map and original reference IDs,
+identify all three objects, and replay both pickup and inventory use. The cause
+and fixed version are unknown. [Issue and reproduction](bugs/HARVEST-BITTERCOAST-29.md).
+
+## Latest scoped RC2 playtest confirmations: 6 October 2026
+
+The RC2 playtest was released on 6 October. Its source and executable remain
+the exact tested snapshot; later full-release preparation is tracked separately.
+
+- **CENSUS-DOOR-STUCK-29:** the player confirms the Census door no longer traps
+  them in the reported case and displays the obstruction message. This accepts
+  that reproduction in RC2; other occupied/clear positions, save/reload, return
+  paths and long-term door behavior remain to be exercised.
+- **LIGHT-EXTERIOR-JUMP-29:** the player confirms the reported sudden brightness
+  increase near the Seyda Neen shack is gone in RC2. The original reproduction
+  and coordinates remain recorded. This does not establish all-world coverage.
+- **HAND-PUNCH-COVERAGE-29:** a High Elf punch playtest reports no exposed gaps.
+  Sex was not specified. This supports the maximum-extension aperture repair
+  in that sampled appearance; brief idle-to-punch disappearance remains open.
+- **Torch appearance:** the player reports that the torch is very good at the
+  default settings. This does not close outdoor tuning, style-3 embers, dark-room
+  floor, unlit/fuel-state or broader actor-lighting coverage.
+- **INTERIOR-LIGHT-29:** the player describes the game's luminance as much more
+  tolerable. Their exact factors were not supplied. Do not infer an exterior
+  brightness change: defaults remain interior 1.2x and exterior 1.0x. Static-NPC
+  sampling and broader performance checks remain separate.
+
+WinUAE guard-follow, race-selection and heavy-load music continuity remain open,
+including the reopened appearance-entry report below. Temple holes remain open.
+
+## Latest v0.0.29-rc2 playtest report: 6 October 2026
+
+- **AUDIO-APPEARANCE-29 is reopened:** the current WinUAE playtest reports
+  background-music pauses on entering the rotating character race-selection
+  screen. The earlier RC1 report that this entry was fixed remains historical
+  evidence; it does not establish the current build's continuity.
+- **AUDIO-ENTER-29 / AUDIO-LOAD-29 remain open:** the current WinUAE playtest
+  still reports music crackle and pauses, including Enter to follow the guard.
+  Heavy-load continuity also remains unresolved. Nonzero FS-UAE audio and
+  synthetic streaming checks do not prove WinUAE continuity at these events.
+- **INTERIOR-LIGHT-29:** the player reports that luma is much more tolerable
+  with the current settings. The exact factor was not supplied. This is a
+  subjective visual improvement, not a new default selection or a resolution
+  of static-NPC sampling, broader performance, or Temple geometry. Defaults
+  remain interior 1.2x and exterior 1.0x.
+
+These reports supersede conflicting current-status claims below while retaining
+their dated history. No audio repair or full-release readiness is claimed.
+
+## Current RC2 issue status: 2026-10-06T19:08:08+00:00
+
+[Implemented repairs, demonstrated cases and still-open issues](RC2_ISSUE_CHECKPOINT.md).
+This dated checkpoint supersedes older candidate status below. Delivery and
+final extracted-package launch are still pending; Temple holes remain open.
+
+## INTERIOR-LIGHT-29: RC2 measured checkpoint, 6 October 2026
+
+Native menu changes and saved settings passed. Census renderer medians at
+1.0x/1.2x were 1.175745/1.189845 s per128frames (+1.199%, +0.110 ms/render).
+Only three alternating pairs; broader gameplay, enabled/disabled, night, RAM
+and physical-Amiga performance remain open. Latest defaults are interior1.2
+and exterior1.0; earlier dated debug-only plans are superseded.
+[Full method, samples and remaining work](bugs/INTERIOR-LIGHT-29.md).
+These post-snapshot notes do not change the measured RC2 executable.
+
+## RC1 regression priorities: 2026-10-06T15:03:42+00:00
+
+Keep Temple partial geometry/collision, Seyda traversal lighting and maximum-punch
+coverage open until their exact native reproductions pass. The inspection-room
+timing failure and dim-floor issue are tracked separately in
+[DEBUG-GALLERY-TIMING-29](bugs/DEBUG-GALLERY-TIMING-29.md); restore those tools
+before using them to accept torch or combat repairs. Building-only1.2 brightness
+now has bounded Census/cave native evidence. Broadening cave brightness, town
+subdivision tuning, alternating punches, torch fuel and disk-backed console
+history remain distinct follow-ups. See the [current bug checkpoint](BUGS.md).
+
+## Building brightness and inspection tools: next candidate
+
+Implementations for building-only `dbg interiorluma` (default1.2), empty-floor
+`dbg combattest` and dark-room `dbg torchtest` have passed focused source checks.
+Complete combined/native acceptance before claiming availability in a playtest.
+Caves remain unchanged. Use these controls for subsequent lighting and hand
+acceptance; keep Temple-only geometry repair and the punch-hole defect open.
+
+## Next candidate: Seyda lighting boundary correction
+
+The empty-versus-unused lightdata cause is isolated and the narrow renderer
+correction passes six focused checks. Complete integrated checks and native
+walking acceptance before marking it fixed. Review Seyda subdivision cost later;
+Balmora/open-country performance observations do not establish cell count as cause.
+See [lighting evidence](DAY_NIGHT_AND_SKY.md).
+
+Interior pipeline gate: use [the partial Temple failure and intact upper-route control](bugs/BALMORA-TEMPLE-GEOMETRY-29.md) to add stage-specific structural accounting, shifted-origin invariance and visible/collision coverage regressions. This follows the current lighting repair priority.
+
+## Balmora Temple geometry/collision report: 6 October 2026
+
+**[BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md): open, major,
+final-release blocker.** RC1 WinUAE playtesting found multiple missing walls,
+floors and structural connections; the player can accidentally pass through.
+Primary reported local position: **1063,1048,3700**, heading E076, pitch65;
+additional captures span game05:22 to06:11. Cause and introducing version are
+unknown. No repair candidate or shipped fixed version exists yet. Preserve
+visual and collision regressions together and verify the repair in FS-UAE/Docker.
+
+## RC1 comparative traversal feedback: Balmora and Seyda Neen
+
+Owner playtest, 6 October 2026; recorded 2026-10-06T13:48:58+00:00: Balmora feels smoother than
+Seyda Neen, with very short loads even when running through its streets. More
+open fields also felt acceptable on the owner's tested route. Preserve these
+as subjective route-specific results, not measured timing or whole-world approval.
+
+The owner suspects Seyda Neen's sub-cell count/partitioning. Compare equivalent
+routes for crossing frequency, resident/transition RAM, geometry, entities,
+load duration, audio continuity and frame time before attributing the difference.
+Roadmap follow-up: review town partitioning **after LIGHT-EXTERIOR-JUMP-29**.
+Fewer cells must not sacrifice Amiga reserve or hide the brightness discontinuity.
+
+## Console history working-set investigation: 6 October 2026
+
+The owner requests disk-backed debug output scrollback, loading old pages only
+while the game is console-paused. Current source uses a fixed **16 KiB output
+ring**; command recall is a separate **8 KiB** array. Console resizing also uses
+a transient **16 KiB stack copy**. Output history does not grow without bound.
+
+Evaluate a small resident recent-page cache plus bounded disk history and index,
+with explicit pause-state checks before historical reads. Batch writes outside
+frame-critical work, preserve readable failure behavior, and bound file growth.
+Report net RAM after indexes/cache and measured I/O/audio/frame cost; the gross
+saving is at most the current output ring, not the separate command history.
+Existing `-condebug` writes per message and is not a suitable streaming design.
+Fix CONSOLE-WHEEL-29 independently rather than adding disk I/O to its input path.
+Status: investigation requested, no disk-backed implementation yet.
+
+## Seyda Neen partition review after lighting repair
+
+6 October 2026 owner RC1 playtest: load-ins/outs feel acceptable while walking
+through the more open fields. The owner asks whether Seyda Neen has too many
+sub-cells. Preserve this route-specific positive feedback without calling all
+streaming solved. **Fix LIGHT-EXTERIOR-JUMP-29 first.**
+
+Later compare the same town route with its current split and a measured
+coarser/merged candidate. Record crossings per distance, peak live/transition
+RAM, loading pause, time to first world frame, steady frame cost and audio
+continuity. Fewer cells reduce handoff frequency but can increase resident
+geometry/texture/entity load; keep the Amiga reserve and collision/coverage gates.
+Do not merge cells merely to hide a lighting-state defect.
+
+## FPV combat action creation pipeline: RC1 baseline
+
+Requested 6 October 2026; recorded 2026-10-06T13:34:07+00:00. Keep the RC1 race/sex fist models
+as immutable inputs for an adjustable first-person action pipeline. This is
+new conversion/preview work, not an implemented editor or a shipped correction.
+
+The pipeline should retain original animation/mesh identity, expose bounded
+camera-relative offsets and per-action/per-frame adjustments, and export a
+fresh candidate plus a repeatable profile. Preview idle, draw, lower and the
+entire punch sequence at the actual viewport/FOV/near plane, with exact frame
+selection and contact sheets. Compare the unchanged baseline side by side.
+
+The initial target is the exposed camera-near forearm at maximum extension.
+Moving the arm toward the player's viewpoint is a requested framing candidate;
+measure which axis/direction improves coverage before adopting it. Distinguish
+UV loss, open geometry, face culling and near-plane clipping. Repositioning alone
+must not be called a topology repair or accepted if another pose opens a hole.
+Retain surface connectivity and validate any explicit cap/stitch separately.
+
+Add right/left unarmed sequencing using verified source animations or an
+explicit derived-animation profile. Preserve held equipment and race/sex
+appearance. Reuse decoded source data and profiles to avoid repeated full
+conversion; load only the selected runtime model. Record triangle/vertex count,
+model/cache bytes and render cost alongside the coverage result. Preview tools
+and profiles can be public; original/converted game assets remain locally owned.
+The existing sprite baker's neutral projection is a framing aid, not acceptance
+of the actual game renderer's clipping or lighting.
+
+## Unarmed right/left sequence request: 6 October 2026
+
+Recorded 2026-10-06T13:23:09+00:00. Successive accepted bare-knuckle attacks should alternate
+**right, left, right, left**. The current converter samples only
+`handtohand: chop start` through `handtohand: chop large follow stop` as one
+ten-frame punch clip; alternating hands is not implemented in RC1.
+
+Inspect the owned first-person animation catalogue for authored left/right
+motions before choosing their conversion. Do not describe strict alternation
+as verified original-Morrowind behaviour merely because it is requested here.
+Add a second attack only when its appearance, timing and fallback contract are
+explicit; count one accepted attack per input and avoid switching sides midway
+through a punch or a cell handoff. This is an animation requirement, not a claim
+of implemented combat damage or combo rules.
+
+The owner further localizes HAND-PUNCH-COVERAGE-29 to **maximum arm extension**.
+Inspect that pose and adjacent/interpolated frames on both arms. Fix visible
+forearm coverage before accepting the new sequence. Preserve race/sex appearance,
+held-item behavior and a bounded selected-model working set; measure any extra
+frame/cache cost rather than retaining all race animations in RAM.
+
+## RC1 fist appearance and punch coverage: 6 October 2026
+
+Preserve the owner-accepted fist improvement. Repair and target-test the
+marked camera-near forearm coverage during punching before final release;
+[HAND-PUNCH-COVERAGE-29](FIRST_PERSON_HANDS.md#hand-punch-coverage-29-exposed-forearm-during-punching-in-rc1)
+tracks topology, animation and clipping checks separately from torch grip.
+
+## Additional RC1 reproduction gates: 6 October 2026
+
+- Reproduce and fix the Census Office door snag, retaining collision and safe
+  passage in both directions after opening and after save/reload.
+- Investigate abrupt outdoor brightening near shacks with no carried torch;
+  separate map/light-state handoff from clock/weather changes.
+
+Both are open playtester reports with unconfirmed causes. See [the follow-up](BUGS-v0.0.29-RC1.md#rc1-door-snag-and-outdoor-brightness-reports-6-october-2026).
+
+## Post-delivery RC1 priorities: 6 October 2026
+
+RC1 is now a delivered private playtest. Final **More Mushrooms** remains the
+current release goal; the combat milestone follows it.
+
+- Preserve owner-accepted appearance-entry music and Go back / Choose borders.
+- Deliver and playtest bounded Options/Interface/Audio navigation and the 75%
+  Effects default, retaining saved settings. Source checks pass; these edits
+  are not in the published RC1.
+- Resolve the remaining guard-follow Enter jump and investigate OST crackling
+  during ship-to-deck loading as separate audio cases.
+- Investigate Census Office NPC lighting independently of environment surfaces
+  and the carried-torch case; require controlled target evidence.
+- Continue the existing hand/grip, memory reserve, world/interior mushroom
+  coverage and outdoor traversal gates; these new observations do not close them.
+
+The [current issue matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026)
+records owners, next checks and bounded acceptance. Earlier dated plans remain
+historical context.
+
+## Current work: v0.0.29-rc1, following published dev4
+
+The published development checkpoint is
+[v0.0.29-dev4](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.29-dev4).
+Next comes the rc1 playtest, then final More Mushrooms once worldwide picking
+and the final-release gates pass. The [current release plan](PLAN-v0.0.29.md)
+tracks scope and next evidence steps; [BUGS.md](BUGS.md) is the issue-status index.
+Current blockers include NPC torch illumination, connected torch-bearing hands,
+the Enter-music regression and world-map admission. Flame visibility and the
+low-memory warning also require their own checks. Outdoor crossing smoothness
+remains open performance work. The combat arena follows this release.
+Source candidates, packages and target-verified fixes are distinct states.
+Earlier plans below preserve historical scope and evidence.
 
 ### Asset coverage accounting
 
@@ -944,6 +1187,12 @@ door panels with frames, preserve attachment ordering without drawing through
 walls, and investigate remaining terrain/roof seams before increasing coverage.
 
 ## Player body and first-person hands
+
+- Investigate a catalogue of transparent, pre-rendered hand sprites, including
+  an OpenMW-based capture path, all race/sex variants and animation/equipment
+  states. Compare appearance, lighting, RAM and streaming with the mesh path;
+  this is a potential pipeline, not an RC1 requirement or chosen replacement.
+  See [the investigation](FIRST_PERSON_HANDS.md#investigation-first-person-hands-rendered-as-sprites).
 
 - Preserve the Quake walking bob (owner preference, 27 September 2026):
   `cl_bob 0.02`, `cl_bobcycle 0.6`, `cl_bobup 0.5`. Camera motion is separate
@@ -1886,21 +2135,133 @@ cycle; and measured local illumination rather than flame sprites alone.
 
 ## Future combat milestone: Time to Fight!
 
-This is future roadmap work, not a mandatory v0.0.29 fix or implemented mode.
-Survey the original Vivec Arena Pit interior and its exact CELL, placements,
-actors, collision and entry/exit routes from owned game data. Study original
-duel eligibility and the Redoran Hortator/Bolvyn Venim quest records alongside
-OpenMW behavior; do not turn the owner's remembered worthiness duel into an
-invented universal quest rule. The exact cell identity and state conditions
-must be verified before implementation.
+Begin after shipping v0.0.29 **More Mushrooms**. This is planned work, not an
+implemented mode or an additional requirement for the current release.
 
-Prototype a separate `dbg arenafight` mode for hostile-NPC combat. Encounters
-must be bounded, explicitly entered, resettable and safely exitable. Isolate
-test actor hostility, health/equipment, deaths, reputation and script state;
-never corrupt main-quest flags or silently progress a live quest. Define how
-the player's existing state is preserved/restored and refuse unsafe contexts.
-Measure actor/animation/light budgets and validate encounter completion,
-abort/reset, save restrictions and return travel before expanding combat scope.
+1. **Build the Nerevarine combat arena first.** Establish a bounded, resettable
+   test arena with reliable collision, spawn positions and safe entry/exit.
+   Survey the original Vivec Arena Pit CELL, placements and routes as the source
+   candidate. Verify that source identity before conversion; the prototype's
+   name does not establish original quest eligibility.
+2. **Enter with `dbg arena`, then trigger combat with E.** The command places
+   the player in the implemented arena interior with an initially calm opponent.
+   Target that NPC and press E to start the encounter; show a suitable interaction
+   prompt. Entering the arena alone must not trigger hostility. Establish the
+   calm-to-aggro transition, target acquisition, approach/chase and attack range.
+   Retain actor identity, health and target state. Reset returns the test opponent
+   to its initial calm state; repeated E presses must not restart active combat.
+3. **Start with sword and shield versus sword and shield.** Give the player and
+   one hostile NPC that equipment pairing. Establish attacks, blocking, hit and
+   damage resolution, health, defeat and encounter reset before expanding the
+   weapon and opponent set. Compare intended mechanics against original data
+   and the OpenMW reference.
+
+**Make failed hit rolls visibly understandable.** Retain the intended
+skill/stat-based hit resolution. When a valid melee attempt against an NPC fails
+its hit roll, show a short dodge, lean or appropriate weapon/shield deflection
+instead of an apparently solid impact that produces no response. Prototype this
+with the sword-and-shield arena opponent after the basic combat loop works.
+
+- Resolve an attack once; its animation and sound present that outcome without
+  adding another avoidance roll, damage, skill gain or attack opportunity.
+- Keep an out-of-reach or off-target swing distinct from a failed hit roll. Only
+  an eligible target should react. A cosmetic deflection must not grant actual
+  shield-block effects; mechanically resolved blocks retain their own animation,
+  sound and gameplay consequences.
+- Synchronize the reaction with the swing's contact window and respect existing
+  stagger, death and attack states. Evaluate short animation blends without
+  teleporting actors, opening mesh seams or letting cosmetic motion change the
+  resolved result. Measure the target animation/frame cost before acceptance.
+
+A useful visual reference is [Can't Touch This — Combat Miss Feedback](https://www.nexusmods.com/morrowind/mods/59155)
+by MrArrean and Dubiousnpc: its author describes dodge animations for missed
+attacks against humanoid NPCs. It is an OpenMW mod, extracted from N'Garde's miss
+feedback feature. This is a behavior reference, not an imported dependency or an
+AmiWind implementation claim. N'Garde's other combat changes are outside this proposal.
+
+**Include speech and combat audio in the first encounter.** Resolve the
+opponent's appropriate original aggro, combat-taunt and attack speech through the imported dialogue
+lookup and its actor/condition rules; do not substitute unrelated dialogue.
+Trigger the aggro line on the calm-to-hostile transition, with appropriate
+anti-repeat behavior for later combat speech. Include original combat taunts
+as a distinct speech opportunity during the encounter, using matching actor voice
+and verified dialogue conditions. Give taunts a cooldown and avoid immediate
+repeats or overlapping speech from the same actor; suppress inappropriate lines
+during death and resolve priority against hurt/aggro reactions. Bound concurrent
+speech so taunts do not drown out essential combat cues or interrupt music.
+Verify taunt availability, playback and event gating in the arena audio checks.
+Include weapon swing/whoosh,
+hit/impact, shield-block, hurt and death events using verified original sound
+records and available converted assets. Check timing against the actual attack,
+contact or block outcome rather than playing every sound on every swing.
+
+Missing or unresolved audio must be visible in coverage/build warnings; converted
+files alone do not prove event playback. Test that speech and effects work together
+without crackling or interrupting the soundtrack. Original and converted game
+audio stays in private build assets; public source contains code and lookups only.
+
+**Exercise combat music and player death in the fight tests.** The calm
+arena starts with normal music. The E-triggered calm-to-aggro transition requests
+combat music once. When the opponent dies or the encounter otherwise ends with
+the player alive, end the combat selection and return to normal music. Drive this
+from encounter state, not animation frames, momentary visibility or cell loading;
+later multi-opponent encounters must wait until no active threat remains.
+
+Keep music decoding/output serviced during track changes, effects and speech;
+avoid frame-driven restarts, unintended silence and crackling. The soundtrack's
+priority remains independent of world simulation or full-screen modal freezing.
+Verify actual audible start/end transitions in the target emulator, including
+encounter reset and abort, rather than only checking playlist variables.
+
+Player death requires its appropriate original death sound and camera movement.
+Verify the reference behavior and available actor/audio assets, then implement
+the death camera motion and its transition out of normal player control. Trigger
+the death sequence once; repeated damage must not restart the sound or camera.
+Reset/retry must restore the normal camera, controls and encounter state. Treat
+player death as its own audio/state transition instead of briefly returning to
+exploration music while the death sequence starts. The precise camera motion,
+timing and death-state music handling remain reference-verification tasks.
+
+Arena acceptance includes calm entry, E-triggered combat, NPC defeat, abort/reset,
+player death, repeated damage during death, and retry with restored view/control.
+Report missing death/voice/effect assets through the build coverage warnings.
+These requirements belong to Time to Fight! after the final More Mushrooms
+release; none is claimed implemented by this roadmap entry.
+
+Use the planned isolated `dbg arena` mode. Preserve and restore the player's
+existing state and isolate test hostility, equipment, deaths, reputation and
+scripts from main-quest progress. Canonical duel eligibility, including the
+Redoran Hortator/Bolvyn Venim quest, requires its own source verification.
+Measure actor, animation, sound and lighting costs; verify completion, abort,
+reset, save restrictions and return travel before expanding scope.
+
+After that combat baseline, investigate minimal NPC state and traversal outside
+loaded cells as described below. Do not pull that later design into the current
+mushroom release.
+
+### Deferred: minimal NPC state outside loaded cells
+
+Sequence: finish the v0.0.29 **More Mushrooms** release, establish the initial
+combat behavior and tests, then design NPC traversal outside loaded cells and
+sub-cells. This task is not a blocker for the mushroom release. The representation
+and scheduling algorithm remain undecided; no implementation is claimed.
+
+- [ ] Define a compact authoritative actor record that survives removal of its
+  rendered model and full active simulation. Determine the minimum identity,
+  logical location, health/equipment, target, follow/chase intent, travel progress,
+  quest/script dependencies and timers that must remain; validate against combat.
+- [ ] Decide when off-screen travel is advanced, which connections are traversable,
+  and how to restore an actor at a valid entry point when its area becomes active.
+  Do not keep every world cell or actor model resident, discard gameplay state,
+  or replace path traversal with teleportation directly beside the player.
+- [ ] Preserve one authoritative actor through unload/re-entry, overlap and
+  save/load. Prevent duplicates, repeated attacks, lost followers and aggression
+  resets. Respect original loading-door rules separately from streaming sections.
+- [ ] Measure record size, aggregate memory, update cost and re-entry peaks with
+  several pursuers/companions and long outdoor travel before choosing limits.
+
+Behavior constraints: [NPC cell traversal](NPC_CELL_TRAVERSAL.md). The exact
+simulation detail for unloaded terrain remains a design and profiling question.
 
 ## Main-quest milestone: Just an Old Man with a Skooma Problem
 
@@ -1915,3 +2276,11 @@ silhouette, material seams, collision and interaction identity. Compare the
 interior with the original-data OpenMW reference, then check target rendering,
 memory and traversal. These are planned tasks, not completed quest or interior
 coverage, and do not block a smaller verified development playtest.
+
+### Conditional v0.0.29 release checkpoint -- More Mushrooms
+
+The planned release title is **AmiWind v0.0.29 -- More Mushrooms**. Ship only after worldwide original mushroom placement and picking are complete and the relevant release gates pass; this is a future milestone, not a completion claim. See the [v0.0.29 plan](PLAN-v0.0.29.md#conditional-release-milestone-more-mushrooms) for scope and evidence requirements. Dev4's six-placement pilot may supply clearly labeled progress screenshots only; final release screenshots must show the completed worldwide candidate. The later Caius quest milestone is separate from this release title.
+
+## Mandatory roadmap and bug tracking
+
+Maintain this roadmap with [BUGS.md](BUGS.md) and the [current release plan](PLAN-v0.0.29.md). Each active or deferred milestone needs its current scope, next action and acceptance gate; each defect needs an ID, evidence and status. Reconcile both against the exact package before release. Current priority remains final More Mushrooms before the combat-arena milestone.

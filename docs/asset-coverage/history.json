@@ -1,6 +1,6 @@
 {
   "schema": "amiwind-asset-coverage-history-v1",
-  "updated_utc": "2026-10-06T06:01:51.253243+00:00",
+  "updated_utc": "2026-10-06T13:53:32+00:00",
   "scope": "Inspected standard Morrowind/Tribunal/Bloodmoon archives and loose overrides; source paths are not placements",
   "source_inventory": {
     "unit": "unique_canonical_paths",
@@ -307,6 +307,340 @@
     },
     {
       "version": "0.0.29-dev4",
+      "stage": "verified_source_and_staged_overlay",
+      "recorded_utc": "2026-10-06T00:36:52.843221+00:00",
+      "staged_overlay": {
+        "files": 7255,
+        "bytes": 409039811,
+        "size_and_sha256_revalidated": true,
+        "is_final_disk_inventory": false
+      },
+      "source_suite": {
+        "tests_run": 953,
+        "passed": 949,
+        "skipped": 4,
+        "failures": 0,
+        "errors": 0
+      },
+      "mushrooms_staged": {
+        "unique_original_placements": 6,
+        "shared_models": 3,
+        "catalogue_maps": 41,
+        "town_awh4_maps": 32,
+        "world_awh3_maps": 9,
+        "town_bsp_bytes": "clean_baseline_unchanged",
+        "modeled_allowance_warnings": 27,
+        "hard_allocation_ceiling_failures": 0
+      },
+      "global_mushroom_source_scope": "Standalone base master; numeric small-mushroom organic containers; not expansions or all flora",
+      "global_mushroom_denominator": {
+        "exterior": 934,
+        "interior": 1149,
+        "total": 2083,
+        "by_model": [
+          {
+            "suffix": "01",
+            "exterior": 161,
+            "interior": 124,
+            "shared_model_prepared": true
+          },
+          {
+            "suffix": "02",
+            "exterior": 70,
+            "interior": 102,
+            "shared_model_prepared": true
+          },
+          {
+            "suffix": "03",
+            "exterior": 61,
+            "interior": 75,
+            "shared_model_prepared": false
+          },
+          {
+            "suffix": "04",
+            "exterior": 102,
+            "interior": 91,
+            "shared_model_prepared": false
+          },
+          {
+            "suffix": "05",
+            "exterior": 88,
+            "interior": 108,
+            "shared_model_prepared": true
+          },
+          {
+            "suffix": "06",
+            "exterior": 159,
+            "interior": 153,
+            "shared_model_prepared": false
+          },
+          {
+            "suffix": "07",
+            "exterior": 94,
+            "interior": 222,
+            "shared_model_prepared": false
+          },
+          {
+            "suffix": "08",
+            "exterior": 199,
+            "interior": 274,
+            "shared_model_prepared": false
+          }
+        ]
+      },
+      "existing_model_reuse_potential": {
+        "exterior_originals": 319,
+        "interior_originals": 334,
+        "exterior_world_maps": 301,
+        "exterior_town_maps": 66,
+        "maximum_local_plants": 37,
+        "maps_above_current_24_limit": 7,
+        "placement_conversion_or_native_claim": false
+      },
+      "all_model_exterior_bounds": {
+        "world_maps": 308,
+        "town_maps": 82,
+        "maximum_local_plants": 77
+      },
+      "next_batch_proposal": {
+        "first_follow_on_originals": 7,
+        "subsequent_originals": 21,
+        "additional_over_current_stage": 15,
+        "catalogue_maps": 46,
+        "additional_map_dependencies": 5,
+        "maximum_local_plants": 14,
+        "assets_generated": false
+      },
+      "final_hdf_status": "pending",
+      "native_acceptance": "pending",
+      "delivery_status": "pending",
+      "new_packaged_or_native_counts_claimed": false,
+      "evidence_sha256": {
+        "staged_asset_review": "75b54030fb30555fcd5139394df416af16b64f8fc3ed5d1c79a8ae7796c7e47f",
+        "global_coverage_plan": "1be908790c6c06853cc67d7aa18355f721031faeaf1bec6f604d994dc4fb48e6",
+        "regional_batch_proposal": "ba2ec5ba643c6c4d0b8c9241fa0f9f909e6091f94667ecbd1e61d4711df76000"
+      },
+      "note": "Source tests and staging verification are separate from final image readback and native gameplay. Preserve earlier failed brush candidate as historical evidence; no warning waiver or global completion claim."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "follow_on_diagnostic",
+      "recorded_utc": "2026-10-06T00:42:12.667940+00:00",
+      "category": "interior_small_clutter",
+      "scope": "Bounded original base-master interior placements; not whole-room or whole-game coverage",
+      "original_placements": 6,
+      "unique_source_models": 4,
+      "model_variants": 8,
+      "atlas_profiles": 2,
+      "placement_types": {
+        "ordinary_bottles": 4,
+        "pipe": 1,
+        "ingredient_prop": 1
+      },
+      "converted_original_placements": 6,
+      "newly_packaged_placements": 0,
+      "native_accepted_placements": 0,
+      "geometry_validation": {
+        "source_triangles_retained": 869,
+        "six_placements_triangles": 1221,
+        "collapsed_or_reversed_faces": 0,
+        "new_geometric_boundary_edges": 0,
+        "authored_open_edges_retained": true
+      },
+      "vertex_colour_material_checks": "passed",
+      "material_quality": "Atlas and palette detail loss remains; native visual acceptance pending",
+      "room_memory_admission": "pending",
+      "runtime_scene_or_item_integration": false,
+      "additional_quest_implementation_claimed": false,
+      "dedicated_quest_voice_claimed": false,
+      "frozen_dev4_source_or_staged_overlay_changed": false,
+      "evidence_sha256": {
+        "asset_handoff": "3c578be0f959e841f59a2541ec13d6556a5ef3de2d09b97ec666e7bad2240bec",
+        "conversion_report": "ca1a3acc343a6bbd4ed3cfa57bab049fec8b3a0772fa2e890afa6dc1af7df4a8"
+      },
+      "note": "Separate follow-on diagnostic. No placed potion invented from ordinary bottle meshes. Existing dev4 six-mushroom and staged-media counts remain unchanged."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "sealed_package_image_readback",
+      "recorded_utc": "2026-10-06T04:27:28Z",
+      "payload_files": 17992,
+      "payload_bytes": 4784758692,
+      "image_readback": "passed",
+      "packaged_artifacts_by_extension": {
+        ".wav": 7320,
+        ".lip": 23,
+        ".awv": 19,
+        ".mws": 18,
+        ".mdl": 7271,
+        ".awh": 275,
+        ".bsp": 2723,
+        ".spr": 102,
+        ".awb": 13,
+        ".awc": 1,
+        ".awf": 16,
+        ".awg": 1,
+        ".awi": 15,
+        ".awj": 1,
+        ".awl": 1,
+        ".awm": 1,
+        ".awn": 3,
+        ".awq": 1,
+        ".awr": 1,
+        ".aws": 2,
+        ".awt": 1,
+        ".awu": 1,
+        ".bin": 1,
+        ".cfg": 4,
+        ".dat": 2,
+        ".json": 10,
+        ".lmp": 10,
+        ".rc": 1,
+        ".tsv": 1,
+        ".txt": 150,
+        ".wad": 1
+      },
+      "media": {
+        "voices": {
+          "available_sources": 6447,
+          "converted_outputs": 6447,
+          "packaged_outputs": 6447,
+          "missing_source": 7,
+          "failed_outputs": 0
+        },
+        "effects": {
+          "available_sources": 717,
+          "converted_outputs": 717,
+          "packaged_outputs": 717,
+          "missing_source": 2,
+          "failed_outputs": 0
+        },
+        "music": {
+          "available_sources": 18,
+          "converted_outputs": 18,
+          "packaged_outputs": 18,
+          "missing_source": 0,
+          "failed_outputs": 0
+        },
+        "videos": {
+          "available_sources": 17,
+          "converted_outputs": 17,
+          "packaged_outputs": 17,
+          "missing_source": 0,
+          "failed_outputs": 0
+        }
+      },
+      "mushrooms": {
+        "unique_original_placements": 6,
+        "shared_models": 3,
+        "map_catalogues": 41,
+        "town_catalogues": 32,
+        "world_catalogues": 9,
+        "packaged": true,
+        "native_accepted_placements": 0
+      },
+      "native_acceptance": "pending",
+      "release_candidate": false,
+      "package_archive": {
+        "bytes": 2598899289,
+        "sha256": "03525d0616c22223ec8b031d4b812fc3be2d5b9a56f597440547e3c4782f7a2a",
+        "single_extraction_launcher_gate": "passed"
+      },
+      "evidence": [
+        "sealed image build and packaged-file readback receipts",
+        "package staging receipt and single-extraction launcher gate"
+      ],
+      "note": "Image counts are packaged artifacts; the extension inventory does not establish source-to-output mapping. Native and delivery acceptance are pending. This is private development packaging, not a public release.",
+      "packaged_extensionless_files": 3,
+      "delivery_acceptance": "pending"
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "bounded_native_pickup_and_media_reconciliation",
+      "recorded_utc": "2026-10-06T05:06:40.663028+00:00",
+      "native_run_completed_utc": "2026-10-06T04:55:30Z",
+      "payload_files": 17992,
+      "payload_bytes": 4784758692,
+      "media_exact_batch_outputs_in_image": {
+        "voices": 6447,
+        "effects": 717,
+        "music": 18,
+        "videos": 16
+      },
+      "retained_alternate_video_outputs": 1,
+      "source_paths_total": 20943,
+      "current_input_rehashed_by_this_reconciliation": false,
+      "mushrooms": {
+        "unique_packaged_placements": 6,
+        "native_tested_pickup_placements": 1,
+        "repeat_pickup_no_duplicate_quantity": true,
+        "native_empty_accepted": false,
+        "worldwide_coverage": false
+      },
+      "native_groups_passed": 4,
+      "delivery_verification": "pending",
+      "release_candidate": false,
+      "open_observation": "Quickload puts hands and torch away; mechanism under investigation",
+      "unexercised": [
+        "native empty rolls",
+        "walked boundaries",
+        "mixed world/town catalogue return",
+        "intro_docks native memory",
+        "audio listening",
+        "Windows batch launch"
+      ],
+      "evidence_sha256": {
+        "native": "68f195a7c26ec245a889e3418a69becaa92858a7824dec22c936ac4f976674e6",
+        "saved_inventory_readback": "4c2132fa1513f178e8bec9f8c2e618e7167e76e7d77a39083f35cccb57dc1d80",
+        "asset_progress": "a045d031cd84ee3692780d17b5f973e917588ac9fe3290691f40ef8e64074828"
+      }
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "private_worldwide_mushroom_converter_diagnostic",
+      "recorded_utc": "2026-10-06T05:43:10Z",
+      "mushroom_numeric_cont_originals": 2083,
+      "exterior_originals": 934,
+      "interior_originals": 1149,
+      "interior_cells": 56,
+      "separately_scanned_acti_stat": 129,
+      "acti_stat_outside_numeric_cont_denominator": true,
+      "diagnostic_catalogued_originals": 1988,
+      "diagnostic_map_groups": 446,
+      "diagnostic_map_groups_by_type": {
+        "world": 308,
+        "town": 82,
+        "interior": 56
+      },
+      "unsupported_originals": 95,
+      "unsupported_interior_groups": 11,
+      "numeric_models_converted": 8,
+      "shared_model_bytes_on_disk": 80528,
+      "configured_interior": "Addamasartus",
+      "configured_interior_placements": 8,
+      "interior_cells_needing_actual_map_and_door_routing": 55,
+      "maximum_local_diagnostic_placements": 97,
+      "overlapping_resident_copies": 9703,
+      "dev4_unique_packaged_placements": 6,
+      "dev4_native_tested_pickup_placements": 1,
+      "new_packaged_placements": 0,
+      "new_native_accepted_placements": 0,
+      "private_diagnostic_only": true,
+      "native_acceptance": false,
+      "release_candidate": false,
+      "coverage_footer": "Terminal-width dashed separator; state what can be placed and what is still missing; planned features remain planned until gates pass.",
+      "caveats": [
+        "Catalogued is not production-integrated.",
+        "ACTI/STAT are separate from the numeric CONT denominator.",
+        "Resident copies are overlap copies, not original placements.",
+        "Unsupported state, dense admission, map routing, complete exterior/interior coverage and native appearance/picking remain open."
+      ],
+      "evidence_sha256": {
+        "audit_005_report": "9853e81c5cf2130c50608c08a8062e40c3a30f63e9b9f3d5d9644e688abf8f6a"
+      }
+    },
+    {
+      "version": "0.0.29-dev4",
       "stage": "assembled_with_bounded_native_checks",
       "recorded_utc": "2026-10-06T06:01:51.253243+00:00",
       "media_available_source_files": {
@@ -349,7 +683,119 @@
       },
       "native_groups_passed": 4,
       "note": "Runtime and converters match the dev4 development snapshot; README/release/coverage documentation updated for the public source prerelease. All-input conversion is not complete per-event playback acceptance."
+    },
+    {
+      "version": "0.0.29",
+      "stage": "post_dev4_world_mushroom_cache_candidate",
+      "recorded_utc": "2026-10-06T07:51:41.864367+00:00",
+      "mushrooms": {
+        "original_base_master_total": 2083,
+        "exterior_originals": 934,
+        "interior_originals": 1149,
+        "interior_cells": 56,
+        "exterior_catalogue_maps": 390,
+        "exterior_resident_copies": 8554,
+        "modeled_admitted_maps": 344,
+        "modeled_remaining_maps": 46,
+        "admitted_primary_originals": 897,
+        "complete_overlap_originals": 883,
+        "new_packaged_placements": 0,
+        "new_native_accepted_placements": 0,
+        "dev4_packaged_placements": 6,
+        "dev4_native_accepted_pickups": 1,
+        "expansion_placement_total": null
+      },
+      "evidence_sha256": {
+        "renderer_residency_handoff": "ab3bc7d4f7023b399d714d6770cf71d26899a18503cc28d07fcd7e05a8a03bc3"
+      },
+      "note": "Isolated source/allocation candidate; combined executable rebinding and native checks remain pending. Playtester confirms dev4 pilot pickup; shroompicker shortcut required for upcoming release."
+    },
+    {
+      "version": "0.0.29-dev4",
+      "stage": "playtest_torch_runtime_gaps",
+      "recorded_utc": "2026-10-06T08:15:25.393380+00:00",
+      "runtime_issues": [
+        "TORCH-NPC-LIGHT-29",
+        "TORCH-HAND-NORD-29"
+      ],
+      "affected_actor_total": null,
+      "affected_race_total": null,
+      "note": "Playtest reports NPC light response absent and detached-looking Nord grip. Legacy torch model remains packaged; topology candidate not included. Conversion/packaging counts unchanged; no new native acceptance."
+    },
+    {
+      "version": "0.0.29-rc1",
+      "stage": "candidate_alias_stream_admission",
+      "recorded_utc": "2026-10-06T09:02:46.518274+00:00",
+      "mushrooms": {
+        "exterior_originals": 934,
+        "exterior_catalogue_maps": 390,
+        "modeled_admitted_maps": 345,
+        "modeled_remaining_maps": 45,
+        "admitted_primary_originals": 897,
+        "complete_overlap_originals": 883,
+        "new_packaged_placements": 0,
+        "new_native_accepted_placements": 0
+      },
+      "evidence_sha256": {
+        "alias_stream_handoff": "e055e16bd46d58f57450d312c028d90823eedf6acf99c92ab6d2ec134f690f26"
+      },
+      "note": "Isolated modeled admission; final combined ABI/hand-cache rebinding and native timing pending. No release/package claim."
+    },
+    {
+      "version": "0.0.29-rc1",
+      "stage": "candidate_exact_edge_surface_admission",
+      "recorded_utc": "2026-10-06T10:49:28.058109+00:00",
+      "mushrooms": {
+        "exterior_originals": 934,
+        "exterior_catalogue_maps": 390,
+        "modeled_admitted_maps": 347,
+        "modeled_remaining_maps": 43,
+        "admitted_primary_originals": 897,
+        "complete_overlap_originals": 886,
+        "new_packaged_placements": 0,
+        "new_native_accepted_placements": 0
+      },
+      "evidence_sha256": {
+        "surface_handoff": "236500f5f019afdc2dd18fbb11e9d8e538920ba2aa9231ed237f0a23ce5c233f"
+      },
+      "note": "Exact storage candidate integrated for combined checks. Target ABI/isolated test evidence is not package/native acceptance; prior snapshots retained."
     }
   ],
-  "history_policy": "Append a dated snapshot when status changes. Preserve previous snapshots; null means unknown. Older version denominators were not reconstructed."
+  "history_policy": "Append a dated snapshot when status changes. Preserve previous snapshots; null means unknown. Older version denominators were not reconstructed.",
+  "runtime_findings": [
+    {
+      "id": "BALMORA-TEMPLE-GEOMETRY-29",
+      "reported_utc": "2026-10-06T13:53:32+00:00",
+      "version": "v0.0.29-rc1",
+      "stage": "owner_runtime_report",
+      "category": "interior_architecture",
+      "unit": "structural_placements_and_surfaces",
+      "source_count": null,
+      "converted_count": null,
+      "packaged_count": null,
+      "affected_count": null,
+      "runtime_acceptance": "failed_at_reported_locations",
+      "cause": "unknown",
+      "first_fixed_version": null
+    },
+    {
+      "id": "BALMORA-TEMPLE-GEOMETRY-29",
+      "recorded_utc": "2026-10-06T15:06:48+00:00",
+      "version": "v0.0.29-rc1",
+      "stage": "structural_source_export_packaged_audit",
+      "category": "interior_architecture",
+      "audited_source_models": 31,
+      "audited_source_visible_triangles": 12913,
+      "exported_visible_triangles": 12913,
+      "audited_packaged_architectural_placements": 62,
+      "total_original_scene_references": 286,
+      "selected_packaged_scene_placements": 185,
+      "affected_runtime_surfaces": null,
+      "new_packaged_placements": 0,
+      "new_native_accepted_placements": 0,
+      "runtime_acceptance": "failed_at_owner_reported_locations",
+      "cause": "unknown",
+      "first_fixed_version": null
+    }
+  ]
 }

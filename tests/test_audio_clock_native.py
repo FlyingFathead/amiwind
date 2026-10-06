@@ -20,6 +20,31 @@ class AudioClockTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
         return result.stdout
 
+    def test_slow_asset_reads_preserve_loading_music_and_ordinary_read_size(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            directory = Path(scratch)
+            objects = []
+            for name, source, defines in (
+                    ('fixture', ROOT/'tests/aga_load_music_io_test.c', []),
+                    ('common', ROOT/'tests/aga_load_music_common.c', []),
+                    ('scheduler', SOURCE/'snd_dma.c', ['-DAMIGA']),
+                    ('mixer', SOURCE/'snd_mix.c', []),
+                    ('music', SOURCE/'aw_music.c', [])):
+                obj = directory/(name+'.o')
+                self.checked(['cc', *FLAGS, *defines, '-I'+str(SOURCE), '-c', str(source), '-o', str(obj)])
+                objects.append(str(obj))
+            exe = str(directory/'load-music-check')
+            self.checked(['cc', *FLAGS, '-Wl,--gc-sections', '-Wl,--wrap=fread',
+                          *objects, '-lm', '-o', exe])
+            for reader in ('model', 'common'):
+                for rate, mode in ((32768, 'loading'), (102400, 'loading'), (32768, 'ordinary')):
+                    with self.subTest(reader=reader, rate=rate, mode=mode):
+                        run = directory/(reader+'-'+str(rate)+'-'+mode)
+                        run.mkdir()
+                        result = subprocess.run([exe, str(rate), reader, mode, '4096'], cwd=run,
+                                                capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+
     def test_absolute_clock_recovers_actual_mixer_after_stalls_and_reset(self):
         with tempfile.TemporaryDirectory() as scratch:
             directory = Path(scratch)

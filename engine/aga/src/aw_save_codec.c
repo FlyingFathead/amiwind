@@ -158,26 +158,36 @@ int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
     if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
+    {uint32_t features=copy.state.harvest.slots?1U:0U;word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
         for(i=0;i<AW_HARVEST_SLOTS;i++)if(copy.state.harvest.facts[i])error=1;
     }
+    word(&copy.equipment);
+    if((copy.equipment&~AW_EQUIPMENT_MASK) ||
+       ((copy.equipment&AW_EQUIPMENT_TORCH) && !(copy.equipment&AW_EQUIPMENT_DRAWN)))error=1;
     if(error)return 0;
-    size=at;memcpy(out,copy.state.harvest.slots?"AWS3":"AWS2",4);at=4;word(&size);
+    size=at;memcpy(out,"AWS4",4);at=4;word(&size);
     crc=crc32(out+12,size-12);word(&crc);return size;
 }
 int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
 {
-    aw_save_t candidate;uint32_t length=0,crc=0;
-    if(size<12 || size>AW_SAVE_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4)))return 0;
+    aw_save_t candidate;uint32_t length=0,crc=0,features=0;
+    if(size<12 || size>AW_SAVE_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
     writing=NULL;reading=data;at=4;end=size;error=0;word(&length);word(&crc);
     if(length!=(uint32_t)size || crc!=crc32(data+12,size-12))return 0;
     memset(&candidate,0,sizeof(candidate));fields(&candidate);
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='3')harvest_fields(&candidate.state.harvest);
+    if(!error && data[3]=='4'){word(&features);if(features>1)error=1;}
+    if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
+    if(!error && data[3]=='4'){
+        word(&candidate.equipment);
+        if((candidate.equipment&~AW_EQUIPMENT_MASK) ||
+           ((candidate.equipment&AW_EQUIPMENT_TORCH) && !(candidate.equipment&AW_EQUIPMENT_DRAWN)))error=1;
+    }
     if(error || at!=size)return 0;
     *out=candidate;return 1;
 }

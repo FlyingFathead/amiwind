@@ -84,12 +84,20 @@ typedef struct texture_s
 #define SURF_DRAWTILED		0x20
 #define SURF_DRAWBACKGROUND	0x40
 
+/* Runtime surface flags are generated here, never copied from disk. Fail the
+ * build if a later flag needs more than the exact unsigned16 storage. */
+#define AW_SURFACE_FIELDS_16 1
+typedef char aw_surface_flags_fit_u16[
+    ((SURF_PLANEBACK|SURF_DRAWSKY|SURF_DRAWSPRITE|SURF_DRAWTURB|
+      SURF_DRAWTILED|SURF_DRAWBACKGROUND)<=65535)?1:-1];
+
 // !!! if this is changed, it must be changed in asm_draw.h too !!!
 typedef struct
 {
 	unsigned short	v[2];
-	unsigned int	cachededgeoffset;
 } medge_t;
+#define AW_EDGE_CACHE_SPLIT 1
+#define AW_EDGE_CACHE_MODEL_LIMIT 256
 
 typedef struct
 {
@@ -107,13 +115,15 @@ typedef struct msurface_s
 	int			dlightbits;
 
 	mplane_t	*plane;
-	int			flags;
-
 	int			firstedge;	// look up in model->surfedges[], negative numbers
-	int			numedges;	// are backwards edges
+	/* Adjacent16-bit fields retain aligned pointers/firstedge and every BSP29
+	 * count. The loader rejects negative counts before storing them. */
+	unsigned short flags;
+	short		numedges;	// are backwards edges
 
 // surface generation data
-	struct surfcache_s	*cachespots[MIPLEVELS];
+	/* At most one cache per mip. Blocks live in the fixed surface arena. */
+	struct surfcache_s	*cachehead;
 
 	short		texturemins[2];
 	short		extents[2];
@@ -333,6 +343,9 @@ typedef struct model_s
 
 	int			numedges;
 	medge_t		*edges;
+	/* Mutable raster cache only for the world-referenced edge prefix. */
+	unsigned int	*edgecache;
+	int			edgecache_count;
 
 	int			numnodes;
 	mnode_t		*nodes;

@@ -71,6 +71,8 @@ qboolean aw_loading_music=false;
 
 cvar_t bgmvolume = {"bgmvolume", "1", true};
 cvar_t volume = {"volume", "0.7", true};
+cvar_t effectsvolume = {"effectsvolume", "0.75", true, false, .75f};
+cvar_t dialoguevolume = {"dialoguevolume", "1", true, false, 1};
 
 cvar_t nosound = {"nosound", "0"};
 cvar_t precache = {"precache", "1"};
@@ -198,6 +200,8 @@ void S_Init (void)
 	Cvar_RegisterVariable(&precache);
 	Cvar_RegisterVariable(&loadas8bit);
 	Cvar_RegisterVariable(&bgmvolume);
+	Cvar_RegisterVariable(&effectsvolume);
+	Cvar_RegisterVariable(&dialoguevolume);
 	Cvar_RegisterVariable(&bgmbuffer);
 	Cvar_RegisterVariable(&ambient_level);
 	Cvar_RegisterVariable(&ambient_fade);

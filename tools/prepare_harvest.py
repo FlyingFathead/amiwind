@@ -79,7 +79,22 @@ def identifier(value):
     return value.casefold()
 
 
-def source_records(master):
+def placement_source_key(ref, master_sha256):
+    """Preserve the already-indexed interior namespace and exact cell spelling."""
+    if not isinstance(master_sha256, str) or not re.fullmatch('[0-9a-f]{64}', master_sha256):
+        raise ValueError('Invalid source master digest')
+    if isinstance(ref['cell'], str):
+        if not ref['cell'] or '\0' in ref['cell'] or type(ref['number']) is not int or not 0 <= ref['number'] <= 0xffffffff:
+            raise ValueError('Invalid interior source identity')
+        return (master_sha256, 'interior', ref['cell'], ref['number'])
+    return source_key(ref, master_sha256)
+
+
+def placement_locator(ref):
+    return ('interior', ref['cell'], ref['number']) if isinstance(ref['cell'], str) else (*ref['cell'], ref['number'])
+
+
+def source_records(master, reference_metadata=None):
     objects, reference_fields = {}, {}
     for tag, flags, payload in records(master):
         subs = list(subrecords(payload)); fields = dict(subs)
@@ -87,16 +102,19 @@ def source_records(master):
             raise ValueError('Only a standalone base master is supported')
         if tag == 'CELL':
             cell = cell_data(subs); current = None
-            if cell['flags'] & 1 or flags & 0x20:
+            if flags & 0x20:
                 continue
             for key, value in subs:
                 if key == 'FRMR':
-                    current = (cell['x'], cell['y'], struct.unpack('<I', value)[0])
+                    number = struct.unpack('<I', value)[0]
+                    current = ('interior', cell['name'], number) if cell['flags'] & 1 else (cell['x'], cell['y'], number)
                     if current in reference_fields:
                         raise ValueError('Duplicate original placement')
                     reference_fields[current] = []
                 elif current:
                     reference_fields[current].append(key)
+                    if reference_metadata is not None and key in ('ANAM', 'INTV', 'NAM9'):
+                        reference_metadata.setdefault(current, []).append((key, value))
         elif tag in ('CONT', 'INGR', 'LEVI', 'LEVC', 'MISC', 'ALCH', 'WEAP', 'ARMO', 'CLOT',
                      'BOOK', 'APPA', 'LOCK', 'PROB', 'REPA', 'LIGH', 'ACTI', 'STAT', 'CREA', 'NPC_') and 'NAME' in fields:
             name = string(fields['NAME']).casefold()
@@ -130,14 +148,57 @@ def placement_index(census):
     return {key: i + 1 for i, key in enumerate(keys)}, digest
 
 
-def source_context(master):
+def source_context(master, *, max_plants=24, intern_root_spans=False):
     """Parse original identity and contents once for a bounded map batch."""
     full = inventory(master, ('small_mushroom',))
     indices, catalogue = placement_index(full)
-    original = {identity_key(source_key(r, full['master_sha256'])): r for r in full['references']}
-    objects, placement_fields = source_records(master)
+    if type(max_plants) is not int or not 1 <= max_plants <= 256 or type(intern_root_spans) is not bool:
+        raise ValueError('Explicit runtime plant admission must be 1..256')
+    original = {identity_key(placement_source_key(r, full['master_sha256'])): r
+                for group in ('references', 'interior_references', 'deferred_references') for r in full[group]
+                if r['kind'] == 'small_mushroom'}
+    reference_metadata = {}
+    objects, placement_fields = source_records(master, reference_metadata)
     return dict(full=full, indices=indices, catalogue=catalogue,
-                original=original, objects=objects, placement_fields=placement_fields)
+                original=original, objects=objects, placement_fields=placement_fields,
+                max_plants=max_plants, intern_root_spans=intern_root_spans, reference_metadata=reference_metadata)
+
+
+def placement_metadata(context, ref):
+    """Retain source CellRef data; never interpret charge/gold as plant yield.
+
+    OpenMW 0.48 components/esm3/cellref.cpp maps ANAM to owner, INTV to
+    charge and NAM9 to gold value. The optional source defaults below have
+    no active CONT charge/gold behavior. Ownership still requires crime and
+    stolen-inventory semantics unavailable in the current runtime.
+    """
+    locator = placement_locator(ref)
+    fields = context['placement_fields'].get(locator)
+    if fields is None or set(fields) - {'NAME', 'DATA', 'XSCL', 'ANAM', 'INTV', 'NAM9'}:
+        raise ValueError('Placement has ownership, lock, deletion or other unsupported state')
+    values = context.get('reference_metadata', {}).get(locator, [])
+    result = dict(owner='', charge=-1, gold_value=1, original_subrecords=[])
+    seen = set()
+    for tag, raw in values:
+        if tag in seen:
+            raise ValueError('Duplicate source placement field: ' + tag)
+        seen.add(tag)
+        result['original_subrecords'].append(dict(tag=tag, bytes=len(raw), hex=raw.hex()))
+        if tag == 'ANAM':
+            if not raw or raw[-1:] != b'\0' or b'\0' in raw[:-1]:
+                raise ValueError('Malformed source placement owner')
+            result['owner'] = string(raw)
+        else:
+            if len(raw) != 4:
+                raise ValueError('Invalid source placement field length: ' + tag)
+            result['charge' if tag == 'INTV' else 'gold_value'] = struct.unpack('<i', raw)[0]
+    # Presence must agree with the independently collected original field list.
+    if seen != set(fields) & {'ANAM', 'INTV', 'NAM9'}:
+        raise ValueError('Source placement metadata is incomplete')
+    result['admission'] = ('requires_ownership_and_theft' if result['owner'] else
+                           'unsupported_nondefault_charge_or_gold' if result['charge'] not in (-1, 0) or result['gold_value'] != 1 else
+                           'supported_neutral_container_metadata')
+    return result
 
 
 def prepare_graph(context, references, binding):
@@ -151,6 +212,8 @@ def prepare_graph(context, references, binding):
     original = context['original']; objects = context['objects']
     placement_fields = context['placement_fields']
     nodes, edges, plants, provenance, node_ids, active, used_keys = [], [], [], [], {}, set(), set()
+
+    root_spans = {}
 
     def node(name):
         name = identifier(name)
@@ -212,8 +275,9 @@ def prepare_graph(context, references, binding):
                 raise ValueError('Source placement metadata mismatch: ' + field)
         if ref['type'] != 'CONT' or ref.get('script') or not ref['container_state']['flags'] & 1:
             raise ValueError('Only unscripted organic container mushrooms are supported')
-        if set(placement_fields[(*ref['cell'], ref['number'])]) - {'NAME', 'DATA', 'XSCL'}:
-            raise ValueError('Placement has ownership, lock, deletion or other unsupported state')
+        metadata = placement_metadata(context, ref)
+        if metadata['admission'] != 'supported_neutral_container_metadata':
+            raise ValueError('Source placement requires ownership/theft or nondefault charge/gold handling: ' + metadata['admission'])
         if not 0 < ref['number'] <= 16777216:
             raise ValueError('Reference cannot be represented exactly by current QC field')
         entity, origin, angles = binding(ref)
@@ -222,7 +286,13 @@ def prepare_graph(context, references, binding):
             if not 1 <= item['count'] <= 64:
                 raise ValueError('Restocking/nonpositive or excessive inventory counts are not supported')
             contents.append((node(item['id']), 0, item['count']))
-        first = len(edges); edges.extend(contents)
+        span = tuple(contents)
+        if context.get('intern_root_spans', False) and span in root_spans:
+            first = root_spans[span]
+        else:
+            first = len(edges); edges.extend(contents)
+            if context.get('intern_root_spans', False):
+                root_spans[span] = first
         fields = objects[ref['id'].casefold()][2]
         label = string(fields.get('FNAM', b''))
         if not re.fullmatch(r'[ -~]{1,63}', label):
@@ -230,8 +300,8 @@ def prepare_graph(context, references, binding):
         plants.append(dict(key=key, slot=indices[key], reference=ref['number'], model=entity['model'], flags=ref['container_state']['flags'],
                            first=first, count=len(contents), origin=origin, angles=angles, label=label))
         provenance.append(dict(key=key, slot=indices[key], source_key=ref['source_key'], source_id=ref['id'],
-                               container_state=ref['container_state'], script=ref['script'], entity=entity))
-    if len(nodes) > 64 or len(edges) > 256 or len(plants) > 24:
+                               container_state=ref['container_state'], script=ref['script'], placement_metadata=metadata, entity=entity))
+    if len(nodes) > 64 or len(edges) > 256 or len(plants) > context.get('max_plants', 24):
         raise ValueError('Harvest catalogue exceeds bounded runtime capacity')
     return nodes, edges, plants, provenance
 
@@ -265,6 +335,8 @@ def prepare(master, region, bsp, *, context=None):
         rows.append('{key} {slot} {reference} {model} {flags} {first} {count} '.format(**p) +
                     ' '.join(format(v, '.9g') for v in p['origin'] + p['angles']) + ' ' + p['label'])
     payload = ('\n'.join(rows) + '\n').encode('ascii')
+    if len(payload) > 65536:
+        raise ValueError('Harvest catalogue exceeds 65536-byte runtime input bound')
     receipt = dict(format='AmiWind direct harvest 3', global_slots=len(indices), global_catalogue_sha256=catalogue, master_sha256=full['master_sha256'], bsp_sha256=region['sha256'],
                    catalogue_sha256=hashlib.sha256(payload).hexdigest(), source_placements=len(plants),
                    nodes=nodes, edges=edges, placements=provenance, respawn='disabled_first_stage',

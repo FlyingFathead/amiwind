@@ -164,3 +164,12 @@ every activator a lava volume. Derive any Vvardenfell debug-map lava overlay fro
 verified placements, with separate contact/damage and bounded illumination
 tests; never infer lava from red terrain or guessed map dots. Reference:
 [`activator.cpp`](https://github.com/OpenMW/openmw/blob/openmw-0.51.0/apps/openmw/mwclass/activator.cpp).
+
+## NPC illumination remains a separate acceptance gate
+
+The dev4 playtest reports torch-lit walls/floors but dark nearby NPCs.
+Track [TORCH-NPC-LIGHT-29](BUG_JOURNAL.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open)
+independently of surface coverage, emitter visibility and light radius. An
+emitter or illuminated floor does not establish actor lighting. Verify the
+actor's rendering branch, base light, dynamic-light clamp and final night
+palette with a fixed-time off/on/off comparison before marking it resolved.

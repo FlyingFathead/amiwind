@@ -8,8 +8,8 @@
 #include "aw_harvest_runtime.h"
 #include "aw_harvest_proxy.h"
 static aw_harvest_t harvest;
-static edict_t *plants[AW_HARVEST_PLANTS];
-static unsigned char available[AW_HARVEST_PLANTS];
+static edict_t **plants;
+static unsigned char *available;
 static cvar_t harvest_mode={"aw_harvest_mode","1",true};
 /* Stable complete-media path for the selected original Fx/item/item.wav. */
 #define PICKUP_SOUND "pool/a031af0520e9edfa2.wav"
@@ -31,11 +31,11 @@ static void shroomtracker(void)
     if(Cmd_Argc()!=1){Con_Printf("Usage: aw_shroomtracker\n");return;}
     Con_Printf("Mushrooms picked: %ld\n",(long)AW_HarvestPickedCount(&aw_state));
 }
-void AW_HarvestInit(void){Cvar_RegisterVariable(&harvest_mode);Cmd_AddCommand("aw_shroomtracker",shroomtracker);}
+void AW_HarvestInit(void){AW_HarvestInitData(&harvest);Cvar_RegisterVariable(&harvest_mode);Cmd_AddCommand("aw_shroomtracker",shroomtracker);}
 void AW_HarvestClear(void)
 {
-    AW_HarvestProxyClear();memset(&harvest,0,sizeof(harvest));memset(plants,0,sizeof(plants));
-    memset(available,0,sizeof(available));pickup_available=0;
+    AW_HarvestProxyClear();free(plants);plants=NULL;available=NULL;
+    AW_HarvestRelease(&harvest);pickup_available=0;
 }
 void AW_HarvestLink(void){AW_HarvestProxyLink();}
 void AW_HarvestBegin(void)
@@ -48,7 +48,7 @@ void AW_HarvestBegin(void)
     if(n<1 || n>24)return;
     memcpy(map,start,n);map[n]=0;
     sprintf(path,"harvest-%s.txt",map);bytes=COM_FOpenFile(path,&f);
-    if(f){if(!AW_HarvestRead(f,bytes,&harvest))Con_Printf("Rejected harvest catalogue: %s\n",path);fclose(f);}
+    if(f){if(!AW_HarvestLoad(f,bytes,&harvest))Con_Printf("Rejected harvest catalogue (data or allocation): %s\n",path);fclose(f);}
 }
 static int binding(edict_t *e)
 {
@@ -57,7 +57,7 @@ static int binding(edict_t *e)
     reference=GetEdictFieldValue(e,"aw_ref");if(!reference || !isfinite(reference->_float))return -1;
     for(i=0;i<harvest.plants;i++){
         p=&harvest.plant[i];
-        if(reference->_float!=(float)p->reference || strcmp(pr_strings+e->v.model,p->model))continue;
+        if(reference->_float!=(float)p->reference || strcmp(pr_strings+e->v.model,AW_HarvestText(&harvest,p->model)))continue;
         for(k=0;k<3;k++){
             if(!isfinite(e->v.origin[k]) || !isfinite(e->v.angles[k]) || fabs(e->v.origin[k]-p->origin[k])>.002f)break;
             a=fmod(e->v.angles[k]-p->angles[k],360.0);if(a>180)a-=360;if(a< -180)a+=360;
@@ -72,7 +72,10 @@ void AW_HarvestSpawn(void)
 {
     int i,b,result,level=aw_character.valid?aw_character.level:1;unsigned char duplicate[AW_HARVEST_PLANTS];edict_t *e;
     if(harvest.representation==4){AW_HarvestProxySpawn(&harvest,&aw_state,level,(unsigned)rand());return;}
-    memset(plants,0,sizeof(plants));memset(available,0,sizeof(available));memset(duplicate,0,sizeof(duplicate));
+    free(plants);plants=NULL;available=NULL;if(!harvest.plants)return;
+    plants=(edict_t **)calloc(harvest.plants,sizeof(*plants)+sizeof(*available));
+    if(!plants){Con_Printf("Harvest brush allocation failed: %d placements unavailable.\n",harvest.plants);return;}
+    available=(unsigned char *)(plants+harvest.plants);memset(duplicate,0,sizeof(duplicate));
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);b=binding(e);if(b<0)continue;
         if(plants[b])duplicate[b]=1;else plants[b]=e;
@@ -102,6 +105,7 @@ static int target(void)
             proxy=AW_HarvestProxyEntity(i);if(!proxy)continue;m=proxy->model;scale=harvest.plant[i].scale;
             VectorSubtract(eye,proxy->origin,delta);VectorCopy(proxy->angles,angles);angles[PITCH]=-angles[PITCH];
         }else{
+            if(!plants || !available)continue;
             e=plants[i];if(!available[i] || !e || e->free || AW_HarvestHidden(&harvest,i,&aw_state))continue;
             index=(int)e->v.modelindex;if(index<=0 || index>=MAX_MODELS || !(m=sv.models[index]) || m->type!=mod_brush)continue;
             VectorSubtract(eye,e->v.origin,delta);VectorCopy(e->v.angles,angles);scale=1;
@@ -123,13 +127,13 @@ static int target(void)
     }
     return best;
 }
-const char *AW_HarvestHint(void){int i=target();return i<0?NULL:harvest.plant[i].label;}
+const char *AW_HarvestHint(void){int i=target();return i<0?NULL:AW_HarvestText(&harvest,harvest.plant[i].label);}
 int AW_HarvestUse(void)
 {
     int i=target(),result,level,j,k;int32_t before[AW_HARVEST_NODES],amount;
     char message[4096],line[96];const char *label;
     if(i<0)return 0;
-    for(j=0;j<harvest.nodes;j++)before[j]=AW_StateGet(&aw_state,AW_ITEM,harvest.node[j].id);
+    for(j=0;j<harvest.nodes;j++)before[j]=AW_StateGet(&aw_state,AW_ITEM,AW_HarvestText(&harvest,harvest.node[j].id));
     level=aw_character.valid?aw_character.level:1;
     result=AW_HarvestTake(&harvest,i,&aw_state,level,(uint32_t)rand());
     if(result>0){
@@ -138,11 +142,11 @@ int AW_HarvestUse(void)
             pickup_sound();message[0]=0;
             for(j=0;j<harvest.nodes;j++){
                 if(harvest.node[j].kind!=0)continue;
-                for(k=0;k<j;k++)if(!strcmp(harvest.node[j].id,harvest.node[k].id))break;
+                for(k=0;k<j;k++)if(!strcmp(AW_HarvestText(&harvest,harvest.node[j].id),AW_HarvestText(&harvest,harvest.node[k].id)))break;
                 if(k<j)continue;
-                amount=AW_StateGet(&aw_state,AW_ITEM,harvest.node[j].id)-before[j];
+                amount=AW_StateGet(&aw_state,AW_ITEM,AW_HarvestText(&harvest,harvest.node[j].id))-before[j];
                 if(amount<=0)continue;
-                label=harvest.node[j].label[0]?harvest.node[j].label:"items"; /* AWH1 compatibility, never an internal record ID. */
+                label=AW_HarvestText(&harvest,harvest.node[j].label);if(!label[0])label="items"; /* AWH1 compatibility. */
                 sprintf(line,"Picked up %ld %s.",(long)amount,label);
                 if(message[0])strcat(message,"\n");
                 strcat(message,line);
@@ -150,6 +154,6 @@ int AW_HarvestUse(void)
             if(message[0])AW_UIPickupNotice(message,3);
         }
     }
-    else if(result<0)AW_UISubtitle(harvest.plant[i].label,"Cannot collect: inventory/state capacity or data rejected.",3);
+    else if(result<0)AW_UISubtitle(AW_HarvestText(&harvest,harvest.plant[i].label),"Cannot collect: inventory/state capacity or data rejected.",3);
     return 1;
 }

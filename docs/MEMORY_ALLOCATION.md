@@ -1,5 +1,21 @@
 # Memory allocation and heap clearance
 
+## Console history working-set investigation: 6 October 2026
+
+The owner requests disk-backed debug output scrollback, loading old pages only
+while the game is console-paused. Current source uses a fixed **16 KiB output
+ring**; command recall is a separate **8 KiB** array. Console resizing also uses
+a transient **16 KiB stack copy**. Output history does not grow without bound.
+
+Evaluate a small resident recent-page cache plus bounded disk history and index,
+with explicit pause-state checks before historical reads. Batch writes outside
+frame-critical work, preserve readable failure behavior, and bound file growth.
+Report net RAM after indexes/cache and measured I/O/audio/frame cost; the gross
+saving is at most the current output ring, not the separate command history.
+Existing `-condebug` writes per message and is not a suitable streaming design.
+Fix CONSOLE-WHEEL-29 independently rather than adding disk I/O to its input path.
+Status: investigation requested, no disk-backed implementation yet.
+
 Current release status, 3 October 2026: [v0.0.27 is published](RELEASE-v0.0.27.md).
 Its final private package passed the complete 2,717-map static heap gate and
 both HDF filesystem readbacks. The worst modeled margin is 135,952 bytes after
@@ -509,3 +525,50 @@ and no comparative FPS or memory result is available.
 See [the corresponding bug-journal record](BUG_JOURNAL.md#mem-geometry-01-transactional-geometrylight-sharing-candidates)
 for the version/cause/fix/status distinction. The rc3 duplicate-visibility-copy
 incident remains open until the repaired trip and lifecycle pass on target.
+
+## Oversized interior maps
+
+The selected approach is [subdivision at natural interior boundaries](CELL_CHANGING.md#large-interiors-subdivision-at-natural-boundaries),
+using doorways, corridors and cave bends while retaining one logical interior
+identity and persistent gameplay state. Implementation is pending. Use polygon
+heatmaps and actual allocation profiles together; budget both sides, boundary
+coverage and loading peaks rather than dividing by equal area or polygon count.
+
+## v0.0.29-rc1 development: bounded residency and compact state
+
+Amiga memory efficiency is a release requirement, but lower RAM use cannot come at the cost of choppy travel, interrupted music or broken saves. Prefer a bounded resident working set: keep stable identity and needed gameplay state resident, share immutable models, load cold data only when needed, and prefetch before a crossing or interaction can use it. Evict only after the previous map/object handoff is safe. Do not put disk reads in frame, targeting, pickup or audio-service callbacks. Measure read/decode time, transition peak overlap, frame time and audio service gaps together. Asynchronous streaming remains a design goal, not an implemented guarantee. Existing synchronous first-use model loads still need bounded admission and native timing checks.
+
+The current mushroom state reserves for more records than the current base-master census needs. A 32-bit fact currently packs a 20-bit random seed, 10-bit encounter level and two terminal flags (empty and picked). The runtime reserves 4,096 facts even though the audited base numeric family currently contains 2,083 original placements. The fixed table therefore uses 16,420 bytes including its 36-byte slot/catalogue header; the save stream remains sparse and stores only encountered indexed facts. A catalogue-sized allocation at the current census would use 8,368 bytes with the same 4-byte fact representation, a theoretical 8,052-byte reduction before allocator/alignment costs. This must not silently lower the supported 4,096-placement limit: a runtime-sized owner could allocate from each validated catalogue's `slots` count while preserving that maximum. The current state is inline, so changing it also requires explicit allocation ownership, failure-atomic initialization, reset, save/load and compatibility tests. Sparse records may save more in ordinary play, but index, alignment, lookup and growth costs must be measured on the 68040; the worst-case representation must not silently exceed the existing bound.
+
+Target compiler measurements found target-ABI records of 192 to 54 bytes per mushroom placement, 148 to 24 bytes per loot node, and 120 to 58 bytes per shared model descriptor; edge records stayed 12 bytes and entity records 184 bytes. Its fixed engine object total fell by 20,032 bytes (33,192 to 13,160 bytes), including 2,564 bytes more code and 22,596 fewer BSS bytes. The layout is now present in a follow-on candidate whose 1,018-test source suite and 68040 link passed; it is not shipped or native-accepted. Per-map dynamic catalogue and binding allocations, shared-model caches, realloc overlap, OS/libc metadata and I/O buffers still need to be charged. For example, the measured estimate for a 77-placement map was 23,907 bytes of dynamic resident catalogue/binding allocations before shared model cache and allocator overhead.
+
+World-scale geometry estimates must be per resident map, not the sum of every map in the corpus. The follow-on candidate reduces its target-ABI surface record by 12 bytes (64 to 52); apply that delta only to an admitted map's actual face count and account for its fixed cache arena, index/header changes, loader scratch and concurrent handoff. Corpus totals across 49 maps are not simultaneous RAM savings. A separate sn012 estimate identifies 258,768 bytes as a potential edge-storage saving if that allocation can be safely reduced or evicted; this is not an edge-record size or a realized saving. A separate exact guard-frame sharing experiment estimates a 57,248-byte saving; it is not integrated or proof of map admission.
+
+A historical target-ABI debug-command catalogue object comparison reduced its code section from 8,412 to 4,492 bytes, for a 3,920-byte object-code reduction; the 24-byte data section was unchanged. At that baseline the source catalogue had 79 entries / 5,830 bytes on disk; later command aliases changed its size. This is code/object and disk evidence, not a resident model cache measurement.
+
+If subdivision still leaves a dense interior or corridor over budget, first measure per-section resident and visible costs. Selective lower-poly variants may be considered for large decorative, non-pickable mushrooms or other costly scenery while preserving silhouette, watertight joins, UV/material boundaries, collision and original placement. This is a fallback after subdivision, not blanket decimation and not a change to pickable mushroom models.
+
+Before accepting a compact layout, preserve the complete original object identity and placement across overlapping map copies, distinguish empty from picked, keep the same roll/level through failed inventory transfers and compatible save/load, and reject incompatible catalogue IDs. Compare before/after 68040 object sections, linked image, per-map peak including old/new overlap, warm cache and cold-load time, and a target travel/pickup route with frame/audio monitoring. Existing dev4 remains the six-placement pilot; worldwide mapping and these memory prototypes are not shipped.
+
+
+## Exact edge and surface storage: 6 October follow-up
+
+The integrated candidate stores each immutable edge as its original two 16-bit
+vertex indices (4 bytes). Mutable renderer cache state resides in a separately
+charged world-edge prefix; generic BSPs conservatively retain a full prefix.
+The model-slot array grows by 2,048 bytes across 256 slots and is included in the
+estimate. Small generic maps can therefore pay allocation/alignment overhead.
+
+A subsequent exact surface layout narrows runtime flags and signed edge counts
+to 16 bits and places the 32-bit first-edge index before them: **52→48 bytes per
+resident face** on the target ABI. All pointers retain alignment, and renderer
+assembly does not consume this structure's offsets. The loader rejects invalid
+edge spans before assignment; it retains the complete valid signed BSP count
+range. No geometry, textures, collision hulls or reserve margins are removed.
+
+Across 49 unchanged maps, 1,458,171 actual C decoded face inputs match, as do
+renderer edge-cache prefixes. Target compilation and the isolated 1,028-test
+suite pass. Modeled admission reaches 347/390 maps; 43 remain withheld. sn031 has
+27,132 bytes clearance, while sn012 remains 1,320,228 bytes short. Corpus totals
+are not simultaneous RAM savings. Native peak memory and frame cost remain
+separate checks; no speedup or final world-completion claim follows from this.

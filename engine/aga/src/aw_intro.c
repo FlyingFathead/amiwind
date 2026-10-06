@@ -191,15 +191,20 @@ void AW_IntroTick(void) {
        AW_IntroSpeak(3,upper_state?"chargenwoman2":"chargenwoman1")){upper_state=1;upper_timer=0;}
 }
 void AW_IntroMove(usercmd_t *cmd) {
+    if(AW_DebugTestInputActive() && !AW_CharacterActive())return;
     if((active && !failed && !unlocked) || AW_OpeningLocked() || AW_CharacterActive()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;}
 }
 int AW_IntroButtons(int bits){
+    if(AW_DebugTestInputActive() && !AW_CharacterActive())return bits;
     if((active && !failed) || AW_OpeningLocked() || AW_CharacterActive())return 0;
     if(!AW_StoryFighting())bits&=~1;
     if(AW_StoryRestricted())bits&=~2;
     return bits;
 }
-int AW_IntroImpulse(int impulse){return ((active && !failed) || !AW_StoryFighting() || AW_OpeningLocked() || AW_CharacterActive()) && impulse==202?0:impulse;}
+int AW_IntroImpulse(int impulse){
+    if(AW_DebugTestInputActive() && !AW_CharacterActive())return impulse;
+    return ((active && !failed) || !AW_StoryFighting() || AW_OpeningLocked() || AW_CharacterActive()) && impulse==202?0:impulse;
+}
 int AW_IntroUse(void){return (active && !failed && !unlocked) || AW_OpeningLocked() || AW_CharacterActive();}
 int AW_IntroPromptActive(void){return prompt!=0;}
 int AW_IntroKey(int key) {

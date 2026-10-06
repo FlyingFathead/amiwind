@@ -1,5 +1,142 @@
 # First-person geometry and sprite experiment
 
+## Maximum-extension repair candidate: 2026-10-06T15:18:15+00:00
+
+The next source candidate now contains a fist-viewmodel-only clipping repair.
+It preserves original models, UVs, animation, perspective and ordinary depth
+bias; world entities, custom viewmodels and torch models keep their prior path.
+The effective fist near distance becomes1.25 units without changing the world
+near plane, and newly visible depth values saturate within the signed range.
+
+Actual-C sanitized rendering passed20appearances x28frames x4pitches, totaling
+2,240frames. Every sampled maximum-extension frame has zero uncovered near-cut
+pixels. Four ambiguous female components occur offscreen; the separate existing
+female wrist-seam issue remains open. The asset-free regression passes the
+candidate and fails original code. Target build, combined suite and native visual
+acceptance remain pending. First packaged/fixed release remains none.
+
+## Projection follow-up: 2026-10-06T15:03:42+00:00
+
+Actual-C alias projection of a sealed RC1 Nord male model at source frame25
+shows 1,522 uncovered near-plane cross-section pixels at pitch0 and 2,641 at
+pitch-39 in the diagnostic camera. The encoded mesh is closed. Small view-local
+offsets did not eliminate the gap; lowering the near plane from5 to3.25 worsened
+coverage, so neither is accepted as a repair. These measurements use a synthetic
+camera, not an identified match to the owner's screenshot. Native confirmation
+and a scoped repair remain pending; no first fixed version is assigned.
+
+## RC1 maximum-extension hand audit: 2026-10-06T14:46:55+00:00
+
+All 20 inspected fist models match the RC1 catalogue. At maximum right-hand
+extension (source frame25 of28), encoded models have no unmatched boundary edges.
+The apparent source boundary rings are paired wrist/forearm seams, not an
+established open proximal arm. Some female models show quantization separation
+in other frames; that is a separate possible seam issue.
+
+At frame25 the standard five-unit near plane intersects 20 triangles in each
+of six sampled appearances. The alias clipper trims triangles without creating
+a cross-section cap. Camera/near-plane exposure is therefore a leading hypothesis
+for the reported see-through forearm, not yet a proven visible cause or repair.
+The owner's screenshot still does not identify an exact race, sex or frame.
+
+Next compare actual renderer coverage at idle, adjacent and maximum poses using
+small view-relative placement changes. Preserve hand proportions, torch grip and
+ordinary clipping. A global near-plane reduction is not accepted: signed depth
+storage has its own range constraints. Do not cap every source boundary or claim
+the new combat inspection room repairs the defect. First fixed version remains
+none; a visible target check is required.
+
+## Combat inspection candidate: 6 October 2026
+
+`dbg combattest` is implemented in the next source candidate, not published RC1.
+It reuses the gallery's empty 4096-unit floor without loading its catalogue actor
+or footprint. This is a large finite BSP floor; `dbg combattest center` resets
+the inspection position. It is not an infinite-world generator.
+
+Normal Attack punches into air; F draws/lowers the current race/sex hands.
+`dbg combattest idle`, `draw`, `lower` and `punch` start the corresponding existing
+action. F1 opens help; Ctrl+X or `dbg combattest exit` restores the captured game.
+The HUD reports hand state/frame. Timing comes from the valid source scene;
+missing timings or floor refuse entry instead of hiding unavailable hands.
+Four focused Linux Docker checks pass, including actual gallery routines,
+compiled hand rules and catalogue staging. Target visual acceptance is pending.
+No punch-hole repair, left/right sequence, pose editor or sprite conversion is
+claimed by this initial inspection mode.
+
+## FPV combat action creation pipeline: RC1 baseline
+
+Requested 6 October 2026; recorded 2026-10-06T13:34:07+00:00. Keep the RC1 race/sex fist models
+as immutable inputs for an adjustable first-person action pipeline. This is
+new conversion/preview work, not an implemented editor or a shipped correction.
+
+The pipeline should retain original animation/mesh identity, expose bounded
+camera-relative offsets and per-action/per-frame adjustments, and export a
+fresh candidate plus a repeatable profile. Preview idle, draw, lower and the
+entire punch sequence at the actual viewport/FOV/near plane, with exact frame
+selection and contact sheets. Compare the unchanged baseline side by side.
+
+The initial target is the exposed camera-near forearm at maximum extension.
+Moving the arm toward the player's viewpoint is a requested framing candidate;
+measure which axis/direction improves coverage before adopting it. Distinguish
+UV loss, open geometry, face culling and near-plane clipping. Repositioning alone
+must not be called a topology repair or accepted if another pose opens a hole.
+Retain surface connectivity and validate any explicit cap/stitch separately.
+
+Add right/left unarmed sequencing using verified source animations or an
+explicit derived-animation profile. Preserve held equipment and race/sex
+appearance. Reuse decoded source data and profiles to avoid repeated full
+conversion; load only the selected runtime model. Record triangle/vertex count,
+model/cache bytes and render cost alongside the coverage result. Preview tools
+and profiles can be public; original/converted game assets remain locally owned.
+The existing sprite baker's neutral projection is a framing aid, not acceptance
+of the actual game renderer's clipping or lighting.
+
+## Unarmed right/left sequence request: 6 October 2026
+
+Recorded 2026-10-06T13:23:09+00:00. Successive accepted bare-knuckle attacks should alternate
+**right, left, right, left**. The current converter samples only
+`handtohand: chop start` through `handtohand: chop large follow stop` as one
+ten-frame punch clip; alternating hands is not implemented in RC1.
+
+Inspect the owned first-person animation catalogue for authored left/right
+motions before choosing their conversion. Do not describe strict alternation
+as verified original-Morrowind behaviour merely because it is requested here.
+Add a second attack only when its appearance, timing and fallback contract are
+explicit; count one accepted attack per input and avoid switching sides midway
+through a punch or a cell handoff. This is an animation requirement, not a claim
+of implemented combat damage or combo rules.
+
+The owner further localizes HAND-PUNCH-COVERAGE-29 to **maximum arm extension**.
+Inspect that pose and adjacent/interpolated frames on both arms. Fix visible
+forearm coverage before accepting the new sequence. Preserve race/sex appearance,
+held-item behavior and a bounded selected-model working set; measure any extra
+frame/cache cost rather than retaining all race animations in RAM.
+
+## HAND-PUNCH-COVERAGE-29: exposed forearm during punching in RC1
+
+Recorded 2026-10-06T13:18:37+00:00. The playtester says RC1 fists are **substantially better**,
+but reports visible background/open coverage in the punching arm. The marked
+image identifies the camera-near forearm region, not the knuckles. Preserve the
+improved appearance while repairing that defect. The race/sex and exact punch
+frame are not established by this screenshot; do not inherit a race from an
+earlier torch report.
+
+**Open; final-release gate.** Check the delivered model's sampled punch frames,
+interpolated poses, triangle winding/back-face culling, and near-plane clipping.
+The source-topology audit deliberately retains authored open ends and reports
+their boundary edges. Its zero-new-gap result proves source preservation, not
+that every visible FPS surface is closed. This is a concrete inspection lead,
+not attribution of the pictured defect to one particular boundary.
+
+If an exposed attachment end is confirmed, generate a small explicitly labeled
+cap or stitched continuation for that end, retaining the source surface audit
+separately. Do not blindly cap every open loop, bridge fingers, reverse hidden
+faces, or disable culling globally. Validate connectivity, orientation, animated
+coverage, texture continuity and target cost across idle/draw/lower/punch for all
+supported race/sex models and relevant camera pitches. Visual acceptance of the
+fist shape does not close punching or the separate torch-grip issue. Model and
+renderer maintenance own this investigation.
+
 The existing 3D converter and model are retained. **3D remains the default.**
 Select `build.sh --hands 3d` or `build.sh --hands sprites` at build time. The
 engine and image builders accept the same flag and reject mismatched modes.
@@ -165,3 +302,37 @@ above without surface or edge overflow. This is limited native acceptance,
 not a complete integration or physical-Amiga performance claim. The reduction
 and catalogue defaults remain unchanged; broader live beast and punch-quality
 acceptance remains pending.
+
+
+## Investigation: first-person hands rendered as sprites
+
+Requested on 6 October 2026. Evaluate whether transparent, pre-rendered hand
+frames can preserve the original fingers and torch grip better at the target
+resolution and cost. This is an investigation, not a replacement selected for
+RC1. Continue the current connected-mesh and animation acceptance checks.
+
+- Build a reproducible conversion catalogue keyed by source identity, race,
+  sex, left/right hand, equipment state, animation, frame and capture settings.
+  Cover idle, draw, lower, punch and torch poses, including both beast races.
+  Record source hashes, dimensions, crop bounds, pivot and timing per frame.
+- Evaluate an OpenMW-based offline capture path using owned game data. First
+  establish whether the chosen capture path provides a clean alpha channel;
+  do not assume ordinary screenshots contain one. If necessary, investigate
+  a separate mask pass or dedicated offscreen renderer using the same authored
+  models and animation. Test edge halos and partial coverage after palette
+  conversion. Ship the conversion tools and catalogue schema publicly, without
+  original or derived game artwork.
+- Convert captures into the runtime palette and transparency representation,
+  with stable wrists, camera framing and frame-to-frame alignment. Keep the
+  flame, embers and dynamic illumination separable from the baked hand image.
+  Evaluate how local lighting, torch on/off, view bob, pitch and screen clipping
+  behave; a baked image must not become permanently daylight-lit at night.
+- Compare the current mesh against a bounded sprite prototype using matching
+  poses. Measure visible silhouette and seams, frame timing, conversion cost,
+  compressed disk size, decoded frame RAM, peak working set and read latency.
+  Use a bounded cache and prefetch upcoming frames; reject visible stalls or
+  audio interruptions. More animation/equipment variants must not imply loading
+  the entire catalogue into Amiga RAM.
+- Preserve the mesh profile for A/B and rollback. Choose a default only after
+  native standing, walking, punching and torch tests across supported race/sex
+  combinations. Sprite conversion has not yet been implemented or validated.

@@ -23,7 +23,7 @@ from harvest_alias_mesh import convert, alias_cost
 from mwad.scene import read_asset, unpack_geometry
 from player_hull import lumps
 from prepare_harvest import (identity_key, source_context, prepare_graph, prepare,
-                             stage_pickup_sound)
+                             stage_pickup_sound, placement_source_key)
 from prepare_scenery import reference_rotation, world_bounds
 from world_flora_policy import source_key
 
@@ -87,12 +87,12 @@ def geometry_bounds(archive, model):
 
 def validate_references(context, index, archive):
     """Bind every packet reference to original master fields and model bytes."""
-    if not 1 <= len(index['references']) <= 24:
-        raise ValueError('Bounded batch requires 1..24 original placements')
+    if not 1 <= len(index['references']) <= 4096:
+        raise ValueError('Source batch requires 1..4096 original placements; map capacity is separate')
     refs, seen, bounds = [], set(), {}
     for item in index['references']:
         ref = dict(item)
-        ref['source_key'] = source_key(ref, context['full']['master_sha256'])
+        ref['source_key'] = placement_source_key(ref, context['full']['master_sha256'])
         key = identity_key(ref['source_key'])
         if key in seen or key not in context['original']:
             raise ValueError('Duplicate or unknown packet placement')
@@ -126,8 +126,15 @@ def region_references(row, refs):
     hi = vector(row['coverage'][1], 2, 'map coverage')
     if np.any(lo >= hi):
         raise ValueError('Empty/inverted map coverage')
+    kind = row.get('source_kind', 'exterior')
+    if kind not in ('exterior', 'interior') or (kind == 'interior' and
+            (not isinstance(row.get('source_cell'), str) or not row['source_cell'] or '\0' in row['source_cell'])):
+        raise ValueError('Explicit interior source cell required')
     selected = []
     for ref in refs:
+        interior = isinstance(ref['cell'], str)
+        if interior != (kind == 'interior') or (interior and ref['cell'] != row['source_cell']):
+            continue
         bounds = np.array(ref['bounds']) * .25 - origin
         if np.all(bounds[1, :2] >= lo) and np.all(bounds[0, :2] <= hi):
             selected.append(ref)
@@ -174,7 +181,10 @@ def catalogue(context, refs, origin, model_indices, registry):
         lines.append('{key} {slot} {reference} {model} {flags} {first} {count} '.format(**plant) +
                      ' '.join(format(v, '.9g') for v in plant['origin'] + plant['angles'] + [ref['scale']]) +
                      ' ' + plant['label'])
-    return ('\n'.join(lines) + '\n').encode('ascii'), provenance
+    raw = ('\n'.join(lines) + '\n').encode('ascii')
+    if len(raw) > 65536:
+        raise ValueError('Harvest catalogue exceeds 65536-byte runtime input bound')
+    return raw, provenance
 
 
 def budget_report(models, maps, budget):
@@ -234,7 +244,11 @@ def convert_plan(plan, master, index_raw, archive_path, palette, base_root, outp
     check_pin(packet_raw, plan['inputs']['packet'], 'packet')
     if len(packet_raw) > 64 * 1024 * 1024 or len(palette) != 768:
         raise ValueError('Packet/palette size exceeds bounded format')
-    context = source_context(master)
+    context = source_context(master, max_plants=plan.get('max_plants', 24),
+                             intern_root_spans=plan.get('intern_root_spans', False))
+    compact_models = plan.get('compact_models', False)
+    if type(compact_models) is not bool:
+        raise ValueError('compact_models must be an explicit boolean')
     if context['catalogue'] != plan['global_catalogue_sha256'] or len(context['indices']) != plan['global_slots']:
         raise ValueError('Global original placement index differs')
     index = json.loads(index_raw)
@@ -258,7 +272,7 @@ def convert_plan(plan, master, index_raw, archive_path, palette, base_root, outp
             model_rows.append(dict(path=name, **pin(raw), source=model['source'],
                                    source_sha256=model['source_sha256'], conversion=report))
     maps = plan['maps']; names = [row['name'] for row in maps]
-    if not 1 <= len(maps) <= 256 or len(set(names)) != len(names):
+    if not 1 <= len(maps) <= 8192 or len(set(names)) != len(names):
         raise ValueError('Map plan duplicate/empty/excessive')
     for row in maps:
         if not re.fullmatch('[a-z0-9_]{1,24}', row['name']):
@@ -267,12 +281,17 @@ def convert_plan(plan, master, index_raw, archive_path, palette, base_root, outp
         bsp = verified_file(base_root, row)
         origin = vector(row['origin'], 3, 'map origin')
         reject_existing_geometry(bsp, selected, origin)
-        raw, provenance = catalogue(context, selected, origin, model_indices, registry)
+        used = sorted({ref['model_index'] for ref in selected}, key=lambda number: model_indices[number]) if compact_models else model_numbers
+        local_indices = {number: i for i, number in enumerate(used)}
+        local_registry = [registry[model_indices[number]] for number in used]
+        raw, provenance = catalogue(context, selected, origin, local_indices, local_registry)
         path = 'harvest-' + row['name'] + '.txt'; files[path] = raw
         map_rows.append(dict(name=row['name'], path=row['path'], **pin(bsp),
                              destination='maps/' + row['name'] + '.bsp', representation='external_alias',
                              catalogue=dict(path=path, **pin(raw)), placements=provenance,
-                             retained_bsp='byte_identical', coverage=row['coverage'], origin=row['origin']))
+                             retained_bsp='byte_identical', coverage=row['coverage'], origin=row['origin'],
+                             source_kind=row.get('source_kind', 'exterior'), source_cell=row.get('source_cell'),
+                             models=len(local_registry), local_plants=len(selected)))
     for row in plan.get('legacy', []):
         if legacy_root is None or not re.fullmatch('[a-z0-9_]{1,24}', row['name']) or row['name'] in names:
             raise ValueError('Legacy map needs a separate valid input and unique name')
@@ -296,7 +315,9 @@ def convert_plan(plan, master, index_raw, archive_path, palette, base_root, outp
                   heap=budget_report(model_raws, map_rows + legacy_rows, budget),
                   budget_input_sha256=digest(json.dumps(budget, sort_keys=True).encode()) if budget else None,
                   save_identity='Original master/cell/FRMR keys and global slots; residency is transient',
-                  model_limit='Bounded to 8 shared models and 24 local plants; no global activation',
+                  model_limit=f"Bounded to 8 shared models and {context['max_plants']} local plants; explicit runtime admission required",
+                  root_spans_interned=context['intern_root_spans'],
+                  compact_models=compact_models,
                   lighting_limitation='All MDL vertex normal indices are zero; native appearance remains unaccepted',
                   native_acceptance='not_run', admission='diagnostic_only',
                   existing_geometry_check='Entity source IDs and exact poses checked; anonymous baked geometry requires independent provenance review')

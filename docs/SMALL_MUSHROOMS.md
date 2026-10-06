@@ -196,3 +196,16 @@ compatibility: old pickup facts must not silently apply to different contents.
 Builds with no harvest catalogues retain their previous fingerprint. The build
 checks map association and the bounded ASCII AWH1/AWH2 envelope; original source
 binding and native catalogue parsing remain separate required gates.
+
+## Dev4 pickup confirmation and repeatable release checkpoint
+
+Playtesting on 6 October 2026 confirms that mushroom picking works at the Seyda
+Neen Luminous Russula pilot near original global XY **-10920, -75120**. The shipped
+dev4 scope remains six original placements; this does not establish worldwide
+coverage or acceptance of every pilot placement.
+
+The upcoming More Mushrooms! release must include `dbg shroompicker` so the same
+location can be checked quickly without resetting collected state. See the
+[pickup checkpoint instructions](DEBUG_OVERLAYS.md#mushroom-pickup-checkpoint-next-v0029-build).
+The command and post-load view setup need source/target checks and native
+acceptance before the final release is marked ready.

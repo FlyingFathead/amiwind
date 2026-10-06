@@ -15,7 +15,7 @@ int AW_CharacterHors(void){aw_character.valid=1;strcpy(aw_story.name,"Hors");ret
 keydest_t key_dest=key_game;double realtime;
 #define ORIGINAL_STRINGS "\0aw_npc\0Fargoth\0worldspawn\0Darvame Hleran\0Selvil Sareloth\0progs/v_nord.mdl"
 char *pr_strings=ORIGINAL_STRINGS "\0func_wall\0*1";
-static int harvest_fixture;
+static int harvest_fixture,section_doors;
 static eval_t harvest_reference;
 static model_t harvest_world,harvest_model;
 static char object_name[80];
@@ -96,19 +96,48 @@ static void finish_signon(edict_t *p){
  cls.signon=SIGNONS;CL_SignonReply();
 }
 static char queued[64];static eval_t goal,torch,hand_state,hand_started,attack_latched;static int clear_buttons,events,occluded;
-static void (*start_demo)(void),(*teleport)(void),(*scene)(void);static cvar_t *demo_option;
+static void (*start_demo)(void),(*teleport)(void),(*scene)(void),(*shroompicker)(void);static cvar_t *demo_option;
 static int command_argc;static char *command_args[4];
 static int opening_track=-1,ship_available=1,narrow_room;
-static int world_map_unavailable,map_place_calls;static vec3_t last_map_arrival;
+static int world_map_unavailable,map_place_calls,map_place_blocked;static vec3_t last_map_arrival;
+static int picker_file_mode,picker_file_reads,picker_list_rows;
 static char notice[96];
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
 void AW_UIPickupNotice(const char *text,double duration){AW_UISubtitle("",text,duration);}
 void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
-void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;else if(!strcmp(name,"aw_teleport"))teleport=fn;else if(!strcmp(name,"aw_scene"))scene=fn;}
+void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;else if(!strcmp(name,"aw_teleport"))teleport=fn;else if(!strcmp(name,"aw_scene"))scene=fn;else if(!strcmp(name,"aw_shroompicker"))shroompicker=fn;}
 int Cmd_Argc(void){return command_argc;}
 char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 int COM_FOpenFile(char *name,FILE **f){
+ if(!strcmp(name,"shroompicker.txt")){
+  int i,size;long start;picker_file_reads++;
+  if(picker_file_mode==1){*f=NULL;return -1;}
+  *f=tmpfile();assert(*f);
+  if(picker_file_mode==6)fputs("PAK prefix and another member\n",*f);
+  start=ftell(*f);fputs("AWSP1\n",*f);
+  for(i=1;i<=10;i++)fprintf(*f,"%d %d %d %s %s %d %.2f %.2f Test mushroom %d\n",
+   picker_file_mode==2 && i==2?1:i,i==1,i==1?0:42,
+   picker_file_mode==5?"vf0000":"seyda",picker_file_mode==3?"nan":"-10920",
+   i==2?-75080:-75120,i==2?17.25:4.,i==2?60.5:64.,i);
+  size=ftell(*f)-start;
+  if(picker_file_mode==6)fputs("Following PAK member must not be read\n1 1 0 seyda 0 0 0 0 invalid duplicate\n",*f);
+  if(picker_file_mode==7)size-=4; /* Member ends within label despite trailing file bytes. */
+  if(picker_file_mode==8)size+=40; /* Advertised member extends beyond actual EOF. */
+  assert(!fseek(*f,start,SEEK_SET));return picker_file_mode==4?5000:size;
+ }
+ if(section_doors && (!strcmp(name,"doors-vf0000.txt") || !strcmp(name,"doors-mi5b8154939f7aa.txt"))){
+  const char *s=!strcmp(name,"doors-vf0000.txt")?
+   "AWD3\nvf0000 mi5b8154939f7aa 222000 -5 35 25 5 45 35 -380 758 77 90\tMine entrance\n":
+   "AWD3\nmi5b8154939f7aa vf0000 221950 -5 35 25 5 45 35 12 34 77 180\tOriginal exterior exit\n";
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
+ if(!strcmp(name,"interior-sections.txt")){
+  const char *s="AWIS1 2 1\nmi5b8154939f7aa -600 600 -600 320 1600 300\n"
+   "mi5b8154939f7ab -300 600 -600 1000 1600 300\n"
+   "mi5b8154939f7aa mi5b8154939f7ab 0 -128 16 -192 960 -256 -64 1216 -128\n";
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
  if(!strcmp(name,"harvest-vf0000.txt") && harvest_fixture){
   const char *s="AWH2 1 1 1\n0 0 0 0 0 original_item\tOriginal item name\n0 0 2\n"
     "aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 *1 11 0 1 40 0 30 0 0 0 Luminous Russula\n";
@@ -133,7 +162,7 @@ int COM_FOpenFile(char *name,FILE **f){
 #endif
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
 }
-void Con_Printf(char *fmt,...){}
+void Con_Printf(char *fmt,...){if(!strcmp(fmt,"%ld: %s [%s]\n"))picker_list_rows++;}
 void Sys_Error(char *fmt,...){abort();}
 void Cbuf_AddText(char *s){strcpy(queued,s);}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
@@ -422,6 +451,47 @@ int main(void){
  p.v.weaponmodel=p.v.weaponframe=0;AW_SceneSpawn(&p);finish_signon(&p);
  assert(!goal._float && !torch._float && !hand_state._float && !p.v.weaponmodel);
  assert(AW_TorchAnimationTime()==cl.time && torch_restores>0);
+ /* Internal original-cell section switches use the proven automatic handoff,
+  * with exact view/equipment/voice preservation and no extra door interaction. */
+ {
+  int before=clear_buttons,begins=scene_voice_begins,ends=scene_voice_ends,j;
+  narrow_room=0;AW_SceneCancelTransition();aw_story.stage=AW_STAGE_RELEASED;
+  strcpy(sv.name,"mi5b8154939f7aa");p.v.movetype=MOVETYPE_WALK;
+  p.v.origin[0]=-112;p.v.origin[1]=1088;p.v.origin[2]=-192;p.v.health=77;
+  cls.signon=SIGNONS;queued[0]=0;AW_SceneTick();assert(!queued[0]);
+  for(j=0;j<4;j++){
+   p.v.origin[0]=j%2?-145:-111;p.v.velocity[0]=j%2?-34:34;
+   cl.viewangles[0]=17.125f;cl.viewangles[1]=278.625f;cl.nodrift=true;
+   goal._float=torch._float=1;hand_state._float=2;
+   queued[0]=0;AW_SceneTick();assert(!strcmp(queued,j%2?"map mi5b8154939f7aa\n":"map mi5b8154939f7ab\n"));
+   CL_ClearState();strcpy(sv.name,j%2?"mi5b8154939f7aa":"mi5b8154939f7ab");
+   goal._float=torch._float=hand_state._float=0;AW_SceneSpawn(&p);finish_signon(&p);
+   assert(p.v.origin[0]==(j%2?-145:-111) && p.v.origin[1]==1088 && p.v.origin[2]==-192);
+   assert(p.v.velocity[0]==(j%2?-34:34) && p.v.health==77);
+   assert(goal._float==1 && torch._float==1 && hand_state._float==2);
+   assert(cl.viewangles[0]==17.125f && cl.viewangles[1]==278.625f && cl.nodrift);
+   queued[0]=0;AW_SceneTick();assert(!queued[0]);
+  }
+  assert(clear_buttons==before && scene_voice_begins==begins+4 && scene_voice_ends==ends+4);
+ }
+ /* Authored exterior and original exit banks are explicit interactions, not
+  * transparent internal connectors: held input clears and voice isn't carried. */
+ {
+  int before=clear_buttons,begins=scene_voice_begins;
+  section_doors=1;door_duration=0;occluded=target_trace=travel_trace=0;
+  AW_SceneCancelTransition();strcpy(sv.name,"vf0000");memset(p.v.origin,0,sizeof(p.v.origin));
+  p.v.view_ofs[2]=30;p.v.movetype=MOVETYPE_WALK;cl.viewangles[0]=0;cl.viewangles[1]=90;
+  cls.state=ca_connected;cls.signon=SIGNONS;queued[0]=0;
+  assert(AW_SceneUse() && !strcmp(queued,"map mi5b8154939f7aa\n"));
+  CL_ClearState();strcpy(sv.name,"mi5b8154939f7aa");AW_SceneSpawn(&p);finish_signon(&p);
+  assert(p.v.origin[0]==-380 && p.v.origin[1]==758 && cl.viewangles[1]==90);
+  memset(p.v.origin,0,sizeof(p.v.origin));cl.viewangles[0]=0;cl.viewangles[1]=90;
+  cls.state=ca_connected;queued[0]=0;
+  assert(AW_SceneUse() && !strcmp(queued,"map vf0000\n"));
+  CL_ClearState();strcpy(sv.name,"vf0000");AW_SceneSpawn(&p);finish_signon(&p);
+  assert(p.v.origin[0]==12 && p.v.origin[1]==34);
+  assert(clear_buttons==before+2 && scene_voice_begins==begins);section_doors=0;
+ }
  /* Original plant FNAM and the Talk-style action row share actual pickup
   * eligibility, and vanish after the transaction. */
  harvest_fixture=1;target_trace=travel_trace=0;occluded=0;narrow_room=0;
@@ -445,6 +515,55 @@ int main(void){
  target_trace=0;target.v.classname=sizeof(ORIGINAL_STRINGS);target.v.netname=0;
  assert(AW_SceneUse());assert(!strcmp(notice,"Picked up 2 Original item name."));
  hint[0]=object_name[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());
+ /* One-command regression location uses checked teleport and does not reset
+  * picked facts/inventory. Final signon must not quantize the requested aim. */
+ {
+  aw_state_t saved;int previous_calls=map_place_calls,mode,reads,listed;
+  AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);saved=aw_state;
+  assert(shroompicker);AW_SceneCancelTransition();
+  strcpy(sv.name,"seyda");p.v.health=73;p.v.movetype=MOVETYPE_WALK;
+  cls.state=ca_connected;cls.signon=SIGNONS;aw_story.stage=AW_STAGE_RELEASED;
+  command_args[0]="aw_shroompicker";command_args[1]="reset";command_argc=2;
+  queued[0]=0;shroompicker();assert(!queued[0]);
+  command_args[1]="0";shroompicker();assert(!queued[0]);
+  command_args[1]="11";shroompicker();assert(!queued[0]);
+  command_args[1]="list";reads=picker_file_reads;shroompicker();
+  assert(!queued[0] && picker_file_reads==reads+1 && !memcmp(&aw_state,&saved,sizeof(saved)));
+  command_argc=1;
+  for(mode=1;mode<=5;mode++){picker_file_mode=mode;shroompicker();assert(!queued[0]);}
+  for(mode=7;mode<=8;mode++){picker_file_mode=mode;shroompicker();assert(!queued[0]);}
+  picker_file_mode=6;command_argc=2;command_args[1]="list";reads=picker_file_reads;listed=picker_list_rows;
+  shroompicker();assert(!queued[0] && picker_file_reads==reads+1 && picker_list_rows==listed+10);
+  command_argc=1;shroompicker();assert(!strcmp(queued,"map seyda\n"));
+  AW_SceneCancelTransition();queued[0]=0;
+  picker_file_mode=0;
+  AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",0);shroompicker();assert(!queued[0]);
+  AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);
+  command_argc=1;world_map_unavailable=1;shroompicker();assert(!queued[0]);
+  world_map_unavailable=0;p.v.health=0;shroompicker();assert(!queued[0]);p.v.health=73;
+  shroompicker();assert(!strcmp(queued,"map seyda\n"));
+  CL_ClearState();AW_SceneSpawn(&p);finish_signon(&p);
+  assert(map_place_calls==previous_calls+1 && last_map_arrival[0]==86 && last_map_arrival[1]==-860);
+  assert(cl.viewangles[0]==64 && cl.viewangles[1]==4 && cl.nodrift);
+  assert(p.v.v_angle[0]==64 && p.v.v_angle[1]==4 && p.v.health==73);
+  assert(!memcmp(&aw_state,&saved,sizeof(saved)));
+  command_argc=2;command_args[1]="2";queued[0]=0;shroompicker();assert(!strcmp(queued,"map seyda\n"));
+  CL_ClearState();AW_SceneSpawn(&p);finish_signon(&p);
+  assert(map_place_calls==previous_calls+2 && last_map_arrival[0]==86 && last_map_arrival[1]==-850);
+  assert(cl.viewangles[0]==60.5 && cl.viewangles[1]==17.25 && cl.nodrift);
+  assert(p.v.v_angle[0]==60.5 && p.v.v_angle[1]==17.25 && !memcmp(&aw_state,&saved,sizeof(saved)));
+  command_args[1]="1";queued[0]=0;shroompicker();assert(!strcmp(queued,"map seyda\n"));
+  CL_ClearState();AW_SceneSpawn(&p);finish_signon(&p);
+  assert(cl.viewangles[0]==64 && cl.viewangles[1]==4 && !memcmp(&aw_state,&saved,sizeof(saved)));
+  command_args[1]="2";queued[0]=0;shroompicker();assert(!strcmp(queued,"map seyda\n"));
+  map_place_blocked=1;CL_ClearState();AW_SceneSpawn(&p);finish_signon(&p);map_place_blocked=0;
+  assert(cl.viewangles[0]!=60.5 && !memcmp(&aw_state,&saved,sizeof(saved)));
+  /* A cancelled shortcut cannot change a subsequent unrelated scene view. */
+  shroompicker();AW_SceneCancelTransition();
+  strcpy(sv.name,"prison");AW_SceneSpawn(&p);
+  cl.viewangles[0]=-10;cl.viewangles[1]=75;AW_SceneSignon();
+  assert(cl.viewangles[0]==-10 && cl.viewangles[1]==75);
+ }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;
 }
@@ -456,4 +575,4 @@ void AW_SaveCapture(void){}
 void AW_SaveSpawn(void){}
 void AW_SaveReset(void){}
 
-qboolean AW_MapPlace(edict_t *p,const float *xy){map_place_calls++;VectorCopy(xy,last_map_arrival);return true;}
+qboolean AW_MapPlace(edict_t *p,const float *xy){map_place_calls++;VectorCopy(xy,last_map_arrival);return !map_place_blocked;}

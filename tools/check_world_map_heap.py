@@ -56,11 +56,17 @@ PROBE_TYPES = ('pointer', 'short', 'int', 'hunk', 'dvertex', 'dedge', 'dplane', 
                'aliashdr', 'maliasframedesc', 'mdl', 'stvert', 'mtriangle',
                'maliasskindesc', 'trivertx', 'cache_system',
                'harvest_proxy_static', 'harvest_catalogue_extension',
-               'harvest_plant_capacity', 'harvest_model_capacity')
+               'harvest_plant_capacity', 'harvest_model_capacity',
+               'harvest_storage_mode', 'harvest_runtime_static',
+               'harvest_model_record', 'harvest_node_record', 'harvest_edge_record',
+               'harvest_plant_record', 'harvest_node_capacity', 'harvest_edge_capacity',
+               'harvest_text_capacity', 'interior_section_static', 'edge_cache_static', 'model')
 
 PROBE_SOURCE = r'''#include "quakedef.h"
 #include "model.h"
 #include "aw_harvest.h"
+#include "aw_section.h"
+const unsigned int aw_size_interior_section_static=sizeof(aw_section_directory_t)+2*sizeof(int)+40;
 typedef struct { int sentinel; int size; char name[8]; } aw_hunk_probe_t;
 const unsigned int aw_size_pointer = sizeof(void *);
 const unsigned int aw_size_short = sizeof(short);
@@ -78,6 +84,12 @@ const unsigned int aw_size_dface = sizeof(dface_t);
 const unsigned int aw_size_dmodel = sizeof(dmodel_t);
 const unsigned int aw_size_mvertex = sizeof(mvertex_t);
 const unsigned int aw_size_medge = sizeof(medge_t);
+const unsigned int aw_size_model = sizeof(model_t);
+#ifdef AW_EDGE_CACHE_SPLIT
+const unsigned int aw_size_edge_cache_static = (sizeof(((model_t *)0)->edgecache)+sizeof(((model_t *)0)->edgecache_count))*AW_EDGE_CACHE_MODEL_LIMIT;
+#else
+const unsigned int aw_size_edge_cache_static = 0;
+#endif
 const unsigned int aw_size_mplane = sizeof(mplane_t);
 const unsigned int aw_size_mtexinfo = sizeof(mtexinfo_t);
 const unsigned int aw_size_msurface = sizeof(msurface_t);
@@ -120,6 +132,18 @@ const unsigned int aw_size_cache_system = sizeof(aw_cache_probe_t);
  * These are static Fast RAM, not Hunk allocations. Report them separately,
  * then conservatively debit the map admission allowance by the same amount. */
 #ifdef AW_HARVEST_MODELS
+#ifdef AW_HARVEST_TEXT_BYTES
+typedef struct {
+    entity_t *proxies; unsigned short *indices; unsigned char *submitted;
+    model_t *models[AW_HARVEST_MODELS]; const aw_harvest_t *catalogue;
+    aw_state_t *state; int capacity_warning,proxy_count; unsigned allocated_bytes;
+} aw_harvest_proxy_probe_t;
+const unsigned int aw_size_harvest_proxy_static=sizeof(aw_harvest_proxy_probe_t);
+const unsigned int aw_size_harvest_catalogue_extension=0;
+const unsigned int aw_size_harvest_storage_mode=1;
+const unsigned int aw_size_harvest_runtime_static=sizeof(aw_harvest_t)+sizeof(edict_t **)+sizeof(unsigned char *)+sizeof(cvar_t)+sizeof(int);
+const unsigned int aw_size_harvest_text_capacity=AW_HARVEST_TEXT_BYTES;
+#else
 typedef struct {
     entity_t proxies[AW_HARVEST_PLANTS];
     model_t *models[AW_HARVEST_MODELS];
@@ -131,6 +155,16 @@ const unsigned int aw_size_harvest_catalogue_extension =
     sizeof(((aw_harvest_t *)0)->representation) + sizeof(((aw_harvest_t *)0)->models) +
     sizeof(((aw_harvest_t *)0)->model) +
     AW_HARVEST_PLANTS * sizeof(((aw_harvest_plant_t *)0)->scale);
+const unsigned int aw_size_harvest_storage_mode=0;
+const unsigned int aw_size_harvest_runtime_static=sizeof(aw_harvest_t)+AW_HARVEST_PLANTS*(sizeof(edict_t *)+sizeof(unsigned char))+sizeof(cvar_t)+sizeof(int);
+const unsigned int aw_size_harvest_text_capacity=0;
+#endif
+const unsigned int aw_size_harvest_model_record=sizeof(aw_harvest_model_t);
+const unsigned int aw_size_harvest_node_record=sizeof(aw_harvest_node_t);
+const unsigned int aw_size_harvest_edge_record=sizeof(aw_harvest_edge_t);
+const unsigned int aw_size_harvest_plant_record=sizeof(aw_harvest_plant_t);
+const unsigned int aw_size_harvest_node_capacity=AW_HARVEST_NODES;
+const unsigned int aw_size_harvest_edge_capacity=AW_HARVEST_EDGES;
 const unsigned int aw_size_harvest_plant_capacity = AW_HARVEST_PLANTS;
 const unsigned int aw_size_harvest_model_capacity = AW_HARVEST_MODELS;
 #else
@@ -138,6 +172,15 @@ const unsigned int aw_size_harvest_proxy_static = 0;
 const unsigned int aw_size_harvest_catalogue_extension = 0;
 const unsigned int aw_size_harvest_plant_capacity = 0;
 const unsigned int aw_size_harvest_model_capacity = 0;
+const unsigned int aw_size_harvest_storage_mode=0;
+const unsigned int aw_size_harvest_runtime_static=0;
+const unsigned int aw_size_harvest_model_record=0;
+const unsigned int aw_size_harvest_node_record=0;
+const unsigned int aw_size_harvest_edge_record=0;
+const unsigned int aw_size_harvest_plant_record=0;
+const unsigned int aw_size_harvest_node_capacity=0;
+const unsigned int aw_size_harvest_edge_capacity=0;
+const unsigned int aw_size_harvest_text_capacity=0;
 #endif
 '''
 
@@ -196,7 +239,7 @@ def compile_target_sizes(sdk):
                 sizes[current] = int(value.group(1))
                 current = None
     missing = sorted(set(PROBE_TYPES) - set(sizes))
-    if missing or any(size <= 0 for key, size in sizes.items() if not key.startswith('harvest_')):
+    if missing or any(size <= 0 for key, size in sizes.items() if not key.startswith(('harvest_','edge_cache_'))):
         raise ValueError('Target ABI probe did not provide valid sizes: ' + ', '.join(missing))
     if (sizes.get('pointer'), sizes.get('short'), sizes.get('int'), sizes.get('hunk')) != (4, 2, 4, 16):
         raise ValueError('Unexpected Amiga ABI core sizes; refusing to estimate')
@@ -204,6 +247,20 @@ def compile_target_sizes(sdk):
     sprite_policy = sprite_loader_profile((ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
     efrag_policy = efrag_pool_profile((ROOT / 'engine/aga/src/client.h').read_text(encoding='utf-8'))
     sizes['sprite_streaming'] = sprite_policy['sprite_streaming']
+    from alias_stream_heap import runtime_policy as alias_runtime_policy
+    alias_policy=alias_runtime_policy(ROOT/'engine/aga/src')
+    sizes['alias_streaming']=alias_policy['alias_streaming']
+    from edge_cache_heap import runtime_policy as edge_runtime_policy
+    edge_policy=edge_runtime_policy(ROOT/'engine/aga/src')
+    sizes['edge_cache_split']=edge_policy['edge_cache_split']
+    if sizes['medge']!=(4 if sizes['edge_cache_split'] else 8):raise ValueError('Packed-edge ABI differs from source policy')
+    from compact_harvest_heap import runtime_policy,allocator_policy
+    harvest_policy=runtime_policy(ROOT/'engine/aga')
+    if (harvest_policy['mode']=='compact_offsets') != bool(sizes['harvest_storage_mode']):
+        raise ValueError('Compiled harvest storage mode differs from recognized source policy')
+    sizes['harvest_storage_policy_verified']=1
+    allocator=allocator_policy(compiler) if sizes['harvest_storage_mode'] else {'mode':'not_required'}
+    sizes['harvest_allocator_mode']=int(allocator['mode']=='newlib_memmap_1')
     compiler_version = subprocess.run([str(compiler), '--version'], text=True,
                                       capture_output=True, check=True).stdout.splitlines()[0]
     return sizes, {'compiler': str(compiler), 'compiler_version': compiler_version,
@@ -216,12 +273,18 @@ def compile_target_sizes(sdk):
                    'runtime_bspfile_h_sha256': digest(ROOT / 'engine/aga/src/bspfile.h'),
                    'runtime_model_c_sha256': digest(ROOT / 'engine/aga/src/model.c'),
                    'sprite_loader_policy': sprite_policy,
+                   'alias_loader_policy': alias_policy,
+                   'edge_cache_policy': edge_policy,
                    'efrag_pool_policy': efrag_policy,
+                   'harvest_storage_policy': harvest_policy,
+                   'harvest_allocator_policy': allocator,
                    'runtime_client_h_sha256': digest(ROOT / 'engine/aga/src/client.h'),
                    'runtime_r_efrag_c_sha256': digest(ROOT / 'engine/aga/src/r_efrag.c'),
                    'runtime_cl_main_c_sha256': digest(ROOT / 'engine/aga/src/cl_main.c'),
                    'runtime_host_c_sha256': digest(ROOT / 'engine/aga/src/host.c'),
                    'runtime_zone_c_sha256': digest(ROOT / 'engine/aga/src/zone.c'),
+                   'runtime_aw_section_h_sha256': digest(ROOT / 'engine/aga/src/aw_section.h'),
+                   'runtime_aw_section_c_sha256': digest(ROOT / 'engine/aga/src/aw_section.c'),
                    'runtime_aw_harvest_h_sha256': digest(ROOT / 'engine/aga/src/aw_harvest.h'),
                    'runtime_aw_harvest_proxy_c_sha256': digest(ROOT / 'engine/aga/src/aw_harvest_proxy.c')
                        if (ROOT / 'engine/aga/src/aw_harvest_proxy.c').is_file() else None}
@@ -413,6 +476,15 @@ def estimate_bsp(path, sizes):
             peak_total, peak_lump = section_peak, name
             resident_at_peak, temp_at_peak = resident, temp
 
+    # Edge cache is allocated after every section, before generic hull0.
+    edge_policy=None
+    if sizes.get('edge_cache_split'):
+        from edge_cache_heap import prefix
+        edge_policy=prefix(lumps)
+        if edge_policy['prefix_edges']:
+            amount=hunk_alloc_bytes(edge_policy['prefix_edges']*sizes['int'],hunk)
+            add('world edge cache prefix',edge_policy['prefix_edges']*sizes['int'])
+            fallback_resident+=amount;fallback_peak=max(fallback_peak,fallback_resident)
     # Generic fallback still makes hull0 after all sections. The certified
     # prefix path already made ALL original-index hull0 nodes during node load.
     hull0_payload = counts.get('nodes', 0) * sizes['clipnode']
@@ -434,6 +506,7 @@ def estimate_bsp(path, sizes):
         'loader_policy': 'validated renderer-prefix/direct-hull0 and direct in-place clipnodes',
         'direct_in_place_sections': sorted(DIRECT_IN_PLACE_LUMPS),
         'node_residency': node_policy,
+        'edge_cache_residency': edge_policy,
         'external_classifier_scratch_bytes': node_policy['external_scratch_bytes'],
         'classifier_allocation_failure_fallback_peak_bytes': fallback_peak,
         'file_sha256': hashlib.sha256(raw).hexdigest(), 'counts': counts,
@@ -516,8 +589,17 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
             report['resident_loader_bytes'])
         apply_guard_cost(report,guard_cost(entity_bytes,guards))
         apply_harvest_cost(report,harvest)
+        # The section directory lives in static Fast RAM for every map.
+        # Debit it even when this particular map has no section catalogue.
+        section_static=sizes.get("interior_section_static",0)
+        report["interior_section_static_allowance_bytes"]=section_static
+        report["additional_static_allowance_bytes"]+=section_static
+        edge_static=sizes.get('edge_cache_static',0)
+        report['edge_cache_static_allowance_bytes']=edge_static
+        report['additional_static_allowance_bytes']+=edge_static
         required = (report['peak_loader_bytes'] + baseline_reserve_bytes + safety_headroom_bytes +
-                    report['additional_static_allowance_bytes'])
+                    report['additional_static_allowance_bytes']+
+                    report['additional_external_allocation_allowance_bytes'])
         report.update(baseline_reserve_bytes=baseline_reserve_bytes,
                       safety_headroom_bytes=safety_headroom_bytes,
                       estimated_total_bytes=required,

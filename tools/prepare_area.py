@@ -40,10 +40,12 @@ def entity(fields):
 def build_room(task):
     data, scene, entry, qbsp, vis, light, timings = task
     slug = entry['map']
-    cell = read_interior(child_ci(data, 'Morrowind.esm'), entry['cell'])
+    cell = read_interior(child_ci(data, 'Morrowind.esm'), entry['cell'],
+                         include_interior_entrances=entry.get('original_door_arrivals', False))
     root = scene/'area-work'/slug
     root.mkdir(parents=True, exist_ok=False)
-    refs, omitted = select_geometry(cell)
+    refs, omitted = select_geometry(cell, harvest_references=entry.get('harvest_references', ()),
+                                    harvest_master_sha256=entry.get('harvest_master_sha256'))
     profiles = {}
     for ref in refs:
         model = 'meshes/'+ref['model'].replace('\\','/').lower()
@@ -97,12 +99,19 @@ def build_room(task):
             subprocess.run([str(Path(exe).resolve()),*args],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
     base=root/'base.bsp';(root/'room.bsp').rename(base)
     rebuild_world_hull(base,root/'room.map',qbsp)
+    retain_selected=entry.get('area')=='balmora' or entry.get('retain_selected_geometry',False)
     report=append_meshes(base,root/'room.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=1,
-                         references=[r['number'] for r in index['references']] if entry.get('area')=='balmora' else None,
-                         retain_dressing=entry.get('area')=='balmora')
+                         references=[r['number'] for r in index['references']] if retain_selected else None,
+                         retain_dressing=retain_selected,
+                         map_identity='bmtemple' if slug=='bmtemple' else None)
     if report['unique_models']>220:raise ValueError(slug+': inline model budget exceeded')
     report.update(map=slug,cell=cell['name'],spawn=spawn,yaw=yaw,omitted=omitted,
                   water_height=water,master_sha256=cell['master_sha256'])
+    if entry.get('original_door_arrivals') or entry.get('harvest_references'):
+        report.update(original_arrivals=cell['entrances'],
+                      harvest_excluded_references=[r['number'] for r in entry.get('harvest_references', ())],
+                      retained_geometry_references=[r['number'] for r in refs],
+                      bsp_sha256=hashlib.sha256((root/'room.bsp').read_bytes()).hexdigest())
     (root/'conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     return report, cell
 

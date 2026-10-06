@@ -8,6 +8,7 @@
 #include "aw_clock.h"
 #include "aw_state.h"
 #include "aw_boolean.h"
+#include "aw_torch.h"
 #include <stdint.h>
 #ifdef AMIGA
 #include <proto/exec.h>
@@ -19,8 +20,8 @@ extern cvar_t r_drawentities;
 extern int hunk_size,hunk_low_used,hunk_high_used;
 #define GUARD_TYPES 32
 #define GUARD_VISIBLE 32
-#define GUARD_LIGHTS 2
-#define GUARD_LIGHT_KEY (-0x415747)
+#define GUARD_LIGHTS AW_GUARD_TORCH_LIGHT_COUNT
+#define GUARD_LIGHT_KEY AW_GUARD_TORCH_LIGHT_KEY
 #define GUARD_LIGHT_RANGE (384.0f*384.0f)
 typedef struct {
     char source[64],base[64],body[64],held[64];

@@ -1,5 +1,39 @@
 # Trees and Grass, Day and Night
 
+## RC1 Seyda Neen brightness discontinuity: cause isolated
+
+Recorded 2026-10-06T14:18:00+00:00; affected build v0.0.29-rc1; introducing version unknown.
+Walking between some Seyda Neen regions causes an abrupt brightness change
+without a torch. The owner did not observe it on the later open-country route.
+The first reported bright region is **sn031**, not sn039. Retain the corrected
+identity when comparing geometry or attempting the original reproduction.
+
+The sealed sn037 map contains an unused lighting lump; sn031 omits the lump.
+Their overlapping geometry/material evidence matches across 29,834 referenced
+polygons and 626 world polygons. The renderer nevertheless took different
+paths: absent world lightdata selected full brightness, whereas an unused lump
+selected the ambient path. This affects world surfaces and actor light samples.
+
+A bounded FS-UAE-in-Docker diagnostic confirmed ambient128 versus actor sample
+255 on the empty-lump map, with the same clock, palette, fog state and gamma,
+and no active torch/dynamic lights. These observations used different cameras;
+they are not a same-camera pixel test or an accepted walking-boundary repair.
+
+The next-candidate correction makes both lump cases follow ambient/dynamic
+lighting on validated AmiWind exteriors. Explicit fullbright and legacy-map
+fallback remain. Six focused Docker checks pass, including 32 actual-renderer
+empty/unused-lump pixel pairs, alias samples and dynamic/baked/legacy controls.
+The narrow change is integrated with the separate torch-strength work; the
+combined candidate still requires its complete checks and native traversal.
+The guard uses the existing validated exterior sky state; missing/invalid sky
+assets retain the compatibility path and are outside this tested configuration.
+
+Retest the reported shack crossings in both directions with fixed clock,
+torch off/on and ordinary walking, then check other affected Seyda regions and
+the open-country control. This correction does not change map subdivision,
+geometry, texture brightness or interior lighting. **First fixed version: none;
+status: source-tested repair candidate, target acceptance pending.**
+
 ## v0.0.29 sky follow-up
 
 - **Night coverage:** dense cloud cover can hide moons, stars and nebula. A

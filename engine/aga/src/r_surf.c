@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_torch.h"
+#include "aw_sky.h"
 
 drawsurf_t	r_drawsurf;
 
@@ -66,7 +68,7 @@ void R_AddDynamicLights (void)
 	msurface_t *surf;
 	int			lnum;
 	int			sd, td;
-	float		dist, rad, minlight;
+	float		dist, rad, minlight, gain;
 	vec3_t		impact, local, lightorigin;
 	int			s, t;
 	int			i;
@@ -102,6 +104,8 @@ void R_AddDynamicLights (void)
 			continue;		// not lit by this light
 
 		rad = cl_dlights[lnum].radius;
+        gain=AW_TorchLightGain(cl_dlights[lnum].key,rad,1)*256;
+        if(gain<=0)continue;
         /* AmiWind, 2026-10-01: match brush-instance marking coordinates. */
         R_DlightOrigin(&cl_dlights[lnum],lightorigin);
 		dist = DotProduct (lightorigin, surf->plane->normal) -
@@ -144,7 +148,7 @@ void R_AddDynamicLights (void)
 #ifdef QUAKE2
 				{
 					unsigned temp;
-					temp = (rad - dist)*256;
+					temp = (rad - dist)*gain;
 					i = t*smax + s;
 					if (!cl_dlights[lnum].dark)
 						blocklights[i] += temp;
@@ -157,7 +161,7 @@ void R_AddDynamicLights (void)
 					}
 				}
 #else
-					blocklights[t*smax + s] += (rad - dist)*256;
+					blocklights[t*smax + s] += (rad - dist)*gain;
 #endif
 			}
 		}
@@ -182,6 +186,10 @@ void R_BuildLightMap (void)
 	unsigned	scale;
 	int			maps;
 	msurface_t	*surf;
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+	float		static_factor;
+#endif
+	int			legacy_unlit;
 
 	surf = r_drawsurf.surf;
 
@@ -189,8 +197,19 @@ void R_BuildLightMap (void)
 	tmax = (surf->extents[1]>>4)+1;
 	size = smax*tmax;
 	lightmap = surf->samples;
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+	static_factor = R_InteriorLumaFactor();
+#endif
+	legacy_unlit = !cl.worldmodel->lightdata && !R_SkyExterior();
 
-	if (r_fullbright.value || !cl.worldmodel->lightdata)
+	/* AmiWind exterior maps can have no lightmaps, or retain an unused lump.
+	 * Both must use the same ambient/dynamic-light path at region boundaries.
+	 * Keep the legacy fallback for maps without the validated exterior sky. */
+	if (r_fullbright.value || (legacy_unlit
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+        && static_factor == 1
+#endif
+        ))
 	{
 		for (i=0 ; i<size ; i++)
 			blocklights[i] = 0;
@@ -199,7 +218,7 @@ void R_BuildLightMap (void)
 
 // clear to ambient
 	for (i=0 ; i<size ; i++)
-		blocklights[i] = r_refdef.ambientlight<<8;
+		blocklights[i] = (legacy_unlit ? 255 : r_refdef.ambientlight)<<8;
 
 
 // add all the lightmaps
@@ -212,6 +231,15 @@ void R_BuildLightMap (void)
 				blocklights[i] += lightmap[i] * scale;
 			lightmap += size;	// skip to next lightmap
 		}
+
+// Scale only the static contribution; torch radii and strengths stay independent.
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+	if (static_factor != 1)
+		for (i=0 ; i<size ; i++) {
+			float value = blocklights[i]*static_factor;
+			blocklights[i] = value >= 255*256 ? 255*256 : (unsigned)value;
+		}
+#endif
 
 // add all the dynamic lights
 	if (surf->dlightframe == r_framecount)

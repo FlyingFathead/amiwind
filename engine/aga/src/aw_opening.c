@@ -239,6 +239,28 @@ int AW_OpeningHint(const char **name,const char **action)
     else{*name="Barrel";*action=AW_CourtyardRingAvailable()?"Take ring: E":"Empty";}
     return 1;
 }
+/* Probe the destination pose before relinking a hinged door. Instant rotation
+ * must not insert a solid brush into the player or a nearby solid actor. The
+ * probe changes no linked bounds, actor coordinates, sound or story state. */
+static int hall_door_can_open(edict_t *door)
+{
+    edict_t *actor,*player;trace_t tr;float yaw=door->v.angles[1];int i,clear=1;
+    player=svs.clients?svs.clients[0].edict:NULL;
+    door->v.angles[1]=-90;
+    if(player && player->v.movetype!=MOVETYPE_NOCLIP){
+        tr=SV_ClipMoveToEntity(door,player->v.origin,player->v.mins,player->v.maxs,player->v.origin);
+        if(tr.startsolid || tr.allsolid)clear=0;
+    }
+    for(i=1;clear && i<sv.num_edicts;i++){
+        actor=EDICT_NUM(i);
+        if(actor==door || actor==player || actor->free ||
+           (actor->v.solid!=SOLID_BBOX && actor->v.solid!=SOLID_SLIDEBOX))continue;
+        tr=SV_ClipMoveToEntity(door,actor->v.origin,actor->v.mins,actor->v.maxs,actor->v.origin);
+        if(tr.startsolid || tr.allsolid)clear=0;
+    }
+    door->v.angles[1]=yaw;
+    return clear;
+}
 int AW_OpeningUse(void)
 {
     edict_t *target=opening_target();eval_t *v;int ref;
@@ -259,7 +281,12 @@ int AW_OpeningUse(void)
     v=GetEdictFieldValue(target,"aw_ref");ref=(int)v->_float;
     if(ref==172859){AW_ReaderOpen("papers",1);return 1;}
     if(ref==172860){
-        if(aw_story.hall){AW_DoorSound(ref,0);target->v.angles[1]=-90;SV_LinkEdict(target,false);aw_story.hall_open=1;}
+        if(aw_story.hall){
+            if(!hall_door_can_open(target)){
+                AW_UISubtitle("","The door is obstructed. Step aside and try again.",4);return 1;
+            }
+            AW_DoorSound(ref,0);target->v.angles[1]=-90;SV_LinkEdict(target,false);aw_story.hall_open=1;
+        }
         else AW_UISubtitle("","The door is locked. Show your papers to the guard.",4);
         return 1;
     }

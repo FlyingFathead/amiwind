@@ -1,5 +1,30 @@
 # Asset coverage
 
+## Temple source completeness audit: 2026-10-06T15:06:48+00:00
+
+For delivered RC1, 31 audited structural model sources used by62 architectural
+placements retain all12,913 visible source triangles in conversion. The62
+placements retain surface area and transformed bounds in the packaged BSP.
+These are separate model, triangle and placement units, not whole-interior
+runtime acceptance. All185 selected scene placements survive; the original
+interior has286 references. The number of affected runtime surfaces remains
+unknown. No new geometry was built, packaged or accepted by this audit.
+The partial lower-area wall/floor/ceiling and collision defect remains open;
+upper-route/stair observations remain the intact control. Next inspect runtime
+visibility/collision. Any geometry repair remains Temple-only.
+See [the detailed issue](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
+
+Temple scope update: some walls/ceilings are intact; upper area and stairs look usable on the owner-tested route. Broken lower/other sections remain a major geometry/collision defect. [Detailed evidence and pipeline audit](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
+
+## RC1 Temple runtime coverage failure: 2026-10-06T13:53:32+00:00
+
+Owner playtesting reports missing walls/floors and pass-through collision in
+Balmora Temple. See [BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
+Unit: interior structural placements/surfaces; exact source, converted, packaged
+and affected counts **unknown** pending audit. Runtime acceptance has failed at
+the reported locations. Do not equate a packaged BSP with complete playable
+architecture or subtract invented counts from previous coverage snapshots.
+
 ## Current dev4 checkpoint — 6 October 2026
 
 The **v0.0.29-dev4 development snapshot** now has an assembled game image and
@@ -34,14 +59,132 @@ quickload equipment reset, transition pauses and allocation reserve warnings.
 ## Earlier dated coverage snapshots
 
 
-Last updated: **5 October 2026, 20:56 UTC**.
-Snapshot: **v0.0.29-dev3 packaged output** and **v0.0.29-dev4 preparation**.
+Last updated: **2026-10-06T05:06:40.663028+00:00**.
+Snapshot: **v0.0.29-dev4 packaged development build with bounded native checks**; delivery verification remains pending.
 The public release remains v0.0.28; the development results below do not describe
 that release's contents or announce a new public release.
 
 All available audio and video files in the inspected input set have converted.
-The larger media batch is staged for the next development build. Whole-game
+The full media batch is present in the sealed dev4 development package. Whole-game
 import completion and complete runtime acceptance have **not** been established.
+
+## Dev4 source and staging checkpoint — 6 October 2026, 00:36 UTC
+
+The current staged overlay contains **7,255 files /409,039,811 bytes**, all
+reconciled by size and SHA-256. This is the staged overlay inventory, not the
+total final disk inventory. The frozen source suite ran **953 tests: 949 passed,
+4 skipped, 0 failures or errors**. Final HDF assembly/readback, native acceptance
+and delivery were pending at this checkpoint; package readback is recorded below.
+
+The same **6 unique original mushrooms /3 shared models** now have **41 map
+catalogues**: 32 town AWH4 catalogues and nine world AWH3 catalogues. Town BSPs
+retain their exact clean baseline bytes. The earlier failed town brush-only
+candidate below is historical; the shared-model candidate reduces its geometry
+cost. Exact file-backed and virtual heap reports agree: 27 inherited modeled
+allowance warnings remain, no hard allocation-ceiling failure was found, and
+no warning-policy approval or native headroom is implied by that comparison.
+
+Saved original placement facts now distinguish picked and empty results across
+overlapping maps. Empty contents are resolved before first visibility or an
+interaction prompt; picked/empty copies stay absent. Source fixtures establish
+this behavior; native pickup/save/appearance acceptance is still pending.
+
+### Global mushroom coverage and next batches
+
+The base-master numeric small-mushroom family contains **934 exterior and
+1,149 interior placements**. Its per-model source denominator is:
+
+| Model suffix | Flora | Exterior | Interior | Shared model prepared |
+| --- | --- | ---: | ---: | --- |
+| 01 | Luminous Russula | 161 | 124 | Yes |
+| 02 | Luminous Russula | 70 | 102 | Yes |
+| 03 | Luminous Russula | 61 | 75 | No |
+| 04 | Luminous Russula | 102 | 91 | No |
+| 05 | Luminous Russula | 88 | 108 | Yes |
+| 06 | Violet Coprinus | 159 | 153 | No |
+| 07 | Violet Coprinus | 94 | 222 | No |
+| 08 | Violet Coprinus | 199 | 274 | No |
+
+The three prepared models could serve **319 exterior** and **334 interior**
+originals; those placements have not thereby been converted or accepted.
+Interior placement/interaction support remains a separate gap. Existing-model
+exterior bounds span 301 world and 66 town/alternative maps, with up to 37
+plants in one map; seven exceed the current 24-plant capacity. All eight-model
+exterior bounds span 308 world and 82 town/alternative maps, with a maximum of
+77. Overlap copies are not unique originals. Additional nonnumeric activators,
+expansions and load-order overrides remain outside this denominator.
+
+A separate follow-on candidate now stages **21 originals** across two adjacent
+source cells: 15 additional over the current six, reusing all three models, with
+46 map catalogues and at most 14 local plants. Five additional map dependencies
+were checked against the retained baseline. State fixtures covered 334 overlapping
+copies and 92 save/load round trips without duplicate grants. The candidate remains
+outside the sealed dev4 package; memory admission and native acceptance are open.
+Global rollout requires merged per-map catalogues, additional model preparation,
+measured capacity expansion and interior support; proximity hiding alone does
+not remove those limits. See [small mushrooms](SMALL_MUSHROOMS.md) and
+[persistent harvest state](HARVEST-STATE.md).
+
+## Dev4 sealed package readback — 6 October 2026, 04:27 UTC
+
+The sealed v0.0.29-dev4 private development image contains **17,992 payload
+files /4,784,758,692 bytes**. Independent file readback passed across the boot
+and two data partitions. The package contains 7,320 WAV files, 23 LIP files,
+19 AWV video files, 18 MWS music files, 7,271 MDL files, 275 AWH files, 2,723
+BSP files, 102 SPR files, and the remaining configuration, catalogue and
+support files. These are packaged artifacts, not unique source assets.
+
+The full media batch is now packaged: 6,447 voice outputs, 717 sound-effect
+outputs, 18 music tracks and 17 videos; seven referenced voice inputs and two
+sound-effect inputs remain absent, with zero failed media outputs. The image's
+aggregate extensions include earlier conversions too, so they do not imply
+one output per unique source or complete event wiring.
+
+The six original mushroom placements from three shared models are packaged
+with 41 map catalogues (32 town and nine world). Catalogue coverage does not
+mean all 2,083 small-mushroom source placements were converted. At the image-readback checkpoint, native checks were pending. The later bounded
+interaction below passed; audible-cue and broader runtime acceptance remain open.
+This is not a release candidate and does not change the public release beyond
+v0.0.28.
+
+| v0.0.29-dev4 package measure | Readback result |
+|---|---:|
+| Payload files / bytes | 17,992 / 4,784,758,692 |
+| WAV / LIP / AWV / MWS artifacts | 7,320 / 23 / 19 / 18 |
+| MDL / AWH / BSP / SPR artifacts | 7,271 / 275 / 2,723 / 102 |
+| Packaged original mushroom placements / shared models / catalogues | 6 / 3 / 41 |
+| Native checks / delivery verification | Bounded checks passed / pending |
+
+
+## Dev4 bounded native result and media reconciliation - 6 October 2026
+
+The exact packaged build passed four bounded FS-UAE checks: version/menu and
+head selection, restored shack walls, default-off walking pitch centering,
+and one original mushroom pickup with save/load persistence. One Luminous
+Russula displayed its original name and E: Pick, granted one ingredient, and
+disappeared. Two actual quicksave generations retained quantity one after
+repeated E. Travel through the real map selector from sn007 to sn032 and back,
+then quickload, retained that quantity and the picked plant's absence.
+
+This establishes **one native-tested pickup**, not six fully accepted plants
+or worldwide coverage. None of the six plants resolved empty in this run.
+Native empty-state behavior, walked boundaries, mixed world/town representation,
+audible pickup/music quality and intro_docks memory headroom remain untested.
+Quickload also returned hands and torch to put-away state; see the open
+SAVE-EQUIPMENT-29 observation in [the bug journal](BUG_JOURNAL.md).
+
+The Docker asset-progress reconciliation counted 20,943 unique source paths and
+17,992 packaged artifacts. Exact outputs from the supplied media batch matched
+6,447 voices, 717 effects, 18 music tracks and 16 of 17 videos. The remaining
+video uses the deliberately retained higher-resolution story intro, so there
+are still 17 source-video conversions represented. This is not a missing or
+failed conversion. The reconciliation itself does not rehash original source
+bytes; the earlier separate source verification remains its own dated evidence.
+Full event wiring and per-asset audible/visual acceptance remain unknown.
+
+The planned public release is **AmiWind v0.0.29 - More Mushrooms**. Worldwide
+original placement and persistent picking remain its future release checkpoint.
+Current screenshots show the six-placement dev4 pilot only.
 
 ## Version history
 
@@ -54,6 +197,8 @@ import completion and complete runtime acceptance have **not** been established.
 | v0.0.29-dev4 harvest source candidate / 5 October, 19:15 UTC | 0 new mushroom placements in a delivered playtest | The same 6 diagnostic source placements now have original-content harvest catalogues and tested pickup/save logic | 0 native-accepted harvest placements; native pickup/appearance pending |
 | v0.0.29-dev4 hand diagnostic / 5 October, 19:15 UTC | 40 MDLs plus catalogue/emitter read back from a separate diagnostic image; no delivered playtest count claimed | 20 race/sex model pairs generated | Nord punch/torch checks and Argonian demo selection observed; complete live race coverage pending |
 | v0.0.29-dev4 mushroom cue/preview / 5 October, 19:30 UTC | 0 new packaged placements or cue outputs claimed | 1 selected source effect converted; source/runtime fixture passed; static preview owner-approved | Native pickup, appearance and audible cue remain unaccepted; requested interaction prompt pending |
+| v0.0.29-dev4 verified source/staging / 6 October, 00:36 UTC | Final HDF and delivery pending at that checkpoint | 7,255 staged files /409,039,811 bytes; 6 original mushrooms, 3 shared models, 41 map catalogues; 949 source tests passed, 4 skipped | Final native acceptance pending |
+| v0.0.29-dev4 sealed package / 6 October, 04:27 UTC | 17,992 payload files /4,784,758,692 bytes; full image readback passed | 6,447 voices, 717 effects, 18 music tracks, 17 videos; 6 original mushrooms /3 models /41 catalogues packaged | Native and delivery acceptance pending at that checkpoint; not a release candidate |
 
 The [machine-readable history](asset-coverage/history.json) records units and
 dated stages for later comparison. Append snapshots when a version's conversion,
@@ -151,7 +296,7 @@ interiors and other reported omissions remain open until those checks resolve
 them. See [the asset catalogue plan](ASSET_CATALOGUE_AND_GALLERY.md) and
 [roadmap](ROADMAP.md).
 
-### Dev4 extra: More mushrooms!
+### Earlier dev4 diagnostic: More mushrooms!
 
 An [optional small-mushroom conversion path](SMALL_MUSHROOMS.md) now preserves
 original Luminous Russula placement and container metadata. A bounded dev4
@@ -226,7 +371,7 @@ claims no newly packaged placements or native placement acceptance. The requeste
 crosshair label using the mushroom name and “(E: Pick)” is implemented and
 fixture-tested in the dev4 source; native interaction acceptance is pending.
 
-### Dev4 global mushroom census and persistent state
+### Earlier dev4 census and persistent-state checkpoint
 
 A base-master census now establishes **2,083 original placements** in the
 supported numeric small-mushroom family: **934 exterior and 1,149 interior**,
@@ -249,7 +394,7 @@ before considering intersecting mesh bounds. The map capacity and geometry,
 collision, memory and frame-cost gates therefore need further work. These are
 source findings, not a claim that global mushrooms have shipped.
 
-### Dev4 actual-map mushroom candidate
+### Earlier dev4 world-map mushroom candidate
 
 The same six original placements now have candidate overlays on nine real
 maps, producing 54 resident copies with shared original identities. The 19
@@ -283,7 +428,7 @@ The nine world-map overlays alone therefore do not establish normal-travel
 coverage. Matching town overlays are being prepared; native-accepted and
 delivered new harvest placements remain zero at this checkpoint.
 
-### Dev4 town harvest admission and Caius house clutter
+### Earlier dev4 town brush admission and Caius house clutter
 
 The six diagnostic mushrooms now also have 32 candidate town/intro-map overlays,
 with 174 resident copies. Their original identities are shared with the earlier
@@ -303,3 +448,102 @@ coverage. The cache has no placed skooma potion record; container inventories
 were not part of this inspection. Preserve source object types and placements
 rather than inferring potion contents from a bottle model. These are open
 interior-content tasks for "Just an Old Man with a Skooma Problem".
+
+
+### Follow-on diagnostic: retained-topology interior clutter — 6 October 2026, 00:42 UTC
+
+A bounded source-backed conversion resolves **6 original placements /4 unique
+models**: four ordinary bottles, one pipe and one ingredient prop. Two atlas
+profiles produce **8 model variants**. Every source triangle is retained; the
+encoded variants introduce no collapsed or reversed faces or new geometric
+boundary edges. Authored open edges remain unchanged. Material checks preserve
+the source vertex-colour gradients; smaller atlases still show visible texture
+loss, and neither profile has native visual acceptance.
+
+This is a **follow-on diagnostic**, separate from the frozen dev4 source and
+7,255-file staged overlay above. It adds **0 packaged placements and 0
+native-accepted placements**. Room memory admission, scene selection, pickup,
+inventory and save behavior remain unimplemented or unaccepted for this sample.
+No placed potion is inferred from the ordinary bottle meshes. This conversion
+establishes no additional quest implementation or dedicated quest voice coverage.
+
+## Worldwide mushroom diagnostic stage — 2026-10-06T05:43:10Z
+
+The current base-master numeric-`CONT` census contains **2,083 original
+placements: 934 exterior and 1,149 interior across 56 interior cells**. A
+separate source scan found **129 `ACTI`/`STAT` references** (8 `ACTI`, 121
+`STAT`); these are outside the numeric-`CONT` denominator and are not counted
+as converted or collectible mushrooms. The conversion diagnostic covers 1,988
+of the 2,083 numeric originals in catalogues across 446 map groups (308 world,
+82 town, 56 interior); **95 placements in 11 interior groups remain
+unsupported**. Catalogue presence is not production map integration.
+
+All eight numeric mushroom models have private shared-model conversions
+(80,528 bytes on disk). Addamasartus is the only currently configured
+mushroom-bearing interior: eight placements. The other **55 interior cells
+need actual map generation and door routing**. The latest bound diagnostic
+finds up to 97 local placements in a map, exceeding the old 24-plant runtime
+bound. Its 9,703 resident copies are overlapping map copies, not additional
+originals. The separate six-placement dev4 pilot remains the only packaged
+mushroom set; one placement has native pickup evidence. This diagnostic adds
+**zero packaged or native-accepted placements** and is not a release claim.
+
+Remaining gates include unsupported placement-state review, real map/door
+integration, compact runtime admission at dense locations, persistent original
+identity through overlap and empty/picked states, all exterior/interior
+coverage, model appearance/lighting and native traversal/picking. A terminal
+coverage footer should use a terminal-width dashed separator and report what
+can be placed and what is still missing; planned coverage must remain labeled
+as planned until its gates pass. Release target remains **AmiWind v0.0.29 --
+More Mushrooms**, conditional on worldwide placement/picking and relevant gates.
+
+## Post-dev4 worldwide mushroom preparation — 6 October 2026
+
+This is a later staged candidate, separate from the sealed dev4 pilot. The
+base-master census remains **2,083 originals: 934 exterior and 1,149 interior
+placements in 56 interiors**. Expansion placement totals remain unestablished.
+
+All 934 exterior originals now appear in 390 generated overlapping map
+catalogues (8,554 resident copies). The latest isolated memory candidate admits
+345 maps; 897 originals have an admitted primary route and 883 have every
+required overlap admitted. **45 maps remain above the modeled allowance.**
+Source identity, resident copies and reachable originals are separate units.
+These estimates still need rebinding to the final combined executable and
+native verification; none of this new exterior batch is counted as packaged.
+
+Abaelun Mine has two candidate sections retaining eight original mushrooms and
+one logical interior identity. Its original visible exterior entrance, collision
+and directed routes have been restored in candidate assets. Four-map allocation
+checks pass, but native entry/section/pickup/save acceptance remains pending.
+Other unintegrated interiors and original ownership handling remain open.
+
+Dev4 retains six packaged pilot placements and one separately recorded native
+pickup acceptance. A new playtester confirmation establishes picking at the
+documented cluster; it does not increase the uniquely counted native placements.
+Use `dbg shroompicker` in the upcoming release for repeatable regression checks.
+
+### 6 October 2026: NPC torch-light runtime coverage gap
+
+Dev4 playtesting reports visible torch response on walls/floors but not nearby
+NPC bodies. This is an **open runtime-lighting issue**, not evidence of missing
+NPC model assets. The affected actor denominator is unknown; conversion and
+packaged-asset counts remain unchanged. See
+[TORCH-NPC-LIGHT-29](BUG_JOURNAL.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
+A no-lightdata saturation correction now passes source/raster/night-palette checks; actual NPC playtest acceptance remains pending. Packaged counts are unchanged.
+
+
+### Rc1 loader accounting follow-up
+
+The bounded direct-to-cache alias loader removes explicit source/decoded staging allocations. Its isolated matched-ABI audit admits one additional map (`sn061`): **345/390 exterior maps**, with45 still withheld; 897 primary-route originals and883 with every overlap remain unchanged. The modeled improvement is640,464 bytes per affected map, including conservative external allocator allowance. This is not a native whole-machine RAM measurement. Final combined-ABI/hand-cache rebinding and native timing/audio remain gates. Two-pass reading trades extra I/O for less temporary RAM; no speedup is claimed. No new placements are packaged or natively accepted by this audit.
+
+
+## 6 October: packed-edge and surface candidate
+
+Latest modeled admission: **347/390 exterior maps**, with 43 withheld;
+**897/934 primary-route originals** and **886/934 originals with all overlap
+copies**. The denominator is unchanged. The improvement preserves source
+placements and geometry; 2 MiB safety and 3 MiB baseline reserves remain in force.
+This is a source/allocation result, not package or native coverage: newly
+packaged and newly native-accepted placements are both 0. The dev4 pilot remains
+its own dated checkpoint. Dense exterior maps and reachable interiors remain
+release work. See [memory details](MEMORY_ALLOCATION.md) and [bugs](BUGS.md).

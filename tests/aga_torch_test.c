@@ -8,16 +8,22 @@ cvar_t r_drawviewmodel={"r_drawviewmodel","1"},chase_active;
 qboolean r_fov_greater_than_90;keydest_t key_dest;int r_framecount;
 byte *host_basepal;
 static edict_t player;static client_t client;
-static eval_t goal,state,torch;static int gallery,locked;
+static eval_t goal,state,torch;static int gallery,locked,torch_test;
 static void (*command)(void);
 static cvar_t *radius_setting,*flame_setting;
 static int setting_argc=1;static char *setting_value="";
-static void (*set_radius)(void),(*set_flame)(void);
+static void (*set_radius)(void),(*set_flame)(void),(*set_strength)(void);
 int Cmd_Argc(void){return setting_argc;}
 char *Cmd_Argv(int n){return n==1?setting_value:"";}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_torch_radius"))radius_setting=c;else flame_setting=c;}
-void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_torch_radius"))radius_setting->value=value;else flame_setting->value=value;}
+void *Z_Malloc(int size){void *p=calloc(1,size);assert(p);return p;}
+void Z_Free(void *p){free(p);}
+int Q_strlen(char *s){return strlen(s);}
+void Q_strcpy(char *to,char *from){strcpy(to,from);}
+int Q_strcmp(char *a,char *b){return strcmp(a,b);}
+float Q_atof(char *s){return atof(s);}
+qboolean Cmd_Exists(char *name){return false;}
+void SV_BroadcastPrintf(char *format,...){assert(0);}
 int AW_UIColor(int r,int g,int b){
     if(r==255 && g==244 && b==214)return 254;
     if(r==255 && g==255 && b==232)return 253;
@@ -54,10 +60,12 @@ eval_t *GetEdictFieldValue(edict_t *e,char *name){
     return NULL;
 }
 int AW_GalleryActive(void){return gallery;}
+int AW_TorchTestActive(void){return torch_test;}
 int AW_IntroImpulse(int impulse){return locked?0:impulse;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){
     if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;
     else if(!strcmp(name,"aw_torch_flame_set"))set_flame=fn;
+    else if(!strcmp(name,"aw_torch_strength_set"))set_strength=fn;
     else {assert(!strcmp(name,"aw_torch"));command=fn;}
 }
 void Con_Printf(char *format,...){}
@@ -78,9 +86,26 @@ int main(void)
     torch_assets[5]=9;assert(!AW_TorchAssetsValidate(torch_assets,716));torch_assets[5]=8;
     put32(torch_assets+8,0);assert(!AW_TorchAssetsValidate(torch_assets,716));put32(torch_assets+8,2667);
     put32(torch_assets+12,129*65536);assert(!AW_TorchAssetsValidate(torch_assets,716));put32(torch_assets+12,12*65536);
-    AW_TorchInit();AW_TorchLoadAssets();assert(command && set_radius && set_flame);
+    AW_TorchInit();AW_TorchLoadAssets();assert(command && set_radius && set_flame && set_strength);
+    radius_setting=Cvar_FindVar("aw_torch_radius");flame_setting=Cvar_FindVar("aw_torch_flame_style");
     assert(radius_setting->archive && flame_setting->archive && AW_TorchLightRadius()==192);
-    assert(AW_TorchFlameCoreColor()==-1);
+    assert(AW_TorchFlameCoreColor()==254 && aw_torch_strength.archive && aw_torch_strength.value==.7f);
+    /* Actual cvar storage, archived override and command validation. */
+    {
+        FILE *f=tmpfile();char saved[512];size_t n;
+        assert(f);Cvar_Set("aw_torch_strength","0.3");
+        Cvar_WriteVariables(f);rewind(f);n=fread(saved,1,sizeof(saved)-1,f);saved[n]=0;fclose(f);
+        assert(strstr(saved,"aw_torch_strength \"0.3\"\n") && aw_torch_strength.value==.3f);
+        assert(strstr(saved,"aw_torch_flame_style \"2\"\n") && strstr(saved,"aw_torch_radius \"192\"\n"));
+        Cvar_Set("aw_torch_strength","-1");assert(aw_torch_strength.value==0);
+        Cvar_Set("aw_torch_strength","2");assert(aw_torch_strength.value==1);
+        Cvar_Set("aw_torch_strength","nan");assert(aw_torch_strength.value==0);
+        Cvar_Set("aw_torch_strength","inf");assert(aw_torch_strength.value==1);
+        setting_argc=2;setting_value="0.7";set_strength();assert(aw_torch_strength.value==.7f);
+        setting_value="nan";set_strength();assert(aw_torch_strength.value==.7f);
+        setting_value="1.1";set_strength();assert(aw_torch_strength.value==.7f);
+        setting_value="0.5junk";set_strength();assert(aw_torch_strength.value==.7f);
+    }
     setting_argc=2;setting_value="240";set_radius();assert(AW_TorchLightRadius()==240);
     setting_value="nan";set_radius();assert(AW_TorchLightRadius()==240);
     setting_value="289";set_radius();assert(AW_TorchLightRadius()==240);
@@ -120,6 +145,15 @@ int main(void)
     r_drawsurf.surf=&surface;memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();
     assert(blocklights[0]>0 && blocklights[3]>0);
     expected=blocklights[0];
+    /* Strength changes real surface accumulation without reallocating light
+     * slots, changing the emitter/radius or turning off the held flame. */
+    setting_value="0";set_strength();memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();
+    assert(!blocklights[0] && lights()==1 && torch._float);
+    setting_value="0.35";set_strength();memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();
+    assert(blocklights[0]>0 && abs((int)(2*blocklights[0])-(int)expected)<=1);
+    setting_value="1";set_strength();memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();
+    assert(blocklights[0]>expected && lights()==1);
+    setting_value="0.7";set_strength();
     /* Greater reach must increase actual ground-surface light, not just flames. */
     setting_value="192";set_radius();AW_TorchUpdate();
     memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();assert(blocklights[0]>expected);
@@ -143,7 +177,9 @@ int main(void)
     command();assert(torch._float);goal._float=0;AW_TorchUpdate();assert(!lights());
     goal._float=1;AW_TorchUpdate();assert(lights()==1);
     player.v.health=0;AW_TorchUpdate();assert(!lights());player.v.health=100;
-    gallery=1;AW_TorchUpdate();assert(!lights());gallery=0;
+    gallery=1;AW_TorchUpdate();assert(!lights());
+    torch_test=1;AW_TorchUpdate();assert(lights()==1);torch_test=0;
+    AW_TorchUpdate();assert(!lights());gallery=0;
     cl.intermission=1;AW_TorchUpdate();assert(!lights());cl.intermission=0;
     locked=1;command();assert(torch._float);locked=0;
     sv.paused=1;command();assert(torch._float);sv.paused=0;

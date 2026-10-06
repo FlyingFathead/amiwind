@@ -369,6 +369,24 @@ CHANNEL MIXING
 void SND_PaintChannelFrom8 (channel_t *ch, sfxcache_t *sc, int endtime);
 void SND_PaintChannelFrom16 (channel_t *ch, sfxcache_t *sc, int endtime);
 
+static int dialogue_sound(const sfx_t *sfx)
+{
+    return sfx && (!strncmp(sfx->name,"npc/",4) || !strncmp(sfx->name,"intro/",6));
+}
+static void paint_channel_gain(channel_t *ch,sfxcache_t *sc,int count,float gain)
+{
+    channel_t mixed=*ch;
+    if(!(gain>=0))gain=0;
+    if(gain>1)gain=1;
+    mixed.leftvol=(int)(mixed.leftvol*gain);
+    mixed.rightvol=(int)(mixed.rightvol*gain);
+    if(sc->width==1)SND_PaintChannelFrom8(&mixed,sc,count);
+    else SND_PaintChannelFrom16(&mixed,sc,count);
+    /* Keep the source's spatial gain and advance muted channels normally.
+     * Changing a bus level never restarts a sound or accumulates attenuation. */
+    ch->pos=mixed.pos;
+}
+
 /* A scene handoff owns a copy of the unpainted part of speech. The ordinary
  * cache, sfx and entity arrays can all disappear while the loader runs.
  * At most four allocations, including their sample headers, total 128 KiB.
@@ -480,7 +498,7 @@ void S_BeginSceneVoice(void)
     }
     for(i=NUM_AMBIENTS;i<NUM_AMBIENTS+MAX_DYNAMIC_CHANNELS;i++){
         ch=&channels[i];
-        if(!ch->sfx || (strncmp(ch->sfx->name,"npc/",4) && strncmp(ch->sfx->name,"intro/",6)))continue;
+        if(!dialogue_sound(ch->sfx))continue;
         if(ch->end<=paintedtime || (!ch->leftvol && !ch->rightvol))continue;
         reason="unavailable or unsupported cached sample";
         /* No S_LoadSound: loading here could evict another live cache entry. */
@@ -529,8 +547,7 @@ static void S_PaintSceneVoice(int start,int end)
         v->channel.pos+=skip;
         count=v->sample->length-v->channel.pos;
         if(count>end-start)count=end-start;
-        if(v->sample->width==1)SND_PaintChannelFrom8(&v->channel,v->sample,count);
-        else SND_PaintChannelFrom16(&v->channel,v->sample,count);
+        paint_channel_gain(&v->channel,v->sample,count,dialoguevolume.value);
         v->next=end;
         if(v->channel.pos==v->sample->length)scene_voice_release(v);
     }
@@ -584,10 +601,7 @@ void S_PaintChannels(int endtime)
 
 				if (count > 0)
 				{
-					if (sc->width == 1)
-						SND_PaintChannelFrom8(ch, sc, count);
-					else
-						SND_PaintChannelFrom16(ch, sc, count);
+                    paint_channel_gain(ch,sc,count,dialogue_sound(ch->sfx)?dialoguevolume.value:effectsvolume.value);
 
 					ltime += count;
 				}

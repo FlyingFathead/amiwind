@@ -30,7 +30,7 @@ static void (*set_radius)(void),(*set_flame)(void);
 int Cmd_Argc(void){return setting_argc;}
 char *Cmd_Argv(int n){return n==1?setting_value:"";}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_torch_radius"))radius_setting=c;else flame_setting=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_torch_radius"))radius_setting=c;else if(!strcmp(c->name,"aw_torch_flame_style"))flame_setting=c;}
 void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_torch_radius"))radius_setting->value=value;else flame_setting->value=value;}
 int AW_UIColor(int r,int g,int b){assert(r==255 && g==244 && b==214);return 254;}
 
@@ -41,6 +41,7 @@ void ED_Print(edict_t *e){assert(0);}
 char *PR_GlobalString(int offset){return "test";}
 char *PR_GlobalStringNoContents(int offset){return "test";}
 int AW_GalleryActive(void){return 0;}
+int AW_TorchTestActive(void){return 0;}
 int AW_IntroImpulse(int impulse){return impulse;}
 void AW_GuardTorchLoadAssets(const byte *data){assert(data==assets);}
 void AW_GuardTorchInit(void){}
@@ -48,6 +49,7 @@ void AW_GuardTorchUpdate(void){}
 void Cmd_AddCommand(char *name,void (*fn)(void)){
     if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;
     else if(!strcmp(name,"aw_torch_flame_set"))set_flame=fn;
+    else if(!strcmp(name,"aw_torch_strength_set")){}
     else {assert(!strcmp(name,"aw_torch"));toggle_torch=fn;}
 }
 byte *COM_LoadHunkFile(char *name){

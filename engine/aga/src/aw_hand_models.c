@@ -10,12 +10,12 @@
 #define HAND_RECORD_BYTES 196
 typedef struct {char race[64],hand[64],torch[64];int female;} hand_appearance_t;
 static hand_appearance_t appearances[MAX_HAND_APPEARANCES];
-static int appearance_count,selected=-2;
+static int appearance_count,selected=-2,pair_valid;
 static model_t *hand_model,*torch_model;
 
 void AW_HandModelsReset(void)
 {
-    selected=-2;hand_model=torch_model=NULL;AW_TorchUseHandAssets(0);
+    selected=-2;pair_valid=0;hand_model=torch_model=NULL;AW_TorchUseHandAssets(0);
 }
 static int string_field(char *out,const byte *raw,int path)
 {
@@ -62,37 +62,85 @@ void AW_HandModelsLoad(void)
         Con_Printf("Hand torch metadata unavailable; using legacy models.\n");
     }
 }
-void AW_HandModelsApply(void)
+static void release_owned(model_t *model,const char *name)
+{
+    /* Mod_FindName can recycle unreferenced model_t slots after a map change.
+     * Name/type are part of ownership, not just the retained pointer. */
+    if(model && model!=cl.viewent.model && model->type==mod_alias &&
+       !strcmp(model->name,name) && model->cache.data)Cache_Free(&model->cache);
+}
+static unsigned int little32(const byte *p)
+{
+    return (unsigned int)p[0]|((unsigned int)p[1]<<8)|
+           ((unsigned int)p[2]<<16)|((unsigned int)p[3]<<24);
+}
+static int probe_frames(const char *name,int frames)
+{
+    FILE *file=NULL;byte header[84];int size,ok;
+    /* Verify both advertised members without retaining either alias. Respect
+     * PAK member length and initial file offset; never read another member. */
+    size=COM_FOpenFile((char *)name,&file);
+    if(!file)return 0;
+    ok=size>=(int)sizeof(header) &&
+       fread(header,1,sizeof(header),file)==sizeof(header) &&
+       !memcmp(header,"IDPO",4) && little32(header+4)==6 &&
+       little32(header+68)==(unsigned int)frames;
+    fclose(file);return ok;
+}
+int AW_HandModelsApply(void)
 {
 #if !AMIWIND_SPRITE_HANDS
-    const char *race="nord";int female=0,index=-1,i;
+    const char *race="nord",*path;int female=0,index=-1,i,equipped,frames;
+    model_t **wanted,*base=cl.viewent.model;
     AW_TorchUseHandAssets(0);
-    if(AW_TorchEquipped())cl.viewent.frame=AW_TorchFrame();
-    if(!appearance_count || !cl.viewent.model)return;
+    if(!appearance_count || !base)return 0;
+    /* Do not replace an actual weapon or other custom viewmodel. */
+    if(strcmp(base->name,"progs/v_nord.mdl") && strcmp(base->name,"progs/v_torch.mdl"))return 0;
     if(aw_character.valid){
         if(aw_character.race<0 || aw_character.race>=aw_race_count ||
-           aw_character.female<0 || aw_character.female>1)return;
+           aw_character.female<0 || aw_character.female>1)return 0;
         race=aw_races[aw_character.race].id;female=aw_character.female;
     }
     for(i=0;i<appearance_count;i++)if(appearances[i].female==female && !strcmp(appearances[i].race,race)){index=i;break;}
     if(index!=selected){
-        selected=index;hand_model=torch_model=NULL;
+        if(selected>=0 && selected<appearance_count){
+            release_owned(hand_model,appearances[selected].hand);
+            release_owned(torch_model,appearances[selected].torch);
+        }
+        selected=index;hand_model=torch_model=NULL;pair_valid=0;
         if(index>=0){
-            hand_model=Mod_ForName(appearances[index].hand,false);
-            torch_model=Mod_ForName(appearances[index].torch,false);
-            if(!hand_model || hand_model->type!=mod_alias || hand_model->numframes!=28 ||
-               !torch_model || torch_model->type!=mod_alias || torch_model->numframes!=8){
-                hand_model=torch_model=NULL;
+            pair_valid=probe_frames(appearances[index].hand,28) &&
+                       probe_frames(appearances[index].torch,8);
+            if(!pair_valid)
                 Con_Printf("Incomplete hand appearance for %s; using legacy models.\n",race);
-            }
         }
     }
-    /* Load the pair atomically: never combine one race's fists with another
-     * race's carried-torch arms. Model pointers reset before map memory frees. */
-    if(hand_model && torch_model){
-        AW_TorchUseHandAssets(1);
-        cl.viewent.model=AW_TorchEquipped()?torch_model:hand_model;
-        if(AW_TorchEquipped())cl.viewent.frame=AW_TorchFrame();
+    if(!pair_valid || index<0)return 0;
+    equipped=AW_TorchEquipped();frames=equipped?8:28;
+    path=equipped?appearances[index].torch:appearances[index].hand;
+    wanted=equipped?&torch_model:&hand_model;
+    if(*wanted && (strcmp((*wanted)->name,path) || (*wanted)->type!=mod_alias ||
+                   (*wanted)->numframes!=frames))*wanted=NULL;
+    if(!*wanted){
+        if(!Mod_CanFindName(path)){
+            pair_valid=0;Con_Printf("Hand model slots unavailable; using legacy models.\n");return 0;
+        }
+        *wanted=Mod_ForName((char *)path,false);
+        if(!*wanted || strcmp((*wanted)->name,path) || (*wanted)->type!=mod_alias ||
+           (*wanted)->numframes!=frames){
+            *wanted=NULL;pair_valid=0;
+            Con_Printf("Invalid hand appearance for %s; using legacy models.\n",race);return 0;
+        }
     }
+    /* Only the selected mode loads. A previously used mode stays ordinary
+     * LRU-evictable cache, avoiding forced reloads on repeated equip toggles.
+     * Mod_Extradata reloads the active payload if cache pressure evicts it. */
+    cl.viewent.model=*wanted;AW_TorchUseHandAssets(1);
+    if(equipped)cl.viewent.frame=AW_TorchFrame();
+    release_owned(base,"progs/v_nord.mdl");
+    AW_TorchReleaseLegacyCache();
+    return 1;
+#else
+    return 0;
 #endif
 }

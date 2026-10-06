@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+qboolean aw_loading_music=false;
 #include <assert.h>
 #include <limits.h>
 #include <setjmp.h>

@@ -1,5 +1,13 @@
 # Intro movie conversion and playback
 
+## Startup branding decision: 6 October 2026
+
+Keep AmiWind's own startup branding. Do not add a Bethesda/ZeniMax logo video
+as a legal-protection measure. Preserve the original-game credits and independent
+project notice in [licensing and credits](LICENSING_AND_CREDITS.md).
+This decision is separate from compatibility with user-supplied in-game movies
+and does not authorize redistribution of proprietary video or branding.
+
 Cold boot plays a separate short AmiWind logo fade, then enters the main menu.
 Esc skips that logo to the menu; it does not start a new game.
 
@@ -105,3 +113,11 @@ intentionally baked multi-card replacements.
 Branding now runs 2 s fade in + 5 s hold + 1 s fade out. Space, Enter and Esc skip
 it. Title music begins with branding and continues into the main menu. The movie
 still uses its own unchanged PCM; starting New Game deliberately pauses the theme.
+
+## Rc1 video-player aliases
+
+`dbg playvid 15` plays the original Morrowind intro when included. IDs `1..17`
+(also `01..17`) or an included catalogue name select other videos. The rc1
+candidate also accepts `dbg vidplay`, `dbg playvideo` and `dbg videoplay`, all
+routing to the same player and arguments. The current dev4 uses `dbg playvid`.
+The aliases are listed under VIDEO in the disk-backed debug catalogue.

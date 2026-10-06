@@ -2,10 +2,22 @@
 
 Recorded from owner playtesting on 4 October 2026, after the published
 [v0.0.28 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.28).
-This is the active follow-up list, not a claim that v0.0.29 is released or that
-the reports are fixed. More reports can be added without losing this baseline.
-Keep released v0.0.28 artifacts unchanged. Retain rocks, joined giant mushrooms,
+The latest published development checkpoint is v0.0.29-dev4; the next is
+v0.0.29-rc1, followed by final More Mushrooms after its release gates pass.
+The original reports remain the baseline; current issue status is authoritative
+in [BUGS.md](BUGS.md). Preserve all published artifacts unchanged. Retain rocks, joined giant mushrooms,
 authored foliage placements and Balmora's mesh-foliage comparison area.
+
+## Current release sequence — 6 October 2026
+
+| Milestone | Current state | Next action and completion evidence |
+| --- | --- | --- |
+| v0.0.29-rc1 playtest | Source integration in progress; no rc1 package released | Package the tested candidate, pin its contents and run targeted hand, torch, Enter-audio, debug-command and persistence checks. Carry unresolved IDs in its notes. |
+| Audio options | Four independent slider controls pass source checks | Verify native appearance, uninterrupted playback, independent gains and saved settings in the RC1 package. |
+| Worldwide mushrooms | Pilot picking verified; broader placement and admission incomplete | Resolve dense-map memory and interior access, then verify placement, empty visibility, pickup, travel and save/load on the exact package. Mapping counts alone do not complete this milestone. |
+| Final More Mushrooms | Blocked by world coverage and the final-release issues below | Verify NPC lighting, connected race-specific hands, Enter-audio continuity and flame visibility; reconcile all required gates and publish the matched screenshot/GIF gallery. |
+| Outdoor streaming | Performance / Needs work; no accepted speedup | Compare pinned outdoor crossings with frame and audio timing plus RAM peaks. Building entry/exit loading screens are acceptable. |
+| Time to Fight! | Deferred until final More Mushrooms | Integrate the arena, then calm-to-aggro E activation, sword/shield combat, voices/SFX, combat music and player-death feedback. See [combat roadmap](ROADMAP.md). |
 
 ## Immediate bugfix queue
 
@@ -24,7 +36,7 @@ Every bug remains **Fixed: N** until its own acceptance is supported.
 | P2 CONSOLE-CAPS-29 | FS-UAE F10 Caps Lock state sticks in v0.0.29-dev1. | Reproduce modifier/focus lifecycle; owner toggle-on/off workaround recorded, cause unknown. |
 | P2 CONSOLE-WHEEL-29 | FS-UAE F10 scroll works initially then emits repeated unbound warnings in v0.0.29-dev1. | Recurring owner report; inspect console wheel consumption/binding fallback with preserved settings. No fix accepted. |
 | P1 MODAL-WORLD-29 | Freeze world and optionally black out head/race, journal and modal backgrounds. | Source candidate: independent aw_modal_freeze/aw_modal_black defaults1; original name entry preserved. Soundtrack always serviced. Revised Linux tests and cross-host Amiga binary parity pass; native timing/lifecycle acceptance pending. |
-| P1 SHACK-VISIBILITY-29 | v0.0.29-dev1: Shack near Seyda Neen reportedly renders incorrectly compared with earlier play. | Global -12917,-71290,98; local -413,97,24; heading104/pitch-3. Active chunk and cause unknown; obtain stable matched views and source-bound region/geometry evidence. |
+| P1 SHACK-VISIBILITY-29 | Indrele Rathryon shack walls were missing in dev1. | Fixed in dev3: matched native restoration and playtester confirmation. Preserve the restored walls as a regression baseline; unrelated structures and horizon gaps remain separate. |
 | P1 SEYDA-TRANSITION-29 | v0.0.29-dev1: Cell/sub-cell passage remains problematic; investigate fewer sub-cells. | Owner report, exact failing crossing unconfirmed. Capture region/hysteresis/collision and memory evidence; merging cells is not yet a verified remedy. |
 | P2 INLAND-SHORE-29 | v0.0.29-dev1: Check angular inland-water shoreline topology. | Owner view at global -39785,-30636,379; cause unconfirmed. Compare source LAND/water intersection and converted topology without changing authored water placement or height. |
 | P1 HORIZON-POP-29 | Distant terrain/features abruptly appear or become a mesh mess when turning. | Authored opaque terrain_rock_rm_18 is rejected by far culling. Exact diagnostic geometry visually restores one sample, but the latest lossless OFF baselines drift by 36.11%; controlled pose/view-angle replay is required before acceptance. |
@@ -32,7 +44,7 @@ Every bug remains **Fixed: N** until its own acceptance is supported.
 | P2 HUD-STATS-29 | Healthy character's red bar appears partly empty; all three bars need independent current/max values. | Independent current/max source and pixel fixtures pass. Native health fills match 55/55, 25/55 and controlled 5/55; quickload restores the 25-health frame exactly. Magicka/fatigue stayed full, so their independent depletion remains untested natively. Sampled heading/time is correct; broader state/damage/healing checks remain open. |
 | P1 TORCH-LIGHT-29 | Guards carry torches but do not visibly illuminate nearby night surfaces. | Signed interpolation repair passes synthetic fixtures ([evidence](TORCH.md#light-gradient-29-unsigned-surface-light-interpolation-overflow)). One Balmora Hlaalu guard visibly lights pavement: 841/1,680 selected pixels brighten, restore exactly off and match automatic night. Earlier guard view still has identical off/on frames and no recognizable guard; diagnose it separately. General surface, actor and cost acceptance stays open ([incident](BUG_JOURNAL.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)). |
 | P2 INTERIOR-LIGHT-29 | Interiors look bleak, with no convincing local light sources. | One Hlaalu Council player-torch replay shows visible wall/floor response; lossless comparison finds 24,728 changed stable viewport pixels, 16,624 above the lower hand/torch band. This is not a depth-classified surface count. One ordinary door roundtrip preserves equipment; F/V restores the sampled light after quickload. Authored static lights, other rooms/save states and budgets remain open. |
-| P2 SKY-NIGHT-COVER-29 | Night can look good in some regions, but near-constant dense cloud cover hides moons, stars and space. | Optional cloud-control V2 provides clear/partial/overcast deep nights and independent midday coverage. Legacy remains default; protected twilight and depth-order fixtures pass. Lossless indexed native frames at one frozen 23:00 dry-exterior pose show optional V2 coverage/night-layer changes confined to sky pixels with exact restores. Broader regions/Balmora, appearance/frame cost and original regional weather remain pending. |
+| P2 SKY-NIGHT-COVER-29 | Night can look good in some regions, but near-constant dense cloud cover hides moons, stars and space. | Optional cloud-control V2 provides clear/partial/overcast deep nights and independent midday coverage. Legacy remains default; protected twilight and depth-order fixtures pass. Lossless indexed native frames at one frozen 23:00 dry-exterior pose show optional V2 coverage/night-layer changes confined to sky pixels with exact restores. Broader regions/Balmora, appearance/frame cost and original regional weather remain pending. Playtester accepted the night-sky appearance on 5 October; preserve that baseline. Exact active configuration and wider weather/region coverage remain open. |
 
 Detailed incident records and evidence limits are in [BUG_JOURNAL.md](BUG_JOURNAL.md)
 and the maintained [fix index](BUGS.md#fix-index). Passing a console handler or
@@ -265,9 +277,19 @@ transitions that do not damage protected dawn/dusk or moon/star depth ordering.
 
 ## Later combat scope
 
-[Time to Fight!](ROADMAP.md#future-combat-milestone-time-to-fight) is the planned
-future Vivec Arena Pit and isolated `dbg arenafight` combat milestone. It follows
-the immediate work and is not a required v0.0.29 feature.
+[Time to Fight!](ROADMAP.md#future-combat-milestone-time-to-fight) follows the
+More Mushrooms release: build the Nerevarine combat arena first, then NPC aggro
+logic and a first sword-and-shield versus sword-and-shield encounter. The
+original Vivec Arena Pit is the source candidate for an isolated `dbg arena`
+prototype. Enter with a calm opponent, then target the NPC and press E to
+trigger combat. Include appropriate NPC aggro lines, combat taunts and effects through
+the imported audio lookups, and report missing assets. Prototype visible dodges
+or deflections for failed hit rolls while preserving the resolved combat outcome.
+Fight tests must switch combat music on/off with encounter state and include the
+player death sound, death-camera movement and correct reset/retry behavior.
+Minimal NPC state outside
+loaded cells follows the combat baseline. These are planned tasks, not required
+v0.0.29 features.
 
 ### Horizon coordinate transcription correction
 
@@ -352,3 +374,65 @@ handoff, radius/flame controls, running-torch depth correction, and map marker/
 debug selection changes. Native acceptance and delivery of these changes remain
 pending. The smaller idle-grip defect and scene-specific light/geometry reports
 remain open.
+
+## Conditional release milestone: More Mushrooms
+
+Recorded 2026-10-06T04:49:51Z from owner direction. The planned public release title is **AmiWind v0.0.29 -- More Mushrooms**. Shipping v0.0.29 is a conditional checkpoint after original mushrooms are placed worldwide, can be picked with persistent state behaving correctly, and the relevant release gates pass. This is a future target, not a claim that worldwide coverage or release readiness is complete. The current dev4 six-placement mushroom pilot may be photographed as progress evidence only and must be labeled as a six-placement pilot, not worldwide coverage. Take final release screenshots from the completed worldwide candidate. The later Caius quest milestone is separate and is not this release title.
+
+## Required More Mushrooms! debug checkpoint
+
+- Include `dbg shroompicker` in the upcoming v0.0.29 release, not as a deferred
+  combat-update task. It reaches the confirmed Seyda Neen pickup cluster at
+  global XY -10920, -75120 and sets yaw4/pitch64 after loading.
+- Preserve inventory, equipment and collected/empty plant state. The shortcut
+  must not silently reset or manufacture a mushroom for the test.
+- Gate the command through its actual console, checked teleport and final-signon
+  paths; verify the built command natively. Retain the two-command recipe for
+  the already published dev4 binary.
+- Dev4 picking has separate playtester confirmation dated 6 October 2026.
+  Worldwide coverage and final release acceptance remain open.
+
+## Final More Mushrooms! release blockers — 6 October 2026
+
+These latest dev4 findings must be fixed and verified in the actual final
+package before release:
+
+- **TORCH-NPC-LIGHT-29:** torch illumination on nearby NPC bodies, while retaining
+  working wall/floor illumination and bounded native frame cost.
+- **TORCH-HAND-NORD-29:** detached-looking Nord torch-grip fragment; package the
+  intended race-specific connected models and verify animation/camera coverage.
+- **Music Enter regression:** brief cuts entering race/head selection and
+  accepting guard-follow on the prison ship; preserve continuous OST while
+  retaining world pause. Census-office negative controls remain in the matrix.
+
+Keep the `sn012.bsp` below-2-MiB warning in the open memory/performance work.
+Worldwide mushroom placement, persistent picking and exact-package regression
+checks remain release requirements. This list does not turn candidates or
+reported improvements into completed acceptance.
+
+## Next checkpoint: v0.0.29-rc1
+
+The next playtest checkpoint is **v0.0.29-rc1**, before the final More Mushrooms!
+release. This is a planned release candidate, not a published artifact. Preserve
+dev4 and its receipts. Include the complete current launchers and required debug
+catalogues in rc1; verify exact-package playtests before declaring it ready.
+The torch/NPC lighting, hand geometry and Enter-music blockers above still apply
+to final release. A newly reported missing torch while testing flame variants
+also needs equipment-versus-rendering reproduction before closure.
+
+## Final-release gallery checklist
+
+- Refresh the GitHub main README gallery for the final More Mushrooms release
+  with representative screenshots and a few short GIFs from the verified build.
+- Show several outdoor regions and mushroom close-ups; include crosshair name,
+  `E: Pick`, disappearance and the pickup notification in a short sequence.
+- Show torch illumination and hands only after their actual release fixes have
+  passed visual checks. Include interiors only when those rooms are admitted.
+- Bind each capture to its build/version and scenario. Progress images from
+  the dev4 pilot must not imply worldwide release acceptance.
+- Keep the active release blockers and roadmap reconciled with actual package
+  contents before publication; source checks and conversion are distinct gates.
+
+## Mandatory issue and roadmap reconciliation
+
+Use [BUGS.md](BUGS.md) as the current issue-status index and [ROADMAP.md](ROADMAP.md) for planned scope. Carry open blocker IDs into every release review and record which exact package contains each fix. Source, package and native evidence are separate gates. The final gallery remains a required deliverable from the verified release build.

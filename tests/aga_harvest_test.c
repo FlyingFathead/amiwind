@@ -7,16 +7,17 @@
 aw_race_t aw_races[16];aw_class_t aw_classes[32];aw_birth_t aw_births[16];aw_part_t aw_parts[384];
 int aw_race_count=1,aw_class_count=1,aw_birth_count=1,aw_part_count=2;
 static aw_harvest_t h;static aw_state_t state,before;
+#include "aga_harvest_fixture.h"
 static void fixture(void)
 {
-    memset(&h,0,sizeof(h));memset(&state,0,sizeof(state));h.nodes=3;h.edges=3;h.plants=1;
-    h.node[0].kind=1;h.node[0].flags=1;h.node[0].count=2;strcpy(h.node[0].id,"list");
-    strcpy(h.node[1].id,"ingredient_a");strcpy(h.node[2].id,"ingredient_b");
+    harvest_fixture_storage();memset(&state,0,sizeof(state));h.nodes=3;h.edges=3;h.plants=1;
+    h.node[0].kind=1;h.node[0].flags=1;h.node[0].count=2;strcpy(HSTR(h.node[0].id),"list");
+    strcpy(HSTR(h.node[1].id),"ingredient_a");strcpy(HSTR(h.node[2].id),"ingredient_b");
     h.edge[0].node=1;h.edge[0].level=1;h.edge[0].count=1;
     h.edge[1].node=2;h.edge[1].level=2;h.edge[1].count=1;
     h.edge[2].node=0;h.edge[2].count=2;
-    strcpy(h.plant[0].key,"aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    strcpy(h.plant[0].label,"Synthetic mushroom");strcpy(h.plant[0].model,"*1");
+    strcpy(HSTR(h.plant[0].key),"aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    strcpy(HSTR(h.plant[0].label),"Synthetic mushroom");strcpy(HSTR(h.plant[0].model),"*1");
     h.plant[0].reference=42;h.plant[0].flags=11;h.plant[0].first=2;h.plant[0].count=1;
     assert(AW_HarvestValidate(&h));
 }
@@ -44,12 +45,12 @@ int main(int argc,char **argv)
     save_roundtrip();before=state;assert(AW_HarvestTake(&h,0,&state,20,999)==0);assert(!memcmp(&state,&before,sizeof(state)));
     assert(AW_HarvestPickedCount(&state)==1);
     /* Scene-local model indices change; full source identity does not. */
-    strcpy(h.plant[0].model,"*19");assert(AW_HarvestHidden(&h,0,&state));
-    h.plant[0].key[5]='b';assert(!AW_HarvestHidden(&h,0,&state));
+    strcpy(HSTR(h.plant[0].model),"*19");assert(AW_HarvestHidden(&h,0,&state));
+    HSTR(h.plant[0].key)[5]='b';assert(!AW_HarvestHidden(&h,0,&state));
     fixture();assert(AW_HarvestTake(&h,0,&state,2,123)==1);assert(AW_StateGet(&state,AW_ITEM,"ingredient_b")==2);
     fixture();h.node[0].chance=100;assert(AW_HarvestTake(&h,0,&state,2,123)==2);
     assert(!state.count[AW_ITEM] && AW_HarvestHidden(&h,0,&state));
-    assert(AW_StateGet(&state,AW_GLOBAL,h.plant[0].key)<0); /* EMPTY is bit31, not level bits20..29. */
+    assert(AW_StateGet(&state,AW_GLOBAL,HSTR(h.plant[0].key))<0); /* EMPTY is bit31, not level bits20..29. */
     save_roundtrip();assert(AW_HarvestHidden(&h,0,&state));before=state;
     assert(AW_HarvestPrepare(&h,0,&state,999,777)==0 && !memcmp(&state,&before,sizeof(state)));
     assert(AW_HarvestTake(&h,0,&state,999,777)==0 && !state.count[AW_ITEM]);
@@ -69,7 +70,7 @@ int main(int argc,char **argv)
     fixture();for(i=0;i<AW_STATE_VALUES;i++){sprintf(id,"slot%d",i);assert(AW_ItemAdd(&state,id,1));}
     assert(AW_HarvestTake(&h,0,&state,1,12)==-1);assert(!AW_HarvestHidden(&h,0,&state));
     before=state;save_roundtrip();assert(AW_HarvestTake(&h,0,&state,2,999)==-1);
-    assert(AW_StateGet(&state,AW_GLOBAL,h.plant[0].key)==AW_StateGet(&before,AW_GLOBAL,h.plant[0].key));
+    assert(AW_StateGet(&state,AW_GLOBAL,HSTR(h.plant[0].key))==AW_StateGet(&before,AW_GLOBAL,HSTR(h.plant[0].key)));
     state.count[AW_ITEM]=0;assert(AW_HarvestTake(&h,0,&state,2,999)==1);
     assert(AW_StateGet(&state,AW_ITEM,"ingredient_a")==2 && !AW_StateGet(&state,AW_ITEM,"ingredient_b"));
     fixture();assert(AW_ItemAdd(&state,"ingredient_a",INT32_MAX));assert(AW_HarvestTake(&h,0,&state,1,2)==-1);
@@ -81,19 +82,19 @@ int main(int argc,char **argv)
     assert(AW_ItemAdd(&state,"ingredient_b",INT32_MAX));assert(AW_HarvestTake(&h,0,&state,1,2)==-1);
     assert(!AW_StateGet(&state,AW_ITEM,"ingredient_a") && !AW_HarvestHidden(&h,0,&state));
     /* Nested leveled recursion and invalid graphs are exercised directly. */
-    fixture();h.nodes=4;h.node[3]=h.node[0];strcpy(h.node[3].id,"nested");h.edge[2].node=3;
+    fixture();h.nodes=4;h.node[3]=h.node[0];strcpy(HSTR(h.node[3].id),"nested");h.edge[2].node=3;
     assert(AW_HarvestTake(&h,0,&state,2,3)==1);
     h.edge[1].node=3;assert(!AW_HarvestValidate(&h));
     fixture();h.plants=2;h.plant[1]=h.plant[0];assert(!AW_HarvestValidate(&h));
-    fixture();f=tmpfile();assert(f);fputs("AWH1 100000 0 0\n",f);i=(int)ftell(f);rewind(f);assert(!AW_HarvestRead(f,i,&h));fclose(f);assert(h.plants==0);
+    fixture();f=tmpfile();assert(f);fputs("AWH1 100000 0 0\n",f);i=(int)ftell(f);rewind(f);assert(!AW_HarvestLoad(f,i,&h));fclose(f);assert(h.plants==0);
     f=tmpfile();assert(f);fputs("AWH1 1 0 0\n0 0 0 0 0 old_item\n",f);i=(int)ftell(f);rewind(f);
-    assert(AW_HarvestRead(f,i,&h) && !h.node[0].label[0]);fclose(f);
+    assert(AW_HarvestLoad(f,i,&h) && !HSTR(h.node[0].label)[0]);fclose(f);
     f=tmpfile();assert(f);fputs("AWH2 1 0 0\n0 0 0 0 0 item_id\tOriginal item name\n",f);i=(int)ftell(f);rewind(f);
-    assert(AW_HarvestRead(f,i,&h) && !strcmp(h.node[0].label,"Original item name"));fclose(f);
+    assert(AW_HarvestLoad(f,i,&h) && !strcmp(HSTR(h.node[0].label),"Original item name"));fclose(f);
     f=tmpfile();assert(f);fputs("AWH2 1 0 0\n0 0 0 0 0 item_id\t-\n",f);i=(int)ftell(f);rewind(f);
-    assert(!AW_HarvestRead(f,i,&h));fclose(f);
+    assert(!AW_HarvestLoad(f,i,&h));fclose(f);
     if(argc==2){
-        f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);i=(int)ftell(f);rewind(f);assert(AW_HarvestRead(f,i,&h));fclose(f);assert(h.plants==6);
+        f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);i=(int)ftell(f);rewind(f);assert(AW_HarvestLoad(f,i,&h));fclose(f);assert(h.plants==6);
         memset(&state,0,sizeof(state));for(i=0;i<h.plants;i++){result=AW_HarvestTake(&h,i,&state,1,123+i);assert(result>0);}
         save_roundtrip();for(i=0;i<h.plants;i++)assert(AW_HarvestHidden(&h,i,&state));
     }

@@ -42,10 +42,10 @@ int AW_HeadLoad(int a,int b){return 1;}
 void Con_Printf(char *s,...){}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 int COM_FOpenFile(char *s,FILE **f){*f=NULL;return -1;}
-static void legacy_header(byte *raw,int size)
+static void legacy_header(byte *raw,int size,int version)
 {
     uint32_t crc=0xffffffffU;int i,j;
-    memcpy(raw,"AWS1",4);
+    memcpy(raw,"AWS1",4);raw[3]=(byte)version;
     for(i=12;i<size;i++){crc^=raw[i];for(j=0;j<8;j++)crc=(crc>>1)^((crc&1)?0xedb88320U:0);}
     crc^=0xffffffffU;
     for(i=0;i<4;i++){raw[4+i]=(size>>(8*i))&255;raw[8+i]=(crc>>(8*i))&255;}
@@ -181,7 +181,12 @@ int main(void)
     assert(!AW_StateGet(&decoded.state,AW_ITEM,"bk_a1_1_caiuspackage")); /* Released saves may lack a former quest item. */
     for(i=12;i<n;i++){raw[i]^=1;assert(!AW_SaveDecode(raw,n,&decoded));raw[i]^=1;}
     /* Legacy bytes have indices, no dates; decoding must not invent history. */
-    i=n-4-source.state.journal_count*16;legacy_header(raw,i);
+    /* AWS4 appends feature/equipment words to this no-harvest sample.
+     * Retain explicit AWS2 and AWS1 reader acceptance, with independent CRCs. */
+    assert(!memcmp(raw,"AWS4",4));
+    i=n-8;legacy_header(raw,i,'2');
+    assert(AW_SaveDecode(raw,i,&decoded) && decoded.state.journal_count==2 && !decoded.equipment);
+    i-=4+source.state.journal_count*16;legacy_header(raw,i,'1');
     assert(AW_SaveDecode(raw,i,&decoded) && !decoded.state.journal_count);
     assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
     strcpy(source.scene,"addamasartus");source.actor_count=1;

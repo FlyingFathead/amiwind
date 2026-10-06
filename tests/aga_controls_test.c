@@ -5,6 +5,7 @@
 static int locked,character;
 int AW_OpeningLocked(void){return locked;}
 int AW_CharacterActive(void){return character;}
+int AW_DebugTestInputActive(void){return 0;} /* Ordinary-game permission fixture. */
 int main(void)
 {
     AW_StoryReset(1);

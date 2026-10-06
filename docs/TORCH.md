@@ -1,5 +1,90 @@
 # Carried torch
 
+## Appearance acceptance: 2026-10-06T20:06:10+03:00
+
+The owner approved the new torch appearance shown in the follow-up capture.
+Candidate 004 demonstrated off/on/off in FS-UAE after appearance selection.
+Keep the gray unlit test-floor and stronger outdoor-area illumination requests
+open; appearance approval alone does not close them. No follow-up package has
+been delivered.
+
+## Indoor/outdoor torch contrast: owner follow-up 2026-10-06T13:53:32+00:00
+
+The RC1 owner repeatedly reports stronger, more useful carried-torch illumination
+indoors than outdoors. Temple images provide interior examples. Preserve the
+accepted nearby-NPC response while comparing fixed torch style/radius/strength,
+distance, surface material, ambient/static light and day/night state in matched
+indoor/outdoor tests. This does not prove one shared cause with missing Temple
+architecture or the Seyda fullbright discontinuity. Type2 remains the requested
+new default; separate normalized illumination control is in implementation.
+
+## RC1 owner torch follow-up: 6 October 2026
+
+Recorded 2026-10-06T13:48:58+00:00. Owner reports NPC illumination from a carried torch now
+looks reasonably good on the tested route. Preserve this scoped positive
+result; it does not close Census static interior lighting or every NPC case.
+The remaining request is stronger useful light on nearby ground/walls, farther
+forward and around player/NPC torch holders, with bounded falloff and light count.
+
+The owner prefers flame type **2, brightbase**, and explicitly requests type 2
+or 3 as the new default. The next candidate will use 2; existing saved preferences
+should remain effective. Type 3's sparks/embers were not visible to the owner,
+so spark visibility remains unaccepted. In RC1 the bright flame core is shared
+by player and supported guard torches; the extra spark pass is player-only.
+`dbg torch flame` without a value already reports the current setting. It does
+not change illumination radius or all stationary world-fire effects.
+
+Implement a separate archived local-light strength control and console query/set
+alias. The requested initial candidate is 0.7 on a normalized 0..1 control, not
+a verified photometric equivalence to daylight. Preserve the accepted default
+NPC response and test surface contribution separately. Radius, flame appearance,
+light strength and admitted light count must remain independently understandable.
+
+**TORCH-FUEL-29: missing unlit/fuel state.** RC1 draws a lit torch and does not
+consume fuel or burn out. Track held/equipped state separately from burning state;
+retain original item identity and only a compact fuel/state override for changed
+items. Prototype bounded integer remaining-time units plus packed flags, then
+measure alignment, inventory/save overhead and update cost before choosing a
+format. Source light duration and zero/negative semantics still need verification;
+do not invent duration from appearance or implement one full entity per item.
+Test equip, extinguish, relight if supported, burnout, save/reload and area changes.
+Pending design/implementation; first fixed release none.
+
+**Dark torch inspection requested:** `dbg torchtest` should use an absolutely
+dark, separate space with no daylight or ambient contribution, nearby surfaces
+and an optional catalogue NPC. Reuse gallery entry/return machinery, not its
+daylit environment. Compare fixed pose/time with torch off/on, radius and strength;
+preserve the player's previous equipment, game state and scene on exit.
+This is requested next-candidate work, not a command shipped in RC1.
+
+## RC1 interior NPC follow-up: 6 October 2026
+
+The playtester reports Census Office NPCs look too dark under interior room
+lighting. Track this as **INTERIOR-NPC-LIGHT-29**, alongside the broader
+INTERIOR-LIGHT-29 work. A lit floor or wall does not verify an actor's light
+sample. Compare static interior lighting, carried torch on/off, NPC body and
+room surface response separately; inspect alias/sprite selection, light data,
+sample position and final shading. A shared cause with TORCH-NPC-LIGHT-29 is
+not established. Keep this case in [the release issue matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026).
+
+## NPC illumination: dev4 report
+
+**Open: TORCH-NPC-LIGHT-29.** Playtesting on 6 October 2026 distinguishes a
+specific problem from general torch brightness: walls/floors respond to the
+player's torch, while the nearby NPC remains dark. Five dev4 screenshots
+include torch-off/on, ground and dawn views. This requires NPC-rendering and
+night-palette investigation; increasing only the radius is not sufficient
+evidence of a fix. See [the report and source leads](BUG_JOURNAL.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
+
+Add NPC bodies to the mandatory light acceptance matrix: compare identical
+camera/time off/on/off samples, player and guard torches, near/far/expired
+lights, ordinary actors/guard bodies, interior/night/day scenes and unchanged
+gallery lighting. Measure the actor pixels independently of flames, hands and
+the floor. Preserve the established surface illumination and record native
+frame cost. The existing alias path has dynamic-light code; base-light
+saturation, actual actor representation and post-render night shading remain
+unverified contributors. **No fix is claimed.**
+
 ## v0.0.29 open owner reports
 
 On 4 October 2026, post-release v0.0.28 playtesting again found **F unable to
@@ -611,3 +696,17 @@ retaining classic as default. See [Torch particles and light reach](TORCH_PARTIC
 for pinned AmiQuake source findings, commands and exact validation limits.
 Earlier source-only statements above describe their original checkpoints;
 they do not retract the later dev3 owner acceptance.
+
+## Final-release gates added after dev4 playtesting
+
+The final **More Mushrooms!** release must resolve the reported missing NPC
+illumination and detached Nord torch-hand fragment. Both require exact-package
+native replay; candidate source checks alone do not close them. The shipped dev4
+torch hand is still the legacy reduced model, so validate replacement catalogue
+and model inclusion as well as connected appearance across animation/camera
+states. See [the hand report](BUG_JOURNAL.md#torch-hand-nord-29-detached-looking-grip-fragment-in-dev4-open).
+
+The dev4 console has confirmed brightbase style2 in playtesting. Query it using
+`aw_torch_flame_set`; direct saved setting `aw_torch_flame_style` also reports
+the value with no argument. `dbg torch flame sparks` selects3; `classic` selects1.
+Flame appearance is separate from actor illumination and grip geometry.

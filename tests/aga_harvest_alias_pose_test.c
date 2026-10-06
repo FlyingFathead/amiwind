@@ -2,6 +2,7 @@
 #include "quakedef.h"
 #include "r_local.h"
 #include <assert.h>
+client_state_t cl;
 entity_t *currententity;vec3_t modelorg,vright={1,0,0},vup={0,-1,0},vpn={0,0,1};
 float aliasxscale=1,aliasyscale=1;clipplane_t view_clipplanes[4];
 extern mdl_t *pmdl;extern float aliastransform[3][4];

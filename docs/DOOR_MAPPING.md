@@ -41,6 +41,8 @@ a 56-unit reach and a world occlusion trace. AWD1 and the old single-origin form
 readable for older conversion bundles. Both supported directions preserve current
 health/hand state and queue at most one map load per activation.
 
+Hostile-pursuit, companion eligibility and original teleport-door rules are recorded in the planned [NPC cell-traversal requirements](NPC_CELL_TRAVERSAL.md); no cross-boundary NPC gameplay is claimed as shipped.
+
 This remains one active BSP at a time. Door mapping does not implement general lock/key rules, ownership,
 character-creation gates or persistent reference state. Original transition sound IDs are catalogued but not yet played.
 

@@ -19,12 +19,38 @@ static char filter[96];
 static aw_save_t *back_state;
 typedef struct {char sound[96],text[2048];float duration;} gallery_voice_t;
 static gallery_voice_t *voice;
-static int back_intro;
+static int back_intro,combat,torch_test,torch_actor;
+static float back_torch,combat_timing[4],back_fullbright;
+extern cvar_t r_fullbright;
+static const char *hand_timing[4]={"aw_hand_idle","aw_hand_draw","aw_hand_lower","aw_hand_punch"};
+static void hand_field(edict_t *p,const char *name,float value){
+    eval_t *v=GetEdictFieldValue(p,(char *)name);if(v)v->_float=value;
+}
+static void combat_pose(edict_t *p,int state){
+    hand_field(p,"aw_hand_goal",state==4?0:1);
+    hand_field(p,"aw_torch",0);hand_field(p,"aw_attack_latched",0);
+    hand_field(p,"aw_hand_state",state);hand_field(p,"aw_hand_started",sv.time);
+}
+static void combat_center(edict_t *p){
+    p->v.origin[0]=p->v.origin[1]=0;p->v.origin[2]=17;
+    VectorCopy(p->v.origin,p->v.oldorigin);VectorCopy(vec3_origin,p->v.velocity);
+    p->v.angles[0]=p->v.angles[2]=0;p->v.angles[1]=180;
+    VectorCopy(p->v.angles,p->v.v_angle);VectorCopy(p->v.angles,cl.viewangles);
+    p->v.movetype=MOVETYPE_WALK;p->v.fixangle=1;SV_LinkEdict(p,false);
+}
 static char query[96],notice[96],back_map[32],model_path[2][64];
 static vec3_t back_origin,back_angles;
 static float back_move,back_health,back_hand_goal;
 
-int AW_GalleryActive(void){return sv.active && !strcmp(sv.name,"charplane");}
+int AW_TorchTestActive(void){return torch_test && session && sv.active && !strcmp(sv.name,"torchtest");}
+/* Only captured, active diagnostic rooms may ignore the source story's input
+ * restrictions. Revoke permission as soon as return begins, before map load. */
+int AW_DebugTestInputActive(void){
+    return session && !returning && sv.active &&
+        ((combat && !strcmp(sv.name,"charplane")) ||
+         (torch_test && !strcmp(sv.name,"torchtest")));
+}
+int AW_GalleryActive(void){return sv.active && (!strcmp(sv.name,"charplane") || AW_TorchTestActive());}
 int AW_GalleryModal(void){return AW_GalleryActive() && key_dest==key_game && (page || help || editing);}
 static void normalize(const char *in,char *out) {
     int n=0;unsigned char c;
@@ -62,7 +88,7 @@ static int read_entry(char *line,gallery_entry_t *e) {
 static void read_voice(void) {
     FILE *f=NULL;char line[2304],*path,*duration,*speech,*end;float seconds;
     if(voice){free(voice);voice=NULL;}
-    if(!session || COM_FOpenFile("gallery/voices.txt",&f)<0 || !f)return;
+    if(!session || combat || torch_test || COM_FOpenFile("gallery/voices.txt",&f)<0 || !f)return;
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWGV1\n")){fclose(f);return;}
     while(fgets(line,sizeof(line),f)){
         path=strchr(line,'\t');if(!path)break;*path++=0;
@@ -183,7 +209,8 @@ void AW_GalleryMouse(int dx,int dy) {
     row=mouse_row();if(row>=0){page_selected=row;filtering=0;}
 }
 static void reload(void) {
-    close_browser();read_voice();editing=help=0;key_dest=key_game;IN_AWClearButtons();Cbuf_InsertText("map charplane\n");
+    close_browser();read_voice();editing=help=0;key_dest=key_game;IN_AWClearButtons();
+    Cbuf_InsertText(torch_test?"map torchtest\n":"map charplane\n");
 }
 static void leave(void) {
     char command[64];FILE *f=NULL;
@@ -197,9 +224,31 @@ static void leave(void) {
     close_browser();editing=help=0;returning=1;key_dest=key_game;IN_AWClearButtons();
     sprintf(command,"map %s\n",back_map);Cbuf_InsertText(command);
 }
+static int capture_game(void) {
+    edict_t *p;eval_t *goal;
+    if(!session){
+        if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){
+            Con_Printf("Start a local game before entering the gallery.\n");return 0;
+        }
+        if(strlen(sv.name)>=sizeof(back_map)){Con_Printf("Scene name too long.\n");return 0;}
+        back_state=(aw_save_t *)malloc(sizeof(*back_state));
+        if(!back_state || !AW_SaveSnapshot(back_state)){
+            if(back_state)free(back_state);
+            back_state=NULL;
+            Con_Printf("Cannot capture the current game for gallery return.\n");return 0;
+        }
+        strcpy(back_map,sv.name);VectorCopy(p->v.origin,back_origin);
+        back_intro=!strcmp(sv.modelname,"maps/intro_docks.bsp");
+        VectorCopy(cl.viewangles,back_angles);back_move=p->v.movetype;session=1;body=0;
+        back_health=p->v.health;goal=GetEdictFieldValue(p,"aw_hand_goal");back_hand_goal=goal?goal->_float:0;
+        goal=GetEdictFieldValue(p,"aw_torch");back_torch=goal?goal->_float:0;
+    }
+    return 1;
+}
 static void command(void) {
-    char search[96];int i,n=0;edict_t *p;eval_t *goal;
+    char search[96];int i,n=0;
     if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"exit")){leave();return;}
+    if(combat || torch_test){Con_Printf("Exit combat/torch test before entering the NPC gallery.\n");return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"talk")){key_dest=key_game;talk();return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"browse")){key_dest=key_game;open_browser();return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"help")){key_dest=key_game;close_browser();help=1;return;}
@@ -215,25 +264,97 @@ static void command(void) {
     }
     search[n]=0;
     if(!select_entry(0,n?search:NULL)){Con_Printf("%s\n",notice);return;}
-    if(!session){
-        if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){
-            Con_Printf("Start a local game before entering the gallery.\n");return;
-        }
-        if(strlen(sv.name)>=sizeof(back_map)){Con_Printf("Scene name too long.\n");return;}
-        back_state=(aw_save_t *)malloc(sizeof(*back_state));
-        if(!back_state || !AW_SaveSnapshot(back_state)){
-            if(back_state)free(back_state);
-            back_state=NULL;
-            Con_Printf("Cannot capture the current game for gallery return.\n");return;
-        }
-        strcpy(back_map,sv.name);VectorCopy(p->v.origin,back_origin);
-        back_intro=!strcmp(sv.modelname,"maps/intro_docks.bsp");
-        VectorCopy(cl.viewangles,back_angles);back_move=p->v.movetype;session=1;body=0;
-        back_health=p->v.health;goal=GetEdictFieldValue(p,"aw_hand_goal");back_hand_goal=goal?goal->_float:0;
-    }
+    if(!capture_game())return;
     reload();
 }
-void AW_GalleryInit(void){Cmd_AddCommand("aw_charplane",command);}
+static void combat_command(void){
+    edict_t *p;eval_t *v;FILE *f=NULL;int i,state=-1;
+    const char *arg=Cmd_Argv(1);
+    if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
+    if(Cmd_Argc()>2){Con_Printf("Usage: dbg combattest [idle/draw/lower/punch/center/help/exit].\n");return;}
+    if(combat && AW_GalleryActive() && !returning){
+        p=svs.clients[0].edict;
+        if(!*arg || !Q_strcasecmp((char *)arg,"center"))combat_center(p);
+        else if(!Q_strcasecmp((char *)arg,"help"))help=1;
+        else if(!Q_strcasecmp((char *)arg,"idle"))state=2;
+        else if(!Q_strcasecmp((char *)arg,"draw"))state=1;
+        else if(!Q_strcasecmp((char *)arg,"lower"))state=4;
+        else if(!Q_strcasecmp((char *)arg,"punch"))state=3;
+        else {Con_Printf("Usage: dbg combattest [idle/draw/lower/punch/center/help/exit].\n");return;}
+        if(state>=0)combat_pose(p,state);
+        key_dest=key_game;IN_AWClearButtons();return;
+    }
+    if(*arg){Con_Printf("Enter with dbg combattest before choosing an action.\n");return;}
+    if(session || AW_GalleryActive()){Con_Printf("Exit the current gallery first.\n");return;}
+    if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict){
+        Con_Printf("Start a local game before entering combat test.\n");return;
+    }
+    /* Reuse the authored timing contract from the running game. The gallery
+     * BSP has no hand stamp; inventing durations would hide conversion bugs. */
+    for(i=0;i<4;i++){
+        v=GetEdictFieldValue(sv.edicts,(char *)hand_timing[i]);
+        if(!v || !isfinite(v->_float) || v->_float<=0 || v->_float>60){
+            Con_Printf("Combat test needs valid hands in the current game.\n");return;
+        }
+        combat_timing[i]=v->_float;
+    }
+    if(COM_FOpenFile("maps/charplane.bsp",&f)<124 || !f){
+        if(f)fclose(f);Con_Printf("Combat test floor missing; rebuild the gallery.\n");return;
+    }
+    fclose(f);
+    if(!capture_game())return;
+    combat=1;notice[0]=0;reload();
+}
+static void torch_center(edict_t *p){combat_center(p);p->v.origin[0]=64;VectorCopy(p->v.origin,p->v.oldorigin);SV_LinkEdict(p,false);}
+static void torch_command(void){
+    edict_t *p;eval_t *v;FILE *f=NULL;int i,n=0,want_actor=0;char search[96];
+    gallery_entry_t previous=current;
+    const char *arg=Cmd_Argv(1);
+    if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
+    if(session && !torch_test){Con_Printf("Exit the current gallery first.\n");return;}
+    if(torch_test && AW_TorchTestActive() && !returning && Cmd_Argc()<=2){
+        if(!*arg || !Q_strcasecmp((char *)arg,"center"))torch_center(svs.clients[0].edict);
+        else if(!Q_strcasecmp((char *)arg,"help"))help=1;
+        else if(!Q_strcasecmp((char *)arg,"empty")){torch_actor=0;reload();return;}
+        else goto usage;
+        key_dest=key_game;IN_AWClearButtons();return;
+    }
+    if(*arg){
+        if(Q_strcasecmp((char *)arg,"npc") || Cmd_Argc()<3)goto usage;
+        for(i=2;i<Cmd_Argc();i++){
+            if(n+(int)strlen(Cmd_Argv(i))+2>(int)sizeof(search))goto usage;
+            if(n)search[n++]=' ';strcpy(search+n,Cmd_Argv(i));n+=strlen(Cmd_Argv(i));
+        }
+        search[n]=0;
+        if(!select_entry(0,search)){Con_Printf("%s\n",notice);return;}
+        if(strcmp(current.kind,"NPC_") || current.size[0]>96 || current.size[1]>96 || current.size[2]>104){
+            current=previous;
+            Con_Printf("Torch room needs an NPC no larger than 96 x 96 x 104 units.\n");return;
+        }
+        want_actor=1;
+    }
+    if(torch_test && AW_TorchTestActive() && !returning){torch_actor=want_actor;body=0;reload();return;}
+    if(session || AW_GalleryActive()){Con_Printf("Exit the current gallery first.\n");return;}
+    if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){
+        Con_Printf("Start a local game before entering torch test.\n");return;
+    }
+    for(i=0;i<4;i++){
+        v=GetEdictFieldValue(sv.edicts,(char *)hand_timing[i]);
+        if(!v || !isfinite(v->_float) || v->_float<=0 || v->_float>60){
+            Con_Printf("Torch test needs valid hands in the current game.\n");return;
+        }
+        combat_timing[i]=v->_float;
+    }
+    if(COM_FOpenFile("maps/torchtest.bsp",&f)<124 || !f){
+        if(f)fclose(f);Con_Printf("Dark torch test room missing; rebuild the image.\n");return;
+    }
+    fclose(f);if(!capture_game())return;
+    torch_test=1;torch_actor=want_actor;body=0;notice[0]=0;
+    back_fullbright=r_fullbright.value;Cvar_Set("r_fullbright","0");reload();return;
+usage:
+    Con_Printf("Usage: dbg torchtest [npc ID/name | empty/center/help/exit].\n");
+}
+void AW_GalleryInit(void){Cmd_AddCommand("aw_charplane",command);Cmd_AddCommand("aw_combattest",combat_command);Cmd_AddCommand("aw_torchtest",torch_command);}
 static int gallery_budget(const char *path) {
     FILE *f=NULL;unsigned char head[72];int vertices,triangles;
     if(COM_FOpenFile((char *)path,&f)<72 || !f){if(f)fclose(f);return 0;}
@@ -260,22 +381,36 @@ static float model_lift(void) {
 }
 void AW_GalleryEntities(void) {
     int i,j;edict_t *e;model_t *m;float lift;
-    if(strcmp(sv.name,"charplane") || !session)return;
+    /* SV_SpawnServer calls this before setting sv.active. Runtime predicates
+     * must stay inactive then, but this captured session's map needs its
+     * timings and actors before physics/baselines and client spawn. */
+    if(!session || strcmp(sv.name,torch_test?"torchtest":"charplane"))return;
+    if(combat || torch_test){
+        for(i=0;i<4;i++)hand_field(sv.edicts,hand_timing[i],combat_timing[i]);
+        if(!torch_test || !torch_actor)return; /* Empty tests need no catalogue. */
+    }
     if(!strcmp(current.model[body],"-")){strcpy(notice,"Conversion failed; see the private gallery audit.");return;}
     sprintf(model_path[0],"gallery/%s.mdl",current.model[body]);
     sprintf(model_path[1],"gallery/f%s.mdl",current.model[body]+1);
     lift=model_lift();
-    for(j=0;j<2;j++){
+    for(j=0;j<(torch_test?1:2);j++){
         if(!gallery_budget(model_path[j])){if(!notice[0])strcpy(notice,"Selected model is missing or invalid.");continue;}
         m=Mod_ForName(model_path[j],false);
         if(!m){strcpy(notice,"Model unavailable: check its budget exception, cap and files.");continue;}
+        if(torch_test && (!(m->maxs[0]>=m->mins[0]) || !(m->maxs[1]>=m->mins[1]) || !(m->maxs[2]>=m->mins[2]))){
+            strcpy(notice,"NPC model bounds are invalid.");return;
+        }
+        if(torch_test && (!(m->maxs[0]-m->mins[0]<=96) || !(m->maxs[1]-m->mins[1]<=96) ||
+           !(m->maxs[2]-m->mins[2]+lift<=104))){strcpy(notice,"NPC model does not fit the dark room.");return;}
         for(i=1;i<MAX_MODELS && sv.model_precache[i];i++);
         if(i==MAX_MODELS){strcpy(notice,"Gallery model table full.");return;}
         sv.model_precache[i]=model_path[j];sv.models[i]=m;
         e=ED_Alloc();e->v.model=ED_NewString(model_path[j])-pr_strings;e->v.modelindex=i;
         e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_NOT;
         if(!j)for(i=0;i<3;i++)current.size[i]=m->maxs[i]-m->mins[i];
-        e->v.origin[2]=j?0.35f:0.25f-m->mins[2]+lift;SV_LinkEdict(e,false);
+        e->v.origin[2]=j?0.35f:0.25f-m->mins[2]+lift;
+        if(torch_test){e->v.origin[0]=-40-(m->mins[0]+m->maxs[0])*.5f;e->v.origin[1]=-(m->mins[1]+m->maxs[1])*.5f;}
+        SV_LinkEdict(e,false);
     }
     Con_Printf("Gallery #%ld %s: %s (%s)\n",(long)current.number,current.id,current.name,body?"base body":"equipped");
 }
@@ -285,18 +420,23 @@ void AW_GallerySpawn(edict_t *p) {
         if(strcmp(sv.name,back_map)){returning=0;strcpy(notice,"Return scene did not load; snapshot retained.");return;}
         AW_SaveSnapshotRestore(back_state);free(back_state);back_state=NULL;
         if(voice){free(voice);voice=NULL;}
-        returning=session=0;VectorCopy(back_origin,p->v.origin);VectorCopy(back_origin,p->v.oldorigin);
+        if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
+        returning=session=combat=torch_test=torch_actor=0;VectorCopy(back_origin,p->v.origin);VectorCopy(back_origin,p->v.oldorigin);
         VectorCopy(vec3_origin,p->v.velocity);VectorCopy(back_angles,p->v.angles);VectorCopy(back_angles,p->v.v_angle);
         VectorCopy(back_angles,cl.viewangles);p->v.movetype=back_move;p->v.health=back_health;
         goal=GetEdictFieldValue(p,"aw_hand_goal");if(goal)goal->_float=back_hand_goal;
+        hand_field(p,"aw_torch",back_torch);
         p->v.fixangle=1;SV_LinkEdict(p,false);return;
     }
     if(!AW_GalleryActive()){
-        close_browser();editing=help=session=0;
+        if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
+        close_browser();editing=help=session=combat=torch_test=torch_actor=0;
         if(back_state){free(back_state);back_state=NULL;}
         if(voice){free(voice);voice=NULL;}return;
     }
     if(!session)return;
+    if(torch_test){torch_center(p);combat_pose(p,1);return;}
+    if(combat){combat_center(p);combat_pose(p,1);return;}
     distance=current.size[0]>current.size[1]?current.size[0]:current.size[1];
     if(distance<current.size[2])distance=current.size[2];
     distance*=1.5f;if(distance<72)distance=72;if(distance>400)distance=400;
@@ -311,6 +451,7 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     if(control && (key=='x' || key=='X')){if(down)leave();return 1;}
     if(key==K_F1){if(down){close_browser();editing=0;help=!help;IN_AWClearButtons();}return 1;}
     if(help){if(down && key==K_ESCAPE)help=0;return 1;}
+    if(combat || torch_test)return 0; /* Normal movement, hands and torch bindings. */
     if(page){
         if(key==K_MOUSE1 && !down){scroll_drag=0;return 1;}
         if(!down)return 1;
@@ -400,6 +541,40 @@ void AW_GalleryDraw(void) {
         "E: converted greeting, when available",
         "Ctrl+X: return to the captured game","F10: console; dbg gallery exit","F1 / Esc: close this help"};
     if(!AW_GalleryActive() || key_dest!=key_game)return;
+    if(torch_test){
+        line(0,"Torch test - dark enclosed room");
+        line(1,torch_actor?current.name:"Empty room");line(2,"V: torch  F: hands  F1: help  Ctrl+X: return");
+        if(notice[0])line(4,notice);
+        if(help){
+            AW_UIBox(2,2,vid.width-4,vid.height-4);
+            line(1,"Torch test: no baked or ambient room light");
+            line(3,"WASD + mouse: move; V: torch on/off");
+            line(4,"F: hands; weapon retains minimum visibility");
+            line(6,"dbg torch strength 0..1 / radius 32..288");
+            line(7,"dbg torchtest npc ID/name (one fitting NPC)");
+            line(8,"dbg torchtest empty / center");
+            line(10,"Ctrl+X or dbg torchtest exit: return");line(11,"F1 / Esc: close help");
+        }
+        scr_copyeverything=1;return;
+    }
+    if(combat){
+        edict_t *p=svs.clients[0].edict;eval_t *state=GetEdictFieldValue(p,"aw_hand_state");
+        line(0,"Combat test - empty gallery floor");
+        sprintf(text,"Hands state %ld / frame %ld",state?(long)state->_float:0L,(long)p->v.weaponframe);line(1,text);
+        line(2,"Attack: punch  F: draw/lower  F1: help");
+        if(help){
+            AW_UIBox(2,2,vid.width-4,vid.height-4);
+            line(1,"Combat test: current race/sex hands");
+            line(3,"WASD + mouse: move and inspect");
+            line(4,"Attack: punch; release for next punch");
+            line(5,"F: draw/lower using normal animation");
+            line(7,"F10: dbg combattest idle/draw/lower");
+            line(8,"dbg combattest punch / center");
+            line(10,"Ctrl+X or dbg combattest exit: return");
+            line(11,"F1 / Esc: close help");
+        }
+        scr_copyeverything=1;return;
+    }
     sprintf(text,"%ld/%ld #%ld %s",(long)(selected+1),(long)count,(long)current.number,current.name);line(0,text);
     line(1,current.id);
     sprintf(text,"%s: %ld x %ld x %ld units",body?"Base body":"Equipped",(long)current.size[0],(long)current.size[1],(long)current.size[2]);line(2,text);

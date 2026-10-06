@@ -3,6 +3,7 @@
 import hashlib
 from pathlib import Path
 import struct
+from alias_stream_heap import apply as alias_policy_apply, fallback as alias_fallback
 
 
 def alias_cost(raw, sizes):
@@ -14,13 +15,16 @@ def alias_cost(raw, sizes):
     alloc = lambda n: sizes['hunk'] + align(n)
     header = alloc(sizes['aliashdr'] + sizes['mdl'] + vertices*sizes['stvert'] + triangles*sizes['mtriangle'])
     decoded = header + alloc(sizes['maliasskindesc']) + alloc(width*height) + alloc(vertices*sizes['trivertx'])
-    return dict(file_bytes=len(raw), vertices=vertices, triangles=triangles,
+    return alias_policy_apply(raw,sizes,dict(file_bytes=len(raw), vertices=vertices, triangles=triangles,
                 decoded_hunk_bytes=decoded, cache_bytes=align(decoded+sizes['cache_system']),
                 source_file_hunk_fallback_bytes=alloc(len(raw)+1),
-                external_malloc_peak_bytes=len(raw)+decoded)
+                external_malloc_peak_bytes=len(raw)+decoded))
 
 
 def profile(id1, sizes):
+    if sizes.get('harvest_storage_mode',0)==1:
+        from compact_harvest_heap import profile as compact_profile
+        return compact_profile(id1,sizes)
     root = Path(id1)
     static_keys = ('harvest_proxy_static', 'harvest_catalogue_extension')
     if any(key in sizes for key in static_keys):
@@ -58,7 +62,7 @@ def profile(id1, sizes):
     # Reuse the exact package/save binding validator, including missing/modified
     # model bytes, bounded catalogues, matching BSPs and common global identity.
     from build_aga import harvest_fingerprint_entries
-    entries = harvest_fingerprint_entries(root)
+    entries = harvest_fingerprint_entries(root,plant_capacity=sizes['harvest_plant_capacity'])
     bindings = {name: sha for name, sha in entries if name.startswith('progs/harvest/')}
     if not bindings:
         raise ValueError('AWH4 model dependency closure is empty')
@@ -82,7 +86,7 @@ def profile(id1, sizes):
     for record in records:
         active = [models[name] for name in record['model_paths']]
         resident = sum(m['cache_bytes'] for m in active)
-        fallback = max(m['decoded_hunk_bytes']+m['source_file_hunk_fallback_bytes'] for m in active)
+        fallback = max(alias_fallback(m) for m in active)
         map_costs[record['path'][8:-4]] = dict(active_model_union=record['model_paths'],
             warm_cache_bytes=resident, loader_fallback_bytes=fallback,
             conservative_game_heap_peak_bytes=resident+fallback,
@@ -100,6 +104,7 @@ def profile(id1, sizes):
 
 def apply(report, prepared):
     report['additional_static_allowance_bytes'] = 0
+    report['additional_external_allocation_allowance_bytes'] = 0
     report['harvest_external'] = None
     if prepared is None:
         return
@@ -119,5 +124,14 @@ def apply(report, prepared):
     report['temporary_input_bytes_at_peak'] += fallback
     report['classifier_allocation_failure_fallback_peak_bytes'] += extra
     report['additional_static_allowance_bytes'] = prepared['additional_static_allowance_bytes']
+    if prepared.get('storage_mode')=='compact_offsets':
+        reserve=active.get('external_allocator_reservation_allowance_bytes',0)
+        report['additional_external_allocation_allowance_bytes']=reserve
+        report['harvest_external'].update(storage_mode='compact_offsets',
+            catalogue_requested_bytes=active.get('catalogue_requested_bytes',0),
+            all_available_binding_bytes=active.get('all_available_binding_bytes',0),
+            external_malloc_requested_peak_bytes=active.get('external_malloc_requested_peak_bytes',0),
+            external_malloc_rounded_blocks_peak_bytes=active.get('external_malloc_rounded_blocks_peak_bytes',0),
+            external_allocator_reservation_allowance_bytes=reserve)
     if extra:
         report['peak_section'] = 'conservative external harvest cache/load overlap'

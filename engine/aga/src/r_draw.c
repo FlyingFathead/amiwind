@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -103,16 +103,16 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 	else
 	{
 		world = &pv0->position[0];
-	
+
 	// transform and project
 		VectorSubtract (world, modelorg, local);
 		TransformVector (local, transformed);
-	
+
 		if (transformed[2] < NEAR_CLIP)
 			transformed[2] = NEAR_CLIP;
-	
+
 		lzi0 = 1.0 / transformed[2];
-	
+
 	// FIXME: build x/yscale into transform?
 		scale = xscale * lzi0;
 		u0 = (xcenter + scale*transformed[0]);
@@ -120,14 +120,14 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 			u0 = r_refdef.fvrectx_adj;
 		if (u0 > r_refdef.fvrectright_adj)
 			u0 = r_refdef.fvrectright_adj;
-	
+
 		scale = yscale * lzi0;
 		v0 = (ycenter - scale*transformed[1]);
 		if (v0 < r_refdef.fvrecty_adj)
 			v0 = r_refdef.fvrecty_adj;
 		if (v0 > r_refdef.fvrectbottom_adj)
 			v0 = r_refdef.fvrectbottom_adj;
-	
+
 		ceilv0 = (int) ceil(v0);
 	}
 
@@ -376,11 +376,11 @@ void R_ClipEdge (mvertex_t *pv0, mvertex_t *pv1, clipplane_t *clip)
 R_EmitCachedEdge
 ================
 */
-void R_EmitCachedEdge (void)
+void R_EmitCachedEdge (unsigned int cached_offset)
 {
 	edge_t		*pedge_t;
 
-	pedge_t = (edge_t *)((unsigned long)r_edges + r_pedge->cachededgeoffset);
+	pedge_t = (edge_t *)((unsigned long)r_edges + cached_offset);
 
 	if (!pedge_t->surfs[0])
 		pedge_t->surfs[0] = surface_p - surfaces;
@@ -408,6 +408,7 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 	vec3_t		p_normal;
 	medge_t		*pedges, tedge;
 	clipplane_t	*pclip;
+	unsigned int *pcache;
 
 /* Hide only the temporary *water sea reference, before allocating edges.
  * Contents/collision remain unchanged. Other future liquids are unaffected. */
@@ -453,6 +454,14 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 	for (i=0 ; i<fa->numedges ; i++)
 	{
 		lindex = currententity->model->surfedges[fa->firstedge + i];
+		pcache = NULL;
+		if (!insubmodel)
+		{
+			unsigned int index = lindex < 0 ? 0U-(unsigned int)lindex : (unsigned int)lindex;
+			if (index >= (unsigned int)currententity->model->edgecache_count || !currententity->model->edgecache)
+				Sys_Error("World edge cache index outside prefix");
+			pcache = &currententity->model->edgecache[index];
+		}
 
 		if (lindex > 0)
 		{
@@ -461,9 +470,9 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 		// if the edge is cached, we can just reuse the edge
 			if (!insubmodel)
 			{
-				if (r_pedge->cachededgeoffset & FULLY_CLIPPED_CACHED)
+				if (*pcache & FULLY_CLIPPED_CACHED)
 				{
-					if ((r_pedge->cachededgeoffset & FRAMECOUNT_MASK) ==
+					if ((*pcache & FRAMECOUNT_MASK) ==
 						r_framecount)
 					{
 						r_lastvertvalid = false;
@@ -473,11 +482,11 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 				else
 				{
 					if ((((unsigned long)edge_p - (unsigned long)r_edges) >
-						 r_pedge->cachededgeoffset) &&
+						 *pcache) &&
 						(((edge_t *)((unsigned long)r_edges +
-						 r_pedge->cachededgeoffset))->owner == r_pedge))
+						 *pcache))->owner == r_pedge))
 					{
-						R_EmitCachedEdge ();
+						R_EmitCachedEdge (*pcache);
 						r_lastvertvalid = false;
 						continue;
 					}
@@ -490,7 +499,7 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 			R_ClipEdge (&r_pcurrentvertbase[r_pedge->v[0]],
 						&r_pcurrentvertbase[r_pedge->v[1]],
 						pclip);
-			r_pedge->cachededgeoffset = cacheoffset;
+			if (pcache) *pcache = cacheoffset;
 
 			if (r_leftclipped)
 				makeleftedge = true;
@@ -505,9 +514,9 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 		// if the edge is cached, we can just reuse the edge
 			if (!insubmodel)
 			{
-				if (r_pedge->cachededgeoffset & FULLY_CLIPPED_CACHED)
+				if (*pcache & FULLY_CLIPPED_CACHED)
 				{
-					if ((r_pedge->cachededgeoffset & FRAMECOUNT_MASK) ==
+					if ((*pcache & FRAMECOUNT_MASK) ==
 						r_framecount)
 					{
 						r_lastvertvalid = false;
@@ -519,11 +528,11 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 				// it's cached if the cached edge is valid and is owned
 				// by this medge_t
 					if ((((unsigned long)edge_p - (unsigned long)r_edges) >
-						 r_pedge->cachededgeoffset) &&
+						 *pcache) &&
 						(((edge_t *)((unsigned long)r_edges +
-						 r_pedge->cachededgeoffset))->owner == r_pedge))
+						 *pcache))->owner == r_pedge))
 					{
-						R_EmitCachedEdge ();
+						R_EmitCachedEdge (*pcache);
 						r_lastvertvalid = false;
 						continue;
 					}
@@ -536,7 +545,7 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 			R_ClipEdge (&r_pcurrentvertbase[r_pedge->v[1]],
 						&r_pcurrentvertbase[r_pedge->v[0]],
 						pclip);
-			r_pedge->cachededgeoffset = cacheoffset;
+			if (pcache) *pcache = cacheoffset;
 
 			if (r_leftclipped)
 				makeleftedge = true;
@@ -931,4 +940,3 @@ void R_ZDrawSubmodelPolys (model_t *pmodel)
 		}
 	}
 }
-

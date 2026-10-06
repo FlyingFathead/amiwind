@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <setjmp.h>
 #include "../engine/aga/src/model.c"
+qboolean aw_loading_music=false;
 static byte heap[3*1024*1024];
 static int used,temporary_calls,failed;
 static jmp_buf failure;

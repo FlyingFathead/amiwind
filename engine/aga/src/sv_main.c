@@ -850,7 +850,7 @@ void SV_SendClientMessages (void)
         }
 
         // check for an overflowed message.  Should only happen
-        // on a very fucked up connection that backs up a lot, then
+        // on a severely congested connection that backs up a lot, then
         // changes level
         if (host_client->message.overflowed)
         {

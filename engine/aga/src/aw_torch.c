@@ -10,7 +10,8 @@
 #define AMIWIND_SPRITE_HANDS 0
 #endif
 static cvar_t torch_radius={"aw_torch_radius","192",true};
-static cvar_t torch_flame_style={"aw_torch_flame_style","1",true};
+static cvar_t torch_flame_style={"aw_torch_flame_style","2",true};
+cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
 float AW_TorchLightRadius(void) {
     float radius=torch_radius.value;
     if(!isfinite(radius))return 192;
@@ -45,6 +46,16 @@ static void flame_command(void) {
     else value=0;
     if(Cmd_Argc()!=2 || !value){Con_Printf("Usage: dbg torch flame classic/brightbase/sparks or 1/2/3.\n");return;}
     Cvar_SetValue(torch_flame_style.name,value);
+    Con_Printf("Torch flame style %ld (%s).\n",(long)value,value==3?"sparks":value==2?"brightbase":"classic");
+}
+static void strength_command(void) {
+    char *end,*text=Cmd_Argv(1);double value;
+    if(Cmd_Argc()==1){Con_Printf("Torch strength %g (0..1, default 0.7; renderer-relative intensity).\n",aw_torch_strength.value);return;}
+    value=strtod(text,&end);
+    if(Cmd_Argc()!=2 || end==text || *end || !isfinite(value) || value<0 || value>1){
+        Con_Printf("Usage: dbg torch strength 0..1 (player and admitted guard lights).\n");return;}
+    Cvar_SetValue(aw_torch_strength.name,(float)value);
+    Con_Printf("Torch strength %g; radius and light count unchanged.\n",aw_torch_strength.value);
 }
 static byte *torch_assets,*hand_torch_assets;
 static int use_hand_torch_assets;
@@ -94,14 +105,14 @@ void AW_TorchLoadAssets(void)
     if(!AW_TorchAssetsValidate(torch_assets,source_size)){torch_assets=NULL;Con_Printf("Original torch assets unavailable; rebuild the image.\n");return;}
     torch_duration=(unsigned int)read32(torch_assets+8);
 }
-#define AW_TORCH_LIGHT (-0x415754)
+#define AW_TORCH_LIGHT AW_TORCH_LIGHT_KEY
 extern cvar_t r_drawviewmodel, chase_active;
 extern qboolean r_fov_greater_than_90;
 
 static edict_t *torch_player(void)
 {
     if(cls.state!=ca_connected || !sv.active || svs.maxclients!=1 ||
-       !svs.clients || !svs.clients[0].edict || cl.intermission || AW_GalleryActive())return NULL;
+       !svs.clients || !svs.clients[0].edict || cl.intermission || (AW_GalleryActive() && !AW_TorchTestActive()))return NULL;
     if(svs.clients[0].edict->v.health<=0)return NULL;
     return svs.clients[0].edict;
 }
@@ -142,8 +153,9 @@ static void toggle(void)
     Con_Printf("Torch %s.\n",v->_float?"on":"off");
 }
 void AW_TorchInit(void){
-    Cvar_RegisterVariable(&torch_radius);Cvar_RegisterVariable(&torch_flame_style);
+    Cvar_RegisterVariable(&torch_radius);Cvar_RegisterVariable(&torch_flame_style);Cvar_RegisterVariable(&aw_torch_strength);
     Cmd_AddCommand("aw_torch_radius_set",radius_command);Cmd_AddCommand("aw_torch_flame_set",flame_command);
+    Cmd_AddCommand("aw_torch_strength_set",strength_command);
     Cmd_AddCommand("aw_torch",toggle);AW_GuardTorchInit();
 }
 static int phase(void)
@@ -170,6 +182,15 @@ int AW_TorchFrame(void)
     if(!duration)return 0;
     cycle=duration*.001;
     return (int)(fmod(AW_TorchAnimationTime(),cycle)*8/cycle)%8;
+}
+/* Only the superseded local-view payload is retired. Model metadata remains
+ * valid for fallback/reload; never free the model currently being drawn. */
+void AW_TorchReleaseLegacyCache(void)
+{
+    if(torch_model && torch_model!=cl.viewent.model &&
+       torch_model->type==mod_alias &&
+       !strcmp(torch_model->name,"progs/v_torch.mdl") && torch_model->cache.data)
+        Cache_Free(&torch_model->cache);
 }
 void AW_TorchViewModel(void)
 {
