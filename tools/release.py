@@ -19,7 +19,8 @@ from project_version import public_version, check_native_versions
 
 PROJECT = "amiwind"
 EXECUTABLES = {"build.sh", "tools/AmiWind-FS-UAE-launcher.py", "tools/run_fs_uae.py"}
-PROJECT_MEDIA = {"resources/media/AmiWind_logo_clear_background.png", "resources/media/AmiWind_wordmark.png"}
+PROJECT_MEDIA = {"resources/media/AmiWind_logo_clear_background.png", "resources/media/AmiWind_wordmark.png",
+                 "resources/media/AmiWind_logo_name_only.png"}
 IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev2-{name}.png" for name in ("port", "fargoth", "tradehouse", "prison"))
@@ -28,6 +29,7 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.23-dev4-{name}.png" for n
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.23-dev5-windows.png")
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc1-{name}.png" for name in ("balmora", "mages"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc2-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river"))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.31-balmora-night-{name}.png" for name in ("street-lamp", "plaza-guard", "lamp-house", "river", "house-corner"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc3-{name}.png" for name in ("dagoth", "balmora"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-rc4-{name}.png" for name in ("map",))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.24-{name}.png" for name in ("balmora-bridge", "balmora-street", "balmora-river", "dagoth", "map"))
@@ -35,6 +37,7 @@ DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.25-dev1-journal.png")
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.25-rc1-{name}.png" for name in ("map", "navigation"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.27-rc2-{name}.png" for name in ("mushroom-cap", "ascadian-mushrooms", "mushroom-underside"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.28-rc1-{name}.png" for name in ("sunrise", "sunset", "night"))
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.31-toolkit-{name}.png" for name in ("header", "world"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 DOCUMENTATION_CLIPS.add("docs/images/amiwind-v0.0.29-rc2-torch.gif")
 DOCUMENTATION_IMAGES.update({
@@ -64,8 +67,12 @@ DOCUMENTATION_CLIPS.update({'docs/images/amiwind-v0.0.29-rc1-mushroom-pick.gif'}
 DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.30-temple-before.png', 'docs/images/amiwind-v0.0.30-temple-after.png', 'docs/images/amiwind-v0.0.30-temple-banner.png', 'docs/images/amiwind-v0.0.30-controls.png'})
 # Project-authored text graphic; retain bounded UTF-8 source validation.
 DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
+# Performance charts written by tools/perf_charts.py from measured numbers.
+DOCUMENTATION_SOURCE_GRAPHICS.update(f"docs/images/amiwind-perf-{name}.svg" for name in ("visibility-by-map", "faces-world-vs-funcwall", "seyda-crossing-load"))
 # Project-authored bounded command metadata, required by the runtime dispatcher.
 DEBUG_CATALOGUES = {"config/debug-commands.txt", "config/shroompicker.txt"}
+# Plain-text world tables shipped to id1/world/ (owner-editable, no game data).
+WORLD_TABLES = {"config/fog-locations.txt"}
 # Exact project-authored C include, validated as bounded UTF-8 source.
 NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc"}
 
@@ -80,8 +87,8 @@ def allowed_files(root):
         p = PurePosixPath(name)
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
-        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES
-        native_aux = name in ("tools/polycount_inspector.html", "tests/test_polycount_markup.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES
+        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "tests/test_polycount_markup.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)

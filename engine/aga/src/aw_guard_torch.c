@@ -120,10 +120,17 @@ invalid:
 static void command(void)
 {
     int value,i,active=0,lights=0;
+    if(Cmd_Argc()==2 && strchr(Cmd_Argv(1),'.')){
+        /* A decimal is the guard torch light radius: dbg guardtorch 0.5 (0.1..2). */
+        float s=(float)atof(Cmd_Argv(1));
+        if(!(s>=.1f && s<=2)){Con_Printf("Usage: dbg guardtorch 0.1..2.0 (light radius, player torch 1; default 0.5)\n");return;}
+        Cvar_SetValue(aw_guard_torch_radius.name,s);
+        Con_Printf("Guard torch light radius %g of the player torch's.\n",aw_guard_torch_radius.value);return;
+    }
     if(Cmd_Argc()==2){
         value=!Q_strcasecmp(Cmd_Argv(1),"auto")?-1:AW_ParseBoolean(Cmd_Argv(1));
         if(value<0 && Q_strcasecmp(Cmd_Argv(1),"auto")){
-            Con_Printf("Usage: dbg guardtorch on/off/auto (true/false, 1/0)\n");return;
+            Con_Printf("Usage: dbg guardtorch on/off/auto (true/false, 1/0) or light radius 0.1..2.0\n");return;
         }
         override=value;
     }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg guardtorch [on/off/auto]\n");return;}
@@ -150,6 +157,8 @@ static int automatic_night(void)
     ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
     return ms>=0 && ms<86400000 && (ms<21600000 || ms>72000000);
 }
+/* Night as the guard torches see it; the night lamps share it. */
+int AW_GuardTorchNight(void){return automatic_night();}
 static guard_asset_t *asset(entity_t *ent,edict_t **actor,int automatic)
 {
     uintptr_t ptr=(uintptr_t)ent,base=(uintptr_t)cl_entities,offset;int index,i;
@@ -295,7 +304,7 @@ void AW_GuardTorchUpdate(void)
         if(best<0)break;
         chosen[j]=best;g=&guards[best];light=CL_AllocDlight(GUARD_LIGHT_KEY-j);
         g->light_key=GUARD_LIGHT_KEY-j;
-        VectorCopy(g->flame,light->origin);light->radius=AW_TorchLightRadius();light->minlight=16;
+        VectorCopy(g->flame,light->origin);light->radius=AW_TorchLightRadius()*(aw_guard_torch_radius.value>=.1f?(aw_guard_torch_radius.value>2?2:aw_guard_torch_radius.value):.1f);light->minlight=16;
         light->die=cl.time+.1;light->decay=0;
         last_lights++;
     }
@@ -311,6 +320,26 @@ void AW_GuardTorchUpdate(void)
  * Shared by guard torches and static fires; scale 1 is the guard size. */
 /* rise: vertical travel scale; opacity: alpha multiplier; solid > 0 replaces the
  * ordered dither with a fixed alpha cut-off (large static flames). Guards: 1, 1, 0. */
+/* Hearth colour table: when set, flame texels are recoloured by brightness
+ * into a hot ramp (deep red, orange, yellow, near-white core). The torch flame
+ * texture is reused for fires and turns brown in the converted palette. */
+static const byte *flame_lut;
+static byte hearth_lut[256];
+static int hearth_lut_ready;
+int AW_UIColor(int r,int g,int b);
+static void hearth_lut_build(void)
+{
+    static const int ramp[5][3]={{130,30,8},{220,80,15},{255,150,30},{255,215,90},{255,248,200}};
+    int i,lum,seg;float t,f;
+    for(i=0;i<256;i++){
+        lum=(host_basepal[i*3]*3+host_basepal[i*3+1]*6+host_basepal[i*3+2])/10;
+        t=lum*1.6f/255.0f;if(t>1)t=1;t*=4;seg=(int)t;if(seg>3)seg=3;f=t-seg;
+        hearth_lut[i]=(byte)AW_UIColor((int)(ramp[seg][0]+(ramp[seg+1][0]-ramp[seg][0])*f),
+                                      (int)(ramp[seg][1]+(ramp[seg+1][1]-ramp[seg][1])*f),
+                                      (int)(ramp[seg][2]+(ramp[seg+1][2]-ramp[seg][2])*f));
+    }
+    hearth_lut_ready=1;
+}
 static void flame_particle(const vec3_t origin,int k,float scale,int core,int max_pixels,float rise,float opacity,int solid)
 {
     static const int threshold[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
@@ -332,7 +361,8 @@ static void flame_particle(const vec3_t origin,int k,float scale,int core,int ma
             py>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
         j=((yy*16/n)*16+xx*16/n)*2;alpha=(int)(flame_pixels[j+1]*(1-age*.6f)*opacity);
         if(alpha>(solid?solid:threshold[(py&3)*4+(px&3)]*16+7) && d_pzbuffer[py*d_zwidth+px]<=z){
-            vid.buffer[py*vid.rowbytes+px]=AW_TorchFlameColor(flame_pixels[j],j,age,core);d_pzbuffer[py*d_zwidth+px]=z;
+            byte c=AW_TorchFlameColor(flame_pixels[j],j,age,core);
+            vid.buffer[py*vid.rowbytes+px]=flame_lut?flame_lut[c]:c;d_pzbuffer[py*d_zwidth+px]=z;
         }
     }
 }
@@ -342,9 +372,11 @@ void AW_GuardTorchDraw(void)
     int i,k,core;
     if(!flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
     core=AW_TorchFlameCoreColor();
-    for(i=0;i<visible_count;i++)for(k=0;k<3;k++){
+    for(i=0;i<visible_count;i++){
         if(!guards[i].active)continue;
-        flame_particle(guards[i].flame,k,1,core,16,1,1,0);
+        for(k=0;k<3;k++)flame_particle(guards[i].flame,k,1,core,16,1,1,0);
+        /* Torch embers (Quake particles): about three per second. */
+        if((rand()&1023)<(int)(host_frametime*6*1024))AW_EmberSpawn(guards[i].flame,.8f,18);
     }
 }
 
@@ -357,27 +389,34 @@ void AW_GuardTorchDraw(void)
 #define STATIC_FLAME_MAX 128
 #define STATIC_FLAME_DRAW 12
 #define STATIC_FLAME_RANGE (640.0f*640.0f)
+#define STATIC_FLAME_PARTS 6
 cvar_t aw_static_flames={"aw_static_flames","1",true};
-static struct {vec3_t origin;float scale;} static_flames[STATIC_FLAME_MAX];
+/* shape: particle size, rise and cone spread in map units (0 = legacy flame) */
+static struct {vec3_t origin;float scale,shape[3];} static_flames[STATIC_FLAME_MAX];
 static int static_flame_count;
 static model_t *static_flame_world;
 static void static_flames_load(model_t *world)
 {
-    char *data,key[64];int flame;vec3_t origin;float scale;
+    char *data,key[64];int flame;vec3_t origin;float scale,shape[3];
     static_flame_count=0;static_flame_world=world;
     if(!world || !world->entities)return;
     data=world->entities;
     while((data=COM_Parse(data))!=NULL && com_token[0]=='{'){
-        flame=0;origin[0]=origin[1]=origin[2]=0;scale=1;
+        flame=0;origin[0]=origin[1]=origin[2]=0;scale=1;shape[0]=shape[1]=shape[2]=0;
         while((data=COM_Parse(data))!=NULL && com_token[0]!='}'){
             strncpy(key,com_token,sizeof(key)-1);key[sizeof(key)-1]=0;
             if(!(data=COM_Parse(data)))break;
             if(!strcmp(key,"classname"))flame=!strcmp(com_token,"aw_flame");
             else if(!strcmp(key,"origin"))sscanf(com_token,"%f %f %f",&origin[0],&origin[1],&origin[2]);
             else if(!strcmp(key,"aw_flame_size"))scale=(float)atof(com_token);
+            else if(!strcmp(key,"aw_flame_shape") &&
+                sscanf(com_token,"%f %f %f",&shape[0],&shape[1],&shape[2])!=3)shape[0]=shape[1]=shape[2]=0;
         }
         if(flame && static_flame_count<STATIC_FLAME_MAX && isfinite(scale) && scale>0 && scale<=16){
             VectorCopy(origin,static_flames[static_flame_count].origin);
+            static_flames[static_flame_count].shape[0]=isfinite(shape[0]) && shape[0]>0 && shape[0]<64?shape[0]:0;
+            static_flames[static_flame_count].shape[1]=isfinite(shape[1]) && shape[1]>=0 && shape[1]<128?shape[1]:0;
+            static_flames[static_flame_count].shape[2]=isfinite(shape[2]) && shape[2]>=0 && shape[2]<64?shape[2]:0;
             static_flames[static_flame_count++].scale=scale;
         }
         if(!data)break;
@@ -400,7 +439,27 @@ void AW_StaticFlamesDraw(void)
         dist[j]=d;chosen[j]=i;
     }
     core=AW_TorchFlameCoreColor();
-    for(i=0;i<count;i++)for(k=0;k<3;k++)
-        flame_particle(static_flames[chosen[i]].origin,k,static_flames[chosen[i]].scale,core,48,
-                       static_flames[chosen[i]].scale<2.5f?static_flames[chosen[i]].scale:2.5f,2,96);
+    for(i=0;i<count;i++){
+        float scale=static_flames[chosen[i]].scale,*shape=static_flames[chosen[i]].shape;
+        if(shape[0]>0){
+            /* Emitter shape from the original mesh: STATIC_FLAME_PARTS particles
+             * of the authored size, spread over the authored cone and lifted by
+             * the authored rise (flame_particle lifts by age*2.7*rise). */
+            vec3_t at;float a,r;
+            if(shape[0]>=4){if(!hearth_lut_ready)hearth_lut_build();flame_lut=hearth_lut;}
+            for(k=0;k<STATIC_FLAME_PARTS;k++){
+                a=k*2.39996f;r=shape[2]*(k?0.45f+0.55f*(float)fmod(k*0.618034f,1.0f):0);
+                VectorCopy(static_flames[chosen[i]].origin,at);
+                at[0]+=r*(float)cos(a);at[1]+=r*(float)sin(a);
+                flame_particle(at,k,(shape[0]>scale*1.5f?shape[0]:scale*1.5f)/1.5f,core,64,shape[1]/2.7f,2,96);
+            }
+            flame_lut=NULL;
+            /* Hearth embers (Quake particles): about 8 per second per fire. */
+            if(shape[0]>=4 && (rand()&1023)<(int)(host_frametime*8*1024))
+                AW_EmberSpawn(static_flames[chosen[i]].origin,shape[2]+shape[0]*0.5f,shape[1]*1.2f);
+            continue;
+        }
+        for(k=0;k<3;k++)
+            flame_particle(static_flames[chosen[i]].origin,k,scale,core,48,scale<2.5f?scale:2.5f,2,96);
+    }
 }

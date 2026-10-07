@@ -1,5 +1,15 @@
 # Mesh tips and tricks: expensive scenery
 
+## Visibility first: brush entities never hide anything (2026-10-07)
+
+Converted meshes become `func_wall` models; Quake's `vis` ignores them, so a
+map whose world is only terrain (or an empty box, for interiors) lets the
+engine see through every building and wall. Give every building, interior wall
+and large rock a structural `skip` occluder, put the static faces in the world
+model (an entity is culled whole, and one in more than 16 leaves is always
+visible), and check the map's visibility share. See [the mandatory map rule](DEVELOPMENT.md) and
+[Town visibility](performance/TOWN-VISIBILITY.md).
+
 ## Packaged interior plane audit: 2026-10-06T20:11:15+03:00
 
 Read-only check of the sealed v0.0.29-rc1 package completed: all 58 gameplay

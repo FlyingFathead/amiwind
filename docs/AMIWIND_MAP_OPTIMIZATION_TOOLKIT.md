@@ -2,6 +2,10 @@
 
 *Geometry analysis, compile-time optimization, and validation for AmiWind.*
 
+7 October 2026: this toolkit is now the map optimisation part of the wider
+[AmiWind Toolkit](AMIWIND_TOOLKIT.md); the 3D Map Inspector moved to
+`amiwind-toolkit/map-inspector.html`.
+
 Documentation snapshot: 4 October 2026. This overview defines the toolkit's scope
 and intended workflow. It does not announce a completed optimization pipeline or
 a new playable release. Diagnostic numbers identify experiments, not separate

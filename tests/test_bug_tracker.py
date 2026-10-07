@@ -5,6 +5,7 @@ See docs/bugs/README.md. docs/bugs/bugs.json lists every bug exactly once and
 docs/BUGS.md is generated from it; every report page and every current journal entry
 has a register row; register links resolve, including heading anchors.
 """
+import json
 from pathlib import Path
 import re
 import sys
@@ -103,6 +104,24 @@ class BugTrackerTest(unittest.TestCase):
                 continue
             first = p.read_text(encoding='utf-8').splitlines()[0]
             self.assertTrue(first.startswith('# %s' % p.stem), 'report title must start with its ID: %s' % p.name)
+
+    def test_tags_are_checked_and_listed(self):
+        base = dict(id='TEST-TAG-31', title='t', state='open', fixed_in=None, owner_accepted=None,
+                    status='s', report=None)
+        self.assertEqual(bug_register.validate([dict(base, tags=['performance'])]), [])
+        for bad in (['perf'], [], ['performance', 'performance'], 'performance'):
+            self.assertTrue(bug_register.validate([dict(base, tags=bad)]), bad)
+        listed = bug_register.table([dict(base, tags=['performance']), dict(base, id='TEST-NOTAG-31')])
+        section = listed.split('### Tagged performance', 1)[1]
+        self.assertIn('TEST-TAG-31', section)
+        self.assertNotIn('TEST-NOTAG-31', section)
+
+    def test_tracker_files_ship_in_release(self):
+        shipped = set(json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8')))
+        files = [REGISTER, JOURNAL, *FROZEN, *sorted((DOCS / 'bugs').iterdir())]
+        missing = [p.relative_to(ROOT).as_posix() for p in files
+                   if p.is_file() and p.relative_to(ROOT).as_posix() not in shipped]
+        self.assertEqual(missing, [], 'tracker files missing from tools/release-files.json')
 
     def test_frozen_trackers_are_marked(self):
         for p in FROZEN:

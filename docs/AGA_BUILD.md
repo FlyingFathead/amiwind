@@ -157,6 +157,10 @@ all game-derived results stay external. The image builder validates all music
 streams and reads every payload back from the finished RDB image before success.
 No ROM or Workbench disk files are copied by this builder.
 
+The image builder also writes the night lighting tables (`id1/world/lamps.awl`,
+`night-windows.txt`, `fog-locations.txt`); their scenery sources and receipt
+are described in [night lighting tables](LINUX_BUILD.md#night-lighting-tables).
+
 All 18 installed base-game music files are stored on the private image.
 Exploration and battle use separate shuffled groups, excluding title duplicates.
 The player uses two 16 KiB PCM buffers and cooperative 4 KiB read slices; each

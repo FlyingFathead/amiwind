@@ -44,6 +44,9 @@ int main(int argc,char **argv) {
         CDAudio_Shutdown();return 0;
     }
     if(!strcmp(argv[2],"menu")) {
+        /* MUSIC-STARTUP-TRACK-31: with a title track nothing plays before the menu. */
+        assert(paused && !music && opens==0);
+        memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);assert(!sample.left && !sample.right);
         AW_MusicTitle();assert(title_playing && current==83 && !paused);
         for(j=0;j<35;j++){memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);}
         assert(current==83 && completions>=3);
@@ -53,6 +56,13 @@ int main(int argc,char **argv) {
         assert(AW_MusicStartTrack(4));assert(!title_playing && current==4 && played==0);
         for(j=0;j<10;j++)AW_MusicPaint(&sample,1);
         assert(AW_MusicStartTrack(4) && played==0);AW_MusicTitle();assert(current==83);
+        /* MUSIC-OPENING-CLIP-31: the hold is silent and flushed; a map-load CD
+         * resume cannot restart it; the opening track ends the hold. */
+        AW_MusicHold();assert(paused && !music && !title_playing);
+        CDAudio_Play(1,1);CDAudio_Resume();assert(paused);
+        memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);assert(!sample.left && !sample.right);
+        assert(AW_MusicStartTrack(4) && !paused && current==4);
+        CDAudio_Pause();CDAudio_Resume();assert(!paused);
         CDAudio_Shutdown();return 0;
     }
     if(!strcmp(argv[2],"demo-missing")) {

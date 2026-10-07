@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <fcntl.h>
 #endif
 #include "quakedef.h"
+#include "aw_remote.h"
 
 void Con_Linefeed (void);
 
@@ -407,6 +408,8 @@ void Con_Printf (char *fmt, ...)
 // log all messages to file
 	if (con_debuglog)
 		Con_DebugLog(va("%s/qconsole.log",com_gamedir), "%s", msg);
+	else if (AW_RemoteLogging ())
+		Con_DebugLog((char *)AW_RemoteConsoleLog (), "%s", msg);
 
 	if (!con_initialized)
 		return;

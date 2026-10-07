@@ -377,6 +377,7 @@ int AW_ConsoleCharWidth(void);
 int AW_ConsoleCharHeight(void);
 void AW_ConsoleCharacter(int x,int y,int c);
 void AW_SmallString(int x,int y,const char *text);
+int AW_LightGalleryDraw(void);
 extern int con_fullscreen;
 int Con_ScrollPage(void);
 int Con_ScrollMax(void);
@@ -404,6 +405,8 @@ trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 void AW_MusicSceneEvent(const char *why);
 int AW_MusicStartTrack(int id);
 void AW_MusicTitle(void);
+void AW_MusicTitleAfter(double seconds);
+void AW_MusicHold(void);
 
 #ifndef AMIWIND_SPRITE_HANDS
 #define AMIWIND_SPRITE_HANDS 0
@@ -415,6 +418,7 @@ void AW_GuardTorchLoadAssets(const byte *torch);
 void AW_GuardTorchUpdate(void);
 void AW_GuardTorchDraw(void);
 void AW_StaticFlamesDraw(void);
+void AW_EmberSpawn(const vec3_t org,float spread,float rise);
 entity_t *AW_GuardTorchEntity(entity_t *entity);
 void AW_TorchInit(void);
 float AW_TorchLightRadius(void);

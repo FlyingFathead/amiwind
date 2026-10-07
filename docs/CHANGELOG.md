@@ -1,5 +1,68 @@
 # Development history
 
+## v0.0.31: Lamps, Lanterns and Loading
+
+- Faster loading (16 KiB reads; Seyda Neen crossings 0.39-0.48 s) and lighter
+  Seyda Neen sub-cells (-25 %).
+- Night lamps, lanterns and glowing glass; light-space night; guard torches.
+- Fog distance slider, skyline fill, optional location fog.
+- Music start-up and opening fixes; place names; AmiWind Toolkit; console.
+- Measured: buildings, rooms and rocks never blocked Quake visibility.
+- Details: [release notes](RELEASE-v0.0.31.md).
+
+## v0.0.31-dev6: Lamps, Lanterns and Loading
+
+- Night lamps keep their light while turning and fade out (LAMPS-FLICKER-31).
+- Fog distance slider (100..1500), skyline fill, optional location fog.
+- Measured: buildings, rooms and rocks do not block visibility
+  (TOWN-VIS-OCCLUSION-31).
+- Details: [release notes](RELEASE-v0.0.31-dev6.md).
+
+## v0.0.31-dev5: Lamps, Lanterns and Loading
+
+- Night lamps: a torch's worth of warm light at night; lamps ahead
+  win the light slots and fade in (LAMPS-RANGE-31).
+- Lantern and window glass glow at night; light hue setting.
+- Guard torches light half as far (GUARD-TORCH-BRIGHT-31).
+- Details: [release notes](RELEASE-v0.0.31-dev5.md).
+
+## v0.0.31-dev4: Revisiting Seyda Neen
+
+- Silent start-up until the main menu's title music (MUSIC-STARTUP-TRACK-31);
+  no title clip while the ship loads (MUSIC-OPENING-CLIP-31).
+- Shorter wait after the intro video; the ship fades in from black.
+- AmiWind Toolkit: World / Local / 3D Inspector tabs, grid buttons, marker
+  highlight, keyboard panning.
+- Details: [release notes](RELEASE-v0.0.31-dev4.md).
+
+## v0.0.31-dev3: Revisiting Seyda Neen
+
+- Opening-scene and title music start after loading (AUDIO-03, AUDIO-LOGO-31).
+- Place names in the location label, from the original cell names.
+- `dbg lightgallery`; opt-in light-space night (`dbg night light`, `dbg night
+  tint`) and horizon veil (`dbg horizon veil`); night tint keeps dark greys.
+- `dbg time` / `dbg settime`, `dbg 24hrcycle` / `dbg daytimecycle`,
+  `dbg luma` status; generated console command page.
+- Light source census and Quake mapping ([light sources](LIGHT_SOURCES.md)).
+- Details: [release notes](RELEASE-v0.0.31-dev3.md).
+
+## v0.0.31-dev2: Revisiting Seyda Neen
+
+- Game files read through a 16 KiB buffer instead of 1 KiB: Seyda Neen
+  crossings 0.39-0.48 s on the test route (dev1 0.70-0.91 s).
+- `dbg headlamp` / `dbg hlamp`: torch light without a torch.
+- Entity tracker in the image build; bug register tags.
+- Details: [release notes](RELEASE-v0.0.31-dev2.md).
+
+## v0.0.31-dev1: Revisiting Seyda Neen
+
+- Seyda Neen sub-cells carry 700 units past their area instead of 896, with
+  ground simplified within 2 units: maps -25 %, crossings 16-44 % faster on
+  the test route, 6 instead of 43 maps over the modeled memory reserve.
+- Hearth fires shaped from the original emitters, hot colour ramp and embers;
+  torch embers; `dbg torchgallery` alias.
+- Details: [release notes](RELEASE-v0.0.31-dev1.md).
+
 ## v0.0.30: The Temple
 
 - Release of the dev3-rc1 work; no changes after rc1 apart from the version.

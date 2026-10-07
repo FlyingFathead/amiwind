@@ -2,27 +2,31 @@ AWDC1
 # Group|debug words|registered handler|help arguments
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
 AUDIO|ost play|aw_music_play|00..98 / original music filename stem (spaces as underscores)
-VIDEO|cull|aw_cull|0/1
-VIDEO|draw distance|aw_fog_distance|[128..1400 local units; default 540]
-VIDEO|drawdistance|aw_fog_distance|[128..1400 local units; default 540]
-VIDEO|fog|aw_fog|0/1
-VIDEO|fog distance|aw_fog_distance|[128..1400 local units; default 540]
+VIDEO|cull|aw_cull|0/1 or on/off (default 1)
+VIDEO|draw distance|aw_fog_distance|[100..1500 local units; default 540]
+VIDEO|drawdistance|aw_fog_distance|[100..1500 local units; default 540]
+VIDEO|fog|aw_fog|on/off or 1/0 (default on)
+VIDEO|fog distance|aw_fog_distance|[100..1500 local units; default 540]
+VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
+VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
 VIDEO|playvid|playvid|<1..17 / 01..17 / catalogue name> (drains queued game audio first)
 VIDEO|playvideo|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
+VIDEO|render order|aw_surface_order|1 legacy / 2 mesh intersections (default)
 VIDEO|videoplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|vidplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
-VIDEO|render order|aw_surface_order|1 legacy / 2 mesh intersections (default)
 PLAYTESTING|aw charplane|aw_charplane|[number/name/ID; next/previous/body/exit]
 PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census)
-PLAYTESTING|daycycle gallery|aw_daycycle_gallery|[here/off] (eight-stage camera tour; here keeps this view; Esc returns)
 PLAYTESTING|combattest|aw_combattest|[idle/draw/lower/punch/center/help/exit] empty floor, current hands
-PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
+PLAYTESTING|daycycle gallery|aw_daycycle_gallery|[here/off] (eight-stage camera tour; here keeps this view; Esc returns)
 PLAYTESTING|gallery|aw_charplane|[number/name/ID; next/previous/body/browse/help/exit]
+PLAYTESTING|lightgallery|aw_lightgallery|[off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done
 PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]
 PLAYTESTING|nightgallery|aw_nightgallery|[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)
 PLAYTESTING|npcgallery|aw_charplane|[number/name/ID]
 PLAYTESTING|shroompicker|aw_shroompicker|[1..10/list] (default 1; preserves inventory and picked state)
 PLAYTESTING|shroomtracker|aw_shroomtracker|(picked mushrooms in this save; excludes empty plants)
+PLAYTESTING|torchgallery|aw_torchtest|[npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch
+PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
 PLAYTESTING|tpscene|aw_tpscene|[list/headselection] (fresh debug scene; resets unsaved progress)
 WORLD / TRAVEL|map tp|aw_teleport_map|select a destination on the world map (alias)
 WORLD / TRAVEL|noclip|noclip|
@@ -34,32 +38,52 @@ WORLD / TRAVEL|tp|aw_teleport|[X Y original Morrowind global XY / balmora / seyd
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
 WORLD / TRAVEL|view|aw_view|x y z yaw pitch
+SKY / LIGHTING|24hrcycle|aw_24hrcycle|[seconds per hour 0.25..60, default 1; off] steps through 24 game hours, showing each hour that long (default 24 s in all); Esc stops
 SKY / LIGHTING|cloudcontrol|aw_cloud_control_set|legacy/new or 1/2 (legacy also disables midnight clearing)
 SKY / LIGHTING|clouds|aw_clouds|on/off true/false 1/0 (default on, independent of sun)
 SKY / LIGHTING|cloudtype|aw_cloud_type_set|classic/veil or 1/2 (classic default)
 SKY / LIGHTING|dayclouds|aw_day_clouds_set|0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected
 SKY / LIGHTING|daynightcycle|aw_daynightcycle|on/off true/false 1/0 (automatic time; explicit set/wait still work)
-SKY / LIGHTING|guardtorch|aw_guardtorch|[on/off/auto] (all guard torches; auto follows guards_torch_cycle)
+SKY / LIGHTING|daytimecycle|aw_24hrcycle|same as 24hrcycle
 SKY / LIGHTING|emissive|aw_emissive|[0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query
-SKY / LIGHTING|luma interior|aw_interiorluma_set|[0..4] no argument: query; build must include luma controls
-SKY / LIGHTING|luma exterior|aw_exteriorluma_set|[0..4] no argument: query; original exterior baseline 1.0
 SKY / LIGHTING|exterior luma|aw_exteriorluma_set|[0..4] no argument: query
-SKY / LIGHTING|interiorluma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
+SKY / LIGHTING|guardtorch|aw_guardtorch|[on/off/auto] (all guard torches; auto follows guards_torch_cycle) or light radius 0.1..2.0 of the player torch (default 0.5)
+SKY / LIGHTING|headlamp|aw_headlamp_set|[on/off, true/false or 1/0] torch light without holding a torch (not saved)
+SKY / LIGHTING|hlamp|aw_headlamp_set|[on/off, true/false or 1/0] same as headlamp
+SKY / LIGHTING|horizon veil|aw_horizon_veil|0..15 (default 0 off) haze the lowest sky bands into the far fog colour so distant gaps read as haze
 SKY / LIGHTING|indoor luma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
 SKY / LIGHTING|interior luma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
+SKY / LIGHTING|interiorluma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
+SKY / LIGHTING|lamp lights|aw_lamp_lights|[0..4] nearest exterior lamps, lanterns, torches and fires lit at night, each a torch's worth (default 2; 0 off)
+SKY / LIGHTING|lamps|aw_lamp_status|status of the night lamps here: map, night, cached and lit lamps, night windows
+SKY / LIGHTING|light hue|aw_light_hue_set|[R G B 0..255] colour of torch, lamp and window light (default 255 210 140); no argument: current
+SKY / LIGHTING|luma|aw_luma_status|no argument: current indoor and outdoor luma, then how to set them
+SKY / LIGHTING|luma exterior|aw_exteriorluma_set|[0..4] no argument: query; original exterior baseline 1.0
+SKY / LIGHTING|luma indoor|aw_interiorluma_set|<0..4> light multiplier indoors (1.0 = original light, default 1.2)
+SKY / LIGHTING|luma interior|aw_interiorluma_set|[0..4] no argument: query; build must include luma controls
+SKY / LIGHTING|luma outdoor|aw_exteriorluma_set|<0..4> light multiplier outdoors (1.0 = original light, default 1.0)
+SKY / LIGHTING|night light|aw_night_light|1 light-space night (default): lamps, glows and torches keep their light / 0 old whole-frame night remap
+SKY / LIGHTING|night tint|aw_night_tint|0..100 hue strength of the night tint with night light 1 (default 100)
+SKY / LIGHTING|night windows|aw_night_window_lights|1/0 window glass glows at night (default 1; an AmiWind addition, the original windows never glow)
 SKY / LIGHTING|nightclouds|aw_night_clouds_set|auto/clear/partial/overcast (night-only, stable game-day prototype)
 SKY / LIGHTING|nightsky|aw_nightsky|on/off true/false 1/0 (night layer including moons; default on)
 SKY / LIGHTING|nightskymode|aw_nightsky_mode_set|legacy/clear or 0/1 (midnight clear default, return by 04:00)
+SKY / LIGHTING|outdoorlantern|aw_lamp_radius|[0.25..3.0] light radius of exterior lamps and lanterns at night, relative to the torch (default 1.0)
 SKY / LIGHTING|set time|aw_set_time|HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn
+SKY / LIGHTING|settime|aw_set_time|same as time
 SKY / LIGHTING|sky|aw_daynight|on/off true/false 1/0 (sky/fog presentation; time control is separate)
+SKY / LIGHTING|skyline fill|aw_skyline_fill|1/0 sky showing below far scenery takes the fog colour (no cut-outs at short fog distances; default 1)
+SKY / LIGHTING|skylinefill|aw_skyline_fill|1/0 sky showing below far scenery takes the fog colour (no cut-outs at short fog distances; default 1)
 SKY / LIGHTING|skyspeed|aw_skyspeed_set|[0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed)
 SKY / LIGHTING|skytype|aw_sky_type_set|1/2/3 or V1/V2/V3 (V3 extra stronk default)
 SKY / LIGHTING|starsky|aw_starsky|on/off true/false 1/0 (stars and nebula; default on)
 SKY / LIGHTING|sun|aw_sun|on/off true/false 1/0 (default on, clock still advances)
+SKY / LIGHTING|time|aw_set_time|[HHMM 0000..2359 or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn] jump to that time; no argument: current time
 SKY / LIGHTING|timeofday|aw_timeofday|[0..23.999 or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn]
 SKY / LIGHTING|torch flame|aw_torch_flame_set|[classic/brightbase/sparks or 1/2/3] no argument: current style
 SKY / LIGHTING|torch radius|aw_torch_radius_set|[32..288] (player + admitted guard lights; default 192, classic 144)
 SKY / LIGHTING|torch strength|aw_torch_strength_set|[0..1] (player + admitted guards; default 0.7; local light only)
+SKY / LIGHTING|warm light|aw_warm_light|1/0 torch, lamp and window light takes the light hue (default 1)
 UI / CONSOLE|console bg color|aw_console_color|black/blue/gray or R G B
 UI / CONSOLE|console font|aw_console_size|small/normal
 UI / CONSOLE|font|aw_console_font|readable/retro

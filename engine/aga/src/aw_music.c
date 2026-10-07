@@ -79,6 +79,11 @@ static int advance(const char *reason) {
     available=0;return 0;
 }
 /* One 4 KiB read per service call. No heap allocation and no decoder on Amiga. */
+static double title_due=-1; /* AW_MusicTitleAfter: realtime when the title starts, -1 none */
+/* Opening hold (MUSIC-OPENING-CLIP-31): silent and flushed until the opening
+ * track starts; Quake's CD-track resume on map load must not restart the
+ * previous stream's buffered blocks. */
+static int held;
 static int refill(void) {
     int target,take,i;
     if(!music || !remaining)return 0;
@@ -96,7 +101,10 @@ static int refill(void) {
     if(loaded==BYTES){valid[loading]=remaining>FRAMES?FRAMES:(int)remaining;remaining-=valid[loading];loading=-1;loaded=0;}
     return 1;
 }
-void CDAudio_Update(void) {if(available && !paused)refill();}
+void CDAudio_Update(void) {
+    if(title_due>=0 && realtime>=title_due)AW_MusicTitle();
+    if(available && !paused)refill();
+}
 void AW_MusicPaint(portable_samplepair_t *dst,int n) {
     int i,take,l,r,next,gain=(int)(bgmvolume.value*256);
     if(!available || paused)return;
@@ -229,7 +237,13 @@ static void music_status(void) {
     Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);
     Con_Printf("OST read-ahead: %lu blocks / %lu bytes; queued %lu frames.\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks),queued);
 }
+/* Deferred title start: lets the menu finish loading before the stream reads. */
+void AW_MusicTitleAfter(double seconds) {
+    if(title_playing && music && current==title_track && !paused)return;
+    title_due=realtime+seconds;
+}
 void AW_MusicTitle(void) {
+    title_due=-1;held=0;
     if(!available)return;
     /* Startup branding and its destination menu share the same title stream. */
     if(title_playing && music && current==title_track && !paused)return;
@@ -241,6 +255,7 @@ void AW_MusicTitle(void) {
  * Keep the chosen track in Previous/Next history and out of the first bag. */
 int AW_MusicStartTrack(int id) {
     int i,j,t,n=0;
+    held=0;
     if(!available)return 0;
     for(i=0;i<counts[0];i++)if(groups[0][i]==id)break;
     if(i==counts[0])return 0;
@@ -256,10 +271,13 @@ int AW_MusicStartTrack(int id) {
     left[0]=n;
     return 1;
 }
-void CDAudio_Play(byte track,qboolean looping) {(void)track;(void)looping;paused=0;}
+void CDAudio_Play(byte track,qboolean looping) {(void)track;(void)looping;if(!held)paused=0;}
 void CDAudio_Stop(void) {paused=1;}
 void CDAudio_Pause(void) {paused=1;}
-void CDAudio_Resume(void) {paused=0;}
+void CDAudio_Resume(void) {if(!held)paused=0;}
+void AW_MusicHold(void) {
+    held=1;paused=1;title_due=-1;title_playing=0;close_music();log_event("hold");
+}
 int CDAudio_IsPaused(void) {return paused!=0;}
 int CDAudio_Init(void) {
     FILE *f;char path[MAX_OSPATH+64];int g,n,i,j,id;
@@ -283,6 +301,10 @@ int CDAudio_Init(void) {
     Cmd_AddCommand("aw_music_play",music_play);
     Cmd_AddCommand("aw_music_next",music_next);Cmd_AddCommand("aw_music_previous",music_previous);
     Cmd_AddCommand("aw_music_mode",music_mode);Cmd_AddCommand("aw_music_status",music_status);
+    /* With a title track, stay silent until the main menu starts it: the startup
+     * logo is silent, and a random world track must not play under it
+     * (MUSIC-STARTUP-TRACK-31). Old playlists without one start the world shuffle. */
+    if(title_track>=0){paused=1;return 0;}
     return advance("start")?0:-1;
 }
 void CDAudio_Shutdown(void) {

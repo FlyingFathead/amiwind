@@ -249,7 +249,7 @@ but search Balmora's unconverted door catalogue and fail to find the entrance.
 
 `dbg fog distance 500` and `debug draw distance 500` set the same value. Both
 other prefixes and the old `dbg drawdistance` spelling work. No value prints
-the current distance; new commands accept whole numbers 128..1400 and reject
+the current distance; new commands accept whole numbers 100..1500 and reject
 invalid input. The default/Medium value remains **700**. One local unit equals
 four source Morrowind units; 700 is 2800 source units. This is forward view
 depth, not a radius or a real-world metre measurement.

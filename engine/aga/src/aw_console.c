@@ -66,7 +66,7 @@ static int route_match(char *words,int argc,char **argv,int start) {
     return *words?0:j;
 }
 static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capacity) {
-    int used,n,k;char *token;
+    int used,n,k,setting;char *token;
     if(!strcmp(r->command,"aw_teleport") && argc-j>2)return 0;
     if(!strcmp(r->command,"aw_shroomtracker") && argc!=j)return 0;
     if(!strcmp(r->command,"aw_shroompicker")){
@@ -82,8 +82,16 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     }
     used=(int)strlen(r->command);if(used+2>capacity)return 0;
     strcpy(out,r->command);
+    setting=Cvar_FindVar(r->command)!=NULL;
     for(;j<argc;j++){
-        token=argv[j];n=(int)strlen(token);
+        token=argv[j];
+        /* A route straight onto a setting gets 1/0 for the toggle words the
+         * help promises; Quake would read "on" as 0 (DBG-TOGGLE-WORDS-31). */
+        if(setting && argc-j==1){
+            if(!Q_strcasecmp(token,"on") || !Q_strcasecmp(token,"true") || !Q_strcasecmp(token,"yes"))token="1";
+            else if(!Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !Q_strcasecmp(token,"no"))token="0";
+        }
+        n=(int)strlen(token);
         if(!n || used+n+3>capacity)return 0;
         for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
             (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
@@ -144,10 +152,25 @@ static void help(void) {
     Con_Printf("Toggle values: on/off true/false 1/0\n");
     Con_Printf("Noclip: look+WASD, E/Q vertical, Shift\n");
 }
+/* dbg help <word>: only the catalogue lines whose command starts with that word,
+ * streamed from the disk file like the full list. */
+static void help_for(char *word) {
+    FILE *f;route_t r;int left,status,n=strlen(word),shown=0;char line[DEBUG_LINE];
+    f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
+    while((status=catalogue_line(f,&left,line))>0){
+        if(!*line || *line=='#')continue;
+        if(!catalogue_route(line,&r)){status=-1;break;}
+        if(Q_strncasecmp(r.words,word,n) || (r.words[n] && r.words[n]!=' '))continue;
+        Con_Printf(" dbg %s %s\n",r.words,r.arguments);shown++;
+    }
+    fclose(f);if(status<0){catalogue_error();return;}
+    if(!shown)Con_Printf("No debug command starts with \"%s\"; use debug help\n",word);
+}
 static void dispatch(void) {
     char *argv[12],out[160];int i,n=Cmd_Argc(),r;
     if(n>12){Con_Printf("Too many arguments; use debug help\n");return;}
     for(i=0;i<n;i++)argv[i]=Cmd_Argv(i);
+    if(n==3 && Q_strcasecmp(argv[0],"amiwind") && !Q_strcasecmp(argv[1],"help")){help_for(argv[2]);return;}
     r=AW_DebugTranslate(n,argv,out,sizeof(out));
     if(r<0)catalogue_error();else if(r==2)help();else if(r==1)Cbuf_InsertText(out);
     else Con_Printf("Unknown debug command; use debug help\n");

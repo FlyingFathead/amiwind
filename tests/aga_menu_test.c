@@ -20,7 +20,7 @@ void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 int AW_UIFrameEnabled(void){return gold_frame;}
 void AW_UIFrameToggle(void){gold_frame=!gold_frame;}
 int AW_DrawDistance(void){return distance;}
-void AW_SetDrawDistance(int n){if(n<128)n=128;if(n>1400)n=1400;distance=n;}
+void AW_SetDrawDistance(int n){if(n<100)n=100;if(n>1500)n=1500;distance=n;}
 int Cmd_Argc(void){return 1;}
 void Con_Printf(char *fmt,...){}
 int COM_FOpenFile(char *name,FILE **f){if(missing || (intro_missing && !strcmp(name,"intro/chargenname1.txt"))){*f=NULL;return -1;}*f=tmpfile();return 124;}
@@ -36,6 +36,7 @@ int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);if(!strcmp(s,"Audio"))audio_draws++;}
 void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
 void AW_MusicTitle(void){}
+void AW_MusicTitleAfter(double seconds){(void)seconds;}
 void AW_MenuMouse(int,int);
 static void open_pause(void){M_Menu_Main_f();mx=160;my=63;}
 static void click(int x,int y){AW_MenuMouse(x-mx,y-my);mx=x;my=y;M_Keydown(K_MOUSE1);}
@@ -82,6 +83,7 @@ static void check_setup_endpoints(void){
  M_Keydown(K_DOWNARROW);M_Draw();assert(highlight_y==73);
  M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
 }
+cvar_t aw_drawdistance={"aw_drawdistance","540",true,false,540};
 int main(void){
  vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;sv.active=true;
  M_Init();assert(picker && front);

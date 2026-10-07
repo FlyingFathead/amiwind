@@ -15,6 +15,18 @@ the current builder. Keep the existing immutable release archives as baselines.
 See REPOSITORY_LAYOUT.md for the path mapping and RELEASE_WORKFLOW.md for the
 single version shared by source, runtime and release packages.
 
+## Mandatory rule: the repository builds the whole game from scratch
+
+The repository's builder (`build.sh`, `build.cmd`, `build.ps1`,
+`tools/build_aga.py` and the converters they call) must be able to build the
+entire game from the builder's own Morrowind data, from scratch: no private
+stage, no reused image, no hand-applied patch. This is checked regularly, before
+every release and after any builder or converter change, by a from-scratch
+build compared file by file with the latest release image; every difference is
+a bug in the [register](BUGS.md). Known gap as of v0.0.31:
+[BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026); the
+release gate in [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) applies from v0.0.32.
+
 ## Mandatory build rule: ALWAYS CHECK COMPILER WARNINGS
 
 For every native build, capture the complete compiler output and inspect every
@@ -42,6 +54,35 @@ The v0.0.20 maintenance comparison is 95 -> 93 with no new warnings under the
 same GCC 16.2-rc11 configuration. Two array-row bounds violations were reproduced
 and fixed. The other 93 warnings remain work, not a clean-bill-of-health claim.
 This rule applies to later builds too, including character creation and save/load.
+
+## Mandatory map rule: EVERY MAP MUST LET QUAKE'S VIS DO ITS JOB
+
+Quake only skips what its `vis` data says cannot be seen, and `vis` only uses
+structural world brushes as walls. Brush entities (`func_wall`, every converted
+building, interior wall, floor and rock today) are drawn and collide but never
+hide anything. Measured on the v0.0.31-dev5 maps: interiors 100 % visible from
+everywhere, Balmora 84-89 %, Seyda Neen 59-76 %, the open world 69-85 %; hidden
+houses and the NPCs behind them were processed every frame
+([Town visibility](performance/TOWN-VISIBILITY.md),
+[TOWN-VIS-OCCLUSION-31](bugs/TOWN-VIS-OCCLUSION-31.md)).
+
+- Static scenery faces (buildings, interior walls and floors, large rocks) go
+  into the world model, so Quake culls them leaf by leaf; doors, activators,
+  lights, NPCs and pickables stay entities. Brush entities are kept or dropped
+  whole, and one linked to more than 16 leaves is treated as visible
+  everywhere, so leaving buildings as `func_wall` defeats `vis` even with
+  occluders (measured on bm019: 589 of 590 still visible).
+- Every converted map also gets structural occluders: invisible `skip`-textured
+  world brushes inside buildings, inside interior walls and floors between
+  rooms, and inside large rocks, so `vis` has walls to cut with.
+- Every map build reports its visibility share (leaves visible from an average
+  leaf) and the faces in the world vs in brush entities; a map that regresses
+  past its limit fails the build.
+- No performance conclusion without the visibility numbers and a matched
+  in-game frame-rate A/B: before saying "nothing more can be culled", read the
+  map's visibility data.
+- The same applies to anything else placed as an entity: NPCs and creatures are
+  only skipped when the visibility data puts them out of sight.
 
 ## Tests
 

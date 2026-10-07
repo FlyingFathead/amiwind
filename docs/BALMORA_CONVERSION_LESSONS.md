@@ -1,5 +1,15 @@
 # Balmora conversion: problems, causes, implications and resolutions
 
+## Visibility update: 2026-10-07
+
+Balmora's buildings are `func_wall` models, which Quake's `vis` ignores, so
+84-89 % of a Balmora map counts as visible from an average spot and hidden
+houses and NPCs are processed every frame. Measurements, method and the
+planned repair (building faces in the world model plus occluders): [Town visibility](performance/TOWN-VISIBILITY.md),
+[TOWN-VIS-OCCLUSION-31](bugs/TOWN-VIS-OCCLUSION-31.md).
+
+![Faces in the world vs in func_wall models](images/amiwind-perf-faces-world-vs-funcwall.svg)
+
 ## Geometry import validation update: 2026-10-06T20:06:10+03:00
 
 The RC1 Temple investigation confirmed that nearly collinear leading vertices

@@ -192,11 +192,15 @@ FLAME_SKIP = ('smoke', 'ash', 'spark', 'steam', 'dust', 'mist', 'bubble', 'fog')
 
 
 def model_flames(raw, N, name=''):
-    """Particle-flame positions [x, y, z, size] in NIF units for a light mesh.
+    """Particle flames [x, y, z, size, particle, rise, spread] for a light mesh.
 
     One entry per NiParticleSystemController emitter (candle, lantern, fire,
     brazier), skipping smoke/ash/spark-type emitters. Uses the same root-node
     rule as model_geometry (rotation dropped, translation and scale kept).
+    x, y, z are NIF units; size is the legacy engine flame scale class;
+    particle (particle size), rise (speed x lifetime) and spread (cone radius
+    at the top of the rise) are NIF units taken from the emitter itself, so
+    a hearth draws as wide and as tall as in the original.
     The engine draws these as static flames (aw_flame entities)."""
     import numpy as np
     data = N.Data()
@@ -224,7 +228,10 @@ def model_flames(raw, N, name=''):
         if id(block.emitter) not in worlds: continue
         if any(k in block.emitter.name.decode('cp1252', 'replace').lower() for k in FLAME_SKIP): continue
         p = worlds[id(block.emitter)][3, :3]
-        flames.append([round(float(p[0]), 3), round(float(p[1]), 3), round(float(p[2]), 3), size])
+        rise = max(0.0, float(block.speed)) * max(0.0, float(block.lifetime))
+        spread = rise * math.tan(min(max(float(block.vertical_angle), 0.0), 1.2))
+        flames.append([round(float(p[0]), 3), round(float(p[1]), 3), round(float(p[2]), 3), size,
+                       round(max(0.0, float(block.size)), 3), round(rise, 3), round(spread, 3)])
     return flames
 
 

@@ -19,7 +19,7 @@ cvar_t r_fullbright={"r_fullbright","0"};
 static int exterior=1;
 int R_SkyExterior(void){return exterior;}
 /* The real inline gain policy reads this setting; unkeyed lights stay at one. */
-cvar_t aw_torch_strength={"aw_torch_strength","1",true,false,1};
+cvar_t aw_torch_strength={"aw_torch_strength","1",true,false,1};cvar_t aw_guard_torch_radius={"aw_guard_torch_radius","1",true,false,1};
 void Con_Printf(char *format,...){}
 void R_EntityRotate(vec3_t p){assert(0);}
 void Sys_Error(char *format,...){fprintf(stderr,"Unexpected renderer error: %s\n",format);abort();}

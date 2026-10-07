@@ -14,7 +14,8 @@
       "fixed_in": {"type": ["string", "null"], "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$", "description": "First version that shipped the fix; null unless state is fixed."},
       "owner_accepted": {"type": ["string", "null"], "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$", "description": "Version in which the owner confirmed the fix in play; null until then."},
       "status": {"type": "string", "description": "Current evidence and next check, factual; keep reported, source-checked, packaged, native-verified and owner-accepted distinct. May contain markdown links."},
-      "report": {"type": ["string", "null"], "description": "bugs/<id>.md when the report page exists, else null."}
+      "report": {"type": ["string", "null"], "description": "bugs/<id>.md when the report page exists, else null."},
+      "tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["performance"]}, "description": "Optional, sorted; each tag gets its own list below the register table in docs/BUGS.md."}
     }
   }
 }

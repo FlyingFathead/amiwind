@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="486" viewBox="0 0 630 486" role="img">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="16" y="24" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#3d3d3a" text-anchor="start" font-weight="bold">Share of the map Quake treats as visible from an average spot</text>
+<text x="16" y="42" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#77756f" text-anchor="start" font-weight="normal">Visibility data of the v0.0.31-dev5 maps; lower is better</text>
+<line x1="190" y1="52" x2="190" y2="450" stroke="#d8d6cf" stroke-width="1"/>
+<text x="190" y="466" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="middle" font-weight="normal">0%</text>
+<line x1="285" y1="52" x2="285" y2="450" stroke="#d8d6cf" stroke-width="1"/>
+<text x="285" y="466" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="middle" font-weight="normal">25%</text>
+<line x1="380" y1="52" x2="380" y2="450" stroke="#d8d6cf" stroke-width="1"/>
+<text x="380" y="466" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="middle" font-weight="normal">50%</text>
+<line x1="475" y1="52" x2="475" y2="450" stroke="#d8d6cf" stroke-width="1"/>
+<text x="475" y="466" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="middle" font-weight="normal">75%</text>
+<line x1="570" y1="52" x2="570" y2="450" stroke="#d8d6cf" stroke-width="1"/>
+<text x="570" y="466" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="middle" font-weight="normal">100%</text>
+<text x="182" y="69" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Mages Guild (interior)</text>
+<rect x="190" y="56" width="380" height="18" rx="3" fill="#c8423f"/>
+<text x="576" y="69" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">100%</text>
+<text x="182" y="95" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Temple (interior)</text>
+<rect x="190" y="82" width="380" height="18" rx="3" fill="#c8423f"/>
+<text x="576" y="95" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">100%</text>
+<text x="182" y="121" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Census (interior)</text>
+<rect x="190" y="108" width="380" height="18" rx="3" fill="#c8423f"/>
+<text x="576" y="121" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">100%</text>
+<text x="182" y="147" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Prison ship (interior)</text>
+<rect x="190" y="134" width="380" height="18" rx="3" fill="#c8423f"/>
+<text x="576" y="147" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">100%</text>
+<text x="182" y="173" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Balmora bm020</text>
+<rect x="190" y="160" width="338.2" height="18" rx="3" fill="#e0784f"/>
+<text x="534.2" y="173" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">89%</text>
+<text x="182" y="199" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Balmora bm028</text>
+<rect x="190" y="186" width="334.4" height="18" rx="3" fill="#e0784f"/>
+<text x="530.4" y="199" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">88%</text>
+<text x="182" y="225" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Balmora bm019</text>
+<rect x="190" y="212" width="330.6" height="18" rx="3" fill="#e0784f"/>
+<text x="526.6" y="225" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">87%</text>
+<text x="182" y="251" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Balmora bm029</text>
+<rect x="190" y="238" width="319.2" height="18" rx="3" fill="#e0784f"/>
+<text x="515.2" y="251" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">84%</text>
+<text x="182" y="277" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Open world vf0930</text>
+<rect x="190" y="264" width="323" height="18" rx="3" fill="#e0784f"/>
+<text x="519" y="277" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">85%</text>
+<text x="182" y="303" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Open world vf1383</text>
+<rect x="190" y="290" width="315.4" height="18" rx="3" fill="#e0784f"/>
+<text x="511.4" y="303" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">83%</text>
+<text x="182" y="329" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Seyda Neen docks</text>
+<rect x="190" y="316" width="288.8" height="18" rx="3" fill="#e8a317"/>
+<text x="484.8" y="329" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">76%</text>
+<text x="182" y="355" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Seyda Neen</text>
+<rect x="190" y="342" width="277.4" height="18" rx="3" fill="#e8a317"/>
+<text x="473.4" y="355" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">73%</text>
+<text x="182" y="381" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Open world vf1158</text>
+<rect x="190" y="368" width="266" height="18" rx="3" fill="#e8a317"/>
+<text x="462" y="381" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">70%</text>
+<text x="182" y="407" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Seyda Neen courtyard</text>
+<rect x="190" y="394" width="224.2" height="18" rx="3" fill="#2f8f4e"/>
+<text x="420.2" y="407" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">59%</text>
+<text x="182" y="433" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Open water vf1311</text>
+<rect x="190" y="420" width="148.2" height="18" rx="3" fill="#2f8f4e"/>
+<text x="344.2" y="433" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">39%</text>
+</svg>

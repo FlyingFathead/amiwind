@@ -12,7 +12,7 @@ static eval_t goal,state,torch;static int gallery,locked,torch_test;
 static void (*command)(void);
 static cvar_t *radius_setting,*flame_setting;
 static int setting_argc=1;static char *setting_value="";
-static void (*set_radius)(void),(*set_flame)(void),(*set_strength)(void);
+static void (*set_radius)(void),(*set_flame)(void),(*set_strength)(void),(*set_headlamp)(void);
 int Cmd_Argc(void){return setting_argc;}
 char *Cmd_Argv(int n){return n==1?setting_value:"";}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
@@ -22,6 +22,7 @@ int Q_strlen(char *s){return strlen(s);}
 void Q_strcpy(char *to,char *from){strcpy(to,from);}
 int Q_strcmp(char *a,char *b){return strcmp(a,b);}
 float Q_atof(char *s){return atof(s);}
+double host_frametime;void AW_EmberSpawn(const vec3_t org,float spread,float rise){(void)org;(void)spread;(void)rise;}
 qboolean Cmd_Exists(char *name){return false;}
 void SV_BroadcastPrintf(char *format,...){assert(0);}
 int AW_UIColor(int r,int g,int b){
@@ -39,6 +40,7 @@ int com_filesize;
 void AW_GuardTorchInit(void){}
 void AW_GuardTorchLoadAssets(const byte *torch){assert(torch==torch_assets);guard_loads++;}
 void AW_GuardTorchUpdate(void){}
+void AW_LampInit(void){}void AW_LampUpdate(void){}
 void AW_GuardTorchDraw(void){}
 vec3_t vpn,vup,vright;
 float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
@@ -66,6 +68,7 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
     if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;
     else if(!strcmp(name,"aw_torch_flame_set"))set_flame=fn;
     else if(!strcmp(name,"aw_torch_strength_set"))set_strength=fn;
+    else if(!strcmp(name,"aw_headlamp_set"))set_headlamp=fn;
     else {assert(!strcmp(name,"aw_torch"));command=fn;}
 }
 void Con_Printf(char *format,...){}
@@ -173,6 +176,15 @@ int main(void)
     assert(local.origin[0]==20 && local.origin[1]==10 && local.origin[2]==24);
     currententity=&cl_entities[0];
     command();assert(!torch._float && !lights());
+    /* Debug headlamp: the torch's eye light without a torch, steady, not saved. */
+    assert(set_headlamp && !Cvar_FindVar("aw_headlamp")->archive && !Cvar_FindVar("aw_headlamp")->value);
+    setting_argc=2;setting_value="maybe";set_headlamp();AW_TorchUpdate();assert(!lights());
+    setting_value="on";set_headlamp();AW_TorchUpdate();assert(lights()==1);
+    light=torchlight();assert(light && light->radius==AW_TorchLightRadius());
+    cl.time+=.3;AW_TorchUpdate();assert(torchlight()==light && light->radius==AW_TorchLightRadius());
+    setting_value="0";set_headlamp();AW_TorchUpdate();assert(!lights());
+    setting_value="TRUE";set_headlamp();AW_TorchUpdate();assert(lights()==1);
+    setting_value="off";set_headlamp();AW_TorchUpdate();assert(!lights());
     memset(blocklights,0,sizeof(blocklights));R_AddDynamicLights();assert(!blocklights[0]);
     command();assert(torch._float);goal._float=0;AW_TorchUpdate();assert(!lights());
     goal._float=1;AW_TorchUpdate();assert(lights()==1);

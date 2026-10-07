@@ -7,6 +7,9 @@ server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;
 aw_character_t aw_character;
 cmd_source_t cmd_source=src_command;
 keydest_t key_dest=key_console;double host_frametime=.02;
+double realtime;static int music_starts;
+int AW_MusicStartTrack(int track){assert(track==4);music_starts++;return 1;}
+static int music_holds;void AW_MusicHold(void){music_holds++;}
 char *pr_strings="";int pr_edict_size=sizeof(edict_t);
 static client_t client;static edict_t entities[3];static eval_t role;
 static int argc=2,maps,save_resets,cancels,opened,done,character;

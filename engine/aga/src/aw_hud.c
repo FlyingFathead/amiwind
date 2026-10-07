@@ -100,6 +100,7 @@ void Sbar_Draw(void) {
     if(key_dest==key_console)return;
     AW_UIHud();
     compass();
+    if(AW_LightGalleryDraw())return; /* its strip replaces the bottom HUD */
     if(!AW_DebugOverlaysEnabled())return;
     if(current_region(&region))
         snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " Vvardenfell / %s",region?region:"Region unavailable");

@@ -5,7 +5,7 @@ agree; a mismatch fails the build.
 
 | Part | File | Holds |
 | --- | --- | --- |
-| Register | [`bugs.json`](bugs.json) (schema: [`bugs.schema.json`](bugs.schema.json)), shown as [`docs/BUGS.md`](../BUGS.md) | Every bug exactly once: ID, title, state (open/fixed/closed), fixed in, owner accepted, current status, report link. The only place for current status. Edit the JSON, or use `tools/bug_register.py add` / `set`, then `tools/bug_register.py render`; never edit the table in BUGS.md by hand. |
+| Register | [`bugs.json`](bugs.json) (schema: [`bugs.schema.json`](bugs.schema.json)), shown as [`docs/BUGS.md`](../BUGS.md) | Every bug exactly once: ID, title, state (open/fixed/closed), fixed in, owner accepted, current status, report link, and optional tags (`performance`: listed together below the table; add with `--tag performance`). The only place for current status. Edit the JSON, or use `tools/bug_register.py add` / `set`, then `tools/bug_register.py render`; never edit the table in BUGS.md by hand. |
 | Report | `docs/bugs/<ID>.md` | The full record of one bug (template below). Required for every bug found from v0.0.30 on, and for an older bug when it is worked on again. |
 | Journal | [`docs/BUG_JOURNAL.md`](../BUG_JOURNAL.md) | Dated, short entries as things happen: reported, cause found, fixed, shipped, accepted. Each entry starts with the bug ID. |
 

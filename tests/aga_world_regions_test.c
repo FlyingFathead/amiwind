@@ -3,7 +3,7 @@
 #include "aw_maps.h"
 #include "aw_world.h"
 #include <assert.h>
-static int opens,missing_map,broken_names;
+static int opens,missing_map,broken_names,old_names;
 void Con_Printf(char *fmt,...){}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void number(FILE *f,float value){unsigned n;memcpy(&n,&value,4);word(f,n);}
@@ -22,16 +22,27 @@ int COM_FOpenFile(char *name,FILE **out){
         rewind(f);return 168;
     }
     if(!strcmp(name,"world/region-names.awn")){
-        char labels[128]={0};
+        char labels[128]={0},places[64]={0};
         /* A packed file has a nonzero member offset. Names deliberately differ
          * from any town name; negative cells must use floor, not truncation. */
         for(i=0;i<137;i++)fputc(0,f);
-        fputs(broken_names?"BAD!":"ARN1",f);word(f,2);word(f,3);
-        strcpy(labels,"Western test region");strcpy(labels+64,"Eastern test region");fwrite(labels,1,128,f);
-        word(f,(unsigned)-1);word(f,0);word(f,0);
-        word(f,0);word(f,0);word(f,1);
-        word(f,1);word(f,0);word(f,1);
-        fseek(f,137,SEEK_SET);return 176;
+        strcpy(labels,"Western test region");strcpy(labels+64,"Eastern test region");
+        if(old_names){
+            fputs(broken_names?"BAD!":"ARN1",f);word(f,2);word(f,3);fwrite(labels,1,128,f);
+            word(f,(unsigned)-1);word(f,0);word(f,0);
+            word(f,0);word(f,0);word(f,1);
+            word(f,1);word(f,0);word(f,1);
+            fseek(f,137,SEEK_SET);return 176;
+        }
+        /* ARN2: cell 0 is a named place in the eastern region; cell 3 has a
+         * place but no region. */
+        strcpy(places,"Test Town");
+        fputs(broken_names?"BAD!":"ARN2",f);word(f,2);word(f,1);word(f,4);fwrite(labels,1,128,f);fwrite(places,1,64,f);
+        word(f,(unsigned)-1);word(f,0);word(f,0);word(f,(unsigned)-1);
+        word(f,0);word(f,0);word(f,1);word(f,0);
+        word(f,1);word(f,0);word(f,1);word(f,(unsigned)-1);
+        word(f,3);word(f,0);word(f,(unsigned)-1);word(f,0);
+        fseek(f,137,SEEK_SET);return 16+128+64+4*16;
     }
     assert(!strncmp(name,"maps/",5));if(missing_map){fclose(f);*out=NULL;return -1;}rewind(f);return 124;
 }
@@ -71,10 +82,14 @@ int main(void){
     source[0]=NAN;assert(!AW_WorldMapTarget(source,target,b));
     source[0]=-0.01f;assert(!strcmp(AW_RegionNameAt(source),"Western test region"));
     before=opens;source[0]=-8192;assert(AW_RegionNameAt(source) && before==opens);
-    source[0]=0;assert(!strcmp(AW_RegionNameAt(source),"Eastern test region"));
+    source[0]=0;assert(!strcmp(AW_RegionNameAt(source),"Eastern test region / Test Town"));
     before=opens;source[0]=8191;assert(AW_RegionNameAt(source) && opens==before);
     source[0]=8192;assert(AW_RegionNameAt(source) && opens==before+1);
     source[0]=16384;assert(!AW_RegionNameAt(source));
+    source[0]=3*8192;assert(!strcmp(AW_RegionNameAt(source),"Test Town"));
+    source[0]=4*8192;assert(!AW_RegionNameAt(source));
+    old_names=1;source[0]=0;assert(!strcmp(AW_RegionNameAt(source),"Eastern test region"));
+    source[0]=3*8192;assert(!AW_RegionNameAt(source));old_names=0;
     broken_names=1;source[0]=-1;assert(!AW_RegionNameAt(source));
     source[0]=NAN;assert(!AW_RegionNameAt(source));
     return 0;

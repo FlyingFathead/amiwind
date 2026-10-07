@@ -153,6 +153,18 @@ class NativeSourceTests(unittest.TestCase):
             ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
+    def test_light_space_night_dims_light_keeps_hue_and_shades_unlit(self):
+        self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+            arguments=['--night-light'])
+
+    def test_night_tint_keeps_dark_near_greys_from_turning_rust(self):
+        self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'],
+            arguments=['--night-rust'])
+
     def test_night_source_stars_are_one_native_pixel_behind_art_world_and_moons(self):
         self.compile_run('aga_daynight_test.c', [Path(SOURCE)/'src'/n for n in
             ('r_sky.c','aw_fog.c','aw_horizon.c','aw_clock.c','aw_state.c','r_part.c','mathlib.c','d_sky.c')],
@@ -308,6 +320,18 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_dialogue_modes_preserve_panel_and_transparent_names(self):
         self.compile_run('aga_dialogue_test.c', [Path(SOURCE)/'src/aw_ui.c'])
+
+    def test_night_lamps_read_per_cell_and_light_the_nearest_at_night(self):
+        self.compile_run('aga_lamps_test.c', [Path(SOURCE)/'src/aw_lamps.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_location_fog_day_night_blend(self):
+        self.compile_run('aga_fog_location_test.c', [Path(SOURCE)/'src/aw_fog_location.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_remote_console_command_and_state_files(self):
+        self.compile_run('aga_remote_test.c', [Path(SOURCE)/'src/aw_remote.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_wait_cancel_bounds_calendar_and_debug_time(self):
         self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in

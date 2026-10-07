@@ -1527,6 +1527,11 @@ int COM_FindFile (char *filename, int *handle, FILE **file)
 			{
 				Sys_FileClose (i);
 				*file = fopen (netpath, "rb");
+				/* AmiWind: the C library reads through 1 KiB by default, one
+				 * AmigaDOS call per KiB. 16 KiB halves map read time
+				 * (SEYDA-READ-SLOW-31); larger buffers gained nothing overall. */
+				if (*file)
+					setvbuf (*file, NULL, _IOFBF, 16384);
 			}
 			return com_filesize;
 		}

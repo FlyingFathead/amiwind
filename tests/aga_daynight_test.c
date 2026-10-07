@@ -5,6 +5,9 @@
 #include "aw_state.h"
 #include "aw_clock.h"
 #include <assert.h>
+/* Light-space night symbols owned by r_light.c / d_sprite.c / d_surf.c. */
+int r_daylight=256;unsigned char *r_warm_colormap;const unsigned char *d_nightshade;
+void Cvar_Set(char *name,char *value){(void)name;(void)value;}static int flushes;void D_FlushCaches(void){flushes++;}
 extern int r_backgroundsky;
 extern float skytime;
 void R_SetSkyFrame(void);
@@ -18,6 +21,7 @@ unsigned short d_8to16table[256];
 static byte palette[768],tile[128*128],night[128*128],baseline_fog[4096];
 static unsigned short tile16[128*128];
 static int opens,inside,cloud_fixture,particle_seen,night_fixture,night_coverage_fixture;
+static cvar_t *night_light,*night_tint;
 static cvar_t *enabled,*fog_enabled,*type,*sun_enabled,*clouds_enabled,*cloud_speed,*cloud_type,*night_clouds,*cloud_control,*day_clouds,*stars_enabled,*night_enabled,*night_mode;
 static int nargs=1;static char *argument="";static void (*type_command)(void),(*speed_command)(void),(*cloud_type_command)(void),(*night_clouds_command)(void),(*cloud_control_command)(void),(*day_clouds_command)(void),(*night_mode_command)(void);
 server_t sv;
@@ -34,7 +38,7 @@ vec3_t vpn={1,0,0},vright={0,-1,0},vup={0,0,1},r_origin;
 cvar_t aw_drawdistance={"aw_drawdistance","540",0,0,540};
 int AW_Interior(void){return inside;}
 void Con_Printf(char *fmt,...){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_nightsky_mode"))night_mode=c;if(!strcmp(c->name,"aw_starsky"))stars_enabled=c;if(!strcmp(c->name,"aw_nightsky"))night_enabled=c;if(!strcmp(c->name,"aw_daynight"))enabled=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;if(!strcmp(c->name,"aw_sky_type"))type=c;if(!strcmp(c->name,"aw_sun"))sun_enabled=c;if(!strcmp(c->name,"aw_clouds"))clouds_enabled=c;if(!strcmp(c->name,"aw_skyspeed"))cloud_speed=c;if(!strcmp(c->name,"aw_cloud_type"))cloud_type=c;if(!strcmp(c->name,"aw_night_clouds"))night_clouds=c;if(!strcmp(c->name,"aw_cloud_control"))cloud_control=c;if(!strcmp(c->name,"aw_day_clouds"))day_clouds=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_night_light"))night_light=c;if(!strcmp(c->name,"aw_night_tint"))night_tint=c;if(!strcmp(c->name,"aw_nightsky_mode"))night_mode=c;if(!strcmp(c->name,"aw_starsky"))stars_enabled=c;if(!strcmp(c->name,"aw_nightsky"))night_enabled=c;if(!strcmp(c->name,"aw_daynight"))enabled=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;if(!strcmp(c->name,"aw_sky_type"))type=c;if(!strcmp(c->name,"aw_sun"))sun_enabled=c;if(!strcmp(c->name,"aw_clouds"))clouds_enabled=c;if(!strcmp(c->name,"aw_skyspeed"))cloud_speed=c;if(!strcmp(c->name,"aw_cloud_type"))cloud_type=c;if(!strcmp(c->name,"aw_night_clouds"))night_clouds=c;if(!strcmp(c->name,"aw_cloud_control"))cloud_control=c;if(!strcmp(c->name,"aw_day_clouds"))day_clouds=c;}
 void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_nightsky_mode")){night_mode->value=value;return;}if(!strcmp(name,"aw_skyspeed")){cloud_speed->value=value;return;}if(!strcmp(name,"aw_sky_type")){type->value=value;return;}if(!strcmp(name,"aw_cloud_type")){cloud_type->value=value;return;}if(!strcmp(name,"aw_night_clouds")){night_clouds->value=value;return;}if(!strcmp(name,"aw_cloud_control")){cloud_control->value=value;return;}if(!strcmp(name,"aw_day_clouds")){day_clouds->value=value;return;}assert(!strcmp(name,"aw_drawdistance"));aw_drawdistance.value=value;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_nightsky_mode_set"))night_mode_command=fn;if(!strcmp(name,"aw_sky_type_set"))type_command=fn;if(!strcmp(name,"aw_skyspeed_set"))speed_command=fn;if(!strcmp(name,"aw_cloud_type_set"))cloud_type_command=fn;if(!strcmp(name,"aw_night_clouds_set"))night_clouds_command=fn;if(!strcmp(name,"aw_cloud_control_set"))cloud_control_command=fn;if(!strcmp(name,"aw_day_clouds_set"))day_clouds_command=fn;}
 int Cmd_Argc(void){return nargs;}char *Cmd_Argv(int n){return n?argument:"aw_sky_type_set";}
@@ -729,9 +733,55 @@ static void night_checks(model_t *model){
     }
 }
 
+byte R_SkyNearest(int r,int g,int b);
+/* NIGHT-RUST-31: a rust entry is nearest the grid point (17,0,0) while a
+ * near-black grey is nearest the colour itself; the grey must win, and a
+ * bright colour must keep the grid answer. */
+static int night_rust_checks(void){
+    int i;
+    for(i=0;i<256;i++){palette[3*i]=((i>>5)&7)*255/7;palette[3*i+1]=((i>>2)&7)*255/7;palette[3*i+2]=(i&3)*85;}
+    palette[3*5]=23;palette[3*5+1]=7;palette[3*5+2]=3;
+    palette[3*6]=9;palette[3*6+1]=9;palette[3*6+2]=6;
+    host_basepal=palette;AW_StateReset();AW_FogInit();R_InitDayNight();
+    assert(R_SkyNearest(17,0,0)==5);
+    assert(R_SkyNearest(9,8,8)==6);
+    assert(R_SkyNearest(255,255,255)==255 && R_SkyNearest(300,-0,0)==R_SkyNearest(255,0,0));
+    puts("night tint: dark near-greys keep their hue; grid answers elsewhere unchanged");
+    return 0;
+}
+/* Light-space night: off by default (legacy look untouched); on, deep night
+ * moves brightness into r_daylight, keeps only hue in the table (white stays
+ * bright), dims unlit sprites/particles through d_nightshade; full daylight at
+ * noon and whenever the mode is off. */
+static int luma(byte i){return (red(i)*299+green(i)*587+blue(i)*114)/1000;}
+static int night_light_checks(void){
+    model_t m;int i,legacy_white;
+    for(i=0;i<256;i++){palette[3*i]=((i>>5)&7)*255/7;palette[3*i+1]=((i>>2)&7)*255/7;palette[3*i+2]=(i&3)*85;}
+    host_basepal=palette;AW_StateReset();AW_FogInit();R_InitDayNight();
+    assert(night_light && night_tint && night_light->archive && night_tint->archive);
+    assert(night_light->value==1 && night_tint->value==100);night_light->value=0;
+    memset(&m,0,sizeof m);m.entities="{\"classname\" \"worldspawn\" \"_aw_sky_mode\" \"exterior\"}";
+    R_SetSkyBackground(&m);type->value=3;
+    assert(AW_ClockSetTime(23,0));R_SetSkyFrame();
+    assert(r_daylight==256 && !d_nightshade && R_DayNightFogColours());
+    legacy_white=luma(R_DayNightFogColours()[255]);
+    night_light->value=1;R_SetSkyFrame();
+    assert(r_daylight>=8 && r_daylight<256 && !(r_daylight&7) && d_nightshade);
+    assert(luma(R_DayNightFogColours()[255])>legacy_white+60);
+    assert(luma(d_nightshade[255])<luma(255)*r_daylight/256+40 && luma(d_nightshade[255])>luma(255)*r_daylight/256-40);
+    night_tint->value=0;R_SetSkyFrame();
+    assert(R_DayNightFogColours()[255]==255 || luma(R_DayNightFogColours()[255])>=240);
+    assert(AW_ClockSetTime(12,0));R_SetSkyFrame();assert(r_daylight==256 && !d_nightshade);
+    assert(AW_ClockSetTime(23,0));night_light->value=0;night_tint->value=100;R_SetSkyFrame();
+    assert(r_daylight==256 && !d_nightshade && luma(R_DayNightFogColours()[255])==legacy_white);
+    puts("night light: legacy by default; light-space night dims light, keeps hue, shades unlit pixels");
+    return 0;
+}
 int main(int argc,char **argv){
     model_t m;int i,warm,dark;float phase;aw_state_t saved;
     int parity_mode=argc==2 && !strcmp(argv[1],"--protected-parity");
+    if(argc==2 && !strcmp(argv[1],"--night-rust"))return night_rust_checks();
+    if(argc==2 && !strcmp(argv[1],"--night-light"))return night_light_checks();
     for(i=0;i<256;i++){
         palette[3*i]=((i>>5)&7)*255/7;palette[3*i+1]=((i>>2)&7)*255/7;palette[3*i+2]=(i&3)*85;
         d_8to16table[i]=i*7;
@@ -767,6 +817,7 @@ int main(int argc,char **argv){
     R_SetSkyBackground(&m);assert(r_backgroundsky && opens==1);
     if(night_coverage_fixture && !parity_mode)night_mode_checks(&m);
     night_mode->value=0; /* Historical fixtures explicitly select retained coverage. */
+    if(night_light)night_light->value=0; /* ... and the whole-frame night remap they were written for. */
     if(parity_mode){
         static const int minutes[]={240,300,360,539,900,930,960,1080,1140,1230,1260,1319};
         int j,minute,profile,control;unsigned int hash;

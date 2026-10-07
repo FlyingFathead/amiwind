@@ -19,6 +19,7 @@ size_t __wrap_fread(void *p,size_t size,size_t n,FILE *f){
  return __real_fread(p,size,n,f);
 }
 double Sys_FloatTime(void){return now;}
+double realtime;
 int SNDDMA_GetSamples(void){return (int)(now*11015);}
 int SNDDMA_GetDMAPos(void){return (SNDDMA_GetSamples()*2)&32767;}
 void SNDDMA_Submit(void){}

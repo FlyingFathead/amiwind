@@ -437,7 +437,7 @@ and outstanding work.
 
 ## Which tools help inspect the converted world?
 
-The [polygon-count and heatmap inspector](https://github.com/FlyingFathead/amiwind/blob/main/tools/polycount_inspector.html)
+The [polygon-count and heatmap inspector](https://github.com/FlyingFathead/amiwind/blob/main/amiwind-toolkit/map-inspector.html)
 was developed specifically for AmiWind. It helps examine the converted world's
 geometry and the density of its scenes. Automated builds and tests support the
 conversion pipeline; the source and applicable licenses are available in this

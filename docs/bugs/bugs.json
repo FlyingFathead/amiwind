@@ -14,8 +14,8 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Still present in v0.0.30-rc1 (owner, WinUAE, 7 October 2026): the music crackles as the game fades in after the intro. Audio source and cause unverified; no mitigation or fix recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#audio-03-winuae-video-to-jiub-loading-spike)",
-    "report": null
+    "status": "Still present in v0.0.31-dev2 (owner, WinUAE, 7 October 2026). Cause found in source: the opening music started before the ship map load. Repair in source: the scene holds and the music starts after load plus settle; not yet packaged or heard.",
+    "report": "bugs/AUDIO-03.md"
   },
   {
     "id": "AUDIO-CLOCK-29",
@@ -185,7 +185,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Reproduced on the v0.0.29 inputs. v0.0.30-dev5 added build_aga.py image --canonical-land-source; the terrain finishing steps behind the shipped sub-cells are not yet in the public build. [Record](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026).",
+    "status": "Reproduced on the v0.0.29 inputs. v0.0.30-dev5 added build_aga.py image --canonical-land-source; the shipped sub-cells are the end of a seven-stage chain whose last three stages (canonical terrain fit, palette remap, ground-winding repair) are not public tools, and the full image path was not run end to end from v0.0.29-dev4 to v0.0.31 (see BUILD-FINALIZE-SCENE-31). v0.0.31 ships with this exception; the release gate applies from v0.0.32. [Record](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026).",
     "report": null
   },
   {
@@ -518,8 +518,8 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Seen in about 5 of 70 scripted FS-UAE runs on dev4/dev5 engines; not reported in manual play. The game waits inside a DOS read whose reply never arrives; cause unknown, no fix. [Record](BUG_JOURNAL.md#seyda-load-hang-30-rare-freeze-during-a-seyda-neen-region-load-7-october-2026).",
-    "report": null
+    "status": "Rare freeze during Seyda Neen region loads in automated FS-UAE runs (about 5 in 70). Debugger capture, verified by disassembly: the game waits in a music stream read (aw_music refill -> fread -> dos Read) that never completes; reply port empty, handlers idle. Cause open; next: breakpoint on the refill read, test pausing music streaming during loads.",
+    "report": "bugs/SEYDA-LOAD-HANG-30.md"
   },
   {
     "id": "SKY-MIDNIGHT-29",
@@ -716,7 +716,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "No-lightdata saturation corrected. A source-matched native candidate visibly brightens the sampled guard with its torch on at night and by day. This is bounded off/on evidence, not an old/new-engine native A/B or measured frame cost. Final package reconciliation remains open.",
+    "status": "No-lightdata saturation corrected earlier; NPC floor light (aw_actor_brush_light) added in v0.0.30. v0.0.31-dev check 7 October 2026: Fargoth in the dark torch room lights up with the player torch (sampled area luma 25 -> 37, torch off again restores the identical frame). Not yet checked at range or with guard torches; owner playtest pending (planned long torch corridor).",
     "report": null
   },
   {
@@ -843,7 +843,10 @@
     "fixed_in": null,
     "owner_accepted": null,
     "status": "One native trace filled 131,072 bytes for the destination, then lost the buffer after high-hunk move failure; no prefix was used. Relocation prototype passes source/ABI checks; matched first-world-frame timing and audio continuity remain pending. Building entry/exit screens are acceptable. See [investigation](performance/CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md).",
-    "report": null
+    "report": null,
+    "tags": [
+      "performance"
+    ]
   },
   {
     "id": "CHAR-CONFIRM-BORDER-29",
@@ -1393,5 +1396,293 @@
     "owner_accepted": null,
     "status": "First v0.0.30 push: host-launcher-parity failed with ModuleNotFoundError pyffi in test_host_asset_formats (not tagged or released). Fixed in source: flames are read only from real NIF data; host-parity tests pass with only numpy and Pillow on Linux and Windows. Ships in the v0.0.30 release commit.",
     "report": "bugs/CI-HOSTDEPS-30.md"
+  },
+  {
+    "id": "GATE-EMBERS-31",
+    "title": "Ember commit broke native torch tests and a header format check",
+    "state": "fixed",
+    "fixed_in": "v0.0.31-dev1",
+    "owner_accepted": null,
+    "status": "Repaired in source before dev1; gates rerun.",
+    "report": "bugs/GATE-EMBERS-31.md"
+  },
+  {
+    "id": "SEYDA-READ-SLOW-31",
+    "title": "dev1 Seyda crossings read slower than the ov700 test image",
+    "state": "fixed",
+    "fixed_in": "v0.0.31-dev2",
+    "owner_accepted": null,
+    "status": "Repair shipped in v0.0.31-dev2 (16 KiB stdio buffer for loose files); same-batch FS-UAE: dev1 Seyda crossings 0.70-0.91 s -> 0.39-0.48 s (v0.0.30 0.54-0.71 s). Owner playtest of dev2, 7 October 2026: Seyda Neen is fast now, and Balmora too (\"holy SHIT Balmora is fast now\"). Cause of the remaining 10-15 % gap between engines with buffering is unknown (unbuffered makes them equal). Owner acceptance pending.",
+    "report": "bugs/SEYDA-READ-SLOW-31.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "TRACKER-MAP-BLANK-31",
+    "title": "World progress map vanished when the mouse moved over it",
+    "state": "fixed",
+    "fixed_in": "v0.0.31-dev1",
+    "owner_accepted": null,
+    "status": "Found by the owner in Firefox before the viewer was committed; fixed in source (only drawing resizes the canvas); owner confirmed the fixed viewer.",
+    "report": "bugs/TRACKER-MAP-BLANK-31.md"
+  },
+  {
+    "id": "AUDIO-LOGO-31",
+    "title": "Music crackles while the startup logo plays (WinUAE)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, WinUAE, 7 October 2026. Cause found in source: the title music was started together with the streaming logo video. Repair in source: music starts after the main menu appears; not yet packaged or heard.",
+    "report": "bugs/AUDIO-LOGO-31.md"
+  },
+  {
+    "id": "LIGHT-FALLOFF-31",
+    "title": "Interior lights stop dead at their radius",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, opening scene, 7 October 2026. The visible lantern is light_com_lantern_02_200_Boat. Earlier \"bakes no light\" claim was a measuring error (placement not applied); the map is lit around it. Remaining: the bake stops each light at its radius, the original is radius/(3d) fading out by twice the radius. No repair yet.",
+    "report": "bugs/LIGHT-FALLOFF-31.md"
+  },
+  {
+    "id": "SEYDA-WALL-SHAPE-31",
+    "title": "Dark shape pokes out of a stone wall by the Seyda Neen shore",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, v0.0.31-dev2, 7 October 2026. Likely cause from a ray-cast of the pose: the trunk base of tree billboard flora_bc_tree_02 (ref 483210), depth-tested at the tree's centre, drawn over the far end of the wall in front of it; present since v0.0.28. In-game capture pending; no repair yet.",
+    "report": "bugs/SEYDA-WALL-SHAPE-31.md"
+  },
+  {
+    "id": "BALMORA-LAMPS-DIM-31",
+    "title": "Balmora's street lamps are far too dim at night",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, v0.0.31-dev2, 7 October 2026; Seyda Neen the same (only guard torches light the towns at night). Causes measured: exterior lamps are never baked (no exterior light conversion at all), the glass is not emissive (EMISSIVE-UNSHIPPED-31), and night darkening remaps the whole finished frame (NIGHT-RUST-31 for the speckle). OpenMW reference captured. No repair yet.",
+    "report": "bugs/BALMORA-LAMPS-DIM-31.md"
+  },
+  {
+    "id": "LIGHT-NEGATIVE-31",
+    "title": "Negative (darkening) lights bake as bright white light",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 7 October 2026 while identifying the Census office fireplace: the original places dark_128 (LIGH flag 0x4 Negative, rgb 255 255 255, radius 128) beside it to darken that corner; tools/interior_lighting.py ignores light flags and adds it as full white. Cause read in source; no repair yet.",
+    "report": "bugs/LIGHT-NEGATIVE-31.md"
+  },
+  {
+    "id": "NIGHT-RUST-31",
+    "title": "Night tint rounds dark colours to rust-red speckle",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause measured 7 October 2026 (night tint grid rounds near-black greys to a rust entry). Repair in source: exact palette search for dark colours whose grid answer jumps hue (6 of 256 at deep night, once per table build); native test added. Not yet packaged or seen in game.",
+    "report": "bugs/NIGHT-RUST-31.md"
+  },
+  {
+    "id": "EMISSIVE-UNSHIPPED-31",
+    "title": "Glowing lantern glass never reached the shipped maps (only the Temple has it)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 7 October 2026 investigating BALMORA-LAMPS-DIM-31; cause measured, no repair yet.",
+    "report": "bugs/EMISSIVE-UNSHIPPED-31.md"
+  },
+  {
+    "id": "LIGHTMAP-GRID-31",
+    "title": "Some baked lightmaps sit one sample row or column off",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 7 October 2026: bake grid rounded in double precision, engine grid from the stored single precision; 925 of 26,551 prison ship faces differ, 241 with a different sample count. No repair yet.",
+    "report": "bugs/LIGHTMAP-GRID-31.md"
+  },
+  {
+    "id": "LIGHT-OFF-31",
+    "title": "Lights flagged Off by default would bake as lit",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 7 October 2026 before any shipped map was affected (136 placements in 56 unconverted cells). Repaired in source: the bake skips the flag; the mapping writes no entity. Unit tests.",
+    "report": "bugs/LIGHT-OFF-31.md"
+  },
+  {
+    "id": "HUD-NOTIFY-OVERLAP-31",
+    "title": "Console messages print over the location title",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner screenshot, 7 October 2026: the heap audit line drawn over the debug title. Cause read in source (Quake notify lines and the title share the top rows); no repair yet.",
+    "report": "bugs/HUD-NOTIFY-OVERLAP-31.md"
+  },
+  {
+    "id": "HORIZON-HOLES-31",
+    "title": "Distant buildings break up against the sky",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner screenshots, 7 October 2026 (Balmora across the river at sunset). Needs work: far culling drops parts of large buildings and the distant fill draws only land. Proposed: collision-hull silhouettes in fog colour; cost to be measured.",
+    "report": "bugs/HORIZON-HOLES-31.md"
+  },
+  {
+    "id": "OPENING-BRIGHT-31",
+    "title": "The prison ship hold is brighter than the original",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, 7 October 2026 (\"too bright\"; murky wanted). Measured: AmiWind 1.2 to 2.5 times brighter than OpenMW at every start pose. Proposed: original falloff plus a darkening box zone; no repair yet.",
+    "report": "bugs/OPENING-BRIGHT-31.md"
+  },
+  {
+    "id": "DLIGHT-WALLS-31",
+    "title": "Torches barely light town walls at night",
+    "state": "fixed",
+    "fixed_in": "v0.0.31-dev4",
+    "owner_accepted": null,
+    "status": "Owner report, 7 October 2026. Cause measured: the whole-frame night remap darkened torch light too (walls do receive the light). Repaired in source for dev4: light-space night on by default (headlamp lift on a Balmora facade 2.5x). Owner check pending.",
+    "report": "bugs/DLIGHT-WALLS-31.md"
+  },
+  {
+    "id": "MUSIC-STARTUP-TRACK-31",
+    "title": "A random world track plays under the startup logo",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, WinUAE, 7 October 2026: regression from the AUDIO-LOGO-31 change in dev3. Cause: start-up opened a random world track and nothing switched to the title. Repaired in source: silent until the main menu starts the title.",
+    "report": "bugs/MUSIC-STARTUP-TRACK-31.md"
+  },
+  {
+    "id": "MUSIC-OPENING-CLIP-31",
+    "title": "A clip of another track plays while the opening scene loads",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, WinUAE, 7 October 2026. Cause: the map load resumes the paused title stream during the new opening hold. Repaired in source: the hold stops and flushes the music and ignores resumes.",
+    "report": "bugs/MUSIC-OPENING-CLIP-31.md"
+  },
+  {
+    "id": "SEYDA-BLOCK-31",
+    "title": "Invisible obstacle blocks the path on a Seyda Neen slope",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, v0.0.31-dev3 playtest, 7 October 2026, Seyda Neen global -11548 -71200 278 facing SW. Cause unknown.",
+    "report": "bugs/SEYDA-BLOCK-31.md"
+  },
+  {
+    "id": "PLACE-NAMES-INTERIOR-31",
+    "title": "Location label has no place name inside interiors",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, v0.0.31-dev3 playtest, 7 October 2026: no town or building name inside the prison ship, Census office or courtyard. Labels come only from exterior cells; no repair yet.",
+    "report": "bugs/PLACE-NAMES-INTERIOR-31.md"
+  },
+  {
+    "id": "LAMPS-RANGE-31",
+    "title": "Only the nearest lamps light up at night",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause known (only the nearest lamps get dynamic lights: 'motion detector' lamps). dev5 mitigation: lamps ahead win the slots, new ones fade in, radius 1.5, lantern glass glows. Repair: lamps baked on a night lightstyle",
+    "report": "bugs/LAMPS-RANGE-31.md"
+  },
+  {
+    "id": "GUARD-TORCH-BRIGHT-31",
+    "title": "Hlaalu guard torches over-bright at night",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report; dev5 halves the guard torch light radius (dbg guardtorch 0.5)",
+    "report": "bugs/GUARD-TORCH-BRIGHT-31.md"
+  },
+  {
+    "id": "NIGHT-0400-DARK-31",
+    "title": "Exterior suddenly much darker around 04:00",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report; cause unknown; time sweep 03:30-04:30 being measured",
+    "report": "bugs/NIGHT-0400-DARK-31.md"
+  },
+  {
+    "id": "BUILD-WINDOWS-DOCKER-SLOW-31",
+    "title": "Docker builds and disk-image steps on Windows folders are slow",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Measured: 225 MB/s through the Windows file share vs ~1.9 GB/s native copy; work moves to Windows-side copies and Docker volumes",
+    "report": "bugs/BUILD-WINDOWS-DOCKER-SLOW-31.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "LAMPS-FLICKER-31",
+    "title": "Night lamps switch on and off while turning or walking",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Regression from the dev5 front priority; repaired in source: lit lamps keep their slot, dropped lamps fade out",
+    "report": "bugs/LAMPS-FLICKER-31.md"
+  },
+  {
+    "id": "SEYDA-LANTERNS-MISSING-31",
+    "title": "Seyda Neen lanterns light the night but are not in its maps",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Lamp table has Seyda's lanterns; the Seyda scenery index has no LIGH meshes; converter change needed",
+    "report": "bugs/SEYDA-LANTERNS-MISSING-31.md"
+  },
+  {
+    "id": "TOWN-VIS-OCCLUSION-31",
+    "title": "Converted buildings, rooms and rocks do not block Quake visibility (func_wall)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Measured: interiors 100% visible, Balmora 84-89%, Seyda 59-76%, open world 69-85%. bm019 prototype: occluders alone leave 589/590 func_walls visible (>16 leaves = always visible; entities culled whole). Repair in prototype: static building faces in the world model (per-leaf culling) plus occluders",
+    "report": "bugs/TOWN-VIS-OCCLUSION-31.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "DBG-TOGGLE-WORDS-31",
+    "title": "dbg on/off words turned settings off",
+    "state": "fixed",
+    "fixed_in": "v0.0.31",
+    "owner_accepted": null,
+    "status": "Repaired in source: toggle words become 1/0 for settings",
+    "report": "bugs/DBG-TOGGLE-WORDS-31.md"
+  },
+  {
+    "id": "BUILD-NIGHT-TABLES-31",
+    "title": "Repository image builds have no night lamp, glowing glass or location fog tables",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 8 October 2026: the tables reached the playtest disks by hand only. Repaired in source: the image builder writes and checks lamps.awl, night-windows.txt and fog-locations.txt and records their hashes; the window table matches the private dev5 table on the same inputs. Not yet in a built image.",
+    "report": "bugs/BUILD-NIGHT-TABLES-31.md"
+  },
+  {
+    "id": "BUILD-FINALIZE-SCENE-31",
+    "title": "Image finalisation stops on an undefined name before media staging",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 8 October 2026 by a static name check: finalize_image uses scene, defined only in image(), since v0.0.29-dev4. Repaired in source (one line); a full image build is pending.",
+    "report": "bugs/BUILD-FINALIZE-SCENE-31.md"
+  },
+  {
+    "id": "BUILD-SEYDA-PRIVATE-STAGES-31",
+    "title": "Repository builder cannot regenerate the shipped Seyda Neen maps",
+    "state": "closed",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Closed 8 October 2026: duplicate of BUILD-SEYDA-REGEN-30 (recorded again while preparing v0.0.31; its detail moved there).",
+    "report": "bugs/BUILD-SEYDA-PRIVATE-STAGES-31.md"
   }
 ]

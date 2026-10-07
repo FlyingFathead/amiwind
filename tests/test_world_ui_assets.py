@@ -18,16 +18,20 @@ class WorldUIAssetsTests(unittest.TestCase):
     def test_region_names_follow_original_cell_assignments_and_display_names(self):
         def region(identifier, name):
             return record('REGN', sub('NAME', identifier)+sub('FNAM', name))
-        def cell(x, y, region, flags=0):
-            return record('CELL', sub('DATA',struct.pack('<Iii',flags,x,y))+sub('RGNN',region))
-        raw=(cell(3,0,b'Internal ID\0')+cell(-1,-2,b'OTHER\0')+cell(0,0,b'')
-             +cell(3,0,b'not-an-exterior-region\0',1)
+        def cell(x, y, region, flags=0, name=b'\0'):
+            return record('CELL', sub('NAME',name)+sub('DATA',struct.pack('<Iii',flags,x,y))+sub('RGNN',region))
+        raw=(cell(3,0,b'Internal ID\0')+cell(-1,-2,b'OTHER\0',name=b'Test Town\0')+cell(0,0,b'')
+             +cell(5,5,b'',name=b'Lone Ruin\0')
+             +cell(3,0,b'not-an-exterior-region\0',1,b'Interior Name\0')
              +region(b'Internal ID\0',b'Original Display Name\0')
              +region(b'other\0',b'Second Display Name\0'))
         packet=region_names(raw)
-        self.assertEqual(packet[:12],b'ARN1'+struct.pack('<II',2,2))
-        self.assertEqual(packet[12:76].rstrip(b'\0'),b'Original Display Name')
-        self.assertEqual(list(struct.iter_unpack('<iiI',packet[140:])),[(-1,-2,1),(3,0,0)])
+        self.assertEqual(packet[:16],b'ARN2'+struct.pack('<III',2,2,3))
+        self.assertEqual(packet[16:80].rstrip(b'\0'),b'Original Display Name')
+        self.assertEqual(packet[144:208].rstrip(b'\0'),b'Lone Ruin')
+        self.assertEqual(packet[208:272].rstrip(b'\0'),b'Test Town')
+        none=0xFFFFFFFF
+        self.assertEqual(list(struct.iter_unpack('<iiII',packet[272:])),[(-1,-2,1,1),(3,0,0,none),(5,5,none,0)])
         with self.assertRaisesRegex(ValueError,'missing REGN'):
             region_names(cell(0,0,b'unknown'))
         with self.assertRaisesRegex(ValueError,'Duplicate exterior'):

@@ -315,17 +315,62 @@ invalid:
  * lookup work; no texture-space dither or per-frame palette search. */
 static byte sky_rgb[4096],sky_tint[256],sky_fog[4096];
 static int sky_tints_ready,sky_phase=-1,sky_phase_last=-2,sky_table_phase=-2;
+/* Light-space night (BALMORA-LAMPS-DIM-31, DLIGHT-WALLS-31): 1 (default) moves
+ * the night's brightness into the light (r_daylight) and keeps only its hue, at
+ * aw_night_tint percent strength, so torches, lamps and glows keep their light;
+ * 0 restores the whole-frame remap, which darkened their light too. */
+static cvar_t sky_night_light={"aw_night_light","1",true};
+static cvar_t sky_night_tint={"aw_night_tint","100",true};
+/* Horizon veil (HORIZON-HOLES-31): the lowest sky bands fade into the far fog
+ * colour, so gaps in fully fogged distant silhouettes read as haze. 0 = off,
+ * 1..15 = veil height in sky bands (one table lookup per veiled sky pixel). */
+static cvar_t sky_horizon_veil={"aw_horizon_veil","0",true};
+/* Light hue (aw_light_hue "R G B"): the colour torch, lamp and window light
+ * leans toward. R_BuildWarmLight makes the per-surface warm table from it:
+ * dark rows copied from the game's own colormap, brighter rows tinted and
+ * matched through the palette grid; 16,384 lookups, only when the hue changes. */
+static cvar_t sky_light_hue={"aw_light_hue","255 210 140",true};
+static byte warm_table[64*256];
+static char warm_built[32];
+static void R_LightHueCommand(void);
+static int sky_table_daylight=256,sky_table_night=-1,sky_table_tint=-1;
+static byte sky_shade[256];
 /* Clear-weather RGB stops from the reference configuration. Timing below is a
  * compact approximation; clouds retain their existing texture luminance and
  * ordinary daytime preserves the original indexed sky. No weather simulation. */
 static const byte sky_rgb_stops[4][3]={{95,135,203},{117,141,164},{56,89,129},{9,10,11}};
 static const byte fog_rgb_stops[4][3]={{206,227,255},{255,189,157},{255,189,157},{9,10,11}};
-static byte R_SkyNearest(int r,int g,int b)
+static int R_SkySpread(int r,int g,int b)
 {
+    int high=r>g?r:g,low=r<g?r:g;
+    if(b>high)high=b;
+    if(b<low)low=b;
+    return high-low;
+}
+/* Nearest palette entry through the 16x16x16 grid. Near black the 17-step grid
+ * can round one channel up and the others down, turning a near-grey into rust
+ * (NIGHT-RUST-31: (9,8,8) -> grid (17,0,0) -> palette (23,7,3)). A dark colour
+ * whose grid answer is clearly more saturated is searched exactly instead; on
+ * the shipped palette that is 6 of 256 colours at deep night, once per table
+ * build, never per pixel. */
+byte R_SkyNearest(int r,int g,int b);
+byte R_SkyNearest(int r,int g,int b)
+{
+    const byte *p;int i,best,distance,best_distance,dr,dg,db;byte grid;
     if(r>255)r=255;
     if(g>255)g=255;
     if(b>255)b=255;
-    return sky_rgb[(((r+8)/17)<<8)|(((g+8)/17)<<4)|((b+8)/17)];
+    grid=sky_rgb[(((r+8)/17)<<8)|(((g+8)/17)<<4)|((b+8)/17)];
+    if(!host_basepal || r>=64 || g>=64 || b>=64)return grid;
+    p=host_basepal+3*grid;
+    if(R_SkySpread(p[0],p[1],p[2])<=R_SkySpread(r,g,b)+12)return grid;
+    best=grid;best_distance=0x7fffffff;
+    for(i=0;i<256;i++){
+        dr=r-host_basepal[3*i];dg=g-host_basepal[3*i+1];db=b-host_basepal[3*i+2];
+        distance=dr*dr+dg*dg+db*db;
+        if(distance<best_distance){best=i;best_distance=distance;}
+    }
+    return (byte)best;
 }
 /* Shared reduced owned bitmaps: 25,600 pixels + 2,048 star-role mask bytes
  * and 4,096 fade-table bytes.
@@ -518,6 +563,9 @@ void R_InitDayNight(void)
     Cvar_RegisterVariable(&sky_night_clouds);Cvar_RegisterVariable(&sky_cloud_control);
     Cvar_RegisterVariable(&sky_day_clouds);Cvar_RegisterVariable(&sky_nightsky_mode);
     Cvar_RegisterVariable(&sky_starsky);Cvar_RegisterVariable(&sky_nightsky);
+    Cvar_RegisterVariable(&sky_night_light);Cvar_RegisterVariable(&sky_night_tint);
+    Cvar_RegisterVariable(&sky_horizon_veil);Cvar_RegisterVariable(&sky_light_hue);
+    Cmd_AddCommand("aw_light_hue_set",R_LightHueCommand);
     Cmd_AddCommand("aw_sky_type_set",R_SkyTypeCommand);
     Cmd_AddCommand("aw_skyspeed_set",R_SkySpeedCommand);
     Cmd_AddCommand("aw_cloud_type_set",R_SkyCloudTypeCommand);
@@ -703,6 +751,10 @@ unsigned char R_DayNightSkyPixel(unsigned char colour,float x,float y,float z,in
             level=level*(15-band)/15;
             colour=sky_glow[level*256+colour];
         }
+        if(fog && sky_horizon_veil.value>=1){
+            int veil=sky_horizon_veil.value>15?15:(int)sky_horizon_veil.value;
+            if(band<veil)colour=sky_fog[(15-band*15/veil)*256+colour];
+        }
     }else{
         if(sky_night_strength)colour=sky_tint[colour];
         if(fog)colour=sky_fog[(15-band)*256+colour];
@@ -719,6 +771,70 @@ unsigned char R_DayNightSkyPixel(unsigned char colour,float x,float y,float z,in
     return R_NightPixel(colour,source,x,y,z);
 }
 
+static int R_SkyNightLightOn(void){return sky_night_light.value>0;}
+static int R_SkyNightTint(void)
+{
+    float tint=sky_night_tint.value;
+    return !(tint>=0)?0:tint>100?100:(int)tint;
+}
+/* Split the scene ambient: its brightness becomes the daylight factor applied
+ * to the light (quantised to steps of 8 so the surface cache rebuilds only
+ * when it changes), its hue stays in the table at the chosen strength. */
+static void R_SkyNightLight(int *ambient)
+{
+    int k,brightness,tint,i;
+    sky_table_daylight=256;
+    if(!R_SkyNightLightOn() || (ambient[0]>=255 && ambient[1]>=255 && ambient[2]>=255))return;
+    brightness=(ambient[0]*299+ambient[1]*587+ambient[2]*114)/1000;
+    if(brightness<8)brightness=8;
+    tint=R_SkyNightTint();
+    for(k=0;k<3;k++)ambient[k]=255+(ambient[k]*255/brightness-255)*tint/100;
+    sky_table_daylight=(brightness*256/255+4)&~7;
+    if(sky_table_daylight<8)sky_table_daylight=8;
+    if(sky_table_daylight>256)sky_table_daylight=256;
+    for(i=0;i<256;i++)
+        sky_shade[i]=R_SkyNearest(host_basepal[3*i]*sky_table_daylight>>8,
+            host_basepal[3*i+1]*sky_table_daylight>>8,host_basepal[3*i+2]*sky_table_daylight>>8);
+}
+static void R_LightHue(int *hue)
+{
+    int k;
+    hue[0]=255;hue[1]=210;hue[2]=140;
+    if(sscanf(sky_light_hue.string,"%d %d %d",&hue[0],&hue[1],&hue[2])!=3){hue[0]=255;hue[1]=210;hue[2]=140;}
+    for(k=0;k<3;k++)hue[k]=hue[k]<0?0:hue[k]>255?255:hue[k];
+}
+static void R_BuildWarmLight(void)
+{
+    int hue[3],level,i,k,rgb[3];float lum,t[3],b,w;const byte *plain=(const byte *)vid.colormap;
+    if(!host_basepal || !sky_tints_ready || !plain)return;
+    R_LightHue(hue);
+    lum=(hue[0]*299+hue[1]*587+hue[2]*114)/1000.0f;if(lum<1)lum=1;
+    for(k=0;k<3;k++)t[k]=hue[k]/lum;
+    for(level=0;level<64;level++){
+        b=1-level/63.0f;if(b<.15f)b=.15f;
+        w=(b-.4f)/.6f;
+        if(!(w>0)){memcpy(warm_table+level*256,plain+level*256,256);continue;}
+        if(w>1)w=1;
+        for(i=0;i<256;i++){
+            for(k=0;k<3;k++){rgb[k]=(int)(host_basepal[3*i+k]*b*(1+w*(t[k]-1))+.5f);if(rgb[k]>255)rgb[k]=255;if(rgb[k]<0)rgb[k]=0;}
+            warm_table[level*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
+        }
+    }
+    snprintf(warm_built,sizeof warm_built,"%s",sky_light_hue.string);
+    r_warm_colormap=warm_table;
+}
+static void R_LightHueCommand(void)
+{
+    int hue[3],k;char text[32];
+    if(Cmd_Argc()==4){
+        for(k=0;k<3;k++){hue[k]=atoi(Cmd_Argv(k+1));hue[k]=hue[k]<0?0:hue[k]>255?255:hue[k];}
+        snprintf(text,sizeof text,"%ld %ld %ld",(long)hue[0],(long)hue[1],(long)hue[2]);
+        Cvar_Set(sky_light_hue.name,text);
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg light hue [R G B 0..255] (default 255 210 140)\n");return;}
+    R_LightHue(hue);
+    Con_Printf("Light hue %ld %ld %ld (torch, lamp and window light; aw_warm_light %s).\n",
+        (long)hue[0],(long)hue[1],(long)hue[2],r_warm_colormap?"on":"waiting for the palette");
+}
 static void R_SkyColourTables(int phase)
 {
     int a=phase>>10,b=(phase>>6)&15,mix=phase&63,i,k,level,luma,rgb[3],fog[3],ambient[3],source[3],left,right,aa,bb;
@@ -727,6 +843,7 @@ static void R_SkyColourTables(int phase)
         (fog_rgb_stops[a][k]*(32-mix)+fog_rgb_stops[b][k]*mix)/32;
     for(k=0;k<3;k++)ambient[k]=sky_frame_type>=2?
         (type2_ambient[a][k]*(32-mix)+type2_ambient[b][k]*mix)/32:255;
+    R_SkyNightLight(ambient);
     aa=a==4?3:a;bb=b==4?3:b;
     for(i=0;i<256;i++){
         luma=(host_basepal[3*i]+2*host_basepal[3*i+1]+host_basepal[3*i+2])/4;
@@ -752,6 +869,7 @@ static void R_SkyColourTables(int phase)
     if(sky_frame_type>=2)R_SkyType2Tables(phase);
     R_NightTables();
     sky_table_phase=phase;sky_table_type=sky_frame_type;
+    sky_table_night=R_SkyNightLightOn();sky_table_tint=R_SkyNightTint();
 }
 const unsigned char *R_DayNightFogColours(void)
 {
@@ -1026,12 +1144,23 @@ void R_SetSkyFrame (void)
     sky_phase=sky_exterior && sky_daynight.value>0 && sky_tints_ready && clock_ready?
         (sky_frame_type>=2?R_SkyType2Phase(clock_ms):R_SkyDayPhase(clock_ms)):-1;
     if(sky_phase>=0){
-        if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type)R_SkyColourTables(sky_phase);
+        if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type ||
+           R_SkyNightLightOn()!=sky_table_night || R_SkyNightTint()!=sky_table_tint)R_SkyColourTables(sky_phase);
         R_SkySunFrame(clock_ms);
         R_NightFrame(clock_ms,clock_days);
     }else{
+        sky_table_daylight=256;
         sky_sun_visible=0;sky_night_strength=0;sky_night_roles_active=0;sky_coverage_roles_active=0;
         sky_night_cloud_density=!clock_ready && sky_exterior && sky_daynight.value>0?16:(R_SkyCloudType()==2?4:16);
+    }
+    /* The warm light table follows aw_light_hue; rebuilt only when it changes. */
+    if(sky_tints_ready && strcmp(warm_built,sky_light_hue.string)){R_BuildWarmLight();D_FlushCaches();}
+    /* Daylight reaches the light only where the day/night tables are in use;
+     * a change rebuilds the surface cache once (quantised steps). */
+    {
+        int daylight=sky_phase>=0 && R_DayNightFogColours()?sky_table_daylight:256;
+        if(daylight!=r_daylight){r_daylight=daylight;D_FlushCaches();}
+        d_nightshade=daylight<256?sky_shade:NULL;
     }
     /* At default clock scale, legacy travel is 240 texels per real second.
      * The cloud-only multiplier defaults to 1/300 (0.8 texels/sec). It never

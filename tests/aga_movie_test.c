@@ -78,7 +78,7 @@ int main(void){
     assert(starts==2 && !AW_MovieActive());
     for(i=0;i<3;i++){
         int before=clears,paused_before=pauses;
-        AW_MovieStartup();assert(AW_MovieActive() && titles==i+1 && pauses==paused_before);
+        AW_MovieStartup();assert(AW_MovieActive() && titles==0 && pauses==paused_before);
         memset(paint,0,sizeof(paint));AW_MoviePaint(paint,16,paintedtime);
         assert(paint[0].left==1234 && music_samples==(i+1)*16);
         AW_MovieKey(i==0?K_SPACE:i==1?K_ENTER:K_ESCAPE,1);

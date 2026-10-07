@@ -499,7 +499,10 @@ def commands(args, tools, run):
     if args.stage == 'aga':
         image_options = ['--hidden-surface-cull', getattr(args, 'hidden_surface_cull', 'true'),
                          '--local-skybox', getattr(args, 'local_skybox', 'false'),
-                         '--map-budget-policy', getattr(args, 'map_budget_policy', 'strict')]
+                         '--map-budget-policy', getattr(args, 'map_budget_policy', 'strict'),
+                         # Night window table sources: the scenery the towns came from.
+                         '--town-scenery', str(run / 'scenery'),
+                         '--balmora-scenery', str(run / 'balmora-work/scenery')]
         if getattr(args, 'shared_sky_source', None) is not None:
             image_options += ['--shared-sky-source', str(args.shared_sky_source.resolve())]
         steps = [(name, command + image_options if name == 'image' else command)

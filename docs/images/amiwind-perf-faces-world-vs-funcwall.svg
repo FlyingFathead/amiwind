@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="326" viewBox="0 0 800 326" role="img">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="16" y="24" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#3d3d3a" text-anchor="start" font-weight="bold">Faces per map: walls Quake can use for visibility vs func_wall models</text>
+<text x="16" y="42" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#77756f" text-anchor="start" font-weight="normal">Only world faces split the map into visibility cells; func_wall models are ignored</text>
+<rect x="16" y="52" width="10" height="10" fill="#2a78d6"/>
+<text x="32" y="61" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">World (structural)</text>
+<rect x="170" y="52" width="10" height="10" fill="#eb6834"/>
+<text x="186" y="61" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="start" font-weight="normal">func_wall models</text>
+<text x="142" y="90" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Mages Guild</text>
+<rect x="150" y="76" width="1" height="20" fill="#2a78d6"/>
+<rect x="151" y="76" width="419.565" height="20" fill="#eb6834"/>
+<text x="576" y="90" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">42 / 40,488 (100% in func_walls)</text>
+<text x="142" y="120" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Temple</text>
+<rect x="150" y="106" width="1" height="20" fill="#2a78d6"/>
+<rect x="151" y="106" width="364.663" height="20" fill="#eb6834"/>
+<text x="521.202" y="120" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">52 / 35,190 (100% in func_walls)</text>
+<text x="142" y="150" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Census</text>
+<rect x="150" y="136" width="1" height="20" fill="#2a78d6"/>
+<rect x="151" y="136" width="213.088" height="20" fill="#eb6834"/>
+<text x="369.482" y="150" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">38 / 20,563 (100% in func_walls)</text>
+<text x="142" y="180" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Balmora bm019</text>
+<rect x="150" y="166" width="22.9534" height="20" fill="#2a78d6"/>
+<rect x="172.953" y="166" width="373.378" height="20" fill="#eb6834"/>
+<text x="552.332" y="180" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">2,215 / 36,031 (94% in func_walls)</text>
+<text x="142" y="210" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Balmora bm020</text>
+<rect x="150" y="196" width="25.0259" height="20" fill="#2a78d6"/>
+<rect x="175.026" y="196" width="368.083" height="20" fill="#eb6834"/>
+<text x="549.109" y="210" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">2,415 / 35,520 (94% in func_walls)</text>
+<text x="142" y="240" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Seyda Neen</text>
+<rect x="150" y="226" width="40.9534" height="20" fill="#2a78d6"/>
+<rect x="190.953" y="226" width="222.539" height="20" fill="#eb6834"/>
+<text x="419.492" y="240" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">3,952 / 21,475 (84% in func_walls)</text>
+<text x="142" y="270" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3d3d3a" text-anchor="end" font-weight="normal">Open world vf0930</text>
+<rect x="150" y="256" width="45.8756" height="20" fill="#2a78d6"/>
+<rect x="195.876" y="256" width="111.917" height="20" fill="#eb6834"/>
+<text x="313.793" y="270" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#77756f" text-anchor="start" font-weight="normal">4,427 / 10,800 (71% in func_walls)</text>
+</svg>

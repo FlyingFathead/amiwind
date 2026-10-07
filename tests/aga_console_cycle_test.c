@@ -10,6 +10,8 @@ void Con_CycleConsole_f(void);
 void Con_ToggleConsole_f(void);
 void SCR_EndLoadingPlaque(void){}
 void M_Menu_Main_f(void){key_dest=key_menu;}
+int AW_RemoteLogging(void){return 0;}
+const char *AW_RemoteConsoleLog(void){return "";}
 int main(void){
     cls.state=ca_connected;
     Con_CycleConsole_f();assert(key_dest==key_console && !con_fullscreen);

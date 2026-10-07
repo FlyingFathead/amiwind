@@ -5,10 +5,10 @@
 Usage:
   bug_register.py render        rewrite the generated table in docs/BUGS.md
   bug_register.py check         validate bugs.json; fail if docs/BUGS.md is stale
-  bug_register.py add ID --title T --found VERSION [--status TEXT]
+  bug_register.py add ID --title T --found VERSION [--status TEXT] [--tag T...]
                                 add an open bug (then write its report page)
   bug_register.py set ID [--state open|fixed|closed] [--fixed-in V]
-                         [--status TEXT] [--owner-accepted V]
+                         [--status TEXT] [--owner-accepted V] [--tag T...]
 
 Schema (docs/bugs/bugs.schema.json): a list of objects, one per bug, unique
 "id"; "state" is open, fixed (a correction shipped in "fixed_in" with
@@ -30,6 +30,8 @@ ID_RE = re.compile(r'^(AW-\d{8}-\d{2}|[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]{2,3}|[
 FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
           'owner_accepted': (str, type(None)), 'status': str, 'report': (str, type(None))}
 STATES = ('open', 'fixed', 'closed')
+# Optional cross-cutting tags; each gets its own list below the register table.
+TAGS = ('performance',)
 VERSION_RE = re.compile(r'^v\d+\.\d+\.\d+(-[a-z]+\d*)?$')
 
 
@@ -51,9 +53,13 @@ def validate(bugs):
         if not isinstance(b, dict):
             errors.append('%s: not an object' % where)
             continue
-        if set(b) != set(FIELDS):
-            errors.append('%s: fields must be exactly %s' % (where, sorted(FIELDS)))
+        if set(b) - {'tags'} != set(FIELDS):
+            errors.append('%s: fields must be exactly %s (plus optional tags)' % (where, sorted(FIELDS)))
             continue
+        tags = b.get('tags', [])
+        if not isinstance(tags, list) or not tags and 'tags' in b or len(set(tags)) != len(tags) \
+                or any(t not in TAGS for t in tags) or tags != sorted(tags):
+            errors.append('%s: tags must be a sorted, non-empty list from %s' % (where, TAGS))
         for k, t in FIELDS.items():
             if not isinstance(b[k], t):
                 errors.append('%s: %s has the wrong type' % (where, k))
@@ -91,6 +97,12 @@ def table(bugs):
         ident = '[%s](%s)' % (b['id'], b['report']) if b['report'] else b['id']
         out.append('| %s | %s | %s | %s | %s | %s |' % (ident, b['title'], b['state'], b['fixed_in'] or '-',
                                                         b['owner_accepted'] or '-', b['status']))
+    for tag in TAGS:
+        tagged = [b for b in sorted(bugs, key=lambda b: (order[b['state']], b['id'])) if tag in b.get('tags', [])]
+        if tagged:
+            out += ['', '### Tagged %s' % tag, '']
+            out += ['- %s: %s (%s)' % ('[%s](%s)' % (b['id'], b['report']) if b['report'] else b['id'],
+                                         b['title'], b['state']) for b in tagged]
     return '\n'.join(out) + '\n'
 
 
@@ -110,8 +122,10 @@ def main(argv=None):
     sub.add_parser('render'); sub.add_parser('check')
     a = sub.add_parser('add'); a.add_argument('id'); a.add_argument('--title', required=True)
     a.add_argument('--found', required=True); a.add_argument('--status')
+    a.add_argument('--tag', action='append', choices=TAGS, default=[])
     s = sub.add_parser('set'); s.add_argument('id'); s.add_argument('--state', choices=STATES)
     s.add_argument('--fixed-in'); s.add_argument('--status'); s.add_argument('--owner-accepted')
+    s.add_argument('--tag', action='append', choices=TAGS, default=[])
     args = p.parse_args(argv)
     bugs = load()
     if args.cmd == 'add':
@@ -121,6 +135,8 @@ def main(argv=None):
         bugs.append({'id': args.id, 'title': args.title, 'state': 'open', 'fixed_in': None, 'owner_accepted': None,
                      'status': args.status or 'Reported in %s; cause unknown.' % args.found,
                      'report': page if (REGISTER.parent / page).is_file() else None})
+        if args.tag:
+            bugs[-1]['tags'] = sorted(set(args.tag))
     elif args.cmd == 'set':
         match = [b for b in bugs if b['id'] == args.id]
         if not match:
@@ -136,6 +152,8 @@ def main(argv=None):
             b['status'] = args.status
         if args.owner_accepted:
             b['owner_accepted'] = args.owner_accepted
+        if args.tag:
+            b['tags'] = sorted(set(b.get('tags', [])) | set(args.tag))
         page = 'bugs/%s.md' % b['id']
         if (REGISTER.parent / page).is_file():
             b['report'] = page

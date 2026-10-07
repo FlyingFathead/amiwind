@@ -13,7 +13,7 @@ static model_t world;static vec3_t seen_origin,seen_angles;
 void R_RenderView(void){memcpy(seen_origin,r_refdef.vieworg,sizeof seen_origin);memcpy(seen_angles,r_refdef.viewangles,sizeof seen_angles);}
 client_static_t cls;server_t sv;server_static_t svs;keydest_t key_dest=key_game;
 double host_frametime=1;char *keybindings[256];int scr_copyeverything;
-static void (*open_wait)(void),(*help)(void),(*settime)(void),(*setexact)(void),(*gallery)(void),(*nightgallery)(void);static edict_t player;static client_t client;
+static void (*open_wait)(void),(*help)(void),(*settime)(void),(*setexact)(void),(*gallery)(void),(*nightgallery)(void),(*hourcycle)(void),(*lightgallery)(void);static edict_t player;static client_t client;
 static int restricted,speech,interior,argc=1;static char *arg="";static cvar_t *scale,*cycle;
 int AW_Interior(void){return interior;}
 void Con_ToggleConsole_f(void){key_dest=key_game;}
@@ -22,7 +22,13 @@ int AW_StoryRestricted(void){return restricted;}double AW_SpeechRemaining(void){
 static char subtitle[256];
 void IN_AWClearButtons(void){}void AW_UISubtitle(const char *a,const char *b,double d){snprintf(subtitle,sizeof subtitle,"%s",b);}
 void Con_Printf(char *s,...){}void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_timescale"))scale=c;else if(!strcmp(c->name,"aw_daynightcycle"))cycle=c;else assert(0);}
-void Cmd_AddCommand(char *n,void(*f)(void)){if(!strcmp(n,"aw_wait"))open_wait=f;else if(!strcmp(n,"aw_quick_help"))help=f;else if(!strcmp(n,"aw_timeofday"))settime=f;else if(!strcmp(n,"aw_set_time"))setexact=f;else if(!strcmp(n,"aw_daycycle_gallery"))gallery=f;else if(!strcmp(n,"aw_nightgallery"))nightgallery=f;}
+void Cmd_AddCommand(char *n,void(*f)(void)){if(!strcmp(n,"aw_wait"))open_wait=f;else if(!strcmp(n,"aw_quick_help"))help=f;else if(!strcmp(n,"aw_timeofday"))settime=f;else if(!strcmp(n,"aw_set_time"))setexact=f;else if(!strcmp(n,"aw_daycycle_gallery"))gallery=f;else if(!strcmp(n,"aw_nightgallery"))nightgallery=f;else if(!strcmp(n,"aw_24hrcycle"))hourcycle=f;else if(!strcmp(n,"aw_lightgallery"))lightgallery=f;}
+/* Light gallery controls (aw_wait.c): renderer switches and cvars by name. */
+int r_lamps=1;static int cache_flushes;void D_FlushCaches(void){cache_flushes++;}
+static cvar_t night_light_var={"aw_night_light","0"},emissive_var={"aw_emissive","1"};
+cvar_t *Cvar_FindVar(char *n){if(!strcmp(n,"aw_night_light"))return &night_light_var;if(!strcmp(n,"aw_emissive"))return &emissive_var;return NULL;}
+void Cvar_SetValue(char *n,float v){cvar_t *c=Cvar_FindVar(n);if(c)c->value=v;}
+void Cvar_Set(char *n,char *v){(void)n;(void)v;}
 int Cmd_Argc(void){return argc;}char *Cmd_Argv(int i){return arg;}int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void AW_UIBox(int x,int y,int w,int h){}void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
@@ -186,6 +192,47 @@ int main(void){
     cycle->value=0;gallery();AW_WaitTick();assert(AW_WaitKey(K_ESCAPE) && cycle->value==0);
     gallery();sv.active=0;AW_WaitTick();sv.active=1;assert(AW_DayGalleryClock(77)==77);
     assert(!memcmp(&saved,&aw_state,sizeof saved));
+    /* dbg 24hrcycle: one clock hour per step, each shown for the given seconds;
+     * 24 steps end at the same hour the next day. Esc, off, a stopped game and
+     * bad input stop or refuse it. Automatic time is off to isolate the steps. */
+    assert(hourcycle);AW_StateReset();assert(AW_ClockEnsure());date(427,8,16,9,0);
+    cycle->value=0;host_frametime=.25;argc=1;key_dest=key_console;hourcycle();assert(key_dest==key_game);
+    for(i=0;i<3;i++)AW_WaitTick();date(427,8,16,9,0);
+    AW_WaitTick();date(427,8,16,10,0);
+    for(i=0;i<23*4;i++)AW_WaitTick();date(427,8,17,9,0);
+    for(i=0;i<8;i++)AW_WaitTick();date(427,8,17,9,0);
+    argc=2;arg="2";hourcycle();for(i=0;i<7;i++)AW_WaitTick();date(427,8,17,9,0);
+    AW_WaitTick();date(427,8,17,10,0);
+    key_dest=key_console;for(i=0;i<16;i++)AW_WaitTick();key_dest=key_game;date(427,8,17,10,0);
+    assert(AW_WaitKey(K_ESCAPE));for(i=0;i<16;i++)AW_WaitTick();date(427,8,17,10,0);
+    saved=aw_state;arg="0.1";hourcycle();arg="61";hourcycle();arg="x";hourcycle();argc=3;hourcycle();
+    for(i=0;i<16;i++)AW_WaitTick();assert(!memcmp(&saved,&aw_state,sizeof saved));
+    argc=2;arg="1";hourcycle();arg="off";hourcycle();for(i=0;i<16;i++)AW_WaitTick();
+    assert(!memcmp(&saved,&aw_state,sizeof saved));
+    arg="1";hourcycle();sv.active=0;AW_WaitTick();sv.active=1;for(i=0;i<16;i++)AW_WaitTick();
+    assert(!memcmp(&saved,&aw_state,sizeof saved));
+    restricted=1;argc=1;hourcycle();for(i=0;i<16;i++)AW_WaitTick();restricted=0;
+    assert(!memcmp(&saved,&aw_state,sizeof saved));
+    /* dbg lightgallery: Up/Down choose a row, Left/Right change it, Esc closes.
+     * Time is a preview only (the saved clock is untouched); lamps and glow
+     * rebuild the surface cache; refused during the intro. */
+    emissive_var.value=1; /* the game default; the stub cvar is not registered */
+    assert(lightgallery);saved=aw_state;argc=1;key_dest=key_console;lightgallery();assert(key_dest==key_game);
+    assert(AW_DayGalleryClock(77)==77);
+    assert(AW_WaitKey(K_RIGHTARROW) && night_light_var.value==1);
+    for(i=0;i<7;i++)assert(AW_WaitKey(K_DOWNARROW)); /* Time is row 7 (after Hue) */
+    assert(AW_WaitKey(K_RIGHTARROW) && AW_DayGalleryClock(77)==330*60000);
+    assert(AW_WaitKey(K_LEFTARROW) && AW_DayGalleryClock(77)==77);
+    assert(AW_WaitKey(K_LEFTARROW) && AW_DayGalleryClock(77)==0);
+    for(i=0;i<5;i++)assert(AW_WaitKey(K_UPARROW)); /* back to Lamps */
+    i=cache_flushes;assert(AW_WaitKey(K_RIGHTARROW) && r_lamps==0 && cache_flushes==i+1);
+    assert(AW_WaitKey(K_DOWNARROW) && AW_WaitKey(K_RIGHTARROW) && emissive_var.value==0 && cache_flushes==i+2);
+    assert(AW_WaitKey(K_ESCAPE) && AW_DayGalleryClock(77)==77 && !AW_WaitKey(K_UPARROW));
+    assert(!memcmp(&saved,&aw_state,sizeof saved));
+    r_lamps=1;emissive_var.value=1;night_light_var.value=0;
+    restricted=1;lightgallery();assert(AW_DayGalleryClock(77)==77 && !AW_WaitKey(K_UPARROW));restricted=0;
+    argc=2;arg="off";lightgallery();argc=1;
+    cycle->value=1;host_frametime=1;
     tour_camera();night_tour_camera();
     AW_StateReset();for(i=0;i<31;i++){char name[32];sprintf(name,"full%ld",(long)i);AW_StateSet(&aw_state,AW_GLOBAL,name,i);}
     saved=aw_state;assert(!AW_ClockEnsure() && !memcmp(&saved,&aw_state,sizeof(saved)));

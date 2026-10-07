@@ -28,10 +28,16 @@ def flame_entities(ref, model, centre):
     rotation = reference_rotation(ref)
     origin = (np.array(ref['position']) - np.array([*centre, 0])) * SCALE
     out = []
-    for x, y, z, size in model['flames']:
+    for flame in model['flames']:
+        x, y, z, size = flame[:4]
         p = origin + rotation @ np.array([x, y, z], dtype=float) * SCALE * ref['scale']
-        out.append('{\n"classname" "aw_flame"\n"origin" "%.2f %.2f %.2f"\n"aw_flame_size" "%.2f"\n}'
-                   % (p[0], p[1], p[2], size * ref['scale']))
+        text = '{\n"classname" "aw_flame"\n"origin" "%.2f %.2f %.2f"\n"aw_flame_size" "%.2f"\n' % (
+            p[0], p[1], p[2], size * ref['scale'])
+        if len(flame) >= 7:
+            # Emitter shape in map units: particle size, rise and cone spread.
+            k = SCALE * ref['scale']
+            text += '"aw_flame_shape" "%.2f %.2f %.2f"\n' % (flame[4] * k, flame[5] * k, flame[6] * k)
+        out.append(text + '}')
     return out
 from prepare_scenery import reference_rotation
 from exterior_visibility import apply_exterior_selection, VisibilityPolicyError

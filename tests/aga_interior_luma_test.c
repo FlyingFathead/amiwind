@@ -18,7 +18,9 @@ void Con_Printf(char *format,...){va_list ap;va_start(ap,format);vsnprintf(print
 int AW_TorchTestActive(void){return torchtest;}
 int Cmd_Argc(void){return argument_count;}
 char *Cmd_Argv(int n){return n==1?argument:"aw_interiorluma_set";}
-void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_interiorluma_set"))luma_command=fn;else {assert(!strcmp(name,"aw_exteriorluma_set"));exterior_command=fn;}}
+static void (*status_command)(void);static char inserted[64];
+void Cbuf_InsertText(char *text){snprintf(inserted,sizeof inserted,"%s",text);}
+void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_interiorluma_set"))luma_command=fn;else if(!strcmp(name,"aw_luma_status"))status_command=fn;else {assert(!strcmp(name,"aw_exteriorluma_set"));exterior_command=fn;}}
 qboolean Cmd_Exists(char *name){return false;}
 void *Z_Malloc(int size){return calloc(1,size);}
 void Z_Free(void *p){free(p);}
@@ -114,6 +116,11 @@ int main(int argc,char **argv)
     Cvar_Set("aw_exteriorluma","nan");R_InteriorLumaUpdate();factor(1);
     assert(isfinite(Cvar_FindVar("aw_exteriorluma")->value));
     strcpy(sv.name,"torchtest");R_InteriorLumaUpdate();factor(1);
+    /* dbg luma: values, what applies here, then the catalogue's own lines. */
+    assert(status_command);status_command();
+    assert(strstr(printed,"In effect here: 1.000 (original light, scene excluded)") && !strcmp(inserted,"dbg help luma\n"));
+    strcpy(sv.name,"census");exterior=0;inserted[0]=0;status_command();
+    assert(strstr(printed,"In effect here: 1.200 (indoor setting)") && !strcmp(inserted,"dbg help luma\n"));
     puts("all authored interiors: real scene classification, static pixels/alias, single 1.0/1.1/1.2/1.3 gain, cache refresh, dynamic independence, bounds/nonfinite, exclusions and archived override passed");
     return 0;
 }

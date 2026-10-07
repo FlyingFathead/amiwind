@@ -16,7 +16,7 @@ class PolycountPreviewTests(unittest.TestCase):
         # of its DOM fixtures and assertions inside a Python string.
         result = subprocess.run(
             [node, str(root / 'tests/test_polycount_markup.js'),
-             str(root / 'tools/polycount_inspector.html')],
+             str(root / 'amiwind-toolkit/map-inspector.html')],
             capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for milestone in ('PASS terrain preview', 'PASS019 whole-placement selection', 'PASS session copy'):

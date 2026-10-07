@@ -46,10 +46,12 @@ int AW_IntroImpulse(int impulse){return impulse;}
 void AW_GuardTorchLoadAssets(const byte *data){assert(data==assets);}
 void AW_GuardTorchInit(void){}
 void AW_GuardTorchUpdate(void){}
+void AW_LampInit(void){}void AW_LampUpdate(void){}
 void Cmd_AddCommand(char *name,void (*fn)(void)){
     if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;
     else if(!strcmp(name,"aw_torch_flame_set"))set_flame=fn;
     else if(!strcmp(name,"aw_torch_strength_set")){}
+    else if(!strcmp(name,"aw_headlamp_set")){}
     else {assert(!strcmp(name,"aw_torch"));toggle_torch=fn;}
 }
 byte *COM_LoadHunkFile(char *name){

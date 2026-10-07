@@ -545,6 +545,10 @@ def write_content_fingerprint(id1):
         return path.read_bytes() if path.is_file() else None
     for name,hash_value in fingerprint_entries(optional_asset):
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
+    from night_lighting import TABLES as night_lighting_tables
+    for name in night_lighting_tables:  # absent from stages built before the tables
+        if (Path(id1)/name).is_file():
+            fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(digest(Path(id1)/name)))
     for name,hash_value in harvest_fingerprint_entries(id1):
         fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(hash_value))
     from interior_sections import fingerprint_entries as section_fingerprint_entries
@@ -855,6 +859,16 @@ def finalize_image(args):
                                        getattr(args, 'allow_known_actor_ground_findings', None))
     actor_acceptance = actor_report['acceptance']
     (out/'actor-ground-acceptance.json').write_text(json.dumps(actor_acceptance, indent=2)+'\n', newline='\n')
+    # Count original versus placed entities on the final maps; an unexplained
+    # loss against the previous build stops here, before any disk is made.
+    from entity_tracker import build_gate as entity_gate
+    from mwad.paths import child_ci
+    entity_tracker = entity_gate(out, boot/'id1/maps', child_ci(args.data_files,'Morrowind.esm'),
+        getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None))
+    # World progress map data: topomap coverage plus entity and POI layers.
+    from world_progress import build_step as world_progress_step
+    world_progress = world_progress_step(out, boot/'id1/world/regions.awr', out/'entity-tracker.json',
+        child_ci(args.data_files,'Morrowind.esm'), Path(__file__).resolve().parents[1]/'docs/trackers/checked.json')
     # Audit the final prepared payload after subdivision and actor annotation;
     # an earlier audit cannot authorize maps subsequently regenerated here.
     world_heap_path=out/'world-map-heap.json'
@@ -874,6 +888,11 @@ def finalize_image(args):
           f"minimum clearance {world_heap['minimum_estimated_clearance_bytes']} bytes after unchanged baseline "
           f"and safety reserves. Policy={budget_decision['policy']}; runtime validation pending.",flush=True)
     verify_optimized_maps(boot/'id1/maps', optimization)
+    # Night lamp, glowing glass and location fog tables from the final maps.
+    from night_lighting import stage as stage_night_lighting, image_sources
+    night_lighting = stage_night_lighting(boot/'id1', master=child_ci(args.data_files,'Morrowind.esm'),
+        maps=staged_exterior_map_names(boot/'id1'), sources=image_sources(args),
+        palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting')
     write_content_fingerprint(boot/'id1')
     manifest=json.loads((music/'soundtrack.json').read_text());groups=playlists(manifest['tracks'])
     opening_track=manifest['tracks'][4] if 4 in groups['explore'] else None
@@ -892,7 +911,7 @@ def finalize_image(args):
     (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n', newline='\n')
     # Reconcile source inventory with the bytes actually staged for the image.
     from prepare_media_assets import stage_catalogue
-    intro_receipt_path = scene/'intro-conversion.json'
+    intro_receipt_path = Path(args.scene)/'intro-conversion.json'
     intro_receipt = json.loads(intro_receipt_path.read_text()).get('movie') if intro_receipt_path.is_file() else None
     media_coverage = stage_catalogue(args.media, boot/'id1', manifest, intro_receipt)
     media_coverage_path = out/'media-coverage.json'
@@ -953,6 +972,7 @@ def finalize_image(args):
         'world_flora':json.loads((out/'world-flora-staging.json').read_text(encoding='utf-8')) if (out/'world-flora-staging.json').is_file() else {'status':'not_requested'},
         'sky_asset_preparation':sky_asset_preparation,
         'guard_torches':guard_torches,
+        'night_lighting':night_lighting,
         'hand_metadata':hand_metadata,
         'exterior_sky':{'local_skybox':exterior_sky['local_skybox'],
             'report':str(exterior_sky_path.relative_to(out)),
@@ -1008,6 +1028,10 @@ def finalize_image(args):
         print('PRIVATE TEST image assembled. Production actor gate DID NOT PASS; see actor-ground-acceptance.json.', flush=True)
     from emulator_configs import print_outputs
     print_outputs(hdf)
+    build_record = json.loads((out/'build.json').read_text(encoding='utf-8'))
+    build_record['entity_tracker'] = entity_tracker
+    build_record['world_progress'] = world_progress
+    (out/'build.json').write_text(json.dumps(build_record,indent=2)+'\n',encoding='utf-8',newline='\n')
     write_world_coverage(out,'image',getattr(args,'world_coverage',None))
 
 def main():
@@ -1040,7 +1064,11 @@ def main():
     i.add_argument('--town-flora-source-index',type=Path,help='Exact original Seyda scenery reference bindings for flora installation')
     i.add_argument('--town-flora-scene-report',type=Path,help='Original alias conversion model mapping; required with --world-flora')
     i.add_argument('--balmora-cache',type=Path,help='Complete owned Balmora preparation cache for measured layout repair before final actor/heap audits')
+    i.add_argument('--town-scenery',type=Path,help='Seyda Neen scenery (prepare_scenery.py output) for the night window table; defaults to the directory of --town-flora-source-index')
+    i.add_argument('--balmora-scenery',type=Path,help='Balmora scenery (the Balmora cache scenery/) for the night window table; defaults to --balmora-cache/scenery')
     i.add_argument('--bootcheck',type=Path,help='Defaults to AmiWindCheck beside the engine binary')
+    i.add_argument('--entity-baseline',type=Path,help="Previous build's entity-tracker.json; placements lost against it stop the build")
+    i.add_argument('--accept-entity-loss',help='Recorded reason that makes an intended entity loss pass the --entity-baseline gate')
     for name in ['scene','music','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     for parser in (e,i):
         parser.add_argument('--hands',choices=['3d','sprites'],default='3d',help='Compile-time first-person renderer; retain both conversion paths')

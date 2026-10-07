@@ -17,6 +17,34 @@ static int frontend,selection,confirming,confirmation_return;
 static int mouse_x=160,mouse_y=63,mouse_visible;
 static int graphics_top,scroll_drag;
 static int audio_options,audio_drag;
+/* Options > Fog distance slider (Morrowind style): drag, arrows, or type. */
+#define FOG_MIN 100
+#define FOG_MAX 1500
+#define FOG_X 60
+#define FOG_W 200
+#define FOG_Y 104
+extern cvar_t aw_drawdistance;
+static int fog_slider,fog_drag,fog_before,fog_typing;static char fog_typed[6];
+static int fog_value(void){int v=(int)aw_drawdistance.value;return v<FOG_MIN?FOG_MIN:v>FOG_MAX?FOG_MAX:v;}
+static void fog_pointer(void){fog_typing=0;AW_SetDrawDistance(FOG_MIN+((mouse_x-FOG_X)*(FOG_MAX-FOG_MIN)+FOG_W/2)/FOG_W);}
+static void fog_close(int keep){
+    if(!keep)AW_SetDrawDistance(fog_before);
+    else if(fog_typing && fog_typed[0])AW_SetDrawDistance(atoi(fog_typed));
+    fog_slider=fog_drag=fog_typing=0;mouse_visible=0;
+}
+static void fog_key(int key){
+    int n=(int)strlen(fog_typed);
+    if(key==K_ESCAPE){fog_close(0);return;}
+    if(key==K_ENTER){fog_close(1);return;}
+    if(key>='0' && key<='9'){if(!fog_typing){fog_typing=1;n=0;}if(n<4){fog_typed[n]=(char)key;fog_typed[n+1]=0;}return;}
+    if(key==K_BACKSPACE){if(fog_typing && n)fog_typed[n-1]=0;return;}
+    if(key==K_LEFTARROW || key==K_RIGHTARROW){fog_typing=0;AW_SetDrawDistance(fog_value()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));}
+    if(key==K_HOME || key==K_END){fog_typing=0;AW_SetDrawDistance(key==K_HOME?FOG_MIN:FOG_MAX);}
+    if(key==K_MOUSE1){
+        if(mouse_x>=FOG_X-6 && mouse_x<=FOG_X+FOG_W+6 && mouse_y>=FOG_Y-10 && mouse_y<=FOG_Y+14){fog_drag=1;fog_pointer();}
+        else if(mouse_x>=122 && mouse_x<198 && mouse_y>=150 && mouse_y<175)fog_close(1);
+    }
+}
 static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,interface_options,intro_available;
 static keydest_t picker_return;
 static int colours[4],ready;
@@ -172,7 +200,7 @@ static void confirm(int action){
 }
 static void cancel_confirmation(void){confirming=0;selection=confirmation_return;mouse_visible=0;}
 void M_Menu_Quit_f(void){M_Menu_Main_f();confirm(1);}
-static void main_menu(void){frontend=1;M_Menu_Main_f();AW_MusicTitle();}
+static void main_menu(void){frontend=1;M_Menu_Main_f();AW_MusicTitleAfter(.5);}
 static void scene_menu(void){
     FILE *f;int i,size;char path[48];
     if(!sv.active || Cmd_Argc()!=1){Con_Printf("Use dbg scene change during play.\n");return;}
@@ -210,7 +238,8 @@ void AW_MenuMouse(int dx,int dy){
     if(mouse_x>319)mouse_x=319;
     if(mouse_y<0)mouse_y=0;
     if(mouse_y>199)mouse_y=199;
-    if(!keydown[K_MOUSE1])scroll_drag=audio_drag=0;
+    if(!keydown[K_MOUSE1])scroll_drag=audio_drag=fog_drag=0;
+    if(fog_slider){if(fog_drag)fog_pointer();return;}
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     if(!keydown[K_MOUSE1])brightness_drag=0;
     if(brightness_options && brightness_drag){brightness_pointer();return;}
@@ -235,6 +264,7 @@ void M_Keydown(int key){
     if(key=='s' || key=='S')key=K_DOWNARROW;
     if(key==K_MWHEELUP)key=K_UPARROW;
     if(key==K_MWHEELDOWN)key=K_DOWNARROW;
+    if(fog_slider){fog_key(key);return;}
     if(key==K_MOUSE1){
         if((graphics && !interface_options && !audio_options && !controls_options && !brightness_active()) || scene_picker){
             row=AW_UIScrollHit(mouse_x,mouse_y,276,54,graphics?133:114,graphics?OPTION_ROWS:AW_MAP_COUNT+1,graphics?7:6,graphics?graphics_top:scene_top);
@@ -318,7 +348,8 @@ void M_Keydown(int key){
         if(selection==8 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
         if(selection==9 && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
         if(key==K_ENTER || key==K_MOUSE1){
-            if(selection==1)AW_SetDrawDistance(540);
+            if(selection==0){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
+            else if(selection==1)AW_SetDrawDistance(540);
             else if(selection==2)AW_UIFrameToggle();
             else if(selection==3){interface_options=1;selection=0;}
             else if(selection==4){audio_options=1;audio_drag=0;selection=0;}
@@ -462,6 +493,21 @@ void M_Draw(void){
         AW_UISmallBegin();
         AW_UITextBox(36,170,236,17,controls_capture?"Press a key   Esc: cancel":"Enter: set   Del: clear",colours[1]);
         AW_UISmallEnd();
+    }else if(graphics && fog_slider){
+        int knob=FOG_X+(fog_value()-FOG_MIN)*FOG_W/(FOG_MAX-FOG_MIN);
+        AW_UITextBox(40,56,240,20,"Fog distance",colours[1]);
+        if(fog_typing)sprintf(line,"%s_",fog_typed);else sprintf(line,"%ld",(long)fog_value());
+        AW_UIFill(130,76,60,20,colours[3]);AW_UITextBox(130,76,60,20,line,colours[1]);
+        AW_UIFill(FOG_X,FOG_Y,FOG_W+1,3,colours[2]);
+        AW_UIFill(FOG_X,FOG_Y,knob-FOG_X,3,colours[1]);
+        AW_UIFill(knob-3,FOG_Y-5,7,13,colours[1]);AW_UIFill(knob-1,FOG_Y-3,3,9,colours[0]);
+        AW_UISmallBegin();
+        sprintf(line,"%ld",(long)FOG_MIN);AW_UITextBox(FOG_X-30,FOG_Y-8,28,17,line,colours[1]);
+        sprintf(line,"%ld",(long)FOG_MAX);AW_UITextBox(FOG_X+FOG_W+4,FOG_Y-8,30,17,line,colours[1]);
+        if(AW_DrawDistance()!=fog_value()){sprintf(line,"This area draws up to %ld",(long)AW_DrawDistance());AW_UITextBox(40,116,240,17,line,colours[2]);}
+        AW_UITextBox(30,132,260,17,"Drag / arrows / type a number   Esc: cancel",colours[1]);
+        AW_UISmallEnd();
+        AW_UIBox(120,150,80,25);label(122,153,76,19,"OK",1,1);
     }else if(graphics){
         for(i=graphics_top;i<graphics_top+7;i++){
             switch(i){

@@ -6,9 +6,10 @@ The standalone browser inspector is AmiWind's current tool for viewing compiled
 BSP geometry, placements and density, and preparing review plans. It sits within
 the aspirational **AmiWind Map Optimization Toolkit** direction. The inspector
 helps analyze geometry and plan work; it does not edit BSPs, perform complete
-automatic optimization, or profile live runtime performance. Its existing
-implementation remains at `tools/polycount_inspector.html`; the legacy filename
-and links are preserved. See the [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) and
+automatic optimization, or profile live runtime performance. Since v0.0.31 it
+lives at `amiwind-toolkit/map-inspector.html` as part of the
+[AmiWind Toolkit](AMIWIND_TOOLKIT.md); the old `tools/polycount_inspector.html`
+link redirects there. See the [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) and
 [exterior hidden-surface status](EXTERIOR_HIDDEN_SURFACES.md).
 See the [Map Optimization Toolkit overview](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md)
 and [measured findings](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
@@ -18,7 +19,8 @@ The startup-frame repair remains: an empty viewport
 is valid before a scene is loaded, and a runtime error does not terminate the
 animation scheduler. Shader and runtime errors appear in the viewport.
 
-Open `tools/polycount_inspector.html` in a desktop browser with WebGL enabled.
+Open `amiwind-toolkit/map-inspector.html` (or the toolkit page,
+`amiwind-toolkit/index.html`) in a desktop browser with WebGL enabled.
 This standalone tool needs no server, package install, CDN or network access.
 Click **Open local BSP / scene JSON** and choose a locally converted Quake BSP
 version 29. **Synthetic cube** supplies a tiny asset-free demonstration.

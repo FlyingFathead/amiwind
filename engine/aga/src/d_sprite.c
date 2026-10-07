@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
+#include "aw_sky.h"
 
 static int		sprite_height;
 static int		minindex, maxindex;
@@ -35,8 +36,13 @@ static sspan_t	*sprite_spans;
 D_SpriteDrawSpans
 =====================
 */
+const unsigned char *d_nightshade;
+static byte shade_identity[256];
+static int shade_identity_ready;
+
 void D_SpriteDrawSpans (sspan_t *pspan)
 {
+	const byte	*shade;
 	int			count, spancount,slowdepth,depthvalue;double pixelzi,endzi;
 	unsigned int		izistep;
 	unsigned int		izi;
@@ -51,6 +57,13 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 	tstep = 0;	// ditto
 
 	pbase = cacheblock;
+	if (!shade_identity_ready)
+	{
+		for (count=0 ; count<256 ; count++)
+			shade_identity[count] = (byte)count;
+		shade_identity_ready = 1;
+	}
+	shade = d_nightshade ? d_nightshade : shade_identity;	// sprites are unlit: night dims them here
 
 	sdivz8stepu = d_sdivzstepu * 8;
 	tdivz8stepu = d_tdivzstepu * 8;
@@ -173,7 +186,7 @@ void D_SpriteDrawSpans (sspan_t *pspan)
                     if (*pz <= depthvalue)
 					{
 						*pz = depthvalue;
-						*pdest = btemp;
+						*pdest = shade[btemp];
 					}
 				}
 

@@ -33,6 +33,7 @@ char *arg="on",last[128],title[128];
 int Cmd_Argc(void) {return argc;}
 char *Cmd_Argv(int n) {return arg;}
 void Con_Printf(char *fmt,...) {}
+int AW_LightGalleryDraw(void){return 0;}
 int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
 void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<settings_count;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}

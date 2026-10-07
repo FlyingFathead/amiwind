@@ -7,7 +7,7 @@ import numpy as np
 
 BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
       156:(158,(250,104,45)),140:(138,(255,174,66)),83:(82,(255,232,160)),221:(223,(153,38,79))}
-OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg'}
+OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl'}
 RAW_LMP={'font-readable.lmp':16384,'font-retro.lmp':16384}
 QPIC_LMP={'conback.lmp','loading.lmp','pause.lmp'}
 EXPECTED_PALETTE='a0f74c36edc83962b99cd254026659466b1932898636f8ccc1a814a06cb7986c'

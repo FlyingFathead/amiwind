@@ -1,0 +1,747 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmiWind Toolkit · World Map</title>
+<style>
+:root{--bg:#101923;--panel:#162433;--ink:#edf3fa;--muted:#9fb3c8;--line:#345;--empty:#1c2a38}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0 8px 0 0}
+label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+input[type=file],button{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
+#layers{display:flex;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+#layers b{margin-right:4px;color:var(--muted);font-weight:600}
+#layers{position:relative}
+#optwrap{margin-left:auto;position:relative}
+.bottomsel{display:inline-flex;align-items:center;gap:4px;margin-right:14px;padding-right:14px;border-right:1px solid var(--line)}
+.bottomsel b{margin-right:6px}
+.bottomsel button{width:28px;height:30px;padding:0;font-size:18px;font-weight:700;cursor:pointer}
+.bottomsel select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px;min-width:150px}
+#optbtn{font-size:20px;line-height:1;width:38px;height:34px;padding:0;cursor:pointer}
+#optbtn:hover::after,#optbtn:focus-visible::after{content:'Options';position:absolute;right:0;top:40px;background:#101923;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:3px 8px;font-size:12px;white-space:nowrap;z-index:6}
+#options{position:absolute;right:0;top:42px;z-index:5;min-width:260px;background:var(--panel);border:1px solid #6a85a3;border-radius:8px;padding:10px 14px;box-shadow:0 6px 24px #0008;display:flex;flex-direction:column;gap:8px}
+#options[hidden]{display:none}
+#options h2{font-size:14px;margin:0 0 2px;color:#ffe28a}
+main{display:flex;flex-wrap:wrap;gap:16px;padding:16px}
+#stage{position:relative;flex:1 1 560px;min-width:0}
+.sbar{position:absolute;background:#0b1118cc;border-radius:5px;display:none;z-index:3}
+.sbar div{position:absolute;background:#9fb3c8aa;border-radius:5px;cursor:grab}
+.sbar div:hover,.sbar div.on{background:#ffd24acc}
+canvas{width:100%;height:auto;display:block;background:var(--empty);border:1px solid var(--line)}
+aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;line-height:1.6}
+#legend div{margin:2px 0}
+#legend span{display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:6px;border:1px solid #0006}
+#tip{position:absolute;pointer-events:none;background:#101923ee;border:1px solid var(--line);padding:6px 8px;border-radius:4px;display:none;white-space:pre}
+.muted{color:var(--muted);font-size:12px}
+#selected{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);font-size:15px}
+#selected b{color:#ffe28a}
+#zoom{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2}
+#zoom button{width:38px;height:34px;font-size:18px;font-weight:700;padding:0;background:#203346ee;border:1px solid #6a85a3;border-radius:6px;cursor:pointer}
+#zoom button#zoomreset{width:auto;padding:0 10px;font-size:13px;font-weight:600}
+#gridtoggle{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;z-index:2;background:#101923cc;border:1px solid #456;border-radius:6px;padding:3px 4px 3px 9px;font-size:13px;font-weight:600}
+#gridtoggle button{height:28px;padding:0 10px;font-size:13px;font-weight:600;background:#203346ee;border:1px solid #6a85a3;border-radius:5px;cursor:pointer;color:inherit}
+#gridtoggle button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
+#ctaslot .cta{display:block;width:100%;margin:0 0 14px}
+.cta{margin:0;padding:9px 16px;font-size:15px;font-weight:700;border-radius:7px;cursor:pointer;background:#ffcf55;color:#101923;border:2px solid #fff3c4;box-shadow:0 0 12px #ffcf5580}
+.cta.pick{background:#203346;color:#ffe28a;border-color:#ffcf55}
+.nocta{color:var(--muted)}
+.mode{padding:7px 18px;font-size:15px;font-weight:600;border-radius:6px;cursor:pointer}
+.mode.on{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
+#localview{display:flex;flex-wrap:wrap;gap:16px;padding:16px;align-items:flex-start}
+#localview[hidden],main[hidden]{display:none}
+#localpanel{flex:1 1 360px;max-width:560px;min-width:0;line-height:1.6}
+#localpanel canvas{max-width:512px}
+#localtitle{font-size:17px;margin-bottom:8px}
+#localtitle b{color:#ffe28a}
+#localpanel select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:6px;max-width:100%}
+#inspector3d{flex:2 1 520px;min-width:0;height:80vh;min-height:420px;border:1px solid var(--line);border-radius:6px;background:#000}
+/* Inside the Toolkit the inspector has its own tab: the local view uses the
+ * width for the map and its lists side by side. */
+body.embedded #inspector3d{display:none}
+body.embedded #localpanel{max-width:none;flex:1 1 100%}
+.localcols{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.localleft{flex:0 1 512px;min-width:0}
+.localright{flex:1 1 320px;min-width:0}
+#picked{margin-top:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px;color:var(--ink);min-height:40px}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="pagetitle">AmiWind Toolkit · World Map</h1>
+  <span role="tablist"><button class="mode on" id="mode-world" role="tab">World</button>
+  <button class="mode" id="mode-local" role="tab">Local</button></span>
+  <label>Status <input id="status" type="file" accept=".json"></label>
+  <label>Island (local) <input id="island" type="file" accept=".png,.json" multiple></label>
+  <label>Maps folder (local) <input id="mapsdir" type="file" webkitdirectory multiple></label>
+  <button id="copystate" title="Copy the toolkit version, loaded data, layers and selection as JSON">Copy state (JSON)</button>
+  <a id="toinspector" href="map-inspector.html" target="_blank" style="color:#ffe28a;display:none">3D Map Inspector &#8599;</a>
+  <span id="copied" class="muted"></span>
+</header>
+<div id="layers"></div>
+<div id="selected">Selected area: click a cell on the map</div>
+<div id="multi" class="muted" style="color:#ffd24a"></div>
+<main>
+  <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="tip"></div>
+    <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
+    <div id="gridtoggle" role="group" aria-label="Cell grid">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button></div>
+    <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomreset" title="Whole island">reset</button><button id="zoomin" title="Zoom in">+</button></div>
+    <div id="picked" class="muted">Click a cell to show it here.</div></div>
+  <aside>
+    <div id="ctaslot"></div>
+    <div id="summary" class="muted">Load world-progress.json from an image build.</div>
+    <div id="legend"></div>
+    <p class="muted">North is up; one square per exterior cell. The topomap (open-world
+    terrain, converted for the whole island) is the basis; every other layer sits on
+    top of it. The island image is rendered on your machine from your own game data
+    (tools/world_progress_background.py) and never leaves it.</p>
+  </aside>
+</main>
+<section id="localview" hidden>
+  <div id="localpanel">
+    <div id="localtitle">Local: click a cell in World first.</div>
+    <div class="localcols">
+      <div class="localleft">
+        <canvas id="local" width="512" height="512"></canvas>
+        <p><label>Map <select id="mapselect"></select></label>
+        <button id="open3d" class="cta">&#9654; Show in 3D</button></p>
+        <div id="localhint" class="muted"></div>
+      </div>
+      <div class="localright">
+        <div id="locallegend" class="muted"></div>
+        <div id="localpois" class="muted"></div>
+      </div>
+    </div>
+  </div>
+  <iframe id="inspector3d" title="3D Map Inspector"></iframe>
+</section>
+<script>
+const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
+let data = null, maxOriginal = 1;
+// Local images by style: {img, bounds}. Each is drawn at its own cell bounds.
+const images = {topo: {}, world: {}};
+// Local level: per-cell terrain and original placements (local cells JSON).
+let cellsDetail = null;
+const CAT_COLOURS = ['#9a9a9a', '#c9a6ff', '#3fae49', '#7fd36b', '#e0c341', '#d8d0c0', '#ff8c42',
+  '#b07a4a', '#ffd23f', '#4fc3f7', '#ff5d8f', '#e53935', '#ffffff'];
+// Layers draw bottom to top. kind: base (image/terrain), fill (one colour per cell),
+// mark (outline or dot), so several can be combined.
+const LAYERS = [
+  {id: 'worldmap', name: 'Game world map', kind: 'base', style: 'world'},
+  {id: 'island', name: 'Topo', kind: 'base', style: 'topo'},
+  {id: 'terrain', name: 'Topomap (terrain)', on: true, kind: 'fill',
+   legend: [['#3d6f9e', 'open-world terrain converted'], ['#5a2a2a', 'no terrain']],
+   colour: c => c.map === 'none' ? '#5a2a2a' : '#3d6f9e', alpha: .45},
+  {id: 'density', name: 'Heatmap: original entities', on: false, kind: 'fill',
+   legend: [['#1f3b73', 'few'], ['#ffcf55', 'many'], ['#ef4545', 'most']],
+   colour: c => c.original ? heat(Math.sqrt(c.original / maxOriginal)) : null, alpha: .8},
+  {id: 'content', name: 'Entities placed (share)', on: false, kind: 'fill',
+   legend: [['#111111', '0 % placed'], ['#5a5a5a', ''], ['#c8321e', '50 %'], ['#ff9a2e', ''], ['#ffffff', '100 % (white hot)']],
+   colour: c => c.original ? glow(c.placed / c.original) : null, alpha: .85},
+  {id: 'full', name: 'Full town/area maps', on: true, kind: 'outline',
+   legend: [['#ffffff', 'full town/area map (white border, black outline)']]},
+  {id: 'missing', name: 'Content missing', on: false, kind: 'mark',
+   legend: [['#ff3b3b', 'original entities not placed (outline)']],
+   mark: (g, c) => { if (c.original > c.placed) outline(g, c, '#ff3b3b'); }},
+  {id: 'interiors', name: 'Interiors', on: false, kind: 'mark',
+   legend: [['#ef4545', 'interior entrances, none converted'], ['#32cfa0', 'all converted']],
+   mark: (g, c) => { if (c.interiors) dot(g, c, ramp(c.interiors_converted / c.interiors), .3); }},
+  {id: 'places', name: 'Named places', on: false, kind: 'mark',
+   legend: [['#c9a6ff', 'named place']], mark: (g, c) => { if (c.places) dot(g, c, '#c9a6ff', .18, -.25); }},
+  {id: 'poi', name: 'Points of interest (local)', on: true, kind: 'poi',
+   legend: [['#ffe28a', 'named place (label)'], ['#32cfa0', 'interior entrance, converted'], ['#f2f2f2', 'interior entrance, not converted']]},
+  // Useful with a partial maps folder; with every map available every cell qualifies.
+  {id: 'inspectable', name: '3D inspectable (corner triangles)', on: false, kind: 'mark', option: true,
+   legend: [['#38e1ff', 'map available in your maps folder (click, then Inspect in 3D)']],
+   mark: (g, c) => { if (inspectable(c)) badge(g, c); }},
+  {id: 'checked', name: 'Owner checked', on: true, kind: 'mark',
+   legend: [['#32cfa0', 'walked and accepted (thick outline)']],
+   mark: (g, c) => { if (c.checked) outline(g, c, '#32cfa0', 3); }},
+  {id: 'grid', name: 'Cell grid', on: false, kind: 'grid'},
+];
+function ramp(t) {
+  t = Math.max(0, Math.min(1, t));
+  const a = t < .5 ? [239, 69, 69] : [255, 207, 85], b = t < .5 ? [255, 207, 85] : [50, 207, 160], u = t < .5 ? t * 2 : t * 2 - 1;
+  return 'rgb(' + a.map((v, i) => Math.round(v + (b[i] - v) * u)).join(',') + ')';
+}
+// Heated metal: black and grey where little is placed, red, orange, yellow, then white hot.
+const GLOW = [[0, [17, 17, 17]], [.2, [90, 90, 90]], [.45, [200, 50, 30]], [.7, [255, 154, 46]], [.88, [255, 230, 120]], [1, [255, 255, 255]]];
+function glow(t) {
+  t = Math.max(0, Math.min(1, t));
+  let i = 0; while (i < GLOW.length - 2 && t > GLOW[i + 1][0]) i++;
+  const [t0, a] = GLOW[i], [t1, b] = GLOW[i + 1], u = (t - t0) / (t1 - t0);
+  return 'rgb(' + a.map((v, k) => Math.round(v + (b[k] - v) * u)).join(',') + ')';
+}
+function heat(t) {
+  t = Math.max(0, Math.min(1, t));
+  const stops = [[31, 59, 115], [255, 207, 85], [239, 69, 69]], k = t < .5 ? 0 : 1, u = t < .5 ? t * 2 : t * 2 - 1;
+  return 'rgb(' + stops[k].map((v, i) => Math.round(v + (stops[k + 1][i] - v) * u)).join(',') + ')';
+}
+// Outer edge of a group of cells: a cell side is drawn when its neighbour is not
+// in the group. Black first (wide), then white on top (narrow), so it stands out
+// on any layer underneath.
+function groupOutline(g, cells) {
+  const inside = new Set(cells.map(c => c.x + ',' + c.y)), edges = [];
+  for (const c of cells) {
+    const x0 = g.px(c.x), y0 = g.py(c.y), x1 = x0 + g.s, y1 = y0 + g.s;
+    if (!inside.has(c.x + ',' + (c.y + 1))) edges.push([x0, y0, x1, y0]);  // north
+    if (!inside.has(c.x + ',' + (c.y - 1))) edges.push([x0, y1, x1, y1]);  // south
+    if (!inside.has((c.x - 1) + ',' + c.y)) edges.push([x0, y0, x0, y1]);  // west
+    if (!inside.has((c.x + 1) + ',' + c.y)) edges.push([x1, y0, x1, y1]);  // east
+  }
+  for (const [col, w] of [['#000000', 6 / view.z], ['#ffffff', 2.5 / view.z]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'square'; ctx.beginPath();
+    for (const [a, b, c2, d] of edges) { ctx.moveTo(a, b); ctx.lineTo(c2, d); }
+    ctx.stroke();
+  }
+}
+function outline(g, c, col, w) { ctx.strokeStyle = col; ctx.lineWidth = (w || 1.5) / view.z; ctx.strokeRect(g.px(c.x) + 1, g.py(c.y) + 1, g.s - 2, g.s - 2); }
+function dot(g, c, col, r, dx) {
+  ctx.fillStyle = col; ctx.beginPath();
+  ctx.arc(g.px(c.x) + g.s * (.5 + (dx || 0)), g.py(c.y) + g.s * .5, Math.max(2, g.s * r), 0, 7); ctx.fill();
+}
+// Pure: setting canvas.width/height clears the canvas, so only draw() resizes.
+function geometry() {
+  const b = data.bounds.slice();
+  for (const im of Object.values(images)) if (im.bounds) {
+    b[0] = Math.min(b[0], im.bounds[0]); b[1] = Math.min(b[1], im.bounds[1]);
+    b[2] = Math.max(b[2], im.bounds[2]); b[3] = Math.max(b[3], im.bounds[3]);
+  }
+  const w = b[2] - b[0] + 1, h = b[3] - b[1] + 1, s = Math.floor(Math.min(820 / w, 820 / h));
+  return {b, s, w: w * s, h: h * s, px: x => (x - b[0]) * s, py: y => (b[3] - y) * s};
+}
+function anyImage() { return LAYERS.some(L => L.kind === 'base' && on(L.id) && images[L.style].img); }
+// Bottom layer: one local image underneath everything (or none), chosen in the layer bar.
+const BOTTOMS = [['topo', 'Topo'], ['world', 'Game world map'], ['none', 'None']];
+let bottom = 'topo';
+function on(id) {
+  const base = LAYERS.find(L => L.id === id && L.kind === 'base');
+  if (base) return bottom === base.style; const el = $('layer-' + id); return el && el.checked; }
+function draw() {
+  if (!data) return;
+  const g = geometry();
+  // Backing store at display size x device pixels, so text and lines stay sharp.
+  const ratio = Math.max(1, (canvas.clientWidth || g.w) * (window.devicePixelRatio || 1) / g.w);
+  const bw = Math.round(g.w * ratio), bh = Math.round(g.h * ratio);
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(ratio * view.z, 0, 0, ratio * view.z, ratio * view.x, ratio * view.y);
+  const legend = [];
+  for (const L of LAYERS) {
+    if (!on(L.id)) continue;
+    if (L.legend) legend.push(...L.legend);
+    if (L.kind === 'base') {
+      const im = images[L.style];
+      ctx.imageSmoothingEnabled = false;  // terrain images keep crisp cell pixels
+      if (im.img && im.bounds) ctx.drawImage(im.img, g.px(im.bounds[0]), g.py(im.bounds[3]),
+        (im.bounds[2] - im.bounds[0] + 1) * g.s, (im.bounds[3] - im.bounds[1] + 1) * g.s);
+      continue;
+    }
+    if (L.kind === 'grid') {
+      ctx.strokeStyle = '#ffffff22'; ctx.lineWidth = 1 / view.z; ctx.beginPath();
+      for (let x = 0; x <= g.w; x += g.s) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, g.h); }
+      for (let y = 0; y <= g.h; y += g.s) { ctx.moveTo(0, y + .5); ctx.lineTo(g.w, y + .5); }
+      ctx.stroke(); continue;
+    }
+    if (L.kind === 'outline') { groupOutline(g, data.cells.filter(c => c.map === 'full')); continue; }
+    if (L.kind === 'poi') { drawPois(g); continue; }
+    for (const c of data.cells) {
+      if (L.kind === 'fill') {
+        const col = L.colour(c); if (!col) continue;
+        ctx.globalAlpha = anyImage() ? L.alpha : 1; ctx.fillStyle = col;
+        ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1); ctx.globalAlpha = 1;
+      } else L.mark(g, c);
+    }
+  }
+  if (multi.size) {
+    ctx.fillStyle = '#ffd24a55'; ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 1.5 / view.z;
+    for (const k of multi) {
+      const [x, y] = k.split(',').map(Number);
+      ctx.fillRect(g.px(x) + 1, g.py(y) + 1, g.s - 2, g.s - 2); ctx.strokeRect(g.px(x) + 1, g.py(y) + 1, g.s - 2, g.s - 2);
+    }
+  }
+  if (picked) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / view.z; ctx.strokeRect(g.px(picked.x) + 1, g.py(picked.y) + 1, g.s - 2, g.s - 2); }
+  scrollbars();
+  $('legend').innerHTML = legend.map(([c, t]) => '<div><span style="background:' + c + '"></span>' + t + '</div>').join('');
+}
+function emptyMessage() {
+  ctx.fillStyle = '#9fb3c8'; ctx.font = '20px system-ui, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('No data loaded.', canvas.width / 2, canvas.height / 2 - 16);
+  ctx.font = '15px system-ui, sans-serif';
+  ctx.fillText('Pick world-progress.json from an image build with "Status",', canvas.width / 2, canvas.height / 2 + 14);
+  ctx.fillText('and optionally your local island .png + .json files with "Island".', canvas.width / 2, canvas.height / 2 + 38);
+}
+emptyMessage();
+// Served by tools/toolkit_serve.py (?served=1): load everything from it at once.
+const SERVED = new URLSearchParams(location.search).has('served');
+let servedMaps = new Set();
+async function autoload() {
+  const get = async (name, kind) => {
+    try { const r = await fetch('../data/' + name); return r.ok ? (kind === 'json' ? r.json() : r.blob()) : null; }
+    catch (_) { return null; }
+  };
+  const status = await get('world-progress.json', 'json');
+  if (status) { statusFileName = 'served:world-progress.json'; setData(status); }
+  for (const [style, stem] of [['topo', 'island'], ['world', 'island-world']]) {
+    const meta = await get(stem + '.json', 'json'), png = await get(stem + '.png', 'blob');
+    if (meta && png) {
+      images[style].bounds = meta.bounds;
+      const im = new Image(); im.onload = () => { images[style].img = im; pickBottom(); draw(); }; im.src = URL.createObjectURL(png);
+    }
+  }
+  const cells = await get('island-cells.json', 'json');
+  if (cells) { cellsDetail = cells; draw(); }
+  try { const r = await fetch('../maps/index.json'); if (r.ok) servedMaps = new Set(await r.json()); } catch (_) {}
+}
+if (SERVED) autoload();
+// Standalone (not inside the toolkit page): offer the inspector as a link.
+if (window.parent === window) $('toinspector').style.display = 'inline';
+else { $('pagetitle').style.display = 'none'; document.querySelector('[role=tablist]').style.display = 'none'; }
+// Main layer bar; less-used layers (option: true) live behind the Options cog.
+const layerBox = L => '<label><input type="checkbox" id="layer-' + L.id + '"' + (L.on ? ' checked' : '') + '> ' + L.name + '</label>';
+$('layers').innerHTML = '<span class="bottomsel"><b>Bottom layer</b><button id="bprev" aria-label="Previous bottom layer">&lsaquo;</button>' +
+  '<select id="bottom" aria-label="Bottom layer">' + BOTTOMS.map(([v, t]) => '<option value="' + v + '">' + t + '</option>').join('') + '</select>' +
+  '<button id="bnext" aria-label="Next bottom layer">&rsaquo;</button></span>' +
+  '<b>Layers</b>' + LAYERS.filter(L => !L.option && L.kind !== 'base').map(layerBox).join('') +
+  '<span id="optwrap"><button id="optbtn" aria-label="Options" aria-expanded="false" aria-controls="options">&#9881;</button>' +
+  '<div id="options" hidden role="dialog" aria-label="Options"><h2>Options</h2>' + LAYERS.filter(L => L.option).map(layerBox).join('') + '</div></span>';
+for (const L of LAYERS) if (L.kind !== 'base') $('layer-' + L.id).onchange = draw;
+// Grid on/off on the map itself, in step with the Cell grid checkbox.
+function syncGrid() {
+  const g = $('layer-grid').checked;
+  $('gridon').setAttribute('aria-pressed', g ? 'true' : 'false');
+  $('gridoff').setAttribute('aria-pressed', g ? 'false' : 'true');
+}
+function setGrid(g) { $('layer-grid').checked = g; syncGrid(); draw(); }
+$('gridon').onclick = () => setGrid(true);
+$('gridoff').onclick = () => setGrid(false);
+$('layer-grid').onchange = () => { syncGrid(); draw(); };
+syncGrid();
+function setBottom(v) { bottom = v; $('bottom').value = v; draw(); }
+$('bottom').onchange = () => setBottom($('bottom').value);
+const stepBottom = d => { const i = BOTTOMS.findIndex(b => b[0] === bottom); setBottom(BOTTOMS[(i + d + BOTTOMS.length) % BOTTOMS.length][0]); };
+$('bprev').onclick = () => stepBottom(-1);
+$('bnext').onclick = () => stepBottom(1);
+// Topo by default. The game world map matches OpenMW 0.51's palette (all 256 colours)
+// and the original's colours documented on UESP (Tes3Mod:World_Map).
+function pickBottom() { if (bottom === 'topo' && !images.topo.img && images.world.img) setBottom('world'); }
+function setOptions(open) { $('options').hidden = !open; $('optbtn').setAttribute('aria-expanded', open ? 'true' : 'false'); }
+$('optbtn').onclick = e => { e.stopPropagation(); setOptions($('options').hidden); };
+$('options').onclick = e => e.stopPropagation();
+document.addEventListener('click', () => setOptions(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') setOptions(false); });
+function load(file, cb) { const r = new FileReader(); r.onload = () => cb(r.result); r.readAsText(file); }
+function setData(d) {
+  if (d.format !== 'AW-WORLD-PROGRESS2') { $('summary').textContent = 'Not a world-progress.json (format 2) file.'; return; }
+  data = d; maxOriginal = Math.max(1, ...data.cells.map(c => c.original));
+  const s = data.summary;
+  $('summary').innerHTML = s.cells + ' cells · ' + s.terrain + ' with topomap terrain · ' + s.full + ' full maps · ' +
+    s.checked + ' checked<br>Entities placed: ' + s.placed.toLocaleString() + ' / ' + s.original.toLocaleString();
+  draw();
+}
+$('status').onchange = e => { statusFileName = e.target.files[0] && e.target.files[0].name; load(e.target.files[0], text => setData(JSON.parse(text))); };
+$('island').onchange = e => {
+  for (const f of e.target.files) {
+    // island.png + island.json (topo) and island-world.png + island-world.json (world style)
+    const style = /world/i.test(f.name) ? 'world' : 'topo';
+    if (f.name.endsWith('.json')) load(f, text => {
+      const j = JSON.parse(text);
+      if (j.format === 'AW-WORLD-CELLS1') { cellsDetail = j; draw(); if (picked) drawLocal(picked.x, picked.y); return; }
+      images[j.style || style].bounds = j.bounds; draw();
+    });
+    else { const img = new Image(); img.onload = () => { images[style].img = img; pickBottom(); draw(); }; img.src = URL.createObjectURL(f); }
+  }
+};
+// Local level close-up: terrain shading plus one dot per original placement,
+// filled when AmiWind places it, hollow with a red ring when it does not.
+// Same land ramp as tools/world_progress_background.py (shore green to volcanic red).
+// White is reserved for real snow (Solstheim, if added): never use it for height.
+const TERRAIN_STOPS = [[0,[92,118,74]],[1400,[122,116,78]],[3500,[120,96,70]],[6000,[104,82,70]],[10000,[100,62,50]],[15000,[118,44,32]]];
+function topoColour(h) {
+  if (h <= 0) { const t = Math.min(1, -h / 2048); return [70 - 40 * t, 110 - 50 * t, 150 - 40 * t]; }
+  for (let i = 0; i < TERRAIN_STOPS.length - 1; i++) {
+    const [h0, c0] = TERRAIN_STOPS[i], [h1, c1] = TERRAIN_STOPS[i + 1];
+    if (h <= h1) { const u = (h - h0) / (h1 - h0); return c0.map((a, k) => a + (c1[k] - a) * u); }
+  }
+  return TERRAIN_STOPS[TERRAIN_STOPS.length - 1][1];
+}
+function drawLocal(x, y) {
+  const named = placeName(x, y);
+  $('localtitle').innerHTML = 'Local: ' + (named ? '<b>' + escapeHtml(named) + '</b> · ' : '') + 'cell ' + x + ', ' + y;
+  const lc = $('local'), l = lc.getContext('2d'), S = lc.width, k2 = S / 256;
+  l.fillStyle = '#2a4256'; l.fillRect(0, 0, S, S);
+  if (!cellsDetail) {
+    l.fillStyle = '#9fb3c8'; l.font = '16px system-ui, sans-serif'; l.textAlign = 'center';
+    l.fillText('Load your island-cells.json with "Island (local)"', S / 2, S / 2); l.textAlign = 'start';
+    $('locallegend').textContent = ''; $('localpois').textContent = ''; return;
+  }
+  const d = cellsDetail.cells[x + ',' + y];
+  if (d && d.h) {
+    const n = d.h.length, step = S / (n - 1);
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+      const v = (d.h[j][i] + d.h[j][i + 1] + d.h[j + 1][i] + d.h[j + 1][i + 1]) / 4, c = topoColour(v);
+      l.fillStyle = 'rgb(' + c.map(Math.round).join(',') + ')';
+      l.fillRect(i * step, S - (j + 1) * step, step + .5, step + .5);  // north up
+    }
+  }
+  const counts = {};
+  for (const [gx, gy, cat, placed] of (d ? d.refs : [])) {
+    const px = (gx + .5) * k2, py = (255.5 - gy) * k2, col = CAT_COLOURS[cat] || '#fff';
+    const k = cellsDetail.categories[cat]; counts[k] = counts[k] || [0, 0]; counts[k][0]++;
+    l.beginPath(); l.arc(px, py, 2.6 * Math.max(1, k2 * .75), 0, 7);
+    if (placed === 0) { l.strokeStyle = '#ff3b3b'; l.lineWidth = 2; l.stroke(); }
+    else { l.fillStyle = col; l.fill(); if (placed === 1) counts[k][1]++; }
+  }
+  const here = poisIn(x, y);
+  l.font = '600 13px system-ui, sans-serif';
+  for (const p of here) {
+    const px = (p.x - x) * S, py = (1 - (p.y - y)) * S;
+    l.fillStyle = p.kind === 'place' ? '#ffe28a' : p.converted ? '#32cfa0' : '#f2f2f2';
+    l.strokeStyle = '#000'; l.lineWidth = 1.5;
+    l.beginPath(); l.moveTo(px, py - 7); l.lineTo(px + 7, py); l.lineTo(px, py + 7); l.lineTo(px - 7, py); l.closePath(); l.fill(); l.stroke();
+    l.lineWidth = 3; l.strokeText(p.name, px + 9, py + 4); l.fillText(p.name, px + 9, py + 4);
+  }
+  $('localpois').innerHTML = here.length ? '<b style="color:var(--ink)">Places here</b><br>' +
+    here.map(p => escapeHtml(p.name) + ' (' + p.kind + (p.kind !== 'place' ? (p.converted ? ', converted' : ', not converted') : '') + ')').join('<br>') : '';
+  const known = cellsDetail.placed_known;
+  $('locallegend').innerHTML = '<b style="color:var(--ink)">Original placements</b><br>' +
+    (known ? 'filled = placed, red ring = not placed<br>' : '') +
+    cellsDetail.categories.map((k, i) => counts[k] ? '<span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:' +
+      CAT_COLOURS[i] + ';margin-right:6px"></span>' + k.replace('_', ' ') + ': ' + (known ? counts[k][1] + ' / ' : '') + counts[k][0] : '')
+      .filter(Boolean).join('<br>');
+}
+let picked = null;
+window.addEventListener('resize', () => draw());
+// Zoom and pan. The view maps base map pixels to the canvas: canvas = base * z + (x, y).
+const view = {z: 1, x: 0, y: 0};
+// Scrollbars: shown when zoomed in; the thumb is the visible part of the island.
+const SB = 10;
+function scrollbars() {
+  const h = $('hbar'), v = $('vbar');
+  if (view.z <= 1) { h.style.display = v.style.display = 'none'; return; }
+  const cw = canvas.offsetWidth, ch = canvas.offsetHeight, l = canvas.offsetLeft, t = canvas.offsetTop, g = geometry();
+  h.style.display = v.style.display = 'block';
+  Object.assign(h.style, {left: l + 'px', top: (t + ch - SB) + 'px', width: (cw - SB) + 'px', height: SB + 'px'});
+  Object.assign(v.style, {left: (l + cw - SB) + 'px', top: t + 'px', width: SB + 'px', height: (ch - SB) + 'px'});
+  const fx = -view.x / (g.w * view.z), fy = -view.y / (g.h * view.z), tw = cw - SB, th = ch - SB;
+  Object.assign(h.firstChild.style, {left: fx * tw + 'px', top: '0', width: Math.max(20, tw / view.z) + 'px', height: SB + 'px'});
+  Object.assign(v.firstChild.style, {top: fy * th + 'px', left: '0', height: Math.max(20, th / view.z) + 'px', width: SB + 'px'});
+}
+function scrollTo(axis, frac) {
+  const g = geometry();
+  if (axis === 'x') view.x = -frac * g.w * view.z; else view.y = -frac * g.h * view.z;
+  clampView(); draw();
+}
+for (const [id, axis] of [['hbar', 'x'], ['vbar', 'y']]) {
+  const bar = $(id), thumb = bar.firstChild;
+  thumb.addEventListener('mousedown', e => {
+    e.preventDefault(); e.stopPropagation(); thumb.classList.add('on');
+    const g = geometry(), len = axis === 'x' ? bar.offsetWidth : bar.offsetHeight;
+    const start = axis === 'x' ? e.clientX : e.clientY, from = axis === 'x' ? -view.x / (g.w * view.z) : -view.y / (g.h * view.z);
+    const move = ev => scrollTo(axis, from + ((axis === 'x' ? ev.clientX : ev.clientY) - start) / len);
+    const up = () => { thumb.classList.remove('on'); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  });
+  bar.addEventListener('mousedown', e => {
+    if (e.target !== bar) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = bar.getBoundingClientRect(), pos = axis === 'x' ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
+    scrollTo(axis, pos - 0.5 / view.z);  // centre the view on the clicked spot
+  });
+}
+window.addEventListener('resize', () => scrollbars());
+function clampView() {
+  view.z = Math.max(1, Math.min(16, view.z));
+  const g = geometry();
+  view.x = Math.min(0, Math.max(g.w * (1 - view.z), view.x));
+  view.y = Math.min(0, Math.max(g.h * (1 - view.z), view.y));
+}
+function zoomAt(f, cx, cy) {
+  const z = view.z;
+  view.z = Math.max(1, Math.min(16, z * f));
+  view.x = cx - (cx - view.x) * view.z / z; view.y = cy - (cy - view.y) * view.z / z;
+  clampView(); draw();
+}
+$('zoomin').onclick = () => { const g = geometry(); zoomAt(1.6, g.w / 2, g.h / 2); };
+$('zoomout').onclick = () => { const g = geometry(); zoomAt(1 / 1.6, g.w / 2, g.h / 2); };
+$('zoomreset').onclick = () => { view.z = 1; view.x = view.y = 0; draw(); };
+canvas.addEventListener('wheel', e => {
+  if (!data) return;
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect(), k = geometry().w / r.width;
+  zoomAt(e.deltaY < 0 ? 1.25 : 1 / 1.25, (e.clientX - r.left) * k, (e.clientY - r.top) * k);
+}, {passive: false});
+let drag = null, dragMoved = false;
+// Multi-selection: shift-click toggles a cell, shift-drag paints cells in (or
+// erases them when the drag starts on a selected cell). Keys are "x,y".
+const multi = new Set();
+let paint = null;  // {add: true/false} while a shift-drag is painting
+function paintCell(e) {
+  const {x, y, c} = cellAt(e); if (!c) return;
+  const k = x + ',' + y, had = multi.has(k);
+  if (paint.add && !had) multi.add(k); else if (!paint.add && had) multi.delete(k); else return;
+  showMulti(); draw();
+}
+canvas.addEventListener('mousedown', e => {
+  if (e.shiftKey && data && e.button === 0) {
+    const {x, y, c} = cellAt(e);
+    if (c) { paint = {add: !multi.has(x + ',' + y), moved: false}; paintCell(e); }
+    e.preventDefault(); return;
+  }
+  drag = {x: e.clientX, y: e.clientY, vx: view.x, vy: view.y}; dragMoved = false;
+});
+window.addEventListener('mousemove', e => {
+  if (paint) { paint.moved = true; paintCell(e); return; }
+  if (!drag) return;
+  const r = canvas.getBoundingClientRect(), k = geometry().w / r.width, dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
+  if (Math.abs(dx) + Math.abs(dy) > 4) dragMoved = true;
+  if (dragMoved && view.z > 1) { view.x = drag.vx + dx; view.y = drag.vy + dy; clampView(); draw(); canvas.style.cursor = 'grabbing'; }
+});
+window.addEventListener('mouseup', () => {
+  if (paint) { paint = null; dragMoved = true; setTimeout(() => { dragMoved = false; }, 0); return; }
+  drag = null; setTimeout(() => { dragMoved = false; }, 0);
+});
+function showMulti() {
+  const n = multi.size;
+  $('multi').textContent = n ? n + ' cell' + (n === 1 ? '' : 's') + ' selected (shift-click / shift-drag to add or remove, Esc to clear)' : '';
+}
+// 3D inspectable: the cell has a map present in the chosen maps folder.
+function inspectable(c) { return !!(c && c.maps && c.maps.some(hasMap)); }
+function hasMap(m) { return !!mapFiles[m] || servedMaps.has(m); }
+// A map as a File: from the chosen folder, or fetched from the local toolkit server.
+async function mapFile(m) {
+  if (mapFiles[m]) return mapFiles[m];
+  if (!servedMaps.has(m)) return null;
+  const r = await fetch('../maps/' + encodeURIComponent(m) + '.bsp');
+  return r.ok ? new File([await r.blob()], m + '.bsp') : null;
+}
+function badge(g, c) {
+  const x = g.px(c.x) + g.s, y = g.py(c.y), r = Math.max(4, g.s * .38);
+  ctx.fillStyle = '#38e1ff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - r, y); ctx.lineTo(x, y + r); ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+// Points of interest from the local cells file (original game data): named
+// places as labels, interior entrances as small markers at their doors.
+function poisIn(x, y) {
+  return cellsDetail && cellsDetail.pois ? cellsDetail.pois.filter(p => Math.floor(p.x) === x && Math.floor(p.y) === y) : [];
+}
+let hoverPoi = null;  // the marker under the cursor, drawn highlighted
+function poiRadius(g) { return Math.max(1.5, g.s * .09); }
+function drawPois(g) {
+  if (!cellsDetail || !cellsDetail.pois) return;
+  const px = v => (v - g.b[0]) * g.s, py = v => (g.b[3] + 1 - v) * g.s;
+  for (const p of cellsDetail.pois) {
+    if (p.kind === 'place') continue;
+    const lit = p === hoverPoi;
+    ctx.fillStyle = lit ? '#ffcf55' : p.converted ? '#32cfa0' : '#f2f2f2'; ctx.strokeStyle = '#000'; ctx.lineWidth = lit ? 2 : 1;
+    const r = poiRadius(g) * (lit ? 1.5 : 1);
+    ctx.beginPath(); ctx.moveTo(px(p.x), py(p.y) - r); ctx.lineTo(px(p.x) + r, py(p.y)); ctx.lineTo(px(p.x), py(p.y) + r);
+    ctx.lineTo(px(p.x) - r, py(p.y)); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.font = '600 ' + (Math.max(10, Math.round(g.s * .55)) / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const p of cellsDetail.pois) {
+    if (p.kind !== 'place') continue;
+    ctx.lineWidth = 3; ctx.strokeStyle = '#000000cc'; ctx.strokeText(p.name, px(p.x), py(p.y));
+    ctx.fillStyle = '#ffe28a'; ctx.fillText(p.name, px(p.x), py(p.y));
+  }
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+// Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.0'};
+let statusFileName = null;
+function stateJson() {
+  const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
+  const d = picked && cellsDetail ? cellsDetail.cells[picked.x + ',' + picked.y] : null;
+  const counts = {};
+  if (d) for (const [, , cat, placed] of d.refs) {
+    const k = cellsDetail.categories[cat]; counts[k] = counts[k] || {original: 0, placed: 0};
+    counts[k].original++; if (placed === 1) counts[k].placed++;
+  }
+  return {
+    tool: TOOLKIT.name, toolkit_version: TOOLKIT.version, page: location.pathname.split('/').pop(),
+    copied_utc: new Date().toISOString(),
+    data: {
+      status: data ? {file: statusFileName, format: data.format, master_sha256: data.master_sha256, summary: data.summary} : null,
+      local_topo: images.topo.img ? {bounds: images.topo.bounds} : null,
+      local_world_map: images.world.img ? {bounds: images.world.bounds} : null,
+      local_cells: cellsDetail ? {format: cellsDetail.format, placed_known: cellsDetail.placed_known,
+                                  cells: Object.keys(cellsDetail.cells).length, pois: (cellsDetail.pois || []).length} : null,
+      maps_folder_bsp_files: Object.keys(mapFiles).length,
+      served: SERVED, served_maps: servedMaps.size,
+    },
+    mode,
+    layers_on: LAYERS.filter(L => on(L.id)).map(L => L.id),
+    selected_cells: [...multi].map(k => k.split(',').map(Number)).map(([x, y]) => ({
+      cell: [x, y], name: placeName(x, y) || null,
+      table: data ? data.cells.find(c => c.x === x && c.y === y) || null : null})),
+    selected: picked ? {
+      cell: [picked.x, picked.y], cell_id: 'exterior:' + picked.x + ',' + picked.y,
+      world_units: [[picked.x * 8192, picked.y * 8192], [picked.x * 8192 + 8191, picked.y * 8192 + 8191]],
+      name: d ? d.name || null : null, region: d ? d.region || null : null,
+      table: sel || null, local_counts: d ? counts : null,
+      pois: poisIn(picked.x, picked.y).map(p => ({name: p.name, kind: p.kind, converted: p.converted})),
+    } : null,
+  };
+}
+$('copystate').onclick = async () => {
+  const text = JSON.stringify(stateJson(), null, 1);
+  try { await navigator.clipboard.writeText(text); }
+  catch (_) { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+  $('copied').textContent = 'Copied ' + text.length + ' characters'; setTimeout(() => { $('copied').textContent = ''; }, 3000);
+};
+// Selected-area bar and maps for the clicked cell. Place and region names come
+// only from the local cells file (your own game data); the public table has none.
+const mapFiles = {};
+let pendingOpen = null;  // map asked for before a maps folder was chosen
+$('mapsdir').onchange = e => {
+  for (const f of e.target.files) if (/\.bsp$/i.test(f.name)) mapFiles[f.name.replace(/\.bsp$/i, '').toLowerCase()] = f;
+  if (pendingOpen && mapFiles[pendingOpen]) { const f = mapFiles[pendingOpen]; pendingOpen = null; openInInspector(f); }
+  draw();
+  if (picked) showSelected(picked.x, picked.y, data && data.cells.find(c => c.x === picked.x && c.y === picked.y));
+};
+function showSelected(x, y, c) {
+  const d = cellsDetail && cellsDetail.cells[x + ',' + y];
+  const name = d && (d.name || d.region) ? '<b>' + escapeHtml(d.name || d.region) + '</b>' + (d.name && d.region ? ' (' + escapeHtml(d.region) + ')' : '') + ' · ' : '';
+  $('selected').innerHTML = 'Selected area: ' + name + 'cell ' + x + ', ' + y + ' · world ' + (x * 8192) + ', ' + (y * 8192) +
+    ' to ' + (x * 8192 + 8191) + ', ' + (y * 8192 + 8191) + ' · cell ID exterior:' + x + ',' + y;
+  const maps = (c && c.maps) || [];
+  const go = document.createElement('button');
+  go.className = 'cta';
+  go.textContent = maps.length ? '▶ Local view (2D + 3D)' : '▶ Local view (2D only; no AmiWind map here)';
+  go.onclick = () => { setMode('local'); if (maps.length) showMap(); };
+  $('ctaslot').innerHTML = ''; $('ctaslot').appendChild(go);
+  fillMapSelect(maps);
+  if (mode === 'local') { drawLocal(x, y); if (maps.length) showMap(); }
+}
+// Local mode: the selected cell's maps (town/area maps first), shown in the 3D view.
+function fillMapSelect(maps) {
+  const sel = $('mapselect'); sel.innerHTML = '';
+  for (const m of maps) {
+    const o = document.createElement('option'); o.value = m;
+    o.textContent = m + '.bsp' + (hasMap(m) ? '' : ' (choose maps folder)'); sel.appendChild(o);
+  }
+  sel.disabled = $('open3d').disabled = !maps.length;
+  $('localhint').textContent = !maps.length ? 'No AmiWind map covers this cell.' :
+    Object.keys(mapFiles).length || servedMaps.size ? '' : 'Choose your maps folder (id1/maps of a build) to see it in 3D.';
+}
+async function showMap() {
+  const m = $('mapselect').value; if (!m) return;
+  if (hasMap(m)) { const f = await mapFile(m); if (f) openInInspector(f); }
+  else { pendingOpen = m; $('mapsdir').click(); }
+}
+$('open3d').onclick = showMap;
+$('mapselect').onchange = showMap;
+// The 3D Map Inspector lives inside the Local view; it loads on first use.
+let inspectorReady = false, inspectorQueue = null;
+const EMBEDDED = window.parent !== window;
+if (EMBEDDED) document.body.classList.add('embedded');
+function openInInspector(file) {
+  // Inside the Toolkit the inspector is its own tab: hand the map over.
+  if (EMBEDDED) { window.parent.postMessage({type: 'amiwind-open-inspector', file}, '*'); return; }
+  setMode('local');
+  if (inspectorReady) { $('inspector3d').contentWindow.postMessage({type: 'amiwind-open-map', file}, '*'); return; }
+  inspectorQueue = file; ensureInspector();
+}
+// Load the embedded inspector once; whatever was asked for meanwhile is sent when ready.
+function ensureInspector() {
+  const frame = $('inspector3d');
+  if (frame.src) return;
+  frame.onload = () => {
+    inspectorReady = true;
+    if (inspectorQueue) { frame.contentWindow.postMessage({type: 'amiwind-open-map', file: inspectorQueue}, '*'); inspectorQueue = null; }
+  };
+  frame.src = 'map-inspector.html';
+}
+let mode = 'world';
+function setMode(m) {
+  mode = m;
+  $('mode-world').classList.toggle('on', m === 'world'); $('mode-local').classList.toggle('on', m === 'local');
+  document.querySelector('main').hidden = m === 'local'; $('localview').hidden = m !== 'local';
+  if (m === 'local' && picked) drawLocal(picked.x, picked.y);
+  if (m === 'local' && !EMBEDDED) ensureInspector();
+  if (window.parent !== window) window.parent.postMessage({type: 'amiwind-mode', mode: m}, '*');
+}
+$('mode-world').onclick = () => setMode('world');
+$('mode-local').onclick = () => setMode('local');
+window.addEventListener('message', e => {
+  if (e.source === window.parent && e.data && e.data.type === 'amiwind-set-mode') setMode(e.data.mode === 'local' ? 'local' : 'world');
+});
+function escapeHtml(t) { return String(t).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
+function cellAt(e) {
+  const g = geometry(), r = canvas.getBoundingClientRect(), k = g.w / r.width;
+  const wx = ((e.clientX - r.left) * k - view.x) / view.z, wy = ((e.clientY - r.top) * k - view.y) / view.z;
+  const x = Math.floor(wx / g.s) + g.b[0], y = g.b[3] - Math.floor(wy / g.s);
+  return {x, y, c: data.cells.find(c => c.x === x && c.y === y)};
+}
+// Place / region name from the local cells file (your own game data), if loaded.
+function placeName(x, y) {
+  const d = cellsDetail && cellsDetail.cells[x + ',' + y];
+  if (!d || !(d.name || d.region)) return '';
+  return (d.name || d.region) + (d.name && d.region ? ' (' + d.region + ')' : '');
+}
+function describe(x, y, c, sep) {
+  const named = placeName(x, y), head = (named ? named + sep : '') + 'cell ' + x + ', ' + y;
+  if (!c) return head + sep + 'outside the island data';
+  const here = poisIn(x, y), poiText = here.length ? sep + 'places: ' + here.slice(0, 4).map(p => p.name).join(', ') +
+    (here.length > 4 ? ' +' + (here.length - 4) : '') : '';
+  return head + poiText + sep + 'map: ' + (c.map === 'full' ? 'full town/area' : c.map === 'terrain' ? 'topomap terrain' : 'no terrain') +
+    sep + 'entities placed: ' + c.placed + ' / ' + c.original + sep + 'interiors converted: ' + c.interiors_converted + ' / ' + c.interiors +
+    sep + 'named places: ' + c.places + (c.checked ? sep + 'owner checked' : '');
+}
+// The interior-entrance marker under the cursor, if any (same transform as cellAt).
+function poiAt(e) {
+  if (!cellsDetail || !cellsDetail.pois || !on('poi')) return null;
+  const g = geometry(), r = canvas.getBoundingClientRect(), k = g.w / r.width;
+  const wx = ((e.clientX - r.left) * k - view.x) / view.z, wy = ((e.clientY - r.top) * k - view.y) / view.z;
+  const reach = poiRadius(g) + 3 / view.z;
+  let best = null, bestD = reach * reach;
+  for (const p of cellsDetail.pois) {
+    if (p.kind === 'place') continue;
+    const dx = (p.x - g.b[0]) * g.s - wx, dy = (g.b[3] + 1 - p.y) * g.s - wy, d = dx * dx + dy * dy;
+    if (d <= bestD) { best = p; bestD = d; }
+  }
+  return best;
+}
+canvas.onmousemove = e => {
+  if (!data) return;
+  const {x, y, c} = cellAt(e), tip = $('tip'), r = canvas.getBoundingClientRect();
+  const poi = poiAt(e);
+  if (poi !== hoverPoi) { hoverPoi = poi; draw(); }
+  canvas.style.cursor = c && inspectable(c) ? 'pointer' : 'crosshair';
+  if (!c) { tip.style.display = 'none'; return; }
+  tip.textContent = (poi ? 'Highlighted: ' + poi.name + '\n' : '') + describe(x, y, c, '\n');
+  tip.style.display = 'block'; tip.style.left = (e.clientX - r.left + 14) + 'px'; tip.style.top = (e.clientY - r.top + 14) + 'px';
+};
+canvas.onclick = e => {
+  if (!data || dragMoved || e.shiftKey) return;
+  const {x, y, c} = cellAt(e);
+  if (multi.size) { multi.clear(); showMulti(); }
+  picked = {x, y}; $('picked').textContent = describe(x, y, c, ' · '); draw();
+  showSelected(x, y, c);
+};
+canvas.onmouseleave = () => { $('tip').style.display = 'none'; if (hoverPoi) { hoverPoi = null; draw(); } mapHover = false; };
+// Keyboard panning: WASD or the arrow keys while the map is active (clicked,
+// or under the mouse). A step is a tenth of the view; held keys repeat.
+let mapHover = false;
+canvas.tabIndex = 0;
+canvas.addEventListener('mouseenter', () => { mapHover = true; });
+canvas.addEventListener('mousedown', () => canvas.focus());
+const PAN_KEYS = {w: [0, 1], arrowup: [0, 1], s: [0, -1], arrowdown: [0, -1], a: [1, 0], arrowleft: [1, 0], d: [-1, 0], arrowright: [-1, 0]};
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && multi.size && mode === 'world') { multi.clear(); showMulti(); draw(); return; }
+  if (mode !== 'world' || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (document.activeElement !== canvas && !mapHover) return;
+  if (document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const k = PAN_KEYS[e.key.toLowerCase()];
+  if (!k) return;
+  e.preventDefault();
+  const g = geometry(), step = g.w / 10;
+  view.x += k[0] * step; view.y += k[1] * step; clampView(); draw();
+});
+</script>
+</body>
+</html>

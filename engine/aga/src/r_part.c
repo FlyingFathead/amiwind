@@ -31,7 +31,53 @@ int		ramp1[8] = {0x6f, 0x6d, 0x6b, 0x69, 0x67, 0x65, 0x63, 0x61};
 int		ramp2[8] = {0x6f, 0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x68, 0x66};
 int		ramp3[8] = {0x6d, 0x6b, 6, 5, 4, 3};
 
+
 particle_t	*active_particles, *free_particles;
+
+/* AmiWind: ember colours picked once from the game palette (hot to cool),
+ * because ramp3 holds Quake palette slots. */
+static int	aw_ember_ramp[6];
+static int	aw_ember_ready;
+int AW_UIColor(int r, int g, int b);
+
+/*
+===============
+AW_EmberSpawn
+
+One hearth ember from Quake's particle pool: rises from org within spread
+map units, cools through aw_ember_ramp and dies (pt_awember).
+===============
+*/
+void AW_EmberSpawn (const vec3_t org, float spread, float rise)
+{
+	particle_t	*p;
+	int			j;
+	static const int rgb[6][3] = {{255,255,235},{255,235,120},{255,190,60},{245,130,35},{210,70,20},{130,30,10}};
+
+	if (!aw_ember_ready)
+	{
+		for (j=0 ; j<6 ; j++)
+			aw_ember_ramp[j] = AW_UIColor(rgb[j][0], rgb[j][1], rgb[j][2]);
+		aw_ember_ready = 1;
+	}
+	if (!free_particles)
+		return;
+	p = free_particles;
+	free_particles = p->next;
+	p->next = active_particles;
+	active_particles = p;
+	p->die = cl.time + 2;
+	p->ramp = 0;
+	p->color = aw_ember_ramp[(int)p->ramp];
+	p->type = pt_awember;
+	for (j=0 ; j<2 ; j++)
+	{
+		p->org[j] = org[j] + ((rand()%2001)-1000)*0.001*spread;
+		p->vel[j] = ((rand()%2001)-1000)*0.006;
+	}
+	p->org[2] = org[2];
+	p->vel[2] = rise * (0.6 + (rand()%401)*0.001);
+}
 
 particle_t	*particles;
 int			r_numparticles;
@@ -744,6 +790,15 @@ void R_DrawParticles (void)
 		{
 		case pt_static:
 			break;
+		case pt_awember:
+			p->ramp += time1;
+			if (p->ramp >= 6)
+				p->die = -1;
+			else
+				p->color = aw_ember_ramp[(int)p->ramp];
+			p->vel[2] += grav * 0.5;
+			break;
+
 		case pt_fire:
 			p->ramp += time1;
 			if (p->ramp >= 6)

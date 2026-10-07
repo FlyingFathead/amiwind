@@ -12,6 +12,10 @@
 static cvar_t torch_radius={"aw_torch_radius","192",true};
 static cvar_t torch_flame_style={"aw_torch_flame_style","2",true};
 cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
+/* Guard torch light radius relative to the player's torch (dbg guardtorch 0.5):
+ * the same brightness at the flame, half the reach; a full torch's reach on every
+ * guard read as over-bright in the light-space night. */
+cvar_t aw_guard_torch_radius={"aw_guard_torch_radius","0.5",true,false,.5f};
 float AW_TorchLightRadius(void) {
     float radius=torch_radius.value;
     if(!isfinite(radius))return 192;
@@ -47,6 +51,17 @@ static void flame_command(void) {
     if(Cmd_Argc()!=2 || !value){Con_Printf("Usage: dbg torch flame classic/brightbase/sparks or 1/2/3.\n");return;}
     Cvar_SetValue(torch_flame_style.name,value);
     Con_Printf("Torch flame style %ld (%s).\n",(long)value,value==3?"sparks":value==2?"brightbase":"classic");
+}
+/* Debug headlamp: the torch's eye light without holding a torch. Not saved. */
+static cvar_t aw_headlamp={"aw_headlamp","0"};
+static void headlamp_command(void) {
+    char *text=Cmd_Argv(1);
+    if(Cmd_Argc()==1){Con_Printf("Headlamp %s (torch light without a torch).\n",aw_headlamp.value?"on":"off");return;}
+    if(Cmd_Argc()!=2 || (Q_strcasecmp(text,"on") && Q_strcasecmp(text,"off") && Q_strcasecmp(text,"true") &&
+       Q_strcasecmp(text,"false") && strcmp(text,"1") && strcmp(text,"0"))){
+        Con_Printf("Usage: dbg headlamp on/off, true/false or 1/0.\n");return;}
+    Cvar_SetValue(aw_headlamp.name,!Q_strcasecmp(text,"on") || !Q_strcasecmp(text,"true") || !strcmp(text,"1"));
+    Con_Printf("Headlamp %s.\n",aw_headlamp.value?"on":"off");
 }
 static void strength_command(void) {
     char *end,*text=Cmd_Argv(1);double value;
@@ -153,10 +168,11 @@ static void toggle(void)
     Con_Printf("Torch %s.\n",v->_float?"on":"off");
 }
 void AW_TorchInit(void){
-    Cvar_RegisterVariable(&torch_radius);Cvar_RegisterVariable(&torch_flame_style);Cvar_RegisterVariable(&aw_torch_strength);
+    Cvar_RegisterVariable(&torch_radius);Cvar_RegisterVariable(&torch_flame_style);Cvar_RegisterVariable(&aw_torch_strength);Cvar_RegisterVariable(&aw_guard_torch_radius);
     Cmd_AddCommand("aw_torch_radius_set",radius_command);Cmd_AddCommand("aw_torch_flame_set",flame_command);
     Cmd_AddCommand("aw_torch_strength_set",strength_command);
-    Cmd_AddCommand("aw_torch",toggle);AW_GuardTorchInit();
+    Cvar_RegisterVariable(&aw_headlamp);Cmd_AddCommand("aw_headlamp_set",headlamp_command);
+    Cmd_AddCommand("aw_torch",toggle);AW_GuardTorchInit();AW_LampInit();
 }
 static int phase(void)
 {
@@ -166,13 +182,17 @@ void AW_TorchUpdate(void)
 {
     static const float radius[8]={144,147,142,146,143,148,144,141};
     dlight_t *light;
+    int torch;
     AW_GuardTorchUpdate();
-    if(!AW_TorchEquipped()){extinguish();return;}
+    AW_LampUpdate();
+    torch=AW_TorchEquipped();
+    if(!torch && !aw_headlamp.value){extinguish();return;}
     light=CL_AllocDlight(AW_TORCH_LIGHT);
     /* Eye position stays inside the player's clear view volume. Offsetting a
-     * point light toward a drawn hand could put it through a nearby wall. */
+     * point light toward a drawn hand could put it through a nearby wall.
+     * The headlamp alone is the same light without the flame's flicker. */
     VectorCopy(r_refdef.vieworg,light->origin);
-    light->radius=AW_TorchLightRadius()+radius[phase()]-144;light->minlight=16;
+    light->radius=AW_TorchLightRadius()+(torch?radius[phase()]-144:0);light->minlight=16;
     light->die=cl.time+.1;light->decay=0;
 }
 int AW_TorchFrame(void)
@@ -260,6 +280,10 @@ void AW_TorchDraw(void)
     AngleVectors(angles,forward,right,up);
     for(i=0;i<3;i++)world[i]=cl.viewent.origin[i]+anchor[0]*forward[i]-anchor[1]*right[i]+anchor[2]*up[i];
     animation_time=AW_TorchAnimationTime();
+    /* Real embers (Quake particles, world space): white-hot to red, about
+     * five per second, trailing as the player moves. Classic style: none. */
+    if(torch_flame_style.value>=2 && (rand()&1023)<(int)(host_frametime*8*1024))
+        AW_EmberSpawn(world,.8f,18);
     for(k=0;k<6;k++){
         age=(float)fmod(animation_time*.833333+k/6.0,1.0);if(age<0)age=0;
         drift=(float)sin(k*2.4+animation_time*4)*.25f;rise=age*2.7f;

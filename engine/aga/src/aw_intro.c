@@ -8,6 +8,34 @@
 #include "aw_character.h"
 #include "aw_region.h"
 static int active,pending,jiub_state,guard_state,upper_state,prompt,unlocked,failed;
+/* AUDIO-03: the opening track starts only after the ship scene has loaded and
+ * settled; music started before 'map prison' crackled under the load. */
+#define OPENING_MUSIC_SETTLE_FRAMES 4
+#define OPENING_MUSIC_SETTLE_SECONDS 0.25
+static int opening_music_pending,opening_music_frames;
+static double opening_music_since;
+/* The opening scene fades in from black: Quake's palette colour shift (the
+ * bonus slot, black), rolled from full to none, so no pixel costs more. */
+#define OPENING_FADE_SECONDS 1.5
+static double opening_fade_start=-1;
+static void opening_fade(void) {
+    double t;int k;
+    if(opening_fade_start<0)return;
+    t=(realtime-opening_fade_start)/OPENING_FADE_SECONDS;
+    for(k=0;k<3;k++)cl.cshifts[CSHIFT_BONUS].destcolor[k]=0;
+    if(!(t<1)){cl.cshifts[CSHIFT_BONUS].percent=0;opening_fade_start=-1;return;}
+    cl.cshifts[CSHIFT_BONUS].percent=(int)(255*(1-(t<0?0:t)));
+}
+/* Hold the intro script until the opening music is running; returns 1 while held. */
+static int opening_music_hold(void) {
+    if(!opening_music_pending)return 0;
+    if(cls.state!=ca_connected || cls.signon!=SIGNONS){opening_music_frames=0;return 1;}
+    if(!opening_music_frames++){opening_music_since=opening_fade_start=realtime;opening_fade();return 1;}
+    if(opening_music_frames<OPENING_MUSIC_SETTLE_FRAMES || realtime-opening_music_since<OPENING_MUSIC_SETTLE_SECONDS)return 1;
+    opening_music_pending=0;
+    if(!AW_MusicStartTrack(4))Con_Printf("Selected opening track unavailable.\n");
+    return 0;
+}
 static double elapsed,jiub_timer,guard_timer,upper_timer,deck_timer;
 static int deck_state;
 /* Named test entry points, not arbitrary map/command strings. Add future
@@ -64,7 +92,7 @@ void AW_IntroBegin(void) {
     debug_scene=NULL;debug_scene_ready=0;
     AW_StoryReset(1);AW_CharacterReset();AW_SaveReset();
     pending=1;active=0;deck_state=0;deck_timer=0;IN_AWClearButtons();key_dest=key_game;
-    if(!AW_MusicStartTrack(4))Con_Printf("Selected opening track unavailable.\n");
+    opening_music_pending=1;opening_music_frames=0;AW_MusicHold();
     AW_EndLoadingStyle();
     AW_SetNextLoadingStyle(AW_LOADING_BLANK);
     /* A screen update can happen before the queued map command runs. Select
@@ -171,7 +199,9 @@ void AW_IntroTick(void) {
         Con_Printf("Debug scene headselection ready. Accept to continue the dock registration flow.\n");
         return;
     }
+    opening_fade();
     if(AW_OpeningTick())return;
+    if(opening_music_hold())return;
     if(!strcmp(sv.name,"seyda") && roles[4] && !aw_story.ship_disabled){
         /* CharGenBoatNPC: timer advances only nearby, after speech ends. */
         if(distance(roles[4],player())<45 && AW_SpeechRemaining()<=0){

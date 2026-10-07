@@ -53,13 +53,46 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
  if(!strcmp(name,"dbg"))dbg_command=fn;
  if(!strcmp(name,"aw_console_font"))font_command=fn;
 }
+cvar_t *Cvar_FindVar(char *n){static cvar_t c;return !strcmp(n,"aw_fog") || !strcmp(n,"aw_skyline_fill")?&c:NULL;}
+/* Every catalogue entry, typed with no arguments, must reach exactly its
+ * handler through the engine's translator: a broken or shadowed entry fails. */
+static void every_entry_translates(void){
+ FILE *f=fopen(catalogue_path,"rb");char line[512],words[160],handler[96],expect[112],output[160],*argv[16],*w;int argc,checked=0;
+ assert(f);
+ while(fgets(line,sizeof line,f)){
+  char *bar1,*bar2,*bar3;size_t n=strlen(line);
+  while(n && (line[n-1]=='\n' || line[n-1]=='\r'))line[--n]=0;
+  if(!n || line[0]=='#' || !strcmp(line,"AWDC1"))continue;
+  bar1=strchr(line,'|');bar2=bar1?strchr(bar1+1,'|'):NULL;bar3=bar2?strchr(bar2+1,'|'):NULL;
+  assert(bar1 && bar2 && bar3);
+  *bar2=0;*bar3=0;snprintf(words,sizeof words,"%s",bar1+1);snprintf(handler,sizeof handler,"%s",bar2+1);
+  argv[0]="dbg";argc=1;
+  for(w=strtok(words," ");w && argc<16;w=strtok(NULL," "))argv[argc++]=w;
+  snprintf(expect,sizeof expect,"%s\n",handler);
+  if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
+   printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);
+  }
+  checked++;
+ }
+ fclose(f);assert(checked>=100);
+ printf("every catalogue entry reaches its handler: %d\n",checked);
+}
 int main(int count,char **values){
  char output[160];byte atlas[16384];int i;
  char *compass[]={"dbg","compass","true"};
  assert(count==2);catalogue_path=values[1];
+ every_entry_translates();
  {
   char *tracker[]={"dbg","shroomtracker","reset"};
   assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
+  { /* DBG-TOGGLE-WORDS-31: toggle words reach settings as 1/0; commands keep their words. */
+    char *fog[3]={"dbg","fog","on"},*fill[4]={"dbg","skyline","fill","Off"},*guard[3]={"dbg","guardtorch","on"};
+    assert(AW_DebugTranslate(3,fog,output,sizeof(output))==1 && !strcmp(output,"aw_fog 1\n"));
+    fog[2]="off";assert(AW_DebugTranslate(3,fog,output,sizeof(output))==1 && !strcmp(output,"aw_fog 0\n"));
+    fog[2]="0.5";assert(AW_DebugTranslate(3,fog,output,sizeof(output))==1 && !strcmp(output,"aw_fog 0.5\n"));
+    assert(AW_DebugTranslate(4,fill,output,sizeof(output))==1 && !strcmp(output,"aw_skyline_fill 0\n"));
+    assert(AW_DebugTranslate(3,guard,output,sizeof(output))==1 && !strcmp(output,"aw_guardtorch on\n"));
+  }
   assert(!AW_DebugTranslate(3,tracker,output,sizeof(output))); /* Query only, no reset. */
   tracker[0]="debug";assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1);
   assert(!AW_DebugTranslate(2,tracker,output,8));

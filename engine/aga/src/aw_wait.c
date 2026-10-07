@@ -41,7 +41,119 @@ static const float gallery_height[8]={180,180,180,240,180,180,240,180};
 static void gallery_stop(void) {
     gallery_active=0;gallery_elapsed=0;
 }
+/* dbg 24hrcycle [seconds]: steps the real clock one game hour at a time and
+ * shows each hour for the given seconds (default 1, so 24 s in all), ending at
+ * the same hour the next day. One step per hour keeps the sky and light
+ * updates to 24, not one per frame. Esc, a map change or a new game stops it. */
+static double cycle_hold,cycle_elapsed;static int cycle_steps;
+/* dbg lightgallery: lighting switches at the current spot, listed in a strip
+ * below the view. Up/Down: choose, Left/Right: change, Esc: done. Time is a
+ * preview through the gallery clock (the saved clock is untouched); the other
+ * switches are the normal settings and stay as chosen. */
+static int light_active,light_row,light_time;
+static const char *const light_rows[]={"Night","Tint","Lamps","Glow","Headlamp","Veil","Hue","Time"};
+#define LIGHT_ROWS 8
+static const char *const light_hues[]={"255 210 140","255 170 80","255 235 200","200 220 255"};
+static const char *const light_hue_names[]={"warm","lamp","soft","cool"};
+#define LIGHT_HUES 4
+static const short light_minutes[]={-1,330,390,780,1080,1140,1320,0};
+static const char *const light_times[]={"real","05:30","06:30","13:00","18:00","19:00","22:00","00:00"};
+#define LIGHT_TIMES 8
+static float light_cvar(const char *name){cvar_t *v=Cvar_FindVar((char *)name);return v?v->value:0;}
+static void light_value(int row,char *out,int size) {
+    switch(row){
+    case 0:snprintf(out,size,"%s",light_cvar("aw_night_light")>0?"light":"remap");break;
+    case 1:snprintf(out,size,"%ld%%",(long)light_cvar("aw_night_tint"));break;
+    case 2:snprintf(out,size,"%s",r_lamps?"on":"off");break;
+    case 3:snprintf(out,size,"%s",light_cvar("aw_emissive")?"on":"off");break;
+    case 4:snprintf(out,size,"%s",light_cvar("aw_headlamp")?"on":"off");break;
+    case 5:snprintf(out,size,"%ld",(long)light_cvar("aw_horizon_veil"));break;
+    case 6:{cvar_t *h=Cvar_FindVar("aw_light_hue");int i;const char *name="custom";
+        for(i=0;h && i<LIGHT_HUES;i++)if(!strcmp(h->string,light_hues[i]))name=light_hue_names[i];
+        snprintf(out,size,"%s",name);break;}
+    default:snprintf(out,size,"%s",light_times[light_time]);
+    }
+}
+static void light_change(int step) {
+    float tint;
+    switch(light_row){
+    case 0:Cvar_SetValue("aw_night_light",light_cvar("aw_night_light")>0?0:1);break;
+    case 1:tint=light_cvar("aw_night_tint")+step*25;if(tint<0)tint=100;if(tint>100)tint=0;
+        Cvar_SetValue("aw_night_tint",tint);break;
+    case 2:r_lamps=!r_lamps;D_FlushCaches();break;
+    case 3:Cvar_SetValue("aw_emissive",light_cvar("aw_emissive")?0:1);D_FlushCaches();break;
+    case 4:Cvar_SetValue("aw_headlamp",light_cvar("aw_headlamp")?0:1);break;
+    case 5:tint=light_cvar("aw_horizon_veil")+step*2;if(tint<0)tint=8;if(tint>8)tint=0;
+        Cvar_SetValue("aw_horizon_veil",tint);break;
+    case 6:{cvar_t *h=Cvar_FindVar("aw_light_hue");int i,at=-1;
+        for(i=0;h && i<LIGHT_HUES;i++)if(!strcmp(h->string,light_hues[i]))at=i;
+        at=(at+step+LIGHT_HUES)%LIGHT_HUES;Cvar_Set("aw_light_hue",(char *)light_hues[at]);break;}
+    default:light_time=(light_time+step+LIGHT_TIMES)%LIGHT_TIMES;
+    }
+}
+int AW_LightGalleryDraw(void) {
+    char line[160],value[16];int i,used=0,n;
+    if(!light_active || key_dest!=key_game)return 0;
+    AW_UIFill(0,vid.height-28,vid.width,28,AW_UIColor(0,0,0));
+    line[0]=0;
+    for(i=0;i<LIGHT_ROWS && used<(int)sizeof(line)-1;i++){
+        light_value(i,value,sizeof value);
+        n=snprintf(line+used,sizeof(line)-used,i==light_row?"[%s:%s] ":"%s:%s ",light_rows[i],value);
+        if(n<0)break;
+        used+=n;
+    }
+    AW_SmallString(4,vid.height-24,line);
+    AW_SmallString(4,vid.height-14,"Up/Down: choose  Left/Right: change  Esc: done");
+    return 1;
+}
+static void light_gallery_command(void) {
+    if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"off")){
+        if(light_active){light_active=0;Con_Printf("Light gallery off; real time shown.\n");}
+        return;
+    }
+    if(Cmd_Argc()>1){Con_Printf("Usage: dbg lightgallery [off]\n");return;}
+    if(!sv.active || cls.state!=ca_connected || svs.maxclients!=1 || gallery_active || cycle_steps || modal ||
+       AW_IntroUse() || AW_CharacterActive() || AW_ReaderActive()){
+        Con_Printf("Start the light gallery in a local game (not during the intro, another gallery or the 24 h cycle).\n");return;
+    }
+    light_active=1;light_row=0;light_time=0;
+    if(key_dest==key_console)Con_ToggleConsole_f();
+    IN_AWClearButtons();
+}
+static void cycle_stop(const char *why) {
+    if(!cycle_steps)return;
+    cycle_steps=0;if(why)AW_UISubtitle("",why,4);
+}
+static void cycle_label(void) {
+    int y,m,d,h,n;char line[96];AW_ClockDate(&y,&m,&d,&h,&n);
+    snprintf(line,sizeof line,"24 h cycle: %02ld:%02ld (%ld/24). Esc: stop.",(long)h,(long)n,(long)(24-cycle_steps));
+    AW_UISubtitle("",line,cycle_hold<1?1:(float)cycle_hold);
+}
+static void cycle_command(void) {
+    char *s=Cmd_Argv(1),*end;double hold=1;
+    if(Cmd_Argc()>2)goto usage;
+    if(Cmd_Argc()==2){
+        if(!Q_strcasecmp(s,"off")){
+            if(cycle_steps){cycle_stop(NULL);Con_Printf("24 h cycle stopped.\n");}
+            else Con_Printf("24 h cycle is not running.\n");
+            return;
+        }
+        hold=strtod(s,&end);if(!*s || *end || !(hold>=.25 && hold<=60))goto usage;
+    }
+    if(!sv.active || cls.state!=ca_connected || svs.maxclients!=1 || gallery_active || modal ||
+       AW_IntroUse() || AW_CharacterActive() || AW_ReaderActive() || !AW_ClockEnsure()){
+        Con_Printf("Start the 24 h cycle in a local game (not during the intro or a gallery).\n");return;
+    }
+    cycle_hold=hold;cycle_elapsed=0;cycle_steps=24;clock_fraction=0;
+    Con_Printf("24 h cycle: each hour shown %ld.%02ld s, %ld s in all. Esc stops.\n",
+        (long)hold,(long)(hold*100+.5)%100,(long)(24*hold+.5));
+    if(key_dest==key_console)Con_ToggleConsole_f();
+    IN_AWClearButtons();cycle_label();return;
+usage:
+    Con_Printf("Usage: dbg 24hrcycle [off or seconds per hour 0.25..60, default 1]\n");
+}
 int AW_DayGalleryClock(int actual_ms) {
+    if(light_active && light_time>0 && sv.active)return light_minutes[light_time]*60000;
     if(gallery_active && (!sv.active || cls.state!=ca_connected ||
        strcmp(gallery_map,sv.name) || !cl.worldmodel ||
        strcmp(gallery_world,cl.worldmodel->name) || AW_Interior()))gallery_stop();
@@ -144,6 +256,7 @@ static void report_time(void) {
 static void set_time(void) {
     char *s=Cmd_Argv(1);int hour,minute=0,i,named;
     if(!sv.active){Con_Printf("Start the local game first.\n");return;}
+    if(Cmd_Argc()==1){report_time();return;} /* dbg time: what time is it */
     if(Cmd_Argc()!=2)goto invalid;
     named=named_minutes(s);
     if(named>=0){hour=named/60;minute=named%60;}
@@ -156,7 +269,7 @@ static void set_time(void) {
     if(!AW_ClockSetTime(hour,minute)){Con_Printf("Clock state unavailable.\n");return;}
     clock_fraction=0;report_time();return;
 invalid:
-    Con_Printf("Usage: dbg set time HHMM (0000..2359) or named time\n");
+    Con_Printf("Usage: dbg time [HHMM 0000..2359 or a named time]\n");
 }
 static void timeofday(void) {
     char *s=Cmd_Argv(1),*end;double hour;
@@ -177,11 +290,25 @@ void AW_WaitInit(void){
     Cmd_AddCommand("aw_set_time",set_time);
     Cmd_AddCommand("aw_daycycle_gallery",daycycle_gallery);
     Cmd_AddCommand("aw_nightgallery",night_gallery);
+    Cmd_AddCommand("aw_24hrcycle",cycle_command);
+    Cmd_AddCommand("aw_lightgallery",light_gallery_command);
 }
 void AW_WaitTick(void) {
     double delta;int whole;
-    if(!sv.active){modal=0;clock_fraction=0;gallery_stop();return;}
+    if(!sv.active){modal=0;clock_fraction=0;gallery_stop();cycle_steps=0;light_active=0;return;}
     (void)AW_DayGalleryClock(0);
+    if(cycle_steps){
+        if(cls.state!=ca_connected || AW_IntroUse()){cycle_stop(NULL);return;}
+        if(modal || sv.paused || key_dest!=key_game)return;
+        if(host_frametime>0 && host_frametime<1)cycle_elapsed+=host_frametime;
+        if(cycle_elapsed>=cycle_hold){
+            cycle_elapsed-=cycle_hold;
+            if(!AW_ClockAdvance(3600000)){cycle_stop("24 h cycle stopped: clock unavailable.");return;}
+            if(--cycle_steps)cycle_label();
+            else {cycle_steps=1;cycle_stop("24 h cycle finished.");}
+        }
+        return;
+    }
     if(gallery_active){
         if(sv.paused || key_dest!=key_game || modal)return;
         if(host_frametime>0 && host_frametime<1)gallery_elapsed+=host_frametime;
@@ -202,6 +329,13 @@ void AW_WaitTick(void) {
 }
 int AW_WaitKey(int key) {
     char line[80];int y,m,d,h,n;
+    if(cycle_steps && key_dest==key_game && key==K_ESCAPE){cycle_stop("24 h cycle stopped.");return 1;}
+    if(light_active && key_dest==key_game){
+        if(key==K_ESCAPE){light_active=0;AW_UISubtitle("","Light gallery closed; real time shown.",3);return 1;}
+        if(key==K_UPARROW){light_row=(light_row+LIGHT_ROWS-1)%LIGHT_ROWS;return 1;}
+        if(key==K_DOWNARROW){light_row=(light_row+1)%LIGHT_ROWS;return 1;}
+        if(key==K_LEFTARROW || key==K_RIGHTARROW){light_change(key==K_RIGHTARROW?1:-1);return 1;}
+    }
     if(gallery_active && key_dest==key_game && key==K_ESCAPE){
         gallery_stop();AW_UISubtitle("","Sky gallery off; real game time restored.",4);return 1;
     }

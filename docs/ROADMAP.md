@@ -25,6 +25,21 @@ about a third more faces across the town.
    evictions and crossing time, with in-game screenshots for comparison.
 4. Investigate the rare load freeze (SEYDA-LOAD-HANG-30).
 
+### Near future: fires and lava across the world
+
+- **Fires everywhere.** The new hearth fire (flames shaped by each Morrowind
+  emitter, a hot colour ramp and rising embers) reaches every fireplace,
+  brazier, campfire and firepit as maps are rebuilt; each keeps its baked
+  light, and Morrowind's flicker and pulse light flags become Quake light
+  styles so the firelight flickers (cost measured on the 68040 first).
+- **Lava fields** (Red Mountain and the Ghostgate approaches): Morrowind's lava
+  surfaces converted to Quake liquid surfaces, which the engine already draws
+  with an animated warp and full brightness, with lava contents (orange view
+  tint and damage when entered) and a few embers rising from the surface.
+
+Before building more of the world at scale: the [trackers](trackers/README.md)
+(world progress, entities, points of interest), so nothing is left behind.
+
 After that: lighting follow-ups, a battle-arena test room, then inventory,
 character statistics, a map that reveals as you travel, and the heap option
 below.
@@ -49,6 +64,74 @@ Plan, measured before it is built:
 The baseline does not change: AmiWind must stay playable on the reference
 configuration with the 11 MiB heap. Memory budgets, release gates and
 acceptance stay measured there, and nothing may depend on the larger heap.
+
+## Other ideas and wildcards
+
+Ideas worth keeping, not scheduled. They wait until the work they depend on
+exists.
+
+### Weather: ash storms and blight winds
+
+Morrowind's regions have their own weather, and two kinds define the land
+around Red Mountain: ash storms and the red blight winds. Both belong in
+AmiWind at some point, built from what the engine already has: the
+[day and night sky](DAY_NIGHT_AND_SKY.md) layers with faster, darker clouds,
+the distance fog pulled in close, a full-screen colour tint like the one Quake
+uses under water and in lava (ash grey, blight red), and a capped stream of
+wind-driven grit from Quake's particle system, plus the storm sound. Each
+region keeps its Morrowind weather chances; the cost is measured on the 68040
+before it ships.
+
+### Long-term possibility: a reusable Amiga game engine
+
+Underneath the Morrowind content, AmiWind is becoming a general open-world
+toolkit for AGA Amigas, all GPL: streaming sub-cell worlds with bounded memory
+and build-time memory budgets; a converter pipeline from large 3D scenes to
+Quake BSP maps; glow, NPC floor lighting, emitter-shaped flames,
+Quake-particle embers and warped liquids; menus, rebindable controls, a book
+and journal reader, music streaming, saves, dialogue and first-person hands;
+and headless emulator testing, a debugger harness and heap auditing.
+
+Someone making their own Amiga RPG, dungeon crawler or adventure game could
+start from this instead of from zero. The aim: document the engine and tools as
+reusable on their own, separate from the Morrowind conversion, with a small
+example project that uses no game data.
+
+### Long-term possibility: Lua scripting
+
+Game logic today runs in QuakeC (the engine's built-in script VM) plus C.
+A small Lua interpreter could later carry quest, dialogue and event scripts
+(Morrowind's own scripts translated at conversion time) and make AmiWind
+moddable without recompiling. To be decided by measurement on the reference
+Amiga: the interpreter's code and heap cost against the 11 MiB budget, script
+speed on a 68040, and whether it replaces or complements QuakeC.
+
+### From Quake Arena to Vivec Arena: two-Amiga 1v1 duels
+
+Once the battle arena and its test fights work, two Amigas could fight each
+other: a 1v1 player-versus-player arena under a new **Extras** entry in the
+main menu.
+
+- **Link options.** A null-modem serial cable between the two machines, or
+  TCP/IP over a network: an A1200 can take a PCMCIA network card with a
+  standard Amiga TCP/IP stack. A TCP/IP stack can also run over the same
+  serial cable (SLIP/PPP), so one network layer could serve both; a raw
+  serial path (through `serial.device`, or directly through the Amiga's UART)
+  remains an option for the lowest latency.
+- **Bandwidth is small.** A duel needs two players' positions, view angles and
+  action events (attack, block, hit, dodge), sent 10-20 times a second: a few
+  hundred bytes per second, well within a 19,200-baud serial link. Quake's own
+  network protocol, which the engine source still carries, was designed for
+  28.8k modems.
+- **Fair results.** Combat follows the arena rules (Morrowind's hit chance,
+  shown as dodges and parries). One machine decides each roll and sends the
+  result, so both screens agree.
+- **The venue.** Morrowind already has the right place: the Arena Pit in
+  Vivec's Arena canton. Converted on its own, it makes a small, closed duel
+  map: from Quake's arenas to Vivec's.
+- **Scope.** Two players, the arena map, no world state. Both machines run the
+  same AmiWind version and their own copy of the converted game data; only
+  game state crosses the link.
 
 ## HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026
 
@@ -2080,10 +2163,17 @@ the partial New Game intro path does not satisfy catalogue completeness.
 ## Visual quality, visibility and performance follow-up
 
 Keep coverage completeness, VIS, draw-distance culling, fog, LOD and resident
-memory as separate investigations. A full-VIS comparison is optional; visibility
-compilation currently precedes appended scenery, so those placements cannot act
-as blockers in that build order. Investigate suitable static occluders only with
-matched visual and memory evidence. VIS cannot create missing terrain, textures
+memory as separate investigations.
+
+Visibility is now required work, not optional
+([TOWN-VIS-OCCLUSION-31](bugs/TOWN-VIS-OCCLUSION-31.md),
+[Town visibility](performance/TOWN-VISIBILITY.md)): static scenery faces go into
+the world model so Quake culls them per leaf, structural `skip` occluders inside
+buildings, interior walls and large rocks give `vis` walls to cut with, shipping
+builds use full `vis` on every core, and every build reports the visible share
+and the entities still sent. Visibility compilation still precedes appended
+scenery, which is why the occluders are compiled brushes and the scenery faces
+are attached to leaves afterwards. Measure visual and memory effects per map. VIS cannot create missing terrain, textures
 or placements.
 
 For the inspected Ashlands central peak, source attribution now identifies an

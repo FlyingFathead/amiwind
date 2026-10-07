@@ -90,9 +90,10 @@ static int start_movie(char *path,int brand){
     audio_start=DATA_START+frames*pixels;
     if(!audio || audio_size!=expected || fseek(audio,audio_start,SEEK_SET))goto invalid;
     if(branding!=2)S_StopAllSounds(true);
-    if(branding==1)AW_MusicTitle();
-    else if(branding==0){CDAudio_Pause();load_opening_card();}
-    else {debug_pending=1;debug_drain_until=paintedtime;}
+    /* No title music under the streaming startup logo: both read the disk and
+     * the music crackled. The main menu starts it once the logo is done. */
+    if(branding==0){CDAudio_Pause();load_opening_card();}
+    else if(branding==2){debug_pending=1;debug_drain_until=paintedtime;}
     clock_start=paintedtime;
     shown=0;pcm_start=pcm_count=0;broken=0;pictures=1;dropped=0;started=Sys_FloatTime();
     if(branding!=2)Con_Printf("Video: %ld frames; %s skips.\n",frames,branding==1?"Space/Enter/Esc":"Esc");

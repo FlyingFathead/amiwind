@@ -3,6 +3,7 @@
 #define AW_WORLD_H
 int AW_WorldDestination(const char *,const float *,char *,float *);
 int AW_WorldToSource(const char *,const float *,float *);
+int AW_SourceToWorld(const char *,const float *,float *);
 int AW_WorldMapTarget(const float *,char *,float *);
 int AW_MapTeleport(const float *);
 qboolean AW_MapPlace(edict_t *,const float *);

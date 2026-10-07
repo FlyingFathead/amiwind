@@ -25,6 +25,7 @@ typedef unsigned char byte;typedef int qboolean;
 static char com_gamedir[1024];
 static struct {float value;} bgmvolume={1.0};
 static double Sys_FloatTime(void){return 0;}
+static double realtime;
 static int debug_overlay,track_notices,status_queries;
 static int AW_DebugOverlaysEnabled(void){return debug_overlay;}
 static void Con_Printf(const char *fmt,...){

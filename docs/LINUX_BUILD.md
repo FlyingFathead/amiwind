@@ -328,6 +328,30 @@ inputs are omitted, a matching converted `id1/world` directory and receipt must
 already exist. The image builder rejects stale palette/content hashes. These
 four world/journal assets participate in the save-content fingerprint.
 
+## Night lighting tables
+
+After the final map optimisation the image stage writes three tables into the
+boot image's `id1/world/`, the ones the engine reads for night lighting:
+
+| File | Contents | Made by |
+| --- | --- | --- |
+| `lamps.awl` | Every exterior lamp, torch, fire and candle of your own `Morrowind.esm`, by cell, with its colour class (AWL1) | `tools/light_sources.py lamp-table` |
+| `night-windows.txt` | Per town map, the textures of window and lamp glass that glow at night | `tools/night_windows.py` |
+| `fog-locations.txt` | Per place day and night fog distance (`dbg fog location`) | validated copy of `config/fog-locations.txt` |
+
+The window table traces the final maps' textures back to the scenery they were
+converted from: `--balmora-scenery` (Balmora cache `scenery/`, default
+`--balmora-cache`/scenery), `--town-scenery` (Seyda Neen `prepare_scenery.py`
+output, default the directory of `--town-flora-source-index`), the scene's
+`opening-barrel-source` and the `--world-flora` overlay. The guided build
+passes the first two. A source that was not given is skipped and listed in
+`image/night-lighting/night-lighting.json` and in `build.json`
+(`night_lighting`, status `partial`); a town without its own scenery gets no
+window line, so its glass stays dark instead of being guessed. Each table is
+checked against the engine's format before it is written, and all three
+participate in the save-content fingerprint. The per-map window report is
+`image/night-lighting/night-windows-report.json`.
+
 Run the separate [world survey](WORLD_SURVEY.md) for cell-density analysis and
 the private atlas/terrain mesh. The usual production ground-contact gate still
 applies; the diagnostic RC4 package does not turn its 23 open findings into a

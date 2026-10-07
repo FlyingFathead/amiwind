@@ -22,6 +22,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_sky.h"
+int r_daylight=256,r_lamps=1;
+unsigned char *r_warm_colormap; /* built by r_sky.c from aw_light_hue */
+unsigned char r_dlight_cool[32];
+/* A lightstyle's value with night dimming: lamps (AW_LAMP_STYLE and up) keep
+ * their full value. */
+int R_StyleLight(int style)
+{
+    int value=d_lightstylevalue[style];
+    if(style>=AW_LAMP_STYLE)return r_lamps?value:0;
+    return r_daylight<256?value*r_daylight>>8:value;
+}
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
 #include "aw_interior_light_policy.h"
 extern int AW_TorchTestActive(void);
@@ -116,20 +127,37 @@ static void R_LumaCommand(int outside)
 }
 static void R_InteriorLumaCommand(void){R_LumaCommand(0);}
 static void R_ExteriorLumaCommand(void){R_LumaCommand(1);}
+/* dbg luma: the current multipliers, then how to set them. The "set with" lines
+ * are the catalogue's own (dbg help luma streams them from the disk file). */
+static void R_LumaStatusCommand(void)
+{
+    long indoor,outdoor,effective;
+    R_InteriorLumaUpdate();
+    indoor=(long)(R_LumaSetting(0)*1000+.5f);outdoor=(long)(R_LumaSetting(1)*1000+.5f);
+    effective=(long)(interior_luma_factor*1000+.5f);
+    Con_Printf("Current luma: indoor %ld.%03ld, outdoor %ld.%03ld (light multiplier; 1.000 = original).\n",
+        indoor/1000,indoor%1000,outdoor/1000,outdoor%1000);
+    Con_Printf("In effect here: %ld.%03ld (%s).\nSet with:\n",effective/1000,effective%1000,
+        interior_luma_mode && !AW_TorchTestActive()?(interior_luma_mode==1?"indoor setting":"outdoor setting"):"original light, scene excluded");
+    Cbuf_InsertText("dbg help luma\n");
+}
 void R_InteriorLumaInit(void)
 {
     Cvar_RegisterVariable(&aw_interiorluma);Cvar_RegisterVariable(&aw_exteriorluma);
     Cmd_AddCommand("aw_interiorluma_set",R_InteriorLumaCommand);
     Cmd_AddCommand("aw_exteriorluma_set",R_ExteriorLumaCommand);
+    Cmd_AddCommand("aw_luma_status",R_LumaStatusCommand);
 }
 #else
 #define R_InteriorStaticLight(value) (value)
 static void R_InteriorLumaUnavailable(void){Con_Printf("Can't adjust interior luma: built without luma controls.\n");}
 static void R_ExteriorLumaUnavailable(void){Con_Printf("Can't adjust exterior luma: built without luma controls.\n");}
+static void R_LumaStatusUnavailable(void){Con_Printf("Luma: original light (built without luma controls).\n");}
 void R_InteriorLumaInit(void)
 {
     Cmd_AddCommand("aw_interiorluma_set",R_InteriorLumaUnavailable);
     Cmd_AddCommand("aw_exteriorluma_set",R_ExteriorLumaUnavailable);
+    Cmd_AddCommand("aw_luma_status",R_LumaStatusUnavailable);
 }
 #endif
 
@@ -391,7 +419,7 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 			for (maps = 0 ; maps < MAXLIGHTMAPS && surf->styles[maps] != 255 ;
 					maps++)
 			{
-				scale = d_lightstylevalue[surf->styles[maps]];
+				scale = R_StyleLight(surf->styles[maps]);
 				r += *lightmap * scale;
 				lightmap += ((surf->extents[0]>>4)+1) *
 						((surf->extents[1]>>4)+1);
@@ -433,7 +461,7 @@ static int R_SurfaceLightAt (msurface_t *surf, vec3_t at)
 	lightmap = surf->samples + dt * ((surf->extents[0]>>4)+1) + ds;
 	for (maps = 0 ; maps < MAXLIGHTMAPS && surf->styles[maps] != 255 ; maps++)
 	{
-		scale = d_lightstylevalue[surf->styles[maps]];
+		scale = R_StyleLight(surf->styles[maps]);
 		r += *lightmap * scale;
 		lightmap += ((surf->extents[0]>>4)+1) * ((surf->extents[1]>>4)+1);
 	}
@@ -519,7 +547,7 @@ int R_LightPoint (vec3_t p)
 	if (!cl.worldmodel->lightdata)
 		/* Match no-sample exterior surfaces instead of lighting actors fully
 		 * merely because this region omitted an unused lighting lump. */
-		return R_InteriorStaticLight(R_SkyExterior() ? r_refdef.ambientlight : 255);
+		return R_InteriorStaticLight(R_SkyExterior() ? r_refdef.ambientlight*r_daylight>>8 : 255);
 
 	end[0] = p[0];
 	end[1] = p[1];
@@ -539,8 +567,8 @@ int R_LightPoint (vec3_t p)
 	if (r == -1)
 		r = 0;
 
-	if (r < r_refdef.ambientlight)
-		r = r_refdef.ambientlight;
+	if (r < r_refdef.ambientlight*r_daylight>>8)
+		r = r_refdef.ambientlight*r_daylight>>8;
 
 	return R_InteriorStaticLight(r);
 }

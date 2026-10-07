@@ -12,21 +12,33 @@ extern cvar_t aw_drawdistance;
 static cvar_t aw_fog={"aw_fog","1",true};
 /* Source candidate: retain classic rendering until target cost/visual acceptance. */
 static cvar_t aw_terrain_horizon={"aw_terrain_horizon","0",true};
+/* Skyline fill: in each column, sky below far scenery (fog level at least
+ * SKYLINE_LEVEL) is a hole left by the far cut-off and takes the full fog
+ * colour, so a short fog distance leaves a fogged skyline, not cut-outs. */
+static cvar_t aw_skyline_fill={"aw_skyline_fill","1",true};
+#define SKYLINE_LEVEL 12
+#define SKYLINE_MAX 1600
+static byte skyline[SKYLINE_MAX];
 static byte *colours;
 static byte depths[32768];
 static int old_distance;
 static cvar_t aw_cull;
+/* Location fog (aw_fog_location.c) shortens the distance in listed places;
+ * NULL until that module is initialised. */
+int (*aw_fog_location_hook)(int);
 int AW_DrawDistance(void) {
+    int d;
     /* This exterior's converted overlap is certified for the default range.
      * Keep the user's larger setting available to other scenes. */
-    if(sv.active && (!strcmp(sv.name,"balmora") || !strcmp(sv.name,"seyda") || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>540)return 540;
-    if(!(aw_drawdistance.value>=128))return 128;
-    if(aw_drawdistance.value>4096)return 4096;
-    return (int)aw_drawdistance.value;
+    if(sv.active && (!strcmp(sv.name,"balmora") || !strcmp(sv.name,"seyda") || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>540)d=540;
+    else if(!(aw_drawdistance.value>=100))d=100;
+    else if(aw_drawdistance.value>4096)d=4096;
+    else d=(int)aw_drawdistance.value;
+    return aw_fog_location_hook?aw_fog_location_hook(d):d;
 }
 void AW_SetDrawDistance(int value) {
-    if(value<128)value=128;
-    if(value>1400)value=1400;
+    if(value<100)value=100;
+    if(value>1500)value=1500;
     Cvar_SetValue("aw_drawdistance",value);
 }
 static void distance_command(void) {
@@ -34,26 +46,26 @@ static void distance_command(void) {
     if(Cmd_Argc()==1){Con_Printf("Fog/draw distance: %ld local units (default 540).\n",(long)AW_DrawDistance());return;}
     if(Cmd_Argc()!=2)goto invalid;
     s=Cmd_Argv(1);if(!*s)goto invalid;
-    while(*s){if(*s<'0'||*s>'9')goto invalid;value=value*10+*s++-'0';if(value>1400)goto invalid;}
-    if(value<128)goto invalid;
+    while(*s){if(*s<'0'||*s>'9')goto invalid;value=value*10+*s++-'0';if(value>1500)goto invalid;}
+    if(value<100)goto invalid;
     AW_SetDrawDistance(value);
     Con_Printf("Fog/draw distance: %ld local units = %ld source units.\n",(long)value,(long)value*4);
     if(AW_Interior())Con_Printf("Exterior setting; indoor visibility is unchanged.\n");
     return;
 invalid:
-    Con_Printf("Usage: dbg fog distance 128..1400 (default 540)\n");
+    Con_Printf("Usage: dbg fog distance 100..1500 (default 540)\n");
 }
 static void cycle_distance(void) {
     int value=aw_drawdistance.value<540?540:aw_drawdistance.value<1000?1000:450;
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
     int level,first=1,last;
-    if(distance<128)distance=128;
+    if(distance<100)distance=100;
     if(distance>4096)distance=4096;
     memset(table,0,32768);table[0]=15;
     for(level=15;level>=1;level--){
@@ -62,7 +74,7 @@ void AW_FogDepths(byte *table,int distance) {
     }
 }
 void AW_FogDraw(void) {
-    int distance,i,x,y,w,h,level,fog;byte *pixels;short *z;
+    int distance,i,x,y,w,h,level,fog,fill;byte *pixels;short *z;
     const byte *environment,*ramp;
     float extent,u,v,step,ray[3],delta[3];int k;
     if(AW_Interior())return;
@@ -74,6 +86,8 @@ void AW_FogDraw(void) {
     w=r_refdef.vrect.width;h=r_refdef.vrect.height;extent=w>h?w:h;
     if(extent<=0)return;
     step=2.0f/extent;for(k=0;k<3;k++)delta[k]=vright[k]*step;
+    fill=fog && aw_skyline_fill.value>0 && w<=SKYLINE_MAX;
+    if(fill)memset(skyline,0,w);
     for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
         pixels=vid.buffer+y*vid.rowbytes+r_refdef.vrect.x;
         z=d_pzbuffer+y*d_zwidth+r_refdef.vrect.x;
@@ -83,8 +97,13 @@ void AW_FogDraw(void) {
         for(x=0;x<w;x++){
             i=z[x];
             if(i==AW_SKY_BACKGROUND_DEPTH){
-                if(environment)pixels[x]=R_DayNightSkyPixel(pixels[x],ray[0],ray[1],ray[2],fog);
-            }else if(fog){if(i<0)i=0;level=depths[i];pixels[x]=ramp[(level<<8)+pixels[x]];}
+                if(fill && skyline[x])pixels[x]=ramp[(15<<8)+pixels[x]];
+                else if(environment)pixels[x]=R_DayNightSkyPixel(pixels[x],ray[0],ray[1],ray[2],fog);
+            }else if(fog){
+                if(i<0)i=0;
+                level=depths[i];pixels[x]=ramp[(level<<8)+pixels[x]];
+                if(fill && level>=SKYLINE_LEVEL)skyline[x]=1;
+            }
             for(k=0;k<3;k++)ray[k]+=delta[k];
         }
     }

@@ -33,6 +33,33 @@ class InteriorPipelineTests(unittest.TestCase):
   light={'ambient':[20,20,20],'lights':[{'position':[0,0,0],'radius':128,'color':[100,100,100]}]}
   out=bake_surface(p,np.array([[1.,0],[0,1],[0,0]]),np.zeros(2),np.eye(3),np.zeros(3),light)
   self.assertEqual(len(out),4);self.assertGreater(out[0],out[-1]);self.assertLess(out[-1],120)
+ def test_original_falloff_reaches_past_the_radius_and_fades_by_twice_it(self):
+  from interior_lighting import original_weight
+  self.assertEqual(original_weight(0,16),1.0);self.assertEqual(original_weight(5,16),1.0)
+  self.assertAlmostEqual(original_weight(16,16),1/3)
+  self.assertGreater(original_weight(27,16),0);self.assertEqual(original_weight(32,16),0)
+  p=np.array([[0.,0,0],[16.,0,0],[0,16.,0]])
+  light={'ambient':[64,64,64],'lights':[{'position':[0,0,4*27],'radius':64,'color':[245,140,40]}]}
+  axes=np.array([[1.,0],[0,1],[0,0]])
+  self.assertEqual(bake_surface(p,axes,np.zeros(2),np.eye(3),np.zeros(3),light)[0],64)
+  out=bake_surface(p,axes,np.zeros(2),np.eye(3),np.zeros(3),dict(light,falloff='original'))
+  self.assertGreater(out[0],64)
+ def test_off_by_default_lights_give_no_light(self):
+  p=np.array([[0.,0,0],[16.,0,0],[0,16.,0]])
+  lit={'position':[0,0,0],'radius':128,'color':[100,100,100],'flags':0x1}
+  axes=np.array([[1.,0],[0,1],[0,0]])
+  self.assertGreater(bake_surface(p,axes,np.zeros(2),np.eye(3),np.zeros(3),{'ambient':[20,20,20],'lights':[lit]})[0],20)
+  off=dict(lit,flags=0x21)
+  self.assertEqual(bake_surface(p,axes,np.zeros(2),np.eye(3),np.zeros(3),{'ambient':[20,20,20],'lights':[off]})[0],20)
+ def test_box_zone_scales_inside_with_a_soft_edge(self):
+  from interior_lighting import zone_scale
+  zone=[{'box':[[0,0,0],[64,64,64]],'scale':.6,'soft':16}]
+  self.assertEqual(zone_scale(np.array([-1.,32,32]),zone),1.0)
+  self.assertAlmostEqual(zone_scale(np.array([32.,32,32]),zone),.6)
+  self.assertAlmostEqual(zone_scale(np.array([8.,32,32]),zone),.8)
+  p=np.array([[0.,0,0],[16.,0,0],[0,16.,0]])+32
+  light={'ambient':[100,100,100],'lights':[],'zones':zone}
+  self.assertEqual(bake_surface(p,np.zeros((3,2)),np.zeros(2),np.eye(3),np.zeros(3),light),bytes([60]))
  def test_hollow_surface_does_not_fill_room_centre(self):
   v=np.array([[-20,-20,0,0,0],[20,-20,0,1,0],[20,20,0,1,1],[-20,20,0,0,1]],float)
   f=np.array([[0,1,2,0],[0,2,3,0]])

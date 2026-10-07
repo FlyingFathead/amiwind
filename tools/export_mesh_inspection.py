@@ -140,7 +140,7 @@ def extract(raw, source):
                     if count<1 or start+count>pool[1]:raise ValueError('Auxiliary render range outside pool')
                     build(pool_id,entity,entity_index,(pool[0]+start,count))
     return dict(format='amiwind-mesh-inspector-1', source=source, source_filename=source, loaded_filename=source,
-                program={'name':'AmiWind Polycount inspector','version':'0.0.28'},
+                program={'name':'AmiWind Polycount inspector','version':'0.0.31'},
                 coordinate_system='Compiled BSP/world XYZ units; +X east, +Y north; not original cell coordinates',
                 source_sha256=hashlib.sha256(raw).hexdigest(),
                 metric='Placed unique vertices per 3D bin; compiled BSP coordinates', objects=result, textures=textures)
@@ -190,7 +190,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('bsp', type=Path)
     parser.add_argument('--out', required=True, type=Path, help='Fresh PRIVATE output directory')
-    parser.add_argument('--viewer', type=Path, default=Path(__file__).with_name('polycount_inspector.html'))
+    parser.add_argument('--viewer', type=Path, default=Path(__file__).resolve().parents[1] / 'amiwind-toolkit' / 'map-inspector.html')
     parser.add_argument('--palette', type=Path, help='Optional owner-supplied 768-byte palette; private export only')
     args = parser.parse_args()
     if args.out.exists():

@@ -109,6 +109,8 @@ unins*
 /releases/
 
 # Explicitly selected documentation screenshots; no other PNGs are source.
+!/docs/images/amiwind-v0.0.31-toolkit-header.png
+!/docs/images/amiwind-v0.0.31-toolkit-world.png
 !/docs/images/amiwind-v0.0.15-dev2-dock.png
 !/docs/images/amiwind-v0.0.15-dev2-npc.png
 !/docs/images/amiwind-v0.0.15-dev2-guard.png
@@ -121,6 +123,7 @@ unins*
 !/docs/images/amiwind-v0.0.23-dev2-port.gif
 !/resources/media/AmiWind_logo_clear_background.png
 !/resources/media/AmiWind_wordmark.png
+!/resources/media/AmiWind_logo_name_only.png
 
 # logs
 *.log
@@ -165,6 +168,11 @@ AmiWind-launcher.json
 !docs/images/amiwind-v0.0.27-rc2-mushroom-cap.png
 !docs/images/amiwind-v0.0.27-rc2-ascadian-mushrooms.png
 !docs/images/amiwind-v0.0.27-rc2-mushroom-underside.png
+!docs/images/amiwind-v0.0.31-balmora-night-street-lamp.png
+!docs/images/amiwind-v0.0.31-balmora-night-plaza-guard.png
+!docs/images/amiwind-v0.0.31-balmora-night-lamp-house.png
+!docs/images/amiwind-v0.0.31-balmora-night-river.png
+!docs/images/amiwind-v0.0.31-balmora-night-house-corner.png
 
 # Owner-requested native v0.0.28-rc1 documentation captures.
 !/docs/images/amiwind-v0.0.28-rc1-sunrise.png

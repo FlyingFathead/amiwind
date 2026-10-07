@@ -38,6 +38,8 @@ Two valid runs:
 
 About 80 % of a Seyda Neen load is file reading.
 
+![Seyda Neen crossing load time, v0.0.30-dev4 vs v0.0.31](images/amiwind-perf-seyda-crossing-load.svg)
+
 ## What a crossing reads (sn019)
 
 The sub-cell map itself is 4.98 MB:

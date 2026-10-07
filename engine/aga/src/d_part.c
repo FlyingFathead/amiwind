@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
+#include "aw_sky.h"
 
 
 /*
@@ -60,13 +61,16 @@ void D_DrawParticle (particle_t *pparticle)
 	byte	*pdest;
 	short	*pz;
 	int		i, izi, pix, count, u, v;
+	byte	colour;
+
+	colour = d_nightshade ? d_nightshade[(int)pparticle->color] : (byte)pparticle->color;	// unlit: night dims here
 
 // transform point
 	VectorSubtract (pparticle->org, r_origin, local);
 
 	transformed[0] = DotProduct(local, r_pright);
 	transformed[1] = DotProduct(local, r_pup);
-	transformed[2] = DotProduct(local, r_ppn);		
+	transformed[2] = DotProduct(local, r_ppn);
 
 	if (transformed[2] < PARTICLE_Z_CLIP)
 		return;
@@ -77,7 +81,7 @@ void D_DrawParticle (particle_t *pparticle)
 	u = (int)(xcenter + zi * transformed[0] + 0.5);
 	v = (int)(ycenter - zi * transformed[1] + 0.5);
 
-	if ((v > d_vrectbottom_particle) || 
+	if ((v > d_vrectbottom_particle) ||
 		(u > d_vrectright_particle) ||
 		(v < d_vrecty) ||
 		(u < d_vrectx))
@@ -106,7 +110,7 @@ void D_DrawParticle (particle_t *pparticle)
 			if (pz[0] <= izi)
 			{
 				pz[0] = izi;
-				pdest[0] = pparticle->color;
+				pdest[0] = colour;
 			}
 		}
 		break;
@@ -119,13 +123,13 @@ void D_DrawParticle (particle_t *pparticle)
 			if (pz[0] <= izi)
 			{
 				pz[0] = izi;
-				pdest[0] = pparticle->color;
+				pdest[0] = colour;
 			}
 
 			if (pz[1] <= izi)
 			{
 				pz[1] = izi;
-				pdest[1] = pparticle->color;
+				pdest[1] = colour;
 			}
 		}
 		break;
@@ -138,19 +142,19 @@ void D_DrawParticle (particle_t *pparticle)
 			if (pz[0] <= izi)
 			{
 				pz[0] = izi;
-				pdest[0] = pparticle->color;
+				pdest[0] = colour;
 			}
 
 			if (pz[1] <= izi)
 			{
 				pz[1] = izi;
-				pdest[1] = pparticle->color;
+				pdest[1] = colour;
 			}
 
 			if (pz[2] <= izi)
 			{
 				pz[2] = izi;
-				pdest[2] = pparticle->color;
+				pdest[2] = colour;
 			}
 		}
 		break;
@@ -163,25 +167,25 @@ void D_DrawParticle (particle_t *pparticle)
 			if (pz[0] <= izi)
 			{
 				pz[0] = izi;
-				pdest[0] = pparticle->color;
+				pdest[0] = colour;
 			}
 
 			if (pz[1] <= izi)
 			{
 				pz[1] = izi;
-				pdest[1] = pparticle->color;
+				pdest[1] = colour;
 			}
 
 			if (pz[2] <= izi)
 			{
 				pz[2] = izi;
-				pdest[2] = pparticle->color;
+				pdest[2] = colour;
 			}
 
 			if (pz[3] <= izi)
 			{
 				pz[3] = izi;
-				pdest[3] = pparticle->color;
+				pdest[3] = colour;
 			}
 		}
 		break;
@@ -196,7 +200,7 @@ void D_DrawParticle (particle_t *pparticle)
 				if (pz[i] <= izi)
 				{
 					pz[i] = izi;
-					pdest[i] = pparticle->color;
+					pdest[i] = colour;
 				}
 			}
 		}
@@ -206,4 +210,3 @@ void D_DrawParticle (particle_t *pparticle)
 
 #endif
 #endif	// !id386
-

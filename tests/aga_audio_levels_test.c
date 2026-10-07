@@ -9,6 +9,7 @@
 char com_gamedir[MAX_OSPATH]=".";
 server_t sv;
 double Sys_FloatTime(void){return 1;}
+double realtime;
 int AW_DebugOverlaysEnabled(void){return 0;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){}
 qboolean Cmd_Exists(char *name){return false;}

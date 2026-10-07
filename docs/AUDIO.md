@@ -1,5 +1,30 @@
 # Streamed music and speech
 
+## Start-up and opening music: 7 October 2026
+
+Music start points were moved away from disk-heavy moments, and two
+regressions from that move were found by the owner in v0.0.31-dev3 and
+repaired for dev4. Status lives in the [bug register](BUGS.md).
+
+- [AUDIO-03](bugs/AUDIO-03.md): the opening track no longer starts as the ship
+  map begins loading; the scene holds until loaded and settled (4 frames and
+  0.25 s), then fades in from black while the music starts.
+- [AUDIO-LOGO-31](bugs/AUDIO-LOGO-31.md): the startup logo no longer starts the
+  title music; the main menu starts it half a second after it appears.
+- [MUSIC-STARTUP-TRACK-31](bugs/MUSIC-STARTUP-TRACK-31.md) (dev3 regression):
+  start-up opened a random world track, which then played under the silent
+  logo. With a title track in the playlist, start-up now opens nothing.
+  This also explains the old start-up crackle, as the owner spotted: start-up
+  pre-read a random track, the logo threw it away and opened the title, while
+  the logo video streamed from the same disk.
+- [MUSIC-OPENING-CLIP-31](bugs/MUSIC-OPENING-CLIP-31.md) (dev3 regression): the
+  ship's map load sends Quake's CD-track message, which resumed the paused
+  title stream's buffered blocks during the opening hold. The hold now stops
+  and empties the music and ignores resumes until the opening track starts.
+
+Lesson: every music start point and every engine resume path (`svc_cdtrack`,
+pause/unpause) is checked together, by test and by ear, before packaging.
+
 ## Loading-audio candidate evidence: 6 October 2026
 
 The next candidate limits loading-only asset reads to 4 KiB and services audio

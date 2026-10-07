@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_hand_models.h"
 #include "aw_harvest_runtime.h"
 #include "aw_save.h"
+#include "aw_remote.h"
 #include "r_local.h"
 
 /*
@@ -675,6 +676,7 @@ void _Host_Frame (float time)
 
 // allow mice or other external controllers to add commands
     IN_Commands ();
+    AW_RemotePoll ();	// headless test sessions: command file, state file
 
 // Do not run queued commands or world simulation during debug playback.
     if(AW_MovieDebugActive()) {

@@ -183,11 +183,49 @@ Combine and scale multiple lightmaps into the 8.8 format in blocklights
  * such surfaces get at least that much light; 0 restores plain lightmaps.
  * Checked per lightmap build, not per pixel. */
 cvar_t	aw_emissive = {"aw_emissive","1",true};
+/* Window glass glowing at night (aw_night_window_lights; an AmiWind addition,
+ * the original windows never glow): set per map by aw_lamps.c. */
+texture_t	*r_night_windows[R_NIGHT_WINDOWS];
+int			r_night_window_count, r_night_windows_on;
+/* Quake light has no colour; the warm table (r_sky.c, from aw_light_hue)
+ * makes lit texels lean toward the light's hue (bright rows only). Chosen per
+ * surface in R_DrawSurface, never per pixel: surfaces lit by a dynamic light
+ * this frame (torches, night lamps) and night-glowing windows. aw_warm_light 0
+ * restores the plain table. */
+cvar_t	aw_warm_light = {"aw_warm_light","1",true};
+static unsigned char	*r_block_colormap;
+static int R_NightWindow (msurface_t *surf)
+{
+	int i;
+	if (!r_night_windows_on)
+		return 0;
+	for (i=0 ; i<r_night_window_count ; i++)
+		if (surf->texinfo->texture == r_night_windows[i])
+			return 1;
+	return 0;
+}
+static int R_SurfaceWarm (msurface_t *surf)
+{
+	if (!r_warm_colormap || !aw_warm_light.value)
+		return 0;
+	if (surf->dlightframe == r_framecount && surf->dlightbits)
+	{
+		int k;
+		for (k=0 ; k<MAX_DLIGHTS && k<32 ; k++)
+			if ((surf->dlightbits & (1u<<k)) && r_dlight_cool[k])
+				return 0;	/* a blue lamp: no warm tint (a cool table later) */
+		return 1;
+	}
+	return R_NightWindow (surf);
+}
+#define R_NIGHT_WINDOW_LEVEL 6
 static int R_EmissiveLevel (msurface_t *surf)
 {
 	const char *n = surf->texinfo->texture->name;
 	if (n[0]=='e' && n[1]=='m' && n[2]=='i' && n[3]=='t' && n[4]>='1' && n[4]<='9')
 		return n[4]-'0';
+	if (R_NightWindow (surf))
+		return R_NIGHT_WINDOW_LEVEL;
 	return 0;
 }
 
@@ -230,9 +268,9 @@ void R_BuildLightMap (void)
 		return;
 	}
 
-// clear to ambient
+// clear to ambient (dimmed by night in light-space mode; r_daylight is 256 by day)
 	for (i=0 ; i<size ; i++)
-		blocklights[i] = (legacy_unlit ? 255 : r_refdef.ambientlight)<<8;
+		blocklights[i] = (legacy_unlit ? 255 : r_refdef.ambientlight*r_daylight>>8)<<8;
 
 
 // add all the lightmaps
@@ -241,6 +279,10 @@ void R_BuildLightMap (void)
 			 maps++)
 		{
 			scale = r_drawsurf.lightadj[maps];	// 8.8 fraction
+			if (surf->styles[maps] >= AW_LAMP_STYLE)
+				scale = r_lamps ? scale : 0;	// lamps keep full value at night
+			else if (r_daylight < 256)
+				scale = scale*r_daylight>>8;
 			for (i=0 ; i<size ; i++)
 				blocklights[i] += lightmap[i] * scale;
 			lightmap += size;	// skip to next lightmap
@@ -366,6 +408,7 @@ void R_DrawSurface (void)
 	if (r_pixbytes != 1)
 		Sys_Error ("R_DrawSurface: only 8-bit surfaces are supported");
 	pblockdrawer = surfmiptable[r_drawsurf.surfmip];
+	r_block_colormap = R_SurfaceWarm (r_drawsurf.surf) ? r_warm_colormap : (unsigned char *)vid.colormap;
 // TODO: only needs to be set when there is a display settings change
 	horzblockstep = blocksize;
 
@@ -434,7 +477,7 @@ void R_DrawSurfaceBlock8_mip0 (void)
 	int	psourcestep, prowdeststep;
 	unsigned char	*psource, *prowdest, *colormap;
 
-	colormap = (unsigned char *)vid.colormap;
+	colormap = r_block_colormap;
 	psourcestep = sourcetstep;
 	prowdeststep = surfrowbytes;
 	psource = pbasesource;
@@ -488,7 +531,7 @@ void R_DrawSurfaceBlock8_mip1 (void)
 	int	psourcestep, prowdeststep;
 	unsigned char	*psource, *prowdest, *colormap;
 
-	colormap = (unsigned char *)vid.colormap;
+	colormap = r_block_colormap;
 	psourcestep = sourcetstep;
 	prowdeststep = surfrowbytes;
 	psource = pbasesource;
@@ -542,7 +585,7 @@ void R_DrawSurfaceBlock8_mip2 (void)
 	int	psourcestep, prowdeststep;
 	unsigned char	*psource, *prowdest, *colormap;
 
-	colormap = (unsigned char *)vid.colormap;
+	colormap = r_block_colormap;
 	psourcestep = sourcetstep;
 	prowdeststep = surfrowbytes;
 	psource = pbasesource;
@@ -596,7 +639,7 @@ void R_DrawSurfaceBlock8_mip3 (void)
 	int	psourcestep, prowdeststep;
 	unsigned char	*psource, *prowdest, *colormap;
 
-	colormap = (unsigned char *)vid.colormap;
+	colormap = r_block_colormap;
 	psourcestep = sourcetstep;
 	prowdeststep = surfrowbytes;
 	psource = pbasesource;

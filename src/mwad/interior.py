@@ -130,17 +130,23 @@ def select_geometry(cell, *, harvest_references=(), harvest_master_sha256=None):
             exclusions[number]=ref
     selected=[];omitted=[]
     for ref in cell['refs']:
-        model=ref.get('model','').replace('\\','/').lower()
-        reason=None
-        if ref.get('deleted'):reason='deleted reference'
-        elif ref['number'] in exclusions:reason='external harvest reference'
-        elif not model:reason='no static model'
-        elif 'marker' in model:reason='editor marker'
-        elif ref['type'] not in ('STAT','DOOR','CONT','LIGH','ACTI'):reason='small item or actor deferred'
-        elif ref['type']=='ACTI' and 'active_de_bed' not in model and not (
-                ref['id'].casefold()=='chargen stuff room' and
-                model=='i/in_c_plain_room_side.nif'):reason='unsupported activator'
-        elif any(x in model for x in ('furn_bone','furn_de_rope','shack_hook','shack_basket')):reason='fine dressing deferred'
+        reason=omission_reason(ref,exclusions)
         if reason:omitted.append({'reference':ref['number'],'id':ref['id'],'reason':reason})
         else:selected.append(ref)
     return selected,omitted
+
+
+def omission_reason(ref,exclusions=()):
+    """Why the interior converter leaves one reference out, or None to keep it.
+    Needs the reference's number, id, type (base record) and model."""
+    model=ref.get('model','').replace('\\','/').lower()
+    if ref.get('deleted'):return 'deleted reference'
+    if ref['number'] in exclusions:return 'external harvest reference'
+    if not model:return 'no static model'
+    if 'marker' in model:return 'editor marker'
+    if ref['type'] not in ('STAT','DOOR','CONT','LIGH','ACTI'):return 'small item or actor deferred'
+    if ref['type']=='ACTI' and 'active_de_bed' not in model and not (
+            ref['id'].casefold()=='chargen stuff room' and
+            model=='i/in_c_plain_room_side.nif'):return 'unsupported activator'
+    if any(x in model for x in ('furn_bone','furn_de_rope','shack_hook','shack_basket')):return 'fine dressing deferred'
+    return None

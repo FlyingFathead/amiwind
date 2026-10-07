@@ -9,7 +9,8 @@ dlight_t cl_dlights[MAX_DLIGHTS];viddef_t vid;refdef_t r_refdef;
 vec3_t vpn,vup,vright;float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
 short *d_pzbuffer;unsigned int d_zwidth;aw_state_t aw_state;
 cvar_t r_drawentities={"r_drawentities","1",false,false,1};
-cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
+cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};cvar_t aw_guard_torch_radius={"aw_guard_torch_radius","1",true,false,1};
+void Cvar_SetValue(char *n,float v){(void)n;aw_guard_torch_radius.value=v;}
 char strings[]="\0aw_npc\0aw_corpse\0guard_a\0guard_b\0ordinary_npc\0";char *pr_strings=strings;
 static edict_t actors[40];static eval_t source[40];
 static byte registry[20000],torch[716],pixels[336*210];static short depths[320*200];
@@ -19,6 +20,7 @@ static float universal_radius=192;
 float AW_TorchLightRadius(void){return universal_radius;}
 int AW_TorchFlameCoreColor(void){return -1;}
 byte AW_TorchFlameColor(byte original,int texel,float age,int core){return original;}
+double host_frametime;void AW_EmberSpawn(const vec3_t org,float spread,float rise){(void)org;(void)spread;(void)rise;}
 static model_t base,body,held,body_b,held_b;static int model_loads,broken_model;
 int hunk_size=8*1024*1024,hunk_low_used,hunk_high_used;
 void *Cache_Check(cache_user_t *c){return c->data;}

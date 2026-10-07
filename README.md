@@ -9,6 +9,123 @@ Amiga runtime. Read the [FAQ](docs/FAQ.md) for the project vision, hardware
 and current scope, and [licensing and credits](docs/LICENSING_AND_CREDITS.md)
 for source provenance and what the public package contains.
 
+## v0.0.31 - Lamps, Lanterns and Loading
+
+Balmora and Seyda Neen at night, lit by their own lamps and lanterns; much
+faster loading; and the AmiWind Toolkit.
+
+What's new:
+
+- **Night in town:** the original street lamps, lanterns, wall torches and fires
+  light Balmora and Seyda Neen at night with warm light; lantern and window
+  glass glows; blue lanterns stay blue.
+- **Light-space night:** night darkens the light, not the finished picture, so
+  torches and glowing materials keep their light after dark.
+- **Fire:** fireplaces and braziers burn with flames shaped like the original
+  emitters, deep red to a near-white core, with rising embers; torches shed
+  embers too. `dbg torchgallery` opens a dark room to look at them.
+- **Guard torches** light half as far, so they no longer outshine the lamps.
+- **Light hue:** torch, lamp and window light can be any colour
+  (`dbg light hue R G B`, or the Hue row in `dbg lightgallery`).
+- **Light gallery:** `dbg lightgallery` puts every night-lighting switch in a
+  strip below the view, with a time preview.
+- **Fog distance slider** (Options > Fog distance, 100-1500), **skyline fill**
+  for short fog distances, and optional **location fog** per place.
+- **Horizon veil** (`dbg horizon veil`) hazes gaps in distant silhouettes.
+- **Faster loading** everywhere, and lighter Seyda Neen sub-cells.
+- **Music and opening:** silent start-up until the title music, no stray clips
+  while the ship loads, a shorter wait after the intro video, and the ship
+  fades in from black.
+- **Place names** in the location label, from the original cell names.
+- **Time controls:** `dbg time`, `dbg time HHMM`, `dbg 24hrcycle`.
+- **Debug headlamp:** `dbg headlamp on` lights dark places without a torch.
+- **`dbg lamps`** shows which lamps are lit around you and why.
+- **AmiWind Toolkit:** World / Local / 3D Inspector, multi-cell selection,
+  scrollbars, keyboard panning.
+- **Entity tracker:** the image build counts what the original game places
+  against what AmiWind places, and stops if a category goes missing.
+- **Builder:** writes the night lamp, glowing glass and location fog tables
+  itself, and finishes its last step again.
+- **Console:** every `dbg` command sorted and tested; on/off words work for
+  every setting.
+- **Docs:** a performance page with charts on what the engine is asked to draw,
+  and the rule that the repository builds the whole game from scratch.
+
+What we gained (measured):
+
+- **Loading:** game files are read in 16 KiB pieces instead of 1 KiB (a 4.8 MB
+  Seyda Neen map took over 4,700 separate disk reads). Seyda Neen region
+  crossings: 0.54-0.71 s in v0.0.30, now 0.39-0.48 s on the test route.
+- **Seyda Neen maps:** 247.5 MB down to 185.6 MB (-25 %); maps over the modeled
+  memory reserve: 43 down to 6.
+- **Lamps and lanterns at night:** 694 original street lamps, lanterns, wall
+  torches and fires give a torch's worth of warm light from dusk to full day;
+  lantern and window glass glows in 79 town maps.
+- **Torch light at night:** torches and glowing materials keep their light after
+  dark; walls lit by a torch measured about 2.5 times brighter than before.
+- **Frame rate control:** Options > Fog distance is now a slider (100-1500); in
+  Balmora a fog distance of 250 roughly doubles the frame rate, and the skyline
+  stays fogged instead of cut out.
+- **Music:** silent start-up until the title music, no stray clips while the
+  opening loads, and the prison ship fades in from black.
+- **Place names:** the location label reads "Vvardenfell / West Gash Region /
+  Balmora" from the original game's cell names.
+- **AmiWind Toolkit:** World, Local and 3D Inspector tabs for anyone working on
+  AmiWind (below).
+- **Console:** 116 `dbg` commands, sorted and tested so every one reaches its
+  handler; `dbg time`, `dbg 24hrcycle`, `dbg lightgallery`, `dbg lamps`,
+  `dbg headlamp`.
+- **Bug tracking:** one register, 186 records, a report page for every bug found
+  since v0.0.30.
+
+| | |
+| --- | --- |
+| ![A Balmora street lamp lights the wall and street at 01:19](docs/images/amiwind-v0.0.31-balmora-night-street-lamp.png) | **01:19, a street lamp.** A torch's worth of warm light on the wall and the street; its glass glows. |
+| ![A lamp-lit house in Balmora at 02:18 with a passer-by](docs/images/amiwind-v0.0.31-balmora-night-lamp-house.png) | **02:18, a lamp-lit house.** Pools of light with darker street between, the way a town at night should look. |
+| ![The Odai river in Balmora glittering at 22:46](docs/images/amiwind-v0.0.31-balmora-night-river.png) | **22:46, the river.** The water glitters under the night sky. |
+| ![A Balmora plaza at 21:38 with a Hlaalu guard carrying a torch](docs/images/amiwind-v0.0.31-balmora-night-plaza-guard.png) | **21:38, a plaza guard.** Guard torches light half as far as before, so they no longer outshine the lamps. |
+| ![A Balmora house corner lit by its lamp at 22:36](docs/images/amiwind-v0.0.31-balmora-night-house-corner.png) | **22:36, a house corner.** Lamps stay lit while you turn and walk; a lamp that hands its light to a nearer one fades out instead of snapping off. |
+
+Release notes: [v0.0.31](docs/RELEASE-v0.0.31.md) (with the dev1-dev6 notes linked
+there) and the [bug register](docs/BUGS.md).
+
+### Whoops! Actually...
+
+Most of what AmiWind draws, Quake never got the chance to skip. Quake's `vis`
+tool precomputes what can be seen from where, but only the world's own walls
+count, and every converted building, room and rock went in as a `func_wall`
+model, which `vis` ignores. Measured on the dev5 and dev6 maps:
+
+| Map type | Visible from an average spot |
+| --- | ---: |
+| Interiors (Mages Guild, Temple, Census, prison ship) | 100 % |
+| Balmora streets | 84-89 % |
+| Open world with rocks and trees | 69-85 % |
+| Seyda Neen | 59-76 % |
+
+Inside the Mages Guild, all 40,488 faces were processed every frame wherever
+you stood, and NPCs behind houses were drawn in full. The fix is the Quake way:
+static building faces become part of the world, which Quake culls leaf by leaf,
+and invisible solid blocks inside buildings and walls give `vis` the walls to
+cut with. (Blocks alone were tried first: buildings left as separate models
+stay visible as a whole.) Details: [Town visibility](docs/performance/TOWN-VISIBILITY.md) and
+[TOWN-VIS-OCCLUSION-31](docs/bugs/TOWN-VIS-OCCLUSION-31.md).
+
+### AmiWind Toolkit
+
+![AmiWind Toolkit](docs/images/amiwind-v0.0.31-toolkit-header.png)
+
+A browser toolkit for anyone working on AmiWind, built from your own converted
+data (nothing is uploaded): the **World** map shows every cell's coverage,
+original versus placed entities, places and interior entrances, with heat maps;
+**Local** shows a cell's maps; the **3D Inspector** opens any converted map to
+look at its geometry, polygon density and planning zones. Shift-click or
+shift-drag selects several cells, and the selection copies out as JSON for
+planning work such as the next town to import. See
+[AmiWind Toolkit](docs/AMIWIND_TOOLKIT.md).
+
+![AmiWind Toolkit world map](docs/images/amiwind-v0.0.31-toolkit-world.png)
+
 ## v0.0.30 - The Temple
 
 The Balmora Temple is whole again. A scene-converter fault turned some meshes
@@ -630,7 +747,7 @@ Development changes must follow the [project rules](docs/PROJECT_RULES.md), incl
 
 The development toolkit now includes a standalone
 [Polycount Inspector](docs/POLYCOUNT_INSPECTOR.md). Open
-[the local viewer](tools/polycount_inspector.html) to explore polygon edges,
+[the local viewer](amiwind-toolkit/map-inspector.html) to explore polygon edges,
 optional local base textures and spatial vertex-density hotspots. Isolate an
 object, compare components, or inspect from above and export a private planning
 polygon. The built-in synthetic scene demonstrates the tool without game assets.

@@ -3,6 +3,8 @@
 #include "d_local.h"
 #include "aw_sky.h"
 #include <assert.h>
+/* Night shade table owned by d_sprite.c. */
+const unsigned char *d_nightshade;
 int r_backgroundsky,r_skymade;byte *r_skysource;
 float d_zistepu,d_zistepv,d_ziorigin;
 cvar_t r_clearcolor={"r_clearcolor","2"};

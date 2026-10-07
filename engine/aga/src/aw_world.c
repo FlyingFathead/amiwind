@@ -13,14 +13,24 @@ static int count,attempted;
 static const char *town_names[2]={"seyda","balmora"};
 static uint32_t word(const byte *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
 static float number(const byte *p){uint32_t n=word(p);float f;memcpy(&f,&n,4);return f;}
+/* One 64-byte name from the catalogue; NUL-terminated, no control characters. */
+static int region_label(FILE *f,long at,char *out) {
+    int i;
+    if(fseek(f,at,SEEK_SET) || fread(out,1,64,f)!=64 || !memchr(out,0,64))return 0;
+    for(i=0;out[i];i++)if((unsigned char)out[i]<32)return 0;
+    return 1;
+}
 /* Original game CELL coordinates, not generated terrain-region IDs. Cache one
  * lookup per visited cell; opening a map or drawing the HUD costs no per-frame
- * filesystem traffic. Fixed disk rows avoid keeping a second world map in RAM. */
+ * filesystem traffic. Fixed disk rows avoid keeping a second world map in RAM.
+ * ARN2 rows also name the original cell (Balmora, a camp, a ruin): the label
+ * is then "Region / Place". ARN1 (region only) is still read. */
 const char *AW_RegionNameAt(const float *position){
     static int cached,old_x,old_y;
-    static char title[64];
-    FILE *f=NULL;byte header[12],row[12];long base,offset;int size,x,y,lo,hi,mid,rx,ry,index,i;
-    unsigned names,cells;
+    static char title[132];
+    FILE *f=NULL;byte header[16],row[16];char place[64];long base,offset;
+    int size,x,y,lo,hi,mid,rx,ry,head,width;
+    unsigned names,places=0,cells,index,where;
     if(!isfinite(position[0]) || !isfinite(position[1]) ||
        fabs(position[0])>2000000 || fabs(position[1])>2000000)return NULL;
     /* floor is essential west/south of zero: C truncation selects the wrong cell. */
@@ -28,19 +38,27 @@ const char *AW_RegionNameAt(const float *position){
     if(cached && old_x==x && old_y==y)return title[0]?title:NULL;
     cached=1;old_x=x;old_y=y;title[0]=0;
     size=COM_FOpenFile("world/region-names.awn",&f);if(!f)return NULL;base=ftell(f);
-    if(base<0 || size<12 || fread(header,1,12,f)!=12 || memcmp(header,"ARN1",4))goto done;
-    names=word(header+4);cells=word(header+8);
-    if(names>1024 || cells>65536 || size!=12+names*64+cells*12)goto done;
-    offset=base+12+names*64;lo=0;hi=(int)cells;
+    if(base<0 || size<12 || fread(header,1,12,f)!=12)goto done;
+    if(!memcmp(header,"ARN1",4)){head=12;width=12;cells=word(header+8);}
+    else if(!memcmp(header,"ARN2",4) && size>=16 && fread(header+12,1,4,f)==4){
+        head=16;width=16;places=word(header+8);cells=word(header+12);
+    }else goto done;
+    names=word(header+4);
+    if(names>1024 || places>1024 || cells>65536 ||
+       size!=head+(long)(names+places)*64+(long)cells*width)goto done;
+    offset=base+head+(long)(names+places)*64;lo=0;hi=(int)cells;
     while(lo<hi){
         mid=lo+(hi-lo)/2;
-        if(fseek(f,offset+(long)mid*12,SEEK_SET) || fread(row,1,12,f)!=12)goto done;
+        if(fseek(f,offset+(long)mid*width,SEEK_SET) || fread(row,1,width,f)!=(size_t)width)goto done;
         rx=(int32_t)word(row);ry=(int32_t)word(row+4);
         if(rx==x && ry==y){
-            index=(int)word(row+8);if(index<0 || (unsigned)index>=names)goto done;
-            if(fseek(f,base+12+(long)index*64,SEEK_SET) || fread(title,1,64,f)!=64 ||
-               !memchr(title,0,64)){title[0]=0;goto done;}
-            for(i=0;title[i];i++)if((unsigned char)title[i]<32){title[0]=0;break;}
+            index=word(row+8);where=width==16?word(row+12):0xFFFFFFFFu;
+            if(index!=0xFFFFFFFFu && (index>=names || !region_label(f,base+head+(long)index*64,title))){title[0]=0;goto done;}
+            if(where!=0xFFFFFFFFu){
+                if(where>=places || !region_label(f,base+head+(long)(names+where)*64,place)){title[0]=0;goto done;}
+                if(title[0])strcat(title," / ");
+                strcat(title,place);
+            }
             goto done;
         }
         if(rx<x || (rx==x && ry<y))lo=mid+1;else hi=mid;
@@ -94,6 +112,13 @@ int AW_WorldToSource(const char *name,const float *local,float *world){
     terrain_region_t *r=source(name);int k;if(!r)return 0;
     for(k=0;k<3;k++)if(!isfinite(local[k]))return 0;
     for(k=0;k<3;k++)world[k]=(local[k]+r->origin[k])*4;
+    return 1;
+}
+/* Inverse of AW_WorldToSource: original coordinates to this map's local ones. */
+int AW_SourceToWorld(const char *name,const float *world,float *local){
+    terrain_region_t *r=source(name);int k;if(!r)return 0;
+    for(k=0;k<3;k++)if(!isfinite(world[k]))return 0;
+    for(k=0;k<3;k++)local[k]=world[k]*.25f-r->origin[k];
     return 1;
 }
 int AW_WorldContains(const char *name,const float *local){

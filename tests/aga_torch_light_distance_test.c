@@ -6,7 +6,7 @@
 #include "aw_torch.h"
 #include <assert.h>
 client_state_t cl;
-cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
+cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};cvar_t aw_guard_torch_radius={"aw_guard_torch_radius","1",true,false,1};
 dlight_t cl_dlights[MAX_DLIGHTS];
 entity_t cl_entities[MAX_EDICTS], *currententity;
 void R_EntityRotate(vec3_t point) { assert(0); }

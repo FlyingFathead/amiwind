@@ -15,10 +15,20 @@ from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
 
 WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn')
+NO_NAME = 0xFFFFFFFF  # region-names.awn row without a region or place
+
+
+def display_name(raw_name, what):
+    encoded = raw_name.encode('cp1252')
+    if not encoded or len(encoded) >= 64 or any(c < 32 for c in encoded):
+        raise ValueError('Invalid original '+what+' display name')
+    return encoded
 
 
 def region_names(raw):
-    """Original exterior CELL coordinates -> RGNN ID -> REGN display name.
+    """Original exterior CELL coordinates -> RGNN ID -> REGN display name,
+    plus the cell's own original name (Balmora, Seyda Neen, a camp or ruin):
+    the area of interest the player is in. Format ARN2.
 
     Keep the source names intact. A cell without RGNN has no known region;
     neither a nearby region nor a generated vf map number supplies one.
@@ -33,10 +43,7 @@ def region_names(raw):
         if 'DELE' in fields: continue
         if tag == 'REGN':
             identifier = string(fields['NAME']).casefold()
-            name = string(fields.get('FNAM', b''))
-            encoded = name.encode('cp1252')
-            if not encoded or len(encoded) >= 64 or any(c < 32 for c in encoded):
-                raise ValueError('Invalid original region display name')
+            encoded = display_name(string(fields.get('FNAM', b'')), 'region')
             if identifier in regions: raise ValueError('Duplicate original region ID')
             regions[identifier] = encoded
         else:
@@ -44,17 +51,23 @@ def region_names(raw):
             cell_flags, x, y = struct.unpack('<Iii', fields['DATA'])
             if cell_flags & 1: continue
             if (x, y) in cells: raise ValueError('Duplicate exterior cell coordinate')
-            cells[x, y] = string(fields.get('RGNN', b'')).casefold()
-    names = sorted(regions)
-    if len(names) > 1024 or len(cells) > 65536: raise ValueError('Region catalogue exceeds runtime bounds')
+            place = string(fields.get('NAME', b''))
+            cells[x, y] = (string(fields.get('RGNN', b'')).casefold(),
+                           display_name(place, 'cell') if place else b'')
+    names = sorted(regions); places = sorted({p for r, p in cells.values() if p})
+    if len(names) > 1024 or len(places) > 1024 or len(cells) > 65536:
+        raise ValueError('Region catalogue exceeds runtime bounds')
     indices = {name: i for i, name in enumerate(names)}
+    place_indices = {name: i for i, name in enumerate(places)}
     rows = []
-    for (x, y), identifier in sorted(cells.items()):
-        if not identifier: continue
-        if identifier not in indices: raise ValueError('CELL references missing REGN: '+identifier)
-        rows.append(struct.pack('<iiI', x, y, indices[identifier]))
-    return (b'ARN1' + struct.pack('<II', len(names), len(rows))
-            + b''.join(regions[name].ljust(64, b'\0') for name in names) + b''.join(rows))
+    for (x, y), (identifier, place) in sorted(cells.items()):
+        if not identifier and not place: continue
+        if identifier and identifier not in indices: raise ValueError('CELL references missing REGN: '+identifier)
+        rows.append(struct.pack('<iiII', x, y, indices[identifier] if identifier else NO_NAME,
+                                place_indices[place] if place else NO_NAME))
+    return (b'ARN2' + struct.pack('<III', len(names), len(places), len(rows))
+            + b''.join(regions[name].ljust(64, b'\0') for name in names)
+            + b''.join(place.ljust(64, b'\0') for place in places) + b''.join(rows))
 
 
 def fixed(value,size):

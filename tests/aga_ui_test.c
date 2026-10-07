@@ -18,6 +18,7 @@ void AW_CharacterReset(void){}
 void AW_SaveReset(void){}
 void IN_AWClearButtons(void){}
 int AW_MusicStartTrack(int track){assert(track==4);return 1;}
+void AW_MusicHold(void){}
 void Cbuf_AddText(char *text){assert(!strcmp(text,"map prison\n"));queued_prison=1;}
 int COM_FOpenFile(char *name,FILE **f){char p[1024];int n;sprintf(p,"%s/%s",directory,name);*f=fopen(p,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);rewind(*f);return n;}
 void Con_Printf(char *fmt,...){}

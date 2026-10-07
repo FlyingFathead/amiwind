@@ -1,0 +1,4 @@
+# Location fog (aw_fog_location 1; off by default): name, day distance,
+# night distance (local units, 100..1500). The player's fog setting stays
+# the upper bound.
+balmora 300 250

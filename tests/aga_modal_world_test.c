@@ -107,6 +107,7 @@ static void policy(void){
     key_dest=key_game;scr_fullupdate=7;AW_ModalFrame();assert(!scr_fullupdate && sv.paused);
     assert(!AW_ModalWorldFrozen());sv.paused=false;
 }
+void AW_RemotePoll(void){}
 int main(void){
     int i,f,b;double before;
     policy();character=1;sv.time=7;cl.time=7;
