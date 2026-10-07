@@ -1,5 +1,13 @@
 # Bug journal
 
+## CI-HOSTDEPS-30: host CI job failed on the first v0.0.30 push, 7 October 2026
+
+The hosted `host-launcher-parity` job failed: flame extraction asked for the
+NIF reader for a synthetic non-NIF test model, and that job installs only
+numpy and Pillow. Not tagged or released. Repaired in source; the host tests
+now also run in a reduced environment before every handoff.
+[Report](bugs/CI-HOSTDEPS-30.md).
+
 ## v0.0.30-rc1 owner playtest summary, 7 October 2026
 
 WinUAE playtest by the owner: Census office interiors work

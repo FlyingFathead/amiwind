@@ -17,7 +17,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-154 bugs: 101 open, 53 fixed, 0 closed.
+155 bugs: 102 open, 53 fixed, 0 closed.
 
 | ID | Issue | State | Fixed in | Owner accepted | Status |
 | --- | --- | --- | --- | --- | --- |
@@ -46,6 +46,7 @@ a duplicate or superseded (the status says which).
 | BALMORA-CAPACITY-005 | Bounded Balmora maps exceed the 600-entity limit | open | - | - | Cause established: the scenery catalogue admitted only the balmora alias, so bmNNN maps kept func_wall entities. Name-predicate candidate passes extended Linux native fixtures; final live-slot, heap and target gates pending; fixed version not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#balmora-capacity-005-retained-town-maps-exceed-entity-admission). |
 | BUILD-QCC-PATH-008 | Image assembly was given the QCC source directory as its compiler | open | - | - | Assembly-wrapper configuration error, not engine code. Corrected wrapper and executable preflight let the next image run start; the record keeps it open until final assembly and target validation. [Record](bugs/ENTITY-EXHAUSTION-007.md#build-qcc-path-008-assembly-received-a-source-directory-as-its-compiler). |
 | BUILD-SEYDA-REGEN-30 | Public build cannot regenerate the Seyda Neen sub-cells | open | - | - | Reproduced on the v0.0.29 inputs. v0.0.30-dev5 added build_aga.py image --canonical-land-source; the terrain finishing steps behind the shipped sub-cells are not yet in the public build. [Record](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026). |
+| [CI-HOSTDEPS-30](bugs/CI-HOSTDEPS-30.md) | Host CI job fails: scenery export needs the NIF reader for non-NIF test data | open | - | - | First v0.0.30 push: host-launcher-parity failed with ModuleNotFoundError pyffi in test_host_asset_formats (not tagged or released). Fixed in source: flames are read only from real NIF data; host-parity tests pass with only numpy and Pillow on Linux and Windows. Ships in the v0.0.30 release commit. |
 | CONFIG-COMMENT-29 | Semicolons split default-config comments into commands | open | - | - | The dev2 source correction replaces semicolons in all five affected comments; the existing regression and full Linux suite pass. The record claims no target-verified fixed version; native startup was not tested. [Record](journals/BUG_JOURNAL-v0.0.29.md#config-comment-29-semicolon-splits-a-default-comment-repair-candidate). |
 | CONSOLE-CAPS-29 | FS-UAE F10 Caps Lock appears stuck | open | - | - | v0.0.29-dev1 owner report; toggling on/off is an observed workaround. Modifier/focus cause unconfirmed. |
 | CONSOLE-WHEEL-29 | FS-UAE console wheel starts working then reports unbound | open | - | - | v0.0.29-dev1 recurring owner report; preserve initial success then MWHEELUP fallback. Event-routing cause and fix unconfirmed. |

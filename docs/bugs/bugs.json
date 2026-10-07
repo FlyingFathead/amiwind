@@ -1384,5 +1384,14 @@
     "owner_accepted": null,
     "status": "Owner report, v0.0.30-rc1 WinUAE playtest 7 October 2026: choosing New Game and confirming with Choose makes the background music crackle. Not yet reproduced; cause unknown.",
     "report": "bugs/AUDIO-NEWGAME-30.md"
+  },
+  {
+    "id": "CI-HOSTDEPS-30",
+    "title": "Host CI job fails: scenery export needs the NIF reader for non-NIF test data",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "First v0.0.30 push: host-launcher-parity failed with ModuleNotFoundError pyffi in test_host_asset_formats (not tagged or released). Fixed in source: flames are read only from real NIF data; host-parity tests pass with only numpy and Pillow on Linux and Windows. Ships in the v0.0.30 release commit.",
+    "report": "bugs/CI-HOSTDEPS-30.md"
   }
 ]

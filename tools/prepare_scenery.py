@@ -22,6 +22,10 @@ from exterior_visibility import (DRAW_MODES, VisibilityPolicyError, validate_pol
                                  select_exterior_faces, source_visibility_issues)
 
 
+# Every Morrowind NIF starts with this header; flame extraction only parses real NIFs.
+NIF_MAGIC = b'NetImmerse File Format'
+
+
 def nif_reader():
     # PyFFI 2.2.3 imports time.clock and picks the newer byte-sized duplicate
     # num_uv_sets field. TES3 4.0.0.2 stores that field as a ushort instead.
@@ -352,7 +356,8 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                                         'source_visibility_issues': source_visibility_issues(materials),
                                         'exterior_visibility': visibility_selection,
                                         'skipped_shapes': skipped,
-                                        'flames': model_flames(raw, nif_reader(), name), **put(f, packet)})
+                                        'flames': (model_flames(raw, nif_reader(), name)
+                                                   if raw.startswith(NIF_MAGIC) else []), **put(f, packet)})
                 print('model',len(index['models']),'/',len(names),name,flush=True)
             except VisibilityPolicyError:
                 raise
