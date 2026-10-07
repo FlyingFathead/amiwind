@@ -528,7 +528,7 @@ Dev4 playtesting reports visible torch response on walls/floors but not nearby
 NPC bodies. This is an **open runtime-lighting issue**, not evidence of missing
 NPC model assets. The affected actor denominator is unknown; conversion and
 packaged-asset counts remain unchanged. See
-[TORCH-NPC-LIGHT-29](BUG_JOURNAL.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
+[TORCH-NPC-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
 A no-lightdata saturation correction now passes source/raster/night-palette checks; actual NPC playtest acceptance remains pending. Packaged counts are unchanged.
 
 

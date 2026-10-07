@@ -185,6 +185,7 @@ R_Init
 ===============
 */
 extern cvar_t aw_depthslop, aw_surface_order;
+extern cvar_t aw_emissive, aw_actor_brush_light;
 void R_Init (void)
 {
 	int		dummy;
@@ -212,6 +213,8 @@ void R_Init (void)
 	Cvar_RegisterVariable (&r_clearcolor);
 	Cvar_RegisterVariable (&r_waterwarp);
 	Cvar_RegisterVariable (&r_fullbright);
+	Cvar_RegisterVariable (&aw_emissive);
+	Cvar_RegisterVariable (&aw_actor_brush_light);
 	Cvar_RegisterVariable (&r_drawentities);
 	Cvar_RegisterVariable (&r_drawviewmodel);
 	Cvar_RegisterVariable (&r_aliasstats);
@@ -1069,6 +1072,7 @@ SetVisibilityByPassages ();
 
 	AW_FogDraw();
     AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
+    AW_StaticFlamesDraw();
     AW_Mark(4);R_DrawViewModel();AW_EndMark(4);
 	if (r_dowarp)
 		D_WarpScreen ();
@@ -1101,6 +1105,13 @@ void R_RenderView (void)
 {
 	int		dummy;
 	int		delta;
+	static float	emissive_seen = -1;
+
+	if (aw_emissive.value != emissive_seen)
+	{	// cached surfaces hold the old lighting
+		emissive_seen = aw_emissive.value;
+		D_FlushCaches ();
+	}
 
 	delta = (byte *)&dummy - r_stack_start;
 	if (delta < -10000 || delta > 10000)

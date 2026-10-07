@@ -9,6 +9,33 @@ Amiga runtime. Read the [FAQ](docs/FAQ.md) for the project vision, hardware
 and current scope, and [licensing and credits](docs/LICENSING_AND_CREDITS.md)
 for source provenance and what the public package contains.
 
+## v0.0.30 - The Temple
+
+The Balmora Temple is whole again. A scene-converter fault turned some meshes
+around their own origin, leaving missing walls, see-through holes and floating
+objects in the Temple's lower rooms; the same fix repairs Tharys Ancestral Tomb
+and the Nord fireplaces of five Seyda Neen interiors.
+
+| Before: v0.0.29, holes where the wall should be | After: v0.0.30, the same view |
+| --- | --- |
+| ![Balmora Temple lower entrance in v0.0.29 with see-through holes](docs/images/amiwind-v0.0.30-temple-before.png) | ![The same Balmora Temple view in v0.0.30 with the wall in place](docs/images/amiwind-v0.0.30-temple-after.png) |
+| ![Balmora Temple lower room in v0.0.30: doorway and banner](docs/images/amiwind-v0.0.30-temple-banner.png) | ![Options > Controls page in v0.0.30](docs/images/amiwind-v0.0.30-controls.png) |
+
+Also new: misplaced Census office objects from dev5 fixed, a crash fix for
+Seyda Neen region changes, an Options > Controls page for rebinding keys,
+arrow keys that move like W/A/S/D, NPCs lit by the floor they stand on,
+glowing lantern glass and flames on placed fires (rebuilt maps only so far),
+about 15 % less reading on heavy Seyda Neen crossings, less music crackle in
+WinUAE (still heard on some map changes), and an engine that builds without
+compiler warnings. Every lighting and loading change has a console switch.
+
+Still open: Seyda Neen crossing pauses (a lighter rebuild of its maps is under
+way), a rare load freeze seen in automated runs, and the issues carried over
+from v0.0.29. See the [release notes](docs/RELEASE-v0.0.30.md) and the
+[tracker](docs/BUGS.md). Development builds:
+[dev3](docs/RELEASE-v0.0.30-dev3.md), [dev4](docs/RELEASE-v0.0.30-dev4.md),
+[dev5](docs/RELEASE-v0.0.30-dev5.md), [rc1](docs/RELEASE-v0.0.30-rc1.md).
+
 ## v0.0.29 - Let There Be (Just a Bit More) Light
 
 Explore with adjustable interior brightness, clearer torchlight and improved

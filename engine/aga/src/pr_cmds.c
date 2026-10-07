@@ -932,7 +932,7 @@ void PF_ftos (void)
     v = G_FLOAT(OFS_PARM0);
 
     if (v == (int)v)
-        sprintf (pr_string_temp, "%ld",(int)v);
+        sprintf (pr_string_temp, "%ld",(long)(int)v);
     else
         sprintf (pr_string_temp, "%5.1f",v);
     G_INT(OFS_RETURN) = pr_string_temp - pr_strings;

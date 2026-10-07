@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <exec/exec.h>
 #include <dos/dos.h>
+#include <clib/alib_protos.h>
 #include <graphics/gfx.h>
 #include <graphics/gfxbase.h>
 #include <graphics/displayinfo.h>
@@ -206,7 +207,7 @@ void	VID_Init (unsigned char *palette)
   DisplayInfoHandle handle;
   struct DisplayInfo dispinfo;
   static struct TextAttr topaz8 = {
-    "topaz.font", 8, FS_NORMAL, FPF_ROMFONT
+    (STRPTR)"topaz.font", 8, FS_NORMAL, FPF_ROMFONT
   };
 
 //  printf ("VID_Init %08x\n", palette);
@@ -217,10 +218,10 @@ void	VID_Init (unsigned char *palette)
   if ((timerio = (struct timerequest *)CreateExtIO (timermp,
                   sizeof(struct timerequest))) == NULL)
     Sys_Error ("Can't create External IO!");
-  if (timerclosed = OpenDevice (TIMERNAME, UNIT_ECLOCK,
-                                (struct IORequest *)timerio, 0))
+  if ((timerclosed = OpenDevice (TIMERNAME, UNIT_ECLOCK,
+                                (struct IORequest *)timerio, 0)))
     Sys_Error ("Can't open timer.device!");
-  TimerBase = (struct Library *)timerio->tr_node.io_Device;
+  TimerBase = timerio->tr_node.io_Device;
   eclocks_per_second = ReadEClock (&start_time);
 #endif
 
@@ -390,7 +391,7 @@ void	VID_Init (unsigned char *palette)
   temprp.BitMap = &tmp_bm;
 
   if (is_native_mode) {
-    if ((sbuffer[0] = AllocScreenBuffer (video_screen, NULL, SB_SCREEN_BITMAP)) == NULL |
+    if ((sbuffer[0] = AllocScreenBuffer (video_screen, NULL, SB_SCREEN_BITMAP)) == NULL ||
         (sbuffer[1] = AllocScreenBuffer (video_screen, NULL, 0)) == NULL ||
         (sbuffer[2] = AllocScreenBuffer (video_screen, NULL, 0)) == NULL)
       Sys_Error ("AllocScreenBuffer() failed");

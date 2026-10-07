@@ -234,7 +234,11 @@ void CL_Record_f (void)
 	else
 		track = -1;
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	if (!COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1)))
+	{
+		Con_Printf ("Demo path too long.\n");
+		return;
+	}
 
 //
 // start the map up

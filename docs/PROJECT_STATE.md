@@ -1,6 +1,42 @@
-# Current project state — 4 October 2026
+# Current project state
 
-## In preparation: v0.0.28 — Trees and Grass, Day and Night
+## 7 October 2026: v0.0.30 - The Temple
+
+v0.0.30 follows v0.0.29 (published 6 October 2026). It repairs the Balmora
+Temple, Tharys Ancestral Tomb and five Seyda Neen fireplace interiors (the
+converter applied NIF root-node rotations that Morrowind ignores), fixes a
+crash on Seyda Neen region changes, adds Options > Controls and arrow-key
+movement, lights NPCs by the floor they stand on, adds glow and flames in
+rebuilt maps, reads converted NPC models once instead of twice, and builds the
+engine without compiler warnings. Release candidate 1 also fixed misplaced
+objects in dev5's Census and Excise Office. Details:
+[release notes](RELEASE-v0.0.30.md), [changelog](CHANGELOG.md).
+
+Gates for the release candidate: 1,361-file source preflight, 1,072 Linux
+tests (0 failures, 4 skipped) and a warning-free asset-free Amiga build, all in
+Docker.
+
+Open, in priority order:
+
+1. **v0.0.31 - Revisiting Seyda Neen,** with a new approach to how the town
+   is built and mapped. Seyda Neen sub-cells are up to about
+   5 MB and fill the 11 MiB heap, so each crossing drops cached models and
+   pauses for about 1.0-1.5 s in the emulator. Plan: make the Seyda Neen build
+   reproducible from the public tools ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)),
+   then rebuild the maps lighter (ground simplification, merged flat faces,
+   simpler collision for clutter) with placements and mechanics unchanged.
+   See [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md).
+2. **Load freeze (SEYDA-LOAD-HANG-30):** rare stop during automated Seyda Neen
+   loads; a disk read never completes. Cause open.
+3. **Lighting:** flame tuning, the prison ship's cabin lantern, Balmora street
+   lanterns (exterior pipeline).
+4. Carried from v0.0.29: WinUAE music pauses and crackle on some map changes,
+   the Bitter Coast mushroom report, hand transitions, 44 modeled memory
+   reserve warnings.
+
+## 4 October 2026 (historical)
+
+### In preparation: v0.0.28 — Trees and Grass, Day and Night
 
 VERSION is 0.0.28; scoped local image015 native acceptance passed. Hosted CI, tag and public publication remain pending the owner's Linux step.
 v0.0.27 is the latest published release. Default V3 adds two cloud layers,
@@ -24,7 +60,7 @@ the ceiling-start arrival correction, the latest cloud-speed change and
 guard voices are unchanged. The current WinUAE listening report still notes
 intermittent artifacts, mostly at load-ins and in heavy scenes. The audio issue
 remains open; publication proceeds with this known limitation, with further
-audio investigation deferred until after publication. See [WIN-05](BUG_JOURNAL.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+audio investigation deferred until after publication. See [WIN-05](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
 The compiler retains 86 warnings; these are successful builds, not warning-free
 builds. The earlier 816-test/739,156-byte result is
 superseded for this source. Compilation and host fixtures do not establish

@@ -299,7 +299,8 @@ static void combat_command(void){
         combat_timing[i]=v->_float;
     }
     if(COM_FOpenFile("maps/charplane.bsp",&f)<124 || !f){
-        if(f)fclose(f);Con_Printf("Combat test floor missing; rebuild the gallery.\n");return;
+        if(f)fclose(f);
+        Con_Printf("Combat test floor missing; rebuild the gallery.\n");return;
     }
     fclose(f);
     if(!capture_game())return;
@@ -323,7 +324,8 @@ static void torch_command(void){
         if(Q_strcasecmp((char *)arg,"npc") || Cmd_Argc()<3)goto usage;
         for(i=2;i<Cmd_Argc();i++){
             if(n+(int)strlen(Cmd_Argv(i))+2>(int)sizeof(search))goto usage;
-            if(n)search[n++]=' ';strcpy(search+n,Cmd_Argv(i));n+=strlen(Cmd_Argv(i));
+            if(n)search[n++]=' ';
+            strcpy(search+n,Cmd_Argv(i));n+=strlen(Cmd_Argv(i));
         }
         search[n]=0;
         if(!select_entry(0,search)){Con_Printf("%s\n",notice);return;}
@@ -346,7 +348,8 @@ static void torch_command(void){
         combat_timing[i]=v->_float;
     }
     if(COM_FOpenFile("maps/torchtest.bsp",&f)<124 || !f){
-        if(f)fclose(f);Con_Printf("Dark torch test room missing; rebuild the image.\n");return;
+        if(f)fclose(f);
+        Con_Printf("Dark torch test room missing; rebuild the image.\n");return;
     }
     fclose(f);if(!capture_game())return;
     torch_test=1;torch_actor=want_actor;body=0;notice[0]=0;

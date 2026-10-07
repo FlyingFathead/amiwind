@@ -25,7 +25,7 @@ test have now passed. The open issues and exact recovery scope remain below.
 
 ### Intermittent Python worker failure (unresolved, 2 October 2026)
 
-Canonical record: [WIN-01 in the bug journal](BUG_JOURNAL.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026).
+Canonical record: [WIN-01 in the bug journal](journals/BUG_JOURNAL-v0.0.29.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026).
 
 Native Windows full-conversion attempts have intermittently failed in Python's
 `ProcessPoolExecutor`, while preparing interior, Balmora or Census BSP geometry:
@@ -411,6 +411,6 @@ packing with WinError 206: the xdftool command exceeded the Windows process
 argument limit. The Windows-only batching correction passed focused file-readback
 and regression checks, then passed full HDF validation and WinUAE game entry.
 See [the exact successful checkpoint](VALIDATION-WINDOWS-2026-10-02.md).
-See [WIN-03](BUG_JOURNAL.md#win-03-windows-image-packing-command-exceeds-process-limit--validation-pending-2-october-2026).
+See [WIN-03](journals/BUG_JOURNAL-v0.0.29.md#win-03-windows-image-packing-command-exceeds-process-limit--fixed-in-working-tree-2-october-2026).
 The original failed receipt remains failed; an image-only retry records its own
 result. WIN-01 was not observed in this run and remains unresolved.

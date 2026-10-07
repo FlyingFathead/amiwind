@@ -1,5 +1,76 @@
 # Development history
 
+## v0.0.30: The Temple
+
+- Release of the dev3-rc1 work; no changes after rc1 apart from the version.
+- rc1 owner playtest (WinUAE, 7 October 2026): Balmora Temple, Census office,
+  Balmora, torches and roadside mushroom picking work. WinUAE music crackles
+  at some transitions remain open (AUDIO-LOAD-29 and related).
+- Bug tracking unified: [`docs/bugs/bugs.json`](bugs/bugs.json) generates
+  the [register](BUGS.md); rules in [docs/bugs](bugs/README.md).
+- Details: [release notes](RELEASE-v0.0.30.md).
+
+## v0.0.30-rc1: The Temple
+
+- Fixed dev5's misplaced Census and Excise Office objects (upright rug, hole
+  seen in the ceiling, tapestry in a bookshelf): the map's object list now
+  matches its geometry ([CENSUS-ENTITIES-30](BUG_JOURNAL.md)).
+
+- Release of the dev3-dev5 work: Balmora Temple, Tharys Ancestral Tomb and
+  five fireplace interiors rebuilt with the root-rotation converter fix;
+  Seyda Neen region-change crash fixed; Options > Controls; arrow keys move
+  like W/A/S/D; NPC floor lighting; glow and flames in rebuilt maps;
+  single-pass actor loading; warning-free engine build.
+- A playtest reports much less WinUAE music crackle; some map changes still
+  crackle.
+- Bug journal entries before 7 October 2026 moved to
+  [journals/BUG_JOURNAL-v0.0.29.md](journals/BUG_JOURNAL-v0.0.29.md).
+- Details: [release notes](RELEASE-v0.0.30-rc1.md).
+
+## v0.0.30-dev5: The Temple
+
+- Lighting: glowing materials (lantern glass, Dwemer lights, mushrooms, lava)
+  are lit by their own emissive strength (`aw_emissive`, `dbg emissive`).
+- Lighting: placed fires, candles, lanterns and braziers show a flame
+  (`aw_static_flames`); look still being tuned.
+- Lighting: NPCs standing on converted floors take that floor's light instead
+  of ambient only (`aw_actor_brush_light`).
+- Seyda Neen: converted actor models are read once instead of twice when
+  loading (`aw_alias_single_pass`); heavier crossings read about 15 % less.
+  See [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md).
+- Engine builds without compiler warnings and the build now fails on any new
+  warning. Removed the unreachable, broken 16-bit surface drawer; bounded all
+  path formatting; moved a 15 KB sprite buffer off the stack.
+- Build: `build_aga.py image --canonical-land-source` passes the world-survey
+  terrain to the Seyda Neen partition
+  ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)).
+- Converter: the recovered root scale is rounded, restoring exact vertex
+  sharing; the rebuilt Temple matches v0.0.30-dev4 byte for byte.
+- Rebuilt maps: Balmora Temple (lantern glow), Census and Excise Office
+  (flames). Details: [release notes](RELEASE-v0.0.30-dev5.md).
+
+## v0.0.30-dev4: The Temple
+
+- Fixed a `NUM_FOR_EDICT: bad pointer` crash on Seyda Neen region changes:
+  intro role pointers are validated against the current entity list
+  ([INTRO-ROLES-30](bugs/INTRO-ROLES-30.md)).
+- Added Options > Controls for rebinding gameplay actions, with greyed
+  planned actions.
+- Arrow keys mirror W/A/S/D by default (Up/Down walk, Left/Right strafe).
+- Maps unchanged from dev3. Details: [release notes](RELEASE-v0.0.30-dev4.md).
+
+## v0.0.30-dev3: The Temple
+
+- Fixed the scene converter applying NIF root-node rotations that Morrowind
+  ignores (root translation and scale are kept). Rebuilt Balmora Temple, Tharys
+  Ancestral Tomb and the fireplace interiors of Arrille's Tradehouse, Eldafire's,
+  Draren Thiralas', Terurise Girvayne's and the Census and Excise Office.
+- Objects previously dropped as buried inside the misplaced fireplaces are
+  admitted again.
+- Added `tools/analyze_subcell_redundancy.py` and its documentation.
+- Engine source unchanged; version 0.0.30-dev3.
+- Details: [release notes](RELEASE-v0.0.30-dev3.md).
+
 ## v0.0.29-rc2: Let There Be (Just a Bit More) Light
 
 AmiWind v0.0.29-rc2 brings adjustable indoor brightness and improved torch controls, alongside the focused playtest repairs made since RC1.
@@ -171,7 +242,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   [rc7 release notes](RELEASE-v0.0.25-rc7.md).
 
 
-## v0.0.25-rc6 â€” 1 October 2026
+## v0.0.25-rc6 — 1 October 2026
 
 - Default compass/heading HUD to hidden; add saved `aw_compass` and
   `dbg compass on/off`, `1/0`, `true/false`.
@@ -196,7 +267,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Include matching rc6 emulator templates, source receipt and direct-update
   metadata. Preserve all earlier source and release records.
 
-## v0.0.25-rc5 â€” 1 October 2026
+## v0.0.25-rc5 — 1 October 2026
 
 - Add a terminal-width completion footer with local start/end timestamps and
   timezone offsets, monotonic elapsed time, final file size in GiB/bytes and SHA-256.
@@ -212,7 +283,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   and asset-free test image on Linux. Full game conversion and Windows remain
   separate, incomplete acceptance work.
 
-## v0.0.25-rc4 â€” 1 October 2026
+## v0.0.25-rc4 — 1 October 2026
 
 - Add host-aware executable and virtual-environment discovery plus a read-only
   `--host-plan` inventory. Windows automatic setup remains unimplemented.
@@ -227,7 +298,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Record the prior rc3 full-build disk exhaustion separately from native
   compilation. Full image and native Windows acceptance remain open.
 
-## v0.0.25-rc3 â€” 1 October 2026
+## v0.0.25-rc3 — 1 October 2026
 
 - Restrict exterior window flattening to exterior scenes. Preserve the original
   window mesh and collision when the same asset is placed inside an interior.
@@ -239,7 +310,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Document the generic installed-game layout and remove account-specific path
   examples from maintained documentation. Deliver public source only.
 
-## v0.0.25-rc2 â€” 1 October 2026
+## v0.0.25-rc2 — 1 October 2026
 
 - Reconcile original rc1 and checkpoints 001/004/006 without losing later modifier,
   launcher and configurable five-autosave fixes.
@@ -248,7 +319,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Retain only the current dev1 journal screenshot; preserve owner cleanup.
 - Source-only handoff for local compilation; native rc2 acceptance remains open.
 
-## v0.0.25-rc1 â€” 1 October 2026
+## v0.0.25-rc1 — 1 October 2026
 
 - Move Seyda Neen's island handoff inside actual ground coverage; retain both
   detailed town conversions and the frozen polymap's 2,526 region divisions.
@@ -261,7 +332,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Separate editable keymaps from settings and maintain [KEYMAPS.md](KEYMAPS.md).
 - Defer unexplored-map masking; retain the 23 existing contact findings.
 
-## v0.0.25-dev1 â€” 1 October 2026
+## v0.0.25-dev1 — 1 October 2026
 
 - Convert the surveyed island footprint into 2,526 terrain/water regions, using
   the recovered polymap subdivisions and preserving detailed Seyda Neen and Balmora.
@@ -290,7 +361,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   release approval does not change the automated audit result.
 - [Release notes](RELEASE-v0.0.24.md).
 
-## v0.0.24-rc4 â€” 1 October 2026
+## v0.0.24-rc4 — 1 October 2026
 
 Whole-base-master terrain/geometry survey, private interactive atlas and terrain
 inspection mesh; native M map and J two-page journal with earned dated history,
@@ -299,7 +370,7 @@ Includes screenshot-tracking validation. Whole-island 3D traversal, inventory
 and complete quest scripting remain future work; the 23 placement findings
 remain open. See [scope and evidence](RELEASE-v0.0.24-rc4.md).
 
-## v0.0.24-rc3 â€” 1 October 2026
+## v0.0.24-rc3 — 1 October 2026
 
 Owner-requested recovery candidate: complete gallery conversion, bounded exact-model
 allowances up to 1,024 triangles, preserved Dagoth mask detail, two authored airborne
@@ -308,7 +379,7 @@ collision-trace correction for the three RC2 walking stalls. Adds the island
 terrain/polygon-density plan and M/I/J interface roadmap. The 23 strict ground
 contact findings remain open. See [scope and evidence](RELEASE-v0.0.24-rc3.md).
 
-## v0.0.24-rc2 â€” 1 October 2026
+## v0.0.24-rc2 — 1 October 2026
 
 Interim owner-testing checkpoint: gallery browser/help/return, bounded per-model
 geometry allowances, canonical ground placement and independent contact audit,
@@ -316,9 +387,9 @@ close NPC targeting, birthsign ordering, guarded hill-material repair, Options
 scrolling and measured experimental read-ahead. The strict contact and walking
 findings remain open. See [full scope and limits](RELEASE-v0.0.24-rc2.md).
 
-## v0.0.24-rc1 â€” 30 September 2026
+## v0.0.24-rc1 — 30 September 2026
 
-**AmiWind v0.0.24-rc1 â€” candidate for Welcome to Balmora.**
+**AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
 
 Balmora now includes 43 destination interiors (42 city interiors plus Tharys
 Ancestral Tomb), 93 NPC placements (90 living and three authored corpses), and
@@ -347,7 +418,7 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
 
-## v0.0.24-dev4 â€” 30 September 2026
+## v0.0.24-dev4 — 30 September 2026
 
 - Add `dbg tp` for the existing destination menu, and direct `balmora`,
   `seydaneen`, `prisonship` and converted-map shortcuts. Retain `dbg scene`.
@@ -366,11 +437,11 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
   whole-map polygon-density study to the next version.
 - See [scope and validation](RELEASE-v0.0.24-dev4.md).
 
-## v0.0.24-dev3 â€” 30 September 2026
+## v0.0.24-dev3 — 30 September 2026
 
 - Share Seyda Neen's inspected Strider profile in Balmora; rebuild the 16 affected
   regions. Collision, entities and the other 48 maps remain unchanged.
-- Add Options â†’ Area loading: Freeze frame / Black screen. Freeze is the default
+- Add Options → Area loading: Freeze frame / Black screen. Freeze is the default
   for region crossings; hold the displayed image and palette with a small top
   Loading box. Reuse the existing loading-art storage; retain music servicing.
 - Record positive dev2 exterior feedback, missing Balmora interiors, the reported
@@ -378,7 +449,7 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 - Pass 279 host tests; native warning review remains 82, with no new diagnostics.
   See [validation and limitations](RELEASE-v0.0.24-dev3.md).
 
-## v0.0.24-dev2 â€” 30 September 2026
+## v0.0.24-dev2 — 30 September 2026
 
 - Restore original Balmora architectural geometry after generic reduction
   destroyed open facades; rebuild all 64 regions with bounded 896-unit overlap.
@@ -393,19 +464,19 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
   [the investigation](INVESTIGATION-v0.0.24-dev2.md) and the existing mesh notes.
 - Pass 278 host tests. Review native warnings: 85 to 82, no added diagnostic.
 
-## v0.0.24-dev1 â€” 30 September 2026
+## v0.0.24-dev1 — 30 September 2026
 
 Initial Balmora exterior, 64 overlapping regions, 1,488 scenery placements,
 18 residents and return Strider travel. See [original scope](BALMORA-v0.0.24-dev1.md).
 Its generic architectural reduction was defective; dev2 corrects that conversion.
 
-## v0.0.23-dev4 â€” 29 September 2026
+## v0.0.23-dev4 — 29 September 2026
 
 Padded content-sized dialogue and caret/rotation regressions; 2/5/1-second logo
 with continuous title music; optional opening quote overlay; sprite background
 depth and deferred NPC floor placement. See [release notes](RELEASE-v0.0.23-dev4.md).
 
-## 0.0.23-dev2 â€” 29 September 2026
+## 0.0.23-dev2 — 29 September 2026
 
 - Expand the exterior beyond the port; retain crossing object bounds, the missing
   rock mound, original Silt Strider and Darvame.
@@ -498,7 +569,7 @@ See RELEASE-v0.0.21-dev7.md for scope and validation.
 
 See RELEASE-v0.0.21-dev6.md for scope and validation.
 
-## v0.0.21-dev5 â€” GOG TTF preference and Steam font fallback, 28 September 2026
+## v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026
 
 - Prefer the GOG GOTY `BookArt/*.ttf` font sources for host-side AmiWind
   rasterization when present. GOG GOTY remains the recommended source edition.
@@ -514,7 +585,7 @@ See RELEASE-v0.0.21-dev6.md for scope and validation.
 
 See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
 
-## v0.0.21-dev4 â€” evening world-mapping checkpoint, 28 September 2026
+## v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026
 
 - Record Horstator's optional polygonal POI-region fallback if cell streaming
   cannot meet the Amiga's measured budgets, starting with Seyda Neen.
@@ -526,7 +597,7 @@ See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
 
 See RELEASE-v0.0.21-dev4.md for validation and save compatibility.
 
-## v0.0.21-dev3 â€” opening maintenance and interaction hints, 28 September 2026
+## v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026
 
 - Two-line lower-right NPC hints: 12 px Morrowind name and current console-font
   action (`npc_interaction_layout_template_001`); matching opening aim/use query.
@@ -543,7 +614,7 @@ Highlight New Game when opening its confirmation dialog, so Enter starts the
 intro immediately. Esc and explicit Cancel return to the menu. The hidden mouse
 position starts over the selected button as well. See RELEASE-v0.0.21-dev3.md.
 
-## v0.0.21-dev2 â€” opening barrier correction, 28 September 2026
+## v0.0.21-dev2 — opening barrier correction, 28 September 2026
 
 Correct compound rotations of the 22 collision-only opening references. Preserve
 the original positions, dimensions and CharGenState lifetime. Add converter and
@@ -551,7 +622,7 @@ state regression coverage, an indexed journal incident, and persistent opening
 access/research priorities. See RELEASE-v0.0.21-dev2.md for exact validation
 coverage and pending owner acceptance.
 
-## Portable launcher helper â€” 28 September 2026
+## Portable launcher helper — 28 September 2026
 
 Add `tools/AmiWind-FS-UAE-launcher.py` for existing local images: numeric release
 and development-version selection, date tie-breaking, saved ROM/settings,
@@ -559,7 +630,7 @@ non-blocking ROM checksum warnings and automatic FS-UAE configuration with
 backups. Enter accepts the suggested image; `--yes` launches immediately.
 This host-tool follow-up leaves runtime v0.0.20 unchanged. See FS-UAE-LAUNCHER.md.
 
-## v0.0.20 â€” 28 September 2026
+## v0.0.20 — 28 September 2026
 
 Prison-ship hull ambience reduced by 5 dB per static mixer channel; audio files
 and other uses remain unchanged. Enabling debug overlays also enables coordinates.
@@ -568,7 +639,7 @@ array-row bounds violations. Recorded intermittent ship-exit/menu freezes and
 the persistent Silt Strider-port report; their causes remain unresolved.
 See RELEASE-v0.0.20.md and BUGS.md.
 
-## v0.0.19 â€” 28 September 2026
+## v0.0.19 — 28 September 2026
 
 Public release of the accumulated 0.0.18 checkpoints: intro/movie, UI/menus,
 loading screens, entrance prompts and parallel builds.
@@ -576,7 +647,7 @@ Routine soundtrack notices now obey the debug-overlay switch at their source.
 Music events still log privately, and explicit status queries still work.
 See RELEASE-v0.0.19.md.
 
-## v0.0.18-dev5 â€” 28 September 2026
+## v0.0.18-dev5 — 28 September 2026
 
 Original main-menu art with bottom-right version, centered Esc menu and New Game
 confirmation, larger logo/movie frames and readable private title cards. Original
@@ -585,7 +656,7 @@ default off. Deck guard greeting/reminder, visible town entrance names and safe
 missing-interior feedback, private source layout reference, automatic compiler
 jobs with explicit overrides. See RELEASE-v0.0.18-dev5.md.
 
-## v0.0.18-dev4 â€” 28 September 2026
+## v0.0.18-dev4 — 28 September 2026
 
 Project-logo startup fade and upper-menu/README branding, main-menu title music,
 reset of the selected New Game track,
@@ -594,14 +665,14 @@ ship NPC body collision and escort waiting, default-off disk indicator,
 actor-cache staging correction and three-line loading credits. See
 RELEASE-v0.0.18-dev4.md for validation and unfinished work.
 
-## v0.0.18-dev3 â€” 28 September 2026
+## v0.0.18-dev3 — 28 September 2026
 
 Original main-menu background with a separate palette, distinct return-to-game
 and main-menu flows, disabled Load, and New Game into the ship. Conservative
 animated alias bounds permit rejecting off-screen actors before disk-cache
 loads. See RELEASE-v0.0.18-dev3.md for verification and remaining work.
 
-## v0.0.18-dev2 â€” 28 September 2026
+## v0.0.18-dev2 — 28 September 2026
 
 First ship-script adapter, original introductory voices/name entry, talking and
 blinking head poses, female appearances, path-grid escort movement, ship ambience
@@ -609,14 +680,14 @@ and darker hold lighting. Distinct HUD colors, optional outer frame off by defau
 New Game entry and integrated private conversion. See RELEASE-v0.0.18-dev2.md for
 verification and remaining dock/Census work. Journal filename corrected.
 
-## v0.0.18-dev1 â€” 28 September 2026
+## v0.0.18-dev1 — 28 September 2026
 
 Original proportional Magic Cards UI, private original border/bar conversion,
 black lower-strip sliding subtitles, font selection with preserved console, and
 native font/clipping validation. See RELEASE-v0.0.18-dev1.md for the exact scope;
 this checkpoint does not claim the completed intro or gameplay resource systems.
 
-## v0.0.17 â€” 28 September 2026
+## v0.0.17 — 28 September 2026
 
 One-command confirmed dependency setup and continuation, isolated fresh tools,
 bounded game-directory discovery, actionable download failures, corrected tool
@@ -665,7 +736,7 @@ See REPOSITORY_LAYOUT.md for migration and verification.
 
 - Preserve structural ship-interior source surfaces and UVs to repair hull intrusion.
 - Add a scene-picker popup via `dbg scene change`, retaining direct commands.
-- Add live fog/draw-distance commands and Options â†’ Graphics slider; replace
+- Add live fog/draw-distance commands and Options → Graphics slider; replace
   floating-point depth-table rebuilds with integer threshold bands.
 - Add default-off FPS HUD using existing profiler timing.
 - Add a private base-master NPC/door/container audit and synthetic deletion tests.
@@ -782,7 +853,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - 47 host tests passed; full guided HDF build/readback passed. Native acceptance pending.
 - See [development record](DEVELOPMENT_011.md); v0.0.10 remains the latest released playable checkpoint.
 
-# Runtime v0.0.10 / source 0.8.2 â€” 27 September 2026
+# Runtime v0.0.10 / source 0.8.2 — 27 September 2026
 
 - Reproduced the reported 80000027 failure with 4 MiB Fast RAM.
 - Added a small 68000 preflight before the engine: OS, CPU/FPU, AGA, free and contiguous memory checks.
@@ -791,7 +862,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - Scene, textures and all 18 music streams remain byte-identical to checkpoint-007.
 - Owner reports v0.0.9 boots in WinUAE after complete-ROM selection, and that selecting maximum CPU speed resolved the slow/glitching run; corrected config preserves that setting. No new hardware-performance claim.
 
-# Runtime v0.0.9 / source 0.8.1 â€” 27 September 2026
+# Runtime v0.0.9 / source 0.8.1 — 27 September 2026
 
 - Fixed the missing icon.library requester on bare-ROM boot by removing unused
   Workbench tooltype/icon handling and desktop close/reopen code.
@@ -803,7 +874,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
   native executable changes in the filesystem payload.
 - Added startup regression tests and separate 3.1/3.1.4 ROM validation records.
 
-# Runtime v0.0.8 / source 0.8.0 â€” 27 September 2026
+# Runtime v0.0.8 / source 0.8.0 — 27 September 2026
 
 - First AGA HDF checkpoint: bounded walkable Seyda Neen, static BSP proxies,
   baked facade textures, foliage sprites, palette fog and distance controls.
@@ -894,23 +965,23 @@ Earlier checkpoint notes follow unchanged.
 - Keep all game-derived assets and the optional private ROM out of source releases.
 - Free movement is the next requested renderer milestone, not part of this vignette.
 
-## 0.1.3 â€” 27 September 2026
+## 0.1.3 — 27 September 2026
 
 - Specified OpenMW itself as the intended host character-rendering backend.
 - Documented capture integration work and the verified engine licence reference.
 
-## 0.1.2 â€” 27 September 2026
+## 0.1.2 — 27 September 2026
 
 - Documented the host-side reduce/bake/map/pack pipeline and final image assembly.
 - Distinguished implemented terrain conversion from the planned native build.
 
-## 0.1.1 â€” 27 September 2026
+## 0.1.1 — 27 September 2026
 
 - Added humanoid body/appearance template design configuration.
 - Separated body rig, equipment, combat style and animation state in the design.
 - Kept the previously packaged source version immutable.
 
-## 0.1.0 â€” 27 September 2026
+## 0.1.0 — 27 September 2026
 
 - Created the named proof-of-concept repository from the initial extraction tools.
 - Added the user-supplied game-folder setup and external-workspace conversion flow.

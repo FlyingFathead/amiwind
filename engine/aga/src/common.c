@@ -1296,20 +1296,52 @@ COM_WriteFile
 The filename will be prefixed by the current game directory
 ============
 */
+/*
+============
+COM_FormatPath
+
+Bounded path formatting. Returns false, leaving an empty string, when the
+result does not fit, so callers report a too-long path instead of using a
+cut-off one or writing past the buffer.
+============
+*/
+qboolean COM_FormatPath (char *out, int size, const char *format, ...)
+{
+	va_list	argptr;
+	int		n;
+
+	va_start (argptr, format);
+	n = vsnprintf (out, size, format, argptr);
+	va_end (argptr);
+	if (n < 0 || n >= size)
+	{
+		if (size > 0)
+			out[0] = 0;
+		return false;
+	}
+	return true;
+}
+
 void COM_WriteFile (char *filename, void *data, int len)
 {
 	int             handle;
 	char    name[MAX_OSPATH];
+	qboolean	fits;
 
 #ifdef AMIGA
 	if (strlen(com_gamedir) == 0 ||
 	    com_gamedir[strlen(com_gamedir)-1] == ':')
-		sprintf (name, "%s%s", com_gamedir, filename);
+		fits = COM_FormatPath (name, sizeof(name), "%s%s", com_gamedir, filename);
 	else
-		sprintf (name, "%s/%s", com_gamedir, filename);
+		fits = COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, filename);
 #else
-	sprintf (name, "%s/%s", com_gamedir, filename);
+	fits = COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, filename);
 #endif
+	if (!fits)
+	{
+		Sys_Printf ("COM_WriteFile: path too long for %s\n", filename);
+		return;
+	}
 
 	handle = Sys_FileOpenWrite (name);
 	if (handle == -1)
@@ -1450,11 +1482,15 @@ int COM_FindFile (char *filename, int *handle, FILE **file)
 #ifdef AMIGA
 			if (strlen(search->filename) == 0 ||
 			    search->filename[strlen(search->filename)-1] == ':')
-				sprintf (netpath, "%s%s",search->filename, filename);
-			else
-				sprintf (netpath, "%s/%s",search->filename, filename);
+			{
+				if (!COM_FormatPath (netpath, sizeof(netpath), "%s%s",search->filename, filename))
+					continue;	// path too long for this search directory
+			}
+			else if (!COM_FormatPath (netpath, sizeof(netpath), "%s/%s",search->filename, filename))
+				continue;
 #else
-			sprintf (netpath, "%s/%s",search->filename, filename);
+			if (!COM_FormatPath (netpath, sizeof(netpath), "%s/%s",search->filename, filename))
+				continue;
 #endif
 
 			findtime = Sys_FileTime (netpath);
@@ -1472,7 +1508,8 @@ int COM_FindFile (char *filename, int *handle, FILE **file)
 				else
 					sprintf (cachepath,"%s%s", com_cachedir, netpath+2);
 #else
-				sprintf (cachepath,"%s%s", com_cachedir, netpath);
+				if (!COM_FormatPath (cachepath, sizeof(cachepath), "%s%s", com_cachedir, netpath))
+					strcpy (cachepath, netpath);	// too long to cache: use in place
 #endif
 
 				cachetime = Sys_FileTime (cachepath);

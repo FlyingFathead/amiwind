@@ -66,7 +66,7 @@ class AudioClockTests(unittest.TestCase):
     def test_actual_driver_clock_follows_elapsed_time_without_polling(self):
         with tempfile.TemporaryDirectory() as scratch:
             directory = Path(scratch)
-            for name in ('proto/exec.h', 'proto/graphics.h', 'graphics/gfxbase.h', 'devices/audio.h'):
+            for name in ('proto/exec.h', 'proto/graphics.h', 'graphics/gfxbase.h', 'devices/audio.h', 'clib/alib_protos.h'):
                 target = directory/name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text('/* Declarations supplied by synthetic fixture header. */\n')

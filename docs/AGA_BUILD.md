@@ -141,6 +141,12 @@ python tools/build_aga.py engine --sdk /external/m68k-amigaos-gcc-16.2 --out ../
 python tools/build_aga.py image --scene ../hands-scene --music ../music --engine ../engine-build/runtime/build/AmiQuakeGCC --out ../image-build --qcc /tools/qcc-host --qbsp /tools/qbsp --vis /tools/vis --light /tools/light --xdftool /tools/xdftool --rdbtool /tools/rdbtool
 ```
 
+The engine compiles without warnings, and the build enforces it: `build_aga.py
+engine` fails if the compiler prints any warning. This covers the 68040 and
+68020 builds, both hand renderers and builds without the brightness controls.
+`--allow-compiler-warnings` turns the check off for local experiments only.
+Do not add `-Wno-*` flags to hide a new warning; fix the cause.
+
 The SDK vasm assembles the independent 68000 boot checker; the renderer uses no
 extracted assembly. An optional `--bootcheck` image argument selects its binary;
 otherwise the builder expects `AmiWindCheck` beside the engine.

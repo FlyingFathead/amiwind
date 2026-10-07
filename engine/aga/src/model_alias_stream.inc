@@ -1,9 +1,15 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Bounded single-skin aliases stream into the final relocatable cache block.
  * Multiple ordinary frames are supported. Other legal formats retain the
- * generic loader. Validate the complete member before admitting a cache.
+ * generic loader. With aw_alias_single_pass 0 the complete member is validated
+ * in a first pass before a cache is admitted. With 1 (default) only the header
+ * and skin kind are read first; the decoding pass performs the same checks,
+ * so each file is read once. A frame group found while decoding releases the
+ * cache block and falls back to the generic loader, as the first pass would.
  * Loading callbacks may move/evict cache blocks: use offsets across reads and
  * abort cleanly on eviction, never retain a pointer across a callback. */
+/* Registered in Host_InitLocal; 0 restores the separate validation pass. */
+cvar_t aw_alias_single_pass = {"aw_alias_single_pass","1",true};
 typedef struct {
     FILE *file;
     long left;
@@ -96,6 +102,7 @@ int Mod_TryStreamAlias(model_t *mod) {
     AW_AliasStreamRead(&s,&kind,sizeof(kind));
     if(LittleLong(kind.type)==ALIAS_SKIN_GROUP){fclose(s.file);return 0;}
     if(LittleLong(kind.type)!=ALIAS_SKIN_SINGLE)AW_AliasStreamError(&s,"skin type");
+    if(!aw_alias_single_pass.value){
     AW_AliasStreamCopy(&s,-1,skinbytes);
     AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(stvert_t));
     AW_AliasStreamTriangles(&s,nt,nv,-1);
@@ -108,6 +115,7 @@ int Mod_TryStreamAlias(model_t *mod) {
         AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(trivertx_t));
     }
     if(s.left)AW_AliasStreamError(&s,"trailing member data");
+    }
     if(fseek(s.file,base,SEEK_SET))AW_AliasStreamError(&s,"member rewind");
     s.left=bytes;AW_AliasStreamRead(&s,&check,sizeof(check));
     if(memcmp(&disk,&check,sizeof(disk)))AW_AliasStreamError(&s,"header changed");
@@ -135,7 +143,12 @@ int Mod_TryStreamAlias(model_t *mod) {
     }
     AW_AliasStreamTriangles(&s,nt,nv,trioff);
     for(i=0;i<nf;i++){
-        AW_AliasStreamRead(&s,&framekind,sizeof(framekind));AW_AliasStreamRead(&s,&frame,sizeof(frame));
+        AW_AliasStreamRead(&s,&framekind,sizeof(framekind));
+        if(LittleLong(framekind.type)==ALIAS_GROUP && aw_alias_single_pass.value){
+            if(mod->cache.data)Cache_Free(&mod->cache);
+            fclose(s.file);mod->needload=NL_NEEDS_LOADED;return 0;
+        }
+        AW_AliasStreamRead(&s,&frame,sizeof(frame));
         if(LittleLong(framekind.type)!=ALIAS_SINGLE || !memchr(frame.name,0,sizeof(frame.name)))AW_AliasStreamError(&s,"frame changed");
         frameoff=AW_AliasStreamAlloc(&s,(size_t)nv*sizeof(trivertx_t));
         h=(aliashdr_t *)AW_AliasStreamData(&s);h->frames[i].type=ALIAS_SINGLE;h->frames[i].frame=frameoff;

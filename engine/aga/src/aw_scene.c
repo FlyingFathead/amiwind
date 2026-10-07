@@ -344,7 +344,8 @@ int AW_SceneUse(void) {
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     sprintf(path,"maps/%s.bsp",links[i].target);
     if(!map_valid(links[i].target) || COM_FOpenFile(path,&f)<0 || !f){
-        if(f)fclose(f);AW_UISubtitle("","Interior not found.",3);return 1;
+        if(f)fclose(f);
+        AW_UISubtitle("","Interior not found.",3);return 1;
     }
     fclose(f);
     if(AW_StoryRestricted() && links[i].reference==119659)AW_StoryTransition(AW_STAGE_RELEASED);
@@ -396,7 +397,8 @@ void AW_SceneDraw(void) {
 }
 static void door_status(void) {
     int i;vec3_t eye,forward,right,up,hit,delta;trace_t tr;edict_t *p;
-    if(!sv.active)return;read_links();p=svs.clients[0].edict;
+    if(!sv.active)return;
+    read_links();p=svs.clients[0].edict;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
     Con_Printf("Doors %ld / aimed %ld / eye %ld %ld %ld / pitch %ld\n",(long)count,
         (long)aimed_door(),(long)eye[0],(long)eye[1],(long)eye[2],(long)cl.viewangles[0]);

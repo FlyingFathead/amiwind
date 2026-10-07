@@ -406,7 +406,8 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 	mplane_t	*pplane;
 	float		distinv;
 	vec3_t		p_normal;
-	medge_t		*pedges, tedge;
+	medge_t		*pedges;
+	static medge_t	tedge;	// r_pedge and edge owners may point here: not on the stack
 	clipplane_t	*pclip;
 	unsigned int *pcache;
 
@@ -618,7 +619,7 @@ void R_RenderBmodelFace (bedge_t *pedges, msurface_t *psurf)
 	mplane_t	*pplane;
 	float		distinv;
 	vec3_t		p_normal;
-	medge_t		tedge;
+	static medge_t	tedge;	// r_pedge and edge owners may point here: not on the stack
 	clipplane_t	*pclip;
 
 /* Hide only the temporary *water sea reference, before allocating edges.

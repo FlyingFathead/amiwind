@@ -522,7 +522,7 @@ experiment was stopped on 3 October with its inputs, logs and saved state
 preserved privately. It is deferred optional research; resumption is unverified
 and no comparative FPS or memory result is available.
 
-See [the corresponding bug-journal record](BUG_JOURNAL.md#mem-geometry-01-transactional-geometrylight-sharing-candidates)
+See [the corresponding bug-journal record](journals/BUG_JOURNAL-v0.0.29.md#mem-geometry-01-transactional-geometrylight-sharing-candidates)
 for the version/cause/fix/status distinction. The rc3 duplicate-visibility-copy
 incident remains open until the repaired trip and lifecycle pass on target.
 

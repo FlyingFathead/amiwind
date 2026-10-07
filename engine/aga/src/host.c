@@ -212,6 +212,8 @@ Host_InitLocal
 void Host_InitLocal (void)
 {
     Host_InitCommands ();
+    /* Converted actor models read once while decoding; see model_alias_stream.inc. */
+    {extern cvar_t aw_alias_single_pass;Cvar_RegisterVariable (&aw_alias_single_pass);}
 
     Cvar_RegisterVariable (&host_framerate);
     Cvar_RegisterVariable (&host_speeds);
@@ -462,7 +464,7 @@ void Host_ShutdownServer(qboolean crash)
     while (count);
 
 // make sure all the clients know we're disconnecting
-    buf.data = message;
+    buf.data = (byte *)message;
     buf.maxsize = 4;
     buf.cursize = 0;
     MSG_WriteByte(&buf, svc_disconnect);

@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -64,7 +64,7 @@ int UDP_Init (void)
 	char	buff[MAXHOSTNAMELEN];
 	struct qsockaddr addr;
 	char *colon;
-	
+
 //	Con_Printf ("UDP_Init()\n");
 	if (COM_CheckParm ("-noudp"))
 		return -1;
@@ -75,8 +75,8 @@ int UDP_Init (void)
         }
 
 	// determine my name & address
-	gethostname(buff, MAXHOSTNAMELEN);
-	local = gethostbyname(buff);
+	gethostname((STRPTR)buff, MAXHOSTNAMELEN);
+	local = gethostbyname((STRPTR)buff);
 	myAddr = *(int *)local->h_addr_list[0];
 
 	// if the quake hostname isn't set, set it to the machine name
@@ -200,7 +200,7 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 	int mask;
 	int run;
 	int port;
-	
+
 //	Con_Printf ("UDP_PartialIPAddress()\n");
 	buff[0] = '.';
 	b = buff;
@@ -219,7 +219,7 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 		{
 		  num = num*10 + *b++ - '0';
 		  if (++run > 3)
-		  	return -1;
+			return -1;
 		}
 		if ((*b < '0' || *b > '9') && *b != '.' && *b != ':' && *b != 0)
 			return -1;
@@ -228,16 +228,16 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 		mask<<=8;
 		addr = (addr<<8) + num;
 	}
-	
+
 	if (*b++ == ':')
 		port = Q_atoi(b);
 	else
 		port = net_hostport;
 
 	((struct sockaddr_in *)hostaddr)->sin_family = AF_INET;
-	((struct sockaddr_in *)hostaddr)->sin_port = htons((short)port);	
+	((struct sockaddr_in *)hostaddr)->sin_port = htons((short)port);
 	((struct sockaddr_in *)hostaddr)->sin_addr.s_addr = (myAddr & htonl(mask)) | htonl(addr);
-	
+
 	return 0;
 }
 //=============================================================================
@@ -274,7 +274,7 @@ int UDP_Read (int socket, byte *buf, int len, struct qsockaddr *addr)
 	long err;
 
 //	Con_Printf ("UDP_Read()\n");
-	ret = recvfrom (socket, buf, len, 0, (struct sockaddr *)addr, &addrlen);
+	ret = recvfrom (socket, buf, len, 0, (struct sockaddr *)addr, (socklen_t *)&addrlen);
 	err = Errno();
 	if (ret == -1 && (err == EWOULDBLOCK || err == ECONNREFUSED))
 		return 0;
@@ -372,9 +372,9 @@ int UDP_GetSocketAddr (int socket, struct qsockaddr *addr)
 
 //	Con_Printf ("UDP_GetSocketAddr()\n");
 	Q_memset(addr, 0, sizeof(struct qsockaddr));
-	getsockname(socket, (struct sockaddr *)addr, &addrlen);
+	getsockname(socket, (struct sockaddr *)addr, (socklen_t *)&addrlen);
 	a = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
-	if (a == 0 || a == inet_addr("127.0.0.1"))
+	if (a == 0 || a == inet_addr((STRPTR)"127.0.0.1"))
 		((struct sockaddr_in *)addr)->sin_addr.s_addr = myAddr;
 
 	return 0;
@@ -387,7 +387,7 @@ int UDP_GetNameFromAddr (struct qsockaddr *addr, char *name)
 	struct hostent *hostentry;
 
 //	Con_Printf ("UDP_GetNameFromAddr()\n");
-	hostentry = gethostbyaddr ((char *)&((struct sockaddr_in *)addr)->sin_addr, sizeof(struct in_addr), AF_INET);
+	hostentry = gethostbyaddr ((STRPTR)&((struct sockaddr_in *)addr)->sin_addr, sizeof(struct in_addr), AF_INET);
 	if (hostentry)
 	{
 		Q_strncpy (name, (char *)hostentry->h_name, NET_NAMELEN - 1);
@@ -407,13 +407,13 @@ int UDP_GetAddrFromName(char *name, struct qsockaddr *addr)
 //	Con_Printf ("UDP_GetAddrFromName()\n");
 	if (name[0] >= '0' && name[0] <= '9')
 		return PartialIPAddress (name, addr);
-	
-	hostentry = gethostbyname (name);
+
+	hostentry = gethostbyname ((STRPTR)name);
 	if (!hostentry)
 		return -1;
 
 	((struct sockaddr_in *)addr)->sin_family = AF_INET;
-	((struct sockaddr_in *)addr)->sin_port = htons(net_hostport);	
+	((struct sockaddr_in *)addr)->sin_port = htons(net_hostport);
 	((struct sockaddr_in *)addr)->sin_addr.s_addr = *(int *)hostentry->h_addr_list[0];
 
 	return 0;

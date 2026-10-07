@@ -72,7 +72,7 @@ BSP graph repair.
 
 The classifier uses `ceil(disk_node_count/8)` temporary bytes from the OS allocator,
 then frees them before either resident allocation. The six measured inputs need
-781Ã¢â‚¬â€œ2,953 bytes. This is external OS memory, not hunk memory; it still matters to
+781–2,953 bytes. This is external OS memory, not hunk memory; it still matters to
 Fast RAM availability and fragmentation. There is no second full node or model
 copy, no new per-frame allocation, and no change to `model_t` or `mnode_t` layout.
 

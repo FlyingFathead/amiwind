@@ -4,10 +4,13 @@ import hashlib
 from pathlib import Path
 import struct
 
+# Re-pinned 2026-10-07 for the warning cleanup: model.c (line split, name buffer
+# 10->16, Mod_PointInLeaf signature matches model.h) and r_draw.c (tedge static).
+# Edge-cache allocation is unchanged.
 SOURCE_HASHES={
-    'model.c':'6fd5722d1e87183b6e78051110f337265178f13053d62c8fa10c7c0b1822f126',
+    'model.c':'8731bbbc42c05ae3e2e67b955a992772dd521cf07be0488db9fe9435436aec8d',
     'model.h':'c49d4a759229aaaab738aac9857ea5dc8feedf300d1c0dca5193e7d80eafb9d2',
-    'r_draw.c':'efbd9525d76b3aabae22d5b0d7afb2796dfa8198bcfab2d020c330df19accb48',
+    'r_draw.c':'d56257781f2617d09f54d9fdc596f3f3dd31f1b3b94629acc1a870284d98965b',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }
 

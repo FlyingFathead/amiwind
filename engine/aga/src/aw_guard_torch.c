@@ -137,8 +137,10 @@ static void command(void)
     Con_Printf("Guard lights: active %d; last selected %d/2, outside range %d, contents rejects %d, trace rejects %d, untested/budget %d.\n",
         lights,last_lights,last_light_range,last_light_contents,last_light_trace,last_light_untested);
 }
+extern cvar_t aw_static_flames;
 void AW_GuardTorchInit(void)
 {
+    Cvar_RegisterVariable(&aw_static_flames);
     Cvar_RegisterVariable(&guards_torch_cycle);Cmd_AddCommand("aw_guardtorch",command);
 }
 static int automatic_night(void)
@@ -152,7 +154,8 @@ static guard_asset_t *asset(entity_t *ent,edict_t **actor,int automatic)
 {
     uintptr_t ptr=(uintptr_t)ent,base=(uintptr_t)cl_entities,offset;int index,i;
     edict_t *e;eval_t *source;
-    if(ptr<base)return NULL;offset=ptr-base;
+    if(ptr<base)return NULL;
+    offset=ptr-base;
     if(offset%sizeof(entity_t) || offset/sizeof(entity_t)>=MAX_EDICTS)return NULL;
     index=(int)(offset/sizeof(entity_t));if(index<=0 || index>=sv.num_edicts)return NULL;
     e=EDICT_NUM(index);
@@ -289,7 +292,8 @@ void AW_GuardTorchUpdate(void)
             g->light_test=3;
             best=i;distance=g->distance;
         }
-        if(best<0)break;chosen[j]=best;g=&guards[best];light=CL_AllocDlight(GUARD_LIGHT_KEY-j);
+        if(best<0)break;
+        chosen[j]=best;g=&guards[best];light=CL_AllocDlight(GUARD_LIGHT_KEY-j);
         g->light_key=GUARD_LIGHT_KEY-j;
         VectorCopy(g->flame,light->origin);light->radius=AW_TorchLightRadius();light->minlight=16;
         light->die=cl.time+.1;light->decay=0;
@@ -303,33 +307,100 @@ void AW_GuardTorchUpdate(void)
         else if(!g->light_test)last_light_untested++;
     }
 }
-void AW_GuardTorchDraw(void)
+/* One rising flame particle: projected, depth-tested, ordered-dither alpha.
+ * Shared by guard torches and static fires; scale 1 is the guard size. */
+/* rise: vertical travel scale; opacity: alpha multiplier; solid > 0 replaces the
+ * ordered dither with a fixed alpha cut-off (large static flames). Guards: 1, 1, 0. */
+static void flame_particle(const vec3_t origin,int k,float scale,int core,int max_pixels,float rise,float opacity,int solid)
 {
     static const int threshold[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
-    int i,k,n,x,y,xx,yy,px,py,j,alpha,z,core;float age,depth,cx,cy,size;vec3_t delta;
+    int n,x,y,xx,yy,px,py,j,alpha,z;float age,depth,cx,cy,size;vec3_t delta;
+    age=(float)fmod(cl.time*.833333+k/3.0,1.0);if(!isfinite(age) || age<0)age=0;
+    VectorSubtract(origin,r_refdef.vieworg,delta);delta[2]+=age*2.7f*rise;
+    depth=DotProduct(delta,vpn);if(!(depth>1))return;
+    cx=aliasxcenter+DotProduct(delta,vright)*aliasxscale/depth;
+    cy=aliasycenter-DotProduct(delta,vup)*aliasyscale/depth;
+    size=aliasyscale/depth*1.5f*scale*(1-age*.3f);
+    if(!isfinite(cx) || !isfinite(cy) || !isfinite(size) || size<1 ||
+        cx<r_refdef.vrect.x-16 || cx>r_refdef.vrect.x+r_refdef.vrect.width+16 ||
+        cy<r_refdef.vrect.y-16 || cy>r_refdef.vrect.y+r_refdef.vrect.height+16)return;
+    n=size>=max_pixels?max_pixels:(int)size;if(n<2)n=2;x=(int)cx-n/2;y=(int)cy-n/2;z=(int)(32768/depth);
+    for(yy=0;yy<n;yy++)for(xx=0;xx<n;xx++){
+        px=x+xx;py=y+yy;
+        if(px<0 || py<0 || px>=vid.width || py>=vid.height || px<r_refdef.vrect.x ||
+            py<r_refdef.vrect.y || px>=r_refdef.vrect.x+r_refdef.vrect.width ||
+            py>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
+        j=((yy*16/n)*16+xx*16/n)*2;alpha=(int)(flame_pixels[j+1]*(1-age*.6f)*opacity);
+        if(alpha>(solid?solid:threshold[(py&3)*4+(px&3)]*16+7) && d_pzbuffer[py*d_zwidth+px]<=z){
+            vid.buffer[py*vid.rowbytes+px]=AW_TorchFlameColor(flame_pixels[j],j,age,core);d_pzbuffer[py*d_zwidth+px]=z;
+        }
+    }
+}
+
+void AW_GuardTorchDraw(void)
+{
+    int i,k,core;
     if(!flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
     core=AW_TorchFlameCoreColor();
     for(i=0;i<visible_count;i++)for(k=0;k<3;k++){
         if(!guards[i].active)continue;
-        age=(float)fmod(cl.time*.833333+k/3.0,1.0);if(!isfinite(age) || age<0)age=0;
-        VectorSubtract(guards[i].flame,r_refdef.vieworg,delta);delta[2]+=age*2.7f;
-        depth=DotProduct(delta,vpn);if(!(depth>1))continue;
-        cx=aliasxcenter+DotProduct(delta,vright)*aliasxscale/depth;
-        cy=aliasycenter-DotProduct(delta,vup)*aliasyscale/depth;
-        size=aliasyscale/depth*1.5f*(1-age*.3f);
-        if(!isfinite(cx) || !isfinite(cy) || !isfinite(size) || size<1 ||
-            cx<r_refdef.vrect.x-16 || cx>r_refdef.vrect.x+r_refdef.vrect.width+16 ||
-            cy<r_refdef.vrect.y-16 || cy>r_refdef.vrect.y+r_refdef.vrect.height+16)continue;
-        n=size>=16?16:(int)size;if(n<2)n=2;x=(int)cx-n/2;y=(int)cy-n/2;z=(int)(32768/depth);
-        for(yy=0;yy<n;yy++)for(xx=0;xx<n;xx++){
-            px=x+xx;py=y+yy;
-            if(px<0 || py<0 || px>=vid.width || py>=vid.height || px<r_refdef.vrect.x ||
-                py<r_refdef.vrect.y || px>=r_refdef.vrect.x+r_refdef.vrect.width ||
-                py>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
-            j=((yy*16/n)*16+xx*16/n)*2;alpha=(int)(flame_pixels[j+1]*(1-age*.6f));
-            if(alpha>threshold[(py&3)*4+(px&3)]*16+7 && d_pzbuffer[py*d_zwidth+px]<=z){
-                vid.buffer[py*vid.rowbytes+px]=AW_TorchFlameColor(flame_pixels[j],j,age,core);d_pzbuffer[py*d_zwidth+px]=z;
-            }
-        }
+        flame_particle(guards[i].flame,k,1,core,16,1,1,0);
     }
+}
+
+/* Static fires: flames for placed fires, candles, lanterns and braziers.
+ * The scene converter writes an "aw_flame" entity (origin, aw_flame_size) for
+ * each placed mesh with a particle emitter; their light is already baked into
+ * the lightmaps, so only the visible flame is drawn here. The entity text is
+ * read once per map into a fixed table; the nearest STATIC_FLAME_DRAW within
+ * range are drawn each frame. aw_static_flames 0 turns them off. */
+#define STATIC_FLAME_MAX 128
+#define STATIC_FLAME_DRAW 12
+#define STATIC_FLAME_RANGE (640.0f*640.0f)
+cvar_t aw_static_flames={"aw_static_flames","1",true};
+static struct {vec3_t origin;float scale;} static_flames[STATIC_FLAME_MAX];
+static int static_flame_count;
+static model_t *static_flame_world;
+static void static_flames_load(model_t *world)
+{
+    char *data,key[64];int flame;vec3_t origin;float scale;
+    static_flame_count=0;static_flame_world=world;
+    if(!world || !world->entities)return;
+    data=world->entities;
+    while((data=COM_Parse(data))!=NULL && com_token[0]=='{'){
+        flame=0;origin[0]=origin[1]=origin[2]=0;scale=1;
+        while((data=COM_Parse(data))!=NULL && com_token[0]!='}'){
+            strncpy(key,com_token,sizeof(key)-1);key[sizeof(key)-1]=0;
+            if(!(data=COM_Parse(data)))break;
+            if(!strcmp(key,"classname"))flame=!strcmp(com_token,"aw_flame");
+            else if(!strcmp(key,"origin"))sscanf(com_token,"%f %f %f",&origin[0],&origin[1],&origin[2]);
+            else if(!strcmp(key,"aw_flame_size"))scale=(float)atof(com_token);
+        }
+        if(flame && static_flame_count<STATIC_FLAME_MAX && isfinite(scale) && scale>0 && scale<=16){
+            VectorCopy(origin,static_flames[static_flame_count].origin);
+            static_flames[static_flame_count++].scale=scale;
+        }
+        if(!data)break;
+    }
+}
+void AW_StaticFlamesDraw(void)
+{
+    int i,j,k,count=0,core,chosen[STATIC_FLAME_DRAW];float dist[STATIC_FLAME_DRAW],d;vec3_t delta;
+    if(!aw_static_flames.value || !cl.worldmodel)return;
+    if(cl.worldmodel!=static_flame_world)static_flames_load(cl.worldmodel);
+    if(!static_flame_count || !flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
+    for(i=0;i<static_flame_count;i++){
+        VectorSubtract(static_flames[i].origin,r_refdef.vieworg,delta);d=DotProduct(delta,delta);
+        if(d>STATIC_FLAME_RANGE)continue;
+        /* keep the STATIC_FLAME_DRAW nearest, sorted by distance */
+        if(count<STATIC_FLAME_DRAW)j=count++;
+        else if(d>=dist[STATIC_FLAME_DRAW-1])continue;
+        else j=STATIC_FLAME_DRAW-1;
+        for(;j>0 && dist[j-1]>d;j--){dist[j]=dist[j-1];chosen[j]=chosen[j-1];}
+        dist[j]=d;chosen[j]=i;
+    }
+    core=AW_TorchFlameCoreColor();
+    for(i=0;i<count;i++)for(k=0;k<3;k++)
+        flame_particle(static_flames[chosen[i]].origin,k,static_flames[chosen[i]].scale,core,48,
+                       static_flames[chosen[i]].scale<2.5f?static_flames[chosen[i]].scale:2.5f,2,96);
 }

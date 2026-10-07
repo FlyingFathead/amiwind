@@ -32,7 +32,8 @@ static FILE *catalogue_open(int *left,char *line) {
     FILE *f=NULL;*left=COM_FOpenFile("debug-commands.txt",&f);
     if(!f || *left<6 || *left>DEBUG_BYTES ||
        catalogue_line(f,left,line)!=1 || strcmp(line,"AWDC1")){
-        if(f)fclose(f);return NULL;
+        if(f)fclose(f);
+        return NULL;
     }
     return f;
 }
@@ -125,7 +126,8 @@ static void help(void) {
     FILE *f;route_t r;int left,status,width=con_linewidth;
     char line[DEBUG_LINE],group[32],separator[129];
     f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
-    if(width<1)width=38;if(width>128)width=128;
+    if(width<1)width=38;
+    if(width>128)width=128;
     memset(separator,'-',width);separator[width]=0;group[0]=0;
     Con_Printf("AmiWind debug commands (PageUp scrolls)\n");
     Con_Printf("Prefix: debug / dbg / amiwind debug\n");
@@ -198,7 +200,8 @@ static void set_font(void) {
 }
 void AW_ConsoleBackground(int lines) {
     int y,ink=(int)colour.value;
-    if(lines<0)return;if(lines>vid.conheight)lines=vid.conheight;
+    if(lines<0)return;
+    if(lines>vid.conheight)lines=vid.conheight;
     if(ink<0||ink>255)ink=255;
     for(y=0;y<lines;y++)
         memset(vid.conbuffer+y*vid.conrowbytes,ink,vid.conwidth);

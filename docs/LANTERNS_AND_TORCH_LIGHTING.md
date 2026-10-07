@@ -7,9 +7,9 @@ gaps: F/V can fail to produce a visible player torch, carried guard torches do
 not convincingly illuminate nearby night surfaces, and interiors look bleak.
 A visible flame and a working local light are different results. Fixing input
 does not prove surface illumination, and making a flame brighter does not light
-a wall. Keep [TORCH-INPUT-29](BUG_JOURNAL.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open),
-[TORCH-LIGHT-29](BUG_JOURNAL.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)
-and [INTERIOR-LIGHT-29](BUG_JOURNAL.md#interior-light-29-interiors-lack-convincing-local-light-open)
+a wall. Keep [TORCH-INPUT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open),
+[TORCH-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)
+and [INTERIOR-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#interior-light-29-interiors-lack-convincing-local-light-open)
 separate until each has its own evidence.
 
 This document is a study and acceptance plan. The existing converted torch and
@@ -126,7 +126,7 @@ The real guard-to-world/rotated-brush surface-cache fixture found and reproduced
 an unsigned-gradient interpolation overflow. The narrow renderer repair passes
 sanitizers and verifies brighter final pixels plus complete light-off restoration
 at representative ambient/static levels across all four mip resolutions. See
-[LIGHT-GRADIENT-29](BUG_JOURNAL.md#light-gradient-29-unsigned-surface-light-interpolation-overflow).
+[LIGHT-GRADIENT-29](journals/BUG_JOURNAL-v0.0.29.md#light-gradient-29-unsigned-surface-light-interpolation-overflow).
 
 This rejects a universal failure to create or rasterize guard lights under those
 conditions. It does not close the observed in-game report. Next, bind the exact
@@ -168,8 +168,54 @@ tests; never infer lava from red terrain or guessed map dots. Reference:
 ## NPC illumination remains a separate acceptance gate
 
 The dev4 playtest reports torch-lit walls/floors but dark nearby NPCs.
-Track [TORCH-NPC-LIGHT-29](BUG_JOURNAL.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open)
+Track [TORCH-NPC-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open)
 independently of surface coverage, emitter visibility and light radius. An
 emitter or illuminated floor does not establish actor lighting. Verify the
 actor's rendering branch, base light, dynamic-light clamp and final night
 palette with a fixed-time off/on/off comparison before marking it resolved.
+
+## Self-lit materials (emissive), 7 October 2026
+
+Morrowind marks glowing parts of a mesh (lantern glass, lava, Dwemer lights,
+Bitter Coast mushrooms) with an emissive colour in the NIF material. The scene
+converter used to read only the diffuse colour, so those parts got the same
+lightmap as the wood or stone around them.
+
+- **Converter:** each material records a glow level from 0 to 9, taken from
+  its brightest emissive channel. Textures of glowing materials are named
+  `emitN_...` instead of `surfaceN`. `AMIWIND_NO_EMISSIVE=1` converts without
+  the marking and reproduces the previous maps byte for byte.
+- **Engine:** when a lightmap is built, a surface whose texture is `emitN...`
+  gets at least N/9 of full light. Dynamic light still adds on top.
+  `aw_emissive` (saved setting, default 1) and `dbg emissive 0/1` switch it;
+  changing it rebuilds the cached surfaces at once.
+- **Measured in the Balmora Temple:** rebuilt with the marking, the map
+  differs from the previous one only in the texture lump (one texture, the
+  Dunmer lantern's glass). In FS-UAE, switching `aw_emissive` changes only
+  the lantern panes (about 2,600 to 2,900 pixels, average brightness 93 to
+  100), and switching back restores the exact previous image.
+
+The prison ship lanterns and all candles have **no** emissive material: their
+glow comes from a particle flame. They need the static-flame work, not this.
+Placed emissive meshes in the game: 86 meshes, about 12,500 placements.
+
+## NPC static light from brush floors, 7 October 2026
+
+Actors take their static light from `R_LightPoint`, which traced straight
+down through the world BSP only. In converted interiors the world is mostly
+the sealing box and the floors are brush objects, so the trace found nothing
+and actors got ambient light only: dark, "anti-lit" NPCs.
+
+The lookup now also tests the brush objects below the actor. AmiWind keeps no
+render node tree for inline models (only collision nodes), so their surfaces
+are tested directly: upward-facing surfaces below the point, the point
+projected onto each surface's plane, the highest hit inside the surface's
+lightmap extents, then the normal lightmap sample. Results are cached per
+position, so actors are re-sampled only after they move. `aw_actor_brush_light`
+(saved setting, default 1) switches it; 0 restores the world-only trace.
+
+Measured in the Census office (FS-UAE, same camera): Socucius Ergalla's
+figure goes from average brightness 9.5 to 16.4 and now matches the floor
+light where he stands; nothing else in the frame changes. A first version
+that traced the inline models' node trees crashed the emulator, because those
+nodes are not resident; it was replaced before any build left the workspace.

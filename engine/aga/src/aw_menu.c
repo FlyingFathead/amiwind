@@ -8,6 +8,7 @@
 extern qboolean keydown[256];
 extern int scr_copyeverything;
 extern int AW_DrawDistance(void);
+extern char *Key_KeynumToString(int keynum);
 extern void AW_SetDrawDistance(int value);
 int m_activenet,m_state,m_return_state;
 qboolean m_return_onerror;
@@ -25,7 +26,7 @@ static const char *items[]={"Return to game","New game","Save game","Load game",
 #define ROW_Y 54
 #define ROW_H 19
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-#define OPTION_ROWS 11
+#define OPTION_ROWS 12
 static int brightness_options,brightness_drag;
 extern int R_BrightnessStep(int outside);
 extern void R_BrightnessSetStep(int outside,int value);
@@ -33,10 +34,10 @@ extern void R_BrightnessSetStep(int outside,int value);
 #define BRIGHTNESS_W 200
 static int brightness_active(void){return brightness_options;}
 static void brightness_reset(void){brightness_options=brightness_drag=0;}
-static void brightness_back(void){brightness_reset();selection=9;mouse_visible=0;}
+static void brightness_back(void){brightness_reset();selection=10;mouse_visible=0;}
 static void brightness_pointer(void){R_BrightnessSetStep(brightness_drag-1,10+((mouse_x-BRIGHTNESS_X)*5+BRIGHTNESS_W/2)/BRIGHTNESS_W);}
 #else
-#define OPTION_ROWS 10
+#define OPTION_ROWS 11
 #define brightness_active() 0
 #define brightness_reset() ((void)0)
 #endif
@@ -58,6 +59,78 @@ static void audio_set(int row,int percent){
 }
 static void audio_pointer(int row){audio_set(row,((mouse_x-AUDIO_X)*100+AUDIO_W/2)/AUDIO_W);}
 static void audio_back(void){audio_options=audio_drag=0;selection=4;mouse_visible=0;}
+/* Options > Controls edits the same bindings as bind/unbind and keymaps.cfg.
+ * Each action shows up to two keys; a third key replaces both.
+ *
+ * Adding or activating an action (e.g. a planned row below):
+ *  1. Set its console command here (a "+name" button or a plain command).
+ *     A NULL command is a planned action: greyed, skipped by the cursor and
+ *     never bound; planned_keys is only display text for the intended keys.
+ *  2. Add its default binding to config/keymaps.cfg (new installs and
+ *     "Reset to defaults").
+ *  3. If existing players should get it too, add an "only if unbound" line to
+ *     AW_ControlsMigrate() in keys.c; saved keymaps.cfg files are not rewritten.
+ *  4. Update docs/KEYMAPS.md.
+ * Keys handled before the menu (F1-F12, the console keys) cannot be captured
+ * here; bind those with the console. */
+typedef struct {const char *name,*command,*planned_keys;} control_t;
+static const control_t controls[]={
+    {"Forward","+forward"},{"Back","+back"},{"Strafe left","+moveleft"},{"Strafe right","+moveright"},
+    {"Turn left","+left"},{"Turn right","+right"},{"Jump","+jump"},{"Run","+speed"},
+    {"Use","+aw_use"},{"Attack","+attack"},{"Hands","impulse 202"},{"Torch","aw_torch"},
+    {"Map","aw_worldmap"},{"Journal","aw_journal"},{"Wait","aw_wait"},
+    {"Quick save","aw_quicksave"},{"Quick load","aw_quickload"},
+    {"Inventory",NULL,"I"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
+#define CONTROL_ACTIONS ((int)(sizeof(controls)/sizeof(controls[0])))
+#define CONTROL_ROWS (CONTROL_ACTIONS+2)
+#define CONTROL_VISIBLE 6
+static int controls_options,controls_top,controls_capture;
+static int control_ready(int row){return row>=CONTROL_ACTIONS || controls[row].command!=NULL;}
+static int control_keys(int action,int *keys){
+    int key,n=0;
+    if(!controls[action].command)return 0;
+    for(key=0;key<256 && n<2;key++)
+        if(keybindings[key] && !strcmp(keybindings[key],controls[action].command))keys[n++]=key;
+    return n;
+}
+static void key_label(int key,char *out){
+    const char *name;int i;
+    if(key==K_UPARROW)name="Up";else if(key==K_DOWNARROW)name="Down";
+    else if(key==K_LEFTARROW)name="Left";else if(key==K_RIGHTARROW)name="Right";
+    else name=Key_KeynumToString(key);
+    for(i=0;name[i] && i<15;i++){
+        out[i]=name[i];
+        if(i && out[i]>='A' && out[i]<='Z')out[i]+='a'-'A';
+        if(!i && out[i]>='a' && out[i]<='z')out[i]-='a'-'A';
+    }
+    out[i]=0;
+}
+static void control_line(int action,char *line){
+    int keys[2],n=control_keys(action,keys),i;char name[16];
+    sprintf(line,"%s:",controls[action].name);
+    if(!controls[action].command){
+        if(controls[action].planned_keys){strcat(line," ");strcat(line,controls[action].planned_keys);}
+        strcat(line," (planned)");return;
+    }
+    if(controls_capture && selection==action){strcat(line," ?");return;}
+    if(!n)strcat(line," -");
+    for(i=0;i<n;i++){key_label(keys[i],name);strcat(line,i?", ":" ");strcat(line,name);}
+}
+static void control_clear(int action){int keys[2],n=control_keys(action,keys),i;for(i=0;i<n;i++)Key_SetBinding(keys[i],"");}
+static void control_capture(int key){
+    int keys[2],n;
+    controls_capture=0;
+    if(key==K_ESCAPE)return;
+    if(key==K_BACKSPACE || key==K_DEL){control_clear(selection);return;}
+    if(key>='A' && key<='Z')key+='a'-'A';
+    if(!controls[selection].command)return;
+    if(keybindings[key] && !strcmp(keybindings[key],controls[selection].command))return;
+    n=control_keys(selection,keys);
+    if(n>=2)control_clear(selection);
+    Key_SetBinding(key,(char *)controls[selection].command);
+}
+static void controls_back(void){controls_options=controls_capture=0;selection=5;mouse_visible=0;}
+static void controls_open(void){controls_options=1;controls_capture=controls_top=selection=0;mouse_visible=0;}
 /* Setup lists stop at their ends so selection and scrollbar never jump back
  * across the list. This also applies to wheel/W/S input normalized below. */
 static void option_step(int key,int rows){
@@ -84,12 +157,12 @@ static void interface_change(int direction){
 static void close_menu(void){
     if(frontend)return;
     brightness_reset();
-    confirming=scene_picker=graphics=interface_options=audio_options=audio_drag=0;key_dest=key_game;IN_AWClearButtons();
+    confirming=scene_picker=graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=0;key_dest=key_game;IN_AWClearButtons();
 }
 void M_Menu_Main_f(void){
     FILE *f=NULL;intro_available=COM_FOpenFile("intro/chargenname1.txt",&f)>0 && f!=NULL;if(f)fclose(f);
     brightness_reset();
-    IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=interface_options=audio_options=audio_drag=mouse_visible=graphics_top=scroll_drag=0;
+    IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=mouse_visible=graphics_top=scroll_drag=0;
     mouse_x=160;mouse_y=ROW_Y+ROW_H/2;
 }
 void M_ToggleMenu_f(void){if(key_dest==key_menu)close_menu();else M_Menu_Main_f();}
@@ -106,7 +179,7 @@ static void scene_menu(void){
     for(i=0;i<AW_MAP_COUNT;i++){sprintf(path,"maps/%s.bsp",AW_MapName(i));f=NULL;size=COM_FOpenFile(path,&f);scene_available[i]=f && size>=124;if(f)fclose(f);}
     brightness_reset();
     picker_return=key_dest;IN_AWClearButtons();key_dest=key_menu;
-    scene_picker=1;graphics=interface_options=audio_options=audio_drag=confirming=mouse_visible=0;selection=AW_MAP_COUNT;scene_top=0;
+    scene_picker=1;graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=confirming=mouse_visible=0;selection=AW_MAP_COUNT;scene_top=0;
     for(i=0;i<AW_MAP_COUNT;i++)if(scene_available[i]){selection=i;break;}
     mouse_x=160;mouse_y=65+selection*24+12;
 }
@@ -123,6 +196,7 @@ static int mouse_row(void){
     if(confirming){if(inside(48,132,106,25))return 0;if(inside(166,132,106,25))return 1;return -1;}
     if(audio_options){for(i=0;i<4;i++)if(inside(10,AUDIO_Y+i*AUDIO_H,300,AUDIO_H))return i;if(inside(222,165,86,25))return 4;return -1;}
     if(interface_options){for(i=0;i<7;i++)if(inside(44,54+i*19,232,19))return i;return -1;}
+    if(controls_options){for(i=0;i<CONTROL_VISIBLE && controls_top+i<CONTROL_ROWS;i++)if(inside(44,54+i*19,230,19))return controls_top+i;return -1;}
     if(graphics){for(i=0;i<7;i++)if(inside(44,54+i*19,230,19))return graphics_top+i;return -1;}
     if(scene_picker){for(i=0;i<6 && scene_top+i<=AW_MAP_COUNT;i++)if(inside(44,55+i*19,230,19))return scene_top+i;return -1;}
     if(frontend){for(i=0;i<4;i++)if(inside(12,front_top()+i*front_height(),front_width()-8,front_height()))return i;return -1;}
@@ -142,7 +216,8 @@ void AW_MenuMouse(int dx,int dy){
     if(brightness_options && brightness_drag){brightness_pointer();return;}
 #endif
     if(audio_options && audio_drag){audio_pointer(audio_drag-1);return;}
-    if(scroll_drag && ((graphics && !interface_options && !audio_options && !brightness_active()) || scene_picker)){
+    if(controls_capture)return;
+    if(scroll_drag && ((graphics && !interface_options && !audio_options && !controls_options && !brightness_active()) || scene_picker)){
         int total=graphics?OPTION_ROWS:AW_MAP_COUNT+1,visible=graphics?7:6;
         row=AW_UIScrollHit(280,mouse_y<55?55:mouse_y>=54+visible*19?53+visible*19:mouse_y,276,54,visible*19,total,visible,graphics?graphics_top:scene_top);
         if(row>=0){if(graphics)graphics_top=row;else scene_top=row;selection=row;}return;
@@ -152,6 +227,8 @@ void AW_MenuMouse(int dx,int dy){
 void M_Keydown(int key){
     int direction,row;char command[48];
     if(AW_SaveMenuKey(key)){if(key_dest==key_game){frontend=0;graphics=0;}return;}
+    /* Capture the raw key before W/A/S/D and wheel are normalized below. */
+    if(controls_options && controls_capture){control_capture(key);return;}
     if(key=='a' || key=='A')key=K_LEFTARROW;
     if(key=='d' || key=='D')key=K_RIGHTARROW;
     if(key=='w' || key=='W')key=K_UPARROW;
@@ -159,7 +236,7 @@ void M_Keydown(int key){
     if(key==K_MWHEELUP)key=K_UPARROW;
     if(key==K_MWHEELDOWN)key=K_DOWNARROW;
     if(key==K_MOUSE1){
-        if((graphics && !interface_options && !audio_options && !brightness_active()) || scene_picker){
+        if((graphics && !interface_options && !audio_options && !controls_options && !brightness_active()) || scene_picker){
             row=AW_UIScrollHit(mouse_x,mouse_y,276,54,graphics?133:114,graphics?OPTION_ROWS:AW_MAP_COUNT+1,graphics?7:6,graphics?graphics_top:scene_top);
             if(row>=0){if(graphics)graphics_top=row;else scene_top=row;selection=row;scroll_drag=mouse_y>=64 && mouse_y<54+(graphics?133:114)-10;return;}
         }
@@ -200,6 +277,23 @@ void M_Keydown(int key){
         return;
     }
 #endif
+    if(controls_options){
+        if(key==K_ESCAPE){controls_back();return;}
+        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){
+            row=selection;
+            do option_step(key,CONTROL_ROWS);while(!control_ready(selection) && selection>0 && selection<CONTROL_ROWS-1);
+            if(!control_ready(selection))selection=row;
+        }
+        if(selection<controls_top)controls_top=selection;
+        if(selection>=controls_top+CONTROL_VISIBLE)controls_top=selection-CONTROL_VISIBLE+1;
+        if((key==K_BACKSPACE || key==K_DEL) && selection<CONTROL_ACTIONS)control_clear(selection);
+        if(key==K_ENTER || key==K_MOUSE1){
+            if(selection<CONTROL_ACTIONS){if(control_ready(selection)){controls_capture=1;mouse_visible=0;}}
+            else if(selection==CONTROL_ACTIONS)Cbuf_AddText("exec keymaps-default.cfg\n");
+            else controls_back();
+        }
+        return;
+    }
     if(interface_options){
         if(key==K_ESCAPE){interface_options=0;selection=3;return;}
         if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)option_step(key,7);
@@ -213,26 +307,28 @@ void M_Keydown(int key){
         if(selection<graphics_top)graphics_top=selection;
         if(selection>=graphics_top+7)graphics_top=selection-6;
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-        if(selection==9 && (key==K_LEFTARROW || key==K_RIGHTARROW)){brightness_options=1;brightness_drag=0;selection=0;return;}
+        if(selection==10 && (key==K_LEFTARROW || key==K_RIGHTARROW)){brightness_options=1;brightness_drag=0;selection=0;return;}
 #endif
         if(selection==0 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
         if(selection==3 && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
         if(selection==4 && (key==K_LEFTARROW || key==K_RIGHTARROW)){audio_options=1;selection=0;return;}
-        if(selection==5 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
-        if(selection==6 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
-        if(selection==7 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
-        if(selection==8 && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
+        if(selection==5 && (key==K_LEFTARROW || key==K_RIGHTARROW)){controls_open();return;}
+        if(selection==6 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
+        if(selection==7 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
+        if(selection==8 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
+        if(selection==9 && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==1)AW_SetDrawDistance(540);
             else if(selection==2)AW_UIFrameToggle();
             else if(selection==3){interface_options=1;selection=0;}
             else if(selection==4){audio_options=1;audio_drag=0;selection=0;}
-            else if(selection==5)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
-            else if(selection==6)AW_RegionLoadingToggle();
-            else if(selection==7)AW_StreamOption(0,1);
-            else if(selection==8 && AW_CellChangeMethod()==2)AW_StreamOption(1,1);
+            else if(selection==5)controls_open();
+            else if(selection==6)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
+            else if(selection==7)AW_RegionLoadingToggle();
+            else if(selection==8)AW_StreamOption(0,1);
+            else if(selection==9 && AW_CellChangeMethod()==2)AW_StreamOption(1,1);
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-            else if(selection==9){brightness_options=1;brightness_drag=0;selection=0;}
+            else if(selection==10){brightness_options=1;brightness_drag=0;selection=0;}
 #endif
             else if(selection==OPTION_ROWS-1){graphics=0;selection=frontend?2:4;}
         }
@@ -356,6 +452,16 @@ void M_Draw(void){
         sprintf(line,"NPC: %s",places[AW_SceneUIOption(1,0)-1]);label(44,130,232,19,line,1,selection==4);
         sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);label(44,149,232,19,line,1,selection==5);
         label(44,168,232,19,"Back",1,selection==6);
+    }else if(controls_options){
+        for(i=controls_top;i<controls_top+CONTROL_VISIBLE && i<CONTROL_ROWS;i++){
+            if(i<CONTROL_ACTIONS)control_line(i,line);
+            else strcpy(line,i==CONTROL_ACTIONS?"Reset to defaults":"Back");
+            label(44,54+(i-controls_top)*19,230,19,line,control_ready(i),selection==i);
+        }
+        AW_UIScrollbar(276,54,CONTROL_VISIBLE*19,CONTROL_ROWS,CONTROL_VISIBLE,controls_top);
+        AW_UISmallBegin();
+        AW_UITextBox(36,170,236,17,controls_capture?"Press a key   Esc: cancel":"Enter: set   Del: clear",colours[1]);
+        AW_UISmallEnd();
     }else if(graphics){
         for(i=graphics_top;i<graphics_top+7;i++){
             switch(i){
@@ -364,16 +470,17 @@ void M_Draw(void){
             case 2:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
             case 3:strcpy(line,"Interface...");break;
             case 4:strcpy(line,"Audio...");break;
-            case 5:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
-            case 6:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
-            case 7:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
-            case 8:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
+            case 5:strcpy(line,"Controls...");break;
+            case 6:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
+            case 7:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
+            case 8:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
+            case 9:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-            case 9:strcpy(line,"Graphics...");break;
+            case 10:strcpy(line,"Graphics...");break;
 #endif
             default:strcpy(line,"Back");break;
             }
-            label(44,54+(i-graphics_top)*19,230,19,line,i!=8 || AW_CellChangeMethod()==2,selection==i);
+            label(44,54+(i-graphics_top)*19,230,19,line,i!=9 || AW_CellChangeMethod()==2,selection==i);
         }
         AW_UIScrollbar(276,54,133,OPTION_ROWS,7,graphics_top);
     }else if(scene_picker){

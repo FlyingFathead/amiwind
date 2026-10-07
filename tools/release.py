@@ -61,6 +61,7 @@ DOCUMENTATION_CLIPS.update({
 })
 DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.29-rc1-torch-night.png', 'docs/images/amiwind-v0.0.29-rc1-high-elf-appearance.png', 'docs/images/amiwind-v0.0.29-rc1-mushroom-prompt.png', 'docs/images/amiwind-v0.0.29-rc1-mushroom-pickup.png', 'docs/images/amiwind-v0.0.29-rc1-audio.png'})
 DOCUMENTATION_CLIPS.update({'docs/images/amiwind-v0.0.29-rc1-mushroom-pick.gif'})
+DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.30-temple-before.png', 'docs/images/amiwind-v0.0.30-temple-after.png', 'docs/images/amiwind-v0.0.30-temple-banner.png', 'docs/images/amiwind-v0.0.30-controls.png'})
 # Project-authored text graphic; retain bounded UTF-8 source validation.
 DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
 # Project-authored bounded command metadata, required by the runtime dispatcher.

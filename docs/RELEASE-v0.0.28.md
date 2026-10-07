@@ -47,7 +47,7 @@ the ceiling-start arrival correction, the latest cloud-speed change and
 guard voices are unchanged. The current WinUAE listening report still notes
 intermittent artifacts, mostly at load-ins and in heavy scenes. The audio issue
 remains open; publication proceeds with this known limitation, with further
-audio investigation deferred until after publication. See [WIN-05](BUG_JOURNAL.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+audio investigation deferred until after publication. See [WIN-05](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
 The compiler retains 86 warnings; these are successful builds, not warning-free
 builds. The earlier 816-test/739,156-byte result is
 superseded for this source. Compilation and host fixtures do not establish

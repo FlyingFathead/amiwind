@@ -1,5 +1,7 @@
 # RC2 issue checkpoint: implemented repairs and remaining work
 
+Frozen history: current status of every bug is in [the register](BUGS.md).
+
 ## HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026
 
 Open RC2 playtest report in **Bitter Coast**: only one of three nearby mushrooms

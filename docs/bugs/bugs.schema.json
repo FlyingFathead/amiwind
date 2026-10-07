@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AmiWind bug register",
+  "description": "docs/bugs/bugs.json: one object per bug. docs/BUGS.md is generated from it by tools/bug_register.py; tests/test_bug_tracker.py enforces these rules.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "title", "state", "fixed_in", "owner_accepted", "status", "report"],
+    "properties": {
+      "id": {"type": "string", "description": "AREA-WHAT-NN, NN = version series in which it was found. Never reused or renamed."},
+      "title": {"type": "string", "description": "Short plain description of the problem; no | or line breaks."},
+      "state": {"enum": ["open", "fixed", "closed"], "description": "fixed = a correction shipped in fixed_in with supporting verification; closed = not a bug, duplicate or superseded (say which in status)."},
+      "fixed_in": {"type": ["string", "null"], "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$", "description": "First version that shipped the fix; null unless state is fixed."},
+      "owner_accepted": {"type": ["string", "null"], "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$", "description": "Version in which the owner confirmed the fix in play; null until then."},
+      "status": {"type": "string", "description": "Current evidence and next check, factual; keep reported, source-checked, packaged, native-verified and owner-accepted distinct. May contain markdown links."},
+      "report": {"type": ["string", "null"], "description": "bugs/<id>.md when the report page exists, else null."}
+    }
+  }
+}

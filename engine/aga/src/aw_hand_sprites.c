@@ -20,10 +20,12 @@ int AW_HandSpritesValidate(byte *p,unsigned long bytes) {
     for(f=0;f<n;f++) {
         at=u32(p+12+4*f);end=u32(p+16+4*f);if(at>end || end>bytes)return 0;
         for(y=0;y<100;y++) {
-            if(at+2>end)return 0;r=u16(p+at);at+=2;start=0;
+            if(at+2>end)return 0;
+            r=u16(p+at);at+=2;start=0;
             if(r>80)return 0;
             while(r--) {
-                if(at+4>end)return 0;x=u16(p+at);len=u16(p+at+2);at+=4;
+                if(at+4>end)return 0;
+                x=u16(p+at);len=u16(p+at+2);at+=4;
                 if(!len || x<start || x+len>160 || at+len>end)return 0;
                 start=x+len;at+=len;
             }

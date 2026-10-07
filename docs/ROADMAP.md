@@ -1,5 +1,55 @@
 # Roadmap and implementation options
 
+## Next: v0.0.31 - Revisiting Seyda Neen
+
+After v0.0.30 - The Temple. v0.0.31 takes a different approach to how Seyda
+Neen is built and mapped, so that the town plays smoother.
+
+Seyda Neen's 64 sub-cell maps are the heaviest in the game: up to about 5 MB
+each, mostly per-triangle data (planes, faces, texture mappings, BSP and
+collision nodes). A loaded sub-cell fills the 11 MiB heap, so each crossing
+drops cached models and pauses. The current maps were built by replacing the
+town ground with dense world-survey terrain in a later step, which alone added
+about a third more faces across the town.
+
+1. Make the current Seyda Neen build reproducible from the public tools, as a
+   fixed reference ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)). Private replays
+   already reproduce the shipped maps byte for byte from the archived town
+   source.
+2. Rebuild the town with a new mapping method, one measured change at a time:
+   ground simplified within an error bound instead of dense survey terrain,
+   merged flat faces, simple collision for clutter and none for flora, and
+   less geometry duplicated between neighbouring sub-cells. Placements, doors,
+   NPCs and the special maps (Census courtyard, docks) stay.
+3. Measure each change on the Seyda Neen test route: map size, cache
+   evictions and crossing time, with in-game screenshots for comparison.
+4. Investigate the rare load freeze (SEYDA-LOAD-HANG-30).
+
+After that: lighting follow-ups, a battle-arena test room, then inventory,
+character statistics, a map that reveals as you travel, and the heap option
+below.
+
+## Planned: heap size matched to the host machine, 7 October 2026
+
+The game heap is a fixed 11 MiB. On the reference configuration a fully loaded
+Seyda Neen sub-cell leaves only about 2.6 MB of it for cached models, so each
+crossing evicts and re-reads actor models
+([Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md)). Accelerated Amigas such
+as an A1200 with a PiStorm32 Lite or a full 68060 board have far more Fast RAM
+([hardware FAQ](FAQ.md#can-todays-heavily-upgraded-amigas-realistically-run-amiwind)).
+
+Plan, measured before it is built:
+
+1. Emulator test: more Fast RAM and a larger heap on the same Seyda Neen route.
+   Continue only if evictions and crossing times improve clearly.
+2. Startup check: when much more Fast RAM is available, ask whether AmiWind may
+   use a larger game heap (Y/n). The choice is saved and can be changed in
+   Options; the engine falls back to 11 MiB if the larger allocation fails.
+
+The baseline does not change: AmiWind must stay playable on the reference
+configuration with the 11 MiB heap. Memory budgets, release gates and
+acceptance stay measured there, and nothing may depend on the larger heap.
+
 ## HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026
 
 Open RC2 playtest report in **Bitter Coast**: only one of three nearby mushrooms
@@ -241,7 +291,7 @@ The [current issue matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-oc
 records owners, next checks and bounded acceptance. Earlier dated plans remain
 historical context.
 
-## Current work: v0.0.29-rc1, following published dev4
+## Historical: v0.0.29-rc1 work, following published dev4
 
 The published development checkpoint is
 [v0.0.29-dev4](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.29-dev4).

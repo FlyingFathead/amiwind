@@ -1,5 +1,90 @@
 # BALMORA-TEMPLE-GEOMETRY-29: missing interior walls and floors
 
+## Status: 7 October 2026
+
+Fixed in v0.0.30-dev3 (Temple rebuilt with the converter correction); carried
+through v0.0.30-rc1. Owner playtest of the lower rooms pending. The sections
+below are kept as recorded.
+
+## Cause found, candidate repair: 7 October 2026
+
+Status: **cause identified; repair is a v0.0.30-dev candidate, not shipped and
+not yet owner-accepted.** First shipped fixed version: none yet.
+
+**What was wrong.** Some Morrowind meshes carry a transform on the NIF *root*
+node. When Morrowind places an object, it ignores that root node's authored
+**rotation** but keeps its **translation and scale**. The scenery converter
+(`tools/prepare_scenery.py`, `model_geometry`) applied the full root transform,
+so any mesh with a rotated root came out turned around its own origin. The
+Velothi interior kit pieces used in the Temple carry exactly a 90-degree yaw on
+the root node, so whole wall, room and corner pieces were a quarter turn off.
+
+**How it looked in game.** Walls missing where they belong and standing where
+they do not; walls seen edge-on as thin slits; black see-through holes (the
+black area is the converter's sealed outer box behind the room); floors and
+ceilings that could be walked around or through; objects appearing to float
+because the surfaces they rested on had moved.
+
+**Why earlier audits missed it.** Triangle counts, surface areas, bounds and
+plane checks compared the BSP with source geometry flattened by the same
+converter, so both sides carried the same rotation. The 13 off-plane faces fixed
+earlier were real but unrelated to the visible holes.
+
+**Evidence.**
+- Independent reference: OpenMW at the reported entrance pose (local
+  997 1062 3701) shows a closed room with a wall and bench ahead, the entrance
+  door, an archway and a banner; v0.0.29 shows an open corridor with black holes.
+- Ray-cast of the original scene from the ESM placements and BSA meshes:
+  see-through pixels at the reported views drop from 393 / 96 / 39 / 218 to
+  **0 / 0 / 0 / 0** when the root rotation is ignored. Applying the root
+  rotation in the opposite direction instead closed some holes but left pieces
+  90 degrees off (an archway replaced by a solid wall), so that is not the fix.
+- Translation check: crates (`contain_crate_01`, root offset z -32) rest exactly
+  on the Temple floor only when the root translation is applied, so translation
+  must be kept.
+- Rebuilt Temple map with the fix: 71 of 76 converted models and all textures
+  are byte-identical to the release; exactly the 5 models with a root rotation
+  changed (`in_v_s_int_wall_01`, `in_v_s_int_entrance_01`,
+  `in_velothismall_room_05`, `in_velothilarge_corner_01`,
+  `in_velothilarge_cap_01`). In FS-UAE, four headings at the reported entrance
+  pose match OpenMW (wall and bench; bench corner and door; door and archway;
+  archway and banner), with no black holes. Only the Temple map was replaced on
+  fresh copies of the v0.0.29 disks; the engine was unchanged.
+
+**Repair.** `model_geometry` keeps the root node's translation and scale and
+replaces its rotation with identity. Child-node transforms are unchanged.
+Regression test: `tests/test_scenery_root_transform.py` (fictional meshes; three
+of its four checks fail on the v0.0.29 converter).
+
+**Other maps.** In the base game, 112 placed meshes have a root rotation or
+offset. Among maps converted so far, the root *rotation* affects Balmora Temple,
+Tharys Ancestral Tomb (same Velothi kit), seven Seyda Neen interiors with
+`in_nord_fireplace_01` (180-degree root yaw) and one `furn_pathspear_03` in
+Balmora. Those maps need rebuilding with the repaired converter. Root offsets
+such as the crate's were already handled correctly.
+
+**Still to verify.** Normal walking and collision across the whole lower level,
+the remaining door-frame seam, the other affected maps, and owner acceptance.
+
+## RC2 entrance-level traversal report: 6 October 2026
+
+Status: **major, open geometry and collision defect**. The player reports that
+they cannot cross the broken entrance area and also reports floating objects.
+The latest original screenshot visibly shows missing entrance-level coverage at
+local XYZ **997 1062 3701**, direction **S197**, pitch **4**, time **06:21** in
+v0.0.29-rc2. Earlier views from the same report are local **924 1076 3701**,
+SE114, pitch 5, time 05:04, and **995 1033 3701**, NW330, pitch 5, time 05:24.
+
+The affected lower area is specifically the **entrance level**. The upper level
+and stairs work and already worked in the previous version; retain them as
+intact controls. The player accepts carrying this known issue on the roadmap
+for v0.0.29. This is a release-scope decision, not repair acceptance. Missing
+wall dimensions is a reported hypothesis; the cause remains unproven.
+
+Do not describe this as cosmetic: blocked traversal and collision holes remain
+part of the open report. Normal collision/route replay and exact face/reference
+bindings are still required for repair verification.
+
 ## Packaged interior plane audit: 2026-10-06T20:11:15+03:00
 
 Read-only check of the sealed v0.0.29-rc1 package completed: all 58 gameplay

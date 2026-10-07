@@ -78,10 +78,20 @@ HEAP_LOADER_SOURCE_PATHS = (
     'src/quakedef.h', 'src/server.h', 'src/net.h', 'src/host.c', 'src/net_main.c', 'src/net_loop.c',
 )
 RUNTIME_BUILD_DIR='runtime'
-CC_FLAGS=' -std=gnu89 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types'
+# The engine compiles warning-free; the build fails on any compiler warning
+# (see build_engine). Do not add -Wno-* flags to hide new ones.
+CC_FLAGS=' -std=gnu89'
 
 def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-def run(args,cwd=None,env=None):subprocess.run(list(map(str,args)),cwd=cwd,env=env,check=True)
+def run(args,cwd=None,env=None,capture=False):
+    if not capture:
+        subprocess.run(list(map(str,args)),cwd=cwd,env=env,check=True);return None
+    # Echo the combined output and return it for inspection (compiler warnings).
+    result=subprocess.run(list(map(str,args)),cwd=cwd,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                          text=True,errors='replace')
+    print(result.stdout,end='',flush=True)
+    if result.returncode:raise subprocess.CalledProcessError(result.returncode,str(args[0]))
+    return result.stdout
 def heap_watcher_summary(report, report_path):
     """Expose estimated use and spare capacity; never invent target measurements."""
     budget = report['heap_budget_bytes']
@@ -330,7 +340,11 @@ def engine(args):
     jobs=resolve_jobs(args.jobs)
     debug_luma=bool(getattr(args,'debug_luma',True))
     print(f'Native compiler jobs: {jobs}',flush=True)
-    run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),make_python_assignment(),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0')+(' -DAMIWIND_DEBUG_LUMA=1' if debug_luma else ''),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env)
+    output=run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),make_python_assignment(),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0')+(' -DAMIWIND_DEBUG_LUMA=1' if debug_luma else ''),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env,capture=True)
+    warnings=[line for line in str(output or '').splitlines() if ': warning: ' in line]
+    if warnings and not getattr(args,'allow_compiler_warnings',False):
+        raise SystemExit(f'Engine build produced {len(warnings)} compiler warning(s); it must be warning-free. '
+                         'Fix them, or pass --allow-compiler-warnings for a local experiment only.')
     binary=tree/('build/AmiQuakeGCC-NoFPU' if args.cpu=='68020' else 'build/AmiQuakeGCC')
     check_binary(binary.read_bytes())
     checker=tree/'build/AmiWindCheck'
@@ -651,7 +665,8 @@ def image(args):
                           source_map=out/'seyda.map',
                           palette=boot/'id1/gfx/palette.lmp',
                           ericw_bin=args.qbsp.parent,
-                          threads=8, work_dir=out/'bounded-seyda')
+                          threads=8, work_dir=out/'bounded-seyda',
+                          canonical_land_source=getattr(args,'canonical_land_source',None))
     if getattr(args, 'balmora_cache', None):
         from repair_balmora_maps import repair as repair_balmora_maps
         print('Preparing measured bounded Balmora layout from complete source cache...', flush=True)
@@ -999,6 +1014,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     e=sub.add_parser('engine');e.add_argument('--cpu',choices=['68020','68040'],default='68040');e.add_argument('--archive',type=Path,help='Optional legacy provenance check; source is always engine/aga in this repository');e.add_argument('--out',type=Path,required=True);e.add_argument('--sdk',type=Path,required=True);e.add_argument('--vasm',type=Path,help='68000 preflight assembler; defaults to the SDK vasm')
     add_jobs(e)
+    e.add_argument('--allow-compiler-warnings',action='store_true',help='Local experiments only: do not fail the build on compiler warnings')
     luma=e.add_mutually_exclusive_group()
     luma.add_argument('--disallow-luma-controls','--no-luma-controls',dest='debug_luma',action='store_false',help='Compile out brightness settings, scaling and menu; retain explanatory console messages')
     luma.add_argument('--interior-brightness','--debug-luma',dest='debug_luma',action='store_true',help='Enable brightness controls (the default); legacy aliases retained')
@@ -1017,6 +1033,7 @@ def main():
     gallery_choice.add_argument('--gallery',type=Path,help='Verified NPC gallery from build_gallery.py; normal default')
     gallery_choice.add_argument('--no-npc-gallery',action='store_true',help='DEBUGGING ONLY: omit inspection gallery, never required game NPCs')
     i.add_argument('--intro-captions',type=Path,help='Private JSON title cards; first card becomes a switchable opening overlay')
+    i.add_argument('--canonical-land-source',type=Path,help='World-survey terrain-source.npz (survey_vvardenfell.py); required while Seyda terrain culling is enabled')
     i.add_argument('--world-terrain',type=Path,help='Complete validated refined terrain receipt and runtime directory, staged before scenery')
     i.add_argument('--world-scenery',type=Path,required=True,help='Complete validated full-world rock and giant-mushroom overlay directory')
     i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')

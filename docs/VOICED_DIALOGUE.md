@@ -138,7 +138,7 @@ map-owned cache/entity/lip references. At most four detached tails share128KiB,
 including PCM headers; refusal paths are explicit. Existing gain and background
 music buffering are unchanged. Source mixer tests pass, but audible target
 continuity and worst-case memory acceptance remain open. See
-[TRANSITION-VOICE-29](BUG_JOURNAL.md#transition-voice-29-active-speech-stops-during-automatic-cell-handoff-open).
+[TRANSITION-VOICE-29](journals/BUG_JOURNAL-v0.0.29.md#transition-voice-29-active-speech-stops-during-automatic-cell-handoff-open).
 
 Modal background freeze/blackout is independent of audio. Character selection,
 journals and other blocking overlays keep the soundtrack serviced continuously;

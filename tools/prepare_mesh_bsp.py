@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """Compile owned static meshes to shared BSP29 submodels with original UVs."""
+import os
 import argparse, json, math, re, shutil, struct, subprocess, sys
 from pathlib import Path
 import numpy as np
@@ -12,6 +13,26 @@ from player_hull import MINS, MAXS, PROFILE, rebuild_world_hull
 from mwad.scene import read_asset, unpack_geometry
 from scenery_selection import select_runtime_refs
 from static_lod import reduce_mesh, rock_profile
+# Build switch: AMIWIND_NO_EMISSIVE=1 converts without self-lit material marking
+# (no emitN_ textures), reproducing pre-emissive maps.
+NO_EMISSIVE = os.environ.get('AMIWIND_NO_EMISSIVE') == '1'
+# Build switch: AMIWIND_NO_FLAMES=1 writes no aw_flame entities.
+NO_FLAMES = os.environ.get('AMIWIND_NO_FLAMES') == '1'
+
+
+def flame_entities(ref, model, centre):
+    """aw_flame entities for a placement's particle flames (prepare_scenery
+    model_flames); same transform as the placed geometry."""
+    if NO_FLAMES or not model.get('flames'):
+        return []
+    rotation = reference_rotation(ref)
+    origin = (np.array(ref['position']) - np.array([*centre, 0])) * SCALE
+    out = []
+    for x, y, z, size in model['flames']:
+        p = origin + rotation @ np.array([x, y, z], dtype=float) * SCALE * ref['scale']
+        out.append('{\n"classname" "aw_flame"\n"origin" "%.2f %.2f %.2f"\n"aw_flame_size" "%.2f"\n}'
+                   % (p[0], p[1], p[2], size * ref['scale']))
+    return out
 from prepare_scenery import reference_rotation
 from exterior_visibility import apply_exterior_selection, VisibilityPolicyError
 
@@ -241,13 +262,15 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        im=Image.fromarray(models[model_ids[m['source']]][4]['_flat_rgb']).quantize(palette=pal,dither=Image.Dither.NONE)
        texture_cache[key]=len(textures);textures.append(miptex('flat'+str(len(textures)),im))
       return texture_cache[key]
-     mat=m['materials'][mi];ti=mat['texture_index'];key=(ti,size,tuple(round(x,2) for x in mat['diffuse']))
+     mat=m['materials'][mi];ti=mat['texture_index'];glow=0 if NO_EMISSIVE else int(mat.get('emissive',0))
+     key=(ti,size,tuple(round(x,2) for x in mat['diffuse']),glow)
      if key not in texture_cache:
       if ti is None:rgb=np.full((32,32,3),180.)
       else:
        raw=read_asset(archive,index['textures'][ti]);_,w,h=struct.unpack_from('>4sHH',raw);rgb=np.frombuffer(raw[8:],np.uint8).reshape(h,w,4)[:,:,:3].astype(float)
       rgb*=np.array(mat['diffuse']);im=Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).resize((size,size)).quantize(palette=pal,dither=Image.Dither.NONE)
-      t=len(textures);texture_cache[key]=t;textures.append(miptex('surface'+str(t),im))
+      # "emitN_" marks a self-lit material for the engine (r_surf.c R_EmissiveLevel).
+      t=len(textures);texture_cache[key]=t;textures.append(miptex(('emit%d_%d'%(glow,t)) if glow else 'surface'+str(t),im))
      return texture_cache[key]
     def collider(pieces, exact=False, model_name='', reference=0):
      if not pieces:return -empty_leaf-1,-1
@@ -368,7 +391,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
         original=visual_models[key];header=bytearray(lumps[14][original*64:(original+1)*64])
         struct.pack_into('<4i',header,36,nroot,croot,croot,croot)
         instance_models[variant]=len(lumps[14])//64;lumps[14]+=header
-       entities.append(entity(instance_models[variant],origin,yaw,ref['number']));continue
+       entities.append(entity(instance_models[variant],origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre));continue
       surfaces,worldparts,lo,hi=next(placements);part_cache[key]=worldparts
       if terrain is not None and terrain.prisms:
        surfaces,cull_counts=cull_surfaces(surfaces,terrain,placement_groups[key])
@@ -402,7 +425,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
       nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
-      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']))
+      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre))
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
     order_face_planes(lumps,face_planes)

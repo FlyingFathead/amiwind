@@ -177,6 +177,20 @@ R_BuildLightMap
 Combine and scale multiple lightmaps into the 8.8 format in blocklights
 ===============
 */
+/* Glowing materials (lantern glass, flames, lava, Bitter Coast mushrooms).
+ * The scene converter names their textures "emitN..." with N = 1..9 for the
+ * source emissive strength (9 = fully self-lit). With aw_emissive 1 (default)
+ * such surfaces get at least that much light; 0 restores plain lightmaps.
+ * Checked per lightmap build, not per pixel. */
+cvar_t	aw_emissive = {"aw_emissive","1",true};
+static int R_EmissiveLevel (msurface_t *surf)
+{
+	const char *n = surf->texinfo->texture->name;
+	if (n[0]=='e' && n[1]=='m' && n[2]=='i' && n[3]=='t' && n[4]>='1' && n[4]<='9')
+		return n[4]-'0';
+	return 0;
+}
+
 void R_BuildLightMap (void)
 {
 	int			smax, tmax;
@@ -240,6 +254,19 @@ void R_BuildLightMap (void)
 			blocklights[i] = value >= 255*256 ? 255*256 : (unsigned)value;
 		}
 #endif
+
+// self-lit materials: raise the static light to the material's level
+	if (aw_emissive.value)
+	{
+		int level = R_EmissiveLevel (surf);
+		if (level)
+		{
+			unsigned floor_light = (unsigned)(level*255*256/9);
+			for (i=0 ; i<size ; i++)
+				if (blocklights[i] < floor_light)
+					blocklights[i] = floor_light;
+		}
+	}
 
 // add all the dynamic lights
 	if (surf->dlightframe == r_framecount)
@@ -336,18 +363,11 @@ void R_DrawSurface (void)
 
 //==============================
 
-	if (r_pixbytes == 1)
-	{
-		pblockdrawer = surfmiptable[r_drawsurf.surfmip];
-	// TODO: only needs to be set when there is a display settings change
-		horzblockstep = blocksize;
-	}
-	else
-	{
-		pblockdrawer = R_DrawSurfaceBlock16;
-	// TODO: only needs to be set when there is a display settings change
-		horzblockstep = blocksize << 1;
-	}
+	if (r_pixbytes != 1)
+		Sys_Error ("R_DrawSurface: only 8-bit surfaces are supported");
+	pblockdrawer = surfmiptable[r_drawsurf.surfmip];
+// TODO: only needs to be set when there is a display settings change
+	horzblockstep = blocksize;
 
 	smax = mt->width >> r_drawsurf.surfmip;
 	twidth = texwidth;
@@ -619,51 +639,9 @@ void R_DrawSurfaceBlock8_mip3 (void)
 }
 
 
-/*
-================
-R_DrawSurfaceBlock16
-
-FIXME: make this work
-================
-*/
-void R_DrawSurfaceBlock16 (void)
-{
-	int				k;
-	unsigned char	*psource;
-	int				lighttemp, lightstep, light;
-	unsigned short	*prowdest;
-	int	lightleft, lightright, lightleftstep, lightrightstep;
-
-	prowdest = (unsigned short *)prowdestbase;
-
-	for (k=0 ; k<blocksize ; k++)
-	{
-		unsigned short	*pdest;
-		int				b;
-
-		psource = pbasesource;
-		lighttemp = lightright - lightleft;
-		lightstep = lighttemp >> blockdivshift;
-
-		light = lightleft;
-		pdest = prowdest;
-
-		for (b=0; b<blocksize; b++)
-		{
-			*pdest = vid.colormap16[(light & 0xFF00) + *psource];
-			psource += sourcesstep;
-			pdest++;
-			light += lightstep;
-		}
-
-		pbasesource += sourcetstep;
-		lightright += lightrightstep;
-		lightleft += lightleftstep;
-		prowdest = (unsigned short *)((long)prowdest + surfrowbytes);
-	}
-
-	prowdestbase = prowdest;
-}
+/* The 16-bit surface drawer (stock Quake, marked "FIXME: make this work")
+ * read uninitialised light values and was unreachable: r_pixbytes is
+ * always 1 here. Removed; see R_DrawSurface. */
 
 #endif
 #endif

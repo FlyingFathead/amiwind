@@ -1,4 +1,4 @@
-# Entity exhaustion investigation history
+# ENTITY-EXHAUSTION-007: entity exhaustion investigation history
 
 The following journal entry is retained verbatim. Moving its detailed
 history here keeps the main journal within the public source size gate.

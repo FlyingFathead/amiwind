@@ -5,7 +5,7 @@
 The 4 October owner playtest reports F no longer raising hands and V printing
 torch on/off without visible hands or a working torch, especially in debug play.
 The cause is unconfirmed. Controls below remain the required behavior, not an
-acceptance claim. See [TORCH-INPUT-29](BUG_JOURNAL.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
+acceptance claim. See [TORCH-INPUT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
 and the [full input/state/visibility/light matrix](TORCH.md#v0029-required-hands-and-light-acceptance-matrix).
 Do not replace personal bindings or bypass intentional story restrictions to
 hide the failure. Capture the active bindings and input destination first.
@@ -21,13 +21,28 @@ writes the current bindings to `keymaps.cfg` and settings to `config.cfg`.
 Edit the personal file while the game is closed; an active session saves its own
 bindings when it exits. Keep the shipped defaults for recovery.
 
+## Options > Controls
+
+Options > Controls lists the gameplay actions with their current keys. Select an
+action and press Enter or click, then press the new key; Escape cancels.
+Delete or Backspace clears the action's keys. Each action holds up to two keys;
+a third key replaces both. A key already used by another action moves to the
+new action. Reset to defaults reloads the shipped `keymaps-default.cfg`.
+Changes use the same bindings as `bind` and are saved to `keymaps.cfg` on exit.
+F1-F12 and the console keys are handled before the menu and cannot be captured
+there; bind them with the console.
+
+Greyed rows are planned actions (inventory, quick keys, magic) with their
+intended keys. They become selectable when the action exists. The action table
+and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
+
 ## Configurable gameplay bindings
 
 | Default key | Command | Action / condition |
 | --- | --- | --- |
-| W / S | `+forward` / `+back` | Forward / backward |
-| A / D | `+moveleft` / `+moveright` | Strafe |
-| Left / Right | `+left` / `+right` | Turn |
+| W / S, Up / Down | `+forward` / `+back` | Forward / backward |
+| A / D, Left / Right | `+moveleft` / `+moveright` | Strafe |
+| (unbound) | `+left` / `+right` | Keyboard turn; mouse turns by default. Earlier saved key files keep Left / Right as turn. |
 | Space | `+jump` | Jump |
 | Shift | `+speed` | Run; faster noclip flight |
 | Ctrl | `+aw_fastflight` | Debug noclip only: twice Shift flight speed |

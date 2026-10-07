@@ -4,7 +4,8 @@
 and creates a self-contained private HTML viewer plus optional numeric JSON.
 Convert your own legally obtained game data with AmiWind first. This tool does
 not directly read TES3/NIF, download assets, or package original game material.
-The public source and tests work with synthetic data only.
+The public source and tests work with synthetic data only. To compare a whole
+set of sub-cell maps, see [sub-cell redundancy](SUBCELL_REDUNDANCY.md).
 
 ```sh
 python tools/generate_polygon_heatmap.py --config /private/heatmap-input.json \

@@ -407,7 +407,9 @@ void D_DrawSprite (void)
 	int			i, nump;
 	float		ymin, ymax;
 	emitpoint_t	*pverts;
-	sspan_t		spans[MAXHEIGHT+1];
+	/* Static, not on the stack: about 12 KB, and sprite_spans must not point
+	 * at a dead stack frame. D_DrawSprite is not reentrant. */
+	static sspan_t	spans[MAXHEIGHT+1];
 
 	sprite_spans = spans;
 

@@ -25,8 +25,11 @@ static double started;
 static unsigned long be32(byte *p){return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3];}
 static void close_movie(void){
     debug_pending=0;
-    if(video)fclose(video);if(audio)fclose(audio);video=audio=NULL;
-    if(buffers)free(buffers);buffers=NULL;
+    if(video)fclose(video);
+    if(audio)fclose(audio);
+    video=audio=NULL;
+    if(buffers)free(buffers);
+    buffers=NULL;
     if(opening_card)free(opening_card);
     opening_card=NULL;
 }
@@ -157,7 +160,8 @@ void AW_MovieUpdate(void){
     /* Drop late pictures without delaying the narration. Seek only on skips. */
     if((frame!=shown+1 && fseek(video,DATA_START+frame*pixels,SEEK_SET)) ||
        fread(buffers->frame,1,pixels,video)!=pixels){finish("video read error");return;}
-    if(frame>shown+1)dropped+=frame-shown-1;pictures++;shown=frame;
+    if(frame>shown+1)dropped+=frame-shown-1;
+    pictures++;shown=frame;
 }
 void AW_MoviePaint(portable_samplepair_t *dst,int count,int first_sample){
     long position=first_sample-clock_start,take;int i,gain=(int)(volume.value*256);

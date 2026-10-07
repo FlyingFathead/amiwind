@@ -304,7 +304,7 @@ char *PR_ValueString (etype_t type, eval_t *val)
 		sprintf (line, "%s", pr_strings + val->string);
 		break;
 	case ev_entity:
-		sprintf (line, "entity %ld", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
+		sprintf (line, "entity %ld", (long)NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
 		break;
 	case ev_function:
 		f = pr_functions + val->function;
@@ -327,7 +327,7 @@ char *PR_ValueString (etype_t type, eval_t *val)
 		sprintf (line, "pointer");
 		break;
 	default:
-		sprintf (line, "bad type %ld", type);
+		sprintf (line, "bad type %ld", (long)type);
 		break;
 	}
 
@@ -356,7 +356,7 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 		sprintf (line, "%s", pr_strings + val->string);
 		break;
 	case ev_entity:
-		sprintf (line, "%ld", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+		sprintf (line, "%ld", (long)NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
 		break;
 	case ev_function:
 		f = pr_functions + val->function;
@@ -376,7 +376,7 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 		sprintf (line, "%f %f %f", val->vector[0], val->vector[1], val->vector[2]);
 		break;
 	default:
-		sprintf (line, "bad type %ld", type);
+		sprintf (line, "bad type %ld", (long)type);
 		break;
 	}
 
@@ -402,11 +402,11 @@ char *PR_GlobalString (int ofs)
 	val = (void *)&pr_globals[ofs];
 	def = ED_GlobalAtOfs(ofs);
 	if (!def)
-		sprintf (line,"%ld(???)", ofs);
+		sprintf (line,"%d(?\?\?)", ofs);
 	else
 	{
 		s = PR_ValueString (def->type, val);
-		sprintf (line,"%ld(%s)%s", ofs, pr_strings + def->s_name, s);
+		sprintf (line,"%ld(%s)%s", (long)ofs, pr_strings + def->s_name, s);
 	}
 
 	i = strlen(line);
@@ -425,9 +425,9 @@ char *PR_GlobalStringNoContents (int ofs)
 
 	def = ED_GlobalAtOfs(ofs);
 	if (!def)
-		sprintf (line,"%ld(???)", ofs);
+		sprintf (line,"%d(?\?\?)", ofs);
 	else
-		sprintf (line,"%ld(%s)", ofs, pr_strings + def->s_name);
+		sprintf (line,"%ld(%s)", (long)ofs, pr_strings + def->s_name);
 
 	i = strlen(line);
 	for ( ; i<20 ; i++)

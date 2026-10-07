@@ -522,7 +522,11 @@ void Host_Savegame_f (void)
 		}
 	}
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	if (!COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1)))
+	{
+		Con_Printf ("Save path too long.\n");
+		return;
+	}
 	COM_DefaultExtension (name, ".sav");
 
 	Con_Printf ("Saving game to %s...\n", name);
@@ -593,7 +597,11 @@ void Host_Loadgame_f (void)
 
 	cls.demonum = -1;		// stop demo loop in case this fails
 
-	sprintf (name, "%s/%s", com_gamedir, Cmd_Argv(1));
+	if (!COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1)))
+	{
+		Con_Printf ("Save path too long.\n");
+		return;
+	}
 	COM_DefaultExtension (name, ".sav");
 
 // we can't call SCR_BeginLoadingPlaque, because too much stack space has
@@ -1022,7 +1030,7 @@ void Host_Say(qboolean teamonly)
 	client_t *save;
 	int		j;
 	char	*p;
-	unsigned char	text[64];
+	char	text[64];
 	qboolean	fromServer = false;
 
 	if (cmd_source == src_command)

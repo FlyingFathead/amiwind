@@ -16,7 +16,8 @@ void AW_NoclipVelocity(vec3_t view, usercmd_t *cmd, float maximum, vec3_t out)
     limit=fabs(cmd->forwardmove);
     if(fabs(cmd->sidemove)>limit)limit=fabs(cmd->sidemove);
     if(fabs(cmd->upmove)>limit)limit=fabs(cmd->upmove);
-    if(limit>maximum)limit=maximum;if(limit<0)limit=0;
+    if(limit>maximum)limit=maximum;
+    if(limit<0)limit=0;
     for(i=0;i<3;i++)out[i]=forward[i]*cmd->forwardmove+right[i]*cmd->sidemove;
     out[2]+=cmd->upmove;
     speed=VectorNormalize(out);if(speed>limit)speed=limit;

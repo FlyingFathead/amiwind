@@ -55,7 +55,7 @@ limitation; further audio investigation is deferred until after publication. Add
 read-ahead is a functionally tested mitigation, not a verified cure or a proven
 hardware/backend diagnosis. The complete attempts, corrected test oracle,
 memory accounting and listening chronology are in
-[WIN-05](BUG_JOURNAL.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+[WIN-05](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
 
 ## Earlier audio design and implementation records
 

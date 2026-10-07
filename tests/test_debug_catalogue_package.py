@@ -57,6 +57,29 @@ class DebugCataloguePackageTests(unittest.TestCase):
                 self.assertEqual('-DAMIWIND_DEBUG_LUMA=1' in compiler, debug)
                 self.assertIs(json.loads((out/'engine-build.json').read_text())['debug_luma'], debug)
 
+    def test_engine_build_fails_on_compiler_warnings(self):
+        warning = 'src/example.c:1:1: warning: example [-Wexample]\n'
+        for extra, expect_failure in (([], True), (['--allow-compiler-warnings'], False)):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as tmp:
+                out = Path(tmp)/'out'
+                tree = out/'runtime'
+                (tree/'build').mkdir(parents=True)
+                (tree/'build/AmiQuakeGCC').write_bytes(b'fixture engine')
+                (tree/'build/AmiWindCheck').write_bytes(b'fixture checker')
+                argv = ['build_aga.py','engine','--sdk',tmp,'--out',str(out),'--jobs','1',*extra]
+                with patch.object(sys,'argv',argv), patch.object(build_aga,'check_native_versions'), \
+                     patch.object(build_aga,'new_output',return_value=out), \
+                     patch.object(build_aga,'stage_runtime',return_value=(tree,{})), \
+                     patch.object(build_aga,'run',return_value=warning), patch.object(build_aga,'check_binary'), \
+                     patch.object(build_aga,'write_world_coverage'), patch.object(build_aga,'executable_path',side_effect=str):
+                    if expect_failure:
+                        with self.assertRaises(SystemExit):
+                            build_aga.main()
+                        self.assertFalse((out/'engine-build.json').exists())
+                    else:
+                        build_aga.main()
+                        self.assertTrue((out/'engine-build.json').exists())
+
     def test_missing_or_invalid_catalogue_stops_before_partial_install(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

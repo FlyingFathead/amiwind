@@ -177,7 +177,7 @@ void *Mod_Extradata (model_t *mod)
 Mod_PointInLeaf
 ===============
 */
-mleaf_t *Mod_PointInLeaf (vec3_t p, model_t *model)
+mleaf_t *Mod_PointInLeaf (float *p, model_t *model)
 {
     mnode_t		*node;
     float		d;
@@ -1499,7 +1499,8 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
     copied=aw_load_prefetch_copy?aw_load_prefetch_copy(loadmodel->name,l->fileofs,mod_base,l->filelen):0;
     if(fseek(aw_bsp_file,aw_bsp_base+l->fileofs+copied,SEEK_SET) || AW_LoadRead(mod_base+copied,l->filelen-copied,aw_bsp_file)!=(size_t)l->filelen-copied)
         Sys_Error("Short BSP section");
-    if(l->filelen>aw_bsp_peak)aw_bsp_peak=l->filelen;aw_bsp_reads++;
+    if(l->filelen>aw_bsp_peak)aw_bsp_peak=l->filelen;
+    aw_bsp_reads++;
     section.fileofs=0;section.filelen=l->filelen;
     started=aw_load_clock?aw_load_clock():0;decode(&section);
     if(aw_load_clock)aw_load_decode_seconds+=aw_load_clock()-started;
@@ -1625,9 +1626,9 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 
         if (i < mod->numsubmodels-1)
         {	// duplicate the basic information
-            char	name[10];
+            char	name[16];
 
-            sprintf (name, "*%ld", i+1);
+            sprintf (name, "*%ld", (long)(i+1));
             loadmodel = Mod_FindName (name);
             *loadmodel = *mod;
             strcpy (loadmodel->name, name);

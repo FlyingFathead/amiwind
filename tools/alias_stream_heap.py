@@ -5,7 +5,8 @@ from pathlib import Path
 import re
 import struct
 
-STREAM_SHA256='909db6182e3b74b47f68bb541ad5e203afca19488d1fbe75cf937611b5c95853'
+# Updated for aw_alias_single_pass (one read while decoding; same cache block, no staging).
+STREAM_SHA256='17b39288303d1d762944dc278d193817fc7396b323735c7b08907379f9d0e36d'
 
 def runtime_policy(source):
     source=Path(source)

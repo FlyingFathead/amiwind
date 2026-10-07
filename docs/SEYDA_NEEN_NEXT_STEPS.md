@@ -25,8 +25,8 @@ Save design and pending comparison gates: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md).
 
 ## Current stability reports, 28 September 2026
 
-- [ ] [AW-20260928-01](BUGS.md#aw-20260928-01-potential-prison-ship-exit-freeze-during-intro): ship-exit freeze during intro on FS-UAE 3.1.66; second attempt worked.
-- [ ] [AW-20260928-02](BUGS.md#aw-20260928-02-potential-dockmenu-freeze-with-looping-music): freeze after remaining in the menu on the dock, with music looping, on the same machine/emulator.
+- [ ] [AW-20260928-01](journals/BUGS-NOTES-v0.0.29.md#aw-20260928-01-potential-prison-ship-exit-freeze-during-intro): ship-exit freeze during intro on FS-UAE 3.1.66; second attempt worked.
+- [ ] [AW-20260928-02](journals/BUGS-NOTES-v0.0.29.md#aw-20260928-02-potential-dockmenu-freeze-with-looping-music): freeze after remaining in the menu on the dock, with music looping, on the same machine/emulator.
 
 Both are owner reports with unknown cause. The earlier hatch implementation and
 passing activation checks below do not close these intermittent stability reports.

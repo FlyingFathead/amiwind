@@ -72,14 +72,24 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
     vertices, faces, materials = [], [], []
     skipped = []
     worlds = {}
-    def collect(node, parent):
+    def collect(node, parent, root=False):
         if not isinstance(node, N.NiAVObject):return
-        transform = np.array(node.get_transform().as_list()) @ parent
+        local = np.array(node.get_transform().as_list())
+        if root:
+            # Morrowind ignores the root node's authored rotation (e.g. the
+            # 90-degree yaw on Velothi interior kit pieces) but keeps its
+            # translation and scale: crates with a -32 root offset rest exactly
+            # on the floor only when that offset is applied.
+            # BALMORA-TEMPLE-GEOMETRY-29.
+            # Round the recovered scale: a rotated unit-scale root gives e.g.
+            # 0.99999994, which breaks exact vertex sharing between pieces.
+            local[:3, :3] = np.eye(3) * round(float(np.linalg.norm(local[0, :3])), 6)
+        transform = local @ parent
         if pose_world and isinstance(node,N.NiNode):transform=pose_world(node.name.decode('cp1252'))
         worlds[id(node)] = transform
         for child in getattr(node, 'children', []):
             if child is not None:collect(child, transform)
-    for root in data.roots:collect(root, np.eye(4))
+    for root in data.roots:collect(root, np.eye(4), root=True)
     def visit(node, parent, hidden=False, in_collision=False, path="root[0]", inherited_stencil=None):
         if not isinstance(node, N.NiAVObject):
             return
@@ -103,10 +113,14 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
             g = node.data
             if g is None or not g.num_vertices or not g.num_triangles:
                 return
-            diffuse, alpha, texture = [1., 1., 1.], 1., None
+            diffuse, alpha, texture, emissive = [1., 1., 1.], 1., None, 0
             for p in ([] if collision else node.properties):
                 if isinstance(p, N.NiMaterialProperty):
                     diffuse = [p.diffuse_color.r, p.diffuse_color.g, p.diffuse_color.b]; alpha = p.alpha
+                    # Self-lit strength 0..9 from the brightest emissive channel; the
+                    # engine raises such surfaces' light (aw_emissive).
+                    glow = max(p.emissive_color.r, p.emissive_color.g, p.emissive_color.b)
+                    emissive = max(0, min(9, int(round(glow * 9)))) if glow > 0.05 else 0
                 if isinstance(p, N.NiTexturingProperty) and p.has_base_texture and p.base_texture.source:
                     texture = p.base_texture.source.file_name.decode('cp1252')
             material = len(materials)
@@ -117,7 +131,7 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
                 'unspecified' if visibility['draw_mode'] is None else 'unknown')
             visibility.update({'hidden': hidden, 'collision_node': in_collision,
                                'runtime_policy': 'existing one-sided winding; metadata is not new raster support'})
-            materials.append({'texture_source': texture, 'diffuse': diffuse, 'alpha': alpha,
+            materials.append({'texture_source': texture, 'diffuse': diffuse, 'alpha': alpha, 'emissive': emissive,
                               'source_shape': name, 'source_shape_path': path,
                               'source_face_range': {'start': len(faces), 'count': int(g.num_triangles)},
                               'source_visibility': visibility})
@@ -167,6 +181,47 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
     unpack_geometry(packet)
     points = np.array(vertices)[:, :3]
     return packet, materials, [points.min(axis=0).tolist(), points.max(axis=0).tolist()], skipped
+
+
+# Particle emitters that are not flames.
+FLAME_SKIP = ('smoke', 'ash', 'spark', 'steam', 'dust', 'mist', 'bubble', 'fog')
+
+
+def model_flames(raw, N, name=''):
+    """Particle-flame positions [x, y, z, size] in NIF units for a light mesh.
+
+    One entry per NiParticleSystemController emitter (candle, lantern, fire,
+    brazier), skipping smoke/ash/spark-type emitters. Uses the same root-node
+    rule as model_geometry (rotation dropped, translation and scale kept).
+    The engine draws these as static flames (aw_flame entities)."""
+    import numpy as np
+    data = N.Data()
+    try:
+        data.read(io.BytesIO(raw))
+    except Exception:
+        return []  # geometry reading decides whether the model is usable
+    worlds = {}
+    def collect(node, parent, root=False):
+        if not isinstance(node, N.NiAVObject): return
+        local = np.array(node.get_transform().as_list())
+        if root:
+            local[:3, :3] = np.eye(3) * round(float(np.linalg.norm(local[0, :3])), 6)
+        world = local @ parent; worlds[id(node)] = world
+        for child in getattr(node, 'children', []):
+            if child is not None: collect(child, world)
+    for root in data.roots: collect(root, np.eye(4), root=True)
+    stem = name.lower()
+    # Engine flame height is about 1.5 x size map units (a torch flame is 1).
+    size = (0.8 if any(k in stem for k in ('candle', 'lantern', 'sconce', 'lamp', 'chandelier', 'torch'))
+            else 8.0 if any(k in stem for k in ('fire', 'brazier', 'pit')) else 2.0)
+    flames = []
+    for block in data.blocks:
+        if type(block).__name__ != 'NiParticleSystemController' or block.emitter is None: continue
+        if id(block.emitter) not in worlds: continue
+        if any(k in block.emitter.name.decode('cp1252', 'replace').lower() for k in FLAME_SKIP): continue
+        p = worlds[id(block.emitter)][3, :3]
+        flames.append([round(float(p[0]), 3), round(float(p[1]), 3), round(float(p[2]), 3), size])
+    return flames
 
 
 def reference_rotation(ref):
@@ -296,7 +351,8 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                                         'collision': collision_record,
                                         'source_visibility_issues': source_visibility_issues(materials),
                                         'exterior_visibility': visibility_selection,
-                                        'skipped_shapes': skipped, **put(f, packet)})
+                                        'skipped_shapes': skipped,
+                                        'flames': model_flames(raw, nif_reader(), name), **put(f, packet)})
                 print('model',len(index['models']),'/',len(names),name,flush=True)
             except VisibilityPolicyError:
                 raise

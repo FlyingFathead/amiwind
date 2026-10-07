@@ -40,6 +40,7 @@ SKY / LIGHTING|cloudtype|aw_cloud_type_set|classic/veil or 1/2 (classic default)
 SKY / LIGHTING|dayclouds|aw_day_clouds_set|0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected
 SKY / LIGHTING|daynightcycle|aw_daynightcycle|on/off true/false 1/0 (automatic time; explicit set/wait still work)
 SKY / LIGHTING|guardtorch|aw_guardtorch|[on/off/auto] (all guard torches; auto follows guards_torch_cycle)
+SKY / LIGHTING|emissive|aw_emissive|[0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query
 SKY / LIGHTING|luma interior|aw_interiorluma_set|[0..4] no argument: query; build must include luma controls
 SKY / LIGHTING|luma exterior|aw_exteriorluma_set|[0..4] no argument: query; original exterior baseline 1.0
 SKY / LIGHTING|exterior luma|aw_exteriorluma_set|[0..4] no argument: query

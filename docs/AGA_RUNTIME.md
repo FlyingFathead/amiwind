@@ -4,7 +4,7 @@
 
 Keep unquoted semicolons out of `//` comments in `config/game.cfg`: the command
 buffer splits them before the comment parser runs. The existing loading-delay
-source regression checks this rule. See [CONFIG-COMMENT-29](BUG_JOURNAL.md#config-comment-29-semicolon-splits-a-default-comment-repair-candidate)
+source regression checks this rule. See [CONFIG-COMMENT-29](journals/BUG_JOURNAL-v0.0.29.md#config-comment-29-semicolon-splits-a-default-comment-repair-candidate)
 for the dev2 punctuation correction and acceptance limits.
 
 This is the maintained runtime source in the AmiWind repository. See

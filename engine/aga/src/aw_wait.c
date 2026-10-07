@@ -5,6 +5,7 @@
  */
 #include "quakedef.h"
 #include "aw_story.h"
+#include "aw_character.h"
 #include "aw_clock.h"
 #include "aw_sky.h"
 static int modal,hours=1,help_page;

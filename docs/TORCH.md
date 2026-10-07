@@ -74,7 +74,7 @@ specific problem from general torch brightness: walls/floors respond to the
 player's torch, while the nearby NPC remains dark. Five dev4 screenshots
 include torch-off/on, ground and dawn views. This requires NPC-rendering and
 night-palette investigation; increasing only the radius is not sufficient
-evidence of a fix. See [the report and source leads](BUG_JOURNAL.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
+evidence of a fix. See [the report and source leads](journals/BUG_JOURNAL-v0.0.29.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
 
 Add NPC bodies to the mandatory light acceptance matrix: compare identical
 camera/time off/on/off samples, player and guard torches, near/far/expired
@@ -89,7 +89,7 @@ unverified contributors. **No fix is claimed.**
 
 On 4 October 2026, post-release v0.0.28 playtesting again found **F unable to
 raise hands in debug play; V prints torch on/off but no hands or working torch
-appear**. Treat [TORCH-INPUT-29](BUG_JOURNAL.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
+appear**. Treat [TORCH-INPUT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
 as a high-priority recurring regression. Missing converted-world hand metadata
 is a confirmed defect; the exact older owner-session cause and debug/map
 involvement remain unverified. Existing control descriptions below state the contract,
@@ -98,8 +98,8 @@ and previous torch crash separate.
 
 Guard torches also fail to produce convincing surrounding night illumination
 in the owner's view, and interiors lack convincing lantern/torch lighting.
-[TORCH-LIGHT-29](BUG_JOURNAL.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)
-and [INTERIOR-LIGHT-29](BUG_JOURNAL.md#interior-light-29-interiors-lack-convincing-local-light-open)
+[TORCH-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)
+and [INTERIOR-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#interior-light-29-interiors-lack-convincing-local-light-open)
 need matched-camera surface comparisons, not just flame/admission tests.
 Study original owned light records, OpenMW semantics and Quake/AmiQuake light
 paths; audit conversion, final lightmap/palette contribution, radius, rejection
@@ -704,7 +704,7 @@ illumination and detached Nord torch-hand fragment. Both require exact-package
 native replay; candidate source checks alone do not close them. The shipped dev4
 torch hand is still the legacy reduced model, so validate replacement catalogue
 and model inclusion as well as connected appearance across animation/camera
-states. See [the hand report](BUG_JOURNAL.md#torch-hand-nord-29-detached-looking-grip-fragment-in-dev4-open).
+states. See [the hand report](journals/BUG_JOURNAL-v0.0.29.md#torch-hand-nord-29-detached-looking-grip-fragment-in-dev4-open).
 
 The dev4 console has confirmed brightbase style2 in playtesting. Query it using
 `aw_torch_flame_set`; direct saved setting `aw_torch_flame_style` also reports

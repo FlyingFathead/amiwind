@@ -25,7 +25,8 @@ int AW_DrawDistance(void) {
     return (int)aw_drawdistance.value;
 }
 void AW_SetDrawDistance(int value) {
-    if(value<128)value=128;if(value>1400)value=1400;
+    if(value<128)value=128;
+    if(value>1400)value=1400;
     Cvar_SetValue("aw_drawdistance",value);
 }
 static void distance_command(void) {
@@ -52,7 +53,8 @@ void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cmd_AddComman
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
     int level,first=1,last;
-    if(distance<128)distance=128;if(distance>4096)distance=4096;
+    if(distance<128)distance=128;
+    if(distance>4096)distance=4096;
     memset(table,0,32768);table[0]=15;
     for(level=15;level>=1;level--){
         last=819200/(distance*(10+level));if(last>32767)last=32767;

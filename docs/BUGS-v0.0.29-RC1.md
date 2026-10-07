@@ -1,5 +1,7 @@
 # v0.0.29-rc1 playtest issues
 
+Frozen history: current status of every bug is in [the register](BUGS.md).
+
 ## Current RC1 regression checkpoint: 2026-10-06T15:03:42+00:00
 
 Delivered playtest remains **v0.0.29-rc1**. The later combined source passed

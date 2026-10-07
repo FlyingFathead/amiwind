@@ -2,10 +2,10 @@
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Last updated:** 2026-10-06 15:28:19 EEST (Europe/Helsinki, UTC+03:00). **FAQ revision:** 4.
-**Published source baseline:** v0.0.29-dev4. **Latest stable release:** v0.0.28.
-**In preparation:** v0.0.29-rc1, with the remaining checks and limitations in
-the [release plan](PLAN-v0.0.29.md) and [RC1 issue tracker](BUGS-v0.0.29-RC1.md).
+**Last updated:** 7 October 2026. **FAQ revision:** 5.
+**Latest release:** v0.0.30 - The Temple ([release notes](RELEASE-v0.0.30.md)).
+**Next:** v0.0.31 - Revisiting Seyda Neen: lighter Seyda Neen maps and shorter
+cell-crossing pauses. See the [roadmap](ROADMAP.md) and [tracker](BUGS.md).
 
 ## What is possible on the Amiga?
 
@@ -169,8 +169,8 @@ configuration**:
 | Default game display | 320 × 200, 8-bit indexed colour |
 
 These settings are recorded in the
-[FS-UAE preset](../resources/emulators/AmiWind-v0.0.29-dev4-FS-UAE.fs-uae),
-[WinUAE preset](../resources/emulators/AmiWind-v0.0.29-dev4-WinUAE.uae) and
+[FS-UAE preset](../resources/emulators/AmiWind-v0.0.30-FS-UAE.fs-uae),
+[WinUAE preset](../resources/emulators/AmiWind-v0.0.30-WinUAE.uae) and
 [AGA build guide](AGA_BUILD.md). The Zorro III setting describes the emulator's
 memory configuration; it is not a specification for an ordinary A1200 expansion.
 
@@ -228,7 +228,12 @@ frame rate, Chip RAM bandwidth or loading performance.
 There is therefore a sound reason to pursue these machines. Extra installed
 RAM does not automatically enlarge AmiWind's current **11 MiB game heap**,
 defined in the [runtime allocation code](../engine/aga/src/sys_amiga.c), but it
-provides room to develop larger budgets where useful. CPU rendering, AGA
+provides room to develop larger budgets where useful. Measurements show where
+that would help: a fully loaded Seyda Neen sub-cell leaves only about 2.6 MB
+of the heap for cached models, so each crossing evicts and re-reads actor
+models (see [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md)). A larger heap
+on a high-memory machine could keep them across crossings; this is untested.
+CPU rendering, AGA
 presentation, loading and audio still need to be measured together on the
 selected configuration.
 
@@ -394,10 +399,9 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **6 October 2026**, the public development snapshot is
-**v0.0.29-dev4** and **v0.0.28** remains the latest stable release. "Stable"
-here identifies the project's release track; AmiWind as a whole is still
-an early work in progress. The September description of only a small town
+As of **7 October 2026**, the latest release is **v0.0.30 - The Temple**.
+"Release" here identifies the project's release track; AmiWind as a whole is
+still an early work in progress. The September description of only a small town
 area and a prison ship is out of date.
 
 The documented playable scope now includes:
@@ -413,20 +417,21 @@ The documented playable scope now includes:
 - Shared day and night skies, original-source stars and moons, torches, and
   converted music, voices, effects and video, with remaining event and audio
   checks tracked separately.
-- A small mushroom-picking pilot in dev4: six original placements are packaged,
-  with one pickup's disappearance and persistence accepted in the documented
-  bounded native test.
+- Mushroom picking with saved pickup state, admitted in 347 of 390 exterior
+  maps under the current memory model (v0.0.29).
+- A repaired Balmora Temple, Tharys Ancestral Tomb and Seyda Neen fireplace
+  interiors, NPCs lit by the floor they stand on, glow and flames in rebuilt
+  maps, and an Options > Controls page for rebinding keys (v0.0.30).
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
 Full combat, quest simulation, services, schedules, conversations and the
 complete inventory system remain unfinished. Wider settlements, world actors
 and interiors also need further work. The dev4 pickup state is a small piece
-of interaction and persistence, and quickload still has an equipment-state
-limitation. Tribunal and Bloodmoon world content are outside the current
+of interaction and persistence. Tribunal and Bloodmoon world content are outside the current
 playable scope.
 
 See the [current overview](../README.md),
-[dev4 release notes](RELEASE-v0.0.29-dev4.md),
+[v0.0.30 release notes](RELEASE-v0.0.30.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 

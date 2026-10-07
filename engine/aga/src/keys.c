@@ -575,6 +575,8 @@ void AW_ControlsMigrate(void)
     }
     if(!keybindings['j'] || !*keybindings['j'])Key_SetBinding('j',"aw_journal");
     if(!keybindings['m'] || !*keybindings['m'])Key_SetBinding('m',"aw_worldmap");
+    if(!keybindings[K_UPARROW] || !*keybindings[K_UPARROW])Key_SetBinding(K_UPARROW,"+forward");
+    if(!keybindings[K_DOWNARROW] || !*keybindings[K_DOWNARROW])Key_SetBinding(K_DOWNARROW,"+back");
 }
 
 void Key_Init (void)

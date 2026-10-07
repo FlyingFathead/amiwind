@@ -51,7 +51,8 @@ static float R_LumaSetting(int outside)
         value=strtod(control->string,&end);
         invalid=end==control->string || *end || !isfinite(value) || !isfinite(control->value);
         if(invalid)value=outside?1:1.2;
-        if(value<0)value=0;if(value>4)value=4;
+        if(value<0)value=0;
+        if(value>4)value=4;
         luma_settings[outside]=(float)value;
         if(invalid || luma_settings[outside]!=control->value || strlen(control->string)>=64)
             Cvar_SetValue(control->name,luma_settings[outside]);
@@ -86,7 +87,8 @@ int R_BrightnessStep(int outside)
 void R_BrightnessSetStep(int outside,int value)
 {
     float setting;outside=outside!=0;
-    if(value<10)value=10;if(value>15)value=15;
+    if(value<10)value=10;
+    if(value>15)value=15;
     setting=value*.1f;
     if(fabs(R_LumaSetting(outside)-setting)<.00001f)return;
     Cvar_SetValue(luma_controls[outside]->name,setting);R_InteriorLumaUpdate();
@@ -102,7 +104,8 @@ static void R_LumaCommand(int outside)
         if(end==Cmd_Argv(1) || *end || !isfinite(value)){
             Con_Printf("%s luma requires a finite number (0..4).\n",name);return;
         }
-        if(value<0)value=0;if(value>4)value=4;
+        if(value<0)value=0;
+        if(value>4)value=4;
         Cvar_SetValue(luma_controls[outside]->name,(float)value);
     }
     R_InteriorLumaUpdate();configured=(long)(R_LumaSetting(outside)*1000+.5f);
@@ -303,6 +306,9 @@ LIGHT SAMPLING
 =============================================================================
 */
 
+/* Height of the surface the last successful RecursiveLightPoint hit. */
+static float lightpoint_hit_z;
+
 int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 {
 	int			r;
@@ -368,6 +374,7 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 		if ( ds > surf->extents[0] || dt > surf->extents[1] )
 			continue;
 
+		lightpoint_hit_z = mid[2];
 		if (!surf->samples)
 			return 0;
 
@@ -400,6 +407,110 @@ int RecursiveLightPoint (mnode_t *node, vec3_t start, vec3_t end)
 	return RecursiveLightPoint (node->children[!side], mid, end);
 }
 
+cvar_t	aw_actor_brush_light = {"aw_actor_brush_light","1",true};
+
+/* Light value of a surface's lightmap at a point on its plane, or -1 if the
+ * point lies outside the surface's texture extents. */
+static int R_SurfaceLightAt (msurface_t *surf, vec3_t at)
+{
+	mtexinfo_t	*tex = surf->texinfo;
+	int		s, t, ds, dt, maps, r = 0;
+	unsigned	scale;
+	byte		*lightmap;
+
+	s = DotProduct (at, tex->vecs[0]) + tex->vecs[0][3];
+	t = DotProduct (at, tex->vecs[1]) + tex->vecs[1][3];
+	if (s < surf->texturemins[0] || t < surf->texturemins[1])
+		return -1;
+	ds = s - surf->texturemins[0];
+	dt = t - surf->texturemins[1];
+	if (ds > surf->extents[0] || dt > surf->extents[1])
+		return -1;
+	if (!surf->samples)
+		return 0;
+	ds >>= 4;
+	dt >>= 4;
+	lightmap = surf->samples + dt * ((surf->extents[0]>>4)+1) + ds;
+	for (maps = 0 ; maps < MAXLIGHTMAPS && surf->styles[maps] != 255 ; maps++)
+	{
+		scale = d_lightstylevalue[surf->styles[maps]];
+		r += *lightmap * scale;
+		lightmap += ((surf->extents[0]>>4)+1) * ((surf->extents[1]>>4)+1);
+	}
+	return r >> 8;
+}
+
+/* Highest upward-facing inline-model surface below p within 2048 units, if
+ * higher than the world floor already found (best_z). Results are cached per
+ * position: actors are re-sampled only after they move. */
+#define ACTOR_LIGHT_CACHE 16
+static int R_ActorBrushLight (vec3_t p, int r, float best_z)
+{
+	static struct {vec3_t p; int r; float floor; model_t *world;} cache[ACTOR_LIGHT_CACHE];
+	static int next;
+	int		i, j, k, sample;
+	entity_t	*e;
+	model_t		*m;
+	msurface_t	*surf;
+	vec3_t	local, d, at;
+	float	yaw, c, s, z, dist, world_floor = best_z;
+
+	for (i=0 ; i<ACTOR_LIGHT_CACHE ; i++)
+		if (cache[i].world == cl.worldmodel && cache[i].floor == best_z &&
+			fabs(cache[i].p[0]-p[0]) < 1 && fabs(cache[i].p[1]-p[1]) < 1 && fabs(cache[i].p[2]-p[2]) < 1)
+			return cache[i].r;
+	for (i=1 ; i<cl.num_entities ; i++)
+	{
+		e = &cl_entities[i];
+		m = e->model;
+		if (!m || m->type != mod_brush || m == cl.worldmodel || m->name[0] != '*')
+			continue;
+		if (e->msgtime != cl.mtime[0])
+			continue;	// not present this frame
+		VectorSubtract (p, e->origin, d);
+		if (d[0]*d[0] + d[1]*d[1] > m->radius*m->radius)
+			continue;
+		if (e->origin[2] + m->mins[2] > p[2] || e->origin[2] + m->maxs[2] <= best_z)
+			continue;	// entirely above the point, or below the floor found
+		yaw = -e->angles[YAW] * (float)(M_PI/180);
+		c = (float)cos (yaw);
+		s = (float)sin (yaw);
+		local[0] = c*d[0] - s*d[1];
+		local[1] = s*d[0] + c*d[1];
+		local[2] = d[2];
+		surf = &m->surfaces[m->firstmodelsurface];
+		for (j=0 ; j<m->nummodelsurfaces ; j++, surf++)
+		{
+			float nz = surf->plane->normal[2];
+			if (surf->flags & (SURF_DRAWTILED|SURF_DRAWSKY))
+				continue;
+			if (surf->flags & SURF_PLANEBACK)
+				nz = -nz;
+			if (nz < 0.7f)
+				continue;	// not a floor
+			dist = surf->plane->dist;
+			/* point on the plane straight below: n.x*x + n.y*y + n.z*z = dist */
+			z = (dist - surf->plane->normal[0]*local[0] - surf->plane->normal[1]*local[1]) / surf->plane->normal[2];
+			if (z > local[2] + 1 || z < local[2] - 2048 || z + e->origin[2] <= best_z)
+				continue;
+			for (k=0 ; k<2 ; k++)
+				at[k] = local[k];
+			at[2] = z;
+			sample = R_SurfaceLightAt (surf, at);
+			if (sample < 0)
+				continue;
+			best_z = z + e->origin[2];
+			r = sample;
+		}
+	}
+	VectorCopy (p, cache[next].p);
+	cache[next].r = r;
+	cache[next].floor = world_floor;
+	cache[next].world = cl.worldmodel;
+	next = (next + 1) % ACTOR_LIGHT_CACHE;
+	return r;
+}
+
 int R_LightPoint (vec3_t p)
 {
 	vec3_t		end;
@@ -415,6 +526,15 @@ int R_LightPoint (vec3_t p)
 	end[2] = p[2] - 2048;
 
 	r = RecursiveLightPoint (cl.worldmodel->nodes, p, end);
+
+	/* Interiors are built from brush objects (func_wall); the world BSP is
+	 * mostly the sealing box, so an actor's floor is usually an object. Also
+	 * look for the highest upward-facing object surface below the point and
+	 * use its lightmap. Inline models keep surfaces but no render nodes here,
+	 * so their surfaces are tested directly. aw_actor_brush_light 0 restores
+	 * the world-only trace. */
+	if (aw_actor_brush_light.value)
+		r = R_ActorBrushLight (p, r, r >= 0 ? lightpoint_hit_z : -1e30f);
 
 	if (r == -1)
 		r = 0;

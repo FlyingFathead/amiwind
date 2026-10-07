@@ -19,10 +19,23 @@ static int debug_scene_ready;
 #define player_name aw_story.name
 static edict_t *roles[9];
 static edict_t *player(void){return svs.clients[0].edict;}
+/* Region loads can drop actors outside the new sub-cell and compact the edict
+ * table after AW_IntroSpawn bound the roles. Clear any role that no longer
+ * points at a live edict of the current map before it is used. */
+static void validate_roles(void) {
+    int i;long b;
+    for(i=0;i<9;i++){
+        edict_t *e=roles[i];
+        if(!e)continue;
+        b=((byte *)e-(byte *)sv.edicts)/pr_edict_size;
+        if((byte *)e<(byte *)sv.edicts || b<1 || b>=sv.num_edicts || e->free)roles[i]=NULL;
+    }
+}
 static float distance(edict_t *a,edict_t *b){vec3_t d;VectorSubtract(a->v.origin,b->v.origin,d);return Length(d);}
 static void face(edict_t *actor){vec3_t d;VectorSubtract(player()->v.origin,actor->v.origin,d);actor->v.angles[1]=atan2(d[1],d[0])*180/M_PI-90;}
 static int say(int role,const char *stem) {
-    FILE *f=NULL;char path[96],text[2048],expanded[2048];int n;sfx_t *sound;edict_t *actor=roles[role];double duration;
+    FILE *f=NULL;char path[96],text[2048],expanded[2048];int n;sfx_t *sound;edict_t *actor;double duration;
+    validate_roles();actor=role>0 && role<9?roles[role]:NULL;
     if(!actor || AW_SpeechRemaining()>0)return 0;
     sprintf(path,"intro/%s.txt",stem);n=COM_FOpenFile(path,&f);
     if(!f)return -1;
@@ -42,7 +55,7 @@ static void failure(const char *reason) {
 int AW_IntroSpeak(int role,const char *stem) {
     int result=say(role,stem);if(result<0)failure("Required speech asset unavailable");return result>0;
 }
-edict_t *AW_IntroRole(int role){return role>0 && role<9?roles[role]:NULL;}
+edict_t *AW_IntroRole(int role){validate_roles();return role>0 && role<9?roles[role]:NULL;}
 static int travel(float x,float y,float z) {
     vec3_t goal;goal[0]=x*.25;goal[1]=y*.25;goal[2]=z*.25;
     if(!AW_NavStart(roles[2],goal)){failure("No connected guard route");return 0;}return 1;
@@ -147,6 +160,7 @@ void AW_IntroSpawn(void) {
 void AW_IntroTick(void) {
     double dt;int result;
     if(!sv.active || sv.paused || key_dest!=key_game || AW_CharacterActive())return;
+    validate_roles();
     if(debug_scene){
         if(!debug_scene_ready || cls.state!=ca_connected || cls.signon!=SIGNONS)return;
         debug_scene=NULL;debug_scene_ready=0;

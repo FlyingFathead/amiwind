@@ -170,7 +170,7 @@ void Turbulent8 (espan_t *pspan)
 {
 	int				count;
 	fixed16_t		snext, tnext;
-	float			sdivz, tdivz, zi, z, du, dv, spancountminus1;
+	float			sdivz, tdivz, zi, z, du, dv, spancountminus1 = 0;
 	float			sdivz16stepu, tdivz16stepu, zi16stepu;
 
 	r_turb_turb = r_turb_sintable;
@@ -322,7 +322,7 @@ void D_DrawSpans8 (espan_t *pspan)
 	int				count, spancount, copy_of_cachewidth;
 	unsigned char	*pbase, *pdest;
 	fixed16_t		s, t, snext, tnext, sstep, tstep;
-	float			sdivz, tdivz, zi, z, du, dv, spancountminus1;
+	float			sdivz, tdivz, zi, z, du, dv, spancountminus1 = 0;
 	float			sdivz8stepu, tdivz8stepu, zi8stepu;
 
 	sstep = 0;	// keep compiler happy
@@ -542,7 +542,7 @@ void D_DrawSpans16 (espan_t *pspan)
 	int				count, spancount, copy_of_cachewidth;
 	unsigned char	*pbase, *pdest;
 	fixed16_t		s, t, snext, tnext, sstep, tstep;
-	float			sdivz, tdivz, zi, z, du, dv, spancountminus1;
+	float			sdivz, tdivz, zi, z, du, dv, spancountminus1 = 0;
 	float			sdivz16stepu, tdivz16stepu, zi16stepu;
 
 	sstep = 0;	// keep compiler happy

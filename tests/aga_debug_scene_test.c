@@ -7,7 +7,7 @@ server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;
 aw_character_t aw_character;
 cmd_source_t cmd_source=src_command;
 keydest_t key_dest=key_console;double host_frametime=.02;
-char *pr_strings="";
+char *pr_strings="";int pr_edict_size=sizeof(edict_t);
 static client_t client;static edict_t entities[3];static eval_t role;
 static int argc=2,maps,save_resets,cancels,opened,done,character;
 static int map_present=1,catalogue=1,preview=1,guard_present=1,placement=1,barriers=1;
@@ -59,7 +59,7 @@ void Cmd_ExecuteString(char *text,cmd_source_t source){
     assert(!strcmp(text,"map seyda"));assert(!character);
     sv.active=!map_failure;cls.signon=0;
     if(map_failure)return;
-    strcpy(sv.name,"seyda");sv.num_edicts=3;
+    strcpy(sv.name,"seyda");sv.edicts=entities;sv.num_edicts=3;
     memset(entities,0,sizeof(entities));entities[1].v.mins[2]=-24;
     entities[2].v.origin[0]=100;entities[2].v.origin[2]=8;
     AW_IntroSpawn();AW_OpeningSpawn();

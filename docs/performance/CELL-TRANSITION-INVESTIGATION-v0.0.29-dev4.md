@@ -143,7 +143,7 @@ Use an identical route and asset set, alternate candidate/baseline order, and re
 
 Extend the matched native route on the patched candidate and unchanged baseline beyond the initial two samples per direction. Include ordinary walking, both directions, narrow/corner boundaries, and repeated transitions. Confirm correct region selection and prefix use, actual destination-world presentation timing, frame cost and memory headroom, and preserved view/equipment/hand/torch state. Test active voice and music continuity during the same transitions. Keep the default unchanged until the data show a repeatable benefit without regressions.
 
-See the [performance bug entry](../BUG_JOURNAL.md#perf-readahead-29-cell-crossing-pauses-and-premature-prefetch-cancellation) for the project tracking status.
+See the [performance bug entry](../journals/BUG_JOURNAL-v0.0.29.md#perf-readahead-29-cell-crossing-pauses-and-premature-prefetch-cancellation) for the project tracking status.
 
 ## Scope clarification — 6 October 2026
 

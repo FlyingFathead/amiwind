@@ -43,11 +43,11 @@ This is candidate work until the matching HUD fixtures and native view pass.
 
 Health, magicka and fatigue must show independent current/max fractions; the
 health denominator currently uses fixed 100. See
-[HUD-STATS-29](BUG_JOURNAL.md#hud-stats-29-healthy-character-appears-partly-depleted-open).
+[HUD-STATS-29](journals/BUG_JOURNAL-v0.0.29.md#hud-stats-29-healthy-character-appears-partly-depleted-open).
 The later requested `dbg god on/off` (`true/false`, `1/0`) is separately planned;
 do not imply that this command or its save semantics are already implemented.
 Recurring F/V hand readiness in debug play is tracked independently in
-[TORCH-INPUT-29](BUG_JOURNAL.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open).
+[TORCH-INPUT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open).
 
 ## Open map-teleport regression - 4 October 2026
 
@@ -59,7 +59,7 @@ intended behavior, not final target verification. Source diagnosis found an
 incorrect dependency on visible HUD overlays; a v0.0.29 candidate removes it,
 preserving explicit map/story gates. Actual C fixtures pass; exact owner-state
 replay and native acceptance remain pending.
-See [MAP-TELEPORT-28](BUG_JOURNAL.md#map-teleport-28-map-teleport-commands-fail-from-f10-open).
+See [MAP-TELEPORT-28](journals/BUG_JOURNAL-v0.0.29.md#map-teleport-28-map-teleport-commands-fail-from-f10-open).
 
 Runtime command reference, updated for the v0.0.28 candidate on 4 October 2026.
 Open the console with F10 or the key left of 1 (normally
@@ -523,7 +523,7 @@ and deliberate wait/rest clock changes remain separate.
 
 User values saved in `id1/config.cfg` override `config/game.cfg` defaults at
 startup. These controls are source-tested candidates; native visual, music and
-performance acceptance remains recorded in [MODAL-WORLD-29](BUG_JOURNAL.md#modal-world-29-world-work-continues-behind-character-creation-open).
+performance acceptance remains recorded in [MODAL-WORLD-29](journals/BUG_JOURNAL-v0.0.29.md#modal-world-29-world-work-continues-behind-character-creation-open).
 
 ## Mushroom pickup checkpoint (next v0.0.29 build)
 

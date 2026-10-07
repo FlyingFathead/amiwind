@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <graphics/gfxbase.h>
 
 #include <devices/audio.h>
+#include <clib/alib_protos.h>
 
 
 static double real_speed;
@@ -90,7 +91,7 @@ static int startsound (int cnum, char *buffer, int length)
   c = &channel_info[cnum];
   c->audio_io->ioa_Request.io_Command = CMD_WRITE;
   c->audio_io->ioa_Request.io_Flags = ADIOF_PERVOL;
-  c->audio_io->ioa_Data = buffer;
+  c->audio_io->ioa_Data = (UBYTE *)buffer;
   c->audio_io->ioa_Length = length;
   c->audio_io->ioa_Period = period;
   c->audio_io->ioa_Volume = 64;
@@ -194,8 +195,8 @@ qboolean SNDDMA_Init(void)
 
     real_speed = (double)clock_constant / period;
 
-    startsound (0, shm->buffer, sampleCount >> 1);
-    startsound (1, shm->buffer + (sampleCount >> 1), sampleCount >> 1);
+    startsound (0, (char *)shm->buffer, sampleCount >> 1);
+    startsound (1, (char *)shm->buffer + (sampleCount >> 1), sampleCount >> 1);
 
     Con_Printf ("Using Native 8 bit Stereo Audio\n");
 

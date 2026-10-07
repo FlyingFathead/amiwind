@@ -32,6 +32,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 #include "quakedef.h"
 
+void Con_Linefeed (void);
+
 int 		con_linewidth;
 int con_fullscreen;
 

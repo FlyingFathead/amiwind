@@ -41,7 +41,10 @@ Amiga renderer still needs palette/mip conversion. Texture paths are resolved
 against the original BSA, including a DDS alternative for NIF TGA names.
 
 Models are shared across references. Flattened local model transforms include
-NIF scale/rotation/translation. TES3 placement position/rotation/scale is retained;
+NIF scale/rotation/translation, except the root node's rotation: like Morrowind,
+the converter ignores the authored root rotation but keeps the root translation
+and scale (see [BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md);
+applying it turned Velothi kit pieces 90 degrees). TES3 placement position/rotation/scale is retained;
 transformed bounds populate every intersected XY bucket, so a building crossing
 a chunk edge is not lost. Camera-sphere queries test bounds rather than object
 origins. Frustum and occlusion rejection are not implemented by this host query.

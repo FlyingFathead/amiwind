@@ -414,6 +414,7 @@ void AW_GuardTorchInit(void);
 void AW_GuardTorchLoadAssets(const byte *torch);
 void AW_GuardTorchUpdate(void);
 void AW_GuardTorchDraw(void);
+void AW_StaticFlamesDraw(void);
 entity_t *AW_GuardTorchEntity(entity_t *entity);
 void AW_TorchInit(void);
 float AW_TorchLightRadius(void);

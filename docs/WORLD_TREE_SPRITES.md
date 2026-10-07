@@ -11,7 +11,7 @@ v0.0.29 candidate passes seven real projection/raster cases. Assets, transforms
 and collision are unchanged. Native root/contact acceptance remains pending. Do not treat earlier sprite conversion
 checks as acceptance of this root/contact defect; preserve original intended
 roots when investigating. See
-[TREE-PILLAR-28](BUG_JOURNAL.md#tree-pillar-28-unintended-pillar-beneath-sprite-tree-roots-open).
+[TREE-PILLAR-28](journals/BUG_JOURNAL-v0.0.29.md#tree-pillar-28-unintended-pillar-beneath-sprite-tree-roots-open).
 
 Development after v0.0.27; not yet an enabled world-wide runtime feature.
 

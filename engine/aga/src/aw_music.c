@@ -30,7 +30,8 @@ static void log_event(const char *why) {
 }
 void AW_MusicSceneEvent(const char *why) {log_event(why);}
 static void close_music(void) {
-    if(music)fclose(music);music=NULL;at=0;memset(valid,0,sizeof(valid));loaded=0;loading=-1;
+    if(music)fclose(music);
+    music=NULL;at=0;memset(valid,0,sizeof(valid));loaded=0;loading=-1;
 }
 static int open_track(int id,const char *reason) {
     byte h[16];char path[MAX_OSPATH+64];unsigned long count;
@@ -147,7 +148,7 @@ static int manual_lookup(const char *query,int *group) {
         g=split[0]-'0';alias=split+2;
         if(!*alias || strlen(alias)>95){fclose(f);return -1;}
         for(end=alias;*end;end++)if(!manual_alias_char(*end)){fclose(f);return -1;}
-        if((numeric && id==wanted) || (!numeric && !Q_strcasecmp(query,alias))) {
+        if((numeric && id==wanted) || (!numeric && !Q_strcasecmp((char *)query,alias))) {
             if(found>=0 && (found!=id || found_group!=g)){fclose(f);return -1;}
             found=id;found_group=g;
         }
@@ -215,7 +216,8 @@ static void music_play(void) {
 
 static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
-    if(!available || title_playing)return;manual_changes++;fade=128;
+    if(!available || title_playing)return;
+    manual_changes++;fade=128;
     if(cursor[mode]>0)cursor[mode]--;
     open_track(history[mode][cursor[mode]],"previous");
 }

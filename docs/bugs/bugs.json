@@ -1,0 +1,1388 @@
+[
+  {
+    "id": "ACTOR-RECEIPT-01",
+    "title": "Windows actor-audit receipt hash did not match the CRLF-written file",
+    "state": "fixed",
+    "fixed_in": "v0.0.27",
+    "owner_accepted": null,
+    "status": "Writer now emits explicit UTF-8/LF bytes and hashes those same bytes; 15 actor-ground checks pass on Windows, followed by the full Linux Docker suite and hosted CI. Receipt serialization fix only; no gameplay impact. [Record](journals/BUG_JOURNAL-v0.0.29.md#actor-receipt-01-windows-audit-receipt-hashed-different-line-endings).",
+    "report": null
+  },
+  {
+    "id": "AUDIO-03",
+    "title": "Audio glitch at the post-movie load into the Jiub opening scene (WinUAE)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Still present in v0.0.30-rc1 (owner, WinUAE, 7 October 2026): the music crackles as the game fades in after the intro. Audio source and cause unverified; no mitigation or fix recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#audio-03-winuae-video-to-jiub-loading-spike)",
+    "report": null
+  },
+  {
+    "id": "AUDIO-CLOCK-29",
+    "title": "Long audio DMA gaps lose elapsed playback time",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Source-checked: a real mixer fixture reproduces lost ring wraps after long unpolled gaps; the EClock-based candidate passes four focused Docker methods and a 68040 compile. Delivery and native listening not recorded; not a cure for all WinUAE crackle. [Record](journals/BUG_JOURNAL-v0.0.29.md#audio-clock-29-long-dma-gaps-lose-elapsed-playback-time-source-repair-candidate).",
+    "report": null
+  },
+  {
+    "id": "AUDIO-EFFECTS-DEFAULT-29",
+    "title": "Effects volume should default to 75%",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-rc2",
+    "owner_accepted": null,
+    "status": "Effects default set to 75% with other mixer defaults and saved preferences unchanged; eight focused checks; included in RC2 and v0.0.29. Owner mixing playtest pending. [Record](RC2_ISSUE_CHECKPOINT.md#repairs-included-in-the-rc2-candidate).",
+    "report": null
+  },
+  {
+    "id": "AW25-01",
+    "title": "Seyda Neen walking reaches water before the island handoff",
+    "state": "fixed",
+    "fixed_in": "v0.0.25-rc1",
+    "owner_accepted": null,
+    "status": "Handoff now derived from the authored LAND bounds; host border/rebasing checks pass, and the rc1 notes record native walking Seyda Neen to terrain and back. That native pass predates the rc1 source reconciliation. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-02",
+    "title": "Dry valleys and rises rendered as flooded after coarse terrain conversion",
+    "state": "fixed",
+    "fixed_in": "v0.0.25-rc1",
+    "owner_accepted": null,
+    "status": "Shoreline refinement inserts original height samples; source-mesh audit finds zero wet/dry mismatches. Source-mesh evidence only; the original camera view and native shoreline visuals were not verified. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-03",
+    "title": "Map marker reported stale; HUD lacked global/local positions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Shared exterior transform, per-draw marker refresh and global/local HUD shipped in v0.0.25-rc1; host tests and native captures show the marker moving. The original report's cause was not isolated, so it is not marked fixed. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-04",
+    "title": "M/N switched to the desktop, including while typing in the console",
+    "state": "fixed",
+    "fixed_in": "v0.0.25-rc1",
+    "owner_accepted": null,
+    "status": "M/N input filter, Right-Amiga-to-Ctrl alias removed, debug-only Alt+M. Native input probe passes map, console 'nm', Alt+M and system return after a return-path regression was found and corrected. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-05",
+    "title": "Console typed only uppercase letters and shifted digits",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Qualifier sync, letters-only Caps Lock and raw 0x30 corrections pass a compiled lost-release host test and are retained in v0.0.25-rc2. No native stuck-Shift reproduction or owner confirmation recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-06",
+    "title": "Quicksave shown as empty; save ordering confusing",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Code inspection confirms the load menu labels absent, corrupt and incompatible saves alike; menu/generation display is TODO and the ordering report needs the affected saves. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-07",
+    "title": "Python FS-UAE launcher not executable after extraction",
+    "state": "fixed",
+    "fixed_in": "v0.0.25-rc2",
+    "owner_accepted": null,
+    "status": "Source packers preserve and validate mode 0755; archive modes and extraction checked, and the rc2 changelog retains the launcher fix. Host packaging behavior only; no native run claimed. [Record](journals/BUG_JOURNAL-v0.0.29.md#1-october-2026-dev1-to-rc1-recovery).",
+    "report": null
+  },
+  {
+    "id": "AW25-08",
+    "title": "Area build aborted on exterior window assets reused indoors",
+    "state": "fixed",
+    "fixed_in": "v0.0.25-rc3",
+    "owner_accepted": null,
+    "status": "Window flattening limited to exterior scenes; synthetic interior regression and the real Warehouse conversion pass, with exterior output byte-identical. Not complete build acceptance. [Record](journals/BUG_JOURNAL-v0.0.29.md#aw25-08-area-build-aborts-on-window-mounting--v0025-rc2).",
+    "report": null
+  },
+  {
+    "id": "AW25-09",
+    "title": "Image stage rejected the world/journal receipt after terrain",
+    "state": "fixed",
+    "fixed_in": "v0.0.25-rc6",
+    "owner_accepted": null,
+    "status": "Receipt writer enumerates only the four UI-owned files; a mixed-directory regression covers repeat generation and corrupted-journal rejection. World UI now validates before terrain; no final game HDF passed in this record. [Record](journals/BUG_JOURNAL-v0.0.29.md#aw25-09-image-rejects-worldjournal-receipt-after-terrain--v0025-rc3).",
+    "report": null
+  },
+  {
+    "id": "AW25-10",
+    "title": "Actor-contact failures stopped image assembly only after terrain",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "v0.0.25-rc6 runs the strict contact gate before world-terrain and adds a labeled private-test acceptance. The 23 placement findings stay unresolved in this record; contact fitting followed in v0.0.25-rc7 under a separate entry. [Record](journals/BUG_JOURNAL-v0.0.29.md#aw25-10--actor-contact-blocks-image-assembly-after-terrain).",
+    "report": null
+  },
+  {
+    "id": "BALMORA-CAPACITY-005",
+    "title": "Bounded Balmora maps exceed the 600-entity limit",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause established: the scenery catalogue admitted only the balmora alias, so bmNNN maps kept func_wall entities. Name-predicate candidate passes extended Linux native fixtures; final live-slot, heap and target gates pending; fixed version not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#balmora-capacity-005-retained-town-maps-exceed-entity-admission).",
+    "report": null
+  },
+  {
+    "id": "BALMORA-TEMPLE-GEOMETRY-29",
+    "title": "Balmora Temple lower rooms: missing walls and floors, collision holes",
+    "state": "fixed",
+    "fixed_in": "v0.0.30-dev3",
+    "owner_accepted": null,
+    "status": "Converter applied a NIF root rotation that Morrowind ignores; the rebuilt Temple matches OpenMW at the reported views in FS-UAE. Owner informally rated the dev5 look OK; lower-level walking/collision and formal owner acceptance pending. [Record](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).",
+    "report": "bugs/BALMORA-TEMPLE-GEOMETRY-29.md"
+  },
+  {
+    "id": "BSP-LIGHT-01",
+    "title": "Vodunius face lightmap range exceeded its lighting lump",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc4",
+    "owner_accepted": null,
+    "status": "Pre-existing baked-data defect exposed by the optimizer. One-face regeneration passes 15 focused tests, all-face checks and the full 2,717-map optimizer, contact and static heap gates. Static build evidence only; producer-wide correction pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#bsp-light-01-pre-existing-vodunius-lightmap-range-exceeds-its-lump).",
+    "report": null
+  },
+  {
+    "id": "BUILD-QCC-PATH-008",
+    "title": "Image assembly was given the QCC source directory as its compiler",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Assembly-wrapper configuration error, not engine code. Corrected wrapper and executable preflight let the next image run start; the record keeps it open until final assembly and target validation. [Record](bugs/ENTITY-EXHAUSTION-007.md#build-qcc-path-008-assembly-received-a-source-directory-as-its-compiler).",
+    "report": null
+  },
+  {
+    "id": "BUILD-REPAIR-01",
+    "title": "Image-repair retry omitted region-ownership files",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc5",
+    "owner_accepted": null,
+    "status": "Build-helper defect caught before any HDF patch. Helper now copies the authenticated ownership files; the rc5 retry passed actor/contact (zero unresolved), all 2,717 heap estimates and HDF readbacks. [Record](journals/BUG_JOURNAL-v0.0.29.md#build-repair-01-ownership-files-omitted-by-rc5-retry-extractor-bug--build-tool).",
+    "report": null
+  },
+  {
+    "id": "BUILD-REPAIR-02",
+    "title": "Retry assertion rejected an empty failure list as a failure",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc5",
+    "owner_accepted": null,
+    "status": "Assertion now matches the receipt's empty-list schema; rc5 was built after the correction with optimizer, contact, static heap and readback gates passing. Build/package checks only. [Record](journals/BUG_JOURNAL-v0.0.29.md#build-repair-02-retry-assertion-misread-an-empty-failure-list-bug--build-tool).",
+    "report": null
+  },
+  {
+    "id": "BUILD-SEYDA-REGEN-30",
+    "title": "Public build cannot regenerate the Seyda Neen sub-cells",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Reproduced on the v0.0.29 inputs. v0.0.30-dev5 added build_aga.py image --canonical-land-source; the terrain finishing steps behind the shipped sub-cells are not yet in the public build. [Record](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026).",
+    "report": null
+  },
+  {
+    "id": "CENSUS-ENTITIES-30",
+    "title": "Census Office objects misplaced (upright rug, ceiling hole, tapestry)",
+    "state": "fixed",
+    "fixed_in": "v0.0.30-rc1",
+    "owner_accepted": "v0.0.30-rc1",
+    "status": "Fixed in v0.0.30-rc1: the dev4 object list plus dev5 flames; all 140 object-to-model pairs match dev4. Owner playtest 7 October 2026 (WinUAE): Census office interiors work.",
+    "report": "bugs/CENSUS-ENTITIES-30.md"
+  },
+  {
+    "id": "CFG-01",
+    "title": "Semicolons in default-config comments ran as console commands",
+    "state": "fixed",
+    "fixed_in": "v0.0.28-rc1",
+    "owner_accepted": null,
+    "status": "Comment separators replaced and the test now rejects semicolons in default comments; both full host suites, Amiga compiles and image007 packaged readback pass. Actual default-startup validation pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#cfg-01-startup-comments-split-into-console-commands).",
+    "report": null
+  },
+  {
+    "id": "CLOCK-01",
+    "title": "Automatic clock dropped fractional milliseconds each frame",
+    "state": "fixed",
+    "fixed_in": "v0.0.28-rc1",
+    "owner_accepted": null,
+    "status": "Bounded fractional remainder kept and cleared on explicit changes, waits and transitions; host fixtures, 63 native methods and both host suites pass, with bounded native clock checks in later images. Not every saved-clock lifecycle is certified. [Record](journals/BUG_JOURNAL-v0.0.29.md#clock-01-automatic-clock-discarded-fractional-milliseconds).",
+    "report": null
+  },
+  {
+    "id": "CONFIG-COMMENT-29",
+    "title": "Semicolons split default-config comments into commands",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "The dev2 source correction replaces semicolons in all five affected comments; the existing regression and full Linux suite pass. The record claims no target-verified fixed version; native startup was not tested. [Record](journals/BUG_JOURNAL-v0.0.29.md#config-comment-29-semicolon-splits-a-default-comment-repair-candidate).",
+    "report": null
+  },
+  {
+    "id": "CONVERTER-ROOT-ROTATION-30",
+    "title": "Converter applied NIF root-node rotation to placed meshes",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Partial: converter fixed and Temple, Tharys Tomb and five fireplace interiors rebuilt in v0.0.30-dev3. One Balmora exterior furn_pathspear_03 placement is pending; walking/collision and fireplace-interior playtests also pending. [Record](bugs/CONVERTER-ROOT-ROTATION-30.md).",
+    "report": "bugs/CONVERTER-ROOT-ROTATION-30.md"
+  },
+  {
+    "id": "CRASH-01",
+    "title": "Heap exhaustion on sn012 after Hors travel from Jiub name entry",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause established: visibility data held twice in Hunk after the rc3 apron growth. Loader repair and bounded maps ship in v0.0.27 and pass static gates; the original route and target lifecycle are unverified, so it stays open. [Record](journals/BUG_JOURNAL-v0.0.29.md#crash-01-rc3-hors-restart-from-jiub-name-entry).",
+    "report": null
+  },
+  {
+    "id": "CRASH-REPORT-02",
+    "title": "Fatal engine exit returned to AmigaDOS without a visible reason",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc4",
+    "owner_accepted": null,
+    "status": "Versioned crash banner, reason and verified ERROR.TXT write compiled into v0.0.27. A controlled malformed-map fatal-report check passed in the v0.0.28 native acceptance; full/read-only directories and other error paths untested. [Record](journals/BUG_JOURNAL-v0.0.29.md#crash-report-02--visible-fatal-exit-report).",
+    "report": null
+  },
+  {
+    "id": "DEBUG-GALLERY-TIMING-29",
+    "title": "Hands unavailable in the combat and torch test rooms",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-rc2",
+    "owner_accepted": null,
+    "status": "Pre-activation timing transfer and explicit test-room input gates repaired; regression fails before repair. A later native run showed punch, torch off/on/off after appearance choice and return to the ordinary state. [Record](bugs/DEBUG-GALLERY-TIMING-29.md).",
+    "report": "bugs/DEBUG-GALLERY-TIMING-29.md"
+  },
+  {
+    "id": "EFRAG-01",
+    "title": "Static foliage leaf links exhausted ('Too many efrags!')",
+    "state": "fixed",
+    "fixed_in": "v0.0.28-rc1",
+    "owner_accepted": null,
+    "status": "Map-owned link pages (hard cap 65,536) pass sanitizer regressions, the all-map estimator audit and both host suites; a bounded native route peaked at 52,176 links with clean exit and reboot. Not all-world or real-hardware proof. [Record](journals/BUG_JOURNAL-v0.0.29.md#efrag-01-static-foliage-leaf-links-exhausted-in-image004).",
+    "report": null
+  },
+  {
+    "id": "ENTITY-DIAGNOSTIC-009",
+    "title": "Entity-exhaustion warning reports the high-water count as live slots",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Source review only: exhaustion can occur below 600 live entities while freed slots are quarantined. Reproduction not run; diagnostic correction not implemented. [Record](bugs/ENTITY-EXHAUSTION-007.md#entity-diagnostic-009-allocation-high-water-count-described-as-live-slots).",
+    "report": null
+  },
+  {
+    "id": "ENTITY-EXHAUSTION-007",
+    "title": "Entity slot exhaustion terminated the game with Sys_Error",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Mitigation only: aw_ent_count_exceed_soft_fail (default 1) warns and ends the session safely; the real-allocator Docker test passes. Not a capacity fix; packaged and target behavior pending. [Record](bugs/ENTITY-EXHAUSTION-007.md).",
+    "report": "bugs/ENTITY-EXHAUSTION-007.md"
+  },
+  {
+    "id": "FLORA-ENTITY-001",
+    "title": "Dense vegetation exceeds the per-map entity reserve",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Adaptive collision-packing candidate passes host reserves (vf2098: 504 entities) with no scenery removed. Signon/heap and target collision/traversal gates pending; fixed version not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#flora-entity-001-dense-vegetation-exceeds-the-entity-reserve).",
+    "report": null
+  },
+  {
+    "id": "FLORA-RESERVE-002",
+    "title": "Two world flora maps exceed storage and clipnode reserves",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Candidate splits vf0698 and vf0791 into four cores each; the refined retry passes 2,532 regions covering all 19,984 references within reserves, plus 34 focused checks. Final image, runtime memory and target acceptance pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#flora-reserve-002-two-full-world-rc1-flora-candidates-exceed-reserves).",
+    "report": null
+  },
+  {
+    "id": "GEO-01",
+    "title": "Giant mushroom cap gaps after material-wise mesh reduction",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc2",
+    "owner_accepted": null,
+    "status": "Material sections sharing source vertices are kept with original UVs; a shared-rim regression and rebuilt BSP budget checks pass. Owner accepted the closed caps in the rc2 WinUAE playtest. [Record](journals/BUG_JOURNAL-v0.0.29.md#geo-01-giant-mushroom-cap-gaps-after-material-wise-reduction---2-october-2026).",
+    "report": null
+  },
+  {
+    "id": "GEO-02",
+    "title": "Seyda Neen ground ends before the world terrain handoff",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Authored LAND apron and shared world sampling introduced in v0.0.27-rc3 and carried into v0.0.27; static gates and readbacks pass. Exact boundary playtest not recorded; no emulator acceptance claimed. [Record](journals/BUG_JOURNAL-v0.0.29.md#geo-02-seyda-neen-ground-disappears-before-the-world-handoff).",
+    "report": null
+  },
+  {
+    "id": "GEO-03",
+    "title": "Canonical clipping stored reversed-winding fragments",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Clip helper and both canonical writers corrected; the house fixture shows zero reversed loops and 30 focused tests pass. No full-scene BSP rebuild, production integration or native result recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#geo-03-canonical-clipping-stores-reversed-winding-fragments-in-diagnostic-023).",
+    "report": null
+  },
+  {
+    "id": "GEO-04",
+    "title": "Canonical-terrain world rebuild fails VIS (too many portals)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Rejected repair trial in v0.0.28-rc1 development. A coplanar-patch merge experiment is proposed; neither that rebuild nor full-world canonical culling is accepted. [Record](journals/BUG_JOURNAL-v0.0.29.md#geo-04-canonical-terrain-world-hits-the-vis-portal-limit).",
+    "report": null
+  },
+  {
+    "id": "GUARD-COLD-28",
+    "title": "Night-guard torches not admitted on cold visits",
+    "state": "fixed",
+    "fixed_in": "v0.0.28",
+    "owner_accepted": null,
+    "status": "Alias staging no longer evicts the hot actor cache; focused regressions pass. Image015 native acceptance admitted all three guards for both factions with zero skips/evictions and correct torch time boundaries. Reserve warning remains open. [Record](journals/BUG_JOURNAL-v0.0.29.md#guard-cold-28-automatic-guard-torch-admission-failed-on-cold-visits-closed-with-bounded-native-verification).",
+    "report": null
+  },
+  {
+    "id": "HAND-IDLE-BLINK-29",
+    "title": "Fists disappear once per idle breathing cycle",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-dev4",
+    "owner_accepted": null,
+    "status": "QuakeC floor rebound from builtin #36 (rint) to #37; Docker fixture with negative control passes and FS-UAE shows no dropouts in 1,500 frames. Included in v0.0.29-dev4 per its hotlist; owner WinUAE acceptance pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#hand-idle-blink-29-fists-disappear-once-per-breathing-cycle-native-verified).",
+    "report": null
+  },
+  {
+    "id": "HAND-PUNCH-TRANSITION-29",
+    "title": "Hands briefly disappear when changing into the punch animation",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report against the proposed-fix punch clip; listed as a known issue in v0.0.29. Frame-by-frame reproduction, cause and repair pending; separate from maximum-extension coverage. [Record](journals/BUG_JOURNAL-v0.0.29.md#follow-up-evidence-and-open-reports-2026-10-06t2006100300).",
+    "report": null
+  },
+  {
+    "id": "HANDOFF-WRAPPER-01",
+    "title": "Source handoff wrapper reused an existing extraction directory",
+    "state": "fixed",
+    "fixed_in": "v0.0.27",
+    "owner_accepted": null,
+    "status": "Transfer-wrapper defect; no source, runtime or HDF change. Repair-002 isolates each extraction by archive checksum and verifies members; the exact-layout Docker test passes. v0.0.27 was then published from a later repair package. [Record](journals/BUG_JOURNAL-v0.0.29.md#handoff-wrapper-01-direct-unzip-wrapper-collided-with-an-existing-extraction-handoff-tool-bug).",
+    "report": null
+  },
+  {
+    "id": "HDF-WRITER-01",
+    "title": "Private image refresh left file-owned blocks marked free",
+    "state": "fixed",
+    "fixed_in": "v0.0.28-rc1",
+    "owner_accepted": null,
+    "status": "Allocation bitmap was not flushed before the device closed. Image006 closes the volume first; owned-block checks and native write/exit/reboot checks pass with no missing files. Private image-assembly tooling only. [Record](journals/BUG_JOURNAL-v0.0.29.md#hdf-writer-01-private-image005-refresh-left-owned-blocks-free).",
+    "report": null
+  },
+  {
+    "id": "INPUT-01",
+    "title": "Held Ctrl/Shift flight modifiers reset on cell changes",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc3",
+    "owner_accepted": null,
+    "status": "Automatic crossings keep held input while doors and teleports still clear it; the real transition harness passes in both variants. Carried into v0.0.27; owner Shift/Ctrl/focus playtest pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#input-01-held-flight-modifiers-reset-on-cell-changes---rc3-correction-awaiting-playtest).",
+    "report": null
+  },
+  {
+    "id": "INTRO-ROLES-30",
+    "title": "NUM_FOR_EDICT bad-pointer crash on a Seyda Neen region change",
+    "state": "fixed",
+    "fixed_in": "v0.0.30-dev4",
+    "owner_accepted": null,
+    "status": "Stale intro role pointers are validated against the current entity list. Scripted FS-UAE route: dev3 crashed 2/2, repaired engine 0/3. Full opening sequence and owner acceptance pending. [Record](bugs/INTRO-ROLES-30.md).",
+    "report": "bugs/INTRO-ROLES-30.md"
+  },
+  {
+    "id": "LAND-HORIZON-GAPS-29",
+    "title": "Sky visible through gaps in distant resident ground",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause in the sampled views: the forward-distance node gate omits resident LAND. Opt-in aw_terrain_horizon pass restores the missing pixels in raster checks; default remains off. Native OFF/ON views and frame cost pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#land-horizon-gaps-29-sky-visible-through-distant-resident-ground-open).",
+    "report": null
+  },
+  {
+    "id": "LIGHT-UV-DISTANCE-29",
+    "title": "Texture scale changes dynamic-light reach on surfaces",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Confirmed in the real surface accumulator; the UV-normalized candidate passes 85 comparisons, six sanitized Docker methods and a 68040 compile. Delivery and native appearance/performance not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#light-uv-distance-29-texture-scale-changes-dynamic-light-reach-source-repair-candidate).",
+    "report": null
+  },
+  {
+    "id": "LINUX-VALID-02",
+    "title": "Linux test fixtures failed to link (missing stubs)",
+    "state": "fixed",
+    "fixed_in": "v0.0.27",
+    "owner_accepted": null,
+    "status": "Fixture stubs added; full Linux Docker suite (558 tests, 3 skips) and asset-free compile pass, verified in the published v0.0.27 source with hosted CI. Test linkage only. [Record](journals/BUG_JOURNAL-v0.0.29.md#linux-valid-02-linux-test-fixture-link-failures-repaired-validation-issue).",
+    "report": null
+  },
+  {
+    "id": "MAP-FOCUS-DRAG-29",
+    "title": "Map or journal keeps dragging after window focus returns",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause: focus resets did not clear the world-UI drag flag. Candidate passes all 11 sanitizer fixture cases (baseline fails 4). Native focus dispatch untested; no verified fixed version. [Record](journals/BUG_JOURNAL-v0.0.29.md#map-focus-drag-29-map-or-journal-keeps-dragging-after-focus-returns-open).",
+    "report": null
+  },
+  {
+    "id": "MAP-MARKER-29",
+    "title": "Requested: click to place a user map marker",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Feature request. A saved click marker is implemented in source and world-UI/save-codec fixtures pass in Docker; native acceptance pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#map-marker-29-click-to-place-a-user-map-marker-requested).",
+    "report": null
+  },
+  {
+    "id": "MAP-REG-01",
+    "title": "In-Game map mode hid settlement markers (regression)",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc5",
+    "owner_accepted": null,
+    "status": "rc4 regression. Landmarks drawn in both modes and the active selector restyled; nine focused checks and the native world-UI fixture pass; included in v0.0.27. Owner target validation pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#map-reg-01-rc4-in-game-selector-hides-retained-settlement-markers-bug--regression).",
+    "report": null
+  },
+  {
+    "id": "MEM-GEOMETRY-01",
+    "title": "Light-range sharing could copy a too-short byte span",
+    "state": "fixed",
+    "fixed_in": "v0.0.27",
+    "owner_accepted": null,
+    "status": "First optimizer candidate failed before replacing any map; deduplication now keeps the longest referenced span. Render-input oracles, Linux C loader comparisons and full 2,717-map gates pass; target renderer/FPU behavior pending. Does not close CRASH-01. [Record](journals/BUG_JOURNAL-v0.0.29.md#mem-geometry-01-transactional-geometrylight-sharing-candidates).",
+    "report": null
+  },
+  {
+    "id": "MEM-TOWN-02",
+    "title": "Bounded Balmora maps exceeded the modeled map heap limit",
+    "state": "fixed",
+    "fixed_in": "v0.0.27",
+    "owner_accepted": null,
+    "status": "Static heap-policy failure. Re-laid-out regions pass the saved-ABI audit (worst 6,155,504 B, 135,952 B margin) and later full gates; carried into v0.0.27. Target crossings and lifecycle pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#mem-town-02-balmora-bounded-layout-estimate-candidate).",
+    "report": null
+  },
+  {
+    "id": "PACKAGE-PORTABILITY-28",
+    "title": "Rebundled ZIPs lost exec modes; Windows path aliases accepted",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Preparation-helper correction preserves modes and rejects nonportable names; five synthetic checks pass. No delivered release known affected; version not recorded; final-package extraction audit pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#package-portability-28-source-zip-modes-and-windows-path-aliases).",
+    "report": null
+  },
+  {
+    "id": "PUNCH-AUDIO-COVERAGE-29",
+    "title": "Original punch swing/hit sound coverage unverified",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open follow-up: inventory original samples, converted equivalents and event wiring. Listed as a known issue in v0.0.29. [Record](journals/BUG_JOURNAL-v0.0.29.md#follow-up-evidence-and-open-reports-2026-10-06t2006100300).",
+    "report": null
+  },
+  {
+    "id": "ROCK-FLORA-SURFACE-29",
+    "title": "Angular rock-like surfaces newly appearing in Bitter Coast",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner screenshot report near global -10940,-74750,81. Object identity and cause unknown; source-bound reproduction pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#rock-flora-surface-29-newly-appeared-angular-rock-like-surfaces-open).",
+    "report": null
+  },
+  {
+    "id": "SAVE-EQUIPMENT-29",
+    "title": "Quickload returns with hands and torch put away",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause established: AWS3 saves store no equipment intent. An AWS4 candidate passes save and compatibility checks; native quickload and integration pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#save-equipment-29-quickload-returns-with-hands-and-torch-put-away).",
+    "report": null
+  },
+  {
+    "id": "SEYDA-LOAD-HANG-30",
+    "title": "Rare freeze during a Seyda Neen region load",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Seen in about 5 of 70 scripted FS-UAE runs on dev4/dev5 engines; not reported in manual play. The game waits inside a DOS read whose reply never arrives; cause unknown, no fix. [Record](BUG_JOURNAL.md#seyda-load-hang-30-rare-freeze-during-a-seyda-neen-region-load-7-october-2026).",
+    "report": null
+  },
+  {
+    "id": "SKY-MIDNIGHT-29",
+    "title": "Dense clouds still hide the midnight sky",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Default midnight clearing implemented in dev3 source; 15 renderer fixture modes pass and dev4 enables it by default. Native visual and frame-cost acceptance pending; related owner appearance acceptance is under SKY-NIGHT-COVER-29. [Record](journals/BUG_JOURNAL-v0.0.29.md#sky-midnight-29-default-nightly-clearing-dev3-source-candidate).",
+    "report": null
+  },
+  {
+    "id": "SKY-VISUAL-01",
+    "title": "Sky-only day/night remap clashed with gray distance fog",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Uniform remaps with coordinated sky and fog targets pass fixtures, both host gates and image007 checks. Native matched-view visual acceptance pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#sky-visual-01-sky-only-daynight-remap-conflicts-with-gray-fog).",
+    "report": null
+  },
+  {
+    "id": "TELEPORT-XY-006",
+    "title": "No dbg tp X Y; map teleport could land underwater",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Coordinate form and water-surface placement pass four Docker native fixtures. No emulator or target result; fixed version not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#teleport-xy-006-explicit-global-coordinates-and-water-safe-debug-arrival).",
+    "report": null
+  },
+  {
+    "id": "TEST-PORT-01",
+    "title": "Focused tests depended on repo root and Windows UTF-8 mode",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Test-only: the configuration test now decodes UTF-8 and passes under default Windows encoding; rooted invocation keeps the intended tests. No runtime impact; version not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#test-port-01-focused-suite-depends-on-repository-root-and-windows-utf-8-mode-test-portability-issue).",
+    "report": null
+  },
+  {
+    "id": "TEST-PORTABILITY-01",
+    "title": "Pre-release test fixtures assumed host features and links",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixture link and platform-mock repairs pass both full host suites locally. Test-only; the record claims no published fixed version. [Record](journals/BUG_JOURNAL-v0.0.29.md#test-portability-01-pre-release-fixture-dependencies-and-host-assumptions).",
+    "report": null
+  },
+  {
+    "id": "TORCH-FUEL-29",
+    "title": "Torch never burns out; no unlit or fuel state",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open design: source light duration and zero/negative semantics unverified; compact state proposal only. Listed as a known issue in v0.0.29. [Record](journals/BUG_JOURNAL-v0.0.29.md#rc1-owner-torch-follow-up-6-october-2026).",
+    "report": null
+  },
+  {
+    "id": "TORCH-HAND-SEPARATION-29",
+    "title": "Torch grip and hand appear to break during idle and running",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Running depth-bob mitigation and a fourth-vertex alias-clip correction pass source fixtures; neither is shown to explain every fragment. Standing/idle visual acceptance pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#torch-hand-separation-29-grip-appears-to-break-during-idle-animation-open).",
+    "report": null
+  },
+  {
+    "id": "TORCHTEST-DARKNESS-29",
+    "title": "Torch test room floor stays dim gray at zero light",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Palette generation keeps a 15% minimum. Room-scoped fix and native off/on comparison pending; listed as a known issue in v0.0.29. [Record](bugs/DEBUG-GALLERY-TIMING-29.md#separate-issue-torchtest-darkness-29).",
+    "report": null
+  },
+  {
+    "id": "TOWN-ARRIVAL-002",
+    "title": "Town flora fallback picked the wrong Balmora region",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Source now uses the AWBR1 arrival fields; the actual table check selects bm019. Assembled image and target arrival pending; fixed version not recorded. [Record](journals/BUG_JOURNAL-v0.0.29.md#town-arrival-002-flora-installation-selected-the-wrong-balmora-fallback).",
+    "report": null
+  },
+  {
+    "id": "TOWN-FLORA-BINDING-003",
+    "title": "Town flora staging rejected a valid legacy sprite binding",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Selection now unions bounds membership with existing bound source keys; 19 interpreted tests and all 66 Seyda binding checks pass. Assembled and target fixed version pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#town-flora-binding-003-valid-legacy-source-copy-outside-rotated-source-bounds).",
+    "report": null
+  },
+  {
+    "id": "TOWN-FLORA-BUDGET-004",
+    "title": "World 4 MiB file budget wrongly applied to town flora maps",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Typed town admission drops the world-only cap but keeps the final ABI heap gate; town and flora tests and 66-map host staging pass. Final gate, image and target pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#town-flora-budget-004-world-file-budget-gate-applied-to-existing-town-profile).",
+    "report": null
+  },
+  {
+    "id": "TRANSITION-EQUIPMENT-29",
+    "title": "Carried torch blinks out on cell/sub-cell arrival",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "The load path did not carry hand state or animation timers. Full equipment-handoff source passes combined Docker checks; native acceptance pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#transition-equipment-29-carried-torch-blinks-out-during-cell-handoff-open).",
+    "report": null
+  },
+  {
+    "id": "TREE-SCALE-001",
+    "title": "Non-unit-scale tree sprites omitted; bounds too conservative",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Converter skips scales outside 1 +/- 0.02. Policy staged with runtime activation off; seven selection-policy checks pass. Renderer/converter integration and target tests pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#tree-scale-001--non-unit-tree-sprites-and-conservative-bounds).",
+    "report": null
+  },
+  {
+    "id": "TREES-BUILD-001",
+    "title": "First v0.0.28-rc1 test run lacked presets and optional inputs",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Missing versioned emulator presets and unconditional vegetation-policy hashing; corrections required a full rerun. The record claims no verified fixed release. [Record](journals/BUG_JOURNAL-v0.0.29.md#trees-build-001-first-rc1-validation-found-missing-integration-inputs).",
+    "report": null
+  },
+  {
+    "id": "UI-ACCEPT-29",
+    "title": "Character selection lacks a visible OK button",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "aw_ui_mode 2 adds a clickable, keyboard-focused OK button, included in v0.0.29-dev4 per its hotlist. Native target check of the new buttons pending. [Record](journals/BUG_JOURNAL-v0.0.29.md#ui-accept-29-character-selection-lacks-a-visible-ok-button-open).",
+    "report": null
+  },
+  {
+    "id": "WIN-04",
+    "title": "Gallery allowance receipt mismatched after Windows CRLF staging",
+    "state": "fixed",
+    "fixed_in": "v0.0.27-rc1",
+    "owner_accepted": null,
+    "status": "Writer emits explicit UTF-8/LF; byte regression and a fresh assembly retry pass. Legacy CRLF receipts needed a v0.0.27-rc4 follow-up (seven Windows tests; retry verified 3,551 models). [Record](journals/BUG_JOURNAL-v0.0.29.md#win-04-gallery-allowance-receipt-differs-after-windows-staging).",
+    "report": null
+  },
+  {
+    "id": "WIN-05",
+    "title": "Intermittent WinUAE background-music snapping",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. 64 KiB OST read-ahead is a functionally tested mitigation in v0.0.28; the owner still hears artifacts at load-ins and heavy scenes. Later reports continue under AUDIO-LOAD-29. [Record](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).",
+    "report": null
+  },
+  {
+    "id": "WORLD-FLORA-HEAP-010",
+    "title": "Seyda sprite payload exceeds the final map heap headroom",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "29 Seyda sub-cells failed the v0.0.28-rc1 final heap gate (worst 328,304 B over). Reduction trials saved little; the record shows no fix or verified version. [Record](bugs/ENTITY-EXHAUSTION-007.md#world-flora-heap-010-seyda-sprite-payload-exceeds-final-headroom).",
+    "report": null
+  },
+  {
+    "id": "HARVEST-BITTERCOAST-29",
+    "title": "Only one of three nearby Bitter Coast mushrooms reportedly usable",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "RC2 report at global -15287 -59485 735, time 02:39. Species and pickup-versus-consumption stage are unverified; map/reference IDs, reproduction and cause are pending. [Issue](bugs/HARVEST-BITTERCOAST-29.md).",
+    "report": "bugs/HARVEST-BITTERCOAST-29.md"
+  },
+  {
+    "id": "CENSUS-DOOR-STUCK-29",
+    "title": "Player stuck after opening Census Office hall door",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-rc2",
+    "owner_accepted": null,
+    "status": "Occupied-door activation guard passes actual-map and five focused checks. RC2 playtester confirms the reported trap is gone and obstruction feedback appears. Other positions, save/reload and return paths remain coverage limits. [Issue](bugs/CENSUS-DOOR-STUCK-29.md).",
+    "report": "bugs/CENSUS-DOOR-STUCK-29.md"
+  },
+  {
+    "id": "LIGHT-EXTERIOR-JUMP-29",
+    "title": "Brightness discontinuity at the reported Seyda Neen shack",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-rc2",
+    "owner_accepted": null,
+    "status": "Empty-versus-unused lightdata correction passes six focused checks. RC2 playtester confirms the reported shack brightness jump is gone. This is scoped to that reproduction; wider town/world traversal coverage remains. [Original boundary evidence](BUGS-v0.0.29-RC1.md#repeated-boundary-evidence-6-october-2026).",
+    "report": null
+  },
+  {
+    "id": "TORCH-NPC-LIGHT-29",
+    "title": "Nearby NPCs do not visibly respond to torchlight",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "No-lightdata saturation corrected. A source-matched native candidate visibly brightens the sampled guard with its torch on at night and by day. This is bounded off/on evidence, not an old/new-engine native A/B or measured frame cost. Final package reconciliation remains open.",
+    "report": null
+  },
+  {
+    "id": "HAND-PUNCH-COVERAGE-29",
+    "title": "Near-plane opening at maximum punch extension",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-rc2",
+    "owner_accepted": null,
+    "status": "Sampled default and Argonian Female native views show no prior aperture; RC2 High Elf playtester also reports no exposed gaps, sex unspecified. Brief idle-to-punch disappearance and full race/pose coverage remain separate.",
+    "report": null
+  },
+  {
+    "id": "TORCH-HAND-NORD-29",
+    "title": "Detached-looking left grip fragment in dev4",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Playtester reports no observed blinking in the latest delivered dev4, while paw-like shape and detached grip remain open. Source-topology Nord models have native binding evidence. A normal-byte-only candidate passes six focused checks and 144 actual C renderer frames with no model-size increase; ordinary standing/punch/run acceptance is pending.",
+    "report": null
+  },
+  {
+    "id": "AUDIO-APPEARANCE-29",
+    "title": "Music pause entering character race selection",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Still present in v0.0.30-rc1 (owner, WinUAE, 7 October 2026): small music clicks and crackles on the pier when entering head selection and on Choose and OK. Earlier: reopened by the RC2 WinUAE playtest on 6 October; earlier RC1 entry acceptance is preserved in the journal. A current fix is not established.",
+    "report": null
+  },
+  {
+    "id": "AUDIO-LOAD-29",
+    "title": "OST crackles under heavy loading",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Still present in v0.0.30-rc1 (owner, WinUAE, 7 October 2026): heavy music crackling going from the ship's hull to the deck, and small crackles entering the Census and Excise Office. Control cases from the same playtest, both without disk loads: no crackle while choosing character attributes or reading the release papers in the Census office. Points at the mixer starving during blocking loads rather than at the music path. Owner priority: the soundtrack must stay clean through loads. Related WIN-05 history retained; cause and independent reproduction pending.",
+    "report": null
+  },
+  {
+    "id": "UI-OPTIONS-WRAP-29",
+    "title": "Setup selection wraps despite a bounded scrollbar",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "RC1 menu/scrollbar accepted except endpoint wrapping. Unpublished candidate clamps selection; seven focused Docker checks pass. Target acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "INTERIOR-NPC-LIGHT-29",
+    "title": "Census Office characters appear too dark under room lighting",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "RC1 owner report; compare static room lighting and torch contribution on NPCs separately. Shared cause with torch lighting is unconfirmed; source and controlled native investigation pending.",
+    "report": null
+  },
+  {
+    "id": "AUDIO-ENTER-29",
+    "title": "Sub-second soundtrack cut on Enter to follow the guard",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Still present in v0.0.30-rc1 (owner, WinUAE, 7 October 2026): the music pauses for a split second on Enter to follow the guard in the prison ship. Owner reports this worked in earlier versions, so it is a regression from a music-servicing (polling) change; bisect against older builds. Appearance-entry acceptance is split into AUDIO-APPEARANCE-29; heavy-load crackling into AUDIO-LOAD-29. Cause open.",
+    "report": null
+  },
+  {
+    "id": "TORCH-FLAME-VISIBILITY-29",
+    "title": "Torch flame not visible after changing styles",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Classic, bright-base and sparks styles are visible in unobscured native day/night views for the tested Nord binding. Other appearances and exact final-package replay remain open; no larger illumination radius is claimed.",
+    "report": null
+  },
+  {
+    "id": "HUNK-RESERVE-SN012-29",
+    "title": "Dev4 first-presented sn012 reserve below 2 MiB target",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Reported clearance 1,940,480 B. This is a reserve warning, not a crash; exact steady/transition peaks and admission review remain open. Do not lower the reserve to silence it. See [RC1 detail](BUGS-v0.0.29-RC1.md) and [memory report](MEMORY_ALLOCATION.md).",
+    "report": null
+  },
+  {
+    "id": "HARVEST-WORLD-29",
+    "title": "Original mushroom placement, picking and persistent state worldwide",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Latest exact-storage admission candidate models 347/390 exterior maps within budget; 43 remain withheld. 897/934 originals have an admitted primary route, 886/934 all overlap copies. Owner playtest of v0.0.30-rc1 (WinUAE, 7 October 2026): picking mushrooms on the road from Seyda Neen to Balmora works. Dense maps, interiors, withheld maps and persistent picking across saves remain gates.",
+    "report": null
+  },
+  {
+    "id": "RENDER-METADATA-29",
+    "title": "Native renderer metadata warns as an unknown QuakeC field",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Integrated in the rc1 candidate; two focused sanitizer checks, combined 1,023-test run and Amiga link pass. Exact package/native replay pending. See [rc1 detail](BUGS-v0.0.29-RC1.md).",
+    "report": null
+  },
+  {
+    "id": "DEBUG-ALIASES-29",
+    "title": "Discoverable video-player aliases and disk-backed help",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "playvid, vidplay, playvideo and videoplay share one handler. Three focused checks and combined source/link pass; package/native command checks pending. See [debug help](DEBUG_OVERLAYS.md#rc1-video-player-aliases).",
+    "report": null
+  },
+  {
+    "id": "VIEW-PITCH-CENTER-29",
+    "title": "Legacy automatic pitch centering during free-look",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Bounded dev4-candidate native walking and sn037/sn054 crossing verified default-off centering, legacy opt-in and explicit centerview. Native evidence supersedes source-only status; reconcile exact shipped package before marking this split issue fixed. Broader yaw remains VIEW-AUTOCENTER-29.",
+    "report": null
+  },
+  {
+    "id": "PERF-READAHEAD-29",
+    "title": "Outdoor cell/sub-cell crossing pauses and lost read-ahead",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "One native trace filled 131,072 bytes for the destination, then lost the buffer after high-hunk move failure; no prefix was used. Relocation prototype passes source/ABI checks; matched first-world-frame timing and audio continuity remain pending. Building entry/exit screens are acceptable. See [investigation](performance/CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md).",
+    "report": null
+  },
+  {
+    "id": "CHAR-CONFIRM-BORDER-29",
+    "title": "Character Go back / Choose actions lack OK-style frames",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-rc1",
+    "owner_accepted": null,
+    "status": "Owner accepts both borders, 5/5, in the RC1 playtest on 6 October. Preserve outlined controls and selected focus; other travel/menu variants are not covered by this acceptance.",
+    "report": null
+  },
+  {
+    "id": "TRANSITION-VIEW-29",
+    "title": "Automatic cell handoff forgets mouse orientation",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Exact live view/drift restore candidate passes focused Linux cases; native route/input acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "VIEW-AUTOCENTER-29",
+    "title": "Reported viewport/yaw resets while walking or crossing cells",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Bounded default-off pitch verification is recorded separately below. The broader yaw/transition report and earlier discrepant capture remain open; do not attribute every reset to pitch centering. See [journal](journals/BUG_JOURNAL-v0.0.29.md#view-autocenter-29-forward-motion-recenters-free-look-open).",
+    "report": null
+  },
+  {
+    "id": "TRANSITION-VOICE-29",
+    "title": "Automatic cell handoff cuts active speech",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Bounded detached PCM candidate passes sanitized actual mixer tests; memory/audible native acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "TERRAIN-TRAP-29",
+    "title": "v0.0.29-dev1: Player reportedly stuck on rocks beside structures",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Global -21794,-17467,545; screenshot reviewed, exact map/collision/transition cause and runtime reproduction pending.",
+    "report": null
+  },
+  {
+    "id": "TORCH-INPUT-29",
+    "title": "F cannot raise hands; V only prints torch state",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "P1 metadata cause reproduced; all 2,532 corrected world maps pass readback and sampled native F/V checks pass. Full state/save/light matrix remains open.",
+    "report": null
+  },
+  {
+    "id": "LIGHT-GRADIENT-29",
+    "title": "Unsigned light gradients overflow during surface interpolation",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Source arithmetic repair passes sanitized final-pixel tests across all four mips; native acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "TORCH-LIGHT-29",
+    "title": "Torch flames look weak and provide little immediate light",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner reports torches look weak/dying and night darkness swallows the scene; requests a brighter near-white/yellow core and stronger immediate light while preserving dark unlit nights. AW_FogDraw is a candidate contributor, not a confirmed cause. No fix/acceptance; distinct from intermittent guard-torch visibility.",
+    "report": null
+  },
+  {
+    "id": "GUARD-TORCH-CYCLE-29",
+    "title": "Guard torch intermittently absent during night-cycle observation",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner first observed a nearby guard without a visible torch, then saw the same guard carrying one after reapproaching during the same night. Trigger and cause unverified; do not treat as a confirmed lost cycle.",
+    "report": null
+  },
+  {
+    "id": "INTERIOR-LIGHT-29",
+    "title": "Interiors lack convincing local illumination",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "P2 source-light and bounded renderer study requested; cause/coverage not yet audited.",
+    "report": "bugs/INTERIOR-LIGHT-29.md"
+  },
+  {
+    "id": "SKY-NIGHT-COVER-29",
+    "title": "Dense night clouds rarely reveal moons/stars",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner accepted the current night-sky appearance on 5 October 2026. Preserve that look as the visual regression baseline; exact active config and broader weather/region/performance coverage remain unrecorded or pending. See [journal](journals/BUG_JOURNAL-v0.0.29.md#sky-night-cover-29-owner-appearance-acceptance-5-october-2026).",
+    "report": null
+  },
+  {
+    "id": "HUD-STATS-29",
+    "title": "Health uses fixed 100; other bars hardcoded full",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "P2 independent current/max candidate passes actual pixel checks; native acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "CONSOLE-CAPS-29",
+    "title": "FS-UAE F10 Caps Lock appears stuck",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "v0.0.29-dev1 owner report; toggling on/off is an observed workaround. Modifier/focus cause unconfirmed.",
+    "report": null
+  },
+  {
+    "id": "CONSOLE-WHEEL-29",
+    "title": "FS-UAE console wheel starts working then reports unbound",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "v0.0.29-dev1 recurring owner report; preserve initial success then MWHEELUP fallback. Event-routing cause and fix unconfirmed.",
+    "report": null
+  },
+  {
+    "id": "MODAL-WORLD-29",
+    "title": "Head/race and journal backgrounds consume world work",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Independent saved aw_modal_freeze/aw_modal_black defaults1; original name entry excluded. Soundtrack/UI stay live; revised Linux fixtures and cross-host Amiga binary parity pass; native acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "SHACK-VISIBILITY-29",
+    "title": "Indrele Rathryon shack front walls missing",
+    "state": "fixed",
+    "fixed_in": "v0.0.29-dev3",
+    "owner_accepted": null,
+    "status": "Matched native wall restoration and explicit playtester confirmation are recorded in the [journal](journals/BUG_JOURNAL-v0.0.29.md#shack-visibility-29-indrele-shack-missing-front-walls-fixed-in-v0029-dev3-owner-confirmed). Other structures and terrain reports remain separate.",
+    "report": null
+  },
+  {
+    "id": "SEYDA-TRANSITION-29",
+    "title": "v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report; reproduce exact crossing and residency/collision state. Fewer sub-cells requested for study, not an established fix.",
+    "report": null
+  },
+  {
+    "id": "INLAND-SHORE-29",
+    "title": "v0.0.29-dev1: Angular/jagged inland shoreline",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner-reported view at global -39785,-30636,379; compare authored LAND/water intersection with conversion. Cause unknown; preserve water placement/height.",
+    "report": null
+  },
+  {
+    "id": "HORIZON-POP-29",
+    "title": "Ashlands horizon pops or breaks up while turning",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner qualitatively reports distant outlines load better in dev3; preserve that as a comparison baseline; occasional fill gaps remain. Opaque-rock far-culling is attributed and an exact probe helps one sample, but OFF baselines differ in 17,565/48,640 pixels (36.11%). Horizon gaps, popping, matched-view replay, and performance remain open.",
+    "report": null
+  },
+  {
+    "id": "MAP-TELEPORT-28",
+    "title": "F10 map teleport intermittently fails",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Shared handler and hidden-HUD correction pass C checks; both aliases open the same picker in sampled native replay. Landing/full-state acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "MAP-SPOTS-28",
+    "title": "In-game map screen has white/yellow spots",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "AWM1 palette remap omission found; pixel/ocean remap candidate passes focused Windows/Linux checks. Target map pending.",
+    "report": null
+  },
+  {
+    "id": "MAP-VIEW-SWITCH-28",
+    "title": "Mouse cannot switch DEBUG / IN-GAME map views",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Overlay and event-order fixes pass focused C checks/Amiga builds. Emulator replay shows oversized guest deltas; manual mouse acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "MAP-RIGHT-DRAG-29",
+    "title": "Advertised right-drag does not pan teleport map",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Amiga right/middle mismatch reproduced; local two-button fix passes fixtures and builds. Manual native acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "TREE-PILLAR-28",
+    "title": "Sprite-tree roots extend into unintended striped pillars",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Scaled/authored-origin sampling mismatch reproduced: 90/105 bad pixels before; seven raster cases pass after. Native tree acceptance pending.",
+    "report": null
+  },
+  {
+    "id": "SKY-GROUND-28",
+    "title": "Rebuilt LAND faces invisible; clouds scroll too fast",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Native winding repair restores ground in bounded town views; current cloud multiplier is 0.00333333333. Final route/motion acceptance pending; [journal](journals/BUG_JOURNAL-v0.0.29.md#sky-ground-28-pale-ground-and-excessive-cloud-speed-open).",
+    "report": null
+  },
+  {
+    "id": "SKY-STARS-28",
+    "title": "Enlarged stars cover original night artwork",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "AWN2 point roles limit stars to one pixel behind nebula and full moon masks. Focused fixtures pass; native views pending; [journal](journals/BUG_JOURNAL-v0.0.29.md#sky-stars-28-enlarged-stars-and-night-layer-ordering-open).",
+    "report": null
+  },
+  {
+    "id": "ARRIVAL-CEILING-28",
+    "title": "Coordinate arrivals start inside solid ceiling shell",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Bounded clear-start search passes four actual owned hull cases; dynamic/native routes pending; [journal](journals/BUG_JOURNAL-v0.0.29.md#arrival-ceiling-28-coordinate-arrivals-blocked-by-solid-ceiling-shell-open).",
+    "report": null
+  },
+  {
+    "id": "DOC-STATE-01",
+    "title": "Published release documentation retained stale candidate/current-version claims",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Local editorial repair; published v0.0.27 tag/assets preserved. See [journal](journals/BUG_JOURNAL-v0.0.29.md#doc-state-01-published-v0027-described-as-an-unpublished-candidate-documentation-bug). (First fixed version: Main-branch correction pending.)",
+    "report": null
+  },
+  {
+    "id": "CI-01",
+    "title": "Windows short aliases mismatch resolved discovery paths in tests",
+    "state": "fixed",
+    "fixed_in": "v0.0.26-rc1",
+    "owner_accepted": null,
+    "status": "Assertions corrected; local short-alias regression and subsequent hosted Windows parity passed. See [journal](journals/BUG_JOURNAL-v0.0.29.md#ci-01-windows-short-path-aliases-fail-host-discovery-assertions).",
+    "report": null
+  },
+  {
+    "id": "WIN-03",
+    "title": "Windows image-packing command exceeds process limit",
+    "state": "fixed",
+    "fixed_in": "v0.0.26-rc1",
+    "owner_accepted": null,
+    "status": "Windows batching passed 1,100-file readback, four regressions and complete image readback/WinUAE game entry; [journal](journals/BUG_JOURNAL-v0.0.29.md#win-03-windows-image-packing-command-exceeds-process-limit--fixed-in-working-tree-2-october-2026)",
+    "report": null
+  },
+  {
+    "id": "WIN-02",
+    "title": "Cancelled Windows stage leaves child workers alive",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Process-tree cleanup candidate tested separately; integration pending; [journal](journals/BUG_JOURNAL-v0.0.29.md#win-02-cancelled-windows-stage-leaves-worker-descendants--open-2-october-2026)",
+    "report": null
+  },
+  {
+    "id": "WIN-01",
+    "title": "Native Windows Python geometry-worker queue failure",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Intermittent invalid semaphore handle; cause unknown; [journal](journals/BUG_JOURNAL-v0.0.29.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026)",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-01",
+    "title": "Ship-exit intermittent freeze",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open; retry succeeded, cause unknown",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-02",
+    "title": "Dock/menu freeze and looping audio",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open; third run remained stable",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-03",
+    "title": "Silt Strider landing geometry",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Expanded bounds and missing rock restored; Strider/Darvame now present; exact-view acceptance pending",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-04",
+    "title": "Invisible barriers across plank",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev2",
+    "owner_accepted": null,
+    "status": "Focused native passage/containment passed; owner acceptance pending; pier escape below remains separate",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-05",
+    "title": "Dock guard misses approach interception",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev3",
+    "owner_accepted": null,
+    "status": "Feet-anchor regression and focused FS-UAE automatic approach/race passed; full escort route remains open",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-06",
+    "title": "Player can leave pier and become stranded",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report; join/edge coverage under investigation",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-07",
+    "title": "Slow opening exterior / excessive residency",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Profile rendering and memory; reduced opening exterior planned",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-08",
+    "title": "Census wall/hanging texture quality or mapping",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev3",
+    "owner_accepted": null,
+    "status": "Confirmed class-art downsampling loss corrected; source art verified and native view inspected; other mapping faults not ruled out",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-09",
+    "title": "Papers unreadable",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev3",
+    "owner_accepted": null,
+    "status": "Native reading/paging: black text on a plain light page; current world palette maps requested white to warm off-white",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-10",
+    "title": "Interior door animation and sound missing",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Hall door snaps open; source motion/sound sequence pending",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-11",
+    "title": "Census missing floor and wall / falling into void",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev3",
+    "owner_accepted": null,
+    "status": "Original room172861 restored; 306-sample scan and native standing at reported hole pass; separate out-of-bounds report remains open",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-12",
+    "title": "Downstairs interior doors cannot open",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Ordinary hinged-door interaction not implemented; only opening hall special case exists",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-13",
+    "title": "New Game confirmation defaults to Cancel",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev3",
+    "owner_accepted": null,
+    "status": "Main/pause host checks and native confirmation/start passed",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-14",
+    "title": "Master debug toggle omits coordinates",
+    "state": "fixed",
+    "fixed_in": "v0.0.20",
+    "owner_accepted": null,
+    "status": "Host regression checks on/off and explicit coordinate override",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-15",
+    "title": "Prison wave ambience masks dialogue",
+    "state": "fixed",
+    "fixed_in": "v0.0.20",
+    "owner_accepted": null,
+    "status": "Historical -5 dB correction; superseded by dev2 authored gain after new quiet-wave report",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-16",
+    "title": "Two compiler-reported array bounds violations",
+    "state": "fixed",
+    "fixed_in": "v0.0.20",
+    "owner_accepted": null,
+    "status": "Sanitizer reproductions and corrected production routines",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-17",
+    "title": "FS-UAE 24-bit-addressing option rejected",
+    "state": "fixed",
+    "fixed_in": "v0.0.20",
+    "owner_accepted": null,
+    "status": "Preset corrected against FS-UAE parser; unrelated freezes remain open",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-18",
+    "title": "Punch blocked after Census office exit",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Candidate: hall fighting gate separated from opening enclosure; post-exit native check pending",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-19",
+    "title": "Courtyard barrel incorrectly says empty",
+    "state": "fixed",
+    "fixed_in": "v0.0.21-dev3",
+    "owner_accepted": null,
+    "status": "Final native build: Take ring, inventory ring present, then Empty; host checks persisted depletion and no refill after losing the ring",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-20",
+    "title": "Census clipped outside room near captain wing",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner screenshot XYZ201,-210,0; route/cause unconfirmed; separate from restored room172861",
+    "report": null
+  },
+  {
+    "id": "AW-20260928-21",
+    "title": "Exterior Census door/wall overlap",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner screenshot XYZ396,-171,39, heading170, pitch-3; cause and FPS impact unmeasured",
+    "report": null
+  },
+  {
+    "id": "AW-20260929-01",
+    "title": "Player passes through town NPCs",
+    "state": "fixed",
+    "fixed_in": "v0.0.23-dev2",
+    "owner_accepted": null,
+    "status": "Shared solid-body spawn path; real engine swept-box checks and native Fargoth approach stop",
+    "report": null
+  },
+  {
+    "id": "AW-20260929-02",
+    "title": "NPCs missing from expanded town render",
+    "state": "fixed",
+    "fixed_in": "v0.0.23-dev2",
+    "owner_accepted": null,
+    "status": "256-entry draw list exhausted; full bounded list and 8,192 visibility links; Darvame/Fargoth captured",
+    "report": null
+  },
+  {
+    "id": "AW-20260929-03",
+    "title": "Music cuts during loading",
+    "state": "fixed",
+    "fixed_in": "v0.0.23-dev2",
+    "owner_accepted": null,
+    "status": "Buffer-clear protection, bounded loader servicing; repeated transitions keep track open with no post-startup underruns in tested runs",
+    "report": null
+  },
+  {
+    "id": "AW-20260929-04",
+    "title": "Loading artwork flashes after intro movie",
+    "state": "fixed",
+    "fixed_in": "v0.0.23-dev2",
+    "owner_accepted": null,
+    "status": "One-shot blank style; native transition sequence contains all-black loading frames, then ship",
+    "report": null
+  },
+  {
+    "id": "AW-20260929-05",
+    "title": "Ship waves too quiet",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Loop confirmed running; extra -5 dB reduction removed in dev2; owner listening acceptance pending",
+    "report": null
+  },
+  {
+    "id": "AW-20260929-06",
+    "title": "Expanded scene exhausts 9 MiB heap",
+    "state": "fixed",
+    "fixed_in": "v0.0.23-dev2",
+    "owner_accepted": null,
+    "status": "Removed redundant plane allocation; 11 MiB heap inside unchanged 16 MiB Fast RAM profile",
+    "report": null
+  },
+  {
+    "id": "AUDIO-NEWGAME-30",
+    "title": "Music crackles when confirming New Game (WinUAE)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner report, v0.0.30-rc1 WinUAE playtest 7 October 2026: choosing New Game and confirming with Choose makes the background music crackle. Not yet reproduced; cause unknown.",
+    "report": "bugs/AUDIO-NEWGAME-30.md"
+  }
+]

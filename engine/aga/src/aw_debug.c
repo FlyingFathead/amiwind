@@ -45,7 +45,7 @@ static void aim(void) {
 }
 static void help(void) {Cbuf_InsertText("debug help\n");}
 static void recover(void) {
-    edict_t *p=player(),*start;int i;
+    edict_t *p=player(),*start=NULL;int i;
     if(!p)return;
     for(i=1;i<sv.num_edicts;i++) {
         start=EDICT_NUM(i);
@@ -70,7 +70,8 @@ static void reset_location(void) {
 /* Native floor scan uses the same swept hull as movement, with no teleport. */
 static void probe(void) {
     FILE *f;edict_t *p=player();int x,y,n=0,missing=0;trace_t a,b;vec3_t top,bottom;
-    if(!p)return;f=fopen("collision-probe.csv","w");if(!f){Con_Printf("Cannot write collision-probe.csv\n");return;}
+    if(!p)return;
+    f=fopen("collision-probe.csv","w");if(!f){Con_Printf("Cannot write collision-probe.csv\n");return;}
     fprintf(f,"x,y,world_z100,scene_z100,world_startsolid,scene_startsolid,scene_allsolid,scene_fraction10000\n");
     for(y=-640;y<=640;y+=64)for(x=-640;x<=640;x+=64) {
         top[0]=bottom[0]=x;top[1]=bottom[1]=y;top[2]=400;bottom[2]=-505;

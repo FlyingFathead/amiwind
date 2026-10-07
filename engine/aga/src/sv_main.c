@@ -59,7 +59,7 @@ void SV_Init (void)
     Cvar_RegisterVariable (&sv_nostep);
 
     for (i=0 ; i<MAX_MODELS ; i++)
-        sprintf (localmodels[i], "*%ld", i);
+        sprintf (localmodels[i], "*%ld", (long)i);
 }
 
 /*
@@ -192,7 +192,7 @@ void SV_SendServerinfo (client_t *client)
     char			message[2048];
 
     MSG_WriteByte (&client->message, svc_print);
-    sprintf (message, "%c\nVERSION %4.2f SERVER (%ld CRC)", 2, VERSION, pr_crc);
+    sprintf (message, "%c\nVERSION %4.2f SERVER (%ld CRC)", 2, VERSION, (long)pr_crc);
     MSG_WriteString (&client->message,message);
 
     MSG_WriteByte (&client->message, svc_serverinfo);
@@ -987,7 +987,7 @@ void SV_SendReconnect (void)
     char	data[128];
     sizebuf_t	msg;
 
-    msg.data = data;
+    msg.data = (byte *)data;
     msg.cursize = 0;
     msg.maxsize = sizeof(data);
 

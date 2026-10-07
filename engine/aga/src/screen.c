@@ -635,7 +635,11 @@ void SCR_ScreenShot_f (void)
     {
         pcxname[5] = i/10 + '0';
         pcxname[6] = i%10 + '0';
-        sprintf (checkname, "%s/%s", com_gamedir, pcxname);
+        if (!COM_FormatPath (checkname, sizeof(checkname), "%s/%s", com_gamedir, pcxname))
+        {
+            Con_Printf ("SCR_ScreenShot_f: path too long\n");
+            return;
+        }
         if (Sys_FileTime(checkname) == -1)
             break;	// file doesn't exist
     }

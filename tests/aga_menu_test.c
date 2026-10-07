@@ -2,6 +2,9 @@
 #include "quakedef.h"
 #include <assert.h>
 keydest_t key_dest;qboolean keydown[256];viddef_t vid;server_t sv;int scr_copyeverything;
+char *keybindings[256];
+void Key_SetBinding(int keynum,char *binding){keybindings[keynum]=binding;}
+char *Key_KeynumToString(int keynum){static char s[2];s[0]=(char)keynum;s[1]=0;return s;}
 byte pixels[320*200];int clears,quit,changes,missing,intro_missing;
 static int distance=540,gold_frame,frozen_loading=1;
 int AW_RegionLoadingFrozen(void){return frozen_loading;}
@@ -36,13 +39,34 @@ void AW_MusicTitle(void){}
 void AW_MenuMouse(int,int);
 static void open_pause(void){M_Menu_Main_f();mx=160;my=63;}
 static void click(int x,int y){AW_MenuMouse(x-mx,y-my);mx=x;my=y;M_Keydown(K_MOUSE1);}
+/* Options > Controls: the raw key is captured (W is not turned into Up),
+ * a third key replaces both, Escape cancels, Delete clears and the cursor
+ * skips planned rows. */
+static void check_controls(void){
+ int i;
+ keybindings['w']="+forward";keybindings[K_UPARROW]="+forward";keybindings[K_F9]="aw_quickload";
+ open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();
+ for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
+ M_Keydown(K_ENTER);M_Draw();assert(highlight_y==54); /* Forward */
+ M_Keydown(K_ENTER);M_Draw();M_Keydown('k');
+ assert(!strcmp(keybindings['k'],"+forward") && !*keybindings['w'] && !*keybindings[K_UPARROW]);
+ M_Keydown(K_ENTER);M_Keydown(K_ESCAPE);assert(key_dest==key_menu && !strcmp(keybindings['k'],"+forward"));
+ M_Keydown(K_ENTER);M_Keydown('W');assert(!strcmp(keybindings['w'],"+forward") && !strcmp(keybindings['k'],"+forward"));
+ M_Keydown(K_DEL);assert(!*keybindings['w'] && !*keybindings['k']);
+ for(i=0;i<40;i++)M_Keydown(K_DOWNARROW);
+ M_Draw();assert(highlight_y==149);  /* Back is the last row */
+ M_Keydown(K_UPARROW);M_Keydown(K_UPARROW);M_Draw(); /* past Reset, over planned rows */
+ M_Keydown(K_ENTER);M_Keydown('q');assert(!strcmp(keybindings['q'],"aw_quickload"));
+ M_Keydown(K_ESCAPE);M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
+ for(i=0;i<256;i++)keybindings[i]=NULL;
+}
 static void check_setup_endpoints(void){
  int i,j,down[]={K_DOWNARROW,K_MWHEELDOWN,'s',K_TAB},up[]={K_UPARROW,K_MWHEELUP,'w'};
  front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
  for(j=0;j<4;j++){
   for(i=0;i<24;i++)M_Keydown(down[j]);
-  M_Draw();assert(scroll_total==10 && scroll_top==3 && highlight_y==168 && highlight_w==230);
-  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==3 && highlight_y==149);
+  M_Draw();assert(scroll_total==11 && scroll_top==4 && highlight_y==168 && highlight_w==230);
+  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==4 && highlight_y==149);
   for(i=0;i<24;i++)M_Keydown(up[j%3]);
   M_Draw();assert(scroll_top==0 && highlight_y==54 && highlight_w==230);
   M_Keydown(K_DOWNARROW);M_Draw();assert(scroll_top==0 && highlight_y==73);
@@ -82,7 +106,7 @@ int main(void){
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
  M_Draw();M_Keydown(K_ESCAPE);
- M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
  M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
  click(100,168+18);assert(frozen_loading); /* final pixel of the loading row */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(AW_CellChangeMethod()==2); /* scrolled loading method */
@@ -102,6 +126,7 @@ int main(void){
  missing=1;picker();M_Draw();M_Keydown(K_ENTER);assert(changes==4 && key_dest==key_game);missing=0;
  M_Menu_Quit_f();M_Draw();M_Keydown(K_ENTER);assert(!quit);M_Menu_Quit_f();M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);assert(quit==1);
  open_pause();AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw();
+ check_controls();
  check_setup_endpoints();
  return 0;
 }

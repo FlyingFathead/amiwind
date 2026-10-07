@@ -76,5 +76,5 @@ nearby crossings, coastline and water, looking down, changed FOV and nighttime.
 Measure actual target frame cost and counters, verify that genuine gaps remain
 open, and retain the old-mode switch.
 
-See [the bug journal](BUG_JOURNAL.md#land-horizon-gaps-29-sky-visible-through-distant-resident-ground-open)
+See [the bug journal](journals/BUG_JOURNAL-v0.0.29.md#land-horizon-gaps-29-sky-visible-through-distant-resident-ground-open)
 and [the separate horizon study](PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
