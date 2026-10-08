@@ -1,8 +1,16 @@
 # Roadmap and implementation options
 
-## Next: v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec
+## Next: v0.0.33 - Towards CHIM: Replacing the Engine Block
 
-v0.0.31 (Lamps, Lanterns and Loading) is out. v0.0.32 starts with Vivec, built
+v0.0.32 (Last Stop on the Old Line: Window-Shopping in Vivec) is out: the last
+release on the AmiQuake-based legacy engine and the legacy builder, with the
+Vivec Arena as an outside-only preview ([release notes](RELEASE-v0.0.32.md)).
+v0.0.33 is the first release on the CHIM engine, the world streamer (plan
+below and [world streamer](WORLD_STREAMER.md)).
+
+## v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec (released)
+
+v0.0.31 (Lamps, Lanterns and Loading) was out. v0.0.32 started with Vivec, built
 by the generic town importer with no hand-building, and with fixes found by
 measuring the whole island on 8 October 2026
 ([world progress](trackers/WORLD_PROGRESS.md), [bug register](BUGS.md)):
@@ -110,7 +118,7 @@ written last and whole in map order. The builder will check this layout.
 
 **Plan:**
 
-1. **v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec** (now, the last
+1. **v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec** (released, the last
    release on the legacy engine and builder, built from scratch): Vivec with today's format; the measurements behind the
    streamer (census done; renderer counters and a cycle-approximate emulator
    profile in progress); real 68040 safety (no library sine and cosine per
@@ -118,7 +126,7 @@ written last and whole in map order. The builder will check this layout.
    one); a map loader without temporary copies; one shared face builder with a
    validator; builder types: today's region pipeline kept as the "legacy"
    builder, CHIM as the new one (named, not numbered; CHIM has its own version).
-2. **v0.0.33 - Towards CHIM: Replacing the Engine Block:** the streamer (CHIM builder and engine 0.1.0) on Balmora, Seyda Neen and the cells
+2. **v0.0.33 - Towards CHIM: Replacing the Engine Block** (next, the first CHIM engine release): the streamer (CHIM builder and engine 0.1.0) on Balmora, Seyda Neen and the cells
    between them, measured against v0.0.31 on the same routes: worst frame time,
    bytes per crossing, memory peak, saves mid-stream.
 3. **Next:** the south-west corridor (Seyda Neen, Pelagiad, Balmora, Vivec,

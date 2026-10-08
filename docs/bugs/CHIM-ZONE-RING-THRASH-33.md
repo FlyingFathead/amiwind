@@ -3,6 +3,8 @@
 ## Status: 8 October 2026
 
 Open; tagged performance. Found in the first FS-UAE session of Balmora drawn by CHIM. CHIM engine.
+Fixed in source on v0.0.33-chim-format-engine (41386bc), not shipped at the time of writing (see Repair
+and Verification).
 
 ## Symptom
 
@@ -37,12 +39,25 @@ FS-UAE, Balmora under CHIM with the default zone: walk the town and read the CHI
 
 ## Repair
 
-Not yet; options under measurement: allocate the frame-world pool before the models, a smaller
-ring, or a larger zone within the memory budget.
+Fixed in source on v0.0.33-chim-format-engine (41386bc), not shipped at the time of writing: the
+zone grows to 6.5 MiB and two 512 KiB frame-world slots are reserved at map start, so a rebuild
+always has room for the new pool next to the old one. New defaults: `chim_zone_kib 6656`,
+`chim_pool_kib 512` (capped at a twelfth of the zone), `chim_prefetch_room 1`. Native tests: the
+slots, ring overrides, standing still reads nothing, a jump lands in a small zone.
 
 ## Verification
 
-Pending: no failed rebuilds and a bounded eviction count on the benchmark walk.
+8 October 2026, one A/B/C/D sweep in FS-UAE (emulated A1200, 2 MiB Chip + 16 MiB Fast), an
+8-chunk walk and back (emulator numbers are relative):
+
+| | Read | Evictions | Failed rebuilds | Long jump |
+| --- | --- | --- | --- | --- |
+| Before (6 MiB zone) | 41 MB | 6,651 | rebuilds found no room | failed |
+| After (6.5 MiB zone, two 512 KiB slots) | 1.9 MB | 338 | 0 | lands |
+
+The rerun of the fixed build was identical. Hunk left after load: 2.86 MB before, 2.33 MB after
+(a legacy region map leaves 3.55 MB). Pending: the full Balmora benchmark walk in a built image and
+a hardware number.
 
 ## Prevention
 

@@ -1,6 +1,25 @@
 # Development history
 
-## Unreleased - v0.0.32
+## v0.0.32: Last Stop on the Old Line: Window-Shopping in Vivec
+
+- The last release on the AmiQuake-based legacy engine and builder; next is
+  v0.0.33, the first release on the CHIM engine.
+- Vivec Arena preview, outside only (doors say "Interior unavailable"), a
+  separate area reached with `dbg tp vivec_arena`; Arena stairs, bridges and
+  residents fixed.
+- Default horizon back to the v0.0.30 look (`aw_skyline_fill 0`); skyline fill
+  selectable as an experimental mode.
+- Fires in view kept by the static flame budget; terminal-style console with
+  history; `dbg daynight off`.
+- 68040 FPU safety, optional FPU support library from your own installation,
+  map loader without staging copies, renderer counters and `awbench`.
+- Builder builds the release from scratch, in parallel, with a build profiler
+  and a known-inputs check; Seyda Neen ships as recorded in v0.0.31 with a
+  temporary pre-CHIM heap bypass for three maps.
+- New logo and start-up lines.
+- Details: [release notes](RELEASE-v0.0.32.md).
+
+Details of the v0.0.32 development line:
 
 - Console line editing like a terminal prompt (`aw_console_mode 1`, default):
   Left/Right move the cursor without deleting, typing inserts, Del deletes at

@@ -6,24 +6,78 @@
 
 An unofficial, experimental project bringing Morrowind to the Commodore Amiga: an
 AmiQuake-based engine and an asset conversion pipeline that builds the game from your own
-legally obtained copy of Morrowind. Not affiliated with or endorsed by Bethesda Softworks or
-ZeniMax.
+legally obtained copy of Morrowind, and, in time, a base for your own Amiga RPG adventures.
+Like community projects such as
+[OpenMW](https://openmw.org), [MGE XE](https://github.com/Hrnchamd/MGE-XE) and
+[MWSE](https://github.com/MWSE/MWSE), it ships no game data.
 
-AmiWind converts your own Morrowind installation for an experimental native
-Amiga runtime. Read the [FAQ](docs/FAQ.md) for the project vision, hardware
-and current scope, and [licensing and credits](docs/LICENSING_AND_CREDITS.md)
-for source provenance and what the public package contains.
+*Not affiliated with or endorsed by Bethesda Softworks or ZeniMax. Please support the original creators: buy Morrowind.*
 
-## Coming next: Vivec, and the whole game on one hard file
+In addition to being a standalone engine extension of the GPL-licensed
+[AmiQuake](https://github.com/terriblefire/amiquake), AmiWind converts your own
+Morrowind installation for an experimental native Amiga runtime. Read the
+[FAQ](docs/FAQ.md) for the project vision, hardware and current scope, and
+[licensing and credits](docs/LICENSING_AND_CREDITS.md) for source provenance and
+what the public package contains. In-game screenshots of every version:
+[gallery](docs/GALLERY.md).
 
-v0.0.32 brings Vivec and makes the engine safe for a real 68040. After that,
-the open world moves to a **world streamer with no duplicated assets**: every
-mesh, collision hull and texture stored once and placed by reference, streamed
-around the player. Estimated from the game's own data, the world itself then comes to about
+<p align="center">
+  <img src="docs/images/amiwind-v0.0.32-gallery.gif" width="800" alt="AmiWind v0.0.32 in Vivec: ten in-game screenshots in turn">
+</p>
+
+<p align="center">Not painted backdrops: every frame is rendered in real time by the engine.</p>
+
+More in the [gallery](docs/GALLERY.md).
+
+## Coming next: v0.0.33 - Towards CHIM: Replacing the Engine Block
+
+v0.0.33 is the first release on the **CHIM** engine: the open world moves to a
+**world streamer with no duplicated assets**: every mesh, collision hull and
+texture stored once and placed by reference, streamed around the player.
+Estimated from the game's own data, the world itself then comes to about
 1 GB, so the whole game should fit **one legacy-safe Amiga hard file**, where
 today's pipeline would need about 24 GB. Details, numbers and the plan:
 [roadmap](docs/ROADMAP.md), [world streamer](docs/WORLD_STREAMER.md),
 [asset census](docs/ASSET_CENSUS.md).
+
+## v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec
+
+A first look at Vivec: the Arena canton as an outside-only preview, with stairs
+you can climb and residents standing where Morrowind puts them. The last
+release on the AmiQuake-based legacy engine.
+
+<!-- v0.0.32 photos -->
+| | |
+| --- | --- |
+| ![A lantern-lit bridge pillar against a blazing sunset in v0.0.32](docs/images/amiwind-v0.0.32-vivec-bridge-pillar.png) | ![A Vivec canal at night, lanterns on both sides, in v0.0.32](docs/images/amiwind-v0.0.32-vivec-canal-night.png) |
+| **A lantern-lit bridge pillar** against a blazing sunset. | **A Vivec canal at night**, lanterns on both sides. |
+
+More in the [gallery](docs/GALLERY.md).
+
+<!-- /v0.0.32 photos -->
+
+What's new:
+
+- **Vivec Arena preview:** the Arena canton and the edges of its neighbours,
+  outside only (doors say "Interior unavailable"); a separate area, reached with
+  `dbg tp vivec_arena`.
+- **Stairs and residents in Vivec:** the Arena stairs, bridges and walkways can
+  be walked, and every resident stands on the original floor.
+- **Horizon:** the default is the v0.0.30 look (`aw_skyline_fill 0`, Horstator
+  approved); the skyline fill stays selectable as an experimental mode.
+- **Fire:** the flames you can see win the flame budget, so hearths stay lit.
+- **Console** edits like a terminal prompt, with history; `dbg daynight off`
+  holds midday.
+- **68040:** no library sine and cosine per frame; your own FPU support library
+  can go on the boot disk (`--amiga-libs`).
+- **Map loader** without temporary staging copies; renderer counters and the
+  `awbench` hardware benchmark.
+- **Builder:** builds the release from scratch from your own data, in parallel,
+  with a build profiler and a known-inputs check.
+- **New logo** and start-up lines.
+
+Release notes, with what is known in this build:
+[v0.0.32](docs/RELEASE-v0.0.32.md).
 
 ## v0.0.31 - Lamps, Lanterns and Loading
 
@@ -762,7 +816,7 @@ loads and crossings, town geometry, scenery continuity and frame cost. Build-tim
 profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
 remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md).
 
-[FAQ](docs/FAQ.md) · [Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
+[FAQ](docs/FAQ.md) · [Gallery](docs/GALLERY.md) · [Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
 [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
 [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) ·
 [Changelog](docs/CHANGELOG.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
@@ -789,3 +843,7 @@ Amiga memory, change the converter or establish a gameplay fix. Your converted
 scenes, textures and captures remain private.
 
 Read [Hidden in Dirt: Seyda Neen's graphics performance bottlenecks](docs/HIDDEN_IN_DIRT.md) for measured geometry experiments and the checks behind the next town optimization.
+
+---
+
+<p align="center"><i>AmiWind is brought to you by <a href="https://github.com/FlyingFathead/">FlyingFathead</a></i></p>

@@ -173,6 +173,16 @@ AmiWind-launcher.json
 !docs/images/amiwind-v0.0.31-balmora-night-lamp-house.png
 !docs/images/amiwind-v0.0.31-balmora-night-river.png
 !docs/images/amiwind-v0.0.31-balmora-night-house-corner.png
+!docs/images/amiwind-v0.0.32-vivec-bridge-pillar.png
+!docs/images/amiwind-v0.0.32-vivec-canal-night.png
+!docs/images/amiwind-v0.0.32-vivec-sunrise.png
+!docs/images/amiwind-v0.0.32-vivec-red-sky.png
+!docs/images/amiwind-v0.0.32-vivec-bridge-dusk.png
+!docs/images/amiwind-v0.0.32-vivec-bridge-night.png
+!docs/images/amiwind-v0.0.32-vivec-arena-sun.png
+!docs/images/amiwind-v0.0.32-vivec-arena-night.png
+!docs/images/amiwind-v0.0.32-vivec-guard-sun.png
+!docs/images/amiwind-v0.0.32-vivec-sun-between-cantons.png
 
 # Owner-requested native v0.0.28-rc1 documentation captures.
 !/docs/images/amiwind-v0.0.28-rc1-sunrise.png
@@ -205,6 +215,7 @@ AmiWind-launcher.json
 !/docs/images/amiwind-v0.0.29-rc1-mushroom-prompt.png
 !/docs/images/amiwind-v0.0.29-rc1-torch-night.png
 !/docs/images/amiwind-v0.0.29-rc2-torch.gif
+!/docs/images/amiwind-v0.0.32-gallery.gif
 !/docs/images/amiwind-v0.0.30-controls.png
 !/docs/images/amiwind-v0.0.30-temple-after.png
 !/docs/images/amiwind-v0.0.30-temple-banner.png

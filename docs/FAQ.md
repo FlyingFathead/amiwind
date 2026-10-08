@@ -2,10 +2,11 @@
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Last updated:** 8 October 2026. **FAQ revision:** 6.
-**Latest release:** v0.0.30 - The Temple ([release notes](RELEASE-v0.0.30.md)).
-**Next:** v0.0.31 - Revisiting Seyda Neen: lighter Seyda Neen maps and shorter
-cell-crossing pauses. See the [roadmap](ROADMAP.md) and [tracker](BUGS.md).
+**Last updated:** 8 October 2026. **FAQ revision:** 7.
+**Latest release:** v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec
+([release notes](RELEASE-v0.0.32.md)). **Next:** v0.0.33 - Towards CHIM: Replacing the
+Engine Block, the first release on the new world streamer engine. See the
+[roadmap](ROADMAP.md) and [tracker](BUGS.md).
 
 ## What is possible on the Amiga?
 
@@ -40,6 +41,22 @@ software fit, run better and reach less powerful machines.
 **Because Morrowind is, and has always been, an otherworldly game title.**
 
 **Morrowind ♥ Amiga ♥**
+
+## Why Morrowind?
+
+*Harry Horsperg ([FlyingFathead](https://github.com/FlyingFathead)) gives his perspective here as
+the AmiWind project's author.*
+
+Morrowind turns 25 on 1 May 2027: it was first released in North America on 1 May
+2002. AmiWind is a 25th-anniversary celebration of one of the greatest RPGs ever
+made. It is the game that inspired me to start tweaking the AmiQuake engine, to see
+how much of Vvardenfell a Commodore Amiga can hold. The aim, not a promise, is the
+whole island running on the Amiga in time for the anniversary.
+
+> *During this process, I have found out so many cool things about the Commodore Amiga
+> that I wanted to share with anyone who's interested in these retro platforms. My dream is to one day make this framework a
+> "create your own adventure" style base engine for every old school Amiga enthusiast
+> out there.*
 
 ## Why build something so demanding before optimizing it?
 
@@ -429,10 +446,9 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **7 October 2026**, the latest release is **v0.0.30 - The Temple**.
-"Release" here identifies the project's release track; AmiWind as a whole is
-still an early work in progress. The September description of only a small town
-area and a prison ship is out of date.
+As of **8 October 2026**, the latest release is **v0.0.32: Last Stop on the Old Line:
+Window-Shopping in Vivec**. "Release" here identifies the project's release track; AmiWind
+as a whole is still an early work in progress.
 
 The documented playable scope now includes:
 
@@ -444,24 +460,27 @@ The documented playable scope now includes:
   model gallery.
 - A journal, world map and save support for the implemented character and
   progression state.
-- Shared day and night skies, original-source stars and moons, torches, and
-  converted music, voices, effects and video, with remaining event and audio
-  checks tracked separately.
-- Mushroom picking with saved pickup state, admitted in 347 of 390 exterior
-  maps under the current memory model (v0.0.29).
+- Day and night skies with original-source stars and moons, torches, and
+  converted music, voices, effects and video.
+- Mushroom picking with saved pickup state (v0.0.29).
 - A repaired Balmora Temple, Tharys Ancestral Tomb and Seyda Neen fireplace
-  interiors, NPCs lit by the floor they stand on, glow and flames in rebuilt
-  maps, and an Options > Controls page for rebinding keys (v0.0.30).
+  interiors and an Options > Controls page for rebinding keys (v0.0.30).
+- Night in town: the original street lamps, lanterns, wall torches and fires light
+  Balmora and Seyda Neen at night, and lantern and window glass glows; faster loading;
+  a fog distance slider (v0.0.31).
+- The Vivec Arena as an outside-only preview, a separate area reached with
+  `dbg tp vivec_arena` and not yet joined to the island; its stairs, bridges and
+  residents work; fires in view stay lit; a console that edits like a terminal prompt,
+  with history; `dbg daynight off` holds midday (v0.0.32).
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
 Full combat, quest simulation, services, schedules, conversations and the
 complete inventory system remain unfinished. Wider settlements, world actors
-and interiors also need further work. The dev4 pickup state is a small piece
-of interaction and persistence. Tribunal and Bloodmoon world content are outside the current
-playable scope.
+and interiors also need further work. Tribunal and Bloodmoon world content are
+outside the current playable scope.
 
 See the [current overview](../README.md),
-[v0.0.30 release notes](RELEASE-v0.0.30.md),
+[v0.0.32 release notes](RELEASE-v0.0.32.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 
@@ -513,6 +532,28 @@ demonstration media. It does not distribute the original or converted game
 assets needed for play, a compiled AmiWind executable, Kickstart ROMs or
 Workbench files. Playable images containing converted game assets are private
 local build outputs. Start with the [build and setup instructions](../README.md#building-and-playing).
+
+### Is AmiWind official? Do I need the game?
+
+AmiWind is an independent hobby project. It is not associated with, endorsed or
+supported by Bethesda Softworks or ZeniMax Media Inc. It ships no game data: you
+need your own legally obtained copy of Morrowind, and we do not support or
+condone pirated copies. AmiWind's own code is free software under the GPL: the
+Amiga engine under GPLv2 (its AmiWind additions GPL-2.0-or-later) and the host
+tools under GPL-3.0-only (table below; [licensing and credits](LICENSING_AND_CREDITS.md)).
+Please support the original creators who made all of this possible: buy Morrowind.
+You can buy it from [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition)
+or [Steam](https://store.steampowered.com/app/22320/): GOG's Game of the Year Edition is the reference
+edition, and Steam's works too (see [Morrowind editions](MORROWIND_EDITIONS.md)).
+And if you run AmiWind in an Amiga emulator, get your Kickstart ROMs and Workbench legally
+too, for example with the latest Amiga Forever from Cloanto. AmiWind is not affiliated with or
+endorsed by Cloanto either.
+
+Morrowind, Tribunal, Bloodmoon, The Elder Scrolls, Bethesda Softworks and
+ZeniMax are trademarks of ZeniMax Media Inc. All other trademarks belong to
+their respective owners. Textures, models, designs, sounds and music from the
+original game that appear in our screenshots and videos remain the property of
+ZeniMax Media Inc.
 
 ### Copyright and public distribution notice
 

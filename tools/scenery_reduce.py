@@ -26,7 +26,17 @@ them; add_options() puts them on a converter's command line.
 """
 import os
 
-import numpy as np
+
+class _LazyNumpy:
+    """numpy is loaded on first use: tools/build.py imports this module's option helpers while it is
+    still running on the system Python, before the tools environment (with numpy) exists."""
+    def __getattr__(self, name):
+        import numpy
+        globals()['np'] = numpy
+        return getattr(numpy, name)
+
+
+np = _LazyNumpy()
 
 DEFAULT_REDUCE_TEXELS = 1/8
 # Share of the --texinfo-snap budget used when one texinfo of the map is

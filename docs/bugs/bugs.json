@@ -2315,7 +2315,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found by the Vivec cantons import.",
+    "status": "Open. Found by the Vivec cantons import. Owner reports in v0.0.32-dev3 play: leaving the Vivec Arena area shows bare flat grey ground with a straight edge and no flora, and from the open world Vivec cannot be seen; the preview frame and the world maps are not merged. Owner decision: ship v0.0.32 as is, CHIM M3/M4",
     "report": "bugs/TOWN-EDGE-UNBUILT-32.md"
   },
   {
@@ -2753,7 +2753,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open: found by the second CHIM engine slice",
+    "status": "Open: frame-world rebuild per chunk crossing 0.7-3.5 ms under JIT but 95-184 ms for 30-40 chunks in a cycle-exact run (JIT off, multiplier 7, busy host): a visible hitch on a 68040; relative until a hardware number exists; direction: an incremental frame-world pool",
     "report": "bugs/CHIM-REBUILD-COST-33.md"
   },
   {
@@ -3185,7 +3185,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open: one FS-UAE session, 15,259 evictions, 61 MB in 30,215 reads and 3,593 opens, 64 failed frame-world rebuilds (largest free 358 KB); options: pool before models, smaller ring, larger zone within budget",
+    "status": "Fixed in source on v0.0.33-chim-format-engine (41386bc), not shipped at the time of writing: 6.5 MiB zone (chim_zone_kib 6656) plus two 512 KiB frame-world slots reserved at map start (chim_pool_kib 512, at most a twelfth of the zone), chim_prefetch_room 1. FS-UAE A/B/C/D, 8-chunk walk and back: 41 MB read and 6,651 evictions before, 1.9 MB and 338 after, 0 failed rebuilds, long jump lands, identical rerun; hunk left after load 2.86 to 2.33 MB (legacy region map 3.55 MB)",
     "report": "bugs/CHIM-ZONE-RING-THRASH-33.md",
     "tags": [
       "performance"
@@ -3208,5 +3208,173 @@
     "owner_accepted": null,
     "status": "Open. Found by the collision census (docs/COLLISION_MESHES.md): banners, tapestries, rugs, hooks, candles, room flora, Vivec banners and waterfalls are solid; Morrowind lets the player pass.",
     "report": "bugs/COLLISION-NC-FLAGS-32.md"
+  },
+  {
+    "id": "CI-BOOTSTRAP-NUMPY-32",
+    "title": "The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (6cb4fc4), not shipped at the time of writing. Found by GitHub CI on main 5e97310 (v0.0.32-pre): source-and-dry-run and docker-builder failed at the tool bootstrap.",
+    "report": "bugs/CI-BOOTSTRAP-NUMPY-32.md"
+  },
+  {
+    "id": "QC-AW-FLAME-SPAWN-32",
+    "title": "Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause found, not repaired: the scene converter writes aw_flame entities that only the engine's static-flame table reads; Quake's entity loader then prints about 23 console calls per flame ('not a field' twice, 'No spawn function', the edict dump) and frees it. Census office 51 per load, prison ship 8. Seen in the v0.0.32-dev3 smoke test console (and dev2)",
+    "report": "bugs/QC-AW-FLAME-SPAWN-32.md"
+  },
+  {
+    "id": "CENSUS-LOAD-SLOW-32",
+    "title": "The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause confirmed: occurs only with the remote debugging console on (aw_remote 1, test sessions): the about 1,170 flame error lines per Census load (QC-AW-FLAME-SPAWN-32) are each appended to the remote console log (REMOTE-CONSOLE-LOG-COST-32). A/B/C/D in FS-UAE: dev3 Census 8.8-20.9 s with the remote console on, 0.13-0.16 s off (normal play). The repair is in source on a later branch, not in v0.0.32",
+    "report": "bugs/CENSUS-LOAD-SLOW-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "DEBUG-MAP-SAVE-VALIDATION-32",
+    "title": "After a debug map load of an open-world map the autosave fails validation; two of three also report Interior spawn blocked",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown: v0.0.32-dev3 smoke test, map vf0291, vf2386, vf2485: each printed 'Save state validation failed; previous saves retained' (earlier saves kept); vf0291 and vf2485 also 'Interior spawn blocked'. Debug path only; whether a normal crossing into an open-world map hits it is not checked",
+    "report": "bugs/DEBUG-MAP-SAVE-VALIDATION-32.md"
+  },
+  {
+    "id": "VIVEC-ARENA-WATER-FALL-32",
+    "title": "The sea ends at the Arena canton edge: sky below the horizon, and the player falls out of the area through the water",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown; owner reports in v0.0.32-dev3 play: LOCAL 1374 165 -212 (falls through the water out of the area) and LOCAL 1076 -150 65 (no sea surface past the canton edge, sky below the horizon). Owner decision: fix later; known in v0.0.32",
+    "report": "bugs/VIVEC-ARENA-WATER-FALL-32.md"
+  },
+  {
+    "id": "VIVEC-ARENA-FLOATING-NPC-32",
+    "title": "A Vivec resident stands at the end of a walkway by the Telvanni canton with sky drawn below his feet",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown; owner report in v0.0.32-dev3 play from LOCAL 1185 -59 117 heading E 087; the actor ground check passed (it checks collision contact, not drawn support). Owner decision: fix later; known in v0.0.32",
+    "report": "bugs/VIVEC-ARENA-FLOATING-NPC-32.md"
+  },
+  {
+    "id": "WAIT-NOCLIP-MESSAGE-32",
+    "title": "Wait refusal names registration, dry ground and speech together instead of the reason that applied (noclip)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, low priority (message wording); cause in source: aw_wait.c wait_open shows one combined message whenever allowed() fails, and noclip fails its MOVETYPE_WALK and FL_ONGROUND test. Refusing the wait in the air follows the original game. Seen in earlier development builds too. Owner decision: fix later",
+    "report": "bugs/WAIT-NOCLIP-MESSAGE-32.md"
+  },
+  {
+    "id": "STAIRS-BALMORA-B01-32",
+    "title": "A Balmora Hlaalu house staircase cannot be approached from below",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: bm020 ex_hlaalu_b_01 ref 41499, standing hull solid above the stair foot; fails the stair gate; the stair gate that found it is on a development branch, not in v0.0.32",
+    "report": "bugs/STAIRS-BALMORA-B01-32.md"
+  },
+  {
+    "id": "STAIRS-BALMORA-WESTSOUTH-32",
+    "title": "A Hlaalu hall staircase in a Balmora interior has no clear foot",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: bmwestsouth in_hlaalu_hall_stairsl ref 384371, foot inside ref 384326; fails the stair gate; the stair gate that found it is on a development branch, not in v0.0.32",
+    "report": "bugs/STAIRS-BALMORA-WESTSOUTH-32.md"
+  },
+  {
+    "id": "STAIRS-SEYDA-WAREHOUSE-32",
+    "title": "A spiral stair in the Seyda Neen warehouse tower is blocked",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: in_common_tower_thatch ref 321953; 9 steps failed, 1 after the stair rule; fails the stair gate; the stair gate that found it is on a development branch, not in v0.0.32",
+    "report": "bugs/STAIRS-SEYDA-WAREHOUSE-32.md"
+  },
+  {
+    "id": "STAIRS-SEYDA-LIGHTHOUSE-32",
+    "title": "Seyda Neen lighthouse stairs are blocked (outside and inside)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: exterior sn012 ex_common_lighthouse (recorded stage, reported not gated; fixed by the rule on regeneration), interior in_common_lighthouse 1 step fails the stair gate; the stair gate that found it is on a development branch, not in v0.0.32",
+    "report": "bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md"
+  },
+  {
+    "id": "STAIRS-ADDAMASARTUS-32",
+    "title": "A low step in the Addamasartus cave is blocked",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: in_moldcave_09 ref 89756, 1-unit step blocked; fails the stair gate; needs an in-game look; the stair gate that found it is on a development branch, not in v0.0.32",
+    "report": "bugs/STAIRS-ADDAMASARTUS-32.md"
+  },
+  {
+    "id": "COLLISION-SEYDA-PREVIEW-BYPASS-32",
+    "title": "The legacy Seyda Neen preview builds its own convex collision",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: tools/prepare_bsp.py writes 14-direction convex brushes outside collision_pieces; shipped images use the recorded Seyda stage; the only allowed exception in the static test; found on a development branch; describes the v0.0.32 code",
+    "report": "bugs/COLLISION-SEYDA-PREVIEW-BYPASS-32.md"
+  },
+  {
+    "id": "COLLISION-STAIR-SLOPE-32",
+    "title": "Convex collision proxies make stairs unclimbable",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: stair rule (authored plates/clip ramp where a proxy buries treads; exact bevels on plate meshes with stairs), follow_original_stair_rules switch (default on) and image-step stair walkability gate in source on v0.0.32-stair-walk; 5 staircases still fail the gate (STAIRS-*-32); not yet in a build; v0.0.32 has only the setting (on by default) and the Vivec Arena stair repair; rule, switch effect and gate are not in v0.0.32",
+    "report": "bugs/COLLISION-STAIR-SLOPE-32.md"
+  },
+  {
+    "id": "VIVEC-CANTON-SKY-HOLE-32",
+    "title": "Sky shows through a Vivec canton wall seen from below",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown; owner screenshot in v0.0.32-dev3 play: a jagged sky-coloured opening in a canton's upper wall and misordered pieces where walls meet; pose not recorded. Owner decision: ship v0.0.32 as is",
+    "report": "bugs/VIVEC-CANTON-SKY-HOLE-32.md"
+  },
+  {
+    "id": "VIVEC-DISTANT-BRIDGES-32",
+    "title": "Distant bridges between the Vivec cantons are not drawn",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown; owner screenshot in v0.0.32-dev3 play from a canton top: the bridges between distant cantons are missing, the gaps empty; pose not recorded. Owner decision: ship v0.0.32 as is; known in v0.0.32",
+    "report": "bugs/VIVEC-DISTANT-BRIDGES-32.md"
+  },
+  {
+    "id": "REMOTE-CONSOLE-LOG-COST-32",
+    "title": "With the remote console on, every console line costs about 7-18 ms in FS-UAE",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause known, not repaired: with aw_remote 1 every Con_Printf opens, appends to and closes AWCTL:console.log on the emulator host-folder volume (Quake -condebug method); the dev3 Census load (about 1,170 console calls) took 5.5-21.7 s against 0.13-0.16 s with the remote console off. Test sessions only; skews every load and frame time measured with the remote console on",
+    "report": "bugs/REMOTE-CONSOLE-LOG-COST-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "DEBUG-TP-SHIP-FREEZE-32",
+    "title": "The game froze once on dbg tp balmora issued 6 s after dbg tp prisonship",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown, seen once in FS-UAE (dev3 image, remote console on), not reproduced in two more attempts: the remote command was taken, then picture, state file and console log stopped while the emulator kept running",
+    "report": "bugs/DEBUG-TP-SHIP-FREEZE-32.md"
   }
 ]

@@ -64,7 +64,9 @@ DOCUMENTATION_CLIPS.update({
 })
 DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.29-rc1-torch-night.png', 'docs/images/amiwind-v0.0.29-rc1-high-elf-appearance.png', 'docs/images/amiwind-v0.0.29-rc1-mushroom-prompt.png', 'docs/images/amiwind-v0.0.29-rc1-mushroom-pickup.png', 'docs/images/amiwind-v0.0.29-rc1-audio.png'})
 DOCUMENTATION_CLIPS.update({'docs/images/amiwind-v0.0.29-rc1-mushroom-pick.gif'})
+DOCUMENTATION_CLIPS.update({'docs/images/amiwind-v0.0.32-gallery.gif'})
 DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.30-temple-before.png', 'docs/images/amiwind-v0.0.30-temple-after.png', 'docs/images/amiwind-v0.0.30-temple-banner.png', 'docs/images/amiwind-v0.0.30-controls.png'})
+DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.32-vivec-bridge-pillar.png', 'docs/images/amiwind-v0.0.32-vivec-canal-night.png', 'docs/images/amiwind-v0.0.32-vivec-sunrise.png', 'docs/images/amiwind-v0.0.32-vivec-red-sky.png', 'docs/images/amiwind-v0.0.32-vivec-bridge-dusk.png', 'docs/images/amiwind-v0.0.32-vivec-bridge-night.png', 'docs/images/amiwind-v0.0.32-vivec-arena-sun.png', 'docs/images/amiwind-v0.0.32-vivec-arena-night.png', 'docs/images/amiwind-v0.0.32-vivec-guard-sun.png', 'docs/images/amiwind-v0.0.32-vivec-sun-between-cantons.png'})
 # Project-authored text graphic; retain bounded UTF-8 source validation.
 DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
 # Performance charts written by tools/perf_charts.py from measured numbers.

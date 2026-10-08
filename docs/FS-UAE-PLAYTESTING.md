@@ -11,6 +11,8 @@ and do not require disk swapping.
 Supply `--kickstart-file /path/to/owned.rom` to the build to fill both local
 ROM paths, or select your licensed ROM in the emulator afterward. ROMs and
 playable images are private build outputs, never public source assets.
+Get your Kickstart ROM and Workbench legally, for example with Amiga Forever from Cloanto
+([FAQ](FAQ.md#is-amiwind-official-do-i-need-the-game)).
 Configurations use host-local absolute paths. After moving the image directory,
 keep `build.json` and every listed HDF together and regenerate the configurations
 on the destination host:

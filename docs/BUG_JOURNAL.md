@@ -1,5 +1,81 @@
 # Bug journal
 
+## CENSUS-LOAD-SLOW-32 cause; REMOTE-CONSOLE-LOG-COST-32 and DEBUG-TP-SHIP-FREEZE-32, 8 October 2026
+
+[CENSUS-LOAD-SLOW-32](bugs/CENSUS-LOAD-SLOW-32.md): cause confirmed in one FS-UAE container (busy host,
+relative numbers): dev3 Census 8.8-20.9 s with the remote console on, 0.13-0.16 s off; normal play is not
+affected. New: [REMOTE-CONSOLE-LOG-COST-32](bugs/REMOTE-CONSOLE-LOG-COST-32.md) (each console line costs
+about 7-18 ms with the remote console on; test sessions only) and
+[DEBUG-TP-SHIP-FREEZE-32](bugs/DEBUG-TP-SHIP-FREEZE-32.md) (one freeze on `dbg tp balmora` 6 s after
+`dbg tp prisonship`, not reproduced in two more attempts). The game logic repair for
+[QC-AW-FLAME-SPAWN-32](bugs/QC-AW-FLAME-SPAWN-32.md) is in source on a later branch, not in v0.0.32.
+
+## v0.0.32-dev3 owner play reports, 8 October 2026
+
+[VIVEC-ARENA-WATER-FALL-32](bugs/VIVEC-ARENA-WATER-FALL-32.md): east of the Arena canton the sea
+ends at the canton edge; sky is drawn below the horizon (LOCAL 1076 -150 65) and the player falls
+out of the area through the water (LOCAL 1374 165 -212). Cause unknown.
+[VIVEC-ARENA-FLOATING-NPC-32](bugs/VIVEC-ARENA-FLOATING-NPC-32.md): a resident by the Telvanni
+canton stands at a walkway end with sky below his feet (seen from LOCAL 1185 -59 117); the actor
+ground check passed, as it checks collision contact only. Cause unknown.
+[WAIT-NOCLIP-MESSAGE-32](bugs/WAIT-NOCLIP-MESSAGE-32.md): with noclip on, T shows the combined
+"after registration, on dry ground, when no one is speaking" refusal; the refusal follows the
+original game (no waiting in the air), the message should name the reason that applied. Seen in
+earlier builds too. All three: owner decision fix later; known in v0.0.32.
+[VIVEC-ARENA-FRAME-EDGE-32](bugs/VIVEC-ARENA-FRAME-EDGE-32.md): owner pose LOCAL 1067 -819 159
+(St. Olms side): a slab ends in darkness; the Arena preview is an isolated frame, not connected to
+the world. [TOWN-EDGE-UNBUILT-32](bugs/TOWN-EDGE-UNBUILT-32.md): owner pose GLOBAL 42527 -94856
+794 (Ascadian Isles, south of the Vivec frame): bare flat grey ground with a straight edge and no
+flora after leaving the Vivec area; ship as is, CHIM M3/M4.
+
+[VIVEC-CANTON-SKY-HOLE-32](bugs/VIVEC-CANTON-SKY-HOLE-32.md): in an owner screenshot the sky shows through a
+canton wall seen from below, with misordered pieces where walls meet; pose not recorded; ship as is.
+
+[VIVEC-DISTANT-BRIDGES-32](bugs/VIVEC-DISTANT-BRIDGES-32.md): in an owner screenshot from a canton top the
+bridges between distant cantons are not drawn; pose not recorded; ship as is.
+
+Stair walkability findings on the v0.0.32-dev2 maps, registered on a development branch whose gate
+is not in v0.0.32, brought into the v0.0.32 register because they describe the shipped maps:
+[COLLISION-STAIR-SLOPE-32](bugs/COLLISION-STAIR-SLOPE-32.md),
+[STAIRS-BALMORA-B01-32](bugs/STAIRS-BALMORA-B01-32.md),
+[STAIRS-BALMORA-WESTSOUTH-32](bugs/STAIRS-BALMORA-WESTSOUTH-32.md),
+[STAIRS-SEYDA-WAREHOUSE-32](bugs/STAIRS-SEYDA-WAREHOUSE-32.md),
+[STAIRS-SEYDA-LIGHTHOUSE-32](bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md),
+[STAIRS-ADDAMASARTUS-32](bugs/STAIRS-ADDAMASARTUS-32.md) and
+[COLLISION-SEYDA-PREVIEW-BYPASS-32](bugs/COLLISION-SEYDA-PREVIEW-BYPASS-32.md). The `--name`
+message mojibake found by the same work is [BUILD-MOJIBAKE-32](bugs/BUILD-MOJIBAKE-32.md).
+
+## v0.0.32-dev3 smoke test findings, 8 October 2026
+
+One FS-UAE session of the dev3 image (built from source 91a7eeb). New:
+[QC-AW-FLAME-SPAWN-32](bugs/QC-AW-FLAME-SPAWN-32.md) (every `aw_flame` entity prints "not a field"
+twice, "No spawn function" and an edict dump: the game logic has no `aw_flame` spawn function or
+fields; 51 per Census office load, 8 per prison ship load),
+[CENSUS-LOAD-SLOW-32](bugs/CENSUS-LOAD-SLOW-32.md) (Census office "Scene ready" 7,816 and
+10,320 ms against 0.2-1.5 s elsewhere; load time follows the flame count, likely the console
+output above written line by line to the session logs; A/B pending) and
+[DEBUG-MAP-SAVE-VALIDATION-32](bugs/DEBUG-MAP-SAVE-VALIDATION-32.md) (after `map vf0291`,
+`vf2386`, `vf2485` the autosave fails validation; two also report "Interior spawn blocked").
+Evidence added to [AW-20260928-01](bugs/AW-20260928-01.md): prison 1,530 ms, ship to deck 309 and
+364 ms, no slow transition in this session. "FPU support: none (CPU 68040)" without a
+68040.library is the documented state ([FPU support library](FPU_SUPPORT_LIBRARY.md)).
+
+## CHIM-ZONE-RING-THRASH-33 and CHIM-REBUILD-COST-33: emulator sweep, 8 October 2026
+
+[CHIM-ZONE-RING-THRASH-33](bugs/CHIM-ZONE-RING-THRASH-33.md): fixed in source on
+v0.0.33-chim-format-engine (41386bc), not shipped at the time of writing: a 6.5 MiB zone plus two
+512 KiB frame-world slots reserved at map start. An 8-chunk walk and back read 1.9 MB instead of
+41 MB, 338 evictions instead of 6,651, no failed rebuilds, and the long jump lands.
+[CHIM-REBUILD-COST-33](bugs/CHIM-REBUILD-COST-33.md): one rebuild per crossing costs 0.7-3.5 ms
+under JIT but 95-184 ms for 30-40 chunks in a cycle-exact run, a visible hitch on a 68040
+(relative numbers); next: an incremental frame-world pool.
+
+## CI-BOOTSTRAP-NUMPY-32, 8 October 2026
+
+GitHub CI on main 5e97310 failed at the tool bootstrap: tools/build.py imported numpy through the
+scenery reduction option helpers before the tools existed. numpy is now loaded on first use; a new
+test runs the builder with every third-party module blocked.
+
 ## HEAP-SEYDA-OVERLAP-32: temporary pre-CHIM heap bypass for three Seyda Neen maps, 8 October 2026
 
 The from-scratch build dev3-r2 stopped at the strict heap gate on the recorded maps sn019, sn026

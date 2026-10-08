@@ -14,6 +14,12 @@ places the player can reach inside the frame, for example the St. Delyn walkway 
 -1211 -962 87, the cut at x -1536 is 325 units away, inside the 540-unit fog distance. Beyond it
 there is only sea and sky. In dev1 the bodies were missing altogether.
 
+The Arena preview is one isolated frame: it is not connected to the open world or to the rest of
+Vivec, and walking off its edges leads nowhere. Owner report in v0.0.32-dev3 play (8 October 2026,
+"vivec is not connected anywhere"): at LOCAL 1067 -819 159 (GLOBAL 40623 -90317 639), heading SE
+140, time 20:48, label "Vivec, St. Olms", a flat stone slab ends in darkness with nothing beyond.
+Joining Vivec to the world is world streamer (CHIM) work.
+
 ## Where
 
 `config/vivec_arena.json` (bounds +-1536, draw distance 540) and the region clipping in
@@ -45,6 +51,11 @@ Not yet; owner decision. Measured options:
 - The planned per-canton towns (`config/vivec_*.json`) and the world streamer replace the cut with
   the neighbouring canton's own frame.
 - A shorter fog distance near the frame edge (location fog) would hide the cut without new data.
+
+Related owner reports from v0.0.32-dev3 play in the same edge area (8 October 2026):
+[VIVEC-ARENA-WATER-FALL-32](VIVEC-ARENA-WATER-FALL-32.md) (no sea past the canton edge; the player
+falls out through the water) and [VIVEC-ARENA-FLOATING-NPC-32](VIVEC-ARENA-FLOATING-NPC-32.md) (a
+resident at a walkway end with sky below him).
 
 ## Verification
 

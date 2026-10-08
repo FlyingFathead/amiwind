@@ -33,7 +33,11 @@ and no eviction storm on failed rebuilds.
 
 ## Verification
 
-Pending.
+8 October 2026, FS-UAE (emulator numbers are relative until a hardware number exists): one
+frame-world rebuild per chunk crossing costs 0.7-3.5 ms under JIT, but 95-184 ms for 30-40 chunks
+in a cycle-exact run (JIT off, CPU multiplier 7, busy host). On a 68040 that is a visible hitch at
+every crossing. Suggested direction: an incremental frame-world pool that touches only the chunks
+that changed. Pending: a hardware number.
 
 ## Prevention
 
