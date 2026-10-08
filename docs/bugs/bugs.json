@@ -185,8 +185,8 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Reproduced on the v0.0.29 inputs. v0.0.30-dev5 added build_aga.py image --canonical-land-source; the shipped sub-cells are the end of a seven-stage chain whose last three stages (canonical terrain fit, palette remap, ground-winding repair) are not public tools, and the full image path was not run end to end from v0.0.29-dev4 to v0.0.31 (see BUILD-FINALIZE-SCENE-31). v0.0.31 ships with this exception; the release gate applies from v0.0.32. [Record](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026).",
-    "report": null
+    "status": "Recorded exception again for v0.0.32 (owner decision, 8 October 2026): shipped Seyda stages used as a recorded input, now the builder option --seyda-recorded, checked byte for byte after every image pass; one named difference: seyda.bsp ships as the sn029 fallback alias (owner option A; the complete town fails the release actor gate); Seyda Neen is rebuilt by the world streamer (v0.0.33), so the legacy builder is not fixed; sn019, sn026, sn035 pass the strict heap gate through a temporary pre-CHIM bypass (HEAP-SEYDA-OVERLAP-32, until CHIM M2)",
+    "report": "bugs/BUILD-SEYDA-REGEN-30.md"
   },
   {
     "id": "CENSUS-ENTITIES-30",
@@ -1138,12 +1138,15 @@
   },
   {
     "id": "AW-20260928-01",
-    "title": "Ship-exit intermittent freeze",
+    "title": "Prison ship to deck transition is intermittently very slow or freezes (FS-UAE)",
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open; retry succeeded, cause unknown",
-    "report": null
+    "status": "Open, cause unknown: first a hatch freeze (28 September 2026, retry worked); owner again 8 October 2026 on dev1/dev2 (FS-UAE 3.1.66, Ubuntu 24.04): ship-to-deck scene change sometimes very sluggish; candidates: cold host cache, deck map size/heap, music/load order, read patterns; next: Scene ready ms and bytes read, cold vs warm, on dev3",
+    "report": "bugs/AW-20260928-01.md",
+    "tags": [
+      "performance"
+    ]
   },
   {
     "id": "AW-20260928-02",
@@ -1412,7 +1415,7 @@
     "state": "fixed",
     "fixed_in": "v0.0.31-dev2",
     "owner_accepted": null,
-    "status": "Repair shipped in v0.0.31-dev2 (16 KiB stdio buffer for loose files); same-batch FS-UAE: dev1 Seyda crossings 0.70-0.91 s -> 0.39-0.48 s (v0.0.30 0.54-0.71 s). Owner playtest of dev2, 7 October 2026: Seyda Neen is fast now, and Balmora too (\"holy SHIT Balmora is fast now\"). Cause of the remaining 10-15 % gap between engines with buffering is unknown (unbuffered makes them equal). Owner acceptance pending.",
+    "status": "Repair shipped in v0.0.31-dev2 (16 KiB stdio buffer for loose files); same-batch FS-UAE: dev1 Seyda crossings 0.70-0.91 s -> 0.39-0.48 s (v0.0.30 0.54-0.71 s). Owner playtest of dev2, 7 October 2026: Seyda Neen is fast now, and Balmora too (\"holy SHIT Balmora is fast now\"). Cause of the remaining 10-15 % gap between engines with buffering is unknown (unbuffered makes them equal). Owner acceptance pending. Timings taken with hard files in a shared Windows folder: likely inflated, compare within batch only (BENCH-HOST-STORAGE-32).",
     "report": "bugs/SEYDA-READ-SLOW-31.md",
     "tags": [
       "performance"
@@ -1496,7 +1499,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Found 7 October 2026: bake grid rounded in double precision, engine grid from the stored single precision; 925 of 26,551 prison ship faces differ, 241 with a different sample count. No repair yet.",
+    "status": "Converter repaired in source (Vivec fixes branch, 8 October 2026): every face's lightmap uses the engine grid of the stored values (0 mismatches in the Vivec dry run; St. Delyn Storage had 3,379 of 29,874 before). Shipped maps keep the fault until rebuilt.",
     "report": "bugs/LIGHTMAP-GRID-31.md"
   },
   {
@@ -1643,7 +1646,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Measured: interiors 100% visible, Balmora 84-89%, Seyda 59-76%, open world 69-85%. bm019 prototype: occluders alone leave 589/590 func_walls visible (>16 leaves = always visible; entities culled whole). Repair in prototype: static building faces in the world model (per-leaf culling) plus occluders",
+    "status": "Occluder and world-face prototypes (8 October 2026) measured: no gain in open towns (589/590 bm019 models still sent); town fix is distance drawing and cheaper models; interior room occluders still to test",
     "report": "bugs/TOWN-VIS-OCCLUSION-31.md",
     "tags": [
       "performance"
@@ -1684,5 +1687,1526 @@
     "owner_accepted": null,
     "status": "Closed 8 October 2026: duplicate of BUILD-SEYDA-REGEN-30 (recorded again while preparing v0.0.31; its detail moved there).",
     "report": "bugs/BUILD-SEYDA-PRIVATE-STAGES-31.md"
+  },
+  {
+    "id": "MESH-EXTENT-GRID-31",
+    "title": "Grid-exact mesh faces exceed the 256-texel surface limit on the 68040",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source (Vivec fixes branch, 8 October 2026): 1/16-texel guard in split_surface plus a three-rule extent check on every converted face. Vivec dry run: all 13 sewer maps pass the optimizer, largest extent 240. Sewer maps outside Vivec not rerun. Not shipped.",
+    "report": "bugs/MESH-EXTENT-GRID-31.md"
+  },
+  {
+    "id": "LIGHTMAP-TAIL-31",
+    "title": "Interior lightmap: the last face points past the end of the lighting lump",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause: lightmaps baked on the unstored double-precision grid (LIGHTMAP-GRID-31). Repaired in source (Vivec fixes branch, 8 October 2026): grid from the stored values by the engine rule, rebake where it differs. Vivec dry run: the 7 rooms pass, 0 overrunning faces in 338 maps. Seran Ancestral Tomb not rerun. Not shipped.",
+    "report": "bugs/LIGHTMAP-TAIL-31.md"
+  },
+  {
+    "id": "ENGINE-BUILD-REPRO-31",
+    "title": "Engine builds from identical source give different binaries",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source (unreleased): version strings from VERSION; two fresh builds byte-identical (3656a074...).",
+    "report": "bugs/ENGINE-BUILD-REPRO-31.md"
+  },
+  {
+    "id": "VIVEC-TEXINFO-31",
+    "title": "Dense Vivec canton regions exceed the 32,767 texture-mapping limit",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source (Vivec fixes branch, 8 October 2026): engine reads face texinfo unsigned with a bounds check, converter and tool readers allow 65,535. Vivec dry run: all 32 blocked regions convert, densest 51,583 mappings; 18 then hit the heap (VIVEC-HEAP-31). Not shipped.",
+    "report": "bugs/VIVEC-TEXINFO-31.md"
+  },
+  {
+    "id": "GATE-NODE-MISSING-31",
+    "title": "The local gate never runs the inspector JavaScript tests (no Node.js in the Docker images)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Local gate fixed 8 October 2026: gate image with Node 24 runs the JavaScript tests and fails on unexpected skips (3 Windows-only skips allowed); hosted CI part: CI-SKIPS-UNGUARDED-31",
+    "report": "bugs/GATE-NODE-MISSING-31.md"
+  },
+  {
+    "id": "TOOLKIT-TEST-POINTERLOCK-31",
+    "title": "Inspector test left pointer lock set, breaking later drag checks",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev; browser run passes; not shipped at the time of writing",
+    "report": "bugs/TOOLKIT-TEST-POINTERLOCK-31.md"
+  },
+  {
+    "id": "ENGINE-FPU-UNIMPL-31",
+    "title": "Every-frame math traps on a real 68040 (sin+cos become cexp)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source (FPU fixes branch, unreleased): per-frame cexp 3547 -> 0 (Balmora); no library trig linked; builder check fails on reachable unimplemented FPU instructions. Open: scene-load text/float conversion (ENGINE-FPSP-MISSING-31).",
+    "report": "bugs/ENGINE-FPU-UNIMPL-31.md"
+  },
+  {
+    "id": "ENGINE-FPSP-MISSING-31",
+    "title": "Boot disk loads no 68040 FPU support library; emulator hides it",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in source on v0.0.32-dev (unreleased): --amiga-libs installs the user's own 68040/68060.library with our AmiWindFPU loader; boot checklist line [x] OK / [~] WARN; dbg fpu; not yet verified with a real library or hardware",
+    "report": "bugs/ENGINE-FPSP-MISSING-31.md"
+  },
+  {
+    "id": "NPC-TARGET-REDUNDANT-31",
+    "title": "NPC targeting runs 2-4 times per frame and checks every NPC",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source (unreleased): once per frame with distance precheck; Balmora 5 searches/70 NPCs tested per frame -> 1/0.",
+    "report": "bugs/NPC-TARGET-REDUNDANT-31.md"
+  },
+  {
+    "id": "CI-ERICW-SKIP-31",
+    "title": "Torch test room test never runs in hosted CI or the builder image",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found while itemising gate skips.",
+    "report": "bugs/CI-ERICW-SKIP-31.md"
+  },
+  {
+    "id": "CI-SKIPS-UNGUARDED-31",
+    "title": "Hosted CI does not fail on skipped tests; JavaScript test coverage unpinned",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. The local gate now fails on unexpected skips and runs the JavaScript tests (Node 24).",
+    "report": "bugs/CI-SKIPS-UNGUARDED-31.md"
+  },
+  {
+    "id": "MODEL-MARKSURF-SIGNED-31",
+    "title": "Face indices above 32,767 in leaf face lists become bad pointers",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source (Vivec fixes branch, 8 October 2026): marksurface entries and leaf mark ranges read unsigned with bounds checks before any pointer; native boundary fixture. Not shipped.",
+    "report": "bugs/MODEL-MARKSURF-SIGNED-31.md"
+  },
+  {
+    "id": "LAMPS-CACHE-31",
+    "title": "Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: cache 256 (worst 3x3 in the game 102), drops counted and shown by dbg lamps, builder refuses a table that could overflow; gate 094; not yet in a build",
+    "report": "bugs/LAMPS-CACHE-31.md"
+  },
+  {
+    "id": "INTERIOR-INLINE-LIMIT-31",
+    "title": "Every interior object is its own inline model: 220 objects per interior at most",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the whole-world measurement (every object placed, estimated per map, checked on 30 converted maps).",
+    "report": "bugs/INTERIOR-INLINE-LIMIT-31.md"
+  },
+  {
+    "id": "FLAMES-CAP-31",
+    "title": "Static flames above 128 per map are silently dropped",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the whole-world measurement (every object placed, estimated per map, checked on 30 converted maps).",
+    "report": "bugs/FLAMES-CAP-31.md"
+  },
+  {
+    "id": "INTERIOR-COORDS-31",
+    "title": "Some interiors place objects beyond the +/-4096 coordinate range",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the whole-world measurement (every object placed, estimated per map, checked on 30 converted maps). In-game effect untested.",
+    "report": "bugs/INTERIOR-COORDS-31.md"
+  },
+  {
+    "id": "BUILD-EXPANSIONS-31",
+    "title": "Tribunal and Bloodmoon cannot be converted with today's tools",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the whole-world measurement (every object placed, estimated per map, checked on 30 converted maps).",
+    "report": "bugs/BUILD-EXPANSIONS-31.md"
+  },
+  {
+    "id": "IMPORT-TEST-CELLS-31",
+    "title": "Development test cells would be imported with the world",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Estimator rule in source: an interior is left out when no load-door chain reaches it from an exterior or a cell named in scripts/dialogue; leaves out the 7 test cells and 8 unreachable cells; converter side not yet",
+    "report": "bugs/IMPORT-TEST-CELLS-31.md"
+  },
+  {
+    "id": "WORLD-REGION-DUPLICATION-31",
+    "title": "Every exterior object is stored about ten times (overlapping region maps)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Intended to be mitigated after initial tests are done. Measured 8 October 2026: x9.8 object duplication across exterior regions; ~20 GB of maps for the island; the world streamer (CHIM) stores every object once (first town: about an eighth of the disk space)",
+    "report": "bugs/WORLD-REGION-DUPLICATION-31.md"
+  },
+  {
+    "id": "ESTIMATE-EVR-BELOW-CUR-31",
+    "title": "World estimate: \"everything\" comes out below \"current content\" in some regions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cause found and fixed in source (v0.0.32-world-estimate): the everything rule dropped any mesh name containing \"marker\", the converter only names starting \"marker_\"; test checks evr >= cur",
+    "report": "bugs/ESTIMATE-EVR-BELOW-CUR-31.md"
+  },
+  {
+    "id": "TOOLING-HEADLESS-BROWSER-31",
+    "title": "No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found by the Toolkit map metrics layer work, 8 October 2026",
+    "report": "bugs/TOOLING-HEADLESS-BROWSER-31.md"
+  },
+  {
+    "id": "ERICW-TEXINFO-SIGNED-31",
+    "title": "ericw vis crashes and ericw light leaves faces unlit above texinfo 32,767",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 8 October 2026 while checking unsigned texinfo: qbsp writes indices above 32,767 correctly; vis segfaults, light skips those faces. No current map affected (vis/light run only before meshes are appended).",
+    "report": "bugs/ERICW-TEXINFO-SIGNED-31.md"
+  },
+  {
+    "id": "EXTENTS-FPU-RULE-31",
+    "title": "Surface extents and lightmap sizes depended on the FPU's arithmetic",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found 8 October 2026: real 68040 code rounds each step to single precision, ericw light uses double, emulators wider, the converter baked from unrounded doubles. Repaired in source (Vivec fixes branch): one double-precision rule in engine and converter. Not shipped.",
+    "report": "bugs/EXTENTS-FPU-RULE-31.md"
+  },
+  {
+    "id": "VIVEC-HEAP-31",
+    "title": "Dense Vivec maps exceed the loader heap budget once mappings and extents no longer stop them",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Cantons import (8 October 2026): FQ, Hlaalu, Redoran, Telvanni regions all pass; Temple 28/36, St. Delyn 20/25, St. Olms 19/25 (over by 20,132 to 3,169,652 B); with the new loader 13 of the 18 dry-run exterior regions and 1 of 4 interiors still fail; options: shorter draw distance per town, explicit region layouts, CHIM",
+    "report": "bugs/VIVEC-HEAP-31.md"
+  },
+  {
+    "id": "ENGINE-SUBMODEL-LIMIT-32",
+    "title": "Map loading does not check the submodel count against MAX_MODELS",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Latent; found by the distant shell prototype. The builder's model budget prevents it today.",
+    "report": "bugs/ENGINE-SUBMODEL-LIMIT-32.md"
+  },
+  {
+    "id": "TOOL-SIMPLIFY-MANIFOLD-32",
+    "title": "Mesh reduction can return open or non-manifold meshes",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the distant shell prototype; effect on current users not yet checked.",
+    "report": "bugs/TOOL-SIMPLIFY-MANIFOLD-32.md"
+  },
+  {
+    "id": "SHELL-TEXTURE-VOTE-32",
+    "title": "Distant shells: door and grille textures win over large sealed areas",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Prototype only (tools/mold_shell.py, not in the game).",
+    "report": "bugs/SHELL-TEXTURE-VOTE-32.md"
+  },
+  {
+    "id": "CONVERT-VARIANTS-32",
+    "title": "Objects are converted once per mesh, scale and tilt: 4-7 times more models than meshes",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Census: tilt causes it (33,076 exterior variants); run-time scale and tilt would give 23.5x fewer; repair in the world streamer",
+    "report": "bugs/CONVERT-VARIANTS-32.md"
+  },
+  {
+    "id": "MAP-TEXTURE-COPIES-32",
+    "title": "Every map carries its own copy of every texture it uses",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found by the world streamer measurement, 8 October 2026",
+    "report": "bugs/MAP-TEXTURE-COPIES-32.md"
+  },
+  {
+    "id": "BSP-SHARED-SUBTREES-32",
+    "title": "Converted maps share node subtrees between submodels; naive tree walks explode",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found by the world streamer measurement, 8 October 2026",
+    "report": "bugs/BSP-SHARED-SUBTREES-32.md"
+  },
+  {
+    "id": "REGION-PLACEMENT-FORMS-32",
+    "title": "The same placement is stored in different forms from region to region",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found by the world streamer measurement, 8 October 2026",
+    "report": "bugs/REGION-PLACEMENT-FORMS-32.md"
+  },
+  {
+    "id": "HEAP-MODEL-SUM-32",
+    "title": "Summing per-object costs overestimates a map's heap (11 % median, 39 % worst)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found by the world streamer measurement, 8 October 2026",
+    "report": "bugs/HEAP-MODEL-SUM-32.md"
+  },
+  {
+    "id": "BENCH-JIT-PROFILE-32",
+    "title": "Every frame-rate and load-time figure was measured with the emulator at host speed",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by an independent review of the open-world plan.",
+    "report": "bugs/BENCH-JIT-PROFILE-32.md"
+  },
+  {
+    "id": "FFS-DIRECTORY-HASH-32",
+    "title": "Thousands of files in one directory are slow to open on a real FFS disk",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Emulator measurement 8 October 2026: crowded legacy maps/ folder (~2,741 entries) costs ~20 ms extra per map load (median 120 vs 94 ms); real FFS disk number pending",
+    "report": "bugs/FFS-DIRECTORY-HASH-32.md"
+  },
+  {
+    "id": "RENDER-BMODEL-FRAGMENTS-32",
+    "title": "Brush models spanning many terrain leaves are clipped face by face down the terrain BSP",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: measured; not fragments (1.03-1.59 per face) but deep world-BSP walks per clipped face (27-52 nodes, up to 234k visits per frame in Balmora; 67-82 % of render time)",
+    "report": "bugs/RENDER-BMODEL-FRAGMENTS-32.md"
+  },
+  {
+    "id": "LOADER-STAGING-PEAK-32",
+    "title": "Map loading stages most lumps in temporary memory before decoding, raising the heap peak",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed on the loader branch: lumps decoded from 16 KiB slices; peak down by up to 925 KB per map (median ~165 KB on Vivec, less than estimated); byte-identical loads on all 1,664 shipped maps; not yet merged",
+    "report": "bugs/LOADER-STAGING-PEAK-32.md"
+  },
+  {
+    "id": "TOWN-FRAME-CEILING-32",
+    "title": "Ground above the town frame ceiling (2,048 units) leaks the map",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Found by the public world estimate: 320 Vvardenfell regions have ground above the ceiling",
+    "report": "bugs/TOWN-FRAME-CEILING-32.md"
+  },
+  {
+    "id": "CONVERT-FACE-PLANE-32",
+    "title": "Converter takes a merged face's plane from its first three vertices",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Repair planned as one shared face builder plus a face validator gate (no path-specific patches); scope being measured on the shipped maps",
+    "report": "bugs/CONVERT-FACE-PLANE-32.md"
+  },
+  {
+    "id": "CONVERT-MERGE-NONPLANAR-32",
+    "title": "Merged polygons can be slightly non-planar (up to about 0.05 units)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Repair planned as one shared face builder plus a face validator gate (no path-specific patches); scope being measured on the shipped maps",
+    "report": "bugs/CONVERT-MERGE-NONPLANAR-32.md"
+  },
+  {
+    "id": "CONVERT-TEXCOORD-RANGE-32",
+    "title": "Converter does not check the 16-bit texture-coordinate range",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Repair planned as one shared face builder plus a face validator gate (no path-specific patches); scope being measured on the shipped maps",
+    "report": "bugs/CONVERT-TEXCOORD-RANGE-32.md"
+  },
+  {
+    "id": "TEST-FPU-STRICT-JIT-31",
+    "title": "Emulator strict FPU mode is silently ignored while JIT is on",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (test method). Strict FPU runs need jit_compiler = 0; probe proves the mode before each run.",
+    "report": "bugs/TEST-FPU-STRICT-JIT-31.md"
+  },
+  {
+    "id": "REMOTE-CONSOLE-APPEND-31",
+    "title": "Remote console log keeps only the last message",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open; fix in source: seek to end before each write (O_APPEND not honoured).",
+    "report": "bugs/REMOTE-CONSOLE-APPEND-31.md"
+  },
+  {
+    "id": "REMOTE-STATE-WIDTH-31",
+    "title": "Remote state file printed 51.*ld for fractional fields",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source before any release (explicit widths; Amiga printf has no * widths); test guards engine formats.",
+    "report": "bugs/REMOTE-STATE-WIDTH-31.md"
+  },
+  {
+    "id": "EXTENTS-RULE-OLD-INTERIORS-32",
+    "title": "The v0.0.32 extent rule breaks the lightmaps of interiors converted before the grid fix",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the face validator (tools/check_faces.py) over every map of the shipped v0.0.31 image. Release blocker for any image that pairs the v0.0.32 engine with old interior maps.",
+    "report": "bugs/EXTENTS-RULE-OLD-INTERIORS-32.md"
+  },
+  {
+    "id": "CONVERT-FACE-WINDING-32",
+    "title": "Six prison faces are wound opposite to their plane side",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the face validator (tools/check_faces.py) over every map of the shipped v0.0.31 image.",
+    "report": "bugs/CONVERT-FACE-WINDING-32.md"
+  },
+  {
+    "id": "CONVERT-DEGENERATE-FACES-32",
+    "title": "The converter writes degenerate faces (no area, slivers, repeated vertices)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the face validator (tools/check_faces.py) over every map of the shipped v0.0.31 image.",
+    "report": "bugs/CONVERT-DEGENERATE-FACES-32.md"
+  },
+  {
+    "id": "INTERIOR-HULLS-HEAVY-32",
+    "title": "Interior collision hulls are bigger than the interior geometry they belong to",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the asset census (tools/asset_census.py).",
+    "report": "bugs/INTERIOR-HULLS-HEAVY-32.md"
+  },
+  {
+    "id": "VF-VIS-LUMP-32",
+    "title": "Open-world terrain maps spend about a fifth of their bytes on visibility data that culls little",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the asset census (tools/asset_census.py). Estimated from a 1-in-10 sample.",
+    "report": "bugs/VF-VIS-LUMP-32.md"
+  },
+  {
+    "id": "TERRAIN-LIGHT-UNIFORM-32",
+    "title": "Open-world terrain lightmaps are nearly uniform",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the asset census (tools/asset_census.py). Needs a headlamp-off visual check.",
+    "report": "bugs/TERRAIN-LIGHT-UNIFORM-32.md"
+  },
+  {
+    "id": "INTERIOR-BAKE-UNIFORM-32",
+    "title": "Some interior bakes are uniform (lights possibly missing)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the asset census (tools/asset_census.py).",
+    "report": "bugs/INTERIOR-BAKE-UNIFORM-32.md"
+  },
+  {
+    "id": "CONVERT-QHULL-FLAT-32",
+    "title": "Collision building fails on a flat mesh (chitin shortbow)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the asset census (tools/asset_census.py).",
+    "report": "bugs/CONVERT-QHULL-FLAT-32.md"
+  },
+  {
+    "id": "BOOT-68060-FPU-FAIL-32",
+    "title": "On a 68060 with Kickstart 3.1 and no 68060.library the boot check fails the FPU line and stops",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the FPU support library work (FS-UAE, Kickstart 3.1, JIT off).",
+    "report": "bugs/BOOT-68060-FPU-FAIL-32.md"
+  },
+  {
+    "id": "BOOT-CONSOLE-WIDTH-32",
+    "title": "Boot check lines wrap on the 64-column boot console",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: all boot lines fit 63 columns, countdown on one row; width test; not shipped at the time of writing",
+    "report": "bugs/BOOT-CONSOLE-WIDTH-32.md"
+  },
+  {
+    "id": "DRYRUN-LIBS-LABEL-32",
+    "title": "A dry-run image built with --amiga-libs still says it contains no game assets or ROMs only",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the FPU support library work (FS-UAE, Kickstart 3.1, JIT off).",
+    "report": "bugs/DRYRUN-LIBS-LABEL-32.md"
+  },
+  {
+    "id": "BUILD-SEYDA-HULL2-32",
+    "title": "From-scratch builds stop at the Seyda Neen full-town map (hull 2 clipnodes over the limit) since v0.0.28",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (a97861b): BSP2 standing-hull intermediate, engine hull limits gate; from-scratch bsp stage passes; not shipped at the time of writing",
+    "report": "bugs/BUILD-SEYDA-HULL2-32.md"
+  },
+  {
+    "id": "BUILD-ACTOR-CONTACT-CALL-32",
+    "title": "Builder actor-contact stage calls convert() with the wrong arguments since v0.0.27",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (511da01): one region-conversion path, stage-entry and call-signature tests; not shipped at the time of writing",
+    "report": "bugs/BUILD-ACTOR-CONTACT-CALL-32.md"
+  },
+  {
+    "id": "VIVEC-ARENA-ACTORS-32",
+    "title": "Five Vivec Arena residents fail the actor placement gate",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (merged 9a2992b): frame keeps objects whose footprint reaches in, exterior architecture keeps authored collision surfaces when the convex proxy closes more than a step; actor gate passes without the waiver; owner dev1 evidence of the frame bug (sewer outflow floating without its canton) recorded, in-game check pending; not shipped at the time of writing",
+    "report": "bugs/VIVEC-ARENA-ACTORS-32.md"
+  },
+  {
+    "id": "IMPORT-TOWN-NO-INTERIORS-32",
+    "title": "The town importer converts no interiors; all Vivec Arena doors say \"Interior unavailable\"",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the first from-scratch build with the repository builder (v0.0.32-dev1 attempt).",
+    "report": "bugs/IMPORT-TOWN-NO-INTERIORS-32.md"
+  },
+  {
+    "id": "PKG-STALE-RUNTIME-32",
+    "title": "The sealed v0.0.31 playtest contains a stale launcher preset folder",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the first from-scratch build with the repository builder (v0.0.32-dev1 attempt). The sealed package stays as it is (sealed artifacts are never changed).",
+    "report": "bugs/PKG-STALE-RUNTIME-32.md"
+  },
+  {
+    "id": "BUILD-NOT-FROM-SCRATCH-32",
+    "title": "Five releases shipped without the public builder being able to build them from scratch",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: process failure behind BUILD-SEYDA-HULL2-32 and BUILD-ACTOR-CONTACT-CALL-32; repair: from-scratch rule before releases + builder fixes in progress",
+    "report": "bugs/BUILD-NOT-FROM-SCRATCH-32.md"
+  },
+  {
+    "id": "BUILD-INPUTS-UNVERIFIED-32",
+    "title": "The builder does not check user inputs (Morrowind data, Amiga libraries) against known versions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: one known-inputs check (Morrowind masters, Kickstart, Amiga libraries), inputs lock, policies; an earlier Morrowind.esm/.bsa reference check existed (page corrected); not shipped at the time of writing",
+    "report": "bugs/BUILD-INPUTS-UNVERIFIED-32.md"
+  },
+  {
+    "id": "BUILD-EDITION-DIFFERENCES-32",
+    "title": "GOG and Steam editions produce different builds (fonts, loose files)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: Steam lacks the BookArt TTF fonts (bitmap fallback used); GOG loose overrides not yet measured; GOG is the reference edition",
+    "report": "bugs/BUILD-EDITION-DIFFERENCES-32.md"
+  },
+  {
+    "id": "BUILD-SEYDA-CULL-STABLE-32",
+    "title": "From-scratch builds stop in Seyda Neen terrain culling (fragment not repeat-stable)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the from-scratch build after the builder fixes. Part of the Seyda Neen regeneration gap (BUILD-SEYDA-REGEN-30); covered by the recorded exception for v0.0.32.",
+    "report": "bugs/BUILD-SEYDA-CULL-STABLE-32.md"
+  },
+  {
+    "id": "MAP-UNUSED-HULL2-32",
+    "title": "Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the builder fixes (hull analysis).",
+    "report": "bugs/MAP-UNUSED-HULL2-32.md"
+  },
+  {
+    "id": "FONT-BITMAP-INDEX-32",
+    "title": "Bitmap font path keeps the .fnt glyph order; the engine indexes by game byte (wrong characters)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the font A/B (TrueType path from the GOG edition, bitmap path from the Steam edition). Affects Steam builds now; little visible in today's shipped text.",
+    "report": "bugs/FONT-BITMAP-INDEX-32.md"
+  },
+  {
+    "id": "FONT-TTF-COVERAGE-32",
+    "title": "Magic Cards TrueType font silently lacks many characters and replaces ASCII brackets with ornaments",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the font A/B (TrueType path from the GOG edition, bitmap path from the Steam edition). Affects the GOG reference build.",
+    "report": "bugs/FONT-TTF-COVERAGE-32.md"
+  },
+  {
+    "id": "NPC-BAKE-VERTEX-32",
+    "title": "NPC model bake exceeds the alias vertex budget for two Telvanni residents",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the Vivec cantons import.",
+    "report": "bugs/NPC-BAKE-VERTEX-32.md"
+  },
+  {
+    "id": "VIVEC-ARENA-HANDOFF-32",
+    "title": "The Arena frame's handoff area reaches into neighbouring cantons; its frame edge can be in view",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the Vivec cantons import.",
+    "report": "bugs/VIVEC-ARENA-HANDOFF-32.md"
+  },
+  {
+    "id": "VIVEC-ROOMS-UNREACHABLE-32",
+    "title": "Excluded Vivec hub rooms leave converted rooms unreachable",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the Vivec cantons import.",
+    "report": "bugs/VIVEC-ROOMS-UNREACHABLE-32.md"
+  },
+  {
+    "id": "TOWN-EDGE-UNBUILT-32",
+    "title": "Leaving a town into an unbuilt neighbour drops the player into a bare world map",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the Vivec cantons import.",
+    "report": "bugs/TOWN-EDGE-UNBUILT-32.md"
+  },
+  {
+    "id": "IMPORT-DOORBANK-LIMIT-32",
+    "title": "Town importer did not check the engine's 128-row door bank limit",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the cantons branch: the importer now enforces the limit.",
+    "report": "bugs/IMPORT-DOORBANK-LIMIT-32.md"
+  },
+  {
+    "id": "LOADER-STALL-32",
+    "title": "One unexplained stall while loading the Mages Guild with the new loader",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the map loader rework (decoding without staging). Not reproduced since.",
+    "report": "bugs/LOADER-STALL-32.md"
+  },
+  {
+    "id": "HEAP-SEYDA-OVERLAP-32",
+    "title": "Shipped Seyda Neen maps fail the current heap model (harvest and guard overlap allowance)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the map loader rework. sn019, sn026, sn035 fail the modelled allowance even without harvest (not the allocation ceiling). v0.0.32: temporary pre-CHIM bypass (owner decision A, config/heap-bypass.json, name + SHA-256, legacy builder only) until CHIM M2; harvest refusals in HARVEST-SEYDA-HEAP-REFUSED-32",
+    "report": "bugs/HEAP-SEYDA-OVERLAP-32.md"
+  },
+  {
+    "id": "MODEL-SLOTS-256-32",
+    "title": "Some Vivec interiors exceed the engine's 256 model slots; the heap check does not catch it",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the map loader rework (decoding without staging).",
+    "report": "bugs/MODEL-SLOTS-256-32.md"
+  },
+  {
+    "id": "ESTIMATE-HEAP-STALE-32",
+    "title": "World estimate heap coefficients were fitted to the old loader model",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the map loader rework (decoding without staging).",
+    "report": "bugs/ESTIMATE-HEAP-STALE-32.md"
+  },
+  {
+    "id": "BUILD-INPUTCHECK-SLOW-32",
+    "title": "The game data reference check takes over 12 minutes through Docker",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: per-file parent walk in ensure_external(); not hashing",
+    "report": "bugs/BUILD-INPUTCHECK-SLOW-32.md"
+  },
+  {
+    "id": "BUILD-WORLD-LAYOUT-DRIFT-32",
+    "title": "The world region layout depends on the town maps, so a from-scratch build lays out a different world",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: survey ceiling recorded (140,801) and enforced; from-scratch regions.awr byte-identical to v0.0.31; not shipped at the time of writing",
+    "report": "bugs/BUILD-WORLD-LAYOUT-DRIFT-32.md"
+  },
+  {
+    "id": "BUILD-EDITION-SKY-32",
+    "title": "Night sky and sky palette outputs depend on the Morrowind edition (loose .tga read before archive .dds)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the GOG/Steam A/B",
+    "report": "bugs/BUILD-EDITION-SKY-32.md"
+  },
+  {
+    "id": "BUILD-PLUGIN-SOUNDS-32",
+    "title": "A GOG image includes 8 converted sounds that only an official plugin uses",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the GOG/Steam A/B",
+    "report": "bugs/BUILD-PLUGIN-SOUNDS-32.md"
+  },
+  {
+    "id": "ASSETS-ARCHIVE-ORDER-32",
+    "title": "Asset readers ignore the Tribunal and Bloodmoon archives, so some textures are pre-expansion versions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the GOG/Steam A/B",
+    "report": "bugs/ASSETS-ARCHIVE-ORDER-32.md"
+  },
+  {
+    "id": "RENDER-SURFCACHE-THRASH-32",
+    "title": "Seyda Neen views rebuild the surface cache every frame at a fixed camera",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the renderer counters work",
+    "report": "bugs/RENDER-SURFCACHE-THRASH-32.md"
+  },
+  {
+    "id": "RENDER-EDGECACHE-SEYDA-32",
+    "title": "No edges are reused between frames in Seyda Neen views",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the renderer counters work",
+    "report": "bugs/RENDER-EDGECACHE-SEYDA-32.md"
+  },
+  {
+    "id": "BENCH-FSUAE-FREQ-32",
+    "title": "FS-UAE ignores uae_cpu_frequency in cycle-exact mode",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the renderer counters work",
+    "report": "bugs/BENCH-FSUAE-FREQ-32.md"
+  },
+  {
+    "id": "STREAM-FFS-SEEK-32",
+    "title": "Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: the first 36 ms per random read was mostly host storage (hard file in a shared Windows folder, BENCH-HOST-STORAGE-32); container-native 18.3-21.2 ms; fill, fragmentation, buffers, RDB and partition size within ~18-22 ms; extension-block seek cost still open",
+    "report": "bugs/STREAM-FFS-SEEK-32.md"
+  },
+  {
+    "id": "ENGINE-ARGS-32",
+    "title": "The C start-up passes no arguments from the boot shell",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the renderer counters work",
+    "report": "bugs/ENGINE-ARGS-32.md"
+  },
+  {
+    "id": "BUILD-NO-OVERLAY-32",
+    "title": "The builder has no engine-overlay command; dev measurements used a private script",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the renderer counters work",
+    "report": "bugs/BUILD-NO-OVERLAY-32.md"
+  },
+  {
+    "id": "DEBUG-TP-TOWN-NAMES-32",
+    "title": "dbg tp help omits new towns and has no short town names",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: dbg tp vivec/arena, help line from the town table; on the fix-before-release list; not in dev1; not shipped at the time of writing",
+    "report": "bugs/DEBUG-TP-TOWN-NAMES-32.md"
+  },
+  {
+    "id": "BUILD-FLORA-OPTIN-32",
+    "title": "A from-scratch build without --tree-sprites leaves out the trees and grass every release ships",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: flora built by default (--no-tree-sprites debug opt-out, --tree-sprites no-op), Balmora layout repair no longer tied to it, image error names the cause; from-scratch confirmation pending; not shipped at the time of writing",
+    "report": "bugs/BUILD-FLORA-OPTIN-32.md"
+  },
+  {
+    "id": "BUILD-IMAGE-SERIAL-32",
+    "title": "The image step runs on one core for about 23 minutes per pass",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.32 development (not shipped): --jobs reaches the image step and every per-map pass; one-pass private-test waiver",
+    "report": "bugs/BUILD-IMAGE-SERIAL-32.md"
+  },
+  {
+    "id": "BUILD-HANDS-NOT-BUILT-32",
+    "title": "Per-race first-person hands are not built by the builder",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: default hand-catalog step (runtime palette, source topology), installed after the sky palette bank; builder command byte-identical to v0.0.31 on owned data; finished from-scratch image pending; not shipped at the time of writing",
+    "report": "bugs/BUILD-HANDS-NOT-BUILT-32.md"
+  },
+  {
+    "id": "BUILD-HARVEST-NOT-BUILT-32",
+    "title": "Mushroom harvest data is not built by the builder",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (0331f76): default harvest step and image install on the final maps; the image step now removes Balmora's 134 baked mushrooms, which v0.0.29 removed by hand (a hand step that hid a builder gap); 381 of 388 maps admitted; from-scratch image pending; not shipped at the time of writing",
+    "report": "bugs/BUILD-HARVEST-NOT-BUILT-32.md"
+  },
+  {
+    "id": "BUILD-STANDALONE-STAGES-32",
+    "title": "Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified",
+    "state": "closed",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Closed 8 October 2026: neither tool output is in v0.0.31 (no section files or appended maps; no original exterior entrance doors in any world map)",
+    "report": "bugs/BUILD-STANDALONE-STAGES-32.md"
+  },
+  {
+    "id": "NET-UDP-INIT-CRASH-32",
+    "title": "UDP network start-up can stop the game at boot when bsdsocket.library is present",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: unchecked NULL and Sys_Error in net_amigaudp.c start-up; runtime impact unverified",
+    "report": "bugs/NET-UDP-INIT-CRASH-32.md"
+  },
+  {
+    "id": "CHIM-READ-RUNS-33",
+    "title": "CHIM crossings read little but in many separate runs, so FFS seeks dominate",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in CHIM source (format 0.2, v0.0.33-chim-format): median 3-4 read runs and ~11-32 ms per Balmora crossing (estimate) vs 287 ms today; real-read replay pending; not shipped",
+    "report": "bugs/CHIM-READ-RUNS-33.md"
+  },
+  {
+    "id": "CHIM-PVS-HOLLOW-33",
+    "title": "Chunk visibility culls almost nothing in Balmora: houses have hollow collision shells",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (performance limit): per-placement lists (format 0.3) block 11.5 % of 51,224 Balmora tests; median per view 95 to 86 placements, 13,535 to 12,170 faces; standing-eye-only variant and smaller erosion untested in the engine",
+    "report": "bugs/CHIM-PVS-HOLLOW-33.md"
+  },
+  {
+    "id": "CHIM-VIEW-FACES-33",
+    "title": "Model faces dominate each Balmora view: the streamer alone does not fix frame rate",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: format 0.3 statistics, a few models dominate (siltstrider 3,266 faces per model; placed faces flora_tree_wg_01 7,310, hlaalu_loaddoor_02 6,328, light_de_streetlight_01 5,587); owners: distance detail and model simplification. First FS-UAE CHIM vs legacy (5 cameras, relative): world faces 654->97, frame time 92.5->46.9 ms, fps x10 108->213 at one camera",
+    "report": "bugs/CHIM-VIEW-FACES-33.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "CHIM-LEAF-SPAN-33",
+    "title": "160 of 1,488 Balmora placements span more than 16 leaves",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: still 160 placements over 16 leaves in format 0.3, always sent; owners: splitting or chunk-level linking",
+    "report": "bugs/CHIM-LEAF-SPAN-33.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "CONVERT-COLLISION-FALLBACK-32",
+    "title": "Five Balmora meshes fall back to a collision union in qbsp",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: Found by the CHIM Balmora build; the legacy dev1 conversion shows the same fallbacks.",
+    "report": "bugs/CONVERT-COLLISION-FALLBACK-32.md"
+  },
+  {
+    "id": "GATE-SUITE-WRITABLE-32",
+    "title": "The test suite needs a writable source copy and an executable /tmp; the documented command does not say so",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: Found by the CHIM format and builder defaults jobs.",
+    "report": "bugs/GATE-SUITE-WRITABLE-32.md"
+  },
+  {
+    "id": "HARVEST-SEYDA-STALE-32",
+    "title": "v0.0.31 ships Seyda Neen harvest catalogues made for older map versions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-harvest: Seyda Neen and docks catalogues regenerated by the image step from the maps it ships (recorded v0.0.31 maps); 55 sub-cells and the docks admitted, 7 refused by the heap check; not shipped at the time of writing",
+    "report": "bugs/HARVEST-SEYDA-STALE-32.md"
+  },
+  {
+    "id": "HARVEST-PILOT-SHIPPING-32",
+    "title": "24 Seyda Neen maps still ship the six-plant pilot harvest catalogue",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (0331f76): every catalogue generated with the shipped settings; 8 shared models (the 3 pilot models are gone); the standalone 8-models-per-run cap that forced three runs is replaced by the runtime limit checked per map; not shipped at the time of writing",
+    "report": "bugs/HARVEST-PILOT-SHIPPING-32.md"
+  },
+  {
+    "id": "HARVEST-GEOMETRY-GATE-32",
+    "title": "The harvest geometry gate was never re-run on the shipped Seyda Neen maps",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-harvest: the image step runs the gate on every candidate final map and stops on failure (passes on all 388 owned dev1 candidates after Balmora's baked mushrooms are removed); not shipped at the time of writing",
+    "report": "bugs/HARVEST-GEOMETRY-GATE-32.md"
+  },
+  {
+    "id": "BUILD-MOJIBAKE-32",
+    "title": "A builder error message contains mojibake",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the builder coverage work",
+    "report": "bugs/BUILD-MOJIBAKE-32.md"
+  },
+  {
+    "id": "CHIM-TERRAIN-GRAFT-33",
+    "title": "CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in CHIM source (v0.0.33-chim-engine d12de3c): chunk terrain grafted into a pooled frame world with index relocation; host-tested; no emulator run yet",
+    "report": "bugs/CHIM-TERRAIN-GRAFT-33.md"
+  },
+  {
+    "id": "CHIM-READ-BUDGET-33",
+    "title": "CHIM per-frame read budget can be exceeded by a whole lump",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the first CHIM engine slice",
+    "report": "bugs/CHIM-READ-BUDGET-33.md"
+  },
+  {
+    "id": "RENDER-VISEDICTS-OVERFLOW-32",
+    "title": "Entities beyond MAX_VISEDICTS (1,112) are dropped silently",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (57ba31e): drops counted in R_StoreEfrags, CL_RelinkEntities, CL_NewTempEntity; one console warning per map; not yet in dbg rcount; not shipped at the time of writing",
+    "report": "bugs/RENDER-VISEDICTS-OVERFLOW-32.md"
+  },
+  {
+    "id": "CHIM-ACTORS-OUTSIDE-RING-33",
+    "title": "Actors outside the CHIM ring have no terrain collision",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in CHIM source (v0.0.33-chim-engine d12de3c): non-client actors outside grafted chunks are frozen; ring loaded at spawn; behaviour review open",
+    "report": "bugs/CHIM-ACTORS-OUTSIDE-RING-33.md"
+  },
+  {
+    "id": "CHIM-LIGHT-CONTENTS-33",
+    "title": "Actor lighting and water contents ignore CHIM chunks",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in CHIM source (v0.0.33-chim-engine d12de3c): R_LightPoint and SV_PointContents work on grafted terrain (water leaves); host-tested",
+    "report": "bugs/CHIM-LIGHT-CONTENTS-33.md"
+  },
+  {
+    "id": "CHIM-ANIM-TEXTURES-33",
+    "title": "Animated shared textures in CHIM show only their first frame",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the first CHIM engine slice",
+    "report": "bugs/CHIM-ANIM-TEXTURES-33.md"
+  },
+  {
+    "id": "CHIM-PACK-DIRS-33",
+    "title": "CHIM pack directories are fully resident and would grow to about 400 KB for the island",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the first CHIM engine slice",
+    "report": "bugs/CHIM-PACK-DIRS-33.md"
+  },
+  {
+    "id": "CHIM-HEAP-CHECK-33",
+    "title": "The heap check does not account for a CHIM map's zone bank",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the first CHIM engine slice",
+    "report": "bugs/CHIM-HEAP-CHECK-33.md"
+  },
+  {
+    "id": "BUILD-XDFTOOL-ARGMAX-32",
+    "title": "The image step fails at the end: xdftool argument list too long",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.32 development (1f301c4, not shipped): bounded xdftool batches on every host; dev1 rebuild pending",
+    "report": "bugs/BUILD-XDFTOOL-ARGMAX-32.md"
+  },
+  {
+    "id": "BUILD-PALETTE-RACE-32",
+    "title": "Census and world flora assets can run together on the same palette file",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.32 development (not shipped): palette readers after Census; whole-file rewrites. Flora bytes can differ from earlier dev1 builds (expected difference for from-scratch comparisons)",
+    "report": "bugs/BUILD-PALETTE-RACE-32.md"
+  },
+  {
+    "id": "BUILD-SCHEDULER-JOBSHARE-32",
+    "title": "The stage scheduler fixes a stage's worker share when it starts",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.32 development (not shipped): shares rebalanced every round through allowance files; scheduler test. Open limit: map tool threads keep the start value, so a shrunk stage can briefly exceed its share",
+    "report": "bugs/BUILD-SCHEDULER-JOBSHARE-32.md"
+  },
+  {
+    "id": "CHIM-FRAME-WORLD-BOUNDS-33",
+    "title": "A CHIM frame map must carry an empty world whose bounds cover the frame",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the second CHIM engine slice",
+    "report": "bugs/CHIM-FRAME-WORLD-BOUNDS-33.md"
+  },
+  {
+    "id": "CHIM-HULL2-33",
+    "title": "CHIM terrain uses the player hull for large entities",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the second CHIM engine slice",
+    "report": "bugs/CHIM-HULL2-33.md"
+  },
+  {
+    "id": "CHIM-BORDER-COLLISION-33",
+    "title": "Collision near CHIM chunk borders ignores the neighbour chunk's ground",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the second CHIM engine slice",
+    "report": "bugs/CHIM-BORDER-COLLISION-33.md"
+  },
+  {
+    "id": "CHIM-REBUILD-COST-33",
+    "title": "Each CHIM crossing rebuilds the whole frame world; the cost is not measured",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the second CHIM engine slice",
+    "report": "bugs/CHIM-REBUILD-COST-33.md"
+  },
+  {
+    "id": "CHIM-FROZEN-ACTORS-33",
+    "title": "Frozen CHIM actors: projectiles stop mid-air and timers stop",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the second CHIM engine slice",
+    "report": "bugs/CHIM-FROZEN-ACTORS-33.md"
+  },
+  {
+    "id": "TEST-NATIVE-TMPDIR-32",
+    "title": "A native test overflows a 64-byte name buffer when the temp path is long",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: relative names, long temp path in the test as regression check",
+    "report": "bugs/TEST-NATIVE-TMPDIR-32.md"
+  },
+  {
+    "id": "BUILD-JOBS-RESOLVE-PER-STAGE-32",
+    "title": "With automatic jobs, stages of one build plan can get different worker counts",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.32 development (not shipped): one resolution per build and per plan",
+    "report": "bugs/BUILD-JOBS-RESOLVE-PER-STAGE-32.md"
+  },
+  {
+    "id": "BUILD-FINALIZE-TORCHTEST-32",
+    "title": "The image step fails at its very end: finalize_image uses an undefined torch test report",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev and the dev1 build source",
+    "report": "bugs/BUILD-FINALIZE-TORCHTEST-32.md"
+  },
+  {
+    "id": "AUDIO-MISSING-SOURCES-32",
+    "title": "The image step reports missing sources for 7 voices and 2 effects",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open",
+    "report": "bugs/AUDIO-MISSING-SOURCES-32.md"
+  },
+  {
+    "id": "WORLD-THIRD-PARTITION-32",
+    "title": "The world image now needs a fourth partition (DW2); launchers were only used with three",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: dev1 launchers mount every partition in FS-UAE; WinUAE mounting of DW2 untested; templates lack the world disk (EMULATOR-TEMPLATES-WORLD-32)",
+    "report": "bugs/WORLD-THIRD-PARTITION-32.md"
+  },
+  {
+    "id": "BENCH-HOST-STORAGE-32",
+    "title": "Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: same hard file 18.3-21.2 ms per random 16 KiB read on a Docker volume vs 33.2-35.3 ms from a shared Windows folder; earlier Windows-folder disk and crossing timings are relative only; rule: disk timings only on container-native storage",
+    "report": "bugs/BENCH-HOST-STORAGE-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "BENCH-SESSION-DRIFT-32",
+    "title": "Emulated disk time drifts about 1.6x between FS-UAE sessions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: identical read lists differ up to ~1.6x between sessions (cycle-approximate profile); host heavily loaded by concurrent builds, unmeasured contributor; build profiler now records host load per stage, emulator benches not yet; compare only same-session runs with a drift-control rerun, repeat on a quiet host",
+    "report": "bugs/BENCH-SESSION-DRIFT-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "BENCH-DISK-BYTES-32",
+    "title": "FS-UAE moves disk bytes at about 90 MB/s, so it cannot price what a walk reads",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: CHIM vs legacy over a whole walk needs a hardware awbench replay; at an assumed 2 MB/s IDE about 20.9 s vs 35.1 s (estimate, unmeasured)",
+    "report": "bugs/BENCH-DISK-BYTES-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "BUILD-HDF-BUFFERS-32",
+    "title": "Hard disk buffer and MaxTransfer defaults depend on the disk type",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: rdbtool RDB partitions 30 buffers and MaxTransfer 0xffffff, FS-UAE plain partitions 50 and 0x7fffffff; builder to set buffers explicitly",
+    "report": "bugs/BUILD-HDF-BUFFERS-32.md"
+  },
+  {
+    "id": "BENCH-FSUAE-PLAIN-HDF-32",
+    "title": "FS-UAE does not mount a plain 1.5 GiB partition hard file",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (emulator behaviour): large benchmark disks use an RDB wrapper",
+    "report": "bugs/BENCH-FSUAE-PLAIN-HDF-32.md"
+  },
+  {
+    "id": "BENCH-AWBENCH-BUFFERS-32",
+    "title": "awbench reported the stale buffer count after AddBuffers",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: fixed on CHIM branch (v0.0.33-chim-format, 66d316b), not merged",
+    "report": "bugs/BENCH-AWBENCH-BUFFERS-32.md"
+  },
+  {
+    "id": "BENCH-FSUAE-JIT-HANG-32",
+    "title": "An FS-UAE JIT session hung with a Windows-folder hard file mounted",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: seen once (10 minutes or more, one JIT table row incomplete); cause unknown",
+    "report": "bugs/BENCH-FSUAE-JIT-HANG-32.md"
+  },
+  {
+    "id": "CHIM-VALIDATOR-ORDER-33",
+    "title": "The CHIM validator walk depended on Python string hashing",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: fixed on CHIM branch (v0.0.33-chim-format, 028904d) with a regression test that fails without the fix, not merged",
+    "report": "bugs/CHIM-VALIDATOR-ORDER-33.md"
+  },
+  {
+    "id": "BUILD-LIGHT-THREADS-32",
+    "title": "ericw light is not byte-reproducible with more than one thread",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (e77370a): LIGHT_THREADS=1 through vis_options.light_args for all 11 light calls; static mutation-checked test; Seyda 3.8 s vs 3.6 s at 16 threads; maps lit multi-threaded before (gallery plane, Census, prison, Seyda mesh scene) differ from earlier builds (expected in from-scratch comparisons); not shipped at the time of writing",
+    "report": "bugs/BUILD-LIGHT-THREADS-32.md"
+  },
+  {
+    "id": "BUILD-HAND-CATALOG-SERIAL-32",
+    "title": "The hand-catalog stage bakes every race and sex one after another",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (63ab202): race/sex pairs bake in the worker pool; 135 s at 1 job, 42 s at 16 (busy host), identical output; not shipped at the time of writing",
+    "report": "bugs/BUILD-HAND-CATALOG-SERIAL-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "BUILD-IMAGE-UNDERUSED-32",
+    "title": "Parts of the image step still run serially or leave most CPUs idle",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: cull 186.5 s to 83.1 s (receipt rewritten at most every 2 s) and parallel drive readback in source (517d548, not shipped); guard torch conversion still serial (60 s, needs per-entry asset recording); shared sky, night lighting, Balmora rebuilds not re-measured",
+    "report": "bugs/BUILD-IMAGE-UNDERUSED-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "TEST-WORKER-SYSPATH-32",
+    "title": "Pool workers started from tests import tools/mwad.py instead of the mwad package",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: spawned workers inherit sys.path with tools/ first; second case: test_build_defaults and test_builder_stage_entries put tools/ before src/ in the test process, so test_actor_ground fails to import after them (gate passes in its default order); builder unaffected; proposed: one shared test path helper (src/ first) and a mwad import test after every sys.path-changing module",
+    "report": "bugs/TEST-WORKER-SYSPATH-32.md"
+  },
+  {
+    "id": "ACTOR-AUDIT-ORDER-32",
+    "title": "The actor audit lists Canonical owner omits errors in set order",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (d776653): omission errors sorted; test under four hash seeds; not shipped at the time of writing",
+    "report": "bugs/ACTOR-AUDIT-ORDER-32.md"
+  },
+  {
+    "id": "COLLISION-CONVEX-LOSS-32",
+    "title": "Convex collision proxies lose and invent authored surfaces",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: 14-direction hulls lose surfaces (up to 107 units in Vivec, 32 in Balmora) and small groups close space; exterior architecture closing more than a step is repaired by VIVEC-ARENA-ACTORS-32; rocks, trees and lost surfaces unchanged",
+    "report": "bugs/COLLISION-CONVEX-LOSS-32.md"
+  },
+  {
+    "id": "HARVEST-SEYDA-HEAP-REFUSED-32",
+    "title": "Seven Seyda Neen sub-cells lose harvest to the heap check, six of which had it in v0.0.31",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: player-visible regression vs v0.0.31; sn019, sn026, sn035 fail the heap model even without a catalogue (HEAP-SEYDA-OVERLAP-32), sn018, sn020, sn021, sn055 fail only with the harvest charge; v0.0.32 notes must list them",
+    "report": "bugs/HARVEST-SEYDA-HEAP-REFUSED-32.md"
+  },
+  {
+    "id": "ENTITY-TRACKER-HARVEST-32",
+    "title": "The entity tracker did not count plants placed by harvest catalogues",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (0331f76, entity_tracker.harvest_refs); test test_entity_tracker_counts_catalogue_plants in tests/test_harvest_build.py; not shipped at the time of writing; finished-image tracker report pending",
+    "report": "bugs/ENTITY-TRACKER-HARVEST-32.md"
+  },
+  {
+    "id": "HARVEST-EXTRA-TOWNS-32",
+    "title": "Opt-in towns get no harvestable mushrooms",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: harvest covers vf, sn, bm and the intro docks only; extra-town maps (Vivec Arena va*, built by default since BUILD-EXTRA-TOWN-OPTIN-32) get none; v0.0.32 notes must mention it",
+    "report": "bugs/HARVEST-EXTRA-TOWNS-32.md"
+  },
+  {
+    "id": "PLAYTEST-PAYLOAD-COVERAGE-32",
+    "title": "The v0.0.32-dev1 playtest has no first-person hands and no harvest",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (process): dev1 was built from a snapshot (978475d) before the hand-catalog and harvest steps were merged; no packaging step runs payload_coverage.py against the last release (gate to add)",
+    "report": "bugs/PLAYTEST-PAYLOAD-COVERAGE-32.md"
+  },
+  {
+    "id": "VIVEC-ARENA-TP-ARRIVAL-32",
+    "title": "dbg tp vivec_arena leaves the player at the frame origin under the water",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-vivec-arrival: arrival stored as the engine search spot on converted collision (Arena 48 447.25 465.075); engine falls back to the spawn point, never the frame origin, never water; dbg unstuck; image-step arrival gate; not shipped at the time of writing",
+    "report": "bugs/VIVEC-ARENA-TP-ARRIVAL-32.md"
+  },
+  {
+    "id": "BUILD-SCRATCH-DISK-GROWTH-32",
+    "title": "Build scratch volumes grow the container disk image on the system drive",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (infrastructure): about 63 GiB growth in 40 minutes during parallel jobs; space freed inside volumes is reused but never returned without compaction (needs Docker stopped, owner decision); per-job scratch budgets to add",
+    "report": "bugs/BUILD-SCRATCH-DISK-GROWTH-32.md"
+  },
+  {
+    "id": "BUILD-SEYDA-RECORDED-REWRITTEN-32",
+    "title": "Later image passes rewrite the recorded Seyda Neen maps, so the exception is not the recorded stage",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, repaired in source (not yet in an image): traced to the actor ground bake (one placement, ref 128961, re-fitted in 64 region maps) and the builder fallback-alias copy over seyda.bsp; sky and hidden-surface passes did not change them. Builder option --seyda-recorded (tools/recorded_stage.py, pin config/seyda-recorded-v0.0.31.json): passes skip the recorded maps and a check after every map pass stops the build on any difference; seyda.bsp = sn029 alias is the one named difference (owner option A)",
+    "report": "bugs/BUILD-SEYDA-RECORDED-REWRITTEN-32.md"
+  },
+  {
+    "id": "FOG-TOWN-HEAVY-32",
+    "title": "Heavy fog at the Vivec Arena and in Balmora in v0.0.32-dev1",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: fog table, configs, lookups and the 540 town distance measured identical to v0.0.31 (fog-locations.txt byte-identical, location fog off by default); Seyda Neen silhouettes are the skyline fill (HORIZON-FLORA-SPRITES-32, default now off); Arena: canton larger than the 540 fog band plus far cut-off (HORIZON-HOLES-31), longer Arena distance is an owner decision; Balmora haze not yet compared at a matched pose",
+    "report": "bugs/FOG-TOWN-HEAVY-32.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "WORLD-HDF-OVER-2GIB-32",
+    "title": "The world hard disk image is 32,768 bytes over 2 GiB",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: dev1 world disk image 2,147,516,416 B although each partition is under 2 GiB; risk for tools with a 2 GiB file limit; disk rule asks for files well under 2 GiB",
+    "report": "bugs/WORLD-HDF-OVER-2GIB-32.md"
+  },
+  {
+    "id": "EMULATOR-TEMPLATES-WORLD-32",
+    "title": "The static emulator templates list only the boot disk, not the world disk",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (also in v0.0.31): FS-UAE template names only the boot image, WinUAE template no hard disk; the launchers add the world disk correctly",
+    "report": "bugs/EMULATOR-TEMPLATES-WORLD-32.md"
+  },
+  {
+    "id": "GATE-SHARED-SOURCE-32",
+    "title": "The local gate always tested the main checkout, in one shared folder",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Local gate fixed 8 October 2026: repository selector, staged source and temp folders per gate, no reused gate numbers, report header names the repository and commit; concurrent gates on the main line and a worktree verified; follow-ups fixed (temp space cleanup with a 150 MB start check; engine build folder owned by the engine step); earlier branch gates from worktrees may have tested the main line",
+    "report": "bugs/GATE-SHARED-SOURCE-32.md"
+  },
+  {
+    "id": "HORIZON-FLORA-SPRITES-32",
+    "title": "Horizon silhouetting: not yet perfect",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, not yet perfect. Cause measured: the skyline fill (aw_skyline_fill, since v0.0.31-dev5; v0.0.31 shipped it on, its engine draws the same Seyda Neen castle and wall); default restored in source: game config aw_skyline_fill 0 plus a one-time migration of saved configs; object silhouetting kept, selectable, experimental and buggy (sprites need their shapes from the alpha channel), tested but subpar results; planned: no topography through the fill, alpha-shaped sprite silhouettes; not a v0.0.32 blocker",
+    "report": "bugs/HORIZON-FLORA-SPRITES-32.md"
+  },
+  {
+    "id": "BUILD-HEAP-RECEIPT-TUPLES-32",
+    "title": "The image step refuses its own final heap receipt (tuples against lists)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev (2ca08b5): the final heap audit returns the saved JSON and harvest fingerprint entries are lists; tests/test_heap_receipt_roundtrip.py; reproduced on the dev2 maps (389 tuple/list differences); not shipped at the time of writing",
+    "report": "bugs/BUILD-HEAP-RECEIPT-TUPLES-32.md"
+  },
+  {
+    "id": "VIVEC-ARENA-FRAME-EDGE-32",
+    "title": "Neighbouring canton bodies end at the Arena frame edge, in view",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (design limit, owner decision): canton bodies kept by footprint end in a straight cut at local +-1536, inside fog range from reachable walkways; whole cantons do not fit the heap (VIVEC-HEAP-31); per-canton towns or location fog are the options",
+    "report": "bugs/VIVEC-ARENA-FRAME-EDGE-32.md"
+  },
+  {
+    "id": "CHIM-PAYLOAD-PARITY-33",
+    "title": "The CHIM world misses the image step's edits to Balmora (harvest mushrooms, town flora)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on CHIM branch (6945b43), not merged: chim stage uses the harvest step source placements and the shared town-flora selection; Balmora 1,488 - 20 + 5 = 1,473 statics, two-way frame-map gate passes; open requirements: frame origin = region-map origin, CHIM town harvest catalogues external alias (rep 4) or keep the harvest func_walls; not shipped",
+    "report": "bugs/CHIM-PAYLOAD-PARITY-33.md"
+  },
+  {
+    "id": "CHIM-HARVEST-NAMING-33",
+    "title": "A town-wide CHIM harvest catalogue does not fit the name and size limits",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, decided: harvest names are [a-z0-9_]{1,24}, harvest-vivec_telvanni-chim.txt is 31 characters (FFS rule 30), a merged catalogue may exceed 64 nodes, 256 edges, 8 models; CHIM keeps loading per-region catalogues by region, no merged catalogue",
+    "report": "bugs/CHIM-HARVEST-NAMING-33.md"
+  },
+  {
+    "id": "CHIM-TERRAIN-HULL-BEVELS-33",
+    "title": "A standing box rests above the ground at convex CHIM terrain edges",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on CHIM branch (057a37c), not merged: exact Minkowski expansion of terrain pieces, seam check 0.25 either side of the stand height, format stays 0.4; regression test; engine native test bound 0.25 pending; not shipped",
+    "report": "bugs/CHIM-TERRAIN-HULL-BEVELS-33.md"
+  },
+  {
+    "id": "CONSOLE-HISTORY-ARROWS-32",
+    "title": "Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open; most likely CONSOLE-HISTORY-EMPTY-32 (fixed in source on v0.0.32-dev, not yet in a build the owner has played). Owner trace on dev1: the arrows reach the game (raw 76/77, qualifier 0x8000 with the mouse grabbed). The same keys and qualifier in FS-UAE 3.1.66 on dev1 recall history; a native replay of the owner's trace passes. A keyboard joystick on port 1 (FS-UAE default when joystick_port_1 is missing) swallows the arrows with no trace line, so it is not the owner's case; every shipped FS-UAE preset sets joystick_port_1 = none (tests/test_fsuae_keyboard_ports.py). Next: owner checks history on the next build with the fix.",
+    "report": "bugs/CONSOLE-HISTORY-ARROWS-32.md"
+  },
+  {
+    "id": "CONSOLE-HISTORY-EMPTY-32",
+    "title": "Console Up past the oldest command shows an empty line and stays there",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-console-history (id Quake code): Up past the oldest entry jumped to an empty slot and every further Up stayed empty until Down; the history position also survived closing and reopening the console. Up now stays on the oldest entry and each open or close starts from the newest; native raw-key test fails on the old code. Not yet packaged.",
+    "report": "bugs/CONSOLE-HISTORY-EMPTY-32.md"
+  },
+  {
+    "id": "FLAME-RANGE-NEAREST-32",
+    "title": "A hearth fire shows only up close when many candles are nearer",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, repaired in source (not yet in an image): the static flame budget (12) took the nearest flames in any direction; in the Census office 14 candles (10 behind the camera) were nearer than the hearth. Default now: flames on screen, ranked by size over distance; earlier rule kept as aw_static_flames_nearest 1; not a regression (same since v0.0.30-dev5)",
+    "report": "bugs/FLAME-RANGE-NEAREST-32.md"
+  },
+  {
+    "id": "BUILD-EXTRA-TOWN-OPTIN-32",
+    "title": "A default build leaves out the Vivec Arena preview that v0.0.32 ships",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: shipped towns marked shipped_since in config/towns.json (vivec_arena v0.0.32) are built by default (--no-extra-town / --only-core-towns debug opt-outs, --extra-town for towns not shipped); release feature extra-towns from the town table; v0.0.32 classes recorded; not shipped at the time of writing",
+    "report": "bugs/BUILD-EXTRA-TOWN-OPTIN-32.md"
+  },
+  {
+    "id": "TEST-PROFILE-SECTION-CPU-32",
+    "title": "The build profile section test fails on a loaded host (CPU time read in clock ticks)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-dev: test tolerance for os.times() tick resolution (two 0.05 s calls read 0.08 s under load); profiler unchanged; not shipped at the time of writing",
+    "report": "bugs/TEST-PROFILE-SECTION-CPU-32.md"
+  },
+  {
+    "id": "KEYS-AMIGA-EDIT-32",
+    "title": "Amiga Del arrived as F11; FS-UAE sent Home/End as keypad ( and Help",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.32-console-terminal: raw 0x46 is Delete; the FS-UAE presets send Home/End as 0x6A/0x6C, read as Home/End. FS-UAE Insert still arrives as 0x2B (Enter), documented. Not yet packaged.",
+    "report": "bugs/KEYS-AMIGA-EDIT-32.md"
+  },
+  {
+    "id": "BUILD-DRESSING-EXCLUDED-32",
+    "title": "The repository builder drops lantern hooks and other dressing in Seyda Neen maps without a receipt",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, repaired in source (not yet in an image): append_meshes skipped flora_/marker_/scum_/lantern_hook/furn_de_rope meshes unless retain_dressing; v0.0.32 lost 6 dressing pieces vs v0.0.31 (2 lantern hooks, 2 ferns, 2 grass in 3 Seyda interiors). Owner decision A: Seyda interiors keep dressing (markers out), --skip-dressing keeps the earlier rule, dressing-track.json lists placed pieces per map with heap; every omission receipted; entity tracker per-cell digests against the v0.0.31 release baseline (config/entity-baseline.json) by default",
+    "report": "bugs/BUILD-DRESSING-EXCLUDED-32.md"
+  },
+  {
+    "id": "CHIM-TEXTURE-SPECKS-33",
+    "title": "CHIM-drawn surfaces show bright single-texel specks that legacy frames do not",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: 38 bm028 textures differ by 1-92 texels from the closest CHIM texture; specks 5 legacy vs 333 CHIM (700 over 176 CHIM textures); survive fullbright, emissive off and no entities, grow with d_mipcap 3: in the data; likely a different quantization path",
+    "report": "bugs/CHIM-TEXTURE-SPECKS-33.md"
+  },
+  {
+    "id": "CHIM-ZONE-RING-THRASH-33",
+    "title": "Balmora's chunk ring does not fit the default 6 MiB CHIM zone, so the cache thrashes",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: one FS-UAE session, 15,259 evictions, 61 MB in 30,215 reads and 3,593 opens, 64 failed frame-world rebuilds (largest free 358 KB); options: pool before models, smaller ring, larger zone within budget",
+    "report": "bugs/CHIM-ZONE-RING-THRASH-33.md",
+    "tags": [
+      "performance"
+    ]
+  },
+  {
+    "id": "COLLISION-RCN-SCOPE-32",
+    "title": "Authored collision meshes (RootCollisionNode) are used by some converters only",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the collision census (docs/COLLISION_MESHES.md): the Seyda Neen exterior (86 models, 376 placements) and every non-i/ model in converted rooms (Balmora 94/1,138, Seyda 62/416) collide with their visual mesh.",
+    "report": "bugs/COLLISION-RCN-SCOPE-32.md"
+  },
+  {
+    "id": "COLLISION-NC-FLAGS-32",
+    "title": "Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the collision census (docs/COLLISION_MESHES.md): banners, tapestries, rugs, hooks, candles, room flora, Vivec banners and waterfalls are solid; Morrowind lets the player pass.",
+    "report": "bugs/COLLISION-NC-FLAGS-32.md"
   }
 ]

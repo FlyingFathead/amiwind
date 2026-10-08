@@ -364,20 +364,34 @@ int Q_atoi (char *str)
 }
 
 
+/*
+Q_atof: Quake's text to float, also used for entity fields, scene text and
+console arguments instead of the C library atof: its strtod code executes
+68040-unimplemented FPU instructions (ENGINE-FPSP-MISSING-31). Leading
+white space and a plus sign are accepted, hexadecimal and 'c' character
+forms are Quake's; decimals (with an optional exponent) go through
+Q_strtod (aw_format.c), which scales the integer digits once by an exact
+power of ten instead of dividing by ten per digit.
+*/
 float Q_atof (char *str)
 {
 	double			val;
 	int             sign;
 	int             c;
-	int             decimal, total;
 
+	while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r')
+		str++;
 	if (*str == '-')
 	{
 		sign = -1;
 		str++;
 	}
 	else
+	{
 		sign = 1;
+		if (*str == '+')
+			str++;
+	}
 
 	val = 0;
 
@@ -412,29 +426,9 @@ float Q_atof (char *str)
 //
 // assume decimal
 //
-	decimal = -1;
-	total = 0;
-	while (1)
-	{
-		c = *str++;
-		if (c == '.')
-		{
-			decimal = total;
-			continue;
-		}
-		if (c <'0' || c > '9')
-			break;
-		val = val*10 + c - '0';
-		total++;
-	}
-
-	if (decimal == -1)
-		return val*sign;
-	while (total > decimal)
-	{
-		val /= 10;
-		total--;
-	}
+	if ((str[0] < '0' || str[0] > '9') && str[0] != '.')
+		return 0;
+	val = Q_strtod (str, NULL);
 
 	return val*sign;
 }

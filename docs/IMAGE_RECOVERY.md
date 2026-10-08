@@ -112,8 +112,8 @@ failure report, the diagnostic option is:
 
 Use the report produced by the current failed image, not a historical report
 with a matching count. The checker reruns normally. Zero findings pass normally.
-Otherwise the complete report, tolerance, identities, measured contacts and
-all recorded BSP/model hashes must match exactly. A changed/new/missing failure
+Otherwise the report, tolerance, identities and measured contacts must match
+exactly (recorded BSP/model hashes as described below). A changed/new/missing failure
 or payload fails. Invalid classification, corrupt model or missing-owner errors
 cannot be accepted through this option. The source audit report remains failed
 and is never overwritten by the new report.
@@ -124,9 +124,16 @@ record `owner-accepted-known-findings`, the report hashes, unresolved count and
 build footer and summary JSON explicitly identify private-test-only acceptance.
 This does not repair floating NPCs or satisfy the production placement gate.
 
-On new full builds, the early comparison excludes only not-yet-built `vfNNNN`
-terrain hashes; final image acceptance checks all hashes. Never change the
-baseline merely to get past an unexpected difference: inspect the new report.
+On new full builds one approved report serves both checks, so one image pass
+suffices. The early actor-contact check compares everything except the
+not-yet-built `vfNNNN` terrain hashes. The image step compares the findings:
+every row (map, reference, pose samples, gaps, support), every error and the
+counts must equal the approved report; payload hashes are not compared there,
+because image assembly rewrites map and model bytes and world maps were never
+part of the approved findings. Any new, changed or missing finding, or a new
+grounded actor, refuses the waiver. Release candidates and final versions refuse
+the option. Never change the baseline merely to get past an unexpected
+difference: inspect the new report.
 Keep the old run and reports if any later gate fails. No terrain conversion is
 required for another image recovery attempt.
 

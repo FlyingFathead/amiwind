@@ -33,13 +33,31 @@ Every original placement that is not placed gets exactly one reason:
 
 ## In the build
 
-The image build writes `entity-tracker.json` (counts, categories and cell
-names only, no game data) for the final maps, prints the summary, and records
-the report's hash in `build.json`. Given the previous build's report
-(`--entity-baseline`), a category that drops to zero, or loses more than 5 %
-of its placements (and at least 10), stops the build before any disk is made,
-unless the loss is intended and explained with `--accept-entity-loss REASON`,
-which is recorded.
+The image build writes `entity-tracker.json` for the final maps, prints the
+summary, and records the report's hash in `build.json`. The report has counts
+per category and per cell, and per cell and category a SHA-256 of the sorted
+placed reference numbers (`placed_digests`); the build's own copy also lists
+the numbers (`placed_refs`), so it can name what is missing. The build report
+stays beside the image and is never shipped.
+
+Against a baseline (`--entity-baseline`), the image step stops before any disk
+is made when a category drops to zero or loses more than 5 % of its placements
+(and at least 10), and, with the same master, when any cell and category has
+fewer placements than the baseline, or the same number of other placements: one
+missing lantern hook is enough (BUILD-DRESSING-EXCLUDED-32). An intended loss
+passes with `--accept-entity-loss REASON`, which is recorded.
+
+`tools/build.py` compares with the last release by default:
+`config/entity-baseline.json`, made from the release's maps with
+`entity_tracker.py baseline` (counts and digests only, no reference numbers).
+`--no-entity-baseline` turns the comparison off for debugging only. Each
+release replaces the baseline with its own.
+
+The image step also writes `dressing-track.json` (private, beside the image):
+every interior placement of dressing (lantern hooks, ropes, ferns and similar,
+`prepare_mesh_bsp.DRESSING_EXCLUDED`) per map, with each map's modelled heap
+estimate. The Seyda Neen interiors keep their dressing by default;
+`--skip-dressing` restores the earlier rule (BUILD-DRESSING-EXCLUDED-32).
 
 Run it on its own:
 
@@ -48,4 +66,5 @@ python3 tools/entity_tracker.py report --master /path/to/Morrowind.esm \
     --maps build/boot/id1/maps --out entity-tracker.json \
     --previous previous/entity-tracker.json
 python3 tools/entity_tracker.py compare old.json new.json
+python3 tools/entity_tracker.py baseline release-entity-tracker.json     --release v0.0.31 --out config/entity-baseline.json
 ```

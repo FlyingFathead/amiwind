@@ -87,11 +87,14 @@ From the repository root, run:
 ```
 
 Compilation and conversion default to a shared worker budget based on available
-CPUs, affinity and Linux container quotas. `-j 4`, `--jobs 4` and `--j 4` set the
-budget. `--single-thread` or `-j 1` runs the serial path. Independent engine, music
+CPUs, affinity, Linux container quotas and memory. `-j 4`, `--jobs 4` and `--j 4` set the
+budget exactly: every stage, including the final image step, gets those workers,
+never fewer because of the CPU count. A value above the usable CPU threads runs
+as requested with one warning. `--single-thread` or `-j 1` runs the serial path. Independent engine, music
 and dialogue stages can overlap the ordered scene pipeline. Scenery decoding,
 scene previews and BSP model preparation use separate processes; shared files
-are assembled in deterministic input order. Census VIS/LIGHT use the same limit.
+are assembled in deterministic input order. Census VIS uses the same limit; map
+lighting runs one thread per map so its output is reproducible.
 FFmpeg and numerical-library threads are bounded to avoid nested oversubscription.
 The pinned QBSP and final BSP/HDF assembly remain serial. See
 [parallel build details and verification](PARALLEL_BUILD.md).
@@ -274,7 +277,8 @@ This produces verified terrain packets, not an Amiga executable or HDF.
 Use the generated RDB HDF with the [documented emulator settings](WINUAE.md).
 Provide a suitable licensed Kickstart ROM, available through
 [Cloanto / Amiga Forever](https://www.amigaforever.com/). No ROM or Workbench
-files are copied into the image. A ROM is needed to boot in an emulator, not
+files are copied into the image, except an FPU support library you select
+yourself with `--amiga-libs` ([FPU support library](FPU_SUPPORT_LIBRARY.md)). A ROM is needed to boot in an emulator, not
 to compile the source. The experimental AGA runtime requires Kickstart 3.x;
 the preserved A500 branch has separate Kickstart 1.3 instructions.
 
@@ -344,7 +348,7 @@ converted from: `--balmora-scenery` (Balmora cache `scenery/`, default
 `--balmora-cache`/scenery), `--town-scenery` (Seyda Neen `prepare_scenery.py`
 output, default the directory of `--town-flora-source-index`), the scene's
 `opening-barrel-source` and the `--world-flora` overlay. The guided build
-passes the first two. A source that was not given is skipped and listed in
+passes all of them (`--world-flora` unless `--no-tree-sprites`). A source that was not given is skipped and listed in
 `image/night-lighting/night-lighting.json` and in `build.json`
 (`night_lighting`, status `partial`); a town without its own scenery gets no
 window line, so its glass stays dark instead of being guessed. Each table is
@@ -387,3 +391,47 @@ models, dialogue or other gameplay dependencies, or be advertised as a complete
 content profile. Normal builds include the NPC gallery for debugging and
 regression inspection. This requirement does not claim that every original
 world NPC has already been converted or placed by the current demake.**
+
+## World flora default
+
+Normal AGA builds make the world flora: the original trees, grass and reeds as
+sprites with collision (`world-flora-assets` and `world-flora` stages, then the
+image's `--world-flora` overlay for the world and both towns). Every release
+since v0.0.28 ships them. `--no-tree-sprites` leaves them out for debugging
+only: the builder prints a warning, `build-state.json` and `build-summary.json`
+record `world_flora` as `disabled by --no-tree-sprites`, and the image does not
+match a release. Maps that place flora (such as Seyda Neen maps reused from a
+release) then stop the image step with "World flora was not built".
+`--tree-sprites`, the old opt-in, is still accepted and has no effect. The
+measured Balmora layout repair (`--balmora-cache`) runs in every AGA build,
+with or without flora. Asset-free `--dry-run` and `--stage terrain` builds make
+no flora. `tests/test_build_defaults.py` fails if a feature the release ships
+leaves the default build.
+
+## Harvestable mushrooms default
+
+Normal AGA builds make the harvestable mushrooms (shipped since v0.0.29): the
+`harvest` stage (`tools/harvest_build.py prepare`) converts every exterior
+small-mushroom model once into a shared model, against the palette the image
+ends with, and records every original placement. The image step (`--harvest`)
+then works on the maps it ships: it removes mushrooms a converter baked into a
+map (Balmora) where a harvestable one goes, writes one catalogue per map that
+covers plants (world maps from `world/regions.awr`, the Seyda Neen and Balmora
+sub-cells from their region tables, the intro docks), runs the geometry gate on
+the final maps and admits a map only when the repository heap check passes
+with its catalogue. Details: [EXTERNAL_HARVEST_MODELS.md](EXTERNAL_HARVEST_MODELS.md#builder-step).
+`--no-harvest` leaves them out for debugging only (a warning; `build-state.json`
+records `harvest` as `disabled by --no-harvest`; mushrooms stay baked and
+cannot be picked), and the image does not match a release.
+
+## Shipped towns default
+
+Normal AGA builds import every town after Seyda Neen and Balmora that a release
+ships: the rows of `config/towns.json` with `shipped_since` (the Vivec Arena
+preview since v0.0.32), one `town-<id>` stage each, right after Balmora's
+interiors. `--extra-town <id>` adds a town that is not shipped yet; naming a
+shipped town there has no effect. `--no-extra-town <id>` (a shipped town) and
+`--only-core-towns` (Seyda Neen and Balmora only) leave towns out for debugging
+only: the builder prints a warning, `build-state.json` records the selection in
+`extra_town_selection`, and the image does not match a release. Contradictory
+town options stop the build before any work. Details: [TOWN_IMPORT.md](TOWN_IMPORT.md).

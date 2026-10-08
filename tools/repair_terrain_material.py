@@ -11,7 +11,7 @@ from player_hull import lumps, pack_lumps
 def repair(raw, bounds, source, target):
     data=lumps(raw);vertices=list(struct.iter_unpack('<3f',data[3]))
     edges=list(struct.iter_unpack('<2H',data[12]));surfedges=[v[0] for v in struct.iter_unpack('<i',data[13])]
-    info=list(struct.iter_unpack('<8f2i',data[6]));faces=list(struct.iter_unpack('<Hhihh4Bi',data[7]))
+    info=list(struct.iter_unpack('<8f2i',data[6]));faces=list(struct.iter_unpack('<HhihH4Bi',data[7]))
     planes=list(struct.iter_unpack('<4fi',data[1]));textures={}
     for i in range(struct.unpack_from('<i',data[2])[0]):
         at=struct.unpack_from('<i',data[2],4+i*4)[0]
@@ -34,7 +34,7 @@ def repair(raw, bounds, source, target):
         faces[i]=(*f[:4],copies[f[4]],*f[5:]);changed+=1
     if not changed:return raw,0
     data[6]=b''.join(struct.pack('<8f2i',*v) for v in info)
-    data[7]=b''.join(struct.pack('<Hhihh4Bi',*v) for v in faces)
+    data[7]=b''.join(struct.pack('<HhihH4Bi',*v) for v in faces)
     return pack_lumps(data),changed
 
 

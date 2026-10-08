@@ -48,7 +48,7 @@ def polygon_samples(raw):
         if length < 0 or offset < 0 or offset + length > len(raw) or (length and offset < 124):
             raise ValueError('Invalid BSP lump bounds')
         lumps.append(raw[offset:offset+length])
-    formats = {3:'<3f', 7:'<Hhihh4Bi', 12:'<HH', 13:'<i', 14:'<9f7i'}
+    formats = {3:'<3f', 7:'<HhihH4Bi', 12:'<HH', 13:'<i', 14:'<9f7i'}
     try:
         rows = {i:list(struct.iter_unpack(fmt, lumps[i])) for i,fmt in formats.items()}
     except struct.error as exc:

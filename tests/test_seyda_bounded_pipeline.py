@@ -38,6 +38,9 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'policy'):validate_layout(bad)
 
     def test_normal_converter_builds_all_worlds_before_aliasing_source(self):
+        self.run_convert(1)
+
+    def run_convert(self, jobs):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);maps=root/'id1/maps';maps.mkdir(parents=True)
             raw=repeated_geometry();source=maps/'seyda.bsp';source.write_bytes(raw)
@@ -57,7 +60,7 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
                  patch('canonical_land_reference.CanonicalLand'), \
                  patch('cull_bsp_terrain.cull_bsp',side_effect=lambda raw,policy,**kw:(raw,{'policy':policy,'unchanged':True,'fixture':True})), \
                  patch('subprocess.run',side_effect=AssertionError('No compiler allowed in source test')):
-                report=convert(source,maps,source_map=land,palette=palette,ericw_bin=root/'unused',
+                report=convert(source,maps,source_map=land,palette=palette,ericw_bin=root/'unused',jobs=jobs,
                                canonical_land_source=root/'synthetic-land.npz',terrain_cull_config={'default':True,'overlap':.5,
                                   'cells':{'Seyda Neen':{'overlap':1.}},
                                   'subcells':{'sn000':{'enabled':False}},
@@ -68,13 +71,30 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
             self.assertEqual(first['bounded']['terrain_visual_cull']['policy']['overlap'],1.)
             self.assertEqual(second['bounded']['terrain_visual_cull']['policy']['overlap'],0.)
             self.assertEqual(second['bounded']['terrain_visual_cull']['policy']['overlap_provenance'],'bsps')
-            self.assertEqual([name for name,_,_ in calls[:64]],[f'sn{i:03d}' for i in range(64)])
-            self.assertEqual([name for name,_,_ in calls[64:]],['intro_docks','sncourt'])
+            if jobs==1:  # serial call order; parallel order is free, results are not
+                self.assertEqual([name for name,_,_ in calls[:64]],[f'sn{i:03d}' for i in range(64)])
+                self.assertEqual([name for name,_,_ in calls[64:]],['intro_docks','sncourt'])
             self.assertEqual(len(list(maps.glob('*.bsp'))),67)
             self.assertEqual(source.read_bytes(),(maps/'sn029.bsp').read_bytes())
             self.assertEqual(Path(report['complete_source_preserved']).read_bytes(),raw)
             self.assertEqual(report['regular_regions'],64)
             self.assertEqual((maps.parent/'seyda-regions.txt').read_text(),directory_text(regions()))
+            report=json.loads(json.dumps(report).replace(str(root),'<root>'))
+            return report,{p.name:p.read_bytes() for p in sorted(maps.glob('*.bsp'))},sorted(calls)
+
+    def test_regions_compile_in_the_pool_with_serial_results(self):
+        # BUILD-IMAGE-SERIAL-32: regions run side by side in the shared pool
+        # (thread pool stand-in here, so the mocked builder applies).
+        from concurrent.futures import ThreadPoolExecutor
+        import build_parallel
+        sizes=[]
+        def pool(count):
+            sizes.append(count);return ThreadPoolExecutor(max_workers=count)
+        serial=self.run_convert(1)
+        with patch.object(build_parallel,'process_pool',side_effect=pool):
+            parallel=self.run_convert(5)
+        self.assertEqual(sizes,[5])
+        self.assertEqual(serial,parallel)
 
     def test_generation_failure_leaves_existing_runtime_map_untouched(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -82,7 +102,8 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
             source=maps/'seyda.bsp';raw=repeated_geometry();source.write_bytes(raw)
             with patch('prepare_bounded_world.build_candidate',side_effect=ValueError('terrain failure')):
                 with self.assertRaisesRegex(ValueError,'terrain failure'):
-                    convert(source,maps,source_map=root/'source.map',palette=root/'palette',ericw_bin=root/'unused',terrain_visual_cull=False)
+                    convert(source,maps,source_map=root/'source.map',palette=root/'palette',ericw_bin=root/'unused',terrain_visual_cull=False,
+                            jobs=1)
             self.assertEqual(source.read_bytes(),raw)
             self.assertEqual([p.name for p in maps.glob('*.bsp')],['seyda.bsp'])
 

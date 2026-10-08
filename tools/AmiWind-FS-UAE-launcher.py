@@ -39,6 +39,8 @@ PROFILE_VALUES = {
     'middle_click_ungrab': '0',
     'keyboard_key_pageup': 'action_key_68',
     'keyboard_key_pagedown': 'action_key_69',
+    'keyboard_key_home': 'action_key_6a',
+    'keyboard_key_end': 'action_key_6c',
     'floppy_drive_volume': '0',
 }
 PROFILE_LABELS = (

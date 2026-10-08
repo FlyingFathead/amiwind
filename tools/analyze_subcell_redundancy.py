@@ -27,7 +27,7 @@ import numpy as np
 LUMP_ENTITIES, LUMP_VERTEXES, LUMP_FACES = 0, 3, 7
 LUMP_EDGES, LUMP_SURFEDGES, LUMP_MODELS = 12, 13, 14
 FACE = np.dtype([('plane', '<u2'), ('side', '<i2'), ('firstedge', '<i4'), ('numedges', '<i2'),
-                 ('texinfo', '<i2'), ('styles', 'u1', 4), ('lightofs', '<i4')])
+                 ('texinfo', '<u2'), ('styles', 'u1', 4), ('lightofs', '<i4')])
 MODEL = np.dtype([('mins', '<f4', 3), ('maxs', '<f4', 3), ('origin', '<f4', 3), ('headnode', '<i4', 4),
                   ('visleafs', '<i4'), ('firstface', '<i4'), ('numfaces', '<i4')])
 

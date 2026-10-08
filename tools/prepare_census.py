@@ -16,15 +16,16 @@ from mwad.paths import resolve_data_files, child_ci, ensure_external
 from mwad.interior import read_interior, select_geometry
 from mwad.npc import load_master, text
 from prepare_scenery import export_refs
-from prepare_mesh_bsp import append_meshes
+from prepare_mesh_bsp import add_dressing_option, append_meshes, apply_dressing_option, interior_dressing
 from prepare_quake import box, wad, miptex
 from prepare_npcs import quote
 from player_hull import lumps, pack_lumps, rebuild_world_hull
 from prepare_doors import prepare as prepare_doors
 from build_jobs import add_jobs, resolve_jobs
+from vis_options import add_vis_option, light_args, vis_args
 
 
-def prepare(data_files, scene, qbsp, vis, light, jobs=None):
+def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'census conversion')
     from ui_palette import reserve
     reserve(data_files,scene/'id1')
@@ -65,10 +66,11 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None):
     source='{\n"classname" "worldspawn"\n"wad" "census.wad"\n"message" "Census and Excise Office"\n'+timings+'\n'+'\n'.join(walls)+'\n}\n'
     source+='{\n"classname" "info_player_start"\n"origin" "'+' '.join(map(str,spawn))+'"\n"angle" "'+str(heading)+'"\n}\n'
     (scene/'census.map').write_text(source)
-    for exe,args in [(qbsp,['-nopercent','census.map']),(vis,['-threads',str(resolve_jobs(jobs)),'-fast','census.bsp']),(light,['-threads',str(resolve_jobs(jobs)),'-minlight','24','census.bsp'])]:
+    for exe,args in [(qbsp,['-nopercent','census.map']),(vis,vis_args('census.bsp',resolve_jobs(jobs),vis_mode)),(light,light_args('-minlight','24','census.bsp'))]:
         subprocess.run([str(Path(exe).resolve()),*args],cwd=scene,check=True)
     base=scene/'census-base.bsp';(scene/'census.bsp').rename(base);rebuild_world_hull(base,scene/'census.map',qbsp)
-    report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs)
+    report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs,
+                         retain_dressing=interior_dressing())
     kinds,_,_=load_master(child_ci(data_files,'Morrowind.esm'));entities=[]
     for identifier,stem,role in [('chargen class','census',6),('chargen captain','captain',7),('chargen door guard','hall',8)]:
         ref=next(r for r in cell['refs'] if r['id'].casefold()==identifier and not r.get('deleted'))
@@ -81,7 +83,7 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None):
     b=lumps((scene/'census.bsp').read_bytes());b[0]=b[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
     target.write_bytes(pack_lumps(b));shutil.copyfile(target,scene/'census.bsp')
     prepare_doors(data_files,scene)
-    report.update(cell=cell['name'],master_sha256=cell['master_sha256'],omitted=omitted,spawn=spawn)
+    report.update(cell=cell['name'],master_sha256=cell['master_sha256'],omitted=omitted+report['omitted'],spawn=spawn)
     (scene/'census-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
@@ -89,4 +91,6 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','qbsp','vis','light'):p.add_argument('--'+n,type=Path,required=True)
-    add_jobs(p);a=p.parse_args();prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.jobs)
+    add_jobs(p);add_vis_option(p);add_dressing_option(p);a=p.parse_args();apply_dressing_option(a)
+    import build_profile;build_profile.instrument('census')
+    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.jobs,a.vis_mode)

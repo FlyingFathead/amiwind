@@ -50,6 +50,20 @@ typedef struct aw_efrag_page_s {
 static aw_efrag_page_t *aw_efrag_pages;
 int aw_efrags_capacity = MAX_EFRAGS;
 
+/* Quake drops an entity silently when cl_visedicts is full (MAX_VISEDICTS).
+ * Count every drop (in total and since the frame's list was reset) and say so
+ * once per map, so a dense view cannot lose objects unnoticed. */
+int aw_visedicts_dropped, aw_visedicts_dropped_frame;
+static int aw_visedicts_warned;
+void AW_VisedictDropped(void)
+{
+    aw_visedicts_dropped++;
+    aw_visedicts_dropped_frame++;
+    if (aw_visedicts_warned) return;
+    aw_visedicts_warned = 1;
+    Con_Printf("WARNING: visible entity limit (%d) reached; some objects are not drawn.\n", MAX_VISEDICTS);
+}
+
 static void R_ResetEfragBlock(efrag_t *links, int count, qboolean reuse)
 {
     int i;
@@ -71,6 +85,7 @@ void R_ClearEfrags(qboolean release_pages)
     r_addent = NULL;
     r_pefragtopnode = NULL;
     aw_efrags_used = 0;
+    aw_visedicts_warned = 0;
     aw_efrags_capacity = MAX_EFRAGS;
     R_ResetEfragBlock(cl_efrags, MAX_EFRAGS, true);
     for (page=aw_efrag_pages; page; page=page->next) {
@@ -315,12 +330,14 @@ void R_StoreEfrags (efrag_t **ppefrag)
 		case mod_sprite:
 			pent = pefrag->entity;
 
-			if ((pent->visframe != r_framecount) &&
-				(cl_numvisedicts < MAX_VISEDICTS))
+			if (pent->visframe != r_framecount)
 			{
-				cl_visedicts[cl_numvisedicts++] = pent;
+				if (cl_numvisedicts < MAX_VISEDICTS)
+					cl_visedicts[cl_numvisedicts++] = pent;
+				else
+					AW_VisedictDropped ();
 
-			// mark that we've recorded this entity for this frame
+			// mark that we've recorded (or counted) this entity for this frame
 				pent->visframe = r_framecount;
 			}
 

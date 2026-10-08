@@ -388,8 +388,8 @@ void R_DrawSprite (void)
 	// that plane around the center according to the sprite entity's roll
 	// angle. So vpn stays the same, but vright and vup rotate
 		angle = currententity->angles[ROLL] * (M_PI*2 / 360);
-		sr = sin(angle);
-		cr = cos(angle);
+		sr = Q_SinRad(angle);
+		cr = Q_CosRad(angle);
 
 		for (i=0 ; i<3 ; i++)
 		{

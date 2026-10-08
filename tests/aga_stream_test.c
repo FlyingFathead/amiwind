@@ -4,6 +4,8 @@
 quakeparms_t host_parms;
 size_t (*aw_load_prefetch_copy)(const char *,long,byte *,size_t);
 double (*aw_load_clock)(void);
+int (*aw_load_hunk_used)(void);
+int hunk_low_used,hunk_high_used;
 long aw_load_disk_bytes,aw_load_disk_calls;
 double aw_load_disk_seconds,aw_load_decode_seconds;
 static cvar_t *choice,*buffer,*ahead;static cache_user_t *allocated;static int opened,freed,low;
@@ -30,6 +32,7 @@ int COM_FOpenFile(char *name,FILE **f){
 int main(void){
     byte out[9000];int i;
     host_parms.memsize=11*1024*1024;AW_StreamInit();
+    hunk_low_used=4096;hunk_high_used=512;assert(aw_load_hunk_used && aw_load_hunk_used()==4608);
     AW_StreamTick("maps/bm001.bsp");assert(!opened); /* method 1 untouched */
     choice->value=2;AW_StreamTick("maps/bm001.bsp");assert(opened==1);
     assert(aw_load_prefetch_copy("maps/bm001.bsp",0,out,sizeof(out))==8192);

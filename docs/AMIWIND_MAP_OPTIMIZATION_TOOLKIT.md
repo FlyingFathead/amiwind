@@ -217,6 +217,14 @@ policies or terrain cutting. The current closed-convex-shell proof removes zero
 house-interior faces in the measured candidate; general assembled-world exterior
 visibility remains unfinished. See [the detailed status](EXTERIOR_HIDDEN_SURFACES.md).
 
+Two mesh-converter options are off by default until accepted:
+`--texinfo-snap TEXELS` shares texture mappings within TEXELS of the shipped
+texture (measured 1/16: texinfo -33 to -51 %, modelled heap -0.45 to -1.06 MB
+on dense exterior regions) and `--scenery-reduce ERROR` simplifies scenery
+visual meshes with locked UV seams (measured: under 1.1 % of faces). Both are
+accepted by `build.py` and the region converters and recorded in the build
+receipt. See [Mesh tips](MESH_TIPS_AND_TRICKS.md#texture-mapping-snapping-and-scenery-reduction-2026-10-08).
+
 Exact plane-table deduplication is implemented separately by
 `tools/dedup_bsp_planes.py`: it remaps faces, nodes and collision nodes while
 preserving complete resolved plane records. Candidate 023 demonstrates a real

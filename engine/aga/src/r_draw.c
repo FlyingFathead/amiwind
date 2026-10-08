@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "d_local.h"	// FIXME: shouldn't need to include this
+#include "aw_rcount.h"
 
 #define MAXLEFTCLIPEDGES		100
 
@@ -93,6 +94,7 @@ void R_EmitEdge (mvertex_t *pv0, mvertex_t *pv1)
 	float	scale, lzi0, u0, v0;
 	int		side;
 
+	AW_RC(RC_EDGES_NEW);
 	if (r_lastvertvalid)
 	{
 		u0 = r_u1;
@@ -380,6 +382,7 @@ void R_EmitCachedEdge (unsigned int cached_offset)
 {
 	edge_t		*pedge_t;
 
+	AW_RC(RC_EDGES_CACHED);
 	pedge_t = (edge_t *)((unsigned long)r_edges + cached_offset);
 
 	if (!pedge_t->surfs[0])

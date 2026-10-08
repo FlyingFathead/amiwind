@@ -9,14 +9,16 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import ensure_external,resolve_data_files,child_ci
 from mwad.interior import read_interior,select_geometry
 from prepare_scenery import export_refs
-from prepare_mesh_bsp import append_meshes
+from prepare_mesh_bsp import add_dressing_option, append_meshes, apply_dressing_option, interior_dressing
 from prepare_quake import box,wad,miptex,CENTRE,SCALE
 from player_hull import rebuild_world_hull,lumps,pack_lumps
 
 
 from build_jobs import add_jobs, resolve_jobs
+from vis_options import add_vis_option, light_args, VIS_MODES
 
-def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
+def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
+    if vis_mode not in VIS_MODES:raise ValueError('Unknown vis mode')
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'exterior scene');out=ensure_external(out,'interior bundle')
     if out.exists():raise ValueError('Choose a new interior output')
     cell=read_interior(child_ci(data_files,'Morrowind.esm'),'Imperial Prison Ship')
@@ -59,10 +61,11 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
     text='{\n"classname" "worldspawn"\n"wad" "prison.wad"\n"message" "AmiWind / Prison Ship"\n'+timings+'\n'+'\n'.join(walls)+'\n}\n'
     text+='{\n"classname" "info_player_start"\n"origin" "0 -35 -4"\n"angle" "90"\n}\n'
     (out/'prison.map').write_text(text)
-    for exe,args in [(qbsp,['-nopercent','prison.map']),(vis,['-fast','prison.bsp']),(light,['-minlight','24','prison.bsp'])]:
-        subprocess.run([str(Path(exe).resolve()),*(['-threads',str(resolve_jobs(jobs))] if exe!=qbsp else []),*args],cwd=out,check=True)
+    for exe,args in [(qbsp,['-nopercent','prison.map']),(vis,['-fast','prison.bsp'] if vis_mode=='fast' else ['prison.bsp']),(light,light_args('-minlight','24','prison.bsp'))]:
+        subprocess.run([str(Path(exe).resolve()),*(['-threads',str(resolve_jobs(jobs))] if exe==vis else []),*args],cwd=out,check=True)
     base=out/'prison-base.bsp';(out/'prison.bsp').rename(base);rebuild_world_hull(base,out/'prison.map',qbsp)
-    report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs)
+    report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs,
+                         retain_dressing=interior_dressing())
     from collision_index import index_model_collision
     report['collision_index'] = index_model_collision(out/'prison.bsp', shell['number'])
     indexed = lumps((out/'prison.bsp').read_bytes())
@@ -80,7 +83,7 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
     (out/'id1/scene-links.txt').write_text(''.join(f"{r['source']} {r['target']} "+' '.join(f'{x:.5f}' for x in [*r['point'],*r['arrival'],r['yaw']])+'\n' for r in links))
     from prepare_doors import prepare as prepare_doors
     prepare_doors(data_files,out)
-    report.update({'cell':cell['name'],'master_sha256':cell['master_sha256'],'omitted':omitted,'lighting':lighting,'links':links,'spawn':spawn,
+    report.update({'cell':cell['name'],'master_sha256':cell['master_sha256'],'omitted':omitted+report['omitted'],'lighting':lighting,'links':links,'spawn':spawn,
                    'notes':'static furnishing/lighting preview; no items, inventory, NPCs or opening scripts; no shadows/flicker in this bake'})
     (out/'interior-report.json').write_text(json.dumps(report,indent=2)+'\n')
     ready=json.loads((out/'scene-ready.json').read_text());ready['interior']='prison';(out/'scene-ready.json').write_text(json.dumps(ready,indent=2)+'\n')
@@ -89,5 +92,5 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','out','qbsp','vis','light'):p.add_argument('--'+n,type=Path,required=True)
-    add_jobs(p);a=p.parse_args()
-    print(json.dumps(prepare(a.data_files,a.scene,a.out,a.qbsp,a.vis,a.light,a.jobs),indent=2))
+    add_jobs(p);add_vis_option(p);add_dressing_option(p);a=p.parse_args();apply_dressing_option(a)
+    print(json.dumps(prepare(a.data_files,a.scene,a.out,a.qbsp,a.vis,a.light,a.jobs,a.vis_mode),indent=2))

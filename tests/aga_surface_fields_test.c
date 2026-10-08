@@ -10,6 +10,7 @@ static short little_short(short n){return n;}
 static float little_float(float n){return n;}
 int (*LittleLong)(int)=little_long;
 short (*LittleShort)(short)=little_short;
+qboolean aw_loading_music=false; /* referenced by the streamed BSP reader */
 float (*LittleFloat)(float)=little_float;
 void Sys_Error(char *format,...){if(expect_failure)longjmp(failure,1);fprintf(stderr,"%s\n",format);abort();}
 void *Hunk_AllocName(int size,char *name){void *p=arena+used;size=(size+15)&~15;assert(used+size<(int)sizeof(arena));used+=size;memset(p,0,size);return p;}

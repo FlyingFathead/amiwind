@@ -19,7 +19,7 @@ class TorchLightDistanceTests(unittest.TestCase):
             command = ['cc', '-std=gnu89', '-fsanitize=undefined,float-cast-overflow',
                        '-fno-sanitize-recover=all', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', '-I'+str(SOURCE), str(ROOT/'tests'/name),
-                       *[str(SOURCE/source) for source in sources], '-lm', '-o', str(executable)]
+                       *[str(SOURCE/source) for source in (*sources, 'aw_format.c')], '-lm', '-o', str(executable)]
             compiled = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stdout+compiled.stderr)
             result = subprocess.run([str(executable)], capture_output=True, text=True)

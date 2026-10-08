@@ -19,6 +19,7 @@ from prepare_quake import box, wad
 from player_hull import lumps, rebuild_world_hull
 from replace_bsp_world import replace_world, texture_blobs, verify_collision, rows
 from compact_bsp import compact
+from vis_options import light_args, vis_args
 from prepare_seyda_regions import select
 from deduplicate_bsp import deduplicate
 from check_world_map_heap import compile_target_sizes, estimate_bsp
@@ -197,7 +198,7 @@ def certified_sea_extent(text, sky_top):
 
 
 def build_candidate(source_map, texture_bsp, source_bsp, palette, coverage, out_dir,
-                    ericw_bin, target_sizes, *, core=None, threads=1):
+                    ericw_bin, target_sizes, *, core=None, threads=1, vis_mode='fast'):
     """Return report; estimate when supplied ABI sizes, otherwise require the final build gate.
 
     Source BSP should be the full town when evaluating different cores, so a
@@ -229,8 +230,8 @@ def build_candidate(source_map, texture_bsp, source_bsp, palette, coverage, out_
         path = binary/name
         return path if path.is_file() else binary/(name+'.exe')
     for name, args in [('qbsp', ['-nopercent', 'base.map']),
-                       ('vis', ['-fast', '-threads', str(threads), 'base.bsp']),
-                       ('light', ['-minlight', '100', '-threads', str(threads), 'base.bsp'])]:
+                       ('vis', vis_args('base.bsp', threads, vis_mode, fast_first=True)),
+                       ('light', light_args('-minlight', '100', 'base.bsp'))]:
         with (out/(name+'.log')).open('w', encoding='utf-8') as log:
             subprocess.run([str(executable(name)), *args], cwd=out,
                            stdout=log, stderr=subprocess.STDOUT, check=True)

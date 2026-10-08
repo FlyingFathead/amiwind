@@ -339,6 +339,12 @@ void Chase_Update (void);
 
 /* AmiWind standalone runtime modules, GPL-2.0-or-later. */
 void AW_ProfileFrame(void);
+void AW_FpuCountInit(void);
+void AW_FpuStatusInit(void);
+void AW_FpuStatusFormat(char *out, int size, unsigned attn, const char *library, int version, int revision);
+void AW_FpuStatusInit(void);
+void AW_FpuStatusFormat(char *out, int size, unsigned attn, const char *library, int version, int revision);
+void AW_FpuCountFrame(void);
 void AW_ProfileClose(void);
 void AW_Mark(int stage);
 void AW_EndMark(int stage);
@@ -392,6 +398,7 @@ void AW_SceneDraw(void);
 void AW_SceneSpawn(edict_t *p);
 void AW_SceneSignon(void);
 int AW_InteriorPlace(edict_t *p,vec3_t preferred);
+int AW_Unstuck(edict_t *p);
 void AW_SceneInit(void);
 void AW_DoorAudioInit(void);
 float AW_DoorSound(unsigned reference,int closing);
@@ -418,6 +425,9 @@ void AW_GuardTorchLoadAssets(const byte *torch);
 void AW_GuardTorchUpdate(void);
 void AW_GuardTorchDraw(void);
 void AW_StaticFlamesDraw(void);
+/* One placed static flame (aw_flame entity); shape: size, rise, spread (0 = legacy). */
+typedef struct {vec3_t origin;float scale,shape[3];} aw_static_flame_t;
+int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,int *chosen);
 void AW_EmberSpawn(const vec3_t org,float spread,float rise);
 entity_t *AW_GuardTorchEntity(entity_t *entity);
 void AW_TorchInit(void);
@@ -582,6 +592,7 @@ void AW_IntroDraw(void);
 void AW_WaitInit(void);
 void AW_WaitTick(void);
 int AW_DayGalleryClock(int actual_ms);
+int AW_DayNightFrozen(void);
 int AW_DayGalleryView(float *origin,float *angles);
 void V_RenderCameraView(void);
 int AW_WaitKey(int key);

@@ -161,10 +161,10 @@ void SetMinMaxSize (edict_t *e, float *min, float *max, qboolean rotate)
 
         a = angles[1]/180 * M_PI;
 
-        xvector[0] = cos(a);
-        xvector[1] = sin(a);
-        yvector[0] = -sin(a);
-        yvector[1] = cos(a);
+        xvector[0] = Q_CosRad(a);
+        xvector[1] = Q_SinRad(a);
+        yvector[0] = -Q_SinRad(a);
+        yvector[1] = Q_CosRad(a);
 
         VectorCopy (min, bounds[0]);
         VectorCopy (max, bounds[1]);
@@ -413,7 +413,7 @@ void PF_vectoyaw (void)
         yaw = 0;
     else
     {
-        yaw = (int) (atan2(value1[1], value1[0]) * 180 / M_PI);
+        yaw = (int) (Q_atan2(value1[1], value1[0]) * 180 / M_PI);
         if (yaw < 0)
             yaw += 360;
     }
@@ -447,12 +447,12 @@ void PF_vectoangles (void)
     }
     else
     {
-        yaw = (int) (atan2(value1[1], value1[0]) * 180 / M_PI);
+        yaw = (int) (Q_atan2(value1[1], value1[0]) * 180 / M_PI);
         if (yaw < 0)
             yaw += 360;
 
         forward = sqrt (value1[0]*value1[0] + value1[1]*value1[1]);
-        pitch = (int) (atan2(value1[2], forward) * 180 / M_PI);
+        pitch = (int) (Q_atan2(value1[2], forward) * 180 / M_PI);
         if (pitch < 0)
             pitch += 360;
     }
@@ -1167,8 +1167,8 @@ void PF_walkmove (void)
 
     yaw = yaw*M_PI*2 / 360;
 
-    move[0] = cos(yaw)*dist;
-    move[1] = sin(yaw)*dist;
+    move[0] = Q_CosRad(yaw)*dist;
+    move[1] = Q_SinRad(yaw)*dist;
     move[2] = 0;
 
 // save program state, because SV_movestep may call other progs
@@ -1826,12 +1826,12 @@ void PF_WaterMove (void)
 
 void PF_sin (void)
 {
-    G_FLOAT(OFS_RETURN) = sin(G_FLOAT(OFS_PARM0));
+    G_FLOAT(OFS_RETURN) = Q_SinRad(G_FLOAT(OFS_PARM0));
 }
 
 void PF_cos (void)
 {
-    G_FLOAT(OFS_RETURN) = cos(G_FLOAT(OFS_PARM0));
+    G_FLOAT(OFS_RETURN) = Q_CosRad(G_FLOAT(OFS_PARM0));
 }
 
 void PF_sqrt (void)

@@ -68,7 +68,7 @@ jobs:
         run: |
           python tools/release.py --check
           python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'
-          python -m unittest discover -s tests -v
+          python tools/run_tests.py -v --module-timeout 900
           python tools/build.py --install-dependencies --plan
       - name: Compile the engine and create a boot-notice image
         run: python tools/build.py --dry-run --tools-dir "$RUNNER_TEMP/amiwind-clean-tools" --name ci

@@ -105,6 +105,18 @@ class BugTrackerTest(unittest.TestCase):
             first = p.read_text(encoding='utf-8').splitlines()[0]
             self.assertTrue(first.startswith('# %s' % p.stem), 'report title must start with its ID: %s' % p.name)
 
+    def test_fixed_in_is_never_a_development_line(self):
+        # ENTITY-TRACKER-HARVEST-32 was once marked fixed in "v0.0.32-dev" (a branch): a fix only
+        # in source stays open until a numbered build ships it (docs/bugs/README.md).
+        self.assertEqual([b['id'] for b in bug_register.load()
+                          if any(b[k] and bug_register.DEV_LINE_RE.match(b[k]) for k in ('fixed_in', 'owner_accepted'))], [])
+        base = dict(id='TEST-DEV-32', title='t', state='fixed', fixed_in='v0.0.32-dev', owner_accepted=None,
+                    status='s', report=None)
+        self.assertTrue(bug_register.validate([base]))
+        self.assertTrue(bug_register.validate([dict(base, fixed_in='v0.0.31-dev2', owner_accepted='v0.0.32-dev')]))
+        self.assertEqual(bug_register.validate([dict(base, fixed_in='v0.0.31-dev2')]), [])
+        self.assertEqual(bug_register.validate([dict(base, fixed_in='v0.0.31')]), [])
+
     def test_tags_are_checked_and_listed(self):
         base = dict(id='TEST-TAG-31', title='t', state='open', fixed_in=None, owner_accepted=None,
                     status='s', report=None)

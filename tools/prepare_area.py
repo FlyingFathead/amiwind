@@ -24,9 +24,10 @@ from mwad.paths import resolve_data_files, child_ci, ensure_external
 from area_config import SCENES, inside
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
+from vis_options import add_vis_option, light_args, map_threads, vis_args
 from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl
 from prepare_scenery import export_refs
-from prepare_mesh_bsp import append_meshes
+from prepare_mesh_bsp import add_dressing_option, append_meshes, apply_dressing_option, interior_dressing
 from prepare_quake import box, wad, miptex, CENTRE, SCALE
 from prepare_npcs import quote, display_text
 from player_hull import lumps, pack_lumps, rebuild_world_hull
@@ -37,8 +38,27 @@ def entity(fields):
     return '{\n' + '\n'.join(quote(k)+' '+quote(v) for k,v in fields.items()) + '\n}'
 
 
+def interior_visual_profile(model, area=None):
+    """Visual/collision profile of one interior mesh ('meshes/...' path), or
+    None when the mesh keeps the assembly default. Shared with the world
+    estimate (tools/world_estimate_data.py) so both use the same rule."""
+    if not model.startswith('meshes/i/'):
+        return None
+    profile = {'ratio':1., 'texture_size':32,
+               'collision_source':'root_node_or_visual',
+               'hollow_collision':not ('rock' in model or 'boulder' in model)}
+    if area == 'balmora' and profile['hollow_collision']:
+        profile['exact_collision_bevels'] = True
+    return profile
+
+
 def build_room(task):
-    data, scene, entry, qbsp, vis, light, timings = task
+    data, scene, entry, qbsp, vis, light, timings = task[:7]
+    # Optional (vis threads, vis mode); older 7-field tasks keep -threads 1 -fast.
+    vis_threads, vis_mode = task[7:9] if len(task) > 7 else (1, 'fast')
+    # Optional 10th field: dressing kept by the Seyda Neen rooms (prepare below,
+    # interior_dressing); other callers keep the earlier skip rule (receipted).
+    dressing = task[9] if len(task) > 9 else False
     slug = entry['map']
     cell = read_interior(child_ci(data, 'Morrowind.esm'), entry['cell'],
                          include_interior_entrances=entry.get('original_door_arrivals', False))
@@ -49,12 +69,9 @@ def build_room(task):
     profiles = {}
     for ref in refs:
         model = 'meshes/'+ref['model'].replace('\\','/').lower()
-        if model.startswith('meshes/i/'):
-            profiles[model] = {'ratio':1., 'texture_size':32,
-                               'collision_source':'root_node_or_visual',
-                               'hollow_collision':not ('rock' in model or 'boulder' in model)}
-            if entry.get('area') == 'balmora' and profiles[model]['hollow_collision']:
-                profiles[model]['exact_collision_bevels'] = True
+        profile = interior_visual_profile(model, entry.get('area'))
+        if profile is not None:
+            profiles[model] = profile
     groups = {slug:{'references':[r['number'] for r in refs], 'visual_profiles':profiles}}
     refs = [dict(r, scene_groups=[slug]) for r in refs]
     lighting = {**cell['lighting'], 'lights':[dict(r['light'],position=r['position'])
@@ -94,18 +111,18 @@ def build_room(task):
     (root/'room.map').write_text(source,encoding='cp1252')
     with (root/'compile.log').open('w') as log:
         for exe,args in [(qbsp,['-nopercent','room.map']),
-                         (vis,['-threads','1','-fast','room.bsp']),
-                         (light,['-threads','1','-minlight','24','room.bsp'])]:
+                         (vis,vis_args('room.bsp',vis_threads,vis_mode)),
+                         (light,light_args('-minlight','24','room.bsp'))]:
             subprocess.run([str(Path(exe).resolve()),*args],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
     base=root/'base.bsp';(root/'room.bsp').rename(base)
     rebuild_world_hull(base,root/'room.map',qbsp)
     retain_selected=entry.get('area')=='balmora' or entry.get('retain_selected_geometry',False)
     report=append_meshes(base,root/'room.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=1,
                          references=[r['number'] for r in index['references']] if retain_selected else None,
-                         retain_dressing=retain_selected,
+                         retain_dressing=True if retain_selected else dressing,
                          map_identity='bmtemple' if slug=='bmtemple' else None)
     if report['unique_models']>220:raise ValueError(slug+': inline model budget exceeded')
-    report.update(map=slug,cell=cell['name'],spawn=spawn,yaw=yaw,omitted=omitted,
+    report.update(map=slug,cell=cell['name'],spawn=spawn,yaw=yaw,omitted=omitted+report['omitted'],
                   water_height=water,master_sha256=cell['master_sha256'])
     if entry.get('original_door_arrivals') or entry.get('harvest_references'):
         report.update(original_arrivals=cell['entrances'],
@@ -152,14 +169,17 @@ def build_resident(task):
         'sha256':hashlib.sha256(raw).hexdigest(),'voice_seconds':duration}
 
 
-def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None):
+def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='fast'):
     data=resolve_data_files(data_files);scene=ensure_external(scene,'area conversion')
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
     ext=lumps((scene/'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',ext))
     entries=[s for s in SCENES if s['interior'] and s['map'] not in ('prison','census')
              and s.get('area', 'seyda') == 'seyda']
-    tasks=[(data,scene,s,qbsp,vis,light,timings) for s in entries]
+    # Rooms compile side by side: divide the job budget between them.
+    workers=min(resolve_jobs(jobs),max(1,len(entries)))
+    tasks=[(data,scene,s,qbsp,vis,light,timings,map_threads(resolve_jobs(jobs),workers),vis_mode,interior_dressing())
+           for s in entries]
     rooms={};reports=[]
     for report,cell in ordered_map(build_room,tasks,min(resolve_jobs(jobs),len(tasks))):
         slug=report['map'];rooms[slug]=cell;reports.append(report)
@@ -169,7 +189,7 @@ def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None):
 
 
 def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
-             include_exterior=True,report_name='area-report.json'):
+             include_exterior=True,report_name='area-report.json',doors=True,exclude_residents=()):
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
     kinds,cells,topics=load_master(child_ci(data,'Morrowind.esm'))
     cast=[]
@@ -179,7 +199,8 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             if not ref.get('deleted') and key in kinds['NPC_'] and not key.startswith('chargen ') and inside(ref['position']):
                 cast.append(('seyda',ref))
     for slug,cell in rooms.items():
-        cast.extend((slug,r) for r in cell['refs'] if not r.get('deleted') and r['type']=='NPC_')
+        cast.extend((slug,r) for r in cell['refs'] if not r.get('deleted') and r['type']=='NPC_'
+                    and r['id'].casefold() not in exclude_residents)
     identifiers=sorted({r['id'].casefold() for _,r in cast})
     tasks=[];models={}
     for identifier in identifiers:
@@ -221,7 +242,8 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             entities.append(entity(fields));placed.append({'map':slug,'reference':ref['number'],'id':ref['id'],'position':pos})
         b[0]=('\n'.join(entities)+'\n\0').encode('cp1252');path.write_bytes(pack_lumps(b))
         if slug=='seyda':shutil.copyfile(path,scene/'seyda.bsp')
-    doors=prepare_doors(data,scene)
+    # Town interiors (import_town.py) write their own door banks.
+    doors=prepare_doors(data,scene) if doors else None
     report={'rooms':reports,'cast':placed,'models':models,'doors':doors,
             'scope':'original placed humanoid residents, blocking idle actors and bounded greetings; combat, services, schedules and small-item interactions remain separate systems'}
     (scene/report_name).write_text(json.dumps(report,indent=2)+'\n')
@@ -231,5 +253,6 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('data-files','scene','qbsp','vis','light'):p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);a=p.parse_args()
-    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.ffmpeg,a.jobs)
+    p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);add_vis_option(p);add_dressing_option(p);a=p.parse_args()
+    apply_dressing_option(a)
+    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.ffmpeg,a.jobs,a.vis_mode)

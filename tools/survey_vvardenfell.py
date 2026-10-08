@@ -143,7 +143,7 @@ def terrain_arrays(master, out, assets):
 def bsp_measure(path):
     from player_hull import lumps
     raw = path.read_bytes(); data = lumps(raw)
-    faces = list(struct.iter_unpack('<hhihh4Bi', data[7]))
+    faces = list(struct.iter_unpack('<HhihH4Bi', data[7]))
     return dict(bsp_bytes=len(raw), source_sha256=hashlib.sha256(raw).hexdigest(),
                 bsp_faces=len(faces), bsp_fan_triangles=sum(max(0, f[3]-2) for f in faces),
                 bsp_clipnodes=len(data[9])//8, bsp_models=len(data[14])//64)

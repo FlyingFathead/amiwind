@@ -57,10 +57,12 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.paths import ensure_external, child_ci
 from build_jobs import add_jobs, resolve_jobs
+from vis_options import light_args
 from build_parallel import completed_map
 from prepare_gallery import catalogue, convert_model, finish_catalogue, GALLERY_FACE_LIMIT
 from audit_gallery_budgets import write_allowances
 from stage_gallery import stage
+from known_inputs import input_sha256
 
 FORMAT = 'AmiWind required NPC gallery 1'
 
@@ -262,12 +264,12 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
         raise ValueError('NPC gallery conversion incomplete; see gallery-audit.json and model-budget-audit.json')
     for command in ([str(Path(qbsp).resolve()), 'charplane.map'],
                     [str(Path(vis).resolve()), '-threads', str(jobs), 'charplane.bsp'],
-                    [str(Path(light).resolve()), '-threads', str(jobs), 'charplane.bsp']):
+                    [str(Path(light).resolve()), *light_args('charplane.bsp')]):
         subprocess.run(command, cwd=out, check=True)
     (out/'maps').mkdir(); shutil.move(out/'charplane.bsp', out/'maps/charplane.bsp')
     count, files = catalogue_files(models/'catalog.txt')
     receipt = {'format': FORMAT, 'records': count, 'models': len(results),
-               'master_sha256': sha(child_ci(data, 'Morrowind.esm')),
+               'master_sha256': input_sha256(child_ci(data, 'Morrowind.esm')),
                'palette_sha256': hashlib.sha256(palette).hexdigest(),
                'files': {name: {'bytes': (out/name).stat().st_size, 'sha256': sha(out/name)} for name in sorted(files)}}
     report = validate_payload(out, receipt)

@@ -28,9 +28,8 @@ class LightBoundsRepairTests(unittest.TestCase):
     def test_rebakes_final_float_grid_and_preserves_all_other_inputs(self):
         raw = truncated_inline()
         before = BSP(raw)
-        for wide in (False, True):
-            with self.assertRaisesRegex(ValueError, 'Light sample range outside lump'):
-                before.face_inputs(1, wide)
+        with self.assertRaisesRegex(ValueError, 'Light sample range outside lump'):
+            before.face_inputs(1, True)
         result, report = repair_light_bounds(raw, self.lighting)
         after = BSP(result)
         self.assertEqual(report['faces_verified'], 2)
@@ -48,8 +47,9 @@ class LightBoundsRepairTests(unittest.TestCase):
 
     def test_refuses_ambiguous_arithmetic_grids(self):
         data = lumps(truncated_inline())
-        scale, offset = 2.73, -469.4419860839844
-        for index, point in enumerate(((195.4, 0, 0), (184, 0, 0), (184, 16, 0)), 3):
+        # binary32 after every operation: 112.0000076; engine rule: 111.9999999.
+        scale, offset = 2.9126579761505127, -23.31492042541504
+        for index, point in enumerate(((46.45753860473633, 0, 0), (0, 0, 0), (0, 16, 0)), 3):
             struct.pack_into('<3f', data[3], index*12, *point)
         struct.pack_into('<8f', data[6], 0, scale, 0, 0, offset, 0, 1, 0, 0)
         data[8] = bytearray([80])

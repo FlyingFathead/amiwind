@@ -10,6 +10,45 @@ This path requires the corresponding AWH4 runtime. A generated payload is
 diagnostic evidence, not proof of native appearance, memory headroom or
 production admission. It does not activate mushrooms across the whole world.
 
+## Builder step
+
+Since BUILD-HARVEST-NOT-BUILT-32 the builder makes the harvest data by default;
+no plan is supplied by hand. `tools/harvest_build.py` uses the functions below
+with the settings the shipped catalogues were made with (at most 256 plants per
+map, the runtime bound; interned root spans; per-map model registries):
+
+1. Builder step `harvest` (`harvest_build.py prepare --data-files ... --palette
+   <intro scene palette> --out <run>/harvest --jobs N`, after the census): every
+   exterior original small-mushroom placement of the master is checked with the
+   catalogue graph rules, exported as one packet (`prepare_scenery.export_refs`,
+   32-pixel materials) and each model converted once against the runtime palette
+   (`prepare_hand_catalog.runtime_palette`: the image's final palette). Writes
+   `harvest-source.json`, the packet and `payload/progs/harvest/*.mdl`.
+2. Image step, before the final map passes (`clear_baked`): on every shipped
+   exterior map, brush entities bound to a harvestable placement in that map's
+   coverage are removed with `tools/remove_harvest_geometry.py` (exact reference
+   and pose; every surviving surface and hull verified). Only Balmora's
+   converter bakes mushrooms today. Receipt `image/harvest/harvest-baked-removal.json`.
+3. Image step, after the last map change and before the entity tracker, heap
+   audit and content fingerprint (`install`): the plan comes from the region
+   directories the image ships (world maps from `world/regions.awr`, Seyda Neen
+   and Balmora sub-cells from `seyda-regions.txt` and `balmora-regions.txt`, the
+   intro docks from its fixed route bounds); a map's placements are those whose
+   transformed bounds touch its coverage. The geometry gate
+   (`reject_existing_geometry`) runs on every candidate's final map and stops the
+   build on failure. Every candidate catalogue is staged, the repository heap
+   check (`check_world_map_heap.inspect_maps`, target ABI sizes) runs on those
+   maps, and maps that fail keep no catalogue; models no admitted map uses are
+   dropped. A map whose baked mushrooms were removed must be admitted, or the
+   build stops. Receipts: `image/harvest/harvest-plan.json` (this format, with
+   the final map pins) and `harvest-staging.json` (admitted and refused maps,
+   plants, models, heap clearance).
+
+The models must have been converted with the stage's final palette, and the
+master must be the one the step read; otherwise the image stops. Output is
+byte-identical for every `--jobs` value. `--no-harvest` (debugging only) skips
+all of it.
+
 ## Inputs and identity
 
 The converter consumes a standalone original master, a bounded scenery packet
@@ -95,7 +134,8 @@ admission must still be measured with the exact candidate.
 
 ## Current limits
 
-- At most 24 original placements per bounded batch and map, and 8 shared models.
+- At most 24 original placements per bounded batch and map by default (the
+  builder step uses the runtime bound, 256), and 8 shared models per map.
 - Original surfaces are retained and split at repeated-UV boundaries; the
   shared quantizer preserves coincident material seam positions.
 - Opaque models with 1–3 materials use 32-pixel source material tiles.

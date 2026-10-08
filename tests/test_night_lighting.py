@@ -70,6 +70,16 @@ class FormatTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 NL.check_lamp_table(bad)
 
+    def test_lamp_table_check_refuses_more_lamps_than_the_engine_cache(self):
+        def table(cells):
+            rows = b''.join(struct.pack('<hh3fHBB', x, y, 0.0, 0.0, 0.0, 223, 1, 1) for x, y in sorted(cells))
+            return b'AWL1' + struct.pack('<I', len(cells)) + rows
+        full = [(0, 0)] * 128 + [(1, 1)] * 128
+        self.assertEqual(NL.check_lamp_table(table(full)), 256)
+        self.assertEqual(NL.check_lamp_table(table(full + [(3, 3)])), 257)
+        with self.assertRaisesRegex(ValueError, 'LAMPS-CACHE-31'):
+            NL.check_lamp_table(table(full + [(1, 0)]))
+
     def test_window_table_check(self):
         self.assertEqual(NL.check_window_table(b''), 0)
         self.assertEqual(NL.check_window_table(b'bm019 surface7\nsn012 surface9\n'), 2)

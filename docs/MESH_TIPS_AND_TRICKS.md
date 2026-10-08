@@ -1,13 +1,92 @@
 # Mesh tips and tricks: expensive scenery
 
+## Face validation (2026-10-08)
+
+Every converted face can be checked as the engine reads it with
+`tools/check_faces.py` ([FACE_VALIDATION.md](FACE_VALIDATION.md)): planarity
+and plane orientation against the stored plane, winding against the side
+flag, degenerate and non-convex faces, surface extents by the engine rule,
+the 16-bit texture fields, lightmap ranges and all index ranges. The
+converter face bugs (CONVERT-FACE-PLANE-32, CONVERT-MERGE-NONPLANAR-32,
+CONVERT-TEXCOORD-RANGE-32) get one repair: a single face builder shared by
+every converter path, with this validator as a builder gate on every map.
+
+## Texture-mapping snapping and scenery reduction (2026-10-08)
+
+Two converter options, both off by default, were measured on the densest
+exterior regions of the world estimate (three Khuul shore regions and two
+Seyda Neen regions, converted with the region converter, before the
+hidden-surface pass) in one A/B/C/D sweep with an A rerun as drift control.
+
+**Quake first.** A Quake texinfo is a 3D affine mapping
+(`s = p . vecs[0] + vecs[0][3]`); nothing in the engine requires it to lie in
+the face plane, so one texinfo can serve faces on several planes. Morrowind
+stores UVs per vertex, so the converter gave nearly every triangle its own
+mapping (Khuul region w-09+17036: 44,334 texinfo for 53,383 faces).
+
+`--texinfo-snap TEXELS` (lever B) grows mapping clusters over edge-connected
+triangles of one material while one least-squares 3D mapping reproduces every
+member vertex's texture coordinates within 3/4 of TEXELS, modulo whole
+texture repeats. Because the difference of two affine mappings is affine, the
+largest error over a convex face is at a vertex: the vertex check is exact.
+Coplanar members merge into larger convex faces; a face may also reuse an
+existing texinfo of the map within the remaining 1/4 of TEXELS. Guards:
+fitted axes stay within 1.5 times the members' own texel density; a shared
+mapping that would change a face's engine mip factor (`model.c` mipadjust)
+is stored as the face's exactly equal in-plane mapping; reuse keeps texture
+coordinates below 16384 (16-bit `texturemins`); plane normals come from the
+whole merged polygon (merged polygons may start with collinear vertices).
+
+`--scenery-reduce ERROR` (lever C) simplifies eligible scenery visual meshes
+per UV chart with fast-simplification, chart borders (open edges, UV seams,
+material boundaries) locked, and keeps a result only if the two-sided surface
+distance stays within ERROR map units, interpolated texture coordinates stay
+within 1/8 texel and no triangle turns over. Collision always uses the source
+mesh.
+
+Measured (heap = `check_world_map_heap` after the map optimizer; texels of the
+shipped 32 x 32 textures):
+
+| Region | Variant | Faces | Texinfo | Heap (bytes) | Max texel / surface deviation |
+| --- | --- | ---: | ---: | ---: | --- |
+| Khuul w-09+17036 | A today | 53,383 | 44,334 | 13,584,932 | 0 |
+| | B 1/16 | 52,687 | 21,713 | 12,526,180 (-1,058,752) | 0.062 texel |
+| | C 0.25 | 52,778 | 43,976 | 13,488,692 (-96,240) | 0.221 units |
+| | D = B + C | 52,125 | 21,782 | 12,452,964 (-1,131,968) | 0.062 texel, 0.221 units |
+| Khuul w-09+17037 | A / B 1/16 | 50,439 / 49,800 | 41,791 / 21,787 | -938,192 | 0.062 texel |
+| Khuul w-09+17034 | A / B 1/16 | 45,537 / 45,065 | 36,202 / 18,984 | -800,384 | 0.062 texel |
+| Seyda Neen w-03-10046 | A / B 1/16 | 37,551 / 37,063 | 29,030 / 19,462 | -464,720 | 0.052 texel |
+| Seyda Neen w-03-10054 | A / B 1/16 | 35,586 / 35,109 | 27,285 / 18,056 | -449,024 | 0.052 texel |
+
+Tolerance hardly matters: 1/32, 1/16 and 1/8 texel give 21,997 / 21,713 /
+21,323 texinfo on w-09+17036. Marksurfaces, clipnodes, nodes and lightmaps are
+unchanged (converted scenery is `func_wall` without baked light in exteriors;
+collision is untouched). The A rerun matched A exactly. Same-pose renders of
+the converted maps differ in 0.01 to 0.07 % of pixels, isolated texel-edge
+flips.
+
+Why faces barely drop: most shack triangles have no coplanar neighbour (one
+shack mesh: 1,757 triangles on 1,407 distinct planes), so even unlimited
+snapping could merge little. Why C fails: plank UV charts are small islands
+whose vertices are mostly on chart borders (72 % in that shack), and where
+interior vertices exist the UV parametrisation is not affine, so any collapse
+moves interpolated texels by 20 to 48 texels even when the surface moves less
+than 0.25 units. Without the UV bound, even 12 units of surface error removed
+only 17 % of the triangles. Lossless-to-the-eye decimation of this scenery is
+not available; the remaining face lever is hidden-surface removal.
+
+The heap gain of B comes from texinfo (about 47 bytes per texinfo removed,
+map file and resident), not geometry. Khuul's worst region stays over the
+heap budget with B alone; Seyda Neen regions gain about 0.45 MB each.
+
 ## Visibility first: brush entities never hide anything (2026-10-07)
 
 Converted meshes become `func_wall` models; Quake's `vis` ignores them, so a
 map whose world is only terrain (or an empty box, for interiors) lets the
-engine see through every building and wall. Give every building, interior wall
-and large rock a structural `skip` occluder, put the static faces in the world
-model (an entity is culled whole, and one in more than 16 leaves is always
-visible), and check the map's visibility share. See [the mandatory map rule](DEVELOPMENT.md) and
+engine see through every building and wall. In open towns the tested occluders and
+world faces gave negligible benefit with the current partitioning; interiors
+still need testing. Always check the map's visibility
+share. See [the mandatory map rule](DEVELOPMENT.md) and
 [Town visibility](performance/TOWN-VISIBILITY.md).
 
 ## Packaged interior plane audit: 2026-10-06T20:11:15+03:00

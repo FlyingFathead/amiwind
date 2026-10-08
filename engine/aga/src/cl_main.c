@@ -448,6 +448,7 @@ void CL_RelinkEntities (void)
 	frac = CL_LerpPoint ();
 
 	cl_numvisedicts = 0;
+	aw_visedicts_dropped_frame = 0;
 
 //
 // interpolate player info
@@ -614,6 +615,8 @@ void CL_RelinkEntities (void)
 			cl_visedicts[cl_numvisedicts] = ent;
 			cl_numvisedicts++;
 		}
+		else
+			AW_VisedictDropped ();
 	}
 
 }

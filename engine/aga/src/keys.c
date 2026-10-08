@@ -31,7 +31,7 @@ int Key_AmigaRaw(int raw) {
     'l', ';', '\'', K_ENTER, 0, '4', '5', '6',
     '<', 'z', 'x', 'c', 'v', 'b', 'n', 'm',
     ',', '.', '/', 0, '.', '7', '8', '9',
-    K_SPACE, K_BACKSPACE, K_TAB, K_ENTER, K_ENTER, K_ESCAPE, K_F11,
+    K_SPACE, K_BACKSPACE, K_TAB, K_ENTER, K_ENTER, K_ESCAPE, K_DEL,
     0, 0, 0, '-', 0, K_UPARROW, K_DOWNARROW, K_RIGHTARROW, K_LEFTARROW,
     K_F1, K_F2, K_F3, K_F4, K_F5, K_F6, K_F7, K_F8,
     K_F9, K_F10, '(', ')', '/', '*', '=', K_PAUSE,
@@ -44,6 +44,10 @@ int Key_AmigaRaw(int raw) {
     if(raw==0x49 || raw==0x69)return K_PGDN;
     if(raw==0x70)return K_HOME;
     if(raw==0x71)return K_END;
+    /* FS-UAE has no action for 0x70/0x71; the supplied preset sends PC Home
+     * and End as its unused-key actions 6a/6c (KEYS-AMIGA-EDIT-32). */
+    if(raw==0x6a)return K_HOME;
+    if(raw==0x6c)return K_END;
     return raw<0x68?xlate[raw]:0;
 }
 
@@ -64,6 +68,15 @@ int		key_lastpress;
 
 int		edit_line=0;
 int		history_line=0;
+
+/* AmiWind terminal line editor (aw_console_mode, default on). The edit line
+ * stays a terminated string; key_linepos is the cursor inside it. The line
+ * being typed is kept while the history is browsed (console_draft), and the
+ * history is saved in the game directory after each new entry. */
+static cvar_t aw_console_mode={"aw_console_mode","1",true,false,1};
+static char console_draft[MAXCMDLINE];
+static char history_path[MAX_OSPATH];
+#define HISTORY_FILE "console-history.txt"
 
 keydest_t	key_dest;
 
@@ -199,11 +212,162 @@ Key_Console
 Interactive line editing and console scrollback
 ====================
 */
+int Key_ConsoleTerminal(void)
+{
+    char *s=aw_console_mode.string;
+    if(!Q_strcasecmp(s,"true") || !Q_strcasecmp(s,"on") || !Q_strcasecmp(s,"yes"))return 1;
+    if(!Q_strcasecmp(s,"false") || !Q_strcasecmp(s,"off") || !Q_strcasecmp(s,"no"))return 0;
+    return aw_console_mode.value!=0;
+}
+
+/* Saved history: one command per line, oldest first, the ring's 31 entries.
+ * Written whole (a few KiB at most) only when Enter adds an entry. */
+static void console_history_write(void)
+{
+    FILE *f;int i,line;
+    if(!history_path[0])return;
+    f=fopen(history_path,"w");
+    if(!f)return;
+    for(i=1;i<32;i++){
+        line=(edit_line+i)&31;
+        if(key_lines[line][1])fprintf(f,"%s\n",key_lines[line]+1);
+    }
+    fclose(f);
+}
+
+static void console_history_read(void)
+{
+    FILE *f;char text[MAXCMDLINE+2];int total=0,skip,n=0,len;
+    if(!history_path[0] || !(f=fopen(history_path,"r")))return;
+    while(fgets(text,sizeof text,f))total++;
+    skip=total>31?total-31:0;
+    rewind(f);
+    while(n<31 && fgets(text+1,sizeof text-1,f)){
+        if(skip>0){skip--;continue;}
+        len=strlen(text+1);
+        while(len && (text[len]=='\n' || text[len]=='\r'))text[len--]=0;
+        if(!text[1])continue;
+        text[0]=']';text[MAXCMDLINE-1]=0;
+        strcpy(key_lines[n++],text);
+    }
+    fclose(f);
+    if(!n)return;
+    edit_line=history_line=n;
+    key_lines[edit_line][0]=']';key_lines[edit_line][1]=0;key_linepos=1;
+}
+
+void Key_ConsoleInit(const char *dir)
+{
+    Cvar_RegisterVariable(&aw_console_mode);
+    if(strlen(dir)+strlen(HISTORY_FILE)+2>sizeof history_path)return;
+    sprintf(history_path,"%s/%s",dir,HISTORY_FILE);
+    console_history_read();
+}
+
+/* Terminal line editing: the cursor moves without deleting, typing inserts,
+ * Delete removes at the cursor, Home/End (Ctrl+A/Ctrl+E) jump, Ctrl+U/Ctrl+K
+ * cut to the start/end, Up/Down browse the history and Down past the newest
+ * entry returns the line that was being typed. Empty and repeated lines are
+ * not stored. */
+static void console_terminal_key(int key)
+{
+    char *line=key_lines[edit_line],*cmd;int len=strlen(line),stored,i;
+    if(key_linepos>len)key_linepos=len;
+    if(key_linepos<1)key_linepos=1;
+    if(keydown[K_CTRL]){
+        if(key>='A' && key<='Z')key+='a'-'A';
+        if(key=='a')key=K_HOME;
+        else if(key=='e')key=K_END;
+        else if(key=='u'){memmove(line+1,line+key_linepos,len-key_linepos+1);key_linepos=1;return;}
+        else if(key=='k'){line[key_linepos]=0;return;}
+        else if(key>=32 && key<127)return;	// no other Ctrl letters type
+    }
+    if(shift_down && (key==K_HOME || key==K_END)){	// Shift+Home/End: scrollback ends
+        con_backscroll=key==K_HOME?Con_ScrollMax():0;
+        return;
+    }
+    switch(key){
+    case K_ENTER:
+        Cbuf_AddText(line+1);
+        Cbuf_AddText("\n");
+        Con_Printf("%s\n",line);
+        stored=line[1] && strcmp(line,key_lines[(edit_line-1)&31]);
+        if(stored)edit_line=(edit_line+1)&31;
+        history_line=edit_line;
+        key_lines[edit_line][0]=']';key_lines[edit_line][1]=0;key_linepos=1;
+        console_draft[0]=0;
+        if(stored)console_history_write();
+        if(cls.state==ca_disconnected)SCR_UpdateScreen();
+        return;
+    case K_TAB:
+        cmd=Cmd_CompleteCommand(line+1);
+        if(!cmd)cmd=Cvar_CompleteVariable(line+1);
+        if(cmd && Q_strlen(cmd)+3<MAXCMDLINE){
+            Q_strcpy(line+1,cmd);
+            key_linepos=Q_strlen(cmd)+1;
+            line[key_linepos++]=' ';
+            line[key_linepos]=0;
+        }
+        return;
+    case K_LEFTARROW:
+        if(key_linepos>1)key_linepos--;
+        return;
+    case K_RIGHTARROW:
+        if(key_linepos<len)key_linepos++;
+        return;
+    case K_HOME:
+        key_linepos=1;
+        return;
+    case K_END:
+        key_linepos=len;
+        return;
+    case K_BACKSPACE:
+        if(key_linepos>1){memmove(line+key_linepos-1,line+key_linepos,len-key_linepos+1);key_linepos--;}
+        return;
+    case K_DEL:
+        if(key_linepos<len)memmove(line+key_linepos,line+key_linepos+1,len-key_linepos);
+        return;
+    case K_UPARROW:
+        i=history_line;
+        do i=(i-1)&31; while(i!=edit_line && !key_lines[i][1]);
+        if(i==edit_line)return;	// no older entry
+        if(history_line==edit_line)strcpy(console_draft,line);
+        history_line=i;
+        memmove(line,key_lines[history_line],strlen(key_lines[history_line])+1);	// another ring slot
+        key_linepos=Q_strlen(line);
+        return;
+    case K_DOWNARROW:
+        if(history_line==edit_line)return;
+        do history_line=(history_line+1)&31; while(history_line!=edit_line && !key_lines[history_line][1]);
+        if(history_line==edit_line){
+            if(console_draft[0])strcpy(line,console_draft);
+            else{line[0]=']';line[1]=0;}
+        }
+        else memmove(line,key_lines[history_line],strlen(key_lines[history_line])+1);
+        key_linepos=Q_strlen(line);
+        return;
+    case K_PGUP:case K_MWHEELUP:
+        con_backscroll+=key==K_MWHEELUP?2:Con_ScrollPage();
+        if(con_backscroll>Con_ScrollMax())con_backscroll=Con_ScrollMax();
+        return;
+    case K_PGDN:case K_MWHEELDOWN:
+        con_backscroll-=key==K_MWHEELDOWN?2:Con_ScrollPage();
+        if(con_backscroll<0)con_backscroll=0;
+        return;
+    }
+    if(key<32 || key>126)return;	// non printable
+    if(len<MAXCMDLINE-1){
+        memmove(line+key_linepos+1,line+key_linepos,len-key_linepos+1);
+        line[key_linepos++]=key;
+    }
+}
+
 void Key_Console (int key)
 {
     char	*cmd;
     if(shift_down && key==K_UPARROW)key=K_PGUP;
     if(shift_down && key==K_DOWNARROW)key=K_PGDN;
+    if(Key_ConsoleTerminal()){console_terminal_key(key);return;}
 
     if (key == K_ENTER)
     {
@@ -245,13 +409,19 @@ void Key_Console (int key)
 
     if (key == K_UPARROW)
     {
+        /* AmiWind (CONSOLE-HISTORY-EMPTY-32): search from a copy and stay
+         * on the oldest entry. id's code jumped to slot edit_line+1, which is
+         * an empty line until all 32 slots have been used, and every further
+         * Up then stayed on that empty line. */
+        int line = history_line;
         do
         {
-            history_line = (history_line - 1) & 31;
-        } while (history_line != edit_line
-                && !key_lines[history_line][1]);
-        if (history_line == edit_line)
-            history_line = (edit_line+1)&31;
+            line = (line - 1) & 31;
+        } while (line != edit_line
+                && !key_lines[line][1]);
+        if (line == edit_line)
+            return;	// no older entry
+        history_line = line;
         Q_strcpy(key_lines[edit_line], key_lines[history_line]);
         key_linepos = Q_strlen(key_lines[edit_line]);
         return;
@@ -607,6 +777,11 @@ void Key_Init (void)
     consolekeys[K_SHIFT] = true;
     consolekeys[K_MWHEELUP] = true;
     consolekeys[K_MWHEELDOWN] = true;
+    // AmiWind: the terminal line editor's keys (classic mode ignores Delete
+    // and uses Home/End for the scrollback, as id's Key_Console does)
+    consolekeys[K_DEL] = true;
+    consolekeys[K_HOME] = true;
+    consolekeys[K_END] = true;
     consolekeys['`'] = false;
     consolekeys['~'] = false;
 
@@ -685,7 +860,9 @@ void Key_Event (int key, qboolean down)
     if (down)
     {
         key_repeats[key]++;
-        if (key != K_BACKSPACE && key != K_PAUSE && key_repeats[key] > 1)
+        if (key != K_BACKSPACE && key != K_PAUSE && key_repeats[key] > 1
+            && !(key_dest == key_console && Key_ConsoleTerminal()
+                 && (key == K_LEFTARROW || key == K_RIGHTARROW || key == K_DEL)))
         {
             return;	// ignore most autorepeats
         }
@@ -789,7 +966,8 @@ void Key_Event (int key, qboolean down)
 // if not a consolekey, send to the interpreter no matter what mode is
 //
     if ( (key_dest == key_menu && menubound[key])
-    || (key_dest == key_console && !consolekeys[key])
+    || (key_dest == key_console && !consolekeys[key]
+        && !(key == K_CTRL && Key_ConsoleTerminal()))	// Ctrl edits the line
     || (key_dest == key_game && ( !con_forcedup || !consolekeys[key] ) ) )
     {
         kb = keybindings[key];

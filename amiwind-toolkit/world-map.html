@@ -67,6 +67,25 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 .localleft{flex:0 1 512px;min-width:0}
 .localright{flex:1 1 320px;min-width:0}
 #picked{margin-top:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px;color:var(--ink);min-height:40px}
+/* Map metrics layer (tools/world_metrics.py via toolkit_serve.py --metrics) */
+#metricsbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:#13202d}
+#metricsbar[hidden],#metricspanel[hidden],#interiorsview[hidden]{display:none}
+#metricsbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
+#metricsbar button{cursor:pointer}
+#metricsbar button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
+#metricscount{color:#ffe28a;font-weight:600}
+#metricspanel,#interiorsview{flex:1 1 100%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;overflow-x:auto}
+#metricspanel h2,#interiorsview h2{font-size:16px;margin:0 0 8px;color:#ffe28a}
+table.mt{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+table.mt th,table.mt td{border:1px solid var(--line);padding:3px 7px;text-align:right;white-space:nowrap}
+table.mt th{background:#203346;position:sticky;top:0}
+table.mt th[data-key]{cursor:pointer}
+table.mt td.l,table.mt th.l{text-align:left}
+table.mt td.worst{outline:2px solid #ffe28a;outline-offset:-2px;font-weight:700}
+table.mt small{opacity:.8}
+#interiorsfilters{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px}
+#interiorsfilters select,#interiorsfilters input{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
+#interiorswrap{max-height:70vh;overflow:auto}
 </style>
 </head>
 <body>
@@ -77,11 +96,22 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
   <label>Status <input id="status" type="file" accept=".json"></label>
   <label>Island (local) <input id="island" type="file" accept=".png,.json" multiple></label>
   <label>Maps folder (local) <input id="mapsdir" type="file" webkitdirectory multiple></label>
+  <label>Metrics (local) <input id="metricsfile" type="file" accept=".json"></label>
   <button id="copystate" title="Copy the toolkit version, loaded data, layers and selection as JSON">Copy state (JSON)</button>
   <a id="toinspector" href="map-inspector.html" target="_blank" style="color:#ffe28a;display:none">3D Map Inspector &#8599;</a>
   <span id="copied" class="muted"></span>
 </header>
 <div id="layers"></div>
+<div id="metricsbar" hidden>
+  <label><input type="checkbox" id="layer-metrics"> <b>Map metrics</b></label>
+  <label>Metric <select id="metric" aria-label="Metric"></select></label>
+  <span role="group" aria-label="Content"><button id="mmode-cur" aria-pressed="false">Current content</button>
+  <button id="mmode-evr" aria-pressed="true">Everything</button></span>
+  <label id="texinfowrap">Texinfo limit <select id="texinfolimit" aria-label="Texinfo limit"></select></label>
+  <label><input type="checkbox" id="townlabels" checked> Town labels</label>
+  <button id="interiorsbtn" aria-pressed="false">Interiors table</button>
+  <span id="metricscount"></span>
+</div>
 <div id="selected">Selected area: click a cell on the map</div>
 <div id="multi" class="muted" style="color:#ffd24a"></div>
 <main>
@@ -93,12 +123,26 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
   <aside>
     <div id="ctaslot"></div>
     <div id="summary" class="muted">Load world-progress.json from an image build.</div>
+    <div id="metricssummary"></div>
     <div id="legend"></div>
     <p class="muted">North is up; one square per exterior cell. The topomap (open-world
     terrain, converted for the whole island) is the basis; every other layer sits on
     top of it. The island image is rendered on your machine from your own game data
     (tools/world_progress_background.py) and never leaves it.</p>
   </aside>
+  <section id="metricspanel" hidden></section>
+  <section id="interiorsview" hidden>
+    <h2>Interiors: estimated limits per interior map</h2>
+    <div id="interiorsfilters">
+      <label>Set <select id="ifset" aria-label="Set"></select></label>
+      <label>Show <select id="ifover" aria-label="Over the limit">
+        <option value="all">all interiors</option><option value="any">over any engine limit</option>
+        <option value="metric">over the selected metric's limit</option></select></label>
+      <label>Name <input id="ifname" type="search" placeholder="filter"></label>
+      <span id="ifcount" class="muted"></span>
+    </div>
+    <div id="interiorswrap"><table class="mt" id="interiorstable"></table></div>
+  </section>
 </main>
 <section id="localview" hidden>
   <div id="localpanel">
@@ -141,6 +185,8 @@ const LAYERS = [
   {id: 'content', name: 'Entities placed (share)', on: false, kind: 'fill',
    legend: [['#111111', '0 % placed'], ['#5a5a5a', ''], ['#c8321e', '50 %'], ['#ff9a2e', ''], ['#ffffff', '100 % (white hot)']],
    colour: c => c.original ? glow(c.placed / c.original) : null, alpha: .85},
+  // Map metrics: its switch and settings live in their own bar (shown when a layer is loaded).
+  {id: 'metrics', name: 'Map metrics', on: false, kind: 'metrics', own: true},
   {id: 'full', name: 'Full town/area maps', on: true, kind: 'outline',
    legend: [['#ffffff', 'full town/area map (white border, black outline)']]},
   {id: 'missing', name: 'Content missing', on: false, kind: 'mark',
@@ -205,11 +251,15 @@ function dot(g, c, col, r, dx) {
 }
 // Pure: setting canvas.width/height clears the canvas, so only draw() resizes.
 function geometry() {
-  const b = data.bounds.slice();
-  for (const im of Object.values(images)) if (im.bounds) {
-    b[0] = Math.min(b[0], im.bounds[0]); b[1] = Math.min(b[1], im.bounds[1]);
-    b[2] = Math.max(b[2], im.bounds[2]); b[3] = Math.max(b[3], im.bounds[3]);
-  }
+  let b = data ? data.bounds.slice() : null;
+  const add = q => {
+    if (!q) return; if (!b) { b = q.slice(); return; }
+    b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]); b[2] = Math.max(b[2], q[2]); b[3] = Math.max(b[3], q[3]);
+  };
+  for (const im of Object.values(images)) add(im.bounds);
+  // The metrics layer reaches beyond Vvardenfell (Solstheim): widen the map while it is on.
+  if (metrics && (metricsOn() || !data)) add(metrics.bounds);
+  if (!b) b = [0, 0, 0, 0];
   const w = b[2] - b[0] + 1, h = b[3] - b[1] + 1, s = Math.floor(Math.min(820 / w, 820 / h));
   return {b, s, w: w * s, h: h * s, px: x => (x - b[0]) * s, py: y => (b[3] - y) * s};
 }
@@ -221,7 +271,7 @@ function on(id) {
   const base = LAYERS.find(L => L.id === id && L.kind === 'base');
   if (base) return bottom === base.style; const el = $('layer-' + id); return el && el.checked; }
 function draw() {
-  if (!data) return;
+  if (!data && !metrics) return;
   const g = geometry();
   // Backing store at display size x device pixels, so text and lines stay sharp.
   const ratio = Math.max(1, (canvas.clientWidth || g.w) * (window.devicePixelRatio || 1) / g.w);
@@ -247,9 +297,10 @@ function draw() {
       for (let y = 0; y <= g.h; y += g.s) { ctx.moveTo(0, y + .5); ctx.lineTo(g.w, y + .5); }
       ctx.stroke(); continue;
     }
-    if (L.kind === 'outline') { groupOutline(g, data.cells.filter(c => c.map === 'full')); continue; }
+    if (L.kind === 'metrics') { drawMetrics(g); legend.push(...metricsLegend()); continue; }
+    if (L.kind === 'outline') { if (data) groupOutline(g, data.cells.filter(c => c.map === 'full')); continue; }
     if (L.kind === 'poi') { drawPois(g); continue; }
-    for (const c of data.cells) {
+    for (const c of (data ? data.cells : [])) {
       if (L.kind === 'fill') {
         const col = L.colour(c); if (!col) continue;
         ctx.globalAlpha = anyImage() ? L.alpha : 1; ctx.fillStyle = col;
@@ -286,6 +337,8 @@ async function autoload() {
   };
   const status = await get('world-progress.json', 'json');
   if (status) { statusFileName = 'served:world-progress.json'; setData(status); }
+  const layer = await get('world-metrics.json', 'json');  // only with toolkit_serve.py --metrics
+  if (layer) { metricsFileName = 'served:world-metrics.json'; setMetrics(layer); }
   for (const [style, stem] of [['topo', 'island'], ['world', 'island-world']]) {
     const meta = await get(stem + '.json', 'json'), png = await get(stem + '.png', 'blob');
     if (meta && png) {
@@ -294,7 +347,7 @@ async function autoload() {
     }
   }
   const cells = await get('island-cells.json', 'json');
-  if (cells) { cellsDetail = cells; draw(); }
+  if (cells) { cellsDetail = cells; draw(); if (metricPick) showMetricsCell(metricPick.x, metricPick.y); }
   try { const r = await fetch('../maps/index.json'); if (r.ok) servedMaps = new Set(await r.json()); } catch (_) {}
 }
 if (SERVED) autoload();
@@ -306,7 +359,7 @@ const layerBox = L => '<label><input type="checkbox" id="layer-' + L.id + '"' + 
 $('layers').innerHTML = '<span class="bottomsel"><b>Bottom layer</b><button id="bprev" aria-label="Previous bottom layer">&lsaquo;</button>' +
   '<select id="bottom" aria-label="Bottom layer">' + BOTTOMS.map(([v, t]) => '<option value="' + v + '">' + t + '</option>').join('') + '</select>' +
   '<button id="bnext" aria-label="Next bottom layer">&rsaquo;</button></span>' +
-  '<b>Layers</b>' + LAYERS.filter(L => !L.option && L.kind !== 'base').map(layerBox).join('') +
+  '<b>Layers</b>' + LAYERS.filter(L => !L.option && !L.own && L.kind !== 'base').map(layerBox).join('') +
   '<span id="optwrap"><button id="optbtn" aria-label="Options" aria-expanded="false" aria-controls="options">&#9881;</button>' +
   '<div id="options" hidden role="dialog" aria-label="Options"><h2>Options</h2>' + LAYERS.filter(L => L.option).map(layerBox).join('') + '</div></span>';
 for (const L of LAYERS) if (L.kind !== 'base') $('layer-' + L.id).onchange = draw;
@@ -470,7 +523,7 @@ $('zoomin').onclick = () => { const g = geometry(); zoomAt(1.6, g.w / 2, g.h / 2
 $('zoomout').onclick = () => { const g = geometry(); zoomAt(1 / 1.6, g.w / 2, g.h / 2); };
 $('zoomreset').onclick = () => { view.z = 1; view.x = view.y = 0; draw(); };
 canvas.addEventListener('wheel', e => {
-  if (!data) return;
+  if (!data && !metrics) return;
   e.preventDefault();
   const r = canvas.getBoundingClientRect(), k = geometry().w / r.width;
   zoomAt(e.deltaY < 0 ? 1.25 : 1 / 1.25, (e.clientX - r.left) * k, (e.clientY - r.top) * k);
@@ -550,6 +603,240 @@ function drawPois(g) {
   }
   ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
 }
+// Map metrics layer: the world estimate per exterior cell, from a layer file
+// written by tools/world_metrics.py (served with toolkit_serve.py --metrics, or
+// picked with "Metrics (local)"). A cell shows the highest value of the sub-cell
+// regions whose core lies in it, against the engine limit, on the same scale as
+// the world heat map chart: up to 50 %, 10 % steps to 100 %, red over the limit.
+const METRIC_FORMAT = 'aw-world-metrics-1';
+const METRIC_SEQ = ['#e8f1fb', '#c6dcf4', '#9cc2eb', '#6ea4df', '#4387d2', '#2a6bb8'], METRIC_OVER = '#c8423f';
+const METRIC_EDGES = [.5, .6, .7, .8, .9, 1];
+const METRIC_BINS = ['<= 50%', '50-60%', '60-70%', '70-80%', '80-90%', '90-100%', '> 100% (over)'];
+const METRIC_MODES = {cur: 'Current content', evr: 'Everything'};
+const COUNT_COLUMNS = [['refs_total', 'Objects'], ['npc', 'NPCs'], ['creatures', 'Creatures']];
+let metrics = null, metricsCells = new Map(), metricPick = null, metricsFileName = null;
+const mset = {metric: 'heap', mode: 'evr', texinfo: null, sort: {key: null, dir: -1}};
+function metricColour(r) {
+  if (r == null || !isFinite(r)) return null;
+  if (r > 1) return METRIC_OVER;
+  for (let i = 0; i < METRIC_EDGES.length; i++) if (r <= METRIC_EDGES[i]) return METRIC_SEQ[i];
+  return METRIC_SEQ[METRIC_SEQ.length - 1];
+}
+function metricsOn() { return !!metrics && on('metrics'); }
+function metricsCell(x, y) { return metricsOn() ? metricsCells.get(x + ',' + y) || null : null; }
+function metricLimit(k) {
+  const L = metrics && metrics.limits[k]; if (!L) return null;
+  return k === 'texinfo' && L.choices && L.choices[mset.texinfo] ? L.choices[mset.texinfo] : L.limit;
+}
+function metricLabel(k) { return metrics.limits[k] ? metrics.limits[k].label : k; }
+function limitWord(k) { return k === 'heap' ? 'budget' : 'the limit'; }
+// [value, ratio, region id] of the cell's worst region, or null.
+function cellWorst(c, k, m) { const w = c.worst && c.worst[m || mset.mode]; return (w && w[k || mset.metric]) || null; }
+function fmtMetric(k, v) {
+  if (v == null) return '–';
+  return k === 'heap' ? (v / 1e6).toFixed(2) + ' MB' : Math.round(v).toLocaleString('en-US');
+}
+function pct(v, lim) { return v == null || !lim ? '' : Math.round(v / lim * 100) + '%'; }
+function metricsCounts() {
+  const lim = metricLimit(mset.metric); let over = 0, valued = 0;
+  for (const c of metrics.cells) { const w = cellWorst(c); if (!w) continue; valued++; if (w[0] > lim) over++; }
+  return {over, cells: metrics.cells.length, valued};
+}
+function metricsCountText() {
+  const n = metricsCounts();
+  return n.over + ' cell' + (n.over === 1 ? '' : 's') + ' hold at least one region over ' + limitWord(mset.metric) +
+    ' · ' + n.cells + ' cells with objects';
+}
+function metricsLegend() {
+  const lim = metricLimit(mset.metric);
+  return METRIC_BINS.map((t, i) => [i < 6 ? METRIC_SEQ[i] : METRIC_OVER, escapeHtml((i === 0 ? metricLabel(mset.metric) + ' / ' +
+    (mset.metric === 'heap' ? 'budget' : 'limit') + ' ' + fmtMetric(mset.metric, lim) + ': ' : '') + t)])
+    .concat([['#000000', 'Bloodmoon (Solstheim) cell: dark outline']]);
+}
+function metricsTip(x, y, sep) {
+  const c = metricsCell(x, y); if (!c) return '';
+  const k = mset.metric, w = cellWorst(c), lim = metricLimit(k);
+  const head = 'Map metrics (' + METRIC_MODES[mset.mode].toLowerCase() + '): ';
+  if (!w) return head + 'no ' + metricLabel(k).toLowerCase() + ' value';
+  return head + 'worst ' + metricLabel(k).toLowerCase() + ' ' + fmtMetric(k, w[0]) + ', ' + pct(w[0], lim) + ' of ' +
+    (k === 'heap' ? 'budget' : 'limit ' + fmtMetric(k, lim)) + sep + 'in region ' + w[2] + ' of ' + c.regions.length +
+    (c.set === 'bloodmoon' ? ' (Bloodmoon)' : '');
+}
+function drawMetrics(g) {
+  const lim = metricLimit(mset.metric);
+  ctx.globalAlpha = anyImage() ? .92 : 1;
+  for (const c of metrics.cells) {
+    const w = cellWorst(c), col = w && metricColour(w[0] / lim); if (!col) continue;
+    ctx.fillStyle = col; ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1);
+  }
+  ctx.globalAlpha = 1; ctx.strokeStyle = '#000000'; ctx.lineWidth = 1.5 / view.z;
+  for (const c of metrics.cells) if (c.set === 'bloodmoon') ctx.strokeRect(g.px(c.x) + 1, g.py(c.y) + 1, g.s - 2, g.s - 2);
+  if (!$('townlabels').checked) return;
+  // Town labels as on the chart: a cell name held by two or more cells, at their centre.
+  for (const [name, cs] of townGroups()) {
+    if (cs.length < 2) continue;
+    const cx = cs.reduce((a, c) => a + c.x, 0) / cs.length, cy = cs.reduce((a, c) => a + c.y, 0) / cs.length;
+    const px = g.px(cx) + g.s / 2, py = g.py(cy) + g.s / 2;
+    ctx.font = 'bold ' + (Math.max(10, g.s * .72) / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3 / Math.sqrt(view.z); ctx.strokeStyle = '#ffffff'; ctx.strokeText(name, px, py);
+    ctx.fillStyle = '#3d3d3a'; ctx.fillText(name, px, py);
+  }
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+// Cell names come only from your local cells file (island-cells.json).
+function townGroups() {
+  const groups = new Map();
+  if (!cellsDetail) return groups;
+  for (const c of metrics.cells) {
+    const d = cellsDetail.cells[c.x + ',' + c.y]; if (!d || !d.name) continue;
+    const n = d.name.split(',')[0].trim(); if (!groups.has(n)) groups.set(n, []); groups.get(n).push(c);
+  }
+  return groups;
+}
+function setMetrics(doc) {
+  if (!doc || doc.format !== METRIC_FORMAT || !Array.isArray(doc.cells) || !doc.limits) {
+    $('metricssummary').textContent = 'Not a map metrics layer (' + METRIC_FORMAT + ').'; return false;
+  }
+  metrics = doc; metricsCells = new Map(doc.cells.map(c => [c.x + ',' + c.y, c])); metricPick = null;
+  const xs = doc.cells.map(c => c.x), ys = doc.cells.map(c => c.y);
+  metrics.bounds = xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null;
+  const keys = (doc.metrics || Object.keys(doc.limits)).filter(k => doc.limits[k]);
+  if (!keys.includes(mset.metric)) mset.metric = keys[0];
+  $('metric').innerHTML = keys.map(k => '<option value="' + escapeHtml(k) + '">' + escapeHtml(metricLabel(k)) + '</option>').join('');
+  $('metric').value = mset.metric;
+  const T = doc.limits.texinfo;
+  mset.texinfo = T && T.choice || null;
+  $('texinfolimit').innerHTML = T && T.choices ? Object.entries(T.choices).map(([n, v]) =>
+    '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + ' ' + Number(v).toLocaleString('en-US') + '</option>').join('') : '';
+  if (mset.texinfo) $('texinfolimit').value = mset.texinfo;
+  const sets = [...new Set(doc.interiors.map(r => r.set))].sort();
+  $('ifset').innerHTML = '<option value="">all sets</option>' + sets.map(s => '<option>' + escapeHtml(s) + '</option>').join('');
+  if (mode !== 'local') $('metricsbar').hidden = false;
+  $('layer-metrics').checked = true;
+  view.z = 1; view.x = view.y = 0;
+  metricsUi(); draw();
+  return true;
+}
+// Everything that depends on the metric, content or limit choice.
+function metricsUi() {
+  if (!metrics) return;
+  const isOn = metricsOn();
+  $('mmode-cur').setAttribute('aria-pressed', mset.mode === 'cur' ? 'true' : 'false');
+  $('mmode-evr').setAttribute('aria-pressed', mset.mode === 'evr' ? 'true' : 'false');
+  $('texinfowrap').style.display = mset.metric === 'texinfo' && $('texinfolimit').innerHTML ? '' : 'none';
+  $('metricscount').textContent = isOn ? metricsCountText() : '';
+  const src = metrics.source || {};
+  $('metricssummary').innerHTML = isOn ? '<b>Map metrics</b>: ' + escapeHtml(metricLabel(mset.metric)) + ' / ' +
+    (mset.metric === 'heap' ? 'budget' : 'limit') + ' ' + escapeHtml(fmtMetric(mset.metric, metricLimit(mset.metric))) +
+    ' (' + METRIC_MODES[mset.mode].toLowerCase() + ')<br>' + escapeHtml(metricsCountText()) +
+    '<br><span class="muted">' + escapeHtml((src.file || 'layer') + (src.rows ? ', ' + src.rows + ' rows' : '')) +
+    '; cell = worst sub-cell region in it</span>' : '';
+  if (metricPick && isOn) showMetricsCell(metricPick.x, metricPick.y); else $('metricspanel').hidden = true;
+  if (!$('interiorsview').hidden) renderInteriors();
+}
+function valueCell(k, v, worst) {
+  const lim = metricLimit(k), col = v == null ? null : metricColour(v / lim);
+  const dark = col && METRIC_SEQ.indexOf(col) >= 0 && METRIC_SEQ.indexOf(col) < 3;
+  return '<td' + (worst ? ' class="worst"' : '') + (col ? ' style="background:' + col + ';color:' + (dark ? '#101923' : '#ffffff') + '"' : '') +
+    ' title="' + escapeHtml(metricLabel(k) + ': ' + (v == null ? 'no value' : pct(v, lim) + ' of ' + fmtMetric(k, lim))) + '">' +
+    fmtMetric(k, v) + (v == null ? '' : '<br><small>' + pct(v, lim) + '</small>') + '</td>';
+}
+function metricHeaders() {
+  return metrics.metrics.filter(k => metrics.limits[k]).map(k => '<th data-key="' + escapeHtml(k) + '" title="' +
+    escapeHtml(metricLabel(k) + ': ' + (metrics.limits[k].source || '') + ', limit ' + fmtMetric(k, metricLimit(k))) + '">' +
+    escapeHtml(metrics.limits[k].short || metricLabel(k)) +
+    '<br><small>limit ' + fmtMetric(k, metricLimit(k)) + '</small></th>').join('');
+}
+function map3dButton(id) {
+  return hasMap(id) ? '<button data-map="' + escapeHtml(id) + '" title="Open ' + escapeHtml(id) + '.bsp in the 3D Inspector">3D</button>'
+    : '<span class="muted" title="No built map with this id in the maps folder">–</span>';
+}
+function metricsCellState(x, y) {
+  const c = metricsCells.get(x + ',' + y); if (!c) return null;
+  return {cell: [x, y], set: c.set, regions: c.regions, worst: c.worst};
+}
+// The clicked cell's sub-cell regions with all their numbers.
+function showMetricsCell(x, y) {
+  metricPick = {x, y};
+  const panel = $('metricspanel'), c = metricsCells.get(x + ',' + y), named = placeName(x, y);
+  panel.hidden = false;
+  const head = '<h2>Map metrics: ' + (named ? escapeHtml(named) + ' · ' : '') + 'cell ' + x + ', ' + y + '</h2>';
+  const built = data && (data.cells.find(q => q.x === x && q.y === y) || {}).maps || [];
+  const builtLine = built.length ? '<p>Built maps covering this cell: ' + built.map(m => escapeHtml(m) + ' ' + map3dButton(m)).join(' · ') + '</p>' : '';
+  if (!c) { panel.innerHTML = head + '<p class="muted">No estimated region with objects in this cell.</p>' + builtLine; return; }
+  const worstIds = {};
+  for (const k of metrics.metrics) { const w = cellWorst(c, k); if (w) worstIds[k] = w[2]; }
+  const rows = c.regions.map(id => {
+    const r = metrics.regions[id] || {}, v = r[mset.mode] || {};
+    return '<tr><td class="l">' + escapeHtml(id) + '</td><td class="l">' + escapeHtml(r.frame || '') + '</td><td class="l">' +
+      escapeHtml((r.cells || []).map(q => q.join(',')).join(' ')) + '</td>' +
+      COUNT_COLUMNS.map(([k]) => '<td>' + (r[k] == null ? '–' : r[k].toLocaleString('en-US')) + '</td>').join('') +
+      metrics.metrics.filter(k => metrics.limits[k]).map(k => valueCell(k, v[k], worstIds[k] === id)).join('') +
+      '<td>' + map3dButton(id) + '</td></tr>';
+  }).join('');
+  panel.innerHTML = head + '<p>' + c.regions.length + ' sub-cell region' + (c.regions.length === 1 ? '' : 's') + ' with their core here · ' +
+    escapeHtml(c.set) + ' · ' + METRIC_MODES[mset.mode] + ' · outlined: the region that sets the cell value for each metric</p>' +
+    builtLine + '<table class="mt"><thead><tr><th class="l">Region</th><th class="l">Frame</th><th class="l">Core cells</th>' +
+    COUNT_COLUMNS.map(([, t]) => '<th>' + t + '</th>').join('') + metricHeaders() + '<th>3D</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+// Interiors (and the Tribunal set, which is interiors only): sortable, filtered.
+const ENGINE_LIMITS_EXCEPT_LIGHTS = k => k !== 'lights';
+function interiorRows() {
+  const set = $('ifset').value, over = $('ifover').value, text = $('ifname').value.trim().toLowerCase();
+  const keys = metrics.metrics.filter(k => metrics.limits[k]);
+  let rows = metrics.interiors.filter(r => (!set || r.set === set) &&
+    (!text || (r.name + ' ' + r.id).toLowerCase().includes(text)) &&
+    (over === 'all' || (over === 'metric' ? (r[mset.mode][mset.metric] || 0) > metricLimit(mset.metric) :
+      keys.filter(ENGINE_LIMITS_EXCEPT_LIGHTS).some(k => (r[mset.mode][k] || 0) > metricLimit(k)))));
+  const key = mset.sort.key || mset.metric, dir = mset.sort.dir;
+  const val = r => metrics.limits[key] ? r[mset.mode][key] : r[key];
+  rows = rows.slice().sort((a, b) => {
+    const va = val(a), vb = val(b);
+    if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1;
+    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
+  });
+  return rows;
+}
+function sortName(k) {
+  return metrics.limits[k] ? metrics.limits[k].short || metricLabel(k) : ({id: 'map', refs_total: 'objects', npc: 'NPCs'}[k] || k);
+}
+function renderInteriors() {
+  const rows = interiorRows(), keys = metrics.metrics.filter(k => metrics.limits[k]);
+  $('ifcount').textContent = rows.length + ' of ' + metrics.interiors.length + ' interiors · ' + METRIC_MODES[mset.mode] +
+    ' · sorted by ' + sortName(mset.sort.key || mset.metric) + (mset.sort.dir < 0 ? ', largest first' : ', smallest first');
+  $('interiorstable').innerHTML = '<thead><tr><th class="l" data-key="id">Map</th><th class="l" data-key="name">Name</th>' +
+    '<th class="l" data-key="set">Set</th>' + COUNT_COLUMNS.map(([k, t]) => '<th data-key="' + k + '">' + t + '</th>').join('') +
+    metricHeaders() + '<th>3D</th></tr></thead><tbody>' + rows.map(r => '<tr><td class="l">' + escapeHtml(r.id) + '</td><td class="l">' +
+      escapeHtml(r.name) + '</td><td class="l">' + escapeHtml(r.set) + '</td>' +
+      COUNT_COLUMNS.map(([k]) => '<td>' + (r[k] == null ? '–' : r[k].toLocaleString('en-US')) + '</td>').join('') +
+      keys.map(k => valueCell(k, r[mset.mode][k], false)).join('') + '<td>' + map3dButton(r.id) + '</td></tr>').join('') + '</tbody>';
+}
+$('interiorstable').onclick = e => {
+  const th = e.target.closest ? e.target.closest('th[data-key]') : null; if (!th) return;
+  const k = th.dataset.key;
+  mset.sort = {key: k, dir: mset.sort.key === k ? -mset.sort.dir : (['id', 'name', 'set'].includes(k) ? 1 : -1)};
+  renderInteriors();
+};
+for (const id of ['ifset', 'ifover']) $(id).onchange = () => renderInteriors();
+$('ifname').oninput = () => renderInteriors();
+async function openMap3d(m) { if (hasMap(m)) { const f = await mapFile(m); if (f) openInInspector(f); } }
+for (const id of ['metricspanel', 'interiorstable']) $(id).addEventListener('click', e => {
+  const m = e.target && e.target.dataset && e.target.dataset.map; if (m) openMap3d(m);
+});
+$('metric').onchange = () => { mset.metric = $('metric').value; mset.sort.key = null; metricsUi(); draw(); };
+$('texinfolimit').onchange = () => { mset.texinfo = $('texinfolimit').value; metricsUi(); draw(); };
+for (const m of ['cur', 'evr']) $('mmode-' + m).onclick = () => { mset.mode = m; metricsUi(); draw(); };
+$('townlabels').onchange = () => draw();
+$('layer-metrics').onchange = () => { view.z = 1; view.x = view.y = 0; metricsUi(); draw(); };
+$('interiorsbtn').onclick = () => {
+  const show = $('interiorsview').hidden; $('interiorsview').hidden = !show;
+  $('interiorsbtn').setAttribute('aria-pressed', show ? 'true' : 'false'); if (show) renderInteriors();
+};
+$('metricsfile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
+};
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
 const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.0'};
 let statusFileName = null;
@@ -572,7 +859,13 @@ function stateJson() {
                                   cells: Object.keys(cellsDetail.cells).length, pois: (cellsDetail.pois || []).length} : null,
       maps_folder_bsp_files: Object.keys(mapFiles).length,
       served: SERVED, served_maps: servedMaps.size,
+      metrics: metrics ? {file: metricsFileName, format: metrics.format, source: metrics.source,
+                          cells: metrics.cells.length, regions: Object.keys(metrics.regions).length,
+                          interiors: metrics.interiors.length} : null,
     },
+    map_metrics: metrics ? {on: metricsOn(), metric: mset.metric, content: mset.mode, limit: metricLimit(mset.metric),
+                            texinfo_limit: mset.texinfo, counts: metricsCounts(),
+                            cell: metricPick ? metricsCellState(metricPick.x, metricPick.y) : null} : null,
     mode,
     layers_on: LAYERS.filter(L => on(L.id)).map(L => L.id),
     selected_cells: [...multi].map(k => k.split(',').map(Number)).map(([x, y]) => ({
@@ -659,6 +952,7 @@ function ensureInspector() {
 let mode = 'world';
 function setMode(m) {
   mode = m;
+  if (m === 'local') { $('metricsbar').hidden = true; } else if (metrics) $('metricsbar').hidden = false;
   $('mode-world').classList.toggle('on', m === 'world'); $('mode-local').classList.toggle('on', m === 'local');
   document.querySelector('main').hidden = m === 'local'; $('localview').hidden = m !== 'local';
   if (m === 'local' && picked) drawLocal(picked.x, picked.y);
@@ -675,7 +969,7 @@ function cellAt(e) {
   const g = geometry(), r = canvas.getBoundingClientRect(), k = g.w / r.width;
   const wx = ((e.clientX - r.left) * k - view.x) / view.z, wy = ((e.clientY - r.top) * k - view.y) / view.z;
   const x = Math.floor(wx / g.s) + g.b[0], y = g.b[3] - Math.floor(wy / g.s);
-  return {x, y, c: data.cells.find(c => c.x === x && c.y === y)};
+  return {x, y, c: data ? data.cells.find(c => c.x === x && c.y === y) : undefined};
 }
 // Place / region name from the local cells file (your own game data), if loaded.
 function placeName(x, y) {
@@ -683,9 +977,11 @@ function placeName(x, y) {
   if (!d || !(d.name || d.region)) return '';
   return (d.name || d.region) + (d.name && d.region ? ' (' + d.region + ')' : '');
 }
-function describe(x, y, c, sep) {
+function describe(x, y, c, sep, noMetrics) {
   const named = placeName(x, y), head = (named ? named + sep : '') + 'cell ' + x + ', ' + y;
-  if (!c) return head + sep + 'outside the island data';
+  const mt = noMetrics ? '' : metricsTip(x, y, sep);
+  if (!c) return head + (mt ? sep + mt : '') + (data ? sep + 'outside the island data' : '');
+  if (mt) return head + sep + mt + describe(x, y, c, sep, true).slice(head.length);
   const here = poisIn(x, y), poiText = here.length ? sep + 'places: ' + here.slice(0, 4).map(p => p.name).join(', ') +
     (here.length > 4 ? ' +' + (here.length - 4) : '') : '';
   return head + poiText + sep + 'map: ' + (c.map === 'full' ? 'full town/area' : c.map === 'terrain' ? 'topomap terrain' : 'no terrain') +
@@ -707,21 +1003,22 @@ function poiAt(e) {
   return best;
 }
 canvas.onmousemove = e => {
-  if (!data) return;
+  if (!data && !metrics) return;
   const {x, y, c} = cellAt(e), tip = $('tip'), r = canvas.getBoundingClientRect();
   const poi = poiAt(e);
   if (poi !== hoverPoi) { hoverPoi = poi; draw(); }
   canvas.style.cursor = c && inspectable(c) ? 'pointer' : 'crosshair';
-  if (!c) { tip.style.display = 'none'; return; }
+  if (!c && !metricsCell(x, y)) { tip.style.display = 'none'; return; }
   tip.textContent = (poi ? 'Highlighted: ' + poi.name + '\n' : '') + describe(x, y, c, '\n');
   tip.style.display = 'block'; tip.style.left = (e.clientX - r.left + 14) + 'px'; tip.style.top = (e.clientY - r.top + 14) + 'px';
 };
 canvas.onclick = e => {
-  if (!data || dragMoved || e.shiftKey) return;
+  if ((!data && !metrics) || dragMoved || e.shiftKey) return;
   const {x, y, c} = cellAt(e);
   if (multi.size) { multi.clear(); showMulti(); }
   picked = {x, y}; $('picked').textContent = describe(x, y, c, ' · '); draw();
   showSelected(x, y, c);
+  if (metricsOn()) showMetricsCell(x, y);
 };
 canvas.onmouseleave = () => { $('tip').style.display = 'none'; if (hoverPoi) { hoverPoi = null; draw(); } mapHover = false; };
 // Keyboard panning: WASD or the arrow keys while the map is active (clicked,

@@ -1,0 +1,55 @@
+# BUILD-INPUTS-UNVERIFIED-32: the builder does not check user inputs against known versions
+
+## Status: 8 October 2026
+
+Open. Repair in progress (one shared known-inputs check).
+
+## Symptom
+
+The builder converts whatever Morrowind data files it is given without telling the user
+whether they match a known edition (for example the GOG Game of the Year release). A
+patched, modded or damaged `Morrowind.esm` or `.bsa` is converted as-is. The same holds
+for the optional Amiga FPU support libraries.
+
+Correction (8 October 2026): this page first said the game data was never checked. That was
+wrong: `config/input-reference/` (7,197 records) with `src/mwad/input_check.py` already stopped
+a build on a different `Morrowind.esm` or `.bsa` unless `--allow-data-differences` was given.
+What was missing: Tribunal and Bloodmoon, naming the edition, the Amiga libraries, and one
+shared hash path. Some steps (`prepare_doors`, `prepare_guard_torches`, `prepare_harvest`,
+`mwad.audit`) still hash `Morrowind.esm` themselves instead of reading the inputs lock.
+
+## Where
+
+`tools/build.py` and `tools/build_aga.py` input handling; `tools/fpu_support.py`.
+
+## How it happened
+
+Only cache consistency was checked: the receipts record `Morrowind.esm`'s SHA-256 and the
+town importer refuses a cache made from a different file. The Kickstart ROM and downloaded
+tools are checked against known hashes; the game data never was.
+
+## Why it was not caught
+
+Builds always used the same owner copy.
+
+## Reproduction
+
+Build with a modified `Morrowind.esm`: no warning.
+
+## Repair
+
+Fixed in source (v0.0.32-dev): `tools/known_inputs.py` identifies every input (TES3 masters,
+BSA archives, Kickstart ROM, Amiga libraries) against `config/known-inputs.json`, reports
+known / unknown / invalid with warn, fail or require-known policies, and keeps the inputs
+lock `amiwind-inputs.lock` (`--check-hashes core|full|auto|off`, default core). The existing
+reference check now reads the lock.
+
+## Verification
+
+Suite 1,371 tests passing; on the GOG data all six masters and archives are known, the
+edition reads "Game of the Year edition (GOG, reference)". Core hashing takes 0.3 s on the
+host and 2.7 s through the Docker bind mount.
+
+## Prevention
+
+The verifier runs on every build.

@@ -85,7 +85,8 @@ class WorldMapHeapEstimateTests(unittest.TestCase):
         self.assertEqual(result['counts']['marksurfaces'], 1)
         self.assertEqual(result['counts']['clipnodes'], 1)
         self.assertEqual(result['temporary_input_peak_lump'], 'textures')
-        self.assertEqual(result['temporary_input_peak_bytes'], 416)
+        # The 388-byte texture lump fits one window; no prefix.
+        self.assertEqual(result['temporary_input_peak_bytes'], 16 + 400)
         self.assertGreater(result['resident_loader_bytes'], 104000)
         self.assertGreaterEqual(result['peak_loader_bytes'], result['resident_loader_bytes'])
         self.assertEqual(result['resident_bytes_at_peak'] + result['temporary_input_bytes_at_peak'],
@@ -135,6 +136,94 @@ class WorldMapHeapEstimateTests(unittest.TestCase):
         self.assertEqual(result['failing_maps'], ['sn012.bsp'])
         self.assertEqual(result['maps'][0]['gate'], 'fail')
         self.assertEqual(result['acceptance'], 'estimate-only; not target or gameplay validation')
+
+    def test_sliced_sections_hold_one_slice_not_a_staged_lump(self):
+        table = heap.lump_table(make_bsp(), Path('synthetic'))
+        table['faces'] = b'f' * (20 * 5000)
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'sn012.bsp'
+            path.write_bytes(build_bsp(table))
+            result = heap.estimate_bsp(path, SIZES)
+        slice_temp = SIZES['hunk'] + heap.BSP_RECORD_PREFIX_BYTES + heap.BSP_SLICE_BYTES
+        self.assertEqual((heap.BSP_SLICE_BYTES, heap.BSP_RECORD_PREFIX_BYTES, heap.BSP_DIRECTORY_BYTES),
+                         (16384, 64, 2052))
+        self.assertEqual(result['bsp_slice_bytes'], heap.BSP_SLICE_BYTES)
+        self.assertEqual(result['temporary_input_peak_bytes'], slice_temp)
+        self.assertEqual(result['temporary_input_peak_lump'], 'faces')
+        faces = next(row for row in result['resident_allocations'] if row['allocation'] == 'faces')
+        self.assertEqual(faces['hunk_bytes'], heap.hunk_alloc_bytes(5000 * SIZES['msurface'], SIZES['hunk']))
+        # The staged loader also held all 100,000 input bytes beside the faces.
+        self.assertLessEqual(result['peak_loader_bytes'], result['resident_loader_bytes'] + slice_temp)
+        self.assertGreaterEqual(result['peak_loader_bytes'], faces['resident_after_bytes'] + slice_temp)
+        self.assertLess(result['peak_loader_bytes'],
+                        faces['resident_after_bytes'] + heap.hunk_temp_bytes(100001, SIZES['hunk']))
+
+    def test_slice_accounting_for_short_and_empty_sections(self):
+        self.assertEqual(heap.slice_temp_bytes(0, 16), 0)
+        self.assertEqual(heap.slice_temp_bytes(20, 16, prefix_bytes=0), 48)
+        self.assertEqual(heap.slice_temp_bytes(20, 16), 112)
+        self.assertEqual(heap.slice_temp_bytes(16384, 16), 16464)
+        self.assertEqual(heap.slice_temp_bytes(10 ** 6, 16), 16464)
+        self.assertEqual(heap.slice_prefix_bytes('faces', 10 ** 6), 64)
+        self.assertEqual(heap.slice_prefix_bytes('textures', 388), 0)
+        self.assertEqual(heap.slice_prefix_bytes('faces', 16384), 0)
+        self.assertEqual(heap.slice_prefix_bytes('textures', 16388), 2064)
+        self.assertEqual(heap.slice_prefix_bytes('textures', 10 ** 6), 2064)
+        with self.assertRaises(ValueError):
+            heap.slice_temp_bytes(-1, 16)
+
+    def test_failed_prefix_certification_attempt_is_charged_at_nodes(self):
+        table = heap.lump_table(make_bsp(), Path('synthetic'))
+        # Ten nodes: a forward world chain 0..8 and an inline root 9 that has
+        # faces, so the predicted prefix (9 nodes) fails certification.
+        nodes = [struct.pack('<i2h6h2H', 0, i + 1, -1, 0, 0, 0, 0, 0, 0, 0, 0) for i in range(8)]
+        nodes.append(struct.pack('<i2h6h2H', 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0))
+        nodes.append(struct.pack('<i2h6h2H', 0, -1, -1, 0, 0, 0, 0, 0, 0, 0, 1))
+        table['nodes'] = b''.join(nodes)
+        table['models'] = (struct.pack('<9f7i', *([0.0] * 9), 0, 0, 0, 0, 1, 0, 1) +
+                           struct.pack('<9f7i', *([0.0] * 9), 9, 0, 0, 0, 0, 0, 0))
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'sn012.bsp'
+            path.write_bytes(build_bsp(table))
+            result = heap.estimate_bsp(path, SIZES)
+        policy = result['node_residency']
+        self.assertFalse(policy['direct_hull0'])
+        self.assertEqual(policy['failed_prefix_attempt_nodes'], 9)
+        rows = result['resident_allocations']
+        index = next(i for i, row in enumerate(rows) if row['allocation'] == 'nodes')
+        before = rows[index - 1]['resident_after_bytes']
+        attempt = (heap.hunk_alloc_bytes(10 * SIZES['clipnode'], SIZES['hunk']) +
+                   heap.hunk_alloc_bytes(9 * SIZES['mnode'], SIZES['hunk']))
+        self.assertGreater(attempt, rows[index]['hunk_bytes'])
+        self.assertEqual(result['peak_section'], 'nodes')
+        self.assertEqual(result['peak_loader_bytes'], before + attempt + heap.slice_temp_bytes(240, SIZES['hunk'], prefix_bytes=0))
+        self.assertEqual(heap.predicted_render_prefix(heap.lump_table(build_bsp(table), Path('x'))), 9)
+
+    def test_slice_policy_is_bound_to_the_loader_source(self):
+        source = (Path(heap.ROOT) / 'engine/aga/src/model.c').read_text(encoding='utf-8')
+        self.assertEqual(heap.bsp_slice_policy(source),
+                         {'mode': 'bounded_slices', 'slice_bytes': heap.BSP_SLICE_BYTES,
+                          'record_prefix_bytes': heap.BSP_RECORD_PREFIX_BYTES,
+                          'directory_bytes': heap.BSP_DIRECTORY_BYTES})
+        staged = source + '\nvoid f(void){mod_base=Hunk_TempAlloc(l->filelen+1);}\n'
+        with self.assertRaisesRegex(ValueError, 'Unrecognized BSP section loader'):
+            heap.bsp_slice_policy(staged)
+        with self.assertRaisesRegex(ValueError, 'Unrecognized BSP section loader'):
+            heap.bsp_slice_policy(source.replace('#define AW_BSP_SLICE_BYTES', '#define AW_BSP_SLICE'))
+        with self.assertRaisesRegex(ValueError, 'Unrecognized BSP section loader'):
+            heap.bsp_slice_policy(source.replace('aw_bsp_slice_bytes+=aw_bsp_slice_prefix;', ''))
+
+
+def build_bsp(table):
+    header = bytearray(struct.pack('<i', heap.BSP_VERSION))
+    body = bytearray()
+    offset = heap.HEADER_SIZE
+    for name in heap.RECORDS:
+        lump = table[name]
+        header.extend(struct.pack('<ii', offset if lump else 0, len(lump)))
+        body.extend(lump)
+        offset += len(lump)
+    return bytes(header + body)
 
 
 if __name__ == '__main__':

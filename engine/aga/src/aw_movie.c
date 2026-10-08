@@ -116,7 +116,7 @@ static int catalogue_path(char *request,char *out,int capacity){
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWVC1\n")){fclose(f);return 0;}
     while(fgets(line,sizeof(line),f)){
         n=-1;
-        if(sscanf(line,"%d %31s %63s%n",&id,name,file,&n)!=3 || n<0 || line[n]!='\n' || line[n+1])goto bad;
+        if(Q_sscanf(line,"%d %31s %63s%n",&id,name,file,&n)!=3 || n<0 || line[n]!='\n' || line[n+1])goto bad;
         if(id<1 || id>17 || id<=previous)goto bad;
         for(i=0;name[i];i++)if(!((name[i]>='a'&&name[i]<='z')||(name[i]>='0'&&name[i]<='9')||name[i]=='_'))goto bad;
         if(id==15)strcpy(expected,"intro/mw_intro.awv");

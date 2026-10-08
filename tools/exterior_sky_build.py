@@ -193,9 +193,32 @@ def transform(raw, *, scene_kind, local_skybox=False):
                     'input_sha256': digest(raw), 'output_sha256': digest(output)}
 
 
+def _sky_map(task):
+    """Worker: transform one staged map; write its original/candidate pair only.
+
+    The parent installs nothing until every map is prepared and re-verified.
+    """
+    path, kind, local_skybox, work = task
+    path, work = Path(path), Path(work)
+    raw = path.read_bytes()
+    if kind is not None:
+        output, detail = transform(raw, scene_kind=kind, local_skybox=local_skybox)
+    else:
+        output, detail = raw, {'scene_kind': 'unknown', 'unchanged': True, 'not_claimed_complete': True}
+    if output != raw:
+        (work / 'originals' / path.name).write_bytes(raw)
+        (work / 'candidates' / path.name).write_bytes(output)
+    return path.stem, detail, digest(raw), digest(output)
+
+
 def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=False,
-                          shared_sky_source=None, work_dir):
-    """Prepare/validate every result, then replace derived staging maps only."""
+                          shared_sky_source=None, work_dir, jobs=1):
+    """Prepare/validate every result, then replace derived staging maps only.
+
+    Maps are independent: up to `jobs` workers transform them (shared pool,
+    tools/build_parallel.py); results, receipt order and bytes equal jobs=1.
+    """
+    from build_parallel import hash_files, ordered_map
     local_skybox = boolean(local_skybox)
     id1, work = Path(id1).resolve(), Path(work_dir).resolve()
     if id1 == work or id1 in work.parents or work in id1.parents:
@@ -207,11 +230,9 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
     names = {p.stem for p in inputs}
     if not inputs or (exterior | interior) - names:
         raise ValueError('Missing staged maps in scene manifest')
-    raw_maps = {}
     for path in inputs:
         if path.is_symlink() or path.resolve().parent != id1 / 'maps':
             raise ValueError('Staged maps must be regular local files')
-        raw_maps[path.stem] = path.read_bytes()
     resource = None
     source = 'none: no exterior maps'
     if exterior:
@@ -224,7 +245,8 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
                 resource = existing.read_bytes()
                 source = 'existing staged shared resource'
             else:
-                resources = {digest(p): p for n in sorted(exterior) for p in sky_pixels(raw_maps[n])}
+                resources = {digest(p): p for n in sorted(exterior)
+                             for p in sky_pixels((id1 / 'maps' / (n + '.bsp')).read_bytes())}
                 if len(resources) != 1:
                     raise ValueError('Require one consistent reserved sky resource or explicit shared-sky-source')
                 resource = next(iter(resources.values()))
@@ -237,13 +259,11 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
     report = {'local_skybox': local_skybox, 'status': 'preparing', 'maps': [],
               'shared_resource_source': source, 'shared_resource_sha256': digest(resource) if resource is not None else None,
               'unknown_maps_preserved': sorted(names - exterior - interior)}
-    outputs = {}
-    for n, raw in raw_maps.items():
-        if n in exterior or n in interior:
-            output, detail = transform(raw, scene_kind='exterior' if n in exterior else 'interior', local_skybox=local_skybox)
-        else:
-            output, detail = raw, {'scene_kind': 'unknown', 'unchanged': True, 'not_claimed_complete': True}
-        outputs[n] = output
+    tasks = [(str(path), 'exterior' if path.stem in exterior else 'interior' if path.stem in interior else None,
+              local_skybox, str(work)) for path in inputs]
+    expected = {}
+    for n, detail, input_sha, output_sha in ordered_map(_sky_map, tasks, max(1, min(jobs, len(tasks)))):
+        expected[n] = (input_sha, output_sha)
         report['maps'].append({'map': n, **detail})
         print('[exterior-sky] {}: {}; local enclosure {}; removed {} faces; {}'.format(
             n, detail['scene_kind'], ('retained (debug)' if local_skybox else 'removed')
@@ -252,13 +272,10 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
             'unknown preserved; not claimed complete' if detail['scene_kind'] == 'unknown'
             else 'shared background ON' if detail['scene_kind'] == 'exterior'
             else 'shared background OFF'), flush=True)
-        if output != raw:
-            (work / 'originals' / (n + '.bsp')).write_bytes(raw)
-            (work / 'candidates' / (n + '.bsp')).write_bytes(output)
     report_path = work / 'exterior-sky.json'
     report_path.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    for path in inputs:
-        if path.read_bytes() != raw_maps[path.stem]:
+    for path, actual in zip(inputs, hash_files(inputs, jobs)):
+        if actual != expected[path.stem][0]:
             raise ValueError('Staged map changed during sky preparation')
     asset = id1 / SHARED_SKY_PATH
     if resource is not None:
@@ -270,8 +287,8 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
         candidate = work / 'candidates' / path.name
         if candidate.exists():
             candidate.replace(path)
-    for path in inputs:
-        if path.read_bytes() != outputs[path.stem]:
+    for path, actual in zip(inputs, hash_files(inputs, jobs)):
+        if actual != expected[path.stem][1]:
             raise ValueError('Installed sky map differs from validated result')
     report['status'] = 'completed'
     report['removed_sky_faces'] = sum(r.get('removed_sky_faces', 0) for r in report['maps'])

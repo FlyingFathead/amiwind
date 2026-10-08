@@ -166,5 +166,23 @@
         -640
       ]
     ]
+  },
+  "town": {
+    "id": "balmora",
+    "title": "Balmora",
+    "map": "balmora",
+    "map_prefix": "bm",
+    "region_cap": 64,
+    "message": "Balmora",
+    "region_file": "balmora-regions.txt",
+    "door_file": "scene-doors-balmora.txt",
+    "visual_group": "balmora",
+    "arrival": {
+      "travel_npc": "darvame hleran"
+    },
+    "return": {
+      "travel_npc": "selvil sareloth",
+      "config": "seyda_area.json"
+    }
   }
 }

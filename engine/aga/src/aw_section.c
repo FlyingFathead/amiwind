@@ -22,19 +22,19 @@ int AW_SectionRead(FILE *f,aw_section_directory_t *out)
     aw_section_directory_t d;char line[256],extra,a[16],b[16];int i,j,k;
     memset(&d,0,sizeof(d));
     if(!f || !out || !fgets(line,sizeof(line),f) ||
-       sscanf(line,"AWIS1 %d %d %c",&d.count,&d.portals,&extra)!=2 ||
+       Q_sscanf(line,"AWIS1 %d %d %c",&d.count,&d.portals,&extra)!=2 ||
        d.count<2 || d.count>AW_SECTION_MAX || d.portals<1 || d.portals>AW_SECTION_PORTALS)return 0;
     for(i=0;i<d.count;i++){
         aw_section_record_t *r=&d.section[i];
-        if(!fgets(line,sizeof(line),f) || sscanf(line,"%15s %f %f %f %f %f %f %c",r->name,
+        if(!fgets(line,sizeof(line),f) || Q_sscanf(line,"%15s %f %f %f %f %f %f %c",r->name,
            &r->low[0],&r->low[1],&r->low[2],&r->high[0],&r->high[1],&r->high[2],&extra)!=7 ||
-           AW_MapId(r->name)<AW_INTERIOR_MAP_BASE)return 0;
+           !AW_MapInteriorSection(r->name))return 0;
         for(j=0;j<i;j++)if(!strcmp(r->name,d.section[j].name))return 0;
         for(k=0;k<3;k++)if(!(r->low[k]<r->high[k] && fabs(r->low[k])<32768 && fabs(r->high[k])<32768))return 0;
     }
     for(i=0;i<d.portals;i++){
         aw_section_portal_t *p=&d.portal[i];
-        if(!fgets(line,sizeof(line),f) || sscanf(line,"%15s %15s %d %f %f %f %f %f %f %f %f %c",a,b,
+        if(!fgets(line,sizeof(line),f) || Q_sscanf(line,"%15s %15s %d %f %f %f %f %f %f %f %f %c",a,b,
            &p->axis,&p->split,&p->margin,&p->low[0],&p->low[1],&p->low[2],
            &p->high[0],&p->high[1],&p->high[2],&extra)!=11)return 0;
         p->a=find(&d,a);p->b=find(&d,b);
@@ -79,14 +79,14 @@ static int read_directory(void)
 }
 int AW_SectionSelect(const char *name,const float *point)
 {
-    int i;if(AW_MapId(name)<AW_INTERIOR_MAP_BASE)return 1;
+    int i;if(!AW_MapInteriorSection(name))return 1;
     if(!read_directory() || (i=find(&directory,name))<0)return 0;
     return contains(&directory.section[i],point);
 }
 int AW_SectionContains(const char *name,const float *point){return AW_SectionSelect(name,point);}
 int AW_SectionDestination(const char *name,const float *point,char *target)
 {
-    int i;if(AW_MapId(name)<AW_INTERIOR_MAP_BASE || !read_directory())return 0;
+    int i;if(!AW_MapInteriorSection(name) || !read_directory())return 0;
     i=AW_SectionChoose(&directory,name,point);if(i<0)return 0;
     strcpy(target,directory.section[i].name);return 1;
 }

@@ -299,4 +299,72 @@ console.log('PASS supplied023 grouped selection: 609 batches/226 groups/145 mult
  assert.equal(JSON.stringify(context.copyFixture),original,'Copy does not mutate scene');
  vm.runInContext('scene=null',context);assert.equal(await element('copysession').onclick(),false);assert.match(element('sessionstatus').textContent,/Load a source scene/);
  console.log('PASS session copy: identical serializer/current POV/source metadata, API success, unavailable/denied local-file manual fallback, explicit feedback, selected text/close and no source mutation; no real host clipboard access.');
-})().catch(error=>{console.error(error);process.exitCode=1;});
+})().then(()=>cutChecks()).catch(error=>{console.error(error);process.exitCode=1;});
+
+// Build 020 sub-cell cuts: overlay format, divider statistics, section plan,
+// import/export round trips, undo/redo, overhead drag and draw toggling.
+function cutChecks(){
+ const R=code=>vm.runInContext(code,context);
+ function quad(x0,x1,y0,y1,z,lightmapped){const vertices=[[x0,y0,z],[x1,y0,z],[x1,y1,z],[x0,y1,z]];return {vertices,edges:[[0,1],[1,2],[2,3],[3,0]],triangles:[[0,1,2],[0,2,3]],polygon:{vertices:[0,1,2,3],texinfo:0,texture:0,planeNormalZ:1,lightmapped,uv:vertices.map(p=>[p[0],p[1]])}};}
+ const floorL=quad(-100,0,-50,50,0,true),floorR=quad(0,100,-50,50,0,true),world={name:'World / terrain',model:0,entityIndex:0,storedFaceRange:[0,2],reference:'',faceCount:2,materialCount:1,vertices:[...floorL.vertices,...floorR.vertices],edges:[...floorL.edges,...floorR.edges.map(e=>e.map(i=>i+4))],triangles:[...floorL.triangles,...floorR.triangles.map(t=>t.map(i=>i+4))],polygons:[floorL.polygon,{...floorR.polygon,vertices:[4,5,6,7]}]};
+ const placed=(ref,model,first,x0,x1,lightmapped,uv)=>{const q=quad(x0,x1,-10,10,10,lightmapped);if(uv)q.polygon.uv=uv;return {name:'func_wall · ref '+ref,model,entityIndex:model,storedFaceRange:[first,1],reference:String(ref),faceCount:1,materialCount:1,vertices:q.vertices,edges:q.edges,triangles:q.triangles,polygons:[q.polygon]};};
+ const fixture={format:'amiwind-mesh-inspector-1',source:'room7.bsp',source_sha256:'c'.repeat(64),textures:[{name:'wall',width:1,height:1,pixels:[90]}],objects:[world,placed(11,1,2,-70,-50,false),placed(12,2,3,50,70,false),placed(13,3,4,-5,5,true,[[0,0],[16,0],[16,16],[0,16]])]};
+ const original=JSON.stringify(fixture);context.cutFixture=fixture;R("load(cutFixture,'room7.bsp')");
+ element('showcuts').checked=true;element('showcutcoverage').checked=true;
+ assert.equal(R('cuts.length'),0);assert.match(element('cutstats').textContent,/Add a cut/);
+ // Overlay validation: accepted shape, then every malformed field refused.
+ const good={format:'aw-cuts-1',map:'bm019',space:'map-local',z:[0,256],regions:[{name:'bm019',core:[[-768,-1536],[0,-768]],coverage:[[-1664,-2432],[896,128]]}],planes:[{label:'cut A',axis:'x',at:-384,from:-2432,to:128,z:[0,512],colour:'#00ff88'},{label:'floor',axis:'z',at:64,x:[0,10],y:[0,10]}]};
+ context.cutDoc=good;const checked=R('validateCutOverlay(cutDoc)');assert.equal(checked.regions[0].core[1][0],0);assert.equal(checked.planes[0].colour,'#00ff88');assert.equal(checked.planes[1].axis,'z');
+ for(const bad of [{...good,format:'aw-cuts-2'},{...good,space:'source'},{...good,planes:[{axis:'w',at:1,from:0,to:1}]},{...good,planes:[{axis:'x',at:1,from:5,to:1}]},{...good,planes:[{axis:'x',at:Infinity,from:0,to:1}]},{...good,regions:[{name:'r'}]},{...good,regions:[{name:'r',core:[[1,0],[0,1]]}]},{...good,planes:[{axis:'x',at:0,from:0,to:1,colour:'red'}]},{...good,divider:{margin:40,apron:30}}]){context.cutDoc=bad;assert.throws(()=>R('validateCutOverlay(cutDoc)'),undefined,JSON.stringify(bad).slice(0,80));}
+ // Quake CalcSurfaceExtents: luxels from floor/ceil of the 16-unit extents.
+ assert.equal(R('cutFaceLightBytes({lightmapped:true,uv:[[-100,-50],[0,-50],[0,50],[-100,50]]},1)'),72);assert.equal(R('cutFaceLightBytes({lightmapped:true,uv:[[0,0],[16,0],[16,16]]},2)'),8);assert.equal(R('cutFaceLightBytes({lightmapped:false},1)'),0);assert.equal(R('cutFaceLightBytes({vertices:[0,1,2]},1)'),null);
+ // One X cut through the middle: two sections, a straddling placement kept by both.
+ const zonesBefore=R('JSON.stringify([exclusionZones,faceMarks])');element('cutaddx').onclick();
+ assert.equal(R('cuts.length'),1);assert.equal(R('cuts[0].at'),0);assert.equal(R('JSON.stringify([cuts[0].from,cuts[0].to,cuts[0].z])'),JSON.stringify([-51,51,[-1,11]]));
+ let S=R('computeCutStats()');assert.equal(S.cells.length,2);
+ assert.deepEqual(S.cells.map(c=>[c.faces,c.stored,c.light,c.inside,c.straddling,c.kept]),[[2,2,72,1,1,2],[3,3,76,1,1,2]]);
+ assert.deepEqual(S.cells.map(c=>[...c.refs].sort()),[[11,13],[12,13]]);assert.deepEqual(S.cells.map(c=>[c.build.faces,c.build.light]),[[4,148],[4,148]]);assert.equal(S.whole.light,148);assert.equal(S.whole.heap,null,'No BSP size: no heap estimate');
+ R('updateCutStats()');assert.match(element('cutstats').textContent,/est\. heap unavailable/);
+ R('cutWorldWhole=false');S=R('computeCutStats()');assert.deepEqual(S.cells.map(c=>c.build.faces),[3,3],'World faces split by coverage when not kept whole');R('cutWorldWhole=true');
+ // Facts read from the BSP: size, light offsets/styles, references without geometry, entry spawn.
+ R("Object.defineProperty(scene,'cutFacts',{value:{bytes:10000,lightingBytes:148,styles:Uint8Array.from([1,1,1,1,1]),lightofs:Int32Array.from([0,72,-1,-1,144]),playerStart:{origin:[50,0,5],yaw:90},refs:[11,12,13].map(ref=>({ref,origin:[0,0,0]})).concat([{ref:99,origin:[500,0,0]}])},configurable:true});cutsSceneChanged()");
+ S=R('computeCutStats()');assert.equal(S.whole.heap,Math.round(5245860+1.09*(10000-148+148)));assert.equal(S.cells[0].build.heap,Math.round(5245860+1.09*((10000-148)*4/5+148)));assert(S.cells[1].refs.has(99)&&!S.cells[0].refs.has(99),'Reference without geometry outside all coverage goes to the nearest section');
+ R('updateCutStats()');assert.match(element('cutstats').textContent,/est\. heap 5,256,760 B \(45\.6% of 11,534,336 B\)/);
+ // Section plan in prepare_interior_sections.py format; geometry passes its rules.
+ const P=R('cutSectionPlan()');assert.deepEqual(P.errors,[]);const plan=P.plan;
+ assert.deepEqual(plan.sections.map(s=>s.name),['room7a','room7b']);assert.equal(plan.entrance_section,'room7b');assert.deepEqual(plan.sections[1].spawn,[50,0,5]);assert.equal(plan.sections[1].yaw,90);assert.match(plan.sections[0].spawn,/^PENDING/);
+ assert.deepEqual(plan.sections.map(s=>s.coverage),[[[-101,-51,-1],[40,51,11]],[[-40,-51,-1],[101,51,11]]]);assert.deepEqual(plan.sections.map(s=>s.references),[[11,13],[12,13,99]]);
+ assert.deepEqual(plan.portals,[{from:'room7a',to:'room7b',axis:0,split:0,margin:24,bounds:[[-40,-51,-1],[40,51,11]]}]);assert.deepEqual(plan.base,{bytes:10000,sha256:'c'.repeat(64)});assert.equal(plan.logical_map,'room7');assert.deepEqual(plan.external_dependencies,[]);
+ for(const key of ['master_sha256','index_sha256','doors_sha256','cell','logical_id'])assert.match(String(plan[key]),/PENDING/,key);
+ context.badPlan={...plan,portals:[{...plan.portals[0],margin:45}]};assert(R('cutPlanErrors(badPlan)').length>0,'Margin outside the apron is refused');
+ // Undo/redo, list selection and field edits.
+ const undoLevels=R('cutUndo.length');element('cutat').value='12.5';element('cutat').onchange();assert.equal(R('cuts[0].at'),12.5);element('cutundo').onclick();assert.equal(R('cuts[0].at'),0);element('cutredo').onclick();assert.equal(R('cuts[0].at'),12.5);
+ element('cutfrom').value='60';element('cutto').value='10';element('cutfrom').onchange();assert.equal(R('cuts[0].from'),-51,'Reversed ends refused');assert.match(element('cutinfo').textContent,/low < high/);
+ element('cutaddy').onclick();assert.equal(R('cuts.length'),2);assert.equal(R('cuts[1].axis'),'y');assert.equal(R('computeCutStats().cells.length'),4);element('cutdelete').onclick();assert.equal(R('cuts.length'),1);assert(R('cutUndo.length')>undoLevels);
+ // Overlay export and import round trip; section plan import (with and without the inspector's own cut list).
+ const before=R('JSON.stringify(cuts)');const overlay=R('cutOverlayDocument()');assert.equal(overlay.format,'aw-cuts-1');assert.equal(overlay.space,'map-local');assert.equal(overlay.regions.length,2);assert.equal(overlay.planes[0].kind,'cut');context.cutDoc=overlay;R('validateCutOverlay(cutDoc)');
+ R('clearCuts()');assert.equal(R('cuts.length'),0);R('cutImportDocument(cutDoc)');assert.equal(R('JSON.stringify(cuts)'),before);
+ context.cutDoc=R('cutSectionPlan()').plan;R('clearCuts();cutImportDocument(cutDoc)');assert.equal(R('JSON.stringify(cuts)'),before);
+ const bare=JSON.parse(JSON.stringify(context.cutDoc));delete bare.inspector_cuts;delete bare.inspector_divider;context.cutDoc=bare;R('clearCuts();cutImportDocument(cutDoc)');assert.equal(R('JSON.stringify(cuts.map(t=>[t.axis,t.at,t.from,t.to,t.z]))'),JSON.stringify([['x',12.5,-51,51,[-1,11]]]));assert.equal(R('JSON.stringify(cutDivider)'),JSON.stringify({margin:24,apron:40}));
+ context.cutDoc=bare;const asOverlay=R('cutPlanOverlay(cutDoc)');assert.equal(asOverlay.regions.length,2);assert.equal(asOverlay.planes[0].axis,'x');assert.equal(asOverlay.planes[0].at,12.5);
+ // Drawing: labels and hit rectangles while shown; nothing while hidden; zones untouched.
+ const drawn=[],ctx=new Proxy({},{get:(_,k)=>k==='fillText'?(text)=>drawn.push(text):typeof k==='string'&&/^(save|restore|beginPath|moveTo|lineTo|closePath|fill|stroke|strokeText|fillRect|setLineDash)$/.test(k)?()=>{}:undefined,set:()=>true});context.cutCtx=ctx;
+ context.cutDoc=good;R("cutOverlay=validateCutOverlay(cutDoc);overhead=false;orbitMode=false;orbitOrtho=false;eye=[0,-300,150];yaw=Math.PI/2;pitch=-.4;focal=1.4;drawCutOverlays(cutCtx)");
+ assert(drawn.some(t=>/^room7a \| room7b · X = 12\.5$/.test(t)),drawn.join('|'));assert(R('cutHits.length')>0);
+ element('showcuts').checked=false;drawn.length=0;R('drawCutOverlays(cutCtx)');assert.equal(drawn.length,0);assert.equal(R('cutHits.length'),0);element('showcuts').checked=true;R('cutOverlay=null');
+ assert.equal(R('JSON.stringify([exclusionZones,faceMarks])'),zonesBefore,'Zone and face markup unchanged by cuts');
+ // Overhead drag moves the cut without panning or selecting; one undo level per drag; the click is swallowed.
+ R('document.pointerLockElement=null;overhead=true;eye=[0,0,500];yaw=Math.PI/2;pitch=-Math.PI/2;overheadScale=100;focal=1.4;cuts[0].at=0;selected=-1');const levels=R('cutUndo.length'),eyeBefore=R('JSON.stringify(eye)');let stopped=0;
+ const ev=(x,y)=>({button:0,target:element('view'),clientX:x,clientY:y,preventDefault(){},stopPropagation(){stopped++;}});
+ context.cutEv=ev(500,350);R('cutPointerDown(cutEv)');assert(R('cutDrag!==null'),'Press on the cut line starts a drag');assert.equal(stopped,1,'Viewport pan handler does not see the press');
+ context.cutEv=ev(550,350);R('cutPointerMove(cutEv)');assert.equal(R('cuts[0].at'),10);R('cutPointerUp()');assert.equal(R('cutUndo.length'),levels+1);assert.equal(R('JSON.stringify(eye)'),eyeBefore);assert.equal(R('selected'),-1);
+ context.cutEv=ev(550,350);R('cutClickGuard(cutEv)');assert.equal(stopped,2,'Click after a drag is swallowed');context.cutEv=ev(900,600);R('cutPointerDown(cutEv)');assert(R('cutDrag===null'),'Press away from cuts leaves navigation alone');
+ R('overhead=false');context.cutEv=ev(500,350);R('cutPointerDown(cutEv)');assert(R('cutDrag===null'),'No drag in perspective view');
+ // BSP facts reader on a synthetic header: entities, one face and lighting.
+ const text='{"classname" "worldspawn"}{"classname" "info_player_start" "origin" "1 2 3" "angle" "450"}{"classname" "light" "aw_ref" "77" "origin" "4 5 6"}{"classname" "func_wall" "model" "*1" "aw_ref" "78"}\0',lumps=Array.from({length:15},()=>[124,0]),buffer=new ArrayBuffer(124+text.length+20+16),view=new DataView(buffer);let at=124;
+ lumps[0]=[at,text.length];for(let i=0;i<text.length;i++)view.setUint8(at+i,text.charCodeAt(i));at+=text.length;lumps[7]=[at,20];[0,255,255,255].forEach((v,k)=>view.setUint8(at+12+k,v));view.setInt32(at+16,8,true);at+=20;lumps[8]=[at,16];
+ view.setInt32(0,29,true);lumps.forEach(([o,n],i)=>{view.setInt32(4+i*8,o,true);view.setInt32(8+i*8,n,true);});context.cutRaw=buffer;const facts=R('cutsBspFacts(cutRaw)');
+ assert.equal(facts.bytes,buffer.byteLength);assert.equal(facts.lightingBytes,16);assert.deepEqual(Array.from(facts.styles),[1]);assert.deepEqual(Array.from(facts.lightofs),[8]);assert.deepEqual(JSON.parse(JSON.stringify(facts.playerStart)),{origin:[1,2,3],yaw:90});assert.deepEqual(JSON.parse(JSON.stringify(facts.refs)),[{ref:77,origin:[4,5,6]},{ref:78,origin:null}]);
+ assert.equal(JSON.stringify(fixture),original,'Cuts never change the loaded scene');assert.equal(R('Object.keys(exportSceneInfo()).includes("cutFacts")'),false,'BSP facts stay out of scene export');
+ console.log('PASS020 sub-cell cuts: aw-cuts-1 validation, Quake surface-extent lightmap bytes per offset, per-section faces/placements/refs/heap estimate, section plan in the section tool format with PENDING identity, overlay/plan round trips, undo/redo, overhead drag isolation, draw toggle, unchanged zones and scene. GPU appearance unverified.');
+}

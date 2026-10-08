@@ -1,0 +1,145 @@
+{
+  "format": 1,
+  "comment": "Runtime town table, in stable save order: append new towns, never reorder. A town after Seyda and Balmora with shipped_since (the release that first ships it) is built by default; the others only with build.py --extra-town. Converted towns keep their converter settings in their own config file (town block); tools/town_table.py generates engine/aga/src/aw_town_table.h from this file.",
+  "towns": [
+    {
+      "id": "seyda",
+      "config": "seyda_area.json",
+      "town": {
+        "id": "seyda",
+        "title": "Seyda Neen",
+        "map": "seyda",
+        "map_prefix": "sn",
+        "region_cap": 64,
+        "region_file": "seyda-regions.txt"
+      },
+      "draw_distance": 540,
+      "world_slot": 0,
+      "flags": [
+        "seyda_scenes",
+        "legacy_payload"
+      ],
+      "travel": {
+        "npc": "Darvame Hleran",
+        "target": "balmora",
+        "use_return_point": false
+      }
+    },
+    {
+      "id": "balmora",
+      "config": "balmora.json",
+      "world_slot": 1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": {
+        "npc": "Selvil Sareloth",
+        "target": "seyda",
+        "use_return_point": true
+      }
+    },
+    {
+      "id": "vivec_arena",
+      "config": "vivec_arena.json",
+      "shipped_since": "v0.0.32",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
+    },
+    {
+      "id": "vivec_foreign",
+      "config": "vivec_foreign.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
+    },
+    {
+      "id": "vivec_hlaalu",
+      "config": "vivec_hlaalu.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
+    },
+    {
+      "id": "vivec_redoran",
+      "config": "vivec_redoran.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
+    },
+    {
+      "id": "vivec_telvanni",
+      "config": "vivec_telvanni.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
+    },
+    {
+      "id": "vivec_temple",
+      "config": "vivec_temple.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null,
+      "blocked": "exterior regions over the loader heap budget (VIVEC-HEAP-31): 8 of 36 regions, up to +3,169,652 B; not convertible within the 64-region cap at draw distance 540"
+    },
+    {
+      "id": "vivec_delyn",
+      "config": "vivec_delyn.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null,
+      "blocked": "exterior regions over the loader heap budget (VIVEC-HEAP-31): 5 of 25 regions, up to +2,041,940 B; not convertible within the 64-region cap at draw distance 540"
+    },
+    {
+      "id": "vivec_olms",
+      "config": "vivec_olms.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null,
+      "blocked": "exterior regions over the loader heap budget (VIVEC-HEAP-31): 6 of 25 regions, up to +2,534,244 B; not convertible within the 64-region cap at draw distance 540"
+    }
+  ]
+}

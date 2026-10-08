@@ -32,6 +32,10 @@ int main(void){
     e->v.origin[1]=12;assert(!AW_NPCTarget(p,angles));e->v.origin[1]=0;
     e->v.origin[0]=90;assert(!AW_NPCTarget(p,angles));e->v.origin[0]=20;
     blocked=1;assert(!AW_NPCTarget(p,angles));blocked=0;
+    /* distance precheck: a far NPC is skipped before its direction vectors */
+    {int before=aw_fpucount[AW_FPU_NPCTEST];e->v.origin[0]=500;assert(!AW_NPCTarget(p,angles));
+     assert(aw_fpucount[AW_FPU_NPCTEST]==before);e->v.origin[0]=20;assert(AW_NPCTarget(p,angles)==e);
+     assert(aw_fpucount[AW_FPU_NPCTEST]==before+1);}
     floor_z=126;e->v.origin[2]=144;
     assert(AW_NPCFloor(e));assert(fabs(e->v.origin[2]-126.25f)<.001);
     assert(AW_NPCFloor(e));assert(fabs(e->v.origin[2]-126.25f)<.001); /* no drift */

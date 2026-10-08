@@ -14,6 +14,10 @@ NDK_INC ?= /opt/amiga/m68k-amigaos/ndk-include
 # Compiler flags
 ARCH_FLAGS = -m68040 -m68881
 OPT_FLAGS = -O1 -fno-strict-aliasing
+# No sin/cos builtins: GCC otherwise merges a sin(a)+cos(a) pair into
+# cexp(i*a), whose C library code executes 68040-unimplemented FPU
+# instructions (ENGINE-FPU-UNIMPL-31). The engine uses Q_SinCosDeg instead.
+MATH_FLAGS = -fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-cosf
 # NOTE: Using -O1 globally due to GCC optimizer bugs (culling, FP math)
 # NOTE: cvar.c contains workaround for AmigaOS sprintf lacking %f support
 WARN_FLAGS = -Wall -Wno-unused
@@ -28,11 +32,16 @@ PYTHON ?= python3
 VERSION_FILE ?= $(if $(wildcard VERSION),VERSION,../../VERSION)
 VERSION_GENERATOR ?= $(if $(wildcard tools/project_version.py),tools/project_version.py,../../tools/project_version.py)
 
-CFLAGS = $(ARCH_FLAGS) $(OPT_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES)
+CFLAGS = $(ARCH_FLAGS) $(OPT_FLAGS) $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES)
 
 # Linker flags
 LDFLAGS = $(ARCH_FLAGS) -s
 LIBS = -lm -lamiga
+# The printf family is Q_vsnprintf (aw_format.c): the C library's float
+# formatting executes 68040-unimplemented FPU instructions
+# (ENGINE-FPSP-MISSING-31), so its printf code is not linked at all.
+FORMAT_WRAPS = -Wl,--wrap=sprintf -Wl,--wrap=snprintf -Wl,--wrap=vsprintf -Wl,--wrap=vsnprintf \
+	-Wl,--wrap=fprintf -Wl,--wrap=vfprintf -Wl,--wrap=printf -Wl,--wrap=vprintf
 
 # Source directory
 SRCDIR = src
@@ -51,7 +60,7 @@ SRCS = \
 	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_gallery.c aw_stream.c \
 	aw_walk.c aw_world.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_hand_models.c \
 	aw_music.c \
-	aw_profile.c aw_render_ranges.c \
+	aw_profile.c aw_render_ranges.c aw_fpu_status.c \
 	aw_platform.c \
 	aw_fog.c aw_horizon.c \
 	chase.c \
@@ -61,7 +70,7 @@ SRCS = \
 	cl_parse.c \
 	cl_tent.c \
 	cmd.c \
-	common.c \
+	common.c aw_format.c aw_rcount.c \
 	console.c \
 	crc.c \
 	cvar.c \
@@ -147,7 +156,7 @@ fpu: ARCH_FLAGS = -m68040 -m68881
 fpu: DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1
 fpu: TARGET = build/AmiQuakeGCC
 fpu: OBJDIR = obj
-fpu: LDFLAGS = -m68040 -m68881 -s
+fpu: LDFLAGS = -m68040 -m68881 -s -Wl,-Map,build/AmiQuakeGCC.map
 fpu: $(TARGET)
 
 # NOFPU target (soft-float for 68020+ without FPU)
@@ -161,7 +170,7 @@ $(OBJDIR):
 # Link
 $(TARGET): $(OBJDIR) $(ALLOBJS)
 	@mkdir -p build
-	$(CC) $(LDFLAGS) -o $(TARGET) $(ALLOBJS) $(LIBS)
+	$(CC) $(LDFLAGS) $(FORMAT_WRAPS) -o $(TARGET) $(ALLOBJS) $(LIBS)
 
 	@echo "Build complete: $(TARGET)"
 
@@ -179,12 +188,20 @@ $(OBJDIR)/net_amigaudp.o: $(SRCDIR)/net_amigaudp.c
 
 # Special rule for d_sprite.c (disable optimization to prevent FPU precision issues)
 $(OBJDIR)/d_sprite.o: $(SRCDIR)/d_sprite.c
-	$(CC) $(ARCH_FLAGS) -O0 $(WARN_FLAGS) $(DEFINES) $(INCLUDES) -c -o $@ $<
+	$(CC) $(ARCH_FLAGS) -O0 $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES) -c -o $@ $<
+
+# Hardware benchmark for owners (docs/HARDWARE-BENCHMARK.md): asset-free,
+# 68020+ (the FPU loop runs only when an FPU is present).
+.PHONY: bench
+bench: build/awbench
+build/awbench: bench/awbench.c
+	@mkdir -p build
+	$(CC) -m68020 -m68881 -O1 -Wall -s -o $@ $< -lamiga
 
 # Clean
 clean:
 	rm -rf obj obj-nofpu
-	rm -f build/AmiQuakeGCC build/AmiQuakeGCC-NoFPU
+	rm -f build/AmiQuakeGCC build/AmiQuakeGCC-NoFPU build/awbench
 	rm -f build/test_*
 	rm -f tests/*.o
 

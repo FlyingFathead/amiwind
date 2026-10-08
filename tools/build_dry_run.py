@@ -15,6 +15,7 @@ from build_aga import VERSION
 from check_aga_binary import check_binary
 from amiga_fs import check_image
 from project_version import CREDITS, PROJECT_URL, THANKS
+import fpu_support
 
 
 def digest(path):
@@ -62,8 +63,24 @@ def build(args):
     check_binary(notice.read_bytes())
     shutil.copyfile(checker, boot / "C/AmiWindCheck")
     shutil.copyfile(engine, boot / "C/AmiWind")
-    (boot / 'S/startup-sequence').write_text(
-        'FailAt 10\nSYS:C/AmiWindCheck\nSYS:C/AmiWindDryRun\n', newline='\n')
+    # Optional: the user's own FPU support library (--amiga-libs), as on a game image.
+    loader = None
+    if getattr(args, 'amiga_libs', None) is not None and fpu_support.find(args.amiga_libs):
+        loader = engine.parent / fpu_support.LOADER
+        if not loader.is_file() or record.get('fpu_loader_sha256') != digest(loader):
+            raise ValueError('AmiWindFPU does not match the engine build receipt; rebuild the engine')
+        check_binary(loader.read_bytes())
+    fpu_receipt = fpu_support.stage(getattr(args, 'amiga_libs', None), boot, loader,
+                                    loader_target='C/' + fpu_support.LOADER,
+                                    policy=getattr(args, 'amiga_libs_policy', None) or 'warn')
+    for line in fpu_support.summary_lines(fpu_receipt):
+        print(line, flush=True)
+    if fpu_receipt['status'] == 'installed':
+        startup = fpu_support.startup_sequence(fpu_receipt, check='SYS:C/AmiWindCheck',
+                                               loader='SYS:C/AmiWindFPU', rest=('SYS:C/AmiWindDryRun',))
+    else:
+        startup = 'FailAt 10\nSYS:C/AmiWindCheck\nSYS:C/AmiWindDryRun\n'
+    (boot / 'S/startup-sequence').write_text(startup, newline='\n')
     (boot / 'README.txt').write_text(message, newline='\n')
     shutil.copyfile(ROOT / 'engine/aga/COPYING', boot / 'COPYING')
     # Use Python module entry points so wrappers cannot select another Python.
@@ -72,8 +89,9 @@ def build(args):
     part = out / 'partition.hdf'
     image = out / f'AmiWind-v{VERSION}-dry-run.hdf'
     command = xdf + [str(part), 'create', 'size=8Mi', '+', 'format', 'AMIWINDTEST', 'ffs', '+', 'boot', 'install']
-    for name in ('C', 'S'):
-        command += ['+', 'makedir', name]
+    for name in ('C', 'S', 'LIBS'):
+        if (boot / name).is_dir():
+            command += ['+', 'makedir', name]
     payload = sorted(p for p in boot.rglob('*') if p.is_file())
     for path in payload:
         command += ['+', 'write', str(path), path.relative_to(boot).as_posix()]
@@ -92,6 +110,7 @@ def build(args):
         'version': VERSION, 'kind': 'asset-free test compile', 'game_assets': False,
         'rom_included': False, 'hdf': image.name, 'hdf_sha256': digest(image),
         'payload': {p.relative_to(boot).as_posix(): digest(p) for p in payload},
+        'fpu_support': fpu_receipt,
         'validation': 'Amiga Hunk headers, filesystem metadata and every payload readback; emulator boot is a separate check'
     }, indent=2) + '\n', newline='\n')
     from emulator_configs import write_configs, print_outputs
@@ -110,6 +129,10 @@ def main():
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--vasm', type=Path)
     p.add_argument('--kickstart-file', type=Path)
+    p.add_argument('--amiga-libs', type=Path,
+                   help='Optional folder with your own 68040.library/68060.library (docs/FPU_SUPPORT_LIBRARY.md)')
+    p.add_argument('--amiga-libs-policy', choices=('warn', 'fail', 'require-known'), default='warn',
+                   help='Known-inputs policy for --amiga-libs (docs/KNOWN_INPUTS.md)')
     try:
         build(p.parse_args())
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:

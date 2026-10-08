@@ -163,6 +163,11 @@ gameplay behavior is correct.
 The GOG default-location suggestion checks both core sizes and SHA-256 hashes
 before offering the folder. Full input checking still follows acceptance.
 
+The [known-inputs check](KNOWN_INPUTS.md) then names the edition (GOG or Steam Game of
+the Year), gives each master and archive, including the expansion files, a verdict
+(known, unknown or invalid) and records the input hashes in the workspace lock
+`amiwind-inputs.lock` (`--check-hashes`, `--game-data-policy`).
+
 Package references: [Ubuntu Python setup](https://ubuntu.com/developers/docs/howto/python-setup/),
 [AmigaPorts releases](https://github.com/AmigaPorts/m68k-amigaos-gcc/releases),
 [ericw-tools](https://github.com/ericwa/ericw-tools),

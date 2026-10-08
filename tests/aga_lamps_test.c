@@ -15,7 +15,7 @@ void Cmd_AddCommand(char *n,void (*f)(void)){assert(!strcmp(n,"aw_lamp_status"))
 void Con_Printf(char *fmt,...){(void)fmt;}
 unsigned char r_dlight_cool[32];
 struct texture_s *r_night_windows[R_NIGHT_WINDOWS];int r_night_window_count,r_night_windows_on;
-static int night=1,opens,corrupt,flushes,window_opens;static cvar_t *lamp_cvar,*window_cvar,*warm_cvar;
+static int night=1,opens,corrupt,overflow,flushes,window_opens;static cvar_t *lamp_cvar,*window_cvar,*warm_cvar;
 void D_FlushCaches(void){flushes++;}
 cvar_t aw_warm_light={"aw_warm_light","1",true}; /* defined in r_surf.c, registered here */
 float AW_TorchLightRadius(void){return 192;}
@@ -44,6 +44,10 @@ int COM_FOpenFile(char *name,FILE **out){
     }
     opens++;assert(!strcmp(name,"world/lamps.awl"));
     f=tmpfile();assert(f);
+    if(overflow){ /* 300 lamps in cell (7,7): more than the cache holds */
+        int i;count=300;fwrite("AWL1",1,4,f);fwrite(&count,4,1,f);
+        for(i=0;i<300;i++)row(f,7,7,57444+(float)i,57444,0,223);
+        rewind(f);*out=f;return 8+300*20;}
     fwrite("AWL1",1,4,f);if(corrupt)count=9;fwrite(&count,4,1,f);
     /* Sorted by cell: (-1,0), (0,0) x3, (5,5). Little-endian host assumed. */
     row(f,-1,0,-400,100,0,223);
@@ -87,7 +91,10 @@ int main(void){
     vpn[0]=1;r_refdef.vieworg[0]=10;
     /* Far cell: only that cell's neighbourhood is read; lamps out of range give none. */
     r_refdef.vieworg[0]=10250;r_refdef.vieworg[1]=10250;frame();assert(opens==2 && count_lit()==1 && lit(10250));
-    corrupt=1;r_refdef.vieworg[0]=10;r_refdef.vieworg[1]=0;frame();assert(opens==3 && count_lit()==0);
+    corrupt=1;r_refdef.vieworg[0]=10;r_refdef.vieworg[1]=0;frame();assert(opens==3 && count_lit()==0);corrupt=0;
+    /* More lamps than the cache: 256 kept, the rest counted as dropped (LAMPS-CACHE-31). */
+    overflow=1;r_refdef.vieworg[0]=14361;r_refdef.vieworg[1]=14361;frame();
+    assert(opens==4 && AW_LampCachedCount()==256 && AW_LampDroppedCount()==44 && count_lit()==2);overflow=0;
     /* Night windows: this map's listed textures only (other maps' lines and
      * names missing from the map ignored), on at night, one cache rebuild per switch. */
     {
@@ -104,6 +111,6 @@ int main(void){
         strcpy(world.name,"maps/vf0001.bsp");cl.worldmodel=NULL;frame();cl.worldmodel=&world;frame();
         assert(window_opens==2 && r_night_window_count==0 && !r_night_windows_on);
     }
-    puts("night lamps: per-cell table, nearest lit at night, torch radius, switches, corrupt table, night windows");
+    puts("night lamps: per-cell table, nearest lit at night, torch radius, switches, corrupt table, cache overflow, night windows");
     return 0;
 }

@@ -1,0 +1,118 @@
+{
+  "format": 1,
+  "comment": "Vivec canton frame (docs/TOWN_IMPORT.md, Vivec). handoff_core is the canton's share of the city on the original cell grid; the bounds add at least draw distance + 32 around it, in whole 768 cores, so a neighbouring frame takes over before this frame's edge comes into view. The centre is the handoff core's centre on the 512-unit terrain material grid. interiors: the rooms reached through the canton's load doors (append only; position = map name and save ID).",
+  "source_cell": [
+    3,
+    -11
+  ],
+  "source_radius": 1,
+  "centre": [
+    28672,
+    -86016
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1920,
+      -1920
+    ],
+    [
+      1920,
+      1920
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "handoff_core": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "town": {
+    "id": "vivec_redoran",
+    "title": "Vivec, Redoran",
+    "map": "vivec_redoran",
+    "map_prefix": "vr",
+    "region_cap": 64,
+    "message": "Vivec, Redoran",
+    "region_file": "vivec_redoran-regions.txt",
+    "door_file": "scene-doors-vivec_redoran.txt",
+    "visual_group": "vivec_redoran",
+    "arrival": {
+      "source_position": [
+        26505,
+        -87552,
+        1890
+      ],
+      "source_rotation_z": 4.71238899230957,
+      "reason": "Original exit point of interior door 188749 (Vivec, Redoran Waistworks) onto the canton."
+    },
+    "return": null
+  },
+  "interiors": [
+    {
+      "cell": "Vivec, Dralor Manor"
+    },
+    {
+      "cell": "Vivec, Redoran Ancestral Vaults"
+    },
+    {
+      "cell": "Vivec, Redoran Canalworks"
+    },
+    {
+      "cell": "Vivec, Redoran Plaza"
+    },
+    {
+      "cell": "Vivec, Redoran Prison Cells"
+    },
+    {
+      "cell": "Vivec, Redoran Records"
+    },
+    {
+      "cell": "Vivec, Redoran Scout & Drillmaster"
+    },
+    {
+      "cell": "Vivec, Redoran Smith"
+    },
+    {
+      "cell": "Vivec, Redoran Temple Shrine",
+      "exclude": "room coordinates reach 4,156, beyond the +-4,096 network range (INTERIOR-COORDS-31); needs recentring"
+    },
+    {
+      "cell": "Vivec, Redoran Trader"
+    },
+    {
+      "cell": "Vivec, Redoran Treasury"
+    },
+    {
+      "cell": "Vivec, Redoran Underworks"
+    },
+    {
+      "cell": "Vivec, Redoran Vaults"
+    },
+    {
+      "cell": "Vivec, Redoran Waistworks",
+      "exclude": "inline models 240 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, Saren Manor"
+    },
+    {
+      "cell": "Vivec, The Flowers of Gold"
+    }
+  ]
+}

@@ -1,37 +1,39 @@
 # Project media
 
-`resources/media/AmiWind_logo_clear_background.png` is the original transparent
-logo supplied by FlyingFathead on 28 September 2026 for the main README and
-project materials. The stored PNG is unchanged; README display width does not
-resample or replace the source.
+`resources/media/AmiWind_logo.png` is the AmiWind logo: the gold AmiWind name
+under the line "An open-source RPG engine for the Commodore Amiga", on a
+transparent background. It is the project's own logo, supplied by FlyingFathead
+on 8 October 2026, and is stored exactly as supplied. The README shows it at a
+reduced display width; the stored PNG is not resampled or replaced.
 
-Dimensions: 2048 × 682 pixels.
+Dimensions: 2172 × 724 pixels, 8-bit RGBA.
 
-SHA-256: `3fa5aca3510ba28cf9c201628c22a17859150dd70abadb72bb0a6303b4b624f1`.
+SHA-256: `9863d887449616ac0ba9780a4a55a0e40af4d38eefe89a872d3256f4e080b261`.
 
-7 October 2026: the stored master has since been replaced; it now measures
-2172 × 724 pixels, SHA-256
-`f741f1c50fe23700ba10fc089fe7c1d0a8e73c4db3df9c0782167e53e4f69beb`.
+These named project assets are included in the public source allowlist.
+Converted Morrowind artwork, fonts, audio, movies and ROMs remain private build
+inputs.
 
-This named project asset is included in the public source allowlist. Converted
-Morrowind artwork, fonts, audio, movies and ROMs remain private build inputs.
+## Name-only logo and wordmark
 
-The image builder makes a private 2.6-second startup stream: fade in from black,
-brief hold, fade out. Esc goes to the main menu. A separately scaled upper logo
-is composited into the menu during image creation; no extra runtime overlay
-buffer is needed. The original transparent PNG remains the reusable master.
-
-## Name-only logo
-
-`resources/media/AmiWind_logo_name_only.png` is the gold AmiWind name from the
-master logo, without the subtitle and the rule, framed tightly around the
-letters (7 October 2026, cropped to the owner's framing). The letters keep their
-dark outlines; only the outer black glow is transparent, so it reads on light
-and dark backgrounds. It heads the [AmiWind Toolkit](AMIWIND_TOOLKIT.md).
+`resources/media/AmiWind_logo_name_only.png` is the gold AmiWind name, framed
+tightly around the letters. It heads the [AmiWind Toolkit](AMIWIND_TOOLKIT.md).
 
 Dimensions: 1813 × 309 pixels.
 
 SHA-256: `3b20caefa58d8bd1056a71acba1413de8525ab35ac29005729a0b35f27f6f346`.
+
+`resources/media/AmiWind_wordmark.png` is the gold AmiWind name under the line.
+The image builder uses it for the startup screen and the menu logo.
+
+## In the game
+
+The image builder makes a private startup stream from the wordmark: fade
+in from black, brief hold, fade out, with the two lines "An open-source RPG
+engine" and "for the Commodore Amiga" drawn below it. Esc goes to the main menu.
+A separately scaled copy of the wordmark is composited into the upper
+menu during image creation; no extra runtime overlay buffer is needed. The PNGs
+in `resources/media/` remain the reusable masters.
 
 ## Use in media
 

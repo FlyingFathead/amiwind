@@ -17,7 +17,7 @@ from compact_bsp import compact, entities
 from player_hull import lumps, pack_lumps
 
 FORMATS = {1: '<4fi', 3: '<3f', 5: '<i2h6h2H', 6: '<8f2i',
-           7: '<Hhihh4Bi', 9: '<iHH', 10: '<ii6h2H4B', 11: '<H',
+           7: '<HhihH4Bi', 9: '<iHH', 10: '<ii6h2H4B', 11: '<H',
            12: '<HH', 13: '<i', 14: '<9f7i'}
 
 
@@ -194,7 +194,7 @@ def replace_world(source_raw, base_raw, source_palette, base_palette, *, allow_i
     for row in ir[14][1:]:
         row=list(row);row[9]=point_child(row[9]);row[10:13]=[clip_child(v) for v in row[10:13]]
         row[14]+=offset[7];merged[14].append(row)
-    if len(merged[5])>32767 or len(merged[9])>65520 or len(merged[1])>65536 or len(merged[3])>65536 or len(merged[6])>32767:
+    if len(merged[5])>32767 or len(merged[9])>65520 or len(merged[1])>65536 or len(merged[3])>65536 or len(merged[6])>65536:
         raise ValueError('Combined BSP exceeds target index widths')
     try:
         for index, values in merged.items():

@@ -122,7 +122,7 @@ static void command(void)
     int value,i,active=0,lights=0;
     if(Cmd_Argc()==2 && strchr(Cmd_Argv(1),'.')){
         /* A decimal is the guard torch light radius: dbg guardtorch 0.5 (0.1..2). */
-        float s=(float)atof(Cmd_Argv(1));
+        float s=(float)Q_strtod(Cmd_Argv(1),NULL);
         if(!(s>=.1f && s<=2)){Con_Printf("Usage: dbg guardtorch 0.1..2.0 (light radius, player torch 1; default 0.5)\n");return;}
         Cvar_SetValue(aw_guard_torch_radius.name,s);
         Con_Printf("Guard torch light radius %g of the player torch's.\n",aw_guard_torch_radius.value);return;
@@ -144,10 +144,10 @@ static void command(void)
     Con_Printf("Guard lights: active %d; last selected %d/2, outside range %d, contents rejects %d, trace rejects %d, untested/budget %d.\n",
         lights,last_lights,last_light_range,last_light_contents,last_light_trace,last_light_untested);
 }
-extern cvar_t aw_static_flames;
+extern cvar_t aw_static_flames,aw_static_flames_nearest;
 void AW_GuardTorchInit(void)
 {
-    Cvar_RegisterVariable(&aw_static_flames);
+    Cvar_RegisterVariable(&aw_static_flames_nearest);Cvar_RegisterVariable(&aw_static_flames);
     Cvar_RegisterVariable(&guards_torch_cycle);Cmd_AddCommand("aw_guardtorch",command);
 }
 static int automatic_night(void)
@@ -384,15 +384,31 @@ void AW_GuardTorchDraw(void)
  * The scene converter writes an "aw_flame" entity (origin, aw_flame_size) for
  * each placed mesh with a particle emitter; their light is already baked into
  * the lightmaps, so only the visible flame is drawn here. The entity text is
- * read once per map into a fixed table; the nearest STATIC_FLAME_DRAW within
- * range are drawn each frame. aw_static_flames 0 turns them off. */
+ * read once per map into a fixed table; at most STATIC_FLAME_DRAW within range
+ * are drawn each frame (AW_StaticFlamesPick). aw_static_flames 0 turns them off. */
 #define STATIC_FLAME_MAX 128
 #define STATIC_FLAME_DRAW 12
 #define STATIC_FLAME_RANGE (640.0f*640.0f)
 #define STATIC_FLAME_PARTS 6
 cvar_t aw_static_flames={"aw_static_flames","1",true};
-/* shape: particle size, rise and cone spread in map units (0 = legacy flame) */
-static struct {vec3_t origin;float scale,shape[3];} static_flames[STATIC_FLAME_MAX];
+/* Which STATIC_FLAME_DRAW flames get the budget (FLAME-RANGE-NEAREST-32).
+ * 0, the default: flames on screen, largest on screen first (size over
+ * distance), so a hearth across the room is not crowded out by candles behind
+ * the camera. 1: the earlier rule, the nearest within range in any direction. */
+cvar_t aw_static_flames_nearest={"aw_static_flames_nearest","0",true};
+/* Emitter particle k sits at angle k*2.39996 rad (golden angle) and radius
+ * 0.45+0.55*frac(k*0.618034) of the authored spread (0 for the core). The
+ * angles never change, so the cosine/sine products are constants, computed
+ * once (anorms.h style) instead of every frame (ENGINE-FPU-UNIMPL-31).
+ * tests/aga_static_flame_offsets_test.c checks them against the formula. */
+const float aw_static_flame_offsets[STATIC_FLAME_PARTS][2]={
+    {0.0f,0.0f},
+    {-0.582459748f,0.533584237f},
+    {0.0506890193f,-0.577617526f},
+    {0.559622347f,0.729913831f},
+    {-0.698827982f,-0.123603635f},
+    {0.421530217f,-0.268152744f}};
+static aw_static_flame_t static_flames[STATIC_FLAME_MAX];
 static int static_flame_count;
 static model_t *static_flame_world;
 static void static_flames_load(model_t *world)
@@ -407,10 +423,10 @@ static void static_flames_load(model_t *world)
             strncpy(key,com_token,sizeof(key)-1);key[sizeof(key)-1]=0;
             if(!(data=COM_Parse(data)))break;
             if(!strcmp(key,"classname"))flame=!strcmp(com_token,"aw_flame");
-            else if(!strcmp(key,"origin"))sscanf(com_token,"%f %f %f",&origin[0],&origin[1],&origin[2]);
-            else if(!strcmp(key,"aw_flame_size"))scale=(float)atof(com_token);
+            else if(!strcmp(key,"origin"))Q_sscanf(com_token,"%f %f %f",&origin[0],&origin[1],&origin[2]);
+            else if(!strcmp(key,"aw_flame_size"))scale=(float)Q_strtod(com_token,NULL);
             else if(!strcmp(key,"aw_flame_shape") &&
-                sscanf(com_token,"%f %f %f",&shape[0],&shape[1],&shape[2])!=3)shape[0]=shape[1]=shape[2]=0;
+                Q_sscanf(com_token,"%f %f %f",&shape[0],&shape[1],&shape[2])!=3)shape[0]=shape[1]=shape[2]=0;
         }
         if(flame && static_flame_count<STATIC_FLAME_MAX && isfinite(scale) && scale>0 && scale<=16){
             VectorCopy(origin,static_flames[static_flame_count].origin);
@@ -422,22 +438,56 @@ static void static_flames_load(model_t *world)
         if(!data)break;
     }
 }
+/* Drawn particle size of a flame in map units: the authored size or
+ * flame_particle's 1.5*scale, whichever is larger. */
+static float flame_size(const aw_static_flame_t *f)
+{
+    return f->shape[0]>f->scale*1.5f?f->shape[0]:f->scale*1.5f;
+}
+/* Could any particle of this flame land in the view rectangle? Same
+ * projection as flame_particle; flames behind the camera never can. */
+static int flame_on_screen(const aw_static_flame_t *f,const vec3_t delta)
+{
+    float depth=DotProduct(delta,vpn),reach,x,y,margin;
+    reach=flame_size(f)+f->shape[2]+(f->shape[0]>0?f->shape[1]:2.7f*(f->scale<2.5f?f->scale:2.5f));
+    if(depth<=-reach)return 0;
+    if(depth<=1)return 1; /* the flame straddles the camera plane: flame_particle decides */
+    x=DotProduct(delta,vright)*aliasxscale/depth;y=DotProduct(delta,vup)*aliasyscale/depth;
+    margin=16+reach*(aliasxscale>aliasyscale?aliasxscale:aliasyscale)/depth;
+    return aliasxcenter+x>=r_refdef.vrect.x-margin && aliasxcenter+x<=r_refdef.vrect.x+r_refdef.vrect.width+margin &&
+           aliasycenter-y>=r_refdef.vrect.y-margin && aliasycenter-y<=r_refdef.vrect.y+r_refdef.vrect.height+margin;
+}
+/* Choose at most STATIC_FLAME_DRAW flames within STATIC_FLAME_RANGE into
+ * chosen[], best first; returns the count. nearest: the earlier rule (nearest
+ * first, in any direction). Otherwise only flames on screen, ranked by drawn
+ * size over distance (distance squared over size squared, smallest first). */
+int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,int *chosen)
+{
+    int i,j,n=0;float key[STATIC_FLAME_DRAW],d,k,size;vec3_t delta;
+    for(i=0;i<count;i++){
+        VectorSubtract(flames[i].origin,r_refdef.vieworg,delta);d=DotProduct(delta,delta);
+        if(d>STATIC_FLAME_RANGE)continue;
+        if(nearest)k=d;
+        else {
+            if(!flame_on_screen(&flames[i],delta))continue;
+            size=flame_size(&flames[i]);k=d/(size*size);
+        }
+        /* keep the STATIC_FLAME_DRAW best, sorted by key */
+        if(n<STATIC_FLAME_DRAW)j=n++;
+        else if(k>=key[STATIC_FLAME_DRAW-1])continue;
+        else j=STATIC_FLAME_DRAW-1;
+        for(;j>0 && key[j-1]>k;j--){key[j]=key[j-1];chosen[j]=chosen[j-1];}
+        key[j]=k;chosen[j]=i;
+    }
+    return n;
+}
 void AW_StaticFlamesDraw(void)
 {
-    int i,j,k,count=0,core,chosen[STATIC_FLAME_DRAW];float dist[STATIC_FLAME_DRAW],d;vec3_t delta;
+    int i,k,count,core,chosen[STATIC_FLAME_DRAW];
     if(!aw_static_flames.value || !cl.worldmodel)return;
     if(cl.worldmodel!=static_flame_world)static_flames_load(cl.worldmodel);
     if(!static_flame_count || !flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
-    for(i=0;i<static_flame_count;i++){
-        VectorSubtract(static_flames[i].origin,r_refdef.vieworg,delta);d=DotProduct(delta,delta);
-        if(d>STATIC_FLAME_RANGE)continue;
-        /* keep the STATIC_FLAME_DRAW nearest, sorted by distance */
-        if(count<STATIC_FLAME_DRAW)j=count++;
-        else if(d>=dist[STATIC_FLAME_DRAW-1])continue;
-        else j=STATIC_FLAME_DRAW-1;
-        for(;j>0 && dist[j-1]>d;j--){dist[j]=dist[j-1];chosen[j]=chosen[j-1];}
-        dist[j]=d;chosen[j]=i;
-    }
+    count=AW_StaticFlamesPick(static_flames,static_flame_count,aw_static_flames_nearest.value!=0,chosen);
     core=AW_TorchFlameCoreColor();
     for(i=0;i<count;i++){
         float scale=static_flames[chosen[i]].scale,*shape=static_flames[chosen[i]].shape;
@@ -445,12 +495,11 @@ void AW_StaticFlamesDraw(void)
             /* Emitter shape from the original mesh: STATIC_FLAME_PARTS particles
              * of the authored size, spread over the authored cone and lifted by
              * the authored rise (flame_particle lifts by age*2.7*rise). */
-            vec3_t at;float a,r;
+            vec3_t at;
             if(shape[0]>=4){if(!hearth_lut_ready)hearth_lut_build();flame_lut=hearth_lut;}
             for(k=0;k<STATIC_FLAME_PARTS;k++){
-                a=k*2.39996f;r=shape[2]*(k?0.45f+0.55f*(float)fmod(k*0.618034f,1.0f):0);
                 VectorCopy(static_flames[chosen[i]].origin,at);
-                at[0]+=r*(float)cos(a);at[1]+=r*(float)sin(a);
+                at[0]+=shape[2]*aw_static_flame_offsets[k][0];at[1]+=shape[2]*aw_static_flame_offsets[k][1];
                 flame_particle(at,k,(shape[0]>scale*1.5f?shape[0]:scale*1.5f)/1.5f,core,64,shape[1]/2.7f,2,96);
             }
             flame_lut=NULL;

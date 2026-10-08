@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_rcount.h"
 
 //
 // current entity info
@@ -76,20 +77,13 @@ void R_EntityRotate (vec3_t vec)
 R_RotateBmodel
 ================
 */
-void R_RotateBmodel (void)
+static void R_BuildBmodelRotation (entity_t *e)
 {
-	float	angle, s, c, temp1[3][3], temp2[3][3], temp3[3][3];
+	float	s, c, temp1[3][3], temp2[3][3], temp3[3][3];
 
-// TODO: should use a look-up table
-// TODO: should really be stored with the entity instead of being reconstructed
-// TODO: could cache lazily, stored in the entity
-// TODO: share work with R_SetUpAliasTransform
-
+	AW_FPUCOUNT(AW_FPU_ROTATE_TRIG);
 // yaw
-	angle = currententity->angles[YAW];
-	angle = angle * M_PI*2 / 360;
-	s = sin(angle);
-	c = cos(angle);
+	Q_SinCosDeg (e->angles[YAW], &s, &c);
 
 	temp1[0][0] = c;
 	temp1[0][1] = s;
@@ -101,12 +95,16 @@ void R_RotateBmodel (void)
 	temp1[2][1] = 0;
 	temp1[2][2] = 1;
 
+// yaw only (converted buildings, doors): pitch and roll are identity
+// matrices, so the products below would return temp1 unchanged
+	if (!e->angles[PITCH] && !e->angles[ROLL])
+	{
+		memcpy (entity_rotation, temp1, sizeof(entity_rotation));
+		return;
+	}
 
 // pitch
-	angle = currententity->angles[PITCH];
-	angle = angle * M_PI*2 / 360;
-	s = sin(angle);
-	c = cos(angle);
+	Q_SinCosDeg (e->angles[PITCH], &s, &c);
 
 	temp2[0][0] = c;
 	temp2[0][1] = 0;
@@ -121,10 +119,7 @@ void R_RotateBmodel (void)
 	R_ConcatRotations (temp2, temp1, temp3);
 
 // roll
-	angle = currententity->angles[ROLL];
-	angle = angle * M_PI*2 / 360;
-	s = sin(angle);
-	c = cos(angle);
+	Q_SinCosDeg (e->angles[ROLL], &s, &c);
 
 	temp1[0][0] = 1;
 	temp1[0][1] = 0;
@@ -137,6 +132,49 @@ void R_RotateBmodel (void)
 	temp1[2][2] = c;
 
 	R_ConcatRotations (temp1, temp3, entity_rotation);
+}
+
+/*
+AmiWind: id's TODOs here ("should use a look-up table", "should really be
+stored with the entity", "could cache lazily, stored in the entity") done the
+GLQuake way: R_DrawBrushModel rotates only when an angle is non-zero. A model
+with all angles zero gets the identity (rotating the view vectors by it
+changes nothing, so that is skipped); otherwise the basis is kept in a small
+cache keyed by the entity and rebuilt only when its angles change (the entity
+structure keeps its size: no heap budget change). The edge drawer calls this
+once per submodel surface, so most calls are cache hits. ENGINE-FPU-UNIMPL-31.
+*/
+#define	ROTATION_CACHE	64	// power of two; collisions only cost a rebuild
+static struct
+{
+	entity_t	*entity;
+	float		angles[3];
+	float		rotation[3][3];
+} rotation_cache[ROTATION_CACHE];
+
+void R_RotateBmodel (void)
+{
+	entity_t	*e = currententity;
+	int			slot;
+
+	AW_FPUCOUNT(AW_FPU_ROTATE);
+	if (!e->angles[0] && !e->angles[1] && !e->angles[2])
+	{
+		memset (entity_rotation, 0, sizeof(entity_rotation));
+		entity_rotation[0][0] = entity_rotation[1][1] = entity_rotation[2][2] = 1;
+		R_TransformFrustum ();
+		return;
+	}
+	slot = ((unsigned long)e / sizeof(entity_t)) & (ROTATION_CACHE-1);
+	if (rotation_cache[slot].entity == e && VectorCompare (rotation_cache[slot].angles, e->angles))
+		memcpy (entity_rotation, rotation_cache[slot].rotation, sizeof(entity_rotation));
+	else
+	{
+		R_BuildBmodelRotation (e);
+		rotation_cache[slot].entity = e;
+		VectorCopy (e->angles, rotation_cache[slot].angles);
+		memcpy (rotation_cache[slot].rotation, entity_rotation, sizeof(entity_rotation));
+	}
 
 //
 // rotate modelorg and the transformation matrix
@@ -164,6 +202,7 @@ void R_RecursiveClipBPoly (bedge_t *pedges, mnode_t *pnode, msurface_t *psurf)
 	mvertex_t	*pvert, *plastvert, *ptvert;
 	mnode_t		*pn;
 
+	AW_RC(RC_CLIP_NODES);
 	psideedges[0] = psideedges[1] = NULL;
 
 	makeclippededge = false;
@@ -308,6 +347,7 @@ void R_RecursiveClipBPoly (bedge_t *pedges, mnode_t *pnode, msurface_t *psurf)
 					if (pn->contents != CONTENTS_SOLID)
 					{
 						r_currentbkey = ((mleaf_t *)pn)->key;
+						AW_RC(RC_FRAGMENTS);
 						R_RenderBmodelFace (psideedges[i], psurf);
 					}
 				}
@@ -350,11 +390,14 @@ void R_DrawSolidClippedSubmodelPolygo (model_t *pmodel)
 		pplane = psurf->plane;
 
 		dot = DotProduct (modelorg, pplane->normal) - pplane->dist;
+		AW_RC(RC_BF_TESTED);
 
 	// draw the polygon
 		if (((psurf->flags & SURF_PLANEBACK) && (dot < -BACKFACE_EPSILON)) ||
 			(!(psurf->flags & SURF_PLANEBACK) && (dot > BACKFACE_EPSILON)))
 		{
+			AW_RC(RC_BF_FRONT);
+			AW_RC(RC_CLIP_FACES);
 		// FIXME: use bounding-box-based frustum clipping info?
 
 		// copy the edges to bedges, flipping if necessary so always
@@ -428,11 +471,14 @@ void R_DrawSubmodelPolygons (model_t *pmodel, int clipflags)
 		pplane = psurf->plane;
 
 		dot = DotProduct (modelorg, pplane->normal) - pplane->dist;
+		AW_RC(RC_BF_TESTED);
 
 	// draw the polygon
 		if (((psurf->flags & SURF_PLANEBACK) && (dot < -BACKFACE_EPSILON)) ||
 			(!(psurf->flags & SURF_PLANEBACK) && (dot > BACKFACE_EPSILON)))
 		{
+			AW_RC(RC_BF_FRONT);
+			AW_RC(RC_LEAF_FACES);
 			r_currentkey = ((mleaf_t *)currententity->topnode)->key;
 
 		// FIXME: use bounding-box-based frustum clipping info?
@@ -600,6 +646,7 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 						}
 						else
 						{
+							AW_RC(RC_WORLD_FACES);
 							R_RenderFace (surf, clipflags);
 						}
 					}
@@ -633,6 +680,7 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 						}
 						else
 						{
+							AW_RC(RC_WORLD_FACES);
 							R_RenderFace (surf, clipflags);
 						}
 					}

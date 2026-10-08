@@ -18,12 +18,18 @@ void Con_Printf(char *fmt,...){va_list ap;va_start(ap,fmt);vsnprintf(report,size
 #ifdef HORIZON_FOG_TEST
 server_t sv;
 cvar_t aw_drawdistance={"aw_drawdistance","540",0,0,540};
-static cvar_t *horizon_switch,*fog_switch;
+static cvar_t *horizon_switch,*fog_switch,*skyline_switch,*defaults_switch;
+static void (*horizon_migrate)(void);
 static byte fog_colours[4096];static int inside;
 int AW_Interior(void){return inside;}
-void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->name,"aw_terrain_horizon"))horizon_switch=v;if(!strcmp(v->name,"aw_fog"))fog_switch=v;}
-void Cvar_SetValue(char *name,float value){aw_drawdistance.value=value;}
-void Cmd_AddCommand(char *name,void (*fn)(void)){}
+void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->name,"aw_terrain_horizon"))horizon_switch=v;if(!strcmp(v->name,"aw_fog"))fog_switch=v;
+    if(!strcmp(v->name,"aw_skyline_fill"))skyline_switch=v;if(!strcmp(v->name,"aw_horizon_defaults"))defaults_switch=v;}
+void Cvar_SetValue(char *name,float value){
+    if(!strcmp(name,"aw_skyline_fill"))skyline_switch->value=value;
+    else if(!strcmp(name,"aw_horizon_defaults"))defaults_switch->value=value;
+    else aw_drawdistance.value=value;
+}
+void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_horizon_migrate"))horizon_migrate=fn;}
 int Cmd_Argc(void){return 1;}char *Cmd_Argv(int n){return "";}
 byte *COM_LoadHunkFile(char *name){return fog_colours;}
 const byte *R_DayNightFogColours(void){return NULL;}
@@ -127,6 +133,21 @@ int main(void) {
     fog_switch->value=0;AW_FogDraw();for(i=0;i<80*60;i++)assert(screen[i]==77 && depth[i]==AW_SKY_BACKGROUND_DEPTH);
     fog_switch->value=1;horizon_switch->value=0;AW_FogDraw();for(i=0;i<80*60;i++)assert(screen[i]==77 && depth[i]==AW_SKY_BACKGROUND_DEPTH);
     puts("fog integration: opt-in paints ground; default/rollback, interiors and disabled fog preserve original pixels and depth");
+    /* Horizon draw methods (HORIZON-FLORA-SPRITES-32). One far scenery pixel
+     * (fog level 15) above open sky in column 10. Object silhouetting
+     * (aw_skyline_fill 1, tested but subpar results, kept) paints the sky below
+     * it in the fog colour; the land-outline default (0) leaves the sky. */
+    assert(skyline_switch && skyline_switch->value==1 && defaults_switch && defaults_switch->value==0 && horizon_migrate);
+    horizon_switch->value=0;
+    reset();depth[10*80+10]=30;AW_FogDraw();
+    assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(screen[j*80+10]==173);
+    for(j=5;j<53;j++)assert(screen[j*80+11]==77);
+    skyline_switch->value=0;reset();depth[10*80+10]=30;AW_FogDraw();
+    assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(screen[j*80+10]==77 && depth[j*80+10]==AW_SKY_BACKGROUND_DEPTH);
+    /* Migration: a saved 1 becomes 0 once; a later explicit 1 is kept. */
+    skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==0 && defaults_switch->value==1);
+    skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==1);
+    puts("horizon methods: land outline (default) keeps the sky; object silhouetting still fills below far scenery; migration once");
 #endif
     puts("resident LAND: 30 independent ray/plane camera cases; valleys, depth, water/material, closure and bounds gates passed");
     return 0;

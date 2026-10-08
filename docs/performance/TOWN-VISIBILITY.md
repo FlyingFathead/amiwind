@@ -80,25 +80,63 @@ Quake itself:
   visible everywhere; 362 of the 590 building models cross that line.
 - A brush entity is kept or skipped as a whole, never per face.
 
-So the building faces belong in the world model, where Quake culls faces leaf
-by leaf through each leaf's surface list, with occluders giving `vis` the walls
-to cut with; collision and appearance stay as they are. That combination is the
-next prototype.
+## Second prototype result (8 October 2026): the tested occluders give negligible benefit
 
-## The Quake way to fix it
+The full prototype rebuilt bm019, bm020 and bm028 with the shipped pipeline
+(byte-identical to the shipped maps without occluders) and added 30-39 skip
+occluder blocks per map, fitted inside the Hlaalu houses so that no block
+touches a drawn surface or leaks through a window.
 
-Keep each building as its brush model, and add occluders: for every building,
-one or a few invisible solid blocks inside its footprint, compiled as
-structural world brushes with the `skip` texture (ericw-tools, already part of
-the build). `vis` then treats the building as a wall and drops the leaves
-behind it; the blocks are never drawn and cost nothing at run time. The
-measure of success is the visible share above, before and after, and the
-frame rate at the same view.
+- What the server sends barely moves. From 213 street points, 589 of bm019's
+  590 building models are still sent with occluders and full `vis`; bm028
+  goes from 653 to 650 of 654, bm020 from 637 to 635 of 638.
+- The cost is real: the visibility lump doubles or triples, about 180-290 KB
+  more modelled heap per map, and full `vis` runs 8-13 times longer.
+- The occlusion exists geometrically. Tracing lines of sight from 48 street
+  points, 497 building placements are visible over bare terrain, 299 with the
+  fitted blocks and 151 with whole-building blocks. Quake's leaf-to-leaf
+  visibility loses it: the open street leaves are huge (median
+  727 x 962 x 114 units), and a visibility row means "seen from anywhere in
+  this leaf". Even with 128-unit leaves, 87 % of leaves stay visible from the
+  street.
+- Hint brushes (ericw-tools `hint`, which add splits and portals for `vis`)
+  were tried too: 128- and 256-unit vertical hints with the occluders moved
+  bm019 from 589 to 586-588 models sent.
+- The 16-leaf entity limit (`MAX_ENT_LEAFS`) is not the binding limit with
+  today's leaves: lifting it changes the count by 0-8 models.
+- Building faces in the world model: measured instead of built. Placing the
+  153 largest buildings' 33,999 faces in every leaf they touch would cut face
+  work by at most about 5 % and break the marksurface (65,535) and texture
+  mapping (32,767) limits. Quake also draws world faces only through the BSP
+  node that owns them, so faces cannot simply be appended to the world model;
+  qbsp would have to compile them.
 
-Interiors need the same idea per room: occluder slabs inside the thick wall
-and floor meshes between rooms, so `vis` splits an interior into rooms. Large
-rocks in the open world can carry occluders the same way; trees and small
-rocks cannot.
+Conclusion: the tested occluders and hints give negligible benefit with the
+current town partitioning, so they are not shipped. Further town occlusion
+work is deferred until there is evidence for a better partitioning or culling
+approach; the line-of-sight numbers show occlusion exists, but they are not a
+frame-rate prediction. Positions inside one leaf share its potentially
+visible set, which must cover every point of that leaf, so a large open-street
+leaf keeps buildings that are hidden from a particular corner. Meanwhile the
+town frame rate is sought from drawing less at a distance (fog distance,
+simpler distant shapes) and cheaper per-model work. Interiors, rooms behind
+thick walls, still need the occluder test below.
+
+## What the sent models cost (8 October 2026)
+
+Renderer counters measured what happens to the building models that visibility
+does not remove. In Balmora they take 67-82 % of render time, and not because
+they are cut into many pieces (1.38-1.59 fragments per face): each clipped face
+walks 27-52 nodes of the world BSP to find where it belongs, up to 233,867 node
+visits in one frame. So cheaper placement of the models that are sent matters
+as much as sending fewer
+([RENDER-BMODEL-FRAGMENTS-32](../bugs/RENDER-BMODEL-FRAGMENTS-32.md);
+[What a town frame is spent on](LESSONS_LEARNED.md)).
+
+## Interiors: still to test
+
+Occluder slabs inside the thick wall and floor meshes between rooms, so `vis`
+splits an interior into rooms, measured the same way.
 
 ## Method
 

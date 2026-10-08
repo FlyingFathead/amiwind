@@ -19,7 +19,7 @@ import struct
 
 
 FORMATS = {1: '<4fi', 3: '<3f', 5: '<i2h6h2H', 6: '<8f2i',
-           7: '<Hhihh4Bi', 9: '<i2H', 10: '<ii6h2H4B',
+           7: '<HhihH4Bi', 9: '<i2H', 10: '<ii6h2H4B',
            11: '<H', 12: '<2H', 13: '<i', 14: '<9f7i'}
 
 
@@ -44,8 +44,12 @@ def project(point, vec):
 
 
 def project_wide(point, vec):
-    """Alternative: wide intermediate products/sums, rounded on float store."""
-    return f32(point[0]*vec[0]+point[1]*vec[1]+point[2]*vec[2]+vec[3])
+    """The engine rule (model.c CalcSurfaceExtents, tools/surface_grid.py):
+    double precision after every product and sum, left to right, no single-
+    precision store. Python floats are IEEE doubles."""
+    result = point[0]*vec[0]+point[1]*vec[1]+point[2]*vec[2]+vec[3]
+    require(math.isfinite(result), 'Non-finite texture coordinate')
+    return result
 
 
 class BSP:
@@ -182,9 +186,11 @@ class BSP:
         samples = None
         if face[9] != -1:
             size = ((extents[0] >> 4)+1)*((extents[1] >> 4)+1)*active
-            require(face[9]+size <= len(self.parts[8]),
+            # The engine rule's span must lie inside the lump; the binary32
+            # rule (engines before it) is compared on the bytes that exist.
+            require(face[9] >= 0 and (face[9]+size <= len(self.parts[8]) or not wide_intermediates),
                     f'Light sample range outside lump: face {index}, '
-                    f'{"wide" if wide_intermediates else "binary32"} extents {extents}, '
+                    f'engine-rule extents {extents}, '
                     f'offset {face[9]}, need {size} bytes, '
                     f'available {len(self.parts[8])-face[9]}')
             samples = self.parts[8][face[9]:face[9]+size]
@@ -198,8 +204,9 @@ def compare_render_inputs(before, after):
     a, b = BSP(before), BSP(after)
     require(len(a.rows[7]) == len(b.rows[7]), 'Face count changed')
     for index in range(len(a.rows[7])):
-        require(a.face_inputs(index) == b.face_inputs(index),
-                'Rendered face input changed at '+str(index))
+        for wide in (False, True):
+            require(a.face_inputs(index, wide) == b.face_inputs(index, wide),
+                    'Rendered face input changed at '+str(index))
         old, new = a.rows[7][index], b.rows[7][index]
         require(old[:2]+old[3:] == new[:2]+new[3:], 'Face metadata changed')
     for index in set(range(15))-{3, 7, 12, 13}:
@@ -226,7 +233,7 @@ def compare_render_inputs(before, after):
             'source_sha256': hashlib.sha256(before).hexdigest(),
             'output_sha256': hashlib.sha256(after).hexdigest(),
             'edge_zero_paths': ['CalcSurfaceExtents: >=0 selects v0', 'renderer: >0 selects v0'],
-            'float_model': 'finite binary32 source values; rounded products and left-associated adds',
+            'float_model': 'finite binary32 source values; left-associated products/adds rounded to binary32 and to double (engine rule)',
             'unchanged': 'models, all collision data, texinfo, textures, light bytes, entities, PVS',
             'native_execution': 'not performed; target/FPU/renderer execution and playtest remain pending'}
 
@@ -272,7 +279,7 @@ def compare_sample_sharing(before, after):
                 decoded_pvs(b.parts[4], new[1], width),
                 'Sample sharing changed decoded PVS at '+str(index))
     return {'faces_verified': len(a.rows[7]), 'pvs_leaves_verified': len(a.rows[10]),
-            'light_samples': 'independently compared under per-operation binary32 and wide-intermediate extents',
+            'light_samples': 'independently compared under per-operation binary32 and engine-rule (double) extents',
             'pvs': 'independently decoded classic BSP29 rows; identical'}
 
 

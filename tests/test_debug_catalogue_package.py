@@ -43,6 +43,8 @@ class DebugCataloguePackageTests(unittest.TestCase):
                 (tree/'build').mkdir(parents=True)
                 (tree/'build/AmiQuakeGCC').write_bytes(b'fixture engine')
                 (tree/'build/AmiWindCheck').write_bytes(b'fixture checker')
+                (tree/'build/awbench').write_bytes(b'fixture benchmark')
+                (tree/'build/AmiWindFPU').write_bytes(b'fixture loader')
                 argv = ['build_aga.py','engine','--sdk',tmp,'--out',str(out),'--jobs','1']
                 if flag:
                     argv.append(flag)
@@ -50,12 +52,19 @@ class DebugCataloguePackageTests(unittest.TestCase):
                      patch.object(build_aga,'new_output',return_value=out), \
                      patch.object(build_aga,'stage_runtime',return_value=(tree,{})), \
                      patch.object(build_aga,'run') as run, patch.object(build_aga,'check_binary'), \
+                     patch.object(build_aga,'check_engine_fpu',return_value={'passed':True}) as fpu, \
                      patch.object(build_aga,'write_world_coverage'), patch.object(build_aga,'executable_path',side_effect=str):
                     build_aga.main()
+                fpu.assert_called_once()  # 68040 builds run the FPU check (ENGINE-FPU-UNIMPL-31)
+                self.assertEqual(json.loads((out/'engine-build.json').read_text())['fpu_unimplemented_check'], {'passed':True})
                 make = run.call_args_list[0].args[0]
                 compiler = next(arg for arg in make if arg.startswith('CC='))
                 self.assertEqual('-DAMIWIND_DEBUG_LUMA=1' in compiler, debug)
                 self.assertIs(json.loads((out/'engine-build.json').read_text())['debug_luma'], debug)
+                # The owners' hardware benchmark is built with every engine (docs/HARDWARE-BENCHMARK.md).
+                self.assertTrue(any('bench' in call.args[0] for call in run.call_args_list))
+                self.assertEqual((out/'awbench').read_bytes(), b'fixture benchmark')
+                self.assertIn('hardware_benchmark_sha256', json.loads((out/'engine-build.json').read_text()))
 
     def test_engine_build_fails_on_compiler_warnings(self):
         warning = 'src/example.c:1:1: warning: example [-Wexample]\n'
@@ -66,11 +75,14 @@ class DebugCataloguePackageTests(unittest.TestCase):
                 (tree/'build').mkdir(parents=True)
                 (tree/'build/AmiQuakeGCC').write_bytes(b'fixture engine')
                 (tree/'build/AmiWindCheck').write_bytes(b'fixture checker')
+                (tree/'build/awbench').write_bytes(b'fixture benchmark')
+                (tree/'build/AmiWindFPU').write_bytes(b'fixture loader')
                 argv = ['build_aga.py','engine','--sdk',tmp,'--out',str(out),'--jobs','1',*extra]
                 with patch.object(sys,'argv',argv), patch.object(build_aga,'check_native_versions'), \
                      patch.object(build_aga,'new_output',return_value=out), \
                      patch.object(build_aga,'stage_runtime',return_value=(tree,{})), \
                      patch.object(build_aga,'run',return_value=warning), patch.object(build_aga,'check_binary'), \
+                     patch.object(build_aga,'check_engine_fpu',return_value={'passed':True}), \
                      patch.object(build_aga,'write_world_coverage'), patch.object(build_aga,'executable_path',side_effect=str):
                     if expect_failure:
                         with self.assertRaises(SystemExit):

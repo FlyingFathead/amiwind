@@ -20,7 +20,8 @@ Paths are relative to your current directory. Context and results must be new,
 separate directories outside the source tree (ignored `out/` is also permitted).
 No existing context, evidence or volume is deleted. Pick new directories on a
 retry. The default named volume `amiwind-docker-builds` retains Linux build files;
-`--volume` selects another volume. `--jobs` defaults to the host CPU count.
+`--volume` selects another volume. `--jobs` defaults to the host CPU count and
+reaches the build unchanged; see [Parallel host builds](PARALLEL_BUILD.md).
 
 On Windows PowerShell, `python` can be the full path to your installed Python.
 Quoted context/results paths may contain spaces. Docker must be available on

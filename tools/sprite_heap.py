@@ -3,6 +3,17 @@
 import hashlib,math,re,struct
 from pathlib import PurePosixPath
 
+# World flora sprites (trees, grass, reeds) come only from the builder's
+# world-flora steps (prepare_tree_sprites.py, prepare_world_flora.py).
+FLORA_SPRITE_DIR='progs/aw_flora/'
+
+def missing_flora_message(models):
+    """Name the cause when maps place flora that this build did not make (BUILD-FLORA-OPTIN-32)."""
+    shown=', '.join(models[:3])+(f' and {len(models)-3} more' if len(models)>3 else '')
+    return (f'World flora was not built: maps place {len(models)} flora sprite(s) missing from the image ({shown}). '
+            'Trees and grass are built by default; this build left them out (--no-tree-sprites, debugging only, '
+            'or a hand-run image step without --world-flora). Rebuild without --no-tree-sprites.')
+
 def allocation(payload,header):
     return header+((payload+15)//16)*16
 
@@ -92,6 +103,10 @@ def inspect_sprites(entity_bytes,asset_root,sizes):
     if signon > min(signon_capacity,sizes.get('reliable_capacity',16380)):
         raise ValueError('Map signon capacity exceeded: '+str(signon)+' bytes')
     assets=[]
+    missing_flora=[model for model in sorted(set(instances))
+                   if model.lower().startswith(FLORA_SPRITE_DIR) and not (asset_root/model).exists()]
+    if missing_flora:
+        raise ValueError(missing_flora_message(missing_flora))
     for model in sorted(set(instances)):
         p=asset_root/model
         if not p.is_file() or not p.resolve().is_relative_to(asset_root.resolve()):

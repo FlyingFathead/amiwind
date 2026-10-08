@@ -18,7 +18,7 @@ static void load(void){
     if(COM_FOpenFile("door-sounds.txt",&f)<0 || !f)return;
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWSFX1\n")){fclose(f);return;}
     while(count<256 && fgets(line,sizeof(line),f)){
-        if(sscanf(line,"%u %31s %31s %f %f %f %f %c",&e.ref,e.path[0],e.path[1],
+        if(Q_sscanf(line,"%u %31s %31s %f %f %f %f %c",&e.ref,e.path[0],e.path[1],
            &e.volume[0],&e.volume[1],&e.seconds[0],&e.seconds[1],&extra)!=7)continue;
         for(i=0;i<2;i++)if(!valid_path(e.path[i]) || !(e.volume[i]>=0 && e.volume[i]<=1) ||
             !(e.seconds[i]>=0 && e.seconds[i]<=30))break;

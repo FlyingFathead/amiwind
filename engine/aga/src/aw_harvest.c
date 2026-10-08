@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "aw_harvest.h"
+#include "aw_format.h"
 #define DONE 0x40000000U
 #define EMPTY 0x80000000U
 #define SEED_MASK 0xfffffU
@@ -143,48 +144,48 @@ int AW_HarvestLoad(FILE *f,int bytes,aw_harvest_t *h)
     long start=ftell(f);char magic[8],digest[65],token[64],label[64];unsigned char catalogue[32];
     AW_HarvestRelease(h);memset(catalogue,0,sizeof(catalogue));
     if(start<0 || bytes<0 || bytes>65536)goto bad;
-    if(fscanf(f,"%7s %d %d %d",magic,&nodes,&edges,&plants)!=4 || (strcmp(magic,"AWH1") && strcmp(magic,"AWH2") && strcmp(magic,"AWH3") && strcmp(magic,"AWH4")))goto bad;
+    if(Q_fscanf(f,"%7s %d %d %d",magic,&nodes,&edges,&plants)!=4 || (strcmp(magic,"AWH1") && strcmp(magic,"AWH2") && strcmp(magic,"AWH3") && strcmp(magic,"AWH4")))goto bad;
     if(!strcmp(magic,"AWH3") || !strcmp(magic,"AWH4")){
-        if(fscanf(f," %d %64s",&slots,digest)!=2 || slots<1 || slots>AW_HARVEST_SLOTS || !digest_read(digest,catalogue))goto bad;
+        if(Q_fscanf(f," %d %64s",&slots,digest)!=2 || slots<1 || slots>AW_HARVEST_SLOTS || !digest_read(digest,catalogue))goto bad;
     }
     if(!strcmp(magic,"AWH4")){
         representation=4;
-        if(fscanf(f," %d",&models)!=1 || models<1 || models>AW_HARVEST_MODELS)goto bad;
+        if(Q_fscanf(f," %d",&models)!=1 || models<1 || models>AW_HARVEST_MODELS)goto bad;
     }
     if(!AW_HarvestReserve(h,models,nodes,edges,plants))goto bad;
     h->slots=slots;h->representation=representation;memcpy(h->catalogue,catalogue,32);
     if(representation==4){
         for(i=0;i<h->models;i++){
             aw_harvest_model_t *m=&h->model[i];
-            if(fscanf(f," %63s %64s",token,digest)!=2 || !digest_read(digest,m->digest))goto bad;
+            if(Q_fscanf(f," %63s %64s",token,digest)!=2 || !digest_read(digest,m->digest))goto bad;
             m->path=AW_HarvestIntern(h,token);if(m->path==AW_HARVEST_BAD_TEXT)goto bad;
-            for(k=0;k<3;k++)if(fscanf(f," %f",&m->mins[k])!=1)goto bad;
-            for(k=0;k<3;k++)if(fscanf(f," %f",&m->maxs[k])!=1)goto bad;
+            for(k=0;k<3;k++)if(Q_fscanf(f," %f",&m->mins[k])!=1)goto bad;
+            for(k=0;k<3;k++)if(Q_fscanf(f," %f",&m->maxs[k])!=1)goto bad;
         }
     }
     for(i=0;i<h->nodes;i++){
         aw_harvest_node_t *n=&h->node[i];
-        if(fscanf(f," %d %d %d %d %d %63s",&n->kind,&n->flags,&n->chance,&n->first,&n->count,token)!=6)goto bad;
+        if(Q_fscanf(f," %d %d %d %d %d %63s",&n->kind,&n->flags,&n->chance,&n->first,&n->count,token)!=6)goto bad;
         n->id=AW_HarvestIntern(h,token);if(n->id==AW_HARVEST_BAD_TEXT)goto bad;
         if(strcmp(magic,"AWH1")){
-            if(fgetc(f)!='\t' || fscanf(f,"%63[^\r\n]",label)!=1)goto bad;
+            if(fgetc(f)!='\t' || Q_fscanf(f,"%63[^\r\n]",label)!=1)goto bad;
             if(n->kind==0 && (!strcmp(label,"-") || !label[0]))goto bad;
             for(k=0;label[k];k++)if((unsigned char)label[k]<32 || (unsigned char)label[k]>126)goto bad;
             n->label=AW_HarvestIntern(h,label);if(n->label==AW_HARVEST_BAD_TEXT)goto bad;
         }
     }
-    for(i=0;i<h->edges;i++)if(fscanf(f," %d %d %d",&h->edge[i].node,&h->edge[i].level,&h->edge[i].count)!=3)goto bad;
+    for(i=0;i<h->edges;i++)if(Q_fscanf(f," %d %d %d",&h->edge[i].node,&h->edge[i].level,&h->edge[i].count)!=3)goto bad;
     for(i=0;i<h->plants;i++){
         aw_harvest_plant_t *p=&h->plant[i];
-        if(fscanf(f," %63s",token)!=1)goto bad;
+        if(Q_fscanf(f," %63s",token)!=1)goto bad;
         p->key=AW_HarvestIntern(h,token);if(p->key==AW_HARVEST_BAD_TEXT)goto bad;
-        if(h->slots && fscanf(f," %d",&p->slot)!=1)goto bad;
-        if(fscanf(f," %u %15s %d %d %d",&p->reference,token,&p->flags,&p->first,&p->count)!=5)goto bad;
+        if(h->slots && Q_fscanf(f," %d",&p->slot)!=1)goto bad;
+        if(Q_fscanf(f," %u %15s %d %d %d",&p->reference,token,&p->flags,&p->first,&p->count)!=5)goto bad;
         p->model=AW_HarvestIntern(h,token);if(p->model==AW_HARVEST_BAD_TEXT)goto bad;
-        for(k=0;k<3;k++)if(fscanf(f," %f",&p->origin[k])!=1)goto bad;
-        for(k=0;k<3;k++)if(fscanf(f," %f",&p->angles[k])!=1)goto bad;
-        if(h->representation==4 && fscanf(f," %f",&p->scale)!=1)goto bad;
-        if(fscanf(f," %63[^\r\n]",label)!=1)goto bad;
+        for(k=0;k<3;k++)if(Q_fscanf(f," %f",&p->origin[k])!=1)goto bad;
+        for(k=0;k<3;k++)if(Q_fscanf(f," %f",&p->angles[k])!=1)goto bad;
+        if(h->representation==4 && Q_fscanf(f," %f",&p->scale)!=1)goto bad;
+        if(Q_fscanf(f," %63[^\r\n]",label)!=1)goto bad;
         p->label=AW_HarvestIntern(h,label);if(p->label==AW_HARVEST_BAD_TEXT)goto bad;
     }
     if(ftell(f)-start>bytes)goto bad;

@@ -3,6 +3,7 @@
  * groups and Previous/Next history. Owned audio remains outside the source tree.
  */
 #include "quakedef.h"
+#include "aw_format.h"
 #include "sound.h"
 #define FRAMES 8192
 #define BYTES (FRAMES*2)
@@ -283,10 +284,10 @@ int CDAudio_Init(void) {
     FILE *f;char path[MAX_OSPATH+64];int g,n,i,j,id;
     sprintf(path,"%s/music/playlist.txt",com_gamedir);f=fopen(path,"r");if(!f)return -1;
     for(g=0;g<2;g++) {
-        if(fscanf(f,"%d",&n)!=1 || n<1 || n>99){fclose(f);return -1;}
+        if(Q_fscanf(f,"%d",&n)!=1 || n<1 || n>99){fclose(f);return -1;}
         counts[g]=0;
         for(i=0;i<n;i++) {
-            if(fscanf(f,"%d",&id)!=1 || id<0 || id>98){fclose(f);return -1;}
+            if(Q_fscanf(f,"%d",&id)!=1 || id<0 || id>98){fclose(f);return -1;}
             for(j=0;j<counts[g];j++)if(groups[g][j]==id)break;
             if(j==counts[g])groups[g][counts[g]++]=id;
         }
@@ -294,7 +295,7 @@ int CDAudio_Init(void) {
     /* Optional third line: converter-resolved canonical title track. Old
      * two-line playlists retain world playback without assuming track 00. */
     title_track=-1;title_playing=0;
-    if(fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
+    if(Q_fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
     fclose(f);available=1;paused=0;mode=0;loading=-1;
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
     events=fopen("music-events.csv","w");if(events)fprintf(events,"time_ms,event,mode,track,file,played_frames,total_frames\n");

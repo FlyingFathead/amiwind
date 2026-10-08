@@ -63,7 +63,7 @@ class HeapLoaderSourceReceiptTests(unittest.TestCase):
             with patch('check_world_map_heap.audit_world_maps', return_value=expected) as audit:
                 report = build_aga.audit_world_map_heap_with_receipt(
                     {'source_sha256': hashes}, root / 'maps', root / 'sdk', output, source)
-            audit.assert_called_once_with(root / 'maps', root / 'sdk', output)
+            audit.assert_called_once_with(root / 'maps', root / 'sdk', output, jobs=1)
             self.assertEqual(report['loader_source_sha256'], hashes)
             self.assertEqual(json.loads(output.read_text())['loader_source_sha256'], hashes)
 

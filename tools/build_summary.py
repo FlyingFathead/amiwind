@@ -8,6 +8,7 @@ import sys
 import time
 
 from mwad.progress import Progress, section
+import build_profile
 
 
 def timestamp():
@@ -148,6 +149,41 @@ def media_coverage_lines(coverage, scope):
     return lines
 
 
+def read_fpu_support(run):
+    """The image receipt's optional FPU support library (--amiga-libs); None when
+    no image receipt exists (terrain builds, failures before the image step)."""
+    for name in ('build.json', 'dry-run-build.json'):
+        path = Path(run) / 'image' / name
+        if path.is_file():
+            try:
+                record = json.loads(path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                return None
+            return record.get('fpu_support') or {'status': 'not_requested', 'libraries': [], 'companions': []}
+    return None
+
+
+def read_harvest(run):
+    """The image receipt's harvest record (BUILD-HARVEST-NOT-BUILT-32); None when
+    no image receipt exists."""
+    path = Path(run) / 'image' / 'build.json'
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    return record.get('harvest') or {'status': 'not_recorded'}
+
+
+def harvest_line(record):
+    if record.get('status') != 'installed':
+        return 'Harvestable mushrooms in the image: ' + record.get('status', 'not recorded')
+    return (f"Harvestable mushrooms in the image: {record['admitted']}/{record['candidates']} maps admitted by the "
+            f"heap check, {record['plants']} plants, {record['models']} shared models"
+            + (f"; not admitted: {', '.join(record['not_admitted'])}" if record.get('not_admitted') else ''))
+
+
 class BuildSummary:
     def __init__(self, run, version, mode):
         self.run = Path(run)
@@ -156,6 +192,7 @@ class BuildSummary:
         self.started = time.monotonic()
         self.finished = False
         self.environment = None
+        self.known_inputs = None  # known-inputs verdicts and hash mode (tools/known_inputs.py)
         print('Compilation started: ' + self.started_at, flush=True)
 
     def record_environment(self, metadata):
@@ -184,7 +221,11 @@ class BuildSummary:
                          for row in rows if row.get('kind') == 'package'],
             'tools': native,
             'npc_gallery': metadata.get('npc_gallery', 'not recorded'),
+            'world_flora': (metadata.get('world_flora') or {}).get('status', 'not recorded'),
+            'harvest': (metadata.get('harvest') or {}).get('status', 'not recorded'),
+            'extra_towns': (metadata.get('extra_town_selection') or {}).get('status', 'not recorded'),
             'worker_budget': metadata.get('compiler_jobs'),
+            'jobs_warning': metadata.get('jobs_warning'),
             'stage_scheduling': 'serial' if metadata.get('serial_stages') or metadata.get('compiler_jobs') == 1 else 'dependency-aware',
         }
 
@@ -208,6 +249,8 @@ class BuildSummary:
         except OSError:
             warnings = {'count': None, 'logs': []}
         diagnostic = bool(actor_acceptance and not actor_acceptance['production_gate_passed'])
+        fpu_receipt = read_fpu_support(self.run)
+        harvest = read_harvest(self.run)
         elapsed = max(0, time.monotonic() - self.started)
         result = {'schema': 'amiwind-build-summary-v1', 'version': self.version,
                   'mode': self.mode, 'status': status,
@@ -218,6 +261,10 @@ class BuildSummary:
                   'media_coverage': media_coverage, 'coverage_scope': coverage_scope,
                   'build_environment': self.environment,
                   'actor_ground_audit': actor_acceptance,
+                  'fpu_support': fpu_receipt,
+                  'harvest': harvest,
+                  'known_inputs': self.known_inputs,
+                  'profile': build_profile.summary_record(self.run),
                   'validation': 'private-test-only' if diagnostic else 'selected-pipeline'}
         saved, save_error = None, None
         if self.run.is_dir():
@@ -238,6 +285,9 @@ class BuildSummary:
         if self.environment:
             env = self.environment
             lines.append('NPC gallery selection: ' + env.get('npc_gallery', 'not recorded'))
+            lines.append('World flora (trees and grass): ' + env.get('world_flora', 'not recorded'))
+            lines.append('Harvestable mushrooms: ' + env.get('harvest', 'not recorded'))
+            lines.append('Extra towns: ' + env.get('extra_towns', 'not recorded'))
             lines.append('Python: ' + env['python'])
             if env['packages']:
                 lines.append('Python environment packages (not all required by every recipe):')
@@ -272,6 +322,16 @@ class BuildSummary:
         else:
             lines.append('Output: no completed output verified')
         lines.extend(media_coverage_lines(media_coverage, coverage_scope))
+        if self.known_inputs:
+            from known_inputs import summary_lines as known_input_lines
+            lines.extend(known_input_lines(self.known_inputs))
+        if harvest is not None:
+            lines.append(harvest_line(harvest))
+        if fpu_receipt is not None:
+            from fpu_support import summary_lines as fpu_support_lines
+            lines.extend(fpu_support_lines(fpu_receipt))
+        if result['profile']:
+            lines.extend(build_profile.summary_lines(build_profile.load(result['profile']['path'])))
         if saved:
             lines.append('Summary: ' + str(saved))
         if save_error:

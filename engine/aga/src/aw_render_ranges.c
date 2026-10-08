@@ -107,9 +107,9 @@ void AW_RenderRangesNewMap(void)
             else if(!strcmp(key,"model")){strncpy(model,value,63);model[63]=0;}
             else if(!strcmp(key,"aw_render_pool")){strncpy(pool,value,63);pool[63]=0;}
             else if(!strcmp(key,"aw_render_ranges"))strcpy(ranges,value);
-            else if(!strcmp(key,"origin")){if(sscanf(value,"%f %f %f",&origin[0],&origin[1],&origin[2])!=3)Sys_Error("Invalid range origin");}
-            else if(!strcmp(key,"angles")){if(sscanf(value,"%f %f %f",&angles[0],&angles[1],&angles[2])!=3)Sys_Error("Invalid range angles");}
-            else if(!strcmp(key,"angle"))angles[1]=atof(value);
+            else if(!strcmp(key,"origin")){if(Q_sscanf(value,"%f %f %f",&origin[0],&origin[1],&origin[2])!=3)Sys_Error("Invalid range origin");}
+            else if(!strcmp(key,"angles")){if(Q_sscanf(value,"%f %f %f",&angles[0],&angles[1],&angles[2])!=3)Sys_Error("Invalid range angles");}
+            else if(!strcmp(key,"angle"))angles[1]=(float)Q_strtod(value,NULL);
         }
         if(entity++==0){
             if(!pool[0])return; /* Ordinary maps allocate nothing and skip per-frame lookup. */

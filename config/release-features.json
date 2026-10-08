@@ -1,0 +1,190 @@
+{
+ "format": "AmiWind release features 1",
+ "about": "What a release ships, by feature: path patterns (glob per path segment) and the default builder steps that make the files. tests/test_release_coverage.py checks it against config/release-payload-classes.json and tools/build.py; tools/payload_coverage.py checks a built payload against it. A feature with \"towns\": \"shipped\" gets the patterns and town-<id> steps of every shipped town from config/towns.json.",
+ "builder_gaps": {},
+ "features": [
+  {
+   "id": "engine",
+   "description": "Game executable and boot-time preflight check",
+   "steps": ["engine", "image"],
+   "patterns": ["AmiWind", "AmiWindCheck"]
+  },
+  {
+   "id": "game-config",
+   "description": "Startup sequence, QuakeC program, configuration, debug catalogues, save-content table",
+   "steps": ["scene", "image"],
+   "patterns": ["S/startup-sequence", "id1/progs.dat", "id1/quake.rc", "id1/default.cfg", "id1/default-game.cfg",
+                "id1/keymaps-default.cfg", "id1/autoexec.cfg", "id1/debug-commands.txt", "id1/shroompicker.txt",
+                "id1/save-content.bin"]
+  },
+  {
+   "id": "base-graphics",
+   "description": "Palette, lighting and fog tables, console fonts and screens, texture WAD",
+   "steps": ["scene", "image"],
+   "patterns": ["id1/gfx.wad", "id1/gfx/palette.lmp", "id1/gfx/colormap.lmp", "id1/gfx/fog.lmp", "id1/gfx/conback.lmp",
+                "id1/gfx/font-retro.lmp", "id1/gfx/font-readable.lmp", "id1/gfx/pause.lmp", "id1/gfx/loading.lmp"]
+  },
+  {
+   "id": "ui",
+   "description": "Original-font UI, menu and loading backgrounds, logo",
+   "steps": ["image"],
+   "patterns": ["id1/gfx/ui.awu", "id1/gfx/ui-conversion.json", "id1/gfx/ui-palette.json", "id1/gfx/menu.awb",
+                "id1/gfx/loading[0-9]*.awb", "id1/gfx/magic[0-9]*.awf", "id1/gfx/magicclear[0-9]*.awf",
+                "id1/gfx/gothic[0-9]*.awf", "id1/gfx/gothicbig[0-9]*.awf", "id1/gfx/daedric[0-9]*.awf",
+                "id1/gfx/book[0-9]*.awf", "id1/gfx/amiwind.awi", "id1/intro/amiwind.awv"]
+  },
+  {
+   "id": "sky",
+   "description": "Shared exterior sky and night sky",
+   "steps": ["image"],
+   "patterns": ["id1/gfx/aw_shared_sky.lmp", "id1/gfx/aw_night_sky.lmp", "id1/gfx/night-sky.json",
+                "id1/gfx/sky-palette-bank.json"]
+  },
+  {
+   "id": "hands-legacy",
+   "description": "Nord first-person hands (3D model and sprite fallback) and the sprite-hands player model",
+   "steps": ["scene", "hands"],
+   "patterns": ["id1/progs/v_nord.mdl", "id1/gfx/hands.aws", "id1/progs/player.mdl"]
+  },
+  {
+   "id": "hands-per-race",
+   "description": "Per-race, per-sex first-person hands and carried-torch arms (AWH1 catalogue)",
+   "steps": ["hand-catalog", "image"],
+   "image_options": ["--hand-catalog"],
+   "patterns": ["id1/progs/hands/*.mdl", "id1/gfx/hand-models.awh", "id1/gfx/hand-torch.awt"]
+  },
+  {
+   "id": "torch",
+   "description": "Carried torch, its emitter metadata and the torch test room",
+   "steps": ["image"],
+   "patterns": ["id1/progs/v_torch.mdl", "id1/gfx/torch.aws", "id1/gfx/torch.awt", "id1/maps/torchtest.bsp"]
+  },
+  {
+   "id": "guard-torches",
+   "description": "Guard-carried torches and their emitters",
+   "steps": ["image"],
+   "patterns": ["id1/progs/gt_[bt]_*.mdl", "id1/gfx/guard-torches.awg", "id1/gfx/guard-torches.json"]
+  },
+  {
+   "id": "scene-models",
+   "description": "Alias and sprite models of the converted scene props",
+   "steps": ["scene"],
+   "patterns": ["id1/progs/m[0-9]*.mdl", "id1/progs/m[0-9]*.spr"]
+  },
+  {
+   "id": "npcs",
+   "description": "Placed NPC models and their voices",
+   "steps": ["npcs", "intro", "census"],
+   "patterns": ["id1/progs/np_*.mdl", "id1/progs/a_*.mdl", "id1/progs/imperial_guard.mdl", "id1/progs/fargoth.mdl",
+                "id1/sound/npc/*.wav", "id1/sound/npc/*.lip"]
+  },
+  {
+   "id": "npc-gallery",
+   "description": "NPC gallery (every NPC model) and its catalogues",
+   "steps": ["npc-gallery", "image"],
+   "image_options": ["--gallery"],
+   "patterns": ["id1/gallery/*", "id1/model-budgets.txt", "id1/maps/charplane.bsp"]
+  },
+  {
+   "id": "opening",
+   "description": "Opening scenes: prison map names, character generation lines and voices, boat sound",
+   "steps": ["intro"],
+   "patterns": ["id1/intro/prison.awn", "id1/intro/chargen*.txt", "id1/sound/intro/*", "id1/sound/env/*"]
+  },
+  {
+   "id": "character",
+   "description": "Character creation: head and hair catalogue, Seyda Neen names, barriers",
+   "steps": ["character"],
+   "patterns": ["id1/character/*", "id1/intro/barriers.awb", "id1/intro/seyda.awn"]
+  },
+  {
+   "id": "reading",
+   "description": "Readable papers and birthsign pages",
+   "steps": ["reading"],
+   "patterns": ["id1/reading/*", "id1/gfx/paper-font-conversion.json"]
+  },
+  {
+   "id": "media",
+   "description": "Converted videos and sound effects with their catalogue",
+   "steps": ["media"],
+   "patterns": ["id1/media/catalogue.json", "id1/sound/pool/*.wav", "id1/intro/video/*.awv", "id1/intro/videos.awl",
+                "id1/intro/mw_intro.awv"]
+  },
+  {
+   "id": "door-sounds",
+   "description": "Original door sounds",
+   "steps": ["door-audio"],
+   "patterns": ["id1/door-sounds.txt", "id1/sound/doors/*.wav"]
+  },
+  {
+   "id": "music",
+   "description": "Soundtrack",
+   "steps": ["music"],
+   "patterns": ["id1/music/*"]
+  },
+  {
+   "id": "seyda-neen",
+   "description": "Seyda Neen exterior maps and region table (recorded exception BUILD-SEYDA-REGEN-30)",
+   "steps": ["bsp", "image"],
+   "patterns": ["id1/maps/seyda.bsp", "id1/maps/sn[0-9][0-9][0-9].bsp", "id1/maps/sncourt.bsp",
+                "id1/maps/intro_docks.bsp", "id1/seyda-regions.txt", "id1/seyda-regions.json"]
+  },
+  {
+   "id": "balmora",
+   "description": "Balmora exterior maps and region table",
+   "steps": ["balmora", "image"],
+   "image_options": ["--balmora-cache"],
+   "patterns": ["id1/maps/balmora.bsp", "id1/maps/bm[0-9][0-9][0-9].bsp", "id1/balmora-regions.txt"]
+  },
+  {
+   "id": "interiors",
+   "description": "Interior maps (prison, census, Seyda Neen area, Balmora) and their door banks",
+   "steps": ["interior", "census", "area", "balmora-interiors"],
+   "patterns": ["id1/maps/bm[a-z]*.bsp", "id1/maps/prison.bsp", "id1/maps/census.bsp", "id1/maps/addamasartus.bsp",
+                "id1/maps/draren.bsp", "id1/maps/eldafire.bsp", "id1/maps/erene.bsp", "id1/maps/fargoth.bsp",
+                "id1/maps/finemouth.bsp", "id1/maps/foryn.bsp", "id1/maps/indrele.bsp", "id1/maps/lighthouse.bsp",
+                "id1/maps/terurise.bsp", "id1/maps/tharystomb.bsp", "id1/maps/tradehouse.bsp", "id1/maps/vodunius.bsp",
+                "id1/maps/warehouse.bsp", "id1/doors-*.txt", "id1/scene-links.txt", "id1/scene-doors.txt"]
+  },
+  {
+   "id": "extra-towns",
+   "description": "Towns after Seyda Neen and Balmora that the release ships (config/towns.json shipped_since; the Vivec Arena since v0.0.32): town map, region maps, region table, door table and interior maps of each, with its town-<id> step, filled in from the town table",
+   "towns": "shipped",
+   "steps": ["image"],
+   "patterns": []
+  },
+  {
+   "id": "world-maps",
+   "description": "Vvardenfell world maps with rocks and giant mushrooms, region directory and volumes",
+   "steps": ["world-survey", "world-terrain", "world-scenery-assets", "world-scenery", "image"],
+   "patterns": ["id1/maps/vf[0-9]*.bsp", "id1/world/regions.awr", "id1/world/conversion.json", "id1/world/volumes.awv"]
+  },
+  {
+   "id": "world-flora",
+   "description": "Trees and grass sprites placed in the world and town maps",
+   "steps": ["world-flora-assets", "world-flora", "image"],
+   "image_options": ["--world-flora"],
+   "patterns": ["id1/progs/aw_flora/*.spr"]
+  },
+  {
+   "id": "world-ui",
+   "description": "World map, journal, quests, region names and entry table",
+   "steps": ["world-ui", "image"],
+   "patterns": ["id1/world/map.awm", "id1/world/journal.awj", "id1/world/quests.awq", "id1/world/region-names.awn",
+                "id1/world/entries.dat"]
+  },
+  {
+   "id": "night-lighting",
+   "description": "Lamps, lit night windows and fog locations",
+   "steps": ["image"],
+   "patterns": ["id1/world/lamps.awl", "id1/world/night-windows.txt", "id1/world/fog-locations.txt"]
+  },
+  {
+   "id": "harvest",
+   "description": "Harvestable mushroom catalogues (AWH4) and their shared models",
+   "steps": ["harvest", "image"],
+   "image_options": ["--harvest"],
+   "patterns": ["id1/harvest-*.txt", "id1/progs/harvest/*.mdl"]
+  }
+ ]
+}

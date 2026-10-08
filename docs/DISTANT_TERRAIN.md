@@ -78,3 +78,17 @@ open, and retain the old-mode switch.
 
 See [the bug journal](journals/BUG_JOURNAL-v0.0.29.md#land-horizon-gaps-29-sky-visible-through-distant-resident-ground-open)
 and [the separate horizon study](PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
+
+## Horizon draw methods (v0.0.32)
+
+| Setting | Method | Status |
+| --- | --- | --- |
+| `aw_skyline_fill 0` (default, from the game config) | Land-outline horizon: far scenery ends at the fog distance and the sky stays sky, as before the skyline fill (v0.0.30). | Default. |
+| `aw_skyline_fill 1` (`dbg skyline fill 1`) | Object silhouetting: in each screen column, sky below far scenery at fog level 12 or more takes the fog colour (added in v0.0.31-dev5, on in v0.0.31). | Experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results; kept for future improvement. |
+| `aw_terrain_horizon 1` | The resident LAND pass described above. | Opt-in, unchanged. |
+
+The subpar result of the silhouetting: far trees near the fog distance turn the sky below them into
+solid fog-colour columns, for example a canopy-shaped block behind Seyda Neen's town wall and a wall
+of spikes to the north-west of the town. A saved configuration from before this default is reset
+once by `aw_horizon_migrate` (run from `quake.rc` after `config.cfg`); a later explicit choice
+stays. Details: [HORIZON-FLORA-SPRITES-32](bugs/HORIZON-FLORA-SPRITES-32.md).

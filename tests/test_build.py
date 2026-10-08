@@ -48,6 +48,9 @@ class GuidedBuildTests(unittest.TestCase):
         self.assertLess(names.index("world-scenery-assets"), names.index("world-scenery"))
         self.assertLess(names.index("world-scenery"), names.index("image"))
         commands = dict(steps)
+        survey = commands["world-survey"]
+        # BUILD-WORLD-LAYOUT-DRIFT-32: the survey always uses the recorded layout ceiling.
+        self.assertEqual(survey[survey.index("--triangle-limit") + 1], str(build.world_layout_ceiling()))
         self.assertNotIn('--archive', commands['engine'])
         self.assertIn(str(Path('/private/run/engine/runtime/build/AmiQuakeGCC')), commands['image'])
         for stage in ("engine", "image"):

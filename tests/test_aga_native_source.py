@@ -27,6 +27,20 @@ class GuardTorchRenderContractTests(unittest.TestCase):
         entity_start=renderer.index('void R_DrawEntitiesOnList')
         self.assertLess(renderer.index('AW_GuardTorchEntity(',entity_start),renderer.index('R_AliasCheckBBox',entity_start))
 
+class VisibleEntityDropContractTests(unittest.TestCase):
+    """Every place that refuses an entity for a full cl_visedicts counts it
+    (R_StoreEfrags is covered natively by aga_visible_entities_test.c)."""
+
+    def test_dynamic_and_temporary_entities_count_their_drops(self):
+        main = (Path(SOURCE)/'src/cl_main.c').read_text()
+        relink = main[main.index('void CL_RelinkEntities'):main.index('CL_ReadFromServer')]
+        self.assertIn('aw_visedicts_dropped_frame = 0;', relink)
+        self.assertRegex(relink, r'if \(cl_numvisedicts < MAX_VISEDICTS\)\s*\{[^}]*\}\s*else\s*AW_VisedictDropped \(\);')
+        tent = (Path(SOURCE)/'src/cl_tent.c').read_text()
+        new = tent[tent.index('entity_t *CL_NewTempEntity'):]
+        self.assertRegex(new, r'if \(cl_numvisedicts == MAX_VISEDICTS\)\s*\{\s*AW_VisedictDropped \(\);\s*return NULL;')
+
+
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
@@ -90,6 +104,16 @@ class NativeSourceTests(unittest.TestCase):
                     defines=['MODAL_CLIENT'] if client else [],
                     cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
 
+    def test_static_flame_offsets_match_golden_angle_formula(self):
+        self.compile_run('aga_static_flame_offsets_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_guard_torch.c','mathlib.c')])
+
+    def test_static_flame_budget_keeps_flames_in_view(self):
+        # FLAME-RANGE-NEAREST-32: on-screen, size-ranked default; nearest-first kept.
+        self.compile_run('aga_static_flame_select_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_guard_torch.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
     def test_guard_torches_source_registry_cycle_pose_lights_and_depth(self):
         self.compile_run('aga_guard_torch_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_guard_torch.c','mathlib.c')],
@@ -145,7 +169,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_exterior_background_uses_sky_with_infinite_depth_and_interior_resets(self):
         self.compile_run('aga_background_test.c', [Path(SOURCE)/'src/d_edge.c', Path(SOURCE)/'src/d_part.c'])
-        self.compile_run('aga_sky_selection_test.c', [Path(SOURCE)/'src/r_sky.c'])
+        self.compile_run('aga_sky_selection_test.c', [Path(SOURCE)/'src/r_sky.c', Path(SOURCE)/'src/mathlib.c'])
         self.compile_run('aga_sky_depth_test.c', [Path(SOURCE)/'src/d_scan.c'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_daynight_sky_phases_toggle_midnight_and_interior_isolation(self):
@@ -225,7 +249,7 @@ class NativeSourceTests(unittest.TestCase):
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
-        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c','aw_save_codec.c')],
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c','aw_save_codec.c','mathlib.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
@@ -235,7 +259,7 @@ class NativeSourceTests(unittest.TestCase):
                                    ('gnu99', ('signed_game', 'filter', 'bounds'))):
             with self.subTest(standard=standard):
                 self.compile_run('aga_mouse_event_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_state.c', 'aw_save_codec.c')],
+                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
                     cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                     standard=standard, argument_sets=[(case,) for case in selected])
 
@@ -256,7 +280,7 @@ class NativeSourceTests(unittest.TestCase):
                                + branches[0].strip() + '}\n')
             self.compile_run('aga_map_focus_test.c',
                 [*[Path(SOURCE)/'src'/n for n in
-                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_state.c')], adapter],
+                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_state.c', 'mathlib.c')], adapter],
                 cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                 argument_sets=[(case,) for case in cases])
 
@@ -302,6 +326,10 @@ class NativeSourceTests(unittest.TestCase):
     def test_modifier_qualifiers_lost_shift_caps_and_focus_reset(self):
         self.compile_run("aga_modifier_state_test.c", [Path(SOURCE)/"src/keys.c"])
 
+    def test_console_history_arrows_from_native_raw_keys(self):
+        self.compile_run("aga_console_history_test.c", [Path(SOURCE)/"src/keys.c"],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_configurable_map_desktop_flight_keys_and_literal_console_input(self):
         self.compile_run("aga_keymap_test.c", [Path(SOURCE)/"src/keys.c"])
 
@@ -313,6 +341,27 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_sprite_background_depth_and_wall_occlusion(self):
         self.compile_run('aga_sprite_depth_test.c', [Path(SOURCE)/'src/d_sprite.c'])
+
+    def test_brush_model_rotation_zero_yaw_and_cached_paths(self):
+        self.compile_run('aga_rotate_bmodel_test.c', [Path(SOURCE)/'src'/n for n in
+            ('r_bsp.c', 'r_efrag.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_engine_text_number_conversion_matches_c_library(self):
+        # ENGINE-FPSP-MISSING-31: no C library float parsing/printing in the engine.
+        self.compile_run('aga_format_test.c', [Path(SOURCE)/'src/aw_format.c'],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
+    def test_fpu_support_status_line_and_command(self):
+        self.compile_run('aga_fpu_status_test.c', [Path(SOURCE)/'src/aw_fpu_status.c'],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+        host = (Path(SOURCE)/'src/host.c').read_text()
+        self.assertEqual(host.count('AW_FpuStatusInit ();'), 1)
+        self.assertLess(host.index('AW_FpuCountInit ();'), host.index('AW_FpuStatusInit ();'))
+
+    def test_table_sine_cosine_accuracy_and_exact_quadrants(self):
+        self.compile_run('aga_sintable_test.c', [Path(SOURCE)/'src/mathlib.c'],
+            cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'])
 
     def test_brush_fragments_do_not_use_far_culled_leaf_keys(self):
         self.compile_run('aga_brush_culling_test.c', [Path(SOURCE)/'src'/n for n in
@@ -335,7 +384,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_wait_cancel_bounds_calendar_and_debug_time(self):
         self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_wait.c','aw_clock.c','aw_state.c','view.c','r_sky.c')],
+            ('aw_wait.c','aw_clock.c','aw_state.c','view.c','r_sky.c','mathlib.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_scenery_cannot_displace_late_npcs_from_visible_list(self):
@@ -452,11 +501,22 @@ class NativeSourceTests(unittest.TestCase):
     def test_unsigned_face_plane_indices_and_bounds(self):
         self.compile_run("aga_face_index_test.c", [Path(SOURCE)/"src/model.c"])
 
+    def test_unsigned_face_texinfo_indices_and_double_precision_extents(self):
+        self.compile_run("aga_face_texinfo_test.c", [Path(SOURCE)/"src/model.c"])
+
+    def test_unsigned_marksurface_and_leaf_mark_indices(self):
+        self.compile_run("aga_marksurface_index_test.c", [Path(SOURCE)/"src/model.c"])
+
     def test_interaction_only_on_game_key_down(self):
         self.compile_run('aga_interact_test.c', [Path(SOURCE)/'src/cl_input.c'])
 
     def test_balmora_region_round_trip(self):
         self.compile_run('aga_region_test.c', [Path(SOURCE)/'src/aw_region.c'])
+
+    def test_data_driven_town_table_and_generic_town_directory(self):
+        self.compile_run('aga_town_table_test.c', [Path(SOURCE)/'src/aw_region.c'],
+            cflags=['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined', '-fno-sanitize-recover=all'],
+            argument_sets=[(), ('prefix',), ('distance',)])
 
     def test_strider_available_destination_and_return(self):
         self.compile_run('aga_scene_test.c', [Path(SOURCE)/'src'/n for n in
@@ -484,6 +544,9 @@ class NativeSourceTests(unittest.TestCase):
             sources = [*sources, tree/"src/aw_harvest.c", tree/"src/aw_harvest_runtime.c"]
             if not any(p.name == "aw_state.c" for p in sources):
                 sources.append(tree/"src/aw_state.c")
+        if not any(p.name == "aw_format.c" for p in sources):
+            # Engine text/number conversion (Q_strtod, Q_sscanf, Q_fscanf).
+            sources = [*sources, tree/"src/aw_format.c"]
         if any(p.name == "aw_harvest_runtime.c" for p in sources):
             if not any(p.name == "aw_harvest_proxy.c" for p in sources):
                 sources.append(tree/"src/aw_harvest_proxy.c")

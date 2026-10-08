@@ -1,0 +1,56 @@
+{
+  "format": 1,
+  "comment": "Vivec, first slice: one frame centred on the Arena canton. The canton's centre piece ex_vivec_c_04 stands at original (36544, -86912); the centre below is that point snapped to the 512-unit terrain material grid (48/32 local units away) so terrain quads align with the original height and material tiles. Bounds +-1536 (16 regions of Balmora's 768 core) keep the frame clear of the neighbouring canton centre pieces and of the dense Temple/Ministry regions that overflowed texinfo in the dry run; the frame edge stays beyond fog range (540) from every point of the canton.",
+  "source_cell": [
+    4,
+    -11
+  ],
+  "source_radius": 1,
+  "centre": [
+    36352,
+    -87040
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1536,
+      -1536
+    ],
+    [
+      1536,
+      1536
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "town": {
+    "id": "vivec_arena",
+    "title": "Vivec, Arena",
+    "map": "vivec_arena",
+    "map_prefix": "va",
+    "region_cap": 64,
+    "message": "Vivec, Arena",
+    "region_file": "vivec_arena-regions.txt",
+    "door_file": "scene-doors-vivec_arena.txt",
+    "visual_group": "vivec_arena",
+    "arrival": {
+      "source_position": [
+        36544,
+        -85315,
+        1895
+      ],
+      "source_rotation_z": 3.141592653589793,
+      "reason": "Original exit point of the north Arena Waistworks door (in_velothismall_ndoor_01, ref 219153), the canton side that faces the Foreign Quarter bridge; turned to face the entrance."
+    },
+    "return": null
+  }
+}

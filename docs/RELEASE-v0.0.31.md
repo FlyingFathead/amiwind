@@ -182,4 +182,8 @@ applies from v0.0.32.
 - [LIGHT-FALLOFF-31](bugs/LIGHT-FALLOFF-31.md): Interior lights stop dead at their radius
 - [LIGHTMAP-GRID-31](bugs/LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
 - [SEYDA-WALL-SHAPE-31](bugs/SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
+- [MESH-EXTENT-GRID-31](bugs/MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040 (found converting Vivec; no shipped map is affected)
+- [LIGHTMAP-TAIL-31](bugs/LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump (found converting Vivec)
+- [ENGINE-BUILD-REPRO-31](bugs/ENGINE-BUILD-REPRO-31.md): Engine builds from identical source give different binaries
+- [VIVEC-TEXINFO-31](bugs/VIVEC-TEXINFO-31.md): Dense Vivec canton regions exceed the 32,767 texture-mapping limit (next release)
 - Everything else open in the [bug register](BUGS.md).

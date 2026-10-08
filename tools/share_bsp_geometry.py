@@ -18,7 +18,7 @@ from player_hull import lumps, pack_lumps
 
 def parse(raw):
     data = lumps(raw)
-    formats = {3: '<3f', 5: '<i2h6h2H', 7: '<Hhihh4Bi',
+    formats = {3: '<3f', 5: '<i2h6h2H', 7: '<HhihH4Bi',
                11: '<H', 12: '<HH', 13: '<i', 14: '<9f7i'}
     try:
         rows = {i: list(struct.iter_unpack(fmt, data[i])) for i, fmt in formats.items()}

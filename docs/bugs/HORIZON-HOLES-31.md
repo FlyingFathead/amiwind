@@ -24,6 +24,10 @@ are fully fogged. The distant fill that closes the view behind the fog plane
 draws only land polygons (flat fog colour), not buildings, so the gaps show
 sky.
 
+v0.0.32-dev1 (8 October 2026): the Vivec Arena shows the same break-up close up (upper parts
+patchy, sky and fog showing through) and turns into a flat fog silhouette from about 1,500 units;
+the heavier fog is recorded separately as [FOG-TOWN-HEAVY-32](FOG-TOWN-HEAVY-32.md).
+
 ## Why it was not caught
 
 Distance views of towns against a bright sky were not part of the checks; the

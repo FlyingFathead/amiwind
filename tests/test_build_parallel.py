@@ -40,6 +40,19 @@ def wait_for_later_job(task):
     return number
 
 
+def held_events(state):
+    """Workers held over time: start share, allowance changes, release at the end."""
+    events = []
+    for s in state['steps']:
+        held = s['jobs']
+        events.append((s['started_seconds'], held))
+        for at, value in s.get('worker_changes', []):
+            events.append((at, value - held))
+            held = value
+        events.append((s['started_seconds'] + s['elapsed_seconds'], -held))
+    return events
+
+
 class ParallelBuildTests(unittest.TestCase):
     def test_completion_queue_refills_past_blocked_first_task(self):
         # Two workers submit four initial tasks. Job 0 only unblocks after job 8,
@@ -106,11 +119,10 @@ class ParallelBuildTests(unittest.TestCase):
                 execute_parallel(steps, root/'run', {'compiler_jobs': 3}, root)
             state = json.loads((root/'run/build-state.json').read_text())
             self.assertEqual(state['status'], 'passed')
-            events = []
+            events = held_events(state)
             by_name = {s['name']: s for s in state['steps']}
             for s in state['steps']:
                 start = s['started_seconds']
-                events += [(start, s['jobs']), (start + s['elapsed_seconds'], -s['jobs'])]
                 for dep in s['dependencies']:
                     before = by_name[dep]
                     self.assertGreaterEqual(start + .005, before['started_seconds'] + before['elapsed_seconds'])
@@ -134,6 +146,79 @@ class ParallelBuildTests(unittest.TestCase):
             self.assertEqual(state['not_started'], ['terrain'])
             self.assertEqual({s['name']: s['status'] for s in state['steps']},
                              {'setup': 'failed', 'engine': 'cancelled'})
+
+
+    def test_late_stage_gets_a_fair_share_and_shares_follow_the_budget(self):
+        # BUILD-SCHEDULER-JOBSHARE-32: a stage that becomes ready while another
+        # holds most of the budget must not keep one worker for its whole run.
+        watch = '\n'.join([
+            'import json, os, sys, time',
+            'from pathlib import Path',
+            'seen = []; end = time.time() + {}',
+            'while time.time() < end:',
+            '    v = int(Path(os.environ["AMIWIND_BUILD_JOBS_FILE"]).read_text())',
+            '    seen.append(v) if not seen or seen[-1] != v else None',
+            '    time.sleep(.02)',
+            'Path({!r}).write_text(json.dumps(seen))'])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            steps = [('engine', [sys.executable, '-c', watch.format(2.5, str(root / 'engine.json')), '--jobs', '1']),
+                     ('setup', [sys.executable, '-c', 'import time; time.sleep(.4)']),
+                     ('terrain', [sys.executable, '-c', watch.format(4.0, str(root / 'terrain.json')), '--jobs', '1'])]
+            with contextlib.redirect_stdout(io.StringIO()):
+                execute_parallel(steps, root / 'run', {'compiler_jobs': 8}, root)
+            state = json.loads((root / 'run/build-state.json').read_text())
+            engine = json.loads((root / 'engine.json').read_text())
+            terrain = json.loads((root / 'terrain.json').read_text())
+        by_name = {s['name']: s for s in state['steps']}
+        self.assertEqual(by_name['engine']['jobs'], 7)
+        self.assertEqual(by_name['terrain']['jobs'], 1)
+        self.assertEqual(engine[:2], [7, 4])      # shrinks when terrain starts
+        self.assertIn(terrain[0], (1, 4))        # starts with what was free
+        self.assertIn(4, terrain)                # grows to a fair share
+        self.assertEqual(terrain[-1], 8)         # and takes the freed budget
+        used = peak = 0
+        for _, delta in sorted(held_events(state)):
+            used += delta
+            peak = max(peak, used)
+        self.assertLessEqual(peak, 8)
+
+
+    def test_palette_readers_wait_for_the_census_rewrite(self):
+        # BUILD-PALETTE-RACE-32: census rewrites intro-scene/id1/gfx/palette.lmp in
+        # place; no stage may read it while census can still be running.
+        import build
+        from build_parallel import stage_dependencies
+        args = build.parser().parse_args(['--jobs', '4', '--tree-sprites'])
+        args.data_files = Path('/owned'); args.sdk = Path('/sdk')
+        tools = {k: '/tools/' + k for k in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
+        steps = build.commands(args, tools, Path('/private/run'))
+        dependencies = stage_dependencies(steps)
+
+        def ancestors(name):
+            seen, todo = set(), list(dependencies[name])
+            while todo:
+                item = todo.pop()
+                if item not in seen:
+                    seen.add(item); todo.extend(dependencies[item])
+            return seen
+        readers = [name for name, command in steps
+                   if any(str(part).endswith('intro-scene/id1/gfx/palette.lmp') for part in command)]
+        self.assertIn('world-flora-assets', readers)
+        for name in readers:
+            if name != 'census' and 'census' not in ancestors(name):
+                self.assertIn(name, ancestors('census'), name + ' may read the palette while census rewrites it')
+
+    def test_in_place_rewrites_are_whole_files(self):
+        from ui_palette import replace_bytes
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'palette.lmp'; path.write_bytes(bytes(768))
+            replace_bytes(path, bytes(range(256)) * 3)
+            self.assertEqual(path.read_bytes(), bytes(range(256)) * 3)
+            self.assertEqual([p.name for p in Path(tmp).iterdir()], ['palette.lmp'])
+        source = (Path(__file__).resolve().parents[1] / 'tools/ui_palette.py').read_text(encoding='utf-8')
+        self.assertNotIn('.write_bytes(new)', source)
+        self.assertNotIn('marker.write_text', source)
 
 
 if __name__ == '__main__':

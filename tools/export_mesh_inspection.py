@@ -36,7 +36,7 @@ def extract(raw, source):
         raise ValueError('Non-finite BSP vertex')
     edges = records(12, '<HH')
     surfedges = [x[0] for x in records(13, '<i')]
-    faces = records(7, '<Hhihh4Bi')
+    faces = records(7, '<HhihH4Bi')
     planes = records(1, '<4fi')
     models = records(14, '<9f7i')
     texinfos = records(6, '<8fii')

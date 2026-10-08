@@ -47,6 +47,14 @@ LOAD_ORDER = ('vertexes', 'edges', 'surfedges', 'textures', 'lighting', 'planes'
               'nodes', 'clipnodes', 'entities')
 DIRECT_BYTE_LUMPS = {'entities', 'visibility', 'lighting'}
 DIRECT_IN_PLACE_LUMPS = {'clipnodes'}
+# Every other lump is decoded from one bounded Hunk_TempAlloc slice straight into
+# its final allocations (model.c AW_LoadBrushSection / AW_RecordsNext): a window
+# of min(lump, 16 KiB) plus, for a lump larger than one window, a prefix: 64
+# bytes for a split record or, for the texture lump, its directory (at most
+# 4+4*512 bytes).
+BSP_SLICE_BYTES = 16384
+BSP_RECORD_PREFIX_BYTES = 64
+BSP_DIRECTORY_BYTES = 4 + 4 * 512
 PROBE_TYPES = ('pointer', 'short', 'int', 'hunk', 'dvertex', 'dedge', 'dplane', 'dnode',
                'dclipnode', 'clipnode', 'dleaf', 'texinfo', 'dface', 'dmodel', 'mvertex',
                'medge', 'mplane', 'mtexinfo', 'msurface', 'mnode', 'mleaf',
@@ -204,6 +212,41 @@ def hunk_temp_bytes(payload, hunk_header):
     return hunk_header + align16(payload)
 
 
+def slice_prefix_bytes(name, lump_bytes, record_prefix=BSP_RECORD_PREFIX_BYTES,
+                       directory_bytes=BSP_DIRECTORY_BYTES):
+    """Slice prefix of model.c AW_LoadBrushSection for one lump."""
+    if lump_bytes <= BSP_SLICE_BYTES:
+        return 0
+    if name != 'textures':
+        return record_prefix
+    return align16(min(lump_bytes, directory_bytes))
+
+
+def slice_temp_bytes(lump_bytes, hunk_header, slice_bytes=BSP_SLICE_BYTES,
+                     prefix_bytes=BSP_RECORD_PREFIX_BYTES):
+    """Temporary input while one sliced lump decodes: prefix + min(lump, slice), none if empty."""
+    if lump_bytes < 0 or slice_bytes <= 0 or prefix_bytes < 0:
+        raise ValueError('Invalid slice accounting')
+    return hunk_temp_bytes(prefix_bytes + min(lump_bytes, slice_bytes), hunk_header) if lump_bytes else 0
+
+
+def bsp_slice_policy(model_c):
+    """Bind the modelled temporary input to the loader source (no staged lumps)."""
+    clean = re.sub(r'/\*.*?\*/|//[^\n]*', '', model_c, flags=re.S)
+    match = re.search(r'^#define\s+AW_BSP_SLICE_BYTES\s+(\d+)\s*$', clean, re.M)
+    prefix = re.search(r'^#define\s+AW_BSP_RECORD_PREFIX\s+(\d+)\s*$', clean, re.M)
+    if (not match or not prefix or 'Hunk_TempAlloc(l->filelen' in clean or
+            not re.search(r'^#define\s+AW_BSP_DIRECTORY_BYTES\s+\(4\+4\*MAX_MAP_TEXTURES\)\s*$', clean, re.M) or
+            'aw_bsp_slice=Hunk_TempAlloc(aw_bsp_slice_bytes)' not in clean or
+            'l->filelen<AW_BSP_SLICE_BYTES?l->filelen:AW_BSP_SLICE_BYTES' not in clean or
+            'aw_bsp_slice_prefix=l->filelen<=AW_BSP_SLICE_BYTES?0:decode!=Mod_LoadTextures?AW_BSP_RECORD_PREFIX:' not in clean or
+            '((l->filelen<AW_BSP_DIRECTORY_BYTES?l->filelen:AW_BSP_DIRECTORY_BYTES)+15)&~15;' not in clean or
+            'if(aw_bsp_slice_bytes)aw_bsp_slice_bytes+=aw_bsp_slice_prefix;' not in clean):
+        raise ValueError('Unrecognized BSP section loader; refusing to estimate')
+    return {'mode': 'bounded_slices', 'slice_bytes': int(match.group(1)),
+            'record_prefix_bytes': int(prefix.group(1)), 'directory_bytes': BSP_DIRECTORY_BYTES}
+
+
 def compile_target_sizes(sdk):
     sdk = Path(sdk).resolve()
     suffix = '.exe' if os.name == 'nt' else ''
@@ -247,6 +290,11 @@ def compile_target_sizes(sdk):
     sprite_policy = sprite_loader_profile((ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
     efrag_policy = efrag_pool_profile((ROOT / 'engine/aga/src/client.h').read_text(encoding='utf-8'))
     sizes['sprite_streaming'] = sprite_policy['sprite_streaming']
+    slice_policy = bsp_slice_policy((ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
+    sizes['bsp_slice_bytes'] = slice_policy['slice_bytes']
+    sizes['bsp_record_prefix_bytes'] = slice_policy['record_prefix_bytes']
+    if not re.search(r'^#define\s+MAX_MAP_TEXTURES\s+512\b', (ROOT / 'engine/aga/src/bspfile.h').read_text(encoding='utf-8'), re.M):
+        raise ValueError('Texture directory bound differs from the heap model')
     from alias_stream_heap import runtime_policy as alias_runtime_policy
     alias_policy=alias_runtime_policy(ROOT/'engine/aga/src')
     sizes['alias_streaming']=alias_policy['alias_streaming']
@@ -273,6 +321,7 @@ def compile_target_sizes(sdk):
                    'runtime_bspfile_h_sha256': digest(ROOT / 'engine/aga/src/bspfile.h'),
                    'runtime_model_c_sha256': digest(ROOT / 'engine/aga/src/model.c'),
                    'sprite_loader_policy': sprite_policy,
+                   'bsp_section_policy': slice_policy,
                    'alias_loader_policy': alias_policy,
                    'edge_cache_policy': edge_policy,
                    'efrag_pool_policy': efrag_policy,
@@ -407,6 +456,20 @@ def runtime_node_policy(lumps):
     return result
 
 
+def predicted_render_prefix(lumps):
+    """Mirror AW_PredictRenderPrefix: the world prefix the streamed node loader
+    tries before certification, or 0. The lowest inline point root ends a
+    valid prefix; when certification then fails, the attempt (all hull0 nodes
+    plus the predicted prefix) was resident before the legacy arrays."""
+    count = len(lumps['nodes']) // 24
+    models = list(struct.iter_unpack('<9f7i', lumps['models']))
+    if len(models) < 2 or models[0][9] != 0:
+        return 0
+    roots = [model[9] for model in models[1:] if model[9] >= 0]
+    world = min(roots + [count])
+    return world if 0 < world < count else 0
+
+
 def estimate_bsp(path, sizes):
     path = Path(path)
     raw = path.read_bytes()
@@ -419,6 +482,10 @@ def estimate_bsp(path, sizes):
     direct_hull0 = node_policy['direct_hull0']
     pointer = sizes['pointer']
     hunk = sizes['hunk']
+    slice_bytes = sizes.get('bsp_slice_bytes', BSP_SLICE_BYTES)
+    record_prefix = sizes.get('bsp_record_prefix_bytes', BSP_RECORD_PREFIX_BYTES)
+    attempt = predicted_render_prefix(lumps) if not direct_hull0 else 0
+    node_policy['failed_prefix_attempt_nodes'] = attempt
     resident = 0
     resident_breakdown = []
     peak_total = 0
@@ -440,7 +507,8 @@ def estimate_bsp(path, sizes):
     for name in LOAD_ORDER:
         before = resident
         lump = lumps[name]
-        temp = 0 if name in DIRECT_BYTE_LUMPS | DIRECT_IN_PLACE_LUMPS else hunk_temp_bytes(len(lump) + 1, hunk)
+        temp = 0 if name in DIRECT_BYTE_LUMPS | DIRECT_IN_PLACE_LUMPS else slice_temp_bytes(len(lump), hunk, slice_bytes,
+                                                       slice_prefix_bytes(name, len(lump), record_prefix))
         if temp > temp_peak:
             temp_peak, temp_lump = temp, name
         if name == 'vertexes':
@@ -459,7 +527,7 @@ def estimate_bsp(path, sizes):
         elif name in ('lighting', 'visibility', 'entities'):
             if lump: add(name + ' (direct byte load)', len(lump))
         elif name == 'nodes' and direct_hull0:
-            # Both allocations coexist with the original staged disk-node lump.
+            # Both allocations coexist with the node lump's decode slice.
             add('hull0 clipnodes (direct disk)', counts[name] * sizes['clipnode'])
             add('nodes (world render prefix)', node_policy['render_nodes'] * sizes['mnode'])
         elif name in ('planes', 'texinfo', 'faces', 'leafs', 'nodes', 'clipnodes', 'models'):
@@ -472,6 +540,11 @@ def estimate_bsp(path, sizes):
                               if name == 'nodes' and direct_hull0 else resident-before)
         fallback_peak = max(fallback_peak, fallback_resident + temp)
         section_peak = resident + temp
+        if name == 'nodes' and attempt:
+            # A failed prefix certification is released before the legacy arrays.
+            section_peak = max(section_peak, before + temp +
+                               hunk_alloc_bytes(counts[name] * sizes['clipnode'], hunk) +
+                               hunk_alloc_bytes(attempt * sizes['mnode'], hunk))
         if section_peak > peak_total:
             peak_total, peak_lump = section_peak, name
             resident_at_peak, temp_at_peak = resident, temp
@@ -503,7 +576,9 @@ def estimate_bsp(path, sizes):
         peak_total = resident
     return {
         'map': path.name, 'path': str(path), 'file_bytes': len(raw),
-        'loader_policy': 'validated renderer-prefix/direct-hull0 and direct in-place clipnodes',
+        'loader_policy': 'validated renderer-prefix/direct-hull0, direct in-place clipnodes, '
+                         'other sections decoded from bounded slices',
+        'bsp_slice_bytes': slice_bytes, 'bsp_record_prefix_bytes': record_prefix,
         'direct_in_place_sections': sorted(DIRECT_IN_PLACE_LUMPS),
         'node_residency': node_policy,
         'edge_cache_residency': edge_policy,
@@ -528,30 +603,20 @@ def heap_capacity():
                                                'heap_megabytes': int(match.group(1))}
 
 
-def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
-                 safety_headroom_bytes=SAFETY_HEADROOM_BYTES):
-    if baseline_reserve_bytes <= 0:
-        raise ValueError('Baseline reserve must be positive')
-    if safety_headroom_bytes <= 0:
-        raise ValueError('Safety headroom must be positive')
-    maps = Path(maps)
-    candidates = sorted(p for p in maps.glob('*.bsp') if p.is_file())
-    if not candidates:
-        raise ValueError(f'No BSP maps found in {maps}')
-    budget, budget_source = heap_capacity()
-    reports = [estimate_bsp(path, sizes) for path in candidates]
-    from guard_torch_heap import profile as guard_profile, map_cost as guard_cost, apply as apply_guard_cost
-    guards=guard_profile(maps.parent,sizes)
-    from harvest_heap import profile as harvest_profile, apply as apply_harvest_cost
-    harvest=harvest_profile(maps.parent,sizes)
-    from sprite_heap import inspect_sprites, inspect_efrags, efrag_pool_profile
-    efrag_policy=efrag_pool_profile((ROOT/'engine/aga/src/client.h').read_text(encoding='utf-8'))
-    for report, path in zip(reports, candidates):
+def _map_reports(task):
+    """Worker: complete heap rows for a chunk of maps (independent per map)."""
+    paths, sizes, guards, harvest, efrag_policy, baseline_reserve_bytes, safety_headroom_bytes, budget = task
+    from guard_torch_heap import map_cost as guard_cost, apply as apply_guard_cost
+    from harvest_heap import apply as apply_harvest_cost
+    from sprite_heap import inspect_sprites, inspect_efrags
+    from scenery_admission import catalogue_count
+    reports = []
+    for path in map(Path, paths):
+        report = estimate_bsp(path, sizes)
         raw = path.read_bytes()
         table = lump_table(raw, path)
         entity_bytes = table['entities']
-        sprites = inspect_sprites(entity_bytes, maps.parent, sizes)
-        from scenery_admission import catalogue_count
+        sprites = inspect_sprites(entity_bytes, path.parent.parent, sizes)
         captured = catalogue_count(path.stem, entity_bytes)
         catalogue_bytes = hunk_alloc_bytes(captured * sizes['scenery'], sizes['hunk']) if captured else 0
         report['scenery_catalogue'] = {'placements':captured,'hunk_bytes':catalogue_bytes,
@@ -605,6 +670,36 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
                       estimated_total_bytes=required,
                       estimated_clearance_bytes=budget - required,
                       gate='pass' if required <= budget else 'fail')
+        reports.append(report)
+    return reports
+
+
+def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
+                 safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1, only=None):
+    # only: map names (no .bsp) to estimate, e.g. harvest admission candidates.
+    if baseline_reserve_bytes <= 0:
+        raise ValueError('Baseline reserve must be positive')
+    if safety_headroom_bytes <= 0:
+        raise ValueError('Safety headroom must be positive')
+    maps = Path(maps)
+    candidates = sorted(p for p in maps.glob('*.bsp') if p.is_file() and (only is None or p.stem in only))
+    if not candidates:
+        raise ValueError(f'No BSP maps found in {maps}')
+    budget, budget_source = heap_capacity()
+    from guard_torch_heap import profile as guard_profile
+    guards=guard_profile(maps.parent,sizes)
+    from harvest_heap import profile as harvest_profile
+    harvest=harvest_profile(maps.parent,sizes)
+    from sprite_heap import efrag_pool_profile
+    efrag_policy=efrag_pool_profile((ROOT/'engine/aga/src/client.h').read_text(encoding='utf-8'))
+    # Every map's estimate is independent: chunks run in up to `jobs` workers
+    # (shared pool, tools/build_parallel.py); rows keep sorted map order.
+    from build_parallel import ordered_map
+    size = max(1, -(-len(candidates) // (4 * max(1, jobs))))
+    chunks = [[str(p) for p in candidates[i:i + size]] for i in range(0, len(candidates), size)]
+    reports = [row for rows in ordered_map(_map_reports, [
+        (chunk, sizes, guards, harvest, efrag_policy, baseline_reserve_bytes, safety_headroom_bytes, budget)
+        for chunk in chunks], max(1, min(jobs, len(chunks)))) for row in rows]
     worst = max(reports, key=lambda row: row['estimated_total_bytes'])
     return {'format': 'AmiWind target BSP heap estimate 1',
             'acceptance': 'estimate-only; not target or gameplay validation',
@@ -620,9 +715,9 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
 
 
 def audit_world_maps(maps, sdk, out, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
-                     safety_headroom_bytes=SAFETY_HEADROOM_BYTES):
+                     safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1):
     sizes, abi = compile_target_sizes(sdk)
-    report = inspect_maps(maps, sizes, baseline_reserve_bytes, safety_headroom_bytes)
+    report = inspect_maps(maps, sizes, baseline_reserve_bytes, safety_headroom_bytes, jobs=jobs)
     report['target_abi_probe'] = abi
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)

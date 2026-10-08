@@ -2,7 +2,7 @@
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Last updated:** 7 October 2026. **FAQ revision:** 5.
+**Last updated:** 8 October 2026. **FAQ revision:** 6.
 **Latest release:** v0.0.30 - The Temple ([release notes](RELEASE-v0.0.30.md)).
 **Next:** v0.0.31 - Revisiting Seyda Neen: lighter Seyda Neen maps and shorter
 cell-crossing pauses. See the [roadmap](ROADMAP.md) and [tracker](BUGS.md).
@@ -25,7 +25,7 @@ Bringing the two together is the point of this project.
 The world, atmosphere and identity need to survive the journey, while the way
 we represent and run them has to work within the Amiga's constraints.
 
-AmiWind sits somewhere between a **conversion pipeline and a demake**. It is
+AmiWind is an **open-source RPG engine and a conversion pipeline**. It is
 also an optimization project in progress: the playable game gives us a demanding
 world to work with, measure and improve. Finding out how far we can take it is
 a central part of the project.
@@ -236,6 +236,36 @@ on a high-memory machine could keep them across crossings; this is untested.
 CPU rendering, AGA
 presentation, loading and audio still need to be measured together on the
 selected configuration.
+
+## Can AmiWind use more RAM if my Amiga has it?
+
+**Not yet, but it is planned, as your choice.** Today the game heap is a fixed
+**11 MiB** however much memory is installed, so extra RAM sits unused.
+
+The baseline stays the contract: **2 MiB Chip RAM and 16 MiB Fast RAM** is the
+machine AmiWind has to work on, and every route is tested there first. On top of that,
+the planned streaming engine (see the [roadmap](ROADMAP.md)) will let the player allow
+AmiWind to use more:
+
+- **Your choice at start-up.** A short boot screen will offer the settings ("S for
+  settings, ENTER to start"): standard memory, automatic, or a maximum you set. Without
+  a key press the game starts with your remembered choice; the default is the standard
+  baseline.
+- **Fewer pauses, not heavier frames.** Extra memory keeps more of the world ready:
+  neighbouring and recently visited areas, shared models and textures, and data that
+  has already been unpacked, so crossings and doors load less from disk. The view
+  distance, detail and number of active characters stay the same, so the frame rate
+  does not depend on how much RAM you have.
+- **Faster memory first.** Expansion memory can sit on different cards at different
+  speeds. The engine will keep its busiest data in the fastest Fast RAM and use slower
+  banks only for caches, instead of one large block that might land on the slowest card.
+- **Always leaving headroom** for the operating system and for the moment two areas are
+  loaded at once during a transition.
+
+Two limits stay whatever the RAM: Chip RAM (the display and sound hardware can only
+use Chip RAM), and the map format's own limits. Classic expansions reached 128-256 MB
+and a PiStorm setup has far more; on such machines much or even all of the world could
+stay in memory. How much each setup gains will be measured, not assumed.
 
 ## Why can AmiWind in FS-UAE run better than native OpenMW on a small PC?
 

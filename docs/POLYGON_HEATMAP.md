@@ -94,5 +94,6 @@ Interiors have local coordinates and must not be plotted in the exterior mosaic.
 callers preparing a private configuration. Directory origins are global runtime
 units: the source-world `centre` is `origin.xy / scale`, not the raw origin.
 Use the directory accompanying the exact staged map set. `--jobs` controls
-parallel mosaic reading and defaults to the host's logical CPU count. Every BSP
+parallel mosaic reading and defaults to the host's logical CPU count; an
+explicit value is used exactly. Every BSP
 can be checked against a caller-supplied expected SHA-256 before aggregation.

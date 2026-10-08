@@ -48,7 +48,8 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg reset location` | - | 0 |
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
-| `dbg tp` | - | [X Y original Morrowind global XY / balmora / seydaneen / prisonship / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y original Morrowind global XY / seydaneen / prisonship / balmora / vivec (Vivec Arena) / <map name>; no argument opens menu] |
+| `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 
 ## Sky / Lighting
@@ -60,6 +61,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg clouds` | - | on/off true/false 1/0 (default on, independent of sun) |
 | `dbg cloudtype` | - | classic/veil or 1/2 (classic default) |
 | `dbg dayclouds` | - | 0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected |
+| `dbg daynight` | - | [on/off] off holds the clock at 12:00 midday (sky, light, lamps, windows; survives map changes, not saved); on resumes from the current time; no argument: state |
 | `dbg daynightcycle` | - | on/off true/false 1/0 (automatic time; explicit set/wait still work) |
 | `dbg emissive` | - | [0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query |
 | `dbg exterior luma` | `dbg luma exterior`, `dbg luma outdoor` | [0..4] no argument: query |
@@ -80,7 +82,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg outdoorlantern` | - | [0.25..3.0] light radius of exterior lamps and lanterns at night, relative to the torch (default 1.0) |
 | `dbg set time` | `dbg settime`, `dbg time` | HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn |
 | `dbg sky` | - | on/off true/false 1/0 (sky/fog presentation; time control is separate) |
-| `dbg skyline fill` | `dbg skylinefill` | 1/0 sky showing below far scenery takes the fog colour (no cut-outs at short fog distances; default 1) |
+| `dbg skyline fill` | `dbg skylinefill` | 1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon) |
 | `dbg skyspeed` | - | [0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed) |
 | `dbg skytype` | - | 1/2/3 or V1/V2/V3 (V3 extra stronk default) |
 | `dbg starsky` | - | on/off true/false 1/0 (stars and nebula; default on) |
@@ -124,6 +126,8 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg dimensions` | - | - |
 | `dbg eyeheight` | - | [offset above player origin] |
 | `dbg fps` | - | on/off |
+| `dbg fpu` | - | (CPU and FPU support library status: 68040.library/68060.library resident or none) |
+| `dbg fpucount` | - | [0/1] once a second: per-frame counts of brush model rotations (and rebuilds), direction vectors, table sine/cosine lookups and NPC targeting (average/peak) |
 | `dbg hands` | - | - |
 | `dbg heap` | - | (current hunk clearance and load peak) |
 | `dbg hud type` | - | 1 original / 2 compact (default) |
@@ -131,6 +135,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg npcs` | - | - |
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |
+| `dbg rcount` | - | [0/1/2] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only |
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |
 | `dbg showram` | - | on/off |

@@ -21,7 +21,7 @@ static void load(void)
     snprintf(loaded,sizeof loaded,"%s",sv.name);have=0;
     if(COM_FOpenFile("world/fog-locations.txt",&f)<0 || !f)return;
     while(fgets(line,sizeof line,f)){
-        if(line[0]=='#' || sscanf(line,"%63s %d %d",name,&day,&night)!=3)continue;
+        if(line[0]=='#' || Q_sscanf(line,"%63s %d %d",name,&day,&night)!=3)continue;
         if(Q_strcasecmp(name,sv.name))continue;
         if(day>=100 && day<=1500 && night>=100 && night<=1500){have=1;day_distance=day;night_distance=night;}
         break;

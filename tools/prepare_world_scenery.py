@@ -130,7 +130,12 @@ def main():
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--only', nargs='+')
     add_jobs(parser)
+    from scenery_reduce import add_options, apply_options
+    add_options(parser)
     args = parser.parse_args()
+    apply_options(args)
+    import build_profile
+    build_profile.instrument('world-scenery')
     result = prepare(args.terrain, args.scenery, args.palette, args.out, resolve_jobs(args.jobs), args.only)
     print('OVERLAY PASSED', len(result['regions']), 'regions;', result['covered_source_references'], 'source references;', result['seconds'], 'seconds', flush=True)
 

@@ -12,6 +12,7 @@ static short same_short(short x){return x;}
 static int same_long(int x){return x;}
 short (*LittleShort)(short)=same_short;
 int (*LittleLong)(int)=same_long;
+qboolean aw_loading_music=false; /* referenced by the streamed BSP reader */
 void *Hunk_AllocName(int n,char *s){return calloc(1,n);}
 void Sys_Error(char *fmt,...){assert(expect_error);longjmp(error,1);}
 int Q_strncmp(char *a,char *b,int n){return strncmp(a,b,n);}

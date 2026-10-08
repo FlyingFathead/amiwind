@@ -1,0 +1,136 @@
+{
+  "format": 1,
+  "comment": "Vivec canton frame (docs/TOWN_IMPORT.md, Vivec). handoff_core is the canton's share of the city on the original cell grid; the bounds add at least draw distance + 32 around it, in whole 768 cores, so a neighbouring frame takes over before this frame's edge comes into view. The centre is the handoff core's centre on the 512-unit terrain material grid. interiors: the rooms reached through the canton's load doors (append only; position = map name and save ID).",
+  "source_cell": [
+    3,
+    -12
+  ],
+  "source_radius": 1,
+  "centre": [
+    28672,
+    -94208
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1920,
+      -1920
+    ],
+    [
+      1920,
+      1920
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "handoff_core": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "town": {
+    "id": "vivec_delyn",
+    "title": "Vivec, St. Delyn",
+    "map": "vivec_delyn",
+    "map_prefix": "vd",
+    "region_cap": 64,
+    "message": "Vivec, St. Delyn",
+    "region_file": "vivec_delyn-regions.txt",
+    "door_file": "scene-doors-vivec_delyn.txt",
+    "visual_group": "vivec_delyn",
+    "arrival": {
+      "source_position": [
+        28153,
+        -91186,
+        1880
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "Original exit point of interior door 158944 (Vivec, St. Delyn Waist North-One) onto the canton."
+    },
+    "return": null
+  },
+  "interiors": [
+    {
+      "cell": "Ihinipalit, Shrine"
+    },
+    {
+      "cell": "Vivec, Lucretinaus Olcinius: Trader"
+    },
+    {
+      "cell": "Vivec, Mevel Fererus: Trader"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canal North-One"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canal North-Three"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canal North-Two"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canal South-One"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canal South-Three"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canal South-Two"
+    },
+    {
+      "cell": "Vivec, St. Delyn Canalworks"
+    },
+    {
+      "cell": "Vivec, St. Delyn Glassworker's Hall"
+    },
+    {
+      "cell": "Vivec, St. Delyn Plaza"
+    },
+    {
+      "cell": "Vivec, St. Delyn Potter's Hall"
+    },
+    {
+      "cell": "Vivec, St. Delyn Storage",
+      "exclude": "inline models 249 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, St. Delyn Underworks",
+      "exclude": "heap 964 B over the 11,534,336 B budget after the optimizer (VIVEC-HEAP-31)"
+    },
+    {
+      "cell": "Vivec, St. Delyn Waist North-One"
+    },
+    {
+      "cell": "Vivec, St. Delyn Waist North-Two"
+    },
+    {
+      "cell": "Vivec, St. Delyn Waist South-One"
+    },
+    {
+      "cell": "Vivec, St. Delyn Waist South-Two"
+    },
+    {
+      "cell": "Vivec, St. Delyn Waistworks"
+    },
+    {
+      "cell": "Vivec, Tervur Braven: Trader"
+    },
+    {
+      "cell": "Vivec, The Abbey of St. Delyn the Wise"
+    }
+  ]
+}

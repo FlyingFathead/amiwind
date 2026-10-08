@@ -143,7 +143,9 @@ position/orientation and safe-spawn validation.
 
 Checkpoint-015 adds `debug help` (or `dbg help`), which lists the supported commands and their
 arguments. `dbg ...` and `amiwind debug ...` are equivalent prefixes. Old underscore commands
-remain valid. Use PageUp/PageDown to scroll help.
+remain valid. Use PageUp/PageDown to scroll help. The command line edits like a terminal
+prompt (cursor keys, Home/End, Del, history kept between sessions; `aw_console_mode 0` for
+id's classic editor); see [console line editing](KEYMAPS.md#console-line-editing).
 
 | Command | Purpose |
 | --- | --- |
@@ -390,6 +392,24 @@ not an archived preference; `dbg input trace` remains an alias. Use
 `dbg inputtrace off` immediately after collecting the needed input evidence,
 because mouse motion produces many lines. Visual playtests and sky captures
 keep tracing off.
+
+`dbg daynight off` sets the game clock to 12:00 (midday) and holds it there.
+It goes through the same clock as `dbg time 1200`, so the sky, daylight, light
+tables, night lamps, night windows, guard torches, location fog and the HUD
+`TIME` all show midday; no system has a switch of its own. While it holds,
+automatic time, waiting, `dbg time HHMM`, `dbg timeofday` and `dbg 24hrcycle`
+do not move the clock (they say so); `dbg time` without an argument still
+reports the time and the hold. Turning it off also ends a running 24 h cycle
+and any sky or light-gallery time preview; previews started afterwards still
+work, since they never change the saved clock. The hold is a session setting:
+it survives map changes, a loaded save and a new game (every frame puts the
+clock back to 12:00, keeping the date), is never written to a savegame (a save
+made during the hold simply records 12:00), and lasts until `dbg daynight on`
+or quitting. `dbg daynight on` resumes the normal cycle from the current time
+(automatic time still follows `dbg daynightcycle`); `dbg daynight` alone
+prints the state, and the remote state file carries `daynight on|off`.
+`dbg sky` is a different switch: it turns the sky/fog presentation off while
+time keeps passing.
 
 `dbg daycycle gallery` previews eight sky stages in a camera tour, eight seconds
 each. On the tested Seyda Neen town map it uses the recorded scenic viewpoints;

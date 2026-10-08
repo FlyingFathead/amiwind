@@ -38,14 +38,22 @@ def zone_scale(point, zones):
     return scale
 
 
+def bake_grid(polygon, axes, offset):
+    """Grid of the unstored double-precision polygon (the default bake grid).
+
+    The engine computes the grid from the stored single-precision values
+    (tools/surface_grid.py); the mesh converter compares the two after
+    writing each face and rebakes with sample_grid where they differ."""
+    uv=polygon@axes+offset
+    low=np.floor(uv.min(0)/16)*16;high=np.ceil(uv.max(0)/16)*16
+    return low,((high-low)/16).astype(int)+1
+
+
 def bake_surface(polygon, axes, offset, rotation, origin, lighting, *, sample_grid=None):
-    # Audited repairs supply the exact grid of serialized BSP coordinates.
-    # Existing conversion callers retain their historical grid pending the
-    # separate cross-FPU precision correction.
+    # Converters and repairs pass the engine's grid of the serialized BSP
+    # coordinates as sample_grid; without it the unstored polygon's grid is used.
     if sample_grid is None:
-        uv=polygon@axes+offset
-        low=np.floor(uv.min(0)/16)*16;high=np.ceil(uv.max(0)/16)*16
-        size=((high-low)/16).astype(int)+1
+        low,size=bake_grid(polygon, axes, offset)
     else:
         low=np.asarray(sample_grid[0],dtype=float)
         size=np.asarray(sample_grid[1],dtype=int)

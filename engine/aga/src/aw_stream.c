@@ -17,6 +17,8 @@ static double worst_read,transition_started;
 static int transition_pending,transition_ready,heap_first_present;
 extern size_t (*aw_load_prefetch_copy)(const char *,long,byte *,size_t);
 extern double (*aw_load_clock)(void);
+extern int (*aw_load_hunk_used)(void);
+extern int hunk_low_used,hunk_high_used;
 extern long aw_load_disk_bytes,aw_load_disk_calls;
 extern double aw_load_disk_seconds,aw_load_decode_seconds;
 static void cancel(void) {
@@ -112,7 +114,8 @@ void AW_StreamPresented(void) {
         Sys_FloatTime()-transition_started,(unsigned long)requested_bytes(),(double)AW_StreamLookahead());fclose(f);}
     transition_pending=transition_ready=0;
 }
+static int hunk_used(void) {return hunk_low_used+hunk_high_used;}
 void AW_StreamInit(void) {
     Cvar_RegisterVariable(&method);Cvar_RegisterVariable(&buffer_kib);Cvar_RegisterVariable(&ahead_seconds);
-    aw_load_prefetch_copy=copy;aw_load_clock=Sys_FloatTime;
+    aw_load_prefetch_copy=copy;aw_load_clock=Sys_FloatTime;aw_load_hunk_used=hunk_used;
 }

@@ -4,6 +4,7 @@
  */
 #include "quakedef.h"
 #include "aw_maps.h"
+#include "aw_town.h"
 #include "aw_sky.h"
 #include "aw_horizon.h"
 extern short *d_pzbuffer;
@@ -14,8 +15,21 @@ static cvar_t aw_fog={"aw_fog","1",true};
 static cvar_t aw_terrain_horizon={"aw_terrain_horizon","0",true};
 /* Skyline fill: in each column, sky below far scenery (fog level at least
  * SKYLINE_LEVEL) is a hole left by the far cut-off and takes the full fog
- * colour, so a short fog distance leaves a fogged skyline, not cut-outs. */
+ * colour, so a short fog distance leaves a fogged skyline, not cut-outs.
+ * Alternative horizon method ("object silhouetting"): experimental and buggy
+ * (sprites need their shapes from the alpha channel); tested but subpar
+ * results; kept for future improvement. The game config (config/game.cfg)
+ * selects 0, the land-outline horizon (HORIZON-FLORA-SPRITES-32). */
 static cvar_t aw_skyline_fill={"aw_skyline_fill","1",true};
+/* Once per saved configuration, after config.cfg (quake.rc), as aw_gallery_migrate:
+ * a save from before the land-outline default (v0.0.31, dev builds) still holds
+ * aw_skyline_fill 1. Later explicit choices stay effective. */
+static cvar_t aw_horizon_defaults={"aw_horizon_defaults","0",true};
+static void horizon_migrate(void) {
+    if(aw_horizon_defaults.value>=1)return;
+    Cvar_SetValue("aw_skyline_fill",0);
+    Cvar_SetValue("aw_horizon_defaults",1);
+}
 #define SKYLINE_LEVEL 12
 #define SKYLINE_MAX 1600
 static byte skyline[SKYLINE_MAX];
@@ -27,10 +41,11 @@ static cvar_t aw_cull;
  * NULL until that module is initialised. */
 int (*aw_fog_location_hook)(int);
 int AW_DrawDistance(void) {
-    int d;
-    /* This exterior's converted overlap is certified for the default range.
-     * Keep the user's larger setting available to other scenes. */
-    if(sv.active && (!strcmp(sv.name,"balmora") || !strcmp(sv.name,"seyda") || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>540)d=540;
+    int d,town=sv.active?AW_TownFind(sv.name):-1,limit=town>=0?AW_Town(town)->draw_distance:540;
+    /* This exterior's converted overlap is certified for its town table range
+     * (540 for every converted town and the open world). Keep the user's
+     * larger setting available to other scenes. */
+    if(sv.active && (town>=0 || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>limit)d=limit;
     else if(!(aw_drawdistance.value>=100))d=100;
     else if(aw_drawdistance.value>4096)d=4096;
     else d=(int)aw_drawdistance.value;
@@ -60,7 +75,7 @@ static void cycle_distance(void) {
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {

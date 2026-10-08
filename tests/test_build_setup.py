@@ -453,6 +453,8 @@ class BuildSetupTests(unittest.TestCase):
             self.assertEqual(report['loose_categories']['video'],1)
             args=build.parser().parse_args(['--data-files',str(data)])
             source=root/'source';source.mkdir();(source/'VERSION').write_text('fixture')
+            # A real AGA receipt hashes the world flora policy (flora is built by default).
+            (source/'config').mkdir();(source/'config/world-flora.json').write_text('{}')
             with patch.object(build,'ROOT',source):receipt=build.provenance(args,{})
             self.assertIn(str(Path('Video')/'mw_intro.bik'),receipt['input_sha256'])
             self.assertFalse(any(name.casefold().endswith('.zip') for name in receipt['input_sha256']))

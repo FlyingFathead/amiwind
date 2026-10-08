@@ -195,14 +195,14 @@ if (!avelocities[0][0])
 	for (i=0 ; i<NUMVERTEXNORMALS ; i++)
 	{
 		angle = cl.time * avelocities[i][0];
-		sy = sin(angle);
-		cy = cos(angle);
+		sy = Q_SinRad(angle);
+		cy = Q_CosRad(angle);
 		angle = cl.time * avelocities[i][1];
-		sp = sin(angle);
-		cp = cos(angle);
+		sp = Q_SinRad(angle);
+		cp = Q_CosRad(angle);
 		angle = cl.time * avelocities[i][2];
-		sr = sin(angle);
-		cr = cos(angle);
+		sr = Q_SinRad(angle);
+		cr = Q_CosRad(angle);
 
 		forward[0] = cp*cy;
 		forward[1] = cp*sy;
@@ -266,7 +266,7 @@ void R_ReadPointFile_f (void)
 	c = 0;
 	for ( ;; )
 	{
-		r = fscanf (f,"%f %f %f\n", &org[0], &org[1], &org[2]);
+		r = Q_fscanf(f,"%f %f %f\n", &org[0], &org[1], &org[2]);
 		if (r != 3)
 			break;
 		c++;

@@ -32,7 +32,12 @@ def available_memory():
     return min(candidates) if candidates else None
 
 
-def auto_jobs():
+def usable_cpus():
+    """CPU threads this process may use: CPU count, affinity and container quota.
+
+    Memory is not part of it (auto_jobs adds the memory budget). An explicit
+    --jobs above this number is still used exactly; see jobs_warning.
+    """
     counts = [os.cpu_count() or 1]
     if hasattr(os, 'process_cpu_count'):
         try:
@@ -51,6 +56,12 @@ def auto_jobs():
             counts.append(math.ceil(int(quota) / int(period)))
     except (OSError, ValueError):
         pass
+    return max(1, min(counts))
+
+
+def auto_jobs():
+    """Default worker count without --jobs: usable CPU threads, capped by memory."""
+    counts = [usable_cpus()]
     # Reserve a quarter of current headroom (at least 256 MiB), then budget
     # 512 MiB per worker. This is a conservative planning estimate, not an
     # assertion that arbitrary future NIFs have a fixed peak memory cost.
@@ -73,7 +84,24 @@ def job_value(value):
     return count
 
 
+def jobs_warning(value):
+    """One warning text when an explicit --jobs exceeds the usable CPU threads.
+
+    Only the CPU count matters here (not memory). The requested count is still
+    used exactly: the warning never lowers it.
+    """
+    if value is None:
+        return None
+    usable = usable_cpus()
+    if value <= usable:
+        return None
+    return (f'WARNING: --jobs {value} exceeds {usable} usable CPU threads; running {value} workers '
+            'as requested (expect contention and higher temperatures)')
+
+
 def resolve_jobs(value=None):
+    """An explicit count is returned unchanged (never capped); otherwise the
+    scheduled stage's AMIWIND_BUILD_JOBS, otherwise auto_jobs()."""
     if value is not None:
         return value
     # A scheduled stage must not expand its allocation back to all host CPUs.

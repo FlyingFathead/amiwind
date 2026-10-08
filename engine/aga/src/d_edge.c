@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "d_local.h"
 #include "aw_sky.h"
+#include "aw_rcount.h"
 
 #if !id68k
 static
@@ -207,7 +208,9 @@ void D_DrawSurfaces (void)
 	surfcache_t		*pcurrentcache;
 	vec3_t			world_transformed_modelorg;
 	vec3_t			local_modelorg;
+	double			t0;
 
+	AW_RT_BEGIN(t0);
 	currententity = &cl_entities[0];
 	TransformVector (modelorg, transformed_modelorg);
 	VectorCopy (transformed_modelorg, world_transformed_modelorg);
@@ -353,4 +356,5 @@ void D_DrawSurfaces (void)
 			}
 		}
 	}
+	AW_RT_END(RT_DRAW, t0);
 }

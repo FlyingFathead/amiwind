@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<html lang="en" data-inspector-version="0.0.31" data-inspector-build="019"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en" data-inspector-version="0.0.31" data-inspector-build="020"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AmiWind Toolkit · 3D Map Inspector</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#101923;color:#edf3fa;font:14px system-ui}header{height:64px;padding:12px 18px;border-bottom:1px solid #345;display:flex;align-items:center;gap:8px;overflow-x:auto;overflow-y:hidden}h1{font-size:18px;margin:0;white-space:nowrap;flex-shrink:0;line-height:1.15}button,select,input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:5px;padding:7px}button{cursor:pointer}main{display:flex;height:calc(100vh - 64px)}aside{width:310px;min-width:310px;padding:16px;overflow:auto}#stage{position:relative;flex:1;min-width:0}canvas{width:100%;height:100%;display:block}#hint,#status{position:absolute;background:#101923dc;padding:10px;pointer-events:none}#hint{top:12px;left:12px;max-width:510px}#status{bottom:12px;left:12px}#selectionstatus{position:absolute;left:12px;right:12px;background:#101923ed;color:#ffe56a;padding:8px 10px;pointer-events:none;display:none;font-weight:600}#cross{position:absolute;left:50%;top:50%;pointer-events:none;color:#ffe28a;font-size:22px;transform:translate(-50%,-50%)}#emptyload{position:absolute;left:50%;top:calc(50% + 24px);transform:translateX(-50%);pointer-events:none;color:#8494a6;font-size:14px;text-align:center;max-width:80%}#emptyload[hidden]{display:none}label{display:block;margin:12px 0}#objects{width:100%;height:230px;padding:0}#objects option{padding:6px}#info{line-height:1.7;white-space:pre-wrap}.small{font-size:12px;color:#b6c7d8;line-height:1.5}.error{color:#ffaaaa}#legend{height:12px;background:linear-gradient(90deg,#4478ee,#32cfa0,#ffcf55,#ef4545);margin:8px 0}
@@ -43,6 +43,28 @@ button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff;color:#fff;b
 <p><button id="zoneexport">Export prebake markup JSON</button></p><label>Load exclusion markup JSON<input id="zoneimport" type="file" accept=".json" style="width:100%"></label>
 <div id="zoneinfo" class="small">Mark hidden interiors of exterior meshes for a later prebake cut. Two clicks make a box; polygons use Finish zone. Min/max Z define the exact volume. Collision and separate interior cells are preserved. Markup does not remove faces; compiler integration is pending.</div>
 </details><p id="sessionstatus" class="small" role="status" aria-live="polite">Export all saves the current view and planning settings. BSP, texture and palette pixels stay in the referenced source.</p><button id="applymismatch" style="display:none">Apply despite source mismatch</button><div id="copysessionfallback" style="display:none"><label>Manual session JSON copy<textarea id="copysessiontext" readonly spellcheck="false" style="width:100%;height:180px" aria-label="Session JSON for manual copy"></textarea></label><p class="small">Clipboard access was unavailable or denied. Press Ctrl+C (Cmd+C on macOS) to copy the selected JSON. Export all also saves it as a file.</p><button id="selectsessiontext">Select JSON</button> <button id="closesessioncopy">Close</button></div>
+<details open id="cutspanel"><summary><b>Sub-cell cuts</b></summary>
+<p class="small">Region borders and section cuts as coloured vertical rectangles through the map, in compiled BSP XYZ. Planning only: no map, region or section is changed.</p>
+<label><input id="showcuts" type="checkbox" checked> Show cuts and region borders</label><label><input id="showcutcoverage" type="checkbox" checked> Show coverage (dashed)</label>
+<label>Load cut overlay JSON<input id="cutoverlayfile" type="file" accept=".json" style="width:100%"></label><p><button id="cutoverlayclear">Clear overlay</button></p>
+<p id="cutoverlayinfo" class="small">No overlay loaded. tools/region_cuts.py writes one from a town region config or a section plan.</p>
+<p><b>Sub-cell divider</b></p>
+<p><button id="cutaddx" title="Plane of constant X, spanning Y">Add X cut</button> <button id="cutaddy" title="Plane of constant Y, spanning X">Add Y cut</button> <button id="cutdelete">Delete cut</button></p>
+<select id="cutlist" size="4" style="width:100%"></select>
+<label>Label <input id="cutlabel" maxlength="40" style="width:170px"></label>
+<label>Position <input id="cutat" type="number" step="1" style="width:110px"><input id="cutslider" type="range" step="1" style="width:100%"></label>
+<label>From <input id="cutfrom" type="number" step="1" style="width:90px"> To <input id="cutto" type="number" step="1" style="width:90px"></label>
+<label>Min Z <input id="cutzmin" type="number" step="1" style="width:80px"> Max Z <input id="cutzmax" type="number" step="1" style="width:80px"></label>
+<label>Cut colour <input id="cutcolour" type="color" value="#ff5d5d"></label>
+<p><button id="cutundo">Undo</button> <button id="cutredo">Redo</button> <button id="cutclear">Clear cuts</button></p>
+<label>Portal margin <input id="cutmargin" type="number" min="1" max="32" step="1" style="width:60px"> Apron <input id="cutapron" type="number" min="2" step="1" style="width:70px"></label>
+<label><input id="cutworldwhole" type="checkbox"> World kept whole in every section (interior section build)</label>
+<label>Fixed non-map heap <input id="cutfixed" type="number" min="0" step="1" style="width:100px"> B · loader factor <input id="cutfactor" type="number" min="0" step="0.01" style="width:60px"></label>
+<div id="cutstats" class="small" style="white-space:pre-wrap">Add a cut to see per-section statistics.</div>
+<p><button id="cutexport">Export cut overlay JSON</button> <button id="cutplan">Export section plan JSON</button></p>
+<label>Import cuts (overlay or section plan JSON)<input id="cutimport" type="file" accept=".json" style="width:100%"></label>
+<p id="cutinfo" class="small">Drag a cut or its end squares in From above (top-down) view; elsewhere use the number boxes and slider. Every cut divides the whole map along its axis; From/To and Z give its portal rectangle.</p>
+</details>
 <p><b>Plan a polygon area</b></p><label>Reference plane Z <input id="planez" type="number" value="0" step="any" style="width:90px"> compiled units</label><p><button id="drawarea" aria-pressed="false">Draw area</button> <button id="finisharea">Finish</button> <button id="cleararea">Clear</button></p><p><button id="areaJSON">Export polygon JSON</button> <button id="areaPNG">Export marked PNG</button></p><div id="areainfo" class="small">Click corners from above. Horizontal reference-plane projection, not terrain tracing. Planning only; no map edits.</div>
 <label>Speed <input id="speed" type="range" min="20" max="1600" value="200"> <span id="speedvalue">200</span> units/s</label>
 <label>Density bin <input id="bin" type="number" min="1" max="8192" value="64" style="width:80px"> compiled units</label>
@@ -50,7 +72,7 @@ button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff;color:#fff;b
 <input id="search" placeholder="Find model, reference, name" style="width:100%"><select id="objects" size="10"></select>
 <p><button id="fit">Fit selected</button> <button id="export">Export scene JSON</button></p><div id="info">Load a locally converted BSP or exported scene.</div>
 <p class="small">Bindings follow AmiWind default keymaps: WASD move, E ascend, Q descend, Shift faster, Ctrl fast flight, left/right arrows turn. Mouse look; Escape releases cursor. Space is jump in AmiWind and has no jump action in this noclip inspector. Unlocked: drag to look, wheel zooms the view (field of view in fly mode; position unchanged); Overview resets zoom. Click selects a surface; in mouse look, click selects under the centre reticle.</p></aside>
-<div id="stage"><canvas id="view" tabindex="0"></canvas><canvas id="areaoverlay" style="position:absolute;inset:0;pointer-events:none"></canvas><div id="hint">Open a converted BSP to navigate its actual polygons. This viewer does not change the game.</div><div id="cross">+</div><div id="emptyload">Please load a map to continue: Local &rarr; Show in 3D, or Open BSP / JSON above.</div><div id="orientationgizmo"><b class="small">Orientation</b><canvas id="gizmo" width="138" height="128" aria-label="Orientation axes; drag to orbit, click plus or minus axes to snap"></canvas><span class="small">Drag to orbit · click axes</span></div><div id="compass"><div id="rose"><span class="n">N</span><span class="e">E</span><span class="s">S</span><span class="w">W</span><div id="needle">↑</div></div><div id="compassvalue">0° N</div></div><div id="terrainwarning"><span id="terrainwarninglabel">Terrain culling preview ON — requires pre-baking to affect the map</span><div id="previewcounts"></div></div><div id="selectionstatus" role="status" aria-live="polite"></div><div id="status">No scene</div></div></main>
+<div id="stage"><canvas id="view" tabindex="0"></canvas><canvas id="areaoverlay" style="position:absolute;inset:0;pointer-events:none"></canvas><div id="hint">Open a converted BSP to navigate its actual polygons. This viewer does not change the game.</div><div id="cross">+</div><div id="emptyload">Please load a map to continue: Local &rarr; Show in 3D, or Open BSP / JSON above.</div><div id="orientationgizmo"><b class="small">Orientation</b><canvas id="gizmo" width="138" height="128" aria-label="Orientation axes; drag to orbit, click plus or minus axes to snap"></canvas><span class="small">Drag to orbit · click axes</span></div><div id="compass"><div id="rose"><span class="n">N</span><span class="e">E</span><span class="s">S</span><span class="w">W</span><div id="needle">↑</div></div><div id="compassvalue">0° N</div></div><div id="terrainwarning"><span id="terrainwarninglabel">Terrain culling preview ON — requires pre-baking to affect the map</span><div id="previewcounts"></div></div><div id="selectionstatus" role="status" aria-live="polite"></div><div id="status">No scene</div><div id="cuttip" style="position:absolute;display:none;pointer-events:none;background:#101923ee;border:1px solid #8bd5ff;border-radius:4px;padding:5px 7px;font-size:12px;white-space:pre;color:#edf3fa"></div></div></main>
 <script>
 'use strict';
 const $=id=>document.getElementById(id),canvas=$('view');let gl=canvas.getContext('webgl');
@@ -65,7 +87,7 @@ try{if(gl){program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_
 else $('hint').textContent='WebGL is unavailable. Enable browser graphics support to inspect meshes.';}catch(e){reportError(e);gl=null;}
 function angles(a){let [p,y,r]=a.map(v=>v*Math.PI/180),sp=Math.sin(p),cp=Math.cos(p),sy=Math.sin(y),cy=Math.cos(y),sr=Math.sin(r),cr=Math.cos(r);return [[cp*cy,cp*sy,-sp],[sr*sp*cy-cr*sy,sr*sp*sy+cr*cy,sr*cp],[cr*sp*cy+sr*sy,cr*sp*sy-sr*cy,cr*cp]];}
 function bsp(buffer,name){let d=new DataView(buffer);if(buffer.byteLength>128*1024*1024)throw Error('BSP exceeds 128 MiB inspection limit');if(buffer.byteLength<124||d.getInt32(0,true)!==29)throw Error('Expected Quake BSP version 29');let lumps=[];for(let i=0;i<15;i++){let o=d.getInt32(4+i*8,true),n=d.getInt32(8+i*8,true);if(o<124||n<0||o+n>buffer.byteLength)throw Error('Invalid lump bounds '+i);lumps.push([o,n]);}function table(i,size,fn){let[o,n]=lumps[i];if(n%size)throw Error('Misaligned lump '+i);return Array.from({length:n/size},(_,j)=>fn(o+j*size));}
-let planes=table(1,20,o=>[0,4,8].map(k=>d.getFloat32(o+k,true))),textures=parseMipTextures(buffer,lumps[2]),infos=table(6,40,o=>({vectors:Array.from({length:8},(_,i)=>d.getFloat32(o+i*4,true)),texture:d.getInt32(o+32,true)}));if(infos.some(t=>!t.vectors.every(Number.isFinite)))throw Error("Non-finite texinfo vectors");let v=table(3,12,o=>[0,4,8].map(x=>d.getFloat32(o+x,true))),e=table(12,4,o=>[d.getUint16(o,true),d.getUint16(o+2,true)]),se=table(13,4,o=>d.getInt32(o,true)),f=table(7,20,o=>({plane:d.getUint16(o,true),side:d.getInt16(o+2,true),lightmapped:d.getInt32(o+16,true)>=0,first:d.getInt32(o+4,true),count:d.getInt16(o+8,true),tex:d.getInt16(o+10,true)})),m=table(14,64,o=>({first:d.getInt32(o+56,true),count:d.getInt32(o+60,true)}));let[o,n]=lumps[0],text=new TextDecoder('windows-1252').decode(new Uint8Array(buffer,o,n)),entities=Array.from(text.matchAll(/\{([^{}]*)\}/g),x=>Object.fromEntries(Array.from(x[1].matchAll(/"([^"\n]*)"\s*"([^"\n]*)"/g),y=>[y[1],y[2]])));
+let planes=table(1,20,o=>[0,4,8].map(k=>d.getFloat32(o+k,true))),textures=parseMipTextures(buffer,lumps[2]),infos=table(6,40,o=>({vectors:Array.from({length:8},(_,i)=>d.getFloat32(o+i*4,true)),texture:d.getInt32(o+32,true)}));if(infos.some(t=>!t.vectors.every(Number.isFinite)))throw Error("Non-finite texinfo vectors");let v=table(3,12,o=>[0,4,8].map(x=>d.getFloat32(o+x,true))),e=table(12,4,o=>[d.getUint16(o,true),d.getUint16(o+2,true)]),se=table(13,4,o=>d.getInt32(o,true)),f=table(7,20,o=>({plane:d.getUint16(o,true),side:d.getInt16(o+2,true),lightmapped:d.getInt32(o+16,true)>=0,first:d.getInt32(o+4,true),count:d.getInt16(o+8,true),tex:d.getUint16(o+10,true)})),m=table(14,64,o=>({first:d.getInt32(o+56,true),count:d.getInt32(o+60,true)}));let[o,n]=lumps[0],text=new TextDecoder('windows-1252').decode(new Uint8Array(buffer,o,n)),entities=Array.from(text.matchAll(/\{([^{}]*)\}/g),x=>Object.fromEntries(Array.from(x[1].matchAll(/"([^"\n]*)"\s*"([^"\n]*)"/g),y=>[y[1],y[2]])));
 let result=[];function build(id,entity,override){if(result.length>=10000)throw Error('Scene exceeds ten thousand placements');if(!m[id])throw Error('Invalid model index');let model=override||m[id];if(model.first<0||model.count<0||model.first+model.count>f.length)throw Error('Invalid model face range');let origin=(entity.origin||'0 0 0').split(/\s+/).map(Number),angle=(entity.angles||('0 '+(entity.angle||'0')+' 0')).split(/\s+/).map(Number);if(origin.length!==3||angle.length!==3||![...origin,...angle].every(Number.isFinite))throw Error('Invalid placement transform');let a=angles(angle),used=new Map(),verts=[],edges=new Set(),triangles=[],materials=new Set(),polygons=[];function remap(j){if(j<0||j>=v.length)throw Error('Invalid vertex index');if(!used.has(j)){used.set(j,verts.length);verts.push(v[j].map((_,k)=>origin[k]+v[j].reduce((s,x,t)=>s+x*a[t][k],0)));}return used.get(j);}for(let j=model.first;j<model.first+model.count;j++){let face=f[j];if(face.first<0||face.count<3||face.first+face.count>se.length)throw Error('Invalid face edge range');let poly=[];materials.add(face.tex);for(let k=0;k<face.count;k++){let s=se[face.first+k],edge=e[Math.abs(s)];if(!edge)throw Error('Invalid edge index');poly.push(remap(edge[s>=0?0:1]));}for(let k=0;k<poly.length;k++)edges.add([poly[k],poly[(k+1)%poly.length]].sort((a,b)=>a-b).join(','));let polygon={vertices:poly,texinfo:face.tex,lightmapped:face.lightmapped};if(planes.length){let plane=planes[face.plane];if(!plane||!plane.every(Number.isFinite))throw Error('Invalid face plane');polygon.planeNormalZ=plane[2]*(face.side?-1:1);}if(infos.length){let info=infos[face.tex];if(!info||info.texture<0||info.texture>=textures.length)throw Error('Invalid texture mapping');polygon.texture=info.texture;polygon.uv=[];for(let k=0;k<face.count;k++){let signed=se[face.first+k],edge=e[Math.abs(signed)],point=v[edge[signed>=0?0:1]],t=info.vectors;polygon.uv.push([point[0]*t[0]+point[1]*t[1]+point[2]*t[2]+t[3],point[0]*t[4]+point[1]*t[5]+point[2]*t[6]+t[7]]);} }polygons.push(polygon);for(let k=1;k+1<poly.length;k++)triangles.push([poly[0],poly[k],poly[k+1]]);}if(verts.length)result.push({name:id===0?'World / terrain':(entity.classname||'inline')+' · ref '+(entity.aw_ref||'?'),model:id,entityClassname:entity.classname||(id===0?'worldspawn':null),terrainRole:!override&&entity.classname==='aw_render_diagnostic'&&entity.aw_ref==='canonical_land_diagnostic'?'canonical_land':id===0?'world_legacy':'none',inspectorOnlyDiagnostic:entity.classname==='aw_render_diagnostic',storedFaceRange:[model.first,model.count],reference:entity.aw_ref||'',entityIndex:entity._inspectionEntityIndex??0,renderPool:override?{model:id,parent_model:Number(entity.model.slice(1)),relative_range:[model.first-pool.first,model.count]}:null,origin,angles:entity.angles||entity.angle||'0',faceCount:model.count,materialCount:materials.size,vertices:verts,edges:Array.from(edges,x=>x.split(',').map(Number)),triangles,polygons});}
 build(0,{});let poolText=entities[0]?.aw_render_pool,pool=null,poolid=-1;if(poolText!==undefined){if(!/^\*\d+$/.test(poolText))throw Error('Invalid render pool model');poolid=Number(poolText.slice(1));pool=m[poolid];if(!pool||pool.first<0||pool.count<0||pool.first+pool.count>f.length)throw Error('Invalid render pool range');}for(let [entityIndex,sourceEntity] of entities.entries()){let entity={...sourceEntity,_inspectionEntityIndex:entityIndex};if(/^\*\d+$/.test(entity.model||'')){build(Number(entity.model.slice(1)),entity);if(entity.aw_render_ranges!==undefined){if(!pool)throw Error('Render ranges lack pool');for(let value of entity.aw_render_ranges.split(',')){if(!/^\d+:\d+$/.test(value))throw Error('Invalid auxiliary render range');let[start,count]=value.split(':').map(Number);if(!Number.isSafeInteger(start)||!Number.isSafeInteger(count)||count<1||start+count>pool.count)throw Error('Auxiliary render range outside pool');build(poolid,entity,{first:pool.first+start,count});}}}}return {format:'amiwind-mesh-inspector-1',source:name,metric:'placed unique vertices per 3D bin; compiled BSP coordinates',objects:result,textures};}
 function parseMipTextures(buffer,lump){
@@ -571,7 +593,7 @@ function gizmoPointerUp(event){
 }
 function initializeGizmo(){const canvas=$('gizmo');canvas.addEventListener('pointerdown',gizmoPointerDown);canvas.addEventListener('pointermove',gizmoPointerMove);canvas.addEventListener('pointerup',gizmoPointerUp);canvas.addEventListener('pointercancel',e=>{e.stopPropagation();gizmoGesture=null;});canvas.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();});$('showgizmo').onchange=()=>{updateOrientationGizmo();dirty=true;};$('vieworbit').onclick=enterOrbit;}
 
-function load(s,filename){validate(s);$('emptyload').hidden=true;resetNavigation();closeSessionCopy();orbitMode=false;orbitOrtho=false;orbitPivot=null;clearZones(false);faceMarks=[];markupUndo=[];markupRedo=[];paintStroke=null;$('markmode').value='inspect';markupStatus();if(!demoSwitching){demoReturn=null;demoActive=false;$('demo').textContent='Synthetic cube';}pendingInspectionImport=null;loadedPaletteFilename=null;requiredPaletteFilename=null;selectedPaletteKind=s.palette?'local':'builtin';loadedFilename=filename||s.loaded_filename||s.source_filename||s.source;areaPoints=[];areaClosed=false;drawArea=false;if(!gl)throw Error('WebGL unavailable');disposeSolids();for(let o of objects){gl.deleteBuffer(o.buffer);}scene=s;baseFaceTotals=previewFaceTotals(s,null);terrainPreview=null;objects=s.objects.map(o=>({...o,bounds:bounds(o.vertices)}));for(let o of objects)componentStats(o);cachePlacementFaceTotals();cacheSceneBatchStats();selected=-1;updateSelectedFooter();density();list();textureList();overview();if($('terraincull').checked)updateTerrainPreview();$('hint').textContent='Actual compiled edges. Wireframe is see-through. Load textures adds depth-tested unlit surfaces. Click a surface to inspect.';}
+function load(s,filename){validate(s);$('emptyload').hidden=true;resetNavigation();closeSessionCopy();orbitMode=false;orbitOrtho=false;orbitPivot=null;clearZones(false);faceMarks=[];markupUndo=[];markupRedo=[];paintStroke=null;$('markmode').value='inspect';markupStatus();if(!demoSwitching){demoReturn=null;demoActive=false;$('demo').textContent='Synthetic cube';}pendingInspectionImport=null;loadedPaletteFilename=null;requiredPaletteFilename=null;selectedPaletteKind=s.palette?'local':'builtin';loadedFilename=filename||s.loaded_filename||s.source_filename||s.source;areaPoints=[];areaClosed=false;drawArea=false;if(!gl)throw Error('WebGL unavailable');disposeSolids();for(let o of objects){gl.deleteBuffer(o.buffer);}scene=s;baseFaceTotals=previewFaceTotals(s,null);terrainPreview=null;objects=s.objects.map(o=>({...o,bounds:bounds(o.vertices)}));for(let o of objects)componentStats(o);cachePlacementFaceTotals();cacheSceneBatchStats();selected=-1;updateSelectedFooter();density();list();textureList();overview();if($('terraincull').checked)updateTerrainPreview();cutsSceneChanged();$('hint').textContent='Actual compiled edges. Wireframe is see-through. Load textures adds depth-tested unlit surfaces. Click a surface to inspect.';}
 function density(){
   if(!scene)return;
   let size=Math.max(1,Math.min(8192,Number($('bin').value)||64)),bins=new Map(),key=p=>p.map(x=>Math.floor(x/size)).join(',');
@@ -618,7 +640,7 @@ function cursorOrigin(x,y){if(!overhead&&!orbitOrtho)return eye;let b=basis(),r=
 function areaCorner(x,y){let ray=cursorRay(x,y),origin=cursorOrigin(x,y);if(Math.abs(ray[2])<1e-8)throw Error('View ray is parallel to the reference plane');let distance=(areaPlane-origin[2])/ray[2];if(distance<=0)throw Error('Reference plane is behind the camera');let p=add(origin,mul(ray,distance));return [p[0],p[1],areaPlane];}
 function projectPoint(point){let b=basis(),q=sub(point,eye),z=dot(q,b.f);if(z<=.1)return null;let scale=(overhead||orbitOrtho)?overheadScale:z;return [canvas.width/2+dot(q,b.r)*focal/scale*canvas.height/2,canvas.height/2-dot(q,b.u)*focal/scale*canvas.height/2];}
 function polygonInfo(){let signed=0;if(areaClosed)for(let i=0;i<areaPoints.length;i++){let a=areaPoints[i],b=areaPoints[(i+1)%areaPoints.length];signed+=a[0]*b[1]-b[0]*a[1];}return {format:'amiwind-polygon-area-plan-1',...inspectionIdentity(),source:scene?scene.source:null,source_sha256:scene?scene.source_sha256:null,coordinate_system:'Compiled BSP/game units; +X east, +Y north; not original Morrowind cell coordinates',reference_plane_z:areaPlane,projection:areaProjection,closed:areaClosed,density_filter:{enabled:$('filterdensity').checked,min:Number($('densitymin').value),max:Number($('densitymax').value),metric:'maximum placed vertex-bin density per line/triangle primitive'},vertices_xy:areaPoints.map(p=>p.slice(0,2)),area_square_units:areaClosed?Math.abs(signed)/2:null,purpose:'Planning overlay only; does not edit subcells, maps, converter or engine'};}
-function drawPolygonOverlay(){let layer=$('areaoverlay');if(layer.width!==canvas.width||layer.height!==canvas.height){layer.width=canvas.width;layer.height=canvas.height;}let c=layer.getContext('2d');c.clearRect(0,0,layer.width,layer.height);drawZoneOverlays(c);if(!areaPoints.length){$('areainfo').textContent='Click corners from above. Horizontal reference-plane projection, not terrain tracing. Planning only; no map edits.';return;}let p=areaPoints.map(projectPoint);c.strokeStyle='#f8ff70';c.lineWidth=3;c.fillStyle='#f8ff7030';if(areaClosed&&p.every(Boolean)){c.beginPath();p.forEach((v,i)=>i?c.lineTo(...v):c.moveTo(...v));c.closePath();c.fill();c.stroke();}else{for(let i=1;i<p.length;i++)if(p[i-1]&&p[i]){c.beginPath();c.moveTo(...p[i-1]);c.lineTo(...p[i]);c.stroke();}}c.font='13px system-ui';for(let i=0;i<p.length;i++)if(p[i]){c.fillStyle='#f8ff70';c.beginPath();c.arc(p[i][0],p[i][1],4,0,Math.PI*2);c.fill();c.fillText(String(i+1),p[i][0]+7,p[i][1]-7);}let info=polygonInfo();$('areainfo').textContent=(drawArea?'Drawing — ':'')+areaPoints.length+' corners · Z '+areaPlane+' · '+(areaClosed?info.area_square_units.toFixed(1)+' square units':'open')+'\n'+areaPoints.map((v,i)=>(i+1)+': X '+v[0].toFixed(3)+', Y '+v[1].toFixed(3)).join('\n');}
+function drawPolygonOverlay(){let layer=$('areaoverlay');if(layer.width!==canvas.width||layer.height!==canvas.height){layer.width=canvas.width;layer.height=canvas.height;}let c=layer.getContext('2d');c.clearRect(0,0,layer.width,layer.height);drawZoneOverlays(c);drawCutOverlays(c);if(!areaPoints.length){$('areainfo').textContent='Click corners from above. Horizontal reference-plane projection, not terrain tracing. Planning only; no map edits.';return;}let p=areaPoints.map(projectPoint);c.strokeStyle='#f8ff70';c.lineWidth=3;c.fillStyle='#f8ff7030';if(areaClosed&&p.every(Boolean)){c.beginPath();p.forEach((v,i)=>i?c.lineTo(...v):c.moveTo(...v));c.closePath();c.fill();c.stroke();}else{for(let i=1;i<p.length;i++)if(p[i-1]&&p[i]){c.beginPath();c.moveTo(...p[i-1]);c.lineTo(...p[i]);c.stroke();}}c.font='13px system-ui';for(let i=0;i<p.length;i++)if(p[i]){c.fillStyle='#f8ff70';c.beginPath();c.arc(p[i][0],p[i][1],4,0,Math.PI*2);c.fill();c.fillText(String(i+1),p[i][0]+7,p[i][1]-7);}let info=polygonInfo();$('areainfo').textContent=(drawArea?'Drawing — ':'')+areaPoints.length+' corners · Z '+areaPlane+' · '+(areaClosed?info.area_square_units.toFixed(1)+' square units':'open')+'\n'+areaPoints.map((v,i)=>(i+1)+': X '+v[0].toFixed(3)+', Y '+v[1].toFixed(3)).join('\n');}
 function downloadBlob(blob,name){let a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function startArea(){if(!scene)return;zoneDrawing=null;zoneCorners=[];zoneCornerWorld=[];zoneHoverWorld=null;if(!Number.isFinite(Number($('planez').value))){reportError('Reference plane must be finite');return;}if(document.exitPointerLock)document.exitPointerLock();inspectAbove();areaPlane=Number($('planez').value);areaProjection='Orthographic overhead rays onto horizontal reference plane; not terrain elevation';areaPoints=[];areaClosed=false;drawArea=true;dirty=true;}
 function simplePolygon(points){
@@ -681,11 +703,313 @@ $('drawarea').onclick=()=>{setPaintMode('inspect');startArea();};$('finisharea')
 $('fly').onclick=()=>{returnFly();if(canvas.requestPointerLock)canvas.requestPointerLock();};$('reset').onclick=overview;$('above').onclick=inspectAbove;$('returnfly').onclick=returnFly;$('showcompass').onchange=()=>{updateCompass();dirty=true;};$('fit').onclick=()=>fit(selected);$('objects').onchange=()=>select(Number($('objects').value));$('search').oninput=list;for(let id of ['mode','terrain','only','textures','overlay','heattextures','textureoverride','filterdensity'])$(id).onchange=()=>dirty=true;$('bin').onchange=density;$('speed').oninput=()=>$('speedvalue').textContent=$('speed').value;
 $('textures').onchange=()=>{updateTextureControls();dirty=true;};$('texturebw').onclick=()=>setTextureColorMode('bw');$('texturecolor').onclick=()=>setTextureColorMode('color');$('palettebuiltin').onclick=()=>setPreviewPaletteKind('builtin');$('palettelocal').onclick=()=>setPreviewPaletteKind('local');
 $('palette').onchange=async()=>{let file=$('palette').files[0];if(!file||!scene)return;try{if(file.size!==768)throw Error('Palette must be exactly 768 bytes');scene.palette=Array.from(new Uint8Array(await file.arrayBuffer()));loadedPaletteFilename=file.name;requiredPaletteFilename=null;selectedPaletteKind='local';disposeSolids();textureList();dirty=true;}catch(e){reportError(e);}};
-async function openFile(f){if(!f)return;try{if(f.size>128*1024*1024)throw Error('File exceeds 128 MiB inspection limit');if(f.name.toLowerCase().endsWith('.bsp')){let raw=await f.arrayBuffer(),parsed=bsp(raw,f.name);parsed.source_sha256=await loadedHash(raw);load(parsed,f.name);}else load(JSON.parse(await f.text()),f.name);}catch(e){$('hint').textContent='Cannot load: '+e.message;$('hint').className='error';}}
+async function openFile(f){if(!f)return;try{if(f.size>128*1024*1024)throw Error('File exceeds 128 MiB inspection limit');if(f.name.toLowerCase().endsWith('.bsp')){let raw=await f.arrayBuffer(),parsed=bsp(raw,f.name);parsed.source_sha256=await loadedHash(raw);cutsAttachFacts(parsed,raw);load(parsed,f.name);}else load(JSON.parse(await f.text()),f.name);}catch(e){$('hint').textContent='Cannot load: '+e.message;$('hint').className='error';}}
 $('file').onchange=()=>openFile($('file').files[0]);
 // AmiWind Toolkit: the toolkit page (or a World Map that opened this window) hands over a map file.
 window.addEventListener('message',e=>{if((e.source===window.parent||e.source===window.opener)&&e.data&&e.data.type==='amiwind-open-map'&&e.data.file instanceof File)openFile(e.data.file);});
 $('export').onclick=()=>{if(scene)downloadInspectionJSON('mesh',exportSceneInfo());};
+// Sub-cell cuts (build 020): planned region borders and divider cuts drawn as
+// translucent vertical rectangles in compiled BSP XYZ. Planning only: no map,
+// region directory or section plan is changed. Quake mechanism: a cut is an
+// axial split plane like a qbsp node plane, a section is the space on one side
+// of it and a portal is the rectangle where two sections meet (AWIS1 portals).
+const CUT_FORMAT='aw-cuts-1',CUT_HEAP_BUDGET=11534336,CUT_LIMIT=16;
+const CUT_COLOURS=['#ff5d5d','#4fc3ff','#ffd24a','#7dff8a','#ff7df0','#ff9f40','#a98bff','#3ff5d2','#d7ff3f','#ff4f9a','#5f8bff','#c8c8c8'];
+let cutOverlay=null,cuts=[],selectedCut=-1,cutUndo=[],cutRedo=[],cutSerial=0,cutDrag=null,cutSuppressClick=false,cutHits=[],cutCache=null,cutStatsDirty=true,cutSliderBefore=null,cutLastStats=null;
+let cutDivider={margin:24,apron:40},cutHeap={fixed:5245860,factor:1.09},cutWorldWhole=true;
+function cutColour(i){return CUT_COLOURS[((i%CUT_COLOURS.length)+CUT_COLOURS.length)%CUT_COLOURS.length];}
+function cutFmt(v){return Number.isInteger(v)?String(v):v.toFixed(1);}
+function cutBytes(v){return Math.round(v).toLocaleString('en-US');}
+function cutFinite(v){return typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=1e7;}
+function cutPair(v,what){if(!Array.isArray(v)||v.length!==2||!v.every(cutFinite)||v[0]>=v[1])throw Error(what+' must be [low, high] with low < high');return [v[0],v[1]];}
+function cutRect(v,what){if(!Array.isArray(v)||v.length!==2||v.some(p=>!Array.isArray(p)||p.length!==2||!p.every(cutFinite))||v[0][0]>=v[1][0]||v[0][1]>=v[1][1])throw Error(what+' must be [[x0,y0],[x1,y1]] with x0 < x1 and y0 < y1');return [v[0].slice(),v[1].slice()];}
+function cutText(v,what,max=60){if(typeof v!=='string'||!v.trim()||v.length>max)throw Error(what+' must be 1-'+max+' characters');return v.trim();}
+function cutColourValue(v){if(typeof v!=='string'||!/^#[0-9a-fA-F]{6}$/.test(v))throw Error('Colour must be #rrggbb');return v.toLowerCase();}
+function cutDividerSettings(d){if(!d||typeof d!=='object'||!cutFinite(d.margin)||d.margin<=0||d.margin>32||!cutFinite(d.apron)||d.apron<=d.margin||d.apron>4096)throw Error('Divider needs 0 < margin <= 32 and margin < apron <= 4096');return {margin:d.margin,apron:d.apron};}
+function validateCutPlane(p,i){
+ if(!p||typeof p!=='object'||!['x','y','z'].includes(p.axis)||!cutFinite(p.at))throw Error('Plane '+(i+1)+' needs axis x, y or z and a finite "at"');
+ const out={label:cutText(p.label===undefined?'plane '+(i+1):p.label,'Plane label'),axis:p.axis,at:p.at};
+ if(p.axis==='z'){out.x=cutPair(p.x,'Horizontal plane x');out.y=cutPair(p.y,'Horizontal plane y');}
+ else{const r=cutPair([p.from,p.to],'Plane from/to');out.from=r[0];out.to=r[1];if(p.z!==undefined)out.z=cutPair(p.z,'Plane z');}
+ if(p.margin!==undefined){if(!cutFinite(p.margin)||p.margin<=0)throw Error('Plane margin must be positive');out.margin=p.margin;}
+ if(p.kind!==undefined)out.kind=cutText(p.kind,'Plane kind',40);if(p.colour!==undefined)out.colour=cutColourValue(p.colour);
+ return out;
+}
+function validateCutOverlay(doc){
+ if(!doc||doc.format!==CUT_FORMAT)throw Error('Unsupported cut overlay: expected format '+CUT_FORMAT);
+ if(doc.space!=='map-local')throw Error('Cut overlay space must be "map-local" (compiled BSP XYZ)');
+ const regions=doc.regions===undefined?[]:doc.regions,planes=doc.planes===undefined?[]:doc.planes;
+ if(!Array.isArray(regions)||!Array.isArray(planes)||regions.length>256||planes.length>256)throw Error('At most 256 regions and 256 planes');
+ const out={format:CUT_FORMAT,map:doc.map===undefined?null:cutText(doc.map,'Map name',80),space:'map-local',z:doc.z===undefined?null:cutPair(doc.z,'Overlay z'),regions:[],planes:planes.map(validateCutPlane)};
+ regions.forEach((r,i)=>{if(!r||typeof r!=='object'||(r.core===undefined&&r.coverage===undefined))throw Error('Region '+(i+1)+' needs core or coverage');const region={name:cutText(r.name===undefined?'region '+(i+1):r.name,'Region name'),core:r.core===undefined?null:cutRect(r.core,'Region core'),coverage:r.coverage===undefined?null:cutRect(r.coverage,'Region coverage'),z:r.z===undefined?null:cutPair(r.z,'Region z')};if(r.colour!==undefined)region.colour=cutColourValue(r.colour);out.regions.push(region);});
+ if(doc.divider!==undefined)out.divider=cutDividerSettings(doc.divider);
+ return out;
+}
+function validateCut(t){
+ if(!t||!['x','y'].includes(t.axis)||!cutFinite(t.at))throw Error('A cut needs axis x or y and a finite position');
+ const r=cutPair([t.from,t.to],'Cut from/to');return {label:cutText(t.label,'Cut label',40),axis:t.axis,at:t.at,from:r[0],to:r[1],z:cutPair(t.z,'Cut Z'),colour:cutColourValue(t.colour)};
+}
+// Read-only facts the parser does not keep: file size, lighting lump, light
+// styles per stored face and every aw_ref entity (some have no geometry).
+function cutsBspFacts(raw){
+ const d=new DataView(raw),lump=i=>[d.getInt32(4+i*8,true),d.getInt32(8+i*8,true)],[fo,fn]=lump(7),styles=new Uint8Array(Math.floor(fn/20)),lightofs=new Int32Array(styles.length);
+ for(let i=0;i<styles.length;i++){let n=0;for(let k=0;k<4;k++)if(d.getUint8(fo+i*20+12+k)!==255)n++;styles[i]=n;lightofs[i]=d.getInt32(fo+i*20+16,true);}
+ const[eo,en]=lump(0),text=new TextDecoder('windows-1252').decode(new Uint8Array(raw,eo,en));let playerStart=null;const refs=[];
+ for(const m of text.matchAll(/\{([^{}]*)\}/g)){const e=Object.fromEntries(Array.from(m[1].matchAll(/"([^"\n]*)"\s*"([^"\n]*)"/g),y=>[y[1],y[2]])),origin=(e.origin||'').split(/\s+/).map(Number),placed=origin.length===3&&origin.every(Number.isFinite);
+  if(e.classname==='info_player_start'&&placed&&!playerStart)playerStart={origin,yaw:((Number(e.angle)||0)%360+360)%360};
+  if(/^\d+$/.test(e.aw_ref||''))refs.push({ref:Number(e.aw_ref),origin:placed?origin:null});}
+ return {bytes:raw.byteLength,lightingBytes:lump(8)[1],styles,lightofs,playerStart,refs};
+}
+function cutsAttachFacts(parsed,raw){Object.defineProperty(parsed,'cutFacts',{value:cutsBspFacts(raw),enumerable:false,configurable:true});}
+// Quake CalcSurfaceExtents: floor/ceil of the texture extents in 16-unit
+// luxels, (extent/16 + 1) samples per axis, one byte per sample per style.
+function cutFaceLightBytes(f,styles){
+ if(f.lightmapped===false)return 0;if(f.lightmapped!==true||!f.uv||f.uv.length<3)return null;
+ let samples=1;for(let a=0;a<2;a++){let low=Infinity,high=-Infinity;for(const p of f.uv){low=Math.min(low,p[a]);high=Math.max(high,p[a]);}samples*=Math.ceil(high/16)-Math.floor(low/16)+1;}
+ return samples*styles;
+}
+function cutMapName(){const name=String(loadedFilename||(scene&&scene.source)||'').split(/[\\/]/).pop().replace(/\.[a-z0-9]+$/i,'').toLowerCase();return name||null;}
+function ensureCutCache(){
+ if(cutCache&&cutCache.scene===scene&&cutCache.objects===objects)return cutCache;
+ const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];
+ for(const o of objects)for(let a=0;a<3;a++){lo[a]=Math.min(lo[a],o.bounds[0][a]);hi[a]=Math.max(hi[a],o.bounds[1][a]);}
+ if(!objects.length){lo.fill(0);hi.fill(1);}
+ const bounds=[lo.map(v=>Math.floor(v)-1),hi.map(v=>Math.ceil(v)+1)],facts=scene&&scene.cutFacts||null,groups=[],byKey=new Map(),groupOf=new Int32Array(objects.length);
+ objects.forEach((o,i)=>{const world=o.model===0,key=world?'world':selectionGroupByIndex[i]?selectionGroupByIndex[i].key:'batch:'+i;let g=byKey.get(key);
+  if(!g){g={index:groups.length,key,world,indices:[],lo:[Infinity,Infinity,Infinity],hi:[-Infinity,-Infinity,-Infinity],ref:null,models:new Set()};byKey.set(key,g);groups.push(g);}
+  g.indices.push(i);groupOf[i]=g.index;for(let a=0;a<3;a++){g.lo[a]=Math.min(g.lo[a],o.bounds[0][a]);g.hi[a]=Math.max(g.hi[a],o.bounds[1][a]);}
+  if(/^\d+$/.test(String(o.reference||'')))g.ref=Number(o.reference);if(!world&&Number.isInteger(o.model))g.models.add(o.model);});
+ let maxStored=-1,count=0;for(const o of objects){if(o.polygons&&o.storedFaceRange)maxStored=Math.max(maxStored,o.storedFaceRange[0]+o.polygons.length-1);count+=o.polygons?o.polygons.length:o.triangles.length;}
+ // Light bytes are counted once per lightmap offset: faces may share stored samples.
+ const cx=new Float64Array(count),cy=new Float64Array(count),id=new Int32Array(count),light=new Float64Array(count),lkey=new Float64Array(count),group=new Int32Array(count),world=new Uint8Array(count);let k=0,next=maxStored+1,unknownLight=0;
+ objects.forEach((o,oi)=>{const faces=o.polygons||o.triangles.map(t=>({vertices:t}));faces.forEach((f,i)=>{let x=0,y=0;for(const v of f.vertices){x+=o.vertices[v][0];y+=o.vertices[v][1];}
+  const stored=o.polygons&&o.storedFaceRange?o.storedFaceRange[0]+i:-1,bytes=cutFaceLightBytes(f,facts&&stored>=0&&stored<facts.styles.length?facts.styles[stored]:1);
+  cx[k]=x/f.vertices.length;cy[k]=y/f.vertices.length;id[k]=stored>=0?stored:next++;light[k]=bytes||0;lkey[k]=facts&&stored>=0&&stored<facts.lightofs.length?facts.lightofs[stored]:-2-id[k];if(bytes===null)unknownLight++;group[k]=groupOf[oi];world[k]=o.model===0?1:0;k++;});});
+ const seen=new Uint8Array(next),offsets=new Set();let stored=0,lightTotal=0;for(let j=0;j<count;j++){if(!seen[id[j]]){seen[id[j]]=1;stored++;}if(lkey[j]!==-1&&!offsets.has(lkey[j])){offsets.add(lkey[j]);lightTotal+=light[j];}}
+ const known=new Set(groups.map(g=>g.ref).filter(r=>r!==null)),loose=facts?facts.refs.filter(r=>!known.has(r.ref)):[];
+ cutCache={scene,objects,bounds,facts,groups,cx,cy,id,light,lkey,group,world,count,idCount:next,stored,lightTotal,unknownLight,loose};return cutCache;
+}
+function cutLayout(){
+ const c=ensureCutCache(),b=c.bounds,xs=[],ys=[];let outside=0;
+ for(const t of cuts){const a=t.axis==='x'?0:1;if(t.at<=b[0][a]||t.at>=b[1][a]){outside++;continue;}(a?ys:xs).push(t.at);}
+ const ux=[...new Set(xs)].sort((p,q)=>p-q),uy=[...new Set(ys)].sort((p,q)=>p-q),ex=[b[0][0],...ux,b[1][0]],ey=[b[0][1],...uy,b[1][1]],apron=cutDivider.apron,cells=[];
+ for(let j=0;j+1<ey.length;j++)for(let i=0;i+1<ex.length;i++){const lo=[ex[i],ey[j]],hi=[ex[i+1],ey[j+1]];
+  cells.push({i,j,lo,hi,clo:[i?Math.max(b[0][0],lo[0]-apron):lo[0],j?Math.max(b[0][1],lo[1]-apron):lo[1]],chi:[i+2<ex.length?Math.min(b[1][0],hi[0]+apron):hi[0],j+2<ey.length?Math.min(b[1][1],hi[1]+apron):hi[1]]});}
+ return {bounds:b,xs:ux,ys:uy,ex,ey,cells,outside,nx:ex.length-1};
+}
+function cutCellOf(L,x,y){let i=0,j=0;while(i<L.xs.length&&x>=L.xs[i])i++;while(j<L.ys.length&&y>=L.ys[j])j++;return j*L.nx+i;}
+function cutHeapEstimate(stored,light){const c=ensureCutCache(),f=c.facts;if(!f)return null;const nonLight=Math.max(0,f.bytes-f.lightingBytes);return Math.round(cutHeap.fixed+cutHeap.factor*(nonLight*(c.stored?stored/c.stored:0)+light));}
+function computeCutStats(){
+ const c=ensureCutCache(),L=cutLayout(),touch=(g,lo,hi)=>g.lo[0]<=hi[0]&&g.hi[0]>=lo[0]&&g.lo[1]<=hi[1]&&g.hi[1]>=lo[1],within=(x,y,lo,hi)=>x>=lo[0]&&x<=hi[0]&&y>=lo[1]&&y<=hi[1];
+ const cells=L.cells.map((cell,index)=>({...cell,index,faces:0,stored:0,light:0,inside:0,straddling:0,kept:0,models:new Set(),refs:new Set(),build:null,offsets:new Set()}));
+ const pairs=new Set();for(let k=0;k<c.count;k++){const cell=cells[cutCellOf(L,c.cx[k],c.cy[k])],key=c.id[k]*512+cell.index;cell.faces++;if(!pairs.has(key)){pairs.add(key);cell.stored++;}if(c.lkey[k]!==-1&&!cell.offsets.has(c.lkey[k])){cell.offsets.add(c.lkey[k]);cell.light+=c.light[k];}}
+ const keep=cells.map(()=>new Uint8Array(c.groups.length));
+ for(const g of c.groups){if(g.world)continue;for(const cell of cells){if(touch(g,cell.lo,cell.hi)){if(g.lo[0]>=cell.lo[0]&&g.hi[0]<=cell.hi[0]&&g.lo[1]>=cell.lo[1]&&g.hi[1]<=cell.hi[1])cell.inside++;else cell.straddling++;}
+  if(touch(g,cell.clo,cell.chi)){keep[cell.index][g.index]=1;cell.kept++;for(const m of g.models)cell.models.add(m);if(g.ref!==null)cell.refs.add(g.ref);}}}
+ // References without geometry follow their origin; outside every coverage, the nearest section keeps them so the union stays complete.
+ for(const r of c.loose){let placed=false;for(const cell of cells)if(!r.origin||within(r.origin[0],r.origin[1],cell.clo,cell.chi)){cell.refs.add(r.ref);placed=true;}if(!placed)cells[cutCellOf(L,r.origin[0],r.origin[1])].refs.add(r.ref);}
+ if(cells.length<=16){const seen=new Uint8Array(c.idCount);for(const cell of cells){seen.fill(0);const b={faces:0,stored:0,light:0},offsets=new Set();
+  for(let k=0;k<c.count;k++){if(c.world[k]?!(cutWorldWhole||within(c.cx[k],c.cy[k],cell.clo,cell.chi)):!keep[cell.index][c.group[k]])continue;b.faces++;if(!seen[c.id[k]]){seen[c.id[k]]=1;b.stored++;}if(c.lkey[k]!==-1&&!offsets.has(c.lkey[k])){offsets.add(c.lkey[k]);b.light+=c.light[k];}}
+  b.heap=cutHeapEstimate(b.stored,b.light);cell.build=b;}}
+ return {layout:L,cells,cache:c,whole:{faces:c.count,stored:c.stored,light:c.lightTotal,heap:cutHeapEstimate(c.stored,c.lightTotal)}};
+}
+function cutSectionNames(n){const base=(cutMapName()||'room').replace(/[^a-z0-9]/g,'').slice(0,13)||'room';return Array.from({length:n},(_,i)=>base+(n<=26?String.fromCharCode(97+i):String(i)));}
+function cutStatsText(S){
+ const c=S.cache,b=S.layout.bounds,names=cutSectionNames(S.cells.length),pct=v=>(100*v/CUT_HEAP_BUDGET).toFixed(1)+'%',heap=v=>v===null?'est. heap unavailable (open the .bsp so its size is known)':'est. heap '+cutBytes(v)+' B ('+pct(v)+' of '+cutBytes(CUT_HEAP_BUDGET)+' B)'+(v>CUT_HEAP_BUDGET?' OVER':'');
+ const lines=[(cutMapName()||'map')+' · bounds X '+b[0][0]+'…'+b[1][0]+', Y '+b[0][1]+'…'+b[1][1]+' · '+cuts.length+' cut'+(cuts.length===1?'':'s')+' → '+S.cells.length+' section'+(S.cells.length===1?'':'s')+(S.layout.outside?' · '+S.layout.outside+' outside the map ignored':''),
+  'Whole map: '+cutBytes(S.whole.faces)+' faces ('+cutBytes(S.whole.stored)+' stored)'+(c.loose.length?' · '+c.loose.length+' references without geometry go by origin':'')+' · lightmap '+cutBytes(S.whole.light)+' B'+(c.facts?' (lighting lump '+cutBytes(c.facts.lightingBytes)+' B)':'')+' · '+heap(S.whole.heap)];
+ S.cells.forEach((cell,i)=>{lines.push('','Section '+names[i]+': X '+cutFmt(cell.lo[0])+'…'+cutFmt(cell.hi[0])+', Y '+cutFmt(cell.lo[1])+'…'+cutFmt(cell.hi[1]),
+  '  by face centre: '+cutBytes(cell.faces)+' faces · '+cutBytes(cell.stored)+' stored · lightmap '+cutBytes(cell.light)+' B',
+  '  placements: '+cell.inside+' inside · '+cell.straddling+' straddling · '+cell.kept+' kept with apron · '+cell.models.size+' inline models');
+  lines.push(cell.build?'  section build: '+cutBytes(cell.build.faces)+' faces · '+cutBytes(cell.build.stored)+' stored · lightmap '+cutBytes(cell.build.light)+' B · '+heap(cell.build.heap):'  section build: not computed for more than 16 sections');});
+ lines.push('','Estimate, not a measurement: heap = fixed non-map heap + loader factor × (BSP bytes without lighting × kept stored faces ÷ all stored faces + kept lightmap bytes). Lightmap bytes from face extents (Quake CalcSurfaceExtents, 16-unit luxels × styles), once per lightmap offset (faces can share samples). Defaults '+cutBytes(5245860)+' B and 1.09 come from one measured room; a section build keeps whole placements that touch its coverage'+(cutWorldWhole?' and the whole world model':' and world faces inside its coverage')+'. Build the section and run the heap check before trusting it.');
+ if(c.unknownLight)lines.push(c.unknownLight+' faces lack light metadata and count 0 lightmap bytes.');
+ return lines.join('\n');
+}
+function updateCutStats(){
+ cutStatsDirty=false;if(!scene){$('cutstats').textContent='Load a map to divide it.';cutLastStats=null;return;}
+ if(!cuts.length){$('cutstats').textContent='Add a cut to see per-section statistics.';cutLastStats=null;return;}
+ try{cutLastStats=computeCutStats();$('cutstats').textContent=cutStatsText(cutLastStats);}catch(e){cutLastStats=null;$('cutstats').textContent='Statistics unavailable: '+e.message;}
+}
+function cutPlanErrors(plan){
+ const e=[],S=plan.sections,P=plan.portals,names=S.map(s=>s.name);
+ if(S.length<2||S.length>8)e.push('A section plan needs 2-8 sections (cuts make '+S.length+')');if(new Set(names).size!==names.length)e.push('Duplicate section names');if(P.length<1||P.length>8)e.push('A section plan needs 1-8 portals (cuts make '+P.length+')');
+ for(const s of S){if(!/^[a-z0-9]{1,15}$/.test(s.name))e.push('Invalid section name '+s.name);const[lo,hi]=s.coverage;if(lo.length!==3||hi.length!==3||[...lo,...hi].some(v=>!Number.isFinite(v)||Math.abs(v)>=32768)||lo.some((v,k)=>v>=hi[k]))e.push('Invalid coverage for '+s.name);}
+ const seen=new Set();for(const p of P){const key=[p.from,p.to].sort().join('|'),a=p.axis,[lo,hi]=p.bounds;
+  if(!names.includes(p.from)||!names.includes(p.to)||p.from===p.to||seen.has(key)||![0,1,2].includes(a)||!(p.margin>0&&p.margin<=32))e.push('Invalid portal binding '+key);seen.add(key);
+  if(!(lo[a]<p.split-p.margin&&p.split-p.margin<p.split+p.margin&&p.split+p.margin<hi[a]))e.push('Portal '+key+': the margin does not fit inside the apron');
+  for(const n of [p.from,p.to]){const s=S[names.indexOf(n)];if(s&&[0,1,2].some(k=>!(s.coverage[0][k]<=lo[k]&&lo[k]<hi[k]&&hi[k]<=s.coverage[1][k])))e.push('Portal '+key+' lies outside the coverage of '+n);}}
+ return e;
+}
+// Section plan in tools/prepare_interior_sections.py format. Identity fields the
+// inspector cannot know stay PENDING strings, so the tool refuses them until filled.
+function cutSectionPlan(){
+ if(!scene)throw Error('Load a map first');if(!cuts.length)throw Error('Add at least one cut');
+ const S=computeCutStats(),L=S.layout,c=S.cache,f=c.facts,b=L.bounds,z=[b[0][2],b[1][2]],names=cutSectionNames(S.cells.length),notes=[],identity=inspectionIdentity();
+ let entrance=null;if(f&&f.playerStart)entrance=S.cells[cutCellOf(L,f.playerStart.origin[0],f.playerStart.origin[1])];
+ const sections=S.cells.map((cell,i)=>{const start=cell===entrance;return {name:names[i],physical_id:'PENDING: appended physical ID (>= 8252) from the registry',references:[...cell.refs].sort((p,q)=>p-q),coverage:[[cell.clo[0],cell.clo[1],z[0]],[cell.chi[0],cell.chi[1],z[1]]],spawn:start?f.playerStart.origin.slice():'PENDING: standing spawn inside this section',yaw:start?f.playerStart.yaw:'PENDING',spawn_source:start?'original entry spawn (info_player_start of the base map)':'PENDING'};});
+ const portals=[],cellAt=(i,j)=>S.cells[j*L.nx+i],m=cutDivider.margin,apron=cutDivider.apron;
+ for(const [axis,list] of [[0,L.xs],[1,L.ys]])list.forEach((at,index)=>{const same=cuts.filter(t=>(t.axis==='x'?0:1)===axis&&t.at===at),span=[Math.min(...same.map(t=>t.from)),Math.max(...same.map(t=>t.to))],zs=[Math.min(...same.map(t=>t.z[0])),Math.max(...same.map(t=>t.z[1]))],o=1-axis;
+  const rows=axis===0?L.ey.length-1:L.ex.length-1;for(let r=0;r<rows;r++){const a=axis===0?cellAt(index,r):cellAt(r,index),q=axis===0?cellAt(index+1,r):cellAt(r,index+1);
+   const lo=[0,0,Math.max(z[0],zs[0])],hi=[0,0,Math.min(z[1],zs[1])];lo[axis]=Math.max(at-apron,q.clo[axis]);hi[axis]=Math.min(at+apron,a.chi[axis]);lo[o]=Math.max(a.clo[o],q.clo[o],span[0]);hi[o]=Math.min(a.chi[o],q.chi[o],span[1]);
+   if(lo.some((v,k)=>v>=hi[k])){notes.push('No portal between '+names[a.index]+' and '+names[q.index]+': '+same[0].label+' does not reach that part of the map');continue;}
+   portals.push({from:names[a.index],to:names[q.index],axis,split:at,margin:m,bounds:[lo,hi]});}});
+ const plan={format_note:'prepare_interior_sections.py plan exported by the AmiWind 3D Map Inspector sub-cell divider; fill every PENDING field from the build receipts before use. NOT installed.',
+  master_sha256:'PENDING: source master SHA-256',index_sha256:'PENDING: source reference index SHA-256',doors_sha256:'PENDING: transformed original-door receipt SHA-256',cell:'PENDING: original cell name',
+  base_map:(cutMapName()||'room')+'.bsp',base:f&&scene.source_sha256?{bytes:f.bytes,sha256:scene.source_sha256}:'PENDING: base BSP bytes and SHA-256',base_source:'loaded in the inspector: '+(loadedFilename||scene.source||'unknown'),
+  logical_map:cutMapName()||'room',logical_id:'PENDING-registry',entrance_section:entrance?names[entrance.index]:names[0],sections,external_dependencies:[],portals,
+  inspector_cuts:cuts.map(t=>JSON.parse(JSON.stringify(t))),inspector_divider:{...cutDivider},
+  inspector_estimate:{method:'Estimate only, see the inspector divider statistics; not a heap measurement',world_kept_whole:cutWorldWhole,fixed_non_map_heap_bytes:cutHeap.fixed,loader_factor:cutHeap.factor,budget_bytes:CUT_HEAP_BUDGET,sections:S.cells.map((cell,i)=>({name:names[i],faces:cell.build?cell.build.faces:null,stored_faces:cell.build?cell.build.stored:null,lightmap_bytes:cell.build?cell.build.light:null,heap_estimate_bytes:cell.build?cell.build.heap:null}))},
+  inspector:{program:identity.program,exported_at_utc:identity.exported_at_utc,exported_at_local:identity.exported_at_local,exported_at_timezone:identity.exported_at_timezone,loaded_filename:identity.loaded_filename},notes};
+ return {plan,errors:cutPlanErrors(plan),notes};
+}
+function cutOverlayDocument(){
+ if(!scene)throw Error('Load a map first');const L=cutLayout(),b=L.bounds,names=cutSectionNames(L.cells.length);
+ return {format:CUT_FORMAT,map:cutMapName()||'map',space:'map-local',...inspectionIdentity(),source_sha256:scene.source_sha256||null,source:'inspector sub-cell divider',z:[b[0][2],b[1][2]],divider:{...cutDivider},
+  regions:cuts.length?L.cells.map((cell,i)=>({name:names[i],core:[cell.lo.slice(),cell.hi.slice()],coverage:[cell.clo.slice(),cell.chi.slice()],colour:cutColour(i)})):[],
+  planes:cuts.map(t=>({label:t.label,kind:'cut',axis:t.axis,at:t.at,from:t.from,to:t.to,z:t.z.slice(),margin:cutDivider.margin,colour:t.colour}))};
+}
+function cutPlanOverlay(plan){
+ if(!Array.isArray(plan.sections)||!Array.isArray(plan.portals))throw Error('Expected a section plan with sections and portals');
+ return validateCutOverlay({format:CUT_FORMAT,map:typeof plan.logical_map==='string'&&plan.logical_map?plan.logical_map:'section plan',space:'map-local',
+  regions:plan.sections.map((s,i)=>({name:String(s.name),coverage:[[s.coverage[0][0],s.coverage[0][1]],[s.coverage[1][0],s.coverage[1][1]]],z:[s.coverage[0][2],s.coverage[1][2]],colour:cutColour(i)})),
+  planes:plan.portals.map((p,i)=>{const[lo,hi]=p.bounds,axis=['x','y','z'][p.axis],plane={label:p.from+' | '+p.to,kind:'portal',axis,at:p.split,margin:p.margin,colour:cutColour(i+6)};if(axis==='z'){plane.x=[lo[0],hi[0]];plane.y=[lo[1],hi[1]];}else{const o=axis==='x'?1:0;plane.from=lo[o];plane.to=hi[o];plane.z=[lo[2],hi[2]];}return plane;})});
+}
+function cutSnapshot(){return JSON.stringify({cuts,selectedCut,divider:cutDivider,serial:cutSerial});}
+function commitCuts(before){if(before!==cutSnapshot()){cutUndo.push(before);if(cutUndo.length>64)cutUndo.shift();cutRedo=[];}refreshCuts();}
+function restoreCuts(snapshot){const v=JSON.parse(snapshot);cuts=v.cuts;selectedCut=v.selectedCut;cutDivider=v.divider;cutSerial=v.serial;refreshCuts();}
+function undoCuts(){if(!cutUndo.length)return;cutRedo.push(cutSnapshot());restoreCuts(cutUndo.pop());}
+function redoCuts(){if(!cutRedo.length)return;cutUndo.push(cutSnapshot());restoreCuts(cutRedo.pop());}
+function cutLabel(n){return 'cut '+(n<=26?String.fromCharCode(64+n):n);}
+function addCut(axis){
+ if(!scene)return;if(cuts.length>=CUT_LIMIT){$('cutinfo').textContent='At most '+CUT_LIMIT+' cuts.';return;}
+ const b=ensureCutCache().bounds,a=axis==='x'?0:1,o=1-a,centre=(overhead||orbitOrtho)?eye[a]:(b[0][a]+b[1][a])/2,before=cutSnapshot();cutSerial++;
+ cuts.push({label:cutLabel(cutSerial),axis,at:Math.round(Math.min(b[1][a]-1,Math.max(b[0][a]+1,centre))),from:b[0][o],to:b[1][o],z:[b[0][2],b[1][2]],colour:cutColour(cutSerial+5)});
+ selectedCut=cuts.length-1;commitCuts(before);
+}
+function deleteCut(){if(selectedCut<0||!cuts[selectedCut])return;const before=cutSnapshot();cuts.splice(selectedCut,1);selectedCut=Math.min(selectedCut,cuts.length-1);commitCuts(before);}
+function clearCuts(){const before=cutSnapshot();cuts=[];selectedCut=-1;commitCuts(before);}
+function cutList(){const list=$('cutlist');list.replaceChildren();cuts.forEach((t,i)=>{const option=document.createElement('option');option.value=i;option.textContent=t.label+' · '+t.axis.toUpperCase()+' = '+cutFmt(t.at)+' · '+(t.axis==='x'?'Y ':'X ')+cutFmt(t.from)+'…'+cutFmt(t.to);option.selected=i===selectedCut;list.append(option);});}
+function cutFields(){
+ const t=cuts[selectedCut];for(const id of ['cutlabel','cutat','cutfrom','cutto','cutzmin','cutzmax','cutslider','cutcolour','cutdelete'])$(id).disabled=!t;if(!t)return;
+ $('cutlabel').value=t.label;$('cutat').value=t.at;$('cutfrom').value=t.from;$('cutto').value=t.to;$('cutzmin').value=t.z[0];$('cutzmax').value=t.z[1];$('cutcolour').value=t.colour;
+ if(scene){const b=ensureCutCache().bounds,a=t.axis==='x'?0:1;$('cutslider').min=b[0][a];$('cutslider').max=b[1][a];}$('cutslider').value=t.at;
+}
+function refreshCuts(){
+ $('cutmargin').value=cutDivider.margin;$('cutapron').value=cutDivider.apron;$('cutundo').disabled=!cutUndo.length;$('cutredo').disabled=!cutRedo.length;
+ cutList();cutFields();cutStatsDirty=true;if(!scene)updateCutStats();dirty=true;
+}
+function applyCutFields(){
+ if(!cuts[selectedCut])return;const t=cuts[selectedCut];
+ try{const next=validateCut({...t,label:$('cutlabel').value,at:Number($('cutat').value),from:Number($('cutfrom').value),to:Number($('cutto').value),z:[Number($('cutzmin').value),Number($('cutzmax').value)],colour:$('cutcolour').value});const before=cutSnapshot();cuts[selectedCut]=next;commitCuts(before);$('cutinfo').textContent='Updated '+next.label+'.';}
+ catch(e){$('cutinfo').textContent=e.message;cutFields();}
+}
+function applyDividerFields(){try{const before=cutSnapshot();cutDivider=cutDividerSettings({margin:Number($('cutmargin').value),apron:Number($('cutapron').value)});commitCuts(before);}catch(e){$('cutinfo').textContent=e.message;refreshCuts();}}
+function applyHeapFields(){const fixed=Number($('cutfixed').value),factor=Number($('cutfactor').value);if(!cutFinite(fixed)||fixed<0||!cutFinite(factor)||factor<0){$('cutinfo').textContent='Heap estimate inputs must be finite and nonnegative';$('cutfixed').value=cutHeap.fixed;$('cutfactor').value=cutHeap.factor;return;}cutHeap={fixed,factor};cutStatsDirty=true;dirty=true;}
+function cutImportDocument(doc){
+ if(!scene)throw Error('Load the map before importing cuts');const b=ensureCutCache().bounds,boundsZ=[b[0][2],b[1][2]];let next=[],divider=cutDivider,skipped=0;
+ if(doc&&doc.format===CUT_FORMAT){const o=validateCutOverlay(doc);if(o.divider)divider=o.divider;o.planes.forEach(p=>{if(p.axis==='z'){skipped++;return;}next.push(validateCut({label:p.label.slice(0,40),axis:p.axis,at:p.at,from:p.from,to:p.to,z:p.z||o.z||boundsZ,colour:p.colour||cutColour(next.length+6)}));});}
+ else if(doc&&Array.isArray(doc.sections)&&Array.isArray(doc.portals)){
+  if(Array.isArray(doc.inspector_cuts)){next=doc.inspector_cuts.map(validateCut);if(doc.inspector_divider)divider=cutDividerSettings(doc.inspector_divider);}
+  else{const merged=new Map();for(const p of doc.portals){if(p.axis===2){skipped++;continue;}if(![0,1].includes(p.axis)||!cutFinite(p.split)||!Array.isArray(p.bounds))throw Error('Invalid portal in section plan');const[lo,hi]=p.bounds,o=1-p.axis,key=p.axis+':'+p.split,m=merged.get(key);
+    if(m){m.from=Math.min(m.from,lo[o]);m.to=Math.max(m.to,hi[o]);m.z=[Math.min(m.z[0],lo[2]),Math.max(m.z[1],hi[2])];}else merged.set(key,{label:(p.from+' | '+p.to).slice(0,40),axis:p.axis?'y':'x',at:p.split,from:lo[o],to:hi[o],z:[lo[2],hi[2]],colour:cutColour(merged.size+6),margin:p.margin,apron:p.split-lo[p.axis]});}
+   next=[...merged.values()].map(validateCut);const first=[...merged.values()][0];if(first)divider=cutDividerSettings({margin:first.margin,apron:first.apron});}}
+ else throw Error('Expected an aw-cuts-1 overlay or a section plan');
+ if(next.length>CUT_LIMIT)throw Error('At most '+CUT_LIMIT+' cuts');const before=cutSnapshot();cuts=next;cutDivider=divider;selectedCut=cuts.length?0:-1;cutSerial=Math.max(cutSerial,cuts.length);commitCuts(before);
+ return {cuts:cuts.length,skipped};
+}
+function cutOverlayInfo(){
+ if(!cutOverlay){$('cutoverlayinfo').textContent='No overlay loaded. tools/region_cuts.py writes one from a town region config or a section plan.';return;}
+ const name=cutMapName(),mismatch=cutOverlay.map&&name&&cutOverlay.map!==name;
+ $('cutoverlayinfo').textContent=(cutOverlay.map||'overlay')+': '+cutOverlay.regions.length+' regions, '+cutOverlay.planes.length+' planes.'+(mismatch?' Overlay is for '+cutOverlay.map+'; the loaded map is '+name+'.':'');
+}
+async function readCutFile(file,kind){
+ if(!file)return;const status=kind==='overlay'?$('cutoverlayinfo'):$('cutinfo');
+ try{if(file.size>16*1024*1024)throw Error('Cut JSON exceeds 16 MiB');const doc=JSON.parse(await file.text());
+  if(kind==='overlay'){cutOverlay=doc&&doc.format===CUT_FORMAT?validateCutOverlay(doc):cutPlanOverlay(doc);cutOverlayInfo();dirty=true;}
+  else{const r=cutImportDocument(doc);status.textContent='Imported '+r.cuts+' cuts from '+file.name+(r.skipped?'; '+r.skipped+' horizontal planes/portals skipped (the divider makes vertical cuts)':'')+'.';}}
+ catch(e){status.textContent='Cannot load '+file.name+': '+e.message;}
+}
+function exportCutOverlay(){try{const doc=cutOverlayDocument();downloadInspectionJSON('subcell-cuts',doc);$('cutinfo').textContent='Exported '+doc.planes.length+' cuts and '+doc.regions.length+' sections as '+CUT_FORMAT+'.';}catch(e){$('cutinfo').textContent=e.message;}}
+function exportSectionPlan(){
+ try{const r=cutSectionPlan();if(r.errors.length){$('cutinfo').textContent='Not exported, the section tool would refuse it:\n'+r.errors.join('\n');return;}
+  downloadBlob(new Blob([inspectionJSONText(r.plan)],{type:'application/json'}),inspectionExportFilename('section-plan',{source_filename:r.plan.base_map,exported_at_local:r.plan.inspector.exported_at_local}));
+  $('cutinfo').textContent='Exported a '+r.plan.sections.length+'-section plan with '+r.plan.portals.length+' portals. Fill the PENDING fields before tools/prepare_interior_sections.py.'+(r.notes.length?'\n'+r.notes.join('\n'):'');}
+ catch(e){$('cutinfo').textContent=e.message;}
+}
+function cutQuad(axis,at,from,to,z){return axis==='x'?[[at,from,z[0]],[at,to,z[0]],[at,to,z[1]],[at,from,z[1]]]:[[from,at,z[0]],[to,at,z[0]],[to,at,z[1]],[from,at,z[1]]];}
+function cutPlaneText(p,z){const other=p.axis==='x'?'Y':'X';return p.label+'\n'+p.axis.toUpperCase()+' = '+cutFmt(p.at)+' · '+other+' '+cutFmt(p.from)+'…'+cutFmt(p.to)+' · Z '+cutFmt(z[0])+'…'+cutFmt(z[1])+(p.margin?' · margin '+cutFmt(p.margin):'');}
+function cutTopDown(){return (overhead||orbitOrtho)&&basis().f[2]<-.999;}
+function cutSegment(a,b){const f=basis().f,near=.10001,da=dot(sub(a,eye),f)-near,db=dot(sub(b,eye),f)-near;if(da<0&&db<0)return null;if(da<0)a=add(a,mul(sub(b,a),da/(da-db)));else if(db<0)b=add(b,mul(sub(a,b),db/(db-da)));const p=projectPoint(a),q=projectPoint(b);return p&&q?[p,q]:null;}
+function drawCutOverlays(c){
+ // A redraw moves the rectangles, so an open hover note would be stale.
+ if(cutStatsDirty)updateCutStats();cutHits=[];cutHideTip();if(!scene||!$('showcuts').checked||(!cuts.length&&!cutOverlay))return;
+ const b=ensureCutCache().bounds,top=cutTopDown(),zDefault=cutOverlay&&cutOverlay.z||[b[0][2],b[1][2]];c.save();c.font='600 13px system-ui';
+ const wall=(points,colour,alpha,width,hit,outline)=>{const p=projectOverlayPolygon(points);if(p.length<2)return;c.beginPath();p.forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.closePath();c.globalAlpha=alpha;c.fillStyle=colour;c.fill();c.globalAlpha=.95;c.strokeStyle=outline||colour;c.lineWidth=top?width+1.5:width;c.stroke();c.globalAlpha=1;if(hit)cutHits.push({...hit,poly:p});};
+ const label=(point,text,colour)=>{const p=projectPoint(point);if(!p)return;c.lineWidth=3;c.strokeStyle='#101923';c.strokeText(text,p[0]+4,p[1]-4);c.fillStyle=colour;c.fillText(text,p[0]+4,p[1]-4);};
+ const corners=r=>[[r[0][0],r[0][1]],[r[1][0],r[0][1]],[r[1][0],r[1][1]],[r[0][0],r[1][1]]];
+ const walls=(r,z,colour,alpha,hit)=>{const k=corners(r);for(let s=0;s<4;s++){const a=k[s],q=k[(s+1)%4];wall([[...a,z[0]],[...q,z[0]],[...q,z[1]],[...a,z[1]]],colour,alpha,1.5,hit);}};
+ const dashed=(r,z,colour)=>{const k=corners(r);c.save();if(c.setLineDash)c.setLineDash([6,4]);c.strokeStyle=colour;c.globalAlpha=.8;c.lineWidth=1.5;for(const h of z)for(let s=0;s<4;s++){const seg=cutSegment([...k[s],h],[...k[(s+1)%4],h]);if(!seg)continue;c.beginPath();c.moveTo(seg[0][0],seg[0][1]);c.lineTo(seg[1][0],seg[1][1]);c.stroke();}c.restore();};
+ const rectText=(name,what,r)=>name+' '+what+'\nX '+cutFmt(r[0][0])+'…'+cutFmt(r[1][0])+', Y '+cutFmt(r[0][1])+'…'+cutFmt(r[1][1]);
+ if(cutOverlay){
+  // Reverse order: the first region (the map itself) is drawn last, on top of shared borders.
+  cutOverlay.regions.map((r,i)=>[r,i]).reverse().forEach(([r,i])=>{const colour=r.colour||cutColour(i),z=r.z||zDefault,main=r.core||r.coverage;
+   if(top&&r.core){const p=projectOverlayPolygon(corners(r.core).map(q=>[...q,z[1]]));if(p.length>2){c.beginPath();p.forEach((q,k)=>k?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.closePath();c.globalAlpha=i?.04:.1;c.fillStyle=colour;c.fill();c.globalAlpha=1;}}
+   if(r.core)walls(r.core,z,colour,.12,{kind:'region',text:rectText(r.name,'core',r.core)+(r.coverage?'\ncoverage X '+cutFmt(r.coverage[0][0])+'…'+cutFmt(r.coverage[1][0])+', Y '+cutFmt(r.coverage[0][1])+'…'+cutFmt(r.coverage[1][1]):'')});
+   else walls(r.coverage,z,colour,.06,{kind:'region',text:rectText(r.name,'coverage',r.coverage)+'\nZ '+cutFmt(z[0])+'…'+cutFmt(z[1])});
+   if(r.coverage&&$('showcutcoverage').checked)dashed(r.coverage,z,colour);
+   label([(main[0][0]+main[1][0])/2,(main[0][1]+main[1][1])/2,z[1]],r.name,colour);});
+  cutOverlay.planes.forEach((p,i)=>{const colour=p.colour||cutColour(i+6);
+   if(p.axis==='z'){const q=[[p.x[0],p.y[0],p.at],[p.x[1],p.y[0],p.at],[p.x[1],p.y[1],p.at],[p.x[0],p.y[1],p.at]];wall(q,colour,.2,2,{kind:'plane',text:p.label+'\nZ = '+cutFmt(p.at)+' · X '+cutFmt(p.x[0])+'…'+cutFmt(p.x[1])+', Y '+cutFmt(p.y[0])+'…'+cutFmt(p.y[1])});label(q[3],p.label,colour);return;}
+   const z=p.z||zDefault,q=cutQuad(p.axis,p.at,p.from,p.to,z);wall(q,colour,.2,2,{kind:'plane',text:cutPlaneText(p,z)});label(q[3],p.label,colour);});
+ }
+ cuts.forEach((t,i)=>{const chosen=i===selectedCut,q=cutQuad(t.axis,t.at,t.from,t.to,t.z);wall(q,t.colour,chosen?.3:.22,chosen?3:2,{kind:'cut',index:i,text:cutPlaneText(t,t.z)+'\ndivider cut'+(top?' · drag to move':'')},chosen?'#ffffff':null);
+  label(t.axis==='x'?[t.at,(t.from+t.to)/2,t.z[1]]:[(t.from+t.to)/2,t.at,t.z[1]],t.label+' · '+t.axis.toUpperCase()+' = '+cutFmt(t.at),t.colour);
+  if(top)for(const end of [q[0],q[1]]){const p=projectPoint(end);if(p){c.fillStyle=chosen?'#ffffff':t.colour;c.fillRect(p[0]-4,p[1]-4,8,8);}}});
+ c.restore();
+}
+function cutPolyDistance(p,x,y){let inside=false,d=Infinity;for(let i=0,j=p.length-1;i<p.length;j=i++){const a=p[i],q=p[j];if((a[1]>y)!==(q[1]>y)&&x<(q[0]-a[0])*(y-a[1])/(q[1]-a[1])+a[0])inside=!inside;const dx=q[0]-a[0],dy=q[1]-a[1],l=dx*dx+dy*dy,t=l?Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/l)):0;d=Math.min(d,Math.hypot(x-a[0]-t*dx,y-a[1]-t*dy));}return inside?0:d;}
+function cutHitAt(x,y){let best=null,score=Infinity;for(const h of cutHits){const d=cutPolyDistance(h.poly,x,y);if(d>=7)continue;const s=d+(h.kind==='cut'?0:.5);if(s<=score){best=h;score=s;}}return best;}
+function cutHideTip(){$('cuttip').style.display='none';}
+function cutHoverMove(e){
+ if(cutDrag||!scene||!$('showcuts').checked||document.pointerLockElement===canvas){cutHideTip();return;}
+ const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,h=cutHitAt(x,y),tip=$('cuttip');
+ if(!h){cutHideTip();canvas.style.cursor='';return;}tip.textContent=h.text;tip.style.display='block';tip.style.left=Math.min(x+14,Math.max(0,r.width-260))+'px';tip.style.top=(y+14)+'px';canvas.style.cursor=h.kind==='cut'&&cutTopDown()?'move':'';
+}
+function cutDragTarget(x,y){
+ if(!cutTopDown()||!$('showcuts').checked)return null;let best=null,distance=9;
+ cuts.forEach((t,i)=>{const q=cutQuad(t.axis,t.at,t.from,t.to,t.z);[['from',q[0]],['to',q[1]]].forEach(([part,point])=>{const p=projectPoint(point);if(p){const d=Math.hypot(p[0]-x,p[1]-y);if(d<distance){best={index:i,part};distance=d;}}});});
+ if(best)return best;distance=7;cuts.forEach((t,i)=>{const s=cutSegment(...cutQuad(t.axis,t.at,t.from,t.to,t.z).slice(0,2));if(s){const d=cutPolyDistance([s[0],s[1]],x,y);if(d<distance){best={index:i,part:'at'};distance=d;}}});return best;
+}
+function cutPointerDown(e){
+ if(!scene||e.button!==0||e.target!==canvas||document.pointerLockElement===canvas||$('markmode').value!=='inspect'||zoneDrawing||drawArea)return;
+ const r=canvas.getBoundingClientRect(),hit=cutDragTarget(e.clientX-r.left,e.clientY-r.top);if(!hit)return;
+ e.preventDefault();e.stopPropagation();cutDrag={...hit,before:cutSnapshot(),moved:false};selectedCut=hit.index;cutHideTip();refreshCuts();
+}
+function cutPointerMove(e){
+ if(!cutDrag)return;const t=cuts[cutDrag.index];if(!t){cutDrag=null;return;}const r=canvas.getBoundingClientRect(),w=cursorOrigin(e.clientX-r.left,e.clientY-r.top),a=t.axis==='x'?0:1,v=Math.round(w[cutDrag.part==='at'?a:1-a]);
+ if(cutDrag.part==='at'&&v!==t.at)t.at=v;else if(cutDrag.part==='from'&&v<t.to&&v!==t.from)t.from=v;else if(cutDrag.part==='to'&&v>t.from&&v!==t.to)t.to=v;else return;
+ cutDrag.moved=true;cutList();cutFields();cutStatsDirty=true;dirty=true;
+}
+function cutPointerUp(){if(!cutDrag)return;const d=cutDrag;cutDrag=null;cutSuppressClick=true;setTimeout(()=>{cutSuppressClick=false;},0);if(d.moved)commitCuts(d.before);}
+function cutClickGuard(e){if(cutSuppressClick){cutSuppressClick=false;e.preventDefault();e.stopPropagation();}}
+function cutsSceneChanged(){cutCache=null;cutHits=[];cutStatsDirty=true;cutOverlayInfo();refreshCuts();}
+function initializeCuts(){
+ $('cutfixed').value=cutHeap.fixed;$('cutfactor').value=cutHeap.factor;$('cutworldwhole').checked=cutWorldWhole;
+ $('showcuts').onchange=()=>{cutHideTip();dirty=true;};$('showcutcoverage').onchange=()=>dirty=true;
+ $('cutoverlayfile').onchange=()=>readCutFile($('cutoverlayfile').files[0],'overlay');$('cutimport').onchange=()=>readCutFile($('cutimport').files[0],'divider');
+ $('cutoverlayclear').onclick=()=>{cutOverlay=null;cutOverlayInfo();dirty=true;};
+ $('cutaddx').onclick=()=>addCut('x');$('cutaddy').onclick=()=>addCut('y');$('cutdelete').onclick=deleteCut;$('cutclear').onclick=clearCuts;$('cutundo').onclick=undoCuts;$('cutredo').onclick=redoCuts;
+ $('cutlist').onchange=()=>{selectedCut=Number($('cutlist').value);refreshCuts();};
+ for(const id of ['cutlabel','cutat','cutfrom','cutto','cutzmin','cutzmax','cutcolour'])$(id).onchange=applyCutFields;
+ $('cutslider').oninput=()=>{const t=cuts[selectedCut];if(!t)return;if(cutSliderBefore===null)cutSliderBefore=cutSnapshot();t.at=Number($('cutslider').value);$('cutat').value=t.at;cutList();cutStatsDirty=true;dirty=true;};
+ $('cutslider').onchange=()=>{if(cutSliderBefore!==null){const before=cutSliderBefore;cutSliderBefore=null;commitCuts(before);}};
+ $('cutmargin').onchange=applyDividerFields;$('cutapron').onchange=applyDividerFields;$('cutfixed').onchange=applyHeapFields;$('cutfactor').onchange=applyHeapFields;
+ $('cutworldwhole').onchange=()=>{cutWorldWhole=$('cutworldwhole').checked;cutStatsDirty=true;dirty=true;};
+ $('cutexport').onclick=exportCutOverlay;$('cutplan').onclick=exportSectionPlan;
+ const stage=$('stage');stage.addEventListener('pointerdown',cutPointerDown,true);stage.addEventListener('click',cutClickGuard,true);stage.addEventListener('mousemove',cutHoverMove);stage.addEventListener('mouseleave',cutHideTip);
+ window.addEventListener('pointermove',cutPointerMove);window.addEventListener('pointerup',cutPointerUp);refreshCuts();
+}
 function syntheticCube(){let vertices=[[-10,-10,-10],[10,-10,-10],[10,10,-10],[-10,10,-10],[-10,-10,10],[10,-10,10],[10,10,10],[-10,10,10]],edges=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]],triangles=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];return {format:'amiwind-mesh-inspector-1',source:'Synthetic cube (asset-free)',objects:[{name:'Synthetic cube',model:1,reference:'synthetic',faceCount:6,materialCount:1,vertices,edges,triangles,polygons:[[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]].map(vertices=>({vertices,texinfo:0}))}]};}
 
 let demoReturn=null,demoActive=false,demoSwitching=false;
@@ -696,7 +1020,7 @@ function toggleSyntheticCube(){
 }
 $('demo').onclick=toggleSyntheticCube
 ;window.addEventListener('resize',()=>dirty=true);requestAnimationFrame(safeTick);
-initializePlanningControls();initializeGizmo();updateTextureControls();
+initializePlanningControls();initializeGizmo();initializeCuts();updateTextureControls();
 // Optional PRIVATE self-contained copies inject only a locally exported scene here.
 if(window.AMIWIND_PRIVATE_SCENE){try{load(window.AMIWIND_PRIVATE_SCENE);}catch(e){$('hint').textContent='Cannot load embedded scene: '+e.message;}}
 </script></html>

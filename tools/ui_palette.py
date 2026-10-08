@@ -12,6 +12,16 @@ from player_hull import lumps
 
 RESERVED=set(range(225,254))
 
+def replace_bytes(path, raw):
+    """Write a staged file whole: a temporary file renamed over it, so a
+    concurrent reader sees the old or the new bytes, never a partial file
+    (BUILD-PALETTE-RACE-32)."""
+    path = Path(path)
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_bytes(raw)
+    temporary.replace(path)
+
+
 def lookup_columns(palette, name):
     """Exact nearest colours for the repurposed bank; no runtime work needed."""
     import numpy as np
@@ -37,7 +47,7 @@ def sync_lookups(game, check=False):
         expected=bytearray(raw);columns=lookup_columns(palette,name)
         for row in range(rows):expected[row*256+225:row*256+254]=columns[row].tobytes()
         if check and raw!=expected:raise ValueError('Stale palette lookup: '+name)
-        if raw!=expected:path.write_bytes(expected)
+        if raw!=expected:replace_bytes(path,expected)
         report[name]=hashlib.sha256(expected).hexdigest()
     return report
 
@@ -91,29 +101,41 @@ def check_scene(game):
                     check_pixels(raw[at:at+count],str(path));at+=count
             if at!=stop:raise ValueError('Invalid hand frame length')
 
-def reserve(data,game):
+def reserved_palette(data,old):
+    """The runtime palette: the scene palette with the original status-bar bank.
+
+    One implementation for the image step and for converters that must match
+    its final palette byte for byte (the per-race hand catalogue,
+    BUILD-HANDS-NOT-BUILT-32). Returns (palette bytes, source digests).
+    """
     from mwad.audit import BSA
-    from mwad.paths import child_ci,ensure_external
+    from mwad.paths import child_ci
     from npc_geometry import Assets
-    game=ensure_external(Path(game),'private palette');data=Path(data);path=game/'gfx/palette.lmp';old=path.read_bytes()
-    marker=game/'gfx/ui-palette.json'
-    if marker.exists():
-        report=json.loads(marker.read_text())
-        if hashlib.sha256(old).hexdigest()!=report['palette_sha256']:raise ValueError('UI palette receipt mismatch')
-        report['lookup_sha256']=sync_lookups(game)
-        marker.write_text(json.dumps(report,indent=2)+'\n')
-        return report
+    data=Path(data)
     if len(old)!=768 or any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED):raise ValueError('Scene has no redundant UI palette bank')
-    check_scene(game)
     assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')));samples=Image.new('RGB',(48,16));sources={}
     for i,color in enumerate(('red','blue','green')):
         name='textures/menu_bar_'+color+'.dds';raw=assets.read(name);image=Image.open(io.BytesIO(raw)).convert('RGBA')
         if image.size!=(16,16):raise ValueError('Unexpected original status bar')
         samples.paste(image,(i*16,0),image);sources[name]=hashlib.sha256(raw).hexdigest()
     colors=bytes(samples.quantize(colors=29,dither=Image.Dither.NONE).getpalette()[:87])
-    new=old[:225*3]+colors+old[254*3:];path.write_bytes(new)
+    return old[:225*3]+colors+old[254*3:],sources
+
+def reserve(data,game):
+    from mwad.paths import ensure_external
+    game=ensure_external(Path(game),'private palette');data=Path(data);path=game/'gfx/palette.lmp';old=path.read_bytes()
+    marker=game/'gfx/ui-palette.json'
+    if marker.exists():
+        report=json.loads(marker.read_text())
+        if hashlib.sha256(old).hexdigest()!=report['palette_sha256']:raise ValueError('UI palette receipt mismatch')
+        report['lookup_sha256']=sync_lookups(game)
+        replace_bytes(marker,(json.dumps(report,indent=2)+'\n').encode('utf-8'))
+        return report
+    if len(old)!=768 or any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED):raise ValueError('Scene has no redundant UI palette bank')
+    check_scene(game)
+    new,sources=reserved_palette(data,old);replace_bytes(path,new)
     report={'format':'AmiWind reserved UI palette 1','indices':[225,253],
             'world_pixels_unchanged':True,'console_font_unchanged':True,'sources':sources,
             'previous_palette_sha256':hashlib.sha256(old).hexdigest(),'palette_sha256':hashlib.sha256(new).hexdigest()}
     report['lookup_sha256']=sync_lookups(game)
-    marker.write_text(json.dumps(report,indent=2)+'\n');return report
+    replace_bytes(marker,(json.dumps(report,indent=2)+'\n').encode('utf-8'));return report

@@ -26,6 +26,23 @@ static cvar_t timescale={"aw_timescale","30",true};
 static cvar_t daynightcycle={"aw_daynightcycle","1",true};
 /* Fraction of one clock millisecond, not a second game-time state. */
 static double clock_fraction;
+/* dbg daynight off: hold the saved clock at 12:00 through AW_ClockSetTime, the
+ * same path as dbg time, so the sky, light tables, lamps, night windows, guard
+ * torches, fog and the HUD clock all show midday with no switch of their own.
+ * A session setting, not saved state: it is never written to a savegame,
+ * survives map changes, loads and new games (every tick puts the clock back
+ * to 12:00) and lasts until dbg daynight on or quitting. */
+#define DAYNIGHT_HOLD_MS (12*3600000)
+static int daynight_hold;
+int AW_DayNightFrozen(void){return daynight_hold;}
+static void hold_clock(void) {
+    if(AW_ClockEnsure() && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==DAYNIGHT_HOLD_MS)return;
+    if(AW_ClockSetTime(12,0))clock_fraction=0;
+}
+static int held(void) {
+    if(daynight_hold)Con_Printf("Day/night is off: clock held at 12:00. dbg daynight on resumes it.\n");
+    return daynight_hold;
+}
 /* A bounded presentation preview, never a second saved world clock. */
 static int gallery_active,gallery_step,gallery_here,gallery_night;
 static double gallery_elapsed;
@@ -138,12 +155,13 @@ static void cycle_command(void) {
             else Con_Printf("24 h cycle is not running.\n");
             return;
         }
-        hold=strtod(s,&end);if(!*s || *end || !(hold>=.25 && hold<=60))goto usage;
+        hold=Q_strtod(s,&end);if(!*s || *end || !(hold>=.25 && hold<=60))goto usage;
     }
     if(!sv.active || cls.state!=ca_connected || svs.maxclients!=1 || gallery_active || modal ||
        AW_IntroUse() || AW_CharacterActive() || AW_ReaderActive() || !AW_ClockEnsure()){
         Con_Printf("Start the 24 h cycle in a local game (not during the intro or a gallery).\n");return;
     }
+    if(held())return;
     cycle_hold=hold;cycle_elapsed=0;cycle_steps=24;clock_fraction=0;
     Con_Printf("24 h cycle: each hour shown %ld.%02ld s, %ld s in all. Esc stops.\n",
         (long)hold,(long)(hold*100+.5)%100,(long)(24*hold+.5));
@@ -171,8 +189,8 @@ int AW_DayGalleryView(float *origin,float *angles) {
         if(!R_NightMoonOrbit(gallery_step-1,1380*60000,
             AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days"),direction,NULL))return 0;
         horizontal=sqrt((double)direction[0]*direction[0]+(double)direction[1]*direction[1]);
-        angles[0]=(float)(-atan2(direction[2],horizontal)*180/M_PI);
-        angles[1]=(float)(atan2(direction[1],direction[0])*180/M_PI);
+        angles[0]=(float)(-Q_atan2(direction[2],horizontal)*180/M_PI);
+        angles[1]=(float)(Q_atan2(direction[1],direction[0])*180/M_PI);
         if(angles[1]<0)angles[1]+=360;
         angles[2]=0;return 1;
     }
@@ -236,6 +254,7 @@ static void wait_open(void) {
     if(modal || gallery_active || key_dest!=key_game)return;
     if(!allowed()){AW_UISubtitle("","Wait after registration, on dry ground, when no one is speaking.",5);return;}
     if(!AW_ClockEnsure()){Con_Printf("Clock state unavailable.\n");return;}
+    if(daynight_hold){AW_UISubtitle("","Time is held at 12:00 (dbg daynight on).",4);return;}
     hours=1;open_modal(1);
 }
 static void quick_help(void){if(!modal && key_dest==key_game){help_page=0;open_modal(2);}}
@@ -250,6 +269,7 @@ static int named_minutes(char *s) {
 static void report_time(void) {
     int y,m,d,h,n;AW_ClockDate(&y,&m,&d,&h,&n);
     Con_Printf("Time %02ld:%02ld, %02ld/%02ld/%ld (day/month/year)\n",(long)h,(long)n,(long)d,(long)m,(long)y);
+    if(daynight_hold)Con_Printf("Day/night off: held at 12:00 (dbg daynight on resumes).\n");
 }
 /* Exact debug input: four decimal digits, HH 00..23 and MM 00..59.
  * Invalid input never touches state; legacy evening/sunset hour aliases stay compatible. */
@@ -258,6 +278,7 @@ static void set_time(void) {
     if(!sv.active){Con_Printf("Start the local game first.\n");return;}
     if(Cmd_Argc()==1){report_time();return;} /* dbg time: what time is it */
     if(Cmd_Argc()!=2)goto invalid;
+    if(held())return;
     named=named_minutes(s);
     if(named>=0){hour=named/60;minute=named%60;}
     else{
@@ -275,14 +296,36 @@ static void timeofday(void) {
     char *s=Cmd_Argv(1),*end;double hour;
     if(!sv.active){Con_Printf("Start the local game first.\n");return;}
     if(Cmd_Argc()==2){
+        if(held())return;
         hour=named_minutes(s)/60.0;
         if(!Q_strcasecmp(s,"evening"))hour=18; /* legacy debug aliases */
         else if(!Q_strcasecmp(s,"sunset"))hour=19;
-        else if(hour<0){hour=strtod(s,&end);if(!*s || *end)hour=-1;}
+        else if(hour<0){hour=Q_strtod(s,&end);if(!*s || *end)hour=-1;}
         if(!AW_ClockSetHour(hour)){Con_Printf("dbg timeofday 0..23.999 / morning night midday day evening sunset sunrise dusk dawn\n");return;}
         clock_fraction=0;
     }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg timeofday [hour or named time]\n");return;}
     report_time();
+}
+/* dbg daynight [on/off]: off holds 12:00 (see hold_clock), on resumes the
+ * normal cycle from the current time, no argument reports the state. */
+static void daynight_command(void) {
+    char *s=Cmd_Argv(1);int on=-1;
+    if(Cmd_Argc()==2){
+        if(!Q_strcasecmp(s,"on") || !Q_strcasecmp(s,"true") || !strcmp(s,"1"))on=1;
+        else if(!Q_strcasecmp(s,"off") || !Q_strcasecmp(s,"false") || !strcmp(s,"0"))on=0;
+    }
+    if(Cmd_Argc()>2 || (Cmd_Argc()==2 && on<0)){
+        Con_Printf("Usage: dbg daynight [on/off] (off holds the clock at 12:00, on resumes)\n");return;
+    }
+    if(on==0){
+        /* Everything shows midday at once: stop the hour stepper and the
+         * previews that would otherwise still show another time. */
+        daynight_hold=1;cycle_steps=0;gallery_stop();light_time=0;
+        if(sv.active)hold_clock();
+    }else if(on==1 && daynight_hold){daynight_hold=0;clock_fraction=0;}
+    if(daynight_hold)Con_Printf("Day/night off: clock held at 12:00%s.\n",sv.active?"":" once a game runs");
+    else Con_Printf("Day/night on: %s.\n",daynightcycle.value>0?"the clock runs from the current time":
+        "the clock is stopped by dbg daynightcycle off");
 }
 void AW_WaitInit(void){
     Cvar_RegisterVariable(&timescale);Cvar_RegisterVariable(&daynightcycle);Cmd_AddCommand("aw_wait",wait_open);
@@ -292,10 +335,13 @@ void AW_WaitInit(void){
     Cmd_AddCommand("aw_nightgallery",night_gallery);
     Cmd_AddCommand("aw_24hrcycle",cycle_command);
     Cmd_AddCommand("aw_lightgallery",light_gallery_command);
+    Cmd_AddCommand("aw_daynight_set",daynight_command);
 }
 void AW_WaitTick(void) {
     double delta;int whole;
+    /* daynight_hold is kept here on purpose: it outlives the map change. */
     if(!sv.active){modal=0;clock_fraction=0;gallery_stop();cycle_steps=0;light_active=0;return;}
+    if(daynight_hold)hold_clock();
     (void)AW_DayGalleryClock(0);
     if(cycle_steps){
         if(cls.state!=ca_connected || AW_IntroUse()){cycle_stop(NULL);return;}
@@ -320,7 +366,7 @@ void AW_WaitTick(void) {
         return;
     }
     if(modal || sv.paused || key_dest!=key_game || cls.state!=ca_connected ||
-       AW_IntroUse() || AW_ReaderActive() || !(daynightcycle.value>0))return;
+       AW_IntroUse() || AW_ReaderActive() || !(daynightcycle.value>0) || daynight_hold)return;
     delta=host_frametime*timescale.value*1000;
     if(delta>0 && delta<=86400000){
         delta+=clock_fraction;whole=(int)delta;
@@ -355,7 +401,7 @@ int AW_WaitKey(int key) {
     if(key==K_LEFTARROW || key==K_DOWNARROW || key=='a' || key=='s'){if(hours>1)hours--;}
     if(key==K_RIGHTARROW || key==K_UPARROW || key=='d' || key=='w'){if(hours<24)hours++;}
     if(key==K_ENTER){
-        if(!allowed()){close_modal();return 1;}
+        if(!allowed() || daynight_hold){close_modal();return 1;}
         if(!AW_ClockAdvance(hours*3600000)){close_modal();AW_UISubtitle("","Could not advance the clock.",4);return 1;}
         clock_fraction=0;
         AW_ClockDate(&y,&m,&d,&h,&n);close_modal();

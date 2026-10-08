@@ -7,6 +7,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from hidden_surface_build import bsp_counts, cull_staged_maps, enabled_value
@@ -125,6 +126,34 @@ class HiddenBuildTests(unittest.TestCase):
                 self.assertEqual(report['preparation_jobs'], jobs)
                 self.assertEqual((base / 'proof/originals/one.bsp').read_bytes(), fixture())
         self.assertEqual(results[0], results[1])
+
+    def test_progress_receipt_writes_are_throttled_and_final_receipt_complete(self):
+        # The parent rewrote the whole growing receipt after every map (4 MB for the
+        # world, 2,741 times): the workers waited for it. Progress saves are now at
+        # most every 2 s; the final receipt is the same.
+        import hidden_surface_build
+        reports = []
+        for throttle in (False, True):
+            with tempfile.TemporaryDirectory() as tmp:
+                base = Path(tmp); maps = base / 'maps'; maps.mkdir()
+                for index in range(40):
+                    (maps / f'm{index:02d}.bsp').write_bytes(fixture())
+                writes = []
+                real = Path.write_text
+
+                def counted(path, *args, **kwargs):
+                    if path.name == 'hidden-surfaces.json':
+                        writes.append(path)
+                    return real(path, *args, **kwargs)
+                clock = patch.object(hidden_surface_build.time, 'monotonic', return_value=100.0) if throttle else contextlib.nullcontext()
+                with contextlib.redirect_stdout(io.StringIO()), patch.object(Path, 'write_text', counted), clock:
+                    report = cull_staged_maps(maps, base / 'proof', {f'm{i:02d}' for i in range(20)},
+                                              processor=parallel_fixture_processor)
+                saved = json.loads((base / 'proof/hidden-surfaces.json').read_text())
+                reports.append(({k: v for k, v in saved.items() if k not in ('started_at', 'finished_at')}, len(writes)))
+        self.assertEqual(reports[0][0], reports[1][0])
+        self.assertEqual(len(reports[1][0]['maps']), 40)
+        self.assertLessEqual(reports[1][1], 3)
 
     def test_parallel_failure_never_installs_partial_candidates(self):
         with tempfile.TemporaryDirectory() as tmp:

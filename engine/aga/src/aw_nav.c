@@ -117,14 +117,14 @@ int AW_NavStep(double dt,int wait_for_player) {
         if(player_wait)Con_Printf("Escort path clear; resuming.\n");
         player_wait=0;
     }
-    walker->v.angles[1]=atan2(delta[1],delta[0])*180/M_PI-90;
+    walker->v.angles[1]=Q_atan2(delta[1],delta[0])*180/M_PI-90;
     field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=1;
     moved=AW_ActorStep(walker,move,dt);
     /* Small local steering around authored path-grid corners. Each candidate
      * still sweeps the same standing collision hull and requires floor support. */
     if(!moved)for(i=0;i<6;i++){
-        angle=atan2(delta[1],delta[0])+avoid[i]*M_PI/180;
-        side[0]=cos(angle)*step;side[1]=sin(angle)*step;side[2]=0;
+        angle=Q_atan2(delta[1],delta[0])+avoid[i]*M_PI/180;
+        side[0]=Q_CosRad(angle)*step;side[1]=Q_SinRad(angle)*step;side[2]=0;
         if(AW_ActorStep(walker,side,dt)){moved=1;walker->v.angles[1]=angle*180/M_PI-90;break;}
     }
     if(moved)blocked=0;else {

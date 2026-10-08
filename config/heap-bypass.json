@@ -1,0 +1,30 @@
+{
+  "format": "AmiWind heap bypass 1",
+  "comment": "Temporary pre-CHIM bypass of the strict world-map heap gate: a temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone M2). Only modelled reserve-allowance failures of these exact maps (name and SHA-256) are bypassed; the allocation ceiling and every other map stay strict. tools/build_aga.py apply_map_budget_policy; HEAP-SEYDA-OVERLAP-32.",
+  "temporary_pre_chim_heap_bypass": [
+    {
+      "map": "sn019.bsp",
+      "sha256": "8b16ba835b16be25d18dda627785c526f5ff9e4587743f5341bd86b03a904e4e",
+      "builder": "legacy",
+      "until": "CHIM M2 (Seyda Neen on CHIM)",
+      "bug": "HEAP-SEYDA-OVERLAP-32",
+      "decision": "Owner decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-238,180 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
+    },
+    {
+      "map": "sn026.bsp",
+      "sha256": "49e75526c344f7911d78e3f2eea0a292856ba16f993619fdb048c7f6ab12f7b1",
+      "builder": "legacy",
+      "until": "CHIM M2 (Seyda Neen on CHIM)",
+      "bug": "HEAP-SEYDA-OVERLAP-32",
+      "decision": "Owner decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-104,356 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
+    },
+    {
+      "map": "sn035.bsp",
+      "sha256": "afb26daa762a03f7ae0e7f66c3980252c5664bb728409f82502fdebaca81c363",
+      "builder": "legacy",
+      "until": "CHIM M2 (Seyda Neen on CHIM)",
+      "bug": "HEAP-SEYDA-OVERLAP-32",
+      "decision": "Owner decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-12,148 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
+    }
+  ]
+}

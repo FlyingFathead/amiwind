@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path
 import struct
-import subprocess
 from amiga_fs import check_image
 
 PAYLOAD_LIMIT = 1536 * 1024 * 1024
@@ -82,8 +81,48 @@ def digest(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
 
-def pack(id1, out, version, xdftool, rdbtool=None):
-    """Verify each temporary partition before removing redundant staging maps."""
+def _pack_batch(task):
+    """Worker: write, check and read back one world partition (independent)."""
+    index, batch, out, xdftool = task
+    batch = [Path(p) for p in batch]
+    volume=f'AW_WORLD{index}';part=Path(out)/f'world{index}-partition.hdf'
+    if part.exists():raise ValueError('World partitions are immutable')
+    payload=sum(p.stat().st_size for p in batch)
+    mib=max(128,((payload*6//5+16*1024*1024+127*1024*1024)//(128*1024*1024))*128)
+    if mib>=2048:raise ValueError('World partition must remain below 2 GiB')
+    command=[str(xdftool),str(part),'create',f'size={mib}Mi','+','format',volume,'ffs',
+             '+','makedir','id1','+','makedir','id1/maps']
+    files=[]
+    for path in batch:
+        name='id1/maps/'+path.name
+        command+=['+','write',str(path),name]
+        files.append(dict(path=name,bytes=path.stat().st_size,sha256=digest(path)))
+    from build_windows_xdftool import run_any as run_xdftool
+    run_xdftool(command)
+    check_image(part,normalize=True)
+    from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+    from amitools.fs.ADFSVolume import ADFSVolume
+    from amitools.fs.FSString import FSString
+    device=BlkDevFactory().open(str(part),read_only=True)
+    try:
+        mounted=ADFSVolume(device);mounted.open()
+        for entry in files:
+            data=mounted.read_file(FSString(entry['path']))
+            if len(data)!=entry['bytes'] or hashlib.sha256(data).hexdigest()!=entry['sha256']:
+                raise ValueError('World disk readback mismatch: '+entry['path'])
+    finally:device.close()
+    return dict(file=part.name,volume=volume,partition=f'DW{index}',bytes=part.stat().st_size,
+                sha256=digest(part),files=files,readback='passed')
+
+
+def pack(id1, out, version, xdftool, rdbtool=None, jobs=1):
+    """Verify each temporary partition before removing redundant staging maps.
+
+    Partitions are independent FFS volumes: up to `jobs` are written and read
+    back at once (shared pool); the receipt keeps partition order. Staging maps
+    are removed only after every partition verified.
+    """
+    from build_parallel import ordered_map
     directory=id1/'world/regions.awr'
     if not directory.exists():return []
     raw=directory.read_bytes()
@@ -96,39 +135,9 @@ def pack(id1, out, version, xdftool, rdbtool=None):
     terrain_bytes=sum(p.stat().st_size for p in paths)
     boot_bytes=sum(p.stat().st_size for p in id1.parent.rglob('*') if p.is_file())-terrain_bytes
     _,batches=partition_batches(paths,boot_bytes)
-    images=[]
-    for index, batch in enumerate(batches):
-        volume=f'AW_WORLD{index}';part=out/f'world{index}-partition.hdf'
-        if part.exists():raise ValueError('World partitions are immutable')
-        payload=sum(p.stat().st_size for p in batch)
-        mib=max(128,((payload*6//5+16*1024*1024+127*1024*1024)//(128*1024*1024))*128)
-        if mib>=2048:raise ValueError('World partition must remain below 2 GiB')
-        command=[str(xdftool),str(part),'create',f'size={mib}Mi','+','format',volume,'ffs',
-                 '+','makedir','id1','+','makedir','id1/maps']
-        files=[]
-        for path in batch:
-            name='id1/maps/'+path.name
-            command+=['+','write',str(path),name]
-            files.append(dict(path=name,bytes=path.stat().st_size,sha256=digest(path)))
-        if os.name == 'nt':
-            from build_windows_xdftool import run as run_xdftool
-            run_xdftool(command)
-        else:
-            subprocess.run(command,check=True)
-        check_image(part,normalize=True)
-        from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-        from amitools.fs.ADFSVolume import ADFSVolume
-        from amitools.fs.FSString import FSString
-        device=BlkDevFactory().open(str(part),read_only=True)
-        try:
-            mounted=ADFSVolume(device);mounted.open()
-            for entry in files:
-                data=mounted.read_file(FSString(entry['path']))
-                if len(data)!=entry['bytes'] or hashlib.sha256(data).hexdigest()!=entry['sha256']:
-                    raise ValueError('World disk readback mismatch: '+entry['path'])
-        finally:device.close()
-        images.append(dict(file=part.name,volume=volume,partition=f'DW{index}',bytes=part.stat().st_size,
-                           sha256=digest(part),files=files,readback='passed'))
+    tasks=[(index,[str(p) for p in batch],str(out),str(xdftool)) for index,batch in enumerate(batches)]
+    images=list(ordered_map(_pack_batch,tasks,max(1,min(jobs,len(tasks) or 1))))
+    for batch in batches:
         for path in batch:path.unlink()
     (id1/'world/volumes.awv').write_bytes(b'AWV1'+bytes([len(images)]))
     (out/'world-partitions.json').write_text(json.dumps(
@@ -136,28 +145,56 @@ def pack(id1, out, version, xdftool, rdbtool=None):
     return images
 
 
-def verify_combined(hdf, partitions):
+READBACK_CHUNK = 1024  # files per readback task
+
+
+def _verify_task(task):
+    """Worker: one partition's header check (files=None) or the readback of a
+    slice of its files. Returns the partition geometry, or the first file with
+    the highest end offset in the slice (files in order, strictly greater)."""
+    hdf, name, files = task
     from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
     from amitools.fs.ADFSVolume import ADFSVolume
     from amitools.fs.FSString import FSString
+    if files is None:
+        check_image(hdf,partition=name)
+    device=BlkDevFactory().open(str(hdf),read_only=True,options={'part':name})
+    try:
+        volume=ADFSVolume(device);volume.open()
+        if files is None:
+            return dict(offset_bytes=device.blk_off*device.block_bytes,bytes=device.num_blocks*device.block_bytes,
+                        free_bytes=volume.bitmap.get_num_free()*device.block_bytes)
+        highest=0;highest_file=None
+        for entry in files:
+            data=volume.read_file(FSString(entry['path']))
+            if len(data)!=entry['bytes'] or hashlib.sha256(data).hexdigest()!=entry['sha256']:
+                raise ValueError('Final HDF readback mismatch: '+entry['path'])
+            node=volume.get_file_path_name(FSString(entry['path']))
+            end=(device.blk_off+max(node.get_block_nums())+1)*device.block_bytes
+            if end>highest:highest=end;highest_file=entry['path']
+        return highest,highest_file
+    finally:device.close()
+
+
+def verify_combined(hdf, partitions, jobs=1):
+    """Read back every partition of one hardfile: each partition's header check
+    and slices of its files run in up to `jobs` workers (read-only opens of the
+    same image); receipts keep partition order and the serial highest file."""
+    from build_parallel import ordered_map
+    tasks=[]
+    for partition in partitions:
+        tasks.append((str(hdf),partition['partition'],None))
+        files=partition['files']
+        tasks.extend((str(hdf),partition['partition'],files[i:i+READBACK_CHUNK]) for i in range(0,len(files),READBACK_CHUNK))
+    results=iter(ordered_map(_verify_task,tasks,max(1,min(jobs,len(tasks)))))
     receipts=[]
     for partition in partitions:
-        check_image(hdf,partition=partition['partition'])
-        device=BlkDevFactory().open(str(hdf),read_only=True,options={'part':partition['partition']})
-        try:
-            volume=ADFSVolume(device);volume.open()
-            highest=0;highest_file=None
-            for entry in partition['files']:
-                data=volume.read_file(FSString(entry['path']))
-                if len(data)!=entry['bytes'] or hashlib.sha256(data).hexdigest()!=entry['sha256']:
-                    raise ValueError('Final HDF readback mismatch: '+entry['path'])
-                node=volume.get_file_path_name(FSString(entry['path']))
-                end=(device.blk_off+max(node.get_block_nums())+1)*device.block_bytes
-                if end>highest:highest=end;highest_file=entry['path']
-            receipts.append(dict(partition=partition['partition'],volume=partition.get('volume'),
-                offset_bytes=device.blk_off*device.block_bytes,bytes=device.num_blocks*device.block_bytes,
-                payload_bytes=sum(e['bytes'] for e in partition['files']),files=len(partition['files']),
-                free_bytes=volume.bitmap.get_num_free()*device.block_bytes,
-                highest_used_end_offset=highest,highest_file=highest_file,readback='passed'))
-        finally:device.close()
+        geometry=next(results);highest=0;highest_file=None
+        for _ in range(0,len(partition['files']),READBACK_CHUNK):
+            end,name=next(results)
+            if end>highest:highest=end;highest_file=name
+        receipts.append(dict(partition=partition['partition'],volume=partition.get('volume'),
+            offset_bytes=geometry['offset_bytes'],bytes=geometry['bytes'],
+            payload_bytes=sum(e['bytes'] for e in partition['files']),files=len(partition['files']),
+            free_bytes=geometry['free_bytes'],highest_used_end_offset=highest,highest_file=highest_file,readback='passed'))
     return receipts

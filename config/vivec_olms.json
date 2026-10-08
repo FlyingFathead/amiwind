@@ -1,0 +1,151 @@
+{
+  "format": 1,
+  "comment": "Vivec canton frame (docs/TOWN_IMPORT.md, Vivec). handoff_core is the canton's share of the city on the original cell grid; the bounds add at least draw distance + 32 around it, in whole 768 cores, so a neighbouring frame takes over before this frame's edge comes into view. The centre is the handoff core's centre on the 512-unit terrain material grid. interiors: the rooms reached through the canton's load doors (append only; position = map name and save ID).",
+  "source_cell": [
+    4,
+    -12
+  ],
+  "source_radius": 1,
+  "centre": [
+    36864,
+    -94208
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1920,
+      -1920
+    ],
+    [
+      1920,
+      1920
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "handoff_core": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "town": {
+    "id": "vivec_olms",
+    "title": "Vivec, St. Olms",
+    "map": "vivec_olms",
+    "map_prefix": "vo",
+    "region_cap": 64,
+    "message": "Vivec, St. Olms",
+    "region_file": "vivec_olms-regions.txt",
+    "door_file": "scene-doors-vivec_olms.txt",
+    "visual_group": "vivec_olms",
+    "arrival": {
+      "source_position": [
+        37555,
+        -91194,
+        1891
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "Original exit point of interior door 159518 (Vivec, St. Olms Waist North-One) onto the canton."
+    },
+    "return": null
+  },
+  "interiors": [
+    {
+      "cell": "Assernerairan, Shrine"
+    },
+    {
+      "cell": "Vivec, St. Olms Brewers and Fishmongers Hall"
+    },
+    {
+      "cell": "Vivec, St. Olms Canal North-One"
+    },
+    {
+      "cell": "Vivec, St. Olms Canal North-Three"
+    },
+    {
+      "cell": "Vivec, St. Olms Canal North-Two"
+    },
+    {
+      "cell": "Vivec, St. Olms Canal South-One"
+    },
+    {
+      "cell": "Vivec, St. Olms Canal South-Three"
+    },
+    {
+      "cell": "Vivec, St. Olms Canal South-Two"
+    },
+    {
+      "cell": "Vivec, St. Olms Canalworks"
+    },
+    {
+      "cell": "Vivec, St. Olms Farmers and Laborers Hall"
+    },
+    {
+      "cell": "Vivec, St. Olms Haunted Manor"
+    },
+    {
+      "cell": "Vivec, St. Olms Plaza"
+    },
+    {
+      "cell": "Vivec, St. Olms Storage"
+    },
+    {
+      "cell": "Vivec, St. Olms Tailors and Dyers Hall"
+    },
+    {
+      "cell": "Vivec, St. Olms Tanners and Miners Hall"
+    },
+    {
+      "cell": "Vivec, St. Olms Temple",
+      "exclude": "inline models 230 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, St. Olms Underworks"
+    },
+    {
+      "cell": "Vivec, St. Olms Upper North-One"
+    },
+    {
+      "cell": "Vivec, St. Olms Upper North-Two"
+    },
+    {
+      "cell": "Vivec, St. Olms Upper South-One"
+    },
+    {
+      "cell": "Vivec, St. Olms Waist North-One"
+    },
+    {
+      "cell": "Vivec, St. Olms Waist North-Two"
+    },
+    {
+      "cell": "Vivec, St. Olms Waist South-One"
+    },
+    {
+      "cell": "Vivec, St. Olms Waist South-Two"
+    },
+    {
+      "cell": "Vivec, St. Olms Waistworks",
+      "exclude": "inline models 230 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, St. Olms Yngling Manor"
+    },
+    {
+      "cell": "Vivec, St. Olms Yngling Manor Basement"
+    }
+  ]
+}

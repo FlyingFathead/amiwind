@@ -19,7 +19,8 @@ class PolycountPreviewTests(unittest.TestCase):
              str(root / 'amiwind-toolkit/map-inspector.html')],
             capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        for milestone in ('PASS terrain preview', 'PASS019 whole-placement selection', 'PASS session copy'):
+        for milestone in ('PASS terrain preview', 'PASS019 whole-placement selection', 'PASS session copy',
+                          'PASS020 sub-cell cuts'):
             self.assertIn(milestone, result.stdout)
 
 

@@ -23,7 +23,7 @@ class InteriorLumaTests(unittest.TestCase):
                        '-fno-sanitize-recover=all', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', '-I'+scratch, '-I'+str(SOURCE),
                        str(ROOT/'tests/aga_interior_luma_test.c'),
-                       *[str(SOURCE/name) for name in ('r_surf.c', 'r_light.c', 'd_surf.c', 'cvar.c', 'common.c', 'aw_scene.c')],
+                       *[str(SOURCE/name) for name in ('r_surf.c', 'r_light.c', 'd_surf.c', 'cvar.c', 'common.c', 'aw_scene.c', 'mathlib.c', 'aw_format.c')],
                        '-lm', '-o', str(executable)]
             compiled = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stdout+compiled.stderr)

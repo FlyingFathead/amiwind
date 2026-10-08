@@ -72,9 +72,11 @@ process-tree cleanup defect. Do not publish private diagnostic logs containing
 local paths, usernames, machine identities or owned asset details.
 
 Record actual pool sizes separately from the top-level `--jobs` budget. Pools
-can be smaller because of task count or concurrent stage reservations. Stage
-allocations are fixed at launch; an existing pool does not automatically grow
-when another stage finishes. CPU graphs alone cannot establish throughput or
+can be smaller because of task count or concurrent stage reservations, never
+because of the CPU count: an explicit `--jobs N` is used exactly (one warning
+when N exceeds the usable CPU threads). The scheduler rebalances running
+stages: their pools shrink when another stage starts and grow when one
+finishes (map tool threads keep their start value). CPU graphs alone cannot establish throughput or
 identify a failure. Compare stage wall times, fresh models/second, cache hits,
 active worker count and memory headroom for comparable workloads. Preserve
 complete content, quality and validation gates when optimizing the builder.
@@ -306,7 +308,11 @@ Keep source, dependencies and generated output in separate sibling directories.
 Use explicit `--tools-dir` and `--workspace` paths inside WSL; the final image is
 `<workspace>/build/<run>/image/AmiWind-v<VERSION>.hdf`. `--autoinstall --plan` previews setup; `--autoinstall --dry-run`
 builds only the asset-free notice image. See the [Linux guide](LINUX_BUILD.md)
-for options and manual setup.
+for options and manual setup. Normal builds include the NPC gallery, the
+world flora (trees and grass) and the harvestable mushrooms; `--no-npc-gallery`,
+`--no-tree-sprites` and `--no-harvest` are for debugging only
+([world flora default](LINUX_BUILD.md#world-flora-default),
+[harvestable mushrooms default](LINUX_BUILD.md#harvestable-mushrooms-default)).
 
 ## WSL fallback resources and first checkpoint
 

@@ -23,7 +23,19 @@ def safe_asset(root, name):
     return path
 
 
-def install(overlay, id1, scenery_acceptance):
+def _copy_verified(task):
+    """Worker: copy one validated file and read it back."""
+    source, target = map(Path, task)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    if digest(target) != digest(source):
+        raise ValueError('Flora staging readback failed')
+
+
+def install(overlay, id1, scenery_acceptance, jobs=1):
+    """Validate every region and sprite, then copy them (hashing and copies in
+    up to `jobs` workers of the shared pool; nothing is copied before all pass)."""
+    from build_parallel import hash_existing, ordered_map
     overlay, id1 = Path(overlay), Path(id1)
     receipt_path = overlay / 'world-flora.json'
     receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
@@ -40,13 +52,16 @@ def install(overlay, id1, scenery_acceptance):
         raise ValueError('Flora overlay does not cover every installed region in order')
     replacements = []
     originals = set()
-    for row in rows:
+    names = [row['name'] for row in rows]
+    installed = hash_existing([id1 / 'maps' / (name + '.bsp') for name in names], jobs)
+    overlays = hash_existing([overlay / name / 'scene.bsp' for name in names], jobs)
+    for row, target_sha, source_sha in zip(rows, installed, overlays):
         name = row['name']
         target = id1 / 'maps' / (name + '.bsp')
         source = overlay / name / 'scene.bsp'
-        if not target.is_file() or digest(target) != row.get('base_sha256'):
+        if target_sha is None or target_sha != row.get('base_sha256'):
             raise ValueError('Flora input differs from installed rock/mushroom map: ' + name)
-        if (not source.is_file() or digest(source) != row.get('sha256')
+        if (source_sha is None or source_sha != row.get('sha256')
                 or source.stat().st_size != row.get('bytes')):
             raise ValueError('Flora output missing or changed: ' + name)
         if row.get('retained_content', {}).get('retained_content') != 'verified':
@@ -85,11 +100,9 @@ def install(overlay, id1, scenery_acceptance):
             raise ValueError('Flora sprite would overwrite different content: ' + name)
         replacements.append((source, target))
     # Every validation above precedes mutation, including stale later regions.
-    for source, target in replacements:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
-        if digest(target) != digest(source):
-            raise ValueError('Flora staging readback failed')
+    for _ in ordered_map(_copy_verified, [(str(s), str(t)) for s, t in replacements],
+                         max(1, min(jobs, len(replacements) or 1))):
+        pass
     return {'status': 'staged', 'runtime_validation': 'pending',
             'receipt_sha256': digest(receipt_path), 'regions': count,
             'covered_unique_original_refs': len(originals), 'shared_sprite_types': len(assets),

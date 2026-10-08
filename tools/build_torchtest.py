@@ -13,6 +13,7 @@ import struct
 import subprocess
 
 from player_hull import lumps, pack_lumps, rebuild_world_hull, PROFILE
+from vis_options import light_args
 
 
 def validate(raw):
@@ -59,7 +60,7 @@ def build(palette, output, work, qbsp, vis, light):
     # solely to allocate valid sample ranges; zero every byte before staging.
     commands = [[str(Path(qbsp).resolve()), '-nopercent', map_path.name],
                 [str(Path(vis).resolve()), '-threads', '1', 'torchtest.bsp'],
-                [str(Path(light).resolve()), '-threads', '1', '-minlight', '16', 'torchtest.bsp']]
+                [str(Path(light).resolve()), *light_args('-minlight', '16', 'torchtest.bsp')]]
     with (work/'compile.log').open('w') as log:
         for command in commands:
             subprocess.run(command, cwd=work, stdout=log, stderr=subprocess.STDOUT, check=True)

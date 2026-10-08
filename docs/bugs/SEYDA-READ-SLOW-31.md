@@ -6,6 +6,11 @@ Open; tagged performance. Narrowed to the engine build that added ember
 particles; not caused by what the embers do. Found before v0.0.31-dev1 was
 shared. dev1 is still faster than v0.0.30 on every measured crossing.
 
+Note (8 October 2026): the crossing timings below were taken with the hard files in a Windows folder
+shared into the container. Such timings include host I/O and are likely inflated
+([BENCH-HOST-STORAGE-32](BENCH-HOST-STORAGE-32.md)); compare them only within their batch. New disk
+timings are taken with the hard files on container-native storage.
+
 ## Symptom
 
 On the FS-UAE crossing route `seyda-east-y-300` (3 runs each), the dev1 disks
@@ -77,7 +82,7 @@ was not part of the engine gates.
 
 ## Repair
 
-In source (not yet shipped): loose game files opened by `COM_FOpenFile` get a
+In source (not shipped at the time of writing): loose game files opened by `COM_FOpenFile` get a
 16 KiB stdio buffer (`setvbuf`) instead of the C library's 1 KiB default. Map
 loading needs far fewer AmigaDOS calls; on the dev1 engine whole Seyda
 crossings drop from 0.70-0.91 s to 0.39-0.48 s (v0.0.30 was 0.54-0.71 s).

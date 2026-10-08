@@ -12,6 +12,8 @@ int aw_efrags_used,aw_efrags_peak;
 static void *pages[128];
 static int page_count,allocations,expected_limit_error;
 static jmp_buf limit_error;
+static int warnings;
+void Con_Printf(char *fmt,...){assert(strstr(fmt,"visible entity limit"));warnings++;}
 void Sys_Error(char *fmt,...){assert(0);}
 void Host_Error(char *fmt,...){
  assert(expected_limit_error && strstr(fmt,"leaf-link limit"));
@@ -39,6 +41,24 @@ static void visible_capacity(void){
  head=frags;R_StoreEfrags(&head);
  assert(cl_numvisedicts==n && cl_visedicts[n-1]==&actors[n-1]);
  R_StoreEfrags(&head);assert(cl_numvisedicts==n);
+ assert(!aw_visedicts_dropped && !warnings);
+ free(frags);free(actors);
+ /* Beyond MAX_VISEDICTS: each refused entity is counted once per frame
+  * (also when linked to several leaves) and the map warns once. */
+ n=MAX_VISEDICTS+40;frags=calloc(2*n,sizeof(*frags));actors=calloc(n,sizeof(*actors));
+ assert(frags && actors);
+ for(i=0;i<2*n;i++){
+  actors[i%n].model=&model;frags[i].entity=&actors[i%n];
+  frags[i].leafnext=i+1<2*n?&frags[i+1]:NULL;
+ }
+ cl_numvisedicts=0;r_framecount++;head=frags;R_StoreEfrags(&head);
+ assert(cl_numvisedicts==MAX_VISEDICTS && aw_visedicts_dropped==40 && aw_visedicts_dropped_frame==40 && warnings==1);
+ cl_numvisedicts=0;aw_visedicts_dropped_frame=0;r_framecount++;R_StoreEfrags(&head);
+ assert(aw_visedicts_dropped==80 && aw_visedicts_dropped_frame==40 && warnings==1);
+ /* A new map (R_ClearEfrags) may warn again. */
+ R_ClearEfrags(false);cl_numvisedicts=0;r_framecount++;R_StoreEfrags(&head);
+ assert(warnings==2);
+ R_ClearEfrags(false);cl_numvisedicts=0;aw_visedicts_dropped=aw_visedicts_dropped_frame=0;
  free(frags);free(actors);
 }
 

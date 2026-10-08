@@ -16,7 +16,8 @@ def plan(entries, evaluate, *, terrain_bounds, prefix, overlap=896,
          draw_distance=540, hysteresis=96, heap_budget=11*MIB,
          non_map_reserve=3*MIB, safety_headroom=2*MIB,
          planning_peak=5*MIB, min_core=64, max_regions=64):
-    if prefix not in ('sn', 'bm'):
+    from town_config import runtime_towns
+    if prefix not in {town['prefix'] for town in runtime_towns()}:
         raise ValueError('Expected supported native town prefix')
     if not 1 <= max_regions <= 64 or min_core <= 0:
         raise ValueError('Invalid native region capacity or minimum core size')

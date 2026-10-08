@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "comment": "Vivec canton frame (docs/TOWN_IMPORT.md, Vivec). handoff_core is the canton's share of the city on the original cell grid; the bounds add at least draw distance + 32 around it, in whole 768 cores, so a neighbouring frame takes over before this frame's edge comes into view. The centre is the handoff core's centre on the 512-unit terrain material grid. interiors: the rooms reached through the canton's load doors (append only; position = map name and save ID).",
+  "source_cell": [
+    2,
+    -11
+  ],
+  "source_radius": 1,
+  "centre": [
+    20480,
+    -84480
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1920,
+      -2304
+    ],
+    [
+      1920,
+      2304
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "handoff_core": [
+    [
+      -1024,
+      -1408
+    ],
+    [
+      1024,
+      1408
+    ]
+  ],
+  "town": {
+    "id": "vivec_hlaalu",
+    "title": "Vivec, Hlaalu",
+    "map": "vivec_hlaalu",
+    "map_prefix": "vh",
+    "region_cap": 64,
+    "message": "Vivec, Hlaalu",
+    "region_file": "vivec_hlaalu-regions.txt",
+    "door_file": "scene-doors-vivec_hlaalu.txt",
+    "visual_group": "vivec_hlaalu",
+    "arrival": {
+      "source_position": [
+        23732,
+        -84349,
+        1885
+      ],
+      "source_rotation_z": 1.5707963705062866,
+      "reason": "Original exit point of interior door 201492 (Vivec, Hlaalu Waistworks) onto the canton."
+    },
+    "return": null
+  },
+  "interiors": [
+    {
+      "cell": "Vivec, Curio Manor"
+    },
+    {
+      "cell": "Vivec, Elven Nations Cornerclub"
+    },
+    {
+      "cell": "Vivec, Hlaalu Alchemist"
+    },
+    {
+      "cell": "Vivec, Hlaalu Ancestral Vaults"
+    },
+    {
+      "cell": "Vivec, Hlaalu Canalworks"
+    },
+    {
+      "cell": "Vivec, Hlaalu Edryno Arethi's House"
+    },
+    {
+      "cell": "Vivec, Hlaalu General Goods"
+    },
+    {
+      "cell": "Vivec, Hlaalu Pawnbroker"
+    },
+    {
+      "cell": "Vivec, Hlaalu Plaza"
+    },
+    {
+      "cell": "Vivec, Hlaalu Prison Cells"
+    },
+    {
+      "cell": "Vivec, Hlaalu Records"
+    },
+    {
+      "cell": "Vivec, Hlaalu Temple"
+    },
+    {
+      "cell": "Vivec, Hlaalu Treasury"
+    },
+    {
+      "cell": "Vivec, Hlaalu Underworks",
+      "exclude": "inline models 225 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md); heap 769028 B over the 11,534,336 B budget after the optimizer (VIVEC-HEAP-31)"
+    },
+    {
+      "cell": "Vivec, Hlaalu Vaults"
+    },
+    {
+      "cell": "Vivec, Hlaalu Waistworks"
+    },
+    {
+      "cell": "Vivec, Hlaalu Weaponsmith"
+    },
+    {
+      "cell": "Vivec, No Name Club",
+      "exclude": "inline models 273 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    }
+  ]
+}

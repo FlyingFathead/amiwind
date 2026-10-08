@@ -10,11 +10,12 @@ from player_hull import lumps, pack_lumps
 
 
 def light_ranges(data):
-    faces=list(struct.iter_unpack('<Hhihh4Bi',data[7]))
+    faces=list(struct.iter_unpack('<HhihH4Bi',data[7]))
     vertices=np.frombuffer(data[3],dtype='<f4').reshape(-1,3).astype(np.float64)
     edges=np.frombuffer(data[12],dtype='<u2').reshape(-1,2)
     surfedges=np.frombuffer(data[13],dtype='<i4')
     texinfo=np.frombuffer(data[6],dtype=np.dtype([('vec','<f4',(2,4)),('tail','<i4',(2,))]))['vec']
+    if any(f[4]>=len(texinfo) for f in faces):raise ValueError('Face texinfo index outside texinfo lump')
     counts=np.array([f[3] for f in faces])
     if np.any(counts<1):raise ValueError('Empty BSP face')
     starts=np.r_[0,np.cumsum(counts)[:-1]]
@@ -23,10 +24,13 @@ def light_ranges(data):
     points=vertices[edges[np.abs(selected),(selected<0).astype(int)]]
     vectors=np.repeat(texinfo[[f[4] for f in faces]].astype(np.float64),counts,axis=0)
     # Float rounding at a 16-unit boundary can change the referenced sample
-    # count. Preserve the longer ORIGINAL byte prefix under both plausible C
-    # evaluation policies: wide intermediates with a final float store, and
-    # binary32 after every product/add. This changes no UV or runtime extent.
-    wide=((points[:,None,:]*vectors[:,:,:3]).sum(2)+vectors[:,:,3]).astype(np.float32)
+    # count. The engine rule (model.c CalcSurfaceExtents, tools/surface_grid.py)
+    # is double precision after every product/add; its span must lie inside
+    # the lump. Also preserve the longer ORIGINAL byte prefix that binary32
+    # after every product/add (engines before that rule) would read, clipped
+    # to the lump. This changes no UV or runtime extent.
+    exact=points[:,None,:]*vectors[:,:,:3]
+    wide=((exact[:,:,0]+exact[:,:,1])+exact[:,:,2])+vectors[:,:,3]
     products=points.astype(np.float32)[:,None,:]*vectors[:,:,:3].astype(np.float32)
     narrow=((products[:,:,0]+products[:,:,1])+products[:,:,2])+vectors[:,:,3].astype(np.float32)
     sample_counts=[]
@@ -36,15 +40,16 @@ def light_ranges(data):
         high=np.ceil(np.maximum(-99999.,np.maximum.reduceat(uv,starts,axis=0))/16)
         dims=np.maximum(1,high-low).astype(np.int64)+1
         sample_counts.append(dims[:,0]*dims[:,1])
-    preserved_samples=np.maximum(*sample_counts)
+    engine_samples,legacy_samples=sample_counts
     result=[]
     for i,face in enumerate(faces):
         if face[-1]<0:continue
         styles=next((j for j,s in enumerate(face[5:9]) if s==255),4)
-        size=int(preserved_samples[i])*styles
+        size=int(engine_samples[i])*styles
         offset=face[-1]
-        if not styles or size<1 or offset+size>len(data[8]):
+        if not styles or size<1 or offset<0 or offset+size>len(data[8]):
             raise ValueError('Lightmap sample bounds')
+        size=min(max(size,int(legacy_samples[i])*styles),len(data[8])-offset)
         result.append((i,offset,size))
     return result
 

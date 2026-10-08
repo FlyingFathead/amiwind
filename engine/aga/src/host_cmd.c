@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#include "amiwind_version.h"
 
 extern cvar_t	pausable;
 extern void SV_SaveSpawnparms (void);
@@ -169,7 +170,7 @@ void Host_Noclip_f (void)
 	else
 	{
         if(SV_TestEntityPosition(sv_player)) {
-            SV_ClientPrintf("Still inside solid: fly clear or use aw_recover.\n");return;
+            SV_ClientPrintf("Still inside solid: dbg unstuck moves you to the nearest clear spot; or fly clear, or dbg recover.\n");return;
         }
         VectorCopy(vec3_origin,sv_player->v.velocity);
 		noclip_anglehack = false;
@@ -616,18 +617,18 @@ void Host_Loadgame_f (void)
 		return;
 	}
 
-	fscanf (f, "%i\n", &version);
+	Q_fscanf(f, "%i\n", &version);
 	if (version != SAVEGAME_VERSION)
 	{
 		fclose (f);
 		Con_Printf ("Savegame is version %i, not %i\n", version, SAVEGAME_VERSION);
 		return;
 	}
-	fscanf (f, "%s\n", str);
+	Q_fscanf(f, "%s\n", str);
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
-		fscanf (f, "%f\n", &spawn_parms[i]);
+		Q_fscanf(f, "%f\n", &spawn_parms[i]);
 // this silliness is so we can load 1.06 save files, which have float skill values
-	fscanf (f, "%f\n", &tfloat);
+	Q_fscanf(f, "%f\n", &tfloat);
 	current_skill = (int)(tfloat + 0.1);
 	Cvar_SetValue ("skill", (float)current_skill);
 
@@ -637,8 +638,8 @@ void Host_Loadgame_f (void)
 	Cvar_SetValue ("teamplay", 0);
 #endif
 
-	fscanf (f, "%s\n",mapname);
-	fscanf (f, "%f\n",&time);
+	Q_fscanf(f, "%s\n",mapname);
+	Q_fscanf(f, "%f\n",&time);
 
 	CL_Disconnect_f ();
 
@@ -659,7 +660,7 @@ void Host_Loadgame_f (void)
 
 	for (i=0 ; i<MAX_LIGHTSTYLES ; i++)
 	{
-		fscanf (f, "%s\n", str);
+		Q_fscanf(f, "%s\n", str);
 		sv.lightstyles[i] = Hunk_Alloc (strlen(str)+1);
 		strcpy (sv.lightstyles[i], str);
 	}
@@ -800,21 +801,21 @@ int LoadGamestate(char *level, char *startspot)
 		return -1;
 	}
 
-	fscanf (f, "%i\n", &version);
+	Q_fscanf(f, "%i\n", &version);
 	if (version != SAVEGAME_VERSION)
 	{
 		fclose (f);
 		Con_Printf ("Savegame is version %i, not %i\n", version, SAVEGAME_VERSION);
 		return -1;
 	}
-	fscanf (f, "%s\n", str);
+	Q_fscanf(f, "%s\n", str);
 //	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
-//		fscanf (f, "%f\n", &spawn_parms[i]);
-	fscanf (f, "%f\n", &sk);
+//		Q_fscanf(f, "%f\n", &spawn_parms[i]);
+	Q_fscanf(f, "%f\n", &sk);
 	Cvar_SetValue ("skill", sk);
 
-	fscanf (f, "%s\n",mapname);
-	fscanf (f, "%f\n",&time);
+	Q_fscanf(f, "%s\n",mapname);
+	Q_fscanf(f, "%f\n",&time);
 
 	SV_SpawnServer (mapname, startspot);
 
@@ -827,7 +828,7 @@ int LoadGamestate(char *level, char *startspot)
 // load the light styles
 	for (i=0 ; i<MAX_LIGHTSTYLES ; i++)
 	{
-		fscanf (f, "%s\n", str);
+		Q_fscanf(f, "%s\n", str);
 		sv.lightstyles[i] = Hunk_Alloc (strlen(str)+1);
 		strcpy (sv.lightstyles[i], str);
 	}
@@ -835,7 +836,7 @@ int LoadGamestate(char *level, char *startspot)
 // load the edicts out of the savegame file
 	while (!feof(f))
 	{
-		fscanf (f, "%i\n",&entnum);
+		Q_fscanf(f, "%i\n",&entnum);
 		for (i=0 ; i<sizeof(str)-1 ; i++)
 		{
 			r = fgetc (f);
@@ -968,7 +969,7 @@ void Host_Name_f (void)
 void Host_Version_f (void)
 {
 	Con_Printf ("Version %4.2f\n", VERSION);
-	Con_Printf ("Exe: "__TIME__" "__DATE__"\n");
+	Con_Printf ("Exe: AmiWind v" AMIWIND_VERSION "\n");	// not the compile time (ENGINE-BUILD-REPRO-31)
 }
 
 #ifdef IDGODS

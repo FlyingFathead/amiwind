@@ -154,13 +154,14 @@ class StagedMapOptimizerTests(unittest.TestCase):
 
     def test_rounding_boundary_keeps_longest_original_light_prefix(self):
         data = lumps(repeated_geometry())
-        # Constructed, asset-free cancellation example: narrow UV=64.00003,
-        # wide intermediates rounded on store=64.0. The larger extent matters.
-        scale, offset = f32(2.73), f32(-469.4419860839844)
-        low = f32((32-offset)/scale)
+        # Constructed, asset-free rounding example: binary32 after every
+        # operation projects 112.0000076, the engine rule (double after every
+        # operation) 111.9999999. The engine span must fit; the longer
+        # binary32 span is preserved too.
+        scale, offset = f32(2.9126579761505127), f32(-23.31492042541504)
         for index in range(len(data[3])//12):
             struct.pack_into('<3f', data[3], index*12,
-                             f32(195.4) if index%3 == 0 else low,
+                             f32(46.45753860473633) if index%3 == 0 else 0.0,
                              16.0 if index%3 == 2 else 0.0, 0.0)
         struct.pack_into('<8f', data[6], 0, scale,0,0,offset,0,1,0,0)
         data[8] = bytearray(range(128))

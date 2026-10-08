@@ -5,12 +5,15 @@
 #include "quakedef.h"
 #include "aw_maps.h"
 #include "aw_world.h"
+#include "aw_town.h"
 #include <stdint.h>
 typedef struct {float origin[3],core[4],cover[4];} terrain_region_t;
 static terrain_region_t *regions;
-static terrain_region_t towns[2];
+/* Town handoffs in town-table order: world directory slots 0/1 (Seyda,
+ * Balmora) or the table's own frame for later towns whose map is installed. */
+static terrain_region_t towns[AW_TOWN_COUNT];
+static int town_ready[AW_TOWN_COUNT];
 static int count,attempted;
-static const char *town_names[2]={"seyda","balmora"};
 static uint32_t word(const byte *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
 static float number(const byte *p){uint32_t n=word(p);float f;memcpy(&f,&n,4);return f;}
 /* One 64-byte name from the catalogue; NUL-terminated, no control characters. */
@@ -66,8 +69,27 @@ const char *AW_RegionNameAt(const float *position){
 done:
     fclose(f);return title[0]?title:NULL;
 }
+static int valid_town(const terrain_region_t *t){
+    int k;
+    for(k=0;k<3;k++)if(!isfinite(t->origin[k]) || fabs(t->origin[k])>1000000)return 0;
+    for(k=0;k<2;k++)if(!(t->core[k]>=-4000 && t->core[k+2]<=4000 && t->core[k]<t->core[k+2]))return 0;
+    return 1;
+}
+/* A table frame joins the world only when its arrival alias map exists. */
+static void table_towns(void){
+    int i,k;FILE *f;char path[40];const aw_town_t *t;
+    for(i=0;i<AW_TOWN_COUNT;i++){
+        t=AW_Town(i);if(t->world_slot>=0 || !t->handoff)continue;
+        for(k=0;k<3;k++)towns[i].origin[k]=t->origin[k];
+        for(k=0;k<4;k++)towns[i].core[k]=t->core[k];
+        if(!valid_town(&towns[i]))continue;
+        sprintf(path,"maps/%s.bsp",t->name);f=NULL;
+        if(COM_FOpenFile(path,&f)>=124 && f)town_ready[i]=1;
+        if(f)fclose(f);
+    }
+}
 static int load_directory(void){
-    FILE *f=NULL;byte header[8],row[52];int size,n,i,k;char expected[8];terrain_region_t *r;
+    FILE *f=NULL;byte header[8],row[52];int size,n,i,k,t;char expected[16];terrain_region_t *r,slots[2];
     if(attempted)return count>0;
     attempted=1;size=COM_FOpenFile("world/regions.awr",&f);
     if(!f)return 0;
@@ -75,10 +97,13 @@ static int load_directory(void){
     n=(int)word(header+4);if(n<1 || n>8192 || size!=64+n*52)goto bad;
     for(i=0;i<2;i++){
         if(fread(row,1,28,f)!=28)goto bad;
-        for(k=0;k<3;k++)towns[i].origin[k]=number(row+k*4);
-        for(k=0;k<4;k++)towns[i].core[k]=number(row+12+k*4);
-        for(k=0;k<3;k++)if(!isfinite(towns[i].origin[k]) || fabs(towns[i].origin[k])>1000000)goto bad;
-        for(k=0;k<2;k++)if(!(towns[i].core[k]>=-4000 && towns[i].core[k+2]<=4000 && towns[i].core[k]<towns[i].core[k+2]))goto bad;
+        for(k=0;k<3;k++)slots[i].origin[k]=number(row+k*4);
+        for(k=0;k<4;k++)slots[i].core[k]=number(row+12+k*4);
+        if(!valid_town(&slots[i]))goto bad;
+    }
+    for(t=0;t<AW_TOWN_COUNT;t++){
+        i=AW_Town(t)->world_slot;if(i<0 || i>1)continue;
+        towns[t]=slots[i];town_ready[t]=1;
     }
     regions=(terrain_region_t *)malloc(n*sizeof(*regions));if(!regions)goto bad;
     for(i=0;i<n;i++){
@@ -91,18 +116,23 @@ static int load_directory(void){
         for(k=0;k<2;k++)if(!(r->core[k]<r->core[k+2] && r->cover[k]<=r->core[k]-896 &&
             r->cover[k+2]>=r->core[k+2]+896 && r->cover[k]>-4000 && r->cover[k+2]<4000))goto bad;
     }
-    fclose(f);count=n;Con_Printf("Vvardenfell: %ld terrain regions; %ld directory bytes.\n",(long)n,(long)(n*sizeof(*regions)));return 1;
+    fclose(f);count=n;table_towns();
+    Con_Printf("Vvardenfell: %ld terrain regions; %ld directory bytes.\n",(long)n,(long)(n*sizeof(*regions)));return 1;
 bad:
-    fclose(f);free(regions);regions=NULL;count=0;
+    fclose(f);free(regions);regions=NULL;count=0;memset(town_ready,0,sizeof(town_ready));
     Con_Printf("Invalid or unavailable Vvardenfell region directory.\n");return 0;
 }
+/* Town with a world handoff (directory slot or table frame), or -1. */
+static int world_town(const char *name){
+    int t=AW_TownFind(name);const aw_town_t *row=AW_Town(t);
+    return row && (row->world_slot>=0 || row->handoff)?t:-1;
+}
 static terrain_region_t *source(const char *name){
-    int i=AW_TerrainId(name);
-    if(i<0 && strcmp(name,"seyda") && strcmp(name,"balmora"))return NULL;
+    int i=AW_TerrainId(name),t=world_town(name);
+    if(i<0 && t<0)return NULL;
     if(!load_directory())return NULL;
     if(i>=0)return i<count?&regions[i]:NULL;
-    for(i=0;i<2;i++)if(!strcmp(name,town_names[i]))return &towns[i];
-    return NULL;
+    return town_ready[t]?&towns[t]:NULL;
 }
 static int inside(const float *point,const float *box,float margin){
     int k;for(k=0;k<2;k++)if(!(point[k]>=box[k]-margin && point[k]<box[k+2]+margin))return 0;
@@ -127,14 +157,15 @@ int AW_WorldContains(const char *name,const float *local){
 }
 int AW_WorldDestination(const char *name,const float *local,char *target,float *arrival){
     terrain_region_t *from,*to=NULL;float global[3],point[3];int i,k,id;char path[32];FILE *f=NULL;
-    if(strcmp(name,"seyda") && strcmp(name,"balmora") && AW_TerrainId(name)<0)return 0;
+    if(world_town(name)<0 && AW_TerrainId(name)<0)return 0;
     from=source(name);if(!from)return 0;
     for(k=0;k<3;k++){if(!isfinite(local[k]))return 0;global[k]=local[k]+from->origin[k];}
-    for(i=0;i<2;i++){
+    for(i=0;i<AW_TOWN_COUNT;i++){
+        if(!town_ready[i])continue;
         for(k=0;k<3;k++)point[k]=global[k]-towns[i].origin[k];
-        if(inside(point,towns[i].core,!strcmp(name,town_names[i])?32:0)){
-            if(!strcmp(name,town_names[i]))return 0;
-            to=&towns[i];strcpy(target,town_names[i]);break;
+        if(inside(point,towns[i].core,!strcmp(name,AW_Town(i)->name)?32:0)){
+            if(!strcmp(name,AW_Town(i)->name))return 0;
+            to=&towns[i];strcpy(target,AW_Town(i)->name);break;
         }
     }
     id=AW_TerrainId(name);
@@ -157,9 +188,10 @@ int AW_WorldMapTarget(const float *world,char *target,float *arrival){
     terrain_region_t *to=NULL;float point[3];int i,k;char path[32];FILE *f=NULL;
     if(!isfinite(world[0]) || !isfinite(world[1]) || fabs(world[0])>2000000 ||
        fabs(world[1])>2000000 || !load_directory())return 0;
-    for(i=0;i<2;i++){
+    for(i=0;i<AW_TOWN_COUNT;i++){
+        if(!town_ready[i])continue;
         for(k=0;k<2;k++)point[k]=world[k]*.25f-towns[i].origin[k];
-        if(inside(point,towns[i].core,0)){to=&towns[i];strcpy(target,town_names[i]);break;}
+        if(inside(point,towns[i].core,0)){to=&towns[i];strcpy(target,AW_Town(i)->name);break;}
     }
     if(!to)for(i=0;i<count;i++){
         for(k=0;k<2;k++)point[k]=world[k]*.25f-regions[i].origin[k];

@@ -24,6 +24,8 @@ void *Hunk_AllocName(int bytes,char *name){
     result=heap+used;memset(result,0,amount);used+=amount;allocation_calls++;
     return result;
 }
+int Hunk_LowMark(void){return used;}
+void Hunk_FreeToLowMark(int mark){assert(mark>=0 && mark<=used);memset(heap+mark,0,used-mark);used=mark;}
 void Sys_Error(char *fmt,...){assert(expect_error);longjmp(failure,1);}
 
 static model_t model;
@@ -107,11 +109,18 @@ int main(int argc,char **argv){
     setup(3);disk[0].children[0]=2;Mod_LoadNodes(&lump);assert(!aw_direct_hull0 && model.numnodes==3);
     setup(2);disk[1].numfaces=1;Mod_LoadNodes(&lump);assert(!aw_direct_hull0);
     setup(3);Mod_LoadNodes(&lump);assert(!aw_direct_hull0); /* orphan tail */
-    /* Invalid disk ranges must fail before allocating or making pointers. */
+    /* Invalid disk ranges must fail before a pointer is made from them. Nodes
+     * are validated as they stream in, so their arrays may already exist. */
     setup(2);disk[1].children[0]=-4;expect_error=1;
-    if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}assert(allocation_calls==0);
+    if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}
     setup(2);disk[1].planenum=4;expect_error=1;
-    if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}assert(allocation_calls==0);
+    if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}
+    setup(2);disk[0].children[1]=2;expect_error=1;
+    if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}
+    /* A failed certification never hides an invalid later node. */
+    setup(3);disk[2].firstface=5;expect_error=1;
+    if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}
+    /* Inline point roots are checked before any allocation. */
     setup(2);models[1].headnode[0]=99;expect_error=1;
     if(!setjmp(failure)){Mod_LoadNodes(&lump);assert(0);}assert(allocation_calls==0);
     return 0;

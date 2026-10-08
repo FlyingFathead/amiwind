@@ -1,5 +1,44 @@
 # Development history
 
+## Unreleased - v0.0.32
+
+- Console line editing like a terminal prompt (`aw_console_mode 1`, default):
+  Left/Right move the cursor without deleting, typing inserts, Del deletes at
+  the cursor, Home/End and Ctrl+A/Ctrl+E jump, Ctrl+U/Ctrl+K cut, Down past
+  the newest command returns the typed line, empty and repeated commands are
+  not stored, and the last 31 commands are kept in `console-history.txt`
+  (written only on Enter). `aw_console_mode 0` keeps id's classic editor.
+  The Amiga Del key now arrives as Delete (was F11); the FS-UAE presets send
+  Home/End (KEYS-AMIGA-EDIT-32). Details: [keymaps](KEYMAPS.md#console-line-editing).
+- `dbg daynight off` holds the game clock at 12:00 midday through the normal
+  clock path, so sky, light, lamps, night windows and the HUD show midday;
+  it survives map changes, is not saved, and `dbg daynight on` resumes.
+- Build profiler, always on: per-stage CPU of the stage and all its children,
+  average cores against its jobs, peak memory, disk bytes, a one-second CPU
+  timeline, timed sections inside long stages, the critical path, idle-core
+  warnings and suggestions in `build-profile.json` and the summary footer;
+  `tools/build_profile.py report RUN [--compare OLD] [--html]` flags slower
+  stages. Measured cost: under 0.1 % of one core.
+- Development builds: `--reuse-from RUN` copies the verified outputs of stages
+  whose input fingerprint (command, imported sources, game inputs, tools,
+  dependencies) is unchanged; refused for release candidates and finals.
+- Details: [build profile and stage reuse](BUILD_PROFILE.md).
+- Builder: `--jobs N` is exact and reaches every stage and every worker pool,
+  including the image step (one warning when N exceeds the usable CPU threads).
+  The image step's per-map passes run in parallel with byte-identical results;
+  a private test with known actor findings needs one image pass instead of two
+  (BUILD-IMAGE-SERIAL-32). The scheduler rebalances worker shares while stages
+  run (BUILD-SCHEDULER-JOBSHARE-32); automatic jobs are resolved once per build
+  (BUILD-JOBS-RESOLVE-PER-STAGE-32); palette readers wait for Census
+  (BUILD-PALETTE-RACE-32); xdftool commands stay below ARG_MAX
+  (BUILD-XDFTOOL-ARGMAX-32).
+- Details: [parallel host builds](PARALLEL_BUILD.md).
+- Builder: the Vivec Arena preview is built by default. Towns a release ships
+  are marked `shipped_since` in `config/towns.json`; `--extra-town` adds towns
+  not shipped yet, and `--no-extra-town` / `--only-core-towns` leave towns out
+  for debugging only. The release coverage check has a matching `extra-towns`
+  feature and records the v0.0.32 file classes (BUILD-EXTRA-TOWN-OPTIN-32).
+
 ## v0.0.31: Lamps, Lanterns and Loading
 
 - Faster loading (16 KiB reads; Seyda Neen crossings 0.39-0.48 s) and lighter

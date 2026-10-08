@@ -51,3 +51,40 @@ void AW_ProfileClose(void) {
     if(f)fprintf(f,"audio_warmup_updates=%lu\naudio_warmup_missed_frames=%lu\n",audio_warmup,warmup_frames);
     if(f){fprintf(f,"frames=%d\nelapsed_ms=%ld\nworst_frame_us=%ld\nheap_used_bytes=%d\n",frames,(long)(sum*1000),(long)(worst*1000000),Hunk_LowMark()+Hunk_HighMark());fprintf(f,"audio_late_updates=%lu\nmissed_audio_frames=%lu\nfree_chip_bytes=%lu\nfree_fast_bytes=%lu\n",audio_late,missed_frames,AvailMem(MEMF_CHIP),AvailMem(MEMF_FAST));fprintf(f,"world_ms=%ld\nentities_ms=%ld\nc2p_ms=%ld\naudio_ms=%ld\n",(long)(stages[0]*1000),(long)(stages[1]*1000),(long)(stages[2]*1000),(long)(stages[3]*1000));fprintf(f,"hands_ms=%ld\nserver_ms=%ld\n",(long)(stages[4]*1000),(long)(stages[5]*1000));fclose(f);}
 }
+/* dbg fpucount (aw_fpucount 1): once a second, the per-frame average and peak
+ * of the maths counters in mathlib.h (ENGINE-FPU-UNIMPL-31): brush model
+ * rotations and how many were rebuilt from sine/cosine, direction vectors,
+ * table sine/cosine lookups and NPC targeting. The C library's trigonometry
+ * is no longer linked at all (tools/check_fpu_unimplemented.py proves it per
+ * build). Integer output only: printing a float would itself use the
+ * library's float formatting, which executes unimplemented instructions. */
+static cvar_t aw_fpucount_cvar={"aw_fpucount","0"};
+static const char *const fpucount_names[AW_FPU_COUNTERS]={
+    "rot","rottrig","av","table","npct","npcscan","npctest"};
+static long fpucount_sum[AW_FPU_COUNTERS],fpucount_peak[AW_FPU_COUNTERS];
+static double fpucount_start;static long fpucount_frames;
+void AW_FpuCountInit(void) {Cvar_RegisterVariable(&aw_fpucount_cvar);}
+void AW_FpuCountFrame(void) {
+    int i;double now;char line[512];size_t used;long avg;
+    for(i=0;i<AW_FPU_COUNTERS;i++){
+        fpucount_sum[i]+=aw_fpucount[i];
+        if(aw_fpucount[i]>fpucount_peak[i])fpucount_peak[i]=aw_fpucount[i];
+        aw_fpucount[i]=0;
+    }
+    if(aw_fpucount_cvar.value<=0 || cls.state!=ca_connected){fpucount_frames=0;fpucount_start=0;
+        memset(fpucount_sum,0,sizeof fpucount_sum);memset(fpucount_peak,0,sizeof fpucount_peak);return;}
+    now=Sys_FloatTime();
+    if(!fpucount_start){fpucount_start=now;fpucount_frames=0;
+        memset(fpucount_sum,0,sizeof fpucount_sum);memset(fpucount_peak,0,sizeof fpucount_peak);return;}
+    fpucount_frames++;
+    if(now-fpucount_start<1.0)return;
+    used=snprintf(line,sizeof line,"fpucount %ld frames fps10 %ld |",fpucount_frames,
+        (long)(fpucount_frames*10.0/(now-fpucount_start)));
+    for(i=0;i<AW_FPU_COUNTERS && used<sizeof line;i++){
+        avg=fpucount_sum[i]*10/fpucount_frames;
+        used+=snprintf(line+used,sizeof line-used," %s %ld.%ld/%ld",fpucount_names[i],avg/10,avg%10,fpucount_peak[i]);
+    }
+    Con_Printf("%s\n",line);
+    fpucount_start=now;fpucount_frames=0;
+    memset(fpucount_sum,0,sizeof fpucount_sum);memset(fpucount_peak,0,sizeof fpucount_peak);
+}

@@ -8,6 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.audit import BSA
 from mwad.npc import load_master,outfit,greeting_fixture,behavior_record,greeting_settings
 from mwad.paths import ensure_external
+from known_inputs import input_sha256
 from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl
 from player_hull import lumps,pack_lumps,PROFILE
 from prepare_quake import CENTRE,SCALE
@@ -74,7 +75,7 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
     b=lumps((out/'seyda.bsp').read_bytes());b[0]=b[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
     raw=pack_lumps(b);(out/'seyda.bsp').write_bytes(raw);(out/'id1/maps/seyda.bsp').write_bytes(raw)
     report={'scope':'three nonblocking idle actors; facing and bounded proximity/E Hello auditions; authored wandering retained but not executed; no full dialogue or combat',
-            'actors':actors,'models':models,'master_sha256':hashlib.sha256((data/'Morrowind.esm').read_bytes()).hexdigest()}
+            'actors':actors,'models':models,'master_sha256':input_sha256(data/'Morrowind.esm')}
     ready['npcs']=report;(out/'scene-ready.json').write_text(json.dumps(ready,indent=2)+'\n')
     (out/'npc-report.json').write_text(json.dumps(report,indent=2)+'\n');return report
 

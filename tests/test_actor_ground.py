@@ -5,6 +5,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 from actor_grounding import fields, initial_state, bake_ground, contact_interval_choice
 from check_actor_ground import audit, require
 from player_hull import pack_lumps, PROFILE
@@ -76,6 +77,22 @@ class GroundGateTests(unittest.TestCase):
         r=audit(self.maps);self.assertEqual(r['status'],'passed');self.assertEqual(r['distinct_placements'],1)
         self.put(actor(.25),'balmora');self.assertEqual(audit(self.maps)['status'],'failed')
         self.put('','bm000',10);self.assertEqual(audit(self.maps)['status'],'failed')
+
+    def test_owner_omission_errors_are_sorted_in_every_process(self):
+        # The omissions came from a set: their order (and the audit bytes) changed
+        # with the interpreter's hash seed between runs.
+        import subprocess, sys
+        (self.id1/'balmora-regions.txt').write_text('AWBR1\nbm000 -10 -10 10 10 -20 -20 20 20\n')
+        self.put('', 'bm000', 10)
+        self.put(''.join(actor(10.25, ref=str(ref)) for ref in (9, 30, 7, 400, 12)), 'balmora', 10)
+        errors = [e for e in audit(self.maps)['errors'] if e['error'] == 'Canonical owner omits its actor placement']
+        self.assertEqual([e['reference'] for e in errors], ['12', '30', '400', '7', '9'])
+        code = ('import json, sys; from check_actor_ground import audit; '
+                'print(json.dumps(audit(sys.argv[1])))')
+        outputs = {subprocess.run([sys.executable, '-c', code, str(self.maps)], capture_output=True, text=True, check=True,
+                                  env={**__import__('os').environ, 'PYTHONHASHSEED': seed}).stdout
+                   for seed in ('1', '2', '3', '4')}
+        self.assertEqual(len(outputs), 1)
 
     def test_missing_owner_duplicate_and_bad_model_fail(self):
         self.put(actor()+actor());self.assertEqual(audit(self.maps)['status'],'failed')
@@ -173,6 +190,58 @@ class GroundGateTests(unittest.TestCase):
         approved.write_text(json.dumps(r))
         with self.assertRaisesRegex(ValueError, 'differs from approved'):
             require(self.maps, self.id1/'early.json', approved, before_world=True)
+
+
+    def test_image_step_accepts_identical_findings_in_one_pass(self):
+        # BUILD-IMAGE-SERIAL-32: the early (before-world) audit approves the image
+        # step: image assembly rewrites map bytes and adds world maps, the
+        # findings themselves are identical.
+        approved = self.baseline()
+        self.put(actor(2)+'{\n"classname" "info_null"\n}\n')
+        self.put('', 'vf0000')
+        self.put('', 'vf0001', floor=5)
+        r = require(self.maps, self.id1/'image.json', approved, findings_only=True)
+        self.assertEqual(r['acceptance']['status'], 'owner-accepted-known-findings')
+        self.assertFalse(r['acceptance']['production_gate_passed'])
+        from check_actor_ground import FINDINGS_SCOPE
+        self.assertEqual(r['acceptance']['comparison_scope'], FINDINGS_SCOPE)
+        self.assertEqual(json.loads((self.id1/'image.json').read_text())['status'], 'failed')
+        # The complete-payload comparison still refuses the same audit.
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'full.json', approved)
+
+    def test_image_step_refuses_changed_or_new_findings(self):
+        approved = self.baseline()
+        for text in (actor(2.1),                      # changed contact, same count
+                     actor(2)+actor(2, ref='456'),    # new failing actor
+                     actor(2)+actor(ref='456'),       # new grounded row
+                     actor(2, ref='124')):            # same finding, other reference
+            self.put(text)
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'differs from approved'):
+                require(self.maps, self.id1/'image.json', approved, findings_only=True)
+        self.put(actor(2), 'second')                  # same actor in another map
+        with self.assertRaisesRegex(ValueError, 'differs from approved'):
+            require(self.maps, self.id1/'image.json', approved, findings_only=True)
+
+    def test_findings_scope_is_separate_from_before_world(self):
+        approved = self.baseline()
+        with self.assertRaisesRegex(ValueError, 'one actor comparison scope'):
+            require(self.maps, self.id1/'x.json', approved, before_world=True, findings_only=True)
+
+    def test_image_step_requests_findings_scope_and_refuses_release_versions(self):
+        import argparse
+        import ast
+        import build_aga
+        source = (Path(build_aga.__file__)).read_text(encoding='utf-8')
+        call = next(node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)
+                    and getattr(node.func, 'id', None) == 'require_actor_ground')
+        self.assertTrue(any(k.arg == 'findings_only' and k.value.value is True for k in call.keywords))
+        approved = self.baseline()
+        for version in ('0.0.32', '0.0.32-rc1'):
+            args = argparse.Namespace(allow_known_actor_ground_findings=approved, map_budget_policy='strict')
+            with self.subTest(version=version), patch.object(build_aga, 'VERSION', version), \
+                    self.assertRaises(ValueError):
+                build_aga.image(args)
 
 
 class NarrowContactIntervalTests(unittest.TestCase):

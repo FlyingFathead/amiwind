@@ -6,18 +6,47 @@ import argparse, json, math, re, shutil, struct, subprocess, sys
 from pathlib import Path
 import numpy as np
 from PIL import Image
-from mesh_geometry import surface_polygons, collision_parts, split_surface, shell_collision_parts
+from mesh_geometry import surface_polygons, split_surface, collision_pieces
 from prepare_quake import miptex, CENTRE, SCALE
 from mwad.paths import ensure_external
 from player_hull import MINS, MAXS, PROFILE, rebuild_world_hull
 from mwad.scene import read_asset, unpack_geometry
 from scenery_selection import select_runtime_refs
 from static_lod import reduce_mesh, rock_profile
+import scenery_reduce
+from surface_grid import check_lumps, engine_grid, face_points, sample_dimensions, texinfo_vecs
 # Build switch: AMIWIND_NO_EMISSIVE=1 converts without self-lit material marking
 # (no emitN_ textures), reproducing pre-emissive maps.
 NO_EMISSIVE = os.environ.get('AMIWIND_NO_EMISSIVE') == '1'
 # Build switch: AMIWIND_NO_FLAMES=1 writes no aw_flame entities.
 NO_FLAMES = os.environ.get('AMIWIND_NO_FLAMES') == '1'
+
+
+# Dressing: mesh path fragments append_meshes leaves out unless the caller
+# retains them. retain_dressing=True keeps all (world, towns, Balmora regions,
+# door overlays); a collection keeps those fragments only. Each omission is
+# receipted ("omitted"), each retained piece too ("dressing_retained").
+DRESSING_EXCLUDED = ('flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope')
+# Interiors keep their dressing (owner decision A, BUILD-DRESSING-EXCLUDED-32):
+# lantern hooks, ropes, potted ferns and grass. Editor markers stay out. The
+# earlier rule (skip all dressing) stays selectable: --skip-dressing.
+INTERIOR_DRESSING = ('flora_', 'scum_', 'lantern_hook', 'furn_de_rope')
+_SKIP_DRESSING = [False]
+
+
+def add_dressing_option(parser):
+    parser.add_argument('--skip-dressing', action='store_true',
+                        help='Earlier interior rule: leave out lantern hooks, ropes, ferns and other dressing '
+                             '(receipted); default keeps them (BUILD-DRESSING-EXCLUDED-32)')
+
+
+def apply_dressing_option(args):
+    _SKIP_DRESSING[0] = bool(getattr(args, 'skip_dressing', False))
+
+
+def interior_dressing():
+    """retain_dressing value for the interior converters (census, prison, areas)."""
+    return () if _SKIP_DRESSING[0] else INTERIOR_DRESSING
 
 
 def flame_entities(ref, model, centre):
@@ -41,6 +70,12 @@ def flame_entities(ref, model, centre):
     return out
 from prepare_scenery import reference_rotation
 from exterior_visibility import apply_exterior_selection, VisibilityPolicyError
+
+
+def mipadjust(axes):
+    """Engine mip factor of a texture mapping (model.c Mod_LoadTexinfo)."""
+    length=(float(np.linalg.norm(axes[:,0]))+float(np.linalg.norm(axes[:,1])))/2
+    return 4 if length<0.32 else 3 if length<0.49 else 2 if length<0.99 else 1
 
 
 def bounded_planes(points, equations):
@@ -102,6 +137,12 @@ def _prepare_model(task):
          keep={i for values in matched.values() for i in values}
          visual_v,visual_f,details=reduce_mesh(v,visual_f,profile['ratio'],keep,profile.get('preserve_shared_seams',False))
          lod.update(details)
+        texsize = profile.get('texture_size', 64)
+        reduction=scenery_reduce.scenery_reduce()
+        if reduction and scenery_reduce.eligible(profile) and len(visual_f):
+         # Visual only: collision below keeps the original source mesh.
+         visual_v,visual_f,details=scenery_reduce.reduce_scenery(visual_v,visual_f,reduction[0],reduction[1]/texsize)
+         lod['scenery_reduce']=details
         if profile.get('flatten'):
          from surface_flatten import bake_panel
          texture_records=extras[0]
@@ -117,17 +158,23 @@ def _prepare_model(task):
          cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
          collision_v,collision_f=np.array(cv),np.array(cf)
          lod['collision']='authored RootCollisionNode, approximate convex conversion'
-        pieces=[] if profile.get("collision_none") else (shell_collision_parts(collision_v,collision_f) if profile.get("hollow_collision") else collision_parts(collision_v,collision_f,2))
-        if profile.get("collision_none"):lod["collision"] = "explicit nonsolid source/category policy"
-        if profile.get('exact_collision_bevels'):
+        pieces,exact,note=collision_pieces(collision_v,collision_f,profile)
+        if note:lod['collision'] = note
+        if exact:
          lod['collision_bevels'] = 'exact standing-box convex sum'
     if profile.get('collision_only'):
         # Sprite foliage retains source collision without a duplicate visible mesh.
         polys = []
         lod['representation'] = 'collision_only'
     else:
-        polys = surface_polygons(visual_v, visual_f)
-    texsize = profile.get('texture_size', 64)
+        budget = scenery_reduce.snap_budget()
+        stats = {}
+        polys = surface_polygons(visual_v, visual_f, snap=None if budget is None else budget[0]/texsize, stats=stats)
+        if budget is not None:
+            lod['texinfo_snap'] = {'tolerance_texels': budget[0], 'triangles': stats.get('triangles', 0),
+                                   'mapping_clusters': stats.get('mapping_clusters', 0),
+                                   'polygons': stats.get('polygons', 0),
+                                   'max_texel_deviation': stats.get('max_deviation', 0.)*texsize}
     if texsize not in (16, 32, 64):
         raise ValueError('Unsupported static texture size')
     polys = [(patch, mat, ax, off, normal) for poly, mat, ax, off, normal in polys
@@ -164,15 +211,22 @@ def _stable_face_normal(points):
     return normal
 
 
+def _placement_frame(ref, centre):
+    """Entity origin and yaw matrix of a placement (the lightmap bake frame)."""
+    origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
+    yr=math.radians(-ref['rotation_radians'][2]*180/math.pi)
+    return origin,np.array([[math.cos(yr),-math.sin(yr),0],[math.sin(yr),math.cos(yr),0],[0,0,1]])
+
+
 def _prepare_placement(task):
     from scipy.spatial import ConvexHull
     from types import SimpleNamespace
     ref, data, texsize, centre, lighting, *options = task
     stable_planes=bool(options and options[0])
+    snap_planes=scenery_reduce.texinfo_snap() is not None
     v,f,polys,components,lod=data
-    origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
-    o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
-    yr=math.radians(yaw);rotation=np.array([[math.cos(yr),-math.sin(yr),0],[math.sin(yr),math.cos(yr),0],[0,0,1]])
+    origin,rotation=_placement_frame(ref,centre)
+    o=np.zeros(3)
     # Runtime applies the entity yaw. Bake its inverse first so the composed
     # transform is exactly the authored TES3 rotation, including tilted rocks.
     r=rotation.T @ reference_rotation(ref);scale=ref['scale']
@@ -181,6 +235,10 @@ def _prepare_placement(task):
     for polygon,material,axes,offset,source_normal in polys:
         q=polygon@r.T*scale+o
         if stable_planes:n=_stable_face_normal(q)
+        elif snap_planes:
+            # Merged polygons may start with collinear vertices; the whole
+            # polygon's area vector gives the plane (default path unchanged).
+            rel=q-q[0];n=np.cross(rel,np.roll(rel,-1,axis=0)).sum(axis=0);n/=np.linalg.norm(n)
         else:
             n=np.cross(q[1]-q[0],q[2]-q[0]);n/=np.linalg.norm(n)
         normal=r@source_normal
@@ -249,6 +307,8 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
     texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[]
+    base_faces=len(lumps[7])//20;regrids=0
+    snap=scenery_reduce.snap_budget();snap=None if snap is None else snap[1];snap_buckets={};texinfo_vectors={};texinfo_keys={};snap_shared=[0,0.,0]
     from surface_flatten import load_profiles
     # Interior exporters record the named cell. Keep their authored window
     # geometry unless a profile explicitly approves interior mounting too.
@@ -340,7 +400,20 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
             points=part[0]@rotation.T+origin;lo=points.min(axis=0);hi=points.max(axis=0)
             if all(hi[a]>=collision_bounds[0][a] and lo[a]<=collision_bounds[1][a] for a in range(2)):kept.append(i)
         return tuple(kept)
-    excluded = [] if retain_dressing else ['flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope']
+    excluded = ([] if retain_dressing is True else
+                [t for t in DRESSING_EXCLUDED if not retain_dressing or t not in retain_dressing])
+    # No silent drops (BUILD-DRESSING-EXCLUDED-32): every placement left out
+    # here is listed in the result's "omitted" with the rule that removed it,
+    # and every dressing piece kept in "dressing_retained".
+    def dressing_term(ref, terms):
+        return next((t for t in terms if t in index['models'][ref['model_index']]['source']), None)
+    omitted = [dict(reference=ref['number'], id=ref.get('id'), model=index['models'][ref['model_index']]['source'],
+                    reason='dressing excluded by the mesh converter (%s)' % term)
+               for ref in selected for term in [dressing_term(ref, excluded)] if term]
+    dressing_retained = [dict(reference=ref['number'], id=ref.get('id'),
+                              model=index['models'][ref['model_index']]['source'], rule=term)
+                         for ref in selected for term in [dressing_term(ref, DRESSING_EXCLUDED)]
+                         if term and term not in excluded]
     unique = dict.fromkeys(ref['model_index'] for ref in selected
                            if not any(t in index['models'][ref['model_index']]['source']
                                       for t in excluded))
@@ -403,18 +476,53 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        surfaces,cull_counts=cull_surfaces(surfaces,terrain,placement_groups[key])
        cull_reports.append({'model':name,'reference':ref['number'],**cull_counts})
       subset=resident_parts(worldparts,ref);variant=(key,subset)
-      firstface=len(lumps[7])//20;vmap={};emap={}
+      firstface=len(lumps[7])//20;vmap={};emap={};frame=None
       def vertex(p):
        key=tuple(np.round(p,5))
        if key not in vmap:vmap[key]=len(lumps[3])//12;lumps[3]+=struct.pack('<3f',*p)
        if vmap[key] >= 65536:raise ValueError('Vertex budget exceeded')
        return vmap[key]
       for q,n,ax,off,material,samples in surfaces:
+       samples_stale=False
+       if snap is not None:
+        # A shared mapping may have a normal component; the engine picks
+        # mip levels from the axis lengths (model.c mipadjust). Keep the
+        # face's own mip choice: else store the exactly equal in-plane
+        # mapping (same texels and lightmap grid on this face).
+        inplane=ax-np.outer(n,n@ax);own_mip=mipadjust(inplane)
+        if mipadjust(ax)!=own_mip:
+         off=off+float(n@q[0])*(n@ax);ax=inplane;snap_shared[2]+=1
        pi=plane(n,float(n@q[0]));t=texture(m,material,texsize);txkey=(*np.round(ax.flatten(),5),*np.round(off,4),t)
+       if snap is not None and txkey not in texinfo_cache and material<len(m['materials']):
+        # Reuse a mapping of the map that gives this face's texels within
+        # the snap tolerance (modulo the texture size); bake with it. The
+        # face's texture coordinates must stay small: the engine keeps
+        # texturemins in 16 bits.
+        bucket=snap_buckets.setdefault((t,*np.round(ax.flatten(),3)),[])
+        for cand in bucket:
+         cax,coff=texinfo_vectors[cand]
+         d=q@(cax-ax)+(coff-off);d=d-texsize*np.round(d.mean(axis=0)/texsize)
+         dev=float(np.abs(d).max())
+         if dev<=snap and mipadjust(cax)==own_mip and np.abs(q@cax+coff).max()<16384:
+          snap_shared[0]+=1;snap_shared[1]=max(snap_shared[1],dev)
+          txkey=texinfo_keys[cand]
+          ax,off=cax,coff;samples_stale=True;break
+       else:
+        bucket=None
        if txkey not in texinfo_cache:
         tx=len(lumps[6])//40;texinfo_cache[txkey]=tx;lumps[6]+=struct.pack('<8fii',*ax[:,0],off[0],*ax[:,1],off[1],t,0)
+        if snap is not None:
+         texinfo_vectors[tx]=(ax,off);texinfo_keys[tx]=txkey
+         if bucket is not None:bucket.append(tx)
        tx=texinfo_cache[txkey];verts=[vertex(p) for p in q[::-1]];firstedge=len(lumps[13])//4
-       if tx>32767:raise ValueError('Texture mapping budget exceeded')
+       # BSP29 stores the face texinfo index in 16 bits; the engine reads it
+       # unsigned (VIVEC-TEXINFO-31).
+       if tx>65535:raise ValueError('Texture mapping budget exceeded: %d mappings, limit 65,536'%(tx+1))
+       # The engine sizes the lightmap from the STORED single-precision vertex
+       # and texinfo values (vertices and mappings are shared within 1e-5), so
+       # compute the grid from them; rebake where the unstored grid differs
+       # (LIGHTMAP-TAIL-31, LIGHTMAP-GRID-31).
+       mins,extents=engine_grid(face_points(lumps[3],verts),texinfo_vecs(lumps[6],tx))
        for a,c in zip(verts,verts[1:]+verts[:1]):
         if (a,c) in emap:ed=emap[a,c]
         elif (c,a) in emap:ed=-emap[c,a]
@@ -422,9 +530,15 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
         lumps[13]+=struct.pack('<i',ed)
        lightoffset=-1;styles=(255,255,255,255)
        if samples is not None:
+        from interior_lighting import bake_grid, bake_surface
+        dims=sample_dimensions(extents);low,size=bake_grid(q,ax,off)
+        if samples_stale or tuple(low)!=mins or tuple(size)!=dims:
+         if frame is None:frame=_placement_frame(ref,centre)
+         samples=bake_surface(q,ax,off,frame[1],frame[0],lighting,sample_grid=(mins,dims));regrids+=1
+        if len(samples)!=dims[0]*dims[1]:raise ValueError('Lightmap sample count differs from the engine grid')
         lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(0,255,255,255)
        face_planes.append(pi)
-       lumps[7]+=struct.pack('<Hhihh4Bi',0,0,firstedge,len(verts),tx,*styles,lightoffset)
+       lumps[7]+=struct.pack('<HhihH4Bi',0,0,firstedge,len(verts),tx,*styles,lightoffset)
       collision_key=(_instance_key(ref,None),subset)
       if collision_key not in collision_models:
        collision_models[collision_key]=collider([worldparts[i] for i in subset], bool(lod.get('collision_bevels')),name,ref['number'])
@@ -435,6 +549,9 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
     order_face_planes(lumps,face_planes)
+    # Every converted face must fit 256 texels under any FPU rule
+    # (MESH-EXTENT-GRID-31); world faces from qbsp keep their own checks.
+    checked_faces=check_lumps(lumps,base_faces)
     # New texture table, preserving the original texture payloads.
     tex=bytearray();offs=[]
     for t in textures:offs.append(4+4*len(textures)+len(tex));tex+=t
@@ -453,8 +570,16 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
                                   'legacy_preview':bool(legacy_terrain_preview),
                                   'acceptance':'Legacy preview is not canonical production acceptance' if legacy_terrain_preview else 'Deferred to final canonical source pass'},
             'collision_compiler_fallbacks':collision_fallbacks,
+            'omitted':omitted,'dressing_retained':dressing_retained,
             'groups':index.get('groups',{}),
             'faces':len(lumps[7])//20,'vertices':len(lumps[3])//12,
+            'texinfo':len(lumps[6])//40,
+            'texinfo_snap':None if snap is None else {'tolerance_texels':scenery_reduce.texinfo_snap(),'map_reuse_texels':snap,'faces_sharing_by_tolerance':snap_shared[0],
+                                                      'max_texel_deviation':snap_shared[1],
+                                                      'mip_guard_inplane_faces':snap_shared[2]},
+            'scenery_reduce':scenery_reduce.scenery_reduce(),
+            'surface_check':{'faces':checked_faces,'lightmap_regrids':regrids,
+             'rule':'engine grid from stored single-precision values; extents within 256 under engine, binary32 and extended rules'},
             'nodes':len(lumps[5])//24,'clipnodes':len(lumps[9])//8,'bytes':out.stat().st_size,
             'instances':len(entities),'unique_models':len(instance_models),
             'collision':'multipart convex union; exact standing-box bevels for open shells, axial bounds otherwise',
@@ -463,9 +588,10 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
 
 
 from build_jobs import add_jobs, resolve_jobs
+from vis_options import light_args
 from build_parallel import ordered_map
 
-def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None):
+def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None, vis_mode='fast'):
     scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
     scenery=ensure_external(scenery,'scenery input')
     shutil.copytree(scene,out)
@@ -478,8 +604,8 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cul
     text=re.sub(r'\{[^{}]*\bclip\b[^{}]*\}', '', text)
     (out/'seyda.map').write_text(text)
     for name in set(removed):(out/'id1'/name).unlink()
-    for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'],'seyda.bsp'),(light,['-minlight','100'],'seyda.bsp')]:
-        subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable!=qbsp else []),*options,target],cwd=out,check=True)
+    for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'] if vis_mode=='fast' else [],'seyda.bsp'),(light,light_args('-minlight','100'),'seyda.bsp')]:
+        subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable==vis else []),*options,target],cwd=out,check=True)
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
     rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True)
     result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs,terrain_visual_cull=terrain_visual_cull,terrain_cull_config=terrain_cull_config,map_identity=map_identity,cell_identity=cell_identity,subcell_identity=subcell_identity,terrain_cull_overlap=terrain_cull_overlap)
@@ -500,8 +626,10 @@ def main():
     p.add_argument('--map-identity')
     p.add_argument('--cell-identity')
     p.add_argument('--subcell-identity')
-    add_jobs(p);a=p.parse_args()
-    try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs,None if a.terrain_visual_cull is None else a.terrain_visual_cull=='true',json.loads(a.terrain_cull_config.read_text(encoding='utf-8')) if a.terrain_cull_config else None,a.map_identity,a.cell_identity,a.subcell_identity,a.terrain_cull_overlap),indent=2))
+    from vis_options import add_vis_option
+    scenery_reduce.add_options(p)
+    add_jobs(p);add_vis_option(p);a=p.parse_args();scenery_reduce.apply_options(a)
+    try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs,None if a.terrain_visual_cull is None else a.terrain_visual_cull=='true',json.loads(a.terrain_cull_config.read_text(encoding='utf-8')) if a.terrain_cull_config else None,a.map_identity,a.cell_identity,a.subcell_identity,a.terrain_cull_overlap,a.vis_mode),indent=2))
     except (OSError,ValueError,subprocess.CalledProcessError) as e:p.exit(1,str(e)+'\n')
 
 if __name__=='__main__':main()

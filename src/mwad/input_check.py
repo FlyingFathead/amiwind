@@ -45,9 +45,15 @@ def matches_core(data):
     return True
 
 
-def fingerprints(loose, stage, reference=None):
+def fingerprints(loose, stage, reference=None, hasher=None):
+    """Compare loose inputs with the reference sizes and SHA-256 hashes.
+
+    hasher: the build's input lock (tools/known_inputs.py), so each input is
+    hashed at most once per build; a None hash (--check-hashes off) counts as
+    unchecked, not as a difference."""
     reference = reference_files() if reference is None else reference
-    result = {"matching": 0, "different": [], "missing": [], "optional_differences": [], "extra": 0}
+    sha = hasher.sha256 if hasher is not None else digest
+    result = {"matching": 0, "different": [], "missing": [], "optional_differences": [], "extra": 0, "unchecked": 0}
     for name, expected in reference.items():
         if not is_game_input(name):
             continue
@@ -60,7 +66,10 @@ def fingerprints(loose, stage, reference=None):
             if required:
                 result["missing"].append(name)
             continue
-        if item["bytes"] == expected["bytes"] and digest(item["path"]) == expected["sha256"]:
+        found = sha(item["path"]) if item["bytes"] == expected["bytes"] else ""
+        if found is None:
+            result["unchecked"] += 1
+        elif found == expected["sha256"]:
             result["matching"] += 1
         else:
             result["different" if required else "optional_differences"].append(name)
@@ -150,7 +159,17 @@ def locate_data_files(selected, notify=None, choose=None, max_depth=4, max_dirs=
     return data
 
 
-def inspect(path, stage="aga", allow_differences=False, reference=None, notify=None, choose=None):
+def loose_overrides(loose, archive):
+    """Loose files that shadow a copy in Morrowind.bsa, per top folder.
+
+    Several builder steps let loose files override the archive, as the game
+    does (BUILD-EDITION-DIFFERENCES-32); the count says how many could."""
+    counts = Counter(key.split("/")[0] for key in loose if key in archive)
+    return {"total": sum(counts.values()), "by_folder": dict(sorted(counts.items())),
+            "scope": "loose files whose path is also in Morrowind.bsa"}
+
+
+def inspect(path, stage="aga", allow_differences=False, reference=None, notify=None, choose=None, hasher=None):
     selected = ensure_external(installed_game_path(path), "game installation")
     if not selected.is_dir():
         raise ValueError(f"Game installation is not a directory: {selected}")
@@ -180,6 +199,9 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
                 errors.append("Expected a regular input file: " + key)
                 continue
             loose[key] = {"path": checked, "bytes": checked.stat().st_size}
+    if hasher is not None and hasattr(hasher, "prepare"):
+        # One parallel stat (and hash where needed) of every input.
+        hasher.prepare([item["path"] for item in loose.values()])
     archive = {}
     for name in ("Morrowind.esm", "Morrowind.bsa"):
         item = loose.get(name.casefold())
@@ -234,7 +256,10 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
     empty = sum(not item["bytes"] for item in loose.values())
     if empty:
         warnings.append(f"{empty} empty loose files found; required inputs are checked separately")
-    known = fingerprints(loose, stage, reference)
+    known = fingerprints(loose, stage, reference, hasher)
+    if known["unchecked"]:
+        warnings.append(f"{known['unchecked']} reference files were not hashed (--check-hashes off): "
+                        "the installation is NOT verified against the reference")
     differences = known["missing"] + known["different"]
     if differences:
         message = (f"Reference comparison: {len(known['missing'])} known files missing, "
@@ -251,7 +276,7 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
             "loose_bytes": sum(item["bytes"] for item in loose.values()),
             "ignored_non_game_files": ignored_files,
             "loose_categories": dict(categories), "archive_categories": dict(packed),
-            "font_sources": font_report,
+            "font_sources": font_report, "loose_overrides": loose_overrides(loose, archive),
             "checks": checks, "warnings": warnings, "errors": errors, "fingerprints": known}
 
 
@@ -262,6 +287,12 @@ def display(report):
         print(f"  Ignored {report['ignored_non_game_files']} unrelated files; these are not game inputs")
     known = report["fingerprints"]
     print(f"  [matching] {known['matching']} reference files: size and SHA-256")
+    if known.get("unchecked"):
+        print(f"  [unchecked] {known['unchecked']} reference files not hashed (--check-hashes off)")
+    overrides = report.get("loose_overrides")
+    if overrides and overrides["total"]:
+        print(f"  [loose] {overrides['total']} loose files shadow a Morrowind.bsa copy: " +
+              ", ".join(f"{name} {count}" for name, count in overrides["by_folder"].items()))
     if known["extra"]:
         print(f"  [unrecognized] {known['extra']} additional files: no reference checksum")
     for message in report["checks"]:

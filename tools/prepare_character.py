@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Convert owned character records and bounded head previews; no game data here."""
 import argparse
-import hashlib
 import json
 import math
 from pathlib import Path
@@ -17,6 +16,7 @@ from prepare_quake import CENTRE
 
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
+from known_inputs import input_sha256
 
 
 def fixed(text, size):
@@ -87,7 +87,7 @@ def catalogue(master, eye_base=None):
 
     special = [struct.unpack_from('<i', dict(kinds['SKIL'][i])['SKDT'], 4)[0] for i in range(27)]
     raw = bytearray(struct.pack('<4s4H27B1x32s', b'AWC1', len(races), len(classes), len(births), len(parts),
-                                *special, hashlib.sha256(Path(master).read_bytes()).digest()))
+                                *special, bytes.fromhex(input_sha256(master))))
     def powers_bytes(powers):
         return bytes([len(powers)]) + b''.join(fixed(p, 64) for p in powers)
     for identifier, f in races:
@@ -246,7 +246,7 @@ def prepare(data_files, scene, previews=True, jobs=None):
             part=parts[i]
             (dest/f'h{i:03d}.awh').write_bytes(raw)
             print(f'Head preview {i+1}/{len(parts)}: {part["id"]}', flush=True)
-    report.update(parts=parts, barriers=refs, master_sha256=hashlib.sha256(master.read_bytes()).hexdigest())
+    report.update(parts=parts, barriers=refs, master_sha256=input_sha256(master))
     (scene/'character-conversion.json').write_text(json.dumps(report, indent=2)+'\n')
     return report
 

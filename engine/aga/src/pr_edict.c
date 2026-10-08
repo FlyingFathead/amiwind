@@ -756,7 +756,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
 		break;
 
 	case ev_float:
-		*(float *)d = atof (s);
+		*(float *)d = Q_atof(s);
 		break;
 
 	case ev_vector:
@@ -768,7 +768,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
 			while (*v && *v != ' ')
 				v++;
 			*v = 0;
-			((float *)d)[i] = atof (w);
+			((float *)d)[i] = Q_atof(w);
 			w = v = v+1;
 		}
 		break;

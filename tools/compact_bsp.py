@@ -24,7 +24,7 @@ def compact(raw, records=None, prune_world=False, visual_bounds=None):
     data=lumps(raw)
     if records is None: records=entities(data[0])
     records=[dict(e) for e in records]
-    formats={1:'<4fi',3:'<3f',5:'<i2h6h2H',6:'<8f2i',7:'<Hhihh4Bi',
+    formats={1:'<4fi',3:'<3f',5:'<i2h6h2H',6:'<8f2i',7:'<HhihH4Bi',
              9:'<iHH',10:'<ii6h2H4B',11:'<H',12:'<HH',13:'<i',14:'<9f7i'}
     src={i:[list(r) for r in struct.iter_unpack(fmt,data[i])] for i,fmt in formats.items()}
     kept={0}

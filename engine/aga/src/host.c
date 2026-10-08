@@ -20,11 +20,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // host.c -- coordinates spawning and killing of local servers
 
 #include "quakedef.h"
+#include "amiwind_version.h"
 #include "aw_hand_models.h"
 #include "aw_harvest_runtime.h"
 #include "aw_save.h"
 #include "aw_remote.h"
 #include "r_local.h"
+#include "aw_rcount.h"
 
 /*
 
@@ -764,6 +766,8 @@ void _Host_Frame (float time)
     if(!AW_ModalWorldFrozen())AW_SceneTick();
     CDAudio_Update();
     AW_ProfileFrame();
+    AW_FpuCountFrame();
+    AW_RCountFrame();
 
     if (host_speeds.value)
     {
@@ -914,14 +918,19 @@ void Host_Init (quakeparms_t *parms)
     W_LoadWadFile ("gfx.wad");
     Key_Init ();
     Con_Init ();
+    Key_ConsoleInit (com_gamedir);	// AmiWind: aw_console_mode and saved history
     M_Init ();
     PR_Init ();
     Mod_Init ();
     NET_Init ();
     SV_Init ();
 
-    Con_Printf ("Exe: "__TIME__" "__DATE__"\n");
-    Con_Printf ("%4.1f megabyte heap\n",parms->memsize/ (1024*1024.0));
+    // AmiWind: the build's version instead of the compile time, so two builds
+    // of one source are byte-identical (ENGINE-BUILD-REPRO-31); the heap in
+    // whole KiB, because float formatting runs the C library's dtoa, which
+    // executes 68040-unimplemented FPU instructions (ENGINE-FPU-UNIMPL-31)
+    Con_Printf ("Exe: AmiWind v" AMIWIND_VERSION "\n");
+    Con_Printf ("%ld KiB heap\n", (long)(parms->memsize / 1024));
 
     R_InitTextures ();		// needed even for dedicated servers
 
@@ -956,6 +965,9 @@ void Host_Init (quakeparms_t *parms)
 #endif	// _WIN32
         CDAudio_Init ();
         Sbar_Init ();
+        AW_FpuCountInit ();
+        AW_FpuStatusInit ();
+        AW_RCountInit ();
         AW_HandSpritesInit();
         AW_TorchLoadAssets();
         AW_HandModelsLoad();

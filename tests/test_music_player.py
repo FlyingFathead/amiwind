@@ -40,7 +40,8 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
             shutil.copyfile(ROOT / "engine/aga/src/aw_music.c", p / "aw_music.c")
             exe = p / "player-test"
             subprocess.run(["cc", "-std=gnu89", "-O2", "-I" + str(p), "-I" + str(ROOT / "engine/aga/src"),
-                            str(ROOT / "tests/music_player_test.c"), "-o", str(exe)], check=True)
+                            str(ROOT / "tests/music_player_test.c"), str(ROOT / "engine/aga/src/aw_format.c"),
+                            "-o", str(exe)], check=True)
             (p / "music").mkdir()
             for number, frames in zip((0, 4, 11, 42, 83), (8200, 9131, 16413, 9001, 11)):
                 pcm = bytes(v for i in range(frames) for v in ((i*3+number*17)%256, (i*7+number*31)%256))

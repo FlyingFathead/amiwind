@@ -1,8 +1,10 @@
 # TOWN-VIS-OCCLUSION-31: town buildings do not block Quake visibility
 
-## Status: 7 October 2026
+## Status: 8 October 2026
 
-Open. Measured; repair planned in the converter.
+Open. The planned repair (occluders, building faces in the world model) was
+prototyped and measured not to help open towns; see
+[Town visibility](../performance/TOWN-VISIBILITY.md). Interiors still to test.
 
 ## Symptom
 

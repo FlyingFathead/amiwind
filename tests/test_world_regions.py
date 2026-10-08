@@ -9,6 +9,8 @@ import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from prepare_world_regions import plan, Terrain, map_text, town_handoffs, terrain_triangles
 from world_volumes import balanced
+from prepare_world_regions import layout_refinements
+CEILING=layout_refinements()['survey_source_triangle_limit']
 
 
 class WorldRegionsTests(unittest.TestCase):
@@ -19,7 +21,7 @@ class WorldRegionsTests(unittest.TestCase):
                 return dict(cell=[x,0],screen=dict(candidate=split),unresolved_placements=0,
                             name='',region='Test')
             report=dict(format='AmiWind world survey 1',terrain=dict(height_seams=[]),
-                        settings=dict(overlap_runtime=896),cells=[cell(0,2),cell(-1,1)])
+                        settings=dict(overlap_runtime=896,source_triangle_limit=CEILING),cells=[cell(0,2),cell(-1,1)])
             (root/'world-survey.json').write_text(json.dumps(report))
             _,entries=plan(root)
             self.assertEqual(len(entries),5)
@@ -107,6 +109,27 @@ class ContentPreservingRefinementTests(unittest.TestCase):
         self.assertIn('converted',original[1])
         with self.assertRaisesRegex(ValueError,'parent differs'):
             refine_entries(original,[{'parent':'vf0099','cell':[1,0],'divisions':2,'reason':'bad'}])
+        split=refine_entries(original,[{'parent':'vf0001','cell':[1,0],'divisions':2,'reason':'reserve'}])
+        with self.assertRaisesRegex(ValueError,r'unsplit cell: cell \[1, 0\] is split into 4'):
+            refine_entries(split,[{'parent':'vf0001','cell':[1,0],'divisions':2,'reason':'again'}])
+
+    def test_survey_with_another_ceiling_is_refused(self):
+        # BUILD-WORLD-LAYOUT-DRIFT-32: a different ceiling lays out a different world.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for ceiling in (CEILING-1,None):
+                settings=dict(overlap_runtime=896)
+                if ceiling is not None:settings['source_triangle_limit']=ceiling
+                report=dict(format='AmiWind world survey 1',terrain=dict(height_seams=[]),settings=settings,
+                            cells=[dict(cell=[0,0],screen=dict(candidate=1),unresolved_placements=0,name='',region='Test')])
+                (root/'world-survey.json').write_text(json.dumps(report))
+                with self.assertRaisesRegex(ValueError,'differs from the recorded world layout ceiling'):
+                    plan(root)
+
+    def test_recorded_ceiling_is_the_shipped_layout(self):
+        layout=layout_refinements()
+        self.assertEqual(layout['survey_source_triangle_limit'],140801)
+        self.assertEqual([r['parent'] for r in layout['regions']],['vf0698','vf0791'])
 
 if __name__=='__main__':unittest.main()
 

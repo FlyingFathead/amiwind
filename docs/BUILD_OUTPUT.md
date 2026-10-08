@@ -98,6 +98,11 @@ monotonic clock and therefore does not depend on wall-clock corrections.
 The terminal displays whole elapsed seconds; JSON retains milliseconds. Hours
 continue beyond 24 instead of wrapping at midnight.
 
+The footer ends with the build profile: wall and CPU time, average cores
+against the job budget, the critical path, the slowest stages and idle-core
+warnings, and any stages reused from an earlier run. Per-stage detail is in
+`build-profile.json`; see [BUILD_PROFILE.md](BUILD_PROFILE.md).
+
 ## Compiler and toolkit inventory
 
 From rc6 the footer repeats the pre-build observations for the tools selected
@@ -114,6 +119,20 @@ as such. Binary hashes identify the selected executable bytes, not all shared
 libraries or the complete SDK. The JSON also retains selected executable paths.
 No extra version probes run at completion. A failed build still lists the
 selected environment; this is an inventory, not proof that every tool ran.
+
+The footer also names four content selections, all recorded in
+`build-summary.json` (`build_environment`) and the run's `build-state.json`:
+`NPC gallery selection` (`enabled` unless `--no-npc-gallery`),
+`World flora (trees and grass)` (`enabled` unless `--no-tree-sprites`),
+`Harvestable mushrooms` (`enabled` unless `--no-harvest`) and `Extra towns`
+(the shipped towns, `vivec_arena (shipped by default)`, plus any `--extra-town`;
+`--no-extra-town` and `--only-core-towns` are named as left out); `asset-free` for
+`--dry-run`, `not applicable (terrain stage)` for `--stage terrain`. Any
+opt-out marks a debugging build that does not match a release; see
+[LINUX_BUILD.md](LINUX_BUILD.md#world-flora-default). After an image, the
+footer line `Harvestable mushrooms in the image` gives the maps admitted by the
+heap check, the plants and the shared models (`harvest` in `build-summary.json`
+and the image's `build.json`; details in `image/harvest/harvest-staging.json`).
 
 ## Warnings
 
@@ -146,7 +165,9 @@ and retains its separate result.
 `build-summary.json` contains the status, mode, version, both timestamps,
 `elapsed_seconds`, human-readable elapsed time, output identity and compiler
 warning count/log paths. `build_environment` records the interpreter, packages,
-selected tool versions/hashes/paths, worker budget and stage scheduling mode.
+selected tool versions/hashes/paths, worker budget, stage scheduling mode and
+`jobs_warning`: the one warning printed at the start when an explicit `--jobs N`
+exceeds the usable CPU threads (otherwise null; the build still runs N workers).
 It is saved atomically when the run directory exists.
 If saving the receipt fails, the terminal reports that separately. The receipt
 contains local paths: keep it with private build evidence outside the source

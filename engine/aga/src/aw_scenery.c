@@ -5,6 +5,7 @@
  */
 #include "quakedef.h"
 #include "aw_harvest_runtime.h"
+#include "aw_town.h"
 extern void AW_MergeCollisionTrace(trace_t *,trace_t *,edict_t *);
 typedef struct {
     entity_t render;
@@ -14,14 +15,15 @@ typedef struct {
 static aw_scenery_t *placements;
 static int count,capacity;
 
-/* Only the validated 64-map Balmora layout shares the alias catalogue.
- * Prefix matching would capture unrelated/scripted map entities silently. */
+/* Only validated converted town layouts (town table flag AW_TOWN_SCENERY:
+ * Balmora's bm000..bm063, the Arena's va000..) share the alias catalogue.
+ * Exact names and region numbers below the town's cap, never a loose prefix
+ * match, so unrelated/scripted map entities are not captured silently. */
 static int AW_SceneryMapEnabled(const char *name)
 {
-    if(!strcmp(name,"balmora"))return 1;
-    if(strlen(name)!=5 || name[0]!='b' || name[1]!='m' || name[2]!='0' ||
-       name[3]<'0' || name[3]>'6' || name[4]<'0' || name[4]>'9')return 0;
-    return name[3]!='6' || name[4]<='3';
+    int town=AW_TownFind(name);
+    if(town<0)town=AW_TownRegionMap(name);
+    return town>=0 && (AW_Town(town)->flags&AW_TOWN_SCENERY)!=0;
 }
 
 void AW_SceneryClear(void) { placements=NULL;count=capacity=0; }

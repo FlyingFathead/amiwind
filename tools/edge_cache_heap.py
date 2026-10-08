@@ -7,10 +7,22 @@ import struct
 # Re-pinned 2026-10-07 for the warning cleanup: model.c (line split, name buffer
 # 10->16, Mod_PointInLeaf signature matches model.h) and r_draw.c (tedge static).
 # Edge-cache allocation is unchanged.
+# Re-pinned 2026-10-08 for unsigned texinfo/marksurface/leaf-mark reads and the
+# double-precision CalcSurfaceExtents rule (model.c); edge-cache allocation is
+# unchanged.
+# Re-pinned 2026-10-08 for Q_sscanf in model.c (engine text parsing,
+# ENGINE-FPSP-MISSING-31) and the renderer edge counters in r_draw.c
+# (dbg rcount); edge-cache allocation is unchanged.
+# Re-pinned 2026-10-08 for BSP sections decoded from bounded slices
+# (LOADER-STAGING-PEAK-32): AW_InitEdgeCache and every resident allocation are
+# unchanged; the decoded Hunk of all shipped maps is byte-identical to the
+# staged loader's. Only the temporary input changed (check_world_map_heap).
+# Re-pinned 2026-10-08 for the merge of both changes above (model.c carries
+# both); edge-cache allocation is unchanged.
 SOURCE_HASHES={
-    'model.c':'8731bbbc42c05ae3e2e67b955a992772dd521cf07be0488db9fe9435436aec8d',
+    'model.c':'7b710cf96b23bbe5c805906708b96941e01c6f4beb1a02e378f9966144149cdb',
     'model.h':'c49d4a759229aaaab738aac9857ea5dc8feedf300d1c0dca5193e7d80eafb9d2',
-    'r_draw.c':'d56257781f2617d09f54d9fdc596f3f3dd31f1b3b94629acc1a870284d98965b',
+    'r_draw.c':'1e26849d022fa219adfd399f8863118b72e34daab4b6e2b588e22ed8c53c8232',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }
 
@@ -26,7 +38,7 @@ def runtime_policy(source):
         note='Allocation/source policy. Renderer output, target ABI and native acceptance are separate gates.')
 
 def prefix(lumps):
-    faces=list(struct.iter_unpack('<Hhihh4Bi',lumps['faces']))
+    faces=list(struct.iter_unpack('<HhihH4Bi',lumps['faces']))
     nodes=list(struct.iter_unpack('<i2h6h2H',lumps['nodes']))
     models=list(struct.iter_unpack('<9f7i',lumps['models']))
     sequence=[v[0] for v in struct.iter_unpack('<i',lumps['surfedges'])]

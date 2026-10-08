@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -67,8 +67,29 @@ fixed16_t Invert24To16(fixed16_t val);
 int GreatestCommonDivisor (int i1, int i2);
 
 void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
+void Q_SinCosDeg (float degrees, float *s, float *c);
+void Q_SinCosRad (float radians, float *s, float *c);
+float Q_SinRad (float radians);
+float Q_CosRad (float radians);
+double Q_atan2 (double y, double x);
+float Q_TanRad (float radians);
 int BoxOnPlaneSide (vec3_t emins, vec3_t emaxs, struct mplane_s *plane);
 float	anglemod(float a);
+
+/* AmiWind per-frame maths counters (dbg fpucount, aw_profile.c). Counted
+ * always (one increment); printed only while aw_fpucount is on. */
+enum {
+	AW_FPU_ROTATE,		/* R_RotateBmodel calls */
+	AW_FPU_ROTATE_TRIG,	/* ... that built a rotation from sine/cosine */
+	AW_FPU_ANGLEVECTORS,	/* AngleVectors calls */
+	AW_FPU_TABLE,		/* table sine/cosine lookups */
+	AW_FPU_NPCTARGET,	/* AW_NPCTarget calls */
+	AW_FPU_NPCSCAN,		/* ... that scanned the NPC list */
+	AW_FPU_NPCTEST,		/* NPCs tested with AngleVectors in a scan */
+	AW_FPU_COUNTERS
+};
+extern int aw_fpucount[AW_FPU_COUNTERS];
+#define AW_FPUCOUNT(i) (aw_fpucount[(i)]++)
 
 
 

@@ -253,15 +253,17 @@ class WorldFloraIntegrationTests(unittest.TestCase):
             args=build.parser().parse_args(['--dry-run']);args.font_options={'synthetic':True}
             with patch.object(build,'ROOT',Path(tmp)):
                 result=build.provenance(args,{})
-                self.assertEqual(result['world_flora']['status'],'not_requested')
+                self.assertEqual(result['world_flora']['status'],'asset-free')
                 self.assertIsNone(result['world_flora']['policy_sha256'])
-                args.tree_sprites=True
-                with self.assertRaises(FileNotFoundError):build.provenance(args,{})
+                # A real AGA build makes flora by default and hashes its policy.
+                args.dry_run=False;args.data_files=Path(tmp)
+                with patch.object(build,'input_hashes',return_value={}),self.assertRaises(FileNotFoundError):
+                    build.provenance(args,{})
 
-    def test_opt_in_builder_auto_inventory_and_dependency_chain(self):
+    def test_default_builder_auto_inventory_and_dependency_chain(self):
         import build
         from build_parallel import stage_dependencies
-        args=build.parser().parse_args(['--tree-sprites']);args.data_files=Path('/owned');args.sdk=Path('/sdk')
+        args=build.parser().parse_args([]);args.data_files=Path('/owned');args.sdk=Path('/sdk')
         tools={name:'/tools/'+name for name in ('qbsp','vis','light','qcc','ffmpeg','xdftool','rdbtool')}
         steps=build.commands(args,tools,Path('/private/run'));commands=dict(steps);deps=stage_dependencies(steps)
         self.assertNotIn('--census',commands['world-flora-assets'])
@@ -271,11 +273,12 @@ class WorldFloraIntegrationTests(unittest.TestCase):
         self.assertEqual(Path(commands['image'][commands['image'].index('--balmora-cache')+1]),Path('/private/run/balmora-work'))
         self.assertEqual(commands['world-flora'][commands['world-flora'].index('--collision-packing')+1],'adaptive')
         self.assertIn('world-scenery',deps['world-flora']);self.assertIn('world-flora',deps['image'])
-        args.tree_sprites=False;commands=dict(build.commands(args,tools,Path('/private/run')))
+        args.no_tree_sprites=True;commands=dict(build.commands(args,tools,Path('/private/run')))
         self.assertNotIn('world-flora',commands);self.assertNotIn('--world-flora',commands['image'])
         self.assertNotIn('--town-flora-source-index',commands['image'])
         self.assertNotIn('--town-flora-scene-report',commands['image'])
-        self.assertNotIn('--balmora-cache',commands['image'])
+        # The Balmora layout repair is not part of flora (BUILD-FLORA-OPTIN-32).
+        self.assertIn('--balmora-cache',commands['image'])
 
 
 class RefinedResumeContractTests(unittest.TestCase):

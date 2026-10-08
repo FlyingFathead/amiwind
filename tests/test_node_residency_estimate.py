@@ -46,7 +46,9 @@ class NodeResidencyEstimateTests(unittest.TestCase):
         self.assertEqual(sum(label.startswith('hull0 clipnodes') for label in labels), 1)
         node = next(r for r in allocations if r['allocation'] == 'nodes (world render prefix)')
         self.assertEqual(report['peak_section'], 'nodes')
-        self.assertEqual(report['peak_loader_bytes'], node['resident_after_bytes']+heap.hunk_temp_bytes(2401, 16))
+        # The 2,400-byte node lump is decoded from one slice that holds all of it.
+        self.assertEqual(report['peak_loader_bytes'], node['resident_after_bytes']+heap.slice_temp_bytes(
+            2400, 16, prefix_bytes=heap.slice_prefix_bytes('nodes', 2400)))
         self.assertEqual(report['resident_bytes_at_peak']+report['temporary_input_bytes_at_peak'], report['peak_loader_bytes'])
 
     def test_optional_classifier_failure_bound_matches_generic_layout(self):

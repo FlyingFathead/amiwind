@@ -1,0 +1,135 @@
+{
+  "format": 1,
+  "comment": "Vivec canton frame (docs/TOWN_IMPORT.md, Vivec). handoff_core is the canton's share of the city on the original cell grid; the bounds add at least draw distance + 32 around it, in whole 768 cores, so a neighbouring frame takes over before this frame's edge comes into view. The centre is the handoff core's centre on the 512-unit terrain material grid. interiors: the rooms reached through the canton's load doors (append only; position = map name and save ID).",
+  "source_cell": [
+    4,
+    -13
+  ],
+  "source_radius": 2,
+  "centre": [
+    32768,
+    -104448
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -2304,
+      -2304
+    ],
+    [
+      2304,
+      2304
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "handoff_core": [
+    [
+      -1536,
+      -1536
+    ],
+    [
+      1536,
+      1536
+    ]
+  ],
+  "town": {
+    "id": "vivec_temple",
+    "title": "Vivec, Temple",
+    "map": "vivec_temple",
+    "map_prefix": "vp",
+    "region_cap": 64,
+    "message": "Vivec, Temple",
+    "region_file": "vivec_temple-regions.txt",
+    "door_file": "scene-doors-vivec_temple.txt",
+    "visual_group": "vivec_temple",
+    "arrival": {
+      "source_position": [
+        32302,
+        -99596,
+        1134
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "Original exit point of interior door 186869 (Vivec, High Fane) onto the canton."
+    },
+    "return": null
+  },
+  "interiors": [
+    {
+      "cell": "Ministry of Truth, Hall of Processing"
+    },
+    {
+      "cell": "Ministry of Truth, Holding Cells"
+    },
+    {
+      "cell": "Ministry of Truth, Prison Keep",
+      "exclude": "inline models 254 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, Canon Offices"
+    },
+    {
+      "cell": "Vivec, Canon Quarters"
+    },
+    {
+      "cell": "Vivec, Hall Underworks"
+    },
+    {
+      "cell": "Vivec, Hall of Justice"
+    },
+    {
+      "cell": "Vivec, Hall of Justice Secret Library"
+    },
+    {
+      "cell": "Vivec, Hall of Wisdom"
+    },
+    {
+      "cell": "Vivec, High Fane"
+    },
+    {
+      "cell": "Vivec, Justice Offices"
+    },
+    {
+      "cell": "Vivec, Library of Vivec"
+    },
+    {
+      "cell": "Vivec, Milo's Quarters"
+    },
+    {
+      "cell": "Vivec, Office of the Watch"
+    },
+    {
+      "cell": "Vivec, Ordinator Barracks"
+    },
+    {
+      "cell": "Vivec, Palace of Vivec"
+    },
+    {
+      "cell": "Vivec, Puzzle Canal, Center"
+    },
+    {
+      "cell": "Vivec, Puzzle Canal, Level 1"
+    },
+    {
+      "cell": "Vivec, Puzzle Canal, Level 2"
+    },
+    {
+      "cell": "Vivec, Puzzle Canal, Level 3"
+    },
+    {
+      "cell": "Vivec, Puzzle Canal, Level 4"
+    },
+    {
+      "cell": "Vivec, Puzzle Canal, Level 5"
+    }
+  ]
+}

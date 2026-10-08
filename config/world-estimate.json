@@ -1,0 +1,10 @@
+{
+  "format": "aw-world-estimate-config-1",
+  "about": "World estimate settings (tools/world_estimate.py, docs/WORLD_ESTIMATE.md). Edit the lists for your own data; cell names are matched case-insensitively.",
+  "exclusion": {
+    "about": "IMPORT-TEST-CELLS-31: development and test cells are not part of the game world. Default rule: an interior cell a player cannot reach (no chain of load doors from an exterior cell or from a cell that a script or dialogue result names) is left out and listed in summary.json. include_cells keeps such a cell; exclude_cells removes any cell. --exclude listed applies only exclude_cells; --exclude none keeps every cell.",
+    "exclude_unreachable_interiors": true,
+    "include_cells": [],
+    "exclude_cells": []
+  }
+}

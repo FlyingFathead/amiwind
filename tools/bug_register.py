@@ -33,6 +33,8 @@ STATES = ('open', 'fixed', 'closed')
 # Optional cross-cutting tags; each gets its own list below the register table.
 TAGS = ('performance',)
 VERSION_RE = re.compile(r'^v\d+\.\d+\.\d+(-[a-z]+\d*)?$')
+# A development line such as v0.0.32-dev is a branch, not a shipped build (numbered -devN builds are).
+DEV_LINE_RE = re.compile(r'^v\d+\.\d+\.\d+-dev$')
 
 
 def load(path=DATA):
@@ -77,6 +79,9 @@ def validate(bugs):
         for k in ('fixed_in', 'owner_accepted'):
             if b[k] and not VERSION_RE.match(b[k]):
                 errors.append('%s: %s must be a version like v0.0.30-rc1' % (where, k))
+            elif b[k] and DEV_LINE_RE.match(b[k]):
+                errors.append('%s: %s names a development line (%s), not a shipped build; keep the bug open '
+                              'with "fixed in source" in status until a numbered build ships it' % (where, k, b[k]))
         if b['owner_accepted'] and b['state'] != 'fixed':
             errors.append('%s: owner_accepted needs a fixed bug' % where)
         if b['report'] and b['report'] != 'bugs/%s.md' % b['id']:

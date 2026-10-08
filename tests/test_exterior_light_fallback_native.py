@@ -20,7 +20,7 @@ class ExteriorLightFallbackTests(unittest.TestCase):
                        '-fno-sanitize-recover=all', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', '-I'+str(SOURCE),
                        str(ROOT/'tests/aga_exterior_light_fallback_test.c'),
-                       *[str(SOURCE/name) for name in ('r_surf.c', 'r_light.c', 'd_surf.c')],
+                       *[str(SOURCE/name) for name in ('r_surf.c', 'r_light.c', 'd_surf.c', 'mathlib.c')],
                        '-lm', '-o', str(executable)]
             compiled = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stdout+compiled.stderr)

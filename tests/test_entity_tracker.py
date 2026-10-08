@@ -159,7 +159,7 @@ class CompareTests(unittest.TestCase):
 
     def test_vanished_category_fails(self):
         problems = et.compare(self.old, et.report(self.rows, {1, 3, 4, 30}, 1, 'sha'))
-        self.assertEqual(problems, ['exterior npc: 1 placed before, none now'])
+        self.assertEqual(problems, ['exterior npc: 1 placed before, none now', 'exterior:0,0 npc: 1 -> 0 placed'])
 
     def test_large_loss_fails_and_small_loss_passes(self):
         old = {'totals': {'rock': {'exterior': {'placed': 1000}}}}
@@ -184,7 +184,8 @@ class CompareTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'exterior npc: 1 placed before, none now'):
                 et.build_gate(tmp / 'out', tmp / 'maps', master, baseline)
             accepted = et.build_gate(tmp / 'out', tmp / 'maps', master, baseline, 'villager moved to an interior')
-            self.assertEqual(accepted['losses'], ['exterior npc: 1 placed before, none now'])
+            self.assertEqual(accepted['losses'], ['exterior npc: 1 placed before, none now',
+                                                  'exterior:0,0 npc: 1 -> 0 placed (references 9)'])
             self.assertEqual(accepted['accepted_loss'], 'villager moved to an interior')
 
     def test_image_build_runs_the_gate_on_final_maps_before_any_disk(self):
@@ -203,6 +204,111 @@ class CompareTests(unittest.TestCase):
             b.write_text(json.dumps(et.report(self.rows, set(), 1, 'sha')))
             self.assertEqual(et.main(['compare', str(a), str(a)]), 0)
             self.assertEqual(et.main(['compare', str(a), str(b)]), 1)
+
+
+class PlacementDigestTests(unittest.TestCase):
+    """BUILD-DRESSING-EXCLUDED-32: one lost placement (a lantern hook) must fail
+    against the release baseline, which carries digests, not reference numbers."""
+    def setUp(self):
+        self.rows, _ = et.census(MASTER)
+        self.placed = {1, 2, 3, 4, 9, 30, 31}
+
+    def test_one_missing_placement_fails_with_digests(self):
+        old = et.report(self.rows, self.placed, 1, 'sha')
+        self.assertEqual(et.compare(old, et.report(self.rows, self.placed, 1, 'sha')), [])
+        new = et.report(self.rows, self.placed - {2}, 1, 'sha')
+        self.assertEqual(et.compare(old, new), ['exterior:0,0 rock: 2 -> 1 placed'])
+        # Without digests (an older report) only the category rule applies.
+        legacy = {k: v for k, v in old.items() if k != 'placed_digests'}
+        self.assertEqual(et.compare(legacy, new), [])
+
+    def test_same_count_other_placements_fails(self):
+        old = et.report(self.rows, self.placed - {2}, 1, 'sha')
+        new = et.report(self.rows, self.placed - {1}, 1, 'sha')
+        self.assertEqual(et.compare(old, new), ['exterior:0,0 rock: 1 placed, other placements than before'])
+
+    def test_gains_pass_and_another_master_skips_digests(self):
+        old = et.report(self.rows, self.placed - {2}, 1, 'sha')
+        self.assertEqual(et.compare(old, et.report(self.rows, self.placed, 1, 'sha')), [])
+        self.assertEqual(et.compare(old, et.report(self.rows, self.placed - {1}, 1, 'other')), [])
+
+    def test_private_report_names_missing_references_and_baseline_has_none(self):
+        import json
+        old = et.report(self.rows, self.placed, 1, 'sha', private=True)
+        new = et.report(self.rows, self.placed - {31}, 1, 'sha', private=True)
+        self.assertIn('interior:Town, Shop light: 1 -> 0 placed (references 31)', et.compare(old, new))
+        base = et.baseline(old, 'v0.0.31')
+        self.assertEqual(set(base), {'format', 'release', 'master_sha256', 'totals', 'cells', 'placed_digests'})
+        self.assertNotIn('placed_refs', json.dumps(base))
+        self.assertEqual(et.compare(base, new)[-1], 'interior:Town, Shop light: 1 -> 0 placed')
+
+    def test_baseline_cli_strips_references(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            src, out = Path(tmp) / 'r.json', Path(tmp) / 'b.json'
+            src.write_text(json.dumps(et.report(self.rows, self.placed, 1, 'sha', private=True)))
+            self.assertEqual(et.main(['baseline', str(src), '--release', 'v0.0.31', '--out', str(out)]), 0)
+            base = json.loads(out.read_text())
+            self.assertEqual((base['format'], base['release']), ('AW-ENTITY-BASELINE1', 'v0.0.31'))
+            self.assertNotIn('placed_refs', base)
+
+
+class DressingTrackTests(unittest.TestCase):
+    def test_track_lists_interior_dressing_per_map_with_heap(self):
+        import json
+        master = b''.join(BASES + [base('STAT', 'lantern_hook', 'f\\Furn_Com_Lantern_Hook.NIF'),
+                                   base('STAT', 'fern', 'f\\Flora_BC_Fern_02.NIF'),
+                                   cell('Town, Shop', True, refs=ref(40, 'lantern_hook') + ref(41, 'fern') + ref(42, 'wall')),
+                                   cell('Town', False, refs=ref(43, 'fern'))])
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp); (tmp / 'maps').mkdir(); (tmp / 'out').mkdir()
+            (tmp / 'master.esm').write_bytes(master)
+            (tmp / 'maps' / 'shop.bsp').write_bytes(bsp(40, 41, 42))
+            (tmp / 'maps' / 'town.bsp').write_bytes(bsp(43))
+            result = et.build_gate(tmp / 'out', tmp / 'maps', tmp / 'master.esm',
+                                   dressing_terms=('flora_', 'lantern_hook'))
+            self.assertEqual(result['dressing'], dict(report='dressing-track.json', pieces=2, maps=1))
+            track = json.loads((tmp / 'out' / 'dressing-track.json').read_text())
+            self.assertEqual([(p['reference'], p['rule']) for p in track['maps']['shop']['pieces']],
+                             [(40, 'lantern_hook'), (41, 'flora_')])
+            et.add_heap(tmp / 'out' / 'dressing-track.json', {'maps': [
+                dict(map='shop.bsp', gate='pass', estimated_total_bytes=10, estimated_clearance_bytes=5)]})
+            track = json.loads((tmp / 'out' / 'dressing-track.json').read_text())
+            self.assertEqual(track['maps']['shop']['heap'],
+                             dict(gate='pass', estimated_total_bytes=10, estimated_clearance_bytes=5))
+
+    def test_image_build_writes_the_track_and_adds_heap(self):
+        source = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
+        finalize = source[source.index('def finalize_image(args):'):source.index('\ndef main():')]
+        self.assertIn('dressing_terms=DRESSING_EXCLUDED', finalize)
+        self.assertLess(finalize.index('audit_world_map_heap_with_receipt('), finalize.index("add_heap(out/'dressing-track.json'"))
+
+
+class ReleaseBaselineTests(unittest.TestCase):
+    def test_guided_build_compares_with_the_release_baseline_by_default(self):
+        import build
+        tools = {n: '/opt/' + n for n in ('qbsp', 'vis', 'light', 'qcc', 'xdftool', 'rdbtool', 'ffmpeg')}
+        base = ['--data-files', '/data', '--workspace', '/ws', '--name', 'r', '--sdk', '/sdk', '--jobs', '2']
+        image = lambda extra: dict(build.commands(build.parser().parse_args(base + extra), tools, Path('/run')))['image']
+        self.assertTrue(build.ENTITY_BASELINE.is_file(), 'config/entity-baseline.json is missing')
+        command = image([])
+        self.assertEqual(command[command.index('--entity-baseline') + 1], str(build.ENTITY_BASELINE))
+        self.assertNotIn('--entity-baseline', image(['--no-entity-baseline']))
+        command = image(['--accept-entity-loss', 'owner: hook removed'])
+        self.assertEqual(command[command.index('--accept-entity-loss') + 1], 'owner: hook removed')
+
+    def test_release_baseline_is_public_safe(self):
+        import json
+        raw = (ROOT / 'config/entity-baseline.json').read_bytes()
+        self.assertLess(len(raw), 262144)  # the release source limit for text files
+        base = json.loads(raw)
+        self.assertEqual((base['format'], base['release']), ('AW-ENTITY-BASELINE1', 'v0.0.31'))
+        self.assertNotIn('placed_refs', base)
+        for key, cats in base['placed_digests'].items():
+            for cat, digest in cats.items():
+                self.assertRegex(digest, '^[0-9a-f]{16}$')
+                self.assertGreater(base['cells'][key][cat][1], 0)
+        self.assertEqual(set(base), {'format', 'release', 'master_sha256', 'totals', 'cells', 'placed_digests'})
 
 
 if __name__ == '__main__':

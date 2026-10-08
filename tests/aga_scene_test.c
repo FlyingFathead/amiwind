@@ -33,6 +33,10 @@ qboolean Mod_CanFindName(const char *name){(void)name;assert(0);return false;}
 model_t *Mod_ForName(char *name,qboolean crash){(void)name;(void)crash;assert(0);return NULL;}
 edict_t *EDICT_NUM(int n){return &target;}
 ddef_t *ED_FindGlobal(char *name){return &deadline_global;}
+int host_framecount; /* npc_target caches its result per frame: each call below is a new frame */
+#define AW_SceneTargetName() (host_framecount++,AW_SceneTargetName())
+#define AW_SceneDraw() (host_framecount++,AW_SceneDraw())
+#define AW_SceneUse() (host_framecount++,AW_SceneUse())
 int AW_UISpeakerAtRight(void){return 0;}
 void AW_UIObjectName(const char *name,int style){if(name)strcpy(object_name,name);}
 void S_LocalSound(char *name){}
@@ -195,8 +199,11 @@ eval_t *GetEdictFieldValue(edict_t *p,char *name){
 }
 qboolean AW_PlacePlayer(edict_t *p,vec3_t v){return false;}
 void SV_LinkEdict(edict_t *p,qboolean touch){}
+static int all_solid,water_feet,calls_mark;
+int SV_PointContents(vec3_t p){return water_feet?CONTENTS_WATER:CONTENTS_EMPTY;}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
+ if(all_solid==1 || (all_solid==2 && fabs(a[0])<100 && fabs(a[1])<100)){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
  if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(harvest_fixture && occluded){t.fraction=.1f;return t;}
@@ -332,7 +339,7 @@ int main(void){
   * the real dead-player rejection, then establish an alive gameplay request. */
  p.v.health=0;queued[0]=0;teleport();assert(!queued[0]);p.v.health=73;
  queued[0]=0;teleport();assert(!strcmp(queued,"map seyda\n"));
- strcpy(sv.name,"seyda");AW_SceneSpawn(&p);assert(map_place_calls==1 && last_map_arrival[0]==0 && last_map_arrival[1]==0);
+ calls_mark=map_place_calls;strcpy(sv.name,"seyda");AW_SceneSpawn(&p);assert(map_place_calls==calls_mark+1 && last_map_arrival[0]==0 && last_map_arrival[1]==0);
  assert(p.v.health==73 && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
  {const char *badcoords[]={"nan","inf","1junk","0x10","1e9999","1e-9999","2000001","--1","1 2",""};unsigned i;
  for(i=0;i<sizeof(badcoords)/sizeof(badcoords[0]);i++) {
@@ -563,6 +570,36 @@ int main(void){
   strcpy(sv.name,"prison");AW_SceneSpawn(&p);
   cl.viewangles[0]=-10;cl.viewangles[1]=75;AW_SceneSignon();
   assert(cl.viewangles[0]==-10 && cl.viewangles[1]==75);
+ }
+ /* VIVEC-ARENA-TP-ARRIVAL-32: a blocked arrival falls back to the scene spawn,
+  * never to the frame origin, and no spot is ever under water. */
+ {
+  vec3_t spawn={300,200,77},blocked={0,0,77},wet={0,0,77};edict_t q;
+  svs.clients[0].edict->v.health=73;memset(&q,0,sizeof(q));
+  q.v.mins[2]=-16.625f;q.v.maxs[2]=16.625f;
+  water_feet=1;assert(!AW_InteriorPlace(&q,wet));water_feet=0;   /* dry feet only */
+  assert(AW_InteriorPlace(&q,wet));assert(q.v.origin[2]>50 && q.v.origin[2]<51);
+  /* Arrival in solid everywhere, spawn clear: the town default is used. */
+  command_argc=2;command_args[0]="aw_teleport";command_args[1]="seydaneen";queued[0]=0;teleport();assert(!strcmp(queued,"map seyda\n"));
+  CL_ClearState();strcpy(sv.name,"seyda");
+  VectorCopy(spawn,q.v.origin);memset(q.v.oldorigin,0,sizeof(q.v.oldorigin));
+  all_solid=2;AW_SceneSpawn(&q);all_solid=0;
+  assert(q.v.origin[0]==300 && q.v.origin[1]==200 && q.v.origin[2]>50 && q.v.origin[2]<51);
+  /* Nothing clear and no map floor: stay at the spawn, which is also the
+   * stuck-recovery anchor (oldorigin), never 0 0 0. */
+  command_argc=2;command_args[0]="aw_teleport";command_args[1]="seydaneen";queued[0]=0;teleport();assert(!strcmp(queued,"map seyda\n"));
+  CL_ClearState();map_place_blocked=1;
+  VectorCopy(spawn,q.v.origin);memset(q.v.oldorigin,0,sizeof(q.v.oldorigin));
+  all_solid=1;AW_SceneSpawn(&q);all_solid=0;map_place_blocked=0;
+  assert(q.v.origin[0]==300 && q.v.origin[1]==200 && q.v.origin[2]==77);
+  assert(q.v.oldorigin[0]==300 && q.v.oldorigin[1]==200 && q.v.oldorigin[2]==77);
+  /* dbg unstuck: nearest clear spot below; nothing clear leaves the player. */
+  q.v.movetype=MOVETYPE_NOCLIP;VectorCopy(blocked,q.v.origin);
+  assert(AW_Unstuck(&q));assert(q.v.movetype==MOVETYPE_WALK && q.v.origin[2]>50 && q.v.origin[2]<51);
+  q.v.movetype=MOVETYPE_NOCLIP;VectorCopy(blocked,q.v.origin);all_solid=1;
+  assert(!AW_Unstuck(&q));all_solid=0;
+  assert(q.v.movetype==MOVETYPE_NOCLIP && q.v.origin[2]==77);
+  water_feet=1;assert(!AW_Unstuck(&q));water_feet=0;assert(q.v.origin[2]==77);
  }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;

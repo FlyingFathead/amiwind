@@ -5,6 +5,9 @@ import struct
 from PIL import Image, ImageEnhance, ImageDraw, ImageFont
 from prepare_video import HEADER, WIDTH, HEIGHT, FPS, RATE, validate
 
+# Two lines under the AmiWind name on the startup screen.
+STARTUP_LINES = ('An open-source RPG engine', 'for the Commodore Amiga')
+
 
 def text_width(font, text):
     return sum(font[8 + c * 8 + 6] for c in text.encode('cp1252'))
@@ -89,7 +92,7 @@ def prepare_logo(source, target, font_path=None):
     full = Image.new('RGBA', (WIDTH, HEIGHT), (0, 0, 0, 255))
     full.alpha_composite(image, ((WIDTH-image.width)//2, 53 + (80-image.height)//2))
     full = full.convert('RGB')
-    lines = ['A Commodore Amiga', 'demake of Morrowind']
+    lines = list(STARTUP_LINES)
     if font_path and Path(font_path).is_file():
         font = load_font(font_path)
         for i, line in enumerate(lines):

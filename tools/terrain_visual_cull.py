@@ -145,7 +145,7 @@ def ground_from_bsp(raw,overlap=.5):
         if o<124 or s<0 or o+s>len(raw):raise ValueError('Invalid BSP lump')
         lumps.append(raw[o:o+s])
     vertices=list(struct.iter_unpack('<3f',lumps[3]));edges=list(struct.iter_unpack('<HH',lumps[12]));se=[v[0] for v in struct.iter_unpack('<i',lumps[13])]
-    planes=list(struct.iter_unpack('<4fi',lumps[1]));texinfos=list(struct.iter_unpack('<8fii',lumps[6]));faces=list(struct.iter_unpack('<Hhihh4Bi',lumps[7]));models=list(struct.iter_unpack('<9f7i',lumps[14]))
+    planes=list(struct.iter_unpack('<4fi',lumps[1]));texinfos=list(struct.iter_unpack('<8fii',lumps[6]));faces=list(struct.iter_unpack('<HhihH4Bi',lumps[7]));models=list(struct.iter_unpack('<9f7i',lumps[14]))
     nt=struct.unpack_from('<i',lumps[2])[0];names=[]
     for i in range(nt):
         o=struct.unpack_from('<i',lumps[2],4+4*i)[0];names.append('' if o<0 else lumps[2][o:o+16].split(b'\0')[0].decode('ascii','replace'))

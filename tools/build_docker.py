@@ -131,7 +131,7 @@ def main(argv=None):
                 script = (
                     'set -eu\npython tools/release.py --check\n'
                     "python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'\n"
-                    'python -m unittest discover -s tests -v\n'
+                    f'python tools/run_tests.py -v --jobs {args.jobs} --module-timeout 900\n'
                     'python tools/build.py --dry-run --tools-dir /opt/amiwind-tools '
                     f'--workspace /work --name {run} --jobs {args.jobs}\n')
                 logged(docker + ['run', '--rm', '--mount',

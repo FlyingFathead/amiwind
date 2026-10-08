@@ -499,3 +499,136 @@ object/face/triangle identities, clicked side and source binding are unchanged.
 Terrain-role discovery and explicit not-performed feedback from build 018 remain.
 Eighteen host regression groups passed, including independent arithmetic for all
 226 groups in the private diagnostic. GPU appearance remains unverified.
+
+## Build 020: sub-cell cuts and divider
+
+The **Sub-cell cuts** panel draws planned region borders and section cuts as
+translucent coloured vertical rectangles through the loaded map, one colour and
+label per region or cut, in perspective, orbit and From above views (seen
+edge-on from above they are coloured lines, and each region core gets a faint
+fill). Hovering a rectangle shows its name and position. **Show cuts and region
+borders** hides everything; **Show coverage** hides the dashed coverage
+outlines. The rectangles are a 2D overlay like the planning zones: they are
+not depth-tested and never alter, hide or select geometry. Zones, face marks,
+their undo history and the session format are unchanged; cuts are saved in
+their own files, not in the session.
+
+Quake mechanism: a cut is an axial split plane, as qbsp chooses for its nodes;
+a section is the space on one side and a portal is the rectangle where two
+sections meet. That is the model of the AWIS1 interior-section portals, so the
+divider exports straight into that format.
+
+### Overlay format `aw-cuts-1`
+
+```json
+{"format": "aw-cuts-1", "map": "bm019", "space": "map-local", "z": [0, 512],
+ "regions": [{"name": "bm019", "core": [[-768, -1536], [0, -768]],
+              "coverage": [[-1664, -2432], [896, 128]], "colour": "#ff5d5d"}],
+ "planes": [{"label": "cut A", "axis": "x", "at": -384, "from": -2432, "to": 128,
+             "z": [0, 512], "colour": "#a98bff", "kind": "cut", "margin": 24}]}
+```
+
+- `space` must be `map-local`: compiled BSP XYZ of the map being viewed. Town
+  configs already store cores and coverage in that frame (map-local =
+  (source - centre) x scale); section plans use the room BSP's own XYZ.
+- `regions[]`: `name`, and a `core` and/or `coverage` rectangle
+  `[[x0, y0], [x1, y1]]` (x0 < x1, y0 < y1). The core is drawn as four solid
+  walls, the coverage as dashed outlines at the bottom and top of the Z range;
+  a region with only a coverage gets faint walls.
+- `planes[]`: `axis` `x` (constant X, spanning Y from `from` to `to`) or `y`
+  (constant Y, spanning X); `at` is the position. `axis` `z` is a horizontal
+  plane at height `at` with `x` and `y` ranges. Optional: `z` range, `colour`
+  (`#rrggbb`), `kind` (`cut`, `portal`, `region-border`), `margin` (portal
+  hysteresis), `label`.
+- Z range: the plane's or region's own `z`, else the overlay's `z`, else the
+  loaded map's bounds.
+- Optional `divider`: `{"margin": 24, "apron": 40}` from a divider export.
+- Limits: 256 regions, 256 planes, coordinates within 10,000,000, 16 MiB.
+
+`tools/region_cuts.py` writes and checks overlays (Python standard library):
+
+- `town --config CONFIG --map NAME` takes a Balmora-style settings file
+  (`bounds`, `core_size`, `overlap`; regions come from
+  `balmora_regions.regions`) or a layout with an explicit `regions` list (the
+  Seyda Neen layout). It writes the map's core and coverage and the core of
+  every region overlapping that coverage: those borders are the sub-cell cuts
+  that pass through the map. `--all` writes every core and coverage;
+  `--border-planes` adds each distinct core border inside the coverage as a
+  plane; `--z ZMIN ZMAX` fixes the height.
+- `plan --plan PLAN` writes each section's coverage as a region and each
+  portal as a plane at its split, after checking the plan's sections and
+  portals with `prepare_interior_sections.section_text`.
+- `check --overlay FILE` and `check --plan FILE` validate without writing.
+
+Verified on `bm019` (Balmora build of v0.0.31-dev2): the map's terrain bounds
+are X -1696..928, Y -2464..160, exactly the generated coverage
+(-1664..896, -2432..128) plus one 32-unit terrain margin on every side, and the
+core walls stand at X -768 and 0, Y -1536 and -768.
+
+### Sub-cell divider
+
+**Add X cut** / **Add Y cut** place a cut through the middle of the map (or
+under the view centre in From above), spanning the whole map and its height.
+Select a cut in the list to edit its label, position, ends, Z range and colour
+in number boxes; the slider moves its position. In From above, drag a cut line
+to move it or its end squares to shorten it; the drag neither pans the view
+nor selects geometry. Undo and Redo (64 levels, panel buttons) cover adding,
+moving, editing, deleting, clearing, importing and the margin and apron;
+Ctrl+Z stays with the face and zone markup. At most 16 cuts.
+
+Every cut divides the whole map along its axis; sections are the rectangles
+between the cuts (two X cuts and one Y cut give six). From/To and Z give the
+portal rectangle where neighbouring sections change over. Each section's
+coverage is its rectangle widened by the **apron** (default 40) across every
+cut; the portal **margin** (default 24, at most 32) must fit inside the apron.
+
+Statistics, live while editing, for the whole map and each section:
+
+- **by face centre**: compiled faces whose centre lies in the section (they
+  add up to the map), stored faces, and lightmap bytes;
+- **placements**: whole entity placements inside the section, straddling its
+  border, and kept with the apron, with the number of inline brush models;
+- **section build**: what a whole-reference section build keeps: every
+  placement touching the coverage, plus the world model whole (interior
+  section builds keep it) or, with that box unticked, the world faces inside
+  the coverage (exterior regions are cut that way);
+- **estimated heap**: fixed non-map heap + loader factor x (BSP bytes without
+  the lighting lump x kept stored faces / all stored faces + kept lightmap
+  bytes), against 11,534,336 B. Defaults 5,245,860 B and 1.09 come from one
+  measured Vivec room (heap 9,497,156 B for a 3,900,172 B BSP); both are
+  editable. It is an estimate for comparing cut positions, not a heap
+  measurement: build the section and run the heap check.
+
+Lightmap bytes follow Quake's CalcSurfaceExtents: per face, the texture
+extents in 16-unit luxels (floor of the minimum, ceiling of the maximum, plus
+one sample) times the face's light styles, counted once per lightmap offset
+because faces can share samples. On `bm019` this sum equals the lighting lump
+exactly (4,786 B). File size, light offsets, styles, the entry spawn and every
+`aw_ref` entity (including those without geometry) are read from an opened
+`.bsp`; for a scene JSON the heap estimate is reported as unavailable.
+
+**Export cut overlay JSON** writes the cuts (`kind: cut`) and the sections
+(core = section rectangle, coverage = with apron). **Export section plan JSON**
+writes a plan in the `tools/prepare_interior_sections.py` format: sections
+named after the map plus a letter (`vi021a`, `vi021b`, ...), each with its
+coverage box over the map's full height and the `aw_ref` numbers of every
+placement touching it (references without geometry go by origin, to the
+nearest section when outside all), one portal per pair of sections sharing a
+cut, and the base BSP's size and SHA-256. The entrance section is the one
+holding the map's `info_player_start`, whose origin and angle become its
+spawn. Fields the inspector cannot know (source and door receipts, cell name,
+logical and physical IDs, the other sections' spawns) are `PENDING` strings,
+so the section tool refuses the plan until they are filled. The export is
+refused, with the reasons listed, when the cuts break the section tool's
+rules (2 to 8 sections, 1 to 8 portals, margin inside the apron). The plan also
+carries `inspector_cuts`, `inspector_divider` and `inspector_estimate`, which
+the section tool ignores. **Import cuts** reads an overlay (its x/y planes) or
+a section plan (its `inspector_cuts`, or else one cut per portal split); **Load
+cut overlay JSON** also accepts a section plan and draws it.
+
+Asset-free checks: `node tests/test_polycount_markup.js` (milestone
+`PASS020 sub-cell cuts`) and `python3 -m unittest tests/test_region_cuts.py`.
+The browser check on `bm019` covered drawing in both views, hover text,
+overhead drag with one undo level and no pan or selection, export and import
+round trips, and a two-section plan accepted by `region_cuts.py check --plan`.
+GPU appearance on other machines is unverified.

@@ -111,9 +111,13 @@ Disk records expand during loading. The current 32-bit Amiga ABI has 4-byte
 pointers; a 20-byte disk face becomes a 64-byte runtime surface, a 24-byte node
 becomes 40 bytes, and a 28-byte leaf becomes 48 bytes. Edges, texinfo, texture
 headers/pixels, pointer arrays and generated collision hulls also allocate.
-Hunk headers and alignment count. Temporary input may coexist with decoded
-output; the maximum is determined by allocation order, not the largest lump
-or final resident total alone.
+Hunk headers and alignment count. The loader reads each lump in bounded
+16 KiB slices and decodes them straight into the final structures (byte lumps
+and clipnodes are read into place), so at most one slice of temporary input
+coexists with decoded output; the maximum is determined by allocation order
+and the final resident total, not by the largest lump. Each streamed load
+writes `bsp-load-profile.txt` with the hunk in use at the end of every
+section, for comparison with the heap estimate.
 
 The audit compiles sizeof probes using the selected Amiga SDK and engine
 architecture flags. Read initialized sizeof constants, not distances between
@@ -547,6 +551,8 @@ World-scale geometry estimates must be per resident map, not the sum of every ma
 A historical target-ABI debug-command catalogue object comparison reduced its code section from 8,412 to 4,492 bytes, for a 3,920-byte object-code reduction; the 24-byte data section was unchanged. At that baseline the source catalogue had 79 entries / 5,830 bytes on disk; later command aliases changed its size. This is code/object and disk evidence, not a resident model cache measurement.
 
 If subdivision still leaves a dense interior or corridor over budget, first measure per-section resident and visible costs. Selective lower-poly variants may be considered for large decorative, non-pickable mushrooms or other costly scenery while preserving silhouette, watertight joins, UV/material boundaries, collision and original placement. This is a fallback after subdivision, not blanket decimation and not a change to pickable mushroom models.
+
+Measured 2026-10-08 (dense Khuul and Seyda Neen exterior regions, see [Mesh tips](MESH_TIPS_AND_TRICKS.md#texture-mapping-snapping-and-scenery-reduction-2026-10-08)): chart-wise quadric reduction that keeps exactly these properties (locked UV seams and borders, 0.25 to 0.5 map units surface error, 1/8 texel texture error, collision untouched) removed only 0.2 to 1.1 % of faces and 9 to 99 KB of modelled heap per map, so the rule stands and decimation is no fallback for this scenery. The measured lever is `--texinfo-snap`, which changes no geometry: 1/16 texel cut texinfo by 33 to 51 % and modelled heap by 0.45 to 1.06 MB per map.
 
 Before accepting a compact layout, preserve the complete original object identity and placement across overlapping map copies, distinguish empty from picked, keep the same roll/level through failed inventory transfers and compatible save/load, and reject incompatible catalogue IDs. Compare before/after 68040 object sections, linked image, per-map peak including old/new overlap, warm cache and cold-load time, and a target travel/pickup route with frame/audio monitoring. Existing dev4 remains the six-placement pilot; worldwide mapping and these memory prototypes are not shipped.
 

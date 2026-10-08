@@ -13,6 +13,11 @@ QPIC_LMP={'conback.lmp','loading.lmp','pause.lmp'}
 EXPECTED_PALETTE='a0f74c36edc83962b99cd254026659466b1932898636f8ccc1a814a06cb7986c'
 
 def sha(b): return hashlib.sha256(b).hexdigest()
+def banked_palette(palette):
+    """The palette with the sky colour bank; convert() and the hand catalogue share it."""
+    new=bytearray(palette)
+    for i,(_,rgb) in BANK.items():new[i*3:i*3+3]=bytes(rgb)
+    return bytes(new)
 def need(ok,msg):
     if not ok: raise ValueError(msg)
 
@@ -70,6 +75,10 @@ def spans(raw,rel):
         add(start,w*h)
     elif ext in ('.awi','.awu'):
         need(raw[:4]==(b'AWI1' if ext=='.awi' else b'AWU1'),'Unknown image version');w,h=get('<2H',4);need(n==8+w*h,'Image size mismatch');add(8,w*h)
+    elif rel.lower()=='gfx/hand-models.awh':
+        # AWH1 hand catalogue (prepare_hand_catalog.pack_catalog): race IDs and model paths, no pixels.
+        need(raw[:4]==b'AWH1','Unknown hand catalogue');count,size=get('>HH',4)
+        need(0<count<=32 and size==196 and n==8+count*size,'Invalid hand catalogue');return [],'hand model catalogue (paths only)'
     elif ext=='.awh':
         need(raw[:4]==b'AWH1','Unknown head preview');count=get('<H',4)[0];need(n==6+count*82,'Invalid head packet')
         for i in range(count):add(6+i*82+18,64)
@@ -148,8 +157,7 @@ def convert(source,output,expected_palette=None,changed_only=False):
     if expected_palette:need(sha(palette)==expected_palette,'Input palette fingerprint does not match approved source')
     for i,(replacement,_) in BANK.items():
         need(max(abs(palette[i*3+k]-palette[replacement*3+k]) for k in range(3))<=2,'Palette remap exceeds two units/channel guard')
-    new=bytearray(palette);mapping=bytes(BANK[i][0] if i in BANK else i for i in range(256))
-    for i,(_,rgb) in BANK.items():new[i*3:i*3+3]=bytes(rgb)
+    new=bytearray(banked_palette(palette));mapping=bytes(BANK[i][0] if i in BANK else i for i in range(256))
     rows=[];total=np.zeros(256,dtype=np.int64)
     # Complete preflight before creating output. Metadata-only manifest, no assets in workspace.
     for path in sorted(source.rglob('*')):

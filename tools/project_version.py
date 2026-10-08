@@ -16,6 +16,16 @@ def read_version(path):
     return value
 
 
+def require_private_test_version(version, waivers):
+    """Private-test waivers are for -devN builds only; rc and final images pass every gate.
+
+    waivers: names of the waiver options in use (empty when none). VIVEC-ARENA-ACTORS-32.
+    """
+    if waivers and not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev[0-9]+', version):
+        raise ValueError(f'Version {version} is a release candidate or final: private-test waivers '
+                         f'({", ".join(waivers)}) are refused; the image must pass every gate')
+
+
 def public_version(root=ROOT):
     return read_version(Path(root)/'VERSION')
 

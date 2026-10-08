@@ -109,7 +109,8 @@ static void fields(aw_save_t *s)
     for(i=0;i<s->actor_count;i++){
         aw_saved_actor_t *a=&s->actors[i];
         word(&a->reference);integer(&a->scene,0,AW_SCENE_COUNT-1);
-        if(!a->reference || a->reference>0xffffffU)error=1;
+        /* The ID range has a gap between interiors and extra towns. */
+        if(!a->reference || a->reference>0xffffffU || (!error && !AW_MapName(a->scene)[0]))error=1;
         for(j=0;j<3;j++){floating(&a->position[j],-32767,32767);floating(&a->angles[j],-360,360);}
         floating(&a->health,-10000,100000);
         integer(&a->hello_count,0,10000000);integer(&a->manual_count,0,10000000);integer(&a->hello_done,0,1);

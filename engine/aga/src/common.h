@@ -145,6 +145,7 @@ int Q_strcasecmp (char *s1, char *s2);
 int Q_strncasecmp (char *s1, char *s2, int n);
 int	Q_atoi (char *str);
 float Q_atof (char *str);
+#include "aw_format.h"	// Q_strtod, Q_sscanf, Q_fscanf, Q_vsnprintf
 
 //============================================================================
 

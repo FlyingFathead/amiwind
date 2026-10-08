@@ -34,15 +34,17 @@ WORLD / TRAVEL|recover|aw_recover|
 WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
-WORLD / TRAVEL|tp|aw_teleport|[X Y original Morrowind global XY / balmora / seydaneen / prisonship / <map name>; no argument opens menu]
+WORLD / TRAVEL|tp|aw_teleport|[X Y original Morrowind global XY / seydaneen / prisonship / balmora / vivec (Vivec Arena) / <map name>; no argument opens menu]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
+WORLD / TRAVEL|unstuck|aw_unstuck|(nearest clear standing spot below or beside you; never into a wall or water; leaves noclip)
 WORLD / TRAVEL|view|aw_view|x y z yaw pitch
 SKY / LIGHTING|24hrcycle|aw_24hrcycle|[seconds per hour 0.25..60, default 1; off] steps through 24 game hours, showing each hour that long (default 24 s in all); Esc stops
 SKY / LIGHTING|cloudcontrol|aw_cloud_control_set|legacy/new or 1/2 (legacy also disables midnight clearing)
 SKY / LIGHTING|clouds|aw_clouds|on/off true/false 1/0 (default on, independent of sun)
 SKY / LIGHTING|cloudtype|aw_cloud_type_set|classic/veil or 1/2 (classic default)
 SKY / LIGHTING|dayclouds|aw_day_clouds_set|0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected
+SKY / LIGHTING|daynight|aw_daynight_set|[on/off] off holds the clock at 12:00 midday (sky, light, lamps, windows; survives map changes, not saved); on resumes from the current time; no argument: state
 SKY / LIGHTING|daynightcycle|aw_daynightcycle|on/off true/false 1/0 (automatic time; explicit set/wait still work)
 SKY / LIGHTING|daytimecycle|aw_24hrcycle|same as 24hrcycle
 SKY / LIGHTING|emissive|aw_emissive|[0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query
@@ -72,8 +74,8 @@ SKY / LIGHTING|outdoorlantern|aw_lamp_radius|[0.25..3.0] light radius of exterio
 SKY / LIGHTING|set time|aw_set_time|HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn
 SKY / LIGHTING|settime|aw_set_time|same as time
 SKY / LIGHTING|sky|aw_daynight|on/off true/false 1/0 (sky/fog presentation; time control is separate)
-SKY / LIGHTING|skyline fill|aw_skyline_fill|1/0 sky showing below far scenery takes the fog colour (no cut-outs at short fog distances; default 1)
-SKY / LIGHTING|skylinefill|aw_skyline_fill|1/0 sky showing below far scenery takes the fog colour (no cut-outs at short fog distances; default 1)
+SKY / LIGHTING|skyline fill|aw_skyline_fill|1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon)
+SKY / LIGHTING|skylinefill|aw_skyline_fill|1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon)
 SKY / LIGHTING|skyspeed|aw_skyspeed_set|[0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed)
 SKY / LIGHTING|skytype|aw_sky_type_set|1/2/3 or V1/V2/V3 (V3 extra stronk default)
 SKY / LIGHTING|starsky|aw_starsky|on/off true/false 1/0 (stars and nebula; default on)
@@ -104,6 +106,8 @@ DIAGNOSTICS|coords|amiwind_debug_coords|on/off
 DIAGNOSTICS|dimensions|aw_dimensions|
 DIAGNOSTICS|eyeheight|aw_eyeheight|[offset above player origin]
 DIAGNOSTICS|fps|amiwind_debug_fps|on/off
+DIAGNOSTICS|fpu|aw_fpu_status|(CPU and FPU support library status: 68040.library/68060.library resident or none)
+DIAGNOSTICS|fpucount|aw_fpucount|[0/1] once a second: per-frame counts of brush model rotations (and rebuilds), direction vectors, table sine/cosine lookups and NPC targeting (average/peak)
 DIAGNOSTICS|hands|aw_hands|
 DIAGNOSTICS|heap|aw_heap_audit|(current hunk clearance and load peak)
 DIAGNOSTICS|hud|amiwind_show_debug|on/off true/false 1/0 (overlay alias)
@@ -113,6 +117,7 @@ DIAGNOSTICS|npcs|aw_npcs|
 DIAGNOSTICS|overlay|amiwind_show_debug|on/off true/false 1/0
 DIAGNOSTICS|pos|aw_pos|
 DIAGNOSTICS|probe|aw_probe|(slow floor audit)
+DIAGNOSTICS|rcount|aw_rcount|[0/1/2] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only
 DIAGNOSTICS|sealevel|amiwind_debug_sealevel|on/off
 DIAGNOSTICS|show fps|amiwind_debug_showfps|[on/off]
 DIAGNOSTICS|showram|amiwind_debug_showram|on/off

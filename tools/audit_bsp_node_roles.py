@@ -17,7 +17,7 @@ from player_hull import lumps
 
 def audit(raw, *, mnode_bytes=40, hull0_node_bytes=8):
     data = lumps(raw)
-    formats = {1: '<4fi', 5: '<i2h6h2H', 7: '<Hhihh4Bi',
+    formats = {1: '<4fi', 5: '<i2h6h2H', 7: '<HhihH4Bi',
                10: '<ii6h2H4B', 14: '<9f7i'}
     try:
         records = {i: list(struct.iter_unpack(fmt, data[i])) for i, fmt in formats.items()}

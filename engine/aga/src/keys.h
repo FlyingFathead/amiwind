@@ -135,3 +135,8 @@ void Key_ClearStates (void);
 
 int Key_AmigaRaw(int raw);
 void Key_AmigaQualifiers(unsigned int qualifier);
+/* AmiWind console line editor: aw_console_mode 1/true = terminal (default),
+ * 0/false = classic Quake. Key_ConsoleInit registers it and reads the saved
+ * history from dir (the game directory). */
+int Key_ConsoleTerminal(void);
+void Key_ConsoleInit(const char *dir);

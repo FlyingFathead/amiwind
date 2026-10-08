@@ -13,7 +13,7 @@ static model_t world;static vec3_t seen_origin,seen_angles;
 void R_RenderView(void){memcpy(seen_origin,r_refdef.vieworg,sizeof seen_origin);memcpy(seen_angles,r_refdef.viewangles,sizeof seen_angles);}
 client_static_t cls;server_t sv;server_static_t svs;keydest_t key_dest=key_game;
 double host_frametime=1;char *keybindings[256];int scr_copyeverything;
-static void (*open_wait)(void),(*help)(void),(*settime)(void),(*setexact)(void),(*gallery)(void),(*nightgallery)(void),(*hourcycle)(void),(*lightgallery)(void);static edict_t player;static client_t client;
+static void (*open_wait)(void),(*help)(void),(*settime)(void),(*setexact)(void),(*gallery)(void),(*nightgallery)(void),(*hourcycle)(void),(*lightgallery)(void),(*daynight)(void);static edict_t player;static client_t client;
 static int restricted,speech,interior,argc=1;static char *arg="";static cvar_t *scale,*cycle;
 int AW_Interior(void){return interior;}
 void Con_ToggleConsole_f(void){key_dest=key_game;}
@@ -22,7 +22,7 @@ int AW_StoryRestricted(void){return restricted;}double AW_SpeechRemaining(void){
 static char subtitle[256];
 void IN_AWClearButtons(void){}void AW_UISubtitle(const char *a,const char *b,double d){snprintf(subtitle,sizeof subtitle,"%s",b);}
 void Con_Printf(char *s,...){}void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_timescale"))scale=c;else if(!strcmp(c->name,"aw_daynightcycle"))cycle=c;else assert(0);}
-void Cmd_AddCommand(char *n,void(*f)(void)){if(!strcmp(n,"aw_wait"))open_wait=f;else if(!strcmp(n,"aw_quick_help"))help=f;else if(!strcmp(n,"aw_timeofday"))settime=f;else if(!strcmp(n,"aw_set_time"))setexact=f;else if(!strcmp(n,"aw_daycycle_gallery"))gallery=f;else if(!strcmp(n,"aw_nightgallery"))nightgallery=f;else if(!strcmp(n,"aw_24hrcycle"))hourcycle=f;else if(!strcmp(n,"aw_lightgallery"))lightgallery=f;}
+void Cmd_AddCommand(char *n,void(*f)(void)){if(!strcmp(n,"aw_wait"))open_wait=f;else if(!strcmp(n,"aw_quick_help"))help=f;else if(!strcmp(n,"aw_timeofday"))settime=f;else if(!strcmp(n,"aw_set_time"))setexact=f;else if(!strcmp(n,"aw_daycycle_gallery"))gallery=f;else if(!strcmp(n,"aw_nightgallery"))nightgallery=f;else if(!strcmp(n,"aw_24hrcycle"))hourcycle=f;else if(!strcmp(n,"aw_lightgallery"))lightgallery=f;else if(!strcmp(n,"aw_daynight_set"))daynight=f;}
 /* Light gallery controls (aw_wait.c): renderer switches and cvars by name. */
 int r_lamps=1;static int cache_flushes;void D_FlushCaches(void){cache_flushes++;}
 static cvar_t night_light_var={"aw_night_light","0"},emissive_var={"aw_emissive","1"};
@@ -122,6 +122,48 @@ static void night_tour_camera(void){
     interior=1;nightgallery();assert(AW_DayGalleryClock(99)==99);interior=0;
     nightgallery();sv.active=0;AW_WaitTick();sv.active=1;assert(AW_DayGalleryClock(99)==99);
     assert(!memcmp(&original_state,&aw_state,sizeof aw_state));
+}
+/* dbg daynight off: the saved clock goes to 12:00 through the
+ * dbg time path and stays there over frames, waits, explicit times, the 24 h
+ * cycle, a map change, a loaded save and a new game; the date is kept; bad
+ * input changes nothing; it stops a running 24 h cycle and a sky preview; on
+ * resumes the normal cycle from 12:00. */
+static int clock_ms(void){return AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");}
+static void daynight_hold(void){
+    aw_state_t loaded;int i;
+    assert(daynight);AW_StateReset();assert(AW_ClockEnsure());
+    cycle->value=1;scale->value=30;host_frametime=1;key_dest=key_game;
+    strcpy(sv.name,"sn045");strcpy(world.name,"maps/sn045.bsp");cl.worldmodel=&world;
+    argc=2;arg="2215";setexact();date(427,8,16,22,15);loaded=aw_state; /* a save made at 22:15 */
+    argc=1;daynight();assert(!AW_DayNightFrozen());date(427,8,16,22,15); /* no argument: report only */
+    argc=2;arg="off";daynight();assert(AW_DayNightFrozen() && clock_ms()==12*3600000);date(427,8,16,12,0);
+    for(i=0;i<2000;i++)AW_WaitTick();assert(clock_ms()==12*3600000);date(427,8,16,12,0);
+    arg="1830";setexact();arg="dusk";setexact();arg="23.5";settime();arg="night";settime();date(427,8,16,12,0);
+    argc=1;setexact();settime();date(427,8,16,12,0); /* queries still answer */
+    subtitle[0]=0;open_wait();assert(key_dest==key_game && strstr(subtitle,"12:00"));date(427,8,16,12,0);
+    argc=1;key_dest=key_game;hourcycle();
+    sv.active=0;AW_WaitTick();sv.active=1;assert(AW_DayNightFrozen()); /* map change */
+    AW_WaitTick();date(427,8,16,12,0);
+    aw_state=loaded;AW_WaitTick();assert(clock_ms()==12*3600000);date(427,8,16,12,0); /* loaded save */
+    AW_StateReset();AW_WaitTick();assert(clock_ms()==12*3600000);date(427,8,16,12,0); /* new game */
+    argc=2;arg="maybe";daynight();assert(AW_DayNightFrozen());
+    argc=3;arg="on";daynight();assert(AW_DayNightFrozen());
+    argc=2;arg="0";daynight();assert(AW_DayNightFrozen());date(427,8,16,12,0);
+    /* on resumes from 12:00; the refused 24 h cycle above never started. */
+    arg="ON";daynight();assert(!AW_DayNightFrozen() && clock_ms()==12*3600000);
+    AW_WaitTick();assert(clock_ms()==12*3600000+30000);
+    cycle->value=0;host_frametime=.25;for(i=0;i<16;i++)AW_WaitTick();assert(clock_ms()==12*3600000+30000);
+    arg="1830";setexact();date(427,8,16,18,30);
+    /* off stops a running 24 h cycle: with automatic time off nothing moves after on. */
+    argc=1;key_dest=key_console;hourcycle();assert(key_dest==key_game);
+    for(i=0;i<4;i++)AW_WaitTick();date(427,8,16,19,30);
+    argc=2;arg="off";daynight();date(427,8,16,12,0);arg="on";daynight();
+    for(i=0;i<16;i++)AW_WaitTick();date(427,8,16,12,0);
+    /* off also ends a sky preview, so the screen shows midday at once. */
+    argc=1;gallery();assert(AW_DayGalleryClock(77)==330*60000);
+    argc=2;arg="off";daynight();assert(AW_DayGalleryClock(77)==77);
+    arg="true";daynight();assert(!AW_DayNightFrozen());
+    cycle->value=1;host_frametime=1;argc=1;
 }
 int main(void){
     aw_state_t saved;int i;char exact[5];
@@ -233,8 +275,10 @@ int main(void){
     restricted=1;lightgallery();assert(AW_DayGalleryClock(77)==77 && !AW_WaitKey(K_UPARROW));restricted=0;
     argc=2;arg="off";lightgallery();argc=1;
     cycle->value=1;host_frametime=1;
-    tour_camera();night_tour_camera();
+    tour_camera();night_tour_camera();daynight_hold();
     AW_StateReset();for(i=0;i<31;i++){char name[32];sprintf(name,"full%ld",(long)i);AW_StateSet(&aw_state,AW_GLOBAL,name,i);}
     saved=aw_state;assert(!AW_ClockEnsure() && !memcmp(&saved,&aw_state,sizeof(saved)));
+    /* A full state cannot take the clock; the hold leaves it untouched. */
+    argc=2;arg="off";daynight();AW_WaitTick();assert(AW_DayNightFrozen() && !memcmp(&saved,&aw_state,sizeof(saved)));
     return 0;
 }

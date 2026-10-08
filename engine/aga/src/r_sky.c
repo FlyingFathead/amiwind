@@ -301,7 +301,7 @@ static void R_SkySpeedCommand(void)
 {
     char *text,*end;double value;
     if(Cmd_Argc()==2){
-        text=Cmd_Argv(1);value=strtod(text,&end);
+        text=Cmd_Argv(1);value=Q_strtod(text,&end);
         if(end==text || *end || !(value>=0 && value<=100))goto invalid;
         Cvar_SetValue(sky_cloud_speed.name,(float)value);
     }else if(Cmd_Argc()!=1)goto invalid;
@@ -434,9 +434,9 @@ int R_NightMoonOrbit(int moon,int milliseconds,int days,float direction[3],int *
     if(phase)*phase=(orbit_day<0?0:orbit_day%24)/3;
     angle=travel*(M_PI/(moon?20.0:23.0));axis=(moon?50.0:35.0)*(M_PI/180.0);
     if(angle>=M_PI)return 0;
-    direction[0]=(float)cos(angle);
-    direction[1]=(float)(-sin(angle)*sin(axis));
-    direction[2]=(float)(sin(angle)*cos(axis));
+    direction[0]=(float)Q_CosRad(angle);
+    direction[1]=(float)(-Q_SinRad(angle)*Q_SinRad(axis));
+    direction[2]=(float)(Q_SinRad(angle)*Q_CosRad(axis));
     return direction[2]>0;
 }
 static void R_NightFrame(int milliseconds,int days)
@@ -800,7 +800,7 @@ static void R_LightHue(int *hue)
 {
     int k;
     hue[0]=255;hue[1]=210;hue[2]=140;
-    if(sscanf(sky_light_hue.string,"%d %d %d",&hue[0],&hue[1],&hue[2])!=3){hue[0]=255;hue[1]=210;hue[2]=140;}
+    if(Q_sscanf(sky_light_hue.string,"%d %d %d",&hue[0],&hue[1],&hue[2])!=3){hue[0]=255;hue[1]=210;hue[2]=140;}
     for(k=0;k<3;k++)hue[k]=hue[k]<0?0:hue[k]>255?255:hue[k];
 }
 static void R_BuildWarmLight(void)

@@ -54,7 +54,7 @@ def derive(raw, bounds=BOUNDS):
     vertices = list(struct.iter_unpack('<3f', data[3]))
     edges = list(struct.iter_unpack('<HH', data[12]))
     surfedges = [v[0] for v in struct.iter_unpack('<i', data[13])]
-    faces = list(struct.iter_unpack('<Hhihh4Bi', data[7]))
+    faces = list(struct.iter_unpack('<HhihH4Bi', data[7]))
     start, count = models[0][14:16]
     hidden = set()
     for index in range(start, start+count):

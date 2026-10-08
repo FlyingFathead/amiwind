@@ -56,7 +56,28 @@ def stamp(raw, fields):
     return pack_lumps(data)
 
 
-def stamp_staged_hands(id1, report, map_names=None):
+def _plan_stamp(task):
+    """Worker: (input hash, needs a change) for one map; writes nothing."""
+    path, fields = task
+    raw = Path(path).read_bytes()
+    return hashlib.sha256(raw).hexdigest(), stamp(raw, fields) != raw
+
+
+def _write_stamp(task):
+    """Worker: re-check one planned map, stamp it and verify the write."""
+    path, fields, original_hash = task
+    path = Path(path)
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != original_hash:
+        raise ValueError('Map changed during hand metadata staging: ' + path.name)
+    corrected = stamp(raw, fields)
+    path.write_bytes(corrected)
+    if path.read_bytes() != corrected:
+        raise ValueError('Hand metadata write verification failed: ' + path.name)
+    return path.name
+
+
+def stamp_staged_hands(id1, report, map_names=None, jobs=1):
     """Call after all map replacements, before content/heap/package gates."""
     id1 = Path(id1)
     fields = hand_fields(report)
@@ -80,23 +101,13 @@ def stamp_staged_hands(id1, report, map_names=None):
         raise ValueError('No staged maps for first-person metadata')
     # Validate all inputs before the first write. Holding every world's bytes
     # would need gigabytes; retain only hashes and reread one bounded map at a time.
-    planned = []
-    for path in maps:
-        raw = path.read_bytes()
-        corrected = stamp(raw, fields)
-        planned.append((path, hashlib.sha256(raw).hexdigest(), corrected != raw))
-    changed = []
-    for path, original_hash, needs_change in planned:
-        if not needs_change:
-            continue
-        raw = path.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != original_hash:
-            raise ValueError('Map changed during hand metadata staging: ' + path.name)
-        corrected = stamp(raw, fields)
-        path.write_bytes(corrected)
-        if path.read_bytes() != corrected:
-            raise ValueError('Hand metadata write verification failed: ' + path.name)
-        changed.append(path.name)
+    # Maps are independent: both passes run in up to `jobs` workers, in map order.
+    from build_parallel import ordered_map
+    workers = max(1, min(jobs, len(maps)))
+    planned = list(ordered_map(_plan_stamp, [(str(path), fields) for path in maps], workers))
+    changed = [name for name in ordered_map(_write_stamp,
+               [(str(path), fields, original_hash) for path, (original_hash, needs_change)
+                in zip(maps, planned) if needs_change], workers)]
     return {'status': 'passed', 'map_count': len(maps), 'changed_maps': changed,
             'model_sha256': model_hash, 'source_model_sha256': report.get('sha256'),
             'worldspawn_fields': fields,

@@ -37,6 +37,8 @@ void AW_HarvestLink(void){harvest++;}
 void AW_SpeechRelink(void){speech++;}
 void CL_UpdateTEnts(void){tempents++;}
 void R_RemoveEfrags(entity_t *e){assert(0);}
+int aw_visedicts_dropped,aw_visedicts_dropped_frame;
+void AW_VisedictDropped(void){assert(0);}
 void R_EntityParticles(entity_t *e){assert(0);}
 void R_RocketTrail(vec3_t a,vec3_t b,int kind){assert(0);}
 #else
@@ -72,6 +74,8 @@ void AW_WaitTick(void){waits++;}
 void AW_SaveTick(void){saves++;}
 void AW_SceneTick(void){scenes++;}
 void AW_ProfileFrame(void){}
+void AW_FpuCountFrame(void){}
+void AW_FpuCountInit(void){}
 double Sys_FloatTime(void){return realtime;}
 #endif
 

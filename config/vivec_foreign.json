@@ -1,0 +1,130 @@
+{
+  "format": 1,
+  "comment": "Vivec canton frame (docs/TOWN_IMPORT.md, Vivec). handoff_core is the canton's share of the city on the original cell grid; the bounds add at least draw distance + 32 around it, in whole 768 cores, so a neighbouring frame takes over before this frame's edge comes into view. The centre is the handoff core's centre on the 512-unit terrain material grid. interiors: the rooms reached through the canton's load doors (append only; position = map name and save ID).",
+  "source_cell": [
+    4,
+    -10
+  ],
+  "source_radius": 2,
+  "centre": [
+    32768,
+    -77824
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -2688,
+      -1920
+    ],
+    [
+      2688,
+      1920
+    ]
+  ],
+  "reference_margin": 0,
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "handoff_core": [
+    [
+      -2048,
+      -1024
+    ],
+    [
+      2048,
+      1024
+    ]
+  ],
+  "town": {
+    "id": "vivec_foreign",
+    "title": "Vivec, Foreign Quarter",
+    "map": "vivec_foreign",
+    "map_prefix": "vq",
+    "region_cap": 64,
+    "message": "Vivec, Foreign Quarter",
+    "region_file": "vivec_foreign-regions.txt",
+    "door_file": "scene-doors-vivec_foreign.txt",
+    "visual_group": "vivec_foreign",
+    "arrival": {
+      "source_position": [
+        32199,
+        -79119,
+        3095
+      ],
+      "source_rotation_z": 1.5707963705062866,
+      "reason": "Original exit point of interior door 215994 (Vivec, Foreign Quarter Upper Waistworks) onto the canton."
+    },
+    "return": null
+  },
+  "interiors": [
+    {
+      "cell": "Ibishammus, Shrine"
+    },
+    {
+      "cell": "Vivec, Agrippina Herennia: Clothier"
+    },
+    {
+      "cell": "Vivec, Alusaron: Smith"
+    },
+    {
+      "cell": "Vivec, Andilu Drothan: Alchemist"
+    },
+    {
+      "cell": "Vivec, Aurane Frernis: Apothecary"
+    },
+    {
+      "cell": "Vivec, Black Shalk Cornerclub"
+    },
+    {
+      "cell": "Vivec, Foreign Quarter Canalworks"
+    },
+    {
+      "cell": "Vivec, Foreign Quarter Lower Waistworks",
+      "exclude": "inline models 222 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, Foreign Quarter Plaza"
+    },
+    {
+      "cell": "Vivec, Foreign Quarter Tomb"
+    },
+    {
+      "cell": "Vivec, Foreign Quarter Underworks"
+    },
+    {
+      "cell": "Vivec, Foreign Quarter Upper Waistworks"
+    },
+    {
+      "cell": "Vivec, Guild of Fighters"
+    },
+    {
+      "cell": "Vivec, Guild of Mages",
+      "exclude": "inline models 260 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+    },
+    {
+      "cell": "Vivec, J'Rasha: Healer"
+    },
+    {
+      "cell": "Vivec, Jeanne: Trader"
+    },
+    {
+      "cell": "Vivec, Jobasha's Rare Books"
+    },
+    {
+      "cell": "Vivec, Miun-Gei: Enchanter"
+    },
+    {
+      "cell": "Vivec, Ralen Tilvur: Smith"
+    },
+    {
+      "cell": "Vivec, Simine Fralinie: Bookseller"
+    }
+  ]
+}

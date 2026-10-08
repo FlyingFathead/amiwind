@@ -63,6 +63,7 @@ qboolean	con_debuglog;
 #define		MAXCMDLINE	256
 extern	char	key_lines[32][MAXCMDLINE];
 extern	int		edit_line;
+extern	int		history_line;
 extern	int		key_linepos;
 
 
@@ -95,6 +96,10 @@ void Con_ToggleConsole_f (void)
 	else {
 		con_fullscreen=0;key_dest = key_console;
 	}
+	// AmiWind (CONSOLE-HISTORY-EMPTY-32): Up starts from the newest command
+	// each time the console opens or closes, not from where the last
+	// history walk stopped
+	history_line = edit_line;
 
 	SCR_EndLoadingPlaque ();
 	memset (con_times, 0, sizeof(con_times));
@@ -377,6 +382,11 @@ void Con_DebugLog(char *file, char *fmt, ...)
     fclose (fd);
 #else
     fd = open(file, O_WRONLY | O_CREAT | O_APPEND, 0666);
+    if (fd < 0)
+        return;
+    /* The Amiga C library does not honour O_APPEND: without this seek every
+     * message overwrote the start of the file (REMOTE-CONSOLE-APPEND-31). */
+    lseek(fd, 0, SEEK_END);
     write(fd, data, strlen(data));
     close(fd);
 #endif
@@ -505,6 +515,29 @@ void Con_DrawInput (void)
 
 	if (key_dest != key_console && !con_forcedup)
 		return;		// don't draw anything
+
+	// AmiWind terminal line editor: the cursor sits inside the line, so draw
+	// from a copy and leave the text after the cursor in place; the cursor
+	// blinks over the character under it
+	if (Key_ConsoleTerminal ())
+	{
+		char	line[MAXCMDLINE+1];
+		int		len, start;
+		Q_strcpy (line, key_lines[edit_line]);
+		len = Q_strlen (line);
+		for (i=len ; i<MAXCMDLINE ; i++)
+			line[i] = ' ';
+		line[MAXCMDLINE] = 0;
+		if ((int)(realtime*con_cursorspeed)&1)
+			line[key_linepos] = 11;
+		else if (key_linepos >= len)
+			line[key_linepos] = 10;
+		start = key_linepos >= con_linewidth ? 1 + key_linepos - con_linewidth : 0;
+		y = con_vislines-2*AW_ConsoleCharHeight();
+		for (i=0 ; i<con_linewidth && start+i<MAXCMDLINE ; i++)
+			AW_ConsoleCharacter ((i+1)*AW_ConsoleCharWidth(), y, line[start+i]);
+		return;
+	}
 
 	text = key_lines[edit_line];
 

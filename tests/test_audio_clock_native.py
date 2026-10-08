@@ -29,7 +29,8 @@ class AudioClockTests(unittest.TestCase):
                     ('common', ROOT/'tests/aga_load_music_common.c', []),
                     ('scheduler', SOURCE/'snd_dma.c', ['-DAMIGA']),
                     ('mixer', SOURCE/'snd_mix.c', []),
-                    ('music', SOURCE/'aw_music.c', [])):
+                    ('music', SOURCE/'aw_music.c', []),
+                    ('format', SOURCE/'aw_format.c', [])):
                 obj = directory/(name+'.o')
                 self.checked(['cc', *FLAGS, *defines, '-I'+str(SOURCE), '-c', str(source), '-o', str(obj)])
                 objects.append(str(obj))

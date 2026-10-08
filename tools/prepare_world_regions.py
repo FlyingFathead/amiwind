@@ -25,11 +25,11 @@ from mwad.audit import BSA, load_esm
 from mwad.paths import ensure_external, child_ci
 from npc_geometry import Assets
 from prepare_quake import brush, box, miptex, wad
-from player_hull import lumps, pack_lumps
-from compact_bsp import compact, entities
+from player_hull import lumps, rebuild_world_hull
 from deduplicate_bsp import deduplicate
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
+from vis_options import add_vis_option, light_args, map_threads, vis_args
 
 SCALE = .25
 STEP = 128
@@ -91,10 +91,13 @@ def refine_entries(entries, refinements):
     for rule in refinements:
         matches=[i for i,e in enumerate(result) if e['cell']==rule['cell']]
         if not matches:continue  # Synthetic surveys can omit this source cell.
-        if len(matches)!=1:raise ValueError('Refinement parent must be an unsplit cell')
+        if len(matches)!=1 or result[matches[0]]['divisions']!=1:
+            raise ValueError('Refinement parent must be an unsplit cell: cell %s is split into %d regions by the survey'
+                             %(rule['cell'],len(matches)))
         slot=matches[0];parent=result[slot]
-        if parent['name']!=rule['parent'] or parent['divisions']!=1:
-            raise ValueError('Refinement parent differs from measured layout')
+        if parent['name']!=rule['parent']:
+            raise ValueError('Refinement parent differs from measured layout: cell %s is %s, expected %s'
+                             %(rule['cell'],parent['name'],rule['parent']))
         n=rule['divisions']
         if n not in (2,4,8):raise ValueError('Invalid refinement divisions')
         size=2048//n;children=[]
@@ -114,12 +117,23 @@ def refine_entries(entries, refinements):
     if len(result)>8192:raise ValueError('World directory exceeds bounded runtime capacity')
     return result
 
+def layout_refinements():
+    """The recorded world layout: survey ceiling plus refinements (BUILD-WORLD-LAYOUT-DRIFT-32)."""
+    return json.loads((Path(__file__).resolve().parents[1]/'config/world-region-refinements.json').read_text(encoding='utf-8'))
+
+
 def plan(survey):
     report = json.loads((survey / 'world-survey.json').read_text())
     if report['format'] != 'AmiWind world survey 1' or report['terrain']['height_seams']:
         raise ValueError('Expected a complete, seam-checked world survey')
     if report['settings']['overlap_runtime'] != OVERLAP:
         raise ValueError('Survey overlap differs from the compiled region profile')
+    refinements=layout_refinements()
+    ceiling=report['settings'].get('source_triangle_limit')
+    if ceiling!=refinements['survey_source_triangle_limit']:
+        raise ValueError('Survey ceiling %s differs from the recorded world layout ceiling %d '
+                         '(config/world-region-refinements.json); run the survey with --triangle-limit %d'
+                         %(ceiling,refinements['survey_source_triangle_limit'],refinements['survey_source_triangle_limit']))
     entries = []
     for cell in sorted(report['cells'], key=lambda c: tuple(c['cell'])):
         n = cell['screen']['candidate']
@@ -314,12 +328,15 @@ def map_text(entry, terrain):
 
 def compile_region(task):
     global _terrain
-    survey, out, entry, bindir = task
+    survey, out, entry, bindir = task[:4]
+    # Optional (vis threads, vis mode); 4-field tasks keep -threads 1 -fast.
+    threads, vis_mode = task[4:] if len(task) > 4 else (1, 'fast')
     if _terrain is None:
         _terrain = Terrain(survey)
     started = time.monotonic(); root=out/entry['name']; root.mkdir(exist_ok=True)
     source=root/'terrain.map'; content=map_text(entry, _terrain)
-    key=hashlib.sha256(b'world-terrain-hull-v5-adaptive-shoreline'+content.encode()+(out/'terrain.wad').read_bytes()).hexdigest()
+    key=hashlib.sha256(b'world-terrain-hull-v5-adaptive-shoreline'+content.encode()+(out/'terrain.wad').read_bytes()+
+                       (b'' if vis_mode=='fast' else b'vis-'+vis_mode.encode())).hexdigest()
     receipt=root/'conversion.json'
     if receipt.exists():
         previous=json.loads(receipt.read_text())
@@ -328,21 +345,17 @@ def compile_region(task):
     shutil.copyfile(out/'terrain.wad', root/'terrain.wad')
     source.write_text(content)
     with (root/'compile.log').open('w') as log:
-        for name,args in [('qbsp',['-nopercent', 'terrain.map']), ('vis',['-threads','1','-fast','terrain.bsp']), ('light',['-threads','1','-minlight','24','terrain.bsp'])]:
+        for name,args in [('qbsp',['-nopercent', 'terrain.map']), ('vis',vis_args('terrain.bsp',threads,vis_mode)), ('light',light_args('-minlight','24','terrain.bsp'))]:
             subprocess.run([str(bindir/name),*args],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
     target=root/'scene.bsp'
-    base=lumps((root/'terrain.bsp').read_bytes())
+    shutil.copyfile(root/'terrain.bsp', target)
     # These terrain-only maps have no large actors. Keep point collision and
     # graft the actual standing hull; discard unused stock Quake actor hulls.
     # Detailed town hulls are built separately and remain intact.
-    for offset in (40,44,48):struct.pack_into('<i',base[14],offset,-1)
-    pruned,_=compact(pack_lumps(base), records=[e for e in entities(base[0]) if e.get('classname')!='info_null']);target.write_bytes(pruned)
-    # Same standing humanoid hull as the established town conversions.
+    # Same standing humanoid hull path as every other converted map.
     with (root/'hull.log').open('w') as log:
-        from player_hull import scaled_map, graft_hull
-        collision=root/'standing-collision.map';collision.write_text(scaled_map(source.read_text()))
-        subprocess.run([str(bindir/'qbsp'),'-nopercent',collision.name],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
-        target.write_bytes(graft_hull(target.read_bytes(),collision.with_suffix('.bsp').read_bytes()))
+        rebuild_world_hull(target, source, bindir/'qbsp', discard_stock_hulls=True, log=log,
+                           records=lambda found: [e for e in found if e.get('classname')!='info_null'])
     packed,storage=deduplicate(target.read_bytes());target.write_bytes(packed)
     data=lumps(packed)
     metrics=dict(bytes=target.stat().st_size,faces=len(data[7])//20,clipnodes=len(data[9])//8,
@@ -356,7 +369,7 @@ def compile_region(task):
     return result
 
 
-def prepare(survey,data,scene,out,bindir,jobs,only=None):
+def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast'):
     survey=survey.resolve();out=ensure_external(out,'world terrain').resolve();out.mkdir(parents=True,exist_ok=True)
     scene=ensure_external(scene,'private scene').resolve();bindir=bindir.resolve()
     report, entries=plan(survey)
@@ -369,7 +382,9 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None):
         entries=[e for e in entries if e['name'] in only]
         if len(entries)!=len(set(only)):raise ValueError('Unknown diagnostic region')
     results=[]
-    for result in ordered_map(compile_region,[(survey,out,e,bindir) for e in entries],jobs):
+    # Maps compile side by side: divide the job budget between them.
+    threads=map_threads(jobs,min(jobs,max(1,len(entries))))
+    for result in ordered_map(compile_region,[(survey,out,e,bindir,threads,vis_mode) for e in entries],jobs):
         results.append(result)
         print(result['name'],result['converted'],flush=True)
     receipt=dict(format='AmiWind playable terrain regions 1',master_sha256=report['master_sha256'],
@@ -392,5 +407,8 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('survey','data-files','scene','out','bindir'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--only',nargs='+',help='Diagnostic subset; never publishes a partial world directory')
-    add_jobs(p);a=p.parse_args()
-    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only)
+    from scenery_reduce import add_options, apply_options
+    add_options(p)
+    add_jobs(p);add_vis_option(p);a=p.parse_args();apply_options(a)
+    import build_profile;build_profile.instrument('world-terrain')
+    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode)

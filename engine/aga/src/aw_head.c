@@ -68,7 +68,7 @@ void AW_HeadDraw(int x,int y,int width,int height,float angle)
     if(a<.01 || c<.01)return;
     scale=(width-8)/a;
     if(scale>(height-8)/c)scale=(height-8)/c;
-    cs=cos(angle);sn=sin(angle);
+    cs=Q_CosRad(angle);sn=Q_SinRad(angle);
     for(i=0;i<width*height;i++)depth[i]=32767;
     AW_UIFill(x,y,width,height,AW_UIColor(16,17,18));
     for(slot=0;slot<2;slot++)for(i=0;i<faces[slot];i++){

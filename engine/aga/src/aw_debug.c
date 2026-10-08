@@ -34,6 +34,7 @@ static void view(void) {
     p->v.fixangle=1;SV_LinkEdict(p,false);
 }
 static void tcl(void) { if(player())Cbuf_AddText("noclip\n"); }
+static void unstuck(void) { AW_Unstuck(player()); }
 /* Camera-only diagnostic: preserve ordinary walking and collision. */
 static void aim(void) {
     edict_t *p=player();float yaw,pitch;if(!p)return;
@@ -174,6 +175,6 @@ void AW_DebugInit(void) {
     Cmd_AddCommand("aw_npc_floors",npc_floors);
     Cmd_AddCommand("aw_blockers",blockers);
     Cmd_AddCommand("aw_npcs",npcs);Cmd_AddCommand("tcl",tcl);Cmd_AddCommand("aw_help",help);Cmd_AddCommand("help",help);
-    Cmd_AddCommand("aw_view",view);Cmd_AddCommand("aw_recover",recover);Cmd_AddCommand("aw_pos",position);Cmd_AddCommand("aw_probe",probe);
+    Cmd_AddCommand("aw_view",view);Cmd_AddCommand("aw_recover",recover);Cmd_AddCommand("aw_unstuck",unstuck);Cmd_AddCommand("aw_pos",position);Cmd_AddCommand("aw_probe",probe);
     Cmd_AddCommand("aw_aim",aim);Cmd_AddCommand("aw_startup",AW_MovieStartup);
 }

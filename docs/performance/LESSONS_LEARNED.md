@@ -3,6 +3,56 @@
 Lessons from measuring AmiWind's loading on the emulated reference machine.
 Newest first.
 
+## What a town frame is spent on (8 October 2026)
+
+The engine now counts its own work per frame (`dbg rcount`: brush models in
+view, faces clipped, fragments, world-BSP nodes visited, surface and edge cache
+use, and the time of each render stage). Ten fixed cameras in Balmora and
+Seyda Neen, measured in FS-UAE, gave the same counts on every repeat:
+
+| | Balmora (5 cameras) | Seyda Neen (5 cameras) |
+| --- | --- | --- |
+| Fragments per clipped brush-model face | 1.38-1.59 | 1.03-1.05 |
+| World-BSP nodes visited per clipped face | 27-52 | 3-5 |
+| Node visits per frame | 79,907-233,867 | 16,713-33,555 |
+| Share of render time in brush models | 67-82 % | 39-59 % |
+| Surface cache blocks built per frame, camera still | 0 | up to 914 (812 KB) |
+| Edges reused from the previous frame | 190-350 | 0 |
+
+What we learned:
+
+1. **The cost was the walk, not the pieces.** We expected brush models to cost
+   time by being cut into many fragments
+   ([RENDER-BMODEL-FRAGMENTS-32](../bugs/RENDER-BMODEL-FRAGMENTS-32.md)). They
+   are barely cut. What costs is finding where each face goes: in Balmora every
+   clipped face walks 27-52 nodes down a deep world BSP, transforming each
+   node's plane again every time. The fast one-leaf path is almost unused there
+   (0-8 models in view).
+2. **A still camera should not rebuild anything.** Seyda Neen views rebuild
+   hundreds of surface cache blocks every frame because the cache is smaller
+   than what they show
+   ([RENDER-SURFCACHE-THRASH-32](../bugs/RENDER-SURFCACHE-THRASH-32.md)), and
+   reuse no edges at all
+   ([RENDER-EDGECACHE-SEYDA-32](../bugs/RENDER-EDGECACHE-SEYDA-32.md)).
+3. **Count first, then time.** The counts are identical across runs and
+   emulator settings; times are not. Counts are the main currency for
+   comparing builds; times only compare within one batch.
+4. **Emulator times are relative.** All earlier frame rates used FS-UAE with
+   the JIT, which runs far faster than any real 68040
+   ([BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md)). A
+   cycle-approximate 68040 at 24.8 MHz takes 148-188 times longer per frame
+   (2.7-8.1 s at these cameras). That profile is a relative reference too, not
+   a hardware number; one measurement on a real accelerated A1200 is still
+   needed. FS-UAE ignores `uae_cpu_frequency` in this mode; only
+   `uae_cpu_multiplier` sets the clock
+   ([BENCH-FSUAE-FREQ-32](../bugs/BENCH-FSUAE-FREQ-32.md)).
+5. **Remove the traps, then prove it.** With the C library's number parsing and
+   formatting replaced by the engine's own, the instructions a 68040 has to
+   emulate in software fell from 40 to 16 in the engine, and a strict-FPU run
+   (no JIT, unimplemented instructions trap) rendered all ten cameras with no
+   trap ([ENGINE-FPU-UNIMPL-31](../bugs/ENGINE-FPU-UNIMPL-31.md)). Saves,
+   menus, combat and the intro are not yet covered.
+
 ## The walls Quake never saw (7 October 2026)
 
 For months the frame rate in towns and interiors was treated as the limit of
@@ -16,7 +66,10 @@ data and count what the engine is asked to draw. And count it the way the
 engine does: the first occluder prototype split the map nicely, yet 589 of 590
 building models stayed visible, because Quake keeps or drops an entity whole
 and treats one linked to more than 16 leaves as visible everywhere. Leaf
-counts alone would have called that a success. Details:
+counts alone would have called that a success. The full prototype then
+showed that even fitted occluders and building faces in the world model barely
+change what is sent in an open town: measure the engine's own decision before
+building the fix. Details:
 [Town visibility](TOWN-VISIBILITY.md); rule in
 [DEVELOPMENT.md](../DEVELOPMENT.md).
 

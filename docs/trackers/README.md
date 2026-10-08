@@ -8,7 +8,7 @@ installation can regenerate the detailed views locally.
 
 | Tracker | Status | What it shows |
 | --- | --- | --- |
-| [World progress](WORLD_PROGRESS.md) | First version in the image build | Every exterior cell with switchable overlays: converted, needs work, memory warnings, entity coverage, points of interest |
+| [World progress](WORLD_PROGRESS.md) | First version in the image build | Every exterior cell with switchable overlays: converted, needs work, memory warnings, entity coverage, points of interest; whole-world limit estimate |
 | [Entities](ENTITIES.md) | First version in the image build | Per entity category (rocks, plants, giant mushrooms, NPCs, creatures, containers, doors, fires...): original placements vs placed in AmiWind, with reasons for anything missing |
 | [Points of interest](POI.md) | Checklist done; `dbg poi` planned | Every named place, from cellars to cities, and which are converted |
 

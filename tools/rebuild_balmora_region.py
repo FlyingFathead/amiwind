@@ -22,9 +22,12 @@ from bound_balmora_visuals import bound_visuals
 from share_bsp_geometry import share_geometry
 from deduplicate_bsp import deduplicate
 from check_geometry_render_inputs import compare_render_inputs, compare_sample_sharing
+from vis_options import light_args, vis_args
 
 
-def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, ericw_bin, threads=4):
+def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, ericw_bin, threads=None, vis_mode='fast'):
+    from build_jobs import resolve_jobs
+    threads=resolve_jobs(threads)  # the builder's --jobs; None: the stage budget
     cache=Path(cache);source_runtime=Path(source_runtime);palette=Path(palette);out=Path(out)
     out.mkdir(parents=True,exist_ok=False)
     index_path=cache/'scenery/scenery-index.json'
@@ -50,8 +53,8 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
         return path if path.is_file() else binary/(name+'.exe')
     with (out/'compile.log').open('w') as log:
         for name,args in (('qbsp',['-nopercent','terrain.map']),
-                          ('vis',['-threads',str(threads),'-fast','terrain.bsp']),
-                          ('light',['-threads',str(threads),'-minlight','24','terrain.bsp'])):
+                          ('vis',vis_args('terrain.bsp',threads,vis_mode)),
+                          ('light',light_args('-minlight','24','terrain.bsp'))):
             subprocess.run([str(exe(name)),*args],cwd=out,stdout=log,stderr=subprocess.STDOUT,check=True)
     base=out/'base.bsp';shutil.copyfile(out/'terrain.bsp',base)
     rebuild_world_hull(base,out/'terrain.map',exe('qbsp'))

@@ -1,0 +1,169 @@
+{
+  "schema": "amiwind-known-inputs-v1",
+  "revision": 1,
+  "scope": "Known builds of the files users supply to the builder: names, sizes, versions, SHA-256 hashes and where they come from. Metadata only; no file contents. A file that is not listed is reported as unknown and still used (see docs/KNOWN_INPUTS.md). Add a build with its source label; never remove one.",
+  "editions": [
+    {
+      "name": "Game of the Year edition (GOG, reference)",
+      "masters_source": "Game of the Year edition (GOG and Steam, identical)",
+      "bookart_ttf": "all",
+      "reference": true,
+      "notes": "Reference edition of AmiWind builds and releases: BookArt TrueType fonts present. See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "name": "Game of the Year edition (Steam: bitmap fonts)",
+      "masters_source": "Game of the Year edition (GOG and Steam, identical)",
+      "bookart_ttf": "none",
+      "reference": false,
+      "notes": "Supported. No BookArt TrueType fonts: interface and book text use the bitmap fonts (BUILD-EDITION-DIFFERENCES-32)."
+    }
+  ],
+  "entries": [
+    {
+      "kind": "tes3-master",
+      "name": "Morrowind.esm",
+      "bytes": 79837557,
+      "sha256": "5c3c8c2cbd20e25901b59b3ece33d36b7ef0e3d60ad8d11828bcc61a5ead1647",
+      "version": "1.20",
+      "identity": {
+        "author": "Bethesda Softworks",
+        "records": 48295,
+        "masters": []
+      },
+      "source": "Game of the Year edition (GOG and Steam, identical)",
+      "tested": true,
+      "notes": "Reference master of every AmiWind build. See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "kind": "tes3-archive",
+      "name": "Morrowind.bsa",
+      "bytes": 310459500,
+      "sha256": "3dcd5e6bfa08245521a53374bf733ee5c920df49103898a15aa31144ad64cf48",
+      "version": "BSA $100",
+      "identity": {
+        "files": 11090
+      },
+      "source": "Game of the Year edition (GOG and Steam, identical)",
+      "tested": true,
+      "notes": "Reference archive of every AmiWind build. See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "kind": "tes3-master",
+      "name": "Tribunal.esm",
+      "bytes": 4565686,
+      "sha256": "2ace511f23cc2a9ddd5f3aa59c7919789b9378cf4b17c8ae3375dd6b782f3f2b",
+      "version": "1.30",
+      "identity": {
+        "author": "Bethesda Softworks",
+        "records": 9999,
+        "masters": [
+          "Morrowind.esm"
+        ]
+      },
+      "source": "Game of the Year edition (GOG and Steam, identical)",
+      "tested": true,
+      "notes": "Read by the world estimate and media steps. See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "kind": "tes3-archive",
+      "name": "Tribunal.bsa",
+      "bytes": 64986032,
+      "sha256": "3901e7a146f7a64a4ae9534c80d5974f7ab15adf5c48c4561d9313c0f7831d69",
+      "version": "BSA $100",
+      "identity": {
+        "files": 1174
+      },
+      "source": "Game of the Year edition (GOG and Steam, identical)",
+      "tested": true,
+      "notes": "See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "kind": "tes3-master",
+      "name": "Bloodmoon.esm",
+      "bytes": 9631798,
+      "sha256": "bd27090d0e6ad4c1bf1abc83f1a2dac56fcc82cae7bfe8263c413fb301801357",
+      "version": "1.30",
+      "identity": {
+        "author": "Bethesda Softworks",
+        "records": 10775,
+        "masters": [
+          "Morrowind.esm"
+        ]
+      },
+      "source": "Game of the Year edition (GOG and Steam, identical)",
+      "tested": true,
+      "notes": "Read by the world estimate and media steps. See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "kind": "tes3-archive",
+      "name": "Bloodmoon.bsa",
+      "bytes": 118425318,
+      "sha256": "7c20956791400d958cb407f0b7c1c19ceaf46719df7eb724d0b450299360bd7c",
+      "version": "BSA $100",
+      "identity": {
+        "files": 1545
+      },
+      "source": "Game of the Year edition (GOG and Steam, identical)",
+      "tested": true,
+      "notes": "See docs/MORROWIND_EDITIONS.md."
+    },
+    {
+      "kind": "amiga-library",
+      "name": "68040.library",
+      "bytes": 43888,
+      "sha256": "b8c26d42369fb22719296a26b67e357640a82ee3dcf6fa8f42c953de41679fbf",
+      "version": "37.30",
+      "identity": {
+        "id_string": "68040 37.30 (18.1.93)",
+        "ver_string": null,
+        "revision_source": "RomTag id string"
+      },
+      "source": "Commodore AmigaOS 3.1 (37.30), as shipped in Amiga Forever 2016 (Cloanto)",
+      "tested": true,
+      "notes": "Commodore 68040.library 37.30, AmigaOS 3.1 original, tested with the builder. File date 1994-07-06 (hint only). Trap handling on a real 68040 not yet verified (ENGINE-FPSP-MISSING-31)."
+    },
+    {
+      "kind": "amiga-library",
+      "name": "68060.library",
+      "bytes": 64820,
+      "sha256": "166472bc4dcc3580cf80f6dccb38f6f4f8ee39bb8f3113a3cc18343dcfb38fd9",
+      "version": "43.1",
+      "identity": {
+        "id_string": "68060.library 43.1 (22.10.2009) (c) 1999-2001 The MMU.lib development group, THOR",
+        "ver_string": "68060.library 43.1 (22.10.2009) (c) 1999-2001 The MMU.lib development group, THOR",
+        "revision_source": "RomTag id string"
+      },
+      "source": "MMULib 43.1 (Thomas Richter), as shipped in Amiga Forever 2016 (Cloanto)",
+      "tested": true,
+      "notes": "MMULib 68060.library 43.1 (Thomas Richter), not a Commodore file: shipped in that set's Libs drawer. Needs mmu.library. Tested with the builder. File date 2009-11-01 (hint only). Trap handling on a real 68060 not yet verified (ENGINE-FPSP-MISSING-31)."
+    },
+    {
+      "kind": "amiga-library",
+      "name": "mmu.library",
+      "bytes": 56720,
+      "sha256": "6a4395da8057072db8c09e17d8fefcabc2c15888af56a04e7642f930e6bdc614",
+      "version": "43.11",
+      "identity": {
+        "id_string": "mmu.library 43.11 (3.10.2009) (c) 1999-2009 The MMU.lib development group, THOR",
+        "ver_string": "mmu.library 43.11 (3.10.2009) (c) 1999-2009 The MMU.lib development group, THOR",
+        "revision_source": "RomTag id string"
+      },
+      "source": "MMULib 43.11 (Thomas Richter), as shipped in Amiga Forever 2016 (Cloanto)",
+      "tested": true,
+      "notes": "MMULib mmu.library 43.11 (Thomas Richter), companion of the MMULib 68060.library. Tested with the builder. File date 2009-10-04 (hint only)."
+    },
+    {
+      "kind": "kickstart-rom",
+      "name": "kickstart-3.1-a1200.rom",
+      "bytes": 524288,
+      "sha256": "6d43840d4099a74170ea0f0425b6257c3891ebcaa39c4d1840075a9ab22b5707",
+      "version": "40.68",
+      "identity": {
+        "encrypted": false
+      },
+      "source": "Kickstart 3.1 A1200 ROM (40.68), the development reference ROM",
+      "tested": true,
+      "notes": "Same SHA-256 as the FS-UAE launcher's reference ROM (tools/AmiWind-FS-UAE-launcher.py); any file name. Never bundled."
+    }
+  ]
+}

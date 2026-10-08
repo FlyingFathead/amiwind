@@ -92,5 +92,20 @@ int main(void){
     source[0]=3*8192;assert(!AW_RegionNameAt(source));old_names=0;
     broken_names=1;source[0]=-1;assert(!AW_RegionNameAt(source));
     source[0]=NAN;assert(!AW_RegionNameAt(source));
+    /* A table town without a world directory slot (the Arena) hands off by
+     * its own frame once its alias map is installed. */
+    source[0]=36352;source[1]=-87040;source[2]=0;
+    assert(AW_WorldMapTarget(source,target,b) && !strcmp(target,"vivec_arena") && b[0]==0 && b[1]==0);
+    a[0]=1000;a[1]=-500;a[2]=40;assert(AW_WorldToSource("vivec_arena",a,source));
+    assert(source[0]==40352 && source[1]==-89040 && source[2]==160);
+    a[0]=1400;assert(!AW_WorldDestination("vivec_arena",a,target,b));
+    /* Neighbouring canton frames: leaving the Arena's core lands in the
+     * Telvanni frame directly; from Redoran, the Arena's core comes first
+     * (earlier in table order). Arrivals keep the shared world position. */
+    a[0]=1500;assert(AW_WorldDestination("vivec_arena",a,target,b));
+    assert(!strcmp(target,"vivec_telvanni") && b[0]==-676 && b[1]==-1140 && b[2]==40);
+    a[0]=1100;a[1]=0;assert(AW_WorldDestination("vivec_redoran",a,target,b));
+    assert(!strcmp(target,"vivec_arena") && b[0]==-820 && b[1]==256 && b[2]==40);
+    a[0]=1500;a[1]=-1500;assert(!AW_WorldDestination("vivec_arena",a,target,b)); /* No town or terrain region there. */
     return 0;
 }

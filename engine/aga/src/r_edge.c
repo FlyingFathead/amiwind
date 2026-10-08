@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_rcount.h"
 
 #if 0
 // FIXME
@@ -737,6 +738,7 @@ void R_ScanEdges (void)
 			S_ExtraUpdate ();	// don't let sound get messed up if going slow
 			VID_LockBuffer ();
 
+			AW_RC_ADD(RC_SPANS, span_p - basespan_p);
 			if (r_drawculledpolys)
 			{
 				R_DrawCulledPolys ();
@@ -774,6 +776,9 @@ void R_ScanEdges (void)
 	(*pdrawfunc) ();
 
 // draw whatever's left in the span list
+	AW_RC_ADD(RC_SPANS, span_p - basespan_p);
+	AW_RC_ADD(RC_SURFS, surface_p - surfaces - 1);
+	AW_RC_ADD(RC_EDGES_USED, edge_p - r_edges);
 	if (r_drawculledpolys)
 		R_DrawCulledPolys ();
 	else

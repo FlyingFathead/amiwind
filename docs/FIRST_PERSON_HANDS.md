@@ -198,7 +198,11 @@ python3 tools/prepare_hand_catalog.py --data-files /owned \
   --topology reduced
 ```
 
-The existing reduced profile remains the default. `--topology source` is an
+The builder runs the catalogue as its default `hand-catalog` stage with `--topology source
+--runtime-palette` (the image's final palette) and the image step installs it after the sky
+palette bank; that output is byte-identical to what v0.0.31 ships (BUILD-HANDS-NOT-BUILT-32).
+
+The existing reduced profile remains the tool's own default. `--topology source` is an
 explicit authored-topology candidate; it does not synthesize racial variants
 by subdividing the Nord mesh. Converted models and textures remain local owned
 assets and are never part of the public source export.

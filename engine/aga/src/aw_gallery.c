@@ -80,7 +80,7 @@ static int read_entry(char *line,gallery_entry_t *e) {
     memset(e,0,sizeof(*e));e->number=(int)number;strcpy(e->kind,fields[1]);
     strcpy(e->model[0],fields[2]);strcpy(e->model[1],fields[3]);strcpy(e->id,fields[7]);strcpy(e->name,fields[8]);
     for(i=0;i<3;i++){
-        e->size[i]=(float)strtod(fields[4+i],&end);
+        e->size[i]=(float)Q_strtod(fields[4+i],&end);
         if(*end || !(e->size[i]>=0 && e->size[i]<4096))return 0;
     }
     return 1;
@@ -96,7 +96,7 @@ static void read_voice(void) {
         speech=strchr(duration,'\t');if(!speech)break;*speech++=0;
         end=strchr(speech,'\n');if(!end)break;*end=0;
         if(Q_strcasecmp(line,current.id))continue;
-        seconds=(float)strtod(duration,&end);
+        seconds=(float)Q_strtod(duration,&end);
         if(*end || !(seconds>0 && seconds<=120) || strlen(path)>95 || strlen(speech)>2047 ||
            strstr(path,"..") || path[0]=='/' || strchr(path,':') || strchr(path,'\\'))break;
         voice=(gallery_voice_t *)malloc(sizeof(*voice));
@@ -124,7 +124,7 @@ static int select_entry(int index,const char *search) {
         }else strcpy(notice,"Gallery catalogue missing; rebuild the image.");
         return 0;
     }
-    if(!fgets(line,sizeof(line),f) || sscanf(line,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
+    if(!fgets(line,sizeof(line),f) || Q_sscanf(line,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
     if(search){normalize(search,needle);if(!needle[0])goto bad;number=strtol(search,&end,10);if(*end)number=0;}
     index=(index%total+total)%total;
     for(i=0;i<total;i++){
@@ -166,7 +166,7 @@ static int read_page(int top) {
     FILE *f=NULL;char text[512],extra;gallery_entry_t e;int total,i,n=0;
     page_count=page_total=0;
     if(!page || COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f)goto bad;
-    if(!fgets(text,sizeof(text),f) || sscanf(text,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
+    if(!fgets(text,sizeof(text),f) || Q_sscanf(text,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
     for(i=0;i<total;i++){
         if(!fgets(text,sizeof(text),f) || !read_entry(text,&e))goto bad;
         if(!keyword_match(&e,filter))continue;
@@ -376,7 +376,7 @@ static float model_lift(void) {
     if(COM_FOpenFile("gallery/poses.txt",&f)<0 || !f)return 0;
     if(fgets(line,sizeof(line),f) && !strcmp(line,"AWGP1\n"))while(fgets(line,sizeof(line),f)){
         tab=strchr(line,'\t');if(!tab)break;*tab++=0;
-        value=(float)strtod(tab,&end);
+        value=(float)Q_strtod(tab,&end);
         if((*end!='\n' && *end) || !(value>=0 && value<=1024))break;
         if(!strcmp(line,current.model[body])){lift=value;break;}
     }

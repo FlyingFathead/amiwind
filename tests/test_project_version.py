@@ -9,6 +9,22 @@ class ProjectVersion(unittest.TestCase):
     def test_runtime_and_metadata_agree(self):
         self.assertEqual(check_native_versions(), VERSION)
 
+    def test_release_versions_refuse_private_test_waivers(self):
+        # VIVEC-ARENA-ACTORS-32: a waived image can only be a -devN private test.
+        from project_version import require_private_test_version
+        require_private_test_version('0.0.32-dev1', ['--allow-known-actor-ground-findings'])
+        for version in ('0.0.32-rc1', '0.0.32'):
+            require_private_test_version(version, [])
+            with self.assertRaisesRegex(ValueError, 'waivers .* are refused'):
+                require_private_test_version(version, ['--map-budget-policy warning'])
+
+    def test_image_step_lists_waivers(self):
+        import argparse
+        from build_aga import image_waivers
+        self.assertEqual(image_waivers(argparse.Namespace(map_budget_policy='strict')), [])
+        both = argparse.Namespace(allow_known_actor_ground_findings='a.json', map_budget_policy='warning')
+        self.assertEqual(len(image_waivers(both)), 2)
+
     def test_drift_stops_release(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
@@ -37,7 +53,7 @@ class ProjectVersion(unittest.TestCase):
         self.assertIn('_LVOWaitForChar', checker)
         self.assertIn('_LVORead', checker)
         self.assertIn('#1000000', checker)
-        self.assertIn('Press SPACE or ENTER', checker)
+        self.assertIn('SPACE or ENTER = start now', checker)
         dry = (ROOT/'tools/build_dry_run.py').read_text()
         self.assertIn('boot / "C/AmiWindCheck"', dry)
         self.assertIn("FailAt 10\\nSYS:C/AmiWindCheck\\nSYS:C/AmiWindDryRun\\n", dry)

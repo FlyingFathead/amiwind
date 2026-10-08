@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 import re
 import struct
+import time
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from concurrent.futures import wait, FIRST_COMPLETED
 
 
 def enabled_value(value=True):
@@ -93,9 +94,11 @@ def _prepared_maps(inputs, work, enabled, names, processor, jobs):
             yield source, _prepare_hidden_map(source, work, enabled, source.stem in names, processor)
         return
     # Only jobs pending results: never retain the entire world's BSP bytes.
-    with ProcessPoolExecutor(max_workers=min(jobs, len(inputs))) as pool:
+    from build_parallel import process_pool, worker_environment
+    with worker_environment(), process_pool(min(jobs, len(inputs))) as pool:
         pending = {}
-        iterator = iter(inputs)
+        # Largest maps first so no big map starts last (results are sorted afterwards).
+        iterator = iter(sorted(inputs, key=lambda p: (-p.stat().st_size, p.name)))
         def submit(source):
             future = pool.submit(_prepare_hidden_map, source, work, enabled, source.stem in names, processor)
             pending[future] = source
@@ -145,7 +148,16 @@ def cull_staged_maps(maps, work, exterior_maps, *, enabled=True, processor=None,
               'acceptance': 'Bounded proof only; not a claim that all hidden interiors or terrain have been removed'}
     report_path = work / 'hidden-surfaces.json'
 
-    def save():
+    saved = [0.0]
+
+    def save(progress=False):
+        # A progress save rewrites the whole growing receipt (megabytes for the
+        # world): at most every 2 s, or the parent serializes instead of feeding
+        # the workers. Start, end and failure always save.
+        now = time.monotonic()
+        if progress and now - saved[0] < 2:
+            return
+        saved[0] = now
         report_path.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
 
     save()
@@ -160,7 +172,7 @@ def cull_staged_maps(maps, work, exterior_maps, *, enabled=True, processor=None,
                 source.stem, 'ON' if enabled else 'OFF', row['scene_kind'],
                 before['stored_faces'], after['stored_faces'], row['removed_stored_faces'],
                 detail_status), flush=True)
-            save()
+            save(progress=True)
         report['maps'].sort(key=lambda row: row['map'])
         # Verify all inputs again before installing anything into build staging.
         for row in report['maps']:

@@ -55,6 +55,16 @@ same GCC 16.2-rc11 configuration. Two array-row bounds violations were reproduce
 and fixed. The other 93 warnings remain work, not a clean-bill-of-health claim.
 This rule applies to later builds too, including character creation and save/load.
 
+## Efficiency rule #1: parallelize
+
+Every independent piece of work runs in parallel: builder stages, converters, checks and gates
+use the shared worker pool (`tools/build_parallel.py`) or separate processes wherever the order
+does not matter. A stage that leaves most cores idle is a bug: the image step once ran on one of
+24 threads for about 23 minutes per pass
+([BUILD-IMAGE-SERIAL-32](bugs/BUILD-IMAGE-SERIAL-32.md)). Serial work says why it must be serial,
+and parallel results stay byte-identical to serial ones (a regression test checks it).
+`--jobs N` is exact and reaches every stage and pool; see [Parallel host builds](PARALLEL_BUILD.md).
+
 ## Mandatory map rule: EVERY MAP MUST LET QUAKE'S VIS DO ITS JOB
 
 Quake only skips what its `vis` data says cannot be seen, and `vis` only uses
@@ -66,15 +76,15 @@ houses and the NPCs behind them were processed every frame
 ([Town visibility](performance/TOWN-VISIBILITY.md),
 [TOWN-VIS-OCCLUSION-31](bugs/TOWN-VIS-OCCLUSION-31.md)).
 
-- Static scenery faces (buildings, interior walls and floors, large rocks) go
-  into the world model, so Quake culls them leaf by leaf; doors, activators,
-  lights, NPCs and pickables stay entities. Brush entities are kept or dropped
-  whole, and one linked to more than 16 leaves is treated as visible
-  everywhere, so leaving buildings as `func_wall` defeats `vis` even with
-  occluders (measured on bm019: 589 of 590 still visible).
-- Every converted map also gets structural occluders: invisible `skip`-textured
-  world brushes inside buildings, inside interior walls and floors between
-  rooms, and inside large rocks, so `vis` has walls to cut with.
+- Measure before changing the visibility structure. In the 8 October 2026
+  prototypes, skip occluders inside houses (with and without hints) and
+  building faces in the world model gave negligible benefit with the current
+  town partitioning (589 of 590 bm019 building models still sent; at most about
+  5 % less face work, with format limits broken). Further town occlusion work
+  waits for evidence of a better partitioning or culling approach; meanwhile
+  town frame rate is sought from drawing less at a distance and cheaper
+  per-model work.
+  Interiors (rooms behind thick walls) still need the occluder test.
 - Every map build reports its visibility share (leaves visible from an average
   leaf) and the faces in the world vs in brush entities; a map that regresses
   past its limit fails the build.
@@ -87,8 +97,25 @@ houses and the NPCs behind them were processed every frame
 ## Tests
 
 ```sh
+python tools/run_tests.py            # parallel; same tests as the serial command below
 python -m unittest discover -s tests -v
 ```
+
+`tools/run_tests.py` discovers exactly what `unittest discover -s tests` finds,
+then runs every test module in a fresh process of its own across `--jobs N`
+workers (default: the builder's automatic CPU and memory budget). Long modules
+start first, from the recorded seconds in `tests/module-timings.json`; a long
+module without module- or class-level fixtures is split into shards of its own
+tests (`--split-above SECONDS`, 0 disables). Each worker checks that it loads
+the same test IDs that discovery found. One merged report lists failures,
+errors, skips with reasons and per-module times; the run fails on any failure,
+error, unexpected success, crashed or timed-out module (`--module-timeout`).
+`--skip-allowlist FILE` (lines `test id | exact reason | why`) also fails on any
+other skip. `--record-timings tests/module-timings.json` refreshes the records,
+`--json FILE` saves the report and `--list` prints the discovered test IDs.
+Tests must not depend on running in the same process as another module, and
+must keep temporary files under unique temporary directories, because modules
+run at the same time.
 
 Fixtures are generated into temporary directories using fictional data. No
 Morrowind files are needed for tests. GCC or Clang enables the C reader test;
@@ -278,6 +305,30 @@ container resets, repeated rewards or stale modifiers cannot arise from several
 conflicting versions of the same state.
 
 
+## Town import
+
+Towns are converted from config files, not code: `tools/import_town.py --town
+<id>` (Balmora, Vivec's Arena; `tools/prepare_balmora.py` is the unchanged
+Balmora command line). The engine reads towns from the generated table
+`engine/aga/src/aw_town_table.h`; regenerate it with `tools/town_table.py
+--write` after changing `config/towns.json` or a town config. Every build
+imports the towns a release ships (`shipped_since` in `config/towns.json`: the
+Vivec Arena since v0.0.32); the builder adds a town not shipped yet with
+`--extra-town <id>` and selects the vis pass with
+`--vis {fast,full}` (vis threads follow `--jobs`). See
+[TOWN_IMPORT.md](TOWN_IMPORT.md), [PARALLEL_BUILD.md](PARALLEL_BUILD.md#vis-threads-and-vis-mode)
+and [performance/TOWN-VISIBILITY.md](performance/TOWN-VISIBILITY.md).
+
+## World estimate
+
+`tools/build_aga.py estimate --data-files <Morrowind> --out <dir>` (or
+`./build.sh --data-files <Morrowind> --estimate-world <dir>`) estimates every
+interior cell and exterior region of a whole-world import from your own files:
+BSP sizes, heap, entities and every limit ratio, with charts, without
+converting. `--sample-convert N` converts N maps to measure its error;
+`estimate-calibrate` refits its coefficients from those conversions. See
+[WORLD_ESTIMATE.md](WORLD_ESTIMATE.md).
+
 ## Mandatory delivery gate
 
 ALWAYS CHECK FOR TRAILING WHITESPACE BEFORE POSTING AN AUTOMATED PUSH/PUBLISH
@@ -292,6 +343,14 @@ LAND/topomap alone is insufficient where placed rocks or structures cover the
 ground. Audit source references, complete transforms and low-poly coverage before
 patching a hole. Follow [What are rocks?](WHAT_ARE_ROCKS.md), including native
 before/after views, compound-rotation tests and separate collision checks.
+
+## Collision meshes
+
+Morrowind keeps a model's collision inside its NIF: a `RootCollisionNode` under the root node,
+otherwise the visible triangles, with root string flags for no collision (`NC`), camera-only
+collision (`NCC`) and editor markers (`MRK`). Before changing collision or stairs, read
+[Morrowind collision meshes](COLLISION_MESHES.md): the exact rules (OpenMW as reference),
+measured counts, the stair findings, and which converter uses which collision source.
 
 ## Further terrain/detail direction — planned, not starting now
 

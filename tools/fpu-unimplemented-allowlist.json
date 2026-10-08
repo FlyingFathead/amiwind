@@ -1,0 +1,15 @@
+{
+  "about": "C library functions that contain 68040-unimplemented FPU instructions and may stay reachable from engine code, each with the callers allowed to use it and why (tools/check_fpu_unimplemented.py; ENGINE-FPU-UNIMPL-31). Any other path from engine code fails the build. Text/number conversion is the engine's own (aw_format.c: Q_strtod, Q_sscanf, Q_fscanf, and Q_vsnprintf behind the printf family via the link's --wrap), so the C library's strtod, scanf and printf code (_strtod_l, _dtoa_r, _svfprintf_r, _vfprintf_r, __fixdfdi) is not linked; adding it back fails the build. On a 68040 without an FPU support library these paths still stop the game when executed (ENGINE-FPSP-MISSING-31).",
+  "allowed": [
+    {"function": "fmod", "callers": "*",
+     "why": "FMOVECR #$0F (0.0) only in the domain-error branch that makes a NaN for fmod(x, 0); valid arguments never execute it"},
+    {"function": "sqrt", "callers": "*",
+     "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument)"},
+    {"function": "sqrtf", "callers": "*",
+     "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument)"},
+    {"function": "pow", "callers": ["BuildGammaTable"],
+     "why": "gamma table only, and only when gamma is not 1 (BuildGammaTable returns before pow at the default 1)"},
+    {"function": "__ieee754_pow", "callers": ["pow"],
+     "why": "the body of pow, reached only through the gamma table call above"}
+  ]
+}

@@ -84,6 +84,12 @@ all remappable through gameplay bindings.
 | Any panel / console | Escape | Close/back; ordinary gameplay opens menu |
 | Console | M, N and other printable letters | Enter text; no desktop action |
 | Console | PageUp / PageDown; Shift+Up / Down | Scroll text |
+| Console | Shift+Home / Shift+End | Scroll to the oldest / newest text |
+| Console | Left / Right, Home / End, Ctrl+A / Ctrl+E | Move the cursor without deleting |
+| Console | Backspace / Del | Delete before / at the cursor |
+| Console | Ctrl+U / Ctrl+K | Cut to the start / end of the line |
+| Console | Up / Down | Previous / next command; Down past the newest returns the typed line |
+| Console | Tab | Complete a command or variable name |
 | Gameplay | Shift+V | Cycle requested draw distance |
 | Gameplay | Shift+F5 / Shift+F6 | Previous / next music track |
 | World map | M, Escape | Close map |
@@ -109,6 +115,34 @@ For diagnostics, use `debug all on`, `debug noclip`, `debug pos`, and
 `aw_input_trace 1` logs native raw-key/qualifier events; restore `0` after checking.
 `aw_desktop` also works as an explicit console command when debug is enabled.
 The compass is normal gameplay UI and does not require debug mode.
+
+## Console line editing
+
+The console edits its line like a terminal prompt (`aw_console_mode 1`, the
+default): the cursor moves without deleting, typing inserts at the cursor, and
+the keys are in the table above. Up and Down walk the last 31 commands; Up stops
+at the oldest, each opening of the console starts from the newest, and Down past
+the newest brings back the line you were typing. Empty lines and a command equal
+to the previous one are not stored. The history is kept between sessions in
+`console-history.txt` in the game folder, rewritten only when Enter stores a new
+command. Held Left, Right, Del and Backspace repeat.
+
+`aw_console_mode 0` (or `false`) restores id's Quake line editor: Left deletes like
+Backspace, Right does nothing, Home/End scroll the text, and nothing is saved.
+The history walk is the same in both modes. The setting is saved in `config.cfg`.
+
+Amiga keys: Del is the Amiga Del key. Home and End are the extended keys of
+PC-style Amiga keyboards (raw 0x70/0x71); FS-UAE sends a PC keyboard's Home and
+End as keypad `(` and Help, so the AmiWind FS-UAE presets map them to the unused
+keys 0x6A/0x6C, which the game also reads as Home/End. Without such a key, use
+Ctrl+A and Ctrl+E. The Amiga keypad has no cursor keys: keypad 8 and 2 type
+digits. FS-UAE sends a PC keyboard's Insert as the key left of Return (raw 0x2B),
+which the game reads as Enter.
+
+If the arrows do nothing, `aw_input_trace 1` shows whether they arrive: Up is raw 76 and
+Down raw 77. No line means the emulator or host kept them, for example a keyboard
+joystick on the cursor keys; the AmiWind presets turn that off. The Amiga keypad has
+no cursor keys, so keypad 8 and 2 always type digits.
 
 ## Reconciled input and defaults
 

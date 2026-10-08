@@ -31,7 +31,7 @@ def cull_bsp(raw,policy, *, terrain_reference=None, terrain_reference_metadata=N
         terrain_policy['envelope']='Intersection: below both authoritative global reference and actual rendered local LAND'
     terrain_policy['reference'] = terrain_reference_metadata or {'scope':'local BSP fallback','sha256':hashlib.sha256(raw if terrain_reference is None else terrain_reference).hexdigest()}
     if not terrain.prisms:return raw,{'policy':policy,'terrain':terrain_policy,'unchanged':True,'no_verified_land':True}
-    formats={3:'<3f',7:'<Hhihh4Bi',12:'<HH',13:'<i',14:'<9f7i'}
+    formats={3:'<3f',7:'<HhihH4Bi',12:'<HH',13:'<i',14:'<9f7i'}
     r={i:[list(v) for v in struct.iter_unpack(fmt,data[i])] for i,fmt in formats.items()}
     groups=collections.defaultdict(list)
     for e in entities(data[0]):

@@ -96,6 +96,9 @@ typedef struct
 #define AW_EFRAG_PAGE_LINKS 1024
 #define AW_EFRAG_LIMIT 65536
 extern int aw_efrags_used,aw_efrags_peak;
+/* Entities refused because cl_visedicts was full (r_efrag.c). */
+extern int aw_visedicts_dropped,aw_visedicts_dropped_frame;
+void AW_VisedictDropped(void);
 extern int aw_efrags_capacity;
 void R_ClearEfrags(qboolean release_pages);
 

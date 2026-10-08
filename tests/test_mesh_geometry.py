@@ -96,3 +96,52 @@ class MeshGeometryTests(unittest.TestCase):
         self.assertEqual(len(parts),2)
         gap=np.array([6.,1.,0.])
         self.assertFalse(any(np.all(gap @ hull.equations[:,:3].T + hull.equations[:,3] <= 0) for points,hull,ids,error in parts))
+
+    @staticmethod
+    def covered_walkway(height):
+        """A floor and a roof joined by one triangle (VIVEC-ARENA-ACTORS-32
+        shape): a single convex hull closes the space between them."""
+        v = np.array([[0, 0, 0], [800, 0, 0], [0, 800, 0],
+                      [0, 0, height], [800, 0, height], [0, 800, height],
+                      [200, 200, height/2]], float)
+        return np.hstack((v, np.zeros((len(v), 2)))), np.array([[0, 1, 2, 0], [3, 5, 4, 0], [0, 3, 6, 0]])
+
+    @staticmethod
+    def buried(pieces, point):
+        return any(np.max(hull.equations[:, :3] @ point + hull.equations[:, 3]) < 0
+                   for points, hull, ids, error in pieces)
+
+    def test_architecture_keeps_walkway_that_convex_collision_buries(self):
+        from mesh_geometry import collision_pieces
+        from player_hull import STEP_HEIGHT
+        v, f = self.covered_walkway(400)
+        floor = np.array([40., 40., 1.])  # one unit above the floor (quarter scale)
+        convex = collision_parts(v, f, 2)
+        self.assertGreater(max(error for _, _, _, error in convex), STEP_HEIGHT)
+        self.assertTrue(self.buried(convex, floor))
+        pieces, exact, note = collision_pieces(v, f, {'surface_collision_beyond': STEP_HEIGHT})
+        self.assertFalse(self.buried(pieces, floor))
+        self.assertTrue(exact)
+        self.assertIn('step height', note)
+        # Without the architecture rule the profile keeps the convex proxy.
+        pieces, exact, note = collision_pieces(v, f, {})
+        self.assertEqual([p[2] for p in pieces], [p[2] for p in convex])
+        self.assertEqual((exact, note), (False, None))
+
+    def test_closed_space_within_a_step_keeps_the_convex_proxy(self):
+        from mesh_geometry import collision_pieces
+        from player_hull import STEP_HEIGHT
+        v, f = self.covered_walkway(40)
+        convex = collision_parts(v, f, 2)
+        self.assertLessEqual(max(error for _, _, _, error in convex), STEP_HEIGHT)
+        pieces, exact, note = collision_pieces(v, f, {'surface_collision_beyond': STEP_HEIGHT})
+        self.assertEqual([(p[2], p[3]) for p in pieces], [(p[2], p[3]) for p in convex])
+        self.assertEqual((exact, note), (False, None))
+
+    def test_step_height_matches_engine(self):
+        import re
+        from player_hull import STEP_HEIGHT
+        src = Path(__file__).resolve().parents[1] / 'engine/aga/src'
+        for name in ('sv_move.c', 'sv_phys.c'):
+            value = re.search(r'#define\s+STEPSIZE\s+([0-9.]+)f?', (src / name).read_text())
+            self.assertEqual(float(value[1]), STEP_HEIGHT, name)

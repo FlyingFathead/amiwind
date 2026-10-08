@@ -147,15 +147,22 @@ engine` fails if the compiler prints any warning. This covers the 68040 and
 `--allow-compiler-warnings` turns the check off for local experiments only.
 Do not add `-Wno-*` flags to hide a new warning; fix the cause.
 
-The SDK vasm assembles the independent 68000 boot checker; the renderer uses no
-extracted assembly. An optional `--bootcheck` image argument selects its binary;
-otherwise the builder expects `AmiWindCheck` beside the engine.
+The SDK vasm assembles the independent 68000 boot checker and the FPU support
+library loader `AmiWindFPU`; the renderer uses no extracted assembly. An optional
+`--bootcheck` image argument selects the checker's binary; otherwise the builder
+expects `AmiWindCheck` (and `AmiWindFPU`) beside the engine.
+
+`--amiga-libs DIR` (optional) copies your own `68040.library`/`68060.library`
+from your Workbench or accelerator installation into `LIBS:` on the boot disk;
+the startup sequence then opens it before the boot check. See
+[FPU support library](FPU_SUPPORT_LIBRARY.md).
 
 The runtime uses GPL C span drawing and an independent C2P routine. Assembly
 identified upstream as extracted from a binary is excluded. Build outputs and
 all game-derived results stay external. The image builder validates all music
 streams and reads every payload back from the finished RDB image before success.
-No ROM or Workbench disk files are copied by this builder.
+No ROM or Workbench disk files are copied by this builder, except the FPU
+support library you select yourself with `--amiga-libs`.
 
 The image builder also writes the night lighting tables (`id1/world/lamps.awl`,
 `night-windows.txt`, `fog-locations.txt`); their scenery sources and receipt

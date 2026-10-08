@@ -8,7 +8,7 @@ Run after all entity/geometry edits and before actor-contact and final heap gate
 This is representation validation, not runtime or gameplay acceptance.
 """
 import argparse
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from concurrent.futures import wait, FIRST_COMPLETED
 import hashlib
 import json
 import os
@@ -72,9 +72,11 @@ def prepare_candidates(candidates, transaction, jobs, report):
             report['active_map'] = path.name
             yield index, prepare_candidate(path, transaction)
         return
-    with ProcessPoolExecutor(max_workers=min(jobs, len(candidates))) as pool:
+    from build_parallel import process_pool, worker_environment
+    with worker_environment(), process_pool(min(jobs, len(candidates))) as pool:
         pending = {}
-        source = iter(enumerate(candidates))
+        # Largest maps first; results keep their index, so the receipt order is unchanged.
+        source = iter(sorted(enumerate(candidates), key=lambda item: (-item[1].stat().st_size, item[0])))
         def submit_next():
             item = next(source, None)
             if item is not None:
@@ -131,8 +133,10 @@ def optimize_maps(maps, report_path, jobs=1):
         # Refuse concurrent edits or new/deleted maps before the first replacement.
         if [p.name for p in sorted(maps.glob('*.bsp'))] != [r['map'] for r in report['maps']]:
             raise ValueError('Staged map set changed during optimization')
-        for row in report['maps']:
-            if sha((maps/row['map']).read_bytes()) != row['input_sha256']:
+        from build_parallel import hash_files
+        current = hash_files([maps/row['map'] for row in report['maps']], jobs)
+        for row, actual in zip(report['maps'], current):
+            if actual != row['input_sha256']:
                 raise ValueError('Staged map changed during optimization: '+row['map'])
         report['status'] = 'committing'
         write_report(report_path, report)
@@ -140,7 +144,7 @@ def optimize_maps(maps, report_path, jobs=1):
             if row['changed']:
                 os.replace(transaction/'candidate'/row['map'], maps/row['map'])
                 committed.append(row['map'])
-        verify_optimized_maps(maps, report, require_committed=False)
+        verify_optimized_maps(maps, report, require_committed=False, jobs=jobs)
         report.update(status='verified', committed_maps=committed,
                       map_count=len(report['maps']), changed_maps=len(committed),
                       file_bytes_saved=sum(r['file_bytes_saved'] for r in report['maps']))
@@ -169,11 +173,13 @@ def optimize_maps(maps, report_path, jobs=1):
             shutil.rmtree(transaction)
 
 
-def verify_optimized_maps(maps, report, require_committed=True):
+def verify_optimized_maps(maps, report, require_committed=True, jobs=1):
     """Bind later gates to the exact complete optimized map set; no mutation."""
+    from build_parallel import hash_files
     if require_committed and report.get('status') != 'verified':
         raise ValueError('Optimizer receipt has not completed verification')
-    actual = {p.name: sha(p.read_bytes()) for p in Path(maps).glob('*.bsp')}
+    paths = sorted(Path(maps).glob('*.bsp'))
+    actual = dict(zip((p.name for p in paths), hash_files(paths, jobs)))
     expected = {r['map']: r['output_sha256'] for r in report['maps']}
     if actual != expected:
         raise ValueError('Final staged maps no longer match optimizer receipt')

@@ -11,6 +11,7 @@ int AW_RegionCrossing(const float *,int);
 const char *AW_RegionAhead(const float *,const float *,int,float);
 int AW_RegionContains(const float *);
 int AW_RegionGroundCoverage(const float *);
+int AW_TownArrival(const char *,int,float *,float *);
 int AW_BalmoraArrival(int,float *,float *);
 int AW_BalmoraSelect(const float *);
 const char *AW_BalmoraWorldModel(void);

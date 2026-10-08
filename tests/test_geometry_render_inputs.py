@@ -70,10 +70,13 @@ class RenderInputOracleTests(unittest.TestCase):
             struct.pack_into('<i', data[7], index*20+16, 0)
         data[8] = bytearray([80]*6)
         parsed = BSP(pack_lumps(data))
-        for wide in (False, True):
-            with self.subTest(wide=wide):
-                with self.assertRaisesRegex(ValueError, 'face 0.*need 8 bytes, available 6'):
-                    parsed.face_inputs(0, wide)
+        # The engine rule's span must lie inside the lump; the binary32 rule
+        # (engines before it) is compared on the bytes that exist.
+        with self.assertRaisesRegex(ValueError, 'face 0.*need 8 bytes, available 6'):
+            parsed.face_inputs(0, True)
+        self.assertEqual(parsed.face_inputs(0, False)[-1], bytes([80]*6))
+        with self.assertRaisesRegex(ValueError, 'face 0.*need 8 bytes, available 6'):
+            compare_render_inputs(pack_lumps(data), pack_lumps(data))
         # A correctly baked complete grid is accepted, without weakening bounds.
         data[8] = bytearray([80]*8)
         parsed = BSP(pack_lumps(data))

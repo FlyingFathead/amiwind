@@ -162,7 +162,8 @@ def profile(root,sizes):
             conservative_total_allowance_charge_bytes=cache+fallback+static+reserve,
             catalogue_requested_bytes=record['catalogue_requested_bytes'],
             all_available_binding_bytes=record['all_available_binding_bytes'],allocation_stages=stages)
-    return dict(storage_mode='compact_offsets',catalogues=records,fingerprint_entries=entries,models=models,
+    # JSON-native lists, not tuples: the heap receipt is compared with its saved JSON (BUILD-HEAP-RECEIPT-TUPLES-32).
+    return dict(storage_mode='compact_offsets',catalogues=records,fingerprint_entries=[list(e) for e in entries],models=models,
         unique_models=len(models),global_warm_cache_ceiling_bytes=sum(m['cache_bytes'] for m in models.values()),
         map_costs=map_costs,proxy_static_bytes=sizes['harvest_proxy_static'],
         runtime_static_bytes=sizes['harvest_runtime_static'],catalogue_extension_static_bytes=0,

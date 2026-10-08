@@ -35,7 +35,7 @@ byte AW_TorchFlameColor(byte original,int texel,float age,int core) {
 static void radius_command(void) {
     char *end,*text=Cmd_Argv(1);double value;
     if(Cmd_Argc()==1){Con_Printf("Torch light radius %g (32..288; classic 144, default 192).\n",AW_TorchLightRadius());return;}
-    value=strtod(text,&end);
+    value=Q_strtod(text,&end);
     if(Cmd_Argc()!=2 || end==text || *end || !isfinite(value) || value<32 || value>288){
         Con_Printf("Usage: dbg torch radius 32..288 (player and admitted guard lights).\n");return;}
     Cvar_SetValue(torch_radius.name,(float)value);
@@ -66,7 +66,7 @@ static void headlamp_command(void) {
 static void strength_command(void) {
     char *end,*text=Cmd_Argv(1);double value;
     if(Cmd_Argc()==1){Con_Printf("Torch strength %g (0..1, default 0.7; renderer-relative intensity).\n",aw_torch_strength.value);return;}
-    value=strtod(text,&end);
+    value=Q_strtod(text,&end);
     if(Cmd_Argc()!=2 || end==text || *end || !isfinite(value) || value<0 || value>1){
         Con_Printf("Usage: dbg torch strength 0..1 (player and admitted guard lights).\n");return;}
     Cvar_SetValue(aw_torch_strength.name,(float)value);
@@ -286,7 +286,7 @@ void AW_TorchDraw(void)
         AW_EmberSpawn(world,.8f,18);
     for(k=0;k<6;k++){
         age=(float)fmod(animation_time*.833333+k/6.0,1.0);if(age<0)age=0;
-        drift=(float)sin(k*2.4+animation_time*4)*.25f;rise=age*2.7f;
+        drift=(float)Q_SinRad(k*2.4+animation_time*4)*.25f;rise=age*2.7f;
 #if AMIWIND_SPRITE_HANDS
         if(anchor[0]<=.5f)continue;
         scale=r_refdef.vrect.width>=320?2:1;

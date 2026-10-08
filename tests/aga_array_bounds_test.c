@@ -13,6 +13,7 @@ static float same_float(float v){return v;}
 static int same_long(int v){return v;}
 float (*LittleFloat)(float)=same_float;
 int (*LittleLong)(int)=same_long;
+qboolean aw_loading_music=false; /* referenced by the streamed BSP reader */
 void *Hunk_AllocName(int n,char *s){return calloc(1,n);}
 void Sys_Error(char *fmt,...){abort();}
 int main(int argc,char **argv){

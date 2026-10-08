@@ -1,29 +1,151 @@
 # Roadmap and implementation options
 
-## Next: v0.0.31 - Revisiting Seyda Neen
+## Next: v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec
 
-After v0.0.30 - The Temple. v0.0.31 takes a different approach to how Seyda
-Neen is built and mapped, so that the town plays smoother.
+v0.0.31 (Lamps, Lanterns and Loading) is out. v0.0.32 starts with Vivec, built
+by the generic town importer with no hand-building, and with fixes found by
+measuring the whole island on 8 October 2026
+([world progress](trackers/WORLD_PROGRESS.md), [bug register](BUGS.md)):
 
-Seyda Neen's 64 sub-cell maps are the heaviest in the game: up to about 5 MB
-each, mostly per-triangle data (planes, faces, texture mappings, BSP and
-collision nodes). A loaded sub-cell fills the 11 MiB heap, so each crossing
-drops cached models and pauses. The current maps were built by replacing the
-town ground with dense world-survey terrain in a later step, which alone added
-about a third more faces across the town.
+1. **Vivec first.** The Arena and the cantons through the normal doors, after
+   the limits that block them: texture mappings read unsigned (32,767 to
+   65,535, [VIVEC-TEXINFO-31](bugs/VIVEC-TEXINFO-31.md)), leaf face lists read
+   unsigned ([MODEL-MARKSURF-SIGNED-31](bugs/MODEL-MARKSURF-SIGNED-31.md)),
+   surface extents ([MESH-EXTENT-GRID-31](bugs/MESH-EXTENT-GRID-31.md)), the
+   lightmap overrun ([LIGHTMAP-TAIL-31](bugs/LIGHTMAP-TAIL-31.md)), the night
+   lamp cache ([LAMPS-CACHE-31](bugs/LAMPS-CACHE-31.md)) and interior
+   coordinates ([INTERIOR-COORDS-31](bugs/INTERIOR-COORDS-31.md)).
+2. **Real 68040 compatibility and speed.** The engine reaches FPU instructions
+   the 68040 does not implement, every frame, and the boot disk loads no FPU
+   support library; the emulator hides both
+   ([ENGINE-FPU-UNIMPL-31](bugs/ENGINE-FPU-UNIMPL-31.md),
+   [ENGINE-FPSP-MISSING-31](bugs/ENGINE-FPSP-MISSING-31.md)). Fixes reuse
+   Quake's own answers: no rotation for unrotated brush models, table
+   sine and cosine, work done once per frame.
+3. **Distant shells.** Buildings far away drawn as closed low-poly shells
+   instead of full meshes, so the town stays visible without its full cost
+   (prototype on Balmora first).
+4. **Your own estimate.** A builder command that estimates every map of the
+   island from your own Morrowind files, shown as a layer on the Toolkit's
+   World Map.
 
-1. Make the current Seyda Neen build reproducible from the public tools, as a
-   fixed reference ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)). Private replays
-   already reproduce the shipped maps byte for byte from the archived town
-   source.
-2. Rebuild the town with a new mapping method, one measured change at a time:
-   ground simplified within an error bound instead of dense survey terrain,
-   merged flat faces, simple collision for clutter and none for flora, and
-   less geometry duplicated between neighbouring sub-cells. Placements, doors,
-   NPCs and the special maps (Census courtyard, docks) stay.
-3. Measure each change on the Seyda Neen test route: map size, cache
-   evictions and crossing time, with in-game screenshots for comparison.
-4. Investigate the rare load freeze (SEYDA-LOAD-HANG-30).
+Before the v0.0.32 release (fix-before-release list):
+
+- Visiting Vivec: `dbg tp vivec` takes you to the Vivec Arena preview (outside only;
+  its doors do not open yet), and the release notes say so
+  ([DEBUG-TP-TOWN-NAMES-32](bugs/DEBUG-TP-TOWN-NAMES-32.md), fixed in source).
+- A from-scratch build with the repository builder reproduces the release payload,
+  file by file, with the recorded Seyda Neen exception
+  ([BUILD-WORLD-LAYOUT-DRIFT-32](bugs/BUILD-WORLD-LAYOUT-DRIFT-32.md) byte check
+  included).
+- No private-test waiver: the Arena residents pass the actor check or are left out
+  ([VIVEC-ARENA-ACTORS-32](bugs/VIVEC-ARENA-ACTORS-32.md)).
+
+### Decided: a world streamer with no duplicated assets - the whole game on one hard file
+
+Keep the AmiQuake engine (renderer, lighting, collision, QuakeC) and change how
+the open world is stored: every asset stored once and placed by reference, as
+Morrowind itself does (its base game holds all meshes and textures in about
+310 MB and the whole world in an 80 MB file), streamed around the player.
+
+**Why.** Today every exterior region is a self-contained Quake map holding
+everything visible from it, so each exterior object is stored about ten times
+([WORLD-REGION-DUPLICATION-31](bugs/WORLD-REGION-DUPLICATION-31.md); Seyda Neen
+24 times per face, Balmora 7 times, [sub-cell redundancy](SUBCELL_REDUNDANCY.md)).
+Two towns and the terrain already take 4.8 GB; with today's pipeline the whole
+game would need about 24 GB (15 legacy partitions), and the oversized regions
+cause most heap failures. Quake's `vis` gives little outdoors
+([town visibility](performance/TOWN-VISIBILITY.md)), so the new layout gives up
+nothing it was providing.
+
+**Measured result (8 October 2026, estimate built from the game's own data:
+every unique mesh, collision hull and texture counted, light per placement
+checked against real bakes; [asset census](ASSET_CENSUS.md),
+[streamer design](WORLD_STREAMER.md)):**
+
+| | Today's pipeline | World streamer |
+| --- | ---: | ---: |
+| Whole game, all files | about 24 GB | **about 1.75 GB** (a leaner layout 1.61 GB) |
+| Legacy-safe drive images (under 4 GiB) | 8 | **1** (estimated; see the note below the table) |
+| Every texture of the game | about 1.4 GB (a copy in every map) | **19 MB** (each stored once) |
+| Island terrain | about 1.8 GB compiled | **17 MB** as a heightfield |
+| Exterior model variants | 33,076 | **1,405** meshes (scale and tilt applied at run time) |
+| Worst memory around the player | regions over the heap budget | **4.9 MB** with 256-unit chunks |
+| Largest load while walking Balmora | 4.6 MB per region crossing | **0.8-1.4 MB** per chunk |
+
+The non-map part of these totals (sound, music, video, the NPC gallery) is still
+v0.0.31's, which covers two towns: the whole game's actors and voices will add to
+it, so expect the hard file to be well over half full, but still one hard file.
+
+The target is the whole game on one legacy-safe drive image (under 4 GiB, with
+partitions under 2 GiB); two images is the absolute limit. Every file follows
+classic FFS: files well under 2 GiB (asset packs of about 1 GiB at most, split
+by area), names of at most 30 characters, few files per directory, packs
+written last and whole in map order. The builder will check this layout.
+
+**How it works:**
+
+- **Asset packs** (Quake PAK files, split by area and stored in map order): each
+  mesh, collision hull and texture once, one shared texture pool.
+- **Chunks** (grain still to be measured; 256 units looked best on memory, larger
+  chunks need fewer disk reads): each holds terrain (compiled per chunk first; a
+  quantized heightfield built at load is a later optimisation, because collision
+  then needs a new path) and a list of placements: which mesh, where, which
+  way, how large, and a lighting record.
+- **Scale and tilt at run time** for drawing; collision hulls stored once and
+  expanded per placement at load.
+- **Three lighting tiers:** terrain keeps its lightmaps; buildings, furniture
+  and rocks get lightmaps per placement on shared geometry; flora and clutter
+  get one light level each (outdoor objects already have no lightmaps today).
+- **Memory:** a ring of chunks around the player inside draw distance, loaded
+  ahead of you and released through Quake's cache (made able to move brush
+  models); a loader process reads the disk while the game keeps drawing;
+  coordinates re-centred as you travel so they stay within Quake's range.
+- **Distance tiers** for the frame rate: full detail nearby, closed low-poly
+  shells further out, the horizon beyond.
+- **Interiors** stay legacy Quake maps behind doors in the first CHIM releases.
+  Moving their pieces to shared placements later removes the 220-model limit, but
+  then they also need the per-sector visibility lists outdoors needs, because
+  placements are not culled by Quake's `vis`.
+
+**Plan:**
+
+1. **v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec** (now, the last
+   release on the legacy engine and builder, built from scratch): Vivec with today's format; the measurements behind the
+   streamer (census done; renderer counters and a cycle-approximate emulator
+   profile in progress); real 68040 safety (no library sine and cosine per
+   frame, Quake-style number parsing, your own FPU support library if you have
+   one); a map loader without temporary copies; one shared face builder with a
+   validator; builder types: today's region pipeline kept as the "legacy"
+   builder, CHIM as the new one (named, not numbered; CHIM has its own version).
+2. **v0.0.33 - Towards CHIM: Replacing the Engine Block:** the streamer (CHIM builder and engine 0.1.0) on Balmora, Seyda Neen and the cells
+   between them, measured against v0.0.31 on the same routes: worst frame time,
+   bytes per crossing, memory peak, saves mid-stream.
+3. **Next:** the south-west corridor (Seyda Neen, Pelagiad, Balmora, Vivec,
+   Ebonheart exteriors), then the rest of the island release by release. CHIM 1.0
+   is the release in which the whole island runs; expect months, not weeks.
+
+Repository layout from v0.0.33 (decided 8 October 2026). CHIM is the same AmiQuake
+engine growing a streamer, not a second engine, so the engine stays one tree:
+
+- `engine/aga/src/` remains the one engine; CHIM's own code (model library, chunk
+  loader, world shift) lives in `engine/aga/src/chim/` with small hooks in the
+  Quake files. "Legacy" is the old code path, used whenever no CHIM data is
+  present, and the v0.0.32 tag.
+- `tools/chim/` holds the CHIM builder. The parts both builders use (model and
+  texture conversion, BSP writing) move step by step into one shared package, so
+  the legacy builder and CHIM call the same code rather than copies.
+- `docs/chim/` holds the CHIM format, design, measurements and release notes.
+- Licences stay clear per folder: the engine is GPLv2 (from Quake), the builder
+  GPLv3.
+- Existing files move only after v0.0.32 ships, in one restructure commit with
+  `git mv` (history follows) and the path tests and release file list updated
+  in the same commit. Until then CHIM work only adds new folders.
+
+The open question is speed on a real 68040: every figure so far comes from the
+emulator ([BENCH-JIT-PROFILE-32](bugs/BENCH-JIT-PROFILE-32.md)), so a small
+benchmark for real accelerated A1200s is being prepared. How data streams
+today: [DATA_STREAMING.md](DATA_STREAMING.md).
 
 ### Near future: fires and lava across the world
 
@@ -2167,13 +2289,11 @@ memory as separate investigations.
 
 Visibility is now required work, not optional
 ([TOWN-VIS-OCCLUSION-31](bugs/TOWN-VIS-OCCLUSION-31.md),
-[Town visibility](performance/TOWN-VISIBILITY.md)): static scenery faces go into
-the world model so Quake culls them per leaf, structural `skip` occluders inside
-buildings, interior walls and large rocks give `vis` walls to cut with, shipping
-builds use full `vis` on every core, and every build reports the visible share
-and the entities still sent. Visibility compilation still precedes appended
-scenery, which is why the occluders are compiled brushes and the scenery faces
-are attached to leaves afterwards. Measure visual and memory effects per map. VIS cannot create missing terrain, textures
+[Town visibility](performance/TOWN-VISIBILITY.md)): every build reports the visible share and the
+entities still sent. The 8 October 2026 prototypes measured negligible benefit from the
+tested occluders and world-model building faces with the current town partitioning; town frame rate is sought from
+drawing less at a distance and cheaper per-model work, and interiors still need
+the room occluder test. Measure visual and memory effects per map. VIS cannot create missing terrain, textures
 or placements.
 
 For the inspected Ashlands central peak, source attribution now identifies an

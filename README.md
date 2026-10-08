@@ -1,13 +1,29 @@
 <p align="center">
-  <img src="resources/media/AmiWind_logo_clear_background.png" width="900" alt="AmiWind  -  A Commodore Amiga demake of Morrowind">
+  <img src="resources/media/AmiWind_logo.png" width="900" alt="AmiWind: an open-source RPG engine for the Commodore Amiga">
 </p>
 
-# AmiWind - Bringing TES III: Morrowind to Commodore Amiga
+# AmiWind
+
+An unofficial, experimental project bringing Morrowind to the Commodore Amiga: an
+AmiQuake-based engine and an asset conversion pipeline that builds the game from your own
+legally obtained copy of Morrowind. Not affiliated with or endorsed by Bethesda Softworks or
+ZeniMax.
 
 AmiWind converts your own Morrowind installation for an experimental native
 Amiga runtime. Read the [FAQ](docs/FAQ.md) for the project vision, hardware
 and current scope, and [licensing and credits](docs/LICENSING_AND_CREDITS.md)
 for source provenance and what the public package contains.
+
+## Coming next: Vivec, and the whole game on one hard file
+
+v0.0.32 brings Vivec and makes the engine safe for a real 68040. After that,
+the open world moves to a **world streamer with no duplicated assets**: every
+mesh, collision hull and texture stored once and placed by reference, streamed
+around the player. Estimated from the game's own data, the world itself then comes to about
+1 GB, so the whole game should fit **one legacy-safe Amiga hard file**, where
+today's pipeline would need about 24 GB. Details, numbers and the plan:
+[roadmap](docs/ROADMAP.md), [world streamer](docs/WORLD_STREAMER.md),
+[asset census](docs/ASSET_CENSUS.md).
 
 ## v0.0.31 - Lamps, Lanterns and Loading
 
@@ -160,7 +176,7 @@ first-person hands. Graphics settings now provide independent saved interior
 and exterior controls; the Census door guard and reported Seyda shack lighting
 jump have positive RC2 playtest results. Confirmation dialogs use framed buttons.
 
-This remains an experimental demake with incomplete world and gameplay coverage.
+This remains an experimental project with incomplete world and gameplay coverage.
 Balmora Temple geometry holes and WinUAE music crackle/pauses remain known issues,
 alongside the hand-animation transition and memory/performance limits. See the
 [release notes](docs/RELEASE-v0.0.29.md) and [current tracker](docs/BUGS.md).
@@ -498,8 +514,11 @@ exposes the desktop. Bindings have their own
 
 `dbg aw hors 0` creates the Nord / Barbarian / The Steed test character after
 Census; `dbg tp balmora` travels to Balmora and supplies that character if absent.
-`dbg tp` opens the destination picker. `dbg map tp` and `dbg tp map` open the
-world-map teleport picker. See [debug controls](docs/DEBUG_OVERLAYS.md).
+`dbg tp vivec` (or `dbg tp vivec_arena`) does the same for the Vivec Arena preview,
+outside only: its doors do not open yet. `dbg tp` opens the destination picker. `dbg map tp` and `dbg tp map` open the
+world-map teleport picker. `dbg daynight off` holds the clock at 12:00 midday
+(sky, light, lamps and windows as by day) until `dbg daynight on`. See
+[debug controls](docs/DEBUG_OVERLAYS.md).
 
 Automatic cell changes preserve held input and gameplay state in the transition
 checks; doors and explicit travel retain their own loading behavior. The default
@@ -686,6 +705,19 @@ to ignored `out/`.
 
 These commands preview setup and check prerequisites. Follow the linked build
 guide to install the required tools and build the playable HDF.
+
+A normal build includes everything the release ships, including the Vivec
+Arena preview (an outside-only look at the canton, new in v0.0.32); no extra
+option is needed. Options that leave shipped content out are for debugging only
+and say so; see [shipped towns](docs/LINUX_BUILD.md#shipped-towns-default).
+
+**FPU support library (optional, your own copy):** a real 68040 or 68060 needs
+`68040.library` or `68060.library` for the rare FPU cases its hardware does not
+handle. Add `--amiga-libs DIR` with a folder from your own Workbench or
+accelerator installation; the builder copies the library into `LIBS:` on the
+boot disk and opens it at start-up. Without it the build continues and the boot
+check shows a warning. AmiWind never includes the library; see
+[FPU support library](docs/FPU_SUPPORT_LIBRARY.md).
 
 ### Run AmiWind in an emulator
 

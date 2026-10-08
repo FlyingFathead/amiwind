@@ -22,9 +22,12 @@ Frozen history (read-only; current status is in the register):
 - **New bug:** add it to `bugs.json` (`tools/bug_register.py add ID --title ... --found vX`),
   a journal entry and the report page in the same change, as soon as it is found, even if the cause is unknown.
 - **Fixed** (`state: fixed` with `fixed_in`) means a correction shipped in a named version and was verified.
-  A candidate, mitigation or source-only change is not fixed. Keep reported,
+  A candidate, mitigation or source-only change is not fixed, and a development line
+  (`v0.0.32-dev`) is never a `fixed_in` value; numbered builds (`v0.0.31-dev2`) are. Keep reported,
   source-checked, packaged, native-verified and owner-accepted distinct, and
   set `owner_accepted` only when the owner has played the fixed build.
+- **Wording for unshipped repairs:** write "fixed in source on <branch> (<commit>), not shipped at the time of
+  writing". Statuses describe the state when they were written; say so instead of "not yet shipped".
 - **Regressions** get their own ID, linked to the older bug they resemble.
 - Old IDs keep their records; their register row is updated when their status
   changes.
@@ -70,3 +73,29 @@ What was run on which build, and what remains (for example owner playtest).
 
 The check or gate added so it cannot recur unnoticed.
 ```
+
+---
+
+## Duplicates and similar bugs
+
+**Duplicates.** A report that turns out to be the same fault as an existing one keeps its ID (IDs are never
+reused or deleted). It is closed with the status "duplicate of <ID>" and a link, and its evidence moves to
+the original. Example: BUILD-SEYDA-PRIVATE-STAGES-31, closed as a duplicate of BUILD-SEYDA-REGEN-30.
+
+**Similar bugs.** Bugs that share a cause or a mechanism stay separate entries (each has its own symptom,
+place and verification), but every page links the others under one family name, and a repair is checked
+against the whole family, not only the bug that prompted it. Fix the shared layer once rather than each
+instance; a family that keeps growing is a sign the shared rule or gate is missing.
+
+Current families:
+
+| Family | Entries | Shared cause or rule |
+| --- | --- | --- |
+| Collision shapes and climbing (stairs, ramps, walkways) | COLLISION-CONVEX-LOSS-32, VIVEC-ARENA-ACTORS-32, VIVEC-ARENA-TP-ARRIVAL-32 | Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: `follow_original_stair_rules` plus a walkability gate. |
+| Distance drawing (horizon, fog, far edges) | HORIZON-FLORA-SPRITES-32, FOG-TOWN-HEAVY-32, HORIZON-HOLES-31 | Far-plane fog, the skyline fill and distant sprites. |
+| Seyda Neen recorded stage | BUILD-SEYDA-REGEN-30, BUILD-SEYDA-RECORDED-REWRITTEN-32, HEAP-SEYDA-OVERLAP-32, HARVEST-SEYDA-HEAP-REFUSED-32 | Recorded v0.0.31 maps kept byte for byte; their heap headroom limits what can be added. |
+| Content silently missing from a build | BUILD-HARVEST-NOT-BUILT-32, BUILD-DRESSING-EXCLUDED-32, PLAYTEST-PAYLOAD-COVERAGE-32 | Every omission is receipted; payload and entity counts are compared with the last release. |
+| Console input | CONSOLE-HISTORY-ARROWS-32, CONSOLE-HISTORY-EMPTY-32 | The console line editor and its key path. |
+| Build speed | BUILD-IMAGE-SERIAL-32, BUILD-IMAGE-UNDERUSED-32 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
+
+Add a row when a third similar bug appears, or earlier when the shared cause is already known.

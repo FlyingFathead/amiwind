@@ -204,6 +204,17 @@ int main(int count,char **values){
  assert(AW_DebugTranslate(4,exact,output,sizeof(output))==1 && !strcmp(output,"aw_set_time 0630\n"));
  assert(AW_DebugTranslate(3,sky,output,sizeof(output))==1 && !strcmp(output,"aw_daynight off\n"));
  {
+  /* dbg daynight (clock hold at 12:00) is its own command, not the sky setting
+   * aw_daynight and not daynightcycle; on/off reach the handler unchanged. */
+  char *hold[]={"dbg","daynight","off"};
+  assert(AW_DebugTranslate(2,hold,output,sizeof(output))==1 && !strcmp(output,"aw_daynight_set\n"));
+  assert(AW_DebugTranslate(3,hold,output,sizeof(output))==1 && !strcmp(output,"aw_daynight_set off\n"));
+  hold[2]="on";assert(AW_DebugTranslate(3,hold,output,sizeof(output))==1 && !strcmp(output,"aw_daynight_set on\n"));
+  hold[2]="off;quit";assert(!AW_DebugTranslate(3,hold,output,sizeof(output)));
+  hold[1]="daynightcycle";hold[2]="off";
+  assert(AW_DebugTranslate(3,hold,output,sizeof(output))==1 && !strcmp(output,"aw_daynightcycle off\n"));
+ }
+ {
   char *cloudtype[]={"dbg","cloudtype","veil"};
   assert(AW_DebugTranslate(2,cloudtype,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_type_set\n"));
   assert(AW_DebugTranslate(3,cloudtype,output,sizeof(output))==1 && !strcmp(output,"aw_cloud_type_set veil\n"));

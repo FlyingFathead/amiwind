@@ -22,7 +22,11 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=4):
+def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=None, vis_mode='fast'):
+    # threads: the builder's --jobs (None: the stage budget, resolve_jobs).
+    from build_jobs import resolve_jobs
+    threads=resolve_jobs(threads)
+    from vis_options import vis_kwargs
     maps_dir=Path(maps_dir);cache=Path(cache);palette=Path(palette)
     work=Path(work_dir);work.mkdir(parents=True,exist_ok=True)
     receipt=work/'balmora-repair.json'
@@ -56,7 +60,7 @@ def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=4):
             name=entry['name'];target=candidates/(name+'.bsp')
             if name in source_names:
                 detail=rebuild_cached_region(cache,backups/(source_names[name]+'.bsp'),palette,
-                            entry,settings,work/('rebuild-'+name),ericw_bin,threads=threads)
+                            entry,settings,work/('rebuild-'+name),ericw_bin,threads=threads,**vis_kwargs(vis_mode))
                 shutil.copyfile(detail['candidate_path'],target)
                 proof={'rebuilt':True,'receipt':str(work/('rebuild-'+name)/'repair.json')}
             else:

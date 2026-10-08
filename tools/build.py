@@ -53,12 +53,14 @@ import tarfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+# Release entity baseline (tools/entity_tracker.py baseline): counts and placement digests.
+ENTITY_BASELINE = ROOT / "config/entity-baseline.json"
 sys.path.insert(0, str(ROOT / "src"))
 from mwad.paths import child_ci, ensure_external, inside, resolve_data_files, installed_game_path, is_wsl, is_game_input
 from mwad import input_check
 from mwad.progress import Progress, live_log, section
 import build_versions
-from build_jobs import add_jobs, resolve_jobs
+from build_jobs import add_jobs, jobs_warning, resolve_jobs
 from build_host import executable_path, find_executable, fallback_font, host_name, setup_plan
 from build_summary import BuildSummary
 from build_font_options import add_font_options, resolve_font_options
@@ -90,6 +92,33 @@ def parser():
     p.add_argument("--autorun-fs-uae", action="store_true", help="Check FS-UAE and your ROM before setup, then launch the completed HDF using the documented preset")
     p.add_argument("--kickstart-file", "--kickstart", dest="kickstart_file", type=Path,
                    help="Owned ROM file or directory for --autorun-fs-uae (default: ~/.roms/; asks if missing interactively)")
+    p.add_argument("--amiga-libs", type=Path, metavar="DIR",
+                   help="Optional: a folder from your own Workbench/accelerator installation (or its LIBS: drawer). "
+                        "68040.library/68060.library found there are copied to LIBS: on the boot disk and opened at boot; "
+                        "without one the build continues and reports no FPU support library. See docs/FPU_SUPPORT_LIBRARY.md")
+    p.add_argument("--seyda-recorded", type=Path, metavar="DIR",
+                   help="Recorded-stage exception BUILD-SEYDA-REGEN-30 (v0.0.31 and v0.0.32): DIR/id1 holds the recorded "
+                        "v0.0.31 Seyda Neen maps from your own v0.0.31 image, checked against "
+                        "config/seyda-recorded-v0.0.31.json; they replace the Seyda region conversion and ship byte for "
+                        "byte. See tools/recorded_stage.py")
+    p.add_argument("--skip-dressing", action="store_true",
+                   help="DEBUGGING ONLY: the earlier interior rule, leaving out lantern hooks, ropes, ferns and other "
+                        "dressing in the Seyda Neen interiors (receipted); by default they are kept (BUILD-DRESSING-EXCLUDED-32)")
+    p.add_argument("--no-entity-baseline", action="store_true",
+                   help="DEBUGGING ONLY: do not compare the image's entity tracker with the release baseline "
+                        "(config/entity-baseline.json); by default a placement lost against it stops the build")
+    p.add_argument("--accept-entity-loss", metavar="REASON",
+                   help="Recorded reason that lets an intended loss against the entity baseline pass")
+    p.add_argument("--amiga-libs-policy", choices=("warn", "fail", "require-known"), default="warn",
+                   help="Known-inputs policy for --amiga-libs: warn (default; unknown builds used with a warning, "
+                        "invalid files not used), fail (an invalid file stops the build), require-known. See docs/KNOWN_INPUTS.md")
+    p.add_argument("--game-data-policy", choices=("warn", "fail", "require-known"), default="warn",
+                   help="Known-inputs policy for Morrowind/Tribunal/Bloodmoon .esm/.bsa: warn (default; unknown versions "
+                        "used with a warning), fail (any invalid file stops), require-known. See docs/KNOWN_INPUTS.md")
+    p.add_argument("--check-hashes", choices=("core", "full", "auto", "off"), default="core",
+                   help="Input hashing with the workspace lock amiwind-inputs.lock: core (default; the masters, archives, "
+                        "Amiga libraries and ROM are hashed every build, other inputs only when size or times changed), "
+                        "full (every input; use for releases), auto (every input only when changed), off (no checks; loud warning)")
     p.add_argument("--allow-data-differences", action="store_true", help="Explicitly allow unverified edition/file checksum differences; container and required-group errors still block")
     p.add_argument("--name", help="New immutable run name; defaults to a UTC timestamp")
     p.add_argument("--sdk", type=Path, help="AmigaPorts GCC SDK root")
@@ -105,17 +134,68 @@ def parser():
     p.add_argument('--gallery-seed-run', type=Path, help='Import completed compatible model pairs from a stopped rc9 build run')
     p.add_argument("--no-npc-gallery", action="store_true", help="DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery included by default")
     p.add_argument("--hands", choices=("3d","sprites"), default="3d", help="First-person runtime build: Nord first-person hands and original carried torch")
+    p.add_argument('--no-tree-sprites', action='store_true',
+                   help='DEBUGGING ONLY: omit world flora (original trees, grass and reeds as sprites with collision, '
+                        'shipped since v0.0.28); flora is built by default and such an image does not match a release')
+    p.add_argument('--no-harvest', action='store_true',
+                   help='DEBUGGING ONLY: omit harvestable mushrooms (shipped since v0.0.29); the harvest step is built '
+                        'by default and such an image does not match a release (mushrooms stay baked, not pickable)')
     p.add_argument('--tree-sprites', action='store_true',
-                   help='STAGED v0.0.28: original tree/grass sprite + collision overlay; requires matching runtime and memory/coverage acceptance')
+                   help='No effect, kept for old command lines: world flora is built by default (BUILD-FLORA-OPTIN-32)')
     p.add_argument('--map-budget-policy', choices=('strict', 'warning'), default='strict',
                    help='Private playtest only: warning permits modeled reserve allowance excess; actual allocation limits and other checks remain enforced')
+    from vis_options import VIS_MODES, DEFAULT_VIS_MODE
+    p.add_argument('--vis', '--vis-mode', dest='vis_mode', choices=VIS_MODES, default=DEFAULT_VIS_MODE,
+                   help='Map compiler vis pass for every converted map: fast (default; portal flood only, '
+                        'outputs unchanged) or full (full portal flow, slower). vis threads follow --jobs. '
+                        'See docs/performance/TOWN-VISIBILITY.md')
+    from town_config import extra_towns as offered_towns, shipped_extra_towns
+    # A registry row with "blocked": reason is configured but fails a limit; it
+    # stays in the table (stable save IDs) and is not offered here. A row with
+    # "shipped_since" is part of the release and built by default
+    # (BUILD-EXTRA-TOWN-OPTIN-32); --extra-town adds the others.
+    extra_towns, shipped_towns = offered_towns(), shipped_extra_towns()
+    p.add_argument('--extra-town', action='append', default=[], choices=extra_towns, metavar='TOWN',
+                   help='Also import this town from config/towns.json (towns not shipped yet: '
+                        + (', '.join(t for t in extra_towns if t not in shipped_towns) or 'none')
+                        + '; shipped towns, ' + (', '.join(shipped_towns) or 'none')
+                        + ', are built by default and need no option). See docs/TOWN_IMPORT.md')
+    p.add_argument('--no-extra-town', action='append', default=[], choices=shipped_towns, metavar='TOWN',
+                   help='DEBUGGING ONLY: leave out this shipped town (' + (', '.join(shipped_towns) or 'none')
+                        + '), which every default build makes; such an image does not match a release')
+    p.add_argument('--only-core-towns', action='store_true',
+                   help='DEBUGGING ONLY: build Seyda Neen and Balmora only, without the shipped towns ('
+                        + (', '.join(shipped_towns) or 'none') + ') or any --extra-town; such an image does '
+                        'not match a release')
     from hidden_surface_build import add_options as add_hidden_surface_options
     add_hidden_surface_options(p)
     from exterior_sky_build import add_options as add_exterior_sky_options
     add_exterior_sky_options(p)
+    p.add_argument('--estimate-world', type=Path, metavar='OUT',
+                   help='Estimate every world map (heap, BSP limits, entities) from --data-files into OUT, '
+                        'without converting; then exit. See docs/WORLD_ESTIMATE.md')
+    p.add_argument('--estimate-sample', type=int, default=0, metavar='N',
+                   help='With --estimate-world: also convert N stratified maps and report the estimate error '
+                        '(uses --quake-tools and --sdk)')
+    from scenery_reduce import add_options as add_scenery_reduce_options
+    add_scenery_reduce_options(p)
     add_jobs(p)
     p.add_argument('--serial-stages', action='store_true',
                    help='Run stages in order while retaining each stage job limit (diagnostics)')
+    p.add_argument('--no-profile', action='store_true',
+                   help='DEBUGGING ONLY: run stages without the build profiler and output manifests '
+                        '(build-profile.json); outputs are the same, and a later --reuse-from cannot use such a run. '
+                        'See docs/BUILD_PROFILE.md')
+    p.add_argument('--reuse-from', type=Path, metavar='RUN',
+                   help='Development builds: copy the verified outputs of stages whose input fingerprint is unchanged '
+                        'from this earlier run instead of running them; refused for release candidates and finals. '
+                        'See docs/BUILD_PROFILE.md')
+    p.add_argument('--reuse-mode', choices=('copy', 'hardlink'), default='copy',
+                   help='With --reuse-from: copy (default) or hard-link reused files (hard links are made read-only '
+                        'in both runs; never as root)')
+    p.add_argument('--allow-release-reuse', action='store_true',
+                   help='With --reuse-from on a release candidate or final VERSION: only while the from-scratch '
+                        'gate runs separately on the same commit')
     add_font_options(p)
     return p
 
@@ -279,10 +359,12 @@ def prerequisites(args, interactive=False):
             print("Checking the installed file tree, containers and reference SHA-256 hashes...", flush=True)
             with Progress("Verifying game files, containers and reference hashes"):
                 args.input_report = input_check.inspect(raw, args.stage, args.allow_data_differences,
-                                                       notify=print, choose=choose_installation if interactive else None)
+                                                       notify=print, choose=choose_installation if interactive else None,
+                                                       hasher=input_lock(args))
             input_check.display(args.input_report)
             errors.extend(args.input_report["errors"])
             data = Path(args.input_report["data_files"])
+            args.known_game_data = check_known_game_data(args, data)
             if inside(args.workspace, data) or inside(data, args.workspace):
                 errors.append("Use an output workspace separate from the game installation, not its parent or child")
         except (OSError, ValueError) as exc:
@@ -396,17 +478,156 @@ def dry_run_commands(args, run):
                     "--out", str(run / "engine"), "--hands", args.hands, "--jobs", str(resolve_jobs(args.jobs))]),
         ("dry-run-image", [sys.executable, str(ROOT / "tools/build_dry_run.py"), *common,
                            "--engine", str(binary), "--out", str(run / "image"),
-                           *(["--kickstart-file", str(args.kickstart_file)] if getattr(args,"kickstart_file",None) else [])]),
+                           *(["--kickstart-file", str(args.kickstart_file)] if getattr(args,"kickstart_file",None) else []),
+                           *(["--amiga-libs", str(args.amiga_libs), "--amiga-libs-policy", getattr(args, "amiga_libs_policy", "warn")]
+                             if getattr(args,"amiga_libs",None) else [])]),
     ]
 
 
-def commands(args, tools, run):
-    """Include the NPC gallery in normal AGA builds for debugging/regressions.
+def world_layout_ceiling():
+    """Fixed survey ceiling of the recorded world layout (BUILD-WORLD-LAYOUT-DRIFT-32)."""
+    layout = json.loads((ROOT / "config/world-region-refinements.json").read_text(encoding="utf-8"))
+    return layout["survey_source_triangle_limit"]
 
-    Only explicit --no-npc-gallery removes it; absence is never inferred from
-    old scene contents. The opt-out is debugging-only: required game NPCs must
-    never be removed by it. Asset-free dry runs use their separate recipe.
+
+def world_flora_status(args):
+    """World flora (trees and grass) in this build: (built, status).
+
+    Built by default in every real AGA image build, like the NPC gallery: every
+    release since v0.0.28 ships it (BUILD-FLORA-OPTIN-32). Only explicit
+    --no-tree-sprites (debugging only) removes it. Asset-free dry runs,
+    terrain-only builds and the rc3 image recovery (which predates flora)
+    make no image with flora.
     """
+    if getattr(args, 'dry_run', False):
+        return False, 'asset-free'
+    if getattr(args, 'stage', 'aga') != 'aga':
+        return False, 'not applicable (terrain stage)'
+    if getattr(args, 'recover_image_from', None):
+        return False, 'not part of the rc3 image recovery'
+    if getattr(args, 'no_tree_sprites', False):
+        return False, 'disabled by --no-tree-sprites'
+    return True, 'enabled'
+
+
+def hand_catalog_status(args):
+    """Per-race first-person hands in this build: (built, status).
+
+    Every release since v0.0.29 ships the catalogue (progs/hands/*.mdl,
+    gfx/hand-models.awh, gfx/hand-torch.awt); it was made outside the builder
+    until BUILD-HANDS-NOT-BUILT-32. Built in every real AGA image build with
+    3D hands; sprite hands, asset-free dry runs, terrain-only builds and the
+    rc3 image recovery (which predates it) make none.
+    """
+    if getattr(args, 'dry_run', False):
+        return False, 'asset-free'
+    if getattr(args, 'stage', 'aga') != 'aga':
+        return False, 'not applicable (terrain stage)'
+    if getattr(args, 'recover_image_from', None):
+        return False, 'not part of the rc3 image recovery'
+    if getattr(args, 'hands', '3d') != '3d':
+        return False, 'not applicable (sprite hands)'
+    return True, 'enabled'
+
+
+def hand_catalog_steps(args, tool, run, jobs=None):
+    """The catalogue step and its image option (BUILD-HANDS-NOT-BUILT-32).
+
+    Converted against the runtime palette the image step derives from the
+    scene palette (UI bank reserved), with the authored source topology:
+    byte-identical to what v0.0.31 shipped.
+    """
+    step = ('hand-catalog', tool('prepare_hand_catalog.py', '--data-files', args.data_files,
+            '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--runtime-palette',
+            '--topology', 'source', '--out', run / 'hand-catalog', '--jobs', resolve_jobs(args.jobs if jobs is None else jobs)))
+    return step, ['--hand-catalog', str(run / 'hand-catalog')]
+
+
+def harvest_status(args):
+    """Harvestable mushrooms in this build: (built, status).
+
+    Every release since v0.0.29 ships them (id1/harvest-*.txt,
+    progs/harvest/*.mdl); they were made outside the builder until
+    BUILD-HARVEST-NOT-BUILT-32. Built in every real AGA image build; only
+    explicit --no-harvest (debugging only) removes them. Asset-free dry runs,
+    terrain-only builds and the rc3 image recovery (which predates it) make none.
+    """
+    if getattr(args, 'dry_run', False):
+        return False, 'asset-free'
+    if getattr(args, 'stage', 'aga') != 'aga':
+        return False, 'not applicable (terrain stage)'
+    if getattr(args, 'recover_image_from', None):
+        return False, 'not part of the rc3 image recovery'
+    if getattr(args, 'no_harvest', False):
+        return False, 'disabled by --no-harvest'
+    return True, 'enabled'
+
+
+def harvest_steps(args, tool, run, jobs):
+    """The harvest step and its image option (BUILD-HARVEST-NOT-BUILT-32).
+
+    Shared mushroom models against the runtime palette (the scene palette after
+    the census) and every original exterior placement; the image step derives
+    the per-map plan from the maps it ships, gates and admits them.
+    """
+    step = ('harvest', tool('harvest_build.py', 'prepare', '--data-files', args.data_files,
+            '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', run / 'harvest',
+            '--jobs', jobs))
+    return step, ['--harvest', str(run / 'harvest')]
+
+
+def town_selection(args):
+    """The towns after Seyda and Balmora this build imports (BUILD-EXTRA-TOWN-OPTIN-32).
+
+    Every town config/towns.json marks "shipped_since" is part of the release
+    and imported by every real AGA build (the Vivec Arena since v0.0.32), in
+    table order; --extra-town adds towns not shipped yet, in command order.
+    Only the debugging opt-outs --no-extra-town TOWN and --only-core-towns
+    leave a shipped town out. Asset-free dry runs, terrain-only builds and the
+    rc3 image recovery (which predates extra towns) import none.
+
+    Returns {'towns': [...], 'shipped': [...], 'left_out': [...], 'status': text};
+    contradictory options raise ValueError.
+    """
+    from town_config import shipped_extra_towns
+    shipped = shipped_extra_towns()
+    requested = list(dict.fromkeys(getattr(args, 'extra_town', None) or []))
+    dropped = list(dict.fromkeys(getattr(args, 'no_extra_town', None) or []))
+    only_core = getattr(args, 'only_core_towns', False)
+    both = [town for town in requested if town in dropped]
+    if both:
+        raise ValueError('--extra-town and --no-extra-town both name ' + ', '.join(both) + '; use one')
+    if only_core and (requested or dropped):
+        raise ValueError('--only-core-towns already leaves out every extra town; drop --extra-town/--no-extra-town')
+    record = {'shipped': shipped}
+    if getattr(args, 'dry_run', False):
+        return dict(record, towns=[], left_out=[], status='asset-free')
+    if getattr(args, 'stage', 'aga') != 'aga':
+        return dict(record, towns=[], left_out=[], status='not applicable (terrain stage)')
+    if getattr(args, 'recover_image_from', None):
+        return dict(record, towns=[], left_out=[], status='not part of the rc3 image recovery')
+    left_out = list(shipped) if only_core else [town for town in shipped if town in dropped]
+    towns = [town for town in shipped if town not in left_out]
+    towns += [town for town in requested if town not in towns]
+    parts = [', '.join(towns) or 'none']
+    if left_out:
+        parts.append('left out for debugging: ' + ', '.join(left_out)
+                     + (' (--only-core-towns)' if only_core else ' (--no-extra-town)'))
+    status = '; '.join(parts) + (' (shipped by default)' if towns and towns == shipped and not left_out else '')
+    return dict(record, towns=towns, left_out=left_out, status=status)
+
+
+def commands(args, tools, run):
+    """Include the NPC gallery and world flora in normal AGA builds.
+
+    Only explicit --no-npc-gallery removes the gallery and only explicit
+    --no-tree-sprites removes world flora; absence is never inferred from
+    old scene contents. Both opt-outs are debugging-only: required game NPCs
+    must never be removed by them. Asset-free dry runs use their separate recipe.
+    """
+    # One worker count for the whole plan: an explicit --jobs N exactly, auto
+    # resolved once (BUILD-JOBS-RESOLVE-PER-STAGE-32).
+    jobs = resolve_jobs(args.jobs)
     font_options = getattr(args, "font_options", None) or resolve_font_options(args)
     py = sys.executable
     def tool(name, *items):
@@ -419,93 +640,142 @@ def commands(args, tools, run):
     if args.stage == "aga":
         binary = run / "engine" / RUNTIME_BUILD_DIR / "build/AmiQuakeGCC"
         steps += [
-            ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery", "--jobs", resolve_jobs(args.jobs))),
-            ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene", "--jobs", resolve_jobs(args.jobs),
+            ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery", "--jobs", jobs)),
+            ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene", "--jobs", jobs,
                            *(['--fallback-font', args.fallback_font] if args.fallback_font else []))),
-            ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", resolve_jobs(args.jobs),
+            ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", jobs,
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("npcs", tool("prepare_npcs.py", "--data-files", args.data_files, "--scene", run / "bsp-scene", "--out", run / "npc-scene", "--ffmpeg", tools["ffmpeg"])),
             ("hands", tool("prepare_hands.py", "--data-files", args.data_files, "--scene", run / "npc-scene", "--out", run / "hands-scene")),
-            ("interior", tool("prepare_interior.py", "--data-files", args.data_files, "--scene", run / "hands-scene", "--out", run / "interior-scene", "--jobs", resolve_jobs(args.jobs),
+            ("interior", tool("prepare_interior.py", "--data-files", args.data_files, "--scene", run / "hands-scene", "--out", run / "interior-scene", "--jobs", jobs,
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("dialogue-lookup", tool("prepare_dialogue_lookup.py", "--data-files", args.data_files, "--out", run / "voice-lookup.json")),
-            ("intro", tool("prepare_intro.py", "--jobs", resolve_jobs(args.jobs), "--data-files", args.data_files, "--scene", run / "interior-scene", "--out", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
+            ("intro", tool("prepare_intro.py", "--jobs", jobs, "--data-files", args.data_files, "--scene", run / "interior-scene", "--out", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
             ("census", tool("prepare_census.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
-                "--jobs", resolve_jobs(args.jobs),
+                "--jobs", jobs,
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("npc-gallery", tool("build_gallery.py", "--data-files", args.data_files,
                 "--palette", run / "intro-scene/id1/gfx/palette.lmp", "--out", run / "npc-gallery",
                 "--cache", getattr(args, "gallery_cache", None) or args.workspace / "cache/npc-gallery-v1",
                 *(["--seed-run", args.gallery_seed_run] if getattr(args, "gallery_seed_run", None) else []),
-                "--jobs", resolve_jobs(args.jobs),
+                "--jobs", jobs,
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("area", tool("prepare_area.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
-                "--jobs", resolve_jobs(args.jobs), "--ffmpeg", tools["ffmpeg"],
+                "--jobs", jobs, "--ffmpeg", tools["ffmpeg"],
                 "--qbsp", tools["qbsp"], "--vis", tools["vis"], "--light", tools["light"])),
             ("balmora", tool("prepare_balmora.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
-                "--out", run / "balmora-work", "--jobs", resolve_jobs(args.jobs), "--ffmpeg", tools["ffmpeg"],
+                "--out", run / "balmora-work", "--jobs", jobs, "--ffmpeg", tools["ffmpeg"],
                 "--qbsp", tools["qbsp"], "--vis", tools["vis"], "--light", tools["light"])),
             ("balmora-interiors", tool("prepare_balmora_interiors.py", "--data-files", args.data_files,
-                "--scene", run / "intro-scene", "--jobs", resolve_jobs(args.jobs), "--ffmpeg", tools["ffmpeg"],
+                "--scene", run / "intro-scene", "--jobs", jobs, "--ffmpeg", tools["ffmpeg"],
                 "--qbsp", tools["qbsp"], "--vis", tools["vis"], "--light", tools["light"])),
             ("door-audio", tool("prepare_door_audio.py", "--data-files", args.data_files, "--scene", run / "intro-scene", "--ffmpeg", tools["ffmpeg"])),
-            ("character", tool("prepare_character.py", "--jobs", resolve_jobs(args.jobs), "--data-files", args.data_files, "--scene", run / "intro-scene")),
+            ("character", tool("prepare_character.py", "--jobs", jobs, "--data-files", args.data_files, "--scene", run / "intro-scene")),
             ("reading", tool("prepare_reading.py", "--data-files", args.data_files, "--scene", run / "intro-scene",
                 "--bitmap-paper-ink", font_options["bitmap_paper_ink"])),
             ("opening-references", tool("prepare_opening_refs.py", "--data-files", args.data_files, "--scene", run / "intro-scene")),
             ("world-survey", tool("survey_vvardenfell.py", "--data-files", args.data_files,
-                "--out", run / "world-survey", "--jobs", resolve_jobs(args.jobs))),
+                "--out", run / "world-survey", "--jobs", jobs,
+                "--triangle-limit", world_layout_ceiling())),
             ("world-ui", tool("prepare_world_ui.py", "--data-files", args.data_files,
                 "--survey", run / "world-survey", "--scene", run / "intro-scene")),
-            ("actor-contact", tool("check_scene_actors.py", "--scene", run / "intro-scene",
+            ("actor-contact", tool("check_scene_actors.py", "--scene", run / "intro-scene", "--jobs", jobs,
                 "--data-files", args.data_files, "--out", run / "actor-contact",
+                "--ericw-bin", Path(tools['qbsp']).parent,
+                "--canonical-land-source", run / "world-survey/terrain-source.npz",
                 *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings]
-                  if getattr(args, "allow_known_actor_ground_findings", None) else []))),
+                  if getattr(args, "allow_known_actor_ground_findings", None) else []),
+                *(["--seyda-recorded", args.seyda_recorded] if getattr(args, "seyda_recorded", None) else []))),
             ("world-terrain", tool("prepare_world_regions.py", "--survey", run / "world-survey",
                 "--data-files", args.data_files, "--scene", run / "intro-scene",
                 "--out", run / "world-terrain", "--bindir", Path(tools['qbsp']).parent,
-                "--jobs", resolve_jobs(args.jobs))),
+                "--jobs", jobs)),
             ("world-scenery-assets", tool("world_scenery.py", "--data-files", args.data_files,
                 "--out", run / "world-scenery-source", "--export-meshes",
-                "--jobs", resolve_jobs(args.jobs))),
+                "--jobs", jobs)),
             ("world-scenery", tool("prepare_world_scenery.py", "--terrain", run / "world-terrain",
                 "--scenery", run / "world-scenery-source/scenery",
                 "--palette", run / "intro-scene/id1/gfx/palette.lmp",
-                "--out", run / "world-scenery", "--jobs", resolve_jobs(args.jobs))),
-            ("media", tool("prepare_media_assets.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "media", "--jobs", resolve_jobs(args.jobs))),
-            ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", resolve_jobs(args.jobs))),
-            ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", resolve_jobs(args.jobs),
+                "--out", run / "world-scenery", "--jobs", jobs)),
+            ("media", tool("prepare_media_assets.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "media", "--jobs", jobs)),
+            ("music", tool("prepare_music.py", "--data-files", args.data_files, "--ffmpeg", tools["ffmpeg"], "--out", run / "music", "--jobs", jobs)),
+            ("engine", tool("build_aga.py", "engine", "--sdk", args.sdk, "--out", run / "engine", "--hands", args.hands, "--jobs", jobs,
                             *(["--vasm", args.vasm] if args.vasm else []))),
-            ("image", tool("build_aga.py", "image", *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", "--jobs", jobs, *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
-    if getattr(args, 'tree_sprites', False):
+        # Shipped towns (by default) and --extra-town towns convert in the same
+        # scene chain, right after Balmora's interiors (BUILD-EXTRA-TOWN-OPTIN-32).
+        towns = [(f'town-{town}', tool('import_town.py', '--town', town, '--data-files', args.data_files,
+                  '--scene', run / 'intro-scene', '--out', run / f'{town}-work', '--jobs', jobs,
+                  '--ffmpeg', tools['ffmpeg'], '--qbsp', tools['qbsp'], '--vis', tools['vis'], '--light', tools['light']))
+                 for town in town_selection(args)['towns']]
+        index = next(i for i, (name, _) in enumerate(steps) if name == 'balmora-interiors') + 1
+        steps[index:index] = towns
+        # Only a non-default vis mode adds an option: default command lines stay unchanged.
+        vis_mode = getattr(args, 'vis_mode', 'fast')
+        if vis_mode != 'fast':
+            vis_steps = {'bsp', 'interior', 'census', 'area', 'balmora', 'balmora-interiors', 'actor-contact', 'world-terrain', 'image',
+                         *(name for name, _ in towns)}
+            steps = [(name, command + ['--vis-mode', vis_mode] if name in vis_steps else command)
+                     for name, command in steps]
+    if world_flora_status(args)[0]:
         image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
         flora_steps = [
             ('world-flora-assets', tool('prepare_tree_sprites.py', '--data-files', args.data_files,
                 '--palette', run / 'intro-scene/id1/gfx/palette.lmp',
-                '--out', run / 'world-flora-assets', '--jobs', resolve_jobs(args.jobs))),
+                '--out', run / 'world-flora-assets', '--jobs', jobs)),
             ('world-flora', tool('prepare_world_flora.py', '--terrain', run / 'world-terrain',
                 '--base', run / 'world-scenery', '--flora', run / 'world-flora-assets',
                 '--palette', run / 'intro-scene/id1/gfx/palette.lmp',
-                '--out', run / 'world-flora', '--jobs', resolve_jobs(args.jobs), '--collision-packing', 'adaptive')),
+                '--out', run / 'world-flora', '--jobs', jobs, '--collision-packing', 'adaptive')),
         ]
         steps[image_index:image_index] = flora_steps
         steps = [(name, command + ['--world-flora', str(run / 'world-flora'),
                       '--town-flora-source-index', str(run / 'scenery/scenery-index.json'),
-                      '--town-flora-scene-report', str(run / 'alias-scene/scene-report.json'),
-                      '--balmora-cache', str(run / 'balmora-work')] if name == 'image' else command)
+                      '--town-flora-scene-report', str(run / 'alias-scene/scene-report.json')] if name == 'image' else command)
                  for name, command in steps]
+    if harvest_status(args)[0]:
+        step, options = harvest_steps(args, tool, run, jobs)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+    if hand_catalog_status(args)[0]:
+        step, options = hand_catalog_steps(args, tool, run, jobs)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
     if args.stage == 'aga':
         image_options = ['--hidden-surface-cull', getattr(args, 'hidden_surface_cull', 'true'),
                          '--local-skybox', getattr(args, 'local_skybox', 'false'),
                          '--map-budget-policy', getattr(args, 'map_budget_policy', 'strict'),
+                         # Seyda region conversion: same canonical LAND as actor-contact.
+                         '--canonical-land-source', str(run / 'world-survey/terrain-source.npz'),
                          # Night window table sources: the scenery the towns came from.
                          '--town-scenery', str(run / 'scenery'),
                          '--balmora-scenery', str(run / 'balmora-work/scenery')]
+        if not getattr(args, 'recover_image_from', None):
+            # Measured bounded Balmora layout repair (since v0.0.27; the rc3 image
+            # recovery predates it). Independent of world flora, which it used
+            # to depend on (BUILD-FLORA-OPTIN-32).
+            image_options += ['--balmora-cache', str(run / 'balmora-work')]
         if getattr(args, 'shared_sky_source', None) is not None:
             image_options += ['--shared-sky-source', str(args.shared_sky_source.resolve())]
+        if getattr(args, 'seyda_recorded', None) is not None:
+            image_options += ['--seyda-recorded', str(args.seyda_recorded)]
+        # Entity tracker against the last release (BUILD-DRESSING-EXCLUDED-32): a placement the
+        # release had and this image lacks stops the image step unless the loss is accepted.
+        if not getattr(args, 'no_entity_baseline', False) and ENTITY_BASELINE.is_file():
+            image_options += ['--entity-baseline', str(ENTITY_BASELINE)]
+        if getattr(args, 'accept_entity_loss', None):
+            image_options += ['--accept-entity-loss', args.accept_entity_loss]
+        if getattr(args, 'amiga_libs', None) is not None:
+            image_options += ['--amiga-libs', str(args.amiga_libs),
+                              '--amiga-libs-policy', getattr(args, 'amiga_libs_policy', 'warn')]
         steps = [(name, command + image_options if name == 'image' else command)
+                 for name, command in steps]
+    if getattr(args, 'skip_dressing', False):
+        steps = [(name, command + ['--skip-dressing'] if name in ('interior', 'census', 'area') else command)
                  for name, command in steps]
     if args.no_npc_gallery:
         steps = [(name, command) for name, command in steps if name != "npc-gallery"]
@@ -524,12 +794,15 @@ def execute(steps, run, metadata):
         temporary.write_text(json.dumps(receipt, indent=2) + "\n")
         temporary.replace(run / "build-state.json")
     save()
+    import build_profile
+    profile = build_profile.start(run, steps, metadata)
     for number, (name, command) in enumerate(steps, 1):
         log = run / "logs" / f"{number:02}-{name}.log"
         title = name + " (pre-baking in-game character models...)" if name == "npc-gallery" else name
         section(f"Build [{number}/{len(steps)}]: {title}")
         print(f"Log: {log}", flush=True)
-        entry = {"name": name, "command": command, "status": "running", "log": str(log)}
+        entry = {"name": name, "command": command, "status": "running", "log": str(log),
+                 "jobs": metadata.get("compiler_jobs", 1)}
         receipt["steps"].append(entry)
         save()
         start = time.monotonic()
@@ -537,22 +810,27 @@ def execute(steps, run, metadata):
             with log.open("w") as output:
                 with Progress(f"[{number}/{len(steps)}] {name}"), live_log(log):
                     from build_parallel import THREAD_LIMITS
-                    subprocess.run(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, check=True,
+                    subprocess.run(profile.command(number, name, command, metadata.get('compiler_jobs', 1)),
+                                   cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, check=True,
                                    env=dict(os.environ, **THREAD_LIMITS, PYTHONUNBUFFERED='1',
                                             AMIWIND_BUILD_JOBS=str(metadata.get('compiler_jobs', 1))))
         except (OSError, subprocess.CalledProcessError, KeyboardInterrupt) as exc:
             status = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
             entry.update(status=status, elapsed_seconds=round(time.monotonic() - start, 3))
+            profile.finished(name, entry)
             receipt["status"] = status
             save()
+            profile.close(receipt)
             if isinstance(exc, KeyboardInterrupt):
                 print(f"Build cancelled. Earlier results and logs retained in {run}", flush=True)
                 raise
             raise RuntimeError(f"{name} failed. Earlier results are retained. Read {log}; use a new --name after fixing the problem.") from exc
         entry.update(status="passed", elapsed_seconds=round(time.monotonic() - start, 3))
+        profile.finished(name, entry)
         save()
     receipt["status"] = "passed"
     save()
+    profile.close(receipt)
 
 
 def provenance(args, tools):
@@ -574,20 +852,112 @@ def provenance(args, tools):
                          "shared_sky_source": str(args.shared_sky_source.resolve()) if getattr(args, "shared_sky_source", None) else None,
                          "stage": "final serialized exterior sky before hidden surfaces and compaction",
                          "unknown_maps": "preserved and recorded"},
+        "mesh_reduction": {"texinfo_snap_texels": getattr(args, "texinfo_snap", None),
+                           "scenery_reduce_error": getattr(args, "scenery_reduce", None),
+                           "scenery_reduce_texels": getattr(args, "scenery_reduce_texels", None),
+                           "default": "both off; see docs/MESH_TIPS_AND_TRICKS.md"},
         "compiler_jobs": resolve_jobs(args.jobs),
+        "jobs_requested": getattr(args, "jobs_requested", args.jobs),
+        "vis_mode": getattr(args, "vis_mode", "fast"),
+        "amiga_libs": str(args.amiga_libs) if getattr(args, "amiga_libs", None) else None,
+        "seyda_recorded": str(args.seyda_recorded) if getattr(args, "seyda_recorded", None) else None,
+        "extra_towns": town_selection(args)['towns'],
+        "extra_town_selection": town_selection(args),
         "serial_stages": args.serial_stages,
-        'world_flora': {'requested': bool(getattr(args, 'tree_sprites', False)),
-                        'status': 'staged opt-in' if getattr(args, 'tree_sprites', False) else 'not_requested',
-                        'policy_sha256': sha256(ROOT / 'config/world-flora.json') if getattr(args, 'tree_sprites', False) else None},
+        'world_flora': {'requested': world_flora_status(args)[0],
+                        'status': world_flora_status(args)[1],
+                        'policy_sha256': sha256(ROOT / 'config/world-flora.json') if world_flora_status(args)[0] else None},
+        'hand_catalog': {'requested': hand_catalog_status(args)[0], 'status': hand_catalog_status(args)[1]},
+        'harvest': {'requested': harvest_status(args)[0], 'status': harvest_status(args)[1]},
         "font_options": getattr(args, "font_options", None) or resolve_font_options(args),
         "input_check": getattr(args, "input_report", None),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
-        "input_sha256": {} if args.dry_run else hashes(args.data_files, lambda path: is_game_input(path.relative_to(args.data_files))),
+        "input_sha256": {} if args.dry_run else input_hashes(args),
+        "known_inputs": known_inputs_record(args),
         "source_sha256": hashes(ROOT, lambda path:
             (path.suffix in (".py", ".c", ".h", ".patch", ".qc", ".asm", ".sh", ".cfg") or path.name in ("Makefile", "VERSION", "pyproject.toml"))
             and path.relative_to(ROOT).parts[0] != "out"
             and "__pycache__" not in path.parts),
     }
+
+
+def input_lock(args):
+    """The build's one input lock: amiwind-inputs.lock in the workspace (private)."""
+    lock = getattr(args, '_input_lock', None)
+    if lock is None:
+        import known_inputs
+        workspace = ensure_external(args.workspace, "build workspace")
+        lock = known_inputs.InputLock(None if getattr(args, 'plan', False) else workspace / known_inputs.LOCK_NAME,
+                                      getattr(args, 'check_hashes', 'core'))
+        args._input_lock = lock
+        if lock.mode == 'off':
+            print('[WARNING] --check-hashes off: input files are NOT verified against known versions or the reference.', flush=True)
+    return lock
+
+
+def check_known_game_data(args, data):
+    """Known-inputs verdicts of the masters and archives, at the start of the build."""
+    import known_inputs
+    report = known_inputs.check_game_data(data, input_lock(args), getattr(args, 'game_data_policy', 'warn'),
+                                          input_report=getattr(args, 'input_report', None))
+    for text in known_inputs.report_lines(report):
+        print(text, flush=True)
+    if report['warnings']:
+        print(f"[warning] {len(report['warnings'])} game data file(s) not known (listed above); "
+              'they are used (--game-data-policy warn). See docs/KNOWN_INPUTS.md', flush=True)
+    args.known_game_data = report
+    return report
+
+
+def input_hashes(args):
+    """SHA-256 of every game input, from the build's input lock (one hashing path)."""
+    lock = input_lock(args)
+    paths = [path for path in sorted(args.data_files.rglob("*"))
+             if path.is_file() and is_game_input(path.relative_to(args.data_files))]
+    lock.prepare(paths)
+    return {str(path.relative_to(args.data_files)): lock.sha256(path) for path in paths}
+
+
+def check_known_kickstart(args):
+    """Verdict of --kickstart-file (informational: the launcher checks the ROM too)."""
+    rom = getattr(args, 'kickstart_file', None)
+    if not rom or not Path(rom).is_file():
+        return None
+    import known_inputs
+    lock = input_lock(args)
+    lock.prepare([rom], core=True)
+    record = known_inputs.classify('kickstart-rom', Path(rom).name, rom, lock.sha256(rom), lock.table)
+    lock.note_verdict(rom, record)
+    print('Kickstart ROM: ' + known_inputs.line(record), flush=True)
+    return record
+
+
+def known_inputs_record(args):
+    """The known-inputs block of the build receipt and summary."""
+    if getattr(args, '_input_lock', None) is None and not getattr(args, 'kickstart_file', None):
+        return None
+    kickstart = check_known_kickstart(args)
+    lock = input_lock(args)
+    return {'check_hashes': lock.summary(), 'game_data': getattr(args, 'known_game_data', None),
+            'amiga_libs': getattr(args, 'known_amiga_libs', None), 'kickstart': kickstart}
+
+
+def estimate_world(args):
+    """--estimate-world: the builder's whole-world estimate (tools/world_estimate.py)."""
+    import world_estimate
+    raw = game_input(args.data_files, sys.stdin.isatty())
+    if raw is None:
+        raise ValueError("Supply --data-files with your Morrowind installation root")
+    if args.estimate_sample and not args.quake_tools:
+        raise ValueError('--estimate-sample needs --quake-tools (ericw-tools directory with qbsp, vis, light)')
+    options = ['estimate', '--data-files', str(installed_game_path(raw)), '--out', str(args.estimate_world)]
+    if args.jobs:
+        options += ['--jobs', str(resolve_jobs(args.jobs))]
+    if args.estimate_sample:
+        options += ['--sample-convert', str(args.estimate_sample), '--quake-tools', str(args.quake_tools)]
+        if args.sdk:
+            options += ['--sdk', str(args.sdk)]
+    return world_estimate.main(options)
 
 
 def main(argv=None):
@@ -600,30 +970,93 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     args = p.parse_args(argv)
     args._argv = argv
+    # One worker count per build (BUILD-JOBS-RESOLVE-PER-STAGE-32): an explicit
+    # --jobs N exactly, automatic resolved here once; provenance, the scheduler
+    # and every stage share it.
+    args.jobs_requested = args.jobs
+    if args.jobs is None:
+        args.jobs = resolve_jobs(None)
+    # Converter workers read these from the environment (off unless given).
+    from scenery_reduce import apply_options as apply_scenery_reduce_options
+    apply_scenery_reduce_options(args)
     if args.no_npc_gallery:
         print("WARNING: --no-npc-gallery is for debugging builds only. All NPC assets required by the game remain required; this flag omits only the inspection gallery.", flush=True)
+    if args.no_tree_sprites:
+        print("WARNING: --no-tree-sprites is for debugging builds only. World flora (trees, grass and reeds, "
+              "shipped in every release since v0.0.28) is left out, so this image does not match a release; "
+              "maps that place flora (such as reused Seyda Neen maps) stop the image step.", flush=True)
+    elif args.tree_sprites:
+        print("Note: --tree-sprites has no effect; world flora is built by default.", flush=True)
+    if args.no_harvest:
+        print("WARNING: --no-harvest is for debugging builds only. Harvestable mushrooms (shipped in every "
+              "release since v0.0.29) are left out, so this image does not match a release.", flush=True)
+    if args.no_extra_town or args.only_core_towns:
+        print("WARNING: " + ("--only-core-towns" if args.only_core_towns else "--no-extra-town") + " is for "
+              "debugging builds only. Towns the release ships (config/towns.json shipped_since) are left out, "
+              "so this image does not match a release.", flush=True)
+    from town_config import shipped_extra_towns
+    for town in dict.fromkeys(args.extra_town):
+        if town in shipped_extra_towns():
+            print(f"Note: --extra-town {town} has no effect; {town} is shipped and built by default.", flush=True)
     summary = None
     try:
+        if args.tree_sprites and args.no_tree_sprites:
+            raise ValueError('--tree-sprites (no effect, flora is the default) contradicts --no-tree-sprites; use one')
+        town_selection(args)  # contradictory town options stop here, before any work
         if args.host_plan:
             if args.autoinstall or args.install_dependencies or args.install_sdk or args.autorun_fs_uae:
                 raise ValueError('--host-plan cannot be combined with installation or launch modes')
             print(json.dumps(setup_plan(args), indent=2))
             return 0
         if args.allow_known_actor_ground_findings:
+            from project_version import require_private_test_version
+            require_private_test_version(VERSION, ['--allow-known-actor-ground-findings'])
             if args.stage != 'aga' or args.dry_run:
                 raise ValueError('--allow-known-actor-ground-findings requires a real AGA image build')
             from check_actor_ground import load_approved_report
             args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.expanduser().resolve()
             load_approved_report(args.allow_known_actor_ground_findings)
-        if args.tree_sprites and (args.stage != 'aga' or args.dry_run):
-            raise ValueError('--tree-sprites requires a real staged AGA image build')
+        if getattr(args, 'seyda_recorded', None) is not None:
+            if args.stage != 'aga':
+                raise ValueError('--seyda-recorded requires an AGA image build')
+            from recorded_stage import check_source
+            args.seyda_recorded = args.seyda_recorded.expanduser().resolve()
+            check_source(args.seyda_recorded)  # before any conversion: the pinned set or nothing
+            print('Recorded-stage exception BUILD-SEYDA-REGEN-30: Seyda Neen from ' + str(args.seyda_recorded), flush=True)
+        if args.amiga_libs is not None:
+            if args.stage != 'aga':
+                raise ValueError('--amiga-libs requires an AGA image build')
+            import fpu_support
+            args.amiga_libs = args.amiga_libs.expanduser().resolve()
+            if not fpu_support.find(args.amiga_libs):
+                print('FPU support library: none found in ' + str(args.amiga_libs) + ' (the build continues without one)', flush=True)
+            else:
+                # Verdicts at the start of the build; the image step applies the same policy.
+                verdicts, warnings = fpu_support.inspect(args.amiga_libs, args.amiga_libs_policy, input_lock(args))
+                args.known_amiga_libs = {'policy': args.amiga_libs_policy, 'files': verdicts, 'warnings': warnings}
+                print(f'Amiga libraries (policy {args.amiga_libs_policy}):', flush=True)
+                from known_inputs import line as known_line
+                for row in verdicts:
+                    print('  ' + known_line(row), flush=True)
         args.font_options = resolve_font_options(args)
         if args.recover_image_from and (args.stage != 'aga' or args.dry_run or args.host_plan or args.check_inputs or args.versions or args.install_dependencies or args.install_sdk):
             raise ValueError('--recover-image-from requires an AGA build/check/plan, with a new run name')
+        if args.reuse_from is not None:
+            if args.no_profile or args.recover_image_from or args.dry_run:
+                raise ValueError('--reuse-from needs a profiled AGA or terrain build (not --no-profile, '
+                                 '--recover-image-from or --dry-run)')
+            from build_cache import require_reuse_allowed
+            require_reuse_allowed(VERSION, args.allow_release_reuse)
+            args.reuse_from = args.reuse_from.expanduser().resolve()
         if sys.version_info < (3, 10):
             raise ValueError("Python 3.10 or newer is required")
         if args.yes and not args.autoinstall:
             raise ValueError('--yes requires --autoinstall')
+        if args.estimate_sample and not args.estimate_world:
+            raise ValueError('--estimate-sample requires --estimate-world')
+        if args.estimate_world and (args.install_dependencies or args.install_sdk or args.versions or args.check_inputs
+                                    or args.dry_run or args.autorun_fs_uae or args.recover_image_from):
+            raise ValueError('--estimate-world runs alone; use it separately from setup, inventory and build modes')
         if args.autoinstall and (args.install_sdk or args.versions or args.check_inputs or args.stage != 'aga'):
             raise ValueError('--autoinstall is for AGA builds/checks; use it separately from setup-only or inventory modes')
         if sum((args.install_dependencies or args.install_sdk, args.versions, args.check_inputs)) > 1:
@@ -668,6 +1101,8 @@ def main(argv=None):
                 args.data_files = installed_game_path(args.data_files).expanduser().resolve()
             setup(args, argv, preview=True)
             return 0
+        if args.estimate_world:
+            return estimate_world(args)
         if args.versions:
             if not args.sdk:
                 args.sdk = detected_sdk(args)
@@ -680,17 +1115,29 @@ def main(argv=None):
             print("Checking the installed file tree, containers and reference SHA-256 hashes...", flush=True)
             with Progress("Verifying game files, containers and reference hashes"):
                 report = input_check.inspect(raw, args.stage, args.allow_data_differences,
-                                             notify=print, choose=choose_installation if sys.stdin.isatty() else None)
+                                             notify=print, choose=choose_installation if sys.stdin.isatty() else None,
+                                             hasher=input_lock(args))
             input_check.display(report)
+            args.input_report = report
+            check_known_game_data(args, Path(report["data_files"]))
+            for line in input_lock(args).summary_lines():
+                print(line)
+            input_lock(args).save()
             return 1 if report["errors"] else 0
         args.name = args.name or datetime.now(timezone.utc).strftime("build-%Y%m%d-%H%M%S")
         if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}", args.name):
             raise ValueError("--name must be 1Ã¢â‚¬â€œ64 letters, digits, dots, hyphens or underscores")
         if args.stage == "aga" and not args.dry_run:
+            print("Original stair rules: " + ("on" if args.font_options["follow_original_stair_rules"] else "OFF (debugging)") +
+                  " (" + args.font_options["follow_original_stair_rules_selected_by"] + ")", flush=True)
             print("Bitmap paper ink: " + args.font_options["bitmap_paper_ink"] +
                   " (" + args.font_options["selected_by"] +
                   "); preferred TTF conversion and dialogue/menu fonts unchanged.")
-        tools = (dry_run_prerequisites if args.dry_run else prerequisites)(args, interactive=sys.stdin.isatty())
+            print("World flora (trees and grass): " + world_flora_status(args)[1])
+            print("Per-race first-person hands: " + hand_catalog_status(args)[1])
+            print("Harvestable mushrooms: " + harvest_status(args)[1])
+            print("Extra towns: " + town_selection(args)['status'])
+        tools =(dry_run_prerequisites if args.dry_run else prerequisites)(args, interactive=sys.stdin.isatty())
         recovery = None
         if args.recover_image_from:
             from recover_image import inspect_run
@@ -717,11 +1164,26 @@ def main(argv=None):
         with Progress("Recording input, tool and source checksums"):
             metadata = provenance(args, tools)
         metadata['build_started_at'] = summary.started_at
+        metadata["jobs_warning"] = jobs_warning(getattr(args, "jobs_requested", args.jobs))
+        if metadata["jobs_warning"]:
+            print(metadata["jobs_warning"], flush=True)  # once per build; recorded in build-state and summary
         summary.record_environment(metadata)
+        summary.known_inputs = metadata.get('known_inputs')
+        lock = getattr(args, '_input_lock', None)
+        lock_path = lock.save() if lock is not None else None
+        if lock_path:
+            # Later stages take input hashes from the lock (known_inputs.input_sha256).
+            os.environ['AMIWIND_INPUTS_LOCK'] = str(lock_path)
         if recovery:
             if metadata['input_sha256'] != recovery.pop('input_sha256'):
                 raise ValueError('Game inputs changed since rc3; refusing mixed-input recovery')
             metadata['recovery'] = recovery
+        metadata['profile'] = not args.no_profile
+        # Stage fingerprints always; reuse only with an explicit --reuse-from (docs/BUILD_PROFILE.md).
+        import build_cache
+        steps = build_cache.prepare(steps, run, metadata, args.reuse_from, args.reuse_mode)
+        if args.reuse_from and args.allow_release_reuse:
+            metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
         print(f"Build run: {run}\nLive tool output follows; per-stage logs are saved in {run / 'logs'}.", flush=True)
         execute(steps, run, metadata)
         if args.dry_run:

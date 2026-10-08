@@ -59,7 +59,7 @@ static float R_LumaSetting(int outside)
 {
     cvar_t *control=luma_controls[outside];char *end;double value;int invalid;
     if(strcmp(control->string,luma_checked_text[outside]) || control->value!=luma_checked_value[outside]){
-        value=strtod(control->string,&end);
+        value=Q_strtod(control->string,&end);
         invalid=end==control->string || *end || !isfinite(value) || !isfinite(control->value);
         if(invalid)value=outside?1:1.2;
         if(value<0)value=0;
@@ -111,7 +111,7 @@ static void R_LumaCommand(int outside)
     char *end;double value;long configured,effective;const char *name=outside?"exterior":"interior";
     if(Cmd_Argc()>2){Con_Printf("Usage: dbg luma %s [0..4]\n",name);return;}
     if(Cmd_Argc()==2){
-        value=strtod(Cmd_Argv(1),&end);
+        value=Q_strtod(Cmd_Argv(1),&end);
         if(end==Cmd_Argv(1) || *end || !isfinite(value)){
             Con_Printf("%s luma requires a finite number (0..4).\n",name);return;
         }
@@ -501,8 +501,8 @@ static int R_ActorBrushLight (vec3_t p, int r, float best_z)
 		if (e->origin[2] + m->mins[2] > p[2] || e->origin[2] + m->maxs[2] <= best_z)
 			continue;	// entirely above the point, or below the floor found
 		yaw = -e->angles[YAW] * (float)(M_PI/180);
-		c = (float)cos (yaw);
-		s = (float)sin (yaw);
+		c = (float)Q_CosRad(yaw);
+		s = (float)Q_SinRad(yaw);
 		local[0] = c*d[0] - s*d[1];
 		local[1] = s*d[0] + c*d[1];
 		local[2] = d[2];

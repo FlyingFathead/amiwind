@@ -354,7 +354,7 @@ int UDP_StringToAddr (char *string, struct qsockaddr *addr)
 	int ipaddr;
 
 //	Con_Printf ("UDP_StringToAddr()\n");
-	sscanf(string, "%d.%d.%d.%d:%d", &ha1, &ha2, &ha3, &ha4, &hp);
+	Q_sscanf(string, "%d.%d.%d.%d:%d", &ha1, &ha2, &ha3, &ha4, &hp);
 	ipaddr = (ha1 << 24) | (ha2 << 16) | (ha3 << 8) | ha4;
 
 	((struct sockaddr_in *)addr)->sin_family = AF_INET;

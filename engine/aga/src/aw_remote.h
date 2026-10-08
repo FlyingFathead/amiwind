@@ -7,5 +7,7 @@ void AW_RemotePoll(void);
 int AW_RemoteLogging(void);
 const char *AW_RemoteConsoleLog(void);
 int AW_LampLitCount(void);
+int AW_LampCachedCount(void);
+int AW_LampDroppedCount(void);
 void AW_FogLocationInit(void);
 #endif

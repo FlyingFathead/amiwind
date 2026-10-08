@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_sky.h"
 #include "aw_hand_models.h"
 #include "aw_torch.h"
+#include "aw_rcount.h"
 
 //define	PASSAGES
 
@@ -380,7 +381,7 @@ void R_ViewChanged (vrect_t *pvrect, int lineadj, float aspect)
 
 	R_SetVrect (pvrect, &r_refdef.vrect, lineadj);
 
-	r_refdef.horizontalFieldOfView = 2.0 * tan (r_refdef.fov_x/360*M_PI);
+	r_refdef.horizontalFieldOfView = 2.0 * Q_TanRad(r_refdef.fov_x/360*M_PI);
 	r_refdef.fvrectx = (float)r_refdef.vrect.x;
 	r_refdef.fvrectx_adj = (float)r_refdef.vrect.x - 0.5;
 	r_refdef.vrect_x_adj_shift20 = (r_refdef.vrect.x<<20) + (1<<19) - 1;
@@ -822,7 +823,9 @@ void R_DrawBEntitiesOnList (void)
                     if(!AW_RenderRangeView(currententity,range_pass,&range_view))break;
                     clmodel=&range_view;
                 }
+            AW_RC(RC_BM_PASSES);
             if(!AW_ModelVisible(currententity->origin,clmodel->radius))break;
+            AW_RC(RC_BM_VISIBLE);
 
 		// see if the bounding box lets us trivially reject, also sets
 		// trivial accept status
@@ -840,6 +843,7 @@ void R_DrawBEntitiesOnList (void)
 
 			if (clipflags != BMODEL_FULLY_CLIPPED)
 			{
+				AW_RC(RC_BM_INVIEW);
 				VectorCopy (currententity->origin, r_entorigin);
 				VectorSubtract (r_origin, r_entorigin, modelorg);
 			// FIXME: is this needed?
@@ -882,6 +886,7 @@ void R_DrawBEntitiesOnList (void)
 						{
 						// not a leaf; has to be clipped to the world BSP
 							r_clipflags = clipflags;
+							AW_RC(RC_BM_CLIPPED);
 							R_DrawSolidClippedSubmodelPolygo (clmodel);
 						}
 						else
@@ -889,6 +894,7 @@ void R_DrawBEntitiesOnList (void)
 						// falls entirely in one leaf, so we just put all the
 						// edges in the edge list and let 1/z sorting handle
 						// drawing order
+							AW_RC(RC_BM_ONELEAF);
 							R_DrawSubmodelPolygons (clmodel, clipflags);
 						}
 
@@ -929,6 +935,7 @@ void R_EdgeDrawing (void)
 				((CACHE_SIZE - 1) / sizeof(edge_t)) + 1];
 	surf_t	lsurfs[NUMSTACKSURFACES +
 				((CACHE_SIZE - 1) / sizeof(surf_t)) + 1];
+	double	t0;
 
 	if (auxedges)
 	{
@@ -958,7 +965,9 @@ void R_EdgeDrawing (void)
 		rw_time1 = Sys_FloatTime ();
 	}
 
+	AW_RT_BEGIN(t0);
 	R_RenderWorld ();
+	AW_RT_END(RT_WORLD, t0);
 
 	if (r_drawculledpolys)
 		R_ScanEdges ();
@@ -973,7 +982,9 @@ void R_EdgeDrawing (void)
 		db_time1 = rw_time2;
 	}
 
+	AW_RT_BEGIN(t0);
 	R_DrawBEntitiesOnList ();
+	AW_RT_END(RT_BMODELS, t0);
 
 	if (r_dspeeds.value)
 	{
@@ -989,7 +1000,11 @@ void R_EdgeDrawing (void)
 	}
 
 	if (!(r_drawpolys | r_drawculledpolys))
+	{
+		AW_RT_BEGIN(t0);
 		R_ScanEdges ();
+		AW_RT_END(RT_SCAN, t0);
+	}
 }
 
 
@@ -1003,7 +1018,9 @@ r_refdef must be set before the first call
 void R_RenderView_ (void)
 {
 	byte	warpbuffer[WARP_WIDTH * WARP_HEIGHT];
+	double	view_t0, t0;
 
+	AW_RT_BEGIN(view_t0);
 	r_warpbuffer = warpbuffer;
 
 	if (r_timegraph.value || r_speeds.value || r_dspeeds.value)
@@ -1049,7 +1066,9 @@ SetVisibilityByPassages ();
 		de_time1 = se_time2;
 	}
 
+	AW_RT_BEGIN(t0);
 	AW_Mark(1); R_DrawEntitiesOnList (); AW_EndMark(1);
+	AW_RT_END(RT_ALIAS, t0);
 
 	if (r_dspeeds.value)
 	{
@@ -1099,6 +1118,7 @@ SetVisibilityByPassages ();
 
 // back to high floating-point precision
 	Sys_HighFPPrecision ();
+	AW_RT_END(RT_VIEW, view_t0);
 }
 
 void R_RenderView (void)
@@ -1140,7 +1160,7 @@ void R_InitTurb (void)
 
 	for (i=0 ; i<(SIN_BUFFER_SIZE) ; i++)
 	{
-		sintable[i] = AMP + sin(i*3.14159*2/CYCLE)*AMP;
-		intsintable[i] = AMP2 + sin(i*3.14159*2/CYCLE)*AMP2;	// AMP2, not 20
+		sintable[i] = AMP + Q_SinRad(i*3.14159*2/CYCLE)*AMP;
+		intsintable[i] = AMP2 + Q_SinRad(i*3.14159*2/CYCLE)*AMP2;	// AMP2, not 20
 	}
 }

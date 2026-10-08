@@ -65,9 +65,13 @@ Images are shared per model; their stable names do not depend on town-local indi
 The tool rejects source mismatches, missing models, invalid transforms and
 incomplete export. Output creation refuses an existing directory.
 
-This is a standalone conversion stage. The normal image builder does not yet
-install its output, and the scale-aware runtime path remains pending. A successful
-bake is not permission to package unsupported instances or omit their collisions.
+The guided build runs this conversion as its `world-flora-assets` stage (without
+`--census`: the stage takes its own inventory), then `prepare_world_flora.py` as
+`world-flora`, and the image installs the overlay in the world and both towns.
+Every normal AGA build does this; `--no-tree-sprites` leaves it out for debugging
+only ([world flora default](LINUX_BUILD.md#world-flora-default)). The
+scale-aware runtime path remains pending. A successful bake is not permission to
+package unsupported instances or omit their collisions.
 
 ## Scale and visibility investigation
 

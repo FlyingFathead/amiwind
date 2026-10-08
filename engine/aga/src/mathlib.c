@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -26,8 +26,155 @@ void Sys_Error (char *error, ...);
 
 vec3_t vec3_origin = {0,0,0};
 int nanmask = 255<<23;
+int aw_fpucount[AW_FPU_COUNTERS];
 
 /*-----------------------------------------------------------------*/
+
+/*
+AmiWind table sine/cosine (ENGINE-FPU-UNIMPL-31). The C library's sin/cos
+(and the cexp the compiler makes of a sin+cos pair) execute FINTRZ/FMOVECR,
+which the 68040 does not implement: each costs a trap into an FPU support
+library, or a crash without one. Quake's own answer for per-frame trig is a
+table (R_InitTurb's sintable, the 16-bit angle quantisation of ANGLE2SHORT);
+here a quarter-wave table of SINTAB_STEPS+1 floats, filled on first use from
+a Taylor series (multiplies and adds only), read with linear interpolation
+plus the second-order term (sine's second derivative is minus itself, so the
+chord error is frac*(1-frac)*h*h/2 times the value). Error below 1.5e-7
+(float rounding); exact at multiples of 90 degrees, so 0 gives 0 and 1.
+*/
+#define SINTAB_STEPS	1024	// per 90 degrees; power of two
+static float	sintab[SINTAB_STEPS+1];
+static int		sintab_ready;
+
+static void Q_SinTableInit (void)
+{
+	int		i, k;
+	double	x, x2, term, sum;
+
+	for (i=0 ; i<SINTAB_STEPS ; i++)
+	{
+		x = i * (M_PI/2) / SINTAB_STEPS;
+		x2 = x*x;
+		term = sum = x;
+		for (k=2 ; k<24 ; k+=2)
+		{
+			term *= -x2 / (k*(k+1));
+			sum += term;
+		}
+		sintab[i] = sum;
+	}
+	sintab[SINTAB_STEPS] = 1;
+	sintab_ready = 1;
+}
+
+void Q_SinCosDeg (float degrees, float *s, float *c)
+{
+	double	t, frac, bend;
+	float	a, b;
+	int		i, j;
+
+	AW_FPUCOUNT(AW_FPU_TABLE);
+	if (degrees == 0)
+	{
+		*s = 0;
+		*c = 1;
+		return;
+	}
+	if (!sintab_ready)
+		Q_SinTableInit ();
+	if (degrees > 1.0e7 || degrees < -1.0e7)	// keep the index in range
+		degrees -= 360 * floor (degrees / 360);
+	t = degrees * (SINTAB_STEPS*4 / 360.0);
+	i = (int)t;
+	if (t < i)
+		i--;
+	frac = t - i;
+	j = i & (SINTAB_STEPS-1);
+	a = sintab[j] + frac * (sintab[j+1] - sintab[j]);	// sine within the quadrant
+	b = sintab[SINTAB_STEPS-j] + frac * (sintab[SINTAB_STEPS-j-1] - sintab[SINTAB_STEPS-j]);
+	bend = 1 + frac * (1 - frac) * ((M_PI/2/SINTAB_STEPS) * (M_PI/2/SINTAB_STEPS) / 2);
+	a *= bend;
+	b *= bend;
+	switch ((i & (SINTAB_STEPS*4-1)) / SINTAB_STEPS)
+	{
+	case 0: *s = a; *c = b; break;
+	case 1: *s = b; *c = -a; break;
+	case 2: *s = -a; *c = -b; break;
+	default: *s = -b; *c = a; break;
+	}
+}
+
+void Q_SinCosRad (float radians, float *s, float *c)
+{
+	Q_SinCosDeg (radians * (float)(180 / M_PI), s, c);
+}
+
+float Q_SinRad (float radians)
+{
+	float	s, c;
+
+	Q_SinCosDeg (radians * (float)(180 / M_PI), &s, &c);
+	return s;
+}
+
+float Q_CosRad (float radians)
+{
+	float	s, c;
+
+	Q_SinCosDeg (radians * (float)(180 / M_PI), &s, &c);
+	return c;
+}
+
+/*
+Arc tangent without the C library (whose atan loads its constants with
+FMOVECR, unimplemented on the 68040): reduce to [0,1] by symmetry, then to
+[0,tan(15 degrees)] with atan(t) = pi/6 + atan((t*sqrt(3)-1)/(t+sqrt(3))),
+and sum the odd series to z^23 (error below 3e-16). Exact for zero and equal
+magnitudes, so axis and diagonal directions give the same angles as before.
+*/
+static double Q_atan01 (double t)
+{
+	double	z, z2, term, sum;
+	int		k, shifted;
+
+	if (t == 1)
+		return M_PI/4;
+	shifted = t > 0.26794919243112270;
+	z = shifted ? (t*1.7320508075688772 - 1) / (t + 1.7320508075688772) : t;
+	z2 = z*z;
+	term = sum = z;
+	for (k=3 ; k<=23 ; k+=2)
+	{
+		term *= -z2;
+		sum += term / k;
+	}
+	return shifted ? M_PI/6 + sum : sum;
+}
+
+double Q_atan2 (double y, double x)
+{
+	double	ax = fabs(x), ay = fabs(y), r;
+
+	if (ay == 0)
+		r = (x < 0) ? M_PI : 0;
+	else if (ax == 0)
+		r = M_PI/2;
+	else
+	{
+		r = ay <= ax ? Q_atan01 (ay/ax) : M_PI/2 - Q_atan01 (ax/ay);
+		if (x < 0)
+			r = M_PI - r;
+	}
+	return y < 0 ? -r : r;
+}
+
+float Q_TanRad (float radians)
+{
+	float	s, c;
+
+	Q_SinCosRad (radians, &s, &c);
+	return s / c;
+}
 
 #define DEG2RAD( a ) ( a * M_PI ) / 180.0F
 
@@ -131,10 +278,15 @@ void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point, 
 	memset( zrot, 0, sizeof( zrot ) );
 	zrot[0][0] = zrot[1][1] = zrot[2][2] = 1.0F;
 
-	zrot[0][0] = cos( DEG2RAD( degrees ) );
-	zrot[0][1] = sin( DEG2RAD( degrees ) );
-	zrot[1][0] = -sin( DEG2RAD( degrees ) );
-	zrot[1][1] = cos( DEG2RAD( degrees ) );
+	{
+		float	s, c;
+
+		Q_SinCosDeg (degrees, &s, &c);
+		zrot[0][0] = c;
+		zrot[0][1] = s;
+		zrot[1][0] = -s;
+		zrot[1][1] = c;
+	}
 
 	R_ConcatRotations( m, zrot, tmpmat );
 	R_ConcatRotations( tmpmat, im, rot );
@@ -205,7 +357,7 @@ int BoxOnPlaneSide (vec3_t emins, vec3_t emaxs, mplane_t *p)
 		return 3;
 	}
 #endif
-	
+
 // general case
 	switch (p->signbits)
 	{
@@ -293,18 +445,12 @@ if (sides == 0)
 
 void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
 {
-	float		angle;
 	float		sr, sp, sy, cr, cp, cy;
 
-	angle = angles[YAW] * (M_PI*2 / 360);
-	sy = sin(angle);
-	cy = cos(angle);
-	angle = angles[PITCH] * (M_PI*2 / 360);
-	sp = sin(angle);
-	cp = cos(angle);
-	angle = angles[ROLL] * (M_PI*2 / 360);
-	sr = sin(angle);
-	cr = cos(angle);
+	AW_FPUCOUNT(AW_FPU_ANGLEVECTORS);
+	Q_SinCosDeg (angles[YAW], &sy, &cy);
+	Q_SinCosDeg (angles[PITCH], &sp, &cp);
+	Q_SinCosDeg (angles[ROLL], &sr, &cr);
 
 	forward[0] = cp*cy;
 	forward[1] = cp*sy;
@@ -320,11 +466,11 @@ void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
 int VectorCompare (vec3_t v1, vec3_t v2)
 {
 	int		i;
-	
+
 	for (i=0 ; i<3 ; i++)
 		if (v1[i] != v2[i])
 			return 0;
-			
+
 	return 1;
 }
 

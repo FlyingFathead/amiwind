@@ -11,6 +11,9 @@ static short same_short(short value){return value;}
 static int same_long(int value){return value;}
 short (*LittleShort)(short)=same_short;
 int (*LittleLong)(int)=same_long;
+/* The section dispatcher names the texture decoder. */
+int Q_strncmp(char *a,char *b,int n){return strncmp(a,b,n);}
+void R_InitSky(texture_t *tx){assert(0);}
 void *Hunk_AllocName(int size,char *name) {
     void *p;int bytes=(size+31)&~15;
     assert(used+bytes<sizeof(heap));p=heap+used;used+=bytes;return p;

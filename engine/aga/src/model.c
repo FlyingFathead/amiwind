@@ -65,7 +65,7 @@ int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const by
     if(!raw || bytes<84 || COM_FOpenFile("model-budgets.txt",&f)<0 || !f)return 0;
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWPB1\n")){fclose(f);return 0;}
     while(fgets(line,sizeof(line),f)){
-        if(sscanf(line,"%63s %d %d %d %lx %c",path,&nv,&nt,&length,&expected,&extra)!=5){fclose(f);return 0;}
+        if(Q_sscanf(line,"%63s %d %d %d %lx %c",path,&nv,&nt,&length,&expected,&extra)!=5){fclose(f);return 0;}
         if(strcmp(path,name))continue;
         fclose(f);
         if(vertices!=nv || triangles!=nt || bytes!=length)return 0;
@@ -82,6 +82,8 @@ char	loadname[32];	// for hunk tags
 void (*aw_load_audio_tick)(void);
 size_t (*aw_load_prefetch_copy)(const char *,long,byte *,size_t);
 double (*aw_load_clock)(void);
+/* Optional Hunk low+high bytes in use; recorded per streamed BSP section. */
+int (*aw_load_hunk_used)(void);
 long aw_load_disk_bytes,aw_load_disk_calls;
 double aw_load_disk_seconds,aw_load_decode_seconds;
 static void AW_LoadAudioTick(void) {
@@ -367,7 +369,23 @@ Loads a model into the cache
  * resident; this bounds temporary loading memory, not world-cell residency. */
 static FILE *aw_bsp_file;
 static long aw_bsp_bytes, aw_bsp_base;
-static int aw_bsp_peak, aw_bsp_reads;
+static int aw_bsp_peak, aw_bsp_reads, aw_bsp_slice_peak;
+/* File position relative to aw_bsp_base after the last read, or -1. */
+static long aw_bsp_position;
+/* Hunk in use at the end of each section (its temporary slice included),
+ * before the first section and after the post-section allocations. */
+static lump_t *aw_bsp_lumps;
+static int aw_bsp_used[HEADER_LUMPS+2],aw_bsp_slices[HEADER_LUMPS];
+static const char *const aw_bsp_lump_names[HEADER_LUMPS]={"entities","planes","textures",
+    "vertexes","visibility","nodes","texinfo","faces","lighting","clipnodes","leafs",
+    "marksurfaces","edges","surfedges","models"};
+static void AW_RecordSection(lump_t *l,int slice)
+{
+    int index;
+    if(!aw_bsp_lumps || !aw_load_hunk_used || l<aw_bsp_lumps || l>=aw_bsp_lumps+HEADER_LUMPS)return;
+    index=(int)(l-aw_bsp_lumps);
+    aw_bsp_used[index]=aw_load_hunk_used();aw_bsp_slices[index]=slice;
+}
 static int AW_TryStreamBrush(model_t *mod) {
     dheader_t header;FILE *report;int filebytes;
     /* Use the same search order as ordinary loads, including world volumes.
@@ -382,12 +400,24 @@ static int AW_TryStreamBrush(model_t *mod) {
     if(fread(&header,1,sizeof(header),aw_bsp_file)!=sizeof(header) || LittleLong(header.version)!=BSPVERSION) {
         fclose(aw_bsp_file);aw_bsp_file=NULL;return 0;
     }
-    aw_bsp_peak=aw_bsp_reads=0;
+    aw_bsp_peak=aw_bsp_reads=aw_bsp_slice_peak=0;aw_bsp_position=sizeof(header);
+    memset(aw_bsp_used,0,sizeof(aw_bsp_used));memset(aw_bsp_slices,0,sizeof(aw_bsp_slices));
+    if(aw_load_hunk_used)aw_bsp_used[HEADER_LUMPS]=aw_load_hunk_used();
     COM_FileBase(mod->name,loadname);loadmodel=mod;mod->needload=NL_PRESENT;
+    aw_bsp_lumps=header.lumps;
     Mod_LoadBrushModel(mod,&header);
+    aw_bsp_lumps=NULL;
     fclose(aw_bsp_file);aw_bsp_file=NULL;
     report=fopen("bsp-load-profile.txt","w");
-    if(report){fprintf(report,"file_bytes=%ld\nmax_input_section_bytes=%d\nsection_reads=%d\n",aw_bsp_bytes,aw_bsp_peak,aw_bsp_reads);fclose(report);}
+    if(report){
+        int i;
+        fprintf(report,"map=%s\nfile_bytes=%ld\nmax_input_section_bytes=%d\nmax_slice_bytes=%d\nsection_reads=%d\nhunk_before=%d\nhunk_after=%d\n",
+            mod->name,aw_bsp_bytes,aw_bsp_peak,aw_bsp_slice_peak,aw_bsp_reads,aw_bsp_used[HEADER_LUMPS],aw_bsp_used[HEADER_LUMPS+1]);
+        /* Mod_LoadBrushModel byte-swapped the header lumps in place. */
+        for(i=0;i<HEADER_LUMPS;i++)fprintf(report,"section=%s bytes=%d slice=%d hunk_end=%d\n",
+            aw_bsp_lump_names[i],header.lumps[i].filelen,aw_bsp_slices[i],aw_bsp_used[i]);
+        fclose(report);
+    }
     return 1;
 }
 
@@ -501,6 +531,105 @@ model_t *Mod_ForName (char *name, qboolean crash)
 
 byte	*mod_base;
 
+/* AmiWind: Quake's Mod_Load* decoders walk one complete file image. Streamed
+ * BSPs instead hand each decoder its lump in bounded slices that are decoded
+ * straight into the final Hunk structures, so no complete second copy of a
+ * lump sits beside its decoded form. A file image (aw_bsp_file NULL) is still
+ * decoded in place from mod_base. Both use the same decoders.
+ *
+ * The file is read exactly as a staged lump was: consecutive 16 KiB chunks from
+ * the lump's start, each into the window at the same aligned address. A record
+ * split by a chunk boundary is completed in the prefix just before the window;
+ * for textures the prefix holds the directory while the window moves on. */
+#define AW_BSP_SLICE_BYTES 16384
+#define AW_BSP_RECORD_PREFIX 64 /* >= every disk record; dmodel_t is largest */
+#define AW_BSP_DIRECTORY_BYTES (4+4*MAX_MAP_TEXTURES)
+static byte *aw_bsp_slice;
+static int aw_bsp_slice_bytes,aw_bsp_slice_prefix,aw_bsp_window_start,aw_bsp_window_bytes;
+typedef struct { lump_t *lump; int size, count, done, next; byte *tail; } aw_records_t;
+
+/* Copy bytes [offset, offset+bytes) of a lump to out. */
+static void AW_LumpBytes(lump_t *l,int offset,void *out,int bytes)
+{
+    size_t copied=0;long position;
+    if(offset<0 || bytes<0 || offset>l->filelen || bytes>l->filelen-offset)
+        Sys_Error("BSP lump read outside %s",loadmodel->name);
+    if(!bytes)return;
+    if(!aw_bsp_file){memcpy(out,mod_base+l->fileofs+offset,bytes);return;}
+    position=l->fileofs+offset;
+    if(aw_load_prefetch_copy){
+        copied=aw_load_prefetch_copy(loadmodel->name,position,(byte *)out,bytes);
+        if(copied>(size_t)bytes)Sys_Error("Invalid BSP prefetch length");
+        if(copied==(size_t)bytes)return;
+        position+=copied;
+    }
+    if(position!=aw_bsp_position && fseek(aw_bsp_file,aw_bsp_base+position,SEEK_SET)){
+        aw_bsp_position=-1;Sys_Error("Short BSP section");
+    }
+    aw_bsp_position=-1;
+    if(AW_LoadRead((byte *)out+copied,bytes-copied,aw_bsp_file)!=(size_t)bytes-copied)
+        Sys_Error("Short BSP section");
+    aw_bsp_position=position+(long)(bytes-copied);
+}
+
+static int AW_RecordsBegin(aw_records_t *r,lump_t *l,int size)
+{
+    if(l->filelen<0 || l->filelen % size)
+        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+    r->lump=l;r->size=size;r->count=l->filelen/size;r->done=r->next=0;r->tail=NULL;
+    return r->count;
+}
+
+static byte *AW_SliceWindow(lump_t *l)
+{
+    int need=l->filelen<AW_BSP_SLICE_BYTES?l->filelen:AW_BSP_SLICE_BYTES;
+    if(!aw_bsp_slice || aw_bsp_slice_bytes<aw_bsp_slice_prefix+need)Sys_Error("Missing BSP slice buffer");
+    return aw_bsp_slice+aw_bsp_slice_prefix;
+}
+
+/* The next run of whole records: the rest of a file image, or one chunk. */
+static void *AW_RecordsNext(aw_records_t *r,int *n)
+{
+    int take,left,chunk;byte *window,*start;
+    if(r->done>=r->count){*n=0;return NULL;}
+    take=r->count-r->done;
+    if(!aw_bsp_file){
+        *n=take;r->done=r->count;
+        return mod_base+r->lump->fileofs+(r->done-take)*r->size;
+    }
+    window=AW_SliceWindow(r->lump);aw_bsp_window_start=-1;
+    left=r->next-r->done*r->size;
+    if(left<0 || left>=r->size || left>aw_bsp_slice_prefix)Sys_Error("Invalid BSP record slice");
+    if(left)memmove(window-left,r->tail,left);
+    chunk=r->lump->filelen-r->next;if(chunk>AW_BSP_SLICE_BYTES)chunk=AW_BSP_SLICE_BYTES;
+    AW_LumpBytes(r->lump,r->next,window,chunk);r->next+=chunk;
+    start=window-left;take=(left+chunk)/r->size;
+    r->done+=take;r->tail=start+take*r->size;*n=take;
+    return start;
+}
+
+/* Bytes [offset, offset+bytes) of a lump through the chunk window; sequential
+ * access reads every chunk once, in order, as a staged lump was read. */
+static void AW_WindowBytes(lump_t *l,int offset,void *out,int bytes)
+{
+    byte *window,*to=(byte *)out;int n;
+    if(offset<0 || bytes<0 || offset>l->filelen || bytes>l->filelen-offset)
+        Sys_Error("BSP lump read outside %s",loadmodel->name);
+    if(!aw_bsp_file){memcpy(out,mod_base+l->fileofs+offset,bytes);return;}
+    window=AW_SliceWindow(l);
+    while(bytes>0){
+        if(aw_bsp_window_start<0 || offset<aw_bsp_window_start ||
+           offset>=aw_bsp_window_start+aw_bsp_window_bytes){
+            aw_bsp_window_start=offset-offset%AW_BSP_SLICE_BYTES;
+            aw_bsp_window_bytes=l->filelen-aw_bsp_window_start;
+            if(aw_bsp_window_bytes>AW_BSP_SLICE_BYTES)aw_bsp_window_bytes=AW_BSP_SLICE_BYTES;
+            AW_LumpBytes(l,aw_bsp_window_start,window,aw_bsp_window_bytes);
+        }
+        n=aw_bsp_window_start+aw_bsp_window_bytes-offset;if(n>bytes)n=bytes;
+        memcpy(to,window+offset-aw_bsp_window_start,n);to+=n;offset+=n;bytes-=n;
+    }
+}
+
 
 /*
 =================
@@ -514,27 +643,46 @@ void Mod_LoadTextures (lump_t *l)
     texture_t	*tx, *tx2;
     texture_t	*anims[10];
     texture_t	*altanims[10];
-    dmiptexlump_t *m;
+    int		nummiptex, dataofs, *directory;
+    miptex_t	header;
 
     if (!l->filelen)
     {
         loadmodel->textures = NULL;
         return;
     }
-    m = (dmiptexlump_t *)(mod_base + l->fileofs);
+    /* The directory (kept in the slice prefix) and each miptex header are read
+     * into locals; the pixels are copied from the window into their texture_t. */
+    mt = &header;
+    AW_WindowBytes (l, 0, &nummiptex, 4);
+    nummiptex = LittleLong (nummiptex);
+    if (nummiptex < 0 || nummiptex > MAX_MAP_TEXTURES || 4 + nummiptex*4 > l->filelen)
+        Sys_Error ("Mod_LoadTextures: bad texture count in %s", loadmodel->name);
 
-    m->nummiptex = LittleLong (m->nummiptex);
+    if (aw_bsp_file && aw_bsp_slice_prefix)
+    {
+        if (!aw_bsp_slice || aw_bsp_slice_prefix < 4 + nummiptex*4)
+            Sys_Error ("Missing BSP slice buffer");
+        AW_WindowBytes (l, 0, aw_bsp_slice, 4 + nummiptex*4);
+        directory = (int *)aw_bsp_slice + 1;
+    }
+    else if (aw_bsp_file) /* the whole lump stays in the window */
+        directory = (int *)AW_SliceWindow (l) + 1;
+    else
+        directory = (int *)(mod_base + l->fileofs) + 1;
 
-    loadmodel->numtextures = m->nummiptex;
-    loadmodel->textures = Hunk_AllocName (m->nummiptex * sizeof(*loadmodel->textures) , loadname);
+    loadmodel->numtextures = nummiptex;
+    loadmodel->textures = Hunk_AllocName (nummiptex * sizeof(*loadmodel->textures) , loadname);
 
-    for (i=0 ; i<m->nummiptex ; i++)
+    for (i=0 ; i<nummiptex ; i++)
     {
         if(!(i&255))AW_LoadAudioTick();
-        m->dataofs[i] = LittleLong(m->dataofs[i]);
-        if (m->dataofs[i] == -1)
+        dataofs = LittleLong(directory[i]);
+        if (dataofs == -1)
             continue;
-        mt = (miptex_t *)((byte *)m + m->dataofs[i]);
+        if (dataofs < 0 || dataofs > l->filelen - (int)sizeof(*mt))
+            Sys_Error ("Mod_LoadTextures: bad miptex offset in %s", loadmodel->name);
+        AW_WindowBytes (l, dataofs, mt, sizeof(*mt));
         mt->width = LittleLong (mt->width);
         mt->height = LittleLong (mt->height);
         for (j=0 ; j<MIPLEVELS ; j++)
@@ -542,7 +690,11 @@ void Mod_LoadTextures (lump_t *l)
 
         if ( (mt->width & 15) || (mt->height & 15) )
             Sys_Error ("Texture %s is not 16 aligned", mt->name);
+        if ( (unsigned)mt->width > 4096 || (unsigned)mt->height > 4096 )
+            Sys_Error ("Texture %s is too large", mt->name);
         pixels = mt->width*mt->height/64*85;
+        if (pixels > l->filelen - dataofs - (int)sizeof(*mt))
+            Sys_Error ("Texture %s is truncated", mt->name);
         tx = Hunk_AllocName (sizeof(texture_t) +pixels, loadname );
         loadmodel->textures[i] = tx;
 
@@ -552,7 +704,7 @@ void Mod_LoadTextures (lump_t *l)
         for (j=0 ; j<MIPLEVELS ; j++)
             tx->offsets[j] = mt->offsets[j] + sizeof(texture_t) - sizeof(miptex_t);
         // the pixels immediately follow the structures
-        memcpy ( tx+1, mt+1, pixels);
+        AW_WindowBytes (l, dataofs + sizeof(*mt), tx+1, pixels);
 
         if (!Q_strncmp(mt->name,"sky",3))
             R_InitSky (tx);
@@ -561,7 +713,7 @@ void Mod_LoadTextures (lump_t *l)
 //
 // sequence the animations
 //
-    for (i=0 ; i<m->nummiptex ; i++)
+    for (i=0 ; i<nummiptex ; i++)
     {
         if(!(i&255))AW_LoadAudioTick();
         tx = loadmodel->textures[i];
@@ -595,7 +747,7 @@ void Mod_LoadTextures (lump_t *l)
         else
             Sys_Error ("Bad animating texture %s", tx->name);
 
-        for (j=i+1 ; j<m->nummiptex ; j++)
+        for (j=i+1 ; j<nummiptex ; j++)
         {
             tx2 = loadmodel->textures[j];
             if (!tx2 || tx2->name[0] != '+')
@@ -713,18 +865,17 @@ void Mod_LoadVertexes (lump_t *l)
 {
     dvertex_t	*in;
     mvertex_t	*out;
-    int			i, count;
+    int			i, count, n;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->vertexes = out;
     loadmodel->numvertexes = count;
 
-    for ( i=0 ; i<count ; i++, in++, out++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++, out++)
     {
         if(!(i&255))AW_LoadAudioTick();
         out->position[0] = LittleFloat (in->point[0]);
@@ -742,18 +893,17 @@ void Mod_LoadSubmodels (lump_t *l)
 {
     dmodel_t	*in;
     dmodel_t	*out;
-    int			i, j, count;
+    int			i, j, count, n;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->submodels = out;
     loadmodel->numsubmodels = count;
 
-    for ( i=0 ; i<count ; i++, in++, out++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++, out++)
     {
         if(!(i&255))AW_LoadAudioTick();
         for (j=0 ; j<3 ; j++)
@@ -779,19 +929,18 @@ void Mod_LoadEdges (lump_t *l)
 {
     dedge_t *in;
     medge_t *out;
-    int	i, count;
+    int	i, count, n;
+    aw_records_t records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( (count + 1) * sizeof(*out), loadname);
 
     loadmodel->edges = out;
     loadmodel->numedges = count;
     loadmodel->edgecache=NULL;loadmodel->edgecache_count=0;
 
-    for ( i=0 ; i<count ; i++, in++, out++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++, out++)
     {
         if(!(i&255))AW_LoadAudioTick();
         out->v[0] = (unsigned short)LittleShort(in->v[0]);
@@ -808,20 +957,19 @@ void Mod_LoadTexinfo (lump_t *l)
 {
     texinfo_t *in;
     mtexinfo_t *out;
-    int	i, j, count;
+    int	i, j, count, n;
     int		miptex;
     float	len1, len2;
+    aw_records_t records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->texinfo = out;
     loadmodel->numtexinfo = count;
 
-    for ( i=0 ; i<count ; i++, in++, out++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++, out++)
     {
         if(!(i&255))AW_LoadAudioTick();
         /* Respect each four-float row; indexing row zero past column 3 is UB. */
@@ -857,7 +1005,7 @@ void Mod_LoadTexinfo (lump_t *l)
         }
         else
         {
-            if (miptex >= loadmodel->numtextures)
+            if (miptex < 0 || miptex >= loadmodel->numtextures)
                 Sys_Error ("miptex >= loadmodel->numtextures");
             out->texture = loadmodel->textures[miptex];
             if (!out->texture)
@@ -876,9 +1024,23 @@ CalcSurfaceExtents
 Fills in s->texturemins[] and s->extents[]
 ================
 */
+/* Surface extents decide each lightmap's size, so the engine, the light
+ * compiler and the map converter must compute the same texture coordinates
+ * on every FPU. The rule, as in QuakeSpasm's CalcSurfaceExtents and ericw
+ * light: IEEE double precision after every product and sum, in source order
+ * (float*float products are exact in double). GCC -m68040 would otherwise
+ * round each step to single precision (fsmul/fsadd) while emulators compute
+ * wider; the volatile store pins double rounding everywhere. The converter
+ * (tools/surface_grid.py) computes the identical values. */
+static double AW_DoubleRound (double x)
+{
+    volatile double r = x;
+    return r;
+}
+
 void CalcSurfaceExtents (msurface_t *s)
 {
-    float	mins[2], maxs[2], val;
+    double	mins[2], maxs[2], val;
     int		i,j, e;
     mvertex_t	*v;
     mtexinfo_t	*tex;
@@ -899,10 +1061,11 @@ void CalcSurfaceExtents (msurface_t *s)
 
         for (j=0 ; j<2 ; j++)
         {
-            val = v->position[0] * tex->vecs[j][0] +
-                v->position[1] * tex->vecs[j][1] +
-                v->position[2] * tex->vecs[j][2] +
-                tex->vecs[j][3];
+            val = AW_DoubleRound(AW_DoubleRound(AW_DoubleRound(
+                      AW_DoubleRound((double)v->position[0] * tex->vecs[j][0]) +
+                      AW_DoubleRound((double)v->position[1] * tex->vecs[j][1])) +
+                  AW_DoubleRound((double)v->position[2] * tex->vecs[j][2])) +
+                  tex->vecs[j][3]);
             if (val < mins[j])
                 mins[j] = val;
             if (val > maxs[j])
@@ -934,19 +1097,18 @@ void Mod_LoadFaces (lump_t *l)
 {
     dface_t		*in;
     msurface_t	*out;
-    int			i, count, surfnum;
-    int			planenum, side, firstedge, numedges;
+    int			i, count, surfnum, n;
+    int			planenum, side, firstedge, numedges, texnum;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->surfaces = out;
     loadmodel->numsurfaces = count;
 
-    for ( surfnum=0 ; surfnum<count ; surfnum++, in++, out++)
+    for ( surfnum=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; surfnum++, in++, out++)
     {
         if(!(surfnum&127))AW_LoadAudioTick();
         firstedge = LittleLong(in->firstedge);
@@ -969,7 +1131,12 @@ void Mod_LoadFaces (lump_t *l)
 
         out->plane = loadmodel->planes + planenum;
 
-        out->texinfo = loadmodel->texinfo + LittleShort (in->texinfo);
+        /* The texinfo index is 16 bits as well; read it unsigned like the
+         * plane index so converted maps may use up to 65535 mappings. */
+        texnum = (unsigned short)LittleShort(in->texinfo);
+        if (texnum >= loadmodel->numtexinfo)
+            Sys_Error("Face texinfo index outside texinfo lump");
+        out->texinfo = loadmodel->texinfo + texnum;
 
         CalcSurfaceExtents (out);
 
@@ -1028,143 +1195,154 @@ Mod_LoadNodes
  * Keep all original-index hull0 clipnodes, but only expand a certified world
  * prefix to mnode_t. World rendering, PVS, leaf ancestry and torch face ranges
  * remain unchanged. Unsupported layouts retain the legacy full representation.
- * Classification uses ceil(node_count/8) temporary OS bytes, freed before either
- * resident allocation. It never creates a second disk-node or submodel table. */
+ * Classification uses ceil(node_count/8) temporary OS bytes. It never creates a
+ * second disk-node or submodel table.
+ *
+ * The disk nodes arrive in slices, so one forward pass validates each node
+ * before any pointer is made from it, certifies the prefix and decodes. A valid
+ * prefix always ends just before the lowest inline point root, so that root
+ * predicts it and both resident arrays are allocated before the pass. If the
+ * certification fails, the attempt is released and the lump is decoded again
+ * with the legacy representation (generic BSPs only). */
 static qboolean aw_direct_hull0;
 
-static void AW_ValidateDiskNodes(dnode_t *nodes, int count)
+#define AW_SEEN(i) (seen[(i)>>3]&(1u<<((i)&7)))
+#define AW_MARK(i) (seen[(i)>>3]|=1u<<((i)&7))
+
+/* 0 when no prefix can be certified, else the predicted world node count. */
+static int AW_PredictRenderPrefix(int count)
 {
-    int i,j,p,first,nfaces,root;
-    if(count<1 || count>MAX_MAP_NODES)Sys_Error("Invalid BSP node count");
-    for(i=0;i<count;i++){
-        p=LittleLong(nodes[i].planenum);
-        first=(unsigned short)LittleShort(nodes[i].firstface);
-        nfaces=(unsigned short)LittleShort(nodes[i].numfaces);
+    int i,root,world=count;
+    if(!loadmodel->submodels || loadmodel->numsubmodels<2 ||
+       loadmodel->submodels[0].headnode[0]!=0)return 0;
+    for(i=1;i<loadmodel->numsubmodels;i++){
+        root=loadmodel->submodels[i].headnode[0];
+        if(root>=0 && root<world)world=root;
+    }
+    return world>0 && world<count?world:0;
+}
+
+/* One pass over the disk nodes. world==count decodes the legacy full tree.
+ * Returns false only when a predicted prefix fails certification. */
+static qboolean AW_DecodeNodes(lump_t *l,int count,int world,byte *seen)
+{
+    aw_records_t records;dnode_t *in;mnode_t *out=loadmodel->nodes;
+    dclipnode_t *clip=world<count?loadmodel->hulls[0].clipnodes:NULL;
+    int i,j,n,p,first,nfaces,last=0,root;
+    AW_RecordsBegin(&records,l,sizeof(*in));
+    if(clip){memset(seen,0,(count+7)/8);AW_MARK(0);}
+    for(i=0;(in=AW_RecordsNext(&records,&n));)
+    for(;n--;i++,in++){
+        if(!(i&255))AW_LoadAudioTick();
+        p=LittleLong(in->planenum);
+        first=(unsigned short)LittleShort(in->firstface);
+        nfaces=(unsigned short)LittleShort(in->numfaces);
         if(p<0 || p>=loadmodel->numplanes || first>loadmodel->numsurfaces ||
            nfaces>loadmodel->numsurfaces-first)Sys_Error("Invalid BSP node data");
         for(j=0;j<2;j++){
-            p=LittleShort(nodes[i].children[j]);
+            p=LittleShort(in->children[j]);
             if(p>=count || (p<0 && -1-p>=loadmodel->numleafs))
                 Sys_Error("Invalid BSP node child");
         }
-    }
-    for(i=0;i<loadmodel->numsubmodels;i++){
-        root=loadmodel->submodels[i].headnode[0];
-        if(root>=count || root < -loadmodel->numleafs)
-            Sys_Error("Invalid BSP point hull root");
-    }
-}
-
-static int AW_RenderNodePrefix(dnode_t *nodes, int count)
-{
-    byte *seen;
-    int bytes,i,j,p,last,world,root;
-    if(!loadmodel->submodels || loadmodel->numsubmodels<2 ||
-       loadmodel->submodels[0].headnode[0]!=0)return count;
-    bytes=(count+7)/8;
-    seen=(byte *)calloc(bytes,1);
-    if(!seen)return count; /* Optional optimization: allocation failure is safe. */
-    seen[0]=1;last=0;
-    for(i=0;i<=last;i++){
-        if(!(seen[i>>3]&(1u<<(i&7))))goto legacy;
-        for(j=0;j<2;j++){
-            p=LittleShort(nodes[i].children[j]);
-            if(p<0)continue;
-            /* Generated world nodes are a forward tree in a contiguous prefix.
+        if(clip){
+            /* Generated world nodes are a forward tree in a contiguous prefix;
+             * every tail node is reached from an inline root and has no faces.
              * Shared/backward/disconnected layouts use the original loader. */
-            if(p<=i || (seen[p>>3]&(1u<<(p&7))))goto legacy;
-            seen[p>>3]|=1u<<(p&7);
-            if(p>last)last=p;
+            if(i<world){
+                if(i>last || !AW_SEEN(i))return false;
+                for(j=0;j<2;j++){
+                    p=LittleShort(in->children[j]);
+                    if(p<0)continue;
+                    if(p<=i || p>=world || AW_SEEN(p))return false;
+                    AW_MARK(p);if(p>last)last=p;
+                }
+            }else{
+                if(i==world){
+                    if(last+1!=world)return false;
+                    memset(seen,0,(count+7)/8);
+                    for(j=1;j<loadmodel->numsubmodels;j++){
+                        root=loadmodel->submodels[j].headnode[0];
+                        if(root>=0)AW_MARK(root);
+                    }
+                }
+                if(!AW_SEEN(i) || nfaces)return false;
+                for(j=0;j<2;j++){
+                    p=LittleShort(in->children[j]);
+                    if(p<0)continue;
+                    if(p<=i)return false;
+                    AW_MARK(p);
+                }
+            }
+            clip[i].planenum=LittleLong(in->planenum);
+            for(j=0;j<2;j++){
+                p=LittleShort(in->children[j]);
+                clip[i].children[j]=p<0?loadmodel->leafs[-1-p].contents:p;
+            }
         }
-    }
-    world=last+1;
-    if(world==count)goto legacy;
-    memset(seen,0,bytes);
-    for(i=1;i<loadmodel->numsubmodels;i++){
-        root=loadmodel->submodels[i].headnode[0];
-        if(root<0)continue;
-        if(root<world)goto legacy;
-        seen[root>>3]|=1u<<(root&7);
-    }
-    for(i=world;i<count;i++){
-        if(!(seen[i>>3]&(1u<<(i&7))) || LittleShort(nodes[i].numfaces))goto legacy;
-        for(j=0;j<2;j++){
-            p=LittleShort(nodes[i].children[j]);
-            if(p<0)continue;
-            if(p<=i)goto legacy;
-            seen[p>>3]|=1u<<(p&7);
-        }
-    }
-    free(seen);
-    return world;
-legacy:
-    free(seen);
-    return count;
-}
-
-static void AW_MakeDiskHull0(dnode_t *nodes,int count)
-{
-    int i,j,p;
-    hull_t *hull=&loadmodel->hulls[0];
-    dclipnode_t *out=Hunk_AllocName(count*sizeof(*out),loadname);
-    hull->clipnodes=out;hull->planes=loadmodel->planes;
-    hull->firstclipnode=0;hull->lastclipnode=count-1;
-    for(i=0;i<count;i++,out++){
-        if(!(i&255))AW_LoadAudioTick();
-        out->planenum=LittleLong(nodes[i].planenum);
-        for(j=0;j<2;j++){
-            p=LittleShort(nodes[i].children[j]);
-            out->children[j]=p<0?loadmodel->leafs[-1-p].contents:p;
-        }
-    }
-}
-
-void Mod_LoadNodes (lump_t *l)
-{
-    int             i, j, count, p, rendercount;
-    dnode_t          *in;
-    mnode_t          *out;
-
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
-    AW_ValidateDiskNodes(in, count);
-    rendercount = AW_RenderNodePrefix(in, count);
-    aw_direct_hull0 = false;
-    if(rendercount < count){
-        /* Original disk indices stay valid for every model point-trace root. */
-        AW_MakeDiskHull0(in, count);
-        aw_direct_hull0 = true;
-    }
-    out = Hunk_AllocName ( rendercount*sizeof(*out), loadname);
-
-    loadmodel->nodes = out;
-    loadmodel->numnodes = rendercount;
-
-    for ( i=0 ; i<rendercount ; i++, in++, out++)
-    {
-        if(!(i&255))AW_LoadAudioTick();
+        if(i>=world)continue;
         for (j=0 ; j<3 ; j++)
         {
-            out->minmaxs[j] = LittleShort (in->mins[j]);
-            out->minmaxs[3+j] = LittleShort (in->maxs[j]);
+            out[i].minmaxs[j] = LittleShort (in->mins[j]);
+            out[i].minmaxs[3+j] = LittleShort (in->maxs[j]);
         }
 
         p = LittleLong(in->planenum);
-        out->plane = loadmodel->planes + p;
+        out[i].plane = loadmodel->planes + p;
 
-        out->firstsurface = LittleShort (in->firstface);
-        out->numsurfaces = LittleShort (in->numfaces);
+        /* Unsigned on disk; checked above. */
+        out[i].firstsurface = first;
+        out[i].numsurfaces = nfaces;
 
         for (j=0 ; j<2 ; j++)
         {
             p = LittleShort (in->children[j]);
             if (p >= 0)
-                out->children[j] = loadmodel->nodes + p;
+                out[i].children[j] = loadmodel->nodes + p;
             else
-                out->children[j] = (mnode_t *)(loadmodel->leafs + (-1 - p));
+                out[i].children[j] = (mnode_t *)(loadmodel->leafs + (-1 - p));
         }
+    }
+    return true;
+}
+
+void Mod_LoadNodes (lump_t *l)
+{
+    int             i, count, world, mark, root;
+    byte            *seen=NULL;
+    hull_t          *hull=&loadmodel->hulls[0];
+    aw_records_t    records;
+
+    count = AW_RecordsBegin (&records, l, sizeof(dnode_t));
+    if(count<1 || count>MAX_MAP_NODES)Sys_Error("Invalid BSP node count");
+    for(i=0;i<loadmodel->numsubmodels;i++){
+        root=loadmodel->submodels[i].headnode[0];
+        if(root>=count || root < -loadmodel->numleafs)
+            Sys_Error("Invalid BSP point hull root");
+    }
+    aw_direct_hull0 = false;
+    world = AW_PredictRenderPrefix(count);
+    /* Optional optimization: scratch allocation failure is safe. */
+    if(world)seen=(byte *)calloc((count+7)/8,1);
+    if(seen){
+        mark=Hunk_LowMark();
+        hull->clipnodes=Hunk_AllocName(count*sizeof(dclipnode_t),loadname);
+        loadmodel->nodes=Hunk_AllocName(world*sizeof(mnode_t),loadname);
+        loadmodel->numnodes=world;
+        if(AW_DecodeNodes(l,count,world,seen)){
+            /* Original disk indices stay valid for every model point-trace root. */
+            hull->planes=loadmodel->planes;
+            hull->firstclipnode=0;hull->lastclipnode=count-1;
+            aw_direct_hull0 = true;
+        }else{
+            hull->clipnodes=NULL;
+            Hunk_FreeToLowMark(mark);
+        }
+        free(seen);
+    }
+    if(!aw_direct_hull0){
+        loadmodel->nodes=Hunk_AllocName(count*sizeof(mnode_t),loadname);
+        loadmodel->numnodes=count;
+        AW_DecodeNodes(l,count,count,NULL);
     }
 
     Mod_SetParent (loadmodel->nodes, NULL);	// sets nodes and leafs
@@ -1179,18 +1357,17 @@ void Mod_LoadLeafs (lump_t *l)
 {
     dleaf_t	*in;
     mleaf_t	*out;
-    int			i, j, count, p;
+    int			i, j, count, p, first, marks, n;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->leafs = out;
     loadmodel->numleafs = count;
 
-    for ( i=0 ; i<count ; i++, in++, out++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++, out++)
     {
         if(!(i&255))AW_LoadAudioTick();
         for (j=0 ; j<3 ; j++)
@@ -1202,9 +1379,15 @@ void Mod_LoadLeafs (lump_t *l)
         p = LittleLong(in->contents);
         out->contents = p;
 
-        out->firstmarksurface = loadmodel->marksurfaces +
-            LittleShort(in->firstmarksurface);
-        out->nummarksurfaces = LittleShort(in->nummarksurfaces);
+        /* Both fields are unsigned 16-bit on disk; signed reads pointed
+         * before the mark list once a map passed 32767 marks. */
+        first = (unsigned short)LittleShort(in->firstmarksurface);
+        marks = (unsigned short)LittleShort(in->nummarksurfaces);
+        if (first > loadmodel->nummarksurfaces ||
+            marks > loadmodel->nummarksurfaces - first)
+            Sys_Error ("Mod_LoadLeafs: bad marksurface range");
+        out->firstmarksurface = loadmodel->marksurfaces + first;
+        out->nummarksurfaces = marks;
 
         p = LittleLong(in->visofs);
         if (p == -1)
@@ -1339,23 +1522,24 @@ Mod_LoadMarksurfaces
 */
 void Mod_LoadMarksurfaces (lump_t *l)
 {
-    int		i, j, count;
+    int		i, j, count, n;
     short		*in;
     msurface_t **out;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->marksurfaces = out;
     loadmodel->nummarksurfaces = count;
 
-    for ( i=0 ; i<count ; i++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++)
     {
         if(!(i&255))AW_LoadAudioTick();
-        j = LittleShort(in[i]);
+        /* Face indices are unsigned 16-bit (0..65535); a signed read
+         * turned faces past 32767 into negative indices. */
+        j = (unsigned short)LittleShort(*in);
         if (j >= loadmodel->numsurfaces)
             Sys_Error ("Mod_ParseMarksurfaces: bad surface number");
         out[i] = loadmodel->surfaces + j;
@@ -1369,21 +1553,21 @@ Mod_LoadSurfedges
 */
 void Mod_LoadSurfedges (lump_t *l)
 {
-    int		i, count;
+    int		i, count, n;
     int		*in, *out;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
 
     loadmodel->surfedges = out;
     loadmodel->numsurfedges = count;
 
-    for ( i=0 ; i<count ; i++) {
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++) {
         unsigned int index;
-        out[i] = LittleLong (in[i]);
+        if(!(i&255))AW_LoadAudioTick();
+        out[i] = LittleLong (*in);
         index=out[i]<0?0U-(unsigned int)out[i]:(unsigned int)out[i];
         if(index>=(unsigned int)loadmodel->numedges)Sys_Error("Invalid signed surface edge index");
     }
@@ -1399,13 +1583,11 @@ void Mod_LoadPlanes (lump_t *l)
     int			i, j;
     mplane_t	*out;
     dplane_t	*in;
-    int			count;
+    int			count, n;
     int			bits;
+    aw_records_t	records;
 
-    in = (void *)(mod_base + l->fileofs);
-    if (l->filelen % sizeof(*in))
-        Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
-    count = l->filelen / sizeof(*in);
+    count = AW_RecordsBegin (&records, l, sizeof(*in));
     /* Only count planes are initialized or referenced; the old double
      * allocation wasted Fast RAM on larger converted cells. */
     out = Hunk_AllocName ( count*sizeof(*out), loadname);
@@ -1413,7 +1595,8 @@ void Mod_LoadPlanes (lump_t *l)
     loadmodel->planes = out;
     loadmodel->numplanes = count;
 
-    for ( i=0 ; i<count ; i++, in++, out++)
+    for ( i=0 ; (in = AW_RecordsNext (&records, &n)) ; )
+    for ( ; n-- ; i++, in++, out++)
     {
         if(!(i&255))AW_LoadAudioTick();
         bits = 0;
@@ -1454,7 +1637,7 @@ Mod_LoadBrushModel
 =================
 */
 static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
-    lump_t section;int mark;size_t copied;double started;
+    int mark;double started,disk;
     if(!aw_bsp_file){decode(l);return;}
     if(l->fileofs<0 || l->filelen<0 || l->fileofs>aw_bsp_bytes || l->filelen>aw_bsp_bytes-l->fileofs)
         Sys_Error("Invalid BSP section");
@@ -1465,16 +1648,12 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
         if(l->filelen%sizeof(*target) || l->filelen/sizeof(*target)>65520)
             Sys_Error("Invalid BSP clipnode section");
         target=Hunk_AllocName(l->filelen,loadname);
-        copied=aw_load_prefetch_copy?aw_load_prefetch_copy(loadmodel->name,l->fileofs,(byte *)target,l->filelen):0;
-        if(copied>(size_t)l->filelen)Sys_Error("Invalid BSP prefetch length");
-        if(fseek(aw_bsp_file,aw_bsp_base+l->fileofs+copied,SEEK_SET) ||
-           AW_LoadRead((byte *)target+copied,l->filelen-copied,aw_bsp_file)!=(size_t)l->filelen-copied)
-            Sys_Error("Short BSP clipnode section");
+        AW_LumpBytes(l,0,target,l->filelen);
         started=aw_load_clock?aw_load_clock():0;
         AW_DecodeClipnodes(target,target,l->filelen/sizeof(*target));
         if(aw_load_clock)aw_load_decode_seconds+=aw_load_clock()-started;
         if(l->filelen>aw_bsp_peak)aw_bsp_peak=l->filelen;
-        aw_bsp_reads++;AW_LoadAudioTick();return;
+        AW_RecordSection(l,0);aw_bsp_reads++;AW_LoadAudioTick();return;
     }
     /* These byte lumps require no conversion. Reading into final storage
      * avoids holding two complete copies of a large visibility table. */
@@ -1482,30 +1661,38 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
         byte *target=NULL;
         if(l->filelen){
             target=Hunk_AllocName(l->filelen,loadname);
-            copied=aw_load_prefetch_copy?aw_load_prefetch_copy(loadmodel->name,l->fileofs,target,l->filelen):0;
-            if(copied>(size_t)l->filelen)Sys_Error("Invalid BSP prefetch length");
-            if(fseek(aw_bsp_file,aw_bsp_base+l->fileofs+copied,SEEK_SET) ||
-               AW_LoadRead(target+copied,l->filelen-copied,aw_bsp_file)!=(size_t)l->filelen-copied)
-                Sys_Error("Short BSP section");
+            AW_LumpBytes(l,0,target,l->filelen);
         }
         if(decode==Mod_LoadVisibility)loadmodel->visdata=target;
         else if(decode==Mod_LoadLighting)loadmodel->lightdata=target;
         else loadmodel->entities=(char *)target;
         if(l->filelen>aw_bsp_peak)aw_bsp_peak=l->filelen;
-        aw_bsp_reads++;AW_LoadAudioTick();return;
+        AW_RecordSection(l,0);aw_bsp_reads++;AW_LoadAudioTick();return;
     }
-    mark=Hunk_HighMark();mod_base=Hunk_TempAlloc(l->filelen+1);
-    if(!mod_base)Sys_Error("BSP section allocation failed");
-    copied=aw_load_prefetch_copy?aw_load_prefetch_copy(loadmodel->name,l->fileofs,mod_base,l->filelen):0;
-    if(fseek(aw_bsp_file,aw_bsp_base+l->fileofs+copied,SEEK_SET) || AW_LoadRead(mod_base+copied,l->filelen-copied,aw_bsp_file)!=(size_t)l->filelen-copied)
-        Sys_Error("Short BSP section");
+    /* Every other lump is decoded from bounded slices of this temporary
+     * buffer straight into its final allocations (AW_RecordsNext). */
+    mark=Hunk_HighMark();aw_bsp_slice=NULL;
+    aw_bsp_slice_bytes=l->filelen<AW_BSP_SLICE_BYTES?l->filelen:AW_BSP_SLICE_BYTES;
+    /* Prefix: split records, or the texture directory (never > lump). A lump
+     * that fits one window needs neither. */
+    aw_bsp_slice_prefix=l->filelen<=AW_BSP_SLICE_BYTES?0:decode!=Mod_LoadTextures?AW_BSP_RECORD_PREFIX:
+        ((l->filelen<AW_BSP_DIRECTORY_BYTES?l->filelen:AW_BSP_DIRECTORY_BYTES)+15)&~15;
+    if(aw_bsp_slice_bytes)aw_bsp_slice_bytes+=aw_bsp_slice_prefix;
+    aw_bsp_window_start=-1;
+    if(aw_bsp_slice_bytes){
+        aw_bsp_slice=Hunk_TempAlloc(aw_bsp_slice_bytes);
+        if(!aw_bsp_slice)Sys_Error("BSP section allocation failed");
+    }
+    if(aw_bsp_slice_bytes>aw_bsp_slice_peak)aw_bsp_slice_peak=aw_bsp_slice_bytes;
     if(l->filelen>aw_bsp_peak)aw_bsp_peak=l->filelen;
     aw_bsp_reads++;
-    section.fileofs=0;section.filelen=l->filelen;
-    started=aw_load_clock?aw_load_clock():0;decode(&section);
-    if(aw_load_clock)aw_load_decode_seconds+=aw_load_clock()-started;
+    started=aw_load_clock?aw_load_clock():0;disk=aw_load_disk_seconds;
+    decode(l);
+    /* Decode time excludes the disk reads now interleaved with it. */
+    if(aw_load_clock)aw_load_decode_seconds+=aw_load_clock()-started-(aw_load_disk_seconds-disk);
     AW_LoadAudioTick();
-    Hunk_FreeToHighMark(mark);mod_base=NULL;
+    AW_RecordSection(l,aw_bsp_slice_bytes);
+    Hunk_FreeToHighMark(mark);aw_bsp_slice=NULL;aw_bsp_slice_bytes=0;
 }
 
 /* Immutable edge vertices keep their original IDs. Only the mutable world
@@ -1597,6 +1784,7 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 
     AW_InitEdgeCache(loadmodel);
     Mod_MakeHull0 ();
+    if(aw_bsp_lumps && aw_load_hunk_used)aw_bsp_used[HEADER_LUMPS+1]=aw_load_hunk_used();
 
     mod->numframes = 2;		// regular and alternate animation
     mod->flags = 0;

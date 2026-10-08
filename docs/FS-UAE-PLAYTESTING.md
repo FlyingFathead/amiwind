@@ -179,6 +179,12 @@ hard_drive_0_type = hdf
 # Keep movement keys available to AmiWind
 joystick_port_1 = none
 
+# Home/End and page keys as keys the game reads (the shipped presets do this)
+keyboard_key_pageup = action_key_68
+keyboard_key_pagedown = action_key_69
+keyboard_key_home = action_key_6a
+keyboard_key_end = action_key_6c
+
 # Windowed mode
 fullscreen = 0
 ```
@@ -271,6 +277,80 @@ This is an accelerated AmiWind playtesting configuration. It is intended to prov
 It is not intended to represent the performance of a stock Amiga 1200 or Amiga 500. The configuration deliberately uses a 68040, JIT, Zorro III Fast RAM, and fastest-possible CPU speed.
 
 For compatibility or minimum-spec testing, use a separate emulator configuration matching the intended target hardware.
+
+## Benchmark profile
+
+The playtest configuration above (JIT, `uae_cpu_speed = max`) runs the 68040 as fast as
+the PC allows, so its frame rates and loading times say little about a real Amiga
+([BENCH-JIT-PROFILE-32](bugs/BENCH-JIT-PROFILE-32.md)). For performance comparisons
+between builds use this cycle-approximate profile instead; it is the relative
+reference profile. **It is not real hardware**: FS-UAE 3.1.66 (WinUAE 3.3 core)
+approximates 68040 instruction and memory timing, its hard disk is a virtual device
+backed by the PC's file cache (load times are not real), and nothing here has been
+checked against a real accelerated A1200 yet ([HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md)
+asks owners for that number). Every performance report names its profile.
+
+Replace the CPU speed lines of the playtest configuration with:
+
+```ini
+# Benchmark profile: interpreted 68040 (no JIT), cycle-approximate timing,
+# CPU clock 7 x 3.546895 MHz = 24.8 MHz (a 68040 at 25 MHz)
+jit_compiler = 0
+uae_cpu_cycle_exact = true
+uae_cpu_multiplier = 7
+```
+
+Everything else stays as in the playtest configuration (A1200, `68040-NOMMU` with its
+FPU, 2 MB Chip RAM, 16 MB Zorro III RAM, Kickstart 3.1); warp mode stays off. Notes from
+setting it up (FS-UAE 3.1.66, checked in the effective configuration FS-UAE writes):
+
+- `uae_cpu_cycle_exact = true` also turns on memory cycle-exact mode for the 68020 and
+  later; FS-UAE reports the CPU as "~cycle-exact fast".
+- The clock comes from `uae_cpu_multiplier` (times 3.546895 MHz). `uae_cpu_frequency`
+  is accepted but ignored in this mode: with `uae_cpu_frequency = 25000000` the CPU
+  stays at the A1200 default multiplier 4 (14.2 MHz). Multiplier 11 gives 39 MHz.
+- JIT and cycle-exact mode exclude each other.
+- `uae_cpu_speed = real` without cycle-exact mode is not a substitute: its CPU loops are
+  close to a 14 MHz cycle-exact run but Fast RAM copies run at 56 MB/s.
+
+The asset-free `awbench cpu` loops ([HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md))
+under each candidate profile (millions of loops per second; MB/s):
+
+| Profile | integer multiply | integer add | FPU | Fast RAM copy | Chip RAM write |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Playtest (JIT, `max`) | 1,100.6 | 1,389.0 | 63.1 | 7,812.5 | 5,211.7 |
+| No JIT, `max` | 28.9 | 23.7 | 2.22 | 529.7 | 122.8 |
+| No JIT, `uae_cpu_speed = real` | 1.34 | 1.66 | 1.04 | 56.1 | 7.17 |
+| Cycle-exact, multiplier 4 (14.2 MHz) | 2.34 | 2.00 | 1.12 | 14.6 | 4.42 |
+| **Benchmark: cycle-exact, multiplier 7 (24.8 MHz)** | **4.17** | **3.58** | **2.00** | **26.1** | **6.69** |
+
+The ten fixed cameras of [performance/RENDERER-COUNTERS.md](performance/RENDERER-COUNTERS.md)
+(positions in [HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md#frame-time-in-the-game)),
+measured 8 October 2026 with `dbg rcount` on the v0.0.32-dev engine overlaid on a copy
+of the v0.0.31 image (noon, day/night cycle off, headlamp off; medians of the
+per-second lines; the renderer counts were the same in every profile):
+
+| Camera | Playtest frame ms | No JIT, `max`, strict FPU mode frame ms | **Benchmark frame ms** | Benchmark: brush models / scan (incl. draw) / span drawing / alias models ms | Benchmark brush model share of the view |
+| --- | ---: | ---: | ---: | --- | ---: |
+| Balmora 1 | 45.0 | 3,320 | **8,139** | 6,973 / 553 / 316 / 28 | 88 % |
+| Balmora 2 | 24.3 | 1,742 | **4,384** | 3,187 / 502 / 303 / 28 | 76 % |
+| Balmora 3 | 21.4 | 1,608 | **3,995** | 2,667 / 328 / 151 / 5 | 83 % |
+| Balmora 4 | 28.3 | 1,604 | **4,292** | 3,195 / 444 / 307 / 49 | 78 % |
+| Balmora 5 | 24.4 | 1,657 | **3,851** | 2,806 / 409 / 233 / 22 | 76 % |
+| Seyda Neen 1 | 22.1 | 1,408 | **3,725** | 1,313 / 1,382 / 1,102 / 402 | 39 % |
+| Seyda Neen 2 | 15.1 | 809 | **2,668** | 1,227 / 369 / 182 / 409 | 55 % |
+| Seyda Neen 3 | 25.1 | 1,492 | **4,718** | 2,473 / 1,406 / 850 / 260 | 55 % |
+| Seyda Neen 4 | 17.7 | 1,236 | **3,238** | 1,951 / 409 / 224 / 291 | 64 % |
+| Seyda Neen 5 | 25.3 | 1,427 | **3,744** | 2,277 / 691 / 324 / 319 | 64 % |
+
+Frame times are medians of the per-second lines (one frame per line at the benchmark
+profile, 10-33 frames per camera); the no-JIT column ran at the same time as the
+benchmark run on the same PC, so it is the least precise. At the benchmark profile a
+view takes 2.7-8.1 seconds; in Balmora 76-88 % of it is the brush models' clipping
+against the world BSP (see the counters page and RENDER-BMODEL-FRAGMENTS-32), in Seyda
+Neen surface cache rebuilding (Seyda Neen 1 and 3) and alias models add up. Between
+the playtest and the benchmark profile the frame time grows 148-188 times. Treat all of
+these as relative numbers until a real 68040 measurement exists.
 
 ## Repository preset and validation note
 

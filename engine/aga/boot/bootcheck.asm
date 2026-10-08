@@ -3,6 +3,7 @@
 ; Runs on a 68000, before loading the 68040 engine or its C runtime.
 ; NDK includes supply public structure offsets, flags and library vectors.
         include "exec/execbase.i"
+        include "exec/libraries.i"
         include "exec/memory.i"
         include "graphics/gfxbase.i"
         include "lvo/exec_lib.i"
@@ -53,6 +54,7 @@ bootcheck_start:
         bsr     format_version
 
         move.w  AttnFlags(a6),d3
+        moveq   #0,d5                   ; 1: 68040-class CPU
         btst    #AFB_68040,d3
         bne     .cpu_ok
         lea     cpu_fail_line(pc),a0
@@ -60,7 +62,15 @@ bootcheck_start:
         moveq   #20,d7
         bra     .fpu_check
 .cpu_ok:
-        lea     cpu_ok_line(pc),a0
+        moveq   #1,d5
+        lea     cpu_060_line(pc),a0
+        btst    #AFB_68060,d3
+        bne     .cpu_print
+        bsr     probe_68060
+        tst.l   d0
+        bne     .cpu_print
+        lea     cpu_040_line(pc),a0
+.cpu_print:
         bsr     puts
 .fpu_check:
         btst    #AFB_FPU40,d3
@@ -68,9 +78,40 @@ bootcheck_start:
         lea     fpu_fail_line(pc),a0
         bsr     puts
         moveq   #20,d7
-        bra     .video_check
+        ; Still report the support library: on Kickstart 3.1 a 68060 shows no
+        ; FPU until its 68060.library is loaded.
+        bra     .support_check
 .fpu_ok:
         lea     fpu_ok_line(pc),a0
+        bsr     puts
+
+.support_check:
+        ; ENGINE-FPSP-MISSING-31: the user's own 68040.library/68060.library,
+        ; resident in SysBase->LibList after AmiWindFPU opened it. Optional:
+        ; a WARN here never sets the failure code (d7) or stops the startup.
+        tst.l   d5
+        beq     .video_check
+        bsr     find_fpu_library
+        tst.l   d0
+        beq     .support_none
+        move.l  a1,version_values
+        moveq   #0,d0
+        move.w  d1,d0
+        move.l  d0,version_values+8
+        swap    d1
+        move.w  d1,d0
+        move.l  d0,version_values+4
+        lea     support_name_format(pc),a0
+        lea     version_values,a1
+        lea     support_name,a3
+        bsr     format_into
+        lea     support_name,a0
+        move.l  a0,version_values
+        lea     support_ok_format(pc),a0
+        bsr     format_version
+        bra     .video_check
+.support_none:
+        lea     support_warn_line(pc),a0
         bsr     puts
 
 .video_check:
@@ -267,7 +308,16 @@ countdown:
         movem.l (sp)+,d0-d4/a0-a3/a6
         rts
 
-; Format the two longword Exec version fields and print the result.
+; Format a0 with the longwords at a1 into the buffer at a3 (no output).
+format_into:
+        movem.l a2/a6,-(sp)
+        move.l  4.w,a6
+        lea     put_char(pc),a2
+        jsr     _LVORawDoFmt(a6)
+        movem.l (sp)+,a2/a6
+        rts
+
+; Format the longwords at version_values with a0 and print the result.
 format_version:
         move.l  4.w,a6
         lea     version_values,a1
@@ -310,6 +360,8 @@ puts:
         movem.l (sp)+,d0-d3/a0-a1/a6
         rts
 
+        include "fpu_support_inc.asm"
+
 dos_name:       dc.b "dos.library",0
 graphics_name:  dc.b "graphics.library",0
                 include "amiwind_version.i"
@@ -319,25 +371,29 @@ credits:        dc.b "By FlyingFathead",10
 separator:      dc.b "----------------------------------------------",10,0
 exec_ok_format: dc.b "Exec API:             %ld.%ld (Kickstart 3.1+) [x] OK",10,0
 exec_fail_format: dc.b "Exec API:             %ld.%ld                    [!] FAIL",10,0
-cpu_ok_line:    dc.b "CPU:                  68040/68060 class          [x] OK",10,0
+cpu_040_line:   dc.b "CPU:                  68040                      [x] OK",10,0
+cpu_060_line:   dc.b "CPU:                  68060                      [x] OK",10,0
 cpu_fail_line:  dc.b "CPU:                  below 68040 class          [!] FAIL",10,0
 fpu_ok_line:    dc.b "FPU:                  internal 040/060 compatible [x] OK",10,0
 fpu_fail_line:  dc.b "FPU:                  required internal FPU absent [!] FAIL",10,0
+support_name_format: dc.b "%s %ld.%ld active",0
+support_ok_format: dc.b "FPU support:          %-27s[x] OK",10,0
+support_warn_line: dc.b "FPU support:          none - see docs (optional) [~] WARN",10,0
 video_ok_line:  dc.b "Video timing:         PAL / 50 Hz                [x] OK",10,0
 video_warn_line:dc.b "Video timing:         not PAL / 50 Hz            [!] WARN",10,0
 aga_ok_line:    dc.b "Machine class:        AGA / A1200-compatible     [x] OK",10,0
 aga_fail_line:  dc.b "Machine class:        AGA not detected           [!] FAIL",10,0
-chip_ok_format: dc.b "Chip RAM KiB:         %ld total, %ld free, %ld largest [x] OK",10,0
-chip_fail_format: dc.b "Chip RAM KiB:         %ld total, %ld free, %ld largest [!] FAIL",10,0
-fast_ok_format: dc.b "Fast RAM KiB:         %ld total, %ld free, %ld largest [x] OK",10,0
-fast_fail_format: dc.b "Fast RAM KiB:         %ld total, %ld free, %ld largest [!] FAIL",10,0
+chip_ok_format: dc.b "Chip RAM:             %ldK, free %ld, max %ld [x] OK",10,0
+chip_fail_format: dc.b "Chip RAM:             %ldK, free %ld, max %ld [!] FAIL",10,0
+fast_ok_format: dc.b "Fast RAM:             %ldK, free %ld, max %ld [x] OK",10,0
+fast_fail_format: dc.b "Fast RAM:             %ldK, free %ld, max %ld [!] FAIL",10,0
 address_ok_line: dc.b "32-bit / Z3 memory:   usable                     [x] OK",10,0
-address_fail_line: dc.b "32-bit / Z3 memory:   required Fast RAM unavailable [!] FAIL",10,0
+address_fail_line: dc.b "32-bit / Z3 memory:   no usable Fast RAM         [!] FAIL",10,0
 host_speed_line: dc.b "JIT / CPU speed:      host-side; see launcher    [?] HOST",10,0
 host_cycle_line: dc.b "Cycle-exact mode:     host-side; see launcher    [?] HOST",10,0
 host_rom_line:   dc.b "Exact ROM revision:   host SHA-256 check         [?] HOST",10,0
-countdown_format: dc.b 13,"Continuing in %ld seconds. Press SPACE or ENTER to continue now.   ",0
-countdown_done:   dc.b 13,"Continuing now.                                                ",10,0
+countdown_format: dc.b 13,"SPACE or ENTER = start now.   Starting in %ld s...",0
+countdown_done:   dc.b 13,"Starting now.                                     ",10,0
 need_os:        dc.b "FAIL: this AGA build needs Kickstart 3.1 or newer.",10,0
 need_aga:       dc.b "FAIL: this build needs the AGA chipset.",10,0
 need_chip:      dc.b "FAIL: select 2 MB Chip; keep 512 KiB free (256 KiB contiguous).",10,0
@@ -354,7 +410,8 @@ input_handle:   ds.l 1
 input_byte:     ds.b 1
                 even
 countdown_value: ds.l 1
-version_values: ds.l 2
+version_values: ds.l 3
+support_name:   ds.b 64
 memory_bytes:   ds.l 6
 memory_kib:     ds.l 6
 report_buffer:  ds.b 256

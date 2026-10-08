@@ -21,7 +21,10 @@
 #include "aw_remote.h"
 #include <stdint.h>
 #define LAMP_ROW 20
-#define LAMP_CACHE 96
+/* Lamps kept for the 3 x 3 cells around the player. The densest 3 x 3 in the
+ * game holds 102 exterior lamps (Vivec); 96 dropped some (LAMPS-CACHE-31).
+ * 36 bytes each; tools/night_lighting.py refuses a table that could overflow. */
+#define LAMP_CACHE 256
 #define LAMP_RANGE 512.0f
 /* A lamp behind the view counts this many times as far when the few light
  * slots are shared out: it only loses near-ties (3x made turning the head
@@ -35,7 +38,7 @@
 #define LAMP_FADE .4f
 typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading;} lamp_t;
 static lamp_t lamps[LAMP_CACHE];
-static int lamp_count,lamp_cell_valid,lamp_cell[2];
+static int lamp_count,lamp_dropped,lamp_cell_valid,lamp_cell[2];
 static cvar_t aw_lamp_lights={"aw_lamp_lights","2",true};
 static cvar_t aw_night_window_lights={"aw_night_window_lights","1",true};
 /* Lamp light radius relative to the torch's (dbg outdoorlantern 1.0): the
@@ -66,9 +69,10 @@ static void load_cell(FILE *f,long base,unsigned count,int cx,int cy)
         if(rx<cx || (rx==cx && ry<cy))lo=mid+1;else hi=mid;
     }
     if(fseek(f,base+8+(long)lo*LAMP_ROW,SEEK_SET))return;
-    for(;lo<(int)count && lamp_count<LAMP_CACHE;lo++){
-        lamp_t *l=&lamps[lamp_count];int k;
+    for(;lo<(int)count;lo++){
+        lamp_t *l=&lamps[lamp_count<LAMP_CACHE?lamp_count:0];int k;
         if(fread(row,1,LAMP_ROW,f)!=LAMP_ROW || s16(row)!=cx || s16(row+2)!=cy)return;
+        if(lamp_count>=LAMP_CACHE){lamp_dropped++;continue;} /* counted, shown by dbg lamps */
         for(k=0;k<3;k++)l->origin[k]=f32(row+4+k*4);
         l->radius=(float)(row[16]|(row[17]<<8));l->cool=row[19]==2;l->lit=l->fading=0;l->lit_since=l->off_since=0;
         if(isfinite(l->origin[0]) && isfinite(l->origin[1]) && isfinite(l->origin[2]) && l->radius>0)lamp_count++;
@@ -77,7 +81,7 @@ static void load_cell(FILE *f,long base,unsigned count,int cx,int cy)
 static void load_cells(int cx,int cy)
 {
     FILE *f=NULL;byte header[8];long base;int size,dx,dy;unsigned count;
-    lamp_count=0;lamp_cell_valid=1;lamp_cell[0]=cx;lamp_cell[1]=cy;
+    lamp_count=lamp_dropped=0;lamp_cell_valid=1;lamp_cell[0]=cx;lamp_cell[1]=cy;
     size=COM_FOpenFile("world/lamps.awl",&f);if(!f)return;
     base=ftell(f);
     if(base>=0 && size>=8 && fread(header,1,8,f)==8 && !memcmp(header,"AWL1",4)){
@@ -142,7 +146,8 @@ static void lamp_status(void)
     /* Why lamps are on or off: each part of lamp_night separately. */
     Con_Printf("Night test: exterior %d, daylight %d (lamps below %d), guard night %d.\n",R_SkyExterior(),r_daylight,LAMP_DUSK_DAYLIGHT,AW_GuardTorchNight());
     if(!lamp_cell_valid)Con_Printf("Lamp table not read yet (it is read at night).\n");
-    else Con_Printf("Cached %ld lamps around cell %ld, %ld.\n",(long)lamp_count,(long)lamp_cell[0],(long)lamp_cell[1]);
+    else Con_Printf("Cached %ld lamps around cell %ld, %ld (%ld dropped, cache %ld).\n",(long)lamp_count,(long)lamp_cell[0],(long)lamp_cell[1],
+        (long)lamp_dropped,(long)LAMP_CACHE);
     for(j=0;j<last_found;j++){
         l=&lamps[last_index[j]];
         Con_Printf("Lit: original %ld %ld %ld, %ld units away%s.\n",(long)l->origin[0],(long)l->origin[1],(long)l->origin[2],
@@ -151,6 +156,8 @@ static void lamp_status(void)
     Con_Printf("Night windows: %ld textures, %s.\n",(long)r_night_window_count,r_night_windows_on?"glowing":"off");
 }
 int AW_LampLitCount(void){return last_found;}
+int AW_LampCachedCount(void){return lamp_count;}
+int AW_LampDroppedCount(void){return lamp_dropped;}
 void AW_LampInit(void)
 {
     Cvar_RegisterVariable(&aw_lamp_lights);Cvar_RegisterVariable(&aw_night_window_lights);

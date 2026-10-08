@@ -19,6 +19,7 @@ build was not given are skipped and listed in the receipt: a town whose own
 scenery is missing gets no window line (its glass stays dark) rather than a
 guessed one. A table that fails its own format check stops the build.
 """
+import collections
 import fnmatch
 import hashlib
 import json
@@ -34,6 +35,7 @@ FOG_MAX_BYTES = 16384
 FOG_MAX_LINE = 126  # the engine reads lines into a 128-byte buffer
 LAMP_ROW_BYTES = 20
 LAMP_MAX_ROWS = 65536  # aw_lamps.c rejects larger tables
+LAMP_CACHE = 256  # aw_lamps.c keeps this many lamps for the 3 x 3 cells around the player
 # Town map groups and the patterns their maps match (as in the dev runs).
 TOWN_PATTERNS = {'balmora': ('bm0[0-9][0-9]', 'balmora'),
                  'seyda': ('sn0[0-9][0-9]', 'seyda', 'intro_docks', 'sncourt')}
@@ -81,6 +83,12 @@ def check_lamp_table(raw):
     cells = [struct.unpack_from('<hh', raw, 8 + k * LAMP_ROW_BYTES) for k in range(count)]
     if cells != sorted(cells):
         raise ValueError('Lamp table is not sorted by cell')
+    per_cell = collections.Counter(cells)
+    busiest = max((sum(per_cell.get((x + dx, y + dy), 0) for dx in (-1, 0, 1) for dy in (-1, 0, 1)), x, y)
+                  for x, y in per_cell) if per_cell else (0, 0, 0)
+    if busiest[0] > LAMP_CACHE:
+        raise ValueError('Lamp table: %d lamps around cell %d, %d exceed the engine cache of %d (LAMPS-CACHE-31)'
+                         % (busiest + (LAMP_CACHE,)))
     return count
 
 

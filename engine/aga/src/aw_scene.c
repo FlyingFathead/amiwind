@@ -9,6 +9,7 @@
 #include "aw_maps.h"
 #include "aw_story.h"
 #include "aw_region.h"
+#include "aw_town.h"
 #include "aw_section.h"
 #include "aw_world.h"
 #include "aw_character.h"
@@ -98,7 +99,9 @@ int AW_NPCFloor(edict_t *e) {
 edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {
     edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,a,b,o,d,t;
     vec3_t eye,end,forward,right,up,delta,local,ray;trace_t tr;
+    AW_FPUCOUNT(AW_FPU_NPCTARGET);
     if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
+    AW_FPUCOUNT(AW_FPU_NPCSCAN);
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(angles,forward,right,up);
     VectorMA(eye,72,forward,end);
     tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
@@ -119,6 +122,12 @@ edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {
            strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
         m=sv.models[index];if(!m || m->type!=mod_alias)continue;
         VectorSubtract(eye,e->v.origin,delta);
+        /* Distance precheck: the bounds lie within the sum of their largest
+         * extents of the origin, so an NPC farther than limit plus that sum
+         * cannot meet the ray (no direction vectors needed). */
+        for(o=0,j=0;j<3;j++)o+=fabs(m->mins[j])>fabs(m->maxs[j])?fabs(m->mins[j]):fabs(m->maxs[j]);
+        if(DotProduct(delta,delta)>(limit+o)*(limit+o))continue;
+        AW_FPUCOUNT(AW_FPU_NPCTEST);
         AngleVectors(e->v.angles,local,right,up);
         ray[0]=DotProduct(forward,local);ray[1]=-DotProduct(forward,right);ray[2]=DotProduct(forward,up);
         end[0]=DotProduct(delta,local);end[1]=-DotProduct(delta,right);end[2]=DotProduct(delta,up);
@@ -136,9 +145,21 @@ edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {
     }
     return best;
 }
+/* The scene draw asks for the target several times a frame (name, travel,
+ * hints, speaker): compute it once per host frame, stamped the way Quake
+ * stamps visframe, and again only if the view turned or the NPC went away. */
 static edict_t *npc_target(void) {
+    static int stamp=-1,cached_count;static edict_t *cached,*cached_player,*cached_edicts;static vec3_t cached_angles;
+    edict_t *p;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || cls.state!=ca_connected)return NULL;
-    return AW_NPCTarget(svs.clients[0].edict,cl.viewangles);
+    p=svs.clients[0].edict;
+    /* same frame, player, view and edict table (a scene load replaces it) */
+    if(stamp==host_framecount && cached_player==p && cached_edicts==sv.edicts && cached_count==sv.num_edicts &&
+       VectorCompare(cached_angles,cl.viewangles) && (!cached || !cached->free))return cached;
+    cached=AW_NPCTarget(p,cl.viewangles);
+    stamp=host_framecount;cached_player=p;cached_edicts=sv.edicts;cached_count=sv.num_edicts;
+    VectorCopy(cl.viewangles,cached_angles);
+    return cached;
 }
 const char *AW_SceneTargetName(void) {
     edict_t *driver;
@@ -160,7 +181,7 @@ const char *AW_SceneWorldModel(const char *name) {
     }
     return NULL;
 }
-int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_MapId(sv.name)>=0 && strcmp(sv.name,"seyda") && strcmp(sv.name,"balmora") && AW_TerrainId(sv.name)<0));}
+int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_MapId(sv.name)>=0 && AW_TownFind(sv.name)<0 && AW_TerrainId(sv.name)<0));}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
 static void read_links_for(const char *map) {
     FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
@@ -170,17 +191,17 @@ static void read_links_for(const char *map) {
     sprintf(path,"doors-%s.txt",map);
     COM_FOpenFile(path,&f);
     if(!f){sprintf(path,"scene-doors-%s.txt",map);COM_FOpenFile(path,&f);}
-    if(!f && AW_MapId(map)<AW_MAP_COUNT && strcmp(map,"balmora"))COM_FOpenFile("scene-doors.txt",&f);
+    if(!f && AW_MapId(map)<AW_MAP_COUNT && !AW_TownFlag(map,AW_TOWN_OWN_DOORS))COM_FOpenFile("scene-doors.txt",&f);
     if(f) {
         if(!fgets(line,sizeof(line),f)){fclose(f);return;}
         version=!strcmp(line,"AWD3\n")?3:!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
         if(!version){fclose(f);return;}
         while(count<128 && fgets(line,sizeof(line),f)) {
             memset(&r,0,sizeof(r));
-            if(version==3)n=sscanf(line,"%15s %15s %u %f %f %f %f %f %f %f %f %f %f %95[^\r\n]",r.source,r.target,&r.reference,
+            if(version==3)n=Q_sscanf(line,"%15s %15s %u %f %f %f %f %f %f %f %f %f %f %95[^\r\n]",r.source,r.target,&r.reference,
                 &r.mins[0],&r.mins[1],&r.mins[2],&r.maxs[0],&r.maxs[1],&r.maxs[2],
                 &r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,r.label);
-            else n=sscanf(line,version==2?"%15s %15s %f %f %f %f %f %f %f %f %f %f %95[^\r\n]":"%15s %15s %f %f %f %f %f %f %f %f %f %f %c",r.source,r.target,
+            else n=Q_sscanf(line,version==2?"%15s %15s %f %f %f %f %f %f %f %f %f %f %95[^\r\n]":"%15s %15s %f %f %f %f %f %f %f %f %f %f %c",r.source,r.target,
                 &r.mins[0],&r.mins[1],&r.mins[2],&r.maxs[0],&r.maxs[1],&r.maxs[2],
                 &r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,version==2?r.label:&extra);
             if(n!=(version==3?14:version==2?13:12) || !map_valid(r.source) ||
@@ -193,11 +214,11 @@ static void read_links_for(const char *map) {
         }
         fclose(f);return;
     }
-    if(!strcmp(map,"balmora") || AW_MapId(map)>=AW_MAP_COUNT)return;
+    if(AW_TownFlag(map,AW_TOWN_OWN_DOORS) || AW_MapId(map)>=AW_MAP_COUNT)return;
     if(COM_FOpenFile("scene-links.txt",&f)<0 || !f)return;
     while(count<128 && fgets(line,sizeof(line),f)) {
         memset(&r,0,sizeof(r));
-        n=sscanf(line,"%15s %15s %f %f %f %f %f %f %f %c",r.source,r.target,
+        n=Q_sscanf(line,"%15s %15s %f %f %f %f %f %f %f %c",r.source,r.target,
             &r.point[0],&r.point[1],&r.point[2],&r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,&extra);
         if(n!=9 || !map_valid(r.source) || !map_valid(r.target))continue;
         for(i=0;i<3;i++)if(!(fabs(r.point[i])<32768 && fabs(r.arrival[i])<32768))break;
@@ -282,21 +303,24 @@ static int aimed_door(void) {
 /* Travel stays unavailable until the destination has a validated arrival
  * and map registration. A stray BSP file alone must never enable a paid ride. */
 static int travel_open,travel_choice;
-static int travel_return,travel_count=5;
+static int travel_return,travel_count=5,travel_town=-1;
 static const char *travel_names[]={"Balmora","Gnisis","Suran","Vivec","Cancel"};
 static const char *travel_message;
+/* The town table names each town's strider (travel_npc) and where it goes:
+ * Seyda's Darvame Hleran to Balmora's arrival, Balmora's Selvil Sareloth
+ * back to Seyda through Balmora's return point. */
 static edict_t *travel_target(void) {
-    edict_t *e;
+    edict_t *e;const aw_town_t *town=AW_Town(AW_TownFind(sv.name));
     if(key_dest!=key_game || AW_StoryRestricted())return NULL;
     e=npc_target();if(!e)return NULL;
-    if(!strcmp(sv.name,"balmora") && !strcmp(pr_strings+e->v.netname,"Selvil Sareloth"))return e;
-    if(!strcmp(sv.name,"seyda") && !strcmp(pr_strings+e->v.netname,"Darvame Hleran"))return e;
+    if(town && town->travel_npc[0] && !strcmp(pr_strings+e->v.netname,town->travel_npc))return e;
     return NULL;
 }
 static int travel_use(void) {
     edict_t *e=travel_target();
     if(!e)return 0;
-    travel_return=!strcmp(sv.name,"balmora");
+    travel_town=AW_TownFind(sv.name);
+    travel_return=AW_Town(travel_town)->travel_return;
     travel_count=travel_return?2:5;
     travel_open=1;travel_choice=0;travel_message=NULL;
     key_dest=key_menu;IN_AWClearButtons();return 1;
@@ -310,23 +334,25 @@ int AW_TravelKey(int key) {
     if(key==K_UPARROW || key=='w'){travel_choice=(travel_choice+travel_count-1)%travel_count;travel_message=NULL;}
     if(key==K_DOWNARROW || key=='s'){travel_choice=(travel_choice+1)%travel_count;travel_message=NULL;}
     if(key==K_ENTER){
-        aw_scene_link_t r;memset(&r,0,sizeof(r));
-        if(travel_choice==0 && AW_BalmoraArrival(travel_return,r.arrival,&r.yaw)){
-            strcpy(r.target,travel_return?"seyda":"balmora");
+        aw_scene_link_t r;const aw_town_t *town=AW_Town(travel_town);memset(&r,0,sizeof(r));
+        if(travel_choice==0 && town && AW_TownArrival(travel_return?town->name:town->travel_target,travel_return,r.arrival,&r.yaw)){
+            strcpy(r.target,town->travel_target);
             travel_open=0;key_dest=key_game;load_scene(&r,0);
         }else travel_message="Destination not found.";
     }
     return 1;
 }
 int AW_TravelDraw(void) {
-    int i;char line[96];
-    if(!travel_open || key_dest!=key_menu)return 0;
+    int i;char line[96];const aw_town_t *town=AW_Town(travel_town),*home;
+    if(!travel_open || key_dest!=key_menu || !town)return 0;
+    home=AW_Town(AW_TownFind(town->travel_target));
     AW_UIBox(18,18,284,170);AW_UISmallBegin();
-    AW_UITextBox(26,23,268,20,travel_return?"Silt Strider: Selvil Sareloth":"Silt Strider: Darvame Hleran",-1);
+    sprintf(line,"Silt Strider: %.60s",town->travel_npc);
+    AW_UITextBox(26,23,268,20,line,-1);
     sprintf(line,"Your gold: %ld",(long)AW_StateGet(&aw_state,AW_ITEM,"gold_001"));
     AW_UITextBox(26,44,268,16,line,-1);
     for(i=0;i<travel_count;i++){
-        sprintf(line,"%s%s",i==travel_choice?"> ":"  ",travel_return?(i?"Cancel":"Seyda Neen"):travel_names[i]);
+        sprintf(line,"%s%.60s",i==travel_choice?"> ":"  ",travel_return?(i?"Cancel":home?home->title:"?"):travel_names[i]);
         if(AW_UIMode()==2){
             int y=61+i*18;
             AW_UIBox(40,y,240,18);
@@ -413,8 +439,11 @@ static void door_status(void) {
 /* Narrow interior landings need a local floor test, not the exterior's wide
  * four-direction square. Source door destinations may start above their floor;
  * allow a bounded downward search when the standing head intersects a hatch. */
-int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
-    vec3_t top,bottom,point;trace_t tr;int i,drop;
+/* The standing-spot search shared by arrivals and dbg unstuck; the same rule as
+ * tools/arrival_spot.py, which checks every town arrival at build time. A spot
+ * needs a walkable floor, a clear standing hull and dry feet (never water). */
+static int standing_spot(edict_t *p,const vec3_t preferred,vec3_t point) {
+    vec3_t top,bottom,feet;trace_t tr;int i,drop;
     static int offsets[9][2]={{0,0},{16,0},{-16,0},{0,16},{0,-16},{16,16},{-16,16},{16,-16},{-16,-16}};
     for(drop=0;drop<=64;drop+=8)for(i=0;i<9;i++) {
         VectorCopy(preferred,top);top[0]+=offsets[i][0];top[1]+=offsets[i][1];top[2]+=8-drop;
@@ -424,11 +453,53 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
         VectorCopy(tr.endpos,point);point[2]+=.25f;
         tr=SV_Move(point,p->v.mins,p->v.maxs,point,MOVE_NORMAL,p);
         if(tr.startsolid || tr.allsolid)continue;
-        VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);VectorCopy(vec3_origin,p->v.velocity);
-        p->v.flags=(int)p->v.flags&~FL_ONGROUND;SV_LinkEdict(p,false);
+        VectorCopy(point,feet);feet[2]+=p->v.mins[2]+1;
+        if(SV_PointContents(feet)!=CONTENTS_EMPTY)continue;
+        return 1;
+    }
+    return 0;
+}
+static void install_spot(edict_t *p,const vec3_t point) {
+    VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);VectorCopy(vec3_origin,p->v.velocity);
+    p->v.flags=(int)p->v.flags&~FL_ONGROUND;SV_LinkEdict(p,false);
+}
+int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
+    vec3_t point;
+    if(standing_spot(p,preferred,point)) {
+        install_spot(p,point);
         Con_Printf("Interior spawn: %ld %ld %ld\n",(long)point[0],(long)point[1],(long)point[2]);return 1;
     }
     Con_Printf("Interior spawn blocked; use dbg noclip to inspect.\n");return 0;
+}
+/* dbg unstuck: the nearest clear standing spot below or beside the player
+ * (then one storey up); never into a wall or water, otherwise nothing moves. */
+int AW_Unstuck(edict_t *p) {
+    vec3_t point,above;
+    if(!p)return 0;
+    VectorCopy(p->v.origin,above);above[2]+=32;
+    if(!standing_spot(p,p->v.origin,point) && !standing_spot(p,above,point)) {
+        Con_Printf("No clear standing spot near here; fly clear in noclip or use dbg recover.\n");return 0;
+    }
+    install_spot(p,point);p->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
+    Con_Printf("Unstuck: %ld %ld %ld\n",(long)point[0],(long)point[1],(long)point[2]);return 1;
+}
+/* A scene arrival tries the requested point, then the scene's own spawn point
+ * (the town default), then the highest clear floor at the requested XY (a map
+ * teleport tries that first). If all fail the player stays at the spawn point,
+ * which is also the stuck-recovery anchor: never the frame origin under the
+ * sea (VIVEC-ARENA-TP-ARRIVAL-32). */
+static int arrival_place(edict_t *p,const vec3_t arrival,int jump) {
+    vec3_t spawn,point;
+    VectorCopy(p->v.origin,spawn);
+    if(jump && AW_MapPlace(p,arrival))return 1;
+    if(standing_spot(p,arrival,point) ||
+       ((spawn[0]!=arrival[0] || spawn[1]!=arrival[1] || spawn[2]!=arrival[2]) && standing_spot(p,spawn,point))) {
+        install_spot(p,point);
+        Con_Printf("Interior spawn: %ld %ld %ld\n",(long)point[0],(long)point[1],(long)point[2]);return 1;
+    }
+    if(!jump && AW_MapPlace(p,arrival))return 1;
+    install_spot(p,spawn);
+    Con_Printf("Arrival blocked: staying at the scene spawn; use dbg unstuck or dbg noclip.\n");return 0;
 }
 /* An explicit debug scene restart owns no old door/cell arrival or voice tail. */
 void AW_SceneCancelTransition(void) {
@@ -470,14 +541,16 @@ void AW_SceneSignon(void) {
 }
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
+    /* Quake's stuck recovery returns to oldorigin, which a fresh client edict
+     * leaves at the frame origin; anchor it at the scene spawn instead. */
+    VectorCopy(p->v.origin,p->v.oldorigin);
     if(region_crossing && (!pending || strcmp(sv.name,next.target)))S_CancelSceneVoice();
     crossing_view_ready=0;hand_clock_ready=0;door_ready=0;
     if(!region_crossing)AW_UISubtitle("","",0);
     if(pending && !strcmp(sv.name,next.target)) {
         if(map_jump){
-            placed=AW_MapPlace(p,next.arrival);
+            placed=arrival_place(p,next.arrival,1);
             if(!placed){
-                AW_InteriorPlace(p,p->v.origin);
                 Con_Printf("Debug teleport target has no clear standing surface; using scene spawn.\n");
                 AW_UISubtitle("DEBUG TELEPORT","Target blocked; using scene spawn.",5);
             }
@@ -488,7 +561,7 @@ void AW_SceneSpawn(edict_t *p) {
             VectorCopy(next.arrival,p->v.origin);VectorCopy(next.arrival,p->v.oldorigin);
             VectorCopy(crossing_angles,p->v.angles);VectorCopy(crossing_velocity,p->v.velocity);
             p->v.movetype=crossing_movetype;p->v.fixangle=1;SV_LinkEdict(p,false);placed=1;
-        }else placed=AW_InteriorPlace(p,next.arrival);
+        }else placed=arrival_place(p,next.arrival,0);
         p->v.angles[0]=0;p->v.angles[1]=next.yaw;p->v.angles[2]=0;p->v.fixangle=1;
         shroompicker_view=shroompicker_view && placed?2:0;
         if(shroompicker_view){
@@ -511,7 +584,7 @@ void AW_SceneSpawn(edict_t *p) {
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
     } else {
         pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
-        if(AW_Interior() || !strcmp(sv.name,"balmora") || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
+        if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
     AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_HarvestSpawn();AW_GallerySpawn(p);region_crossing=map_jump=0;
@@ -553,23 +626,39 @@ void AW_SceneTick(void) {
     load_scene(&r,1);
     if(!pending)region_crossing=0;
 }
+/* Help line built from the town table, so new teleport towns appear without
+ * editing this text (DEBUG-TP-TOWN-NAMES-32). */
+static void scene_help(void) {
+    int i;
+    Con_Printf("During play: dbg tp seydaneen/prisonship");
+    for(i=0;i<AW_TOWN_COUNT;i++)
+        if(AW_Town(i)->flags&AW_TOWN_TELEPORT)Con_Printf("/%s",AW_Town(i)->name);
+    if(AW_TownFind("vivec_arena")>=0)Con_Printf("/vivec");
+    Con_Printf("/<map name>; dbg tp opens the menu.\n");
+}
 static void scene_command(void) {
     aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];FILE *f=NULL;int i,size;
     if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
        !Q_strcasecmp((char *)s,"town"))s="town";
     else if(!Q_strcasecmp((char *)s,"ship") || !Q_strcasecmp((char *)s,"prisonship"))s="ship";
-    else for(i=0;i<AW_MAP_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_MapName(i))){s=AW_MapName(i);break;}
+    /* Short name while the Arena is the only Vivec town (DEBUG-TP-TOWN-NAMES-32). */
+    else if((!Q_strcasecmp((char *)s,"vivec") || !Q_strcasecmp((char *)s,"arena")) &&
+            AW_TownFind("vivec_arena")>=0)s="vivec_arena";
+    else{
+        for(i=0;i<AW_MAP_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_MapName(i))){s=AW_MapName(i);break;}
+        if(i==AW_MAP_COUNT)for(i=0;i<AW_TOWN_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_Town(i)->name)){s=AW_Town(i)->name;break;}
+    }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
-        Con_Printf("During play: dbg tp balmora/seydaneen/prisonship/<map name>; dbg tp opens the menu.\n");return;
+        scene_help();return;
     }
     door_ready=0;door_close=0;
     sprintf(path,"maps/%s.bsp",!strcmp(s,"ship")?"prison":!strcmp(s,"town")?"seyda":s);
     size=COM_FOpenFile(path,&f);if(f)fclose(f);
     if(!f || size<124){Con_Printf("Destination not found: %s.\n",s);return;}
     if(map_valid(s)){
-        if(!strcmp(s,"balmora")){
-            memset(&r,0,sizeof(r));strcpy(r.target,"balmora");
-            if(AW_BalmoraArrival(0,r.arrival,&r.yaw)){
+        if(AW_TownFlag(s,AW_TOWN_TELEPORT)){
+            memset(&r,0,sizeof(r));strcpy(r.target,s);
+            if(AW_TownArrival(s,0,r.arrival,&r.yaw)){
                 if(!aw_character.valid || !aw_story.name[0]){
                     if(!AW_CharacterHors()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
                     AW_SaveReset();svs.clients[0].edict->v.health=aw_character.current[0];
@@ -578,12 +667,15 @@ static void scene_command(void) {
                 }
                 load_scene(&r,1);
             }
-            else Con_Printf("Balmora conversion not found.\n");
+            else Con_Printf("%s conversion not found.\n",AW_Town(AW_TownFind(s))->title);
             return;
         }
         /* Select the destination area's entrance catalogue. Appended Balmora
-         * interior IDs must not fall back to Seyda's unrelated door bank. */
-        read_links_for(AW_MapId(s)>AW_MapId("balmora")?"balmora":"seyda");
+         * interior IDs must not fall back to Seyda's unrelated door bank; a
+         * town interior uses its own town's bank. */
+        i=AW_MapId(s)-AW_TOWN_INTERIOR_BASE;
+        if(i>=0 && AW_TownInteriorTown(i)>=0)read_links_for(AW_Town(AW_TownInteriorTown(i))->name);
+        else read_links_for(AW_MapId(s)>AW_MapId("balmora")?"balmora":"seyda");
         /* The catalogue's first Census entry is a separate upper doorway.
          * Debug arrival uses the inspected registration entrance from the pier. */
         if(!strcmp(s,"census"))for(i=0;i<count;i++)
@@ -615,7 +707,7 @@ static int teleport_coordinate(const char *text,float *result) {
     if(!text || !*text || strlen(text)>32)return 0;
     for(p=text;*p;p++)if(!((*p>='0' && *p<='9') || *p=='+' || *p=='-' ||
                          *p=='.' || *p=='e' || *p=='E'))return 0;
-    errno=0;value=strtod(text,&end);
+    errno=0;value=Q_strtod(text,&end);
     if(end==text || *end || errno==ERANGE || !isfinite(value) || fabs(value)>2000000)return 0;
     *result=(float)value;return isfinite(*result);
 }
@@ -625,7 +717,7 @@ static int shroompicker_line(char *line,shroompicker_spot_t *spot) {
     if(!length || line[length-1]!='\n')return 0;
     line[--length]=0;
     if(length && line[length-1]=='\r')line[--length]=0;
-    if(sscanf(line,"%d %d %u %15s %f %f %f %f %95[^\r\n]%n",&spot->slot,&spot->verified,
+    if(Q_sscanf(line,"%d %d %u %15s %f %f %f %f %95[^\r\n]%n",&spot->slot,&spot->verified,
        &spot->reference,spot->map,&spot->x,&spot->y,&spot->yaw,&spot->pitch,spot->label,&end)!=9 ||
        end!=(int)length || spot->slot<1 || spot->slot>10 || spot->verified<0 || spot->verified>1 ||
        (!spot->reference && spot->slot!=1) || !map_valid(spot->map) ||

@@ -27,7 +27,6 @@ int Cmd_Argc(void){return 1;}char *Cmd_Argv(int n){return "";}
 int COM_FOpenFile(char *path,FILE **file){int i;if(!strcmp(path,AW_NIGHT_SKY_PATH)){*file=NULL;return -1;}assert(!strcmp(path,AW_SHARED_SKY_PATH));opens++;*file=NULL;if(!present)return -1;*file=tmpfile();assert(*file);for(i=0;i<size;i++)fputc((i%256)<128?0:200,*file);rewind(*file);return size;}
 int AW_ClockEnsure(void){return 1;}
 int32_t AW_StateGet(const aw_state_t *s,int kind,const char *id){return strstr(id,":ms")?clock_ms:0;}
-int GreatestCommonDivisor(int a,int b){int t;while(b){t=a%b;a=b;b=t;}return a;}
 int main(void){
  model_t m;texture_t *legacy;byte *source;int old_opens;float phase;
  R_InitDayNight();

@@ -1,3 +1,4 @@
 {
-  "bitmap_paper_ink": "filled"
+  "bitmap_paper_ink": "filled",
+  "follow_original_stair_rules": true
 }

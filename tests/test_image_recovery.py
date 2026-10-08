@@ -13,7 +13,7 @@ from unittest.mock import patch
 import build
 from build_parallel import stage_dependencies
 from recover_image import inspect_run, recovery_commands
-from prepare_world_regions import plan, region_directory
+from prepare_world_regions import layout_refinements, plan, region_directory
 
 
 class ImageRecoveryTests(unittest.TestCase):
@@ -41,7 +41,7 @@ class ImageRecoveryTests(unittest.TestCase):
             core=[[config['centre'][k]+sign*extent*4 for k in range(2)] for sign in (-1,1)]
             areas.append(dict(name=name,centre=config['centre'],scale=.25,regions=[dict(core=core)]))
         survey={'format':'AmiWind world survey 1','terrain':{'height_seams':[]},
-                'settings':{'overlap_runtime':896},'areas':areas,
+                'settings':{'overlap_runtime':896,'source_triangle_limit':layout_refinements()['survey_source_triangle_limit']},'areas':areas,
                 'cells':[dict(cell=[0,0],screen=dict(candidate=1),unresolved_placements=0,name='',region='Test')]}
         (old/'world-survey/world-survey.json').write_text(json.dumps(survey))
         (old/'world-survey/terrain-source.npz').write_bytes(b'synthetic survey packet')

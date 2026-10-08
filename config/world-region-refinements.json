@@ -1,5 +1,7 @@
 {
   "format": "AmiWind bounded world refinements 1",
+  "survey_source_triangle_limit": 140801,
+  "survey_limit_reason": "Ceiling of the shipped world layout (2,526 survey regions plus these refinements); fixed so a from-scratch build lays out the same world (BUILD-WORLD-LAYOUT-DRIFT-32)",
   "regions": [
     {
       "parent": "vf0698",

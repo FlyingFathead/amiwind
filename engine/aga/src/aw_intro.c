@@ -60,7 +60,7 @@ static void validate_roles(void) {
     }
 }
 static float distance(edict_t *a,edict_t *b){vec3_t d;VectorSubtract(a->v.origin,b->v.origin,d);return Length(d);}
-static void face(edict_t *actor){vec3_t d;VectorSubtract(player()->v.origin,actor->v.origin,d);actor->v.angles[1]=atan2(d[1],d[0])*180/M_PI-90;}
+static void face(edict_t *actor){vec3_t d;VectorSubtract(player()->v.origin,actor->v.origin,d);actor->v.angles[1]=Q_atan2(d[1],d[0])*180/M_PI-90;}
 static int say(int role,const char *stem) {
     FILE *f=NULL;char path[96],text[2048],expanded[2048];int n;sfx_t *sound;edict_t *actor;double duration;
     validate_roles();actor=role>0 && role<9?roles[role]:NULL;
