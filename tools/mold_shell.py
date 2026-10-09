@@ -411,14 +411,25 @@ def _plane_quadric(p0, p1, p2):
     return np.outer(plane, plane) * (length / 2)
 
 
-def quadric_simplify(vertices, faces, targets, max_turn=0.3):
+def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchored=False):
     """Garland-Heckbert edge collapse that keeps a closed 2-manifold closed:
     a collapse must pass the link condition (exactly two common neighbours),
     must not turn any surviving face by more than acos(max_turn) or collapse
     it, and the mesh keeps at least 4 faces. Targets are face counts; returns
     {target: (vertices, faces)} snapshots taken on the way down (a target the
-    mesh cannot reach gets the smallest valid mesh)."""
+    mesh cannot reach gets the smallest valid mesh).
+
+    locked: vertex indices that must keep their position (static_lod's
+    boundary-locked reduction, MESH-LOD-OPEN-SEAMS-33): an edge with one
+    locked end collapses onto that end, an edge with two locked ends never
+    collapses. Boundary edges (one face) never collapse in any case, so an
+    open part keeps its rim where it meets its neighbours.
+
+    anchored: the face-turn limit is measured against each face's ORIGINAL
+    normal instead of its previous one, so many small turns cannot add up to
+    a flipped or edge-on face."""
     import heapq
+    locked = set(int(x) for x in (locked or ()))
     V = np.array(vertices, float)
     F = [list(map(int, f)) for f in np.asarray(faces, int)]
     alive = [True] * len(F)
@@ -427,6 +438,7 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3):
         for x in f:
             vf[x].add(i)
     Q = np.zeros((len(V), 4, 4))
+    origin = [np.cross(V[f[1]] - V[f[0]], V[f[2]] - V[f[0]]) for f in F] if anchored else None
     for i, f in enumerate(F):
         k = _plane_quadric(V[f[0]], V[f[1]], V[f[2]])
         for x in f:
@@ -444,6 +456,12 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3):
 
     def cost(a, b):
         q = Q[a] + Q[b]
+        if a in locked or b in locked:
+            if a in locked and b in locked:
+                return math.inf, V[a]
+            c = V[a] if a in locked else V[b]
+            h = np.append(c, 1.0)
+            return max(float(h @ q @ h), 0.0) + 1e-9 * float((V[a] - V[b]) @ (V[a] - V[b])), c
         cands = [V[a], V[b], (V[a] + V[b]) / 2]
         A = q[:3, :3]
         if np.linalg.cond(A) < 1e4:
@@ -488,6 +506,8 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3):
         c, a, b, va, vb, pos = heapq.heappop(heap)
         if dead[a] or dead[b] or version[a] != va or version[b] != vb:
             continue
+        if c == math.inf:
+            continue
         shared = vf[a] & vf[b]
         if len(shared) != 2 or count - 2 < 4:
             continue
@@ -502,7 +522,9 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3):
             n0 = np.cross(old[1] - old[0], old[2] - old[0])
             n1 = np.cross(new[1] - new[0], new[2] - new[0])
             l0, l1 = np.linalg.norm(n0), np.linalg.norm(n1)
-            if l1 < 1e-6 * max(l0, 1e-9) or l1 < 1e-9 or (n0 @ n1) < max_turn * l0 * l1:
+            ref = n0 if origin is None else origin[i]
+            lr = l0 if origin is None else np.linalg.norm(ref)
+            if l1 < 1e-6 * max(l0, 1e-9) or l1 < 1e-9 or (ref @ n1) < max_turn * lr * l1:
                 ok = False
                 break
         if not ok:
@@ -517,6 +539,9 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3):
         vf[b] = set()
         dead[b] = True
         V[a] = pos
+        if b in locked:
+            # a now stands on b's locked position and inherits the lock
+            locked.add(a)
         Q[a] += Q[b]
         version[a] += 1
         count -= 2

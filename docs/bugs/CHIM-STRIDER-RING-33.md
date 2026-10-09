@@ -9,7 +9,7 @@
 | Where | CHIM Balmora heap gate (tools/chim/heap.py) with the strider profile of MESH-LOD-OPEN-SEAMS-33 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | v0.0.33-dev, v0.0.33 (last seen) |
 | Severity | high: The strict CHIM heap gate would fail the Balmora build once the fix and the CHIM builder are merged together |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -20,11 +20,12 @@
 
 <!-- END GENERATED FACTS -->
 
-## Status: 9 October 2026
+## Status: 10 October 2026
 
-Open. Found by measuring the fix of [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md) on CHIM
-worlds. Owner decision pending. The fix (variant E, owner-approved for its look) stays the strider
-profile; nothing was switched.
+Fixed in source for v0.0.34, not shipped yet. The strider profile is now boundary-locked 0.45
+(variant D at 0.45, [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md)): seams closed, CHIM block
+464,336 B, Balmora's active ring peak 6,226,544 B of 6,242,304 B (15,760 B headroom; the v0.0.33
+build left 2,528 B). E stays selectable and still does not fit.
 
 ## Symptom
 
@@ -90,9 +91,17 @@ smallest that fits is L2.
 
 ## Repair
 
-Not decided. Options: a larger zone (CHIM-ZONE-BUDGET-33); a smaller strider block for CHIM (for
-example legs boundary-locked: 1.8 % sky-through on the legs, or splitting the strider into shell and
-legs blocks, which lowers the largest block but not the ring); D for CHIM only.
+v0.0.34: variant D at ratio 0.45 (boundary-locked, every part reduced). Measured on CHIM worlds built
+from the v0.0.33 release run's inputs with the v0.0.34 builder (control: the v0.0.33 profile gives the
+released peak, 6,239,776 B, exactly):
+
+| | v0.0.33 profile (B) | D 0.5 | D 0.45 (v0.0.34) |
+| --- | ---: | ---: | ---: |
+| Strider block, Balmora | 477,568 | 489,584 | 464,336 |
+| Balmora active ring peak (budget 6,242,304) | 6,239,776 | 6,251,792 (over, 1 position) | 6,226,544 |
+| Seyda Neen active ring peak | 5,683,920 | 5,696,016 | 5,670,768 |
+
+The other options (a larger zone, CHIM-ZONE-BUDGET-33; a split strider block) stay open for variant E.
 
 ## Verification
 

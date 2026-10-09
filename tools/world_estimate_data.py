@@ -39,7 +39,7 @@ OBJECT_TAGS = frozenset('STAT DOOR MISC WEAP CONT CREA LIGH NPC_ ARMO CLOT REPA 
                         'ALCH LEVI LEVC BODY'.split())
 ITEM_TAGS = frozenset({'MISC', 'WEAP', 'ARMO', 'CLOT', 'REPA', 'APPA', 'LOCK', 'PROB', 'INGR', 'BOOK', 'ALCH', 'LEVI'})
 ACTOR_TAGS = frozenset({'NPC_', 'CREA', 'LEVC'})
-SCAN_VERSION = 4      # bump when mesh_costs changes; invalidates mesh caches
+SCAN_VERSION = 5      # bump when mesh_costs changes; invalidates mesh caches (5: reduce_for_profile)
 LAMP_KINDS = ('lamp', 'torch', 'fire', 'candle')
 
 
@@ -214,7 +214,7 @@ def exterior_profile(model, triangles):
     return {'collision_source': 'root_node_or_visual', **visual_profile(model, triangles)}
 
 
-def mesh_costs(vertices, faces, collision, profile):
+def mesh_costs(vertices, faces, collision, profile, materials=None):
     """Per-variant BSP cost of one mesh under one converter profile.
 
     Mirrors prepare_mesh_bsp._prepare_model and the per-surface/per-piece
@@ -229,8 +229,8 @@ def mesh_costs(vertices, faces, collision, profile):
     visual_v, visual_f = v, f
     ratio = profile.get('ratio')
     if ratio and ratio < 1:
-        from static_lod import reduce_mesh
-        visual_v, visual_f, _ = reduce_mesh(v, f, ratio)
+        from static_lod import reduce_for_profile
+        visual_v, visual_f, _ = reduce_for_profile(v, f, profile, materials)
     texsize = profile.get('texture_size', 64)
     out = {'faces': 0, 'texinfo': 0, 'luxels': 0, 'nodes': 0, 'clipnodes': 0, 'max_extent': 0.0,
            'max_extent_target': 0.0, 'area_q': 0.0}
@@ -352,7 +352,7 @@ def scan_mesh(source, name):
     for space, profile in (('interior', interior_profile(name, out['tris'])),
                            ('exterior', exterior_profile(name, out['tris']))):
         try:
-            out['costs'][space] = mesh_costs(v, f, collision, profile)
+            out['costs'][space] = mesh_costs(v, f, collision, profile, materials)
         except Exception as exc:  # noqa: BLE001 - recorded; the estimator falls back to triangle ratios
             out['costs'][space] = {'error': ('%s: %s' % (type(exc).__name__, exc))[:200]}
     return out

@@ -1,0 +1,4 @@
+{
+  "about": "Placed harvestable plants that the harvest pick audit (tools/harvest_pick_audit.py) may find unpickable without failing the build; each entry names its bug ID. Empty: every placed plant must be pickable.",
+  "known": []
+}

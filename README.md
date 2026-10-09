@@ -29,6 +29,17 @@ what the public package contains. In-game screenshots of every version:
 
 More in the [gallery](docs/GALLERY.md).
 
+## v0.0.34 - CHIM: Tightening the Bolts
+
+**AmiWind v0.0.34, running on CHIM Engine v0.1.0.**
+
+A fix release for v0.0.33: the silt strider's hull is closed again (its seams stay put when
+the mesh is reduced, and it still fits Balmora's chunk memory), and every placed Bitter
+Coast mushroom can be picked (invisible tree collision no longer blocks the pick). Both
+fixes come with an island-wide check that runs in every build.
+
+- [Release notes](docs/RELEASE-v0.0.34.md)
+
 ## v0.0.33 - Towards CHIM: Replacing the Engine Block
 
 Introducing AmiWind's **CHIM** engine, a.k.a. **[C]hunks and [H]eaps [I]n [M]emory**.

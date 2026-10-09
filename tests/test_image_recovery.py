@@ -32,7 +32,7 @@ class ImageRecoveryTests(unittest.TestCase):
                'data_files':str(data),'font_options':args.font_options,
                'source_sha256':{'tools/example.py':'a'*64},'input_sha256':{'Morrowind.esm':'b'*64},
                'steps':[{'name':name,'status':'failed' if name=='image' else 'passed','command':command}
-                        for name,command in steps if name not in ('world-ui', 'actor-contact', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'media')]}
+                        for name,command in steps if name not in ('world-ui', 'actor-contact', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'media', 'seam-audit')]}
         (old/'build-state.json').write_text(json.dumps(state))
         (source/'docs/PATCH-v0.0.25-rc6.json').write_text(json.dumps({'base_files':{'tools/example.py':{'sha256':'a'*64}}}))
         areas=[]

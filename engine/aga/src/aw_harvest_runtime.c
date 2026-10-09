@@ -116,28 +116,29 @@ void AW_HarvestSpawn(void)
 }
 static int target(void)
 {
-    edict_t *p,*e;entity_t *proxy;model_t *m;trace_t tr;int i,j,index,best=-1;float limit,lo,hi,a,b,t,o,d,scale;
-    vec3_t eye,forward,right,up,end,delta,axis,ray,local,angles;
+    edict_t *p,*e=NULL;entity_t *proxy;model_t *m;trace_t tr,inside;int i,j,index,best=-1;
+    float limit,lo,hi,a,b,t,o,d,scale,reach=72,nearest=0;
+    vec3_t eye,forward,right,up,end,delta,axis,ray,local,angles,base,centre,world;
     if(!harvest.plants || harvest_mode.value!=1 || !sv.active || svs.maxclients!=1 || !svs.clients ||
        !(p=svs.clients[0].edict) || p->v.movetype!=MOVETYPE_WALK || cls.state!=ca_connected || key_dest!=key_game)return -1;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
-    VectorMA(eye,72,forward,end);tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+    VectorMA(eye,reach,forward,end);tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
     if(tr.startsolid || tr.allsolid)return -1;
-    limit=72*tr.fraction;
+    limit=reach*tr.fraction;
     for(i=0;i<harvest.plants;i++){
         if(harvest.representation==4){
             proxy=AW_HarvestProxyEntity(i);if(!proxy)continue;m=proxy->model;scale=harvest.plant[i].scale;
-            VectorSubtract(eye,proxy->origin,delta);VectorCopy(proxy->angles,angles);angles[PITCH]=-angles[PITCH];
+            VectorCopy(proxy->origin,base);VectorSubtract(eye,base,delta);VectorCopy(proxy->angles,angles);angles[PITCH]=-angles[PITCH];
         }else{
             if(!plants || !available)continue;
             e=plants[i];if(!available[i] || !e || e->free || AW_HarvestHidden(&harvest,i,&aw_state))continue;
             index=(int)e->v.modelindex;if(index<=0 || index>=MAX_MODELS || !(m=sv.models[index]) || m->type!=mod_brush)continue;
-            VectorSubtract(eye,e->v.origin,delta);VectorCopy(e->v.angles,angles);scale=1;
+            VectorCopy(e->v.origin,base);VectorSubtract(eye,base,delta);VectorCopy(e->v.angles,angles);scale=1;
         }
         AngleVectors(angles,axis,right,up);
         ray[0]=DotProduct(forward,axis)/scale;ray[1]=-DotProduct(forward,right)/scale;ray[2]=DotProduct(forward,up)/scale;
         local[0]=DotProduct(delta,axis)/scale;local[1]=-DotProduct(delta,right)/scale;local[2]=DotProduct(delta,up)/scale;
-        lo=0;hi=limit+.01f;
+        lo=0;hi=reach+.01f;
         for(j=0;j<3;j++){
             o=local[j];d=ray[j];
             if(fabs(d)<.00001f){if(o<m->mins[j] || o>m->maxs[j])break;}
@@ -147,7 +148,19 @@ static int target(void)
                 if(lo>hi)break;
             }
         }
-        if(j==3 && lo<=limit+.01f){limit=lo;best=i;}
+        if(j<3 || lo>reach+.01f || (best>=0 && lo>nearest+.01f))continue;
+        /* The view trace hit a solid before the box. Collision of converted scenery is an
+         * approximation; when the solid also contains the plant's own centre (a tree's convex root
+         * collision over the mushrooms under it), it is not what hides the drawn plant: the plant
+         * stays the target (HARVEST-BITTERCOAST-29). Tested only for boxes on the ray. */
+        if(lo>limit+.01f){
+            for(j=0;j<3;j++)centre[j]=(m->mins[j]+m->maxs[j])*.5f;
+            for(j=0;j<3;j++)world[j]=base[j]+scale*(centre[0]*axis[j]-centre[1]*right[j]+centre[2]*up[j]);
+            /* a brush plant is solid itself: pass it, not the player */
+            inside=SV_Move(world,vec3_origin,vec3_origin,world,MOVE_NORMAL,harvest.representation==4?p:e);
+            if(!inside.startsolid && !inside.allsolid)continue;
+        }
+        nearest=lo;best=i;
     }
     return best;
 }

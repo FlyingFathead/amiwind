@@ -1670,19 +1670,20 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "RC2 report at global -15287 -59485 735, time 02:39. Species and pickup-versus-consumption stage are unverified; map/reference IDs, reproduction and cause are pending. [Issue](bugs/HARVEST-BITTERCOAST-29.md).",
+    "status": "Fixed in source for v0.0.34, not shipped: a solid that contains a plant's own centre no longer hides it from the pick ray (a tree's convex root collision covered two of the three); island-wide pick audit gates the image (51 of 934 plants unpickable before, 0 after); owner playtest pending",
     "report": "bugs/HARVEST-BITTERCOAST-29.md",
     "reported_by": "owner",
     "found_date": "2026-10-06",
     "found_in": "v0.0.29-rc2",
-    "where": "Bitter Coast mushrooms near global -15287 -59485 735",
-    "reproduction": "unknown",
+    "where": "Bitter Coast cluster 266620-266622 (map vf0850 and its neighbours); aw_harvest_runtime.c target()",
+    "reproduction": "always",
     "duplicate_of": null,
     "persists_in": [
-      "v0.0.29-rc2"
+      "v0.0.29-rc2",
+      "v0.0.33"
     ],
-    "severity": "low",
-    "severity_reason": "Only one of three nearby mushrooms reportedly usable; cause unknown.",
+    "severity": "medium",
+    "severity_reason": "Placed mushrooms that are drawn cannot be picked: 51 of 934 plants island-wide",
     "family": "harvest",
     "related": []
   },
@@ -11479,7 +11480,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open, known issue of v0.0.33: cause found (the reducer collapses rim edges of each reduced part, seams open); a fix (boundary-locked reduction, 0 % sky-through) is held on branch v0.0.33-strider because on CHIM it overflows Balmora's active ring (CHIM-STRIDER-RING-33). v0.0.33 ships the v0.0.32 strider profile by owner decision",
+    "status": "Fixed in source for v0.0.34, not shipped: boundary-locked reduction (0 % torn seams and rims) with the strider profile at ratio 0.45, which fits CHIM Balmora's active ring (headroom 15,760 B; the v0.0.33 profile left 2,528 B); seam audit is a builder gate on every converter profile, including the town/CHIM composition. Not a regression: v0.0.33 shipped the v0.0.32 strider as a known issue",
     "report": "bugs/MESH-LOD-OPEN-SEAMS-33.md",
     "reported_by": "owner",
     "found_date": "2026-10-09",
@@ -11489,7 +11490,7 @@
     "duplicate_of": null,
     "persists_in": [
       "v0.0.32",
-      "v0.0.33-dev"
+      "v0.0.33"
     ],
     "severity": "medium",
     "severity_reason": "Visible holes in a landmark model in two towns; no crash, other reduced models to be audited",
@@ -11508,12 +11509,42 @@
     }
   },
   {
+    "id": "MESH-LOD-TORN-MESHES-33",
+    "title": "Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the seam audit (tools/seam_audit.py) built for MESH-LOD-OPEN-SEAMS-33; recorded as known findings in config/seam-audit-known.json so the builder gate fails only on new or worse tears; repairs (boundary-locked or shape-preserving profiles) to be weighed against heap and face budgets",
+    "report": "bugs/MESH-LOD-TORN-MESHES-33.md",
+    "reported_by": "audit",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.32",
+    "where": "town flora/rock profiles, open-world rock scenery, arrival ship (static_lod reduction)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.32"
+    ],
+    "severity": "medium",
+    "severity_reason": "Open seams on 49 reduced meshes (13,448 placements); visible where the reduced mesh is drawn",
+    "family": "converter-geometry",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "9582693",
+      "engine_commit": "9582693",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
     "id": "CHIM-STRIDER-RING-33",
     "title": "The closed-hull strider (MESH-LOD-OPEN-SEAMS-33, variant E) puts CHIM Balmora's active ring over the heap budget",
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open, known issue of v0.0.33: no CHIM strider change in v0.0.33 by owner decision (the shipped profile stays); measured on CHIM worlds with the fix: Balmora ring at 636 units 6,350,976 B against 6,242,304 (over by 108,672 B at 1 position); options: a larger zone (CHIM-ZONE-BUDGET-33), a smaller strider block (L2 fits by 14,048 B) or D for CHIM",
+    "status": "Fixed in source for v0.0.34, not shipped: the strider profile is boundary-locked 0.45 (CHIM block 464,336 B, below the v0.0.32 profile's 477,568 B): Balmora ring peak 6,226,544 of 6,242,304 B. Variant E (full shell and legs) stays selectable and still does not fit",
     "report": "bugs/CHIM-STRIDER-RING-33.md",
     "reported_by": "test",
     "found_date": "2026-10-09",
@@ -11522,7 +11553,8 @@
     "reproduction": "always",
     "duplicate_of": null,
     "persists_in": [
-      "v0.0.33-dev"
+      "v0.0.33-dev",
+      "v0.0.33"
     ],
     "severity": "high",
     "severity_reason": "The strict CHIM heap gate would fail the Balmora build once the fix and the CHIM builder are merged together",
@@ -12379,6 +12411,66 @@
       "name": "source",
       "source_commit": "3e1fdfa",
       "engine_commit": "3e1fdfa",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "HARVEST-PLANTS-IN-COLLISION-33",
+    "title": "51 placed harvest plants have their centre inside converted collision (terrain or a tree's convex root piece)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the harvest pick audit on the v0.0.33 maps: 32 plant centres inside world collision (terrain above the authored ground), 19 inside a tree or rock collision entity; collision shapes not changed in v0.0.34",
+    "report": "bugs/HARVEST-PLANTS-IN-COLLISION-33.md",
+    "reported_by": "audit",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.33",
+    "where": "Converted terrain and flora/rock collision around harvest placements (Bitter Coast)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33"
+    ],
+    "severity": "low",
+    "severity_reason": "No longer blocks picking (HARVEST-BITTERCOAST-29); the solids may still stop the player under tree roots and half-bury plants",
+    "family": "harvest",
+    "related": [],
+    "build": {
+      "name": "AmiWind-v0.0.33",
+      "source_commit": "35720ae",
+      "engine_commit": "35720ae",
+      "world_commit": "35720ae",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "CI-SUITE-TWICE-33",
+    "title": "Hosted CI runs the full test suite twice per revision",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source: check runs a short test set, --full-suite keeps the previous method. Ships with the next release.",
+    "report": "bugs/CI-SUITE-TWICE-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.33",
+    "where": "CI workflow docker-builder job (tools/build_docker.py check)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33"
+    ],
+    "severity": "low",
+    "severity_reason": "Every revision waits for a second full suite run; no wrong result.",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "28fbcc30375d13aa29f0ef07457834a2312d3dd9",
+      "engine_commit": "28fbcc30375d13aa29f0ef07457834a2312d3dd9",
       "world_commit": null,
       "chim_version": null,
       "chim_format": null

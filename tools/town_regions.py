@@ -49,6 +49,14 @@ def visual_profile(source, triangles):
     return profile
 
 
+def town_model_profile(group_profile, source, triangles):
+    """The profile a town converter uses for one mesh: the scenery index's group profile with
+    visual_profile on top. One reading for the legacy town builder (import_town), the CHIM model
+    builder (chim.build) and the seam audit (seam_audit), so the audit measures what is built
+    (MESH-LOD-OPEN-SEAMS-33)."""
+    return {**group_profile, **visual_profile(source, triangles)}
+
+
 def config(town='balmora'):
     return load_settings(town)
 

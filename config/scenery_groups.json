@@ -22,7 +22,8 @@
     },
     "visual_profiles": {
       "meshes/r/siltstrider.nif": {
-        "ratio": 0.5,
+        "ratio": 0.45,
+        "lock_boundaries": true,
         "texture_size": 64,
         "collision_source": "root_node"
       }

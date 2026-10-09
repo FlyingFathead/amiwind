@@ -30,7 +30,14 @@ void AW_UIPickupNotice(const char *message,double seconds){AW_UISubtitle("",mess
 edict_t *EDICT_NUM(int n){assert(n>=0 && n<4);return &edicts[n];}
 eval_t *GetEdictFieldValue(edict_t *e,char *name){assert(!strcmp(name,"aw_ref"));reference._float=e==&edicts[3]?43:42;return &reference;}
 void SV_LinkEdict(edict_t *e,qboolean touch){assert(e==&edicts[2]);assert(!touch);linked++;}
-trace_t SV_Move(vec3_t a,vec3_t b,vec3_t c,vec3_t d,int type,edict_t *e){trace_t t;memset(&t,0,sizeof(t));t.fraction=wall;return t;}
+/* enclosing: a solid that holds the plant's centre (HARVEST-BITTERCOAST-29); a zero-length move is
+ * the point test, made past the plant's own brush, not past the player. */
+static int enclosing,point_tests;
+trace_t SV_Move(vec3_t a,vec3_t b,vec3_t c,vec3_t d,int type,edict_t *e){
+    trace_t t;memset(&t,0,sizeof(t));(void)b;(void)c;(void)type;
+    if(VectorCompare(a,d)){point_tests++;assert(e==&edicts[2] || e==&edicts[1]); /* the brush plant, or the player for alias proxies */t.startsolid=enclosing;t.fraction=enclosing?0:1;return t;}
+    t.fraction=wall;return t;
+}
 int COM_FOpenFile(char *name,FILE **out){
     FILE *f;int size;*out=NULL;
     if(!strcmp(name,"sound/pool/a031af0520e9edfa2.wav")){
@@ -62,7 +69,10 @@ int main(void){
     AW_HarvestSpawn();assert(!strcmp(AW_HarvestHint(),"Synthetic mushroom"));
     edicts[1].v.origin[0]=-100;assert(!AW_HarvestHint() && !AW_HarvestUse());edicts[1].v.origin[0]=0;
     cl.viewangles[1]=90;assert(!AW_HarvestHint() && !AW_HarvestUse());cl.viewangles[1]=0;
-    wall=.1f;assert(!AW_HarvestHint() && !AW_HarvestUse());wall=1;
+    wall=.1f;assert(!AW_HarvestHint() && !AW_HarvestUse());assert(point_tests);
+    /* A solid between the eye and the plant hides it; one that contains the plant does not. */
+    enclosing=1;assert(!strcmp(AW_HarvestHint(),"Synthetic mushroom"));enclosing=0;wall=1;point_tests=0;
+    assert(!strcmp(AW_HarvestHint(),"Synthetic mushroom") && !point_tests);
     assert(AW_HarvestUse());assert(AW_StateGet(&aw_state,AW_ITEM,"synthetic_ingredient")==2);
     assert(edicts[2].v.modelindex==0 && edicts[2].v.solid==SOLID_NOT && linked==1 && subtitle==1 && sounds==1 && sound_checks==1);
     assert(!strcmp(notice,"Picked up 2 Original ingredient name."));

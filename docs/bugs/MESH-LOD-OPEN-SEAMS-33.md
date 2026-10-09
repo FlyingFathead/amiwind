@@ -9,7 +9,7 @@
 | Where | Silt Strider (siltstrider.nif) in Balmora and Seyda Neen; static_lod.reduce_mesh |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32, v0.0.33-dev (last seen) |
+| Persists in | v0.0.32, v0.0.33 (last seen) |
 | Severity | medium: Visible holes in a landmark model in two towns; no crash, other reduced models to be audited |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -21,7 +21,7 @@
 <!-- contents start -->
 ## Contents
 
-- [Status: 9 October 2026](#status-9-october-2026)
+- [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -34,10 +34,14 @@
 
 <!-- contents end -->
 
-## Status: 9 October 2026
+## Status: 10 October 2026
 
-Open. Cause found; fixed in source on v0.0.33-strider, not shipped at the time of writing. Present in v0.0.32 (and in CHIM Preview 1, which ships v0.0.32's models); the
-strider profile behind it (ratio 0.5) has been shared by Balmora and Seyda Neen since v0.0.24-dev3.
+Fixed in source for v0.0.34; not shipped yet, owner playtest pending. v0.0.32 and v0.0.33 ship the
+open hull: v0.0.33 kept the v0.0.32 strider profile by owner decision because the full-detail repair
+(variant E below) did not fit CHIM Balmora's memory ([CHIM-STRIDER-RING-33](CHIM-STRIDER-RING-33.md)),
+and the release notes listed it as a known issue. It is not a regression: the repair and its seam
+audit stayed on their own branch and never reached the v0.0.33 release line. The owner saw the open
+hull again in v0.0.33 (Balmora, global -21760 -19334 380, looking up at the strider).
 
 ## Symptom
 
@@ -81,6 +85,10 @@ The v0.0.24-dev3 profile change was checked for restored legs and body at one vi
 nothing compared the reduced surface with the source, and no check looks for opened rims after a
 reduction. The GEO-01 repair fixed one model family instead of the shared reducer.
 
+In v0.0.33 the gate itself was missing: the seam audit was committed with the held repair, so the
+release line had neither; and the audit read only the group profile, not the profile the town and
+CHIM converters actually compose.
+
 ## Reproduction
 
 Measured on the owner's data (private receipts): source 5,600 visible triangles; ratio 0.5 gives 3,057
@@ -122,6 +130,26 @@ heap = the map heap estimate of bm011):
 Heap: the v0.0.32 release maps that carry the strider keep at least 356,604 B clearance (balmora,
 bm019), so E leaves about 79 KB there and A2/C about 17 KB; D leaves almost all of it. Every option
 stays selectable through the profile.
+
+### v0.0.34: the shipped profile
+
+v0.0.34 ships variant D at ratio 0.45: boundary-locked reduction of every part. Every seam and rim
+keeps its exact position (0 % torn seam and rim length); the remaining sky-through (about 2 % over the
+16 views, as for D at 0.5) is the slightly thinner legs, not gaps in the shell. The strider's CHIM
+block is 464,336 B (3,219 faces), smaller than the v0.0.32 profile's 477,568 B (3,266 faces), so CHIM
+Balmora's active ring peak falls from 6,239,776 to 6,226,544 B (budget 6,242,304 B) and Seyda Neen's
+from 5,683,920 to 5,670,768 B. Ratios 0.45 to 0.48 measure the same sky-through (1.95 to 1.97 % at 320
+pixels); 0.45 leaves the most room. Variant E and the keep-the-legs candidates stay selectable through
+the profile (`preserve_shape_prefixes`); none of them fits the ring.
+
+### v0.0.34: the audit sees every converter's profile
+
+The seam audit measured each mesh with the scenery group's profile alone, while the town converters
+(legacy `import_town` and the CHIM model builder) put `town_regions.visual_profile` over it. Both now
+read one function, `town_regions.town_model_profile`, and the audit measures that composition as well
+as the group profile alone (the Seyda Neen scenery path), so every converter path the builder uses,
+CHIM included, is gated. Island-wide run with the owner's data: no failure above 2 % beyond the known
+findings.
 
 ## Verification
 
@@ -176,6 +204,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
 - [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump
 - [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
+- [MESH-LOD-TORN-MESHES-33](MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
 - SKY-GROUND-28 (no report page): Rebuilt LAND faces invisible; clouds scroll too fast
 - [TOOL-ALIAS-FRAMES-33](TOOL-ALIAS-FRAMES-33.md): The alias model writer refuses more than 32 frames

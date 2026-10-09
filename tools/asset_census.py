@@ -158,8 +158,8 @@ def mesh_census(vertices, faces, collision, profile, materials):
     visual_v, visual_f = v, f
     ratio = profile.get('ratio')
     if ratio and ratio < 1:
-        from static_lod import reduce_mesh
-        visual_v, visual_f, _ = reduce_mesh(v, f, ratio)
+        from static_lod import reduce_for_profile
+        visual_v, visual_f, _ = reduce_for_profile(v, f, profile, materials)
     texsize = int(profile.get('texture_size', 64))
     out = {'faces': 0, 'vertexes': 0, 'edges': 0, 'surfedges': 0, 'texinfo': 0, 'planes': 0,
            'luxels': 0, 'lux_s1': 0.0, 'lux_s2': 0.0, 'nodes': 0, 'clipnodes': 0, 'cplanes': 0,

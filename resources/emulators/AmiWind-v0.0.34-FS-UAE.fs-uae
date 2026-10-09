@@ -1,0 +1,28 @@
+# AmiWind v0.0.34 accelerated Linux playtest preset.
+# Replace ROM and HDF placeholders with your owned local files.
+# This is not a stock A1200 performance configuration.
+[config]
+amiga_model = A1200
+cpu = 68040-NOMMU
+fpu = 68040
+jit_compiler = 1
+uae_cpu_speed = max
+uae_cpu_24bit_addressing = false
+chip_memory = 2048
+slow_memory = 0
+fast_memory = 0
+zorro_iii_memory = 16384
+kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
+hard_drive_0 = /path/to/your/AmiWind-v0.0.34.hdf
+hard_drive_0_type = hdf
+joystick_port_1 = none
+# Send middle-click to the game; use F12+G to release input.
+middle_click_ungrab = 0
+# Deliver page navigation instead of keypad ')' / Right Amiga.
+keyboard_key_pageup = action_key_68
+keyboard_key_pagedown = action_key_69
+# Deliver Home/End (console line, map, menus) instead of keypad ( / Help.
+keyboard_key_home = action_key_6a
+keyboard_key_end = action_key_6c
+floppy_drive_volume = 0
+fullscreen = 0

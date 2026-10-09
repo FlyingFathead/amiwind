@@ -25,7 +25,7 @@ from mwad.audit import audit, BSA, normpath
 from mwad.paths import child_ci, ensure_external, resolve_data_files
 from mwad.npc import load_master, outfit, greeting_fixture, behavior_record, greeting_settings
 from town_config import load_settings, registry_row, resident_exclusions, town_field
-from town_regions import (regions, select_references, audit_coverage, owner, visual_profile, collision_coverage,
+from town_regions import (regions, select_references, audit_coverage, owner, town_model_profile, collision_coverage,
                           intersects, local_bounds)
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
@@ -420,7 +420,7 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
     for mi, model in enumerate(index['models']):
         # Select immutable offline representations; every placed reference and
         # authored collision mesh is retained. The original MWSC mesh is kept.
-        profile = {**profiles[model['source']], **visual_profile(model['source'], model['triangles'])}
+        profile = town_model_profile(profiles[model['source']], model['source'], model['triangles'])
         if model['source'] in flatten: profile['flatten'] = flatten[model['source']]
         profiles[model['source']] = profile
         tasks.append((mi, model, profile, out / 'scenery/scenery.mwpak', index['textures']))

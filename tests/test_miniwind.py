@@ -56,7 +56,8 @@ def value(command, flag):
 
 EXPECTED_STAGES = ['setup', 'terrain', 'scenery', 'scene', 'bsp', 'npcs', 'hands', 'interior', 'dialogue-lookup',
                    'intro', 'census', 'balmora', 'balmora-interiors', 'door-audio', 'character', 'reading',
-                   'opening-references', 'media', 'music', 'engine', 'harvest', 'hand-catalog', 'chim', 'image']
+                   'opening-references', 'seam-audit', 'media', 'music', 'engine', 'harvest', 'hand-catalog', 'chim',
+                   'image']  # seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33)
 
 
 class BuildTypeTests(unittest.TestCase):

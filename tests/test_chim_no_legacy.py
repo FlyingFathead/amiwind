@@ -25,7 +25,7 @@ LEGACY_PLAN = (
     ('reading', 'prepare_reading.py'), ('opening-references', 'prepare_opening_refs.py'),
     ('world-survey', 'survey_vvardenfell.py'), ('world-ui', 'prepare_world_ui.py'),
     ('actor-contact', 'check_scene_actors.py'), ('world-terrain', 'prepare_world_regions.py'),
-    ('world-scenery-assets', 'world_scenery.py'), ('world-scenery', 'prepare_world_scenery.py'),
+    ('seam-audit', 'seam_audit.py'), ('world-scenery-assets', 'world_scenery.py'), ('world-scenery', 'prepare_world_scenery.py'),
     ('media', 'prepare_media_assets.py'), ('music', 'prepare_music.py'), ('engine', 'build_aga.py'),
     ('world-flora-assets', 'prepare_tree_sprites.py'), ('world-flora', 'prepare_world_flora.py'),
     ('harvest', 'harvest_build.py'), ('hand-catalog', 'prepare_hand_catalog.py'), ('image', 'build_aga.py'))

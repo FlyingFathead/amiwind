@@ -114,8 +114,9 @@ checked against them.
   Each finding names its mechanism, the whole island is swept for the same
   mechanism, the fix goes into the shared converter once, and the sweep stays
   as a builder gate (see [island-wide audits](IDEAS.md#island-wide-audits-mechanism-classes)).
-- **Don't block the traffic.** Streaming never stalls a frame: no synchronous
-  chunk loads or whole-world rebuilds on the main path, budgets per frame.
+- **Don't block the traffic.** Incremental streaming spreads loading across
+  frames with a per-frame budget, and the whole-world rebuild is off the main
+  path; reads are still synchronous, so a chunk read can cause a short stall.
 - **No artificial clamps.** The view distance follows the ring and the memory
   budget; a limit that remains is measured and stated by the engine, never a
   silent cap.

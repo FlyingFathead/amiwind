@@ -1,0 +1,455 @@
+{
+ "format": "amiwind-seam-audit-known-1",
+ "rule": "Known torn meshes (seam torn share above the gate threshold, measured by tools/seam_audit.py on the reference GOG data, 2026-10-09). The builder gate fails on any other reduced mesh above the threshold and on any listed mesh that tears more than recorded. Remove a row when its profile is repaired. Meshes under \"closed\" must show no torn seam or rim at all (repaired bugs).",
+ "threshold": 0.02,
+ "known": [
+  {
+   "model": "meshes/f/flora_bc_tree_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.9187,
+   "rim_torn_share": 0.76627,
+   "placements": 84,
+   "ratio": 0.0688,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bc_tree_04.nif",
+   "space": "town",
+   "seam_torn_share": 0.89076,
+   "rim_torn_share": 0.40673,
+   "placements": 89,
+   "ratio": 0.0872,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_tree_ac_03.nif",
+   "space": "town",
+   "seam_torn_share": 0.73388,
+   "rim_torn_share": 0.59608,
+   "placements": 78,
+   "ratio": 0.1523,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bc_tree_06.nif",
+   "space": "town",
+   "seam_torn_share": 0.7243,
+   "rim_torn_share": 0.67025,
+   "placements": 5,
+   "ratio": 0.0896,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bm_snow_log_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.70831,
+   "rim_torn_share": 0.0,
+   "placements": 15,
+   "ratio": 0.2268,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/ex_t_rock_coastal_02.nif",
+   "space": "world",
+   "seam_torn_share": 0.7035,
+   "rim_torn_share": 0.75547,
+   "placements": 441,
+   "ratio": 0.2807,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_treestump_wg_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.62759,
+   "rim_torn_share": 0.74453,
+   "placements": 30,
+   "ratio": 0.3371,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_tree_ac_04.nif",
+   "space": "town",
+   "seam_torn_share": 0.61824,
+   "rim_torn_share": 0.61686,
+   "placements": 178,
+   "ratio": 0.1376,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_05.nif",
+   "space": "world",
+   "seam_torn_share": 0.6158,
+   "rim_torn_share": 0.95238,
+   "placements": 927,
+   "ratio": 0.32,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/ex_t_rock_coastal_01.nif",
+   "space": "world",
+   "seam_torn_share": 0.59868,
+   "rim_torn_share": 0.71951,
+   "placements": 487,
+   "ratio": 0.2807,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.5794,
+   "rim_torn_share": 0.27187,
+   "placements": 441,
+   "ratio": 0.2055,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_03.nif",
+   "space": "world",
+   "seam_torn_share": 0.57671,
+   "rim_torn_share": 0.70911,
+   "placements": 729,
+   "ratio": 0.2819,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ash_log_04.nif",
+   "space": "town",
+   "seam_torn_share": 0.55985,
+   "rim_torn_share": 0.0,
+   "placements": 50,
+   "ratio": 0.1255,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_08.nif",
+   "space": "world",
+   "seam_torn_share": 0.55976,
+   "rim_torn_share": 0.84517,
+   "placements": 627,
+   "ratio": 0.2667,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_tree_ac_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.54751,
+   "rim_torn_share": 0.49504,
+   "placements": 135,
+   "ratio": 0.0718,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.54204,
+   "rim_torn_share": 0.83333,
+   "placements": 70,
+   "ratio": 0.8,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_emp_parasol_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.52572,
+   "rim_torn_share": 0.29902,
+   "placements": 238,
+   "ratio": 0.1964,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_10.nif",
+   "space": "world",
+   "seam_torn_share": 0.51334,
+   "rim_torn_share": 1.0,
+   "placements": 589,
+   "ratio": 0.16,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_tree_ac_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.49232,
+   "rim_torn_share": 0.48183,
+   "placements": 176,
+   "ratio": 0.1179,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_04.nif",
+   "space": "world",
+   "seam_torn_share": 0.44596,
+   "rim_torn_share": 0.8944,
+   "placements": 301,
+   "ratio": 0.1839,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ash_log_03.nif",
+   "space": "town",
+   "seam_torn_share": 0.4324,
+   "rim_torn_share": 0.0,
+   "placements": 77,
+   "ratio": 0.1594,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_09.nif",
+   "space": "world",
+   "seam_torn_share": 0.4144,
+   "rim_torn_share": 0.89172,
+   "placements": 376,
+   "ratio": 0.2667,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_emp_parasol_03.nif",
+   "space": "town",
+   "seam_torn_share": 0.41089,
+   "rim_torn_share": 0.58719,
+   "placements": 271,
+   "ratio": 0.2381,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bm_snow_log_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.40815,
+   "rim_torn_share": 0.0,
+   "placements": 15,
+   "ratio": 0.292,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_06.nif",
+   "space": "world",
+   "seam_torn_share": 0.40793,
+   "rim_torn_share": 0.65945,
+   "placements": 241,
+   "ratio": 0.2991,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ash_log_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.37787,
+   "rim_torn_share": 0.0,
+   "placements": 107,
+   "ratio": 0.1613,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.37231,
+   "rim_torn_share": 0.35272,
+   "placements": 442,
+   "ratio": 0.2459,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bm_snow_log_03.nif",
+   "space": "town",
+   "seam_torn_share": 0.35133,
+   "rim_torn_share": 0.04765,
+   "placements": 15,
+   "ratio": 0.5128,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_02.nif",
+   "space": "world",
+   "seam_torn_share": 0.34336,
+   "rim_torn_share": 0.80628,
+   "placements": 364,
+   "ratio": 0.32,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_emp_parasol_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.32593,
+   "rim_torn_share": 0.53442,
+   "placements": 191,
+   "ratio": 0.2804,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_03.nif",
+   "space": "town",
+   "seam_torn_share": 0.32509,
+   "rim_torn_share": 0.41455,
+   "placements": 659,
+   "ratio": 0.2048,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_t_mushroom_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.28984,
+   "rim_torn_share": 0.33539,
+   "placements": 48,
+   "ratio": 0.4478,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_t_mushroom_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.25726,
+   "rim_torn_share": 0.7632,
+   "placements": 76,
+   "ratio": 0.4478,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_07.nif",
+   "space": "world",
+   "seam_torn_share": 0.23693,
+   "rim_torn_share": 0.54397,
+   "placements": 183,
+   "ratio": 0.32,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ash_log_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.23399,
+   "rim_torn_share": 0.0,
+   "placements": 38,
+   "ratio": 0.1734,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_t_shelffungus_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.18283,
+   "rim_torn_share": 0.31757,
+   "placements": 11,
+   "ratio": 0.75,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bm_snow_log_05.nif",
+   "space": "town",
+   "seam_torn_share": 0.16562,
+   "rim_torn_share": 0.07386,
+   "placements": 15,
+   "ratio": 0.5769,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_treestump_wg_01.nif",
+   "space": "town",
+   "seam_torn_share": 0.13073,
+   "rim_torn_share": 0.77655,
+   "placements": 2,
+   "ratio": 0.2667,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bm_snow_log_04.nif",
+   "space": "town",
+   "seam_torn_share": 0.12211,
+   "rim_torn_share": 0.03643,
+   "placements": 15,
+   "ratio": 0.6061,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_05.nif",
+   "space": "town",
+   "seam_torn_share": 0.11222,
+   "rim_torn_share": 0.58507,
+   "placements": 725,
+   "ratio": 0.0814,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_07.nif",
+   "space": "town",
+   "seam_torn_share": 0.10888,
+   "rim_torn_share": 0.59479,
+   "placements": 1010,
+   "ratio": 0.1112,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/terrain_ashland_rock_01.nif",
+   "space": "world",
+   "seam_torn_share": 0.0875,
+   "rim_torn_share": 0.79916,
+   "placements": 227,
+   "ratio": 0.32,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_t_podbud_03.nif",
+   "space": "town",
+   "seam_torn_share": 0.08145,
+   "rim_torn_share": 0.0,
+   "placements": 270,
+   "ratio": 0.9375,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_06.nif",
+   "space": "town",
+   "seam_torn_share": 0.06483,
+   "rim_torn_share": 0.53697,
+   "placements": 847,
+   "ratio": 0.0958,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_t_podbud_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.06056,
+   "rim_torn_share": 0.0,
+   "placements": 174,
+   "ratio": 0.9375,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_ashtree_04.nif",
+   "space": "town",
+   "seam_torn_share": 0.05303,
+   "rim_torn_share": 0.18551,
+   "placements": 1078,
+   "ratio": 0.1961,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/flora_t_podbud_04.nif",
+   "space": "town",
+   "seam_torn_share": 0.04167,
+   "rim_torn_share": 0.0,
+   "placements": 263,
+   "ratio": 0.9375,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/f/flora_bm_log_02.nif",
+   "space": "town",
+   "seam_torn_share": 0.02924,
+   "rim_torn_share": 0.0,
+   "placements": 9,
+   "ratio": 0.5357,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  },
+  {
+   "model": "meshes/x/ex_de_ship.nif",
+   "space": "group",
+   "seam_torn_share": 0.02176,
+   "rim_torn_share": 0.01383,
+   "placements": 9,
+   "ratio": 0.2,
+   "bug": "MESH-LOD-TORN-MESHES-33"
+  }
+ ],
+ "closed": [
+  {
+   "model": "meshes/r/siltstrider.nif",
+   "bug": "MESH-LOD-OPEN-SEAMS-33",
+   "rule": "the caravan Silt Strider is a solid object: no torn seam or rim after reduction"
+  }
+ ]
+}

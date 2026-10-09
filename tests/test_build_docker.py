@@ -60,3 +60,26 @@ class DockerBuilderTests(unittest.TestCase):
                 build_docker.logged([sys.executable, '-c',
                     "import sys; print('exact diagnostic', file=sys.stderr); sys.exit(7)"], log)
             self.assertIn('exact diagnostic', log.read_text())
+
+    def test_check_runs_smoke_tests_not_the_full_suite_by_default(self):
+        script = build_docker.check_script('run-1', 4)
+        self.assertNotIn('run_tests.py', script)
+        for name in build_docker.SMOKE_TESTS:
+            self.assertIn(f"-p '{name}.py'", script)
+            self.assertTrue((Path(__file__).resolve().parent / f'{name}.py').is_file(), name)
+        lines = script.splitlines()
+        self.assertEqual(lines[1], 'python tools/release.py --check')
+        self.assertIn('check_nif_reader()', lines[2])
+        self.assertTrue(lines[-1].startswith('python tools/build.py --dry-run '))
+
+    def test_full_suite_option_keeps_the_previous_method(self):
+        script = build_docker.check_script('run-1', 4, full_suite=True)
+        self.assertIn('python tools/run_tests.py -v --jobs 4 --module-timeout 900', script)
+        self.assertNotIn('unittest discover', script)
+
+    def test_ci_runs_the_full_suite_once(self):
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/source-check.yml').read_text(encoding='utf-8')
+        self.assertEqual(workflow.count('tools/run_tests.py'), 1)
+        docker_job = workflow.split('docker-builder:', 1)[1]
+        self.assertIn('tools/build_docker.py check', docker_job)
+        self.assertNotIn('--full-suite', docker_job)

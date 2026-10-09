@@ -10,6 +10,7 @@ Official project: https://github.com/FlyingFathead/amiwind/
 - [Release gate: the build tool must match the release](#release-gate-the-build-tool-must-match-the-release)
 - [Game version and engine version](#game-version-and-engine-version)
 - [Release gate](#release-gate)
+- [Release flow: test once, publish in resumable steps](#release-flow-test-once-publish-in-resumable-steps)
 - [Boot identity](#boot-identity)
 - [Amiga limitations](#amiga-limitations)
   - [FFS partition capacity and hardfile capacity are different](#ffs-partition-capacity-and-hardfile-capacity-are-different)
@@ -155,6 +156,40 @@ their own validation. The owner runs Git/GitHub commands; see FIRST_RELEASE.md
 for the historical first-release workflow. The source repository and source
 releases are public. Playable images, converted game files and supplied ROMs
 remain private and must never become GitHub release assets.
+
+## Release flow: test once, publish in resumable steps
+
+Every release follows the same short path from a green release gate
+to a published release. The aim is about 15 minutes for that path; each release
+records its step times so the figure is measured, not assumed.
+
+1. **One release gate on the final candidate.** The full gate (source checks,
+   suite, engine build, launcher parity) runs once on the exact release commit,
+   and the full test suite also runs once in a single interpreter, in discovery
+   order (`python -m unittest discover -s tests`). Leaks between tests only show
+   up in one interpreter and in order, so this run is never split into chunks
+   or parallel workers. Its result is recorded with the commit, the tree hash
+   and the test mode.
+2. **Focused package checks.** The release package carries that record. Package
+   validation and publication check that the committed tree equals the tested
+   tree and that the mode and result match; they do not run the full suite
+   again. Their own checks are short: file list and checksums, version, the
+   exact tree, `tools/release.py --check` and an asset-free dry-run build.
+3. **One hosted CI run per revision.** The pushed commit runs the CI workflow
+   once. The full suite runs in the source checks job; the Docker builder job
+   checks only what is specific to the container (image build, its tools,
+   source checks, a short set of builder tests and the dry-run build).
+   `tools/build_docker.py check --full-suite` still runs the full suite in the
+   image when wanted.
+4. **Publish from a separate checkout.** The release commit is applied and
+   checked in a separate scratch worktree. The publishing checkout's branch,
+   index, files and stash do not change until the release is published and its
+   downloaded assets are verified; only then is its branch fast-forwarded.
+   Cleanup removes only the scratch state it created and keeps every log.
+5. **Resume, never repeat.** If pushing, the CI wait, tagging or the release
+   upload fails, running the same command again continues from that step for
+   the same package and commit: no new scratch worktree, no repeated checks,
+   no retest. Existing tags and release files are verified, never replaced.
 
 ## Boot identity
 

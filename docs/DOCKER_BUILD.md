@@ -30,8 +30,11 @@ selects an explicit engine endpoint without changing global Docker settings.
 
 `context` validates the public source and prepares only the build context.
 `build` additionally creates the local image. `check` builds it, runs source
-checks and synthetic regression tests, then compiles an asset-free Amiga test
-image. This boot-notice image is not a playable game and uses no game data/ROM.
+checks, confirms the image tools (NIF reader), runs a short set of builder test
+modules in the image, then compiles an asset-free Amiga test image. This
+boot-notice image is not a playable game and uses no game data/ROM. Add
+`--full-suite` to run the full synthetic regression suite in the image instead
+of the short set; hosted CI runs the full suite once, in its source checks job.
 
 The Ubuntu base is pinned by digest; SDK/map-tool downloads and reference qcc
 use the existing verified Linux bootstrap. Ubuntu package and unpinned Python

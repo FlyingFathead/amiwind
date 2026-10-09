@@ -331,6 +331,8 @@ DEPENDENCIES = {
     'npc-gallery': ('census',),
     'actor-contact': ('world-ui',), 'world-terrain': ('actor-contact', 'npc-gallery'),
     'world-scenery-assets': (),
+    # Seam-tear gate over every mesh the static converters reduce (MESH-LOD-OPEN-SEAMS-33).
+    'seam-audit': (),
     'world-scenery': ('world-terrain', 'world-scenery-assets'),
     # Census rewrites intro-scene/id1/gfx/palette.lmp (BUILD-PALETTE-RACE-32).
     'world-flora-assets': ('census',),
@@ -407,6 +409,8 @@ def stage_dependencies(steps, skipped=()):
         # the CHIM world leaves out the harvest placements and adds the town flora (payload parity)
         if name == 'chim':
             deps = (*deps, *(d for d in ('harvest', 'world-flora-assets', 'world-survey') if d in names))
+        if name == 'image' and 'seam-audit' in names:
+            deps = (*deps, 'seam-audit')
         missing = set(deps) - set(names)
         if missing:
             raise ValueError(f'{name}: missing dependencies {sorted(missing)}')

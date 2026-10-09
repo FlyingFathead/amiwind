@@ -180,7 +180,7 @@ def convert_frame(data, work, quake, palette, fid, centre_cell, regions, jobs):
     """Convert the listed region indices of one 3x3-cell frame with the town converter's steps."""
     from mwad.audit import audit, normpath
     from town_config import town_field
-    from town_regions import regions as make_regions, select_references, visual_profile, collision_coverage
+    from town_regions import regions as make_regions, select_references, town_model_profile, collision_coverage
     from prepare_scenery import export_refs
     from prepare_mesh_bsp import append_meshes, _prepare_model
     from build_parallel import ordered_map
@@ -215,7 +215,7 @@ def convert_frame(data, work, quake, palette, fid, centre_cell, regions, jobs):
         flatten = load_profiles()
         tasks = []
         for mi, model in enumerate(index['models']):
-            profile = {**vprof[model['source']], **visual_profile(model['source'], model['triangles'])}
+            profile = town_model_profile(vprof[model['source']], model['source'], model['triangles'])
             if model['source'] in flatten:
                 profile['flatten'] = flatten[model['source']]
             vprof[model['source']] = profile

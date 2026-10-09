@@ -256,7 +256,7 @@ family links to its list in the register.
 | [First-person hands and torch](../BUGS.md#first-person-hands-and-torch-torch-hands) | `torch-hands` | 7 of 10 | First-person hands, punches and the carried torch. |
 | [Map heap and memory budget](../BUGS.md#map-heap-and-memory-budget-heap-memory) | `heap-memory` | 16 of 20 | The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. |
 | [Engine table limits](../BUGS.md#engine-table-limits-engine-limits) | `engine-limits` | 18 of 21 | Fixed engine tables (models, entities, faces, texinfo, flames, lamps, door rows) are checked by the builder before a map ships, never discovered in play. |
-| [Mesh converter geometry](../BUGS.md#mesh-converter-geometry-converter-geometry) | `converter-geometry` | 20 of 24 | Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. |
+| [Mesh converter geometry](../BUGS.md#mesh-converter-geometry-converter-geometry) | `converter-geometry` | 21 of 25 | Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. |
 | [World storage and duplication](../BUGS.md#world-storage-and-duplication-world-storage) | `world-storage` | 7 of 7 | Every asset stored once and placed by reference (world streamer); map lumps carry only what the engine uses. |
 | [Loading and disk reads](../BUGS.md#loading-and-disk-reads-disk-loading) | `disk-loading` | 6 of 7 | Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. |
 | [Rendering cost and visibility](../BUGS.md#rendering-cost-and-visibility-render-performance) | `render-performance` | 8 of 8 | Read the visibility data and renderer counters before any performance claim. |
@@ -267,14 +267,14 @@ family links to its list in the register.
 | [Morrowind editions, archives and inputs](../BUGS.md#morrowind-editions-archives-and-inputs-game-data-editions) | `game-data-editions` | 6 of 6 | The builder reads the owner's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. |
 | [Object placement and in-game geometry](../BUGS.md#object-placement-and-in-game-geometry-placement-geometry) | `placement-geometry` | 5 of 9 | Placed objects match the original (OpenMW A/B at the same pose). |
 | [Actors and NPCs](../BUGS.md#actors-and-npcs-actors-npc) | `actors-npc` | 5 of 7 | Actor placement, models and behaviour; the actor placement gate. |
-| [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 8 of 8 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
+| [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 9 of 9 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
 | [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 6 of 7 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
 | [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 8 of 12 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
 | [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 17 of 21 | Menus, HUD, map screen, fonts and messages. |
 | [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 9 of 11 | dbg commands, teleports, debug map loads and the remote console. |
 | [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 7 of 9 | The boot check and engine start-up report problems clearly and never stop the game silently. |
 | [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 14 of 17 | QuakeC entities, saves and game state. |
-| [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 21 of 25 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
+| [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 22 of 26 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
 | [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 15 of 22 | Receipts, packaging, development tools and the tracker itself. |
 
 <!-- END GENERATED FAMILIES -->

@@ -3,6 +3,7 @@
 <!-- contents start -->
 ## Contents
 
+- [v0.0.34: CHIM: Tightening the Bolts](#v0034-chim-tightening-the-bolts)
 - [v0.0.33: Towards CHIM: Replacing the Engine Block](#v0033-towards-chim-replacing-the-engine-block)
 - [v0.0.32: Last Stop on the Old Line: Window-Shopping in Vivec](#v0032-last-stop-on-the-old-line-window-shopping-in-vivec)
 - [v0.0.31: Lamps, Lanterns and Loading](#v0031-lamps-lanterns-and-loading)
@@ -92,6 +93,18 @@
   - [rc6 image recovery follow-up](#rc6-image-recovery-follow-up)
 
 <!-- contents end -->
+
+## v0.0.34: CHIM: Tightening the Bolts
+
+- The silt strider's hull is closed: boundary-locked mesh reduction keeps every seam and
+  rim in place; the strider is a little smaller than before, so CHIM Balmora's busiest
+  ring has more room (MESH-LOD-OPEN-SEAMS-33, CHIM-STRIDER-RING-33).
+- Every placed Bitter Coast mushroom can be picked: a solid that contains a plant no
+  longer hides it from the pick ray (HARVEST-BITTERCOAST-29; 51 of 934 plants were
+  unpickable in v0.0.33).
+- New build gates: the seam audit (every reduced mesh, with the profile each converter
+  uses) and the harvest pick audit (every placed plant on the final maps).
+- Details: [release notes](RELEASE-v0.0.34.md).
 
 ## v0.0.33: Towards CHIM: Replacing the Engine Block
 

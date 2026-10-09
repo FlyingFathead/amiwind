@@ -38,6 +38,7 @@ SHIPPED_STAGES = {
     'opening-references': 'opening references', 'world-survey': 'world/regions.awr, map.awm',
     'world-ui': 'world/journal.awj, quests.awq', 'actor-contact': 'actor ground gate',
     'world-terrain': 'world maps (vf*)', 'world-scenery-assets': 'rocks and giant mushrooms',
+    'seam-audit': 'seam-tear gate over reduced meshes (seam-audit.json)',
     'world-scenery': 'rock and mushroom overlay',
     'world-flora-assets': 'progs/aw_flora/*.spr (76 files)', 'world-flora': 'trees and grass overlay',
     'media': 'media/catalogue.json, sound/*', 'music': 'music/*.mws', 'engine': 'AmiWind, AmiWindCheck',

@@ -801,6 +801,8 @@ def commands(args, tools, run):
                 "--data-files", args.data_files, "--scene", run / "intro-scene",
                 "--out", run / "world-terrain", "--bindir", Path(tools['qbsp']).parent,
                 "--jobs", jobs, *world_terrain_cache(args))),
+            ("seam-audit", tool("seam_audit.py", "gate", "--data-files", args.data_files,
+                "--out", run / "seam-audit.json", "--jobs", jobs)),
             ("world-scenery-assets", tool("world_scenery.py", "--data-files", args.data_files,
                 "--out", run / "world-scenery-source", "--export-meshes",
                 "--jobs", jobs)),

@@ -494,8 +494,23 @@ def image_step(args, id1, work, *, jobs=None):
     print(f"Harvest: {staging['admitted']}/{staging['candidates']} maps with mushrooms admitted by the heap check, "
           f"{staging['plants']} plants, {staging['models']} shared models; not admitted: "
           f"{', '.join(staging['not_admitted']) or 'none'}.", flush=True)
+    # Every placed plant must be pickable by the engine's pick rule (HARVEST-BITTERCOAST-29): replayed
+    # offline on the final maps, before any disk is made.
+    from harvest_pick_audit import audit as pick_audit, check as pick_check
+    pick = pick_audit(id1, jobs, progress=None)
+    (Path(work) / 'harvest-pick-audit.json').write_text(json.dumps(pick, indent=1) + '\n', encoding='utf-8',
+                                                        newline='\n')
+    failures = pick_check(pick)
+    print(f"Harvest pick audit: {pick['plants']} plants in {pick['maps']} maps; cannot be picked: {len(failures)} "
+          f"(earlier engine rule: {len(pick['unpickable_before'])}); no standing position in reach: "
+          f"{len(pick['unreachable'])}; catalogues followed on CHIM maps: {len(pick['catalogues_without_map'])}.", flush=True)
+    if failures:
+        raise ValueError('Harvest pick audit: %d placed plants cannot be picked (%s); see harvest-pick-audit.json'
+                         % (len(failures), ', '.join(map(str, failures[:10]))))
     report = Path(work) / 'harvest-staging.json'
-    return dict(status='installed', report=str(report.relative_to(Path(work).parent)), report_sha256=digest(report.read_bytes()),
+    return dict(status='installed', pick_audit={k: (len(pick[k]) if isinstance(pick[k], list) else pick[k]) for k in
+                                                ('plants', 'maps', 'unpickable_before', 'unpickable_fixed', 'unreachable',
+                                                 'catalogues_without_map')}, report=str(report.relative_to(Path(work).parent)), report_sha256=digest(report.read_bytes()),
                 **{k: staging[k] for k in ('maps_considered', 'candidates', 'admitted', 'plants', 'models', 'families',
                                            'baked_removal', 'geometry_gate')},
                 not_admitted=sorted(staging['not_admitted']), over_runtime_capacity=sorted(staging['over_runtime_capacity']))

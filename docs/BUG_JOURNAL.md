@@ -3,6 +3,9 @@
 <!-- contents start -->
 ## Contents
 
+- [CI-SUITE-TWICE-33, 10 October 2026](#ci-suite-twice-33-10-october-2026)
+- [HARVEST-BITTERCOAST-29 and HARVEST-PLANTS-IN-COLLISION-33, 10 October 2026](#harvest-bittercoast-29-and-harvest-plants-in-collision-33-10-october-2026)
+- [MESH-LOD-OPEN-SEAMS-33 and CHIM-STRIDER-RING-33 for v0.0.34, 10 October 2026](#mesh-lod-open-seams-33-and-chim-strider-ring-33-for-v0034-10-october-2026)
 - [TEST-ENV-LEAK-HULL-33, 9 October 2026](#test-env-leak-hull-33-9-october-2026)
 - [CHIM-COURT-BARREL-USE-33, 9 October 2026](#chim-court-barrel-use-33-9-october-2026)
 - [CHIM-INTRO-TP-OTHER-TOWN-33, 9 October 2026](#chim-intro-tp-other-town-33-9-october-2026)
@@ -224,6 +227,29 @@
 - [BALMORA-TEMPLE-GEOMETRY-29: cause found, 7 October 2026](#balmora-temple-geometry-29-cause-found-7-october-2026)
 
 <!-- contents end -->
+
+## CI-SUITE-TWICE-33, 10 October 2026
+
+[CI-SUITE-TWICE-33](bugs/CI-SUITE-TWICE-33.md): hosted CI ran the full test suite twice per
+revision (source checks job and the Docker builder job). The Docker check now runs a short set of builder
+test modules; `--full-suite` keeps the previous method.
+
+## HARVEST-BITTERCOAST-29 and HARVEST-PLANTS-IN-COLLISION-33, 10 October 2026
+
+[HARVEST-BITTERCOAST-29](bugs/HARVEST-BITTERCOAST-29.md): seen again in v0.0.33 at the same Bitter Coast
+cluster. Cause: the pick ray stops on a tree's convex root collision that also contains two of the three
+mushrooms. The engine now keeps a plant as the target when the solid that stopped the ray contains the
+plant's own centre; a new island-wide pick audit (51 of 934 plants unpickable before, 0 after) gates the
+image. The enclosing solids are tracked as
+[HARVEST-PLANTS-IN-COLLISION-33](bugs/HARVEST-PLANTS-IN-COLLISION-33.md).
+
+## MESH-LOD-OPEN-SEAMS-33 and CHIM-STRIDER-RING-33 for v0.0.34, 10 October 2026
+
+[MESH-LOD-OPEN-SEAMS-33](bugs/MESH-LOD-OPEN-SEAMS-33.md): the owner saw the strider's open hull again in
+v0.0.33; it shipped as a known issue (the repair was held), not a regression. v0.0.34 takes the repair
+and its seam audit, with the strider boundary-locked at 0.45, which fits CHIM Balmora's ring
+([CHIM-STRIDER-RING-33](bugs/CHIM-STRIDER-RING-33.md)). The audit now measures the profile the town and
+CHIM converters compose, not the group profile alone.
 
 ## TEST-ENV-LEAK-HULL-33, 9 October 2026
 

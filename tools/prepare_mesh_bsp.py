@@ -12,7 +12,7 @@ from mwad.paths import ensure_external
 from player_hull import MINS, MAXS, PROFILE, rebuild_world_hull
 from mwad.scene import read_asset, unpack_geometry
 from scenery_selection import select_runtime_refs
-from static_lod import reduce_mesh, rock_profile
+from static_lod import reduce_for_profile, rock_profile
 import scenery_reduce
 from surface_grid import check_lumps, engine_grid, face_points, sample_dimensions, texinfo_vecs
 # Build switch: AMIWIND_NO_EMISSIVE=1 converts without self-lit material marking
@@ -129,13 +129,7 @@ def _prepare_model(task):
         if len(visual_f)!=len(f) and profile.get('flatten'):
          raise VisibilityPolicyError('Combine flattening and source exclusions only after explicit pipeline validation')
         if profile.get('ratio'):
-         prefixes=profile.get('preserve_shape_prefixes',[])
-         matched={prefix:[i for i,mat in enumerate(m['materials'])
-                          if mat.get('source_shape','').casefold().startswith(prefix.casefold())]
-                  for prefix in prefixes}
-         if any(not values for values in matched.values()):raise ValueError('Missing preserved structural shape in '+name)
-         keep={i for values in matched.values() for i in values}
-         visual_v,visual_f,details=reduce_mesh(v,visual_f,profile['ratio'],keep,profile.get('preserve_shared_seams',False))
+         visual_v,visual_f,details=reduce_for_profile(v,visual_f,profile,m['materials'],name)
          lod.update(details)
         texsize = profile.get('texture_size', 64)
         reduction=scenery_reduce.scenery_reduce()

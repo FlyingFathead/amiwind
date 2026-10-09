@@ -519,7 +519,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     from prepare_quake import SCALE
     from surface_flatten import load_profiles, mount_references
     from town_config import load_settings, town_field
-    from town_regions import visual_profile
+    from town_regions import town_model_profile
     from visual_offsets import apply_visual_offsets
     settings = load_settings(town)
     with timer.section('source stage'):
@@ -531,7 +531,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     profiles, items = {}, []
     archive = work / 'scenery/scenery.mwpak'
     for mi, model in enumerate(index['models']):
-        profile = {**group[model['source']], **visual_profile(model['source'], model['triangles'])}
+        profile = town_model_profile(group[model['source']], model['source'], model['triangles'])
         if model['source'] in flatten:
             profile['flatten'] = flatten[model['source']]
         profiles[model['source']] = profile

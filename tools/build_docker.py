@@ -18,6 +18,10 @@ from release import inspect_source, EXECUTABLES
 ROOT = Path(__file__).resolve().parents[1]
 BASE_IMAGE = 'ubuntu@sha256:a853f94d226358a79c740cfc7bce0c289748f3fe3488d921d038ccd752c61b60'
 IMAGE = 'amiwind-builder:local'
+# `check` runs these short test modules in the image (its tools, paths and builder entry points); the full
+# suite runs once per revision in the source-and-dry-run CI job, or here with --full-suite.
+SMOKE_TESTS = ('test_build_docker', 'test_build_host', 'test_build', 'test_release',
+               'test_collision_bsp', 'test_engine_hulls')
 DOCKERFILE = f'''FROM {BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates build-essential ffmpeg unzip xz-utils fonts-dejavu-core libgmp10 libmpfr6 libmpc3 && rm -rf /var/lib/apt/lists/*
@@ -87,6 +91,19 @@ def logged(command, log):
         raise RuntimeError(f'Command exited {status}; full output: {log}')
 
 
+def check_script(run, jobs, full_suite=False):
+    """Container script of `check`: source checks, image tools, tests (smoke or full), asset-free build."""
+    if full_suite:
+        tests = f'python tools/run_tests.py -v --jobs {jobs} --module-timeout 900\n'
+    else:
+        tests = ''.join(f"python -m unittest discover -s tests -p '{name}.py' -v\n" for name in SMOKE_TESTS)
+    return ('set -eu\npython tools/release.py --check\n'
+            "python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'\n"
+            + tests +
+            'python tools/build.py --dry-run --tools-dir /opt/amiwind-tools '
+            f'--workspace /work --name {run} --jobs {jobs}\n')
+
+
 def main(argv=None):
     # Windows redirected console streams otherwise use the legacy code page.
     for stream in (sys.stdout, sys.stderr):
@@ -103,6 +120,8 @@ def main(argv=None):
     parser.add_argument('--jobs', type=int, default=os.cpu_count() or 1)
     parser.add_argument('--docker', default='docker')
     parser.add_argument('--docker-host', help='Optional explicit Docker engine endpoint')
+    parser.add_argument('--full-suite', action='store_true',
+                        help='check: run the full test suite in the image instead of the smoke modules')
     args = parser.parse_args(argv)
     if args.jobs < 1:
         parser.error('--jobs must be positive')
@@ -117,7 +136,8 @@ def main(argv=None):
     output.mkdir(parents=True)
     receipt = {'started_at': datetime.now(timezone.utc).isoformat(),
                'action': args.action, 'status': 'running', 'base': BASE_IMAGE,
-               'image': args.image, 'jobs': args.jobs, 'volume': args.volume}
+               'image': args.image, 'jobs': args.jobs, 'volume': args.volume,
+               'tests': 'full' if args.full_suite else 'smoke'}
     status = 0
     try:
         receipt['source_sha256'] = prepare_context(context)
@@ -128,12 +148,7 @@ def main(argv=None):
             if args.action == 'check':
                 run = 'docker-ci-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
                 receipt['run'] = run
-                script = (
-                    'set -eu\npython tools/release.py --check\n'
-                    "python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'\n"
-                    f'python tools/run_tests.py -v --jobs {args.jobs} --module-timeout 900\n'
-                    'python tools/build.py --dry-run --tools-dir /opt/amiwind-tools '
-                    f'--workspace /work --name {run} --jobs {args.jobs}\n')
+                script = check_script(run, args.jobs, args.full_suite)
                 logged(docker + ['run', '--rm', '--mount',
                        f'type=volume,source={args.volume},target=/work',
                        args.image, 'bash', '-c', script], output / 'validation.log')

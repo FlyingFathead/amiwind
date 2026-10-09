@@ -44,6 +44,8 @@ int main(void)
     /* Actual inverse-scale picking: model front is20+(-8*2)=4. A wall
      * at5 permits pickup; a wall at3 occludes it. Unscaled picking would miss. */
     wall=3.f/72;assert(!AW_HarvestHint());wall=5.f/72;assert(AW_HarvestHint());
+    /* A solid that contains the proxy's centre does not occlude it (HARVEST-BITTERCOAST-29). */
+    wall=3.f/72;enclosing=1;assert(AW_HarvestHint());enclosing=0;wall=5.f/72;
     assert(AW_HarvestUse() && AW_StateGet(&aw_state,AW_ITEM,"synthetic_ingredient")==2);
     assert(sounds==1 && subtitle==1 && !strcmp(notice,"Picked up 2 Original ingredient name."));
     assert(!AW_HarvestUse() && !AW_HarvestHint());AW_HarvestBegin();AW_HarvestSpawn();cl_numvisedicts=0;AW_HarvestLink();
