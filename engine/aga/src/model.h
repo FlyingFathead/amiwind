@@ -393,4 +393,45 @@ void	Mod_TouchModel (char *name);
 mleaf_t *Mod_PointInLeaf (float *p, model_t *model);
 byte	*Mod_LeafPVS (mleaf_t *leaf, model_t *model);
 
+/* CHIM brush loading (chim/chim_models.c). A brush model is decoded by the
+ * same Mod_Load* section decoders, but into a caller-owned arena instead of
+ * the Hunk, from a file image already in memory or streamed from an open
+ * pack file one section per step. Without an arena (every legacy load) the
+ * decoders use the Hunk exactly as before. */
+typedef struct
+{
+	byte	*base;			/* 16-byte aligned, zero-filled allocations */
+	int		size, used;
+	byte	*slice;			/* loading buffer used instead of Hunk_TempAlloc */
+	int		slice_bytes;
+	/* Set: the texture lump is a CHIM reference list (count, then one
+	 * shared texture id per local index) resolved through this call. */
+	struct texture_s	*(*texture)(void *context, int id);
+	void	*context;
+	/* Set: the node lump is only a point hull (a placed model's chain of
+	 * convex pieces, whose outside branches share the next piece). It is
+	 * decoded into hull 0's clipnodes only, with no render node tree. */
+	int		point_hull_only;
+} aw_brush_arena_t;
+
+#define AW_BRUSH_SLICE_BYTES	(16384+2064)	/* one window plus the largest prefix */
+
+typedef struct
+{
+	model_t	*mod;
+	FILE	*file;
+	long	base, bytes;
+	dheader_t	header;		/* lumps already byte-swapped */
+	int		next;			/* next section, AW_BRUSH_SECTIONS when finished */
+	aw_brush_arena_t	*arena;
+} aw_brush_stream_t;
+
+#define AW_BRUSH_SECTIONS	15
+
+int AW_BrushHeader (dheader_t *out, const void *raw, long bytes);
+int AW_BrushBound (const dheader_t *header, int texture_refs);
+int AW_BrushImage (model_t *mod, byte *image, long bytes, aw_brush_arena_t *arena);
+int AW_BrushStreamBegin (aw_brush_stream_t *s, model_t *mod, FILE *file, long base, long bytes, aw_brush_arena_t *arena);
+int AW_BrushStreamStep (aw_brush_stream_t *s);
+
 #endif	// __MODEL__

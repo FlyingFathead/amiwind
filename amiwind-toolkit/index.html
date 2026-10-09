@@ -19,6 +19,16 @@ nav button{background:#203346;color:var(--ink);border:1px solid #456;border-radi
 nav button[aria-selected="true"]{background:#2e4a66;border-color:var(--accent);color:var(--accent)}
 .note{color:var(--muted);font-size:12px;margin-left:auto;flex:1 1 260px;min-width:0;max-width:520px;text-align:right;line-height:1.35}
 @media (max-width:820px){.note{flex-basis:100%;max-width:none;text-align:left;margin-left:0}}
+#chimhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;border-bottom:1px solid var(--line);background:#13202d}
+#chimhead[hidden]{display:none}
+#chimhead .chimtitle{font-size:17px;color:var(--ink);white-space:nowrap}
+#chimhead .chimtitle b{color:#46c37b}
+#chimhead .chimparts{display:flex;flex-wrap:wrap;gap:4px 8px}
+#chimhead button{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer}
+#chimhead button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+#chimhead button i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+#chimhead .chimnote,#chimhead .chimhist{color:var(--muted);font-size:12px}
+#chimhead .chimhist svg{vertical-align:middle}
 main{flex:1;position:relative;min-height:0}
 iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
 iframe.active{display:block}
@@ -27,7 +37,7 @@ iframe.active{display:block}
 <body>
 <header>
   <img src="../resources/media/AmiWind_logo_name_only.png" alt="AmiWind">
-  <h1>Toolkit<small id="toolkit-version" title="Set by hand when the Toolkit is next updated">Last updated with AmiWind v0.0.31</small></h1>
+  <h1>Toolkit<small id="toolkit-version" title="Set by hand when the Toolkit is next updated">Last updated with AmiWind v0.0.33</small></h1>
   <nav role="tablist">
     <button role="tab" id="tab-world" aria-selected="true">World</button>
     <button role="tab" id="tab-local" aria-selected="false">Local</button>
@@ -36,17 +46,19 @@ iframe.active{display:block}
   <span class="note">Everything here runs in your browser. Views of the world are made from your
   own Morrowind files and build output on your machine; nothing is uploaded.</span>
 </header>
+<div id="chimhead" hidden aria-label="CHIM Progress Tracker headline"></div>
 <main>
   <iframe id="world" class="active" title="World and Local maps"></iframe>
   <iframe id="inspector" title="3D Map Inspector"></iframe>
 </main>
+<script src="chim-head.js"></script>
 <script>
 // World / Local, like the game's map menu, both in world-map.html; the 3D Map
 // Inspector has its own tab and full-size frame, loaded on first use. "Show in
 // 3D" in the Local view hands its map file here and switches to the inspector.
 const frame = document.getElementById('world'), inspector = document.getElementById('inspector');
 frame.src = 'world-map.html' + location.search;  // ?served=1 from tools/toolkit_serve.py
-let inspectorReady = false, inspectorQueue = null;
+let inspectorReady = false, inspectorQueue = null, lastChim = null;
 function mark(m) {
   for (const t of ['world', 'local', 'inspector'])
     document.getElementById('tab-' + t).setAttribute('aria-selected', m === t ? 'true' : 'false');
@@ -70,8 +82,21 @@ function send() {
 document.getElementById('tab-world').onclick = () => { mark('world'); frame.contentWindow.postMessage({type: 'amiwind-set-mode', mode: 'world'}, '*'); };
 document.getElementById('tab-local').onclick = () => { mark('local'); frame.contentWindow.postMessage({type: 'amiwind-set-mode', mode: 'local'}, '*'); };
 document.getElementById('tab-inspector').onclick = () => showInspector(null);
+// CHIM Progress Tracker headline: the World Map page sends its numbers; a click on one asks it to highlight those cells.
+let chimPicked = null;
+function chimHead(m) {
+  const pick = bucket => {
+    chimPicked = chimPicked === bucket ? null : bucket;
+    mark('world');
+    frame.contentWindow.postMessage({type: 'amiwind-set-mode', mode: 'world'}, '*');
+    frame.contentWindow.postMessage({type: 'amiwind-chim-pick', bucket: chimPicked}, '*');
+    chimHead(m);
+  };
+  window.ChimHead.render(document.getElementById('chimhead'), m.headline, m.history, pick, chimPicked);
+}
 window.addEventListener('message', e => {
   if (e.source !== frame.contentWindow || !e.data) return;
+  if (e.data.type === 'amiwind-chim-head') { lastChim = e.data; chimHead(e.data); return; }
   if (e.data.type === 'amiwind-mode' && !inspector.classList.contains('active')) mark(e.data.mode);
   if (e.data.type === 'amiwind-open-inspector' && e.data.file instanceof File) showInspector(e.data.file);
 });

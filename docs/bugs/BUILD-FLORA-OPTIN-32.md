@@ -1,5 +1,23 @@
 # BUILD-FLORA-OPTIN-32: a from-scratch build without --tree-sprites leaves out the trees and grass every release ships
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | build |
+| First noticed | 8 October 2026, in v0.0.32-dev1 |
+| Where | tools/build.py, world flora stages |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.28, v0.0.32-dev1 (last seen) |
+| Severity | high: A default build left out the trees and grass every release ships; the image step failed late. |
+| Family | Content silently missing from a build (`build-content-missing`) |
+| Playtest version | v0.0.32-dev1 |
+| From commit | source and engine 978475d |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Fixed in source on v0.0.32-dev (not shipped at the time of writing; a from-scratch build with the default options
@@ -76,3 +94,29 @@ The from-scratch check compares the payload with the last release file by file; 
 config file states the release's options instead of a remembered command line.
 `tests/test_build_defaults.py` fails when a shipped feature leaves the default build or a new
 builder option is not classified against the release.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Content silently missing from a build (`build-content-missing`). Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. See [families](README.md#families).
+
+- [AUDIO-MISSING-SOURCES-32](AUDIO-MISSING-SOURCES-32.md): The image step reports missing sources for 7 voices and 2 effects
+- [BUILD-DRESSING-EXCLUDED-32](BUILD-DRESSING-EXCLUDED-32.md): The repository builder drops lantern hooks and other dressing in Seyda Neen maps without a receipt
+- [BUILD-EXTRA-TOWN-OPTIN-32](BUILD-EXTRA-TOWN-OPTIN-32.md): A default build leaves out the Vivec Arena preview that v0.0.32 ships
+- [BUILD-HANDS-NOT-BUILT-32](BUILD-HANDS-NOT-BUILT-32.md): Per-race first-person hands are not built by the builder
+- [BUILD-HARVEST-NOT-BUILT-32](BUILD-HARVEST-NOT-BUILT-32.md): Mushroom harvest data is not built by the builder
+- [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
+- [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
+- [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
+
+Related bugs in other categories:
+
+- [BUILD-ACTOR-CONTACT-CALL-32](BUILD-ACTOR-CONTACT-CALL-32.md): Builder actor-contact stage calls convert() with the wrong arguments since v0.0.27
+- [BUILD-NOT-FROM-SCRATCH-32](BUILD-NOT-FROM-SCRATCH-32.md): Five releases shipped without the public builder being able to build them from scratch
+- [BUILD-XDFTOOL-ARGMAX-32](BUILD-XDFTOOL-ARGMAX-32.md): The image step fails at the end: xdftool argument list too long
+
+<!-- END GENERATED CATEGORY -->

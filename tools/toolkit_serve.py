@@ -15,9 +15,14 @@ opens any map without picking a folder. Python standard library only.
                tools/world_metrics.py, or the world estimate's metrics.json /
                metrics.csv itself (converted when the server starts); without
                it the World Map has no Map metrics layer
+  --progress P the CHIM Progress Tracker: the folder tools/cell_progress.py writes
+               (or its cell-progress.json). It is read again on every request, so
+               running cell_progress.py after a build updates the page on reload
+               without restarting the server; without it the tracker is empty
+               until you use "Import progress" in the page
 
 Usage:
-  toolkit_serve.py --data DIR [--maps DIR] [--metrics FILE] [--port 8031] [--open]
+  toolkit_serve.py --data DIR [--maps DIR] [--metrics FILE] [--progress DIR|FILE] [--port 8031] [--open]
 Then open http://127.0.0.1:8031/ (printed).
 """
 import argparse, json, mimetypes, sys, webbrowser
@@ -31,12 +36,18 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_FILES = ('world-progress.json', 'island.png', 'island.json', 'island-world.png', 'island-world.json',
               'island-cells.json')
 METRICS_FILE = 'world-metrics.json'   # served from --metrics, never from the data folder
+# The CHIM Progress Tracker files, served from --progress under these names (the progress folder's own file names).
+PROGRESS_FILES = {'cell-progress.json': 'application/json', 'cell-progress-next.json': 'application/json',
+                  'cell-progress-curve.json': 'application/json', 'cell-progress-curve.png': 'image/png'}
+PROGRESS_SOURCES = {'cell-progress.json': 'cell-progress.json', 'cell-progress-next.json': 'next.json',
+                    'cell-progress-curve.json': 'mesh-curve.json', 'cell-progress-curve.png': 'mesh-curve.png'}
 
 
 class Handler(SimpleHTTPRequestHandler):
     data_dir = None
     maps_dir = None
     metrics = None   # the Map metrics layer as JSON bytes, or None
+    progress_dir = None   # the CHIM Progress Tracker folder (files are read on every request), or None
 
     def log_message(self, fmt, *args):  # quiet: one line per request is noise here
         pass
@@ -61,12 +72,15 @@ class Handler(SimpleHTTPRequestHandler):
         parts = [p for p in path.split('/') if p]
         if any(p in ('..', '.') or '\\' in p for p in parts):
             return self.send_error(400)
-        if len(parts) == 2 and parts[0] == 'amiwind-toolkit' and parts[1].endswith('.html'):
+        if len(parts) == 2 and parts[0] == 'amiwind-toolkit' and parts[1].endswith(('.html', '.js')):
             return self.send_file(ROOT / 'amiwind-toolkit' / parts[1])
         if len(parts) == 3 and parts[:2] == ['resources', 'media'] and parts[2].endswith('.png'):
             return self.send_file(ROOT / 'resources' / 'media' / parts[2])
         if parts == ['data', METRICS_FILE]:
             return self.send_bytes(self.metrics, 'application/json') if self.metrics else self.send_error(404)
+        if len(parts) == 2 and parts[0] == 'data' and parts[1] in PROGRESS_FILES:
+            f = self.progress_dir / PROGRESS_SOURCES[parts[1]] if self.progress_dir else None
+            return self.send_bytes(f.read_bytes(), PROGRESS_FILES[parts[1]]) if f and f.is_file() else self.send_error(404)
         if len(parts) == 2 and parts[0] == 'data' and parts[1] in DATA_FILES and self.data_dir:
             return self.send_file(self.data_dir / parts[1])
         if parts == ['maps', 'index.json']:
@@ -83,22 +97,31 @@ def load_metrics(path):
     return world_metrics.dumps(world_metrics.load_any(path)).encode('utf-8')
 
 
+def progress_folder(path):
+    """The tracker folder for --progress: a folder, or the cell-progress.json inside it."""
+    path = path.resolve()
+    return path.parent if path.is_file() else path
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--data', type=Path, required=True)
     p.add_argument('--maps', type=Path)
     p.add_argument('--metrics', type=Path, help='Map metrics layer, or a world estimate metrics.json/.csv')
+    p.add_argument('--progress', type=Path, help='CHIM Progress Tracker folder (tools/cell_progress.py --out) or its cell-progress.json')
     p.add_argument('--port', type=int, default=8031)
     p.add_argument('--open', action='store_true', help='open the toolkit in your browser')
     a = p.parse_args(argv)
     Handler.data_dir = a.data.resolve()
     Handler.maps_dir = a.maps.resolve() if a.maps else None
     Handler.metrics = load_metrics(a.metrics) if a.metrics else None
+    Handler.progress_dir = progress_folder(a.progress) if a.progress else None
     server = ThreadingHTTPServer(('127.0.0.1', a.port), Handler)
     url = 'http://127.0.0.1:%d/' % a.port
     present = [n for n in DATA_FILES if (Handler.data_dir / n).is_file()]
     maps = len(list(Handler.maps_dir.glob('*.bsp'))) if Handler.maps_dir else 0
-    print('AmiWind Toolkit at %s (this machine only; Ctrl+C stops)\n  data: %s\n  maps: %d' % (url, ', '.join(present) or 'none', maps), flush=True)
+    print('AmiWind Toolkit at %s (this machine only; Ctrl+C stops)\n  data: %s\n  maps: %d\n  CHIM progress: %s' %
+          (url, ', '.join(present) or 'none', maps, Handler.progress_dir or 'none (use Import progress in the page)'), flush=True)
     if a.open:
         webbrowser.open(url)
     try:

@@ -2,6 +2,7 @@
 """Compile the union of expanded convex pieces to a compact native BSP tree."""
 import hashlib
 from itertools import product
+import os
 from pathlib import Path
 import pickle
 import struct
@@ -12,12 +13,14 @@ from scipy.spatial import ConvexHull
 from player_hull import MINS,MAXS,lumps
 
 
-def compile_standing(pieces,qbsp,cache):
+def compile_standing(pieces,qbsp,cache,grid=64):
+    """grid: the expanded corners are merged on a 1/grid unit lattice (64, as for the models; a finer
+    lattice leaves qbsp slivers, seam holes in the CHIM terrain hull: CHIM-SEYDA-MEMORY-33)."""
     corners=np.array(list(product(*zip(MINS,MAXS))))
     brushes=[]
     for points,hull,ids,error in pieces:
         expanded=(points[:,None,:]-corners[None,:,:]).reshape(-1,3)
-        expanded=np.unique(np.round(expanded*64)/64,axis=0)
+        expanded=np.unique(np.round(expanded*grid)/grid,axis=0)
         convex=ConvexHull(expanded);seen=set();lines=['{']
         for equation in convex.equations:
             n=equation[:3];d=-equation[3]
@@ -53,4 +56,6 @@ def compile_standing(pieces,qbsp,cache):
         return contents
     packed=[(planes[nodes[n][0]][:4],child(nodes[n][1]),child(nodes[n][2])) for n in order]
     result=(packed,remap[root] if root>=0 else child(root))
-    path.write_bytes(pickle.dumps(result,protocol=4));return result
+    # Atomic: maps compiled side by side share this content-addressed cache.
+    partial=path.with_name(path.name+'.'+str(os.getpid())+'.tmp');partial.write_bytes(pickle.dumps(result,protocol=4))
+    os.replace(partial,path);return result

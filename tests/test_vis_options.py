@@ -111,7 +111,8 @@ class BuilderOption(unittest.TestCase):
         deps = stage_dependencies(steps)
         self.assertEqual(deps['town-vivec_arena'], ('balmora-interiors',))
         self.assertEqual(deps['door-audio'], ('town-vivec_arena',))
-        self.assertEqual(stage_dependencies(self.steps())['door-audio'], ('town-vivec_arena',))
+        # v0.0.33 withdraws the Arena (config/towns.json "withdrawn"): a default build imports no extra town.
+        self.assertEqual(stage_dependencies(self.steps())['door-audio'], ('balmora-interiors',))
         self.assertEqual(stage_dependencies(self.steps(['--only-core-towns']))['door-audio'], ('balmora-interiors',))
         with self.assertRaises(SystemExit):
             self.steps(['--extra-town', 'balmora'])
@@ -157,23 +158,24 @@ class ConverterInvocation(unittest.TestCase):
                 with patch.object(repair_balmora_maps, 'rebuild_cached_region', side_effect=rebuilt), \
                      patch.object(repair_balmora_maps, 'bound_visuals', side_effect=lambda raw, bounds: (raw, {})):
                     repair_balmora_maps.repair(maps, cache=cache, palette=root / 'palette', ericw_bin=root,
-                                               work_dir=root / 'work', vis_mode=mode)
+                                               work_dir=root / 'work', vis_mode=mode, threads=1)
             self.assertTrue(seen)
             self.assertTrue(all(k == expected for k in seen), mode)
 
     def test_room_tasks_carry_divided_threads(self):
         import prepare_area
         captured = {}
-        def fake_map(function, tasks, workers):
+        def fake_map(name, function, tasks, keys, workers, fallback=None):
             captured['tasks'] = tasks; captured['workers'] = workers
             return []
+        import build_costs
         with tempfile.TemporaryDirectory() as tmp:
             scene = Path(tmp) / 'scene'; (scene / 'id1/maps').mkdir(parents=True)
             (scene / 'id1/gfx').mkdir(); (scene / 'id1/gfx/palette.lmp').write_bytes(bytes(768))
             from player_hull import pack_lumps
             (scene / 'id1/maps/seyda.bsp').write_bytes(pack_lumps([b'{\n"aw_eye_height" "22"\n}\n\0'] + [b''] * 14))
             with patch.object(prepare_area, 'resolve_data_files', side_effect=lambda p: Path(p)), \
-                 patch.object(prepare_area, 'ordered_map', side_effect=fake_map), \
+                 patch.object(build_costs, 'costed_map', side_effect=fake_map), \
                  patch.object(prepare_area, 'populate', return_value={}):
                 prepare_area.prepare(tmp, scene, 'q', 'v', 'l', jobs=24, vis_mode='full')
         tasks = captured['tasks']

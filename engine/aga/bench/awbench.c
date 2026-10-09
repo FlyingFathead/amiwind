@@ -7,6 +7,19 @@
  *                               seeks; MB/s and how much CPU time other tasks
  *                               still got while the disk was read
  *   awbench all FILE            both
+ *   awbench seek FILE [N]       how a streamer's reads cost on this drive: FILE
+ *                               (any size; created at 8 MB if missing) read in
+ *                               16 KiB requests straight through, skipping
+ *                               4 KiB to 1 MiB forward between requests (Seek),
+ *                               reading through 4-64 KiB gaps instead of
+ *                               seeking, and at random positions; microseconds
+ *                               per request and free CPU for each pattern
+ *                               (N requests per pattern, default 256)
+ *   awbench replay LIST         read what a list of file ranges names, crossing
+ *                               by crossing, and time each crossing (the world
+ *                               streamer's walk, written by its validator)
+ *   awbench buffers DRIVE N     set the drive's buffers to N (AddBuffers), for
+ *                               disk and seek runs with other buffer counts
  *
  * Every run starts with a setup block (AWBENCH-REPORT begin/end: CPU and FPU
  * from AttnFlags, the 68060's PCR when 68060.library has flagged one, memory,
@@ -38,6 +51,7 @@
 #include <proto/timer.h>
 #include <clib/alib_protos.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define FILE_BYTES (8UL * 1024 * 1024)
@@ -432,6 +446,248 @@ static void report_tester(void)
     printf("AWBENCH-REPORT end\n");
 }
 
+/* Seek mode (CHIM pack layout, CHIM-READ-RUNS-33): 16 KiB requests through
+ * the whole file, at most seek_requests of them per pattern. kind 0: Seek
+ * forward by gap between requests (OFFSET_CURRENT); 1: read the gap instead;
+ * 2: random absolute positions. */
+#define SEEK_REQUEST 16384UL
+static unsigned long seek_requests = 256;   /* per pattern; awbench seek FILE N */
+static void seek_pass(const char *name, UBYTE *buffer, unsigned long size, int kind, unsigned long gap,
+                      unsigned long baseline)
+{
+    BPTR f;
+    unsigned long stride = SEEK_REQUEST + gap, n = 0, seed = 11, us, free_permille, open_us, useful;
+    unsigned long long t0, t1, t2;
+    char rate[32], cpu[32];
+    static const char *const kinds[3] = {"skip", "through", "random"};
+    t0 = now_ticks();
+    f = Open((STRPTR)name, MODE_OLDFILE);
+    if (!f) {
+        printf("AWBENCH error=cannot_open file=%s\n", name);
+        return;
+    }
+    t1 = now_ticks();
+    open_us = microseconds(t1 - t0);
+    {
+        unsigned long idle0 = idle_count;
+        unsigned long pos = 0;
+        while (n < seek_requests) {
+            if (kind == 2) {
+                seed = seed * 1103515245UL + 12345UL;
+                pos = ((seed >> 8) % (size / SEEK_REQUEST)) * SEEK_REQUEST;
+                if (Seek(f, (LONG)pos, OFFSET_BEGINNING) < 0)
+                    break;
+            } else if (pos + SEEK_REQUEST > size) {
+                break;
+            }
+            if (Read(f, buffer, SEEK_REQUEST) != (LONG)SEEK_REQUEST) {
+                printf("AWBENCH error=short_read file=%s\n", name);
+                break;
+            }
+            n++;
+            if (kind != 2) {
+                pos += stride;
+                if (gap && pos + SEEK_REQUEST <= size) {
+                    if (kind == 0) {
+                        if (Seek(f, (LONG)gap, OFFSET_CURRENT) < 0)
+                            break;
+                    } else {
+                        unsigned long left = gap;
+                        while (left) {
+                            unsigned long take = left > BIG_REQUEST ? BIG_REQUEST : left;
+                            if (Read(f, buffer, take) != (LONG)take)
+                                break;
+                            left -= take;
+                        }
+                    }
+                }
+            }
+        }
+        t2 = now_ticks();
+        us = microseconds(t2 - t1);
+        free_permille = baseline ? (unsigned long)((unsigned long long)(idle_count - idle0) * eclock_rate /
+                                                   (t2 - t1 ? t2 - t1 : 1) * 1000ULL / baseline) : 0;
+    }
+    Close(f);
+    if (free_permille > 1000)
+        free_permille = 1000;
+    useful = n * SEEK_REQUEST;
+    thousandths(rate, (unsigned long long)useful * 1000000ULL / (us ? us : 1) * 1000ULL / 1048576ULL);
+    sprintf(cpu, "%lu.%lu", free_permille / 10, free_permille % 10);
+    printf("AWBENCH seek pattern=%s gap=%lu file_bytes=%lu requests=%lu request=%lu us=%lu us_per_request=%lu "
+           "useful_mb_per_s=%s open_us=%lu cpu_free_pct=%s\n", kinds[kind], kind == 2 ? 0UL : gap, size, n,
+           SEEK_REQUEST, us, n ? us / n : 0UL, rate, open_us, cpu);
+}
+
+static void seek_tests(const char *name)
+{
+    static const unsigned long skips[] = {0, 4096, 16384, 65536, 262144, 1048576};
+    static const unsigned long throughs[] = {4096, 16384, 65536};
+    UBYTE *buffer = (UBYTE *)AllocMem(BIG_REQUEST, MEMF_ANY);
+    unsigned long baseline, size, i;
+    BPTR f;
+    if (!buffer) {
+        printf("AWBENCH error=no_memory\n");
+        return;
+    }
+    if (create_file(name, buffer) && (f = Open((STRPTR)name, MODE_OLDFILE)) != 0) {
+        Seek(f, 0, OFFSET_END);
+        size = (unsigned long)Seek(f, 0, OFFSET_BEGINNING);
+        Close(f);
+        if (!idle_start())
+            printf("AWBENCH note=no_idle_task (cpu_free_pct is 0)\n");
+        baseline = idle_rate();
+        printf("AWBENCH idle counts_per_s=%lu\n", baseline);
+        for (i = 0; i < sizeof skips / sizeof *skips; i++)
+            seek_pass(name, buffer, size, 0, skips[i], baseline);
+        for (i = 0; i < sizeof throughs / sizeof *throughs; i++)
+            seek_pass(name, buffer, size, 1, throughs[i], baseline);
+        seek_pass(name, buffer, size, 2, 0, baseline);
+        idle_end();
+    }
+    FreeMem(buffer, BIG_REQUEST);
+}
+
+/* Replay mode (CHIM-READ-RUNS-33): LIST holds lines "X n" (a crossing starts)
+ * and "R path offset bytes" (one read run). Runs of a crossing are read in
+ * list order: a file is opened at its first run and closed when another file
+ * or the next crossing starts; a run after the current position seeks forward
+ * from it (OFFSET_CURRENT), any other one from the file start. Only the reads
+ * are timed: the list is in memory before the first crossing. */
+#define REPLAY_PATH 96
+typedef struct { char path[REPLAY_PATH]; unsigned long offset, bytes; long crossing; } replay_t;
+
+static void replay_crossing(replay_t *r, unsigned long n, long crossing, UBYTE *buffer)
+{
+    BPTR f = 0;
+    const char *open_path = "";
+    unsigned long pos = 0, i, bytes = 0, runs = 0, files = 0, us;
+    unsigned long long t0 = now_ticks(), t1;
+    int ok = 1;
+    for (i = 0; i < n && ok; i++) {
+        unsigned long left;
+        if (!f || strcmp(open_path, r[i].path)) {
+            if (f)
+                Close(f);
+            f = Open((STRPTR)r[i].path, MODE_OLDFILE);
+            if (!f) {
+                printf("AWBENCH error=cannot_open file=%s\n", r[i].path);
+                ok = 0;
+                break;
+            }
+            open_path = r[i].path;
+            pos = 0;
+            files++;
+        }
+        if (r[i].offset != pos) {
+            if (Seek(f, r[i].offset > pos ? (LONG)(r[i].offset - pos) : (LONG)r[i].offset,
+                     r[i].offset > pos ? OFFSET_CURRENT : OFFSET_BEGINNING) < 0) {
+                printf("AWBENCH error=seek_failed file=%s offset=%lu\n", r[i].path, r[i].offset);
+                ok = 0;
+                break;
+            }
+        }
+        for (left = r[i].bytes; left; ) {
+            unsigned long take = left > BIG_REQUEST ? BIG_REQUEST : left;
+            if (Read(f, buffer, take) != (LONG)take) {
+                printf("AWBENCH error=short_read file=%s\n", r[i].path);
+                ok = 0;
+                break;
+            }
+            left -= take;
+        }
+        pos = r[i].offset + r[i].bytes;
+        bytes += r[i].bytes;
+        runs++;
+    }
+    if (f)
+        Close(f);
+    t1 = now_ticks();
+    us = microseconds(t1 - t0);
+    printf("AWBENCH replay crossing=%ld runs=%lu files=%lu bytes=%lu us=%lu%s\n", crossing, runs, files, bytes, us,
+           ok ? "" : " incomplete=1");
+}
+
+static void replay_tests(const char *list)
+{
+    BPTR f = Open((STRPTR)list, MODE_OLDFILE);
+    LONG size;
+    char *text, *line, *next;
+    replay_t *runs;
+    unsigned long count = 0, cap, i, start;
+    long crossing = -1;
+    UBYTE *buffer;
+    unsigned long long t0, t1;
+    if (!f) {
+        printf("AWBENCH error=cannot_open file=%s\n", list);
+        return;
+    }
+    Seek(f, 0, OFFSET_END);
+    size = Seek(f, 0, OFFSET_BEGINNING);
+    text = size > 0 ? (char *)AllocMem(size + 1, MEMF_ANY) : NULL;
+    if (!text || Read(f, text, size) != size) {
+        Close(f);
+        printf("AWBENCH error=cannot_read file=%s\n", list);
+        if (text)
+            FreeMem(text, size + 1);
+        return;
+    }
+    Close(f);
+    text[size] = 0;
+    for (cap = 1, i = 0; i < (unsigned long)size; i++)
+        cap += text[i] == '\n';
+    runs = (replay_t *)AllocMem(cap * sizeof *runs, MEMF_ANY | MEMF_CLEAR);
+    buffer = (UBYTE *)AllocMem(BIG_REQUEST, MEMF_ANY);
+    if (!runs || !buffer) {
+        printf("AWBENCH error=no_memory\n");
+        goto done;
+    }
+    for (line = text; line && *line; line = next) {
+        next = strchr(line, '\n');
+        if (next)
+            *next++ = 0;
+        if (line[0] == 'X') {
+            crossing = strtol(line + 1, NULL, 10);
+        } else if (line[0] == 'R' && count < cap) {
+            if (sscanf(line + 1, "%95s %lu %lu", runs[count].path, &runs[count].offset, &runs[count].bytes) == 3) {
+                runs[count].crossing = crossing;
+                count++;
+            }
+        }
+    }
+    printf("AWBENCH replay list=%s runs=%lu\n", list, count);
+    t0 = now_ticks();
+    for (start = 0, i = 1; i <= count; i++) {
+        if (i == count || runs[i].crossing != runs[start].crossing) {
+            replay_crossing(runs + start, i - start, runs[start].crossing, buffer);
+            start = i;
+        }
+    }
+    t1 = now_ticks();
+    printf("AWBENCH replay total us=%lu\n", microseconds(t1 - t0));
+done:
+    if (runs)
+        FreeMem(runs, cap * sizeof *runs);
+    if (buffer)
+        FreeMem(buffer, BIG_REQUEST);
+    FreeMem(text, size + 1);
+}
+
+/* Buffers mode: AddBuffers with 0 reports the file system's current buffer count
+ * (FFS, Kickstart 3.0 and later; the DosEnvec count in the mount entry does not
+ * follow later changes), then AddBuffers adds or removes the difference to n. */
+static void set_buffers(const char *drive, long want)
+{
+    long have = AddBuffers((STRPTR)drive, 0), result;
+    if (have <= 1) {
+        printf("AWBENCH error=no_buffer_count drive=%s result=%ld\n", drive, have);
+        return;
+    }
+    result = AddBuffers((STRPTR)drive, want - have);
+    printf("AWBENCH buffers drive=%s before=%ld want=%ld result=%ld after=%ld\n", drive, have, want, result,
+           (long)AddBuffers((STRPTR)drive, 0));
+}
+
 static void disk_tests(const char *name)
 {
     UBYTE *buffer = (UBYTE *)AllocMem(BIG_REQUEST, MEMF_ANY);
@@ -458,15 +714,17 @@ int main(void)
 {
     /* AmigaDOS argument parsing (ReadArgs), so the shell's own rules apply:
      * awbench cpu, awbench disk DH1:awbench.dat, awbench all DH1:awbench.dat */
-    LONG values[2] = {0, 0};
-    struct RDArgs *rd = ReadArgs((STRPTR)"MODE/A,FILE", values, NULL);
+    LONG values[3] = {0, 0, 0};
+    struct RDArgs *rd = ReadArgs((STRPTR)"MODE/A,FILE,N/N", values, NULL);
     const char *mode = rd ? (const char *)values[0] : "";
     const char *file = rd ? (const char *)values[1] : NULL;
     int status = 0;
     struct Process *self = (struct Process *)FindTask(NULL);
     APTR window = self->pr_WindowPtr;
-    if (strcmp(mode, "cpu") && (!file || (strcmp(mode, "disk") && strcmp(mode, "all")))) {
-        printf("usage: awbench cpu | awbench disk FILE | awbench all FILE\n"
+    if (strcmp(mode, "cpu") && (!file || (strcmp(mode, "disk") && strcmp(mode, "all") && strcmp(mode, "seek")
+                                          && strcmp(mode, "replay") && strcmp(mode, "buffers")))) {
+        printf("usage: awbench cpu | awbench disk FILE | awbench all FILE | awbench seek FILE [N]\n"
+               "       awbench replay LIST | awbench buffers DRIVE N\n"
                "FILE is created (8 MB) on the drive to test if missing; delete it afterwards.\n");
         if (rd)
             FreeArgs(rd);
@@ -474,6 +732,8 @@ int main(void)
     }
     /* a missing drive or a full disk fails with a message instead of a requester
      * (the benchmark may run with no screen to answer one) */
+    if (rd && values[2] && *(LONG *)values[2] > 0)
+        seek_requests = (unsigned long)*(LONG *)values[2];
     self->pr_WindowPtr = (APTR)-1;
     timer_port = CreateMsgPort();
     timer_request = timer_port ? (struct timerequest *)CreateIORequest(timer_port, sizeof *timer_request) : NULL;
@@ -508,6 +768,12 @@ int main(void)
         cpu_tests();
     if (!strcmp(mode, "disk") || !strcmp(mode, "all"))
         disk_tests(file);
+    if (!strcmp(mode, "seek"))
+        seek_tests(file);
+    if (!strcmp(mode, "replay"))
+        replay_tests(file);
+    if (!strcmp(mode, "buffers"))
+        set_buffers(file, (long)seek_requests);
     printf("AWBENCH end\n");
     CloseDevice((struct IORequest *)timer_request);
     DeleteIORequest((struct IORequest *)timer_request);

@@ -1,5 +1,24 @@
 # CENSUS-ENTITIES-30: misplaced objects in the Census and Excise Office
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 7 October 2026, in v0.0.30-dev5 |
+| Where | Census and Excise Office interior map |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | fixed in v0.0.30-rc1 |
+| Severity | high: Player fell through the upper floor; objects drawn as the wrong models (67 of 140). |
+| Family | Object placement and in-game geometry (`placement-geometry`) |
+| Playtest version | v0.0.30-dev5 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 7 October 2026
 
 Fixed in v0.0.30-rc1 and owner-accepted (WinUAE playtest, 7 October 2026:
@@ -88,3 +107,20 @@ check that pairing before packaging.
 AW-20260928-11 (Census missing floor and wall, falling into the void, fixed
 in v0.0.21-dev3) had the same symptom from a different cause: a missing room
 piece in an early conversion.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Object placement and in-game geometry (`placement-geometry`). Placed objects match the original (OpenMW A/B at the same pose). See [families](README.md#families).
+
+- AW-20260928-03 (no report page): Silt Strider landing geometry
+- AW-20260928-04 (no report page): Invisible barriers across plank
+- AW-20260928-06 (no report page): Player can leave pier and become stranded
+- AW-20260928-11 (no report page): Census missing floor and wall / falling into void
+- AW-20260928-20 (no report page): Census clipped outside room near captain wing
+- [CONVERTER-ROOT-ROTATION-30](CONVERTER-ROOT-ROTATION-30.md): Converter applied NIF root-node rotation to placed meshes
+- ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
+- SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+
+<!-- END GENERATED CATEGORY -->

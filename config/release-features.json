@@ -1,6 +1,6 @@
 {
  "format": "AmiWind release features 1",
- "about": "What a release ships, by feature: path patterns (glob per path segment) and the default builder steps that make the files. tests/test_release_coverage.py checks it against config/release-payload-classes.json and tools/build.py; tools/payload_coverage.py checks a built payload against it. A feature with \"towns\": \"shipped\" gets the patterns and town-<id> steps of every shipped town from config/towns.json.",
+ "about": "What a release ships, by feature: path patterns (glob per path segment) and the default builder steps that make the files. tests/test_release_coverage.py checks it against config/release-payload-classes.json and tools/build.py; tools/payload_coverage.py checks a built payload against it. A feature with \"towns\": \"shipped\" gets the patterns and town-<id> steps of every shipped town from config/towns.json. new_features: features the last release does not ship, made by an opt-in builder type (builder legacy|chim); required only in a payload built with that builder. replaced_by_chim: a town feature whose exterior maps a pure CHIM build (--builder chim) leaves out; its map classes are not expected there.",
  "builder_gaps": {},
  "features": [
   {
@@ -124,6 +124,7 @@
   },
   {
    "id": "seyda-neen",
+   "replaced_by_chim": true,
    "description": "Seyda Neen exterior maps and region table (recorded exception BUILD-SEYDA-REGEN-30)",
    "steps": ["bsp", "image"],
    "patterns": ["id1/maps/seyda.bsp", "id1/maps/sn[0-9][0-9][0-9].bsp", "id1/maps/sncourt.bsp",
@@ -131,6 +132,7 @@
   },
   {
    "id": "balmora",
+   "replaced_by_chim": true,
    "description": "Balmora exterior maps and region table",
    "steps": ["balmora", "image"],
    "image_options": ["--balmora-cache"],
@@ -185,6 +187,24 @@
    "steps": ["harvest", "image"],
    "image_options": ["--harvest"],
    "patterns": ["id1/harvest-*.txt", "id1/progs/harvest/*.mdl"]
+  }
+ ],
+ "new_features": [
+  {
+   "id": "chim-world",
+   "builder": "chim",
+   "description": "CHIM world: index, frame files and sector files on their own world volume (docs/chim/WORLD_FORMAT.md)",
+   "steps": ["chim", "image"],
+   "image_options": ["--chim-world"],
+   "patterns": ["id1/chim/world.cwi", "id1/chim/frames/*/*/frame.ccf", "id1/chim/frames/*/*/s[0-9][0-9].ccs"]
+  },
+  {
+   "id": "chim-frame-maps",
+   "builder": "chim",
+   "description": "CHIM frame maps: one map per CHIM area that the engine loads instead of its region maps",
+   "steps": ["chim", "image"],
+   "image_options": ["--chim-world"],
+   "patterns": ["id1/maps/*-chim.bsp"]
   }
  ]
 }

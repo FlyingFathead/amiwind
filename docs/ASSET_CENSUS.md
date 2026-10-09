@@ -8,6 +8,16 @@ variants scale and tilt create, how much a chunk ring holds, how much light
 each placement carries, what the terrain costs, and whether the whole game
 fits on one drive image.
 
+<!-- contents start -->
+## Contents
+
+- [Running it](#running-it)
+- [How Quake does it, and what is computed](#how-quake-does-it-and-what-is-computed)
+- [Results on the owner's data](#results-on-the-owners-data)
+- [Recommendations](#recommendations)
+
+<!-- contents end -->
+
 Status: measurement, 8 October 2026. No converter or engine change.
 
 ## Running it

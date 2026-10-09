@@ -2,7 +2,7 @@
 #define main previous_menu_fixture_main
 #include "aga_menu_test.c"
 #undef main
-static void enter_audio(void){int i;for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();}
+static void enter_audio(void){int i;for(i=0;i<6;i++)M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();}
 int main(void){
  int i,draws,sets;
  vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;sv.active=true;M_Init();

@@ -25,6 +25,7 @@ import time
 
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
+from engine_limits import limits as engine_limits
 from player_hull import lumps, pack_lumps
 from world_scenery import region_references
 from world_flora_policy import source_key
@@ -38,6 +39,17 @@ def digest(path):
 
 def identity(key):
     return json.dumps(key, separators=(',', ':'))
+
+
+def mesh_profile(model, refs, mode='mesh'):
+    """Converter profile of one flora model placed by refs (the overlay's and the CHIM builder's)."""
+    collision_none = next(r['source_collision']['mode'] == 'nonsolid' for r in refs)
+    profile = {'texture_size': 32, 'collision_only': mode == 'collision_only', 'collision_none': collision_none}
+    if mode == 'mesh':
+        profile['ratio'] = min(1., 120 / max(1, model['triangles']))
+    if mode == 'mesh' and any(r.get('kind') == 'small_mushroom' for r in refs):
+        profile['preserve_shared_seams'] = True
+    return profile
 
 
 def effective_representation(ref):
@@ -167,7 +179,9 @@ def aggregate_collision(index, refs, prepared, entry):
     return subset,{0:data},[ref['number']]
 
 
-RESERVES = {'models_plus_sprites': 240, 'entities': 550, 'static_entities': 480,
+# static_entities: the engine's budget (client.h MAX_STATIC_ENTITIES, tools/engine_limits.py) less 32
+# for the scene's own statics.
+RESERVES = {'models_plus_sprites': 240, 'entities': 550, 'static_entities': engine_limits()['max_static_entities'] - 32,
             'nodes': 32767, 'clipnodes': 32767, 'bytes': 4 * 1024 * 1024}
 
 
@@ -306,11 +320,8 @@ def _overlay_candidate(source, out, flora, index, receipt, entry, palette,
         prepared = {}
         for mi in {r['model_index'] for r in refs}:
             model = index['models'][mi]
-            collision_none = next(r['source_collision']['mode'] == 'nonsolid' for r in refs if r['model_index'] == mi)
-            profile = {'texture_size': 32, 'collision_only': mode == 'collision_only', 'collision_none': collision_none}
-            if mode == 'mesh':profile['ratio'] = min(1., 120 / max(1, model['triangles']))
-            if mode == 'mesh' and any(r.get('kind') == 'small_mushroom' for r in refs if r['model_index'] == mi):
-                profile['preserve_shared_seams'] = True
+            profile = mesh_profile(model, [r for r in refs if r['model_index'] == mi], mode)
+            collision_none = profile['collision_none']
             profiles[model['source']] = profile
             key = (str(packet.resolve()), mi, mode, collision_none, bool(profile.get('preserve_shared_seams')))
             if key not in _CACHE:

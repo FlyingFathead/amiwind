@@ -95,6 +95,7 @@ void Con_ToggleConsole_f (void)
 	}
 	else {
 		con_fullscreen=0;key_dest = key_console;
+		AW_PhotoConsoleReminder();	// F10 in photo mode says how to leave it
 	}
 	// AmiWind (CONSOLE-HISTORY-EMPTY-32): Up starts from the newest command
 	// each time the console opens or closes, not from where the last

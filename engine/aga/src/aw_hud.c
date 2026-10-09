@@ -100,7 +100,10 @@ void Sbar_Draw(void) {
     if(key_dest==key_console)return;
     AW_UIHud();
     compass();
-    if(AW_LightGalleryDraw())return; /* its strip replaces the bottom HUD */
+    /* Its strip replaces the bottom HUD. Photo mode hides it like everything
+     * else over the view; Ctrl+H (dbg hud) brings it back with the debug HUD.
+     * Its keys keep working while hidden (AW_WaitKey). */
+    if((!AW_PhotoModeActive() || AW_DebugOverlaysEnabled()) && AW_LightGalleryDraw())return;
     if(!AW_DebugOverlaysEnabled())return;
     if(current_region(&region))
         snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " Vvardenfell / %s",region?region:"Region unavailable");
@@ -120,8 +123,11 @@ void Sbar_Draw(void) {
         /* Report the simulated player in local play, before view interpolation. */
         if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
             p=svs.clients[0].edict->v.origin;
-        /* Two compact console-font rows beside the health/magicka/fatigue bars. */
-        Draw_Fill(88,vid.height-18,vid.width-88,18,255);
+        /* Two compact console-font rows beside the health/magicka/fatigue bars.
+         * Photo mode has no bars and a full-screen view: the strip spans the
+         * whole width (PHOTO-DEBUG-STRIP-33). */
+        if(AW_PhotoModeActive())Draw_Fill(0,vid.height-18,vid.width,18,255);
+        else Draw_Fill(88,vid.height-18,vid.width-88,18,255);
         if(sv.active && AW_WorldToSource(sv.name,p,global))
             snprintf(line,sizeof(line),"GLOBAL XYZ: %ld %ld %ld",(long)global[0],(long)global[1],(long)global[2]);
         else strcpy(line,"GLOBAL XYZ: unavailable (interior)");
@@ -146,7 +152,7 @@ void Sbar_Draw(void) {
         /* This strip is outside scr_vrect; the normal viewport-only update
          * would leave its old pixels on the Amiga screen. */
         scr_copyeverything=1;
-    } else AW_SmallString(92,vid.height-8,"WASD / F10 console");
+    } else if(!AW_PhotoModeActive())AW_SmallString(92,vid.height-8,"WASD / F10 console");
 }
 void Sbar_IntermissionOverlay(void) {}
 void Sbar_FinaleOverlay(void) {}

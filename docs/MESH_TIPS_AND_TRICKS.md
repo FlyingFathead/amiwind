@@ -1,5 +1,48 @@
 # Mesh tips and tricks: expensive scenery
 
+<!-- contents start -->
+## Contents
+
+- [Face validation (2026-10-08)](#face-validation-2026-10-08)
+- [Texture-mapping snapping and scenery reduction (2026-10-08)](#texture-mapping-snapping-and-scenery-reduction-2026-10-08)
+- [Visibility first: brush entities never hide anything (2026-10-07)](#visibility-first-brush-entities-never-hide-anything-2026-10-07)
+- [Packaged interior plane audit: 2026-10-06T20:11:15+03:00](#packaged-interior-plane-audit-2026-10-06t2011150300)
+- [Temple plane defect and import risk: 2026-10-06T20:06:10+03:00](#temple-plane-defect-and-import-risk-2026-10-06t2006100300)
+- [Case 1: Seyda Neen façades and projecting windows](#case-1-seyda-neen-façades-and-projecting-windows)
+  - [1) Problem](#1-problem)
+  - [2) Investigation](#2-investigation)
+  - [3) Solution](#3-solution)
+  - [Conversion validation and mounting correction](#conversion-validation-and-mounting-correction)
+- [Case 2: invisible scenery, residency and cleanup](#case-2-invisible-scenery-residency-and-cleanup)
+  - [1) Problem](#1-problem-1)
+  - [2) Investigation](#2-investigation-1)
+  - [3) Solution](#3-solution-1)
+- [Fourth window regression: v0.0.23 follow-up](#fourth-window-regression-v0023-follow-up)
+  - [Problem](#problem)
+  - [Investigation](#investigation)
+  - [Solution](#solution)
+- [Census exterior doors: wall breakthrough (v0.0.23)](#census-exterior-doors-wall-breakthrough-v0023)
+  - [1. Problem](#1-problem-2)
+  - [2. Investigation](#2-investigation-2)
+  - [3. Solution](#3-solution-2)
+- [Balmora missing facades (v0.0.24-dev2)](#balmora-missing-facades-v0024-dev2)
+  - [1. Problem and initial suspicion](#1-problem-and-initial-suspicion)
+  - [2. Inspected cause](#2-inspected-cause)
+  - [3. Fix and validation](#3-fix-and-validation)
+  - [Owner playtest, 30 September 2026, v0.0.24-dev2](#owner-playtest-30-september-2026-v0024-dev2)
+- [Balmora underpasses and global player height (v0.0.24-dev2)](#balmora-underpasses-and-global-player-height-v0024-dev2)
+  - [1. Problem and initial suspicion](#1-problem-and-initial-suspicion-1)
+  - [2. Inspected collision cause](#2-inspected-collision-cause)
+  - [3. Collision fix and limits](#3-collision-fix-and-limits)
+  - [4. Global physical dimensions: runtime measurement](#4-global-physical-dimensions-runtime-measurement)
+  - [5. Confirmed global eye-height error and correction](#5-confirmed-global-eye-height-error-and-correction)
+- [Balmora Silt Strider — dev3 correction, 30 September 2026](#balmora-silt-strider--dev3-correction-30-september-2026)
+- [Balmora black boundary flashes — dev3 loading presentation](#balmora-black-boundary-flashes--dev3-loading-presentation)
+- [Balmora dev5: separate image ordering from physical collision](#balmora-dev5-separate-image-ordering-from-physical-collision)
+- [Large room collision unions: index before flattening](#large-room-collision-unions-index-before-flattening)
+
+<!-- contents end -->
+
 ## Face validation (2026-10-08)
 
 Every converted face can be checked as the engine reads it with

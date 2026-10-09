@@ -18,6 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "quakedef.h"
+#include "aw_log.h"
 
 /* Native raw keys, including extended PC/Amiga keyboard navigation.
  * Values follow the SDK libraries/keymap.h definitions. */
@@ -224,15 +225,16 @@ int Key_ConsoleTerminal(void)
  * Written whole (a few KiB at most) only when Enter adds an entry. */
 static void console_history_write(void)
 {
-    FILE *f;int i,line;
+    int i,line;
     if(!history_path[0])return;
-    f=fopen(history_path,"w");
-    if(!f)return;
+    /* A diagnostic snapshot held in memory unless aw_logs_live; written at Exit
+     * game or with dbg savelogs (aw_log.c, BOOT-VOLUME-NOT-VALIDATED-33). */
+    AW_LogBegin(AW_LOG_HISTORY);
     for(i=1;i<32;i++){
         line=(edit_line+i)&31;
-        if(key_lines[line][1])fprintf(f,"%s\n",key_lines[line]+1);
+        if(key_lines[line][1])AW_LogPrintf(AW_LOG_HISTORY,"%s\n",key_lines[line]+1);
     }
-    fclose(f);
+    AW_LogEnd(AW_LOG_HISTORY);
 }
 
 static void console_history_read(void)
@@ -261,6 +263,7 @@ void Key_ConsoleInit(const char *dir)
     Cvar_RegisterVariable(&aw_console_mode);
     if(strlen(dir)+strlen(HISTORY_FILE)+2>sizeof history_path)return;
     sprintf(history_path,"%s/%s",dir,HISTORY_FILE);
+    AW_LogSetPath(AW_LOG_HISTORY,history_path);
     console_history_read();
 }
 
@@ -881,6 +884,10 @@ void Key_Event (int key, qboolean down)
         if(down)Cbuf_AddText(shift_down?"aw_console_fullscreen\n":"aw_console_cycle\n");
         return;
     }
+
+    /* Photo mode only: Ctrl+F fog, Ctrl+H debug HUD. Outside photo mode
+     * Ctrl and F keep their bindings (fast flight, hands). */
+    if (down && key_dest == key_game && keydown[K_CTRL] && AW_PhotoKey(key)) return;
 
     /* Music history controls are handled before ordinary game bindings. */
     if (AW_GalleryKey(shift_down?keyshift[key]:key,down,shift_down,keydown[K_CTRL])) return;

@@ -13,6 +13,9 @@ byte *draw_chars;
 static int font_size=-1,catalogue_opens,catalogue_missing,catalogue_size_adjust;
 static const char *catalogue_path,*catalogue_override;
 static char printed[20000];
+/* The gallery marker check (aw_gallery.c) as seen by the listing code. */
+static int gallery_omitted,gallery_checks;
+int AW_GalleryOmitted(void){gallery_checks++;return gallery_omitted;}
 int COM_FOpenFile(char *name,FILE **f){
  int i,n,c;FILE *source;
  if(!strcmp(name,"debug-commands.txt")){
@@ -93,6 +96,17 @@ int main(int count,char **values){
     assert(AW_DebugTranslate(4,fill,output,sizeof(output))==1 && !strcmp(output,"aw_skyline_fill 0\n"));
     assert(AW_DebugTranslate(3,guard,output,sizeof(output))==1 && !strcmp(output,"aw_guardtorch on\n"));
   }
+  { /* Photo mode (dbg photomode / dbg killhud) and dbg crosshair(s): one handler each, words kept. */
+    char *photo[3]={"dbg","photomode","off"},*kill[3]={"dbg","killhud","on"},*cross[3]={"dbg","crosshairs","on"};
+    assert(AW_DebugTranslate(3,photo,output,sizeof(output))==1 && !strcmp(output,"aw_photomode off\n"));
+    assert(AW_DebugTranslate(2,photo,output,sizeof(output))==1 && !strcmp(output,"aw_photomode\n"));
+    assert(AW_DebugTranslate(3,kill,output,sizeof(output))==1 && !strcmp(output,"aw_photomode on\n"));
+    assert(AW_DebugTranslate(2,kill,output,sizeof(output))==1 && !strcmp(output,"aw_photomode\n"));
+    assert(AW_DebugTranslate(3,cross,output,sizeof(output))==1 && !strcmp(output,"aw_crosshair on\n"));
+    cross[1]="crosshair";cross[2]="off";
+    assert(AW_DebugTranslate(3,cross,output,sizeof(output))==1 && !strcmp(output,"aw_crosshair off\n"));
+    assert(AW_DebugTranslate(2,cross,output,sizeof(output))==1 && !strcmp(output,"aw_crosshair\n"));
+  }
   assert(!AW_DebugTranslate(3,tracker,output,sizeof(output))); /* Query only, no reset. */
   tracker[0]="debug";assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1);
   assert(!AW_DebugTranslate(2,tracker,output,8));
@@ -160,7 +174,8 @@ int main(int count,char **values){
  char *tp[]={"dbg","tp","balmora"};
  char *tp_menu[]={"amiwind","debug","tp","menu"};
  char *tp_xy[]={"dbg","tp","-14231","-76109"};
- char *tp_extra[]={"dbg","tp","-14231","-76109","extra"};
+ char *tp_extra[]={"dbg","tp","-14231","-76109","1200","extra"};
+ char *tp_xyz[]={"dbg","tp","-14231","-76109","1200"};
  char *tp_bad[]={"dbg","tp","balmora;quit"};
  char *fog[]={"dbg","fog","distance","400"};
  char *distance[]={"debug","draw","distance","500"};
@@ -291,7 +306,9 @@ int main(int count,char **values){
  assert(AW_DebugTranslate(3,tp,output,sizeof(output))==1 && !strcmp(output,"aw_teleport prisonship\n"));
  assert(AW_DebugTranslate(4,tp_menu,output,sizeof(output))==1 && !strcmp(output,"aw_scene_menu\n"));
  assert(AW_DebugTranslate(4,tp_xy,output,sizeof(output))==1 && !strcmp(output,"aw_teleport -14231 -76109\n"));
- assert(!AW_DebugTranslate(5,tp_extra,output,sizeof(output)));
+ /* dbg tp X Y Z (DEBUG-TP-CHIM-33); a fourth number is refused. */
+ assert(AW_DebugTranslate(5,tp_xyz,output,sizeof(output))==1 && !strcmp(output,"aw_teleport -14231 -76109 1200\n"));
+ assert(!AW_DebugTranslate(6,tp_extra,output,sizeof(output)));
  assert(!AW_DebugTranslate(3,tp_bad,output,sizeof(output)));
  tp_bad[2]="../prison";assert(!AW_DebugTranslate(3,tp_bad,output,sizeof(output)));
  assert(!AW_DebugTranslate(3,tp,output,8));
@@ -325,6 +342,29 @@ int main(int count,char **values){
  AW_ConsoleInit();assert(colour->value==255);assert(dbg_command==debug_command);
  assert(i==catalogue_opens); /* Registering/opening does not load a catalogue. */
  argc=2;args[0]="dbg";args[1]="help";printed[0]=0;debug_command();
+ /* Normal builds: the gallery commands are listed plainly. */
+ assert(gallery_checks==1 && !strstr(printed,"(not in this build)"));
+ assert(strstr(printed," npcgallery [number/name/ID]\n"));
+ /* A --no-npc-gallery build marks every gallery route, and only those, in the
+  * full list and in dbg help <word>; dispatch never checks the marker. */
+ gallery_omitted=1;printed[0]=0;debug_command();
+ assert(gallery_checks==2);
+ assert(strstr(printed," npcgallery [number/name/ID] (not in this build)\n"));
+ assert(strstr(printed," modelgallery [number/name/ID] (not in this build)\n"));
+ assert(strstr(printed," gallery [number/name/ID; next/previous/body/browse/help/exit] (not in this build)\n"));
+ assert(strstr(printed," aw charplane [number/name/ID; next/previous/body/exit] (not in this build)\n"));
+ /* dbg combattest is the Vivec Arena (no gallery needed); its floor test explains itself. */
+ assert(strstr(printed," combattest [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit\n"));
+ assert(strstr(printed," arenapit [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena"));
+ {char *p=printed;int marks=0;while((p=strstr(p,"(not in this build)"))){marks++;p++;}assert(marks==4);}
+ assert(!strstr(printed,"Esc done (not in this build)") && !strstr(printed,"Esc returns) (not in this build)"));
+ argc=3;args[1]="help";args[2]="npcgallery";printed[0]=0;debug_command();
+ assert(gallery_checks==3 && !strcmp(printed," dbg npcgallery [number/name/ID] (not in this build)\n"));
+ args[2]="lightgallery";printed[0]=0;debug_command();
+ assert(gallery_checks==4 && strstr(printed," dbg lightgallery [off]") && !strstr(printed,"(not in this build)"));
+ argc=2;args[1]="npcgallery";strcpy(queued,"untouched");debug_command();
+ assert(gallery_checks==4 && !strcmp(queued,"aw_charplane\n"));
+ gallery_omitted=0;argc=2;args[1]="help";printed[0]=0;debug_command();
  assert(strstr(printed,"AUDIO\n--------------------------------------\n"));
  assert(strstr(printed,"VIDEO\n--------------------------------------\n"));
  assert(strstr(printed,"PLAYTESTING\n--------------------------------------\n"));

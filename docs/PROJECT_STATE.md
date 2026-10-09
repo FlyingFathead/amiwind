@@ -1,5 +1,29 @@
 # Current project state
 
+<!-- contents start -->
+## Contents
+
+- [7 October 2026: v0.0.30 - The Temple](#7-october-2026-v0030---the-temple)
+- [4 October 2026 (historical)](#4-october-2026-historical)
+  - [In preparation: v0.0.28 — Trees and Grass, Day and Night](#in-preparation-v0028--trees-and-grass-day-and-night)
+- [Published: v0.0.27 — Rocks, Mushrooms, and Then Some](#published-v0027--rocks-mushrooms-and-then-some)
+- [Current limits and next checks](#current-limits-and-next-checks)
+- [Historical checkpoints](#historical-checkpoints)
+  - [AmiWind v0.0.27-rc2 - Rocks and Mushrooms](#amiwind-v0027-rc2---rocks-and-mushrooms)
+  - [Published v0.0.26 baseline — historical](#published-v0026-baseline--historical)
+  - [Earlier gameplay and performance checkpoints](#earlier-gameplay-and-performance-checkpoints)
+  - [RC3 recovery baseline (historical)](#rc3-recovery-baseline-historical)
+  - [RC1 baseline (historical)](#rc1-baseline-historical)
+  - [Previous checkpoint notes](#previous-checkpoint-notes)
+  - [Historical context](#historical-context)
+  - [Project identity and build access, 28 September 2026](#project-identity-and-build-access-28-september-2026)
+  - [Historical priority — v0.0.16](#historical-priority--v0016)
+  - [Open issues and measured findings](#open-issues-and-measured-findings)
+  - [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
+  - [28 September 15:50 owner follow-up](#28-september-1550-owner-follow-up)
+
+<!-- contents end -->
+
 ## 7 October 2026: v0.0.30 - The Temple
 
 v0.0.30 follows v0.0.29 (published 6 October 2026). It repairs the Balmora

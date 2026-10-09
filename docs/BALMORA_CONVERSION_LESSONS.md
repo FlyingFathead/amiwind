@@ -1,5 +1,27 @@
 # Balmora conversion: problems, causes, implications and resolutions
 
+<!-- contents start -->
+## Contents
+
+- [Visibility update: 2026-10-07](#visibility-update-2026-10-07)
+- [Geometry import validation update: 2026-10-06T20:06:10+03:00](#geometry-import-validation-update-2026-10-06t2006100300)
+- [1. Buildings lost their facades while decoration remained](#1-buildings-lost-their-facades-while-decoration-remained)
+- [2. Hollow passages became solid collision](#2-hollow-passages-became-solid-collision)
+- [3. A stair ramp fell just below the walkable-floor threshold](#3-a-stair-ramp-fell-just-below-the-walkable-floor-threshold)
+- [4. Far-origin interiors became nearly empty rooms](#4-far-origin-interiors-became-nearly-empty-rooms)
+- [5. A second selection policy silently removed interior dressing](#5-a-second-selection-policy-silently-removed-interior-dressing)
+- [6. Truncated intermediate caches interrupted rebuilding](#6-truncated-intermediate-caches-interrupted-rebuilding)
+- [7. NPC names were incompatible with BSP entity quoting](#7-npc-names-were-incompatible-with-bsp-entity-quoting)
+- [8. Names, Talk prompts and activation selected different targets](#8-names-talk-prompts-and-activation-selected-different-targets)
+- [9. Door catalogues existed without playable destination interiors](#9-door-catalogues-existed-without-playable-destination-interiors)
+- [10. Gold text lost character distinctions](#10-gold-text-lost-character-distinctions)
+- [11. Ground patches lacked the expected paving](#11-ground-patches-lacked-the-expected-paving)
+- [12. The dock guard circled or faced the wrong direction at the door](#12-the-dock-guard-circled-or-faced-the-wrong-direction-at-the-door)
+- [Applying these lessons to the next region](#applying-these-lessons-to-the-next-region)
+- [13. A directory-mounted build hid an invalid Amiga filename](#13-a-directory-mounted-build-hid-an-invalid-amiga-filename)
+
+<!-- contents end -->
+
 ## Visibility update: 2026-10-07
 
 Balmora's buildings are `func_wall` models, which Quake's `vis` ignores, so

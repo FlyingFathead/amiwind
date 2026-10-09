@@ -74,8 +74,8 @@ def build_room(task):
             profiles[model] = profile
     groups = {slug:{'references':[r['number'] for r in refs], 'visual_profiles':profiles}}
     refs = [dict(r, scene_groups=[slug]) for r in refs]
-    lighting = {**cell['lighting'], 'lights':[dict(r['light'],position=r['position'])
-                for r in cell['refs'] if r.get('light') and not r.get('deleted')]}
+    from interior_lighting import cell_lighting
+    lighting = cell_lighting(cell)
     if slug=='addamasartus':
         lighting={**lighting,'lights':[],'shared_ambient':True}
     parts = root/'source'
@@ -169,19 +169,32 @@ def build_resident(task):
         'sha256':hashlib.sha256(raw).hexdigest(),'voice_seconds':duration}
 
 
-def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='fast'):
+def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='fast',rooms=True):
+    """rooms=False: a quick test build without interiors (--exclude interiors,
+    tools/build_exclusions.py). The rooms are not compiled; the exterior residents
+    are placed and the door tables written as usual, so their doors say the area is
+    unavailable."""
     data=resolve_data_files(data_files);scene=ensure_external(scene,'area conversion')
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
     ext=lumps((scene/'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',ext))
     entries=[s for s in SCENES if s['interior'] and s['map'] not in ('prison','census')
              and s.get('area', 'seyda') == 'seyda']
+    if not rooms:
+        print(f'Quick test build: {len(entries)} Seyda Neen rooms left out (--exclude interiors).',flush=True)
+        entries=[]
     # Rooms compile side by side: divide the job budget between them.
     workers=min(resolve_jobs(jobs),max(1,len(entries)))
     tasks=[(data,scene,s,qbsp,vis,light,timings,map_threads(resolve_jobs(jobs),workers),vis_mode,interior_dressing())
            for s in entries]
     rooms={};reports=[]
-    for report,cell in ordered_map(build_room,tasks,min(resolve_jobs(jobs),len(tasks))):
+    # Longest room first: history, else its placed references (BUILD-ORDERED-WINDOW-33).
+    from build_costs import costed_map, room_sizes
+    sizes=room_sizes(data,[(e['map'],e['cell']) for e in entries])
+    # A quick test build without interiors runs no room (and records no room times).
+    for report,cell in (costed_map('area-rooms',build_room,tasks,[e['map'] for e in entries],max(1,min(resolve_jobs(jobs),len(tasks))),
+                                  fallback=sizes.get if sizes else None)
+                        if tasks else ()):
         slug=report['map'];rooms[slug]=cell;reports.append(report)
         shutil.copyfile(scene/'area-work'/slug/'room.bsp',scene/'id1/maps'/f'{slug}.bsp')
         print('Interior ready:',slug,report['bytes'],'bytes',flush=True)
@@ -209,7 +222,7 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         appearance['initially_dead']=len(stats)==52 and struct.unpack_from('<h',stats,38)[0]<=0
         greeting={'text':'','voice':''} if appearance['initially_dead'] else greeting_fixture(topics,appearance)
         tasks.append((data,palette,appearance,greeting,ffmpeg))
-    for identifier,raw,voice,record in ordered_map(build_resident,tasks,min(resolve_jobs(jobs),len(tasks))):
+    for identifier,raw,voice,record in ordered_map(build_resident,tasks,max(1,min(resolve_jobs(jobs),len(tasks)))):
         stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
         record.update(model='progs/'+stem+'.mdl',voice='npc/'+stem+'.wav' if voice else '')
         (scene/'id1'/record['model']).write_bytes(raw)
@@ -253,6 +266,9 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('data-files','scene','qbsp','vis','light'):p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);add_vis_option(p);add_dressing_option(p);a=p.parse_args()
+    p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);add_vis_option(p);add_dressing_option(p)
+    p.add_argument('--no-rooms',action='store_true',help='Quick test build (--exclude interiors): do not compile the rooms')
+    a=p.parse_args()
     apply_dressing_option(a)
-    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.ffmpeg,a.jobs,a.vis_mode)
+    import build_profile; build_profile.instrument('area')  # sub-stage timers (docs/BUILD_PROFILE.md)
+    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.ffmpeg,a.jobs,a.vis_mode,rooms=not a.no_rooms)

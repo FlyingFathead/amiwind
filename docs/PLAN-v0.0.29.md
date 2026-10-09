@@ -8,6 +8,38 @@ The original reports remain the baseline; current issue status is authoritative
 in [BUGS.md](BUGS.md). Preserve all published artifacts unchanged. Retain rocks, joined giant mushrooms,
 authored foliage placements and Balmora's mesh-foliage comparison area.
 
+<!-- contents start -->
+## Contents
+
+- [Current release sequence — 6 October 2026](#current-release-sequence--6-october-2026)
+- [Immediate bugfix queue](#immediate-bugfix-queue)
+- [Torch and local-light regression gate](#torch-and-local-light-regression-gate)
+- [Modal workload and Seyda Neen follow-up](#modal-workload-and-seyda-neen-follow-up)
+- [Navigation, character state and optional sky work](#navigation-character-state-and-optional-sky-work)
+- [Weather, storms and lava study](#weather-storms-and-lava-study)
+- [Evidence and acceptance before a patch release](#evidence-and-acceptance-before-a-patch-release)
+- [HUD source-candidate evidence, 4 October 2026](#hud-source-candidate-evidence-4-october-2026)
+- [Distant terrain topology and occlusion study](#distant-terrain-topology-and-occlusion-study)
+- [Bonus after the immediate fixes: Ghostgate and Ghostfence feasibility](#bonus-after-the-immediate-fixes-ghostgate-and-ghostfence-feasibility)
+- [Additional source evidence, 4 October 2026](#additional-source-evidence-4-october-2026)
+- [Protected sunrise and sunset baseline for v0.0.29](#protected-sunrise-and-sunset-baseline-for-v0029)
+- [Later combat scope](#later-combat-scope)
+  - [Horizon coordinate transcription correction](#horizon-coordinate-transcription-correction)
+- [5 October afternoon owner follow-up](#5-october-afternoon-owner-follow-up)
+  - [5 October radius and grip follow-up](#5-october-radius-and-grip-follow-up)
+  - [Standing full-screen UI resource rule](#standing-full-screen-ui-resource-rule)
+  - [5 October map interaction split](#5-october-map-interaction-split)
+  - [Map controls: source implementation and focused checks](#map-controls-source-implementation-and-focused-checks)
+  - [Combined source validation, 5 October 2026](#combined-source-validation-5-october-2026)
+- [Conditional release milestone: More Mushrooms](#conditional-release-milestone-more-mushrooms)
+- [Required More Mushrooms! debug checkpoint](#required-more-mushrooms-debug-checkpoint)
+- [Final More Mushrooms! release blockers — 6 October 2026](#final-more-mushrooms-release-blockers--6-october-2026)
+- [Next checkpoint: v0.0.29-rc1](#next-checkpoint-v0029-rc1)
+- [Final-release gallery checklist](#final-release-gallery-checklist)
+- [Mandatory issue and roadmap reconciliation](#mandatory-issue-and-roadmap-reconciliation)
+
+<!-- contents end -->
+
 ## Current release sequence — 6 October 2026
 
 | Milestone | Current state | Next action and completion evidence |

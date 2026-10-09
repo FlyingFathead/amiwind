@@ -173,10 +173,12 @@ def frozen_maps(work_dir):
     return frozenset(row['file'][5:] for row in receipt['files'] if row['file'].startswith('maps/'))
 
 
-def check(id1, work_dir, stage, jobs=None):
+def check(id1, work_dir, stage, jobs=None, removed=()):
     """Stop the build when `stage` left any recorded file different from its recorded bytes.
 
-    No-op without a recorded stage. Each passed check is appended to the receipt.
+    No-op without a recorded stage. Each passed check is appended to the receipt. removed:
+    recorded files a pure CHIM image left out on purpose (Seyda Neen runs on CHIM; their removal
+    is in build.json chim_world.removed_legacy): not checked, and counted in the receipt.
     """
     path = receipt_path(work_dir)
     receipt = load_receipt(work_dir)
@@ -184,7 +186,8 @@ def check(id1, work_dir, stage, jobs=None):
         return None
     from build_parallel import hash_existing
     id1 = Path(id1)
-    rows = receipt['files']
+    removed = set(removed)
+    rows = [row for row in receipt['files'] if row['file'] not in removed]
     found = hash_existing([id1 / row['file'] for row in rows], jobs)
     changed = [row['file'] for row, value in zip(rows, found) if value != row['sha256']]
     if changed:
@@ -192,7 +195,8 @@ def check(id1, work_dir, stage, jobs=None):
                          'Seyda Neen file(s) differ from the recorded bytes (' + ', '.join(changed[:6]) +
                          '). A pass may change recorded maps only when the change is named on '
                          'BUILD-SEYDA-REGEN-30 (BUILD-SEYDA-RECORDED-REWRITTEN-32).')
-    receipt['checks'].append(dict(stage=stage, files=len(rows), status='byte-identical'))
+    receipt['checks'].append(dict(stage=stage, files=len(rows), status='byte-identical',
+                                  **({'removed_for_chim': len(removed)} if removed else {})))
     path.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8', newline='\n')
     return receipt
 

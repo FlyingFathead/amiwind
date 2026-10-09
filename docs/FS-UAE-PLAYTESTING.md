@@ -1,5 +1,26 @@
 # AmiWind playtesting with FS-UAE
 
+<!-- contents start -->
+## Contents
+
+- [Automatically generated image configurations](#automatically-generated-image-configurations)
+- [Current v0.0.27 preset](#current-v0027-preset)
+- [Build and launch automatically](#build-and-launch-automatically)
+- [Requirements](#requirements)
+- [Create the FS-UAE configuration](#create-the-fs-uae-configuration)
+- [Start AmiWind](#start-amiwind)
+- [Expected memory check](#expected-memory-check)
+- [Floppy-drive sounds](#floppy-drive-sounds)
+- [Optional fullscreen mode](#optional-fullscreen-mode)
+- [Notes](#notes)
+- [Slow accelerator preset](#slow-accelerator-preset)
+- [Benchmark profile](#benchmark-profile)
+- [Repository preset and validation note](#repository-preset-and-validation-note)
+- [Emulator development access](#emulator-development-access)
+- [Headless development container](#headless-development-container)
+
+<!-- contents end -->
+
 ## Automatically generated image configurations
 
 Full-game assembly writes `AmiWind-v<VERSION>-WinUAE.uae` and
@@ -280,6 +301,54 @@ It is not intended to represent the performance of a stock Amiga 1200 or Amiga 5
 
 For compatibility or minimum-spec testing, use a separate emulator configuration matching the intended target hardware.
 
+## Slow accelerator preset
+
+[resources/emulators/AmiWind-SlowAccelerator-FS-UAE.fs-uae](../resources/emulators/AmiWind-SlowAccelerator-FS-UAE.fs-uae)
+plays the game roughly like an A1200 with a TF1260-class accelerator: a 68040 at about
+50 MHz with its FPU, the same 2 MB Chip RAM and 16 MB Zorro III RAM as the normal preset.
+It is the normal preset with only the CPU speed lines changed:
+
+```ini
+jit_compiler = 0
+uae_cpu_cycle_exact = true
+uae_cpu_multiplier = 14
+```
+
+That is the [benchmark profile](#benchmark-profile) at twice the clock
+(14 x 3.546895 MHz = 49.7 MHz). It gives the feel of slow hardware; it is not a
+measurement, for the reasons given under the benchmark profile. Set your ROM and HDF paths
+as for the normal preset (v0.0.32 and later images also need the world disk, listed as
+`hard_drive_1`), then start FS-UAE with it. The playtest launcher always writes the normal
+(JIT) preset; use this file directly.
+
+- Tuning: a higher multiplier is faster, a lower one slower (7 = 24.8 MHz, 11 = 39 MHz,
+  20 = 70.9 MHz). A real 68060 does more per clock than the emulated 68040, so for a
+  68060 card raise the multiplier.
+- A 68060 (`cpu = 68060-NOMMU`, `fpu = 68060`) needs a 68060.library on the boot disk;
+  without it Kickstart 3.1 does not report the FPU and the boot check stops
+  ([BOOT-68060-FPU-FAIL-32](bugs/BOOT-68060-FPU-FAIL-32.md)). A CPU without an FPU
+  (68LC060, 68LC040, 68EC040) cannot run AmiWind.
+- The emulated CPU runs in real time only if the PC can interpret a 50 MHz 68040 that
+  fast; on a busy PC the whole emulation runs slower than real time (the game's own
+  frame times stay the same, the clock on the wall does not).
+- The engine limits a frame's game time to 0.1 s (Quake's `host_frametime` cap), so at
+  one frame a second the game also runs in slow motion.
+
+First check (9 October 2026, FS-UAE 3.1.66 in a container, one host CPU per run, host
+busy with builds; Balmora exterior on the CHIM engine, noon, `dbg rcount` per-second
+lines, medians; frame times are the game's own timer):
+
+| Preset | Frames per second | Frame time | Slowest frame, standing | Slowest frame at a chunk crossing (`chim_tp`, 1024 units) |
+| --- | ---: | ---: | ---: | ---: |
+| Normal (JIT, `max`) | 20-25 | 41-50 ms | 181 ms | 208-228 ms |
+| Slow accelerator (multiplier 14) | 0.8-0.9 | 1.02-1.19 s | 1.20 s | 1.23-1.43 s |
+| Benchmark profile (multiplier 7) | 0.4-0.5 | 1.91-2.28 s | 2.22 s | 2.17-2.59 s |
+
+In the slow preset a chunk crossing adds up to about 0.3 s to a frame; the town
+itself is the cost: about a second for every frame. Doubling the multiplier from 7 to 14
+nearly halves the frame time, so the multiplier does set the clock. Relative numbers until a real
+accelerated A1200 has been measured ([HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md)).
+
 ## Benchmark profile
 
 The playtest configuration above (JIT, `uae_cpu_speed = max`) runs the 68040 as fast as
@@ -291,6 +360,13 @@ approximates 68040 instruction and memory timing, its hard disk is a virtual dev
 backed by the PC's file cache (load times are not real), and nothing here has been
 checked against a real accelerated A1200 yet ([HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md)
 asks owners for that number). Every performance report names its profile.
+
+Benchmark tools read the engine's diagnostic logs (`tools/profile_aga.py` reads
+`walk-profile.csv`, `frame-profile.txt` and `music-profile.txt`). Since
+BOOT-VOLUME-NOT-VALIDATED-33 a normal image keeps them in fixed memory buffers (only
+the newest lines) and writes them at Exit game; for a benchmark run use an image built
+with `--live-logs`, or type `dbg logs live on` before the run, so every line is written
+as it happens.
 
 Replace the CPU speed lines of the playtest configuration with:
 

@@ -4,6 +4,28 @@ Keep owner reports separate from local acceptance tests. A fix at one location
 is not evidence that every collision/rendering issue is solved. New reports
 append to the relevant version; do not rewrite earlier observations as passes.
 
+<!-- contents start -->
+## Contents
+
+- [v0.0.24-rc1](#v0024-rc1)
+- [v0.0.23-dev1 / parallel-build checkpoint](#v0023-dev1--parallel-build-checkpoint)
+- [v0.0.12-dev2 / checkpoint-013](#v0012-dev2--checkpoint-013)
+- [v0.0.13-dev1 / checkpoint-014](#v0013-dev1--checkpoint-014)
+- [Reporting a regression](#reporting-a-regression)
+- [New terrain/formation report, 27 September 20:55 Helsinki](#new-terrainformation-report-27-september-2055-helsinki)
+- [v0.0.14-dev1 / checkpoint-015](#v0014-dev1--checkpoint-015)
+- [v0.0.15-dev1 / checkpoint-016](#v0015-dev1--checkpoint-016)
+- [v0.0.15-dev1 follow-up reports, 27 September 22:17–22:40 Helsinki](#v0015-dev1-follow-up-reports-27-september-22172240-helsinki)
+- [v0.0.15-dev2 / checkpoint-017](#v0015-dev2--checkpoint-017)
+- [Owner checkpoint-017 playtest, 27 September 23:28 Helsinki](#owner-checkpoint-017-playtest-27-september-2328-helsinki)
+- [Latest owner playtest and default decision, 27 September 23:29–23:31 Helsinki](#latest-owner-playtest-and-default-decision-27-september-23292331-helsinki)
+- [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
+- [28 September 15:50 owner follow-up](#28-september-1550-owner-follow-up)
+- [v0.0.21-dev1 regression / v0.0.21-dev2 correction](#v0021-dev1-regression--v0021-dev2-correction)
+- [v0.0.21-dev2 owner follow-up / dev3 maintenance](#v0021-dev2-owner-follow-up--dev3-maintenance)
+
+<!-- contents end -->
+
 ## v0.0.24-rc1
 
 **AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**

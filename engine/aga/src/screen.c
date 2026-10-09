@@ -248,8 +248,8 @@ static void SCR_CalcRefdef (void)
     r_refdef.fov_x = scr_fov.value;
     r_refdef.fov_y = CalcFov (r_refdef.fov_x, r_refdef.vrect.width, r_refdef.vrect.height);
 
-// intermission is always full screen
-    if (cl.intermission)
+// intermission is always full screen; so is photo mode (dbg photomode)
+    if (cl.intermission || AW_PhotoModeActive())
         size = 120;
     else
         size = scr_viewsize.value;
@@ -262,9 +262,10 @@ static void SCR_CalcRefdef (void)
         sb_lines = 24+16+8;
 
     /* Keep normal HUD/dialogue entirely below the 3D view. */
-    if (!cl.intermission && sb_lines < 48) sb_lines = 48;
-    /* Keep the optional diagnostic strip outside the rendered world. */
-    if (AW_DebugCoordsEnabled() && sb_lines < 12) sb_lines = 12;
+    if (!cl.intermission && !AW_PhotoModeActive() && sb_lines < 48) sb_lines = 48;
+    /* Keep the optional diagnostic strip outside the rendered world
+     * (in photo mode Ctrl+H draws it over the full-screen view). */
+    if (AW_DebugCoordsEnabled() && !AW_PhotoModeActive() && sb_lines < 12) sb_lines = 12;
 
 // these calculations mirror those in R_Init() for r_refdef, but take no
 // account of water warping
@@ -991,13 +992,22 @@ void SCR_UpdateScreen (void)
             SCR_DrawNet ();
             SCR_DrawTurtle ();
         }
-        SCR_DrawPause ();
+        /* Photo mode: no pause plaque, prompts, names or subtitles. */
+        if (!AW_PhotoModeActive())
+            SCR_DrawPause ();
+        AW_PhotoDraw ();
         SCR_CheckDrawCenterString ();
         Sbar_Draw ();
-        AW_SceneDraw();
-        AW_UIDraw();
+        if (!AW_PhotoModeActive())
+            AW_SceneDraw();
+        /* In photo mode the message box shows only photo mode's own notice. */
+        if (!AW_PhotoModeActive() || AW_PhotoNoticeShowing())
+            AW_UIDraw();
         AW_IntroDraw();
-        AW_GalleryDraw();
+        /* Test-room and gallery instruction text is not part of a photo
+         * (PHOTO-GALLERY-TEXT-33); the light gallery strip stays, it is a tool. */
+        if (!AW_PhotoModeActive())
+            AW_GalleryDraw();
         AW_UIOuterFrame();
         SCR_DrawConsole ();
         M_Draw ();

@@ -30,6 +30,38 @@ def check_payload_names(root):
         seen.add(key)
 
 
+def check_payload_host_paths(root, workspace_paths, *, text_limit=8 << 20):
+    """Reject payload text files that contain the build workspace path.
+
+    A shipped file must not depend on where the build ran (BUILD-PATH-IN-PAYLOAD-32): rebuilds in
+    another folder stay byte-identical and no build path reaches a public payload. Text files only
+    (no NUL byte in the first 4 KiB, at most text_limit bytes). Paths with fewer than three parts
+    are not checked, so a short root such as /work cannot match ordinary text."""
+    needles=[]
+    for value in workspace_paths:
+        text=str(value)
+        if len(Path(text).parts)<3:
+            continue
+        for form in (text, Path(text).as_posix(), text.replace('\\','\\\\')):
+            if form.encode('utf-8') not in needles:
+                needles.append(form.encode('utf-8'))
+    hits=[]
+    for path in sorted(p for p in Path(root).rglob('*') if p.is_file()):
+        if path.stat().st_size>text_limit:
+            continue
+        with path.open('rb') as stream:
+            head=stream.read(4096)
+            if b'\0' in head:
+                continue
+            raw=head+stream.read()
+        if any(n in raw for n in needles):
+            hits.append(path.relative_to(root).as_posix())
+    if hits:
+        more=' and %d more'%(len(hits)-10) if len(hits)>10 else ''
+        raise ValueError('Payload files contain the build workspace path (BUILD-PATH-IN-PAYLOAD-32): '
+                         +', '.join(hits[:10])+more)
+
+
 def legacy_root(data, dos_type, normalize=False):
     if dos_type not in range(0x444f5300,0x444f5304):
         raise ValueError('Only legacy DOS0..3 are supported by this check')

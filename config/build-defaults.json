@@ -1,4 +1,12 @@
 {
   "bitmap_paper_ink": "filled",
-  "follow_original_stair_rules": true
+  "builder": "chim",
+  "chim_areas": [
+    "balmora",
+    "seyda"
+  ],
+  "chim_texture_effects": [],
+  "follow_original_stair_rules": true,
+  "chim_stream_statics": true,
+  "model_hull": "chain"
 }

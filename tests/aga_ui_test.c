@@ -169,3 +169,4 @@ int main(int argc,char **argv){
 }
 
 double AW_SpeechRemaining(void){return 0;}
+int AW_PhotoModeActive(void){return 0;}

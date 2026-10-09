@@ -67,7 +67,7 @@ static int route_match(char *words,int argc,char **argv,int start) {
 }
 static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capacity) {
     int used,n,k,setting;char *token;
-    if(!strcmp(r->command,"aw_teleport") && argc-j>2)return 0;
+    if(!strcmp(r->command,"aw_teleport") && argc-j>3)return 0;   /* dbg tp X Y [Z] */
     if(!strcmp(r->command,"aw_shroomtracker") && argc!=j)return 0;
     if(!strcmp(r->command,"aw_shroompicker")){
         if(argc-j>1)return 0;
@@ -126,14 +126,22 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
     if(!valid || (int)strlen(candidate)+1>capacity)return 0;
     strcpy(out,candidate);return 1;
 }
+/* A --no-npc-gallery image lists the gallery's commands as absent. The marker
+ * is checked once per listing (dbg help, dbg help <word>), never on dispatch.
+ * dbg combattest enters the Vivec Arena now, which needs no gallery (its
+ * floor test, dbg combattest gallery, explains itself when used). */
+static const char *availability(int omitted,const route_t *r) {
+    return omitted && !strcmp(r->command,"aw_charplane")?" (not in this build)":"";
+}
 static void catalogue_error(void) {
     Con_Printf("Debug catalogue missing/invalid: debug-commands.txt\n");
     Con_Printf("Restore the matching build's file; legacy command names still work.\n");
 }
 static void help(void) {
-    FILE *f;route_t r;int left,status,width=con_linewidth;
+    FILE *f;route_t r;int left,status,width=con_linewidth,omitted;
     char line[DEBUG_LINE],group[32],separator[129];
     f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
+    omitted=AW_GalleryOmitted();
     if(width<1)width=38;
     if(width>128)width=128;
     memset(separator,'-',width);separator[width]=0;group[0]=0;
@@ -145,7 +153,7 @@ static void help(void) {
         if(strcmp(group,r.group)){
             strcpy(group,r.group);Con_Printf("\n%s\n%s\n",group,separator);
         }
-        Con_Printf(" %s %s\n",r.words,r.arguments);
+        Con_Printf(" %s %s%s\n",r.words,r.arguments,availability(omitted,&r));
     }
     fclose(f);if(status<0){catalogue_error();return;}
     Con_Printf(" help: this list; old names still work\n");
@@ -155,13 +163,14 @@ static void help(void) {
 /* dbg help <word>: only the catalogue lines whose command starts with that word,
  * streamed from the disk file like the full list. */
 static void help_for(char *word) {
-    FILE *f;route_t r;int left,status,n=strlen(word),shown=0;char line[DEBUG_LINE];
+    FILE *f;route_t r;int left,status,n=strlen(word),shown=0,omitted;char line[DEBUG_LINE];
     f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
+    omitted=AW_GalleryOmitted();
     while((status=catalogue_line(f,&left,line))>0){
         if(!*line || *line=='#')continue;
         if(!catalogue_route(line,&r)){status=-1;break;}
         if(Q_strncasecmp(r.words,word,n) || (r.words[n] && r.words[n]!=' '))continue;
-        Con_Printf(" dbg %s %s\n",r.words,r.arguments);shown++;
+        Con_Printf(" dbg %s %s%s\n",r.words,r.arguments,availability(omitted,&r));shown++;
     }
     fclose(f);if(status<0){catalogue_error();return;}
     if(!shown)Con_Printf("No debug command starts with \"%s\"; use debug help\n",word);

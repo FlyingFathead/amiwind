@@ -69,7 +69,34 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 #picked{margin-top:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px;color:var(--ink);min-height:40px}
 /* Map metrics layer (tools/world_metrics.py via toolkit_serve.py --metrics) */
 #metricsbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:#13202d}
-#metricsbar[hidden],#metricspanel[hidden],#interiorsview[hidden]{display:none}
+#metricsbar[hidden],#metricspanel[hidden],#interiorsview[hidden],#chimpanel[hidden],#chimhead[hidden]{display:none}
+/* CHIM Progress Tracker (tools/cell_progress.py via toolkit_serve.py --progress) */
+#chimbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:#13202d}
+#chimbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px;max-width:260px}
+#chimbar button,#chimbar input[type=file]{cursor:pointer}
+#chimcount{color:#46c37b;font-weight:600}
+#chimpanel{flex:1 1 100%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;overflow-x:auto}
+#chimpanel h2{font-size:16px;margin:0 0 8px;color:#ffe28a}
+#chimpanel h3{font-size:14px;margin:14px 0 6px;color:var(--ink)}
+#chimpanel tr[data-xy]:hover td{background:#203346}
+#chimsearchwrap{position:relative}
+#chimsearch{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px;width:300px}
+#chimresults{position:absolute;z-index:30;top:100%;left:0;min-width:420px;max-height:340px;overflow:auto;background:#0f1822;border:1px solid #567;border-radius:6px}
+#chimresults[hidden]{display:none}
+#chimresults div{padding:5px 9px;cursor:pointer;border-bottom:1px solid #223}
+#chimresults div:hover,#chimresults div.sel{background:#203346}
+#chimresults small{color:var(--muted)}
+#chimpanel td.tree{text-align:left;white-space:nowrap}
+#chimpanel .dim{color:var(--muted)}
+#chimhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;border-bottom:1px solid var(--line);background:#13202d}
+#chimhead .chimtitle{font-size:17px;white-space:nowrap}
+#chimhead .chimtitle b{color:#46c37b}
+#chimhead .chimparts{display:flex;flex-wrap:wrap;gap:4px 8px}
+#chimhead button{font-size:12px;padding:3px 8px;cursor:pointer}
+#chimhead button[aria-pressed="true"]{border-color:#ffe28a;color:#ffe28a}
+#chimhead button i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+#chimhead .chimnote,#chimhead .chimhist{color:var(--muted);font-size:12px}
+#chimhead .chimhist svg{vertical-align:middle}
 #metricsbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
 #metricsbar button{cursor:pointer}
 #metricsbar button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
@@ -89,6 +116,7 @@ table.mt small{opacity:.8}
 </style>
 </head>
 <body>
+<div id="chimhead" hidden aria-label="CHIM Progress Tracker headline"></div>
 <header>
   <h1 id="pagetitle">AmiWind Toolkit · World Map</h1>
   <span role="tablist"><button class="mode on" id="mode-world" role="tab">World</button>
@@ -112,6 +140,21 @@ table.mt small{opacity:.8}
   <button id="interiorsbtn" aria-pressed="false">Interiors table</button>
   <span id="metricscount"></span>
 </div>
+<div id="chimbar">
+  <label><input type="checkbox" id="layer-chim"> <b>CHIM Progress Tracker</b></label>
+  <label>Colour by <select id="chimcolour" aria-label="Colour by"></select></label>
+  <label>Sweep order <select id="chimorder" aria-label="Sweep order">
+    <option value="spiral">Spiral: coast inwards, ring by ring</option><option value="risk">Risk: scout list, riskiest first</option></select></label>
+  <label>Show <select id="chimfilter" aria-label="Filter by audit"></select></label>
+  <label><input type="checkbox" id="chimnums" checked> Ring / rank numbers</label>
+  <label><input type="checkbox" id="chimnext" checked> Mark the next 25</label>
+  <span id="chimsearchwrap"><input id="chimsearch" type="search" placeholder="Find a cell or interior: name or ID" aria-label="Find a cell or interior" autocomplete="off"><div id="chimresults" hidden role="listbox"></div></span>
+  <button id="chimcsv" title="The cells shown (after the filter) as a CSV file: status, audits and every numeric stat">Export CSV</button>
+  <button id="chimjson" title="The cells shown (after the filter) as a JSON file, records and stats in full">Export JSON</button>
+  <label>Import progress <input id="chimfile" type="file" accept=".json"></label>
+  <button id="chimreload" title="Read the progress file again (served mode)">Reload progress</button>
+  <span id="chimcount">No CHIM progress loaded: serve it with toolkit_serve.py --progress, or import cell-progress.json.</span>
+</div>
 <div id="selected">Selected area: click a cell on the map</div>
 <div id="multi" class="muted" style="color:#ffd24a"></div>
 <main>
@@ -131,6 +174,7 @@ table.mt small{opacity:.8}
     (tools/world_progress_background.py) and never leaves it.</p>
   </aside>
   <section id="metricspanel" hidden></section>
+  <section id="chimpanel" hidden></section>
   <section id="interiorsview" hidden>
     <h2>Interiors: estimated limits per interior map</h2>
     <div id="interiorsfilters">
@@ -162,6 +206,7 @@ table.mt small{opacity:.8}
   </div>
   <iframe id="inspector3d" title="3D Map Inspector"></iframe>
 </section>
+<script src="chim-head.js"></script>
 <script>
 const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
 let data = null, maxOriginal = 1;
@@ -187,8 +232,10 @@ const LAYERS = [
    colour: c => c.original ? glow(c.placed / c.original) : null, alpha: .85},
   // Map metrics: its switch and settings live in their own bar (shown when a layer is loaded).
   {id: 'metrics', name: 'Map metrics', on: false, kind: 'metrics', own: true},
+  // CHIM Progress Tracker: its switch and settings live in their own bar.
+  {id: 'chim', name: 'CHIM Progress Tracker', on: false, kind: 'chim', own: true},
   {id: 'full', name: 'Full town/area maps', on: true, kind: 'outline',
-   legend: [['#ffffff', 'full town/area map (white border, black outline)']]},
+   legend: [['#ffb347', 'legacy full town/area map (dashed amber border; a solid white border is a CHIM Cell complete group)']]},
   {id: 'missing', name: 'Content missing', on: false, kind: 'mark',
    legend: [['#ff3b3b', 'original entities not placed (outline)']],
    mark: (g, c) => { if (c.original > c.placed) outline(g, c, '#ff3b3b'); }},
@@ -229,7 +276,9 @@ function heat(t) {
 // Outer edge of a group of cells: a cell side is drawn when its neighbour is not
 // in the group. Black first (wide), then white on top (narrow), so it stands out
 // on any layer underneath.
-function groupOutline(g, cells) {
+// style 'solid' (default): black wide + white narrow, the CHIM "Cell complete" border. 'dashed': black wide + amber dashed,
+// the legacy "Full town/area maps" border (a solid white border means Cell complete only).
+function groupOutline(g, cells, style) {
   const inside = new Set(cells.map(c => c.x + ',' + c.y)), edges = [];
   for (const c of cells) {
     const x0 = g.px(c.x), y0 = g.py(c.y), x1 = x0 + g.s, y1 = y0 + g.s;
@@ -238,11 +287,14 @@ function groupOutline(g, cells) {
     if (!inside.has((c.x - 1) + ',' + c.y)) edges.push([x0, y0, x0, y1]);  // west
     if (!inside.has((c.x + 1) + ',' + c.y)) edges.push([x1, y0, x1, y1]);  // east
   }
-  for (const [col, w] of [['#000000', 6 / view.z], ['#ffffff', 2.5 / view.z]]) {
-    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'square'; ctx.beginPath();
+  const dashed = style === 'dashed';
+  for (const [col, w] of [['#000000', 6 / view.z], [dashed ? '#ffb347' : '#ffffff', 2.5 / view.z]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = dashed && col !== '#000000' ? 'butt' : 'square';
+    ctx.setLineDash(dashed && col !== '#000000' ? [7 / view.z, 5 / view.z] : []); ctx.beginPath();
     for (const [a, b, c2, d] of edges) { ctx.moveTo(a, b); ctx.lineTo(c2, d); }
     ctx.stroke();
   }
+  ctx.setLineDash([]);
 }
 function outline(g, c, col, w) { ctx.strokeStyle = col; ctx.lineWidth = (w || 1.5) / view.z; ctx.strokeRect(g.px(c.x) + 1, g.py(c.y) + 1, g.s - 2, g.s - 2); }
 function dot(g, c, col, r, dx) {
@@ -259,6 +311,7 @@ function geometry() {
   for (const im of Object.values(images)) add(im.bounds);
   // The metrics layer reaches beyond Vvardenfell (Solstheim): widen the map while it is on.
   if (metrics && (metricsOn() || !data)) add(metrics.bounds);
+  if (chim && (chimOn() || (!data && !metrics))) add(chim.bounds);
   if (!b) b = [0, 0, 0, 0];
   const w = b[2] - b[0] + 1, h = b[3] - b[1] + 1, s = Math.floor(Math.min(820 / w, 820 / h));
   return {b, s, w: w * s, h: h * s, px: x => (x - b[0]) * s, py: y => (b[3] - y) * s};
@@ -271,7 +324,7 @@ function on(id) {
   const base = LAYERS.find(L => L.id === id && L.kind === 'base');
   if (base) return bottom === base.style; const el = $('layer-' + id); return el && el.checked; }
 function draw() {
-  if (!data && !metrics) return;
+  if (!data && !metrics && !chim) return;
   const g = geometry();
   // Backing store at display size x device pixels, so text and lines stay sharp.
   const ratio = Math.max(1, (canvas.clientWidth || g.w) * (window.devicePixelRatio || 1) / g.w);
@@ -298,7 +351,8 @@ function draw() {
       ctx.stroke(); continue;
     }
     if (L.kind === 'metrics') { drawMetrics(g); legend.push(...metricsLegend()); continue; }
-    if (L.kind === 'outline') { if (data) groupOutline(g, data.cells.filter(c => c.map === 'full')); continue; }
+    if (L.kind === 'chim') { drawChim(g); legend.push(...chimLegend()); continue; }
+    if (L.kind === 'outline') { if (data) groupOutline(g, data.cells.filter(c => c.map === 'full'), 'dashed'); continue; }
     if (L.kind === 'poi') { drawPois(g); continue; }
     for (const c of (data ? data.cells : [])) {
       if (L.kind === 'fill') {
@@ -346,8 +400,9 @@ async function autoload() {
       const im = new Image(); im.onload = () => { images[style].img = im; pickBottom(); draw(); }; im.src = URL.createObjectURL(png);
     }
   }
+  await loadChim(true);  // only with toolkit_serve.py --progress
   const cells = await get('island-cells.json', 'json');
-  if (cells) { cellsDetail = cells; draw(); if (metricPick) showMetricsCell(metricPick.x, metricPick.y); }
+  if (cells) { cellsDetail = cells; if (chim) chimBuildIndex(); draw(); if (metricPick) showMetricsCell(metricPick.x, metricPick.y); }
   try { const r = await fetch('../maps/index.json'); if (r.ok) servedMaps = new Set(await r.json()); } catch (_) {}
 }
 if (SERVED) autoload();
@@ -523,7 +578,7 @@ $('zoomin').onclick = () => { const g = geometry(); zoomAt(1.6, g.w / 2, g.h / 2
 $('zoomout').onclick = () => { const g = geometry(); zoomAt(1 / 1.6, g.w / 2, g.h / 2); };
 $('zoomreset').onclick = () => { view.z = 1; view.x = view.y = 0; draw(); };
 canvas.addEventListener('wheel', e => {
-  if (!data && !metrics) return;
+  if (!data && !metrics && !chim) return;
   e.preventDefault();
   const r = canvas.getBoundingClientRect(), k = geometry().w / r.width;
   zoomAt(e.deltaY < 0 ? 1.25 : 1 / 1.25, (e.clientX - r.left) * k, (e.clientY - r.top) * k);
@@ -863,6 +918,8 @@ function stateJson() {
                           cells: metrics.cells.length, regions: Object.keys(metrics.regions).length,
                           interiors: metrics.interiors.length} : null,
     },
+    chim_progress: chim ? {source: chimSource, generated: chim.generated, on: chimOn(), colour: cset.colour, order: cset.order, filter: cset.filter,
+                           headline: chim.headline, cell: chimClicked ? chimCells.get(chimClicked.x + ',' + chimClicked.y) || null : null} : null,
     map_metrics: metrics ? {on: metricsOn(), metric: mset.metric, content: mset.mode, limit: metricLimit(mset.metric),
                             texinfo_limit: mset.texinfo, counts: metricsCounts(),
                             cell: metricPick ? metricsCellState(metricPick.x, metricPick.y) : null} : null,
@@ -978,10 +1035,14 @@ function placeName(x, y) {
   return (d.name || d.region) + (d.name && d.region ? ' (' + d.region + ')' : '');
 }
 function describe(x, y, c, sep, noMetrics) {
+  const base = describeBase(x, y, c, sep, noMetrics), ct = noMetrics ? '' : chimTip(x, y, sep);
+  return base + (ct ? sep + ct : '');
+}
+function describeBase(x, y, c, sep, noMetrics) {
   const named = placeName(x, y), head = (named ? named + sep : '') + 'cell ' + x + ', ' + y;
   const mt = noMetrics ? '' : metricsTip(x, y, sep);
   if (!c) return head + (mt ? sep + mt : '') + (data ? sep + 'outside the island data' : '');
-  if (mt) return head + sep + mt + describe(x, y, c, sep, true).slice(head.length);
+  if (mt) return head + sep + mt + describeBase(x, y, c, sep, true).slice(head.length);
   const here = poisIn(x, y), poiText = here.length ? sep + 'places: ' + here.slice(0, 4).map(p => p.name).join(', ') +
     (here.length > 4 ? ' +' + (here.length - 4) : '') : '';
   return head + poiText + sep + 'map: ' + (c.map === 'full' ? 'full town/area' : c.map === 'terrain' ? 'topomap terrain' : 'no terrain') +
@@ -1003,22 +1064,23 @@ function poiAt(e) {
   return best;
 }
 canvas.onmousemove = e => {
-  if (!data && !metrics) return;
+  if (!data && !metrics && !chim) return;
   const {x, y, c} = cellAt(e), tip = $('tip'), r = canvas.getBoundingClientRect();
   const poi = poiAt(e);
   if (poi !== hoverPoi) { hoverPoi = poi; draw(); }
   canvas.style.cursor = c && inspectable(c) ? 'pointer' : 'crosshair';
-  if (!c && !metricsCell(x, y)) { tip.style.display = 'none'; return; }
+  if (!c && !metricsCell(x, y) && !chimCell(x, y)) { tip.style.display = 'none'; return; }
   tip.textContent = (poi ? 'Highlighted: ' + poi.name + '\n' : '') + describe(x, y, c, '\n');
   tip.style.display = 'block'; tip.style.left = (e.clientX - r.left + 14) + 'px'; tip.style.top = (e.clientY - r.top + 14) + 'px';
 };
 canvas.onclick = e => {
-  if ((!data && !metrics) || dragMoved || e.shiftKey) return;
+  if ((!data && !metrics && !chim) || dragMoved || e.shiftKey) return;
   const {x, y, c} = cellAt(e);
   if (multi.size) { multi.clear(); showMulti(); }
   picked = {x, y}; $('picked').textContent = describe(x, y, c, ' · '); draw();
   showSelected(x, y, c);
   if (metricsOn()) showMetricsCell(x, y);
+  if (chimOn()) showChimCell(x, y);
 };
 canvas.onmouseleave = () => { $('tip').style.display = 'none'; if (hoverPoi) { hoverPoi = null; draw(); } mapHover = false; };
 // Keyboard panning: WASD or the arrow keys while the map is active (clicked,
@@ -1038,6 +1100,463 @@ window.addEventListener('keydown', e => {
   e.preventDefault();
   const g = geometry(), step = g.w / 10;
   view.x += k[0] * step; view.y += k[1] * step; clampView(); draw();
+});
+// ---------------------------------------------------------------------------------------------------------------
+// CHIM Progress Tracker: one record per exterior cell (tools/cell_progress.py writes them, toolkit_serve.py
+// --progress serves them, "Import progress" loads a file). Colour per cell by status, the legacy mapping quality
+// next to it, per-mechanism audits, linked bugs, the sweep orders (spiral from the coast inwards, risk scout list)
+// and the store-once mesh reuse numbers. Unknown is "not measured", never guessed.
+const CHIM_FORMAT = 'aw-cell-progress-1';
+const CHIM_BUCKETS = {
+  complete: ['#7dffa6', 'Cell complete: terrain and every placed object converted, all audits passed (solid white border around a group)'],
+  terrain_complete: ['#7dffa6', 'Terrain complete: all audits passed, everything but actors converted'],
+  approved: ['#ffd23f', 'owner-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],
+  converted_failing: ['#e5484d', 'converted, failing audits'], not_converted: ['#c2185b', 'not converted (tried, could not finish)'], converted_unmeasured: ['#6ea4df', 'converted, nothing measured'],
+  not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'], hull_policy_pending: ['#b07ae0', 'hull policy pending']};
+const CHIM_GRADES = {A: '#32cfa0', B: '#7fd36b', C: '#e0c341', D: '#c8803c', E: '#5a2a2a'};
+const CHIM_AUDIT = {passed: '#46c37b', failed: '#e5484d', accepted: '#ffcf55', not_measured: '#4a5d72'};
+const CHIM_NEXT = 25;
+let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, chimBucket = null, chimSource = null,
+  chimImported = false, chimNext = {spiral: new Map(), risk: new Map()}, chimNextDoc = null, chimMaxRing = 1, chimMaxElapsed = 1;
+const cset = {colour: 'status', order: 'spiral', filter: '', nums: true, next: true};
+function chimOn() { return !!chim && on('chim'); }
+function chimCell(x, y) { return chimOn() ? chimCells.get(x + ',' + y) || null : null; }
+function chimOpenBugs(c) {
+  return (c.bugs || []).filter(id => { const b = chim.bugs && chim.bugs[id]; return !b || (b.state !== 'fixed' && b.state !== 'closed'); });
+}
+function chimMech(id) { const m = chim.mechanisms.find(m => m.id === id); return m ? m.label : id; }
+function chimColour(c) {
+  const m = cset.colour;
+  if (m === 'status') return c.land || c.chim.converted || c.chim.bucket === 'empty_sea' ? CHIM_BUCKETS[c.chim.bucket][0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
+  if (m === 'ring') {
+    if (c.ring == null) return null;
+    return c.ring === 0 ? '#7a7a7a' : 'hsl(' + Math.round(205 - 195 * (c.ring - 1) / Math.max(1, chimMaxRing - 1)) + ',68%,48%)';
+  }
+  if (m === 'scout') return c.risk ? metricColour(c.risk.score) : null;
+  if (m === 'legacy') return c.legacy ? CHIM_GRADES[c.legacy.grade] : null;
+  if (m === 'bugs') { const n = chimOpenBugs(c).length; return n ? heat(Math.min(1, n / 30)) : null; }
+  if (m === 'lastbuild') {
+    if (!c.chim.converted) return null;
+    return c.last_build ? heat(Math.min(1, c.last_build.elapsed_s / chimMaxElapsed)) : '#555f6b';
+  }
+  if (m.startsWith('audit:')) {
+    if (!c.chim.converted) return c.land ? '#24313f' : null;
+    return CHIM_AUDIT[(c.audits[m.slice(6)] || {status: 'not_measured'}).status];
+  }
+  return null;
+}
+function chimMatch(c) {
+  const f = cset.filter;
+  if (!f) return true;
+  if (f === 'failing') return c.audit_counts.failed > 0;
+  if (f === 'unmeasured') return c.chim.converted && c.audit_counts.not_measured > 0;
+  const [kind, id] = f.split(':'), a = c.audits[id];
+  if (!a || !c.chim.converted) return false;
+  return kind === 'fail' ? a.status === 'failed' : kind === 'unm' ? a.status === 'not_measured' : false;
+}
+function chimLegend() {
+  const m = cset.colour;
+  if (m === 'status') return Object.values(CHIM_BUCKETS).map(([c, t]) => [c, t]);
+  if (m === 'ring') return [['hsl(205,68%,48%)', 'ring 1 (coast)'], ['hsl(110,68%,48%)', 'inner rings'], ['hsl(10,68%,48%)', 'innermost ring'], ['#7a7a7a', 'ring 0: sea-only cells with content']];
+  if (m === 'scout') return [['#e8f1fb', 'share of the tightest engine limit, up to 50 %'], ['#4387d2', '80-90 %'], ['#c8423f', 'over a limit (risk > 100 %)']];
+  if (m === 'legacy') return Object.entries(CHIM_GRADES).map(([g, c]) => [c, 'legacy ' + g + ': ' + ({A: 'full map, 80 %+ placed', B: 'full town/area map', C: 'terrain, some placed', D: 'terrain only', E: 'no terrain'}[g])]);
+  if (m === 'bugs') return [['#1f3b73', 'open bugs linked to the cell (few)'], ['#ef4545', 'many']];
+  if (m === 'lastbuild') return [['#1f3b73', 'quick last build'], ['#ef4545', 'slow'], ['#555f6b', 'no ledger entry']];
+  return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, owner-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t]);
+}
+function chimIsComplete(c) { return c.chim.bucket === 'complete'; }
+function chimPx(g) { return g.s * view.z * (canvas.clientWidth || g.w) / g.w; }
+function drawChim(g) {
+  const px = chimPx(g), dim = chimBucket || cset.filter;
+  for (const c of chimCellList) {
+    const col = chimColour(c); if (!col) continue;
+    const hit = (!cset.filter || chimMatch(c)) && (!chimBucket || (c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket);
+    ctx.globalAlpha = (anyImage() ? .85 : 1) * (dim && !hit ? .14 : 1); ctx.fillStyle = col;
+    ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1);
+  }
+  ctx.globalAlpha = 1;
+  groupOutline(g, chimCellList.filter(chimIsComplete));
+  if (chimBucket) for (const c of chimCellList) if ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket) outline(g, c, '#ffe28a', 2.5);
+  const showOrder = cset.next ? chimNext[cset.order] : new Map(), other = cset.next ? chimNext[cset.order === 'spiral' ? 'risk' : 'spiral'] : new Map();
+  if (cset.next) {
+    for (const [k] of showOrder) { const c = chimCells.get(k); if (c) outline(g, c, '#ffffff', 3); }
+    ctx.fillStyle = '#ffa23a'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1 / view.z;
+    for (const [k] of chimNext.risk) {   // scout cells: a diamond in the cell's corner
+      const c = chimCells.get(k); if (!c) continue;
+      const x = g.px(c.x) + g.s * .22, y = g.py(c.y) + g.s * .22, r = g.s * .18;
+      ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }
+  if (cset.nums && px >= 24) {
+    ctx.font = '600 ' + Math.min(g.s * .5, 14 / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const c of chimCellList) {
+      let t = null;
+      if (cset.order === 'spiral' && c.ring != null) t = String(c.ring);
+      else if (cset.order === 'risk' && c.risk_rank && c.risk_rank <= 150 && !c.chim.converted) t = String(c.risk_rank);
+      if (cset.next && showOrder.has(c.x + ',' + c.y)) t = '#' + showOrder.get(c.x + ',' + c.y) + (t ? ' r' + t : '');
+      if (t == null) continue;
+      ctx.lineWidth = 2.5; ctx.strokeStyle = '#000000cc'; ctx.strokeText(t, g.px(c.x) + g.s / 2, g.py(c.y) + g.s / 2);
+      ctx.fillStyle = '#fff'; ctx.fillText(t, g.px(c.x) + g.s / 2, g.py(c.y) + g.s / 2);
+    }
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+}
+function chimTip(x, y, sep) {
+  const c = chimCell(x, y); if (!c) return '';
+  const lines = ['CHIM Progress Tracker: ' + CHIM_BUCKETS[c.chim.bucket][1] + (c.chim.build ? ' (build ' + c.chim.build + ')' : '')];
+  if (c.ring != null) lines.push('sweep: ring ' + c.ring + ', spiral #' + c.spiral_rank + (c.risk_rank ? ', scout #' + c.risk_rank : ''));
+  if (c.risk) lines.push('risk ' + pct(c.risk.score, 1) + ' of the ' + c.risk.limiting + ' limit');
+  if (c.legacy) lines.push('legacy mapping: grade ' + c.legacy.grade + ' (' + c.legacy.grade_label + ')');
+  if (c.chim.converted) {
+    const n = c.audit_counts;
+    lines.push('audits: ' + n.passed + ' passed, ' + n.failed + ' failed, ' + n.not_measured + ' not measured');
+    const bad = Object.entries(c.audits).filter(([, a]) => a.status === 'failed').map(([k]) => chimMech(k));
+    if (bad.length) lines.push('failing: ' + bad.join(', '));
+  }
+  const bugs = chimOpenBugs(c).length; if (bugs) lines.push(bugs + ' open linked bug' + (bugs === 1 ? '' : 's'));
+  return lines.join(sep);
+}
+const chimSpan = (col, t) => '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + col + ';margin-right:5px"></span>' + escapeHtml(t);
+function chimRow(c) {
+  const m = c.contents || {};
+  return '<tr data-xy="' + c.x + ',' + c.y + '" style="cursor:pointer"><td class="l">' + escapeHtml(c.name || c.region || '') + '</td><td>' + c.x + ', ' + c.y +
+    '</td><td>' + (c.ring == null ? '' : c.ring) + '</td><td>' + (c.spiral_rank || '') + '</td><td>' + (c.risk_rank || '') + '</td><td>' +
+    (c.risk ? pct(c.risk.score, 1) + ' ' + escapeHtml(c.risk.limiting) : '') + '</td><td>' + (m.refs_total == null ? '' : m.refs_total) + '</td><td>' +
+    (m.unique_meshes == null ? '' : m.unique_meshes) + '</td></tr>';
+}
+// ----- stats, interiors, search, export
+const errText = e => typeof e === 'string' ? e : [[e.stage, e.mechanism].filter(Boolean).join('/'), e.message].filter(Boolean).join(': ');
+const nf = v => v == null ? 'not measured' : typeof v === 'number' ? v.toLocaleString('en-US', {maximumFractionDigits: 2}) : String(v);
+const bytesText = v => v == null ? 'not measured' : v >= 1048576 ? (v / 1048576).toFixed(2) + ' MiB' : v >= 1024 ? (v / 1024).toFixed(1) + ' KiB' : v + ' B';
+function sget(o, path) { for (const k of path.split('.')) { if (o == null || typeof o !== 'object') return undefined; o = o[k]; } return o; }
+function chimStatsTable(st, converted) {
+  st = st || {};
+  const first = (...paths) => { for (const p of paths) { const v = sget(st, p); if (v !== undefined && v !== null) return v; } return null; };
+  const byType = sget(st, 'records.by_type');
+  const faceB = first('faces.before'), faceA = first('faces.after'), chimF = (sget(st, 'faces.chim_terrain') || 0) + (sget(st, 'faces.chim_placed') || 0);
+  const rows = [
+    ['Records (original references)', nf(first('records.refs_total')) + (byType ? ' (' + Object.entries(byType).map(([k, v]) => k + ' ' + v).join(', ') + ')' : '')],
+    ['Unique meshes: this cell / new / reused', [first('meshes.unique'), first('meshes.new'), first('meshes.reused')].map(nf).join(' / ') + (sget(st, 'meshes.source') ? ' <span class="dim">(' + escapeHtml(sget(st, 'meshes.source')) + ')</span>' : '')],
+    ['Faces before (legacy)', faceB != null ? nf(faceB) : sget(st, 'legacy_estimate.faces') != null ? nf(sget(st, 'legacy_estimate.faces')) + ' <span class="dim">(estimator)</span>' : 'not measured'],
+    ['Faces after (CHIM)', faceA != null ? nf(faceA) : converted && chimF ? nf(chimF) + ' <span class="dim">(terrain ' + nf(first('faces.chim_terrain')) + ' + placed ' + nf(first('faces.chim_placed')) + ')</span>' : 'not measured'],
+    ['Textures: count / bytes', nf(first('textures.count')) + ' / ' + bytesText(first('textures.bytes'))],
+    ['Bytes: CHIM / legacy', bytesText(first('bytes.chim')) + ' / ' + bytesText(first('bytes.legacy'))],
+    ['Chunks: count / bytes', nf(first('chunks.count')) + ' / ' + bytesText(first('chunks.bytes')) + (first('chunks.legacy_maps') != null || first('chunks.legacy_bytes') != null ? ' · legacy maps ' + nf(first('chunks.legacy_maps')) + ' / ' + bytesText(first('chunks.legacy_bytes')) : '')],
+    ['Clipnodes / max hull depth', (first('hull.clipnodes', 'collision.clipnodes') != null ? nf(first('hull.clipnodes', 'collision.clipnodes')) : sget(st, 'legacy_estimate.clipnodes') != null ? nf(sget(st, 'legacy_estimate.clipnodes')) + ' (legacy estimate)' : 'not measured') + ' / ' + nf(first('hull.max_depth', 'collision.max_hull_depth'))],
+    ['Zone ring peak / frame heap peak', bytesText(first('memory.zone_ring_peak_bytes', 'memory.active_ring_peak', 'memory.zone_locked_peak_bytes')) + ' / ' + bytesText(first('memory.frame_heap_peak_bytes', 'memory.load_ring_peak')) +
+      (first('memory.frame_heap_budget_bytes') != null ? ' of ' + bytesText(first('memory.frame_heap_budget_bytes')) : '') + (sget(st, 'memory.basis') ? ' <span class="dim">(' + escapeHtml(sget(st, 'memory.basis')) + ')</span>' : '')],
+    ['Vis', sget(st, 'vis') ? Object.entries(sget(st, 'vis')).map(([k, v]) => escapeHtml(k) + ' ' + nf(v)).join(', ') : 'not measured'],
+    ['Conversion time (s): wall / cpu', nf(first('time.convert_s', 'time.wall_s')) + ' / ' + nf(first('time.cpu_s')) + (sget(st, 'time.basis') ? ' <span class="dim">(' + escapeHtml(sget(st, 'time.basis')) + ')</span>' : '')],
+  ];
+  const shown = /^(records\.|meshes\.|faces\.(before|after|chim_terrain|chim_placed)$|textures\.|bytes\.(chim|legacy)$|chunks\.(count|bytes|legacy_maps|legacy_bytes)$|hull\.|collision\.(clipnodes|max_hull_depth)$|time\.(convert_s|wall_s|cpu_s)$|legacy_estimate\.|memory\.(zone_ring_peak_bytes|active_ring_peak|zone_locked_peak_bytes|frame_heap_peak_bytes|load_ring_peak|frame_heap_budget_bytes)$|vis\.)/;
+  const other = Object.entries(flatNums(st, '', {})).filter(([k]) => !shown.test(k) && !/^records_by_type/.test(k));
+  const rbt = sget(st, 'records_by_type');
+  const rbtRows = rbt ? Object.entries(rbt).map(([tag, v]) => {
+    const why = o => o && typeof o === 'object' ? Object.entries(o).map(([k, n]) => k + ' ' + n).join(', ') : '';
+    return '<tr><td class="l">' + escapeHtml(tag) + '</td><td>' + nf(v.placed) + '</td><td>' + nf(v.converted) + '</td><td title="' + escapeHtml(why(v.deferred)) + '">' + (typeof v.deferred === 'object' ? nf(Object.values(v.deferred).reduce((a, b) => a + b, 0)) : nf(v.deferred)) +
+      '</td><td>' + nf(v.failed) + '</td><td title="' + escapeHtml(why(v.skipped)) + '">' + (typeof v.skipped === 'object' ? nf(Object.values(v.skipped).reduce((a, b) => a + b, 0)) : nf(v.skipped)) + '</td><td class="l dim">' + escapeHtml([why(v.deferred) && 'deferred: ' + why(v.deferred), why(v.skipped) && 'skipped: ' + why(v.skipped)].filter(Boolean).join(' · ')) + '</td></tr>'; }).join('') : '';
+  return '<table class="mt"><tbody>' + rows.map(([k, v]) => '<tr><td class="l">' + k + '</td><td class="l">' + v + '</td></tr>').join('') +
+    (other.length ? '<tr><td class="l">Other measured numbers</td><td class="l">' + other.map(([k, v]) => escapeHtml(k) + ' ' + (/bytes/i.test(k) ? bytesText(v) : nf(v))).join(' · ') + '</td></tr>' : '') + '</tbody></table>' +
+    (rbtRows ? '<h4>Records by type: placed / converted / deferred / failed / skipped</h4><table class="mt"><thead><tr><th class="l">Type</th><th>Placed</th><th>Converted</th><th>Deferred</th><th>Failed</th><th>Skipped</th><th class="l">Reasons</th></tr></thead><tbody>' + rbtRows + '</tbody></table>' : '');
+}
+function chimErrorsBlock(c) {
+  const errs = c.errors || [];
+  if (!errs.length) return '';
+  return '<h3 style="color:#ff8a8a">Errors (' + errs.length + ')</h3><table class="mt"><thead><tr><th class="l">Stage</th><th class="l">Mechanism</th><th class="l">Message</th></tr></thead><tbody>' +
+    errs.map(e => typeof e === 'string' ? '<tr><td></td><td></td><td class="l">' + escapeHtml(e) + '</td></tr>' : '<tr><td class="l">' + escapeHtml(e.stage || '') + '</td><td class="l">' + escapeHtml(e.mechanism || '') + '</td><td class="l">' + escapeHtml(e.message || '') + '</td></tr>').join('') + '</tbody></table>';
+}
+function chimIntRecord(id) { return chimInt.get(id); }
+function chimDoorText(n) {
+  if (!n || n.ref == null) return '<span class="dim">not measured</span>';
+  return 'ref ' + n.ref + (n.object ? ' (' + escapeHtml(n.object) + ')' : '') + (n.pos ? ' at ' + n.pos.join(', ') : '');
+}
+function chimIntRows(nodes, depth) {
+  let out = '';
+  for (const n of nodes) {
+    const r = chimIntRecord(n.id); if (!r) continue;
+    const co = r.contents || {}, st = r.legacy && r.legacy.known ? (r.legacy.converted ? 'legacy: converted' : 'legacy: not converted') : 'not started / legacy unknown';
+    out += '<tr data-int="' + escapeHtml(r.id) + '" style="cursor:pointer"><td class="tree" style="padding-left:' + (7 + depth * 18) + 'px">' + (depth ? '&#9492;&#9472; ' : '') + '<b>' + escapeHtml(r.name) + '</b></td><td class="l">' + escapeHtml(r.id) + '</td><td class="l">' +
+      escapeHtml(r.our_map || '') + '</td><td class="l">' + chimDoorText(n) + '</td><td class="l">' + st + '</td><td>' + nf(co.refs_total) + '</td><td>' + nf(co.npcs) + '</td><td>' + nf(co.lights) + '</td><td>' + nf(co.load_doors) + '</td><td class="l">' +
+      escapeHtml((r.bugs || []).join(', ')) + '</td></tr>' + chimIntRows(n.children || [], depth + 1);
+  }
+  return out;
+}
+function chimInteriorsBlock(c) {
+  const trees = c.entrances || [];
+  const total = (function count(ns) { return ns.reduce((a, n) => a + 1 + count(n.children || []), 0); })(trees);
+  if (!trees.length) return '<h3>Interiors reached from this cell</h3><p>none (no door in this cell leads to an interior)</p>';
+  return '<h3>Interiors reached from this cell (' + trees.length + ' entrance' + (trees.length === 1 ? '' : 's') + ', ' + total + ' in all)</h3>' +
+    '<div style="max-height:380px;overflow:auto"><table class="mt"><thead><tr><th class="l">Interior (in-game name)</th><th class="l">Cell ID</th><th class="l">Our map</th><th class="l">Door (reference, object, position)</th><th class="l">CHIM / legacy status</th><th>Refs</th><th>NPCs</th><th>Lights</th><th>Doors</th><th class="l">Bugs</th></tr></thead><tbody>' +
+    chimIntRows(trees, 0) + '</tbody></table></div><p class="muted">The door position is where the door stands in this exterior cell; a door inside an interior leads one level deeper (indented). Click a row for the interior.</p>';
+}
+function showChimInterior(id) {
+  const r = chimIntRecord(id), panel = $('chimpanel'); if (!r) return;
+  chimClicked = null; chimShownInterior = id; panel.hidden = false;
+  const co = r.contents || {}, ent = (r.entrances || []).map(e => {
+    const cc = chimCells.get(e.cell), nm = cc ? (cc.name || cc.region) : '';
+    return '<tr data-xy="' + e.cell + '" style="cursor:pointer"><td class="l">' + escapeHtml(nm || '') + '</td><td class="l">' + e.cell.replace(',', ', ') + '</td><td class="l">' + chimDoorText({ref: e.door_ref, object: e.door_object, pos: e.door_pos}) +
+      '</td><td class="l">' + escapeHtml((e.via || []).map(v => { const q = chimIntRecord(v); return q ? q.name : v; }).join(' > ')) + '</td></tr>'; }).join('');
+  const bugs = (r.bugs || []).map(b => { const x = chim.bugs[b] || {}; return '<tr><td class="l">' + escapeHtml(b) + '</td><td class="l">' + escapeHtml(x.state || '') + '</td><td class="l">' + escapeHtml(x.title || '') + '</td></tr>'; }).join('');
+  panel.innerHTML = '<h2>Interior: ' + escapeHtml(r.name) + '</h2><p>' + chimSpan(CHIM_BUCKETS.not_started[0], 'CHIM: not started') + ' · legacy: ' + (r.legacy && r.legacy.known ? (r.legacy.converted ? 'converted' : 'not converted') : 'not known') + '</p>' +
+    '<table class="mt"><tbody><tr><td class="l">Cell ID (metrics)</td><td class="l">' + escapeHtml(r.id) + '</td></tr><tr><td class="l">Cell name string</td><td class="l">' + escapeHtml(r.name) + '</td></tr><tr><td class="l">Our map</td><td class="l">' + escapeHtml(r.our_map || 'none yet') +
+    '</td></tr><tr><td class="l">Set</td><td class="l">' + escapeHtml(r.set) + '</td></tr><tr><td class="l">Door depth from the exterior</td><td class="l">' + nf(r.depth) + '</td></tr><tr><td class="l">Estimator risk (share of the tightest limit)</td><td class="l">' + (r.risk_score == null ? 'not measured' : pct(r.risk_score, 1)) +
+    '</td></tr></tbody></table><h3>Stats</h3>' + chimStatsTable(r.stats, false) + '<h3>Reached from</h3>' + (ent ? '<table class="mt"><thead><tr><th class="l">Exterior cell</th><th class="l">Cell</th><th class="l">Door</th><th class="l">Through</th></tr></thead><tbody>' + ent + '</tbody></table>' : '<p>no exterior entrance found in the data (reached by script or another way)</p>') +
+    '<h3>Linked bugs (' + (r.bugs || []).length + ')</h3>' + (bugs ? '<table class="mt"><tbody>' + bugs + '</tbody></table>' : '<p>none linked</p>') + '<p><button id="chimoverview">Back to the overview</button></p>';
+  $('chimoverview').onclick = () => { chimShownInterior = null; $('chimpanel').innerHTML = chimOverview(); };
+}
+// Search: one box finds a cell or an interior by friendly name or ID and jumps to it on the map.
+let chimIndex = [], chimInt = new Map(), chimShownInterior = null;
+function chimBuildIndex() {
+  chimInt = new Map((chim.interiors || []).map(r => [r.id, r]));
+  chimIndex = [];
+  for (const c of chimCellList) {
+    const pois = cellsDetail && cellsDetail.pois ? cellsDetail.pois.filter(p => Math.floor(p.x) === c.x && Math.floor(p.y) === c.y && p.kind === 'place').map(p => p.name) : [];
+    chimIndex.push({kind: 'cell', c, label: (c.name || c.region || 'cell') + ' · cell ' + c.x + ', ' + c.y, sub: [c.region, ...pois].filter(Boolean).join(' · '),
+      text: [c.name, c.region, c.x + ',' + c.y, c.x + ', ' + c.y, 'cell ' + c.x + ',' + c.y, ...pois].join(' ').toLowerCase()});
+  }
+  for (const r of chim.interiors || []) {
+    const first = (r.entrances || [])[0];
+    chimIndex.push({kind: 'interior', r, label: r.name + ' (interior ' + r.id + ')', sub: [r.our_map, r.set, first ? 'from cell ' + first.cell : ''].filter(Boolean).join(' · '),
+      text: [r.name, r.id, r.our_map, r.set, ...(r.entrances || []).map(e => e.door_ref)].join(' ').toLowerCase()});
+  }
+}
+function chimJump(x, y) {
+  const g = geometry(); view.z = Math.max(view.z, 6);
+  view.x = g.w / 2 - view.z * (g.px(x) + g.s / 2); view.y = g.h / 2 - view.z * (g.py(y) + g.s / 2);
+  clampView();
+  const c = data && data.cells.find(q => q.x === x && q.y === y);
+  picked = {x, y}; $('picked').textContent = describe(x, y, c, ' · ');
+  showSelected(x, y, c); if (!chimOn()) { $('layer-chim').checked = true; $('layer-metrics').checked = false; if (metrics) metricsUi(); }
+  showChimCell(x, y); draw();
+}
+function chimSearch() {
+  const q = $('chimsearch').value.trim().toLowerCase(), box = $('chimresults');
+  if (!q || !chim) { box.hidden = true; return; }
+  const toks = q.split(/\s+/);
+  const hits = chimIndex.filter(e => toks.every(t => e.text.includes(t)))
+    .sort((a, b) => (b.text.startsWith(q) - a.text.startsWith(q)) || (a.kind === 'cell' ? -1 : 1) - (b.kind === 'cell' ? -1 : 1) || a.label.localeCompare(b.label)).slice(0, 14);
+  box.innerHTML = hits.length ? hits.map((e, i) => '<div data-i="' + chimIndex.indexOf(e) + '" class="' + (i ? '' : 'sel') + '">' + escapeHtml(e.label) + '<br><small>' + escapeHtml(e.sub) + '</small></div>').join('') : '<div class="dim">nothing found</div>';
+  box.hidden = false;
+}
+function chimGo(e) {
+  $('chimresults').hidden = true;
+  if (e.kind === 'cell') { chimJump(e.c.x, e.c.y); return; }
+  const first = (e.r.entrances || [])[0];
+  if (first) { const [x, y] = first.cell.split(',').map(Number); chimJump(x, y); }
+  showChimInterior(e.r.id);
+}
+$('chimsearch').addEventListener('input', chimSearch);
+$('chimsearch').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') { const d = $('chimresults').querySelector('div[data-i]'); if (d) chimGo(chimIndex[+d.dataset.i]); ev.preventDefault(); }
+  if (ev.key === 'Escape') { $('chimresults').hidden = true; }
+});
+$('chimresults').addEventListener('click', ev => { const d = ev.target.closest('div[data-i]'); if (d) chimGo(chimIndex[+d.dataset.i]); });
+document.addEventListener('click', ev => { if (!ev.target.closest('#chimsearchwrap')) $('chimresults').hidden = true; });
+// Export what is shown: CSV (status, audits and every numeric stat) or JSON (records in full).
+function chimShown() { return chimCellList.filter(c => chimMatch(c) && (!chimBucket || ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket))); }
+function flatNums(o, pre, out) {
+  for (const [k, v] of Object.entries(o || {})) {
+    if (typeof v === 'number') out[pre + k] = v;
+    else if (v && typeof v === 'object' && !Array.isArray(v)) flatNums(v, pre + k + '.', out);
+  }
+  return out;
+}
+function chimCsv(cells) {
+  const flats = cells.map(c => flatNums(c.stats, 'stats.', {})), keys = [...new Set(flats.flatMap(f => Object.keys(f)))].sort();
+  const mech = chim.mechanisms.map(m => m.id);
+  const head = ['x', 'y', 'name', 'region', 'island', 'ring', 'spiral_rank', 'risk_rank', 'risk_score', 'land', 'chim_status', 'chim_bucket', 'legacy_grade', 'legacy_placed_share', 'open_bugs', 'build',
+    'source_commit', 'chim_version', 'world_format', 'errors', ...mech.map(m => 'audit.' + m), ...keys];
+  const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const rows = cells.map((c, i) => [c.x, c.y, c.name, c.region, c.island, c.ring, c.spiral_rank, c.risk_rank, c.risk ? c.risk.score : '', c.land, c.chim.status, c.chim.bucket,
+    c.legacy ? c.legacy.grade : '', c.legacy ? c.legacy.placed_share : '', chimOpenBugs(c).length, c.provenance ? c.provenance.build : '', c.provenance ? c.provenance.source_commit : '',
+    c.provenance ? c.provenance.chim_version : '', c.provenance ? c.provenance.world_format : '', (c.errors || []).map(errText).join(' | '), ...mech.map(m => (c.audits[m] || {}).status), ...keys.map(k => flats[i][k])].map(q).join(','));
+  return [head.join(','), ...rows].join('\n') + '\n';
+}
+function chimDownload(name, text, type) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+$('chimcsv').onclick = () => { if (chim) chimDownload('chim-progress-cells.csv', chimCsv(chimShown()), 'text/csv'); };
+$('chimjson').onclick = () => { if (chim) chimDownload('chim-progress-cells.json', JSON.stringify({format: chim.format, generated: chim.generated, headline: chim.headline, totals: chim.totals, cells: chimShown()}, null, 1), 'application/json'); };
+const CHIM_CATS = {statics: 'Statics', flora: 'Flora', lights: 'Lights', doors: 'Doors', containers: 'Containers', activators: 'Activators',
+  items: 'Items', npcs: 'NPCs', creatures: 'Creatures', markers: 'Markers', other: 'Other'};
+// Per-object-type table: placed / converted / deferred (with reasons) / skipped / failed. cats = {category: record} or null.
+function chimCatTable(cats) {
+  if (!cats) return '<p>not measured</p>';
+  const sum = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
+  const why = o => Object.entries(o || {}).map(([k, v]) => escapeHtml(k) + ' (' + nf(v) + ')').join(', ');
+  const rows = Object.entries(CHIM_CATS).filter(([k]) => cats[k] && (cats[k].placed || cats[k].converted)).map(([k, t]) => { const c = cats[k];
+    return '<tr><td class="l">' + t + '</td><td>' + nf(c.placed) + '</td><td>' + (k === 'flora' ? 'in statics' : nf(c.converted)) + '</td><td>' + nf(sum(c.deferred)) + '</td><td>' + nf(sum(c.skipped)) +
+      '</td><td>' + nf(c.failed) + '</td><td class="l dim">' + [why(c.deferred) && 'deferred: ' + why(c.deferred), why(c.skipped) && 'skipped: ' + why(c.skipped)].filter(Boolean).join('; ') + '</td></tr>'; }).join('');
+  return rows ? '<table class="mt"><thead><tr><th class="l">Object type</th><th>Placed</th><th>Converted</th><th>Deferred</th><th>Skipped</th><th>Failed</th><th class="l">Reasons</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p>nothing placed</p>';
+}
+function chimTotalsBlock() {
+  const t = chim.totals; if (!t) return '';
+  const f = (g, n) => g.stats && g.stats[n] != null ? nf(g.stats[n]) : '';
+  const cols = [['records.refs_total', 'Refs'], ['meshes.new', 'New meshes'], ['meshes.reused', 'Reused'], ['faces.chim_placed', 'Faces placed'], ['chunks.count', 'Chunks'], ['bytes.chim', 'CHIM bytes'], ['time.convert_s', 'Convert s']];
+  const row = (g, label, ind) => '<tr><td class="l" style="padding-left:' + (7 + ind * 16) + 'px">' + label + '</td><td>' + g.cells + '</td><td>' + g.converted + '</td><td>' + g.passed + '</td><td>' + (g.complete || 0) + '</td><td>' + g.failing + '</td><td>' + g.with_errors + '</td>' + cols.map(([n]) => '<td>' + f(g, n) + '</td>').join('') + '</tr>';
+  const islandName = i => i === 1 ? 'island 1 (Vvardenfell)' : 'island ' + i;
+  return '<details><summary><b>Totals per island and ring</b> (sums over converted cells; "new meshes" counted in conversion order)</summary><table class="mt"><thead><tr><th class="l">Group</th><th>Cells</th><th>Converted</th><th>Passed</th><th>Complete</th><th>Failing</th><th>With errors</th>' +
+    cols.map(([, h]) => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + row(t.all, 'All land cells', 0) +
+    t.islands.map(i => row(i, islandName(i.island), 1) + i.rings.map(r => row(r, 'ring ' + r.ring, 2)).join('')).join('') + '</tbody></table>' +
+    '<h4>Per object type</h4>' + [[t.all, 'All land cells']].concat(t.islands.map(i => [i, islandName(i.island)]).concat(t.islands.flatMap(i => i.rings.map(r => [r, islandName(i.island) + ', ring ' + r.ring]))))
+      .map(([g, label]) => '<details><summary>' + label + '</summary>' + chimCatTable(g.by_category) + '</details>').join('') + '</details>';
+}
+function chimOverview() {
+  const h = chim.headline, o = cset.order;
+  const rows = [...chimNext[o].keys()].slice(0, 10).map(k => chimRow(chimCells.get(k))).join('');
+  const mech = chim.mechanisms.map(m => { const n = chim.by_mechanism[m.id] || {};
+    return '<tr><td class="l">' + escapeHtml(m.label) + '</td><td>' + (n.passed || 0) + '</td><td>' + (n.failed || 0) + '</td><td>' + (n.accepted || 0) +
+      '</td><td>' + (n.not_measured || 0) + '</td></tr>'; }).join('');
+  const runs = chim.runs.map(r => '<tr><td class="l">' + escapeHtml(r.name) + '</td><td class="l">' + escapeHtml(r.label || '') + '</td><td>' + escapeHtml((r.areas || []).join(', ')) +
+    '</td><td>' + escapeHtml(r.chim_version || '?') + '</td><td>' + escapeHtml(r.world_format || '?') + '</td><td>' + escapeHtml(r.commit || 'not recorded') +
+    '</td><td>' + escapeHtml((r.built_at || '').replace('T', ' ').slice(0, 16)) + '</td></tr>').join('');
+  const mc = chim.mesh_curve;
+  const mesh = mc ? '<h3>Mesh-first view (store-once reuse)</h3><p>' + mc.unique_meshes.toLocaleString() + ' unique meshes island-wide; ' + mc.cells_with_meshes.toLocaleString() +
+    ' cells hold placements; ' + mc.meshes_in_one_cell_only.toLocaleString() + ' meshes appear in one cell only (' + mc.cells_that_own_a_mesh +
+    ' cells own one); in the spiral order ' + mc.cells_without_new_mesh_spiral.toLocaleString() + ' cells add no new mesh. With every unique mesh converted first, the other ' +
+    (mc.cells_with_meshes - mc.cells_that_own_a_mesh).toLocaleString() + ' cells need only a placement list.</p>' +
+    (SERVED ? '<img alt="Cumulative unique meshes along the spiral and risk orders" src="../data/cell-progress-curve.png?t=' + Date.now() + '" style="max-width:100%;border:1px solid var(--line)">' : '') : '';
+  return '<h2>CHIM Progress Tracker</h2><p class="muted">' + escapeHtml(chimSource || '') + ' · generated ' + escapeHtml(chim.generated) + ' · ' +
+    (h.islands || []).map(i => i.name + ' ' + i.cells.toLocaleString() + ' cells, done ' + i.done.toLocaleString() + ' (' + i.percent + ' %)').join(' · ') + ' · ' +
+    h.converted + ' converted · sources: ' +
+    Object.entries(chim.sources).map(([k, v]) => k + (v ? '' : ' (missing)')).join(', ') + '</p>' +
+    '<h3>Next cells: ' + (o === 'spiral' ? 'spiral, coast inwards' : 'risk, scout list (riskiest first)') + '</h3><table class="mt"><thead><tr><th class="l">Name</th><th>Cell</th><th>Ring</th><th>Spiral</th><th>Scout</th><th>Risk</th><th>Refs</th><th>Meshes</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<h3>Audits over converted cells</h3><table class="mt"><thead><tr><th class="l">Mechanism</th><th>Passed</th><th>Failed</th><th>Accepted</th><th>Not measured</th></tr></thead><tbody>' + mech + '</tbody></table>' +
+    chimTotalsBlock() + '<h3>CHIM builds read</h3><table class="mt"><thead><tr><th class="l">Run</th><th class="l">Label</th><th>Areas</th><th>CHIM</th><th>Format</th><th>Source commit</th><th>Built (UTC)</th></tr></thead><tbody>' + runs + '</tbody></table>' + mesh;
+}
+function showChimCell(x, y) {
+  chimClicked = {x, y};
+  const panel = $('chimpanel'), c = chimCells.get(x + ',' + y);
+  panel.hidden = false;
+  if (!c) { panel.innerHTML = chimOverview(); return; }
+  const m = c.contents || {}, lg = c.legacy, name = c.name || c.region;
+  const facts = [['References', m.refs_total], ['Statics', m.statics], ['Flora (meshes/f/)', m.flora], ['Actors', m.actors], ['Doors', m.doors], ['Load doors', m.load_doors],
+    ['Lights', m.lights], ['Containers', m.containers], ['Items', m.items], ['Unique meshes', m.unique_meshes]]
+    .map(([k, v]) => '<td class="l">' + k + '</td><td>' + (v == null ? 'not measured' : v) + '</td>');
+  const audits = chim.mechanisms.map(mm => { const a = c.audits[mm.id] || {status: 'not_measured'};
+    return '<tr><td class="l">' + escapeHtml(mm.label) + '</td><td class="l">' + chimSpan(CHIM_AUDIT[a.status], (a.outcome === 'kept_as_chain' ? 'passed: kept as chain for memory' : a.status.replace('_', ' ')) + (a.stale ? ' (stale: was ' + a.stale_result + ' on ' + a.build + ')' : '')) +
+      '</td><td class="l">' + escapeHtml(a.detail || '') + (a.numbers ? ' <span class="dim">' + escapeHtml(JSON.stringify(a.numbers)) + '</span>' : '') + '</td><td class="l">' + escapeHtml(a.build || '') + '</td></tr>'; }).join('');
+  const bugs = (c.bugs || []).map(id => { const b = chim.bugs[id] || {};
+    return '<tr><td class="l">' + escapeHtml(id) + '</td><td class="l">' + escapeHtml(b.state || '') + '</td><td class="l">' + escapeHtml(b.severity || '') + '</td><td class="l">' + escapeHtml(b.title || '') + '</td></tr>'; }).join('');
+  const r = c.risk ? Object.entries(c.risk.ratios).map(([k, v]) => k + ' ' + pct(v, 1)).join(' · ') : 'not measured';
+  const pv = c.provenance;
+  chimShownInterior = null;
+  panel.innerHTML = '<h2>CHIM Progress Tracker: ' + (name ? escapeHtml(name) + ' · ' : '') + 'cell ' + x + ', ' + y + '</h2>' +
+    '<p class="muted">Exterior cell ' + x + ', ' + y + (c.region && c.region !== name ? ' · region ' + escapeHtml(c.region) : '') + (c.set ? ' · ' + escapeHtml(c.set) : '') + (c.island ? ' · island ' + c.island : '') + ' · cell ID exterior:' + x + ',' + y + '</p>' +
+    '<p>' + chimSpan(CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][1]) + (c.land ? '' : ' · not land (sea-only cell with content)') +
+    (c.chim.owner ? ' · owner: ' + escapeHtml(c.chim.owner) + (c.chim.owner_date ? ' ' + escapeHtml(c.chim.owner_date) : '') : '') +
+    (c.chim.partial_terrain ? ' · terrain only in a CHIM build (no placements owned here)' : '') + '</p>' +
+    '<p class="muted">Sweep: ' + (c.ring == null ? 'not in the sweep' : 'ring ' + c.ring + ', spiral #' + c.spiral_rank) + (c.risk_rank ? ' · scout #' + c.risk_rank : '') +
+    ' · risk: ' + escapeHtml(r) + (c.cost && c.cost.heap_bytes ? ' · estimated heap ' + Math.round(c.cost.heap_bytes / 1048576 * 10) / 10 + ' MiB' : '') + '</p>' +
+    '<h3>Contents</h3><table class="mt"><tbody>' + [0, 2, 4, 6, 8].map(i => '<tr>' + facts[i] + facts[i + 1] + '</tr>').join('') + '</tbody></table>' +
+    '<h3>Objects by type</h3>' + chimCatTable(c.categories) +
+    '<h3>Stats</h3>' + chimStatsTable(c.stats, c.chim.converted) + chimErrorsBlock(c) +
+    '<h3>Legacy mapping quality (before CHIM)</h3>' + (lg ? '<p>' + chimSpan(CHIM_GRADES[lg.grade], 'grade ' + lg.grade + ': ' + lg.grade_label) + '<br>entities placed ' + lg.placed + ' / ' + lg.original +
+      (lg.placed_share == null ? '' : ' (' + pct(lg.placed_share, 1) + ')') + ' · interiors converted ' + lg.interiors_converted + ' / ' + lg.interiors + ' · named places ' + lg.places +
+      (lg.checked ? ' · owner checked' : '') + '</p>' : '<p>not measured</p>') +
+    '<h3>Audits</h3>' + (c.chim.converted ? '<table class="mt"><thead><tr><th class="l">Mechanism</th><th class="l">Result</th><th class="l">Detail</th><th class="l">Build</th></tr></thead><tbody>' + audits + '</tbody></table>' : '<p>not converted yet: nothing to audit</p>') +
+    '<h3>Provenance</h3><p>' + (pv ? 'build ' + escapeHtml(pv.build) + ' (' + escapeHtml(pv.label || '') + ') · source commit ' + escapeHtml(pv.source_commit || 'not recorded') + ' · CHIM ' + escapeHtml(pv.chim_version || '?') +
+      ' · world format ' + escapeHtml(pv.world_format || '?') + ' · built ' + escapeHtml((pv.built_at || '').replace('T', ' ').slice(0, 16)) : 'not in a CHIM build') +
+    (c.last_build ? '<br>last build: ' + Math.round(c.last_build.elapsed_s / 60 * 10) / 10 + ' min elapsed' + (c.last_build.chim_stage_s ? ', CHIM stage ' + Math.round(c.last_build.chim_stage_s) + ' s' : '') +
+      (c.last_build.host_busy ? ' (busy host)' : '') : '') + '</p>' +
+    chimInteriorsBlock(c) +
+    '<h3>Linked bugs (' + (c.bugs || []).length + ', ' + chimOpenBugs(c).length + ' open)</h3>' + (bugs ? '<div style="max-height:260px;overflow:auto"><table class="mt"><thead><tr><th class="l">ID</th><th class="l">State</th><th class="l">Severity</th><th class="l">Title</th></tr></thead><tbody>' + bugs + '</tbody></table></div>' : '<p>none linked</p>') +
+    '<p><button id="chimoverview">Back to the overview</button></p>';
+  $('chimoverview').onclick = () => { chimClicked = null; $('chimpanel').innerHTML = chimOverview(); };
+}
+function chimUi() {
+  if (!chim) return;
+  const isOn = chimOn(), h = chim.headline;
+  const ts = chim.totals && chim.totals.all && chim.totals.all.stats || {};
+  $('chimcount').textContent = isOn ? (h.islands && h.islands.length ? h.islands[0].name + ' done ' + h.islands[0].done.toLocaleString() + ' of ' + h.islands[0].cells.toLocaleString() + ' (' + h.islands[0].percent + ' %)' : 'CHIM cells ' + h.passed + ' / ' + h.land_cells + ' (' + h.percent + '%)') + (h.converted ? ' · converted ' + h.converted + (ts['meshes.new'] != null ? ' · new meshes ' + nf(ts['meshes.new']) : '') +
+    (ts['time.convert_s'] != null ? ' · convert time ' + nf(ts['time.convert_s']) + ' s' : '') : '') : '';
+  $('chimpanel').hidden = !isOn;
+  if (isOn) { if (chimClicked) showChimCell(chimClicked.x, chimClicked.y); else if (chimShownInterior) showChimInterior(chimShownInterior); else $('chimpanel').innerHTML = chimOverview(); }
+}
+function chimHeadSend() {
+  if (!chim) return;
+  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history};
+  if (window.parent !== window) window.parent.postMessage(msg, '*');
+  else window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket);
+}
+function chimPickBucket(b) {
+  chimBucket = b;
+  if (b) { $('layer-chim').checked = true; $('layer-metrics').checked = false; if (metrics) metricsUi(); }
+  chimUi(); draw();
+}
+function setChim(doc, source, keepView) {
+  if (!doc || doc.format !== CHIM_FORMAT || typeof doc.cells !== 'object' || !doc.headline) {
+    $('chimcount').textContent = 'Not a CHIM progress file (' + CHIM_FORMAT + ').'; return false;
+  }
+  const first = !chim;
+  chim = doc; chimSource = source;
+  chim.bugs = chim.bugs || {}; chim.interiors = chim.interiors || []; chim.runs = chim.runs || []; chim.sources = chim.sources || {};
+  chimCellList = Object.values(doc.cells); chimCells = new Map(chimCellList.map(c => [c.x + ',' + c.y, c]));
+  const xs = chimCellList.map(c => c.x), ys = chimCellList.map(c => c.y);
+  chim.bounds = xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null;
+  chimMaxRing = Math.max(1, ...chimCellList.map(c => c.ring || 0));
+  chimMaxElapsed = Math.max(1, ...chimCellList.map(c => c.last_build ? c.last_build.elapsed_s : 0));
+  for (const o of ['spiral', 'risk']) {
+    const key = o === 'spiral' ? 'spiral_rank' : 'risk_rank';
+    const list = chimCellList.filter(c => !c.chim.converted && c[key]).sort((a, b) => a[key] - b[key]).slice(0, CHIM_NEXT);
+    chimNext[o] = new Map(list.map((c, i) => [c.x + ',' + c.y, i + 1]));
+  }
+  const cur = cset.colour, flt = cset.filter;
+  $('chimcolour').innerHTML = [['status', 'CHIM status'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
+    ['bugs', 'Open bugs linked'], ['lastbuild', 'Last build time']].concat(doc.mechanisms.map(m => ['audit:' + m.id, 'Audit: ' + m.label]))
+    .map(([v, t]) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>').join('');
+  $('chimcolour').value = cset.colour = [...$('chimcolour').options].some(o => o.value === cur) ? cur : 'status';
+  $('chimfilter').innerHTML = '<option value="">all cells</option><option value="failing">any failing audit</option><option value="unmeasured">any audit not measured</option>' +
+    doc.mechanisms.map(m => '<option value="fail:' + escapeHtml(m.id) + '">failing: ' + escapeHtml(m.label) + '</option>').join('') +
+    doc.mechanisms.map(m => '<option value="unm:' + escapeHtml(m.id) + '">not measured: ' + escapeHtml(m.label) + '</option>').join('');
+  $('chimfilter').value = cset.filter = [...$('chimfilter').options].some(o => o.value === flt) ? flt : '';
+  if (first) { $('layer-chim').checked = true; $('layer-metrics').checked = false; if (metrics) metricsUi(); }
+  if (first || !keepView) { view.z = 1; view.x = view.y = 0; }
+  chimBuildIndex();
+  chimUi(); chimHeadSend(); draw();
+  return true;
+}
+// Served by toolkit_serve.py --progress: read again on reload, on window focus and on the Reload button.
+async function loadChim(force) {
+  if (chimImported && !force) return false;
+  try {
+    const r = await fetch('../data/cell-progress.json?t=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) return false;
+    const doc = await r.json();
+    if (chim && !chimImported && doc.generated === chim.generated && !force) return false;
+    chimImported = false;
+    return setChim(doc, 'served: cell-progress.json', !!chim);
+  } catch (_) { return false; }
+}
+$('chimfile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  load(f, text => { try { chimImported = setChim(JSON.parse(text), 'imported: ' + f.name, false); } catch (err) { $('chimcount').textContent = 'Cannot read ' + f.name + ': ' + err.message; } });
+};
+$('chimreload').onclick = async () => {
+  if (!SERVED) { $('chimcount').textContent = 'Reload works with toolkit_serve.py --progress; here, import the file again.'; return; }
+  chimImported = false;
+  $('chimcount').textContent = (await loadChim(true)) ? '' : 'No progress file served (start toolkit_serve.py with --progress).';
+  chimUi();
+};
+$('layer-chim').onchange = () => {
+  if ($('layer-chim').checked) { $('layer-metrics').checked = false; if (metrics) { view.z = 1; view.x = view.y = 0; metricsUi(); } }
+  chimUi(); draw();
+};
+$('layer-metrics').addEventListener('change', () => { if ($('layer-metrics').checked) { $('layer-chim').checked = false; chimUi(); draw(); } });
+for (const [id, key] of [['chimcolour', 'colour'], ['chimorder', 'order'], ['chimfilter', 'filter']]) $(id).onchange = () => { cset[key] = $(id).value; chimUi(); draw(); };
+for (const [id, key] of [['chimnums', 'nums'], ['chimnext', 'next']]) $(id).onchange = () => { cset[key] = $(id).checked; draw(); };
+$('chimpanel').addEventListener('click', e => {
+  const ir = e.target.closest && e.target.closest('tr[data-int]');
+  if (ir) { showChimInterior(ir.dataset.int); return; }
+  const tr = e.target.closest && e.target.closest('tr[data-xy]'); if (!tr) return;
+  const [x, y] = tr.dataset.xy.split(',').map(Number);
+  picked = {x, y}; $('picked').textContent = describe(x, y, data && data.cells.find(c => c.x === x && c.y === y), ' · ');
+  showChimCell(x, y); draw();
+});
+window.addEventListener('focus', () => { if (SERVED) loadChim(false); });
+window.addEventListener('message', e => {
+  if (e.source === window.parent && e.data && e.data.type === 'amiwind-chim-pick') chimPickBucket(e.data.bucket || null);
 });
 </script>
 </body>

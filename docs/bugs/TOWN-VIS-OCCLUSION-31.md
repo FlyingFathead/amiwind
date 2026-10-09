@@ -1,5 +1,24 @@
 # TOWN-VIS-OCCLUSION-31: town buildings do not block Quake visibility
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 7 October 2026, in v0.0.31-dev5 |
+| Where | Town and interior maps: func_wall models ignored by vis |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.31-dev5 (last seen) |
+| Severity | medium: Most of a town stays potentially visible; low frame rates in Balmora and Seyda Neen. |
+| Family | Rendering cost and visibility (`render-performance`) |
+| Playtest version | v0.0.31-dev5 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. The planned repair (occluders, building faces in the world model) was
@@ -66,3 +85,24 @@ Pending: visible share and frame rate at the same views, before and after.
 
 A visibility gate per town map: the average visible share must stay below a
 set limit.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Rendering cost and visibility (`render-performance`). Read the visibility data and renderer counters before any performance claim. See [families](README.md#families).
+
+- AW-20260928-07 (no report page): Slow opening exterior / excessive residency
+- [CHIM-TRACE-TAIL-33](CHIM-TRACE-TAIL-33.md): A few CHIM collision traces visit thousands of clipnodes
+- MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
+- [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
+- [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
+- [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views
+- [RENDER-SURFCACHE-THRASH-32](RENDER-SURFCACHE-THRASH-32.md): Seyda Neen views rebuild the surface cache every frame at a fixed camera
+
+Related bugs in other categories:
+
+- [CHIM-PVS-HOLLOW-33](CHIM-PVS-HOLLOW-33.md): Chunk visibility culls almost nothing in Balmora: houses have hollow collision shells
+- [VF-VIS-LUMP-32](VF-VIS-LUMP-32.md): Open-world terrain maps spend about a fifth of their bytes on visibility data that culls little
+
+<!-- END GENERATED CATEGORY -->

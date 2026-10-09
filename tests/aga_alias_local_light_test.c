@@ -48,6 +48,8 @@ float R_SpriteEntityScale(const entity_t *e){return 1;}
 qboolean AcceptAliasBBox(void){currententity->trivial_accept=0;return true;}
 void CaptureAliasDraw(alight_t *light){received=*light;draws++;R_AliasDrawModel(light);}
 int R_LightPoint(vec3_t p){return world_light;}
+/* Maps without an actor light grid: the floor light (r_light.c R_ActorLight). */
+int R_ActorLight(entity_t *e,int centre){(void)centre;return R_LightPoint(e->origin);}
 int AW_GalleryActive(void){return gallery_active;}
 int AW_TorchTestActive(void){return torch_test_active;}
 void R_DrawSprite(void){}

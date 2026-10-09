@@ -15,6 +15,12 @@ from check_actor_ground import entities
 from mwad.paths import ensure_external
 
 
+def _voiced_actors(path):
+    """Worker: the voiced actor entities of one map, in file order."""
+    return [e for e in entities(Path(path).read_bytes())
+            if e.get('classname')=='aw_npc' and e.get('aw_source_id') and e.get('aw_voice')]
+
+
 def stage(gallery, id1):
     gallery=ensure_external(gallery,'converted gallery');id1=ensure_external(id1,'private game data')
     audit=json.loads((gallery/'gallery-audit.json').read_text())
@@ -31,9 +37,13 @@ def stage(gallery, id1):
         shutil.copyfile(gallery/'gallery'/name,dest/name)
     report=write_allowances(gallery/'gallery',audit['models'],audit['entries'],id1/'model-budgets.txt')
     voices={}
-    for path in sorted((id1/'maps').glob('*.bsp')):
-        for e in entities(path.read_bytes()):
-            if e.get('classname')!='aw_npc' or not e.get('aw_source_id') or not e.get('aw_voice'):continue
+    # Every staged map is read (the world maps too): in the worker pool, applied
+    # in map order so a later map's greeting wins as before.
+    from build_parallel import ordered_map
+    from build_jobs import resolve_jobs
+    paths=sorted((id1/'maps').glob('*.bsp'))
+    for found in ordered_map(_voiced_actors,[str(p) for p in paths],max(1,min(resolve_jobs(None),len(paths) or 1))):
+        for e in found:
             if not (id1/'sound'/e['aw_voice']).is_file():continue
             line=e.get('aw_line','').replace('\n',' ').replace('\t',' ')
             voices[e['aw_source_id'].casefold()]=(e['aw_voice'],e.get('aw_greet_duration','8'),line)

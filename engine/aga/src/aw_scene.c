@@ -12,9 +12,14 @@
 #include "aw_town.h"
 #include "aw_section.h"
 #include "aw_world.h"
+#include "chim/chim.h"
 #include "aw_character.h"
 #include "aw_harvest_runtime.h"
+#include "aw_miniwind.h"
 #include "amiwind_version.h"
+/* CHIM: the harvest catalogue of the region the player is in while a town
+ * runs its frame map; 0 on a legacy map. */
+static int harvest_follow(edict_t *p,int arrival){return AW_HarvestFollow(AW_RegionAt,p->v.origin,arrival);}
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
 static aw_scene_link_t links[128];static int count,loaded,pending;
 static aw_scene_link_t next;
@@ -28,6 +33,12 @@ static double hand_torch_time;
 static int hand_clock_ready;
 static double started;
 static int region_crossing,map_jump;
+/* A partial-area build (aw_miniwind.c): what an exit to an area it does not
+ * hold says, and the quick start's notice still to show on arrival. */
+#define AREA_UNAVAILABLE "Area unavailable"
+static int quick_notice;
+static vec3_t area_last;static int area_last_ok;static double area_said=-10;
+static int area_hold(edict_t *p);
 /* 1: requested, 2: checked spawn awaiting the final signon angle packet. */
 static int shroompicker_view;
 static float shroompicker_pitch,shroompicker_yaw;
@@ -96,25 +107,29 @@ int AW_NPCFloor(edict_t *e) {
 /* Shared with the QC greeting builtin. A visible head can be above the fixed
  * walking hull. Intersect the resident alias bounds in model space, retaining
  * the exact crosshair and world/brush occlusion rather than a facing cone. */
-edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {
+void (*aw_companion_scene)(edict_t *);   /* aw_companion.c: a scene spawned */
+void (*aw_combat_scene)(void);           /* aw_combat.c: a scene spawned (before the arena spawns its fight) */
+edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {return AW_NPCTargetReach(p,angles,72);}
+/* The same test with a longer reach (dbg pickcompanion: 384 units). */
+edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
     edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,a,b,o,d,t;
     vec3_t eye,end,forward,right,up,delta,local,ray;trace_t tr;
     AW_FPUCOUNT(AW_FPU_NPCTARGET);
     if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
     AW_FPUCOUNT(AW_FPU_NPCSCAN);
     VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(angles,forward,right,up);
-    VectorMA(eye,72,forward,end);
+    VectorMA(eye,reach,forward,end);
     tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);e=tr.ent;
     /* Keep direct physical hits, including legacy assets without bounds. */
-    limit=72;
+    limit=reach;
     if(!tr.startsolid && !tr.allsolid && tr.fraction<1){
-        limit=tr.fraction*72;
+        limit=tr.fraction*reach;
         if(e && !e->free && e->v.modelindex && e->v.netname &&
            !strcmp(pr_strings+e->v.classname,"aw_npc"))best=e;
     }else{
         tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
         if(tr.startsolid || tr.allsolid)return NULL;
-        limit=tr.fraction*72;
+        limit=tr.fraction*reach;
     }
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);index=(int)e->v.modelindex;
@@ -254,19 +269,29 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     if(region_crossing)S_BeginSceneVoice();
     if(immediate)Cbuf_InsertText(command);else Cbuf_AddText(command);
 }
-int AW_MapTeleport(const float *source_position) {
-    aw_scene_link_t r;edict_t *p;
+/* A teleport to original-game coordinates: the town or region whose map holds
+ * the point (a CHIM town's frame map on a CHIM disk, AW_WorldMapTarget), the
+ * ring there loaded before the ground is searched (aw_chim_spawn). With a
+ * height (dbg tp X Y Z) the player lands on the first surface at or below it,
+ * else on the highest one; a blocked target falls back to the scene spawn. */
+int AW_MapTeleportAt(const float *source_position,int use_height) {
+    aw_scene_link_t r;edict_t *p;float local[3];
     if(pending || !sv.active || svs.maxclients!=1 || !svs.clients ||
        !(p=svs.clients[0].edict) || cls.state!=ca_connected || p->v.health<=0 ||
        AW_StoryRestricted())return 0;
     memset(&r,0,sizeof(r));
     if(!AW_WorldMapTarget(source_position,r.target,r.arrival))return 0;
+    if(use_height){
+        if(!AW_SourceToWorld(r.target,source_position,local) || !(fabs(local[2])<4000))return 0;
+        r.arrival[2]=local[2];
+    }
     r.yaw=p->v.v_angle[1];region_crossing=0;door_ready=0;door_close=0;
     crossing_movetype=p->v.movetype;
     load_scene(&r,1);
     if(!pending)return 0;
-    map_jump=1;return 1;
+    map_jump=use_height?2:1;return 1;
 }
+int AW_MapTeleport(const float *source_position) {return AW_MapTeleportAt(source_position,0);}
 /* Ray/slab intersection with converted model bounds. The model origin may
  * be buried in the ceiling or far from the visible handle/hatch surface. */
 static int door_hit(aw_scene_link_t *r,vec3_t eye,vec3_t forward,vec3_t hit) {
@@ -338,7 +363,7 @@ int AW_TravelKey(int key) {
         if(travel_choice==0 && town && AW_TownArrival(travel_return?town->name:town->travel_target,travel_return,r.arrival,&r.yaw)){
             strcpy(r.target,town->travel_target);
             travel_open=0;key_dest=key_game;load_scene(&r,0);
-        }else travel_message="Destination not found.";
+        }else travel_message=AW_MiniwindActive()?AREA_UNAVAILABLE:"Destination not found.";
     }
     return 1;
 }
@@ -365,15 +390,14 @@ int AW_TravelDraw(void) {
     AW_UISmallEnd();return 1;
 }
 int AW_SceneUse(void) {
-    int i;float duration;FILE *f=NULL;char path[40];if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && AW_HarvestUse())return 1;i=aimed_door();if(i<0)return 0;
+    int i;float duration;char path[40];if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && AW_HarvestUse())return 1;i=aimed_door();if(i<0)return 0;
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
-    sprintf(path,"maps/%s.bsp",links[i].target);
-    if(!map_valid(links[i].target) || COM_FOpenFile(path,&f)<0 || !f){
-        if(f)fclose(f);
-        AW_UISubtitle("","Interior not found.",3);return 1;
+    if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){
+        /* A quick test build without interiors (aw_excluded.c): a friendly line, not a repair message. */
+        if(AW_ContentExcludedSay("interiors",1)){AW_UISubtitle("","Area unavailable in this quick test build.",3);return 1;}
+        AW_UISubtitle("",AW_MiniwindActive()?AREA_UNAVAILABLE:"Interior not found.",3);return 1;
     }
-    fclose(f);
     if(AW_StoryRestricted() && links[i].reference==119659)AW_StoryTransition(AW_STAGE_RELEASED);
     duration=AW_DoorSound(links[i].reference,0);
     if(duration>0){
@@ -405,7 +429,7 @@ void AW_SceneDraw(void) {
             name=links[i].label[0]?links[i].label:!strcmp(links[i].target,"seyda")?"Seyda Neen":"Imperial Prison Ship";
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
-                !map_valid(links[i].target)?"Interior unavailable":"Enter: E";
+                !map_valid(links[i].target)?(AW_ContentExcluded("interiors")?"Area unavailable":"Interior unavailable"):"Enter: E";
         }else{ name=npc_hint();if(name){
             eval_t *voice;edict_t *target=npc_target();npc=1;
             voice=target?GetEdictFieldValue(target,"aw_voice"):NULL;
@@ -539,17 +563,29 @@ void AW_SceneSignon(void) {
     cl.driftmove=crossing_driftmove;cl.laststop=cl.time+crossing_laststop;
     S_EndSceneVoice();
 }
+/* CHIM: the chunk ring around the arrival point is loaded before the
+ * clearance search (chim/chim_world.c sets it only when its data exists). */
+void (*aw_chim_spawn)(vec3_t);
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
+    area_last_ok=0;
     /* Quake's stuck recovery returns to oldorigin, which a fresh client edict
      * leaves at the frame origin; anchor it at the scene spawn instead. */
     VectorCopy(p->v.origin,p->v.oldorigin);
+    if(aw_chim_spawn)aw_chim_spawn(pending && !strcmp(sv.name,next.target)?next.arrival:p->v.origin);
     if(region_crossing && (!pending || strcmp(sv.name,next.target)))S_CancelSceneVoice();
     crossing_view_ready=0;hand_clock_ready=0;door_ready=0;
     if(!region_crossing)AW_UISubtitle("","",0);
     if(pending && !strcmp(sv.name,next.target)) {
         if(map_jump){
-            placed=arrival_place(p,next.arrival,1);
+            extern const char *aw_map_place_failure;
+            placed=(map_jump==2 && AW_MapPlaceBelow(p,next.arrival)) || arrival_place(p,next.arrival,1);
+            /* Said when the player did not land at the asked XY (the fallbacks
+             * use the scene spawn), with why the map placement failed. */
+            if(placed && (fabs(p->v.origin[0]-next.arrival[0])>48 || fabs(p->v.origin[1]-next.arrival[1])>48))
+                Con_Printf("Debug teleport: %s at %ld %ld (map %s); placed at %ld %ld %ld instead.\n",
+                    (char *)(aw_map_place_failure[0]?aw_map_place_failure:"no standing spot"),(long)next.arrival[0],(long)next.arrival[1],
+                    sv.name,(long)p->v.origin[0],(long)p->v.origin[1],(long)p->v.origin[2]);
             if(!placed){
                 Con_Printf("Debug teleport target has no clear standing surface; using scene spawn.\n");
                 AW_UISubtitle("DEBUG TELEPORT","Target blocked; using scene spawn.",5);
@@ -587,8 +623,15 @@ void AW_SceneSpawn(edict_t *p) {
         if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_HarvestSpawn();AW_GallerySpawn(p);region_crossing=map_jump=0;
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();if(!harvest_follow(p,1))AW_HarvestSpawn();
+    if(aw_combat_scene)aw_combat_scene();
+    AW_GallerySpawn(p);if(aw_companion_scene)aw_companion_scene(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
+    /* The partial-area build's notice, in the game's own message box, once the
+     * quick start has arrived (the build's data file, aw_miniwind.c). */
+    if(quick_notice && AW_MiniwindActive()){
+        quick_notice=0;AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);
+    }
     AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
 void AW_SceneTick(void) {
@@ -608,6 +651,8 @@ void AW_SceneTick(void) {
     if(pending || !sv.active || cls.state!=ca_connected || cls.signon!=SIGNONS || key_dest!=key_game ||
        svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
        p->v.health<=0 || (p->v.movetype!=MOVETYPE_WALK && p->v.movetype!=MOVETYPE_NOCLIP))return;
+    harvest_follow(p,0);
+    if(area_hold(p))return;
     memset(&r,0,sizeof(r));
     if(AW_SectionDestination(sv.name,p->v.origin,r.target)){
         VectorCopy(p->v.origin,r.arrival);
@@ -626,18 +671,40 @@ void AW_SceneTick(void) {
     load_scene(&r,1);
     if(!pending)region_crossing=0;
 }
+/* A partial-area build holds the player inside the town's CHIM frame: past
+ * the union of its region cores (the frame's edge, AW_RegionAt) lies an area
+ * the build does not hold. The player stays at the last spot 32 units clear of
+ * the edge and the message box says so. Normal builds, legacy region maps,
+ * interiors and noclip are never held. Returns 1 while holding. */
+static int area_inside(const float *o) {
+    static const float step[4][2]={{32,0},{-32,0},{0,32},{0,-32}};float q[3];int i;
+    for(i=0;i<4;i++){
+        q[0]=o[0]+step[i][0];q[1]=o[1]+step[i][1];q[2]=o[2];
+        if(AW_RegionAt(q,-1,NULL,0)==-1)return 0;
+    }
+    return 1;
+}
+static int area_hold(edict_t *p) {
+    if(!AW_MiniwindActive() || p->v.movetype!=MOVETYPE_WALK || AW_RegionAt(p->v.origin,-1,NULL,0)==-2)return 0;
+    if(area_inside(p->v.origin)){VectorCopy(p->v.origin,area_last);area_last_ok=1;return 0;}
+    if(area_last_ok){
+        VectorCopy(area_last,p->v.origin);VectorCopy(area_last,p->v.oldorigin);
+        p->v.velocity[0]=p->v.velocity[1]=0;SV_LinkEdict(p,false);
+    }
+    if(realtime>=area_said+3 || realtime<area_said){area_said=realtime;AW_UISubtitle("",AREA_UNAVAILABLE,3);}
+    return 1;
+}
 /* Help line built from the town table, so new teleport towns appear without
  * editing this text (DEBUG-TP-TOWN-NAMES-32). */
 static void scene_help(void) {
-    int i;
-    Con_Printf("During play: dbg tp seydaneen/prisonship");
-    for(i=0;i<AW_TOWN_COUNT;i++)
-        if(AW_Town(i)->flags&AW_TOWN_TELEPORT)Con_Printf("/%s",AW_Town(i)->name);
-    if(AW_TownFind("vivec_arena")>=0)Con_Printf("/vivec");
-    Con_Printf("/<map name>; dbg tp opens the menu.\n");
+    char names[256];
+    /* Only what this disk has: a pure-CHIM disk offers its CHIM towns. */
+    if(AW_TeleportDestinations(names,sizeof(names)))
+        Con_Printf("During play: dbg tp %s/<map name>, dbg tp X Y [Z] (original coordinates); dbg tp opens the menu.\n",names);
+    else Con_Printf("During play: dbg tp <map name> or dbg tp X Y [Z] (original coordinates); no town on this disk.\n");
 }
 static void scene_command(void) {
-    aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];FILE *f=NULL;int i,size;
+    aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];int i,size;
     if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
        !Q_strcasecmp((char *)s,"town"))s="town";
     else if(!Q_strcasecmp((char *)s,"ship") || !Q_strcasecmp((char *)s,"prisonship"))s="ship";
@@ -649,12 +716,12 @@ static void scene_command(void) {
         if(i==AW_MAP_COUNT)for(i=0;i<AW_TOWN_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_Town(i)->name)){s=AW_Town(i)->name;break;}
     }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
+        if(sv.active && Cmd_Argc()==2)Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));
         scene_help();return;
     }
     door_ready=0;door_close=0;
-    sprintf(path,"maps/%s.bsp",!strcmp(s,"ship")?"prison":!strcmp(s,"town")?"seyda":s);
-    size=COM_FOpenFile(path,&f);if(f)fclose(f);
-    if(!f || size<124){Con_Printf("Destination not found: %s.\n",s);return;}
+    size=AW_SceneMapSize(!strcmp(s,"ship")?"prison":!strcmp(s,"town")?"seyda":s,path,sizeof(path));
+    if(size<124){Con_Printf("Destination not on this disk: %s.\n",s);scene_help();return;}
     if(map_valid(s)){
         if(AW_TownFlag(s,AW_TOWN_TELEPORT)){
             memset(&r,0,sizeof(r));strcpy(r.target,s);
@@ -787,22 +854,47 @@ static void shroompicker_command(void) {
 }
 static void teleport_command(void) {
     vec3_t source;
-    if(Cmd_Argc()==3) {
+    if(Cmd_Argc()==3 || Cmd_Argc()==4) {
         if(!teleport_coordinate(Cmd_Argv(1),&source[0]) ||
-           !teleport_coordinate(Cmd_Argv(2),&source[1])) {
-            Con_Printf("Usage: dbg tp X Y (original Morrowind global coordinates)\n");return;
+           !teleport_coordinate(Cmd_Argv(2),&source[1]) ||
+           (Cmd_Argc()==4 && !teleport_coordinate(Cmd_Argv(3),&source[2]))) {
+            Con_Printf("Usage: dbg tp X Y [Z] (original Morrowind global coordinates)\n");return;
         }
-        source[2]=0;
-        if(!AW_MapTeleport(source))
-            Con_Printf("Coordinate teleport unavailable; player state unchanged.\n");
+        if(Cmd_Argc()==3)source[2]=0;
+        if(!AW_MapTeleportAt(source,Cmd_Argc()==4))
+            Con_Printf("Coordinate teleport unavailable (no map on this disk holds that point); player state unchanged.\n");
         return;
     }
-    if(Cmd_Argc()>3) {
-        Con_Printf("Usage: dbg tp X Y, dbg tp <name>, or dbg tp map\n");return;
+    if(Cmd_Argc()>4) {
+        Con_Printf("Usage: dbg tp X Y [Z], dbg tp <name>, or dbg tp map\n");return;
     }
 
     if(Cmd_Argc()==1 && sv.active){Cbuf_InsertText("aw_scene_menu\n");return;}
     scene_command();
+}
+/* aw_quick_start [town]: a fresh game straight in a town (default: the
+ * partial-area build's town, aw_miniwind.c), as the Hors preset dbg tp
+ * creates, at the town's directory arrival, placed as a door arrival is. A
+ * partial-area build runs it after the startup logo and for New Game. */
+static void quick_start(void) {
+    aw_scene_link_t r;const char *s;int town;char command[32];
+    s=Cmd_Argc()>=2?Cmd_Argv(1):AW_MiniwindActive()?AW_Miniwind()->town:"";
+    town=AW_TownFind(s);
+    if(Cmd_Argc()>2 || town<0 || !(AW_Town(town)->flags&AW_TOWN_TELEPORT)){
+        Con_Printf("Usage: aw_quick_start <town with an arrival point, e.g. balmora>\n");return;
+    }
+    memset(&r,0,sizeof(r));strcpy(r.target,AW_Town(town)->name);
+    if(!AW_TownArrival(r.target,0,r.arrival,&r.yaw) || !AW_CharacterHors()){
+        Con_Printf("Quick start: %s or the character catalogue not found.\n",AW_Town(town)->title);
+        if(!sv.active)Cbuf_AddText("aw_main_menu\n");
+        return;
+    }
+    AW_SaveReset();AW_SceneCancelTransition();
+    health=aw_character.current[0];next=r;pending=1;started=Sys_FloatTime();
+    quick_notice=AW_MiniwindActive();
+    IN_AWClearButtons();key_dest=key_game;
+    Con_Printf("Quick start: %s as %s.\n",AW_Town(town)->title,aw_story.name);
+    sprintf(command,"map %s\n",r.target);Cbuf_AddText(command);
 }
 static void demo_start(void) {
     FILE *f;
@@ -833,4 +925,5 @@ void AW_SceneInit(void) {
     Cmd_AddCommand("aw_teleport",teleport_command);
     Cmd_AddCommand("aw_shroompicker",shroompicker_command);
     Cmd_AddCommand("aw_demo_start",demo_start);
+    Cmd_AddCommand("aw_quick_start",quick_start);
 }

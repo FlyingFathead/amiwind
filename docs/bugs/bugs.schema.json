@@ -1,21 +1,229 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AmiWind bug register",
-  "description": "docs/bugs/bugs.json: one object per bug. docs/BUGS.md is generated from it by tools/bug_register.py; tests/test_bug_tracker.py enforces these rules.",
+  "description": "docs/bugs/bugs.json: one object per bug. docs/BUGS.md, the fact table and category section of every report page and the families table in docs/bugs/README.md are generated from it by tools/bug_register.py; tests/test_bug_tracker.py enforces these rules, including that bugs found from v0.0.30 on (ID suffix 30 or higher) carry every fact field, that duplicate_of and related name registered IDs, and that related links go both ways and stay outside the family. Optional chim (CHIM part) and build (the build it was found in) are checked by the same test; CHIM bugs are listed on docs/bugs/CHIM_TRACKER.md.",
   "type": "array",
   "items": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["id", "title", "state", "fixed_in", "owner_accepted", "status", "report"],
+    "required": [
+      "id",
+      "title",
+      "state",
+      "fixed_in",
+      "owner_accepted",
+      "status",
+      "report"
+    ],
     "properties": {
-      "id": {"type": "string", "description": "AREA-WHAT-NN, NN = version series in which it was found. Never reused or renamed."},
-      "title": {"type": "string", "description": "Short plain description of the problem; no | or line breaks."},
-      "state": {"enum": ["open", "fixed", "closed"], "description": "fixed = a correction shipped in fixed_in with supporting verification; closed = not a bug, duplicate or superseded (say which in status)."},
-      "fixed_in": {"type": ["string", "null"], "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$", "description": "First version that shipped the fix; null unless state is fixed."},
-      "owner_accepted": {"type": ["string", "null"], "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$", "description": "Version in which the owner confirmed the fix in play; null until then."},
-      "status": {"type": "string", "description": "Current evidence and next check, factual; keep reported, source-checked, packaged, native-verified and owner-accepted distinct. May contain markdown links."},
-      "report": {"type": ["string", "null"], "description": "bugs/<id>.md when the report page exists, else null."},
-      "tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["performance"]}, "description": "Optional, sorted; each tag gets its own list below the register table in docs/BUGS.md."}
+      "id": {
+        "type": "string",
+        "description": "AREA-WHAT-NN, NN = version series in which it was found. Never reused or renamed."
+      },
+      "title": {
+        "type": "string",
+        "description": "Short plain description of the problem; no | or line breaks."
+      },
+      "state": {
+        "enum": [
+          "open",
+          "fixed",
+          "closed"
+        ],
+        "description": "fixed = a correction shipped in fixed_in with supporting verification; closed = not a bug, duplicate or superseded (say which in status)."
+      },
+      "fixed_in": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$",
+        "description": "First version that shipped the fix; null unless state is fixed."
+      },
+      "owner_accepted": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$",
+        "description": "Version in which the owner confirmed the fix in play; null until then."
+      },
+      "status": {
+        "type": "string",
+        "description": "Current evidence and next check, factual; keep reported, source-checked, packaged, native-verified and owner-accepted distinct. May contain markdown links."
+      },
+      "report": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "bugs/<id>.md when the report page exists, else null."
+      },
+      "reported_by": {
+        "type": "string",
+        "pattern": "^(owner|developer|review|audit|test|build|ci|unknown|gate:[a-z0-9][a-z0-9-]*)$",
+        "description": "Who first reported it: owner, developer, review, audit, test, build, ci, gate:<name> or unknown."
+      },
+      "found_date": {
+        "type": "string",
+        "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2}|unknown)$",
+        "description": "Date first noticed (YYYY-MM-DD), or unknown."
+      },
+      "found_in": {
+        "type": "string",
+        "pattern": "^(v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?|unknown)$",
+        "description": "Version or development line it was found in, or unknown."
+      },
+      "where": {
+        "type": "string",
+        "maxLength": 100,
+        "description": "Short location or component; one line, no |."
+      },
+      "reproduction": {
+        "enum": [
+          "always",
+          "sometimes",
+          "once",
+          "unknown"
+        ]
+      },
+      "duplicate_of": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "ID of the original when this is a duplicate (then state is closed); else null."
+      },
+      "persists_in": {
+        "oneOf": [
+          {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$"
+            }
+          },
+          {
+            "type": "string",
+            "pattern": "^(unknown|fixed in v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?)$"
+          }
+        ],
+        "description": "Versions it was observed in, oldest first (last = last seen); \"fixed in <fixed_in>\" for a fixed bug; or unknown."
+      },
+      "severity": {
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ],
+        "description": "See docs/bugs/README.md, \"Choosing the severity\"."
+      },
+      "severity_reason": {
+        "type": "string",
+        "maxLength": 160,
+        "description": "One line: why this severity."
+      },
+      "family": {
+        "type": "string",
+        "description": "A key from docs/bugs/families.json."
+      },
+      "related": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string"
+        },
+        "description": "Sorted IDs of related bugs in other families; links go both ways."
+      },
+      "tags": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "enum": [
+            "performance"
+          ]
+        },
+        "description": "Optional, sorted; each tag gets its own list below the register table in docs/BUGS.md."
+      },
+      "chim": {
+        "enum": [
+          "streaming",
+          "format",
+          "builder",
+          "stairs",
+          "rendering",
+          "performance"
+        ],
+        "description": "Marks a CHIM bug and names its part (docs/bugs/README.md \"CHIM bugs\"); required for CHIM- IDs and the chim-streamer family; listed on docs/bugs/CHIM_TRACKER.md."
+      },
+      "build": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "source_commit",
+          "engine_commit",
+          "world_commit",
+          "chim_version",
+          "chim_format"
+        ],
+        "description": "The build the bug was found in (docs/bugs/README.md \"Found in build\"); required for CHIM bugs and bugs found in a numbered build. Any unknown value needs unknown_reason.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Playtest version with its number (CHIM Preview 1, v0.0.33-dev1, MiniWind v0.0.33-dev1), or source."
+          },
+          "source_commit": {
+            "type": "string",
+            "pattern": "^([0-9a-f]{7,40}|unknown)$",
+            "description": "Commit the build was made from (for source: where it was found)."
+          },
+          "engine_commit": {
+            "type": "string",
+            "pattern": "^([0-9a-f]{7,40}|unknown)$",
+            "description": "Commit the engine was compiled from."
+          },
+          "world_commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([0-9a-f]{7,40}|unknown)$",
+            "description": "Commit of the builder that wrote the CHIM world; null for a legacy-engine build."
+          },
+          "chim_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([0-9]+\\.[0-9]+\\.[0-9]+|unknown)$",
+            "description": "CHIM version; null for a legacy-engine build."
+          },
+          "chim_format": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([0-9]+\\.[0-9]+|unknown)$",
+            "description": "CHIM world format; null for a legacy-engine build."
+          },
+          "unknown_reason": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Why a value is unknown; only when one is."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional one-line note."
+          }
+        }
+      }
     }
   }
 }

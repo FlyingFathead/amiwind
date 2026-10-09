@@ -1,14 +1,22 @@
 # VIVEC-ARENA-WATER-FALL-32: The sea ends at the Arena canton edge: sky below the horizon, and the player falls out of the area through the water
 
-| | |
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
 | --- | --- |
-| Reported by | Harry (owner playtest) |
-| First noticed | 8 October 2026, v0.0.32-dev3 |
+| Reported by | owner |
+| First noticed | 8 October 2026, in v0.0.32-dev3 |
 | Where | Vivec Arena preview, east of the Arena canton: LOCAL 1374 165 -212 and LOCAL 1076 -150 65 |
-| Reproduction | always at those poses (steps on the page) |
-| Duplicate of | none (related: VIVEC-ARENA-FRAME-EDGE-32) |
-| Persists in | v0.0.32 (shipped as is) |
-| Severity | medium (the player can fall out of the area) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev3, v0.0.32 (last seen) |
+| Severity | medium: The player can fall out of the area. |
+| Family | Vivec preview frame and its joins to the world (`vivec-frame-edge`) |
+| Playtest version | v0.0.32-dev3 |
+| From commit | source and engine 91a7eeb |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
 
 ## Status: 8 October 2026
 
@@ -75,3 +83,18 @@ Pending.
 Proposed: a frame check in the town import report that the water surface and a floor under it cover
 every point of the frame below the water line, plus a swim and a look-out pose at each canton edge in
 the Arena smoke test.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Vivec preview frame and its joins to the world (`vivec-frame-edge`). The Vivec Arena preview is one isolated frame: what lies at or beyond its edge (canton cuts, sea, bridges, the open-world maps around it) is missing, cut or wrong until the world streamer joins Vivec to the world. See [families](README.md#families).
+
+- [TOWN-EDGE-UNBUILT-32](TOWN-EDGE-UNBUILT-32.md): Leaving a town into an unbuilt neighbour drops the player into a bare world map
+- [VIVEC-ARENA-FLOATING-NPC-32](VIVEC-ARENA-FLOATING-NPC-32.md): A Vivec resident stands at the end of a walkway by the Telvanni canton with sky drawn below his feet
+- [VIVEC-ARENA-FRAME-EDGE-32](VIVEC-ARENA-FRAME-EDGE-32.md): Neighbouring canton bodies end at the Arena frame edge, in view
+- [VIVEC-ARENA-HANDOFF-32](VIVEC-ARENA-HANDOFF-32.md): The Arena frame's handoff area reaches into neighbouring cantons; its frame edge can be in view
+- [VIVEC-CANTON-SKY-HOLE-32](VIVEC-CANTON-SKY-HOLE-32.md): Sky shows through a Vivec canton wall seen from below
+- [VIVEC-DISTANT-BRIDGES-32](VIVEC-DISTANT-BRIDGES-32.md): Distant bridges between the Vivec cantons are not drawn
+
+<!-- END GENERATED CATEGORY -->

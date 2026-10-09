@@ -6,6 +6,23 @@ artifacts and host tests. Public summaries contain no game geometry or private
 host paths. The supplied draft and independent reviews remain unchanged in the
 private archive. Diagnostic numbers are experiment identifiers, not game releases.
 
+<!-- contents start -->
+## Contents
+
+- [Trial ledger at a glance](#trial-ledger-at-a-glance)
+- [Prioritized recovery checklist](#prioritized-recovery-checklist)
+- [Evidence and compiled storage](#evidence-and-compiled-storage)
+- [What differs between the original and diagnostic 023](#what-differs-between-the-original-and-diagnostic-023)
+  - [Required comparison format for future optimization reports](#required-comparison-format-for-future-optimization-reports)
+- [Exact plane-record deduplication: applied](#exact-plane-record-deduplication-applied)
+- [Hidden-interior detector: zero cuts preserved in the record](#hidden-interior-detector-zero-cuts-preserved-in-the-record)
+- [Inspector receiver and selection corrections](#inspector-receiver-and-selection-corrections)
+- [Embedded-house A/B: less buried area, more geometry](#embedded-house-ab-less-buried-area-more-geometry)
+  - [Repeat-clip acceptance: separate geometry from representation](#repeat-clip-acceptance-separate-geometry-from-representation)
+- [Memory, shared sky and production gates](#memory-shared-sky-and-production-gates)
+
+<!-- contents end -->
+
 ## Trial ledger at a glance
 
 Each gain below is relative to the immediate input unless the entry explicitly

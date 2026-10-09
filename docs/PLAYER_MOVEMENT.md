@@ -4,6 +4,21 @@ The owner reported blocked stairs, excessive resistance on mild slopes and
 idle downhill sliding in checkpoint-011. The old standing player used Quake's
 32 x 32 x 56 box although the imported Morrowind world is scaled by 0.25.
 
+<!-- contents start -->
+## Contents
+
+- [Verified base dimensions](#verified-base-dimensions)
+- [Physical recheck, v0.0.24-dev2](#physical-recheck-v0024-dev2)
+- [Original race-based heights](#original-race-based-heights)
+- [Matching the baked map](#matching-the-baked-map)
+- [Ground support and feel](#ground-support-and-feel)
+- [Checkpoint-013 architectural ghost volumes](#checkpoint-013-architectural-ghost-volumes)
+- [Eye-height audit, checkpoint-016 development](#eye-height-audit-checkpoint-016-development)
+- [Dev1 regression comparison, 28 September 2026](#dev1-regression-comparison-28-september-2026)
+- [dev4 Balmora stair entrance](#dev4-balmora-stair-entrance)
+
+<!-- contents end -->
+
 ## Verified base dimensions
 
 The owner's `meshes/base_anim.nif` Bounding Box gives half extents approximately

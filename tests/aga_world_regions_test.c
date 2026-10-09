@@ -46,6 +46,8 @@ int COM_FOpenFile(char *name,FILE **out){
     }
     assert(!strncmp(name,"maps/",5));if(missing_map){fclose(f);*out=NULL;return -1;}rewind(f);return 124;
 }
+/* aw_region.c AW_SceneMapSize: the scene's own map (no CHIM frame maps in this test). */
+int AW_SceneMapSize(const char *n,char *p,int s){char b[64];FILE *f=NULL;int k;sprintf(b,"maps/%s.bsp",n);k=COM_FOpenFile(b,&f);if(f)fclose(f);else k=-1;if(p && s>0){strncpy(p,b,s-1);p[s-1]=0;}return k;}
 int main(void){
     float a[3]={240,0,40},b[3],c[3],source[3];char target[16];int before;
     assert(AW_MapId("vf0000")==AW_MAP_COUNT);

@@ -1,5 +1,20 @@
 # BENCH-HOST-STORAGE-32: Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.33-dev |
+| Where | Emulator disk timings with hard files in a Windows folder |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.33-dev (last seen) |
+| Severity | low: Measurement-method issue: earlier disk timings inflated and relative only. |
+| Family | Emulator measurement method (`benchmark-method`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open (benchmark method). Found by the CHIM world-format follow-up (FFS sweep, branch
@@ -57,3 +72,24 @@ Pending: repeat the Seyda crossing bench and the seek bench with the hard files 
 
 Every disk benchmark report records where the hard files sit on the PC; benchmark scripts refuse a
 hard file in a shared Windows folder for disk timings.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Emulator measurement method (`benchmark-method`). Emulator numbers are relative until a hardware number exists; same-session runs with a drift control. See [families](README.md#families).
+
+- [BENCH-AWBENCH-BUFFERS-32](BENCH-AWBENCH-BUFFERS-32.md): awbench reported the stale buffer count after AddBuffers
+- [BENCH-DISK-BYTES-32](BENCH-DISK-BYTES-32.md): FS-UAE moves disk bytes at about 90 MB/s, so it cannot price what a walk reads
+- [BENCH-FSUAE-FREQ-32](BENCH-FSUAE-FREQ-32.md): FS-UAE ignores uae_cpu_frequency in cycle-exact mode
+- [BENCH-FSUAE-JIT-HANG-32](BENCH-FSUAE-JIT-HANG-32.md): An FS-UAE JIT session hung with a Windows-folder hard file mounted
+- [BENCH-JIT-PROFILE-32](BENCH-JIT-PROFILE-32.md): Every frame-rate and load-time figure was measured with the emulator at host speed
+- [BENCH-SESSION-DRIFT-32](BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions
+
+Related bugs in other categories:
+
+- [CHIM-READ-RUNS-33](CHIM-READ-RUNS-33.md): CHIM crossings read little but in many separate runs, so FFS seeks dominate
+- [SEYDA-READ-SLOW-31](SEYDA-READ-SLOW-31.md): dev1 Seyda crossings read slower than the ov700 test image
+- [STREAM-FFS-SEEK-32](STREAM-FFS-SEEK-32.md): Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU
+
+<!-- END GENERATED CATEGORY -->

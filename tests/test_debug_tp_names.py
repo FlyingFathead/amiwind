@@ -13,8 +13,12 @@ class DebugTeleportNameTests(unittest.TestCase):
     def test_help_line_is_built_from_the_town_table(self):
         text = SCENE.read_text(encoding='utf-8')
         helper = re.search(r'static void scene_help\(void\) \{(.*?)\n\}', text, re.S).group(1)
-        self.assertIn('AW_TOWN_TELEPORT', helper)
-        self.assertIn('AW_Town(i)->name', helper)
+        # The list comes from the town table, filtered to what the disk has (DEBUG-TP-CHIM-33).
+        self.assertIn('AW_TeleportDestinations(names,sizeof(names))', helper)
+        region = (ROOT / 'engine/aga/src/aw_region.c').read_text(encoding='utf-8')
+        lister = re.search(r'int AW_TeleportDestinations\(char \*out,int size\)\n\{(.*?)\n\}', region, re.S).group(1)
+        self.assertIn('AW_TOWN_TELEPORT', lister)
+        self.assertIn('t->name', lister)
         self.assertNotIn('dbg tp balmora/', text, 'fixed town list in the help text')
 
     def test_vivec_short_name_maps_to_the_arena(self):

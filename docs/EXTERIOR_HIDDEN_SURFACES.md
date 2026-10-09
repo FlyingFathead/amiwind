@@ -6,6 +6,27 @@ implemented and synthetically tested. Asset-local volumes, placement overrides
 and the inspector-zone connection remain proposals. No production house geometry
 was removed by this investigation; no target-rendering acceptance is implied.
 
+<!-- contents start -->
+## Contents
+
+- [Owner imperative: default compile-time hidden-surface culling](#owner-imperative-default-compile-time-hidden-surface-culling)
+- [Verified mesh pipeline gap and BSP storage](#verified-mesh-pipeline-gap-and-bsp-storage)
+  - [Source-loop winding and serialized-output validation — 4 October 2026, 04:23 EEST](#source-loop-winding-and-serialized-output-validation--4-october-2026-0423-eest)
+- [Cell loading, backface rejection and stored geometry](#cell-loading-backface-rejection-and-stored-geometry)
+- [Verified exterior-export provenance](#verified-exterior-export-provenance)
+- [What the converter actually creates](#what-the-converter-actually-creates)
+- [Permanent exclusion catalog: proposed contract](#permanent-exclusion-catalog-proposed-contract)
+- [Whole-scene exterior reachability proposal](#whole-scene-exterior-reachability-proposal)
+  - [Diagnostic 022: bounded helper made no house cut](#diagnostic-022-bounded-helper-made-no-house-cut)
+  - [Build integration and scope assessment](#build-integration-and-scope-assessment)
+  - [Independent BSP plane and terrain-UV audit](#independent-bsp-plane-and-terrain-uv-audit)
+  - [Independent sn045 package review and memory accounting](#independent-sn045-package-review-and-memory-accounting)
+- [Combined object and canonical-ground boundary: proposal and A/B](#combined-object-and-canonical-ground-boundary-proposal-and-ab)
+  - [Idempotence and boundary acceptance](#idempotence-and-boundary-acceptance)
+- [Inspector plans and the compiler boundary](#inspector-plans-and-the-compiler-boundary)
+
+<!-- contents end -->
+
 ## Owner imperative: default compile-time hidden-surface culling
 
 Recorded 4 October 2026 01:33 EEST. Compile-time omission of permanently hidden

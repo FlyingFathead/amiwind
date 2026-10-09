@@ -41,7 +41,8 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
             profiles[model]={'ratio':1.0,'texture_size':32,'collision_source':'root_node','hollow_collision':True}
     group='census_interior';groups={group:{'references':[r['number'] for r in refs],'visual_profiles':profiles}}
     refs=[dict(r,scene_groups=[group]) for r in refs]
-    lighting={**cell['lighting'],'lights':[dict(r['light'],position=r['position']) for r in cell['refs'] if r.get('light') and not r.get('deleted')]}
+    from interior_lighting import cell_lighting
+    lighting=cell_lighting(cell)
     parts=scene/'census-source'
     # Retain detail in rectangular wall art until the final bounded BSP bake.
     # A 32-pixel intermediate reduced tall tapestries to only 16 pixels wide,

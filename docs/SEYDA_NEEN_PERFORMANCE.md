@@ -7,6 +7,19 @@ what a crossing consists of, and what each optimization changed. Numbers come
 from the scripted benchmark below; physical Amiga timings are not measured
 here and will differ.
 
+<!-- contents start -->
+## Contents
+
+- [Benchmark](#benchmark)
+- [Baseline: v0.0.30-dev4](#baseline-v0030-dev4)
+- [What a crossing reads (sn019)](#what-a-crossing-reads-sn019)
+- [Heaviest objects](#heaviest-objects)
+- [Optimizations](#optimizations)
+- [Where the sub-cell geometry comes from](#where-the-sub-cell-geometry-comes-from)
+- [Not changed](#not-changed)
+
+<!-- contents end -->
+
 ## Benchmark
 
 - Emulator: FS-UAE 3.1.66, A1200/AGA, 68040 with FPU, 2 MiB Chip + 16 MiB Z3
@@ -20,7 +33,9 @@ here and will differ.
   recorded but not part of the plan.
 - Per crossing the engine writes `cell-load-profile.tsv` (bytes read, read
   calls, read time, total load time) and `heap-audit.log` (heap and cache
-  state per load phase, including cache evictions).
+  state per load phase, including cache evictions). From v0.0.33 these logs are
+  written as they happen only on a `--live-logs` image or after `dbg logs live on`
+  (BOOT-VOLUME-NOT-VALIDATED-33); benchmark runs use one of the two.
 
 ## Baseline: v0.0.30-dev4
 

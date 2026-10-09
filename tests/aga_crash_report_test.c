@@ -55,8 +55,13 @@ static int NameFromLock(BPTR handle, char *path, unsigned long size) {
 }
 static void UnLock(BPTR handle) {assert(handle==3);}
 static void Host_Shutdown(void) {assert(phase==1);phase=2;}
+/* In-memory diagnostic logs are written after shutdown, before the heap goes. */
+static int log_flushes, log_closes;
+static int AW_LogFlushAll(void) {assert(phase==2);log_flushes++;return 0;}
+static void AW_LogClose(void) {assert(phase==2 && log_flushes==1);log_closes++;}
 static void FreeMem(void *memory, unsigned long size) {
-    assert(phase==2 && memory==aw_heap_allocation && size==16);phase=3;
+    assert(phase==2 && memory==aw_heap_allocation && size==16);
+    assert(log_flushes==1 && log_closes==1);phase=3;
 }
 static void AW_PlatformClose(void) {assert(phase==3);phase=4;}
 static void PutStr(const char *text) {
@@ -71,7 +76,7 @@ int main(void) {
     char cause[200]; int i;
     for(i=0;i<150;i++)cause[i]=(char)('a'+i%26);cause[150]=0;
     for(mode=0;mode<10;mode++) {
-        phase=exit_status=close_count=read_count=0; output[0]=0;
+        phase=exit_status=close_count=read_count=0; log_flushes=log_closes=0; output[0]=0;
         aw_heap_allocation=&phase; aw_heap_allocation_size=16;
         quakeparms.membase=aw_heap_allocation;
         if(!setjmp(terminated)) Sys_Error("fixture error: %s",cause);

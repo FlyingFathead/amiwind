@@ -190,8 +190,9 @@ int			r_night_window_count, r_night_windows_on;
 /* Quake light has no colour; the warm table (r_sky.c, from aw_light_hue)
  * makes lit texels lean toward the light's hue (bright rows only). Chosen per
  * surface in R_DrawSurface, never per pixel: surfaces lit by a dynamic light
- * this frame (torches, night lamps) and night-glowing windows. aw_warm_light 0
- * restores the plain table. */
+ * this frame (torches, night lamps), night-glowing windows and baked faces lit
+ * mainly by a warm lamp (style AW_WARM_STYLE, OPENING-JIUB-LANTERN-32).
+ * aw_warm_light 0 restores the plain table. */
 cvar_t	aw_warm_light = {"aw_warm_light","1",true};
 static unsigned char	*r_block_colormap;
 static int R_NightWindow (msurface_t *surf)
@@ -206,16 +207,20 @@ static int R_NightWindow (msurface_t *surf)
 }
 static int R_SurfaceWarm (msurface_t *surf)
 {
+	int k;
 	if (!r_warm_colormap || !aw_warm_light.value)
 		return 0;
 	if (surf->dlightframe == r_framecount && surf->dlightbits)
 	{
-		int k;
 		for (k=0 ; k<MAX_DLIGHTS && k<32 ; k++)
 			if ((surf->dlightbits & (1u<<k)) && r_dlight_cool[k])
 				return 0;	/* a blue lamp: no warm tint (a cool table later) */
 		return 1;
 	}
+	/* Baked light mainly from a warm lamp (the converter's warm style). */
+	for (k=0 ; k<MAXLIGHTMAPS && surf->styles[k] != 255 ; k++)
+		if (surf->styles[k] == AW_WARM_STYLE)
+			return 1;
 	return R_NightWindow (surf);
 }
 #define R_NIGHT_WINDOW_LEVEL 6

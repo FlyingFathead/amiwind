@@ -1,5 +1,20 @@
 # ENTITY-TRACKER-HARVEST-32: The entity tracker did not count plants placed by harvest catalogues
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | Entity tracker (tools/entity_tracker.py), harvest catalogues |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | medium: Tracker undercounts catalogue plants, so a plant loss could be hidden. |
+| Family | Harvestable plants (`harvest`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open: fixed in source on the v0.0.32 development line (commit 0331f76); not shipped at the time of writing.
@@ -41,3 +56,23 @@ read; an empty catalogue gives none). A finished image's tracker report is pendi
 ## Prevention
 
 That test; the tracker is run after the harvest install in the image step.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Harvestable plants (`harvest`). Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. See [families](README.md#families).
+
+- [CHIM-HARVEST-SPECIALS-33](CHIM-HARVEST-SPECIALS-33.md): The intro docks on CHIM have no harvestable plants: their catalogue is named after the legacy map, which a pure CHIM image leaves out
+- [HARVEST-BITTERCOAST-29](HARVEST-BITTERCOAST-29.md): Only one of three nearby Bitter Coast mushrooms reportedly usable
+- [HARVEST-EXTRA-TOWNS-32](HARVEST-EXTRA-TOWNS-32.md): Opt-in towns get no harvestable mushrooms
+- [HARVEST-GEOMETRY-GATE-32](HARVEST-GEOMETRY-GATE-32.md): The harvest geometry gate was never re-run on the shipped Seyda Neen maps
+- [HARVEST-PILOT-SHIPPING-32](HARVEST-PILOT-SHIPPING-32.md): 24 Seyda Neen maps still ship the six-plant pilot harvest catalogue
+- [HARVEST-SEYDA-STALE-32](HARVEST-SEYDA-STALE-32.md): v0.0.31 ships Seyda Neen harvest catalogues made for older map versions
+- HARVEST-WORLD-29 (no report page): Original mushroom placement, picking and persistent state worldwide
+
+Related bugs in other categories:
+
+- [BUILD-HARVEST-NOT-BUILT-32](BUILD-HARVEST-NOT-BUILT-32.md): Mushroom harvest data is not built by the builder
+
+<!-- END GENERATED CATEGORY -->

@@ -953,6 +953,9 @@ Used for both fresh maps and savegame loads.  A fresh map would also need
 to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 ================
 */
+/* Set by Chim_Init when the CHIM data exists (chim/chim_statics.c). */
+int (*aw_chim_entity)(char **data);
+
 void ED_LoadFromFile (char *data)
 {
 	edict_t		*ent;
@@ -974,6 +977,10 @@ void ED_LoadFromFile (char *data)
 		if (com_token[0] != '{')
 			Sys_Error ("ED_LoadFromFile: found %s when expecting {",com_token);
 
+		/* CHIM: a frame map's streamed static (tagged aw_static/aw_flora) is
+		 * taken by its chunk, not spawned (chim/chim_statics.c). */
+		if (ent && aw_chim_entity && aw_chim_entity (&data))
+			continue;
 		if (!ent)
 			ent = EDICT_NUM(0);
 		else

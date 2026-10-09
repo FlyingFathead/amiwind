@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Z_zone.c
 
 #include "quakedef.h"
+#include "aw_log.h"
 #ifdef AMIGA
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -306,6 +307,10 @@ static int aw_cache_preserve_free;
 static char aw_heap_scene[MAX_QPATH]="startup",aw_heap_phase[32]="startup";
 static char aw_heap_peak_label[32]="baseline",aw_heap_failed_arena[16]="none";
 static int aw_heap_failed_request,aw_heap_failed_available;
+static void AW_HeapAuditPeak(void);
+/* The Hunk's load peak since the map started (bytes, low + high): CHIM's
+ * whole-map check (chim_world.c) reads it after the map has loaded. */
+int AW_HeapLoadPeak(void) {AW_HeapAuditPeak();return aw_heap_load_peak;}
 static void AW_HeapAuditPeak(void) {
     int used=hunk_low_used+hunk_high_used;
     if(used>aw_heap_load_peak)aw_heap_load_peak=used;
@@ -328,7 +333,7 @@ void AW_HeapAuditBegin(void) {
     aw_heap_failed_request=aw_heap_failed_available=0;
 }
 void AW_HeapAuditPhase(const char *scene,const char *phase) {
-    FILE *f;memblock_t *block;int used,clearance,peak_clearance,zone_free=0,zone_largest=0;
+    memblock_t *block;int used,clearance,peak_clearance,zone_free=0,zone_largest=0;
     char previous_phase[32];
     unsigned long fast_free=0,fast_largest=0,chip_free=0,chip_largest=0;
     if(!hunk_base || hunk_size<=0)return;
@@ -351,15 +356,16 @@ void AW_HeapAuditPhase(const char *scene,const char *phase) {
         (long)aw_heap_load_peak,(long)hunk_size,(long)clearance,(long)peak_clearance,
         (long)aw_cache_bytes,(long)aw_cache_peak,(long)zone_largest);
     if(peak_clearance<2097152)Con_Printf("WARNING: hunk-gap safety below 2 MiB. Region requires memory review.\n");
-    f=fopen("heap-audit.log","a");
-    if(f){
-        fprintf(f,"format=AWH1 transition=%lu scene=%s phase=%s previous_phase=%s version=%s budget=%d low=%d high=%d used=%d load_peak=%d clearance=%d peak_clearance=%d peak_label=%s largest_hunk_request=%d cache_bytes=%d cache_peak=%d largest_cache_request=%d cache_evictions=%lu cache_moves=%lu zone_free=%d zone_largest=%d os_metrics=%d fast_free=%lu fast_largest=%lu chip_free=%lu chip_largest=%lu failed_arena=%s failed_request=%d failed_available=%d safety=2097152 status=%s\n",
+    /* heap-audit.log: in memory unless aw_logs_live (aw_log.c); a fatal exit writes it
+     * after the crash report (BOOT-VOLUME-NOT-VALIDATED-33). */
+    {
+        AW_LogPrintf(AW_LOG_HEAP,"format=AWH1 transition=%lu scene=%s phase=%s previous_phase=%s version=%s budget=%d low=%d high=%d used=%d load_peak=%d clearance=%d peak_clearance=%d peak_label=%s largest_hunk_request=%d cache_bytes=%d cache_peak=%d largest_cache_request=%d cache_evictions=%lu cache_moves=%lu zone_free=%d zone_largest=%d os_metrics=%d fast_free=%lu fast_largest=%lu chip_free=%lu chip_largest=%lu failed_arena=%s failed_request=%d failed_available=%d safety=2097152 status=%s\n",
             aw_heap_transition,aw_heap_scene,aw_heap_phase,previous_phase,AW_HEAP_VERSION,hunk_size,hunk_low_used,hunk_high_used,
             used,aw_heap_load_peak,clearance,peak_clearance,aw_heap_peak_label,aw_heap_largest_request,
             aw_cache_bytes,aw_cache_peak,aw_cache_largest_request,aw_cache_evictions,aw_cache_moves,
             zone_free,zone_largest,AW_HEAP_OS_METRICS,fast_free,fast_largest,chip_free,chip_largest,
             aw_heap_failed_arena,aw_heap_failed_request,aw_heap_failed_available,
-            peak_clearance<2097152?"LOW_HEADROOM":"HUNK_GAP_CLEAR");fclose(f);
+            peak_clearance<2097152?"LOW_HEADROOM":"HUNK_GAP_CLEAR");
     }
 }
 void AW_HeapAuditReport(const char *scene) {AW_HeapAuditPhase(scene,"snapshot");}

@@ -1,5 +1,18 @@
 # Docker builder roadmap
 
+<!-- contents start -->
+## Contents
+
+- [Current release evidence — 3 October 2026](#current-release-evidence--3-october-2026)
+- [Historical full-conversion evidence — v0.0.26, 2 October 2026](#historical-full-conversion-evidence--v0026-2-october-2026)
+- [User-supplied inputs and persistent outputs](#user-supplied-inputs-and-persistent-outputs)
+- [Disk budget: measured starting point, not a container requirement](#disk-budget-measured-starting-point-not-a-container-requirement)
+- [Implementation and acceptance](#implementation-and-acceptance)
+- [Input helper scripts](#input-helper-scripts)
+- [Required pre-handoff Linux validation](#required-pre-handoff-linux-validation)
+
+<!-- contents end -->
+
 ## Current release evidence — 3 October 2026
 
 Published v0.0.27 passed the complete Linux Docker suite (558 tests, 3 skips)

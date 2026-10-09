@@ -4,6 +4,7 @@
 #include "quakedef.h"
 #include "aw_story.h"
 #include "aw_character.h"
+#include "aw_activated.h"
 static int route_started,route_failed,route_done;
 static float near_actor(int role)
 {
@@ -34,6 +35,12 @@ static void hide(edict_t *e)
 {
     e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);
 }
+/* The rule for "aw_story_hidden" below, for CHIM placements flagged story
+ * hidden (chim/chim_chunks.c, world format 0.5). */
+int AW_OpeningStoryHidden(void)
+{
+    return sv.active && !strcmp(sv.name,"seyda") && aw_story.ship_disabled;
+}
 void AW_OpeningSpawn(void)
 {
     int i,reference;edict_t *e;eval_t *v;
@@ -47,8 +54,8 @@ void AW_OpeningSpawn(void)
         v=GetEdictFieldValue(e,"aw_story_hidden");
         if(!strcmp(sv.name,"seyda") && aw_story.ship_disabled && v && v->_float)hide(e);
         if(!strcmp(sv.name,"census")){
-            if(reference==172859 && (aw_story.stage<AW_STAGE_PAPERS || AW_Papers() || aw_story.captain))hide(e);
-            if(reference==172860 && aw_story.hall_open){e->v.angles[1]=-90;SV_LinkEdict(e,false);}
+            if(reference==AW_REF_CENSUS_PAPERS && (aw_story.stage<AW_STAGE_PAPERS || AW_Papers() || aw_story.captain))hide(e);
+            if(reference==AW_REF_CENSUS_HALL_DOOR && aw_story.hall_open){e->v.angles[1]=-90;SV_LinkEdict(e,false);}
         }
     }
     if(aw_story.ship_disabled && !strcmp(sv.name,"seyda")){
@@ -71,7 +78,7 @@ static void show_papers(void)
         e=EDICT_NUM(i);
         if(e->free)continue;
         v=GetEdictFieldValue(e,"aw_ref");
-        if(v && (int)v->_float==172859){e->v.modelindex=SV_ModelIndex(pr_strings+e->v.model);e->v.solid=SOLID_BSP;SV_LinkEdict(e,false);}
+        if(v && (int)v->_float==AW_REF_CENSUS_PAPERS){e->v.modelindex=SV_ModelIndex(pr_strings+e->v.model);e->v.solid=SOLID_BSP;SV_LinkEdict(e,false);}
     }
 }
 int AW_OpeningTick(void)
@@ -194,6 +201,19 @@ static void door_point(edict_t *e,vec3_t eye,vec3_t point)
         if(point[i]>e->v.absmax[i])point[i]=e->v.absmax[i];
     }
 }
+/* On a CHIM frame the object's drawn shape and collision are a chunk
+ * placement; its edict (kept by the frame map for every AW_REF_ in
+ * aw_activated.h) is a brush model without faces that only marks where it
+ * is. A world hit inside such an edict's linked box is the object itself,
+ * not something in front of it. Edicts with drawn faces (legacy maps) keep
+ * the plain rule. */
+static int own_surface(edict_t *e,trace_t *tr)
+{
+    int k;model_t *m=sv.models[(int)e->v.modelindex];
+    if(!tr->ent || tr->ent!=sv.edicts || !m || m->type!=mod_brush || m->nummodelsurfaces)return 0;
+    for(k=0;k<3;k++)if(tr->endpos[k]<e->v.absmin[k] || tr->endpos[k]>e->v.absmax[k])return 0;
+    return 1;
+}
 static edict_t *opening_target(void)
 {
     int i,ref,role;edict_t *p,*e,*target=NULL;eval_t *v;
@@ -210,18 +230,18 @@ static edict_t *opening_target(void)
                (role==6 && aw_story.census!=0) || (role==7 && aw_story.stage!=AW_STAGE_CAPTAIN))continue;
             VectorCopy(e->v.origin,point);point[2]+=27;
         }else{
-            if(ref!=172859 && ref!=172860 && ref!=172851)continue;
-            if(ref==172860 && aw_story.hall_open)continue;
+            if(ref!=AW_REF_CENSUS_PAPERS && ref!=AW_REF_CENSUS_HALL_DOOR && ref!=AW_REF_COURTYARD_BARREL)continue;
+            if(ref==AW_REF_CENSUS_HALL_DOOR && aw_story.hall_open)continue;
             VectorAdd(e->v.absmin,e->v.absmax,point);VectorScale(point,.5f,point);
             /* A tall hinged door's centre can be above the player's reach.
              * Aim toward its nearest visible surface at eye height, while
              * retaining facing, distance and occlusion checks. */
-            if(ref==172860)door_point(e,eye,point);
+            if(ref==AW_REF_CENSUS_HALL_DOOR)door_point(e,eye,point);
         }
         VectorSubtract(point,eye,delta);distance=Length(delta);
-        if(distance<.1f || distance>=best || distance>=(ref==172860?56:49) || DotProduct(delta,forward)/distance<.65f)continue;
+        if(distance<.1f || distance>=best || distance>=(ref==AW_REF_CENSUS_HALL_DOOR?56:49) || DotProduct(delta,forward)/distance<.65f)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NORMAL,p);
-        if(tr.startsolid || (tr.fraction<1 && tr.ent!=e))continue;
+        if(tr.startsolid || (tr.fraction<1 && tr.ent!=e && !own_surface(e,&tr)))continue;
         best=distance;target=e;
     }
     return target;
@@ -234,8 +254,8 @@ int AW_OpeningHint(const char **name,const char **action)
         *name=pr_strings+target->v.netname;*action="Talk: E";return 1;
     }
     v=GetEdictFieldValue(target,"aw_ref");ref=(int)v->_float;
-    if(ref==172859){*name="Identification papers";*action="Read: E";}
-    else if(ref==172860){*name="Hall door";*action=aw_story.hall?"Open: E":"Locked - show papers";}
+    if(ref==AW_REF_CENSUS_PAPERS){*name="Identification papers";*action="Read: E";}
+    else if(ref==AW_REF_CENSUS_HALL_DOOR){*name="Hall door";*action=aw_story.hall?"Open: E":"Locked - show papers";}
     else{*name="Barrel";*action=AW_CourtyardRingAvailable()?"Take ring: E":"Empty";}
     return 1;
 }
@@ -279,8 +299,8 @@ int AW_OpeningUse(void)
         return 1;
     }
     v=GetEdictFieldValue(target,"aw_ref");ref=(int)v->_float;
-    if(ref==172859){AW_ReaderOpen("papers",1);return 1;}
-    if(ref==172860){
+    if(ref==AW_REF_CENSUS_PAPERS){AW_ReaderOpen("papers",1);return 1;}
+    if(ref==AW_REF_CENSUS_HALL_DOOR){
         if(aw_story.hall){
             if(!hall_door_can_open(target)){
                 AW_UISubtitle("","The door is obstructed. Step aside and try again.",4);return 1;

@@ -4,6 +4,29 @@ A streaming boundary changes the resident map, not the player's ongoing game.
 Seyda Neen and Balmora subdivisions are required to bound frame cost; preserving
 continuity must not require loading the entire world at once.
 
+<!-- contents start -->
+## Contents
+
+- [How this list grows](#how-this-list-grows)
+- [Current evidence and remaining acceptance](#current-evidence-and-remaining-acceptance)
+- [Required continuity](#required-continuity)
+- [Rc2 reports and rc3 correction status](#rc2-reports-and-rc3-correction-status)
+- [Visible overlap and terrain handoff policy](#visible-overlap-and-terrain-handoff-policy)
+  - [Seyda Neen: town-to-world and internal town subdivisions](#seyda-neen-town-to-world-and-internal-town-subdivisions)
+  - [Balmora: FPS subdivisions and surrounding-world boundary](#balmora-fps-subdivisions-and-surrounding-world-boundary)
+- [Regression and playtest checklist](#regression-and-playtest-checklist)
+- [Heap clearance: rc3 Seyda Neen incident](#heap-clearance-rc3-seyda-neen-incident)
+  - [Imperative: LEAVE HEADROOM](#imperative-leave-headroom)
+- [Complete lifecycle watcher and over-budget regions](#complete-lifecycle-watcher-and-over-budget-regions)
+- [Boundary placement is a measured choice, not an FPS guarantee](#boundary-placement-is-a-measured-choice-not-an-fps-guarantee)
+- [Automatic region-crossing presentation delay](#automatic-region-crossing-presentation-delay)
+- [Large interiors: subdivision at natural boundaries](#large-interiors-subdivision-at-natural-boundaries)
+  - [Preferred subdivision points](#preferred-subdivision-points)
+  - [Pursuit across section and cell boundaries](#pursuit-across-section-and-cell-boundaries)
+  - [Dense ramps: subdivide first, then measure](#dense-ramps-subdivide-first-then-measure)
+
+<!-- contents end -->
+
 ## How this list grows
 
 This is a living checklist, not a closed definition of gameplay state. Every

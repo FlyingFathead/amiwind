@@ -1,5 +1,24 @@
 # ENGINE-FPU-UNIMPL-31: Every-frame math traps on a real 68040 (sin+cos become cexp)
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.31 |
+| Where | engine maths (rotation, AngleVectors, libm trig) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.31 (last seen) |
+| Severity | high: Thousands of 68040-unimplemented FPU instructions per frame would trap on real hardware, severe slowness. |
+| Family | FPU and CPU behaviour (68040/68060) (`fpu-cpu`) |
+| Playtest version | v0.0.31 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open; repaired in source on the FPU fixes branch (not yet released). Per-frame
@@ -107,3 +126,21 @@ the drift of the reference reruns (the emulator never pays for a trap). Strict-m
 
 The builder check above runs in every 68040 engine build (result in
 `fpu-unimplemented.json` and `engine-build.json`); `dbg fpucount` for per-frame counts.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. See [families](README.md#families).
+
+- [ENGINE-FPSP-MISSING-31](ENGINE-FPSP-MISSING-31.md): Boot disk loads no 68040 FPU support library; emulator hides it
+- [ENGINE-FPU-DATA-DECODE-33](ENGINE-FPU-DATA-DECODE-33.md): The 68040 FPU check reads a pointer table in the engine code section as fintrz instructions
+- [EXTENTS-FPU-RULE-31](EXTENTS-FPU-RULE-31.md): Surface extents and lightmap sizes depended on the FPU's arithmetic
+- [TEST-FPU-STRICT-JIT-31](TEST-FPU-STRICT-JIT-31.md): Emulator strict FPU mode is silently ignored while JIT is on
+
+Related bugs in other categories:
+
+- [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
+- [REMOTE-STATE-WIDTH-31](REMOTE-STATE-WIDTH-31.md): Remote state file printed 51.*ld for fractional fields
+
+<!-- END GENERATED CATEGORY -->

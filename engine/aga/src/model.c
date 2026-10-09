@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // on the same machine.
 
 #include "quakedef.h"
+#include "aw_log.h"
 #include "r_local.h"
 #include <limits.h>
 #include <stddef.h>
@@ -387,7 +388,7 @@ static void AW_RecordSection(lump_t *l,int slice)
     aw_bsp_used[index]=aw_load_hunk_used();aw_bsp_slices[index]=slice;
 }
 static int AW_TryStreamBrush(model_t *mod) {
-    dheader_t header;FILE *report;int filebytes;
+    dheader_t header;int filebytes;
     /* Use the same search order as ordinary loads, including world volumes.
      * Pack-file offsets remain relative to this member's starting position. */
     filebytes=COM_FOpenFile(mod->name,&aw_bsp_file);
@@ -408,16 +409,17 @@ static int AW_TryStreamBrush(model_t *mod) {
     Mod_LoadBrushModel(mod,&header);
     aw_bsp_lumps=NULL;
     fclose(aw_bsp_file);aw_bsp_file=NULL;
-    report=fopen("bsp-load-profile.txt","w");
-    if(report){
+    /* In memory unless aw_logs_live (aw_log.c, BOOT-VOLUME-NOT-VALIDATED-33). */
+    AW_LogBegin(AW_LOG_BSP_LOAD);
+    {
         int i;
-        fprintf(report,"map=%s\nfile_bytes=%ld\nmax_input_section_bytes=%d\nmax_slice_bytes=%d\nsection_reads=%d\nhunk_before=%d\nhunk_after=%d\n",
+        AW_LogPrintf(AW_LOG_BSP_LOAD,"map=%s\nfile_bytes=%ld\nmax_input_section_bytes=%d\nmax_slice_bytes=%d\nsection_reads=%d\nhunk_before=%d\nhunk_after=%d\n",
             mod->name,aw_bsp_bytes,aw_bsp_peak,aw_bsp_slice_peak,aw_bsp_reads,aw_bsp_used[HEADER_LUMPS],aw_bsp_used[HEADER_LUMPS+1]);
         /* Mod_LoadBrushModel byte-swapped the header lumps in place. */
-        for(i=0;i<HEADER_LUMPS;i++)fprintf(report,"section=%s bytes=%d slice=%d hunk_end=%d\n",
+        for(i=0;i<HEADER_LUMPS;i++)AW_LogPrintf(AW_LOG_BSP_LOAD,"section=%s bytes=%d slice=%d hunk_end=%d\n",
             aw_bsp_lump_names[i],header.lumps[i].filelen,aw_bsp_slices[i],aw_bsp_used[i]);
-        fclose(report);
     }
+    AW_LogEnd(AW_LOG_BSP_LOAD);
     return 1;
 }
 
@@ -544,9 +546,33 @@ byte	*mod_base;
 #define AW_BSP_SLICE_BYTES 16384
 #define AW_BSP_RECORD_PREFIX 64 /* >= every disk record; dmodel_t is largest */
 #define AW_BSP_DIRECTORY_BYTES (4+4*MAX_MAP_TEXTURES)
+/* A CHIM loading buffer (model.h) holds the largest window plus prefix. */
+typedef char aw_brush_slice_fits[AW_BRUSH_SLICE_BYTES>=AW_BSP_SLICE_BYTES+((AW_BSP_DIRECTORY_BYTES+15)&~15)?1:-1];
 static byte *aw_bsp_slice;
 static int aw_bsp_slice_bytes,aw_bsp_slice_prefix,aw_bsp_window_start,aw_bsp_window_bytes;
 typedef struct { lump_t *lump; int size, count, done, next; byte *tail; } aw_records_t;
+
+/* CHIM: the arena that brush decoders allocate from (model.h). NULL for every
+ * legacy load, which keeps the Hunk calls exactly as before. */
+static aw_brush_arena_t *aw_brush_arena;
+static void *AW_BrushAlloc(int size,char *name)
+{
+    byte *p;
+    if(!aw_brush_arena)return Hunk_AllocName(size,name);
+    if(size<0 || size>aw_brush_arena->size-aw_brush_arena->used ||
+       ((size+15)&~15)>aw_brush_arena->size-aw_brush_arena->used)
+        Sys_Error("CHIM model %s exceeds its decoded-size bound",loadmodel->name);
+    p=aw_brush_arena->base+aw_brush_arena->used;aw_brush_arena->used+=(size+15)&~15;
+    memset(p,0,(size+15)&~15);
+    return p;
+}
+static int AW_BrushMark(void){return aw_brush_arena?aw_brush_arena->used:Hunk_LowMark();}
+static void AW_BrushFreeToMark(int mark)
+{
+    if(!aw_brush_arena){Hunk_FreeToLowMark(mark);return;}
+    if(mark<0 || mark>aw_brush_arena->used)Sys_Error("CHIM arena: bad mark");
+    memset(aw_brush_arena->base+mark,0,aw_brush_arena->used-mark);aw_brush_arena->used=mark;
+}
 
 /* Copy bytes [offset, offset+bytes) of a lump to out. */
 static void AW_LumpBytes(lump_t *l,int offset,void *out,int bytes)
@@ -636,6 +662,30 @@ static void AW_WindowBytes(lump_t *l,int offset,void *out,int bytes)
 Mod_LoadTextures
 =================
 */
+/* CHIM: the texture lump of a CHIM brush image lists shared texture ids
+ * (little-endian count, then one id per local index); texinfo indexes it as
+ * it would a miptex lump. The textures stay in CHIM's shared pool. */
+static void AW_LoadTextureRefs (lump_t *l)
+{
+    int i, n, id;
+
+    if (l->filelen < 4)
+        Sys_Error ("Invalid CHIM texture references in %s", loadmodel->name);
+    AW_WindowBytes (l, 0, &n, 4);
+    n = LittleLong (n);
+    if (n < 0 || n > MAX_MAP_TEXTURES || l->filelen != 4 + 4*n)
+        Sys_Error ("Invalid CHIM texture references in %s", loadmodel->name);
+    loadmodel->numtextures = n;
+    loadmodel->textures = AW_BrushAlloc (n * sizeof(*loadmodel->textures), loadname);
+    for (i=0 ; i<n ; i++)
+    {
+        AW_WindowBytes (l, 4 + 4*i, &id, 4);
+        loadmodel->textures[i] = aw_brush_arena->texture (aw_brush_arena->context, LittleLong (id));
+        if (!loadmodel->textures[i])
+            Sys_Error ("Missing CHIM texture %ld in %s", (long)LittleLong (id), loadmodel->name);
+    }
+}
+
 void Mod_LoadTextures (lump_t *l)
 {
     int		i, j, pixels, num, max, altmax;
@@ -649,6 +699,11 @@ void Mod_LoadTextures (lump_t *l)
     if (!l->filelen)
     {
         loadmodel->textures = NULL;
+        return;
+    }
+    if (aw_brush_arena && aw_brush_arena->texture)
+    {
+        AW_LoadTextureRefs (l);
         return;
     }
     /* The directory (kept in the slice prefix) and each miptex header are read
@@ -672,7 +727,7 @@ void Mod_LoadTextures (lump_t *l)
         directory = (int *)(mod_base + l->fileofs) + 1;
 
     loadmodel->numtextures = nummiptex;
-    loadmodel->textures = Hunk_AllocName (nummiptex * sizeof(*loadmodel->textures) , loadname);
+    loadmodel->textures = AW_BrushAlloc (nummiptex * sizeof(*loadmodel->textures) , loadname);
 
     for (i=0 ; i<nummiptex ; i++)
     {
@@ -695,7 +750,7 @@ void Mod_LoadTextures (lump_t *l)
         pixels = mt->width*mt->height/64*85;
         if (pixels > l->filelen - dataofs - (int)sizeof(*mt))
             Sys_Error ("Texture %s is truncated", mt->name);
-        tx = Hunk_AllocName (sizeof(texture_t) +pixels, loadname );
+        tx = AW_BrushAlloc (sizeof(texture_t) +pixels, loadname );
         loadmodel->textures[i] = tx;
 
         memcpy (tx->name, mt->name, sizeof(tx->name));
@@ -817,7 +872,7 @@ void Mod_LoadLighting (lump_t *l)
         loadmodel->lightdata = NULL;
         return;
     }
-    loadmodel->lightdata = Hunk_AllocName ( l->filelen, loadname);
+    loadmodel->lightdata = AW_BrushAlloc ( l->filelen, loadname);
     memcpy (loadmodel->lightdata, mod_base + l->fileofs, l->filelen);
 }
 
@@ -834,7 +889,7 @@ void Mod_LoadVisibility (lump_t *l)
         loadmodel->visdata = NULL;
         return;
     }
-    loadmodel->visdata = Hunk_AllocName ( l->filelen, loadname);
+    loadmodel->visdata = AW_BrushAlloc ( l->filelen, loadname);
     memcpy (loadmodel->visdata, mod_base + l->fileofs, l->filelen);
 }
 
@@ -851,7 +906,7 @@ void Mod_LoadEntities (lump_t *l)
         loadmodel->entities = NULL;
         return;
     }
-    loadmodel->entities = Hunk_AllocName ( l->filelen, loadname);
+    loadmodel->entities = AW_BrushAlloc ( l->filelen, loadname);
     memcpy (loadmodel->entities, mod_base + l->fileofs, l->filelen);
 }
 
@@ -869,7 +924,7 @@ void Mod_LoadVertexes (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->vertexes = out;
     loadmodel->numvertexes = count;
@@ -897,7 +952,7 @@ void Mod_LoadSubmodels (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->submodels = out;
     loadmodel->numsubmodels = count;
@@ -933,7 +988,7 @@ void Mod_LoadEdges (lump_t *l)
     aw_records_t records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( (count + 1) * sizeof(*out), loadname);
+    out = AW_BrushAlloc ( (count + 1) * sizeof(*out), loadname);
 
     loadmodel->edges = out;
     loadmodel->numedges = count;
@@ -963,7 +1018,7 @@ void Mod_LoadTexinfo (lump_t *l)
     aw_records_t records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->texinfo = out;
     loadmodel->numtexinfo = count;
@@ -1102,7 +1157,7 @@ void Mod_LoadFaces (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->surfaces = out;
     loadmodel->numsurfaces = count;
@@ -1320,13 +1375,38 @@ void Mod_LoadNodes (lump_t *l)
             Sys_Error("Invalid BSP point hull root");
     }
     aw_direct_hull0 = false;
+    if(aw_brush_arena && aw_brush_arena->point_hull_only){
+        /* A brush entity never walks its own nodes to draw (its faces come
+         * from firstmodelsurface); only hull 0 traces use them. The chain
+         * of pieces is a graph with shared subtrees, which Mod_SetParent
+         * would walk once per path, exponentially often. */
+        aw_records_t r;dnode_t *in;dclipnode_t *clip;int n,j,p;
+        clip=AW_BrushAlloc(count*sizeof(dclipnode_t),loadname);
+        AW_RecordsBegin(&r,l,sizeof(*in));
+        for(i=0;(in=AW_RecordsNext(&r,&n));)
+        for(;n--;i++,in++){
+            p=LittleLong(in->planenum);
+            if(p<0 || p>=loadmodel->numplanes)Sys_Error("Invalid BSP node data");
+            clip[i].planenum=p;
+            for(j=0;j<2;j++){
+                p=LittleShort(in->children[j]);
+                if(p>=count || (p<0 && -1-p>=loadmodel->numleafs))Sys_Error("Invalid BSP node child");
+                clip[i].children[j]=p<0?loadmodel->leafs[-1-p].contents:p;
+            }
+        }
+        hull->clipnodes=clip;hull->planes=loadmodel->planes;
+        hull->firstclipnode=0;hull->lastclipnode=count-1;
+        loadmodel->nodes=NULL;loadmodel->numnodes=0;
+        aw_direct_hull0=true;
+        return;
+    }
     world = AW_PredictRenderPrefix(count);
     /* Optional optimization: scratch allocation failure is safe. */
     if(world)seen=(byte *)calloc((count+7)/8,1);
     if(seen){
-        mark=Hunk_LowMark();
-        hull->clipnodes=Hunk_AllocName(count*sizeof(dclipnode_t),loadname);
-        loadmodel->nodes=Hunk_AllocName(world*sizeof(mnode_t),loadname);
+        mark=AW_BrushMark();
+        hull->clipnodes=AW_BrushAlloc(count*sizeof(dclipnode_t),loadname);
+        loadmodel->nodes=AW_BrushAlloc(world*sizeof(mnode_t),loadname);
         loadmodel->numnodes=world;
         if(AW_DecodeNodes(l,count,world,seen)){
             /* Original disk indices stay valid for every model point-trace root. */
@@ -1335,12 +1415,12 @@ void Mod_LoadNodes (lump_t *l)
             aw_direct_hull0 = true;
         }else{
             hull->clipnodes=NULL;
-            Hunk_FreeToLowMark(mark);
+            AW_BrushFreeToMark(mark);
         }
         free(seen);
     }
     if(!aw_direct_hull0){
-        loadmodel->nodes=Hunk_AllocName(count*sizeof(mnode_t),loadname);
+        loadmodel->nodes=AW_BrushAlloc(count*sizeof(mnode_t),loadname);
         loadmodel->numnodes=count;
         AW_DecodeNodes(l,count,count,NULL);
     }
@@ -1361,7 +1441,7 @@ void Mod_LoadLeafs (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->leafs = out;
     loadmodel->numleafs = count;
@@ -1470,7 +1550,7 @@ void Mod_LoadClipnodes (lump_t *l)
     count=l->filelen/sizeof(*in);
     if(count>65520)Sys_Error("Invalid BSP clipnode count");
     in=(void *)(mod_base+l->fileofs);
-    out=Hunk_AllocName(count*sizeof(*out),loadname);
+    out=AW_BrushAlloc(count*sizeof(*out),loadname);
     AW_DecodeClipnodes(in,out,count);
 }
 
@@ -1493,7 +1573,7 @@ void Mod_MakeHull0 (void)
 
     in = loadmodel->nodes;
     count = loadmodel->numnodes;
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     hull->clipnodes = out;
     hull->firstclipnode = 0;
@@ -1528,7 +1608,7 @@ void Mod_LoadMarksurfaces (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->marksurfaces = out;
     loadmodel->nummarksurfaces = count;
@@ -1558,7 +1638,7 @@ void Mod_LoadSurfedges (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->surfedges = out;
     loadmodel->numsurfedges = count;
@@ -1590,7 +1670,7 @@ void Mod_LoadPlanes (lump_t *l)
     count = AW_RecordsBegin (&records, l, sizeof(*in));
     /* Only count planes are initialized or referenced; the old double
      * allocation wasted Fast RAM on larger converted cells. */
-    out = Hunk_AllocName ( count*sizeof(*out), loadname);
+    out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->planes = out;
     loadmodel->numplanes = count;
@@ -1647,7 +1727,7 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
         dclipnode_t *target;
         if(l->filelen%sizeof(*target) || l->filelen/sizeof(*target)>65520)
             Sys_Error("Invalid BSP clipnode section");
-        target=Hunk_AllocName(l->filelen,loadname);
+        target=AW_BrushAlloc(l->filelen,loadname);
         AW_LumpBytes(l,0,target,l->filelen);
         started=aw_load_clock?aw_load_clock():0;
         AW_DecodeClipnodes(target,target,l->filelen/sizeof(*target));
@@ -1660,7 +1740,7 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
     if(decode==Mod_LoadVisibility || decode==Mod_LoadLighting || decode==Mod_LoadEntities){
         byte *target=NULL;
         if(l->filelen){
-            target=Hunk_AllocName(l->filelen,loadname);
+            target=AW_BrushAlloc(l->filelen,loadname);
             AW_LumpBytes(l,0,target,l->filelen);
         }
         if(decode==Mod_LoadVisibility)loadmodel->visdata=target;
@@ -1671,7 +1751,7 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
     }
     /* Every other lump is decoded from bounded slices of this temporary
      * buffer straight into its final allocations (AW_RecordsNext). */
-    mark=Hunk_HighMark();aw_bsp_slice=NULL;
+    mark=aw_brush_arena?0:Hunk_HighMark();aw_bsp_slice=NULL;
     aw_bsp_slice_bytes=l->filelen<AW_BSP_SLICE_BYTES?l->filelen:AW_BSP_SLICE_BYTES;
     /* Prefix: split records, or the texture directory (never > lump). A lump
      * that fits one window needs neither. */
@@ -1679,7 +1759,12 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
         ((l->filelen<AW_BSP_DIRECTORY_BYTES?l->filelen:AW_BSP_DIRECTORY_BYTES)+15)&~15;
     if(aw_bsp_slice_bytes)aw_bsp_slice_bytes+=aw_bsp_slice_prefix;
     aw_bsp_window_start=-1;
-    if(aw_bsp_slice_bytes){
+    if(aw_bsp_slice_bytes && aw_brush_arena){
+        /* CHIM loads use their own loading buffer, never the high Hunk. */
+        if(!aw_brush_arena->slice || aw_brush_arena->slice_bytes<aw_bsp_slice_bytes)
+            Sys_Error("CHIM loading buffer too small for %s",loadmodel->name);
+        aw_bsp_slice=aw_brush_arena->slice;
+    }else if(aw_bsp_slice_bytes){
         aw_bsp_slice=Hunk_TempAlloc(aw_bsp_slice_bytes);
         if(!aw_bsp_slice)Sys_Error("BSP section allocation failed");
     }
@@ -1692,7 +1777,8 @@ static void AW_LoadBrushSection(lump_t *l,void (*decode)(lump_t *)) {
     if(aw_load_clock)aw_load_decode_seconds+=aw_load_clock()-started-(aw_load_disk_seconds-disk);
     AW_LoadAudioTick();
     AW_RecordSection(l,aw_bsp_slice_bytes);
-    Hunk_FreeToHighMark(mark);aw_bsp_slice=NULL;aw_bsp_slice_bytes=0;
+    if(!aw_brush_arena)Hunk_FreeToHighMark(mark);
+    aw_bsp_slice=NULL;aw_bsp_slice_bytes=0;
 }
 
 /* Immutable edge vertices keep their original IDs. Only the mutable world
@@ -1739,50 +1825,48 @@ static void AW_InitEdgeCache(model_t *mod) {
     }
     if(limit>INT_MAX/(int)sizeof(unsigned int))Sys_Error("Edge cache size overflow");
     mod->edgecache_count=limit;
-    mod->edgecache=limit?Hunk_AllocName(limit*sizeof(unsigned int),loadname):NULL;
+    mod->edgecache=limit?AW_BrushAlloc(limit*sizeof(unsigned int),loadname):NULL;
     AW_LoadAudioTick();
 }
 
-void Mod_LoadBrushModel (model_t *mod, void *buffer)
+/* One section of a brush load, in Mod_LoadBrushModel's order (step 0-14). A
+ * CHIM image stores the entities before the clipnodes (its collision lump
+ * comes last), so a CHIM stream swaps the last two steps and reads its file
+ * front to back. A switch, not a table: unused decoders stay out of tests
+ * that link only part of this file. */
+static void AW_BrushSection (dheader_t *h, int step, qboolean chim)
+{
+    if (chim && step >= 13)
+        step = step == 13 ? 14 : 13;
+    switch (step)
+    {
+    case 0: AW_LoadBrushSection(&h->lumps[LUMP_VERTEXES],Mod_LoadVertexes); break;
+    case 1: AW_LoadBrushSection(&h->lumps[LUMP_EDGES],Mod_LoadEdges); break;
+    case 2: AW_LoadBrushSection(&h->lumps[LUMP_SURFEDGES],Mod_LoadSurfedges); break;
+    case 3: AW_LoadBrushSection(&h->lumps[LUMP_TEXTURES],Mod_LoadTextures); break;
+    case 4: AW_LoadBrushSection(&h->lumps[LUMP_LIGHTING],Mod_LoadLighting); break;
+    case 5: AW_LoadBrushSection(&h->lumps[LUMP_PLANES],Mod_LoadPlanes); break;
+    case 6: AW_LoadBrushSection(&h->lumps[LUMP_TEXINFO],Mod_LoadTexinfo); break;
+    case 7: AW_LoadBrushSection(&h->lumps[LUMP_FACES],Mod_LoadFaces); break;
+    case 8: AW_LoadBrushSection(&h->lumps[LUMP_MARKSURFACES],Mod_LoadMarksurfaces); break;
+    case 9: AW_LoadBrushSection(&h->lumps[LUMP_VISIBILITY],Mod_LoadVisibility); break;
+    case 10: AW_LoadBrushSection(&h->lumps[LUMP_LEAFS],Mod_LoadLeafs); break;
+    /* Validate all model point roots before selecting the renderer node prefix. */
+    case 11: AW_LoadBrushSection(&h->lumps[LUMP_MODELS],Mod_LoadSubmodels); break;
+    case 12: AW_LoadBrushSection(&h->lumps[LUMP_NODES],Mod_LoadNodes); break;
+    case 13: AW_LoadBrushSection(&h->lumps[LUMP_CLIPNODES],Mod_LoadClipnodes); break;
+    case 14: AW_LoadBrushSection(&h->lumps[LUMP_ENTITIES],Mod_LoadEntities); break;
+    }
+}
+
+static void AW_BrushFinish (model_t *mod)
 {
     int			i, j;
-    dheader_t	*header;
     dmodel_t	*bm;
 
-    loadmodel->type = mod_brush;
-
-    header = (dheader_t *)buffer;
-
-    i = LittleLong (header->version);
-    if (i != BSPVERSION)
-        Sys_Error ("Mod_LoadBrushModel: %s has wrong version number (%ld should be %ld)", mod->name, i, BSPVERSION);
-
-// swap all the lumps
-    mod_base = (byte *)header;
-
-    for (i=0 ; i<sizeof(dheader_t)/4 ; i++)
-        ((int *)header)[i] = LittleLong ( ((int *)header)[i]);
-
-// load into heap
-
-    AW_LoadBrushSection(&header->lumps[LUMP_VERTEXES],Mod_LoadVertexes);
-    AW_LoadBrushSection(&header->lumps[LUMP_EDGES],Mod_LoadEdges);
-    AW_LoadBrushSection(&header->lumps[LUMP_SURFEDGES],Mod_LoadSurfedges);
-    AW_LoadBrushSection(&header->lumps[LUMP_TEXTURES],Mod_LoadTextures);
-    AW_LoadBrushSection(&header->lumps[LUMP_LIGHTING],Mod_LoadLighting);
-    AW_LoadBrushSection(&header->lumps[LUMP_PLANES],Mod_LoadPlanes);
-    AW_LoadBrushSection(&header->lumps[LUMP_TEXINFO],Mod_LoadTexinfo);
-    AW_LoadBrushSection(&header->lumps[LUMP_FACES],Mod_LoadFaces);
-    AW_LoadBrushSection(&header->lumps[LUMP_MARKSURFACES],Mod_LoadMarksurfaces);
-    AW_LoadBrushSection(&header->lumps[LUMP_VISIBILITY],Mod_LoadVisibility);
-    AW_LoadBrushSection(&header->lumps[LUMP_LEAFS],Mod_LoadLeafs);
-    /* Validate all model point roots before selecting the renderer node prefix. */
-    AW_LoadBrushSection(&header->lumps[LUMP_MODELS],Mod_LoadSubmodels);
-    AW_LoadBrushSection(&header->lumps[LUMP_NODES],Mod_LoadNodes);
-    AW_LoadBrushSection(&header->lumps[LUMP_CLIPNODES],Mod_LoadClipnodes);
-    AW_LoadBrushSection(&header->lumps[LUMP_ENTITIES],Mod_LoadEntities);
-
-    AW_InitEdgeCache(loadmodel);
+    /* A CHIM model is always drawn as a brush entity, never as the world, so
+     * the world-only edge cache is not built for it. */
+    if(!aw_brush_arena)AW_InitEdgeCache(loadmodel);
     Mod_MakeHull0 ();
     if(aw_bsp_lumps && aw_load_hunk_used)aw_bsp_used[HEADER_LUMPS+1]=aw_load_hunk_used();
 
@@ -1823,6 +1907,155 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
             mod = loadmodel;
         }
     }
+}
+
+void Mod_LoadBrushModel (model_t *mod, void *buffer)
+{
+    int			i;
+    dheader_t	*header;
+
+    loadmodel->type = mod_brush;
+
+    header = (dheader_t *)buffer;
+
+    i = LittleLong (header->version);
+    if (i != BSPVERSION)
+        Sys_Error ("Mod_LoadBrushModel: %s has wrong version number (%ld should be %ld)", mod->name, i, BSPVERSION);
+
+// swap all the lumps
+    mod_base = (byte *)header;
+
+    for (i=0 ; i<sizeof(dheader_t)/4 ; i++)
+        ((int *)header)[i] = LittleLong ( ((int *)header)[i]);
+
+// load into heap
+
+    for (i=0 ; i<AW_BRUSH_SECTIONS ; i++)
+        AW_BrushSection (header, i, false);
+
+    AW_BrushFinish (mod);
+}
+
+/* CHIM: a copy of a BSP header, byte-swapped and checked against the bytes
+ * that hold it. A CHIM model has exactly one submodel: AW_BrushFinish would
+ * otherwise register "*N" inline models of the current map. */
+int AW_BrushHeader (dheader_t *out, const void *raw, long bytes)
+{
+    int i;
+    if (!out || !raw || bytes < (long)sizeof(dheader_t))
+        return 0;
+    memcpy (out, raw, sizeof(*out));
+    for (i=0 ; i<sizeof(dheader_t)/4 ; i++)
+        ((int *)out)[i] = LittleLong ( ((int *)out)[i]);
+    if (out->version != BSPVERSION)
+        return 0;
+    for (i=0 ; i<HEADER_LUMPS ; i++)
+        if (out->lumps[i].fileofs < 0 || out->lumps[i].filelen < 0 ||
+            out->lumps[i].fileofs > bytes || out->lumps[i].filelen > bytes - out->lumps[i].fileofs)
+            return 0;
+    return out->lumps[LUMP_MODELS].filelen == (int)sizeof(dmodel_t);
+}
+
+/* CHIM: upper bound of the arena bytes the decoders allocate for a checked
+ * header (every allocation 16-byte aligned, no edge cache). Texture pixels
+ * are bounded by their lump, which holds each texture once; a malformed lump
+ * that overruns its arena stops with an error instead of overwriting memory. */
+#define AW_ARENA16(n) ((((long)(n))+15)&~15L)
+int AW_BrushBound (const dheader_t *h, int texture_refs)
+{
+    const lump_t *l = h->lumps;
+    long total = 0, n, k;
+
+    total += AW_ARENA16 (l[LUMP_VERTEXES].filelen/(long)sizeof(dvertex_t)*(long)sizeof(mvertex_t));
+    total += AW_ARENA16 ((l[LUMP_EDGES].filelen/(long)sizeof(dedge_t)+1)*(long)sizeof(medge_t));
+    total += AW_ARENA16 (l[LUMP_SURFEDGES].filelen/(long)sizeof(int)*(long)sizeof(int));
+    if (l[LUMP_TEXTURES].filelen && texture_refs)
+        total += AW_ARENA16 ((l[LUMP_TEXTURES].filelen/4)*(long)sizeof(texture_t *));
+    else if (l[LUMP_TEXTURES].filelen)
+    {
+        n = l[LUMP_TEXTURES].filelen >= 4 ? (l[LUMP_TEXTURES].filelen-4)/4 : 0;
+        if (n > MAX_MAP_TEXTURES)
+            n = MAX_MAP_TEXTURES;
+        k = l[LUMP_TEXTURES].filelen/(long)sizeof(miptex_t);
+        if (k > n)
+            k = n;
+        total += AW_ARENA16 (n*(long)sizeof(texture_t *)) + k*((long)sizeof(texture_t)+15) + l[LUMP_TEXTURES].filelen;
+    }
+    total += AW_ARENA16 (l[LUMP_LIGHTING].filelen) + AW_ARENA16 (l[LUMP_VISIBILITY].filelen) +
+        AW_ARENA16 (l[LUMP_ENTITIES].filelen) + AW_ARENA16 (l[LUMP_CLIPNODES].filelen);
+    total += AW_ARENA16 (l[LUMP_PLANES].filelen/(long)sizeof(dplane_t)*(long)sizeof(mplane_t));
+    total += AW_ARENA16 (l[LUMP_TEXINFO].filelen/(long)sizeof(texinfo_t)*(long)sizeof(mtexinfo_t));
+    total += AW_ARENA16 (l[LUMP_FACES].filelen/(long)sizeof(dface_t)*(long)sizeof(msurface_t));
+    total += AW_ARENA16 (l[LUMP_MARKSURFACES].filelen/(long)sizeof(short)*(long)sizeof(msurface_t *));
+    total += AW_ARENA16 (l[LUMP_LEAFS].filelen/(long)sizeof(dleaf_t)*(long)sizeof(mleaf_t));
+    total += AW_ARENA16 (l[LUMP_MODELS].filelen/(long)sizeof(dmodel_t)*(long)sizeof(dmodel_t));
+    /* Nodes: the direct hull-0 attempt (clipnodes + nodes), or after its
+     * rollback the full node array plus Mod_MakeHull0's clipnodes. */
+    n = l[LUMP_NODES].filelen/(long)sizeof(dnode_t);
+    total += AW_ARENA16 (n*(long)sizeof(dclipnode_t)) + AW_ARENA16 (n*(long)sizeof(mnode_t));
+    return total > INT_MAX ? -1 : (int)total;
+}
+
+/* CHIM: decode a complete BSP file image (in a loading buffer) into an arena.
+ * Returns 0 for an image whose header does not check out. */
+int AW_BrushImage (model_t *mod, byte *image, long bytes, aw_brush_arena_t *arena)
+{
+    model_t *saved_model = loadmodel;
+    dheader_t header;
+
+    if (!arena || !AW_BrushHeader (&header, image, bytes))
+        return 0;
+    COM_FileBase (mod->name, loadname);
+    loadmodel = mod;
+    mod->needload = NL_PRESENT;
+    aw_brush_arena = arena;
+    Mod_LoadBrushModel (mod, image);
+    aw_brush_arena = NULL;
+    loadmodel = saved_model;
+    return 1;
+}
+
+/* CHIM: stream a BSP from an open pack file at an offset, one section per
+ * call, so a large model can be spread over several frames. The loader's
+ * file state is installed for the step and cleared after it, so ordinary
+ * loads between two steps are unaffected. */
+int AW_BrushStreamBegin (aw_brush_stream_t *s, model_t *mod, FILE *file, long base, long bytes, aw_brush_arena_t *arena)
+{
+    byte raw[sizeof(dheader_t)];
+
+    memset (s, 0, sizeof(*s));
+    if (!file || !arena || base < 0 || bytes < (long)sizeof(raw) || fseek (file, base, SEEK_SET) ||
+        fread (raw, 1, sizeof(raw), file) != sizeof(raw) || !AW_BrushHeader (&s->header, raw, bytes))
+        return 0;
+    s->mod = mod; s->file = file; s->base = base; s->bytes = bytes; s->arena = arena;
+    mod->type = mod_brush;
+    mod->needload = NL_PRESENT;
+    return 1;
+}
+
+int AW_BrushStreamStep (aw_brush_stream_t *s)
+{
+    model_t *saved_model = loadmodel;
+    char saved_name[sizeof(loadname)];
+    int i;
+
+    if (s->next >= AW_BRUSH_SECTIONS)
+        return 1;
+    memcpy (saved_name, loadname, sizeof(saved_name));
+    COM_FileBase (s->mod->name, loadname);
+    loadmodel = s->mod;
+    aw_bsp_file = s->file; aw_bsp_base = s->base; aw_bsp_bytes = s->bytes;
+    aw_bsp_position = -1; aw_bsp_lumps = NULL; mod_base = NULL;
+    aw_brush_arena = s->arena;
+    i = s->next++;
+    AW_BrushSection (&s->header, i, true);
+    if (s->next == AW_BRUSH_SECTIONS)
+        AW_BrushFinish (s->mod);
+    aw_brush_arena = NULL;
+    aw_bsp_file = NULL; aw_bsp_position = -1;
+    loadmodel = saved_model;
+    memcpy (loadname, saved_name, sizeof(saved_name));
+    return s->next == AW_BRUSH_SECTIONS;
 }
 
 /*
@@ -2503,6 +2736,18 @@ static int AW_SpriteRead(FILE *file,long base,long end,void *data,size_t bytes)
     return AW_LoadRead((byte *)data,bytes,file)==bytes;
 }
 
+/* Where a sprite's blocks go: the Hunk (Mod_ForName), or a caller's allocator
+ * (Mod_LoadSpriteInto: CHIM's streamed statics decode into its zone). */
+static void *(*aw_sprite_alloc)(void *context,int size);
+static void *aw_sprite_context;
+static void *AW_SpriteAlloc(int size)
+{
+    void *data;
+    if(!aw_sprite_alloc)return Hunk_AllocName(size,loadname);
+    data=aw_sprite_alloc(aw_sprite_context,size);
+    if(!data)Sys_Error("Mod_LoadSpriteInto: %s: allocator out of room",loadmodel?loadmodel->name:"?");
+    return data;
+}
 static int AW_SpriteError(FILE *file,model_t *mod,const char *reason)
 {
     if(file)fclose(file);
@@ -2533,7 +2778,7 @@ static mspriteframe_t *AW_StreamSpriteFrame(FILE *file,long base,long end,model_
     if(position<base || position>end || pixels>(size_t)(end-position))
         {AW_SpriteError(file,mod,"truncated frame pixels");return NULL;}
     allocation=sizeof(*frame)+pixels*bpp;
-    frame=Hunk_AllocName((int)allocation,loadname);
+    frame=AW_SpriteAlloc((int)allocation);
     Q_memset(frame,0,(int)(sizeof(*frame)+pixels));
     origin[0]=LittleLong(disk.origin[0]);origin[1]=LittleLong(disk.origin[1]);
     if(origin[0]>INT_MAX-width || origin[1]<INT_MIN+height)
@@ -2607,7 +2852,7 @@ int Mod_TryStreamSprite(model_t *mod)
         return AW_SpriteError(file,mod,"invalid sprite beam length");
     COM_FileBase(mod->name,loadname);loadmodel=mod;mod->needload=NL_PRESENT;
     size=sizeof(*sprite)+(numframes-1)*sizeof(mspriteframedesc_t);
-    sprite=Hunk_AllocName(size,loadname);mod->cache.data=sprite;
+    sprite=AW_SpriteAlloc(size);mod->cache.data=sprite;
     sprite->type=LittleLong(header.type);sprite->maxwidth=LittleLong(header.width);
     sprite->maxheight=LittleLong(header.height);sprite->beamlength=LittleFloat(header.beamlength);
     sprite->numframes=numframes;mod->synctype=LittleLong(header.synctype);
@@ -2640,8 +2885,8 @@ int Mod_TryStreamSprite(model_t *mod)
         group_size=sizeof(mspritegroup_t)+(size_t)(group_frames-1)*sizeof(mspriteframe_t *);
         interval_bytes=(size_t)group_frames*sizeof(float);
         {
-            mspritegroup_t *group=Hunk_AllocName((int)group_size,loadname);
-            float *intervals=Hunk_AllocName((int)interval_bytes,loadname);
+            mspritegroup_t *group=AW_SpriteAlloc((int)group_size);
+            float *intervals=AW_SpriteAlloc((int)interval_bytes);
             group->numframes=group_frames;group->intervals=intervals;
             sprite->frames[i].frameptr=(mspriteframe_t *)group;
             for(j=0;j<group_frames;j++){
@@ -2795,4 +3040,19 @@ void Mod_Print (void)
             Con_Printf (" (!P)");
         Con_Printf ("\n");
     }
+}
+
+/* A sprite decoded through a caller's allocator instead of the Hunk (CHIM's
+ * streamed statics, chim/chim_statics.c). The allocator must not fail for
+ * the sizes it was sized for (Sys_Error otherwise, like a bad sprite). The
+ * model is not in mod_known. Returns 1 when loaded, 0 when the file is
+ * missing or not a sprite. */
+int Mod_LoadSpriteInto(model_t *mod,void *(*alloc)(void *context,int size),void *context)
+{
+    int ok;
+    aw_sprite_alloc=alloc;aw_sprite_context=context;
+    ok=Mod_TryStreamSprite(mod);
+    aw_sprite_alloc=NULL;aw_sprite_context=NULL;
+    if(ok)mod->type=mod_sprite;
+    return ok;
 }

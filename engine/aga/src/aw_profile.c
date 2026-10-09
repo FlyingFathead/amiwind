@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "aw_log.h"
 #include <proto/exec.h>
 #include <exec/memory.h>
-static FILE *logfile, *stalls;
+/* walk-profile.csv, frame-stalls.csv and frame-profile.txt are diagnostic logs held in
+ * memory unless aw_logs_live (aw_log.c, BOOT-VOLUME-NOT-VALIDATED-33). */
+static int logfile, stalls;
 static double previous, start, sum, worst;
 static int frames;
 static double fps_start;
@@ -36,20 +39,21 @@ void AW_ProfileFrame(void) {
     if(!previous){previous=start=now;return;}
     dt=now-previous;previous=now;frames++;sum+=dt;if(dt>worst)worst=dt;
     if(dt>.1) {
-        if(!stalls){stalls=fopen("frame-stalls.csv","w");if(stalls)fprintf(stalls,"time_ms,frame,frame_us\n");}
-        if(stalls)fprintf(stalls,"%ld,%d,%ld\n",(long)(now*1000),frames,(long)(dt*1000000));
+        if(!stalls){AW_LogHeader(AW_LOG_STALLS,"time_ms,frame,frame_us\n");stalls=1;}
+        if(stalls)AW_LogPrintf(AW_LOG_STALLS,"%ld,%d,%ld\n",(long)(now*1000),frames,(long)(dt*1000000));
     }
-    if(!logfile) {logfile=fopen("walk-profile.csv","w");if(logfile)fprintf(logfile,"frame,elapsed_ms,frame_us,x100,y100,z100,yaw100,hunk_bytes,distance,world_us,map,server_us,surface_order\n");}
+    if(!logfile) {logfile=1;AW_LogHeader(AW_LOG_WALK,"frame,elapsed_ms,frame_us,x100,y100,z100,yaw100,hunk_bytes,distance,world_us,map,server_us,surface_order\n");}
     p=&cl_entities[cl.viewentity].origin;
-    if(logfile && frames%10==0)fprintf(logfile,"%d,%ld,%ld,%ld,%ld,%ld,%ld,%d,%d,%ld,%s,%ld,%d\n",frames,(long)((now-start)*1000),(long)(dt*1000000),(long)((*p)[0]*100),(long)((*p)[1]*100),(long)((*p)[2]*100),(long)(cl.viewangles[YAW]*100),Hunk_LowMark()+Hunk_HighMark(),AW_DrawDistance(),(long)(last_stage[0]*1000000),cl.worldmodel->name,(long)(last_stage[5]*1000000),(int)aw_surface_order.value);
+    if(logfile && frames%10==0)AW_LogPrintf(AW_LOG_WALK,"%d,%ld,%ld,%ld,%ld,%ld,%ld,%d,%d,%ld,%s,%ld,%d\n",frames,(long)((now-start)*1000),(long)(dt*1000000),(long)((*p)[0]*100),(long)((*p)[1]*100),(long)((*p)[2]*100),(long)(cl.viewangles[YAW]*100),Hunk_LowMark()+Hunk_HighMark(),AW_DrawDistance(),(long)(last_stage[0]*1000000),cl.worldmodel->name,(long)(last_stage[5]*1000000),(int)aw_surface_order.value);
 }
 void AW_ProfileClose(void) {
-    FILE *f;if(logfile){fclose(logfile);logfile=NULL;}if(stalls){fclose(stalls);stalls=NULL;}
-    f=fopen("frame-profile.txt","w");
-    if(f)fprintf(f,"efrag_peak=%d\nefrag_capacity=%d\nefrag_limit=%d\n",aw_efrags_peak,aw_efrags_capacity,AW_EFRAG_LIMIT);
-    if(f)fprintf(f,"surface_overflow_frames=%lu\nedge_overflow_frames=%lu\nmax_surfaces_seen=%d\nmax_edges_seen=%d\n",surface_overflow_frames,edge_overflow_frames,r_maxsurfsseen,r_maxedgesseen);
-    if(f)fprintf(f,"audio_warmup_updates=%lu\naudio_warmup_missed_frames=%lu\n",audio_warmup,warmup_frames);
-    if(f){fprintf(f,"frames=%d\nelapsed_ms=%ld\nworst_frame_us=%ld\nheap_used_bytes=%d\n",frames,(long)(sum*1000),(long)(worst*1000000),Hunk_LowMark()+Hunk_HighMark());fprintf(f,"audio_late_updates=%lu\nmissed_audio_frames=%lu\nfree_chip_bytes=%lu\nfree_fast_bytes=%lu\n",audio_late,missed_frames,AvailMem(MEMF_CHIP),AvailMem(MEMF_FAST));fprintf(f,"world_ms=%ld\nentities_ms=%ld\nc2p_ms=%ld\naudio_ms=%ld\n",(long)(stages[0]*1000),(long)(stages[1]*1000),(long)(stages[2]*1000),(long)(stages[3]*1000));fprintf(f,"hands_ms=%ld\nserver_ms=%ld\n",(long)(stages[4]*1000),(long)(stages[5]*1000));fclose(f);}
+    if(logfile){AW_LogStreamClose(AW_LOG_WALK);logfile=0;}if(stalls){AW_LogStreamClose(AW_LOG_STALLS);stalls=0;}
+    AW_LogBegin(AW_LOG_FRAME);
+    AW_LogPrintf(AW_LOG_FRAME,"efrag_peak=%d\nefrag_capacity=%d\nefrag_limit=%d\n",aw_efrags_peak,aw_efrags_capacity,AW_EFRAG_LIMIT);
+    AW_LogPrintf(AW_LOG_FRAME,"surface_overflow_frames=%lu\nedge_overflow_frames=%lu\nmax_surfaces_seen=%d\nmax_edges_seen=%d\n",surface_overflow_frames,edge_overflow_frames,r_maxsurfsseen,r_maxedgesseen);
+    AW_LogPrintf(AW_LOG_FRAME,"audio_warmup_updates=%lu\naudio_warmup_missed_frames=%lu\n",audio_warmup,warmup_frames);
+    {AW_LogPrintf(AW_LOG_FRAME,"frames=%d\nelapsed_ms=%ld\nworst_frame_us=%ld\nheap_used_bytes=%d\n",frames,(long)(sum*1000),(long)(worst*1000000),Hunk_LowMark()+Hunk_HighMark());AW_LogPrintf(AW_LOG_FRAME,"audio_late_updates=%lu\nmissed_audio_frames=%lu\nfree_chip_bytes=%lu\nfree_fast_bytes=%lu\n",audio_late,missed_frames,AvailMem(MEMF_CHIP),AvailMem(MEMF_FAST));AW_LogPrintf(AW_LOG_FRAME,"world_ms=%ld\nentities_ms=%ld\nc2p_ms=%ld\naudio_ms=%ld\n",(long)(stages[0]*1000),(long)(stages[1]*1000),(long)(stages[2]*1000),(long)(stages[3]*1000));AW_LogPrintf(AW_LOG_FRAME,"hands_ms=%ld\nserver_ms=%ld\n",(long)(stages[4]*1000),(long)(stages[5]*1000));}
+    AW_LogEnd(AW_LOG_FRAME);
 }
 /* dbg fpucount (aw_fpucount 1): once a second, the per-frame average and peak
  * of the maths counters in mathlib.h (ENGINE-FPU-UNIMPL-31): brush model

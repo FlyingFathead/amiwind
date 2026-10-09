@@ -39,6 +39,22 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.27-rc2-{name}.png" for na
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.28-rc1-{name}.png" for name in ("sunrise", "sunset", "night"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.31-toolkit-{name}.png" for name in ("header", "world"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
+TEXT_LIMIT = 262144
+# The bug register grows with every bug: its JSON source and the generated table (docs/bugs/README.md).
+LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576}
+# Whitespace baselines (docs/PATCH-v<version>.json) list every file of the published base release and
+# grow with the repository (RELEASE-PATCH-SIZE-33).
+LARGE_TEXT_PATTERNS = ((re.compile(r"docs/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),)
+
+
+def text_limit(name):
+    """The release text size limit of one source file (TEXT_LIMIT unless named above)."""
+    if name in LARGE_TEXT:
+        return LARGE_TEXT[name]
+    for pattern, limit in LARGE_TEXT_PATTERNS:
+        if pattern.fullmatch(name):
+            return limit
+    return TEXT_LIMIT
 DOCUMENTATION_CLIPS.add("docs/images/amiwind-v0.0.29-rc2-torch.gif")
 DOCUMENTATION_IMAGES.update({
     'docs/images/amiwind-v0.0.28-balmora-guard-street.png',
@@ -67,6 +83,12 @@ DOCUMENTATION_CLIPS.update({'docs/images/amiwind-v0.0.29-rc1-mushroom-pick.gif'}
 DOCUMENTATION_CLIPS.update({'docs/images/amiwind-v0.0.32-gallery.gif'})
 DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.30-temple-before.png', 'docs/images/amiwind-v0.0.30-temple-after.png', 'docs/images/amiwind-v0.0.30-temple-banner.png', 'docs/images/amiwind-v0.0.30-controls.png'})
 DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.32-vivec-bridge-pillar.png', 'docs/images/amiwind-v0.0.32-vivec-canal-night.png', 'docs/images/amiwind-v0.0.32-vivec-sunrise.png', 'docs/images/amiwind-v0.0.32-vivec-red-sky.png', 'docs/images/amiwind-v0.0.32-vivec-bridge-dusk.png', 'docs/images/amiwind-v0.0.32-vivec-bridge-night.png', 'docs/images/amiwind-v0.0.32-vivec-arena-sun.png', 'docs/images/amiwind-v0.0.32-vivec-arena-night.png', 'docs/images/amiwind-v0.0.32-vivec-guard-sun.png', 'docs/images/amiwind-v0.0.32-vivec-sun-between-cantons.png'})
+# CHIM-TEXTURE-SPECKS-33: before/after frames and the autumn_glitter_leaves effect (docs/bugs page).
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-chim-specks-{name}.png" for name in ("before", "after", "autumn-glitter-leaves"))
+# v0.0.33 release notes: graphs drawn by tools/release_graphs.py from docs/performance/CHIM-v0.0.33-MEASUREMENTS.json.
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-chim-{name}.png" for name in ("disk", "island", "loading", "frame-jit", "frame-slow", "counters", "memory", "build", "chunkload"))
+# v0.0.33 release notes, "Let's fix those bugs": before/after frames (FS-UAE, headlamp off) and one OpenMW reference.
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-fix-{name}.png" for name in ("strider-before", "strider-after", "ship-light-before", "ship-light-after", "ship-light-openmw"))
 # Project-authored text graphic; retain bounded UTF-8 source validation.
 DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
 # Performance charts written by tools/perf_charts.py from measured numbers.
@@ -75,6 +97,9 @@ DOCUMENTATION_SOURCE_GRAPHICS.update(f"docs/images/amiwind-perf-{name}.svg" for 
 DEBUG_CATALOGUES = {"config/debug-commands.txt", "config/shroompicker.txt"}
 # Plain-text world tables shipped to id1/world/ (owner-editable, no game data).
 WORLD_TABLES = {"config/fog-locations.txt"}
+# Project-authored CHIM texture effect definitions: plain-text .chimfx files of the public effects library
+# (docs/chim/TEXTURE_EFFECTS.md); no game data.
+CHIM_EFFECTS_DIR = PurePosixPath("tools/chim/effects")
 # Exact project-authored C include, validated as bounded UTF-8 source.
 NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc"}
 
@@ -89,9 +114,9 @@ def allowed_files(root):
         p = PurePosixPath(name)
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
-        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES
-        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
-        if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
+        preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES or (p.suffix == ".chimfx" and p.parent == CHIM_EFFECTS_DIR)
+        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)
 
@@ -100,31 +125,134 @@ def version(root):
     return public_version(root)
 
 
+# Inherited files (original id Software/AmiQuake sources, licence texts) keep their historical
+# formatting while they are byte-identical to the last PUBLISHED release. The list is keyed to that
+# release's commit, not to the VERSION being worked on, so a new VERSION needs no extra file.
+WHITESPACE_BASELINE = 'docs/WHITESPACE-BASELINE.json'
+# Only inherited code lives here (id Software/AmiQuake engine, QuakeC, upstream patches and licence
+# texts); project-authored files elsewhere are never exempt, whatever the baseline lists.
+INHERITED_PREFIXES = ('engine/aga/', 'docs/aga/')
+
+
+def whitespace_defects(name, data):
+    """Trailing spaces/tabs, whitespace-only lines, space before tab in indentation, blank EOF."""
+    errors = []
+    lines = data.splitlines()
+    for number, line in enumerate(lines, 1):
+        if line.endswith((b' ', b'\t')):
+            errors.append(f'{name}:{number}: trailing whitespace')
+        indent = re.match(rb'^[ \t]*', line).group()
+        if b' \t' in indent:
+            errors.append(f'{name}:{number}: space before tab in indentation')
+    if lines and not lines[-1].strip():
+        errors.append(f'{name}:{len(lines)}: blank line at EOF')
+    return errors
+
+
+def load_whitespace_baseline(root):
+    """The published-release baseline record, or None when the file is absent."""
+    path = root / WHITESPACE_BASELINE
+    if not path.is_file():
+        return None
+    record = json.loads(path.read_text(encoding='utf-8'))
+    files = record.get('files') if isinstance(record, dict) else None
+    if (not isinstance(files, dict) or not isinstance(record.get('release'), str)
+            or not re.fullmatch(r'[0-9a-f]{40}', str(record.get('commit', '')))
+            or not all(isinstance(v, str) and re.fullmatch(r'[0-9a-f]{64}', v) for v in files.values())):
+        raise ValueError(f'Invalid {WHITESPACE_BASELINE}: expected release, commit and files {{path: sha256}}')
+    return record
+
+
 def check_source_whitespace(root, content):
     """Block whitespace defects before checking or packaging changed source.
 
-    Exact unchanged base files retain their historical formatting. New/modified
-    text files are checked in full, including untracked files in an extracted ZIP.
+    Files under INHERITED_PREFIXES that are byte-identical to the last published release (listed
+    in docs/WHITESPACE-BASELINE.json) retain their historical formatting. Every other text file,
+    including an inherited file we edit and untracked files in an extracted ZIP, is checked in full.
     """
-    patch = root / 'docs' / f'PATCH-v{version(root)}.json'
-    baseline = json.loads(patch.read_text()).get('base_files', {}) if patch.is_file() else {}
+    record = load_whitespace_baseline(root)
+    exempt = record['files'] if record else {}
     errors = []
     for name, data in content.items():
         if name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA:
             continue
-        if baseline.get(name, {}).get('sha256') == hashlib.sha256(data).hexdigest():
+        if name.startswith(INHERITED_PREFIXES) and exempt.get(name) == hashlib.sha256(data).hexdigest():
             continue
-        lines = data.splitlines()
-        for number, line in enumerate(lines, 1):
-            if line.endswith((b' ', b'\t')):
-                errors.append(f'{name}:{number}: trailing whitespace')
-            indent = re.match(rb'^[ \t]*', line).group()
-            if b' \t' in indent:
-                errors.append(f'{name}:{number}: space before tab in indentation')
-        if lines and not lines[-1].strip():
-            errors.append(f'{name}:{len(lines)}: blank line at EOF')
+        errors.extend(whitespace_defects(name, data))
     if errors:
-        raise ValueError('Source whitespace check failed:\n' + '\n'.join(errors))
+        if record is None:
+            hint = (f'{WHITESPACE_BASELINE} is missing, so no inherited file is exempt. Write it from the '
+                    'last published release (its tag must be present): '
+                    'python3 tools/release.py --whitespace-baseline v<LAST PUBLISHED VERSION>')
+        else:
+            hint = (f'{len(exempt)} inherited files of published v{record["release"]} '
+                    f'({record["commit"][:12]}) are exempt while byte-identical; a file you edit is '
+                    'checked in full, so clean the whole file. Our own files are never exempt.')
+        raise ValueError('Source whitespace check failed:\n' + '\n'.join(errors) + '\n' + hint)
+
+
+def whitespace_baseline_record(blobs, commit, tagged, revision='HEAD'):
+    """Baseline record from a release tree ({path: bytes}); tagged = commit its v<VERSION> tag names."""
+    if 'VERSION' not in blobs:
+        raise ValueError(f'{revision} has no VERSION file')
+    release_version = blobs['VERSION'].decode('ascii').strip()
+    if tagged != commit:
+        raise ValueError(f'{revision} ({commit[:12]}) is not the published release: tag v{release_version} '
+                         f'must point to it (found {tagged[:12] or "no tag"}). Fetch the tags first.')
+    files = {}
+    for name, data in blobs.items():
+        if not name.startswith(INHERITED_PREFIXES) or b'\0' in data or PurePosixPath(name).suffix in ('.png', '.gif'):
+            continue
+        try:
+            data.decode('utf-8')
+        except UnicodeDecodeError:
+            continue
+        if whitespace_defects(name, data):
+            files[name] = hashlib.sha256(data).hexdigest()
+    return {'note': ('Inherited files (engine/aga/, docs/aga/) of the last published release that keep '
+                     'their historical whitespace while byte-identical (tools/release.py '
+                     'check_source_whitespace). Written by python3 tools/release.py --whitespace-baseline '
+                     'v<VERSION> after a release is published; a newer release can only shrink this list.'),
+            'release': release_version, 'commit': commit, 'files': dict(sorted(files.items()))}
+
+
+def whitespace_baseline(root, revision):
+    """Read a published release commit with git and build its baseline record."""
+    def git(*args, data=None):
+        return subprocess.check_output(['git', '-C', str(root), *args], input=data)
+    commit = git('rev-parse', '--verify', revision + '^{commit}').decode().strip()
+    rows = [r for r in git('ls-tree', '-r', '-z', commit).split(b'\0') if r]
+    meta = []
+    for row in rows:
+        info, name = row.split(b'\t', 1)
+        _mode, kind, oid = info.decode('ascii').split()
+        if kind == 'blob':
+            meta.append((name.decode('utf-8'), oid))
+    out = git('cat-file', '--batch', data=''.join(oid + '\n' for _, oid in meta).encode('ascii'))
+    blobs, pos = {}, 0
+    for name, oid in meta:
+        newline = out.index(b'\n', pos)
+        found, _kind, size = out[pos:newline].decode('ascii').split()
+        if found != oid:
+            raise ValueError('Unexpected git object for ' + name)
+        blobs[name] = out[newline + 1:newline + 1 + int(size)]
+        pos = newline + 1 + int(size) + 1
+    tagged = ''
+    if 'VERSION' in blobs:
+        try:
+            tag = 'v' + blobs['VERSION'].decode('ascii').strip()
+            tagged = git('rev-parse', '--verify', '--quiet', tag + '^{commit}').decode().strip()
+        except subprocess.CalledProcessError:
+            tagged = ''
+    return whitespace_baseline_record(blobs, commit, tagged, revision)
+
+
+def write_whitespace_baseline(root, revision):
+    record = whitespace_baseline(root, revision)
+    with (root / WHITESPACE_BASELINE).open('w', encoding='utf-8', newline='\n') as handle:
+        handle.write(json.dumps(record, indent=2, sort_keys=True) + '\n')
+    return {'baseline': WHITESPACE_BASELINE, 'release': record['release'], 'commit': record['commit'],
+            'inherited_files': len(record['files'])}
 
 
 def inspect_source(root):
@@ -173,7 +301,7 @@ def inspect_source(root):
                 raise ValueError(f"Invalid public PNG: {name}")
             content[name] = data
             continue
-        if len(data) > 262144 or b"\0" in data:
+        if len(data) > text_limit(name) or b"\0" in data:
             raise ValueError(f"Unexpected binary or oversized source content: {name}")
         data.decode("utf-8")
         content[name] = data
@@ -257,10 +385,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--check", action="store_true", help="Inspect the source file list without creating a release")
+    parser.add_argument("--whitespace-baseline", metavar="RELEASE_TAG",
+                        help="Write docs/WHITESPACE-BASELINE.json from a published release tag (e.g. v0.0.32)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
-        if args.check:
+        if args.whitespace_baseline:
+            print(json.dumps(write_whitespace_baseline(root, args.whitespace_baseline), indent=2))
+        elif args.check:
             print(json.dumps({"source_files": len(inspect_source(root)), "status": "passed"}, indent=2))
         elif args.workspace:
             print(json.dumps(release(root, args.workspace), indent=2))

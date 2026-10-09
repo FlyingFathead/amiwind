@@ -6,6 +6,21 @@ converter now imports any town from a config file: `tools/import_town.py
 command line and byte-identical Balmora outputs. The first new town is Vivec's
 Arena canton (`config/vivec_arena.json`).
 
+<!-- contents start -->
+## Contents
+
+- [How Quake does it](#how-quake-does-it)
+- [Town config](#town-config)
+- [Town interiors and doors](#town-interiors-and-doors)
+- [Arrival](#arrival)
+- [Collision of exterior architecture](#collision-of-exterior-architecture)
+- [Adding a town](#adding-a-town)
+- [Vivec, Arena](#vivec-arena)
+- [Vivec](#vivec)
+- [vis options](#vis-options)
+
+<!-- contents end -->
+
 ## How Quake does it
 
 Nothing here is a new engine mechanism. A town frame is an ordinary Quake map:
@@ -63,6 +78,7 @@ never reorder) with the engine-only facts:
 | `flags` | `seyda_scenes`, `legacy_payload`, `own_doors`, `scenery_catalogue`, `teleport_arrival`, `ground_place` (see `aw_town.h`) |
 | `travel` | `{"npc": display name, "target": map, "use_return_point": bool}` or `null` |
 | `shipped_since` | Optional `vX.Y.Z`, towns after Seyda and Balmora only: the release that first ships the town. Every default build imports it (`vivec_arena`: `v0.0.32`); the release feature `extra-towns` in `config/release-features.json` takes its files from this row. Not allowed on a blocked town |
+| `withdrawn` | Optional reason, on a town with `shipped_since`: the town is left out of default builds (and the release feature) until the field is removed; `--extra-town` builds it again. `vivec_arena`: withdrawn from v0.0.33 (CHIM-ARENA-MEMORY-33) |
 | `blocked` | Optional reason: the town is configured but fails a limit. It keeps its table row and save IDs; `build.sh --extra-town` does not offer it and `import_town.py` converts it only with `--dry-run` |
 
 Towns after Seyda and Balmora get save IDs from `AW_TOWN_MAP_BASE` (16384) in
@@ -167,9 +183,10 @@ door-bank rows; 7 residents (3 NPC records, classified as standing in
 `config/actor_grounding.json`). An average leaf still sees 33-85 % of its
 region's leaves (TOWN-VIS-OCCLUSION-31).
 
-Shipped since v0.0.32 as an outside-only preview (`shipped_since`): every
-default build imports it; `--no-extra-town vivec_arena` or `--only-core-towns`
-leave it out for debugging only (BUILD-EXTRA-TOWN-OPTIN-32).
+Shipped in v0.0.32 as an outside-only preview (`shipped_since`). Withdrawn from
+v0.0.33 by owner decision (`withdrawn`: the canton bodies do not fit the CHIM
+zone, CHIM-ARENA-MEMORY-33): a default build no longer imports it, and
+`--extra-town vivec_arena` still builds it (BUILD-EXTRA-TOWN-OPTIN-32).
 
 Not yet done for a playable Arena: a target playtest (arrival, region
 crossings, heap on the Amiga); the Arena

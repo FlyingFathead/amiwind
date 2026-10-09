@@ -184,6 +184,31 @@ def harvest_line(record):
             + (f"; not admitted: {', '.join(record['not_admitted'])}" if record.get('not_admitted') else ''))
 
 
+def read_file_cache(run):
+    """{stage: {group: {'hit', 'miss', 'enabled'}}} from the per-file cache reports (profile/file-cache).
+
+    A stage reused from an earlier run converts nothing and writes no report.
+    """
+    folder = Path(run) / 'profile' / 'file-cache'
+    result = {}
+    for path in sorted(folder.glob('*.json')) if folder.is_dir() else ():
+        try:
+            record = json.loads(path.read_text(encoding='utf-8'))
+            result[record.get('stage') or path.stem] = record.get('groups') or {}
+        except (OSError, ValueError):
+            continue
+    return result
+
+
+def file_cache_lines(record):
+    lines = []
+    for stage, groups in record.items():
+        parts = [f"{group} {row.get('hit', 0)} reused, {row.get('miss', 0)} converted"
+                 + ('' if row.get('enabled', True) else ' (no cache)') for group, row in groups.items()]
+        lines.append(f'Per-file cache ({stage}): ' + '; '.join(parts))
+    return lines
+
+
 class BuildSummary:
     def __init__(self, run, version, mode):
         self.run = Path(run)
@@ -193,6 +218,7 @@ class BuildSummary:
         self.finished = False
         self.environment = None
         self.known_inputs = None  # known-inputs verdicts and hash mode (tools/known_inputs.py)
+        self.build_type = None  # a build type other than the normal one (tools/miniwind.py)
         print('Compilation started: ' + self.started_at, flush=True)
 
     def record_environment(self, metadata):
@@ -202,6 +228,7 @@ class BuildSummary:
         this recipe are included, not every executable the version probe found.
         Selection is not proof of execution (especially on a failed build).
         """
+        self.build_type = metadata.get('build_type')
         rows = metadata.get('version_comparison', [])
         by_name = {row['name']: row for row in rows}
         native = []
@@ -221,6 +248,8 @@ class BuildSummary:
                          for row in rows if row.get('kind') == 'package'],
             'tools': native,
             'npc_gallery': metadata.get('npc_gallery', 'not recorded'),
+            # Quick test builds (--exclude, tools/build_exclusions.py): "quick test build, excluded: ...".
+            'excluded_content': (metadata.get('excluded_content') or {}).get('summary', 'not recorded'),
             'world_flora': (metadata.get('world_flora') or {}).get('status', 'not recorded'),
             'harvest': (metadata.get('harvest') or {}).get('status', 'not recorded'),
             'extra_towns': (metadata.get('extra_town_selection') or {}).get('status', 'not recorded'),
@@ -251,6 +280,7 @@ class BuildSummary:
         diagnostic = bool(actor_acceptance and not actor_acceptance['production_gate_passed'])
         fpu_receipt = read_fpu_support(self.run)
         harvest = read_harvest(self.run)
+        file_cache = read_file_cache(self.run)
         elapsed = max(0, time.monotonic() - self.started)
         result = {'schema': 'amiwind-build-summary-v1', 'version': self.version,
                   'mode': self.mode, 'status': status,
@@ -263,7 +293,9 @@ class BuildSummary:
                   'actor_ground_audit': actor_acceptance,
                   'fpu_support': fpu_receipt,
                   'harvest': harvest,
+                  'file_cache': file_cache,
                   'known_inputs': self.known_inputs,
+                  **({'build_type': self.build_type} if self.build_type else {}),
                   'profile': build_profile.summary_record(self.run),
                   'validation': 'private-test-only' if diagnostic else 'selected-pipeline'}
         saved, save_error = None, None
@@ -282,12 +314,20 @@ class BuildSummary:
         lines = [titles[status], f'AmiWind v{self.version} | {self.mode}',
                  'Started: ' + self.started_at, 'Finished: ' + result['finished_at'],
                  'Elapsed: ' + result['elapsed']]
+        if self.build_type:
+            lines.append('Build type: ' + self.build_type['name'] + ' | ' + self.build_type['partial_area'])
+            if self.build_type.get('label'):
+                lines.append('MiniWind scope: %s (%s)' % (self.build_type.get('scope'), self.build_type['label']))
+            lines.extend(self.build_type['notice'])
+            if self.build_type.get('description'):
+                lines.append('Scene: ' + self.build_type['description'])
         if self.environment:
             env = self.environment
             lines.append('NPC gallery selection: ' + env.get('npc_gallery', 'not recorded'))
             lines.append('World flora (trees and grass): ' + env.get('world_flora', 'not recorded'))
             lines.append('Harvestable mushrooms: ' + env.get('harvest', 'not recorded'))
             lines.append('Extra towns: ' + env.get('extra_towns', 'not recorded'))
+            lines.append('Content: ' + env.get('excluded_content', 'not recorded'))
             lines.append('Python: ' + env['python'])
             if env['packages']:
                 lines.append('Python environment packages (not all required by every recipe):')
@@ -327,6 +367,7 @@ class BuildSummary:
             lines.extend(known_input_lines(self.known_inputs))
         if harvest is not None:
             lines.append(harvest_line(harvest))
+        lines.extend(file_cache_lines(file_cache))
         if fpu_receipt is not None:
             from fpu_support import summary_lines as fpu_support_lines
             lines.extend(fpu_support_lines(fpu_receipt))

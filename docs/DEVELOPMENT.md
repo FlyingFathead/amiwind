@@ -6,6 +6,35 @@ uses ignored out/ or a selected external workspace.
 The project owner handles all Git/GitHub pushes. No remote is configured by the
 source package, and packaging does not commit, tag, push or publish anything.
 
+<!-- contents start -->
+## Contents
+
+- [Source authority](#source-authority)
+- [Mandatory rule: the repository builds the whole game from scratch](#mandatory-rule-the-repository-builds-the-whole-game-from-scratch)
+- [Mandatory build rule: ALWAYS CHECK COMPILER WARNINGS](#mandatory-build-rule-always-check-compiler-warnings)
+- [Efficiency rule #1: parallelize](#efficiency-rule-1-parallelize)
+- [Mandatory map rule: EVERY MAP MUST LET QUAKE'S VIS DO ITS JOB](#mandatory-map-rule-every-map-must-let-quakes-vis-do-its-job)
+- [Tests](#tests)
+- [Explicit release file list](#explicit-release-file-list)
+- [Optional private development bundle](#optional-private-development-bundle)
+- [Preserve working features and alternatives](#preserve-working-features-and-alternatives)
+- [Historical repository-consolidation checks](#historical-repository-consolidation-checks)
+- [Static scene walkability audit](#static-scene-walkability-audit)
+- [Geometry optimization principle: remove unnecessary runtime work](#geometry-optimization-principle-remove-unnecessary-runtime-work)
+- [Something akin to Nanite, but on these old pieces of gear](#something-akin-to-nanite-but-on-these-old-pieces-of-gear)
+- [Tables, tables, we need more tables](#tables-tables-we-need-more-tables)
+- [Town import](#town-import)
+- [World estimate](#world-estimate)
+- [Mandatory delivery gate](#mandatory-delivery-gate)
+- [Terrain coverage workflow](#terrain-coverage-workflow)
+- [Collision meshes](#collision-meshes)
+- [Further terrain/detail direction — planned, not starting now](#further-terraindetail-direction--planned-not-starting-now)
+- [Compiler diagnostics requirement](#compiler-diagnostics-requirement)
+- [Emulator development access](#emulator-development-access)
+- [Headless development container](#headless-development-container)
+
+<!-- contents end -->
+
 ## Source authority
 
 There is one repository root, `amiwind/`. Edit native code directly in
@@ -121,6 +150,11 @@ Fixtures are generated into temporary directories using fictional data. No
 Morrowind files are needed for tests. GCC or Clang enables the C reader test;
 that test is explicitly skipped if neither compiler is available. The host
 tests do not measure Amiga performance.
+
+Long documents carry a generated contents list after their title and intro
+(`tools/doc_toc.py`; the rule and the excluded files are in its header). After
+adding, renaming or removing a heading, run `python tools/doc_toc.py write`;
+`tests/test_doc_toc.py` runs `doc_toc.py check` and fails on a stale list.
 
 ## Explicit release file list
 

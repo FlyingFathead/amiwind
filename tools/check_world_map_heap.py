@@ -593,14 +593,18 @@ def estimate_bsp(path, sizes):
     }
 
 
-def heap_capacity():
+def heap_capacity(heap_mb=None):
+    """The heap the maps must fit: the build's own size (the engine receipt's heap_mb, from --heap-mb)
+    when given, else the engine source's AMIWIND_HEAP_MB."""
     source = ROOT / 'engine/aga/src/sys_amiga.c'
     text = source.read_text(encoding='utf-8')
     match = re.search(r'^#define\s+AMIWIND_HEAP_MB\s+(\d+)\s*$', text, re.M)
     if not match:
         raise ValueError('Could not find literal AMIWIND_HEAP_MB in sys_amiga.c')
-    return int(match.group(1)) * 1024 * 1024, {'source': str(source), 'source_sha256': digest(source),
-                                               'heap_megabytes': int(match.group(1))}
+    megabytes = int(match.group(1)) if heap_mb is None else int(heap_mb)
+    return megabytes * 1024 * 1024, {'source': str(source), 'source_sha256': digest(source),
+                                     'heap_megabytes': megabytes,
+                                     'selected_by': 'engine source' if heap_mb is None else 'engine build receipt'}
 
 
 def _map_reports(task):
@@ -675,7 +679,7 @@ def _map_reports(task):
 
 
 def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
-                 safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1, only=None):
+                 safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1, only=None, heap_mb=None):
     # only: map names (no .bsp) to estimate, e.g. harvest admission candidates.
     if baseline_reserve_bytes <= 0:
         raise ValueError('Baseline reserve must be positive')
@@ -685,7 +689,7 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
     candidates = sorted(p for p in maps.glob('*.bsp') if p.is_file() and (only is None or p.stem in only))
     if not candidates:
         raise ValueError(f'No BSP maps found in {maps}')
-    budget, budget_source = heap_capacity()
+    budget, budget_source = heap_capacity(heap_mb)
     from guard_torch_heap import profile as guard_profile
     guards=guard_profile(maps.parent,sizes)
     from harvest_heap import profile as harvest_profile
@@ -715,9 +719,9 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
 
 
 def audit_world_maps(maps, sdk, out, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
-                     safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1):
+                     safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1, heap_mb=None):
     sizes, abi = compile_target_sizes(sdk)
-    report = inspect_maps(maps, sizes, baseline_reserve_bytes, safety_headroom_bytes, jobs=jobs)
+    report = inspect_maps(maps, sizes, baseline_reserve_bytes, safety_headroom_bytes, jobs=jobs, heap_mb=heap_mb)
     report['target_abi_probe'] = abi
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -732,11 +736,12 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--baseline-reserve-bytes', type=int, default=BASELINE_RESERVE_BYTES)
     parser.add_argument('--safety-headroom-bytes', type=int, default=SAFETY_HEADROOM_BYTES)
+    parser.add_argument('--heap-mb', type=int, help="The build's heap in MiB (default: the engine source's)")
     args = parser.parse_args()
     report = audit_world_maps(args.maps, args.sdk, args.out,
-                              args.baseline_reserve_bytes, args.safety_headroom_bytes)
+                              args.baseline_reserve_bytes, args.safety_headroom_bytes, heap_mb=args.heap_mb)
     print(f"BSP heap estimate: {report['passing_maps']}/{report['map_count']} maps clear "
-          f"11 MiB with {args.baseline_reserve_bytes} baseline + {args.safety_headroom_bytes} safety bytes; "
+          f"{report['heap_budget_source']['heap_megabytes']} MiB with {args.baseline_reserve_bytes} baseline + {args.safety_headroom_bytes} safety bytes; "
           f"worst={report['worst_map']} estimated={report['worst_estimated_total_bytes']}; "
           f"report={args.out}", flush=True)
     if report['failing_maps']:

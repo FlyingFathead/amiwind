@@ -1,5 +1,23 @@
 # First-person geometry and sprite experiment
 
+<!-- contents start -->
+## Contents
+
+- [Maximum-extension repair candidate: 2026-10-06T15:18:15+00:00](#maximum-extension-repair-candidate-2026-10-06t1518150000)
+- [Projection follow-up: 2026-10-06T15:03:42+00:00](#projection-follow-up-2026-10-06t1503420000)
+- [RC1 maximum-extension hand audit: 2026-10-06T14:46:55+00:00](#rc1-maximum-extension-hand-audit-2026-10-06t1446550000)
+- [Combat inspection candidate: 6 October 2026](#combat-inspection-candidate-6-october-2026)
+- [FPV combat action creation pipeline: RC1 baseline](#fpv-combat-action-creation-pipeline-rc1-baseline)
+- [Unarmed right/left sequence request: 6 October 2026](#unarmed-rightleft-sequence-request-6-october-2026)
+- [HAND-PUNCH-COVERAGE-29: exposed forearm during punching in RC1](#hand-punch-coverage-29-exposed-forearm-during-punching-in-rc1)
+- [Coverage gate before adopting sprites generally](#coverage-gate-before-adopting-sprites-generally)
+- [Race and sex catalogue candidate](#race-and-sex-catalogue-candidate)
+- [Connected surfaces before a smaller triangle budget](#connected-surfaces-before-a-smaller-triangle-budget)
+- [Detailed-model depth arithmetic candidate](#detailed-model-depth-arithmetic-candidate)
+- [Investigation: first-person hands rendered as sprites](#investigation-first-person-hands-rendered-as-sprites)
+
+<!-- contents end -->
+
 ## Maximum-extension repair candidate: 2026-10-06T15:18:15+00:00
 
 The next source candidate now contains a fist-viewmodel-only clipping repair.

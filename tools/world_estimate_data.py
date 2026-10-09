@@ -261,10 +261,10 @@ def mesh_costs(vertices, faces, collision, profile):
     if not profile.get('collision_none'):
         cv, cf = collision if (collision is not None and profile.get('collision_source')) else (v, f)
         pieces, exact, _ = collision_pieces(cv, cf, profile)
-        for points, hull, ids, error in pieces:
+        for k, (points, hull, ids, error) in enumerate(pieces):
             point_eq = np.unique(np.round(hull.equations, 5), axis=0)
             out['nodes'] += len(point_eq)
-            out['clipnodes'] += len(standing_planes(points, point_eq, exact))
+            out['clipnodes'] += len(standing_planes(points, point_eq, exact is True or (bool(exact) and k in exact)))
     return out
 
 

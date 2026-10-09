@@ -2,6 +2,19 @@
 
 *Geometry analysis, compile-time optimization, and validation for AmiWind.*
 
+<!-- contents start -->
+## Contents
+
+- [Identity and scope](#identity-and-scope)
+- [Geometry policy](#geometry-policy)
+- [Host optimizer/profiler research](#host-optimizerprofiler-research)
+- [Inspector contract](#inspector-contract)
+- [Matched A/B protocol](#matched-ab-protocol)
+- [Acceptance and publication](#acceptance-and-publication)
+- [Current implementation and next steps](#current-implementation-and-next-steps)
+
+<!-- contents end -->
+
 7 October 2026: this toolkit is now the map optimisation part of the wider
 [AmiWind Toolkit](AMIWIND_TOOLKIT.md); the 3D Map Inspector moved to
 `amiwind-toolkit/map-inspector.html`.

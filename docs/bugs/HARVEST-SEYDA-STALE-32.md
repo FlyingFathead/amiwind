@@ -1,5 +1,24 @@
 # HARVEST-SEYDA-STALE-32: v0.0.31 ships Seyda Neen harvest catalogues made for older map versions
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.31 |
+| Where | Seyda Neen and docks harvest catalogues (46 maps) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.31 (last seen) |
+| Severity | medium: Shipped plant catalogues do not match their maps in 46 maps. |
+| Family | Harvestable plants (`harvest`) |
+| Playtest version | v0.0.31 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Fixed in source on v0.0.32-harvest (not shipped at the time of writing). Found by the builder coverage work (comparing the
@@ -53,3 +72,24 @@ BUILD-SEYDA-REGEN-30 exception, after the image passes):
 
 Harvest becomes a builder step that rebuilds its catalogues from the maps it ships with, with
 the geometry gate in the image step.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Harvestable plants (`harvest`). Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. See [families](README.md#families).
+
+- [CHIM-HARVEST-SPECIALS-33](CHIM-HARVEST-SPECIALS-33.md): The intro docks on CHIM have no harvestable plants: their catalogue is named after the legacy map, which a pure CHIM image leaves out
+- [ENTITY-TRACKER-HARVEST-32](ENTITY-TRACKER-HARVEST-32.md): The entity tracker did not count plants placed by harvest catalogues
+- [HARVEST-BITTERCOAST-29](HARVEST-BITTERCOAST-29.md): Only one of three nearby Bitter Coast mushrooms reportedly usable
+- [HARVEST-EXTRA-TOWNS-32](HARVEST-EXTRA-TOWNS-32.md): Opt-in towns get no harvestable mushrooms
+- [HARVEST-GEOMETRY-GATE-32](HARVEST-GEOMETRY-GATE-32.md): The harvest geometry gate was never re-run on the shipped Seyda Neen maps
+- [HARVEST-PILOT-SHIPPING-32](HARVEST-PILOT-SHIPPING-32.md): 24 Seyda Neen maps still ship the six-plant pilot harvest catalogue
+- HARVEST-WORLD-29 (no report page): Original mushroom placement, picking and persistent state worldwide
+
+Related bugs in other categories:
+
+- [BUILD-HARVEST-NOT-BUILT-32](BUILD-HARVEST-NOT-BUILT-32.md): Mushroom harvest data is not built by the builder
+- [HEAP-SEYDA-OVERLAP-32](HEAP-SEYDA-OVERLAP-32.md): Shipped Seyda Neen maps fail the current heap model (harvest and guard overlap allowance)
+
+<!-- END GENERATED CATEGORY -->

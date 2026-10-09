@@ -6,6 +6,22 @@ covers all base-master terrain grids and placed scenery geometry. The native
 below still governs playable world expansion; the atlas and terrain mesh do not
 replace its runtime acceptance gates.
 
+<!-- contents start -->
+## Contents
+
+- [Source coordinates remain authoritative](#source-coordinates-remain-authoritative)
+- [Source cells are not RAM allocation units](#source-cells-are-not-ram-allocation-units)
+- [Optional polygonal POI regions](#optional-polygonal-poi-regions)
+- [Next milestone: entire-world terrain topomesh](#next-milestone-entire-world-terrain-topomesh)
+- [Recovered follow-up: world-scale flight and precomputed geometry experiments](#recovered-follow-up-world-scale-flight-and-precomputed-geometry-experiments)
+- [Compact indices without accidental signed limits](#compact-indices-without-accidental-signed-limits)
+- [Loading, visibility and eviction are separate decisions](#loading-visibility-and-eviction-are-separate-decisions)
+- [Interior/exterior handoff](#interiorexterior-handoff)
+- [Coverage and the temporary sea](#coverage-and-the-temporary-sea)
+- [Acceptance and profiling gates](#acceptance-and-profiling-gates)
+
+<!-- contents end -->
+
 Core design recorded 27 September 2026; status updated 30 September. Balmora now
 uses 64 overlapping runtime regions with synchronous replacement of one resident
 BSP. Player state crosses those boundaries. Dev3 adds optional frozen-frame

@@ -1,5 +1,20 @@
 # KEYS-AMIGA-EDIT-32: Amiga Del arrived as F11; FS-UAE sent Home/End as keypad ( and Help
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | engine raw-key table (keys.c) and FS-UAE presets: Del, Home, End |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev1 (last seen) |
+| Severity | medium: Delete never worked and Home or End did nothing in FS-UAE; present in every earlier version. |
+| Family | Console, keyboard and mouse input (`console-input`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open: fixed in source on the console-terminal branch, not yet packaged. Present
@@ -61,3 +76,20 @@ checks the preset lines. FS-UAE with the rebuilt engine: see the journal.
 ## Prevention
 
 The two tests above.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Console, keyboard and mouse input (`console-input`). The console line editor, qualifier keys and the emulator key path. See [families](README.md#families).
+
+- AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
+- AW25-05 (no report page): Console typed only uppercase letters and shifted digits
+- CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
+- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+- [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
+- CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
+- MAP-VIEW-SWITCH-28 (no report page): Mouse cannot switch DEBUG / IN-GAME map views
+- VIEW-PITCH-CENTER-29 (no report page): Legacy automatic pitch centering during free-look
+
+<!-- END GENERATED CATEGORY -->

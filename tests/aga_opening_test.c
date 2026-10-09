@@ -7,10 +7,12 @@ server_t sv;server_static_t svs;double host_frametime=.1;
 aw_character_t aw_character;char *pr_strings;
 int pr_edict_size=sizeof(edict_t);client_state_t cl;
 static edict_t object,clerk;static eval_t reference;static int occluded,reads;
-static int obstructed,door_sounds,links,probes;
+static int obstructed,door_sounds,links,probes,world_hit;static vec3_t hit_pos;
 edict_t *EDICT_NUM(int n){return n==1?&object:&clerk;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
- trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;return t;
+ trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;
+ if(world_hit){t.fraction=.5f;t.ent=sv.edicts;VectorCopy(hit_pos,t.endpos);}  /* a CHIM chunk placement */
+ return t;
 }
 static edict_t guard;static int speech,menu,done,nav_stops,nav_starts,nav_result;
 static vec3_t nav_goal;
@@ -101,6 +103,35 @@ int main(void)
         object.v.absmin[1]=object.v.absmax[1]=0;object.v.absmin[2]=13;
         reference._float=172851;object.v.absmax[2]=13;AW_StoryReset(0); /* No false empty outside tutorial stage. */
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Take ring: E"));
+        /* CHIM frame (CHIM-COURT-BARREL-USE-33): the barrel is drawn and collides as a chunk
+         * placement (a world hit); its edict is a brush marker without faces. A world hit
+         * inside the marker's linked box is the barrel itself; one in front of it occludes. */
+        {
+            model_t marker;edict_t world_edict;
+            memset(&marker,0,sizeof(marker));marker.type=mod_brush;
+            memset(&world_edict,0,sizeof(world_edict));sv.edicts=&world_edict;sv.models[1]=&marker;
+            object.v.absmin[0]=28;object.v.absmax[0]=32;object.v.absmin[1]=-2;object.v.absmax[1]=2;
+            object.v.absmin[2]=11;object.v.absmax[2]=15;
+            world_hit=1;hit_pos[0]=28.5f;hit_pos[1]=0;hit_pos[2]=13;
+            assert(AW_OpeningHint(&name,&action) && !strcmp(name,"Barrel") && !strcmp(action,"Take ring: E"));
+            hit_pos[0]=20;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());
+            hit_pos[0]=28.5f;marker.nummodelsurfaces=1;   /* a drawn brush (legacy maps): the plain rule */
+            assert(!AW_OpeningHint(&name,&action));
+            marker.nummodelsurfaces=0;
+            /* Leaving the Census office: the courtyard frame (sncourt-chim) in stage COURTYARD. The
+             * courtyard gate (113889) stays shut until the ring is taken; E on the barrel's marker
+             * takes it, advances to CAPTAIN and opens the gate. */
+            AW_StoryReset(1);aw_story.stage=AW_STAGE_COURTYARD;strcpy(sv.name,"seyda");
+            assert(AW_CourtyardRingAvailable() && !AW_StoryDoor(113889));
+            assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Take ring: E"));
+            assert(AW_OpeningUse() && AW_Ring()==1 && aw_story.stage==AW_STAGE_CAPTAIN);
+            assert(AW_StoryDoor(113889) && !AW_CourtyardRingAvailable());
+            assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Empty"));
+            AW_StoryReset(0);strcpy(sv.name,"census");
+            world_hit=0;sv.models[1]=NULL;sv.edicts=NULL;
+            object.v.absmin[0]=object.v.absmax[0]=30;object.v.absmin[1]=object.v.absmax[1]=0;
+            object.v.absmin[2]=object.v.absmax[2]=13;
+        }
         assert(AW_OpeningUse() && AW_Ring()==1);
         aw_story.stage=AW_STAGE_COURTYARD;AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",1);
         AW_OpeningTick();assert(aw_story.stage==AW_STAGE_CAPTAIN);

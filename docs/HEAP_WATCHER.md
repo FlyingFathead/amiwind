@@ -6,6 +6,21 @@ v0.0.27-rc3 repair and carried into published v0.0.27. It extends [memory alloca
 implemented merely because it appears here. Target runtime acceptance remains
 pending; the original rc3 playtest image is not repaired by these documents.
 
+<!-- contents start -->
+## Contents
+
+- [Build receipts: used, free and growth margin](#build-receipts-used-free-and-growth-margin)
+- [Budget and growth policy](#budget-and-growth-policy)
+- [Four different memory pressures](#four-different-memory-pressures)
+- [Required lifecycle evidence](#required-lifecycle-evidence)
+- [Build contract and target reconciliation](#build-contract-and-target-reconciliation)
+- [Residency is not the same as per-frame visibility](#residency-is-not-the-same-as-per-frame-visibility)
+- [Synthetic regression coverage](#synthetic-regression-coverage)
+- [Required watcher / profiler / optimizer pipeline](#required-watcher--profiler--optimizer-pipeline)
+- [Required pipeline: Heap Watcher → Profiler → Optimizer](#required-pipeline-heap-watcher--profiler--optimizer)
+
+<!-- contents end -->
+
 ## Build receipts: used, free and growth margin
 
 Implemented during the rc3 repair and included in published v0.0.27:
@@ -34,7 +49,9 @@ remains for modeled growth. The 6 MiB is not permission to add 6 MiB of assets.
 At a 6-MiB map peak the growth margin is zero, while safety remains reserved.
 
 These numbers are **target-ABI estimates**, not measured total application use.
-The runtime watcher records lifecycle snapshots in `heap-audit.log`; acceptance
+The runtime watcher records lifecycle snapshots in `heap-audit.log` (in memory until
+Exit game, a fatal error or `dbg savelogs`; evidence runs use a `--live-logs` image or
+`dbg logs live on`, BOOT-VOLUME-NOT-VALIDATED-33); acceptance
 must bind that evidence to the exact engine, maps and emulator configuration.
 Missing measurements mean unknown, not zero. Cache pressure, zone fragmentation,
 external Fast/Chip allocations and transition peaks still need target profiling.

@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <setjmp.h>
 #include "../engine/aga/src/model.c"
+/* Diagnostic logs (aw_log.c); without a bound switch they are written live. */
+#include "../engine/aga/src/aw_log.c"
 qboolean aw_loading_music=false;
 static byte heap[2*1024*1024];
 static int used, allocations, temporary_calls, expect_error;

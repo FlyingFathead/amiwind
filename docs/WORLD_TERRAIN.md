@@ -1,5 +1,17 @@
 # Playable Vvardenfell terrain
 
+<!-- contents start -->
+## Contents
+
+- [Current scope — published v0.0.27](#current-scope--published-v0027)
+- [Historical v0.0.25-rc1 terrain baseline](#historical-v0025-rc1-terrain-baseline)
+- [Coordinates and transitions](#coordinates-and-transitions)
+- [Shoreline correction](#shoreline-correction)
+- [Disk layout](#disk-layout)
+- [Rebuilding](#rebuilding)
+
+<!-- contents end -->
+
 ## Current scope — published v0.0.27
 
 The 2,526-region terrain foundation now carries 37,960 exterior rocks and 816

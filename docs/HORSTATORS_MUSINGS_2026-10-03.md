@@ -4,6 +4,21 @@
 > converted buildings never blocked Quake's visibility. See
 > [Well, it looks like you should always check and recheck](HORSTATORS_MUSINGS_2026-10-07.md).
 
+<!-- contents start -->
+## Contents
+
+- [Polygons in, polygons out](#polygons-in-polygons-out)
+- [A circle is not a square, and the player can turn around](#a-circle-is-not-a-square-and-the-player-can-turn-around)
+- [Investigation status](#investigation-status)
+- [What the inspected code actually does](#what-the-inspected-code-actually-does)
+- [Boundaries should fit content, not a prescribed shape](#boundaries-should-fit-content-not-a-prescribed-shape)
+- [Profile the entire residency cycle](#profile-the-entire-residency-cycle)
+- [Follow-up: less visible is not automatically less work](#follow-up-less-visible-is-not-automatically-less-work)
+- [Heap watching: somebody has to count the mushrooms](#heap-watching-somebody-has-to-count-the-mushrooms)
+- [Out of sight, still on the guest list](#out-of-sight-still-on-the-guest-list)
+
+<!-- contents end -->
+
 Fog promises less work: hide the distant stuff, draw fewer polygons, enjoy better
 performance. Yet in central Balmora, increasing the view distance to 1000 seemed
 to make things run better. Apparently, telling the engine to see less isn’t

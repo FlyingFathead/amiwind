@@ -6,6 +6,20 @@ files in about ten minutes (seconds on a rerun), without converting the world: o
 interior cell and per exterior town-converter region, with BSP sizes, the
 target heap, entity counts and every limit ratio, plus charts.
 
+<!-- contents start -->
+## Contents
+
+- [How Quake does it, and what is computed](#how-quake-does-it-and-what-is-computed)
+- [Limits](#limits)
+- [Accuracy and bias](#accuracy-and-bias)
+- [Development cells (IMPORT-TEST-CELLS-31)](#development-cells-import-test-cells-31)
+- [Check it on your machine: --sample-convert](#check-it-on-your-machine---sample-convert)
+- [Recalibrate from your own conversions](#recalibrate-from-your-own-conversions)
+- [Output](#output)
+- [Loading the results into the Toolkit](#loading-the-results-into-the-toolkit)
+
+<!-- contents end -->
+
 It is a builder command:
 
 ```sh

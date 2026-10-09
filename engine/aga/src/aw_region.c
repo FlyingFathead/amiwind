@@ -14,6 +14,25 @@ typedef struct {
  * region cap and certified draw distance all come from the table. */
 static aw_region_area_t areas[AW_TOWN_COUNT];
 static char model_path[40];
+/* CHIM: a town whose exterior is a CHIM frame runs in one map with no region
+ * loads (chim/chim_world.c sets this only when its data exists; it returns
+ * the town's frame map, or NULL to keep the region maps). */
+const char *(*aw_chim_town_map)(const char *town);
+static const char *chim_map(const char *town){return aw_chim_town_map?aw_chim_town_map(town):NULL;}
+/* The running map is the town's CHIM frame map (not its intro regions). */
+/* The town's frame map, or (world format 0.5) a frame map of the same
+ * frame with its own entities: the intro docks', the enclosed courtyard's.
+ * One frame map, no region crossings. */
+static int chim_running(void){
+    const char *c=chim_map(sv.name),*d;
+    if(c && !strcmp(sv.modelname,c))return 1;
+    if(!c)return 0;
+    if((d=chim_map("intro_docks"))!=NULL && !strcmp(sv.modelname,d))return 1;
+    return (d=chim_map("sncourt"))!=NULL && !strcmp(sv.modelname,d);
+}
+/* An arrival in Seyda Neen's enclosed courtyard (entered only by door links)
+ * selects the courtyard's frame map when the town runs on CHIM. */
+static int chim_courtyard;
 static const float dock_low[2]={-240,-1100},dock_high[2]={1120,620};
 static const float court_low[2]={-128,-384},court_high[2]={512,256};
 
@@ -124,6 +143,11 @@ int AW_RegionSelect(const char *name,const float *point,int intro)
 {
     int area=area_id(name),id;aw_region_area_t *a;
     if(area<0)return AW_SectionSelect(name,point);
+    if((!intro || !scenes(area)) && chim_map(name)){   /* the frame map covers the town (the intro docks are Seyda Neen's) */
+        chim_courtyard=scenes(area) && seyda_kind(point,0,0)==2 && chim_map("sncourt")!=NULL;
+        return 1;
+    }
+    if(intro && scenes(area) && chim_map(name) && chim_map("intro_docks"))return 1;   /* and the intro docks' frame map */
     /* Legacy full single-map payload (Seyda) when its directory is absent. */
     if(!read_regions(area))return (AW_Town(area)->flags&AW_TOWN_LEGACY_PAYLOAD)!=0;
     a=&areas[area];id=AW_RegionOwner(a->regions,a->count,point,-1,0);
@@ -132,19 +156,34 @@ int AW_RegionSelect(const char *name,const float *point,int intro)
 }
 const char *AW_RegionWorldModel(const char *name,int intro)
 {
-    int area=area_id(name);aw_region_area_t *a;
+    int area=area_id(name);aw_region_area_t *a;const char *chim;
+    if(area>=0 && (!intro || !scenes(area)) && (chim=chim_map(name))!=NULL){
+        const char *court=chim_courtyard?chim_map("sncourt"):NULL;
+        chim_courtyard=0;
+        if(read_regions(area)){areas[area].current=-1;areas[area].kind=0;areas[area].requested=-1;}
+        if(court){Con_Printf("%s (courtyard): CHIM frame map %s.\n",AW_Town(area)->title,court);return court;}
+        Con_Printf("%s: CHIM frame map %s.\n",AW_Town(area)->title,chim);return chim;
+    }
+    /* The intro's docks on CHIM: their own frame map over the town's frame
+     * (maps/intro_docks-chim.bsp, world format 0.5). */
+    if(area>=0 && intro && scenes(area) && chim_map(name) && (chim=chim_map("intro_docks"))!=NULL){
+        if(read_regions(area)){areas[area].current=-1;areas[area].kind=0;areas[area].requested=-1;}
+        Con_Printf("%s (intro docks): CHIM frame map %s.\n",AW_Town(area)->title,chim);return chim;
+    }
     if(area<0 || !read_regions(area))return NULL;
     a=&areas[area];
     if(a->requested<0){a->requested=AW_RegionOwner(a->regions,a->count,a->arrival,-1,0);a->requested_kind=scenes(area)&&intro?1:0;}
     a->current=a->requested;a->kind=a->requested_kind;a->requested=-1;
     if(a->kind==1)return "maps/intro_docks.bsp";
     if(a->kind==2)return "maps/sncourt.bsp";
-    sprintf(model_path,"maps/%s.bsp",a->regions[a->current].name);return model_path;
+    sprintf(model_path,"maps/%s.bsp",a->regions[a->current].name);
+    Con_Printf("%s: legacy region map %s.\n",AW_Town(area)->title,model_path);return model_path;
 }
 int AW_RegionCrossing(const float *point,int intro)
 {
     int area=area_id(sv.name),id,kind;aw_region_area_t *a;
     if(area<0 || !read_regions(area))return 0;
+    if(chim_running())return 0;   /* one frame map: no region crossings */
     a=&areas[area];kind=scenes(area)?seyda_kind(point,intro,a->kind):0;
     if(kind!=a->kind)return 1;
     if(kind)return 0;
@@ -154,7 +193,7 @@ int AW_RegionCrossing(const float *point,int intro)
 const char *AW_RegionAhead(const float *point,const float *velocity,int intro,float seconds) {
     int area=area_id(sv.name),id;aw_region_area_t *a;static char next[40];
     if(area<0)return AW_SectionAhead(sv.name,point,velocity,seconds);
-    if(intro || !read_regions(area))return NULL;
+    if(intro || !read_regions(area) || chim_running())return NULL;
     a=&areas[area];if(a->kind || a->current<0)return NULL;
     id=AW_RegionNextOwner(a->regions,a->count,point,velocity,a->current,a->hysteresis,seconds);
     if(id<0 || id==a->current)return NULL;
@@ -164,7 +203,7 @@ int AW_RegionContains(const float *point)
 {
     int area=area_id(sv.name),k;const float *low,*high;aw_region_area_t *a;
     if(area<0)return AW_SectionContains(sv.name,point);
-    if(!read_regions(area))return 1;
+    if(!read_regions(area) || chim_running())return 1;
     a=&areas[area];if(a->current<0 || a->current>=a->count)return 0;
     low=a->kind==1?dock_low:a->kind==2?court_low:a->regions[a->current].cover_low;
     high=a->kind==1?dock_high:a->kind==2?court_high:a->regions[a->current].cover_high;
@@ -173,7 +212,7 @@ int AW_RegionContains(const float *point)
 }
 int AW_RegionGroundCoverage(const float *point) {
     int area=area_id(sv.name);aw_region_area_t *a;
-    if(area<0)return 1;
+    if(area<0 || chim_running())return 1;
     a=&areas[area];
     if(!read_regions(area) || a->current<0)return 0;
     if(a->kind)return AW_RegionContains(point);
@@ -181,19 +220,82 @@ int AW_RegionGroundCoverage(const float *point) {
      * Audit/correct in the owning core; other copies keep the baked support Z. */
     return AW_RegionOwner(a->regions,a->count,point,-1,0)==a->current;
 }
+/* CHIM: while a town runs its frame map, the region that owns point (kept
+ * with the region hysteresis while current still owns it), with its region
+ * map's name in map: per-region data such as the harvest catalogues stays
+ * per region. -1: no region owns point; -2: the running map is not a town's
+ * CHIM frame map (legacy: the loaded region map is the region). */
+int AW_RegionAt(const float *point,int current,char *map,int size)
+{
+    int area=area_id(sv.name),id;aw_region_area_t *a;
+    if(area<0 || !chim_running() || !read_regions(area))return -2;
+    a=&areas[area];
+    if(current>=a->count)current=-1;
+    id=AW_RegionOwner(a->regions,a->count,point,current,current>=0?a->hysteresis:0);
+    if(id>=0 && map && size>0){strncpy(map,a->regions[id].name,size-1);map[size-1]=0;}
+    return id;
+}
+/* The map file a scene loads from, for every check that a scene exists
+ * (arrivals, saves, dbg tp, doors, the scene picker, the town checks): its
+ * own maps/<name>.bsp, or, when that is absent and the town runs on CHIM, its
+ * frame map (a pure-CHIM image has no legacy town maps). Returns the file's
+ * size as COM_FOpenFile does (-1: neither exists) and the path in path. */
+int AW_SceneMapSize(const char *name,char *path,int size)
+{
+    static char found[MAX_QPATH+24];FILE *f=NULL;int n=-1;const char *chim;
+    found[0]=0;
+    if(name && *name && strlen(name)<=40){
+        sprintf(found,"maps/%s.bsp",name);n=COM_FOpenFile(found,&f);
+        if(f)fclose(f);
+        else if((chim=chim_map(name))!=NULL){
+            strcpy(found,chim);f=NULL;n=COM_FOpenFile(found,&f);
+            if(f)fclose(f);else n=-1;
+        }else n=-1;
+    }
+    if(path && size>0){strncpy(path,found,size-1);path[size-1]=0;}
+    return n;
+}
+/* dbg tp's named destinations this disk has (the scene's map or the town's
+ * CHIM frame map, AW_SceneMapSize), "/"-separated, for its help and error
+ * lines: on a pure-CHIM disk only the towns that are there are offered.
+ * Returns how many. */
+int AW_TeleportDestinations(char *out,int size)
+{
+    int i,n=0;const char *name;const aw_town_t *t;
+    if(!out || size<1)return 0;
+    out[0]=0;
+    for(i=-2;i<=AW_TOWN_COUNT;i++){
+        if(i==-2)name=AW_SceneMapSize("seyda",NULL,0)>=124?"seydaneen":NULL;
+        else if(i==-1)name=AW_SceneMapSize("prison",NULL,0)>=124?"prisonship":NULL;
+        else if(i==AW_TOWN_COUNT)   /* the short name while the Arena is the only Vivec town */
+            name=AW_TownFind("vivec_arena")>=0 && AW_SceneMapSize("vivec_arena",NULL,0)>=124?"vivec":NULL;
+        else{
+            t=AW_Town(i);
+            name=t && (t->flags&AW_TOWN_TELEPORT) && strcmp(t->name,"seyda") &&
+                AW_SceneMapSize(t->name,NULL,0)>=124?t->name:NULL;
+        }
+        if(!name || (int)(strlen(out)+strlen(name)+2)>size)continue;
+        if(n++)strcat(out,"/");
+        strcat(out,name);
+    }
+    return n;
+}
 /* Arrival into a town's directory point, or (returning) its return travel
- * point inside the town's travel target. The destination map must exist. */
+ * point inside the town's travel target. The destination map must exist: the
+ * arrival region's map, or the town's CHIM frame map when it runs on CHIM. */
 int AW_TownArrival(const char *name,int returning,float *point,float *yaw)
 {
-    FILE *f=NULL;int id,area=area_id(name);aw_region_area_t *a;char back[40];const aw_town_t *t;
+    FILE *f=NULL;int id,area=area_id(name);aw_region_area_t *a;const aw_town_t *t;
     if(area<0 || !read_regions(area))return 0;
     a=&areas[area];t=AW_Town(area);
     if(returning && !t->travel_target[0])return 0;
     id=AW_RegionOwner(a->regions,a->count,a->arrival,-1,0);
-    sprintf(model_path,"maps/%s.bsp",a->regions[id].name);
-    sprintf(back,"maps/%.15s.bsp",t->travel_target);
-    if(COM_FOpenFile(returning?back:model_path,&f)<0 || !f)return 0;
-    fclose(f);
+    if(returning){if(AW_SceneMapSize(t->travel_target,NULL,0)<0)return 0;}
+    else if(!chim_map(name)){
+        sprintf(model_path,"maps/%s.bsp",a->regions[id].name);
+        if(COM_FOpenFile(model_path,&f)<0 || !f)return 0;
+        fclose(f);
+    }
     if(returning){VectorCopy(a->return_point,point);*yaw=a->return_yaw;}
     else {VectorCopy(a->arrival,point);*yaw=a->arrival_yaw;a->requested=id;a->requested_kind=0;}
     return 1;

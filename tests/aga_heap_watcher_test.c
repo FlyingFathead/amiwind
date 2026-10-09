@@ -6,6 +6,8 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include "../engine/aga/src/zone.c"
+/* Diagnostic logs (aw_log.c); without a bound switch they are written live. */
+#include "../engine/aga/src/aw_log.c"
 
 static union { long double alignment; byte bytes[6*1024*1024]; } arena;
 static union { long double alignment; byte bytes[32768]; } zone_arena;

@@ -6,7 +6,15 @@
 #include "quakedef.h"
 #include "aw_harvest_runtime.h"
 #include "aw_town.h"
+#include "chim/chim.h"
 extern void AW_MergeCollisionTrace(trace_t *,trace_t *,edict_t *);
+/* CHIM world streamer (chim/chim_world.c sets these only when its data
+ * exists): chunk placements are this catalogue's successor, so they enter
+ * and leave with it, link with it and clip with it. */
+void (*aw_chim_map_begin)(const char *);
+void (*aw_chim_map_end)(void);
+void (*aw_chim_link)(void);
+void (*aw_chim_clip)(vec3_t,vec3_t,vec3_t,vec3_t,trace_t *);
 typedef struct {
     entity_t render;
     vec3_t mins,maxs;
@@ -26,11 +34,12 @@ static int AW_SceneryMapEnabled(const char *name)
     return town>=0 && (AW_Town(town)->flags&AW_TOWN_SCENERY)!=0;
 }
 
-void AW_SceneryClear(void) { placements=NULL;count=capacity=0; }
+void AW_SceneryClear(void) { placements=NULL;count=capacity=0;if(aw_chim_map_end)aw_chim_map_end(); }
 void AW_SceneryBegin(const char *entities)
 {
     const char *p=entities;
     AW_SceneryClear();AW_HarvestBegin();
+    if(aw_chim_map_begin)aw_chim_map_begin(entities);
     if(!AW_SceneryMapEnabled(sv.name))return;
     while((p=strstr(p,"\"classname\" \"func_wall\""))!=NULL){capacity++;p++;}
     if(capacity>1000)Host_Error("Balmora scenery catalogue exceeds 1000 placements");
@@ -62,6 +71,7 @@ int AW_SceneryCapture(edict_t *e)
 void AW_SceneryLink(void)
 {
     int i;
+    if(aw_chim_link)aw_chim_link();
     if(!sv.active || !AW_SceneryMapEnabled(sv.name))return;
     if(cl_numvisedicts+count>MAX_VISEDICTS)Host_Error("Balmora visible entity budget exceeded");
     for(i=0;i<count;i++)cl_visedicts[cl_numvisedicts++]=&placements[i].render;
@@ -69,6 +79,7 @@ void AW_SceneryLink(void)
 void AW_SceneryClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *best)
 {
     int i,k;vec3_t low,high;edict_t solid;trace_t hit;aw_scenery_t *p;
+    if(aw_chim_clip){aw_chim_clip(start,mins,maxs,end,best);if(best->allsolid)return;}
     if(!count)return;
     for(k=0;k<3;k++){
         low[k]=(start[k]<end[k]?start[k]:end[k])+mins[k]-1;

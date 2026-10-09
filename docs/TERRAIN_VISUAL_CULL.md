@@ -1,5 +1,18 @@
 # Terrain visual culling (created during AmiWind v0.0.28)
 
+<!-- contents start -->
+## Contents
+
+- [Current status: coherent town host checks pass; native acceptance pending](#current-status-coherent-town-host-checks-pass-native-acceptance-pending)
+- [Historical candidate010 rejection and 011 diagnosis](#historical-candidate010-rejection-and-011-diagnosis)
+- [Non-destructive compile-time behavior](#non-destructive-compile-time-behavior)
+- [Mandatory Morrowind exterior map acceptance requirements](#mandatory-morrowind-exterior-map-acceptance-requirements)
+- [Canonical source-to-compiled terrain mapping](#canonical-source-to-compiled-terrain-mapping)
+- [Coarse/fine terrain boundary diagnosis (separate from object culling)](#coarsefine-terrain-boundary-diagnosis-separate-from-object-culling)
+- [Current bounded implementation (incomplete; retained behavior is not acceptance)](#current-bounded-implementation-incomplete-retained-behavior-is-not-acceptance)
+
+<!-- contents end -->
+
 ## Current status: coherent town host checks pass; native acceptance pending
 
 The coherent 049/050 Seyda batch passes bounded host validation, and the assembled
@@ -80,7 +93,7 @@ The serialized final BSP must satisfy both conditions with ALL inspector hiding 
 
 These are required outcomes, not claims that the current implementation is complete. Candidate010 was rejected by owner visual review. It used compiled LAND proxies, not direct canonical NPZ evaluation. Direct NPZ alignment was subsequently checked at 288 source-grid corners with zero residual; that diagnosis is not a repaired BSP. The global packet exposed a continuous terrain surface where the compiled coarse/fine terrain had a height step.
 
-For the existing sky background path, see [Day/night and sky](DAY_NIGHT_AND_SKY.md#existing-renderer-background-and-sky-enclosure-geometry).
+For the existing sky background path, see [Day/night and sky](DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate).
 
 ## Canonical source-to-compiled terrain mapping
 
@@ -108,7 +121,7 @@ interior triangle evaluation, or geometry removal. Candidate010 records the
 canonical heightfield for provenance but says it was **not used for culling**;
 that pass used compiled town LAND and local guards. The global heightfield must
 actually drive classification and clipping before the terrain requirement can
-pass. See [Day/night and sky](DAY_NIGHT_AND_SKY.md#existing-renderer-background-and-sky-enclosure-geometry)
+pass. See [Day/night and sky](DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate)
 for the independent sky-background path.
 
 ## Coarse/fine terrain boundary diagnosis (separate from object culling)

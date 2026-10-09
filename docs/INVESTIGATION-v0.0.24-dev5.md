@@ -3,6 +3,23 @@
 Work in progress, 30 September 2026. Delivered dev4 archives are immutable.
 Results below distinguish owner reports, inspected causes and validation.
 
+<!-- contents start -->
+## Contents
+
+- [Guard chest armor](#guard-chest-armor)
+- [Small gold font](#small-gold-font)
+- [Stairs](#stairs)
+- [Paving](#paving)
+- [Additional owner reports against dev4 (18:16 Helsinki)](#additional-owner-reports-against-dev4-1816-helsinki)
+- [Accepted constraints](#accepted-constraints)
+- [Subsequent reports and current candidates (18:43 Helsinki)](#subsequent-reports-and-current-candidates-1843-helsinki)
+- [Final collision and door findings](#final-collision-and-door-findings)
+- [Prison ship performance](#prison-ship-performance)
+- [Renderer cost and acceptance limits](#renderer-cost-and-acceptance-limits)
+- [Packaged dev5 acceptance](#packaged-dev5-acceptance)
+
+<!-- contents end -->
+
 ## Guard chest armor
 
 At Balmora (862,-502,58), yaw290/pitch13, the Hlaalu guard has the correct

@@ -44,3 +44,4 @@ int main(void){
     for(i=0;i<320*152;i++)assert(frame[i]==0x5a);
     return 0;
 }
+int AW_PhotoModeActive(void){return 0;}

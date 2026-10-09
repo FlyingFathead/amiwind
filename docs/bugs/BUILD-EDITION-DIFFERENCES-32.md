@@ -1,5 +1,20 @@
 # BUILD-EDITION-DIFFERENCES-32: GOG and Steam editions produce different builds
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | Builder inputs (BookArt fonts, loose-file overrides) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | medium: Steam lacks the TTF fonts and GOG loose files override archives, so builds differ by edition. |
+| Family | Morrowind editions, archives and inputs (`game-data-editions`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Fonts confirmed; loose-file differences not yet measured.
@@ -58,3 +73,17 @@ Pending.
 ## Prevention
 
 The known-inputs check identifies the edition and reports edition-specific inputs.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Morrowind editions, archives and inputs (`game-data-editions`). The builder reads the owner's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. See [families](README.md#families).
+
+- [ASSETS-ARCHIVE-ORDER-32](ASSETS-ARCHIVE-ORDER-32.md): Asset readers ignore the Tribunal and Bloodmoon archives, so some textures are pre-expansion versions
+- [BUILD-EDITION-SKY-32](BUILD-EDITION-SKY-32.md): Night sky and sky palette outputs depend on the Morrowind edition (loose .tga read before archive .dds)
+- [BUILD-EXPANSIONS-31](BUILD-EXPANSIONS-31.md): Tribunal and Bloodmoon cannot be converted with today's tools
+- [BUILD-INPUTS-UNVERIFIED-32](BUILD-INPUTS-UNVERIFIED-32.md): The builder does not check user inputs (Morrowind data, Amiga libraries) against known versions
+- [BUILD-PLUGIN-SOUNDS-32](BUILD-PLUGIN-SOUNDS-32.md): A GOG image includes 8 converted sounds that only an official plugin uses
+
+<!-- END GENERATED CATEGORY -->

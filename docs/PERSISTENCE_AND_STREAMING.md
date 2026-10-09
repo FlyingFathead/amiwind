@@ -6,6 +6,22 @@ planned. Balmora replaces one resident BSP synchronously among 64 overlapping
 regions, carrying player state across the boundary. Method 1 does not prefetch. Experimental method 2 reads a bounded destination
 prefix ahead of a crossing; neither keeps two complete regions resident.
 
+<!-- contents start -->
+## Contents
+
+- [Numbered transition investigation, 30 September 2026](#numbered-transition-investigation-30-september-2026)
+- [Controlled read-ahead comparison, 30 September 2026](#controlled-read-ahead-comparison-30-september-2026)
+- [Separate base content from saved changes](#separate-base-content-from-saved-changes)
+- [Cell load and unload](#cell-load-and-unload)
+- [Memory and disk access](#memory-and-disk-access)
+- [Save format and recovery](#save-format-and-recovery)
+- [Proposed implementation stages](#proposed-implementation-stages)
+- [Owner acceptance: 30 September 2026](#owner-acceptance-30-september-2026)
+- [Seyda Neen regions in dev4](#seyda-neen-regions-in-dev4)
+- [dev5 Seyda centre boundary](#dev5-seyda-centre-boundary)
+
+<!-- contents end -->
+
 Dev3 can hold the last rendered frame with a small top Loading box during these
 swaps; Options retains the previous black-screen method. This masks the blank
 transition, not the disk/decoding pause. Music servicing remains active.

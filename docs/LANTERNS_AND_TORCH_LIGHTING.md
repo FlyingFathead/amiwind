@@ -1,5 +1,23 @@
 # Study lanterns and torch lighting more
 
+<!-- contents start -->
+## Contents
+
+- [Why this study is part of v0.0.29](#why-this-study-is-part-of-v0029)
+- [Read the source placements before choosing a renderer](#read-the-source-placements-before-choosing-a-renderer)
+- [OpenMW and original-game behavior to examine](#openmw-and-original-game-behavior-to-examine)
+- [Quake and AmiQuake pipeline to examine](#quake-and-amiquake-pipeline-to-examine)
+- [Bounded prototype options](#bounded-prototype-options)
+- [Required evidence before calling it fixed](#required-evidence-before-calling-it-fixed)
+- [First end-to-end surface fixture result, v0.0.29-dev1](#first-end-to-end-surface-fixture-result-v0029-dev1)
+- [Source study: light attachments and lava are separate contracts](#source-study-light-attachments-and-lava-are-separate-contracts)
+- [NPC illumination remains a separate acceptance gate](#npc-illumination-remains-a-separate-acceptance-gate)
+- [Self-lit materials (emissive), 7 October 2026](#self-lit-materials-emissive-7-october-2026)
+- [NPC static light from brush floors, 7 October 2026](#npc-static-light-from-brush-floors-7-october-2026)
+- [Warm baked faces, glowing lantern glass and the actor light grid, 9 October 2026](#warm-baked-faces-glowing-lantern-glass-and-the-actor-light-grid-9-october-2026)
+
+<!-- contents end -->
+
 ## Why this study is part of v0.0.29
 
 The 4 October 2026 post-release playtest reports three distinct failures or
@@ -219,3 +237,27 @@ figure goes from average brightness 9.5 to 16.4 and now matches the floor
 light where he stands; nothing else in the frame changes. A first version
 that traced the inline models' node trees crashed the emulator, because those
 nodes are not resident; it was replaced before any build left the workspace.
+
+## Warm baked faces, glowing lantern glass and the actor light grid, 9 October 2026
+
+From the prison ship work ([OPENING-BRIGHT-31](bugs/OPENING-BRIGHT-31.md),
+[OPENING-JIUB-LANTERN-32](bugs/OPENING-JIUB-LANTERN-32.md),
+[NPC-LIGHT-COHERENCE-32](bugs/NPC-LIGHT-COHERENCE-32.md)):
+
+- **Per-cell bake profiles.** `tools/interior_lighting.py` keeps the lighting choices of single
+  cells in `CELL_PROFILES` (original falloff, facing term, box zones that scale all light or only
+  the ambient, warm faces, glowing glass). Every interior converter builds its light set through
+  `cell_lighting`; a cell without an entry bakes exactly as before. Only the prison ship has one.
+- **Warm faces.** Baked light has one brightness per sample. A face lit mainly by warm (orange)
+  lamps gets lightstyle 31, which the engine shows exactly like style 0 but builds with the warm
+  colour table (`aw_light_hue`), like torch-lit surfaces. Chosen per surface when the surface
+  cache builds it; `dbg warm light 0` returns the plain table.
+- **Glowing lantern glass.** The original's lantern glass is translucent and shows the candle
+  inside; AmiWind draws it opaque. In cells that opt in, the glass of a lantern with a flame
+  inside is marked self-lit (level 7) and warm, so the lantern reads as lit.
+- **Actor light grid.** Characters used to take the light of the floor below them. The interior
+  converters now also bake the light on a coarse grid (16, 32 or 64 units, at most 8,192 points)
+  stored in the worldspawn; the engine lights each character by the grid at the middle of its
+  model, the view model by the grid at the view. `aw_actor_light_grid 0` restores the floor
+  sample; `aw_light_probe` prints both at the player's position. Exteriors have no grid and keep
+  ambient plus dynamic lights.

@@ -20,3 +20,4 @@ int main(void){
     AW_ControlsMigrate();assert(!strcmp(keybindings['2'],"impulse 2"));
     return 0;
 }
+int AW_PhotoKey(int key){(void)key;return 0;}

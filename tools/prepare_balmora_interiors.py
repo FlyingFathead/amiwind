@@ -18,7 +18,10 @@ from prepare_area import build_room, populate
 from vis_options import add_vis_option, map_threads
 
 
-def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis_mode='fast'):
+def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis_mode='fast', rooms=True):
+    """rooms=False: a quick test build without interiors (--exclude interiors,
+    tools/build_exclusions.py): no room is compiled; the door tables are still
+    written, so Balmora's doors say the area is unavailable."""
     data = resolve_data_files(data_files)
     scene = ensure_external(scene, 'Balmora interiors')
     exterior = lumps((scene / 'id1/maps/balmora.bsp').read_bytes())[0].decode('cp1252')
@@ -26,8 +29,17 @@ def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis
     # Rooms compile side by side: divide the job budget between them.
     threads = map_threads(resolve_jobs(jobs), min(resolve_jobs(jobs), max(1, len(BALMORA_INTERIORS))))
     tasks = [(data, scene, entry, qbsp, vis, light, timings, threads, vis_mode) for entry in BALMORA_INTERIORS]
+    if not rooms:
+        print(f'Quick test build: {len(tasks)} Balmora rooms left out (--exclude interiors).', flush=True)
+        tasks = []
     rooms, reports = {}, []
-    for report, cell in ordered_map(build_room, tasks, min(resolve_jobs(jobs), len(tasks))):
+    # Longest room first: history, else its placed references (BUILD-ORDERED-WINDOW-33).
+    from build_costs import costed_map, room_sizes
+    sizes = room_sizes(data, [(e['map'], e['cell']) for e in BALMORA_INTERIORS])
+    # A quick test build without interiors runs no room (and records no room times).
+    for report, cell in (costed_map('balmora-interiors-rooms', build_room, tasks, [t[2]['map'] for t in tasks],
+                                    max(1, min(resolve_jobs(jobs), len(tasks))), fallback=sizes.get if sizes else None)
+                         if tasks else ()):
         slug = report['map']
         rooms[slug] = cell
         reports.append(report)
@@ -44,6 +56,9 @@ if __name__ == '__main__':
     p.add_argument('--ffmpeg', default='ffmpeg')
     add_jobs(p)
     add_vis_option(p)
+    p.add_argument('--no-rooms', action='store_true',
+                   help='Quick test build (--exclude interiors): do not compile the rooms')
     a = p.parse_args()
-    report = prepare(a.data_files, a.scene, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs, a.vis_mode)
+    import build_profile; build_profile.instrument('balmora-interiors')  # sub-stage timers (docs/BUILD_PROFILE.md)
+    report = prepare(a.data_files, a.scene, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs, a.vis_mode, rooms=not a.no_rooms)
     print(json.dumps({'interiors': len(report['rooms']), 'residents': len(report['cast'])}))

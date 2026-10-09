@@ -28,3 +28,4 @@ int main(void){
  assert(Con_ScrollPage()==13);assert(Con_ScrollMax()>0);
  return 0;
 }
+void AW_PhotoConsoleReminder(void){}

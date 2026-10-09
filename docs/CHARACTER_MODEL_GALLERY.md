@@ -3,6 +3,21 @@
 rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
 coverage and protected model quality remain mandatory.
 
+<!-- contents start -->
+## Contents
+
+- [Controls](#controls)
+- [Memory and return state](#memory-and-return-state)
+- [Dialogue and coverage boundaries](#dialogue-and-coverage-boundaries)
+- [Model identity and inspection ledger](#model-identity-and-inspection-ledger)
+- [Optional per-model geometry allowance](#optional-per-model-geometry-allowance)
+- [Per-model budget exceptions](#per-model-budget-exceptions)
+- [Default NPC gallery: required unless explicitly disabled](#default-npc-gallery-required-unless-explicitly-disabled)
+- [RC3 conversion coverage and authored poses](#rc3-conversion-coverage-and-authored-poses)
+- [rc9 preservation check](#rc9-preservation-check)
+
+<!-- contents end -->
+
 **Outside approval is required for any exception affecting either gallery.**
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
@@ -54,6 +69,11 @@ instead of removing coverage. The current demake does not yet place every origin
 Only the owner's explicit `--no-npc-gallery` permits a **debugging-only** build
 without the inspection gallery. It must never remove required game NPCs, models,
 placements, dialogue or dependencies, and must never become the normal default.
+Such an image carries `id1/npc-gallery-disabled.txt`; the gallery commands
+(`dbg npcgallery`, `dbg gallery`, `dbg modelgallery`, `dbg combattest`,
+`dbg torchtest npc ...`) then print "This build was made without the NPC gallery
+(quick playtest build). To include it, build without --no-npc-gallery." instead
+of failing.
 The future static-asset gallery must follow the same rule once implemented.
 
 ## Controls

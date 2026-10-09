@@ -6,7 +6,7 @@ import struct
 import tempfile
 import unittest
 
-from build_gallery import FORMAT, catalogue_files, sha, stage_required, validate_payload, omit_gallery
+from build_gallery import DISABLED_MARKER, FORMAT, catalogue_files, sha, stage_required, validate_payload, omit_gallery
 
 
 class GalleryBuildTests(unittest.TestCase):
@@ -35,9 +35,13 @@ class GalleryBuildTests(unittest.TestCase):
             root=Path(temp);gallery,receipt,key=self.fixture(root);id1=root/'id1'
             (id1/'gfx').mkdir(parents=True);(id1/'maps').mkdir()
             (id1/'gfx/palette.lmp').write_bytes(bytes(768))
+            (id1/DISABLED_MARKER).write_text('stale marker from an earlier gallery-less image\n')
             report=stage_required(gallery,id1)
             self.assertEqual(report['status'],'passed')
             self.assertEqual(report['records'],1)
+            # Default builds carry no marker, so the engine's gallery commands work as normal.
+            self.assertFalse((id1/DISABLED_MARKER).exists())
+            self.assertNotIn('marker',report)
             self.assertEqual((id1/'gallery/voices.txt').read_text(),'AWGV1\n')
             self.assertEqual((id1/'maps/charplane.bsp').read_bytes(),b'synthetic-map')
             self.assertTrue((id1/'gallery'/('f'+key[1:]+'.mdl')).is_file())
@@ -104,3 +108,9 @@ class GalleryBuildTests(unittest.TestCase):
             self.assertIn('progs/other.mdl',(gallery/'model-budgets.txt').read_text())
             self.assertNotIn('gallery/',(gallery/'model-budgets.txt').read_text())
             self.assertIn('--no-npc-gallery',(gallery/'npc-gallery-disabled.txt').read_text())
+            # The engine's friendly notice keys on this exact file name; build.json records it.
+            self.assertEqual(DISABLED_MARKER,'npc-gallery-disabled.txt')
+            self.assertEqual(report['marker'],'id1/npc-gallery-disabled.txt')
+            engine=(Path(__file__).resolve().parents[1]/'engine/aga/src/aw_gallery.c').read_text(encoding='utf-8')
+            self.assertIn('COM_FOpenFile("%s"' % DISABLED_MARKER,engine)
+            self.assertIn('build without --no-npc-gallery',engine)

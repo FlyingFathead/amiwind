@@ -1010,6 +1010,7 @@ void Host_Shutdown(void)
 // keep Con_Printf from trying to update the screen
     scr_disabled_for_loading = true;
 
+    AW_PhotoConfigRestore ();	// config.cfg keeps the pre-photo-mode settings
     Host_WriteConfiguration ();
 
     AW_ProfileClose();

@@ -2,6 +2,46 @@
 
 Captain's log, 28 September 2026, 05:10–05:24 Helsinki.
 
+<!-- contents start -->
+## Contents
+
+- [Starting point](#starting-point)
+- [UI and fonts](#ui-and-fonts)
+- [Opening sequence and actors](#opening-sequence-and-actors)
+- [Time and lighting](#time-and-lighting)
+- [Script translation and durable state](#script-translation-and-durable-state)
+- [Persistent geometry problems](#persistent-geometry-problems)
+- [Working while the captain sleeps](#working-while-the-captain-sleeps)
+- [Checklist annotation convention](#checklist-annotation-convention)
+- [Further opening requests, 05:26–05:30](#further-opening-requests-05260530)
+- [Character creation and introductory residency, 05:31–05:33](#character-creation-and-introductory-residency-05310533)
+- [Route constraints and ship ambience, 05:35–05:36](#route-constraints-and-ship-ambience-05350536)
+- [Main menu, 05:37](#main-menu-0537)
+- [Reading, menus and town voices, 05:39–05:40](#reading-menus-and-town-voices-05390540)
+- [Generic dialogue reference, 05:41](#generic-dialogue-reference-0541)
+- [Actor collision, attack reactions and ambience, 05:58](#actor-collision-attack-reactions-and-ambience-0558)
+- [Checkpoint pace and camera review, 06:01–06:04](#checkpoint-pace-and-camera-review-06010604)
+- [Frame and dialogue feedback, 06:11–06:13](#frame-and-dialogue-feedback-06110613)
+- [Outer-frame correction and journal name, 06:14–06:16](#outer-frame-correction-and-journal-name-06140616)
+- [v0.0.18-dev2 implementation checkpoint](#v0018-dev2-implementation-checkpoint)
+- [v0.0.18-dev3 checkpoint](#v0018-dev3-checkpoint)
+- [28 September, morning — dev3 playtest follow-up](#28-september-morning--dev3-playtest-follow-up)
+- [28 September, 11:26–11:32 Helsinki — prophecy movie](#28-september-11261132-helsinki--prophecy-movie)
+- [28 September, 11:39–11:41 Helsinki — project logo](#28-september-11391141-helsinki--project-logo)
+- [Dev5 steering, 28 September 2026, Helsinki](#dev5-steering-28-september-2026-helsinki)
+- [Track-change overlay follow-up](#track-change-overlay-follow-up)
+- [Evening — polygonal POI regions if streaming is insufficient](#evening--polygonal-poi-regions-if-streaming-is-insufficient)
+  - [20:36 Helsinki — open-world/topographic-map limitation and elevated mode](#2036-helsinki--open-worldtopographic-map-limitation-and-elevated-mode)
+  - [The fog is our friend](#the-fog-is-our-friend)
+  - [20:38–20:39 Helsinki — entire-world terrain topomesh and inspection scene](#20382039-helsinki--entire-world-terrain-topomesh-and-inspection-scene)
+  - [20:40 Helsinki — a thought for Carmack](#2040-helsinki--a-thought-for-carmack)
+  - [Tables, tables, we need more tables](#tables-tables-we-need-more-tables)
+  - [Post-dev4 recovered note — FREQUENT FLYER BONUS](#post-dev4-recovered-note--frequent-flyer-bonus)
+  - [Something akin to Nanite, but on these old pieces of gear](#something-akin-to-nanite-but-on-these-old-pieces-of-gear)
+- [Later continuation: Balmora, 30 September–1 October](#later-continuation-balmora-30-september1-october)
+
+<!-- contents end -->
+
 Owner's development direction, recorded before the captain gets some sleep.
 This is a request/decision log. Completion belongs in checkpoint validation records.
 

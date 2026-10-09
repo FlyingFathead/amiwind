@@ -1,5 +1,20 @@
 # HEAP-SEYDA-OVERLAP-32: Shipped Seyda Neen maps fail the current heap model (harvest and guard overlap allowance)
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | gate:heap |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | Seyda Neen maps sn019, sn026, sn035 (world map heap gate) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.31, v0.0.32-dev1 (last seen) |
+| Severity | medium: Modelled heap reserve exceeded; allocation ceiling respected, temporary bypass in place. |
+| Family | Seyda Neen recorded stage (`seyda-recorded`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Found by the map loader rework (decoding without staging). v0.0.32 ships sn019, sn026 and
@@ -80,3 +95,23 @@ respected) through the temporary pre-CHIM bypass; harvest stays off in them
 ## Prevention
 
 Heap check on reused maps in every build.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Seyda Neen recorded stage (`seyda-recorded`). Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. See [families](README.md#families).
+
+- [BUILD-SEYDA-CULL-STABLE-32](BUILD-SEYDA-CULL-STABLE-32.md): From-scratch builds stop in Seyda Neen terrain culling (fragment not repeat-stable)
+- [BUILD-SEYDA-PRIVATE-STAGES-31](BUILD-SEYDA-PRIVATE-STAGES-31.md): Repository builder cannot regenerate the shipped Seyda Neen maps
+- [BUILD-SEYDA-RECORDED-REWRITTEN-32](BUILD-SEYDA-RECORDED-REWRITTEN-32.md): Later image passes rewrite the recorded Seyda Neen maps, so the exception is not the recorded stage
+- [BUILD-SEYDA-REGEN-30](BUILD-SEYDA-REGEN-30.md): Public build cannot regenerate the Seyda Neen sub-cells
+- [HARVEST-SEYDA-HEAP-REFUSED-32](HARVEST-SEYDA-HEAP-REFUSED-32.md): Seven Seyda Neen sub-cells lose harvest to the heap check, six of which had it in v0.0.31
+- [SEYDA-REGIONS-PIN-33](SEYDA-REGIONS-PIN-33.md): The recorded Seyda Neen region table differs from what the region layout writes, and its only copy was inside a build volume
+
+Related bugs in other categories:
+
+- [ESTIMATE-HEAP-STALE-32](ESTIMATE-HEAP-STALE-32.md): World estimate heap coefficients were fitted to the old loader model
+- [HARVEST-SEYDA-STALE-32](HARVEST-SEYDA-STALE-32.md): v0.0.31 ships Seyda Neen harvest catalogues made for older map versions
+
+<!-- END GENERATED CATEGORY -->

@@ -15,6 +15,12 @@ suggestions) goes into build-profile.json in the run folder and a short table in
 the build summary. Read and compare runs with:
 
     python tools/build_profile.py report RUN [--compare OLDER_RUN] [--html OUT.html]
+    python tools/build_profile.py compare RUN OLDER_RUN [--fail-on-regression]
+    python tools/build_profile.py optimize RUN [RUN ...]
+
+(the same as `python tools/build.py profile report|compare|optimize ...`).
+Live progress and ETA while a build runs: tools/build_progress.py
+(`python tools/build.py status RUN`).
 
 Profiling never changes a stage's command line, environment variables other
 than AMIWIND_PROFILE_SECTIONS, working directory or outputs. Linux gives all
@@ -47,6 +53,10 @@ REGRESSION_SHARE = 0.10   # compare: slower by more than 10 % ...
 REGRESSION_SECONDS = 5.0  # ... and by more than 5 s is a regression
 HOST_BUSY_SHARE = 0.25   # other work above this share of the machine during a stage: host_busy
 CHART_JS = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js'
+# Stage read trace (tools/build_cache.py installs the hook and checks the lists).
+TRACE_ENV = 'AMIWIND_STAGE_TRACE'
+TRACE_HOOK_FOLDER = 'trace-hook'
+READS_FOLDER = 'reads'
 
 
 def enabled(metadata=None):
@@ -355,11 +365,31 @@ INSTRUMENT = {
     'world-scenery': ('ordered_map',),
     'census': ('ui_palette:reserve', 'read_interior', 'export_refs', 'append_meshes', 'rebuild_world_hull',
                'prepare_doors', 'load_master'),
+    # Stages the v0.0.32 from-scratch profile showed idle against the workers they held.
+    'bsp': ('append_meshes', 'rebuild_world_hull', 'ordered_map'),
+    'interior': ('export_refs', 'append_meshes', 'rebuild_world_hull', 'read_interior',
+                 'collision_index:index_model_collision', 'prepare_doors:prepare'),
+    'area': ('populate', 'load_master', 'prepare_doors', 'ordered_map'),
+    'balmora': ('import_town:collect', 'import_town:residents', 'import_town:rebuild_world_hull',
+                'import_town:append_meshes', 'import_town:bound_visuals', 'import_town:convert_interiors',
+                'import_town:publish', 'import_town:ordered_map', 'town_interiors:convert',
+                'town_interiors:write_room_banks', 'prepare_area:populate'),
+    'town': ('collect', 'residents', 'rebuild_world_hull', 'append_meshes', 'bound_visuals', 'convert_interiors',
+             'publish', 'ordered_map', 'town_interiors:convert', 'town_interiors:write_room_banks',
+             'prepare_area:populate'),
+    'balmora-interiors': ('populate', 'ordered_map', 'prepare_area:load_master', 'prepare_area:prepare_doors',
+                          'prepare_area:ordered_map'),
+    'actor-contact': ('convert_builder_scene', 'annotate', 'bake_ground', 'check_recorded', 'require',
+                      'frozen_maps'),
+    'media': ('discover', 'lookups', 'prepare_video:prepare_video'),
 }
 # The stage script that owns each table's plain names (for the consistency test).
 INSTRUMENT_SCRIPTS = {'build_aga image': 'build_aga', 'build_aga census': 'build_aga',
                       'world-terrain': 'prepare_world_regions', 'world-scenery': 'prepare_world_scenery',
-                      'census': 'prepare_census'}
+                      'census': 'prepare_census', 'bsp': 'prepare_mesh_bsp', 'interior': 'prepare_interior',
+                      'area': 'prepare_area', 'balmora': 'prepare_balmora', 'town': 'import_town',
+                      'balmora-interiors': 'prepare_balmora_interiors', 'actor-contact': 'check_scene_actors',
+                      'media': 'prepare_media_assets'}
 MAP_FUNCTIONS = ('ordered_map', 'completed_map')
 
 
@@ -451,12 +481,32 @@ def read_sections(path):
 # --------------------------------------------------------------------------
 # Stage wrapper (runs as `build_profile.py _stage STATS SECTIONS -- command...`)
 
+def reads_path(stats_path):
+    """The read list of the stage whose wrapper statistics go to STATS_PATH."""
+    stats_path = Path(stats_path)
+    return stats_path.parent.parent / READS_FOLDER / (stats_path.stem + '.txt')
+
+
+def trace_environment(stats_path, environment):
+    """Environment additions for a traced stage: the hook first on PYTHONPATH, the list to write."""
+    hook = Path(stats_path).parent.parent / TRACE_HOOK_FOLDER
+    if environment.get(TRACE_ENV, '') == 'off' or not (hook / 'sitecustomize.py').is_file():
+        return {}
+    existing = environment.get('PYTHONPATH', '')
+    return {TRACE_ENV: str(reads_path(stats_path)),
+            'PYTHONPATH': str(hook) + (os.pathsep + existing if existing else '')}
+
+
 def stage_main(argv):
     if len(argv) < 4 or argv[2] != '--':
         print('usage: build_profile.py _stage STATS SECTIONS -- command...', file=sys.stderr)
         return 2
     stats_path, sections_path, command = Path(argv[0]), argv[1], argv[3:]
     environment = dict(os.environ, **{SECTIONS_ENV: sections_path})
+    try:  # The stage's read list, checked against its fingerprint (tools/build_cache.py).
+        environment.update(trace_environment(stats_path, environment))
+    except Exception as exc:  # noqa: BLE001 - tracing must never stop a stage
+        print(f'[warning] Stage read trace not started: {exc}', file=sys.stderr, flush=True)
     start = time.monotonic()
     before = _rusage_children()
     io_before, cgroup_before = read_proc_io(), read_cgroup_io()
@@ -640,8 +690,8 @@ class Session:
         self.order = [name for name, _ in steps]
         if dependencies is None:
             try:
-                from build_parallel import stage_dependencies
-                dependencies = stage_dependencies(steps)
+                from build_parallel import plan_skipped, stage_dependencies
+                dependencies = stage_dependencies(steps, plan_skipped(metadata))
             except (ImportError, ValueError):
                 dependencies = {name: tuple(self.order[i - 1:i]) for i, name in enumerate(self.order)}
         self.dependencies = {name: list(deps) for name, deps in dependencies.items()}
@@ -663,6 +713,14 @@ class Session:
         except Exception as exc:  # noqa: BLE001 - output manifests are optional evidence
             print(f'[warning] Build output manifests disabled: {exc}', flush=True)
             self.cache = None
+        # Live progress and ETA (build-progress.json; tools/build_progress.py).
+        try:
+            import build_progress
+            self.progress = build_progress.start(self.run, self.order, self.dependencies, metadata,
+                                                 self.sampler, self.start)
+        except Exception as exc:  # noqa: BLE001 - progress must never fail a build
+            print(f'[warning] Live build progress disabled: {exc}', flush=True)
+            self.progress = None
         self.closed = False
 
     def _paths(self, number, name):
@@ -674,6 +732,8 @@ class Session:
         stats, sections = self._paths(number, name)
         self.stages[name] = {'name': name, 'number': number, 'jobs': jobs, 'start': round(time.monotonic() - self.start, 3),
                              'stats': stats, 'sections': sections, 'status': 'running'}
+        if self.progress is not None:
+            self.progress.stage_started(name, number, jobs)
         if self.cache is not None:
             try:
                 self.cache.before(name, command)
@@ -693,6 +753,12 @@ class Session:
             return
         stage['end'] = round(time.monotonic() - self.start, 3)
         stage['status'] = entry.get('status', 'unknown')
+        if entry.get('worker_changes'):
+            # Scheduler times count from its own start; shift them onto this session's clock.
+            offset = stage['start'] - entry['started_seconds'] if entry.get('started_seconds') is not None else 0.0
+            stage['worker_changes'] = [[round(at + offset, 3), int(value)] for at, value in entry['worker_changes']]
+        if self.progress is not None:
+            self.progress.stage_finished(name, stage['status'])
         if self.sampler:
             self.sampler.remove(name)
         try:
@@ -701,6 +767,10 @@ class Session:
             stats = {}
         stage['measured'] = stats
         summary = {'jobs': stage['jobs']}
+        low, high, mean = allowance_summary({'start': stage['start'], 'end': stage['end'], 'jobs': stage['jobs'],
+                                             'worker_changes': stage.get('worker_changes')})
+        if (low, high) != (stage['jobs'], stage['jobs']):
+            summary.update(jobs_min=low, jobs_max=high, jobs_mean=mean)
         if 'cpu' in stats:
             wall = stats.get('wall') or (stage['end'] - stage['start'])
             summary.update(cpu_seconds=stats['cpu'], cores_avg=round(stats['cpu'] / wall, 2) if wall else None,
@@ -710,7 +780,7 @@ class Session:
         if self.cache is not None and entry.get('status') == 'passed':
             began = time.monotonic()
             try:
-                manifest = self.cache.after(name, entry)
+                manifest = self.cache.after(name, entry, reads=reads_path(stage['stats']) if self.wrap else None)
                 if manifest:
                     summary['outputs'] = {'files': manifest['counts']['files'], 'bytes': manifest['counts']['bytes']}
             except Exception as exc:  # noqa: BLE001
@@ -730,6 +800,8 @@ class Session:
         if self.closed:
             return
         self.closed = True
+        if self.progress is not None:
+            self.progress.close(receipt.get('status'))
         if self.sampler:
             self.sampler.stop()
         try:
@@ -761,6 +833,9 @@ class Session:
             row = {'name': name, 'number': stage['number'], 'status': entry.get('status', stage['status']),
                    'jobs': stage['jobs'], 'dependencies': self.dependencies.get(name, []),
                    'start': stage['start'], 'end': end, 'wall': round(end - stage['start'], 3)}
+            if stage.get('worker_changes'):
+                row['worker_changes'] = stage['worker_changes']
+            row['jobs_min'], row['jobs_max'], row['jobs_mean'] = allowance_summary(row)
             for key in ('cpu_user', 'cpu_system', 'cpu', 'peak_process_rss_bytes', 'read_bytes', 'write_bytes',
                         'rchar', 'wchar', 'io_source', 'wrapper_cpu'):
                 if key in measured:
@@ -904,33 +979,83 @@ def host_load(stage, timeline, share=HOST_BUSY_SHARE):
             'other_percent': round(100 * other, 1), 'samples': len(busy), 'host_busy': other > share}
 
 
+def allowance_steps(stage):
+    """[(time, workers)] a stage held: its start value, then every rebalance of the parallel
+    scheduler (worker_changes, profile time). BUILD-PROFILE-JOBS-START-ONLY-33: the start value
+    alone is often 1 for a stage that held 12 workers a moment later."""
+    start = stage.get('start') or 0.0
+    steps = [(start, max(1, int(stage.get('jobs') or 1)))]
+    for at, value in sorted(stage.get('worker_changes') or []):
+        steps.append((max(start, at), max(1, int(value))))
+    return steps
+
+
+def allowance_at(steps, moment):
+    value = steps[0][1]
+    for at, workers in steps:
+        if at > moment:
+            break
+        value = workers
+    return value
+
+
+def allowance_summary(stage):
+    """(min, max, time-weighted mean) of the workers a stage held from its start to its end."""
+    steps = allowance_steps(stage)
+    start = stage.get('start') or 0.0
+    end = stage.get('end', start)
+    values = [workers for at, workers in steps if at <= end] or [steps[0][1]]
+    if end <= start:
+        return min(values), max(values), float(steps[-1][1])
+    total = 0.0
+    for index, (at, workers) in enumerate(steps):
+        until = steps[index + 1][0] if index + 1 < len(steps) else end
+        total += workers * max(0.0, min(until, end) - min(at, end))
+    return min(values), max(values), round(total / (end - start), 2)
+
+
+def jobs_text(stage):
+    """The jobs column: the start value, or the range the scheduler moved it through."""
+    low, high = stage.get('jobs_min'), stage.get('jobs_max')
+    if low is None or high is None or low == high:
+        return str(stage.get('jobs', '-'))
+    return f'{low}-{high}'
+
+
 def idle_periods(stage, timeline, share=IDLE_SHARE, minimum=IDLE_SECONDS):
-    """Longest run of samples where STAGE used less than SHARE of its job budget."""
-    jobs = max(1, int(stage.get('jobs') or 1))
-    limit = share * jobs
+    """Longest run of samples where STAGE used less than SHARE of the workers it held at that moment.
+
+    The workers come from its start value and every rebalance (allowance_steps); 'jobs' in the
+    result is their mean over the low samples, 'jobs_start' the start value."""
+    steps = allowance_steps(stage)
     if timeline and stage['name'] in (timeline.get('stages') or {}):
         times = timeline['t']
         interval = timeline.get('interval') or DEFAULT_INTERVAL
         longest = current = 0.0
-        low_cores = []
+        low_cores, low_jobs = [], []
         previous_index = None
         for index, cores in timeline['stages'][stage['name']]:
             gap = interval if previous_index is None else (times[index] - times[previous_index] if index < len(times) else interval)
             previous_index = index
-            if cores < limit:
+            jobs = allowance_at(steps, times[index]) if index < len(times) else steps[-1][1]
+            if cores < share * jobs:
                 current += gap
                 low_cores.append(cores)
+                low_jobs.append(jobs)
                 longest = max(longest, current)
             else:
                 current = 0.0
         if longest > minimum:
-            return {'seconds': round(longest, 1), 'jobs': jobs,
+            return {'seconds': round(longest, 1), 'jobs': max(1, round(sum(low_jobs) / len(low_jobs))),
+                    'jobs_start': steps[0][1],
                     'cores_while_idle': round(sum(low_cores) / len(low_cores), 2) if low_cores else None,
                     'source': 'timeline'}
         return None
     cpu, wall = stage.get('cpu'), stage.get('wall', 0)
-    if cpu is not None and wall > minimum and cpu / wall < limit:
-        return {'seconds': round(wall, 1), 'jobs': jobs, 'cores_while_idle': round(cpu / wall, 2), 'source': 'average'}
+    mean = stage.get('jobs_mean') or allowance_summary(stage)[2]
+    if cpu is not None and wall > minimum and cpu / wall < share * mean:
+        return {'seconds': round(wall, 1), 'jobs': max(1, round(mean)), 'jobs_start': steps[0][1],
+                'cores_while_idle': round(cpu / wall, 2), 'source': 'average'}
     return None
 
 
@@ -947,7 +1072,8 @@ def suggestions(profile, critical, warnings):
     stages = {row['name']: row for row in profile['stages']}
     for name in critical['path']:
         row = stages[name]
-        if row['wall'] >= 30 and row.get('jobs', 1) == 1 and row.get('cores_avg', 0) and row['cores_avg'] < 1.5:
+        held = row.get('jobs_max') or row.get('jobs', 1)
+        if row['wall'] >= 30 and held == 1 and row.get('cores_avg', 0) and row['cores_avg'] < 1.5:
             lines.append(f"{name}: {row['wall']:.0f}s on one core on the critical path; it takes no --jobs budget. "
                          'A parallel inner loop would shorten the build directly.')
     budget = profile.get('budget') or 1
@@ -987,6 +1113,7 @@ def analyse(profile, top=10):
             warnings.append({'stage': row['name'], **period,
                              'sections': [{'name': s['name'], 'wall': s['wall'], 'cores_avg': s.get('cores_avg')} for s in sections]})
     slowest = [{'name': row['name'], 'wall': row['wall'], 'cores_avg': row.get('cores_avg'), 'jobs': row.get('jobs'),
+                'jobs_max': row.get('jobs_max'), 'jobs_mean': row.get('jobs_mean'),
                 'critical': row['name'] in critical['path']}
                for row in sorted(stages, key=lambda r: -r['wall'])[:top]]
     sections = []
@@ -1055,6 +1182,161 @@ def compare(new, old, share=REGRESSION_SHARE, seconds=REGRESSION_SECONDS):
 
 
 # --------------------------------------------------------------------------
+# Optimizer: where the cores went idle, with concrete suggestions
+
+TAIL_CORES = 1.5        # a stage that ran on 2+ cores and then on fewer than this ...
+TAIL_SECONDS = 30.0     # ... for longer than this ...
+TAIL_SHARE = 0.10       # ... and longer than this share of its wall time has a single-core tail
+SERIAL_SECONDS = 60.0   # a one-core stage on the critical path longer than this is listed
+
+
+def single_core_tail(stage, timeline, cores=TAIL_CORES, minimum=TAIL_SECONDS, share=TAIL_SHARE):
+    """The stretch at the end of a parallel stage that ran on about one core, or None.
+
+    Typical cause: the largest item of a worker pool finishes last while the
+    other workers have nothing left. Needs the profiler's CPU timeline."""
+    rows = ((timeline or {}).get('stages') or {}).get(stage['name'])
+    if not rows:
+        return None
+    times = timeline.get('t') or []
+    interval = timeline.get('interval') or DEFAULT_INTERVAL
+    points = [(times[index], value) for index, value in rows if index < len(times)]
+    seconds, first = 0.0, len(points)
+    for index in range(len(points) - 1, -1, -1):
+        if points[index][1] >= cores:
+            break
+        seconds += points[index][0] - points[index - 1][0] if index > 0 else interval
+        first = index
+    before = [value for _, value in points[:first]]
+    if not before or max(before) < 2 or seconds <= minimum or seconds <= share * (stage.get('wall') or 0):
+        return None
+    tail = [value for _, value in points[first:]]
+    return {'seconds': round(seconds, 1), 'cores': round(sum(tail) / len(tail), 2),
+            'peak_cores_before': round(max(before), 2)}
+
+
+def _suggestion(item):
+    stage, seconds = item['stage'], _seconds(item.get('seconds'))
+    sections = item.get('sections') or []
+    where = (' Slowest sections: ' + ', '.join(f"{s['name']} {_seconds(s['wall'])} ({s.get('cores_avg')} cores)"
+                                                for s in sections) + '.') if sections else ''
+    if item['kind'] == 'idle':
+        text = (f"{stage} used {item.get('cores')} of {item.get('jobs')} cores for {seconds}. Find its serial loop or "
+                'the waits (timed sections show where), run independent items on the shared worker pool '
+                '(tools/build_parallel.py ordered_map or completed_map), or give the idle workers to other stages; '
+                f'prove byte-identical outputs against --jobs 1.{where}')
+    elif item['kind'] == 'tail':
+        text = (f"{stage} ran on up to {item.get('peak_cores_before')} cores, then spent its last {seconds} on "
+                f"{item.get('cores')} core(s): one large item finished last. Submit the largest items first "
+                '(completed_map over a size-sorted list), split the largest item, or let the next stage start on '
+                f'the finished part.{where}')
+    elif item['kind'] == 'serial-critical':
+        held = item.get('jobs_max') or 1
+        budget = ('takes no --jobs budget' if held <= 1 else
+                  f'held up to {held} workers without using them')
+        text = (f"{stage} runs {seconds} on one core on the critical path and {budget}; a parallel "
+                f'inner loop shortens the whole build directly.{where}')
+    else:
+        text = (f"The build waited {seconds} for job slots (wall {_seconds(item.get('wall'))} against a longest "
+                f"dependency chain of {_seconds(item.get('ideal'))}): give stages off the critical path fewer "
+                "workers; the report lists each stage's slack.")
+    if item.get('critical') and item['kind'] in ('idle', 'tail'):
+        text += ' It is on the critical path, so this lengthens the build.'
+    if item.get('host_busy'):
+        text += ' Measured while other work loaded the machine: re-measure on a quiet host before acting.'
+    return text
+
+
+def optimize(profile, share=IDLE_SHARE, minimum=IDLE_SECONDS):
+    """Optimizer items of one profile: idle-core stages, single-core tails, serial stages on the
+    critical path and waiting for job slots. potential_seconds is an upper bound of the wall time
+    the item could save (the low-core stretch run at the stage's parallel width)."""
+    analysis = profile.get('analysis') or analyse(profile)
+    critical = analysis['critical_path']
+    on_path = set(critical['path'])
+    timeline = profile.get('timeline')
+    run = Path(str(profile.get('run') or '')).name
+    interval = (timeline or {}).get('interval') or DEFAULT_INTERVAL
+    items = []
+    for row in profile.get('stages', []):
+        if row.get('reused'):
+            continue
+        common = {'run': run, 'stage': row['name'], 'wall': row.get('wall'), 'jobs': row.get('jobs'),
+                  'jobs_max': row.get('jobs_max') or row.get('jobs'), 'jobs_start': row.get('jobs'),
+                  'critical': row['name'] in on_path, 'host_busy': bool((row.get('host') or {}).get('host_busy')),
+                  'sections': [{'name': s['name'], 'wall': s['wall'], 'cores_avg': s.get('cores_avg')}
+                               for s in sorted(row.get('sections', []), key=lambda s: -s['wall'])
+                               if not s.get('missing')][:3]}
+        idle = idle_periods(row, timeline, share, minimum)
+        tail = single_core_tail(row, timeline)
+        if idle and not (tail and tail['seconds'] >= idle['seconds'] - 2 * interval):
+            cores = idle.get('cores_while_idle') or 0.0
+            items.append(dict(common, kind='idle', seconds=idle['seconds'], cores=cores, jobs=idle['jobs'],
+                              jobs_start=idle['jobs_start'], method=idle['source'],
+                              potential_seconds=round(idle['seconds'] * max(0.0, 1 - cores / idle['jobs']), 1)))
+        if tail:
+            items.append(dict(common, kind='tail', seconds=tail['seconds'], cores=tail['cores'],
+                              peak_cores_before=tail['peak_cores_before'],
+                              potential_seconds=round(tail['seconds'] * (1 - 1 / tail['peak_cores_before']), 1)))
+        if (not idle and not tail and row['name'] in on_path and (row.get('wall') or 0) >= SERIAL_SECONDS
+                and row.get('cores_avg') is not None and row['cores_avg'] < TAIL_CORES):
+            items.append(dict(common, kind='serial-critical', seconds=row['wall'], cores=row['cores_avg'],
+                              potential_seconds=None))
+    wall, ideal = profile.get('wall_seconds') or 0, critical['ideal_seconds']
+    if wall and ideal and wall > 1.25 * ideal:
+        items.append({'run': run, 'stage': '(whole build)', 'kind': 'slot-wait', 'seconds': round(wall - ideal, 1),
+                      'wall': wall, 'ideal': ideal, 'critical': True, 'host_busy': bool(analysis.get('host_busy')),
+                      'potential_seconds': round(wall - ideal, 1)})
+    for item in items:
+        item['suggestion'] = _suggestion(item)
+    return items
+
+
+def optimize_runs(profiles, share=IDLE_SHARE, minimum=IDLE_SECONDS):
+    """Items of several profiles grouped by (stage, kind): how often, worst case, best saving."""
+    groups = {}
+    for profile in profiles:
+        for item in optimize(profile, share, minimum):
+            group = groups.setdefault((item['stage'], item['kind']), {'stage': item['stage'], 'kind': item['kind'],
+                                                                    'runs': [], 'items': []})
+            group['runs'].append(item['run'])
+            group['items'].append(item)
+    rows = []
+    for group in groups.values():
+        worst = max(group['items'], key=lambda item: item.get('seconds') or 0)
+        potentials = [item['potential_seconds'] for item in group['items'] if item.get('potential_seconds') is not None]
+        rows.append({'stage': group['stage'], 'kind': group['kind'], 'runs': group['runs'], 'of_runs': len(profiles),
+                     'worst_seconds': worst.get('seconds'), 'cores': worst.get('cores'), 'jobs': worst.get('jobs'),
+                     'critical': any(item.get('critical') for item in group['items']),
+                     'host_busy': any(item.get('host_busy') for item in group['items']),
+                     'potential_seconds': max(potentials) if potentials else None,
+                     'suggestion': worst['suggestion']})
+    rows.sort(key=lambda row: (not row['critical'], -(row['potential_seconds'] or row['worst_seconds'] or 0)))
+    return rows
+
+
+def optimize_lines(rows, runs):
+    lines = [f"Optimizer: {len(runs)} run(s): " + ', '.join(runs),
+             f"Items: a stage under {int(100 * IDLE_SHARE)} % of its jobs for > {IDLE_SECONDS:.0f} s (idle), a parallel "
+             f"stage ending on about one core for > {TAIL_SECONDS:.0f} s (tail), a one-core stage on the critical path "
+             '(serial-critical), waiting for job slots (slot-wait). Critical-path items first.']
+    if not rows:
+        return lines + ['', 'Nothing to optimize: no idle cores, tails or slot waits found.']
+    lines += ['', f"{'#':>3} {'stage':<24}{'kind':<16}{'runs':>6}{'worst':>9}{'cores/jobs':>12}{'saves up to':>13}  note"]
+    for number, row in enumerate(rows, 1):
+        used = f"{row['cores']}/{row['jobs']}" if row.get('cores') is not None and row.get('jobs') else (
+            str(row['cores']) if row.get('cores') is not None else '-')
+        note = ', '.join(text for flag, text in ((row['critical'], 'critical'), (row['host_busy'], 'host busy')) if flag)
+        runs_text = f"{len(row['runs'])}/{row['of_runs']}"
+        lines.append(f"{number:>3} {row['stage'][:23]:<24}{row['kind']:<16}{runs_text:>6}"
+                     f"{_seconds(row['worst_seconds']):>9}{used:>12}{_seconds(row['potential_seconds']):>13}  {note}")
+    lines.append('')
+    for number, row in enumerate(rows, 1):
+        lines.append(f"{number:>3}. {row['suggestion']}")
+    return lines
+
+
+# --------------------------------------------------------------------------
 # Reports
 
 def load(path):
@@ -1108,10 +1390,11 @@ def summary_lines(profile, top=5):
         reused = ' reused' if row.get('reused') else ''
         lines.append(f"  {mark}{row['name']:<25}{_seconds(row['wall']):>9}"
                      f"{(str(row.get('cores_avg')) if row.get('cores_avg') is not None else '-'):>7}"
-                     f"{row.get('jobs', '-'):>6}{_bytes(rss):>11}{reused}")
+                     f"{jobs_text(row):>6}{_bytes(rss):>11}{reused}")
     for warning in analysis['idle_warnings']:
         lines.append(f"  [idle] {warning['stage']}: {warning['cores_while_idle']} of {warning['jobs']} cores "
-                     f"for {_seconds(warning['seconds'])}")
+                     f"for {_seconds(warning['seconds'])}"
+                     + (f" (started with {warning['jobs_start']})" if warning.get('jobs_start') not in (None, warning['jobs']) else ''))
     for warning in analysis.get('host_busy', []):
         lines.append(f"  [host busy] {warning['stage']}: other work used {warning['other_percent']} % of the "
                      f"{warning['cpus']} CPUs (machine {warning['busy_percent']} % busy); its timings are not comparable "
@@ -1156,7 +1439,7 @@ def report_lines(profile, comparison=None, top=10):
                      f"({100 * (overhead.get('sampler_share_of_one_core') or 0):.3f} % of one core), wrappers "
                      f"{overhead.get('wrapper_cpu_seconds', 0):.3f}s, output manifests {overhead.get('manifest_seconds', 0):.1f}s")
     lines.append('')
-    header = f"{'#':>3} {'stage':<24}{'start':>8}{'wall':>9}{'cpu':>9}{'cores':>7}{'jobs':>5}{'peak RSS':>11}{'read':>11}{'written':>11}  note"
+    header = f"{'#':>3} {'stage':<24}{'start':>8}{'wall':>9}{'cpu':>9}{'cores':>7}{'jobs':>6}{'peak RSS':>11}{'read':>11}{'written':>11}  note"
     lines.append(header)
     slack = critical.get('slack', {})
     for row in profile['stages']:
@@ -1178,7 +1461,7 @@ def report_lines(profile, comparison=None, top=10):
         rss = row.get('peak_tree_rss_bytes') or row.get('peak_process_rss_bytes')
         lines.append(f"{row['number']:>3} {row['name']:<24}{_seconds(row['start']):>8}{_seconds(row['wall']):>9}"
                      f"{_seconds(row.get('cpu')):>9}{(str(row.get('cores_avg')) if row.get('cores_avg') is not None else '-'):>7}"
-                     f"{row.get('jobs', '-'):>5}{_bytes(rss):>11}{_bytes(row.get('read_bytes')):>11}"
+                     f"{jobs_text(row):>6}{_bytes(rss):>11}{_bytes(row.get('read_bytes')):>11}"
                      f"{_bytes(row.get('write_bytes')):>11}  {', '.join(note)}")
     lines += ['', f"Critical path {_seconds(critical['ideal_seconds'])} (unlimited cores): " + ' > '.join(critical['path']),
               'Waited on: ' + ' > '.join(critical['actual_path'])]
@@ -1203,26 +1486,32 @@ def report_lines(profile, comparison=None, top=10):
     if analysis['suggestions']:
         lines += ['', 'Suggestions:'] + [f'  - {text}' for text in analysis['suggestions']]
     if comparison:
-        lines += ['', f"Compared with {comparison['old_run']}: wall {comparison['wall_delta']:+.1f}s",
-                  f"{'stage':<26}{'old':>9}{'new':>9}{'delta':>10}{'%':>8}  status"]
-        for row in comparison['stages']:
-            delta = f"{row['delta']:+.1f}s" if row.get('delta') is not None else '-'
-            percent = f"{row['percent']:+.1f}" if row.get('percent') is not None else '-'
-            status = row['status'].upper() if row['status'] == 'slower' else row['status']
-            if row.get('same_fingerprint') and row['status'] not in ('reused',):
-                status += ' (same fingerprint: reusable)'
-            if row.get('host_new') == 'busy' or row.get('host_old') == 'busy':
-                status += f" [host {row.get('host_old')} -> {row.get('host_new')}]"
-            lines.append(f"{row['name']:<26}{_seconds(row.get('old')):>9}{_seconds(row.get('new')):>9}{delta:>10}{percent:>8}  {status}")
-        if comparison['regressions']:
-            lines.append('REGRESSION: slower stages: ' + ', '.join(comparison['regressions']))
-        busy = comparison.get('busy_host') or {}
-        if busy.get('new') or busy.get('old'):
-            lines.append('WARNING: busy host in ' + ' and '.join(n for n in ('new', 'old') if busy.get(n))
-                         + ' run; wall times include other work on the machine')
-        if comparison.get('host_mismatch'):
-            lines.append('WARNING: busy host in one run and quiet in the other, not comparable: '
-                         + ', '.join(comparison['host_mismatch']))
+        lines += [''] + compare_lines(comparison)
+    return lines
+
+
+def compare_lines(comparison):
+    """The comparison table of `report --compare` and `compare`."""
+    lines = [f"Compared with {comparison['old_run']}: wall {comparison['wall_delta']:+.1f}s",
+             f"{'stage':<26}{'old':>9}{'new':>9}{'delta':>10}{'%':>8}  status"]
+    for row in comparison['stages']:
+        delta = f"{row['delta']:+.1f}s" if row.get('delta') is not None else '-'
+        percent = f"{row['percent']:+.1f}" if row.get('percent') is not None else '-'
+        status = row['status'].upper() if row['status'] == 'slower' else row['status']
+        if row.get('same_fingerprint') and row['status'] not in ('reused',):
+            status += ' (same fingerprint: reusable)'
+        if row.get('host_new') == 'busy' or row.get('host_old') == 'busy':
+            status += f" [host {row.get('host_old')} -> {row.get('host_new')}]"
+        lines.append(f"{row['name']:<26}{_seconds(row.get('old')):>9}{_seconds(row.get('new')):>9}{delta:>10}{percent:>8}  {status}")
+    if comparison['regressions']:
+        lines.append('REGRESSION: slower stages: ' + ', '.join(comparison['regressions']))
+    busy = comparison.get('busy_host') or {}
+    if busy.get('new') or busy.get('old'):
+        lines.append('WARNING: busy host in ' + ' and '.join(n for n in ('new', 'old') if busy.get(n))
+                     + ' run; wall times include other work on the machine')
+    if comparison.get('host_mismatch'):
+        lines.append('WARNING: busy host in one run and quiet in the other, not comparable: '
+                     + ', '.join(comparison['host_mismatch']))
     return lines
 
 
@@ -1235,14 +1524,15 @@ def html_page(profile, comparison=None):
              'bars': [[row['start'], row['end']] for row in stages],
              'colors': ['#d03b3b' if row['name'] in critical else '#1baf7a' if row.get('reused') else '#2a78d6'
                         for row in stages],
-             'cores': [row.get('cores_avg') for row in stages], 'jobs': [row.get('jobs') for row in stages]}
+             'cores': [row.get('cores_avg') for row in stages],
+             'jobs': [row.get('jobs_max') or row.get('jobs') for row in stages]}
     timeline = profile.get('timeline') or {}
     data = {'gantt': gantt, 't': timeline.get('t', []), 'cores': timeline.get('cores', []),
             'cgroup': timeline.get('cgroup_cores'), 'budget': profile.get('budget'),
             'memory': timeline.get('memory_bytes')}
     rows = '\n'.join('<tr><td>' + '</td><td>'.join(html_escape.escape(str(cell)) for cell in (
         row['number'], row['name'], _seconds(row['start']), _seconds(row['wall']), _seconds(row.get('cpu')),
-        row.get('cores_avg', '-'), row.get('jobs', '-'),
+        row.get('cores_avg', '-'), jobs_text(row),
         _bytes(row.get('peak_tree_rss_bytes') or row.get('peak_process_rss_bytes')),
         ('critical ' if row['name'] in critical else '') + ('reused' if row.get('reused') else ''))) + '</td></tr>'
         for row in stages)
@@ -1305,11 +1595,11 @@ if (window.Chart) {{
 """
 
 
-def main(argv=None):
+def main(argv=None, prog=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ['_stage']:
         return stage_main(argv[1:])
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(prog=prog, description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='action', required=True)
     report = sub.add_parser('report', help='Print the profile table of a build run (or a sections .jsonl file)')
     report.add_argument('run', type=Path, help='Build run folder, its build-profile.json, or a sections .jsonl file')
@@ -1318,8 +1608,33 @@ def main(argv=None):
     report.add_argument('--top', type=int, default=10)
     report.add_argument('--fail-on-regression', action='store_true', help='Exit 3 when --compare finds a slower stage')
     report.add_argument('--json', action='store_true', help='Print the analysis (and comparison) as JSON')
+    versus = sub.add_parser('compare', help='Per-stage wall time of a run against an older run; slower stages are flagged')
+    versus.add_argument('run', type=Path, help='Newer build run folder or its build-profile.json')
+    versus.add_argument('older', type=Path, help='Older build run folder or its build-profile.json')
+    versus.add_argument('--fail-on-regression', action='store_true', help='Exit 3 when a stage is slower')
+    versus.add_argument('--json', action='store_true', help='Print the comparison as JSON')
+    tune = sub.add_parser('optimize', help='Idle-core stages, single-core tails, serial critical stages and slot '
+                                           'waits of one or more runs, with suggestions')
+    tune.add_argument('runs', type=Path, nargs='+', metavar='run', help='Build run folders or build-profile.json files')
+    tune.add_argument('--share', type=float, default=IDLE_SHARE, help='Idle below this share of the jobs (default 0.5)')
+    tune.add_argument('--seconds', type=float, default=IDLE_SECONDS, help='... for longer than this (default 60)')
+    tune.add_argument('--json', action='store_true', help='Print the items as JSON')
     args = parser.parse_args(argv)
     try:
+        if args.action == 'compare':
+            comparison = compare(load(args.run), load(args.older))
+            comparison['old_run'] = str(args.older)
+            print(json.dumps(comparison, indent=2) if args.json else '\n'.join(compare_lines(comparison)))
+            return 3 if args.fail_on_regression and comparison['regressions'] else 0
+        if args.action == 'optimize':
+            profiles = [load(path) for path in args.runs]
+            rows = optimize_runs(profiles, args.share, args.seconds)
+            names = [Path(str(profile.get('run') or path)).name for profile, path in zip(profiles, args.runs)]
+            if args.json:
+                print(json.dumps({'runs': names, 'items': rows}, indent=2))
+            else:
+                print('\n'.join(optimize_lines(rows, names)))
+            return 0
         if args.run.suffix == '.jsonl':
             rows = read_sections(args.run)
             print(f"{'section':<48}{'calls':>6}{'wall':>9}{'cores':>7}")

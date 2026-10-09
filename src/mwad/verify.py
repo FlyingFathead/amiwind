@@ -51,5 +51,3 @@ def verify(area):
               "materials_checked": checked_materials, "bytes_checked": position, "status": "passed"}
     print(json.dumps(result, indent=2))
     return result
-
-

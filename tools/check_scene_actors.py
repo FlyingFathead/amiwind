@@ -68,6 +68,7 @@ def main():
     add_vis_option(parser)
     add_jobs(parser)
     args = parser.parse_args()
+    import build_profile; build_profile.instrument('actor-contact')  # sub-stage timers (docs/BUILD_PROFILE.md)
     try: check(args.scene, args.data_files, args.out, args.allow_known_actor_ground_findings,
                ericw_bin=args.ericw_bin, canonical_land_source=args.canonical_land_source, vis_mode=args.vis_mode,
                jobs=args.jobs, seyda_recorded=args.seyda_recorded)

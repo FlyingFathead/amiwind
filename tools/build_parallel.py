@@ -12,12 +12,19 @@ import time
 
 from build_jobs import resolve_jobs
 import build_profile
+from build_scratch import stage_environment
 
 # One numerical-library thread per worker prevents N workers each starting N
 # BLAS/OpenMP threads. Native make and map tools use their explicit job budget.
 THREAD_LIMITS = {name: '1' for name in (
     'OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS',
     'BLIS_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'NUMEXPR_NUM_THREADS')}
+
+
+# Scheduler allowance: a running stage's Python pools follow the share the
+# scheduler writes to this file (BUILD-SCHEDULER-JOBSHARE-32).
+ALLOWANCE_ENV = 'AMIWIND_BUILD_JOBS_FILE'
+BUDGET_ENV = 'AMIWIND_BUILD_BUDGET'
 
 
 @contextmanager
@@ -34,12 +41,22 @@ def worker_environment():
                 os.environ[key] = value
 
 
+def _pool_worker_init():
+    """A pool worker is one of its stage's workers, not the stage: pools a worker
+    opens must not follow the stage's allowance (BUILD-NESTED-POOL-ALLOWANCE-33).
+    Without the allowance a nested ordered_map(f, items, 1) stays serial and an
+    explicit share stays that share, so outer x inner keeps to the budget."""
+    os.environ.pop(ALLOWANCE_ENV, None)
+    os.environ.pop(BUDGET_ENV, None)
+
+
 def process_pool(count):
     """The one worker-pool factory of the builder (tests record its size).
 
     Spawn avoids inherited archive handles and numerical-library thread state.
     """
-    return ProcessPoolExecutor(max_workers=count, mp_context=multiprocessing.get_context('spawn'))
+    return ProcessPoolExecutor(max_workers=count, mp_context=multiprocessing.get_context('spawn'),
+                               initializer=_pool_worker_init)
 
 
 def sha256_file(path):
@@ -68,6 +85,55 @@ def hash_existing(paths, jobs=None):
     return list(ordered_map(_sha256_existing, paths, max(1, min(resolve_jobs(jobs), len(paths) or 1))))
 
 
+def keep_original(path, backup, raw):
+    """Keep a staged file's current bytes at `backup` before it is replaced.
+
+    A hard link when possible (same file system): the pass then replaces the
+    staged file by renaming its candidate over it, so the linked inode keeps
+    the original bytes without writing them again. Callers must replace, never
+    rewrite in place, a file they backed up this way. Otherwise a copy of `raw`.
+    """
+    try:
+        os.link(path, backup)
+    except OSError:
+        Path(backup).write_bytes(raw)
+
+
+def captured(function, *args):
+    """Run function(*args) with this process's stdout and stderr (file descriptors 1
+    and 2, so tool subprocesses too) going to a temporary file.
+
+    Returns (result, output text). A pool worker uses it so the caller can print
+    each item's output in item order, keeping a stage log readable and in the
+    serial order. On an error the output is written to stderr before re-raising.
+    """
+    import sys
+    from build_scratch import scratch_file
+    for stream in (sys.stdout, sys.stderr):
+        stream.flush()
+    with scratch_file() as sink:
+        saved = [os.dup(1), os.dup(2)]
+        failed = True
+        try:
+            os.dup2(sink.fileno(), 1)
+            os.dup2(sink.fileno(), 2)
+            result = function(*args)
+            failed = False
+        finally:
+            for stream in (sys.stdout, sys.stderr):
+                stream.flush()
+            os.dup2(saved[0], 1)
+            os.dup2(saved[1], 2)
+            for fd in saved:
+                os.close(fd)
+            sink.seek(0)
+            text = sink.read().decode('utf-8', errors='replace')
+            if failed and text:
+                sys.stderr.write(text)
+                sys.stderr.flush()
+    return result, text
+
+
 def _copy(task):
     import shutil
     shutil.copyfile(*task)
@@ -80,10 +146,21 @@ def copy_files(pairs, jobs=None):
         pass
 
 
-# Scheduler allowance: a running stage's Python pools follow the share the
-# scheduler writes to this file (BUILD-SCHEDULER-JOBSHARE-32).
-ALLOWANCE_ENV = 'AMIWIND_BUILD_JOBS_FILE'
-BUDGET_ENV = 'AMIWIND_BUILD_BUDGET'
+def live_jobs(jobs):
+    """The workers this stage holds now: under the scheduler its allowance file
+    (the share grows when other stages finish), otherwise `jobs` unchanged.
+
+    For choices taken when a pass starts rather than per pool task: map tool
+    threads and whether a pass runs serially at all. Pool workers do not see the
+    allowance (BUILD-NESTED-POOL-ALLOWANCE-33), so inside them this is `jobs`.
+    """
+    path = os.environ.get(ALLOWANCE_ENV)
+    if not path:
+        return jobs
+    try:
+        return max(1, int(Path(path).read_text().strip()))
+    except (OSError, ValueError):
+        return jobs
 
 
 def _throttle(count):
@@ -122,42 +199,84 @@ def _running(futures):
     return sum(not future.done() for future in futures)
 
 
-def ordered_map(function, items, jobs=None):
-    """Yield in input order; at most the current limit running, twice it queued.
+# Results an ordered map may hold ahead of the one it hands back next, per worker:
+# with only two, one slow item at the head left the others idle (world terrain
+# ran at 14 of 24 cores; simulated on its 2,532 region times: 994 s with two,
+# 921 s with four, 919 s ideal; BUILD-ORDERED-WINDOW-33).
+WINDOW = 4
 
+
+def _timed_call(function, item):
+    """Worker: (seconds, result) of one item."""
+    started = time.monotonic()
+    result = function(item)
+    return time.monotonic() - started, result
+
+
+def ordered_map(function, items, jobs=None, cost=None, timings=None):
+    """Yield in input order; at most the current limit running.
+
+    Up to WINDOW times the limit are submitted and not yet handed back, so a slow
+    item at the head does not idle the other workers. `cost` (item -> number):
+    every item is submitted largest first (ties in input order) so the long ones
+    do not finish last on a few workers; results still come back in input order,
+    held until their turn. `timings` (a list): the seconds each item took in its
+    worker are appended in input order (item cost history, build_costs.py).
     Workers return data; the caller alone writes shared archives and indices.
     Spawn avoids inherited archive handles and numerical-library thread state.
     """
+    from functools import partial
     count = resolve_jobs(jobs)
     size, limit = _throttle(count)
+    call = function if timings is None else partial(_timed_call, function)
+
+    def deliver(result):
+        if timings is None:
+            return result
+        seconds, value = result
+        timings.append(round(seconds, 3))
+        return value
     if size == 1:
-        yield from map(function, items)
+        for item in items:
+            yield deliver(call(item))
         return
-    items = iter(items)
+    if cost is not None:
+        items = list(items)
+        order = iter(sorted(range(len(items)), key=lambda i: -cost(items[i])))
+        source = ((index, items[index]) for index in order)
+    else:
+        source = enumerate(items)
     with worker_environment(), process_pool(size) as pool:
-        pending = deque()
+        pending = {}
+        following = 0          # next input index to hand back
+        submitted = 0
         exhausted = False
         try:
             while True:
                 cap = count if limit is None else limit()
-                # Static: queue twice the workers in the pool. Allowance: at
-                # most `cap` unfinished tasks, so the stage never exceeds it.
-                while (not exhausted and len(pending) < 2 * cap
-                       and (limit is None or _running(pending) < cap)):
+                while (not exhausted and _running(pending.values()) < cap
+                       and (cost is not None or submitted - following < WINDOW * cap)):
                     try:
-                        item = next(items)
+                        index, item = next(source)
                     except StopIteration:
                         exhausted = True
                         break
-                    pending.append(pool.submit(function, item))
+                    pending[index] = pool.submit(call, item)
+                    submitted += 1
+                if following in pending and pending[following].done():
+                    yield deliver(pending.pop(following).result())
+                    following += 1
+                    continue
                 if not pending:
                     return
-                if limit is None or pending[0].done() or exhausted or len(pending) >= 2 * cap:
-                    yield pending.popleft().result()
-                else:
-                    wait([f for f in pending if not f.done()], timeout=1, return_when=FIRST_COMPLETED)
+                if following in pending and (exhausted or cost is None and submitted - following >= WINDOW * cap):
+                    # Nothing more may be submitted: wait for the head itself.
+                    yield deliver(pending.pop(following).result())
+                    following += 1
+                    continue
+                wait([f for f in pending.values() if not f.done()], timeout=1, return_when=FIRST_COMPLETED)
         finally:
-            for future in pending:
+            for future in pending.values():
                 future.cancel()
 
 
@@ -218,14 +337,27 @@ DEPENDENCIES = {
     'world-flora': ('world-terrain', 'world-scenery', 'world-flora-assets'),
     'hand-catalog': ('census',),
     'harvest': ('census',),
+    # The CHIM world (--builder chim) reads the census palette too.
+    'chim': ('census',),
     'media': (), 'music': (), 'engine': (),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
 
 
-def stage_dependencies(steps):
+def plan_skipped(metadata):
+    """Stages a quick test build leaves out on purpose (the build receipt's
+    excluded_content.skipped_stages, written by tools/build.py from
+    tools/build_exclusions.py). This module never imports that table: stage code
+    stays free of it, so the stage fingerprints do not depend on it."""
+    return set(((metadata or {}).get('excluded_content') or {}).get('skipped_stages') or ())
+
+
+def stage_dependencies(steps, skipped=()):
+    """{stage: (stages it waits for)}. skipped: stages the plan leaves out on purpose
+    (plan_skipped); they are no one's dependency."""
     names = [name for name, _ in steps]
+    commands = {name: [str(part) for part in command] for name, command in steps}
     if len(set(names)) != len(names):
         raise ValueError('Build stage names must be unique')
     result = {}
@@ -233,8 +365,32 @@ def stage_dependencies(steps):
     # towns on request) extend the ordered scene chain after Balmora's
     # interiors; the chain continues from the last of them.
     towns = [name for name in names if name.startswith('town-')]
+    # An AmiWind "MiniWind" Playtester Build (its image step says --miniwind) leaves
+    # stages out (tools/miniwind.py): Balmora follows the census and the image waits
+    # only for the stages the plan has.
+    miniwind = any(name == 'image' and '--miniwind' in map(str, command) for name, command in steps)
+
+    def passed_on(dep):
+        # A stage a MiniWind scope leaves out of the ordered scene chain (the exterior
+        # scope: balmora-interiors, door-audio) passes its own predecessors on.
+        if dep in names or dep not in DEPENDENCIES:
+            return (dep,)
+        return tuple(d for parent in DEPENDENCIES[dep] for d in passed_on(parent))
+    skipped = set(skipped) - set(names)
     for index, name in enumerate(names):
         deps = DEPENDENCIES.get(name, tuple(names[index - 1:index]))
+        # Quick test builds (--exclude): a stage the plan skips is no one's dependency.
+        deps = tuple(d for d in deps if d not in skipped)
+        if miniwind:
+            from miniwind import DEPENDENCY_OVERRIDES, IMAGE_AFTER, omitted
+            deps = DEPENDENCY_OVERRIDES.get(name, deps)
+            if name == 'image':
+                deps = (*(d for d in deps if not omitted(d)), *IMAGE_AFTER)
+            else:
+                deps = tuple(dict.fromkeys(d for dep in deps for d in passed_on(dep)))
+        # An area build's reference closure (--exclude-unreferenced): its readers wait for it.
+        if '--reference-closure' in commands[name] and 'reference-closure' in names:
+            deps = (*deps, 'reference-closure')
         if name == 'door-audio' and towns:
             deps = (towns[-1],)
         # The sole optional branch requires an explicit builder opt-out.
@@ -246,6 +402,11 @@ def stage_dependencies(steps):
             deps = (*deps, 'hand-catalog')
         if name == 'image' and 'harvest' in names:
             deps = (*deps, 'harvest')
+        if name == 'image' and 'chim' in names:
+            deps = (*deps, 'chim')
+        # the CHIM world leaves out the harvest placements and adds the town flora (payload parity)
+        if name == 'chim':
+            deps = (*deps, *(d for d in ('harvest', 'world-flora-assets', 'world-survey') if d in names))
         missing = set(deps) - set(names)
         if missing:
             raise ValueError(f'{name}: missing dependencies {sorted(missing)}')
@@ -261,7 +422,7 @@ def budget_command(command, jobs):
 
 
 def execute_parallel(steps, run, metadata, root):
-    dependencies = stage_dependencies(steps)
+    dependencies = stage_dependencies(steps, plan_skipped(metadata))
     budget = int(metadata['compiler_jobs'])
     run.mkdir(parents=True, exist_ok=False)
     (run / 'logs').mkdir()
@@ -317,19 +478,26 @@ def execute_parallel(steps, run, metadata, root):
     def held(state):
         return state['allowance'] if state['parallel'] else 1
 
-    def rebalance(waiting):
+    def rebalance(waiting, incoming=0):
         """Share the budget again: serial stages hold one worker, running pooled
         stages split the rest evenly, leaving one worker for each ready stage
         still waiting (BUILD-SCHEDULER-JOBSHARE-32). Pools inside a stage follow
-        its allowance file at their next task; tool threads keep their start value."""
+        its allowance file at their next task; tool threads keep their start value.
+
+        `incoming` pooled stages about to start are counted in the split: the
+        running stages shrink first and the shares of the incoming ones are
+        returned, so a stage starts with its fair share instead of the one
+        worker left free at that moment (BUILD-STAGE-START-SHARE-33: its map
+        tool threads and pool decisions are taken from that start value)."""
         pooled = [s for s in active.values() if s['parallel']]
-        if not pooled:
-            return
+        count = len(pooled) + incoming
+        if not count:
+            return []
         serial = len(active) - len(pooled)
-        share = max(len(pooled), budget - serial - waiting)
-        base, extra = divmod(share, len(pooled))
-        for index, state in enumerate(sorted(pooled, key=lambda s: s['start'])):
-            value = base + (1 if index < extra else 0)
+        share = max(count, budget - serial - waiting)
+        base, extra = divmod(share, count)
+        values = [base + (1 if index < extra else 0) for index in range(count)]
+        for value, state in zip(values, sorted(pooled, key=lambda s: s['start'])):
             if value != state['allowance']:
                 state['allowance'] = value
                 temporary = state['allowance_file'].with_suffix('.tmp')
@@ -338,22 +506,34 @@ def execute_parallel(steps, run, metadata, root):
                 state['entry']['workers_now'] = value
                 state['entry'].setdefault('worker_changes', []).append(
                     [round(time.monotonic() - start, 3), value])
+        return values[len(pooled):]
     profile = build_profile.start(run, steps, metadata, dependencies)
     try:
         while pending or active:
             ready = [item for item in pending if set(dependencies[item[1][0]]) <= passed]
             rebalance(len(ready))
-            free = budget - sum(held(s) for s in active.values())
             for item in ready:
-                if free < 1:
-                    break
                 number, (name, original) = item
                 # Reserve a slot for each other ready branch before handing the
                 # remainder to a parallel stage. Never exceed the global budget.
                 others = ready[ready.index(item) + 1:]
                 serial = sum('--jobs' not in command for _, (_, command) in others)
                 parallel = sum('--jobs' in command for _, (_, command) in others)
-                jobs = max(1, (free - serial) // (parallel + 1)) if '--jobs' in original else 1
+                if '--jobs' in original:
+                    # A pooled stage takes its even share at once: running pooled
+                    # stages shrink before it starts (BUILD-STAGE-START-SHARE-33).
+                    running_serial = sum(not s['parallel'] for s in active.values())
+                    running_pooled = len(active) - running_serial
+                    # With nothing running, the first ready stage starts whatever it would reserve for
+                    # the others: a budget smaller than the ready branches must not leave every branch
+                    # waiting for room that never comes (BUILD-SCHEDULER-LOWBUDGET-33).
+                    if budget - running_serial - serial < running_pooled + 1 + parallel and active:
+                        break
+                    jobs = rebalance(serial, 1 + parallel)[0]
+                else:
+                    if budget - sum(held(s) for s in active.values()) < 1:
+                        break
+                    jobs = 1
                 command = budget_command(original, jobs)
                 log = run / 'logs' / f'{number:02}-{name}.log'
                 entry = {'name': name, 'command': command, 'status': 'running',
@@ -368,7 +548,7 @@ def execute_parallel(steps, run, metadata, root):
                 limits = {ALLOWANCE_ENV: str(allowance_file), BUDGET_ENV: str(budget)} if pooled_stage else {}
                 try:
                     process = subprocess.Popen(profile.command(number, name, command, jobs), cwd=root, stdout=writer, stderr=subprocess.STDOUT,
-                        env=dict(os.environ, **THREAD_LIMITS, **limits, PYTHONUNBUFFERED='1', AMIWIND_BUILD_JOBS=str(jobs)),
+                        env=dict(os.environ, **THREAD_LIMITS, **limits, **stage_environment(run), PYTHONUNBUFFERED='1', AMIWIND_BUILD_JOBS=str(jobs)),
                         start_new_session=os.name == 'posix')
                 except OSError as exc:
                     writer.close()
@@ -378,7 +558,6 @@ def execute_parallel(steps, run, metadata, root):
                 active[name] = {'process': process, 'writer': writer, 'reader': log.open(errors='replace'),
                                 'entry': entry, 'start': time.monotonic(), 'parallel': pooled_stage,
                                 'allowance': jobs, 'allowance_file': allowance_file}
-                free -= jobs
                 title = name + " (pre-baking in-game character models...)" if name == "npc-gallery" else name
                 print(f'Build [{number}/{len(steps)}]: {title}, {jobs} worker(s). Log: {log}', flush=True)
                 save()

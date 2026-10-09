@@ -160,8 +160,11 @@ def _prepare_model(task):
          lod['collision']='authored RootCollisionNode, approximate convex conversion'
         pieces,exact,note=collision_pieces(collision_v,collision_f,profile)
         if note:lod['collision'] = note
-        if exact:
+        if exact is True:
          lod['collision_bevels'] = 'exact standing-box convex sum'
+        elif exact:
+         # Only the stair plates need exact bevels (COLLISION-STAIR-SLOPE-32).
+         lod['collision_bevels_pieces'] = sorted(exact)
     if profile.get('collision_only'):
         # Sprite foliage retains source collision without a duplicate visible mesh.
         polys = []
@@ -182,6 +185,16 @@ def _prepare_model(task):
     # The assembly pass recomputes world-space hulls after each placement.
     pieces = [(points, None, ids, error) for points, hull, ids, error in pieces]
     return mi, (v, f, polys, pieces, lod)
+
+
+def _bevels(lod, subset):
+    """The collider's exact flag for the pieces at positions subset: True for
+    every piece, or the new positions of the pieces listed as needing exact
+    standing bevels."""
+    if lod.get('collision_bevels'):
+        return True
+    wanted = set(lod.get('collision_bevels_pieces', ()))
+    return frozenset(k for k, i in enumerate(subset) if i in wanted)
 
 
 def _instance_key(ref, lighting):
@@ -284,6 +297,26 @@ def append_meshes(src, out, scenery, palette, centre=CENTRE, lighting=None, jobs
                               terrain_cull_config, map_identity, cell_identity, subcell_identity, terrain_cull_overlap, legacy_terrain_preview)
 
 
+def material_image(archive, index, model, material, size, pal, flat_rgb=None):
+    """The quantized texture image of one model material: the flattened panel (material ==
+    len(materials), from flat_rgb) or the material's texture tinted by its diffuse colour, resized and
+    quantized to the palette image without dithering. The converter's texture() and the CHIM builder
+    (chim.models.texture_unit) share it."""
+    if material == len(model['materials']):
+        return Image.fromarray(flat_rgb).quantize(palette=pal, dither=Image.Dither.NONE)
+    mat = model['materials'][material]
+    ti = mat['texture_index']
+    if ti is None:
+        rgb = np.full((32, 32, 3), 180.)
+    else:
+        raw = read_asset(archive, index['textures'][ti])
+        _, w, h = struct.unpack_from('>4sHH', raw)
+        rgb = np.frombuffer(raw[8:], np.uint8).reshape(h, w, 4)[:, :, :3].astype(float)
+    rgb *= np.array(mat['diffuse'])
+    return Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8)).resize((size, size)).quantize(
+        palette=pal, dither=Image.Dither.NONE)
+
+
 def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
                    references, prepared_models, retain_dressing, collision_bounds,
                    collision_compiler, collision_cache, terrain_visual_cull, terrain_cull_config,
@@ -306,7 +339,9 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     cull_reports=[]
     pal=Image.new('P',(1,1));pal.putpalette(palette.read_bytes())
     texdata=lumps[2];nt=struct.unpack_from('<i',texdata)[0];offsets=list(struct.unpack_from('<'+str(nt)+'i',texdata,4));textures=[bytes(texdata[o:offsets[k+1] if k+1<nt else len(texdata)]) for k,o in enumerate(offsets)]
-    texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[]
+    texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[];hull_routes=[]
+    from routed_hull import routed_standing, routing, wants_route
+    from mesh_geometry_env import model_hull_mode
     base_faces=len(lumps[7])//20;regrids=0
     snap=scenery_reduce.snap_budget();snap=None if snap is None else snap[1];snap_buckets={};texinfo_vectors={};texinfo_keys={};snap_shared=[0,0.,0]
     from surface_flatten import load_profiles
@@ -325,34 +360,51 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
      if mi==len(m['materials']):
       key=('flatten',m['source'],size)
       if key not in texture_cache:
-       im=Image.fromarray(models[model_ids[m['source']]][4]['_flat_rgb']).quantize(palette=pal,dither=Image.Dither.NONE)
+       im=material_image(archive,index,m,mi,size,pal,models[model_ids[m['source']]][4]['_flat_rgb'])
        texture_cache[key]=len(textures);textures.append(miptex('flat'+str(len(textures)),im))
       return texture_cache[key]
      mat=m['materials'][mi];ti=mat['texture_index'];glow=0 if NO_EMISSIVE else int(mat.get('emissive',0))
+     if not NO_EMISSIVE and lighting and lighting.get('glowing_glass'):
+      # Lantern glass around a flame glows in cells that opt in (OPENING-JIUB-LANTERN-32).
+      from interior_lighting import glass_glow
+      glow=max(glow,glass_glow(m,mat,lighting))
      key=(ti,size,tuple(round(x,2) for x in mat['diffuse']),glow)
      if key not in texture_cache:
-      if ti is None:rgb=np.full((32,32,3),180.)
-      else:
-       raw=read_asset(archive,index['textures'][ti]);_,w,h=struct.unpack_from('>4sHH',raw);rgb=np.frombuffer(raw[8:],np.uint8).reshape(h,w,4)[:,:,:3].astype(float)
-      rgb*=np.array(mat['diffuse']);im=Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).resize((size,size)).quantize(palette=pal,dither=Image.Dither.NONE)
+      im=material_image(archive,index,m,mi,size,pal)
       # "emitN_" marks a self-lit material for the engine (r_surf.c R_EmissiveLevel).
       t=len(textures);texture_cache[key]=t;textures.append(miptex(('emit%d_%d'%(glow,t)) if glow else 'surface'+str(t),im))
      return texture_cache[key]
     def collider(pieces, exact=False, model_name='', reference=0):
+     # exact: True (every piece; a compiled union when a compiler is given) or
+     # the set of piece positions that get exact standing bevels.
      if not pieces:return -empty_leaf-1,-1
      # A union of convex volumes. Outside each piece tries the next one.
      compiled=None
-     if exact and collision_compiler:
+     if exact is True and collision_compiler:
       from collision_bsp import compile_standing
       try:compiled=compile_standing(pieces,collision_compiler,collision_cache)
       except ValueError as error:
        collision_fallbacks.append({'model':model_name,'reference':reference,'reason':str(error),
                                    'fallback':'exact standing-box convex pieces'})
        print('Collision union fallback to exact planes:',model_name,reference,str(error)[-200:],flush=True)
+     # A large model's standing hull is routed (short chains behind axial clipnodes, the same solid set
+     # as one chain; routed_hull, INTERIOR-HULL-CHAIN-33) unless AMIWIND_MODEL_HULL selects the chain;
+     # when no routing fits the clipnode budget the chain stays.
+     routed=None
+     if wants_route(len(pieces),model_hull_mode(),compiled is not None):
+      try:
+       routed,leaf,chains=routed_standing(lumps,plane,planes_cache,pieces,exact if isinstance(exact,bool) else set(exact),
+                                          **routing(model_hull_mode(),shared_budget=True))
+       hull_routes.append({'model':model_name,'reference':reference,'pieces':len(pieces),'step':leaf,
+                           'parts':len(chains),'longest_chain':max(chains,default=0)})
+      except ValueError as error:
+       if 'budget' not in str(error):raise
+       hull_routes.append({'model':model_name,'reference':reference,'pieces':len(pieces),'fallback':'chain',
+                           'reason':str(error)})
      roots=[];noderoots=[]
      for k,(points,hull,ids,error) in enumerate(pieces):
       point_eq=np.unique(np.round(hull.equations,5),axis=0)
-      eq=standing_planes(points,point_eq,exact) if compiled is None else [];root=len(lumps[9])//8;noderoot=len(lumps[5])//24;roots.append(root);noderoots.append(noderoot)
+      eq=standing_planes(points,point_eq,exact is True or (bool(exact) and k in exact)) if compiled is None and routed is None else [];root=len(lumps[9])//8;noderoot=len(lumps[5])//24;roots.append(root);noderoots.append(noderoot)
       count=len(eq)
       nxt=root+count if k+1<len(pieces) else -1
       low=np.floor(points.min(axis=0)).astype(int);high=np.ceil(points.max(axis=0)).astype(int)
@@ -377,6 +429,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        children=[start+n if n>=0 else n&65535 for n in (front,back)]
        lumps[9]+=struct.pack('<iHH',pi,*children)
       return noderoots[0],start+croot if croot>=0 else croot
+     if routed is not None:return noderoots[0],routed
      return noderoots[0],roots[0]
     entities=[];instance_models={};collision_models={};visual_models={};part_cache={}
     def entity(modelnum,origin,yaw,reference):
@@ -465,7 +518,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        if variant not in instance_models:
         collision_key=(_instance_key(ref,None),subset)
         if collision_key not in collision_models:
-         collision_models[collision_key]=collider([worldparts[i] for i in subset],bool(lod.get('collision_bevels')),name,ref['number'])
+         collision_models[collision_key]=collider([worldparts[i] for i in subset],_bevels(lod,subset),name,ref['number'])
         nroot,croot=collision_models[collision_key]
         original=visual_models[key];header=bytearray(lumps[14][original*64:(original+1)*64])
         struct.pack_into('<4i',header,36,nroot,croot,croot,croot)
@@ -536,12 +589,22 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
          if frame is None:frame=_placement_frame(ref,centre)
          samples=bake_surface(q,ax,off,frame[1],frame[0],lighting,sample_grid=(mins,dims));regrids+=1
         if len(samples)!=dims[0]*dims[1]:raise ValueError('Lightmap sample count differs from the engine grid')
-        lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(0,255,255,255)
+        # Faces lit mainly by warm lights take the warm style (cells that opt in).
+        style=0
+        if lighting.get('warm_style'):
+         from interior_lighting import surface_style, glass_glow, warm_light, WARM_STYLE
+         if frame is None:frame=_placement_frame(ref,centre)
+         if (material<len(m['materials']) and glass_glow(m,m['materials'][material],lighting)
+             and warm_light(ref.get('light') or {'color':[255,140,40]})):
+          style=WARM_STYLE  # a warm lantern's glowing glass
+         else:
+          style=surface_style(q,frame[1],frame[0],lighting)
+        lightoffset=len(lumps[8]);lumps[8]+=samples;styles=(style,255,255,255)
        face_planes.append(pi)
        lumps[7]+=struct.pack('<HhihH4Bi',0,0,firstedge,len(verts),tx,*styles,lightoffset)
       collision_key=(_instance_key(ref,None),subset)
       if collision_key not in collision_models:
-       collision_models[collision_key]=collider([worldparts[i] for i in subset], bool(lod.get('collision_bevels')),name,ref['number'])
+       collision_models[collision_key]=collider([worldparts[i] for i in subset],_bevels(lod,subset),name,ref['number'])
       nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
@@ -558,6 +621,15 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     lumps[2]=bytearray(struct.pack('<i',len(textures))+struct.pack('<'+'i'*len(offs),*offs)+tex)
     # WAD is compiler input metadata, not a runtime worldspawn field.
     lumps[0]=bytearray(re.sub(rb'(?m)^"wad" "[^"\n]*"\n',b'',bytes(lumps[0])))
+    light_grid=None
+    if lighting:
+     # Actor light grid over the sealed interior (NPC-LIGHT-COHERENCE-32):
+     # the world model's bounds are the sealing box around the objects.
+     from interior_lighting import light_grid as make_grid, add_light_grid, GRID_MARGIN
+     wmins=np.array(struct.unpack_from('<3f',lumps[14],0));wmaxs=np.array(struct.unpack_from('<3f',lumps[14],12))
+     light_grid=make_grid(lighting,wmins+GRID_MARGIN,wmaxs-GRID_MARGIN)
+     if light_grid is not None:
+      lumps[0]=bytearray(add_light_grid(bytes(lumps[0]).rstrip(b'\0').decode('latin-1'),light_grid).encode('latin-1'))
     lumps[0]=lumps[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode()
     header=bytearray(struct.pack('<i',29)+bytes(120));data=bytearray()
     for k,lump in enumerate(lumps):
@@ -570,6 +642,10 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
                                   'legacy_preview':bool(legacy_terrain_preview),
                                   'acceptance':'Legacy preview is not canonical production acceptance' if legacy_terrain_preview else 'Deferred to final canonical source pass'},
             'collision_compiler_fallbacks':collision_fallbacks,
+            'model_hull':{'mode':model_hull_mode(),'routed':[r for r in hull_routes if 'fallback' not in r],
+                          'chain_fallbacks':[r for r in hull_routes if 'fallback' in r]},
+            'light_grid':None if light_grid is None else {'step':light_grid[0],'dims':light_grid[1],'origin':light_grid[2],
+                'bytes':len(light_grid[3]),'max':max(light_grid[3]),'min':min(light_grid[3])},
             'omitted':omitted,'dressing_retained':dressing_retained,
             'groups':index.get('groups',{}),
             'faces':len(lumps[7])//20,'vertices':len(lumps[3])//12,
@@ -589,7 +665,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
 
 from build_jobs import add_jobs, resolve_jobs
 from vis_options import light_args
-from build_parallel import ordered_map
+from build_parallel import live_jobs, ordered_map
 
 def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None, vis_mode='fast'):
     scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
@@ -605,7 +681,7 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cul
     (out/'seyda.map').write_text(text)
     for name in set(removed):(out/'id1'/name).unlink()
     for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'] if vis_mode=='fast' else [],'seyda.bsp'),(light,light_args('-minlight','100'),'seyda.bsp')]:
-        subprocess.run([str(Path(executable).resolve()),*(['-threads',str(resolve_jobs(jobs))] if executable==vis else []),*options,target],cwd=out,check=True)
+        subprocess.run([str(Path(executable).resolve()),*(['-threads',str(live_jobs(resolve_jobs(jobs)))] if executable==vis else []),*options,target],cwd=out,check=True)
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
     rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True)
     result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs,terrain_visual_cull=terrain_visual_cull,terrain_cull_config=terrain_cull_config,map_identity=map_identity,cell_identity=cell_identity,subcell_identity=subcell_identity,terrain_cull_overlap=terrain_cull_overlap)
@@ -629,6 +705,7 @@ def main():
     from vis_options import add_vis_option
     scenery_reduce.add_options(p)
     add_jobs(p);add_vis_option(p);a=p.parse_args();scenery_reduce.apply_options(a)
+    import build_profile; build_profile.instrument('bsp')  # sub-stage timers (docs/BUILD_PROFILE.md)
     try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs,None if a.terrain_visual_cull is None else a.terrain_visual_cull=='true',json.loads(a.terrain_cull_config.read_text(encoding='utf-8')) if a.terrain_cull_config else None,a.map_identity,a.cell_identity,a.subcell_identity,a.terrain_cull_overlap,a.vis_mode),indent=2))
     except (OSError,ValueError,subprocess.CalledProcessError) as e:p.exit(1,str(e)+'\n')
 

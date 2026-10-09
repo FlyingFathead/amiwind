@@ -69,8 +69,15 @@ class WindowsXdfToolTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1] / 'tools'
         for name in ('build_aga.py', 'world_volumes.py'):
             text = (root / name).read_text(encoding='utf-8')
-            self.assertIn('run_any as run_xdftool', text, name)
             self.assertNotIn('import run as run_xdftool', text, name)
+        # The image step writes its boot partition with world_volumes.write_boot_partition (and its world
+        # partitions with world_volumes.write_partitions); both use the bounded runner.
+        volumes = (root / 'world_volumes.py').read_text(encoding='utf-8')
+        self.assertIn('run_any as run_xdftool', volumes)
+        boot = volumes[volumes.index('def write_boot_partition('):]
+        self.assertIn('run_xdftool(command)', boot[:boot.index('\ndef ')])
+        self.assertIn('root_check=write_boot_partition(args.xdftool,part,boot,partition_mib)',
+                      (root / 'build_aga.py').read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

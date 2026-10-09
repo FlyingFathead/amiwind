@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include "sound.h"
+#include "aw_miniwind.h"
 #include <assert.h>
-viddef_t vid;int soundtime,paintedtime,sound_started,snd_blocked;keydest_t key_dest;
+viddef_t vid;byte *draw_chars;int soundtime,paintedtime,sound_started,snd_blocked;keydest_t key_dest;
 static int titles,music_samples,paused,begins,ends,flushes;static cvar_t *overlay;
 static void (*playvid_command)(void);
 static char *cmdargs[2];static int cmdargc;
@@ -11,7 +12,11 @@ int Q_strcasecmp(char *a,char *b){unsigned char x,y;do{x=(unsigned char)*a++;y=(
 void AW_MusicPaint(portable_samplepair_t *dst,int n){int i;music_samples+=n;for(i=0;i<n;i++)dst[i].left=1234;}
 void Cvar_RegisterVariable(cvar_t *c){overlay=c;c->value=atof(c->string);}
 static byte card[16+768+64000];static int card_length;
-static int menus;void Cbuf_AddText(char *s){assert(!strcmp(s,"aw_main_menu\n"));menus++;}
+static int menus,quick_starts,miniwind_file;
+void Cbuf_AddText(char *s){
+    if(!strcmp(s,"aw_quick_start\n")){assert(miniwind_file);quick_starts++;return;}
+    assert(!strcmp(s,"aw_main_menu\n"));menus++;
+}
 volatile dma_t *shm;static dma_t device;
 cvar_t volume={"volume","1",false,false,1};
 static byte file[800+128000+2205];static int length,starts,clears,pauses;static FILE *last_media_file;
@@ -21,7 +26,7 @@ void Con_Printf(char *s,...){
     /* Production console printing can redraw immediately after the movie
      * closes. The destination must already have selected its loading style. */
     if(!strcmp(s,"Intro movie: %s.\n")){
-        assert(starts+menus>finished);finished=starts+menus;
+        assert(starts+menus+quick_starts>finished);finished=starts+menus+quick_starts;
     }
 }
 void S_StopAllSounds(qboolean clear){clears++;}
@@ -39,6 +44,13 @@ void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"playvid"))playv
 void Key_ClearStates(void){}
 void V_UpdatePalette(void){}
 int COM_FOpenFile(char *path,FILE **out){
+    if(!strcmp(path,AW_MINIWIND_FILE)){
+        /* A partial-area build's notice file (tools/miniwind.py data_file). */
+        const char *text="AWMW1\ntown balmora\ntitle ATTENTION: THIS IS A MINIWIND PLAYTEST BUILD\n"
+            "features FEATURES ONLY: Balmora exterior (CHIM)\n";int n=(int)strlen(text);
+        if(!miniwind_file){*out=NULL;return -1;}
+        *out=tmpfile();assert(*out);fwrite(text,1,n,*out);rewind(*out);return n;
+    }
     if(!strcmp(path,"intro/videos.awl")){
         const char *list="AWVC1\n1 mw_logo intro/video/01.awv\n";int n=(int)strlen(list);
         *out=tmpfile();assert(*out);fwrite(list,1,n,*out);rewind(*out);return n;
@@ -124,5 +136,48 @@ int main(void){
     AW_MoviePaint(paint,1,4000);assert(AW_MovieActive());
     AW_MovieUpdate();assert(!AW_MovieActive() && !paused && key_dest==key_console && ends==4);
 #endif
-    puts("movie headers, PCM, frame clock, bounds, EOF, Esc, debug command, drained start, completion/error return and music pause restore passed");return 0;
+    /* A partial-area build (aw_miniwind.c): the startup logo's last frame stays up
+     * with "Press ENTER to start" in the console font; only Enter starts the game. */
+    {
+        static byte font[128*128];int y,left=(320-(int)strlen(AW_MINIWIND_PROMPT)*8)/2,before=clears;
+        paused=0;sound_started=0;key_dest=key_game;
+        miniwind_file=1;AW_MiniwindInit();assert(AW_MiniwindActive());
+        for(y=0;y<8;y++)font[('P'>>4)*1024+('P'&15)*8+y*128]=1; /* the left column of 'P' */
+        draw_chars=font;
+        fixture();file[32+9*3]=file[32+9*3+1]=file[32+9*3+2]=250; /* the stream palette's brightest entry */
+        vid.buffer=pixels+1;vid.width=320;vid.height=200;vid.rowbytes=320;
+        soundtime=paintedtime=100;AW_MovieStartup();assert(AW_MovieActive());
+        /* Space (and Esc) skip only to the held screen: the last frame and the prompt */
+        assert(AW_MovieKey(K_SPACE,1) && AW_MovieActive() && quick_starts==0);
+        memset(pixels,0xa5,sizeof(pixels));AW_MovieDraw();
+        assert(pixels[1]==7 && pixels[64000]==7 && pixels[0]==0xa5 && pixels[64001]==0xa5);
+        for(y=0;y<8;y++){
+            assert(pixels[1+(AW_MINIWIND_PROMPT_Y+y)*320+left]==9);
+            assert(pixels[1+(AW_MINIWIND_PROMPT_Y+y)*320+left+1]==7);
+        }
+        assert(pixels[1+(AW_MINIWIND_PROMPT_Y-1)*320+left]==7 && pixels[1+(AW_MINIWIND_PROMPT_Y+8)*320+left]==7);
+        /* it waits: time passing, Esc, Space and other keys keep it up */
+        soundtime=99999;AW_MovieUpdate();assert(AW_MovieActive());
+        assert(AW_MovieKey(K_ESCAPE,1) && AW_MovieKey(K_SPACE,1) && AW_MovieKey('x',1) && AW_MovieActive());
+        assert(AW_MovieKey(K_ENTER,0) && AW_MovieActive() && quick_starts==0);
+        /* Enter: the quick start, no main menu */
+        assert(AW_MovieKey(K_ENTER,1) && !AW_MovieActive() && quick_starts==1 && menus==3 && clears==before+1);
+        /* the stream completing holds the screen too */
+        soundtime=paintedtime=5000;AW_MovieStartup();soundtime=7205;AW_MovieUpdate();
+        assert(AW_MovieActive() && quick_starts==1);
+        memset(pixels,0xa5,sizeof(pixels));AW_MovieDraw();
+        assert(pixels[1]==7 && pixels[1+AW_MINIWIND_PROMPT_Y*320+left]==9);
+        assert(AW_MovieKey(K_ENTER,1) && !AW_MovieActive() && quick_starts==2);
+        /* Enter during the fade starts at once */
+        soundtime=paintedtime=9000;AW_MovieStartup();
+        assert(AW_MovieKey(K_ENTER,1) && !AW_MovieActive() && quick_starts==3);
+        /* the ship-opening movie (branding 0) is unchanged: Esc still skips it */
+        fixture();soundtime=paintedtime=100;assert(AW_MovieStart());
+        assert(AW_MovieKey(K_ESCAPE,1) && !AW_MovieActive() && quick_starts==3);
+        /* no console font: the held screen still works, without the prompt */
+        draw_chars=NULL;soundtime=paintedtime=100;AW_MovieStartup();AW_MovieKey(K_ESCAPE,1);
+        memset(pixels,0xa5,sizeof(pixels));AW_MovieDraw();assert(pixels[1+AW_MINIWIND_PROMPT_Y*320+left]==7);
+        assert(AW_MovieKey(K_ENTER,1) && quick_starts==4);
+    }
+    puts("movie headers, PCM, frame clock, bounds, EOF, Esc, debug command, drained start, completion/error return, music pause restore and the MiniWind Enter screen passed");return 0;
 }

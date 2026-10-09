@@ -40,4 +40,3 @@ class BarrierConversionTests(unittest.TestCase):
         # Translation along the corridor is tangent to the wall. The wrong
         # multiplication order crosses its thickness instead.
         self.assertAlmostEqual(n[0]*30+n[1]*30, 0, places=5)
-

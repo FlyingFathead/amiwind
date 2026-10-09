@@ -559,11 +559,18 @@ void Host_Savegame_f (void)
 
 
 	ED_WriteGlobals (f);
+	/* The debug companion is not saved (aw_companion.c): a spawned one is
+	 * written as a free slot, a picked NPC at its home spot. */
+	AW_CompanionSaveSwap (1);
 	for (i=0 ; i<sv.num_edicts ; i++)
 	{
-		ED_Write (f, EDICT_NUM(i));
+		if (AW_CompanionSkipSave (EDICT_NUM(i)))
+			fprintf (f, "{\n}\n");
+		else
+			ED_Write (f, EDICT_NUM(i));
 		fflush (f);
 	}
+	AW_CompanionSaveSwap (0);
 	fclose (f);
 	Con_Printf ("done.\n");
 }
@@ -1898,8 +1905,16 @@ void Host_Stopdemo_f (void)
 Host_InitCommands
 ==================
 */
+/* "hunk_print": the Hunk's blocks by name (Quake's Hunk_Print), totalled per
+ * name; "hunk_print all" lists every block. For memory audits. */
+static void Host_HunkPrint_f (void)
+{
+	Hunk_Print (Cmd_Argc () > 1 && !strcmp (Cmd_Argv (1), "all"));
+}
+
 void Host_InitCommands (void)
 {
+	Cmd_AddCommand ("hunk_print", Host_HunkPrint_f);
     AW_DebugInit();
 	Cmd_AddCommand ("status", Host_Status_f);
 	Cmd_AddCommand ("quit", Host_Quit_f);

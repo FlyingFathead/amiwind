@@ -197,9 +197,9 @@ bootcheck_start:
 
 .fast_check:
         lea     memory_bytes,a0
-        cmp.l   #14*1024*1024,16(a0)
+        cmp.l   #AW_FAST_FREE_BYTES,16(a0)
         blo     .fast_fail
-        cmp.l   #11*1024*1024+16,20(a0)
+        cmp.l   #AW_HEAP_BYTES+16,20(a0)
         blo     .fast_fail
         lea     fast_ok_format(pc),a0
         lea     memory_kib+12,a1
@@ -218,6 +218,10 @@ bootcheck_start:
         moveq   #20,d7
 
 .host_notes:
+        ; The build's heap size above the measured safe size (--heap-mb): one
+        ; warning row, never a failure. Empty otherwise (amiwind_heap.i).
+        lea     heap_note(pc),a0
+        bsr     puts
         ; UAE host policy is intentionally not guessed from guest state. The
         ; portable launcher validates the requested FS-UAE profile before launch.
         lea     host_speed_line(pc),a0
@@ -397,8 +401,7 @@ countdown_done:   dc.b 13,"Starting now.                                     ",1
 need_os:        dc.b "FAIL: this AGA build needs Kickstart 3.1 or newer.",10,0
 need_aga:       dc.b "FAIL: this build needs the AGA chipset.",10,0
 need_chip:      dc.b "FAIL: select 2 MB Chip; keep 512 KiB free (256 KiB contiguous).",10,0
-need_fast:      dc.b "FAIL: select 16 MB Fast RAM or more.",10
-                dc.b "      Need 14 MiB free; 11 MiB + 16 bytes must be contiguous.",10,0
+                include "amiwind_heap.i"
         even
 memory_flags:
         dc.l    MEMF_CHIP!MEMF_TOTAL,MEMF_CHIP,MEMF_CHIP!MEMF_LARGEST

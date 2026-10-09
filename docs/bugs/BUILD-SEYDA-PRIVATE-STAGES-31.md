@@ -1,5 +1,20 @@
 # BUILD-SEYDA-PRIVATE-STAGES-31: repository builder cannot regenerate the shipped Seyda Neen maps
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 8 October 2026, in v0.0.31-dev |
+| Where | image step (tools/build_aga.py), Seyda Neen maps |
+| Reproduction | always |
+| Duplicate of | [BUILD-SEYDA-REGEN-30](BUILD-SEYDA-REGEN-30.md) |
+| Persists in | v0.0.31-dev (last seen) |
+| Severity | high: The repository builder cannot regenerate the shipped Seyda Neen maps. |
+| Family | Seyda Neen recorded stage (`seyda-recorded`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Closed: duplicate of [BUILD-SEYDA-REGEN-30](../BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026),
@@ -53,3 +68,18 @@ image.
 ## Prevention
 
 The release gate above.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Seyda Neen recorded stage (`seyda-recorded`). Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. See [families](README.md#families).
+
+- [BUILD-SEYDA-CULL-STABLE-32](BUILD-SEYDA-CULL-STABLE-32.md): From-scratch builds stop in Seyda Neen terrain culling (fragment not repeat-stable)
+- [BUILD-SEYDA-RECORDED-REWRITTEN-32](BUILD-SEYDA-RECORDED-REWRITTEN-32.md): Later image passes rewrite the recorded Seyda Neen maps, so the exception is not the recorded stage
+- [BUILD-SEYDA-REGEN-30](BUILD-SEYDA-REGEN-30.md): Public build cannot regenerate the Seyda Neen sub-cells
+- [HARVEST-SEYDA-HEAP-REFUSED-32](HARVEST-SEYDA-HEAP-REFUSED-32.md): Seven Seyda Neen sub-cells lose harvest to the heap check, six of which had it in v0.0.31
+- [HEAP-SEYDA-OVERLAP-32](HEAP-SEYDA-OVERLAP-32.md): Shipped Seyda Neen maps fail the current heap model (harvest and guard overlap allowance)
+- [SEYDA-REGIONS-PIN-33](SEYDA-REGIONS-PIN-33.md): The recorded Seyda Neen region table differs from what the region layout writes, and its only copy was inside a build volume
+
+<!-- END GENERATED CATEGORY -->

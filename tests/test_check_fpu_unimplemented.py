@@ -92,6 +92,27 @@ class GraphTests(unittest.TestCase):
         result = self.run_check(dis('  108:\tf200 0001      \tfintx %fp0,%fp0'))
         self.assertEqual([r['function'] for r in result['engine_failures']], ['AW_Print'])
 
+    def test_pointer_table_in_text_is_not_an_instruction(self):
+        # ENGINE-FPU-DATA-DECODE-33: a constant table of .text pointers (0x0003f2xx) decodes as
+        # fintrz; the opcode lies inside a relocated longword, so it is data, not code.
+        table = dis(
+            '   44:\t0000 0003      \torib #3,%d0',
+            '\t\t\t46: RELOC32\t.text',
+            '   48:\tf202 0003      \tfintrzx %fp0,%fp0',
+            '\t\t\t4a: RELOC32\t.text',
+            '   4c:\tf210 0003      \tfintrzx %fp0,%fp0')
+        result = self.run_check(table)
+        self.assertTrue(result['passed'], result)
+        self.assertEqual(result['unimplemented_instructions'], 0)
+        # A real instruction keeps failing, even right after a relocated operand.
+        real = dis(
+            '   44:\t4eb9 0000 0040 \tjsr 0x40',
+            '\t\t\t46: RELOC32\t.text',
+            '   4a:\tf203 0003      \tfintrzx %fp0,%fp0')
+        result = self.run_check(real)
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['unimplemented_instructions'], 1)
+
 
 class RepositoryTests(unittest.TestCase):
     def test_allowlist_is_justified_line_by_line(self):

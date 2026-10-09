@@ -22,6 +22,21 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _repair_region(task):
+    """Worker: one Balmora region, rebuilt from the cache or visually bounded."""
+    entry=task['entry'];name=entry['name']
+    work=Path(task['work']);target=Path(task['candidates'])/(name+'.bsp')
+    if task['source']:
+        detail=rebuild_cached_region(Path(task['cache']),Path(task['backups'])/(task['source']+'.bsp'),
+                    Path(task['palette']),entry,task['settings'],work/('rebuild-'+name),Path(task['ericw_bin']),
+                    threads=task['threads'],**task['vis'])
+        shutil.copyfile(detail['candidate_path'],target)
+        return name,{'rebuilt':True,'receipt':str(work/('rebuild-'+name)/'repair.json')}
+    raw,proof=bound_visuals((Path(task['backups'])/(name+'.bsp')).read_bytes(),entry['coverage'])
+    target.write_bytes(raw)
+    return name,proof
+
+
 def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=None, vis_mode='fast'):
     # threads: the builder's --jobs (None: the stage budget, resolve_jobs).
     from build_jobs import resolve_jobs
@@ -56,17 +71,25 @@ def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=None, vis_m
     save()
     committed=[]
     try:
+        # Regions are independent (own candidate and work folder). The rebuilt
+        # cores run side by side first, each with its share of the budget for vis
+        # and model preparation (light stays one thread per map); then the bounded
+        # regions run in up to `threads` workers. Receipt order is unchanged.
+        from build_parallel import ordered_map
+        from vis_options import map_threads
+        rebuilt=[e for e in entries if e['name'] in source_names]
+        bounded=[e for e in entries if e['name'] not in source_names]
+        inner=map_threads(threads,max(1,len(rebuilt)))
+        common=dict(cache=str(cache),palette=str(palette),settings=settings,work=str(work),ericw_bin=str(ericw_bin),
+                    vis=vis_kwargs(vis_mode),backups=str(backups),candidates=str(candidates))
+        proofs={}
+        for group,count,share in ((rebuilt,len(rebuilt),inner),(bounded,len(bounded),1)):
+            tasks=[dict(common,entry=e,source=source_names.get(e['name']),threads=share) for e in group]
+            for name,proof in ordered_map(_repair_region,tasks,max(1,min(threads,count))):
+                proofs[name]=proof
         for entry in entries:
             name=entry['name'];target=candidates/(name+'.bsp')
-            if name in source_names:
-                detail=rebuild_cached_region(cache,backups/(source_names[name]+'.bsp'),palette,
-                            entry,settings,work/('rebuild-'+name),ericw_bin,threads=threads,**vis_kwargs(vis_mode))
-                shutil.copyfile(detail['candidate_path'],target)
-                proof={'rebuilt':True,'receipt':str(work/('rebuild-'+name)/'repair.json')}
-            else:
-                raw,proof=bound_visuals((backups/(name+'.bsp')).read_bytes(),entry['coverage'])
-                target.write_bytes(raw)
-            outputs.append({'name':name,'sha256':sha(target),'proof':proof})
+            outputs.append({'name':name,'sha256':sha(target),'proof':proofs[name]})
             print('Balmora staged repair:',name,flush=True)
         arrival=[float(v) for v in header[4:7]]
         default=entries[owner(arrival,entries)]['name']

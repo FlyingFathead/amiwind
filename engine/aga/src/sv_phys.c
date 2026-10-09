@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sv_phys.c
 
 #include "quakedef.h"
+#include "chim/chim.h"
 
 /*
 
@@ -53,6 +54,7 @@ static	vec3_t	vec_origin = {0.0, 0.0, 0.0};
 
 void SV_Physics_Toss (edict_t *ent);
 extern void AW_WalkPlayer(edict_t *ent);
+extern int AW_TerrainFloor(edict_t *ent, int player);	/* aw_walk.c: CHIM terrain floor */
 
 /*
 ================
@@ -1473,6 +1475,7 @@ void SV_Physics_Step (edict_t *ent)
 		SV_AddGravity (ent);
 		SV_CheckVelocity (ent);
 		SV_FlyMove (ent, host_frametime, NULL);
+		AW_TerrainFloor (ent, 0);	// never below the CHIM terrain
 		SV_LinkEdict (ent, true);
 
 		if ( (int)ent->v.flags & FL_ONGROUND )	// just hit ground
@@ -1519,6 +1522,12 @@ void SV_Physics (void)
 		if (ent->free)
 			continue;
 
+		/* CHIM: actors outside the active chunk ring stay frozen (no think,
+		 * no movement) until the ring reaches them, as Morrowind runs only
+		 * the cells around the player. */
+		if (aw_chim_frozen && i > svs.maxclients && aw_chim_frozen (ent))
+			continue;
+
 		if (pr_global_struct->force_retouch)
 		{
 			SV_LinkEdict (ent, true);	// force retouch even for stationary
@@ -1549,6 +1558,11 @@ void SV_Physics (void)
 		else
 			Sys_Error ("SV_Physics: bad movetype %i", (int)ent->v.movetype);
 	}
+
+	/* The debug companion's think (aw_companion.c), on Quake's cadence. */
+	AW_CompanionPhysics ();
+	/* Hostile NPCs and the player's punch (aw_combat.c), after the companion. */
+	AW_CombatPhysics ();
 
 	if (pr_global_struct->force_retouch)
 		pr_global_struct->force_retouch--;

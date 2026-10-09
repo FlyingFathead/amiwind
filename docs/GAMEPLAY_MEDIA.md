@@ -1,5 +1,24 @@
 # Gameplay media
 
+<!-- contents start -->
+## Contents
+
+- [v0.0.29-rc1 — More Mushrooms! (...and fixes)](#v0029-rc1--more-mushrooms-and-fixes)
+- [v0.0.28 — Trees and Grass, Day and Night](#v0028--trees-and-grass-day-and-night)
+- [v0.0.23-dev2 captures — 29 September 2026](#v0023-dev2-captures--29-september-2026)
+- [v0.0.23-dev3 captures — 29 September 2026](#v0023-dev3-captures--29-september-2026)
+- [v0.0.23-dev4 captures — 29 September 2026](#v0023-dev4-captures--29-september-2026)
+- [v0.0.24-rc1 captures — 30 September 2026](#v0024-rc1-captures--30-september-2026)
+- [v0.0.24-rc2 captures — 1 October 2026](#v0024-rc2-captures--1-october-2026)
+- [RC3 captures — 1 October 2026](#rc3-captures--1-october-2026)
+- [RC4 island map and journal](#rc4-island-map-and-journal)
+- [v0.0.24 final release captures - 1 October 2026](#v0024-final-release-captures---1-october-2026)
+- [v0.0.25-dev1 corrected journal — 1 October 2026](#v0025-dev1-corrected-journal--1-october-2026)
+- [v0.0.25-rc1 navigation captures — 1 October 2026](#v0025-rc1-navigation-captures--1-october-2026)
+- [v0.0.28-rc1 first day/night captures — 4 October 2026](#v0028-rc1-first-daynight-captures--4-october-2026)
+
+<!-- contents end -->
+
 ## v0.0.29-rc1 — More Mushrooms! (...and fixes)
 
 The mushroom, Audio menu and torch captures below were made on 6 October 2026

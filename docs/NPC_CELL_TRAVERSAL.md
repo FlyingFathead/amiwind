@@ -11,7 +11,7 @@
 Across any permitted handoff, keep one authoritative actor identified by its stable original reference. Preserve applicable health, equipment, target/aggression, position, movement intent, dialogue and combat timers. Reach the actual traversable connection and arrive at its corresponding point; do not teleport an actor beside the player or duplicate it across overlapping sections. A pursuit boundary does not itself clear hostility or reset health.
 
 
-See [cell-changing and pursuit requirements](CELL_CHANGING.md#pursuit-across-section-and-cell-boundaries), [world mapping](WORLD_MAPPING_PLAN.md), and [door mapping](DOOR_MAPPING.md). Reference context: [OpenMW issue 5101](https://gitlab.com/OpenMW/openmw/-/issues/5101) distinguishes hostile followers at teleport doors; it does not establish AmiWind implementation.
+See [cell-changing and pursuit requirements](CELL_CHANGING.md#pursuit-across-section-and-cell-boundaries), [world mapping](WORLD_MAPPING_PLAN.md), [door mapping](DOOR_MAPPING.md), and [NPC pathfinding](NPC_PATHFINDING.md) (how actors route inside and across cells). Reference context: [OpenMW issue 5101](https://gitlab.com/OpenMW/openmw/-/issues/5101) distinguishes hostile followers at teleport doors; it does not establish AmiWind implementation.
 
 ### Deferred: minimal NPC state outside loaded cells
 

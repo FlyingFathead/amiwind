@@ -1,5 +1,20 @@
 # EXTENTS-FPU-RULE-31: surface extents and lightmap sizes depended on the FPU's arithmetic
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | surface extents (model.c) and converter lightmap sizing |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | high: Lightmap sizes depended on FPU rounding, shifting light or stopping with Bad surface extents. |
+| Family | FPU and CPU behaviour (68040/68060) (`fpu-cpu`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Repaired in source on the v0.0.32 Vivec fixes branch; not shipped.
@@ -68,3 +83,23 @@ Native fixture `aga_face_texinfo_test.c` (extent 256 for the case above);
 `tools/surface_grid.py` is the single definition; the converter checks every
 converted face's extents under the engine, single-precision and 68040
 extended rules.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. See [families](README.md#families).
+
+- [ENGINE-FPSP-MISSING-31](ENGINE-FPSP-MISSING-31.md): Boot disk loads no 68040 FPU support library; emulator hides it
+- [ENGINE-FPU-DATA-DECODE-33](ENGINE-FPU-DATA-DECODE-33.md): The 68040 FPU check reads a pointer table in the engine code section as fintrz instructions
+- [ENGINE-FPU-UNIMPL-31](ENGINE-FPU-UNIMPL-31.md): Every-frame math traps on a real 68040 (sin+cos become cexp)
+- [TEST-FPU-STRICT-JIT-31](TEST-FPU-STRICT-JIT-31.md): Emulator strict FPU mode is silently ignored while JIT is on
+
+Related bugs in other categories:
+
+- [EXTENTS-RULE-OLD-INTERIORS-32](EXTENTS-RULE-OLD-INTERIORS-32.md): The v0.0.32 extent rule breaks the lightmaps of interiors converted before the grid fix
+- [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
+- [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump
+- [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
+
+<!-- END GENERATED CATEGORY -->

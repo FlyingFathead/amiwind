@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "comment": "Area names the CHIM Progress Tracker uses to link bugs to the cells of a CHIM area (ids as in the CHIM receipt's areas). A bug is linked to every converted cell of the area when its title, where or tags contain one of the words.",
+  "areas": {
+    "balmora": ["balmora"],
+    "seyda": ["seyda", "seyda neen"],
+    "vivec_arena": ["arena", "vivec arena"]
+  }
+}

@@ -53,3 +53,4 @@ int main(void){
     assert(!strcmp(key_lines[edit_line],"]a "));
     return 0;
 }
+void AW_PhotoConsoleReminder(void){}

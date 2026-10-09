@@ -3,6 +3,7 @@
  * No second scene, entity construction or collision swap runs in the background.
  */
 #include "quakedef.h"
+#include "aw_log.h"
 #define PREFETCH_STEP 8192
 static cvar_t method={"aw_cell_change_method","1",true};
 static cvar_t buffer_kib={"aw_cell_prefetch_kib","128",true};
@@ -88,13 +89,11 @@ void AW_StreamLoadBegin(const char *name) {
     aw_load_disk_seconds=aw_load_decode_seconds=0;
 }
 void AW_StreamLoadEnd(const char *name,double world,double actors,double total) {
-    FILE *f=fopen("cell-load-profile.tsv","a");
-    if(f){
-        fprintf(f,"%s\t%d\t%ld\t%ld\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%lu\t%.6f\t%d\t%d\t%lu\t%lu\t%.6f\t%.2f\n",name,
+    {
+        AW_LogPrintf(AW_LOG_CELL_LOAD,"%s\t%d\t%ld\t%ld\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%lu\t%.6f\t%d\t%d\t%lu\t%lu\t%.6f\t%.2f\n",name,
             AW_CellChangeMethod(),aw_load_disk_bytes,aw_load_disk_calls,aw_load_disk_seconds,
             aw_load_decode_seconds,world,actors,total,(unsigned long)consumed,read_seconds,Hunk_LowMark(),Hunk_HighMark(),
             (unsigned long)capacity,(unsigned long)filled,worst_read,(double)AW_StreamLookahead());
-        fclose(f);
     }
     cancel();
 }
@@ -104,14 +103,12 @@ void AW_StreamTransitionBegin(void) {
 void AW_StreamTransitionReady(void) {if(transition_pending)transition_ready=1;}
 /* Called after video presentation, before selecting the next scene. */
 void AW_StreamPresented(void) {
-    FILE *f;
     if(heap_first_present && cls.state==ca_connected && cls.signon==SIGNONS && cl.worldmodel){
         AW_HeapAuditPhase(cl.worldmodel->name,"first-presented");heap_first_present=0;
     }
     if(!transition_pending || !transition_ready || cls.state!=ca_connected || cls.signon!=SIGNONS || !cl.worldmodel)return;
-    f=fopen("cell-visible-profile.tsv","a");
-    if(f){fprintf(f,"%s\t%d\t%.6f\t%lu\t%.2f\n",cl.worldmodel->name,AW_CellChangeMethod(),
-        Sys_FloatTime()-transition_started,(unsigned long)requested_bytes(),(double)AW_StreamLookahead());fclose(f);}
+    {AW_LogPrintf(AW_LOG_CELL_VISIBLE,"%s\t%d\t%.6f\t%lu\t%.2f\n",cl.worldmodel->name,AW_CellChangeMethod(),
+        Sys_FloatTime()-transition_started,(unsigned long)requested_bytes(),(double)AW_StreamLookahead());}
     transition_pending=transition_ready=0;
 }
 static int hunk_used(void) {return hunk_low_used+hunk_high_used;}

@@ -3,6 +3,19 @@
 Runtime **v0.0.15-dev2**, source **0.12.0.dev2**, 27 September 2026.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 
+<!-- contents start -->
+## Contents
+
+- [Delivered scope](#delivered-scope)
+- [Diagnosis and host validation](#diagnosis-and-host-validation)
+- [Native acceptance by build](#native-acceptance-by-build)
+- [Exact environment and artifacts](#exact-environment-and-artifacts)
+- [Remaining reports](#remaining-reports)
+- [Live visibility trial and final control acceptance](#live-visibility-trial-and-final-control-acceptance)
+- [Ship contribution diagnostic](#ship-contribution-diagnostic)
+
+<!-- contents end -->
+
 ## Delivered scope
 
 Restore selected structural interior surfaces and their source UVs; retain

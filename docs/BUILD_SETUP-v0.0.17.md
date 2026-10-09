@@ -4,6 +4,21 @@ This source snapshot is for a local clean setup/build test before publication.
 The published v0.0.16 archives and tag remain unchanged. Do not run the old
 `publish_first_release.py` helper: it is specific to the initial v0.0.16 release.
 
+<!-- contents start -->
+## Contents
+
+- [Quickest build](#quickest-build)
+- [Changes](#changes)
+- [Progress and logs](#progress-and-logs)
+- [If a download fails](#if-a-download-fails)
+- [Evidence and remaining checks](#evidence-and-remaining-checks)
+- [Test-004 fixes](#test-004-fixes)
+- [Test-005: optional FS-UAE autorun](#test-005-optional-fs-uae-autorun)
+- [Test-006: cumulative candidate and default demo opening](#test-006-cumulative-candidate-and-default-demo-opening)
+- [Final source update](#final-source-update)
+
+<!-- contents end -->
+
 ## Quickest build
 
 ```sh

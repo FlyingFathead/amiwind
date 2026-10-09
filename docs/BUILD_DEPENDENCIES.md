@@ -1,5 +1,16 @@
 # Dependency checks and reference versions
 
+<!-- contents start -->
+## Contents
+
+- [Confirmed installation](#confirmed-installation)
+- [Version comparison](#version-comparison)
+- [Game inputs and editions](#game-inputs-and-editions)
+- [Original game inputs; remote-work archives are excluded](#original-game-inputs-remote-work-archives-are-excluded)
+- [Proposed bundled reference compiler](#proposed-bundled-reference-compiler)
+
+<!-- contents end -->
+
 The full AGA build has three kinds of dependency:
 
 | Source | Dependencies | Purpose |

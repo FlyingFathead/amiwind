@@ -2,6 +2,23 @@
 
 **Status: open.** The measured route still spends roughly 1.1 seconds in the transition-ready/presentation timing path. A bounded source candidate corrects one prediction error. A fresh native comparison improves prefix reuse but has mixed timing results; actual first-world-frame acceptance remains unmeasured. No overall speedup is claimed.
 
+<!-- contents start -->
+## Contents
+
+- [What was measured](#what-was-measured)
+- [Prediction finding and current source candidate](#prediction-finding-and-current-source-candidate)
+- [Matched native follow-up: prediction improves, timing remains mixed](#matched-native-follow-up-prediction-improves-timing-remains-mixed)
+- [Follow-on cache trace and allocator probe — 6 October 2026](#follow-on-cache-trace-and-allocator-probe--6-october-2026)
+- [Gap-probe setup limitation — 6 October 2026](#gap-probe-setup-limitation--6-october-2026)
+- [Timing caveats](#timing-caveats)
+- [Existing diagnostic controls and output](#existing-diagnostic-controls-and-output)
+- [A useful low-overhead profiler](#a-useful-low-overhead-profiler)
+- [Questions for an independent optimizer review](#questions-for-an-independent-optimizer-review)
+- [Acceptance still required](#acceptance-still-required)
+- [Scope clarification — 6 October 2026](#scope-clarification--6-october-2026)
+
+<!-- contents end -->
+
 ## What was measured
 
 Eight automatic outdoor crossings were recorded on one fixed route: four with each of two loading methods, split across both travel directions. The route used a fixed-height noclip movement to isolate loading; it does not represent ordinary walking, collision, or all boundary shapes. Assets and the engine were held constant within the run.

@@ -1,5 +1,39 @@
 # CONSOLE-HISTORY-ARROWS-32: Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 8 October 2026, in v0.0.32-dev1 |
+| Where | Console Up/Down history on the owner's FS-UAE (Ubuntu) |
+| Reproduction | unknown |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev1 (last seen) |
+| Severity | low: Console history recall seems dead for one owner setup; not reproduced. |
+| Family | Console, keyboard and mouse input (`console-input`) |
+| Playtest version | v0.0.32-dev1 |
+| From commit | source and engine 978475d |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 8 October 2026
 
 Open. Reported on v0.0.32-dev1. The arrows reach the game on the owner's
@@ -118,3 +152,20 @@ qualifiers through `Key_Event` into the console history, with the default
 `+forward`/`+back` bindings on the arrows, and replays the owner's trace
 with qualifier 32768. `tests/test_fsuae_keyboard_ports.py` keeps
 `joystick_port_1 = none` in every shipped FS-UAE configuration.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Console, keyboard and mouse input (`console-input`). The console line editor, qualifier keys and the emulator key path. See [families](README.md#families).
+
+- AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
+- AW25-05 (no report page): Console typed only uppercase letters and shifted digits
+- CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
+- [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
+- CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
+- [KEYS-AMIGA-EDIT-32](KEYS-AMIGA-EDIT-32.md): Amiga Del arrived as F11; FS-UAE sent Home/End as keypad ( and Help
+- MAP-VIEW-SWITCH-28 (no report page): Mouse cannot switch DEBUG / IN-GAME map views
+- VIEW-PITCH-CENTER-29 (no report page): Legacy automatic pitch centering during free-look
+
+<!-- END GENERATED CATEGORY -->

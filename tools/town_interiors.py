@@ -186,7 +186,11 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
     tasks = [(data, scene, {'map': room['map'], 'cell': room['cell'], 'interior': True, 'area': 'balmora',
                             **({} if room['cell'].casefold() in outside else {'original_door_arrivals': True})},
               qbsp, vis, light, timings, map_threads(jobs, workers), vis_mode) for room in work]
-    for room, (status, value) in zip(work, ordered_map(build_room_checked, tasks, workers)):
+    from build_costs import costed_map, room_sizes
+    sizes = room_sizes(data, [(room['map'], room['cell']) for room in work])
+    rooms = costed_map('town-%s-rooms' % town_field(settings, 'id'), build_room_checked, tasks,
+                       [room['map'] for room in work], workers, fallback=sizes.get if sizes else None)
+    for room, (status, value) in zip(work, rooms):
         if status != 'ok':
             if not dry_run:
                 raise ValueError(town_field(settings, 'title') + ' interior failed: ' + value)

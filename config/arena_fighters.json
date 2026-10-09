@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "about": "Vivec Arena debug minigame (dbgmode arenapit, docs/COMBAT.md): NPC records baked with combat frames (idle, run, attack, hit, knockdown, death) by tools/prepare_combat.py. The first row is the default opponent. Any other humanoid NPC record can still be chosen in game (gallery model or a stand-in, stats from combat/actors.txt). Add a row to add a fighter; each costs about 0.2 MB on disk.",
+  "fighters": [
+    {"id": "mevil molor", "note": "Arena drillmaster, level 9, steel mace and chitin shield"},
+    {"id": "ultis salam", "note": "Arena scout, level 9, steel longsword, boiled netch cuirass and helm"},
+    {"id": "farmin", "note": "Arena Waistworks warrior, level 8 (autocalculated), steel longsword"},
+    {"id": "seanwen", "note": "Arena master-at-arms, level 25, ebony longsword and shield (strong)"}
+  ]
+}

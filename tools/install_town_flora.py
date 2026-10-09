@@ -108,6 +108,18 @@ def derive_bindings(raw, source_index, scene_report, receipt, flora_index, entry
     return retained,bindings
 
 
+def town_entries(town):
+    """Region entries (name, coverage, origin) the image installs a town's flora into, for
+    towns whose entries come from their converter settings: Balmora. Seyda Neen's come from
+    the image's own region file (seyda-regions.json), so None here, as for other towns."""
+    if town != 'balmora':
+        return None
+    from balmora_regions import config, regions
+    settings = config()
+    origin = [v * settings['scale'] for v in settings['centre']] + [0.]
+    return [{**entry, 'origin': origin} for entry in regions(settings)]
+
+
 def install(scene, flora, palette, *, entries, town_source_index, town_scene_report=None,
             collision_packing='adaptive', work_dir=None):
     """Validate and stage every candidate before replacing any installed map.

@@ -6,6 +6,17 @@ stores shared one-frame MDL models separately. AWH4 catalogues bind original
 placements to those models. Existing AWH3 brush catalogues can coexist with
 AWH4 when they use the same original placement index.
 
+<!-- contents start -->
+## Contents
+
+- [Builder step](#builder-step)
+- [Inputs and identity](#inputs-and-identity)
+- [Conversion and staging](#conversion-and-staging)
+- [Memory and admission](#memory-and-admission)
+- [Current limits](#current-limits)
+
+<!-- contents end -->
+
 This path requires the corresponding AWH4 runtime. A generated payload is
 diagnostic evidence, not proof of native appearance, memory headroom or
 production admission. It does not activate mushrooms across the whole world.

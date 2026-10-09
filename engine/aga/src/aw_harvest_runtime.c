@@ -38,17 +38,41 @@ void AW_HarvestClear(void)
     AW_HarvestRelease(&harvest);pickup_available=0;
 }
 void AW_HarvestLink(void){AW_HarvestProxyLink();}
+static void load(const char *map)
+{
+    FILE *f=NULL;char path[64];int bytes;
+    if(strlen(map)>24)return;
+    sprintf(path,"harvest-%s.txt",map);bytes=COM_FOpenFile(path,&f);
+    if(f){if(!AW_HarvestLoad(f,bytes,&harvest))Con_Printf("Rejected harvest catalogue (data or allocation): %s\n",path);fclose(f);}
+}
 void AW_HarvestBegin(void)
 {
-    FILE *f=NULL;char map[32],path[64];const char *start,*end;int n,bytes;
+    char map[32];const char *start,*end;int n;
     AW_HarvestClear();
     if(!sv.worldmodel)return;
     start=strrchr(sv.worldmodel->name,'/');start=start?start+1:sv.worldmodel->name;
     end=strrchr(start,'.');n=end?(int)(end-start):(int)strlen(start);
     if(n<1 || n>24)return;
     memcpy(map,start,n);map[n]=0;
-    sprintf(path,"harvest-%s.txt",map);bytes=COM_FOpenFile(path,&f);
-    if(f){if(!AW_HarvestLoad(f,bytes,&harvest))Con_Printf("Rejected harvest catalogue (data or allocation): %s\n",path);fclose(f);}
+    load(map);
+}
+/* CHIM: a town running its frame map keeps its per-region catalogues
+ * (harvest-<region map>.txt; the frame map has none). region_at (aw_region.c
+ * AW_RegionAt) names the region the player is in; at arrival and on each
+ * region change within the frame the previous region's catalogue and
+ * proxies are released and the new one is loaded and spawned. The per-file
+ * limits and the saved facts are unchanged. Returns 0 on a legacy map
+ * (nothing done: the loaded region map's catalogue is the region's). */
+static int follow_region=-1;
+int AW_HarvestFollow(aw_harvest_region_at_t region_at,const float *origin,int arrival)
+{
+    char map[16];int id=region_at(origin,arrival?-1:follow_region,map,sizeof(map));
+    if(id<-1){follow_region=-1;return 0;}
+    if(!arrival && id==follow_region)return 1;
+    follow_region=id;AW_HarvestClear();
+    if(id>=0)load(map);
+    AW_HarvestSpawn();
+    return 1;
 }
 static int binding(edict_t *e)
 {

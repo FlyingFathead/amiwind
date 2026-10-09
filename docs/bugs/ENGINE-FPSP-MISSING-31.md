@@ -1,5 +1,24 @@
 # ENGINE-FPSP-MISSING-31: Boot disk loads no 68040 FPU support library; emulator hides it
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.31 |
+| Where | boot disk startup sequence (tools/build_aga.py), 68040 FPU |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.31, v0.0.32-dev (last seen) |
+| Severity | critical: Without a support library the engine stops on unimplemented FPU instructions on a real 68040. |
+| Family | FPU and CPU behaviour (68040/68060) (`fpu-cpu`) |
+| Playtest version | v0.0.31 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Measured in the emulator's strict FPU mode: the v0.0.31 engine stops
@@ -104,3 +123,16 @@ Not covered: a real support library and its trap handling.
 
 A strict-mode run (JIT off, starting with the probe program that proves the mode
 traps) in the benchmark sweep; the builder check for reachable instructions.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. See [families](README.md#families).
+
+- [ENGINE-FPU-DATA-DECODE-33](ENGINE-FPU-DATA-DECODE-33.md): The 68040 FPU check reads a pointer table in the engine code section as fintrz instructions
+- [ENGINE-FPU-UNIMPL-31](ENGINE-FPU-UNIMPL-31.md): Every-frame math traps on a real 68040 (sin+cos become cexp)
+- [EXTENTS-FPU-RULE-31](EXTENTS-FPU-RULE-31.md): Surface extents and lightmap sizes depended on the FPU's arithmetic
+- [TEST-FPU-STRICT-JIT-31](TEST-FPU-STRICT-JIT-31.md): Emulator strict FPU mode is silently ignored while JIT is on
+
+<!-- END GENERATED CATEGORY -->

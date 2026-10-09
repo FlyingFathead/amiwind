@@ -5,6 +5,7 @@
 #include "quakedef.h"
 #include "aw_format.h"
 #include "sound.h"
+#include "aw_log.h"
 #define FRAMES 8192
 #define BYTES (FRAMES*2)
 #define HISTORY 128
@@ -21,13 +22,14 @@ static int history[2][HISTORY], length[2], cursor[2]={-1,-1};
 static int opened[256], opened_count;
 static unsigned int rng=0x41c64e6dU;
 static int fade, previous_l, previous_r;
-static FILE *events;
+/* music-events.csv: an in-memory diagnostic log unless aw_logs_live (aw_log.c). */
+static int events;
 static char opened_file[12]="none";
 static unsigned long be32(byte *p) { return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3]; }
 static int random_bounded(int n) { rng=rng*1664525U+1013904223U;return (rng>>16)%n; }
 static void log_event(const char *why) {
     /* Buffer diagnostic writes; synchronous flushes do not belong in the mixer. */
-    if(events) fprintf(events,"%ld,%s,%d,%d,%s,%lu,%lu\n",(long)(Sys_FloatTime()*1000),why,mode,current,opened_file,played,total);
+    if(events) AW_LogPrintf(AW_LOG_MUSIC_EVENTS,"%ld,%s,%d,%d,%s,%lu,%lu\n",(long)(Sys_FloatTime()*1000),why,mode,current,opened_file,played,total);
 }
 void AW_MusicSceneEvent(const char *why) {log_event(why);}
 static void close_music(void) {
@@ -223,6 +225,28 @@ static void music_play(void) {
     Con_Printf("OST manual: track %02ld (%s)\n",(long)id,g==2?"special, then world playlist":g?"battle":"explore");
 }
 
+/* Combat (aw_combat.c, docs/COMBAT.md): the battle group plays while an NPC
+ * fights the player and the explore group returns when the fight ends, each
+ * switch starting a fresh track of the group (the original rule as OpenMW
+ * 0.51 files/data-mw/scripts/omw/music/music.lua implements it: the battle
+ * playlist outranks explore while any actor has combat targets). No switch
+ * during the opening hold or on the title screen. */
+static unsigned long combat_switches;
+void AW_MusicCombat(int on) {
+    int want=on?1:0;
+    if(!available || held || title_playing || counts[want]<1 || (mode==want && music))return;
+    mode=want;combat_switches++;fade=128;paused=0;
+    advance(want?"combat":"combat-end");
+}
+/* The player died: the special death track once (music.lua playerDied),
+ * then the current group's shuffle at its end. */
+void AW_MusicDeath(void) {
+    int g,id;
+    if(!available || held)return;
+    id=manual_lookup("mw_death",&g);
+    if(id<0 || !manual_preflight(id))return;
+    if(open_track(id,"death")){title_playing=0;paused=0;fade=128;}
+}
 static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
     if(!available || title_playing)return;
@@ -237,6 +261,7 @@ static void music_status(void) {
     if(queued>=(unsigned long)at)queued-=(unsigned long)at;
     Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);
     Con_Printf("OST read-ahead: %lu blocks / %lu bytes; queued %lu frames.\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks),queued);
+    Con_Printf("OST combat switches: %lu\n",combat_switches);
 }
 /* Deferred title start: lets the menu finish loading before the stream reads. */
 void AW_MusicTitleAfter(double seconds) {
@@ -298,7 +323,7 @@ int CDAudio_Init(void) {
     if(Q_fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
     fclose(f);available=1;paused=0;mode=0;loading=-1;
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
-    events=fopen("music-events.csv","w");if(events)fprintf(events,"time_ms,event,mode,track,file,played_frames,total_frames\n");
+    AW_LogHeader(AW_LOG_MUSIC_EVENTS,"time_ms,event,mode,track,file,played_frames,total_frames\n");events=1;
     Cmd_AddCommand("aw_music_play",music_play);
     Cmd_AddCommand("aw_music_next",music_next);Cmd_AddCommand("aw_music_previous",music_previous);
     Cmd_AddCommand("aw_music_mode",music_mode);Cmd_AddCommand("aw_music_status",music_status);
@@ -309,7 +334,12 @@ int CDAudio_Init(void) {
     return advance("start")?0:-1;
 }
 void CDAudio_Shutdown(void) {
-    FILE *f;int i;log_event("shutdown");close_music();if(events){fclose(events);events=NULL;}
-    f=fopen("music-profile.txt","w");
-    if(f){fprintf(f,"read_slices=%lu\nbytes_read=%lu\nread_errors=%lu\ntrack_opens=%lu\nlast_track=%d\nnatural_completions=%lu\nmanual_changes=%lu\nsynchronous_fills=%lu\n",reads,bytes_read,errors,opens,current,completions,manual_changes,sync_fills);fprintf(f,"buffer_blocks=%lu\nbuffer_bytes=%lu\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks));fprintf(f,"track_history=");for(i=0;i<opened_count;i++)fprintf(f,"%s%d",i?",":"",opened[i]);fprintf(f,"\n");fclose(f);}
+    int i;log_event("shutdown");close_music();if(events){AW_LogStreamClose(AW_LOG_MUSIC_EVENTS);events=0;}
+    AW_LogBegin(AW_LOG_MUSIC_PROFILE);
+    AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"read_slices=%lu\nbytes_read=%lu\nread_errors=%lu\ntrack_opens=%lu\nlast_track=%d\nnatural_completions=%lu\nmanual_changes=%lu\nsynchronous_fills=%lu\n",reads,bytes_read,errors,opens,current,completions,manual_changes,sync_fills);
+    AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"buffer_blocks=%lu\nbuffer_bytes=%lu\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks));
+    AW_LogWrite(AW_LOG_MUSIC_PROFILE,"track_history=");
+    for(i=0;i<opened_count;i++)AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"%s%d",i?",":"",opened[i]);
+    AW_LogWrite(AW_LOG_MUSIC_PROFILE,"\n");
+    AW_LogEnd(AW_LOG_MUSIC_PROFILE);
 }

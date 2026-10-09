@@ -4,6 +4,20 @@ Ground residents must stand on the converted walkable surface, including stairs,
 bridges, platforms and interior floors. Original placement Z is an input, not
 proof of foot contact after geometry conversion.
 
+<!-- contents start -->
+## Contents
+
+- [Classify the intended initial state first](#classify-the-intended-initial-state-first)
+- [Main gate: host build, before packaging](#main-gate-host-build-before-packaging)
+- [Runtime correction](#runtime-correction)
+- [Native integration checks](#native-integration-checks)
+- [Diagnostic RC2 exception](#diagnostic-rc2-exception)
+- [rc3 retained contact findings and rc6 early checking](#rc3-retained-contact-findings-and-rc6-early-checking)
+- [Source progression review, 1 October 2026](#source-progression-review-1-october-2026)
+- [rc7 mesh-aware correction](#rc7-mesh-aware-correction)
+
+<!-- contents end -->
+
 ## Classify the intended initial state first
 
 The question is whether the actor is meant to have ground support at game/scene

@@ -101,6 +101,10 @@ def prepare_staged_sky(id1,data_files,work_dir,*,shared_sky_source=None,local_sk
     report={'status':'prepared_owned_clouds','vivid_sky':True,'shared_sky_source':str(output),'palette_sha256':digest(palette),'sky_sha256':hashlib.sha256(raw).hexdigest(),'lookup_sha256':{name:digest(id1/'gfx'/name) for name in ('colormap.lmp','fog.lmp')},'sources':[r for _,r in clouds],'cloud_conversion':new_report,'changed_files':len(changes),'runtime_colour_mapping_required':True,'native_acceptance':False}
     report=with_night(report)
     # configure_staged_maps will install this exact sky immediately afterward.
-    marker.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    # The shipped marker names the source relative to the build work folder (the sky itself is
+    # identified by sky_sha256): an absolute path would make the payload depend on where the
+    # build ran (BUILD-PATH-IN-PAYLOAD-32). The returned report keeps the usable path.
+    shipped=dict(report,shared_sky_source=Path(work.name,output.name).as_posix())
+    marker.write_text(json.dumps(shipped,indent=2)+'\n',encoding='utf-8')
     (work/'sky-asset-preparation.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     return report

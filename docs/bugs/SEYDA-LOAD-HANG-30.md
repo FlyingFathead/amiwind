@@ -1,5 +1,24 @@
 # SEYDA-LOAD-HANG-30: rare freeze while loading in Seyda Neen
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | test |
+| First noticed | 7 October 2026, in v0.0.30-dev4 |
+| Where | Seyda Neen region load, music stream read (aw_music refill) |
+| Reproduction | sometimes |
+| Duplicate of | no |
+| Persists in | v0.0.30-dev4, v0.0.30-dev5 (last seen) |
+| Severity | critical: The game froze during a region load in about 5 of 70 automated runs. |
+| Family | Loading and disk reads (`disk-loading`) |
+| Playtest version | v0.0.30-dev4 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 7 October 2026
 
 Open. Seen only in automated FS-UAE runs; not reported in manual play.
@@ -59,3 +78,22 @@ pausing music streaming during region loads prevents the freeze.
 
 The WinUAE music crackles at transitions (AUDIO-LOAD-29 and related) come from
 the same streaming path being starved during loads.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Loading and disk reads (`disk-loading`). Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. See [families](README.md#families).
+
+- [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md): The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s
+- [CHIM-READ-RUNS-33](CHIM-READ-RUNS-33.md): CHIM crossings read little but in many separate runs, so FFS seeks dominate
+- [LOADER-STALL-32](LOADER-STALL-32.md): One unexplained stall while loading the Mages Guild with the new loader
+- PERF-READAHEAD-29 (no report page): Outdoor cell/sub-cell crossing pauses and lost read-ahead
+- [SEYDA-READ-SLOW-31](SEYDA-READ-SLOW-31.md): dev1 Seyda crossings read slower than the ov700 test image
+- [STREAM-FFS-SEEK-32](STREAM-FFS-SEEK-32.md): Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU
+
+Related bugs in other categories:
+
+- AUDIO-LOAD-29 (no report page): OST crackles under heavy loading
+
+<!-- END GENERATED CATEGORY -->

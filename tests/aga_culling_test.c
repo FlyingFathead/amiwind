@@ -4,6 +4,7 @@
 server_t sv;client_state_t cl;
 float xcenter,ycenter,xscale,yscale;
 #include <assert.h>
+#include <stdarg.h>
 static int inside;
 int AW_Interior(void){return inside;}
 int AW_DrawDistance(void);
@@ -13,7 +14,11 @@ static int argc=1;
 static char *argument="";
 int Cmd_Argc(void){return argc;}
 char *Cmd_Argv(int n){return argument;}
-void Con_Printf(char *fmt,...){}
+static char said[512];
+void Con_Printf(char *fmt,...){va_list a;va_start(a,fmt);vsnprintf(said+strlen(said),sizeof said-strlen(said),fmt,a);va_end(a);}
+extern int (*aw_chim_view_reach)(void);
+static int chim_reach;
+static int view_reach(void){return chim_reach;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_fog_distance"))distance_command=fn;}
 
 cvar_t aw_drawdistance={"aw_drawdistance","700",0,0,700};
@@ -59,10 +64,23 @@ int main(void) {
  inside=1;AW_CullBegin();assert(AW_ModelVisible(far_door,10));inside=0;
  argument="0";distance_command();assert(AW_DrawDistance()==400);
  argument="999999999999999999999";distance_command();assert(AW_DrawDistance()==400);
+ argument="4097";distance_command();assert(AW_DrawDistance()==400);
  argument="700junk";distance_command();assert(AW_DrawDistance()==400);
  argument="700";distance_command();assert(AW_DrawDistance()==700);
  sv.active=true;strcpy(sv.name,"balmora");assert(AW_DrawDistance()==540);
  assert(aw_drawdistance.value==700);strcpy(sv.name,"seyda");assert(AW_DrawDistance()==540);
  strcpy(sv.name,"prison");assert(AW_DrawDistance()==700);
+ /* No artificial clamps: beyond the old 1500 the setting holds where nothing
+  * else limits it; a CHIM map follows it up to its own world's data, and the
+  * command says what limits it. */
+ argument="2000";said[0]=0;distance_command();assert(AW_DrawDistance()==2000 && !strstr(said,"Here:"));
+ aw_chim_view_reach=view_reach;chim_reach=0;assert(AW_DrawDistance()==2000);
+ strcpy(sv.name,"balmora");assert(AW_DrawDistance()==540);
+ said[0]=0;argc=1;distance_command();assert(strstr(said,"Here: 540") && strstr(said,"region maps"));argc=2;
+ chim_reach=636;said[0]=0;distance_command();
+ assert(AW_DrawDistance()==636 && strstr(said,"Here: 636") && strstr(said,"CHIM world's visibility data"));
+ argument="600";said[0]=0;distance_command();assert(AW_DrawDistance()==600 && !strstr(said,"Here:"));
+ chim_reach=1200;argument="1100";distance_command();assert(AW_DrawDistance()==1100);
+ aw_chim_view_reach=NULL;assert(AW_DrawDistance()==540);
  puts("forward-depth culling retains visible edge/door and rejects far bounds");return 0;
 }

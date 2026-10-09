@@ -2,6 +2,19 @@
 
 This preserves the prior source snapshot; its versions and status are historical.
 
+<!-- contents start -->
+## Contents
+
+- [AmiWind](#amiwind)
+- [Current state of the project](#current-state-of-the-project)
+- [About AmiWind](#about-amiwind)
+- [Standing on the shoulders of giants](#standing-on-the-shoulders-of-giants)
+- [Current checkpoint: runtime v0.0.15-dev2 / source 0.12.1.dev1](#current-checkpoint-runtime-v0015-dev2--source-0121dev1)
+- [Start from your own installation](#start-from-your-own-installation)
+- [Project layout](#project-layout)
+
+<!-- contents end -->
+
 > Development checkpoint **v0.0.15-dev2 / source 0.12.1.dev1**: see
 > [setup](AGA_BUILD.md), [validation](CHECKPOINT_017_VALIDATION.md)
 > and the [WinUAE preset](../resources/emulators/AmiWind-v0.0.15-dev2-WinUAE.uae).
@@ -51,7 +64,7 @@ Debug FPS values show individual moments, not a hardware benchmark.*
 
 ## About AmiWind
 
-Created by **FlyingFathead a.k.a. Horstator**  
+Created by **FlyingFathead a.k.a. Horstator**\
 Thanks to: **ChaosWhisperer**
 
 > Massive thanks to everyone in the Amiga community who have been willing to

@@ -56,20 +56,42 @@ def proof_summary(detail):
         'protected_nonstatic_placements': len(detail.get('unsupported_static_cases', []))}
 
 
-def _prepare_hidden_map(source, work, enabled, exterior, processor):
-    """Worker prepares private evidence only; parent installs after all checks."""
+def _prepare_hidden_map(source, work, enabled, exterior, processor, cache=None):
+    """Worker prepares private evidence only; parent installs after all checks.
+
+    cache (pass_cache.PassCache or None, only for the builder's own processor):
+    a recorded result for the same input bytes, options and sources is used
+    instead of culling again (BUILD-IMAGE-NOT-INCREMENTAL-33)."""
     source, work = Path(source), Path(work)
     if enabled and exterior and processor is None:
         from cull_bsp_hidden import cull_bsp
         processor = cull_bsp
     raw = source.read_bytes()
-    before = bsp_counts(raw)
-    if not enabled:
-        output, detail = raw, {'status': 'disabled by explicit override'}
-    elif not exterior:
-        output, detail = raw, {'status': 'outside explicit exterior manifest'}
+    found = None
+    if cache is not None:
+        found = cache.load(digest(raw) + (':exterior' if exterior else ':other'))
+    if found is not None:
+        detail, output = found
+        output = raw if output is None else output
     else:
-        output, detail = processor(raw, enabled=True, scene_kind='exterior')
+        output, detail = _hidden_output(raw, enabled, exterior, processor)
+        if cache is not None:
+            detail = json.loads(json.dumps(detail))  # the form a cached detail has
+            cache.store(digest(raw) + (':exterior' if exterior else ':other'), detail,
+                        None if output == raw else output)
+    return _hidden_row(source, work, enabled, exterior, raw, output, detail)
+
+
+def _hidden_output(raw, enabled, exterior, processor):
+    if not enabled:
+        return raw, {'status': 'disabled by explicit override'}
+    if not exterior:
+        return raw, {'status': 'outside explicit exterior manifest'}
+    return processor(raw, enabled=True, scene_kind='exterior')
+
+
+def _hidden_row(source, work, enabled, exterior, raw, output, detail):
+    before = bsp_counts(raw)
     after = bsp_counts(output)
     if after['stored_faces'] > before['stored_faces']:
         raise ValueError('Hidden whole-surface removal increased stored faces: ' + source.stem)
@@ -79,7 +101,8 @@ def _prepare_hidden_map(source, work, enabled, exterior, processor):
            'removed_stored_faces': before['stored_faces'] - after['stored_faces'],
            'file_bytes_saved': len(raw) - len(output), 'details': proof_summary(detail)}
     if output != raw:
-        (work / 'originals' / source.name).write_bytes(raw)
+        from build_parallel import keep_original  # the map is replaced by rename below
+        keep_original(source, work / 'originals' / source.name, raw)
         (work / 'candidates' / source.name).write_bytes(output)
         proof_path = (work / 'proofs') / (source.stem + '.json')
         proof_path.write_text(json.dumps(detail, indent=2) + '\n', encoding='utf-8', newline='\n')
@@ -88,10 +111,10 @@ def _prepare_hidden_map(source, work, enabled, exterior, processor):
     return row, detail.get('status', detail.get('acceptance', 'proof pass complete'))
 
 
-def _prepared_maps(inputs, work, enabled, names, processor, jobs):
+def _prepared_maps(inputs, work, enabled, names, processor, jobs, cache=None):
     if jobs == 1:
         for source in inputs:
-            yield source, _prepare_hidden_map(source, work, enabled, source.stem in names, processor)
+            yield source, _prepare_hidden_map(source, work, enabled, source.stem in names, processor, cache)
         return
     # Only jobs pending results: never retain the entire world's BSP bytes.
     from build_parallel import process_pool, worker_environment
@@ -100,7 +123,7 @@ def _prepared_maps(inputs, work, enabled, names, processor, jobs):
         # Largest maps first so no big map starts last (results are sorted afterwards).
         iterator = iter(sorted(inputs, key=lambda p: (-p.stat().st_size, p.name)))
         def submit(source):
-            future = pool.submit(_prepare_hidden_map, source, work, enabled, source.stem in names, processor)
+            future = pool.submit(_prepare_hidden_map, source, work, enabled, source.stem in names, processor, cache)
             pending[future] = source
         for _ in range(min(jobs, len(inputs))): submit(next(iterator))
         while pending:
@@ -162,10 +185,18 @@ def cull_staged_maps(maps, work, exterior_maps, *, enabled=True, processor=None,
 
     save()
     try:
+        cache = None
         if enabled and processor is None:
             from cull_bsp_hidden import cull_bsp
             processor = cull_bsp
-        for source, (row, detail_status) in _prepared_maps(inputs, work, enabled, names, processor, jobs):
+            # Development builds reuse results for unchanged map bytes (pass_cache.py);
+            # only for the builder's own processor, whose sources are hashed.
+            from pass_cache import PassCache
+            import cull_bsp_hidden
+            cache = PassCache.open('hidden-surface-cull', {'enabled': enabled}, __file__, cull_bsp_hidden.__file__)
+            if cache is not None:
+                report['pass_cache'] = {'sources_sha256': cache.sources}
+        for source, (row, detail_status) in _prepared_maps(inputs, work, enabled, names, processor, jobs, cache):
             before, after = row['before'], row['after']
             report['maps'].append(row)
             print('[hidden-surface-cull] {}: {}; {}; stored faces {} -> {}; removed {}; {}'.format(
@@ -175,17 +206,21 @@ def cull_staged_maps(maps, work, exterior_maps, *, enabled=True, processor=None,
             save(progress=True)
         report['maps'].sort(key=lambda row: row['map'])
         # Verify all inputs again before installing anything into build staging.
-        for row in report['maps']:
-            if digest((maps / (row['map'] + '.bsp')).read_bytes()) != row['input_sha256']:
+        # The three checks hash every map (gigabytes): up to `jobs` workers each.
+        from build_parallel import hash_existing, hash_files
+        rows = report['maps']
+        for row, actual in zip(rows, hash_files([maps / (row['map'] + '.bsp') for row in rows], jobs)):
+            if actual != row['input_sha256']:
                 raise ValueError('Staged BSP changed during hidden-surface pass: ' + row['map'])
-        for row in report['maps']:
-            staged = candidates / (row['map'] + '.bsp')
-            if staged.exists():
-                if digest(staged.read_bytes()) != row['output_sha256']:
-                    raise ValueError('Hidden-surface output checksum mismatch: ' + row['map'])
-                staged.replace(maps / staged.name)
-        for row in report['maps']:
-            if digest((maps / (row['map'] + '.bsp')).read_bytes()) != row['output_sha256']:
+        staged = hash_existing([candidates / (row['map'] + '.bsp') for row in rows], jobs)
+        for row, actual in zip(rows, staged):
+            if actual is not None and actual != row['output_sha256']:
+                raise ValueError('Hidden-surface output checksum mismatch: ' + row['map'])
+        for row, actual in zip(rows, staged):
+            if actual is not None:
+                (candidates / (row['map'] + '.bsp')).replace(maps / (row['map'] + '.bsp'))
+        for row, actual in zip(rows, hash_files([maps / (row['map'] + '.bsp') for row in rows], jobs)):
+            if actual != row['output_sha256']:
                 raise ValueError('Installed BSP checksum mismatch: ' + row['map'])
         report.update(status='completed', map_count=len(inputs), exterior_map_count=len(names),
                       removed_stored_faces=sum(r['removed_stored_faces'] for r in report['maps']),

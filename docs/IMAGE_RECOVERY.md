@@ -9,6 +9,15 @@ approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.
 
+<!-- contents start -->
+## Contents
+
+- [Preserve and recover](#preserve-and-recover)
+- [Explicit private-test acceptance](#explicit-private-test-acceptance)
+- [Default NPC gallery: required unless explicitly disabled](#default-npc-gallery-required-unless-explicitly-disabled)
+
+<!-- contents end -->
+
 All NPCs and other game assets must remain intact, packaged and loadable by the
 engine for the complete game to function properly. Skipping their creation
 alongside either gallery is pointless and counterproductive: the final product

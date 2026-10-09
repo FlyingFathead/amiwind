@@ -1,5 +1,29 @@
 # v0.0.29-rc1 owner playtest ledger
 
+<!-- contents start -->
+## Contents
+
+- [HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026](#harvest-bittercoast-29-one-of-three-nearby-mushrooms-usable-6-october-2026)
+- [Latest scoped RC2 playtest confirmations: 6 October 2026](#latest-scoped-rc2-playtest-confirmations-6-october-2026)
+- [Latest v0.0.29-rc2 playtest report: 6 October 2026](#latest-v0029-rc2-playtest-report-6-october-2026)
+- [Current RC2 issue status: 2026-10-06T19:08:08+00:00](#current-rc2-issue-status-2026-10-06t1908080000)
+- [INTERIOR-LIGHT-29: RC2 measured checkpoint, 6 October 2026](#interior-light-29-rc2-measured-checkpoint-6-october-2026)
+- [v0.0.29-rc2: Let There Be (Just a Bit More) Light](#v0029-rc2-let-there-be-just-a-bit-more-light)
+- [Live-console comparison completed: 2026-10-06T20:52:21+03:00](#live-console-comparison-completed-2026-10-06t2052210300)
+- [Debug-only luminosity checkpoint: 2026-10-06T20:30:20+03:00](#debug-only-luminosity-checkpoint-2026-10-06t2030200300)
+- [Follow-up evidence and open reports: 2026-10-06T20:06:10+03:00](#follow-up-evidence-and-open-reports-2026-10-06t2006100300)
+- [Current RC1 regression checkpoint: 2026-10-06T15:03:42+00:00](#current-rc1-regression-checkpoint-2026-10-06t1503420000)
+- [Package identity and status](#package-identity-and-status)
+- [Balmora Temple geometry/collision - BALMORA-TEMPLE-GEOMETRY-29](#balmora-temple-geometrycollision---balmora-temple-geometry-29)
+- [Rendering and traversal](#rendering-and-traversal)
+- [Audio and interface](#audio-and-interface)
+- [Hands and combat](#hands-and-combat)
+- [Torch and local light](#torch-and-local-light)
+- [CENSUS-DOOR-STUCK-29](#census-door-stuck-29)
+- [Latest candidate gates and exact scope](#latest-candidate-gates-and-exact-scope)
+
+<!-- contents end -->
+
 ## HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026
 
 Open RC2 playtest report in **Bitter Coast**: only one of three nearby mushrooms

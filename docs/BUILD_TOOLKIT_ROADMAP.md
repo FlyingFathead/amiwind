@@ -3,6 +3,26 @@
 rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
 coverage and protected model quality remain mandatory.
 
+<!-- contents start -->
+## Contents
+
+- [Capacity before conversion](#capacity-before-conversion)
+- [Asset inventory and coverage receipts](#asset-inventory-and-coverage-receipts)
+- [Top engineering priority: practical world build times](#top-engineering-priority-practical-world-build-times)
+- [Establish the current pipeline before optimizing it](#establish-the-current-pipeline-before-optimizing-it)
+  - [Compile order and worker allocation audit](#compile-order-and-worker-allocation-audit)
+- [Checkpoint 1: measure phases and resource use](#checkpoint-1-measure-phases-and-resource-use)
+- [Checkpoint 2: improve the measured CPU and storage bottlenecks](#checkpoint-2-improve-the-measured-cpu-and-storage-bottlenecks)
+  - [Reuse across runs and reduce repeated BSP construction](#reuse-across-runs-and-reduce-repeated-bsp-construction)
+- [Checkpoint 3: investigate optional CPU plus GPU conversion](#checkpoint-3-investigate-optional-cpu-plus-gpu-conversion)
+- [Checkpoint 4: configuration, compatibility and acceptance](#checkpoint-4-configuration-compatibility-and-acceptance)
+- [Deferred possibility: GPU-assisted QCC](#deferred-possibility-gpu-assisted-qcc)
+  - [rc6 early-gate implementation](#rc6-early-gate-implementation)
+- [Separately rebuildable scenery: near-term design target](#separately-rebuildable-scenery-near-term-design-target)
+- [Mutable NPC equipment](#mutable-npc-equipment)
+
+<!-- contents end -->
+
 **Outside approval is required for any exception affecting either gallery.**
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,

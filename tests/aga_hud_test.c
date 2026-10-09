@@ -2,6 +2,8 @@
 #include "quakedef.h"
 #include <assert.h>
 void AW_UIHud(void){}
+static int photo_mode;int AW_PhotoModeActive(void){return photo_mode;}
+static int fill_x=-1,fill_w=-1,hint_draws;
 int AW_Interior(void){return 0;}
 int AW_FpsTenths(void){return 123;}
 static int clock_ok=1,clock_hour=23,clock_minute=59;
@@ -33,16 +35,18 @@ char *arg="on",last[128],title[128];
 int Cmd_Argc(void) {return argc;}
 char *Cmd_Argv(int n) {return arg;}
 void Con_Printf(char *fmt,...) {}
-int AW_LightGalleryDraw(void){return 0;}
+static int light_gallery,light_draws;
+int AW_LightGalleryDraw(void){if(!light_gallery)return 0;light_draws++;return 1;}
 int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
 void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<settings_count;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
 void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"amiwind_debug_compass"))compass_command=fn;else if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;else if(!strcmp(name,"aw_debug_hud_type"))hud_type=fn;}
-void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;if(y+h==vid.height)assert(x==88);assert(y+h==vid.height || (y==19 && h==10 && x==8 && w==80));}
+void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;fill_x=x;fill_w=w;if(y+h==vid.height)assert(photo_mode?x==0 && w==vid.width:x==88);assert(y+h==vid.height || (y==19 && h==10 && x==8 && w==80));}
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
 static int small_draws,compass_draws;static char global_line[80],local_line[80],bearing[96];
 void AW_SmallString(int x,int y,const char *s){
  if(y==8){assert(x==8);strcpy(title,s);small_draws++;return;}
+ if(!strcmp(s,"WASD / F10 console")){hint_draws++;return;}
  assert(x>=88 && x+strlen(s)*4<=312);
  if(y==174){strcpy(bearing,s);compass_draws++;}
  else if(y==184)strcpy(global_line,s);
@@ -100,6 +104,27 @@ int main(void) {
   float yaw[]={90,180,270,360,45};
   for(i=0;i<5;i++){cl.viewangles[YAW]=yaw[i];Sbar_Draw();assert(!strncmp(bearing,expected[i],strlen(expected[i])));assert(strstr(bearing," / REGION: Bitter Coast Region"));}
   assert(compass_draws==n+5);key_dest=key_menu;Sbar_Draw();assert(compass_draws==n+5);key_dest=key_game;
+ }
+ /* PHOTO-DEBUG-STRIP-33: Ctrl+H in photo mode (dbg hud over a full-screen view)
+  * blacks out the coordinate strip across the whole width, not from x=88;
+  * the input hint never draws over the photo-mode view. */
+ {int n=hint_draws;
+  arg="on";master();photo_mode=1;Sbar_Draw();assert(fill_y==182 && fill_x==0 && fill_w==320);
+  photo_mode=0;Sbar_Draw();assert(fill_x==88 && fill_w==232);
+  arg="off";command();photo_mode=1;Sbar_Draw();assert(hint_draws==n);
+  photo_mode=0;Sbar_Draw();assert(hint_draws==n+1);
+  arg="0";master();
+ }
+ /* The light gallery strip: shown normally (it replaces the bottom HUD), hidden in
+  * photo mode, back with Ctrl+H (dbg hud), shown again after photo mode. */
+ {int n=small_draws;
+  light_gallery=1;light_draws=0;
+  Sbar_Draw();assert(light_draws==1 && small_draws==n);
+  photo_mode=1;Sbar_Draw();assert(light_draws==1);
+  arg="on";master();Sbar_Draw();assert(light_draws==2 && small_draws==n); /* Ctrl+H: strip, as with dbg hud normally */
+  arg="0";master();Sbar_Draw();assert(light_draws==2);
+  photo_mode=0;Sbar_Draw();assert(light_draws==3);
+  light_gallery=0;
  }
  strcpy(sv.name,"census");strcpy(cl.levelname,"Census and Excise Office");
  arg="1";master();assert(AW_DebugCoordsEnabled() && !scr_showram.value);

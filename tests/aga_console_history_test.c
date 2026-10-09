@@ -236,3 +236,4 @@ static void terminal_section(void){
  /* No file: nothing loaded, nothing breaks. */
  remove("console-history.txt");reset_console();Key_ConsoleInit(".");assert(edit_line==0);
 }
+int AW_PhotoKey(int key){(void)key;return 0;}

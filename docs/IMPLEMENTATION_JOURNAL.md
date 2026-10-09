@@ -4,23 +4,8 @@ Started 27 September 2026, after v0.0.13-dev1 / checkpoint-014. Record a finding
 when it changes a design or exposes an assumption. Append later corrections
 instead of erasing old results. Keep rejected trials and their evidence.
 
-Entry format: **symptom -> confirmed cause (or hypothesis) -> change -> first
-fixed version -> evidence -> regression check -> remaining limitation**.
-Distinguish host tests, native tests and owner confirmation. Never assign a fix
-version to an unresolved hypothesis. Raw extracts, screenshots and source lookup
-tables remain private; public notes describe the mapping. Untried proposals live
-in [IMPLEMENTATION_IDEAS.md](IMPLEMENTATION_IDEAS.md).
-
-Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NEEN.md).
-
-## Index
-
-- [J031 — connected ground, shoreline samples and protected typing](#j031--connected-ground-shoreline-samples-and-protected-typing)
-
-- [J024 — initial NPC support and incomplete overlap collision](#j024--initial-npc-support-and-incomplete-overlap-collision)
-- [J025 — RC2 gallery and bounded geometry exceptions](#j025--rc2-gallery-and-bounded-geometry-exceptions-1-october-2026)
-- [J026 — completing the missing gallery appearances](#j026--completing-the-missing-gallery-appearances)
-- [J027 — pale faces mapped back to sky grey](#j027--pale-faces-mapped-back-to-sky-grey)
+<!-- contents start -->
+## Contents
 
 - [Verified mapping at checkpoint-014](#verified-mapping-at-checkpoint-014)
 - [J001 — later pier faces disappeared](#j001--later-pier-faces-disappeared)
@@ -40,6 +25,8 @@ Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NE
 - [J014 — eye height, hands and repeatable reports (checkpoint-016)](#j014--eye-height-hands-and-repeatable-reports-checkpoint-016)
 - [v0.0.15-dev2: curved interior shell and placed deletion](#v0015-dev2-curved-interior-shell-and-placed-deletion)
 - [28 September 2026: UI checkpoint preparation](#28-september-2026-ui-checkpoint-preparation)
+  - [Baseline and recovery](#baseline-and-recovery)
+  - [Font and UI decisions](#font-and-ui-decisions)
 - [2026-09-28: actor poses, escort and palette work (0.0.18-dev2 candidate)](#2026-09-28-actor-poses-escort-and-palette-work-0018-dev2-candidate)
 - [v0.0.18-dev2 native checkpoint result](#v0018-dev2-native-checkpoint-result)
 - [v0.0.18-dev3: alias cache and front-end palette](#v0018-dev3-alias-cache-and-front-end-palette)
@@ -53,7 +40,31 @@ Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NE
 - [J019 — independent fighting gates, target hints and container contents](#j019--independent-fighting-gates-target-hints-and-container-contents)
 - [J020 — repeatable room standing-hull audit](#j020--repeatable-room-standing-hull-audit)
 - [J021 — door-shaped cuts remove redundant runtime geometry](#j021--door-shaped-cuts-remove-redundant-runtime-geometry)
+- [J022 — accepted sub-cell loading presentation (30 September 2026)](#j022--accepted-sub-cell-loading-presentation-30-september-2026)
+- [J023 — Balmora dev3 acceptance and second stair report](#j023--balmora-dev3-acceptance-and-second-stair-report)
+- [v0.0.24-dev5: measured Balmora and ship follow-up](#v0024-dev5-measured-balmora-and-ship-follow-up)
+- [RC1 — Balmora completion and repeatable conversion checks](#rc1--balmora-completion-and-repeatable-conversion-checks)
+- [J024 — initial NPC support and incomplete overlap collision](#j024--initial-npc-support-and-incomplete-overlap-collision)
+- [J025 — RC2 gallery and bounded geometry exceptions, 1 October 2026](#j025--rc2-gallery-and-bounded-geometry-exceptions-1-october-2026)
+- [J026 — completing the missing gallery appearances](#j026--completing-the-missing-gallery-appearances)
+- [J027 — pale faces mapped back to sky grey](#j027--pale-faces-mapped-back-to-sky-grey)
+- [J028 — one island, measured cells and earned journal entries](#j028--one-island-measured-cells-and-earned-journal-entries)
+- [J029 - Final v0.0.24 milestone and release imagery](#j029---final-v0024-milestone-and-release-imagery)
+- [J030 - Island terrain, corrected UI and storage policy](#j030---island-terrain-corrected-ui-and-storage-policy)
+- [J031 — connected ground, shoreline samples and protected typing](#j031--connected-ground-shoreline-samples-and-protected-typing)
+- [J032 — rc1 source reconciliation, 1 October 2026](#j032--rc1-source-reconciliation-1-october-2026)
+- [J033 — rc2 local builder inputs, 1 October 2026](#j033--rc2-local-builder-inputs-1-october-2026)
 
+<!-- contents end -->
+
+Entry format: **symptom -> confirmed cause (or hypothesis) -> change -> first
+fixed version -> evidence -> regression check -> remaining limitation**.
+Distinguish host tests, native tests and owner confirmation. Never assign a fix
+version to an unresolved hypothesis. Raw extracts, screenshots and source lookup
+tables remain private; public notes describe the mapping. Untried proposals live
+in [IMPLEMENTATION_IDEAS.md](IMPLEMENTATION_IDEAS.md).
+
+Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NEEN.md).
 
 ## Verified mapping at checkpoint-014
 

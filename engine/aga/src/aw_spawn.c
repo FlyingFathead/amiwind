@@ -110,23 +110,44 @@ static qboolean map_clear_start(edict_t *p,vec3_t top,vec3_t bottom)
 }
 
 /* Explicit debug-map arrival: keep the chosen XY, find the highest walkable
- * surface below the scene ceiling, and test the complete standing hull. A failed
- * request must not install unchecked coordinates. */
-qboolean AW_MapPlace(edict_t *p,const float *xy)
+ * surface below the scene ceiling (or below a given height), and test the
+ * complete standing hull. A failed request must not install unchecked
+ * coordinates. */
+/* Why the last map placement failed (said by a debug teleport that falls back). */
+const char *aw_map_place_failure="";
+static qboolean map_place(edict_t *p,const float *xy,float ceiling)
 {
     vec3_t top,bottom,point;
-    if(!p || !sv.worldmodel || !isfinite(xy[0]) || !isfinite(xy[1]) ||
+    aw_map_place_failure="outside the map";
+    if(!p || !sv.worldmodel || !isfinite(xy[0]) || !isfinite(xy[1]) || !isfinite(ceiling) ||
        fabs(xy[0])>=4000 || fabs(xy[1])>=4000)return false;
     top[0]=bottom[0]=xy[0];top[1]=bottom[1]=xy[1];
     top[2]=sv.worldmodel->maxs[2]-p->v.maxs[2]-4;
+    if(ceiling<top[2])top[2]=ceiling;
     bottom[2]=sv.worldmodel->mins[2]-p->v.mins[2]+4;
     if(top[2]>3990)top[2]=3990;
     if(bottom[2]<-3990)bottom[2]=-3990;
-    if(!isfinite(top[2]) || !isfinite(bottom[2]) || top[2]<=bottom[2] ||
-       !map_clear_start(p,top,bottom) || !floor_at(p,top,bottom,point) ||
-       !map_water_surface(p,top,point))return false;
+    if(!isfinite(top[2]) || !isfinite(bottom[2]) || top[2]<=bottom[2])return false;
+    aw_map_place_failure="no clear space at the top of the search";
+    if(!map_clear_start(p,top,bottom))return false;
+    aw_map_place_failure="no walkable floor below";
+    if(!floor_at(p,top,bottom,point))return false;
+    aw_map_place_failure="water surface not standable";
+    if(!map_water_surface(p,top,point))return false;
+    aw_map_place_failure="";
     VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);
     VectorCopy(vec3_origin,p->v.velocity);
     p->v.flags=(int)p->v.flags & ~FL_ONGROUND;SV_LinkEdict(p,false);
     return true;
+}
+qboolean AW_MapPlace(edict_t *p,const float *xy)
+{
+    return map_place(p,xy,4000);
+}
+/* dbg tp X Y Z: the first walkable surface at or below Z (the player's centre
+ * there; a solid start steps down up to 128 units), so a bridge, a roof or an
+ * upper floor is kept instead of the highest surface. Checked as AW_MapPlace. */
+qboolean AW_MapPlaceBelow(edict_t *p,const float *point)
+{
+    return point && isfinite(point[2]) && fabs(point[2])<4000 && map_place(p,point,point[2]);
 }

@@ -8,6 +8,19 @@ move-along greetings. Resolve their actual record IDs and conditions from the
 installation before implementation; do not assume a remembered phrase is a
 voiced line or invent a sound mapping for a text-only response.
 
+<!-- contents start -->
+## Contents
+
+- [References and observed behaviour](#references-and-observed-behaviour)
+- [Proposed conversion contract](#proposed-conversion-contract)
+- [Appearance and acceptance plan](#appearance-and-acceptance-plan)
+- [27 September 2026 conversion research handoff](#27-september-2026-conversion-research-handoff)
+- [Checkpoint-012 implemented subset](#checkpoint-012-implemented-subset)
+- [Checkpoint-013: three distinct behavior paths](#checkpoint-013-three-distinct-behavior-paths)
+- [Expanded host roster and activity work](#expanded-host-roster-and-activity-work)
+
+<!-- contents end -->
+
 ## References and observed behaviour
 
 - [UESP: Morrowind — Generic Dialogue Voiced](https://en.uesp.net/wiki/Morrowind:Generic_Dialogue_Voiced)

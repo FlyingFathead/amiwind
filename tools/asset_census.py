@@ -196,10 +196,10 @@ def mesh_census(vertices, faces, collision, profile, materials):
         cv, cf = collision if (collision is not None and profile.get('collision_source')) else (v, f)
         pieces, exact, _ = collision_pieces(cv, cf, profile)
         cpl = set()
-        for points, hull, ids, error in pieces:
+        for k, (points, hull, ids, error) in enumerate(pieces):
             point_eq = np.unique(np.round(hull.equations, 5), axis=0)
             out['nodes'] += len(point_eq)
-            standing = standing_planes(points, point_eq, exact)
+            standing = standing_planes(points, point_eq, exact is True or (bool(exact) and k in exact))
             out['clipnodes'] += len(standing)
             cpl.update(tuple(np.round(e, 5)) for e in point_eq)
             cpl.update(tuple(np.round(e, 5)) for e in standing)

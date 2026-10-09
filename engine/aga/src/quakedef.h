@@ -375,6 +375,18 @@ void AW_NoclipVelocity(vec3_t view, usercmd_t *cmd, float maximum, vec3_t out);
 void AW_NoclipDebugVelocity(vec3_t view,usercmd_t *cmd,float maximum,
                            int fast,int shifted,float shift_scale,vec3_t out);
 int AW_DebugOverlaysEnabled(void);
+/* Photo mode (aw_photo.c): dbg photomode / dbg killhud, dbg crosshair. */
+void AW_PhotoInit(void);
+int AW_PhotoModeActive(void);
+int AW_PhotoModeAvailable(void);
+int AW_PhotoModeSet(int on);
+void AW_PhotoConfigRestore(void);
+void AW_PhotoDraw(void);
+int AW_PhotoNoticeShowing(void);
+void AW_PhotoConsoleReminder(void);
+int AW_PhotoKey(int key);
+int AW_CrosshairShown(void);
+void AW_CrosshairSet(int on);
 void IN_AWClearButtons(void);
 
 void AW_ConsoleInit(void);
@@ -489,6 +501,7 @@ int AW_UIWidth(const char *);
 int AW_UIHeight(void);
 const char *AW_UILine(const char *,int,char *,int);
 void AW_UISubtitle(const char *,const char *,double);
+int AW_UISubtitleIs(const char *text);
 void AW_UIPickupNotice(const char *text,double duration);
 void AW_UICenterMessage(const char *);
 void AW_UIDraw(void);
@@ -506,10 +519,18 @@ void AW_UIObjectName(const char *name,int style);
 int AW_IntroPromptActive(void);
 const char *AW_SceneTargetName(void);
 edict_t *AW_NPCTarget(edict_t *player,vec3_t angles);
+edict_t *AW_NPCTargetReach(edict_t *player,vec3_t angles,float reach);
 int AW_NPCFloor(edict_t *actor);
 int AW_AliasBudgetAllows(int vertices,int triangles);
 int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const byte *raw,int bytes);
 int AW_GalleryActive(void);
+int AW_GalleryOmitted(void);
+/* Quick test builds (tools/build.py --exclude): id1/excluded-content.txt, aw_excluded.c. */
+int AW_ContentExcluded(const char *group);
+const char *AW_ContentExcludedNotice(const char *group);
+int AW_ContentExcludedSay(const char *group,int always);
+void AW_ContentExcludedStartup(void);
+void AW_ExcludedReset(void);
 int AW_TorchTestActive(void);
 int AW_DebugTestInputActive(void);
 int AW_GalleryModal(void);
@@ -544,6 +565,42 @@ int AW_NavLoad(const char *);
 int AW_NavStart(edict_t *,vec3_t);
 int AW_NavStep(double,int);
 qboolean AW_ActorStep(edict_t *,vec3_t,double);
+/* Debug companion (aw_companion.c). */
+void AW_CompanionInit(void);
+void AW_CompanionPhysics(void);
+void AW_CompanionSceneSpawn(edict_t *player);
+int AW_CompanionEdict(edict_t *e);
+int AW_CompanionHome(edict_t *e,vec3_t origin,vec3_t angles);
+int AW_CompanionSkipSave(edict_t *e);
+void AW_CompanionSaveSwap(int begin);
+int AW_CompanionCrosshair(int x,int y);
+int AW_CompanionButtons(int bits);
+int AW_CompanionPickMode(void);
+/* Hooks set by AW_CompanionInit, defined beside their callers (NULL in
+ * fixtures that compile those files alone): view.c, cl_input.c,
+ * aw_scene.c, aw_save.c. */
+extern int (*aw_companion_crosshair)(int x,int y);
+extern int (*aw_companion_buttons)(int bits);
+extern void (*aw_companion_scene)(edict_t *player);
+extern int (*aw_companion_home)(edict_t *e,vec3_t origin,vec3_t angles);
+/* Melee combat for every NPC (aw_combat.c, aw_combat.h) and the Vivec Arena
+ * debug minigame (aw_arena.c). Hooks defined beside their callers: aw_ui.c,
+ * aw_scene.c. */
+void AW_CombatInit(void);
+void AW_CombatPhysics(void);
+void AW_MusicCombat(int on);
+void AW_MusicDeath(void);
+extern int (*aw_combat_enemy_bar)(float *fraction,float *alpha);
+extern void (*aw_combat_scene)(void);
+int AW_ArenaActive(void);
+void AW_ArenaEntities(void);
+void AW_ArenaSpawn(edict_t *player);
+int AW_ArenaKey(int key,int down);
+void AW_ArenaDraw(void);
+void AW_UIEnemyBar(float fraction,float alpha);
+int AW_CompanionDistance(void);
+int AW_CompanionMimic(void);
+int AW_CompanionToggleWord(char *word);
 int AW_MovieStart(void);
 void AW_MovieInit(void);
 void AW_MovieStartup(void);

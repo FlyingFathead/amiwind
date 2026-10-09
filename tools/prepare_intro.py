@@ -107,7 +107,8 @@ def _actor(task):
     return identifier,role,raw,report
 
 
-def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None):
+def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None,movie=True,cache=None,cache_report=None):
+    """CACHE: a per-file cache folder for the movie (tools/file_cache.py); None converts it. movie=False: quick test build."""
     data=ensure_external(data,'owned data');scene=ensure_external(scene,'existing scene');out=ensure_external(out,'intro conversion')
     if out.exists():raise ValueError('Choose a new output')
     shutil.copytree(scene,out)
@@ -170,10 +171,17 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None):
     videos=[p for p in data.rglob('*') if p.is_file() and
             p.name.casefold()=='mw_intro.bik' and p.parent.name.casefold()=='video']
     if len(videos)>1:raise ValueError('Multiple intro movies; select one installation')
-    if videos:
-        from prepare_video import prepare_video
-        converted=out/'intro-video';report['movie']=prepare_video(videos[0],converted,ffmpeg)
+    if not movie:
+        # Quick test build (--exclude video, tools/build_exclusions.py): New Game starts in the ship.
+        print('Quick test build: intro movie left out (--exclude video).',flush=True)
+        report['movie']={'status':'excluded by --exclude video (quick test build); start directly in ship'}
+    elif videos:
+        from prepare_video import cached_prepare_video,video_cache_identity
+        converted=out/'intro-video'
+        report['movie'],outcome=cached_prepare_video(videos[0],converted,ffmpeg,cache=(str(cache),video_cache_identity(ffmpeg)) if cache else None)
         shutil.copyfile(converted/'mw_intro.awv',out/'id1/intro/mw_intro.awv')
+        from file_cache import write_report
+        write_report(cache_report,'intro',{'videos':{'hit':int(outcome=='hit'),'miss':int(outcome!='hit'),'enabled':bool(cache)}})
     else:
         print('[warning] Video not found; will not be included: Video/mw_intro.bik',flush=True)
         report['movie']={'status':'missing optional Video/mw_intro.bik; start directly in ship'}
@@ -184,4 +192,8 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','out'):p.add_argument('--'+n,type=Path,required=True)
-    p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);a=p.parse_args();prepare(a.data_files,a.scene,a.out,a.ffmpeg,a.jobs)
+    p.add_argument('--ffmpeg',default='ffmpeg')
+    p.add_argument('--no-movie',action='store_true',help='Quick test build (--exclude video): leave the intro movie out')
+    p.add_argument('--cache',type=Path,help='Per-file cache folder: the movie converted before (same source, size, ffmpeg and code) is copied and verified instead of converted again')
+    p.add_argument('--cache-report',type=Path,help='Write the per-file cache hits and misses here (build summary)')
+    add_jobs(p);a=p.parse_args();prepare(a.data_files,a.scene,a.out,a.ffmpeg,a.jobs,movie=not a.no_movie,cache=a.cache,cache_report=a.cache_report)

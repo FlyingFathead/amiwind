@@ -95,7 +95,9 @@ def inspect_sprites(entity_bytes,asset_root,sizes):
             except (KeyError,ValueError):raise ValueError('Missing/invalid flora scale')
             if not math.isfinite(scale) or scale<=0:raise ValueError('Invalid flora scale')
         instances.append(model)
-    if len(instances)>512:raise ValueError('Static sprite entity limit exceeded')
+    # The engine's static entity budget (client.h MAX_STATIC_ENTITIES, tools/engine_limits.py).
+    from engine_limits import limits as engine_limits
+    if len(instances)>engine_limits()['max_static_entities']:raise ValueError('Static sprite entity limit exceeded')
     # Reserve room for player/world baselines and signon control messages.
     # Count even model-less map records conservatively; no content is omitted.
     signon += 1024

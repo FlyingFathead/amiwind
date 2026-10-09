@@ -152,3 +152,4 @@ int main(void){
 #endif
     return 0;
 }
+int AW_PhotoModeActive(void){return 0;}

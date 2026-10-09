@@ -22,13 +22,23 @@ LINUX = build_profile.linux_proc()
 
 # A stage that starts N processes, each burning SECONDS of CPU, and waits for them.
 BURN = '''
-import subprocess, sys, time
+import json, os, resource, subprocess, sys, time
+began = time.monotonic()
 n, seconds = int(sys.argv[1]), float(sys.argv[2])
 code = "import time\\nend = time.process_time() + %r\\nwhile time.process_time() < end: pass" % seconds
 children = [subprocess.Popen([sys.executable, "-c", code]) for _ in range(n)]
 assert all(child.wait() == 0 for child in children)
+report = os.environ.get('AMIWIND_TEST_BURN_REPORT')
+if report:
+    own, waited = resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN)
+    with open(report, "w") as out:
+        json.dump({"cpu": own.ru_utime + own.ru_stime + waited.ru_utime + waited.ru_stime,
+                   "span": time.monotonic() - began}, out)
 print("burned", n, seconds)
 '''
+# Where a burn stage writes its own CPU (itself plus its waited-for children, from getrusage)
+# and the wall span it saw: an independent reading to compare the profiler with.
+BURN_REPORT_ENV = 'AMIWIND_TEST_BURN_REPORT'
 
 
 def burn_stage(n, seconds):
@@ -67,27 +77,50 @@ def fixture_profile(run, walls, wall_seconds=None, fingerprints=None):
 @unittest.skipUnless(LINUX, 'process counters need Linux /proc')
 class MeasuredStageTests(unittest.TestCase):
     def test_cpu_and_wall_of_a_stage_and_all_its_children(self):
-        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {build_profile.INTERVAL_ENV: '0.05'}):
+        # TEST-PROFILE-STAGE-WALL-32: how much the three children overlap is the host's
+        # business (a busy host runs them partly one after another, so wall can exceed CPU).
+        # The profiler is checked against independent readings of the same stage instead:
+        # its CPU against the stage's own getrusage (itself plus its waited-for children),
+        # its wall against the span the stage saw and the time around the run.
+        with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            steps = [('media', burn_stage(3, 0.6)), ('music', [sys.executable, '-c', 'import time; time.sleep(.3)'])]
-            with contextlib.redirect_stdout(io.StringIO()):
-                execute_parallel(steps, root / 'run', {'compiler_jobs': 4}, root)
+            report = root / 'burn.json'
+            with patch.dict(os.environ, {build_profile.INTERVAL_ENV: '0.05', BURN_REPORT_ENV: str(report)}):
+                steps = [('media', burn_stage(3, 0.6)), ('music', [sys.executable, '-c', 'import time; time.sleep(.3)'])]
+                began = time.monotonic()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    execute_parallel(steps, root / 'run', {'compiler_jobs': 4}, root)
+                elapsed = time.monotonic() - began
+            seen = json.loads(report.read_text())
             profile = json.loads((root / 'run' / build_profile.PROFILE_NAME).read_text())
             burn = next(row for row in profile['stages'] if row['name'] == 'media')
             idle = next(row for row in profile['stages'] if row['name'] == 'music')
-            # Three children at 0.6 s each plus four interpreter start-ups.
+            # Three children at 0.6 s each plus four interpreter start-ups, all counted.
             self.assertGreater(burn['cpu'], 1.7)
             self.assertLess(burn['cpu'], 2.8)
+            self.assertAlmostEqual(burn['cpu'], seen['cpu'], delta=0.1)
             self.assertAlmostEqual(burn['cpu'], burn['cpu_user'] + burn['cpu_system'], places=2)
-            self.assertLess(burn['wall'], burn['cpu'])
-            self.assertGreater(burn['cores_avg'], 1.2)
+            # Wall covers the stage's own span and lies within the run; no host-load bound.
+            self.assertGreaterEqual(burn['wall'], seen['span'] - 0.01)
+            self.assertGreaterEqual(burn['wall'], 0.6)
+            self.assertLessEqual(burn['wall'], elapsed + 0.01)
+            self.assertAlmostEqual(burn['cores_avg'], burn['cpu'] / burn['wall'], delta=0.006)
             self.assertGreater(burn['peak_process_rss_bytes'], 1024 * 1024)
             self.assertLess(idle['cpu'], 0.3)
             self.assertGreaterEqual(idle['wall'], 0.3)
-            # The sampled timeline sees the burning stage use more than one core at once.
+            # The sampled timeline follows the whole process tree: summed over the samples it
+            # sees most of the children's CPU, far more than the waiting stage process uses,
+            # and sees it while the children run: a sampler blind to live children sees their
+            # CPU only in one jump, when the stage process reaps them.
             timeline = profile['timeline']
             self.assertGreater(len(timeline['t']), 5)
-            self.assertGreater(max(cores for _, cores in timeline['stages']['media']), 1.5)
+            times = timeline['t']
+            seconds = [cores * (times[i] - times[i - 1]) for i, cores in timeline['stages']['media'] if i > 0]
+            self.assertGreater(sum(seconds), 1.0)
+            # Samples are rounded cores over jittered intervals: allow 0.2 s over the exact CPU
+            # (TEST-PROFILE-TIMELINE-BOUND-33: 0.1 failed by 0.00006 s on a busy host).
+            self.assertLess(sum(seconds), burn['cpu'] + 0.2)
+            self.assertLess(max(seconds), 0.5 * sum(seconds))
             self.assertGreater(burn['peak_tree_rss_bytes'], 3 * 1024 * 1024)
             state = json.loads((root / 'run' / 'build-state.json').read_text())
             entry = next(step for step in state['steps'] if step['name'] == 'media')

@@ -4,6 +4,7 @@
  */
 #include "quakedef.h"
 #include "aw_maps.h"
+#include "aw_region.h"
 #include "aw_world.h"
 #include "aw_town.h"
 #include <stdint.h>
@@ -77,15 +78,13 @@ static int valid_town(const terrain_region_t *t){
 }
 /* A table frame joins the world only when its arrival alias map exists. */
 static void table_towns(void){
-    int i,k;FILE *f;char path[40];const aw_town_t *t;
+    int i,k;char path[40];const aw_town_t *t;
     for(i=0;i<AW_TOWN_COUNT;i++){
         t=AW_Town(i);if(t->world_slot>=0 || !t->handoff)continue;
         for(k=0;k<3;k++)towns[i].origin[k]=t->origin[k];
         for(k=0;k<4;k++)towns[i].core[k]=t->core[k];
         if(!valid_town(&towns[i]))continue;
-        sprintf(path,"maps/%s.bsp",t->name);f=NULL;
-        if(COM_FOpenFile(path,&f)>=124 && f)town_ready[i]=1;
-        if(f)fclose(f);
+        if(AW_SceneMapSize(t->name,path,sizeof(path))>=124)town_ready[i]=1;
     }
 }
 static int load_directory(void){
@@ -134,6 +133,13 @@ static terrain_region_t *source(const char *name){
     if(i>=0)return i<count?&regions[i]:NULL;
     return town_ready[t]?&towns[t]:NULL;
 }
+/* A destination exists when its scene map does: a region map, or for a town
+ * its own map or, on a CHIM disk, its CHIM frame map (AW_SceneMapSize), so a
+ * pure-CHIM disk without the towns' legacy maps keeps coordinate teleports
+ * and walking into a town from the open world. */
+static int target_map(const char *target){
+    char path[64];return AW_SceneMapSize(target,path,sizeof(path))>=124;
+}
 static int inside(const float *point,const float *box,float margin){
     int k;for(k=0;k<2;k++)if(!(point[k]>=box[k]-margin && point[k]<box[k+2]+margin))return 0;
     return 1;
@@ -156,7 +162,7 @@ int AW_WorldContains(const char *name,const float *local){
     return r && inside(local,r->cover,-24);
 }
 int AW_WorldDestination(const char *name,const float *local,char *target,float *arrival){
-    terrain_region_t *from,*to=NULL;float global[3],point[3];int i,k,id;char path[32];FILE *f=NULL;
+    terrain_region_t *from,*to=NULL;float global[3],point[3];int i,k,id;
     if(world_town(name)<0 && AW_TerrainId(name)<0)return 0;
     from=source(name);if(!from)return 0;
     for(k=0;k<3;k++){if(!isfinite(local[k]))return 0;global[k]=local[k]+from->origin[k];}
@@ -176,16 +182,14 @@ int AW_WorldDestination(const char *name,const float *local,char *target,float *
     }
     if(!to || !strcmp(name,target))return 0;
     for(k=0;k<3;k++){arrival[k]=global[k]-to->origin[k];if(!(fabs(arrival[k])<4000))return 0;}
-    sprintf(path,"maps/%s.bsp",target);
-    if(COM_FOpenFile(path,&f)<124 || !f){if(f)fclose(f);return 0;}
-    fclose(f);return 1;
+    return target_map(target);
 }
 
 /* Resolve a clicked original-game XY position. Z is deliberately not inferred
  * from map colour or the current player's altitude: the destination scene checks
  * its actual standing collision before placing the player. */
 int AW_WorldMapTarget(const float *world,char *target,float *arrival){
-    terrain_region_t *to=NULL;float point[3];int i,k;char path[32];FILE *f=NULL;
+    terrain_region_t *to=NULL;float point[3];int i,k;
     if(!isfinite(world[0]) || !isfinite(world[1]) || fabs(world[0])>2000000 ||
        fabs(world[1])>2000000 || !load_directory())return 0;
     for(i=0;i<AW_TOWN_COUNT;i++){
@@ -200,7 +204,5 @@ int AW_WorldMapTarget(const float *world,char *target,float *arrival){
     if(!to)return 0;
     for(k=0;k<2;k++){arrival[k]=world[k]*.25f-to->origin[k];if(fabs(arrival[k])>=4000)return 0;}
     arrival[2]=0;
-    sprintf(path,"maps/%s.bsp",target);
-    if(COM_FOpenFile(path,&f)<124 || !f){if(f)fclose(f);return 0;}
-    fclose(f);return 1;
+    return target_map(target);
 }

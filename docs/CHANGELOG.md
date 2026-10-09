@@ -1,5 +1,188 @@
 # Development history
 
+<!-- contents start -->
+## Contents
+
+- [v0.0.33: Towards CHIM: Replacing the Engine Block](#v0033-towards-chim-replacing-the-engine-block)
+- [v0.0.32: Last Stop on the Old Line: Window-Shopping in Vivec](#v0032-last-stop-on-the-old-line-window-shopping-in-vivec)
+- [v0.0.31: Lamps, Lanterns and Loading](#v0031-lamps-lanterns-and-loading)
+- [v0.0.31-dev6: Lamps, Lanterns and Loading](#v0031-dev6-lamps-lanterns-and-loading)
+- [v0.0.31-dev5: Lamps, Lanterns and Loading](#v0031-dev5-lamps-lanterns-and-loading)
+- [v0.0.31-dev4: Revisiting Seyda Neen](#v0031-dev4-revisiting-seyda-neen)
+- [v0.0.31-dev3: Revisiting Seyda Neen](#v0031-dev3-revisiting-seyda-neen)
+- [v0.0.31-dev2: Revisiting Seyda Neen](#v0031-dev2-revisiting-seyda-neen)
+- [v0.0.31-dev1: Revisiting Seyda Neen](#v0031-dev1-revisiting-seyda-neen)
+- [v0.0.30: The Temple](#v0030-the-temple)
+- [v0.0.30-rc1: The Temple](#v0030-rc1-the-temple)
+- [v0.0.30-dev5: The Temple](#v0030-dev5-the-temple)
+- [v0.0.30-dev4: The Temple](#v0030-dev4-the-temple)
+- [v0.0.30-dev3: The Temple](#v0030-dev3-the-temple)
+- [v0.0.29-rc2: Let There Be (Just a Bit More) Light](#v0029-rc2-let-there-be-just-a-bit-more-light)
+- [0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026](#0028--trees-and-grass-day-and-night--in-preparation-4-october-2026)
+- [0.0.28-rc1 — Trees and Grass, Day and Night — candidate, 4 October 2026](#0028-rc1--trees-and-grass-day-and-night--candidate-4-october-2026)
+- [0.0.27 — Rocks, Mushrooms, and Then Some — 3 October 2026](#0027--rocks-mushrooms-and-then-some--3-october-2026)
+- [0.0.26](#0026)
+- [0.0.26-rc1](#0026-rc1)
+- [0.0.25](#0025)
+- [0.0.25-rc10](#0025-rc10)
+- [v0.0.25-rc9](#v0025-rc9)
+- [v0.0.25-rc8](#v0025-rc8)
+- [v0.0.25-rc7](#v0025-rc7)
+- [v0.0.25-rc6 — 1 October 2026](#v0025-rc6--1-october-2026)
+- [v0.0.25-rc5 — 1 October 2026](#v0025-rc5--1-october-2026)
+- [v0.0.25-rc4 — 1 October 2026](#v0025-rc4--1-october-2026)
+- [v0.0.25-rc3 — 1 October 2026](#v0025-rc3--1-october-2026)
+- [v0.0.25-rc2 — 1 October 2026](#v0025-rc2--1-october-2026)
+- [v0.0.25-rc1 — 1 October 2026](#v0025-rc1--1-october-2026)
+- [v0.0.25-dev1 — 1 October 2026](#v0025-dev1--1-october-2026)
+- [v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026](#v0024---welcome-to-balmora-and-vvardenfell---1-october-2026)
+- [v0.0.24-rc4 — 1 October 2026](#v0024-rc4--1-october-2026)
+- [v0.0.24-rc3 — 1 October 2026](#v0024-rc3--1-october-2026)
+- [v0.0.24-rc2 — 1 October 2026](#v0024-rc2--1-october-2026)
+- [v0.0.24-rc1 — 30 September 2026](#v0024-rc1--30-september-2026)
+- [v0.0.24-dev4 — 30 September 2026](#v0024-dev4--30-september-2026)
+- [v0.0.24-dev3 — 30 September 2026](#v0024-dev3--30-september-2026)
+- [v0.0.24-dev2 — 30 September 2026](#v0024-dev2--30-september-2026)
+- [v0.0.24-dev1 — 30 September 2026](#v0024-dev1--30-september-2026)
+- [v0.0.23-dev4 — 29 September 2026](#v0023-dev4--29-september-2026)
+- [0.0.23-dev2 — 29 September 2026](#0023-dev2--29-september-2026)
+- [v0.0.23-dev1 - parallel builds, 29 September 2026](#v0023-dev1---parallel-builds-29-september-2026)
+- [v0.0.22 - normal public source release, 29 September 2026](#v0022---normal-public-source-release-29-september-2026)
+- [v0.0.21-dev8 - reconciled boot/launcher and paper-font sources, 29 September 2026](#v0021-dev8---reconciled-bootlauncher-and-paper-font-sources-29-september-2026)
+- [v0.0.21-dev7 - visible five-second preflight and dry-run boot order, 29 September 2026](#v0021-dev7---visible-five-second-preflight-and-dry-run-boot-order-29-september-2026)
+- [v0.0.21-dev6 - versioned boot/environment preflight, 29 September 2026](#v0021-dev6---versioned-bootenvironment-preflight-29-september-2026)
+- [v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026](#v0021-dev5--gog-ttf-preference-and-steam-font-fallback-28-september-2026)
+- [v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026](#v0021-dev4--evening-world-mapping-checkpoint-28-september-2026)
+- [v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026](#v0021-dev3--opening-maintenance-and-interaction-hints-28-september-2026)
+- [v0.0.21-dev2 — opening barrier correction, 28 September 2026](#v0021-dev2--opening-barrier-correction-28-september-2026)
+- [Portable launcher helper — 28 September 2026](#portable-launcher-helper--28-september-2026)
+- [v0.0.20 — 28 September 2026](#v0020--28-september-2026)
+- [v0.0.19 — 28 September 2026](#v0019--28-september-2026)
+- [v0.0.18-dev5 — 28 September 2026](#v0018-dev5--28-september-2026)
+- [v0.0.18-dev4 — 28 September 2026](#v0018-dev4--28-september-2026)
+- [v0.0.18-dev3 — 28 September 2026](#v0018-dev3--28-september-2026)
+- [v0.0.18-dev2 — 28 September 2026](#v0018-dev2--28-september-2026)
+- [v0.0.18-dev1 — 28 September 2026](#v0018-dev1--28-september-2026)
+- [v0.0.17 — 28 September 2026](#v0017--28-september-2026)
+- [v0.0.16](#v0016)
+- [0.12.1.dev1 / runtime source still v0.0.15-dev2](#0121dev1--runtime-source-still-v0015-dev2)
+- [0.12.0.dev2 / runtime v0.0.15-dev2](#0120dev2--runtime-v0015-dev2)
+- [0.12.0.dev1 / runtime v0.0.15-dev1](#0120dev1--runtime-v0015-dev1)
+- [0.11.0.dev1 / runtime v0.0.14-dev1](#0110dev1--runtime-v0014-dev1)
+- [0.10.0.dev1 / runtime v0.0.13-dev1](#0100dev1--runtime-v0013-dev1)
+- [0.9.0.dev2 / runtime v0.0.12-dev2](#090dev2--runtime-v0012-dev2)
+- [0.9.0.dev1 / runtime v0.0.12-dev1](#090dev1--runtime-v0012-dev1)
+- [0.8.3.dev4 / runtime v0.0.11-dev4](#083dev4--runtime-v0011-dev4)
+- [0.8.3.dev3 / runtime v0.0.11-dev3](#083dev3--runtime-v0011-dev3)
+- [Development source 0.8.3.dev1 / runtime v0.0.11-dev1](#development-source-083dev1--runtime-v0011-dev1)
+- [Runtime v0.0.10 / source 0.8.2 — 27 September 2026](#runtime-v0010--source-082--27-september-2026)
+- [Runtime v0.0.9 / source 0.8.1 — 27 September 2026](#runtime-v009--source-081--27-september-2026)
+- [Runtime v0.0.8 / source 0.8.0 — 27 September 2026](#runtime-v008--source-080--27-september-2026)
+- [Changelog](#changelog)
+- [0.7.0 source / AmiWind v0.0.6 checkpoint-005](#070-source--amiwind-v006-checkpoint-005)
+- [0.6.0 source / demo v0.0.5 checkpoint-004](#060-source--demo-v005-checkpoint-004)
+- [0.5.0 source / demo v0.0.4 checkpoint-003](#050-source--demo-v004-checkpoint-003)
+- [0.4.0 source / demo v0.0.3 checkpoint-002](#040-source--demo-v003-checkpoint-002)
+- [0.3.0 source / opening and terrain walk v0.0.2](#030-source--opening-and-terrain-walk-v002)
+- [0.2.0 source / opening v0.0.1](#020-source--opening-v001)
+- [0.1.3 — 27 September 2026](#013--27-september-2026)
+- [0.1.2 — 27 September 2026](#012--27-september-2026)
+- [0.1.1 — 27 September 2026](#011--27-september-2026)
+- [0.1.0 — 27 September 2026](#010--27-september-2026)
+  - [rc6 image recovery follow-up](#rc6-image-recovery-follow-up)
+
+<!-- contents end -->
+
+## v0.0.33: Towards CHIM: Replacing the Engine Block
+
+- Builder fixes: `--reuse-from` reuses byte-identical stages again (the run's
+  scratch folder counted as an undeclared output; the v0.0.33 final reused 30 of
+  34 stages from the last release candidate); the image step runs its payload
+  checks first and lists every error together (`tools/build.py --check-payload
+  RUN`); the harvest catalogue check covers every caller; a small `--jobs` budget
+  no longer stalls the stage scheduler.
+
+- Melee combat, one shared layer for every NPC: hit chance, weapon and
+  hand-to-hand damage, armour, block, knockdown, knockout, fatigue drain and
+  return, death, the original hit and miss sounds, the battle music while an
+  NPC fights you and the enemy's yellow health bar above yours. Rolls are
+  seeded per fight; `dbg combat readout` prints each swing. Details:
+  [combat](COMBAT.md).
+- The Vivec Arena minigame in the debugger: `dbgmode arenapit [opponent]`
+  (also `dbg arenapit`, `dbg battlearena`, `dbg arenatest`, `dbg arena`,
+  `testarena`): a title card, the fight in the Arena Pit, a result screen,
+  then rematch, same seed, next or previous opponent, pick, or leave with
+  the game restored. Opponents: the Arena fighters baked with combat frames,
+  any NPC of the gallery or any NPC record, with the record's own stats.
+- `dbg combattest` now enters the Vivec Arena too; the previous empty-floor
+  hands test is `dbg combattest gallery` (or `floor`, `dbgmode combattest`).
+- Photo mode for clean screenshots: `dbg photomode` (also `dbg killhud`) or
+  Options > Photo mode. It hides the bars, crosshair, first-person hands and
+  torch (the torch light stays), prompts, names, subtitles, compass, gold
+  frame, the `dbg hud` overlays, test-room text and the light gallery strip;
+  the view fills the whole screen. By
+  default the fog is off and the camera flies free (`aw_photomode_nofog`,
+  `aw_photomode_noclip`, `aw_photomode_hands`). A short notice in the game's
+  message box says how to leave. Ctrl+F switches the fog and Ctrl+H the debug
+  HUD while it is on. Leaving restores every setting and returns the player to
+  where photo mode started. Not saved. Details: [keymaps](KEYMAPS.md#photo-mode-and-crosshair).
+- `dbg crosshair` (also `dbg crosshairs`) and Options > Show crosshairs turn
+  the crosshair on or off; saved with the settings, default on.
+- Stairs follow Morrowind's own rules (`follow_original_stair_rules`, on by
+  default) and the image step walks every flight of stairs of every map. Known:
+  five flights still fail the stair gate (STAIRS-*-32 in the
+  [bug register](BUGS.md)), so a legacy image build stops there until they are
+  repaired; the next stair job repairs them.
+- Menu logo: the gold name without the rule above it; `--menu-logo legacy`
+  keeps the previous logo.
+- Builder: a prerendered store (`--prerendered DIR`) keeps finished CHIM
+  worlds, interiors and region maps by version and area
+  (`chim/<CHIM version>/<format>/<area>/<fingerprint>/`, `interiors/<fingerprint>/`)
+  and uses them in later development builds whose stage fingerprints match;
+  entries are written only when the whole build passed. `--prerendered list`,
+  `verify` and `prune` (reports only) look after it. The chim stage's unit
+  cache no longer changes its fingerprint (BUILD-CACHE-CHIM-UNITS-33). Details:
+  [Speed](chim/build_guide/SPEED.md).
+- Builder: the shipped sky marker no longer contains the folder the build ran
+  in, and the image step refuses payload text files that do
+  (BUILD-PATH-IN-PAYLOAD-32).
+- Builder: live progress and ETA. Every profiled build keeps
+  `build-progress.json` in its run folder up to date (stages, cores in use,
+  percent weighted by expected stage durations, ETA and the stages it waits on,
+  idle-core warnings, machine load); `build.py status RUN` prints it.
+  `build.py profile report|compare|optimize` reads finished builds; `optimize`
+  ranks idle-core stages, single-core tails, one-core stages on the critical
+  path and waits for job slots, with suggestions. All performance options:
+  [BUILD_PROFILE.md](BUILD_PROFILE.md#performance-options).
+- Builder profile: idle-core warnings, the stage table and `optimize` compare a stage's cores with
+  the workers it held over time, not the count it started with (BUILD-PROFILE-JOBS-START-ONLY-33).
+- A build made with `--no-npc-gallery` says so in game: `dbg npcgallery` and
+  the other gallery commands print "This build was made without the NPC gallery
+  (quick playtest build). To include it, build without --no-npc-gallery."
+  `dbg help` lists those commands with "(not in this build)". Normal builds
+  are unchanged. Details: [Linux build](LINUX_BUILD.md).
+- Builder: quick test builds. `--exclude GROUP[,GROUP...]` (and one
+  `--exclude-...` option per group) leaves videos, music, the dialogue voice
+  library, the NPC gallery, the town interiors or the harvestable plants out of
+  a development build; `--exclude-unreferenced [GROUPS]` keeps only what an
+  area build references (its NPCs, their whole dialogue pool, their sounds;
+  music always stays). Dressing, flora and other collision content are never
+  excluded. The image is named `-quick-test`, the receipts list the groups, and
+  the game says "This build was made without ... (quick test build)." instead
+  of a repair message. Release candidates and finals refuse every exclusion.
+  Details: [Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md), in the
+  new [CHIM build guide](chim/build_guide/README.md).
+- Bug register: every bug carries its facts (who reported it, when, where,
+  reproduction, severity, family) and each report page lists the bugs in the
+  same category.
+- New page [Disk space: Amiga limits and what CHIM saves](chim/DISK_SPACE.md): the
+  partition and drive-image limits the builder enforces (including that every
+  partition must start below 2 GiB), why the legacy region maps stored each
+  object about 9.8 times, the measured CHIM savings (Balmora exterior 7.6 times
+  smaller, Seyda Neen area 24.3 times) and an estimated size budget for the
+  whole game.
+- Details: [release notes](RELEASE-v0.0.33.md).
+
 ## v0.0.32: Last Stop on the Old Line: Window-Shopping in Vivec
 
 - The last release on the AmiQuake-based legacy engine and builder; next is

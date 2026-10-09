@@ -38,12 +38,35 @@ def write_report(path, report):
             os.unlink(temporary)
 
 
-def prepare_candidate(path, transaction):
-    """Worker: only read one input and write its private candidate/backup files."""
+def prepare_candidate(path, transaction, cache=None):
+    """Worker: only read one input and write its private candidate/backup files.
+
+    cache (pass_cache.PassCache or None): a recorded result for the same input
+    bytes and optimizer sources is used instead of preparing the map again
+    (BUILD-IMAGE-NOT-INCREMENTAL-33); the row and bytes are those it recorded."""
     path, transaction = Path(path), Path(transaction)
     if path.is_symlink() or not path.is_file():
         raise ValueError('Expected regular staged map: '+path.name)
     original = path.read_bytes()
+    if cache is not None:
+        input_sha = sha(original)
+        found = cache.load(input_sha)
+        if found is not None:
+            row, final = found
+            row = {k: (path.name if k == 'map' else v) for k, v in row.items()}  # key order kept
+            if row['changed']:
+                from build_parallel import keep_original
+                keep_original(path, transaction/'original'/path.name, original)
+                (transaction/'candidate'/path.name).write_bytes(final)
+            return row
+        row, final = _prepare(path, transaction, original)
+        row = json.loads(json.dumps(row))  # the form a cached row has
+        cache.store(input_sha, row, final if row['changed'] else None)
+        return row
+    return _prepare(path, transaction, original)[0]
+
+
+def _prepare(path, transaction, original):
     shared, geometry = share_geometry(original)
     geometry_oracle = compare_render_inputs(original, shared)
     final, samples = deduplicate(shared)
@@ -55,12 +78,13 @@ def prepare_candidate(path, transaction):
            'geometry': geometry, 'geometry_oracle': geometry_oracle,
            'sample_sharing': samples, 'sample_oracle': sample_oracle}
     if changed:
-        (transaction/'original'/path.name).write_bytes(original)
+        from build_parallel import keep_original  # committed by os.replace, never rewritten
+        keep_original(path, transaction/'original'/path.name, original)
         (transaction/'candidate'/path.name).write_bytes(final)
-    return row
+    return row, final
 
 
-def prepare_candidates(candidates, transaction, jobs, report):
+def prepare_candidates(candidates, transaction, jobs, report, cache=None):
     """At most jobs outstanding maps; parent keeps deterministic receipt order.
 
     Pool shutdown waits for running workers before transaction cleanup. Workers
@@ -70,7 +94,7 @@ def prepare_candidates(candidates, transaction, jobs, report):
     if jobs == 1:
         for index, path in enumerate(candidates):
             report['active_map'] = path.name
-            yield index, prepare_candidate(path, transaction)
+            yield index, prepare_candidate(path, transaction, cache)
         return
     from build_parallel import process_pool, worker_environment
     with worker_environment(), process_pool(min(jobs, len(candidates))) as pool:
@@ -81,7 +105,7 @@ def prepare_candidates(candidates, transaction, jobs, report):
             item = next(source, None)
             if item is not None:
                 index, path = item
-                pending[pool.submit(prepare_candidate, path, transaction)] = (index, path)
+                pending[pool.submit(prepare_candidate, path, transaction, cache)] = (index, path)
         for _ in range(min(jobs, len(candidates))):
             submit_next()
         try:
@@ -124,7 +148,12 @@ def optimize_maps(maps, report_path, jobs=1):
         (transaction/'original').mkdir()
         ordered_rows = [None] * len(candidates)
         completed = 0
-        for index, row in prepare_candidates(candidates, transaction, jobs, report):
+        # Development builds reuse results for unchanged map bytes (pass_cache.py).
+        from pass_cache import PassCache
+        cache = PassCache.open('optimize-world-maps', {}, __file__)
+        if cache is not None:
+            report['pass_cache'] = {'sources_sha256': cache.sources}
+        for index, row in prepare_candidates(candidates, transaction, jobs, report, cache):
             ordered_rows[index] = row
             completed += 1
             report['maps'] = [item for item in ordered_rows if item is not None]
@@ -183,6 +212,44 @@ def verify_optimized_maps(maps, report, require_committed=True, jobs=1):
     expected = {r['map']: r['output_sha256'] for r in report['maps']}
     if actual != expected:
         raise ValueError('Final staged maps no longer match optimizer receipt')
+
+
+def rebind_chim_maps(maps, report, report_path, removed, jobs=1):
+    """A CHIM image changes the optimized map set once, after the optimizer: it writes the CHIM frame
+    maps (maps/*-chim.bsp, an empty world plus entities; not optimized) and removes the legacy
+    exterior maps it does not ship (`removed`: id1-relative 'maps/x.bsp' rows). The receipt follows:
+    removed rows leave, frame maps join unchanged (input = output), the change is recorded under
+    'chim_rebind', and the later gates (final heap audit, verify_optimized_maps) bind to the result.
+    Any other new or missing map stops the image."""
+    from build_parallel import hash_files
+    maps = Path(maps)
+    gone = sorted({Path(name).name for name in removed if name.startswith('maps/') and name.endswith('.bsp')})
+    present = {p.name for p in maps.glob('*.bsp')}
+    rows = [r for r in report['maps'] if r['map'] not in gone]
+    missing = sorted(r['map'] for r in rows if r['map'] not in present)
+    if missing:
+        raise ValueError('Optimized maps missing after the CHIM frame maps: ' + ', '.join(missing[:8]))
+    still = sorted(set(gone) & present)
+    if still:
+        raise ValueError('Removed legacy maps still staged: ' + ', '.join(still[:8]))
+    added = sorted(present - {r['map'] for r in rows})
+    other = [name for name in added if not name.endswith('-chim.bsp')]
+    if other:
+        raise ValueError('Maps added after the optimizer that are not CHIM frame maps: ' + ', '.join(other[:8]))
+    for name, value in zip(added, hash_files([maps / name for name in added], jobs)):
+        size = (maps / name).stat().st_size
+        rows.append({'map': name, 'input_sha256': value, 'output_sha256': value, 'input_bytes': size,
+                     'output_bytes': size, 'file_bytes_saved': 0, 'changed': False,
+                     'not_optimized': 'CHIM frame map'})
+    rows.sort(key=lambda r: r['map'])
+    report['maps'] = rows
+    report['committed_maps'] = [name for name in report.get('committed_maps', []) if name not in gone]
+    report.update(map_count=len(rows), changed_maps=len(report['committed_maps']),
+                  file_bytes_saved=sum(r['file_bytes_saved'] for r in rows),
+                  chim_rebind={'removed': gone, 'added_frame_maps': added})
+    write_report(report_path, report)
+    verify_optimized_maps(maps, report, jobs=jobs)
+    return report
 
 
 def bind_heap_report(optimization, heap, heap_path, report_path):

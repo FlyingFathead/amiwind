@@ -1,6 +1,46 @@
 # HORIZON-FLORA-SPRITES-32: Horizon silhouetting: not yet perfect
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 8 October 2026, in v0.0.32-dev1 |
+| Where | Seyda Neen horizon (skyline fill with far trees) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.31-dev5, v0.0.31, v0.0.32-dev1 (last seen) |
+| Severity | medium: Fog-coloured castle and spike columns break the skyline; not a blocker, default restored. |
+| Family | Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`) |
+| Playtest version | v0.0.32-dev1 |
+| From commit | source and engine 978475d |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Planned improvements (owner, 8 October 2026)](#planned-improvements-owner-8-october-2026)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 8 October 2026
+
+Owner verdict, 8 October 2026 (playing v0.0.32-dev3, default `aw_skyline_fill 0`): the horizon
+draws are excellent. The default method is owner-accepted and ships in v0.0.32; this page stays
+open for the experimental skyline fill (object silhouetting), which is kept, selectable and not
+yet good enough.
 
 Open: not yet perfect. Reported by the owner on v0.0.32-dev1 (8 October 2026), who notes it was
 partly his own call. Not a v0.0.32 blocker. Default restored in source (v0.0.32-final-blockers):
@@ -108,3 +148,23 @@ Still open: the planned improvements below.
 
 Matched horizon views on fixed exterior cameras (with and without flora) in the playtest checks.
 The defaults and both methods are pinned by the tests above.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Far-plane fog, the skyline fill, distant sprites and resident ground. See [families](README.md#families).
+
+- [FOG-TOWN-HEAVY-32](FOG-TOWN-HEAVY-32.md): Heavy fog at the Vivec Arena and in Balmora in v0.0.32-dev1
+- GEO-02 (no report page): Seyda Neen ground ends before the world terrain handoff
+- [HORIZON-HOLES-31](HORIZON-HOLES-31.md): Distant buildings break up against the sky
+- HORIZON-POP-29 (no report page): Ashlands horizon pops or breaks up while turning
+- LAND-HORIZON-GAPS-29 (no report page): Sky visible through gaps in distant resident ground
+- [SEYDA-WALL-SHAPE-31](SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
+- [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
+- SKY-NIGHT-COVER-29 (no report page): Dense night clouds rarely reveal moons/stars
+- SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
+- SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog
+- TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
+
+<!-- END GENERATED CATEGORY -->

@@ -3,6 +3,19 @@
 Runtime **v0.0.14-dev1**, public pipeline **0.11.0.dev1**, 27 September 2026.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 
+<!-- contents start -->
+## Contents
+
+- [Delivered scope](#delivered-scope)
+- [Host checks](#host-checks)
+- [Failed trial retained](#failed-trial-retained)
+- [Final native route](#final-native-route)
+- [Exact environment and artifact identity](#exact-environment-and-artifact-identity)
+- [Relaunch acceptance](#relaunch-acceptance)
+- [Remaining work](#remaining-work)
+
+<!-- contents end -->
+
 ## Delivered scope
 
 - Select the hull, gangplank, hatch and cabin door as one named assembly. Admit

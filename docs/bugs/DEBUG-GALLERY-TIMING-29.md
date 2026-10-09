@@ -1,5 +1,20 @@
 # DEBUG-GALLERY-TIMING-29: hands unavailable in combat and torch test rooms
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 6 October 2026, in v0.0.29-dev |
+| Where | combat and torch test rooms (dbg combattest, torchtest) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | fixed in v0.0.29-rc2 |
+| Severity | low: Debug test rooms only; hands were unavailable there. |
+| Family | First-person hands and torch (`torch-hands`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Explicit test-room input restriction, 2026-10-06T18:59:52+03:00
 
 Native follow-up identified a separate control failure: after appearance
@@ -56,3 +71,25 @@ This is separate from the missing-hands lifecycle failure. Global darkening is
 not an accepted fix: scope any change to the test room, check off/on world
 pixels and an NPC, then verify normal interiors/exteriors remain unchanged.
 Status open; no darkness repair or first fixed version yet.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: First-person hands and torch (`torch-hands`). First-person hands, punches and the carried torch. See [families](README.md#families).
+
+- AW-20260928-18 (no report page): Punch blocked after Census office exit
+- HAND-IDLE-BLINK-29 (no report page): Fists disappear once per idle breathing cycle
+- HAND-PUNCH-COVERAGE-29 (no report page): Near-plane opening at maximum punch extension
+- HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation
+- TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
+- TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
+- TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4
+- TORCH-HAND-SEPARATION-29 (no report page): Torch grip and hand appear to break during idle and running
+- TORCH-INPUT-29 (no report page): F cannot raise hands; V only prints torch state
+
+Related bugs in other categories:
+
+- TORCHTEST-DARKNESS-29 (no report page): Torch test room floor stays dim gray at zero light
+
+<!-- END GENERATED CATEGORY -->

@@ -4,6 +4,31 @@
 Current released baseline: v0.0.23-dev4. Working checkpoint: v0.0.23-dev5.
 Owner's design direction, not a list of implemented streaming features.
 
+<!-- contents start -->
+## Contents
+
+- [Why load the entire map at once?](#why-load-the-entire-map-at-once)
+- [Original cells are source units, not mandatory town boundaries](#original-cells-are-source-units-not-mandatory-town-boundaries)
+- [Layered LOD and residency](#layered-lod-and-residency)
+- [Flying changes the problem](#flying-changes-the-problem)
+- [First experiment, not a full-world claim](#first-experiment-not-a-full-world-claim)
+  - [Evening addendum, 22:58 Helsinki](#evening-addendum-2258-helsinki)
+- [From Seyda Neen to Balmora: evening notes, 30 September 2026](#from-seyda-neen-to-balmora-evening-notes-30-september-2026)
+  - [A town is beginning to feel like a town](#a-town-is-beginning-to-feel-like-a-town)
+  - [Put the work on the world map](#put-the-work-on-the-world-map)
+  - [Meet the entire cast on a plain floor](#meet-the-entire-cast-on-a-plain-floor)
+  - [Residents should arrive on the ground when they are meant to](#residents-should-arrive-on-the-ground-when-they-are-meant-to)
+  - [Finish the small things that break the illusion](#finish-the-small-things-that-break-the-illusion)
+  - [A browser and a safe return from the gallery](#a-browser-and-a-safe-return-from-the-gallery)
+  - [An inspection checkpoint before the final release — 1 October 2026](#an-inspection-checkpoint-before-the-final-release--1-october-2026)
+  - [The late shift: leave nobody out — 1 October 2026](#the-late-shift-leave-nobody-out--1-october-2026)
+  - [After Balmora: joining the island — 1 October 2026](#after-balmora-joining-the-island--1-october-2026)
+  - [The ashen faces, and three familiar keys — 1 October, late night](#the-ashen-faces-and-three-familiar-keys--1-october-late-night)
+- [1 October: give the island a common map](#1-october-give-the-island-a-common-map)
+- [1 October 2026 - Welcome to Balmora (and Vvardenfell!)](#1-october-2026---welcome-to-balmora-and-vvardenfell)
+
+<!-- contents end -->
+
 ## Why load the entire map at once?
 
 The slow spots around Seyda Neen raise a bigger question than which window has
@@ -156,7 +181,7 @@ A related future convenience is a translation from the current local XYZ display
 to original world coordinates and a clearly defined world-map coordinate view.
 Establish the transforms first, including interior limitations and negative cell
 boundaries. The proposed small upper-right display and `dbg global coords` switch
-belong in [the roadmap](ROADMAP.md#future-world-coordinate-hud-investigate-first-not-v0024-work),
+belong in [the roadmap](ROADMAP.md#world-coordinate-hud),
 not in this release's implementation queue.
 
 ### Meet the entire cast on a plain floor

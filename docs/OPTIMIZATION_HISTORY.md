@@ -5,6 +5,31 @@ layout or I/O scheduler. Keep rejected candidates: a failed experiment is useful
 evidence. Never compare a maximum-speed JIT run to a stock-speed machine as if
 they were the same hardware.
 
+<!-- contents start -->
+## Contents
+
+- [2026-09-27: checkpoint-013 bounded hulls and greeting polling](#2026-09-27-checkpoint-013-bounded-hulls-and-greeting-polling)
+- [2026-09-27: checkpoint-012 humanoid hull and first actors](#2026-09-27-checkpoint-012-humanoid-hull-and-first-actors)
+- [2026-09-27: dev4 fresh-boot movement regression](#2026-09-27-dev4-fresh-boot-movement-regression)
+- [2026-09-27: dev3 correctness before expansion](#2026-09-27-dev3-correctness-before-expansion)
+- [2026-09-27: dev2 geometry, music and restart repair](#2026-09-27-dev2-geometry-music-and-restart-repair)
+- [2026-09-27: check hardware before loading the engine](#2026-09-27-check-hardware-before-loading-the-engine)
+- [2026-09-27: static buildings belong in the wall renderer](#2026-09-27-static-buildings-belong-in-the-wall-renderer)
+- [Existing A500 baseline](#existing-a500-baseline)
+- [Regression procedure](#regression-procedure)
+- [Next bottlenecks to measure](#next-bottlenecks-to-measure)
+- [Packaged HDF baseline](#packaged-hdf-baseline)
+- [2026-09-27: remove the desktop icon startup dependency](#2026-09-27-remove-the-desktop-icon-startup-dependency)
+- [Owner confirmation — v0.0.12-dev2, 27 September 2026](#owner-confirmation--v0012-dev2-27-september-2026)
+- [v0.0.13-dev1 / checkpoint-014 — correct geometry and bounded render buffers](#v0013-dev1--checkpoint-014--correct-geometry-and-bounded-render-buffers)
+- [v0.0.14-dev1 / checkpoint-015 — ship conversion and cache budget](#v0014-dev1--checkpoint-015--ship-conversion-and-cache-budget)
+- [v0.0.15-dev1 / checkpoint-016 — interior policy and measured hand path](#v0015-dev1--checkpoint-016--interior-policy-and-measured-hand-path)
+- [2026-09-27: checkpoint-017 structural interior correction](#2026-09-27-checkpoint-017-structural-interior-correction)
+- [Ship contribution diagnostic](#ship-contribution-diagnostic)
+- [Building culling investigation 001 (after checkpoint-017)](#building-culling-investigation-001-after-checkpoint-017)
+
+<!-- contents end -->
+
 Verified asset mappings and symptom/cause/fix records are indexed in
 [IMPLEMENTATION_JOURNAL.md](IMPLEMENTATION_JOURNAL.md); untried proposals are in
 [IMPLEMENTATION_IDEAS.md](IMPLEMENTATION_IDEAS.md). Keep measured trials here.

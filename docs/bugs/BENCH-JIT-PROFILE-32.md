@@ -1,5 +1,20 @@
 # BENCH-JIT-PROFILE-32: Every frame-rate and load-time figure was measured with the emulator at host speed
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | review |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | FS-UAE benchmark profile (JIT, unlimited CPU speed) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | low: Measurement-method issue: figures are relative to a host-speed emulator. |
+| Family | Emulator measurement method (`benchmark-method`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Found by an independent review of the open-world plan.
@@ -40,3 +55,22 @@ Pending.
 ## Prevention
 
 Every performance report states its emulator profile.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Emulator measurement method (`benchmark-method`). Emulator numbers are relative until a hardware number exists; same-session runs with a drift control. See [families](README.md#families).
+
+- [BENCH-AWBENCH-BUFFERS-32](BENCH-AWBENCH-BUFFERS-32.md): awbench reported the stale buffer count after AddBuffers
+- [BENCH-DISK-BYTES-32](BENCH-DISK-BYTES-32.md): FS-UAE moves disk bytes at about 90 MB/s, so it cannot price what a walk reads
+- [BENCH-FSUAE-FREQ-32](BENCH-FSUAE-FREQ-32.md): FS-UAE ignores uae_cpu_frequency in cycle-exact mode
+- [BENCH-FSUAE-JIT-HANG-32](BENCH-FSUAE-JIT-HANG-32.md): An FS-UAE JIT session hung with a Windows-folder hard file mounted
+- [BENCH-HOST-STORAGE-32](BENCH-HOST-STORAGE-32.md): Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS
+- [BENCH-SESSION-DRIFT-32](BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions
+
+Related bugs in other categories:
+
+- [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
+
+<!-- END GENERATED CATEGORY -->

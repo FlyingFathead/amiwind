@@ -47,12 +47,18 @@ def index_model_collision(path, reference, leaf_size=8):
 
     point_tree, clip_tree = nodes(5), nodes(9)
     point_parts, point_empty = pieces(point_tree, roots[0])
-    clip_parts, clip_empty = pieces(clip_tree, roots[1])
-    if len(point_parts) != len(clip_parts) or len(point_parts) < leaf_size*2:
+    try:
+        clip_parts, clip_empty = pieces(clip_tree, roots[1])
+    except ValueError:
+        # The converter already routed this model's standing hull (--model-hull auto|routed,
+        # tools/routed_hull.py): its clip tree is indexed by construction. Index the point hull
+        # only and keep the routed standing hull as it is.
+        clip_parts = clip_empty = None
+    if len(point_parts) < leaf_size*2 or (clip_parts is not None and len(point_parts) != len(clip_parts)):
         raise ValueError('Collision index needs matching, sufficiently large hulls')
     bounds = [struct.unpack_from('<6h', data[5], ids[0]*24+8) for ids in point_parts]
     source_planes = list(struct.iter_unpack('<4fi', data[1]))
-    for ids, box in zip(clip_parts, bounds):
+    for ids, box in zip(clip_parts or (), bounds):
         for axis in range(3):
             for sign in (-1, 1):
                 limit = box[axis+3]-MINS[axis] if sign>0 else -box[axis]+MAXS[axis]
@@ -119,12 +125,18 @@ def index_model_collision(path, reference, leaf_size=8):
         return root
 
     new_point = compile_tree(5, point_tree, point_parts, point_empty, False)
-    new_clip = compile_tree(9, clip_tree, clip_parts, clip_empty, True)
-    for offset in range(0, len(data[14]), 64):
-        if struct.unpack_from('<2i', data[14], offset+36) == roots:
-            struct.pack_into('<4i', data[14], offset+36, new_point, new_clip, new_clip, new_clip)
+    if clip_parts is not None:
+        new_clip = compile_tree(9, clip_tree, clip_parts, clip_empty, True)
+        for offset in range(0, len(data[14]), 64):
+            if struct.unpack_from('<2i', data[14], offset+36) == roots:
+                struct.pack_into('<4i', data[14], offset+36, new_point, new_clip, new_clip, new_clip)
+    else:
+        for offset in range(0, len(data[14]), 64):
+            if struct.unpack_from('<2i', data[14], offset+36) == roots:
+                struct.pack_into('<i', data[14], offset+36, new_point)
     path.write_bytes(pack_lumps(data))
     return {'reference': reference, 'pieces': len(point_parts), 'leaf_size': leaf_size,
+            'standing_hull': 'indexed' if clip_parts is not None else 'routed by the converter (kept)',
             'before_nodes_clipnodes_planes': before,
             'after_nodes_clipnodes_planes': [len(data[5])//24, len(data[9])//8, len(data[1])//20],
             'geometry': 'original convex piece planes and solid leaves retained'}

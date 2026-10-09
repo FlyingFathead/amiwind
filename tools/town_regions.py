@@ -133,10 +133,16 @@ def select_references(index, entry, settings):
             if intersects(local_bounds(r, settings['centre'], settings['scale']), entry['coverage'])]
 
 
+def town_references(index, settings):
+    """The town's placements: converted bounds reaching into its bounds (the union of its sub-cell
+    coverages; the legacy region maps and the CHIM world hold exactly these)."""
+    return [r['number'] for r in index['references']
+            if intersects(local_bounds(r, settings['centre'], settings['scale']), settings['bounds'])]
+
+
 def audit_coverage(index, entries, settings):
     selected = [set(select_references(index, e, settings)) for e in entries]
-    expected = {r['number'] for r in index['references']
-                if intersects(local_bounds(r, settings['centre'], settings['scale']), settings['bounds'])}
+    expected = set(town_references(index, settings))
     present = set().union(*selected)
     if present != expected:
         raise ValueError('Sub-cell union loses or invents references')

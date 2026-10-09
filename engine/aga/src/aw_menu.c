@@ -4,6 +4,7 @@
 #include "quakedef.h"
 #include "aw_save.h"
 #include "aw_maps.h"
+#include "aw_region.h"
 #include "amiwind_version.h"
 extern qboolean keydown[256];
 extern int scr_copyeverything;
@@ -51,10 +52,13 @@ static int colours[4],ready;
 static const char *front_items[]={"New game","Load game","Options","Exit game"};
 static const char *items[]={"Return to game","New game","Save game","Load game","Options","Main menu"};
 
+/* Options list rows (Back is OPTION_ROWS-1). Display settings first. */
+enum {OPT_FOG,OPT_RESET,OPT_FRAME,OPT_CROSSHAIR,OPT_PHOTO,OPT_INTERFACE,OPT_AUDIO,OPT_CONTROLS,
+    OPT_AUTOSAVE,OPT_AREA,OPT_METHOD,OPT_BUFFER,OPT_GRAPHICS};
 #define ROW_Y 54
 #define ROW_H 19
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-#define OPTION_ROWS 12
+#define OPTION_ROWS 14
 static int brightness_options,brightness_drag;
 extern int R_BrightnessStep(int outside);
 extern void R_BrightnessSetStep(int outside,int value);
@@ -62,10 +66,10 @@ extern void R_BrightnessSetStep(int outside,int value);
 #define BRIGHTNESS_W 200
 static int brightness_active(void){return brightness_options;}
 static void brightness_reset(void){brightness_options=brightness_drag=0;}
-static void brightness_back(void){brightness_reset();selection=10;mouse_visible=0;}
+static void brightness_back(void){brightness_reset();selection=OPT_GRAPHICS;mouse_visible=0;}
 static void brightness_pointer(void){R_BrightnessSetStep(brightness_drag-1,10+((mouse_x-BRIGHTNESS_X)*5+BRIGHTNESS_W/2)/BRIGHTNESS_W);}
 #else
-#define OPTION_ROWS 11
+#define OPTION_ROWS 13
 #define brightness_active() 0
 #define brightness_reset() ((void)0)
 #endif
@@ -86,7 +90,7 @@ static void audio_set(int row,int percent){
     if(audio_levels[row]->value!=percent*.01f)Cvar_SetValue(audio_levels[row]->name,percent*.01f);
 }
 static void audio_pointer(int row){audio_set(row,((mouse_x-AUDIO_X)*100+AUDIO_W/2)/AUDIO_W);}
-static void audio_back(void){audio_options=audio_drag=0;selection=4;mouse_visible=0;}
+static void audio_back(void){audio_options=audio_drag=0;selection=OPT_AUDIO;mouse_visible=0;}
 /* Options > Controls edits the same bindings as bind/unbind and keymaps.cfg.
  * Each action shows up to two keys; a third key replaces both.
  *
@@ -157,7 +161,7 @@ static void control_capture(int key){
     if(n>=2)control_clear(selection);
     Key_SetBinding(key,(char *)controls[selection].command);
 }
-static void controls_back(void){controls_options=controls_capture=0;selection=5;mouse_visible=0;}
+static void controls_back(void){controls_options=controls_capture=0;selection=OPT_CONTROLS;mouse_visible=0;}
 static void controls_open(void){controls_options=1;controls_capture=controls_top=selection=0;mouse_visible=0;}
 /* Setup lists stop at their ends so selection and scrollbar never jump back
  * across the list. This also applies to wheel/W/S input normalized below. */
@@ -176,6 +180,8 @@ static void font_step(int direction){
 static int inside(int x,int y,int w,int h){return mouse_x>=x && mouse_x<x+w && mouse_y>=y && mouse_y<y+h;}
 static int enabled(int row){return row==3 || (row==2 && AW_SaveAllowed()) || row==0 || (row==1 && intro_available) || row==4 || row==5;}
 int AW_MenuFrontEnd(void){return frontend && !graphics && !confirming && key_dest==key_menu;}
+/* Photo mode is offered from the pause menu's Options, not the title screen. */
+static int photo_ready(void){return !frontend && AW_PhotoModeAvailable();}
 static void interface_change(int direction){
     if(selection==0)font_step(direction);
     else if(selection==1)AW_UIVoiceNamesToggle();
@@ -202,9 +208,9 @@ static void cancel_confirmation(void){confirming=0;selection=confirmation_return
 void M_Menu_Quit_f(void){M_Menu_Main_f();confirm(1);}
 static void main_menu(void){frontend=1;M_Menu_Main_f();AW_MusicTitleAfter(.5);}
 static void scene_menu(void){
-    FILE *f;int i,size;char path[48];
+    int i,size;char path[48];
     if(!sv.active || Cmd_Argc()!=1){Con_Printf("Use dbg scene change during play.\n");return;}
-    for(i=0;i<AW_MAP_COUNT;i++){sprintf(path,"maps/%s.bsp",AW_MapName(i));f=NULL;size=COM_FOpenFile(path,&f);scene_available[i]=f && size>=124;if(f)fclose(f);}
+    for(i=0;i<AW_MAP_COUNT;i++){size=AW_SceneMapSize(AW_MapName(i),path,sizeof(path));scene_available[i]=size>=124;}
     brightness_reset();
     picker_return=key_dest;IN_AWClearButtons();key_dest=key_menu;
     scene_picker=1;graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=confirming=mouse_visible=0;selection=AW_MAP_COUNT;scene_top=0;
@@ -254,7 +260,7 @@ void AW_MenuMouse(int dx,int dy){
     row=mouse_row();if(row>=0)selection=row;
 }
 void M_Keydown(int key){
-    int direction,row;char command[48];
+    int direction,row,photo;char command[48];
     if(AW_SaveMenuKey(key)){if(key_dest==key_game){frontend=0;graphics=0;}return;}
     /* Capture the raw key before W/A/S/D and wheel are normalized below. */
     if(controls_options && controls_capture){control_capture(key);return;}
@@ -325,10 +331,10 @@ void M_Keydown(int key){
         return;
     }
     if(interface_options){
-        if(key==K_ESCAPE){interface_options=0;selection=3;return;}
+        if(key==K_ESCAPE){interface_options=0;selection=OPT_INTERFACE;return;}
         if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)option_step(key,7);
         if(key==K_LEFTARROW || key==K_RIGHTARROW)interface_change(key==K_LEFTARROW?-1:1);
-        if(key==K_ENTER || key==K_MOUSE1){if(selection==6){interface_options=0;selection=3;}else interface_change(1);}
+        if(key==K_ENTER || key==K_MOUSE1){if(selection==6){interface_options=0;selection=OPT_INTERFACE;}else interface_change(1);}
         return;
     }
     if(graphics){
@@ -337,29 +343,34 @@ void M_Keydown(int key){
         if(selection<graphics_top)graphics_top=selection;
         if(selection>=graphics_top+7)graphics_top=selection-6;
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-        if(selection==10 && (key==K_LEFTARROW || key==K_RIGHTARROW)){brightness_options=1;brightness_drag=0;selection=0;return;}
+        if(selection==OPT_GRAPHICS && (key==K_LEFTARROW || key==K_RIGHTARROW)){brightness_options=1;brightness_drag=0;selection=0;return;}
 #endif
-        if(selection==0 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
-        if(selection==3 && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
-        if(selection==4 && (key==K_LEFTARROW || key==K_RIGHTARROW)){audio_options=1;selection=0;return;}
-        if(selection==5 && (key==K_LEFTARROW || key==K_RIGHTARROW)){controls_open();return;}
-        if(selection==6 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
-        if(selection==7 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
-        if(selection==8 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
-        if(selection==9 && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
+        if(selection==OPT_FOG && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
+        if(selection==OPT_CROSSHAIR && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_CrosshairSet(!AW_CrosshairShown());
+        if(selection==OPT_INTERFACE && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
+        if(selection==OPT_AUDIO && (key==K_LEFTARROW || key==K_RIGHTARROW)){audio_options=1;selection=0;return;}
+        if(selection==OPT_CONTROLS && (key==K_LEFTARROW || key==K_RIGHTARROW)){controls_open();return;}
+        if(selection==OPT_AUTOSAVE && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
+        if(selection==OPT_AREA && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
+        if(selection==OPT_METHOD && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
+        if(selection==OPT_BUFFER && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
         if(key==K_ENTER || key==K_MOUSE1){
-            if(selection==0){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
-            else if(selection==1)AW_SetDrawDistance(540);
-            else if(selection==2)AW_UIFrameToggle();
-            else if(selection==3){interface_options=1;selection=0;}
-            else if(selection==4){audio_options=1;audio_drag=0;selection=0;}
-            else if(selection==5)controls_open();
-            else if(selection==6)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
-            else if(selection==7)AW_RegionLoadingToggle();
-            else if(selection==8)AW_StreamOption(0,1);
-            else if(selection==9 && AW_CellChangeMethod()==2)AW_StreamOption(1,1);
+            if(selection==OPT_FOG){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
+            else if(selection==OPT_RESET)AW_SetDrawDistance(540);
+            else if(selection==OPT_FRAME)AW_UIFrameToggle();
+            else if(selection==OPT_CROSSHAIR)AW_CrosshairSet(!AW_CrosshairShown());
+            /* Photo mode needs the running game; the menu closes first so the
+             * notice and then the clean frames follow at once. */
+            else if(selection==OPT_PHOTO && photo_ready()){photo=!AW_PhotoModeActive();close_menu();AW_PhotoModeSet(photo);}
+            else if(selection==OPT_INTERFACE){interface_options=1;selection=0;}
+            else if(selection==OPT_AUDIO){audio_options=1;audio_drag=0;selection=0;}
+            else if(selection==OPT_CONTROLS)controls_open();
+            else if(selection==OPT_AUTOSAVE)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
+            else if(selection==OPT_AREA)AW_RegionLoadingToggle();
+            else if(selection==OPT_METHOD)AW_StreamOption(0,1);
+            else if(selection==OPT_BUFFER && AW_CellChangeMethod()==2)AW_StreamOption(1,1);
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-            else if(selection==10){brightness_options=1;brightness_drag=0;selection=0;}
+            else if(selection==OPT_GRAPHICS){brightness_options=1;brightness_drag=0;selection=0;}
 #endif
             else if(selection==OPTION_ROWS-1){graphics=0;selection=frontend?2:4;}
         }
@@ -511,22 +522,24 @@ void M_Draw(void){
     }else if(graphics){
         for(i=graphics_top;i<graphics_top+7;i++){
             switch(i){
-            case 0:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
-            case 1:strcpy(line,"Reset distance: 540");break;
-            case 2:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
-            case 3:strcpy(line,"Interface...");break;
-            case 4:strcpy(line,"Audio...");break;
-            case 5:strcpy(line,"Controls...");break;
-            case 6:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
-            case 7:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
-            case 8:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
-            case 9:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
+            case OPT_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
+            case OPT_RESET:strcpy(line,"Reset distance: 540");break;
+            case OPT_FRAME:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
+            case OPT_CROSSHAIR:strcpy(line,AW_CrosshairShown()?"Show crosshairs: On":"Show crosshairs: Off");break;
+            case OPT_PHOTO:strcpy(line,AW_PhotoModeActive()?"Leave photo mode":"Photo mode");break;
+            case OPT_INTERFACE:strcpy(line,"Interface...");break;
+            case OPT_AUDIO:strcpy(line,"Audio...");break;
+            case OPT_CONTROLS:strcpy(line,"Controls...");break;
+            case OPT_AUTOSAVE:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
+            case OPT_AREA:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
+            case OPT_METHOD:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
+            case OPT_BUFFER:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-            case 10:strcpy(line,"Graphics...");break;
+            case OPT_GRAPHICS:strcpy(line,"Graphics...");break;
 #endif
             default:strcpy(line,"Back");break;
             }
-            label(44,54+(i-graphics_top)*19,230,19,line,i!=9 || AW_CellChangeMethod()==2,selection==i);
+            label(44,54+(i-graphics_top)*19,230,19,line,(i!=OPT_BUFFER || AW_CellChangeMethod()==2) && (i!=OPT_PHOTO || photo_ready()),selection==i);
         }
         AW_UIScrollbar(276,54,133,OPTION_ROWS,7,graphics_top);
     }else if(scene_picker){

@@ -19,6 +19,9 @@ int AW_MovieKey(int k,int d){return 0;} int AW_WorldUIKey(int k,int d){return 0;
 int AW_GalleryKey(int k,int d,int s,int c){return 0;}
 int AW_TravelKey(int k){return 0;} int AW_WaitKey(int k){return 0;} int AW_IntroKey(int k){return 0;}
 int AW_ConsoleCharHeight(void){return 8;} int AW_ConsoleCharWidth(void){return 4;}
+/* Photo mode stub: active, it claims Ctrl+F and Ctrl+H only. */
+static int photo_active,photo_keys;
+int AW_PhotoKey(int k){if(!photo_active || (k!='f' && k!='h'))return 0;photo_keys++;return 1;}
 extern char *keybindings[256];extern char key_lines[32][256];extern int edit_line,key_linepos;
 static void tap(int key){Key_Event(key,true);Key_Event(key,false);}
 static void scroll_limits(void){
@@ -64,6 +67,17 @@ int main(void){
  key_dest=key_console;queued[0]=0;tap('m');tap('n');assert(!queued[0]);
  assert(!strcmp(key_lines[edit_line],"]mn"));
  Key_Event(K_ALT,true);tap('m');Key_Event(K_ALT,false);assert(!queued[0] && !strcmp(key_lines[edit_line],"]mnm"));
+ /* Ctrl+F / Ctrl+H reach photo mode only while it is on and only with Ctrl;
+  * plain F (hands) and Ctrl (fast flight) keep their bindings, F10 stays the console key. */
+ key_dest=key_game;Key_SetBinding('f',"impulse 202");Key_SetBinding('h',"");
+ queued[0]=0;Key_Event(K_CTRL,true);tap('f');Key_Event(K_CTRL,false);
+ assert(!photo_keys && strstr(queued,"impulse 202") && strstr(queued,"+aw_fastflight"));
+ photo_active=1;queued[0]=0;tap('f');assert(!photo_keys && !strcmp(queued,"impulse 202\n"));
+ queued[0]=0;Key_Event(K_CTRL,true);tap('f');tap('h');Key_Event(K_CTRL,false);
+ assert(photo_keys==2 && !strstr(queued,"impulse 202"));
+ queued[0]=0;tap(K_F10);assert(!strcmp(queued,"aw_console_cycle\n") && photo_keys==2);
+ key_dest=key_console;Key_Event(K_CTRL,true);tap('f');Key_Event(K_CTRL,false);assert(photo_keys==2);
+ photo_active=0;key_dest=key_console;
  f=tmpfile();assert(f);Key_WriteBindings(f);rewind(f);n=fread(text,1,sizeof(text)-1,f);text[n]=0;fclose(f);
  assert(strstr(text,"unbindall\n") && strstr(text,"bind \"ALT+M\" \"aw_desktop\""));
  return 0;

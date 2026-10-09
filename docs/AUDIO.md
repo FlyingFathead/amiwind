@@ -1,5 +1,33 @@
 # Streamed music and speech
 
+<!-- contents start -->
+## Contents
+
+- [Host CPU load: 9 October 2026](#host-cpu-load-9-october-2026)
+- [Start-up and opening music: 7 October 2026](#start-up-and-opening-music-7-october-2026)
+- [Loading-audio candidate evidence: 6 October 2026](#loading-audio-candidate-evidence-6-october-2026)
+- [RC1 playtester updates and next mix default: 6 October 2026](#rc1-playtester-updates-and-next-mix-default-6-october-2026)
+- [Current AGA candidate: music-only read-ahead, 4 October 2026](#current-aga-candidate-music-only-read-ahead-4-october-2026)
+- [Earlier audio design and implementation records](#earlier-audio-design-and-implementation-records)
+- [Opening / terrain walk implementation (v0.0.1–v0.0.3)](#opening--terrain-walk-implementation-v001v003)
+- [Complete soundtrack streaming (v0.0.4)](#complete-soundtrack-streaming-v004)
+- [Async refill scheduler (v0.0.5)](#async-refill-scheduler-v005)
+- [Playlist policy (v0.0.6)](#playlist-policy-v006)
+- [Authored door sounds (dev5)](#authored-door-sounds-dev5)
+- [5 October: long-stall playback clock recovery, next development source](#5-october-long-stall-playback-clock-recovery-next-development-source)
+- [6 October: sub-second music pause on Enter (investigation open)](#6-october-sub-second-music-pause-on-enter-investigation-open)
+- [RC1 Audio options candidate](#rc1-audio-options-candidate)
+
+<!-- contents end -->
+
+## Host CPU load: 9 October 2026
+
+[AUDIO-HOST-LOAD-33](bugs/AUDIO-HOST-LOAD-33.md): CHIM Preview 1 crackled and snapped throughout
+play on a PC whose CPU was saturated by build jobs, and was clean on an idle second PC. The emulator
+cannot feed the host sound system in time when every host thread is busy; the game's mixer is not
+involved. Audio is judged only on an unloaded host (like emulator timings), and playtest reports
+note the host load. In-game loading crackle stays under [AUDIO-LOAD-29](BUGS.md#music-and-sound-audio).
+
 ## Start-up and opening music: 7 October 2026
 
 Music start points were moved away from disk-heavy moments, and two

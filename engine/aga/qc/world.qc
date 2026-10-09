@@ -265,3 +265,16 @@ void() PlayerPreThink = {
         }
     }
 };
+/* Static flames (QC-AW-FLAME-SPAWN-32). The engine reads aw_flame entities
+ * straight from the map's entity text into its static-flame table
+ * (aw_guard_torch.c), as the light compiler reads light entities. The server
+ * still spawns every map entity through this file, so the keys are declared
+ * and the entity is removed at once, as id's info_null does: loading prints
+ * no "is not a field" or "No spawn function" block per flame. New fields stay
+ * at the end so no earlier field moves. */
+.float aw_flame_size;
+.vector aw_flame_shape;
+void(entity e) remove = #15;
+void() aw_flame = { remove(self); };
+/* World field from id's defs.qc: the texture wad named by worldspawn. */
+.string wad;

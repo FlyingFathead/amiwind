@@ -26,6 +26,19 @@ def digest(path):
     return h.hexdigest()
 
 
+def gate_dry_run_image(image, boot, payload):
+    """The disk-layout gate of every image step (BUILD-WORLD-PARTITION-MOUNT-33) on the dry-run HDF as
+    written: the partition table read back (geometry and every file), then partition start and size
+    below 2 GiB, files below 1 GiB and the drive below 4 GiB. Returns the measured layout."""
+    from world_volumes import require_disk_layout, require_mountable, verify_combined
+    partitions = [dict(partition='DH0', volume='AMIWINDTEST',
+                       files=[dict(path=p.relative_to(boot).as_posix(), bytes=p.stat().st_size, sha256=digest(p))
+                              for p in payload])]
+    checked = verify_combined(image, partitions)
+    require_mountable(checked)
+    return require_disk_layout(image.name, image.stat().st_size, checked, partitions)
+
+
 def build(args):
     out = ensure_external(args.out, "dry-run output")
     sdk = ensure_external(args.sdk, "Amiga SDK")
@@ -99,6 +112,7 @@ def build(args):
     check_image(part, normalize=True)
     subprocess.run(rdb + [str(image), 'create', 'chs=257,1,64', '+', 'init', '+', 'addimg', str(part), 'name=DH0', 'bootable=1', 'pri=0'], check=True)
     check_image(image, partition='DH0')
+    disk_layout = [gate_dry_run_image(image, boot, payload)]
     check = out / 'readback.tmp'
     for path in payload:
         subprocess.run(xdf + [str(image), 'open', 'part=DH0', '+', 'read', path.relative_to(boot).as_posix(), str(check)], check=True)
@@ -111,6 +125,7 @@ def build(args):
         'rom_included': False, 'hdf': image.name, 'hdf_sha256': digest(image),
         'payload': {p.relative_to(boot).as_posix(): digest(p) for p in payload},
         'fpu_support': fpu_receipt,
+        'disk_layout': disk_layout,
         'validation': 'Amiga Hunk headers, filesystem metadata and every payload readback; emulator boot is a separate check'
     }, indent=2) + '\n', newline='\n')
     from emulator_configs import write_configs, print_outputs

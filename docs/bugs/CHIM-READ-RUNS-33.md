@@ -1,5 +1,25 @@
 # CHIM-READ-RUNS-33: CHIM crossings read little but in many separate runs, so FFS seeks dominate
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.33-dev |
+| Where | CHIM model pack order and world format |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.33-dev (last seen) |
+| Severity | medium: Crossings read little but in many runs, so FFS seeks dominate load time. |
+| Family | Loading and disk reads (`disk-loading`) |
+| CHIM | World format ([CHIM Engine tracker](CHIM_TRACKER.md)) |
+| Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
+| From commit | source unknown, engine unknown, CHIM world unknown |
+| CHIM engine version | CHIM 0.1.0, engine unknown, world format unknown |
+| Unknown because | registered before found-in-build records existed; found on a CHIM development branch, the finding commit and world format were not recorded |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Found by the first CHIM world-format build of Balmora (branch v0.0.33-chim-format, format 0.1).
@@ -54,3 +74,23 @@ Pending.
 ## Prevention
 
 Read runs per crossing in the validator report, with a limit.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Loading and disk reads (`disk-loading`). Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. See [families](README.md#families).
+
+- [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md): The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s
+- [LOADER-STALL-32](LOADER-STALL-32.md): One unexplained stall while loading the Mages Guild with the new loader
+- PERF-READAHEAD-29 (no report page): Outdoor cell/sub-cell crossing pauses and lost read-ahead
+- [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
+- [SEYDA-READ-SLOW-31](SEYDA-READ-SLOW-31.md): dev1 Seyda crossings read slower than the ov700 test image
+- [STREAM-FFS-SEEK-32](STREAM-FFS-SEEK-32.md): Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU
+
+Related bugs in other categories:
+
+- [BENCH-DISK-BYTES-32](BENCH-DISK-BYTES-32.md): FS-UAE moves disk bytes at about 90 MB/s, so it cannot price what a walk reads
+- [BENCH-HOST-STORAGE-32](BENCH-HOST-STORAGE-32.md): Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS
+
+<!-- END GENERATED CATEGORY -->

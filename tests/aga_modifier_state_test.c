@@ -40,3 +40,4 @@ int main(void){
  tap('3');assert(!strcmp(key_lines[edit_line],"]dbg 1A2a!3"));
  return 0;
 }
+int AW_PhotoKey(int key){(void)key;return 0;}

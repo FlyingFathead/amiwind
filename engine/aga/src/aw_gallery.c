@@ -20,6 +20,10 @@ static aw_save_t *back_state;
 typedef struct {char sound[96],text[2048];float duration;} gallery_voice_t;
 static gallery_voice_t *voice;
 static int back_intro,combat,torch_test,torch_actor;
+/* The Vivec Arena minigame (aw_arena.c) uses this session: arena_map is the
+ * pit, the gallery floor or the captured scene itself ("here"). */
+static int arena;static char arena_map[32];
+extern void AW_ArenaInit(void);extern void AW_ArenaEnd(void);extern void AW_ArenaCommand(int argc,char **argv);
 static float back_torch,combat_timing[4],back_fullbright;
 extern cvar_t r_fullbright;
 static const char *hand_timing[4]={"aw_hand_idle","aw_hand_draw","aw_hand_lower","aw_hand_punch"};
@@ -43,14 +47,15 @@ static vec3_t back_origin,back_angles;
 static float back_move,back_health,back_hand_goal;
 
 int AW_TorchTestActive(void){return torch_test && session && sv.active && !strcmp(sv.name,"torchtest");}
+static int arena_here(void){return arena && session && sv.active && arena_map[0] && !strcmp(sv.name,arena_map);}
 /* Only captured, active diagnostic rooms may ignore the source story's input
  * restrictions. Revoke permission as soon as return begins, before map load. */
 int AW_DebugTestInputActive(void){
     return session && !returning && sv.active &&
         ((combat && !strcmp(sv.name,"charplane")) ||
-         (torch_test && !strcmp(sv.name,"torchtest")));
+         (torch_test && !strcmp(sv.name,"torchtest")) || arena_here());
 }
-int AW_GalleryActive(void){return sv.active && (!strcmp(sv.name,"charplane") || AW_TorchTestActive());}
+int AW_GalleryActive(void){return sv.active && ((!arena && !strcmp(sv.name,"charplane")) || AW_TorchTestActive() || arena_here());}
 int AW_GalleryModal(void){return AW_GalleryActive() && key_dest==key_game && (page || help || editing);}
 static void normalize(const char *in,char *out) {
     int n=0;unsigned char c;
@@ -112,16 +117,29 @@ static void talk(void) {
     if(COM_FOpenFile(path,&f)<44 || !f){if(f)fclose(f);strcpy(notice,"Greeting audio unavailable.");return;}
     fclose(f);S_LocalSound(voice->sound);AW_UIVoiceSubtitle(current.name,voice->text,voice->duration);
 }
+/* A --no-npc-gallery image omits the catalogue and the inspection map and
+ * carries the builder's marker file instead (tools/build_gallery.py,
+ * omit_gallery). The marker is opened only after a gallery entry finds its own
+ * files missing, or while dbg help lists commands, so normal play never looks
+ * for it. */
+#define NO_GALLERY_TEXT "This build was made without the NPC gallery (quick playtest build).\n" \
+    "To include it, build without --no-npc-gallery.\n"
+static int omitted;
+int AW_GalleryOmitted(void) {
+    FILE *f=NULL;
+    if(COM_FOpenFile("npc-gallery-disabled.txt",&f)<0 || !f)return 0;
+    fclose(f);return 1;
+}
+static void print_notice(void){if(omitted)Con_Printf(NO_GALLERY_TEXT);else Con_Printf("%s\n",notice);}
 /* Prefer an exact source ID. Repeated display names select the first stable ID
  * and explicitly report how many variants share that name. */
 static int select_entry(int index,const char *search) {
     FILE *f=NULL;char line[512],needle[96],id[96],name[96],extra;int total,i,matches=0,match_index=0,exact=0;
     gallery_entry_t e,match;long number=0;char *end;
+    omitted=0;
     if(COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f){
-        f=NULL;
-        if(COM_FOpenFile("npc-gallery-disabled.txt",&f)>=0 && f){
-            fclose(f);strcpy(notice,"Gallery disabled by --no-npc-gallery.");
-        }else strcpy(notice,"Gallery catalogue missing; rebuild the image.");
+        if((omitted=AW_GalleryOmitted()))strcpy(notice,"NPC gallery not included in this build.");
+        else strcpy(notice,"Gallery catalogue missing; rebuild the image.");
         return 0;
     }
     if(!fgets(line,sizeof(line),f) || Q_sscanf(line,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
@@ -209,16 +227,20 @@ void AW_GalleryMouse(int dx,int dy) {
     row=mouse_row();if(row>=0){page_selected=row;filtering=0;}
 }
 static void reload(void) {
+    char command[48];
     close_browser();read_voice();editing=help=0;key_dest=key_game;IN_AWClearButtons();
+    if(arena){
+        /* "here": the captured scene's own region is selected again. */
+        if(!strcmp(arena_map,back_map) && !AW_RegionSelect(back_map,back_origin,back_intro)){Con_Printf("Arena: scene region unavailable.\n");return;}
+        sprintf(command,"map %s\n",arena_map);Cbuf_InsertText(command);return;
+    }
     Cbuf_InsertText(torch_test?"map torchtest\n":"map charplane\n");
 }
 static void leave(void) {
-    char command[64];FILE *f=NULL;
+    char command[64];
     if(!session || !back_state || returning){Con_Printf("No gallery return is pending.\n");return;}
     /* A missing return scene must leave the temporary snapshot available. */
-    sprintf(command,"maps/%s.bsp",back_map);
-    if(COM_FOpenFile(command,&f)<124 || !f){if(f)fclose(f);strcpy(notice,"Return scene unavailable; snapshot retained.");Con_Printf("%s\n",notice);return;}
-    fclose(f);
+    if(AW_SceneMapSize(back_map,NULL,0)<124){strcpy(notice,"Return scene unavailable; snapshot retained.");Con_Printf("%s\n",notice);return;}
     if(!AW_RegionSelect(back_map,back_origin,back_intro)){strcpy(notice,"Return region unavailable; snapshot retained.");return;}
     AW_SaveSnapshotRestore(back_state);
     close_browser();editing=help=0;returning=1;key_dest=key_game;IN_AWClearButtons();
@@ -238,7 +260,8 @@ static int capture_game(void) {
             Con_Printf("Cannot capture the current game for gallery return.\n");return 0;
         }
         strcpy(back_map,sv.name);VectorCopy(p->v.origin,back_origin);
-        back_intro=!strcmp(sv.modelname,"maps/intro_docks.bsp");
+        /* The intro docks: the legacy map or their CHIM frame map. */
+        back_intro=!strcmp(sv.modelname,"maps/intro_docks.bsp") || !strcmp(sv.modelname,"maps/intro_docks-chim.bsp");
         VectorCopy(cl.viewangles,back_angles);back_move=p->v.movetype;session=1;body=0;
         back_health=p->v.health;goal=GetEdictFieldValue(p,"aw_hand_goal");back_hand_goal=goal?goal->_float:0;
         goal=GetEdictFieldValue(p,"aw_torch");back_torch=goal?goal->_float:0;
@@ -248,7 +271,7 @@ static int capture_game(void) {
 static void command(void) {
     char search[96];int i,n=0;
     if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"exit")){leave();return;}
-    if(combat || torch_test){Con_Printf("Exit combat/torch test before entering the NPC gallery.\n");return;}
+    if(combat || torch_test || arena){Con_Printf("Exit combat/torch test or the arena before entering the NPC gallery.\n");return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"talk")){key_dest=key_game;talk();return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"browse")){key_dest=key_game;open_browser();return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"help")){key_dest=key_game;close_browser();help=1;return;}
@@ -263,15 +286,28 @@ static void command(void) {
         strcpy(search+n,Cmd_Argv(i));n+=strlen(Cmd_Argv(i));
     }
     search[n]=0;
-    if(!select_entry(0,n?search:NULL)){Con_Printf("%s\n",notice);return;}
+    if(!select_entry(0,n?search:NULL)){print_notice();return;}
     if(!capture_game())return;
     reload();
 }
+/* dbg combattest: since the arena minigame it enters the Vivec Arena (as
+ * dbgmode arenapit); the empty gallery floor test is dbg combattest gallery
+ * (or floor), with its idle/draw/lower/punch/center/help/exit actions. */
 static void combat_command(void){
     edict_t *p;eval_t *v;FILE *f=NULL;int i,state=-1;
     const char *arg=Cmd_Argv(1);
     if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
-    if(Cmd_Argc()>2){Con_Printf("Usage: dbg combattest [idle/draw/lower/punch/center/help/exit].\n");return;}
+    if(arena || (!combat && !session && (!*arg || (Q_strcasecmp((char *)arg,"gallery") && Q_strcasecmp((char *)arg,"floor") &&
+       Q_strcasecmp((char *)arg,"help"))))){
+        char *argv[16];int argc=Cmd_Argc()>16?16:Cmd_Argc();
+        for(i=0;i<argc;i++)argv[i]=Cmd_Argv(i);
+        AW_ArenaCommand(argc,argv);return;
+    }
+    if(!combat && !session && !Q_strcasecmp((char *)arg,"help")){
+        Con_Printf("dbg combattest [opponent]: the Vivec Arena (dbgmode arenapit); dbg combattest gallery: the empty floor test.\n");return;
+    }
+    if(!combat && (!Q_strcasecmp((char *)arg,"gallery") || !Q_strcasecmp((char *)arg,"floor")))arg="";
+    if(Cmd_Argc()>2){Con_Printf("Usage: dbg combattest gallery, then dbg combattest [idle/draw/lower/punch/center/help/exit].\n");return;}
     if(combat && AW_GalleryActive() && !returning){
         p=svs.clients[0].edict;
         if(!*arg || !Q_strcasecmp((char *)arg,"center"))combat_center(p);
@@ -280,11 +316,11 @@ static void combat_command(void){
         else if(!Q_strcasecmp((char *)arg,"draw"))state=1;
         else if(!Q_strcasecmp((char *)arg,"lower"))state=4;
         else if(!Q_strcasecmp((char *)arg,"punch"))state=3;
-        else {Con_Printf("Usage: dbg combattest [idle/draw/lower/punch/center/help/exit].\n");return;}
+        else {Con_Printf("Usage: dbg combattest [idle/draw/lower/punch/center/help/exit] (floor test).\n");return;}
         if(state>=0)combat_pose(p,state);
         key_dest=key_game;IN_AWClearButtons();return;
     }
-    if(*arg){Con_Printf("Enter with dbg combattest before choosing an action.\n");return;}
+    if(*arg){Con_Printf("Enter with dbg combattest gallery before choosing an action.\n");return;}
     if(session || AW_GalleryActive()){Con_Printf("Exit the current gallery first.\n");return;}
     if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict){
         Con_Printf("Start a local game before entering combat test.\n");return;
@@ -300,6 +336,7 @@ static void combat_command(void){
     }
     if(COM_FOpenFile("maps/charplane.bsp",&f)<124 || !f){
         if(f)fclose(f);
+        if(AW_GalleryOmitted()){Con_Printf("Combat test uses the NPC gallery room. " NO_GALLERY_TEXT);return;}
         Con_Printf("Combat test floor missing; rebuild the gallery.\n");return;
     }
     fclose(f);
@@ -328,7 +365,7 @@ static void torch_command(void){
             strcpy(search+n,Cmd_Argv(i));n+=strlen(Cmd_Argv(i));
         }
         search[n]=0;
-        if(!select_entry(0,search)){Con_Printf("%s\n",notice);return;}
+        if(!select_entry(0,search)){print_notice();return;}
         if(strcmp(current.kind,"NPC_") || current.size[0]>96 || current.size[1]>96 || current.size[2]>104){
             current=previous;
             Con_Printf("Torch room needs an NPC no larger than 96 x 96 x 104 units.\n");return;
@@ -357,7 +394,44 @@ static void torch_command(void){
 usage:
     Con_Printf("Usage: dbg torchtest [npc ID/name | empty/center/help/exit].\n");
 }
-void AW_GalleryInit(void){Cmd_AddCommand("aw_charplane",command);Cmd_AddCommand("aw_combattest",combat_command);Cmd_AddCommand("aw_torchtest",torch_command);}
+void AW_GalleryInit(void){Cmd_AddCommand("aw_charplane",command);Cmd_AddCommand("aw_combattest",combat_command);Cmd_AddCommand("aw_torchtest",torch_command);AW_ArenaInit();}
+/* ---- the Vivec Arena's session (aw_arena.c) ---- */
+int AW_GalleryArenaEnter(const char *map) {
+    edict_t *p;eval_t *v;int i;
+    if(session){Con_Printf("Exit the current gallery or test room first.\n");return 0;}
+    if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){
+        Con_Printf("Start a local game before entering the arena.\n");return 0;
+    }
+    if(p->v.health<=0){Con_Printf("You are dead.\n");return 0;}
+    for(i=0;i<4;i++){
+        v=GetEdictFieldValue(sv.edicts,(char *)hand_timing[i]);
+        if(!v || !isfinite(v->_float) || v->_float<=0 || v->_float>60){Con_Printf("The arena needs valid hands in the current game.\n");return 0;}
+        combat_timing[i]=v->_float;
+    }
+    if(strlen(map)>=sizeof(arena_map) || strlen(sv.name)>=sizeof(arena_map)){Con_Printf("Scene name too long.\n");return 0;}
+    if(!capture_game())return 0;
+    arena=1;notice[0]=0;strcpy(arena_map,*map?map:sv.name);reload();return 1;
+}
+void AW_GalleryArenaReload(void){if(arena && session && !returning)reload();}
+void AW_GalleryArenaLeave(void){leave();}
+int AW_GalleryArenaBack(vec3_t origin,vec3_t angles){
+    if(!arena || !session)return 0;
+    VectorCopy(back_origin,origin);VectorCopy(back_angles,angles);return 1;
+}
+void AW_GalleryHandsDrawn(edict_t *p){combat_pose(p,1);}
+/* A gallery NPC for the arena: by search (number, ID or name) or by index.
+ * The gallery's own selection is left as it was. */
+int AW_GalleryFind(const char *search,int index,char *id,char *name,char *model,int *total){
+    gallery_entry_t keep=current;int keep_selected=selected,keep_count=count,ok;
+    ok=select_entry(index,search);
+    if(ok){
+        *total=count;
+        ok=!strcmp(current.kind,"NPC_") && strcmp(current.model[0],"-");
+        if(ok){strcpy(id,current.id);strcpy(name,current.name);sprintf(model,"gallery/%s.mdl",current.model[0]);}
+    }
+    current=keep;selected=keep_selected;count=keep_count;
+    return ok;
+}
 static int gallery_budget(const char *path) {
     FILE *f=NULL;unsigned char head[72];int vertices,triangles;
     if(COM_FOpenFile((char *)path,&f)<72 || !f){if(f)fclose(f);return 0;}
@@ -387,7 +461,11 @@ void AW_GalleryEntities(void) {
     /* SV_SpawnServer calls this before setting sv.active. Runtime predicates
      * must stay inactive then, but this captured session's map needs its
      * timings and actors before physics/baselines and client spawn. */
-    if(!session || strcmp(sv.name,torch_test?"torchtest":"charplane"))return;
+    if(!session || strcmp(sv.name,arena?arena_map:torch_test?"torchtest":"charplane"))return;
+    if(arena){
+        for(i=0;i<4;i++)hand_field(sv.edicts,hand_timing[i],combat_timing[i]);
+        AW_ArenaEntities();return;
+    }
     if(combat || torch_test){
         for(i=0;i<4;i++)hand_field(sv.edicts,hand_timing[i],combat_timing[i]);
         if(!torch_test || !torch_actor)return; /* Empty tests need no catalogue. */
@@ -424,6 +502,7 @@ void AW_GallerySpawn(edict_t *p) {
         AW_SaveSnapshotRestore(back_state);free(back_state);back_state=NULL;
         if(voice){free(voice);voice=NULL;}
         if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
+        AW_ArenaEnd();arena=0;
         returning=session=combat=torch_test=torch_actor=0;VectorCopy(back_origin,p->v.origin);VectorCopy(back_origin,p->v.oldorigin);
         VectorCopy(vec3_origin,p->v.velocity);VectorCopy(back_angles,p->v.angles);VectorCopy(back_angles,p->v.v_angle);
         VectorCopy(back_angles,cl.viewangles);p->v.movetype=back_move;p->v.health=back_health;
@@ -433,11 +512,13 @@ void AW_GallerySpawn(edict_t *p) {
     }
     if(!AW_GalleryActive()){
         if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
+        AW_ArenaEnd();arena=0;
         close_browser();editing=help=session=combat=torch_test=torch_actor=0;
         if(back_state){free(back_state);back_state=NULL;}
         if(voice){free(voice);voice=NULL;}return;
     }
     if(!session)return;
+    if(arena){AW_ArenaSpawn(p);return;}
     if(torch_test){torch_center(p);combat_pose(p,1);return;}
     if(combat){combat_center(p);combat_pose(p,1);return;}
     distance=current.size[0]>current.size[1]?current.size[0]:current.size[1];
@@ -452,6 +533,7 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     int n,rows;
     if(!AW_GalleryActive() || key_dest!=key_game)return 0;
     if(control && (key=='x' || key=='X')){if(down)leave();return 1;}
+    if(arena)return AW_ArenaKey(key,down);
     if(key==K_F1){if(down){close_browser();editing=0;help=!help;IN_AWClearButtons();}return 1;}
     if(help){if(down && key==K_ESCAPE)help=0;return 1;}
     if(combat || torch_test)return 0; /* Normal movement, hands and torch bindings. */
@@ -544,6 +626,7 @@ void AW_GalleryDraw(void) {
         "E: converted greeting, when available",
         "Ctrl+X: return to the captured game","F10: console; dbg gallery exit","F1 / Esc: close this help"};
     if(!AW_GalleryActive() || key_dest!=key_game)return;
+    if(arena){AW_ArenaDraw();return;}
     if(torch_test){
         line(0,"Torch test - dark enclosed room");
         line(1,torch_actor?current.name:"Empty room");line(2,"V: torch  F: hands  F1: help  Ctrl+X: return");

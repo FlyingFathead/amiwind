@@ -1,8 +1,49 @@
 # ENTITY-EXHAUSTION-007: entity exhaustion investigation history
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 3 October 2026, in v0.0.28-rc1 |
+| Where | Engine entity allocator (ED_Alloc, 600 slots) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.28-rc1 (last seen) |
+| Severity | high: Running out of entity slots ended the game with a fatal error; only a safe session end exists, not capacity. |
+| Family | Engine table limits (`engine-limits`) |
+
+<!-- END GENERATED FACTS -->
+
 The following journal entry is retained verbatim. Moving its detailed
 history here keeps the main journal within the public source size gate.
 Current status remains in [the issue index](../BUGS.md).
+
+<!-- contents start -->
+## Contents
+
+- [ENTITY-EXHAUSTION-007: interactive entity exhaustion recovery](#entity-exhaustion-007-interactive-entity-exhaustion-recovery)
+  - [Balmora catalogue admission and heap accounting addendum](#balmora-catalogue-admission-and-heap-accounting-addendum)
+  - [BUILD-QCC-PATH-008: assembly received a source directory as its compiler](#build-qcc-path-008-assembly-received-a-source-directory-as-its-compiler)
+  - [ENTITY-DIAGNOSTIC-009: allocation high-water count described as live slots](#entity-diagnostic-009-allocation-high-water-count-described-as-live-slots)
+  - [WORLD-FLORA-HEAP-010: Seyda sprite payload exceeds final headroom](#world-flora-heap-010-seyda-sprite-payload-exceeds-final-headroom)
+  - [WORLD-FLORA-HEAP-010: contained-collision experiment and refreshed diagnostics](#world-flora-heap-010-contained-collision-experiment-and-refreshed-diagnostics)
+  - [Development inspection follow-up: Blender mesh views (3 October 2026)](#development-inspection-follow-up-blender-mesh-views-3-october-2026)
+  - [SPRITE-STREAM-VALIDATION: development wrapper and legacy alignment failures](#sprite-stream-validation-development-wrapper-and-legacy-alignment-failures)
+  - [POLYCOUNT-INSPECTOR: initial empty-scene render stops animation](#polycount-inspector-initial-empty-scene-render-stops-animation)
+  - [Sprite validation follow-up: bounded native and full suite results](#sprite-validation-follow-up-bounded-native-and-full-suite-results)
+  - [WORLD-FLORA-HEAP-010: unresolved fallback diagnostic accounting](#world-flora-heap-010-unresolved-fallback-diagnostic-accounting)
+  - [POLYCOUNT-INSPECTOR release admission and current estimate follow-up](#polycount-inspector-release-admission-and-current-estimate-follow-up)
+  - [TERRAIN-CULL: global topology and local sky enclosure remain unaccepted](#terrain-cull-global-topology-and-local-sky-enclosure-remain-unaccepted)
+  - [POLYCOUNT-INSPECTOR: fly navigation and repeated-count regressions open](#polycount-inspector-fly-navigation-and-repeated-count-regressions-open)
+  - [TERRAIN-CULL audit follow-up 002: sky geometry removed; global terrain still pending](#terrain-cull-audit-follow-up-002-sky-geometry-removed-global-terrain-still-pending)
+  - [TERRAIN-CULL inspection004: source join repair is separate from buried-object removal](#terrain-cull-inspection004-source-join-repair-is-separate-from-buried-object-removal)
+  - [SKY-FOG v0.0.28: shared resource and reserved depth validated natively; target pending](#sky-fog-v0028-shared-resource-and-reserved-depth-validated-natively-target-pending)
+  - [EXTERIOR-SURFACES v0.0.28: no checked interior-cell leak; storage exclusion remains open](#exterior-surfaces-v0028-no-checked-interior-cell-leak-storage-exclusion-remains-open)
+  - [EXTERIOR-VISIBILITY v0.0.28: source policy metadata and bounded selector added](#exterior-visibility-v0028-source-policy-metadata-and-bounded-selector-added)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## ENTITY-EXHAUSTION-007: interactive entity exhaustion recovery
 
@@ -556,3 +597,37 @@ variant or file-byte result exists. Texinfo mappings were reused without a
 measured lightmap rebake. The already clipped 021 reclip grew to 704/594/948 via
 numeric fragmentation. Treat it as a geometry experiment, not an optimization
 or applied production saving.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Engine table limits (`engine-limits`). Fixed engine tables (models, entities, faces, texinfo, flames, lamps, door rows) are checked by the builder before a map ships, never discovered in play. See [families](README.md#families).
+
+- AW-20260928-16 (no report page): Two compiler-reported array bounds violations
+- AW-20260929-02 (no report page): NPCs missing from expanded town render
+- BALMORA-CAPACITY-005 (no report page): Bounded Balmora maps exceed the 600-entity limit
+- EFRAG-01 (no report page): Static foliage leaf links exhausted ('Too many efrags!')
+- [ENGINE-SUBMODEL-LIMIT-32](ENGINE-SUBMODEL-LIMIT-32.md): Map loading does not check the submodel count against MAX_MODELS
+- ENTITY-DIAGNOSTIC-009 (no report page): Entity-exhaustion warning reports the high-water count as live slots
+- [ERICW-TEXINFO-SIGNED-31](ERICW-TEXINFO-SIGNED-31.md): ericw vis crashes and ericw light leaves faces unlit above texinfo 32,767
+- [FLAMES-CAP-31](FLAMES-CAP-31.md): Static flames above 128 per map are silently dropped
+- FLORA-ENTITY-001 (no report page): Dense vegetation exceeds the per-map entity reserve
+- FLORA-RESERVE-002 (no report page): Two world flora maps exceed storage and clipnode reserves
+- GEO-04 (no report page): Canonical-terrain world rebuild fails VIS (too many portals)
+- [IMPORT-DOORBANK-LIMIT-32](IMPORT-DOORBANK-LIMIT-32.md): Town importer did not check the engine's 128-row door bank limit
+- [INTERIOR-COORDS-31](INTERIOR-COORDS-31.md): Some interiors place objects beyond the +/-4096 coordinate range
+- [INTERIOR-INLINE-LIMIT-31](INTERIOR-INLINE-LIMIT-31.md): Every interior object is its own inline model: 220 objects per interior at most
+- [LAMPS-CACHE-31](LAMPS-CACHE-31.md): Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec)
+- [MODEL-MARKSURF-SIGNED-31](MODEL-MARKSURF-SIGNED-31.md): Face indices above 32,767 in leaf face lists become bad pointers
+- [MODEL-SLOTS-256-32](MODEL-SLOTS-256-32.md): Some Vivec interiors exceed the engine's 256 model slots; the heap check does not catch it
+- [RENDER-VISEDICTS-OVERFLOW-32](RENDER-VISEDICTS-OVERFLOW-32.md): Entities beyond MAX_VISEDICTS (1,112) are dropped silently
+- TOWN-FLORA-BUDGET-004 (no report page): World 4 MiB file budget wrongly applied to town flora maps
+- [VIVEC-TEXINFO-31](VIVEC-TEXINFO-31.md): Dense Vivec canton regions exceed the 32,767 texture-mapping limit
+
+Related bugs in other categories:
+
+- BUILD-QCC-PATH-008 (no report page): Image assembly was given the QCC source directory as its compiler
+- WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
+
+<!-- END GENERATED CATEGORY -->

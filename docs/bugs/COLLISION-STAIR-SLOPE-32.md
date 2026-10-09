@@ -1,21 +1,53 @@
 # COLLISION-STAIR-SLOPE-32: Convex collision proxies make stairs unclimbable
 
-| | |
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
 | --- | --- |
-| Reported by | owner reports and the stair walkability gate |
-| First noticed | 8 October 2026 (Balmora stairs reported in v0.0.24) |
+| Reported by | owner |
+| First noticed | 8 October 2026, in v0.0.24 |
 | Where | converted stairs and slopes; staircases listed on the page |
-| Reproduction | always for the listed flights |
-| Duplicate of | none (parent of the STAIRS-*-32 pages) |
-| Persists in | v0.0.32 (rule and gate not in this release) |
-| Severity | medium (blocked stairs) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.24, v0.0.32 (last seen) |
+| Severity | medium: Blocked stairs. |
+| Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
+| Playtest version | v0.0.24 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 8 October 2026
 
-Open: rule, switch and gate in source on branch v0.0.32-stair-walk (not yet in a build). Five
-staircases still fail the gate and are tracked separately (below). Owner order 8 October 2026:
+Open: rule, switch and gate in source (not yet in a build). 9 October 2026: no staircase fails the
+gate any more on the maps rebuilt with the rule (legacy) or on the CHIM Balmora and Seyda Neen
+worlds; the last four were gate artefacts, fixed on branch v0.0.33-stairs-2 (see "Gate after the
+last fixes" below). Was: five staircases still fail the gate and are tracked separately (below). Owner order 8 October 2026:
 stairs follow Morrowind's own rules in the next build, and a build fails on any unclimbable
 flight of stairs.
+
+8 October 2026: the rule, the switch and the gate are merged on v0.0.33-dev. Until the five
+STAIRS-*-32 flights are repaired, a legacy image build from v0.0.33-dev stops at the stair gate;
+the source gate (tests, preflight, engine build) is not affected. Repairing those flights is the
+next stair job.
 
 In v0.0.32: the stair rule, the gate (`tools/stair_walk.py`) and the converter side of the `follow_original_stair_rules` setting are on a development branch and not in v0.0.32. v0.0.32 has the setting in the builder configuration (on by default) and the Vivec Arena stair repair from [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md).
 
@@ -104,6 +136,62 @@ Owner's data, inside Docker, 8 October 2026:
   advisory, `check_polys` interface).
 - Pending: a build with the switch on, an in-game check of the listed staircases.
 
+### Gate after the last fixes (9 October 2026, branch v0.0.33-stairs-2)
+
+The four flights still failing were gate artefacts, not collision faults (causes on their pages):
+a cave floor read as a step ([STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md)), a start inside
+an authored ramp under a low lintel ([STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md)), and
+start boxes touching a wall or a closed door within the collision plates' 0.2 thickness
+([STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md),
+[STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md)); the gate rules are in
+[STAIR_RULES.md](../STAIR_RULES.md). Previous gate vs this gate on the same maps (owner's data,
+inside Docker, flight steps passed / failed / untestable):
+
+| Maps | Previous gate | This gate | Gating failures |
+|---|---|---|---|
+| Legacy, rebuilt with the rule: 64 Balmora regions | 295 / 1 / 4 | 296 / 0 / 4 | 1 -> 0 |
+| Legacy, rebuilt with the rule: 58 interiors (Seyda Neen rooms, prison ship, Census, Balmora rooms) | 419 / 6 / 15 | 420 / 0 / 18 | 4 -> 0 |
+| v0.0.32 release maps (no rule): Vivec Arena | 197 / 0 / 0 | 197 / 0 / 0 | 0 -> 0 |
+| v0.0.32 release maps (no rule): all 204 | | | 18 -> 13 (the rest: pre-rule warehouse 7 and lighthouse 1, recorded Seyda Neen lighthouse 5; the rebuilt maps clear them) |
+| CHIM Balmora world | 294 / 1 / 4 | 295 / 0 / 4 | 1 -> 0 |
+| CHIM Seyda Neen world (built with the slanted-riser cut) | 7 passed (1 covered, 1 advisory) | 7 passed | 0 -> 0 |
+
+No flight step that passed before fails or becomes untestable. Rows that disappear are not steps
+(two tilted cave-floor triangles in Addamasartus, a tilted dock plank at the intro docks): of all
+step rows, 1,643 -> 1,565 on the rebuilt maps; ramp rows unchanged. Regression fixtures:
+`tests/test_stair_walk_cases.py`.
+
 ## Prevention
 
 The image-step gate on every build's final maps, on by default with the stair rules.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`). Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. See [families](README.md#families).
+
+- [BUILD-HULL-ROUTE-BUDGET-33](BUILD-HULL-ROUTE-BUDGET-33.md): Routed standing hulls with copies overflow a legacy map's shared clipnode budget
+- [BUILD-ROUTED-FLORA-RESERVE-33](BUILD-ROUTED-FLORA-RESERVE-33.md): Routed standing hulls push a legacy open-world map past the flora collision reserve: the full build stops in world-flora (vf0779)
+- [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
+- [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
+- [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
+- [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
+- [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
+- [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only
+- [COLLISION-SEYDA-PREVIEW-BYPASS-32](COLLISION-SEYDA-PREVIEW-BYPASS-32.md): The legacy Seyda Neen preview builds its own convex collision
+- [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
+- [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
+- [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot
+- [STAIRS-SEYDA-LIGHTHOUSE-32](STAIRS-SEYDA-LIGHTHOUSE-32.md): Seyda Neen lighthouse stairs are blocked (outside and inside)
+- [STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md): A spiral stair in the Seyda Neen warehouse tower is blocked
+- TERRAIN-TRAP-29 (no report page): v0.0.29-dev1: Player reportedly stuck on rocks beside structures
+- [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
+- [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water
+
+Related bugs in other categories:
+
+- [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+
+<!-- END GENERATED CATEGORY -->

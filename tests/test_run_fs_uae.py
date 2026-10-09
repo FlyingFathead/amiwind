@@ -38,7 +38,7 @@ class FsUaeTests(unittest.TestCase):
              patch.object(build, 'prerequisites') as prerequisites, \
              contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             with self.assertRaises(SystemExit) as error:
-                build.main(['--autoinstall', '--autorun-fs-uae'])
+                build.main(['--autoinstall', '--autorun-fs-uae', '--builder', 'legacy'])
         self.assertEqual(error.exception.code, 1)
         environment.assert_not_called()
         prerequisites.assert_not_called()
@@ -207,7 +207,7 @@ class FsUaeTests(unittest.TestCase):
                  patch.object(build, 'prerequisites', return_value={}), \
                  patch.object(build, 'commands', return_value=[]), \
                  contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(build.main([mode, '--autorun-fs-uae', '--workspace', tmp]), 0)
+                self.assertEqual(build.main([mode, '--autorun-fs-uae', '--workspace', tmp, '--builder', 'legacy']), 0)
                 launch.assert_not_called()
                 self.assertEqual(list(Path(tmp).iterdir()), [])
 
@@ -238,7 +238,7 @@ class FsUaeTests(unittest.TestCase):
                  patch.object(build, 'dry_run_commands', return_value=[]), \
                  patch.object(build, 'provenance', return_value={}), \
                  patch.object(build, 'execute') as execute, contextlib.redirect_stdout(io.StringIO()) as output:
-                argv = ['--autorun-fs-uae', '--workspace', tmp, '--name', 'fixture']
+                argv = ['--autorun-fs-uae', '--workspace', tmp, '--name', 'fixture', '--builder', 'legacy']
                 if dry_run:
                     argv.append('--dry-run')
                 suffix = '-dry-run' if dry_run else ''

@@ -53,7 +53,19 @@ def original_doors(raw):
 
 
 def read_interior(path, name, *, include_interior_entrances=False):
-    raw=Path(path).read_bytes();cells=[];objects={};entrances=[]
+    return read_interiors(path, [name], include_interior_entrances=include_interior_entrances)[0]
+
+
+def read_interiors(path, names, *, include_interior_entrances=False):
+    """read_interior for several cells in one pass over the master, in `names` order.
+
+    Each result equals read_interior(path, name) (tests compare them); the
+    master is parsed once instead of once per cell (BUILD-DOOR-REFERENCE-SERIAL-33:
+    the door step read the 80 MB master again for each of its destination cells)."""
+    import copy
+    raw=Path(path).read_bytes();objects={}
+    wanted={}
+    for name in names:wanted.setdefault(name.casefold(),{'cells':[],'entrances':[]})
     kinds={'STAT','DOOR','CONT','LIGH','ACTI','NPC_','MISC','BOOK','INGR','WEAP','ARMO','CLOT','ALCH','APPA','REPA','LOCK','PROB','LEVC','LEVI','CREA'}
     for tag,flags,payload in records(raw):
         if tag not in kinds and tag!='CELL':continue
@@ -64,11 +76,13 @@ def read_interior(path, name, *, include_interior_entrances=False):
                 if t=='FRMR':break
                 header[t]=b
             if not struct.unpack_from('<I',header['DATA'])[0]&1:
-                if any(t=='DNAM' and string(b).casefold()==name.casefold() for t,b in subs):
+                targets={string(b).casefold() for t,b in subs if t=='DNAM'}
+                for key in [key for key in wanted if key in targets]:
                     outside=cell_data(subs)
-                    entrances.extend(r for r in outside['refs'] if r.get('destination_cell','').casefold()==name.casefold())
+                    wanted[key]['entrances'].extend(r for r in outside['refs'] if r.get('destination_cell','').casefold()==key)
                 continue
-            if string(header.get('NAME',b'')).casefold()!=name.casefold():continue
+            key=string(header.get('NAME',b'')).casefold()
+            if key not in wanted:continue
             cell=cell_data(subs)
             if not cell['flags']&1:continue
             cell['water_height']=None
@@ -85,7 +99,7 @@ def read_interior(path, name, *, include_interior_entrances=False):
             require(ambient is not None and len(ambient)==16,'Interior AMBI missing/invalid')
             cell['lighting']={'ambient':list(ambient[:3]),'sunlight':list(ambient[4:7]),
                               'fog':list(ambient[8:11]),'fog_density':struct.unpack_from('<f',ambient,12)[0]}
-            cells.append(cell)
+            wanted[key]['cells'].append(cell)
         elif 'NAME' in s and 'DELE' not in s:
             obj={'type':tag,'model':string(s.get('MODL',b'')),'display_name':string(s.get('FNAM',b''))}
             if tag=='LIGH':
@@ -93,17 +107,32 @@ def read_interior(path, name, *, include_interior_entrances=False):
                 weight,value,duration,radius=struct.unpack_from('<fiiI',s['LHDT'])
                 obj['light']={'radius':radius,'color':list(s['LHDT'][16:19]),'flags':struct.unpack_from('<I',s['LHDT'],20)[0]}
             objects[string(s['NAME']).casefold()]=obj
-    require(len(cells)==1,'Interior must resolve uniquely: '+name)
-    cell=cells[0]
-    for ref in cell['refs']:
-        require(ref['id'].casefold() in objects,'Missing interior base record: '+ref['id'])
-        ref.update(objects[ref['id'].casefold()])
-    if include_interior_entrances:
-        entrances=[r for r in original_doors(raw)
-                   if r['destination_cell'].casefold()==cell['name'].casefold()]
-    cell['entrances']=entrances
-    cell['master_sha256']=hashlib.sha256(raw).hexdigest()
-    return cell
+    doors=original_doors(raw) if include_interior_entrances else None
+    digest=hashlib.sha256(raw).hexdigest()
+    result=[];used=set()
+    for name in names:
+        found=wanted[name.casefold()]
+        require(len(found['cells'])==1,'Interior must resolve uniquely: '+name)
+        cell=found['cells'][0]
+        if name.casefold() in used:
+            # A repeated name gets its own copy, as a separate read_interior call would.
+            cell=copy.deepcopy(cell);found['entrances']=copy.deepcopy(found['entrances'])
+        used.add(name.casefold())
+        # Base records are copied per cell: refs of one cell share them, cells do not.
+        bases={}
+        for ref in cell['refs']:
+            key=ref['id'].casefold()
+            require(key in objects,'Missing interior base record: '+ref['id'])
+            if key not in bases:bases[key]=copy.deepcopy(objects[key]) if len(names)>1 else objects[key]
+            ref.update(bases[key])
+        entrances=found['entrances']
+        if include_interior_entrances:
+            entrances=[r for r in (copy.deepcopy(doors) if len(names)>1 else doors)
+                       if r['destination_cell'].casefold()==cell['name'].casefold()]
+        cell['entrances']=entrances
+        cell['master_sha256']=digest
+        result.append(cell)
+    return result
 
 
 def select_geometry(cell, *, harvest_references=(), harvest_master_sha256=None):

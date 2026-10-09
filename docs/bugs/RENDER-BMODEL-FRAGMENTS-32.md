@@ -1,5 +1,20 @@
 # RENDER-BMODEL-FRAGMENTS-32: Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | review |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | engine r_bsp.c brush models clipped down the terrain BSP |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | high: Deep BSP walks take 67-82 percent of Balmora render time. |
+| Family | Rendering cost and visibility (`render-performance`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Found by an independent review of the open-world plan. Hypothesis from the source; fragment counts not yet measured.
@@ -44,3 +59,19 @@ Pending.
 ## Prevention
 
 Fragment counters in the performance overlay.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Rendering cost and visibility (`render-performance`). Read the visibility data and renderer counters before any performance claim. See [families](README.md#families).
+
+- AW-20260928-07 (no report page): Slow opening exterior / excessive residency
+- [CHIM-TRACE-TAIL-33](CHIM-TRACE-TAIL-33.md): A few CHIM collision traces visit thousands of clipnodes
+- MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
+- [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
+- [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views
+- [RENDER-SURFCACHE-THRASH-32](RENDER-SURFCACHE-THRASH-32.md): Seyda Neen views rebuild the surface cache every frame at a fixed camera
+- [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+
+<!-- END GENERATED CATEGORY -->

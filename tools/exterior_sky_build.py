@@ -206,7 +206,8 @@ def _sky_map(task):
     else:
         output, detail = raw, {'scene_kind': 'unknown', 'unchanged': True, 'not_claimed_complete': True}
     if output != raw:
-        (work / 'originals' / path.name).write_bytes(raw)
+        from build_parallel import keep_original  # installed by rename, never rewritten
+        keep_original(path, work / 'originals' / path.name, raw)
         (work / 'candidates' / path.name).write_bytes(output)
     return path.stem, detail, digest(raw), digest(output)
 
@@ -218,7 +219,7 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
     Maps are independent: up to `jobs` workers transform them (shared pool,
     tools/build_parallel.py); results, receipt order and bytes equal jobs=1.
     """
-    from build_parallel import hash_files, ordered_map
+    from build_parallel import completed_map, hash_files
     local_skybox = boolean(local_skybox)
     id1, work = Path(id1).resolve(), Path(work_dir).resolve()
     if id1 == work or id1 in work.parents or work in id1.parents:
@@ -261,9 +262,14 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
               'unknown_maps_preserved': sorted(names - exterior - interior)}
     tasks = [(str(path), 'exterior' if path.stem in exterior else 'interior' if path.stem in interior else None,
               local_skybox, str(work)) for path in inputs]
-    expected = {}
-    for n, detail, input_sha, output_sha in ordered_map(_sky_map, tasks, max(1, min(jobs, len(tasks)))):
-        expected[n] = (input_sha, output_sha)
+    # Largest maps first, results as they finish (no wait behind one slow map);
+    # the receipt and the log keep map order.
+    expected, details = {}, {}
+    biggest = sorted(tasks, key=lambda task: (-Path(task[0]).stat().st_size, task[0]))
+    for n, detail, input_sha, output_sha in completed_map(_sky_map, biggest, max(1, min(jobs, len(tasks)))):
+        expected[n], details[n] = (input_sha, output_sha), detail
+    for n in (Path(task[0]).stem for task in tasks):
+        detail = details[n]
         report['maps'].append({'map': n, **detail})
         print('[exterior-sky] {}: {}; local enclosure {}; removed {} faces; {}'.format(
             n, detail['scene_kind'], ('retained (debug)' if local_skybox else 'removed')

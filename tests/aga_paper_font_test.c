@@ -74,3 +74,4 @@ int main(int argc,char **argv) {
     sprintf(path,"%s/gfx",directory);assert(!rmdir(path));assert(!rmdir(directory));
     return 0;
 }
+int AW_PhotoModeActive(void){return 0;}

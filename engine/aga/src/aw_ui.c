@@ -468,6 +468,8 @@ void AW_UISubtitle(const char *name,const char *text,double duration) {
     if(duration>120)duration=120;
     subtitle_started=realtime;subtitle_until=realtime+duration;
 }
+/* Photo mode asks whether its own notice (no speaker) is the current message. */
+int AW_UISubtitleIs(const char *text){return !speaker[0] && !strcmp(subtitle,text);}
 void AW_UIPickupNotice(const char *text,double duration) {
     AW_UISubtitle("",text,duration);subtitle_pickup=1;
 }
@@ -481,13 +483,36 @@ void AW_UICenterMessage(const char *text) {
     else AW_UISubtitle("",text,duration);
     subtitle_voice=voiced;
 }
+/* color: 0 red (health), 1 blue (magicka), 2 green (fatigue), 3 yellow (the
+ * enemy's health: the atlas's fourth bar, tools/prepare_ui.py). */
+static int bar_fallback(int color) {
+    return color==3?AW_UIColor(255,186,0):AW_UIColor(color==0?170:35,color==2?160:35,color==1?170:35);
+}
 void AW_UIBar(int x,int y,int w,int h,int color,float fraction) {
     int fill,row;
     initialize();if(!(fraction>0))fraction=0;if(fraction>1)fraction=1;fill=(int)((w-4)*fraction);
     AW_UIFill(x,y,w,h,ink[1]);AW_UIFill(x+1,y+1,w-2,h-2,black);
     if(fill>0){if(skin_ready){for(row=0;row<h-4;row++)tile(x+2,y+2+row,fill,1,color*16,32+(row*12/(h-4))+3,16,1);}
-        else AW_UIFill(x+2,y+2,fill,h-4,AW_UIColor(color==0?170:35,color==2?160:35,color==1?170:35));}
+        else AW_UIFill(x+2,y+2,fill,h-4,bar_fallback(color));}
 }
+/* The enemy's health bar (OpenMW 0.51 openmw_hud.layout "EnemyHealth": the
+ * yellow energy bar the size of the health bar, just above it). The fade
+ * over its last fNPCHealthBarFade seconds becomes a stipple on the 8-bit
+ * screen: every other row, then gone. */
+void AW_UIEnemyBar(float fraction,float alpha) {
+    int x=8,y=vid.height-26-9,w=75,h=7,row,fill;
+    initialize();if(alpha<=.25f || !ui_hud.value)return;
+    if(alpha>.75f){AW_UIBar(x,y,w,h,3,fraction);return;}
+    if(!(fraction>0))fraction=0;
+    if(fraction>1)fraction=1;
+    fill=(int)((w-4)*fraction);
+    for(row=0;row<h;row+=2){
+        AW_UIFill(x,y+row,w,1,ink[1]);
+        if(row>=2 && row<h-2)AW_UIFill(x+1,y+row,w-2,1,black);
+        if(row>=2 && row<h-2 && fill>0)AW_UIFill(x+2,y+row,fill,1,bar_fallback(3));
+    }
+}
+int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
     int i,y=vid.height-26;
@@ -503,6 +528,7 @@ void AW_UIHud(void) {
     if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
         current[0]=svs.clients[0].edict->v.health;
     for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
+    {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
     scr_copyeverything=1;
 }
 /* Names are bounded text over the world, with no panel/background fill. */
@@ -655,6 +681,9 @@ void AW_UIDraw(void) {
     /* Input prompts own the strip; an expired speaker must not linger above it. */
     if(AW_IntroPromptActive()){panel_position=0;return;}
     h=vid.height-(r_refdef.vrect.y+r_refdef.vrect.height);
+    /* Photo mode's full-screen view has no strip below it: its notice box
+     * rises over the bottom of the view, with room for three rows. */
+    if(AW_PhotoModeActive() && h<72)h=72;
     if(h<24)return;
     legacy=AW_UIDialogueMethod()==1;centered=!legacy && dialogue_layout.value!=1;
     show_name=speaker[0] && (!subtitle_voice || AW_UIVoiceNames());

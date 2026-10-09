@@ -1,5 +1,20 @@
 # RENDER-EDGECACHE-SEYDA-32: No edges are reused between frames in Seyda Neen views
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | Engine edge cache (r_edge.c), Seyda Neen cameras |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | medium: No edges reused per frame in Seyda Neen; measurable cost. |
+| Family | Rendering cost and visibility (`render-performance`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Found by the renderer counters work (branch v0.0.32-counters, not yet merged).
@@ -35,3 +50,19 @@ Pending.
 ## Prevention
 
 Counters in the benchmark route.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Rendering cost and visibility (`render-performance`). Read the visibility data and renderer counters before any performance claim. See [families](README.md#families).
+
+- AW-20260928-07 (no report page): Slow opening exterior / excessive residency
+- [CHIM-TRACE-TAIL-33](CHIM-TRACE-TAIL-33.md): A few CHIM collision traces visit thousands of clipnodes
+- MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
+- [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
+- [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
+- [RENDER-SURFCACHE-THRASH-32](RENDER-SURFCACHE-THRASH-32.md): Seyda Neen views rebuild the surface cache every frame at a fixed camera
+- [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+
+<!-- END GENERATED CATEGORY -->

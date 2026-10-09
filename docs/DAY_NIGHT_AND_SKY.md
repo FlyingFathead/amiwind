@@ -1,5 +1,41 @@
 # Trees and Grass, Day and Night
 
+<!-- contents start -->
+## Contents
+
+- [RC1 Seyda Neen brightness discontinuity: cause isolated](#rc1-seyda-neen-brightness-discontinuity-cause-isolated)
+- [v0.0.29 sky follow-up](#v0029-sky-follow-up)
+- [Native playtest blockers and preview — 4 October 2026](#native-playtest-blockers-and-preview--4-october-2026)
+- [Original night sky, Masser and Secunda — current candidate](#original-night-sky-masser-and-secunda--current-candidate)
+- [Guard torches and the saved clock — current work](#guard-torches-and-the-saved-clock--current-work)
+- [V3 sky and moving sun — current candidate, 4 October 2026](#v3-sky-and-moving-sun--current-candidate-4-october-2026)
+- [Historical image009 / V1 status — 4 October 2026](#historical-image009--v1-status--4-october-2026)
+- [Shared exterior background sky: implementation candidate](#shared-exterior-background-sky-implementation-candidate)
+  - [Coverage and the fog marker](#coverage-and-the-fog-marker)
+  - [Required converter and target acceptance](#required-converter-and-target-acceptance)
+- [Cycle control and coordinated sky/fog candidate — 4 October 2026, 09:06 EEST](#cycle-control-and-coordinated-skyfog-candidate--4-october-2026-0906-eest)
+- [Earlier V1 host and bounded native verification — 4 October 2026](#earlier-v1-host-and-bounded-native-verification--4-october-2026)
+- [Historical pre-release gate after the static-link correction — 4 October 2026, 06:26:57 EEST](#historical-pre-release-gate-after-the-static-link-correction--4-october-2026-062657-eest)
+  - [Static foliage links: image004 incident and image005 correction candidate](#static-foliage-links-image004-incident-and-image005-correction-candidate)
+  - [Bounded native result and remaining visual defects — 4 October 2026](#bounded-native-result-and-remaining-visual-defects--4-october-2026)
+- [One world clock, separate presentation](#one-world-clock-separate-presentation)
+- [Source appearance: independent color profiles, texture layers and haze](#source-appearance-independent-color-profiles-texture-layers-and-haze)
+  - [Use the Amiga palette creatively](#use-the-amiga-palette-creatively)
+- [Historical first day/night sky milestone — 4 October 2026](#historical-first-daynight-sky-milestone--4-october-2026)
+  - [Waiting and exact-time debug controls](#waiting-and-exact-time-debug-controls)
+- [Remaining debug proposal](#remaining-debug-proposal)
+- [Cheap visual candidates to measure](#cheap-visual-candidates-to-measure)
+- [Acceptance route](#acceptance-route)
+- [Recovered sky fallback and guard-torch request](#recovered-sky-fallback-and-guard-torch-request)
+- [Earlier shared sky and regional environment review — 4 October 2026](#earlier-shared-sky-and-regional-environment-review--4-october-2026)
+  - [Source references](#source-references)
+  - [Owner-authorized reference audit: visual target without asset redistribution — 4 October 2026, 02:41 EEST](#owner-authorized-reference-audit-visual-target-without-asset-redistribution--4-october-2026-0241-eest)
+- [Protected sunrise and sunset baseline for v0.0.29](#protected-sunrise-and-sunset-baseline-for-v0029)
+- [Additive cloud controls: v0.0.29 development candidate](#additive-cloud-controls-v0029-development-candidate)
+- [Dev3 midnight clearing mode — source candidate, 5 October 2026](#dev3-midnight-clearing-mode--source-candidate-5-october-2026)
+
+<!-- contents end -->
+
 ## RC1 Seyda Neen brightness discontinuity: cause isolated
 
 Recorded 2026-10-06T14:18:00+00:00; affected build v0.0.29-rc1; introducing version unknown.

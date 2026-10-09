@@ -196,16 +196,35 @@ def shipped_since(row):
     A town after Seyda and Balmora with "shipped_since": "vX.Y.Z" is part of
     every release from that version on, so a default build makes it
     (BUILD-EXTRA-TOWN-OPTIN-32). Seyda and Balmora are always built; a
-    blocked town cannot be shipped.
+    blocked town cannot be shipped. A town with "withdrawn": "<reason>" keeps
+    its "shipped_since" on record but is left out of default builds until the
+    field is removed; --extra-town still builds it (an owner decision, e.g.
+    the Vivec Arena in v0.0.33: CHIM-ARENA-MEMORY-33).
     """
     value = row.get('shipped_since')
+    withdrawn(row)
     if value is None:
         return None
     if not isinstance(value, str) or not SHIPPED_VERSION.match(value):
         raise ValueError('Town shipped_since must be a release version vX.Y.Z: ' + row['id'])
     if row['id'] in FIXED_TOWNS or row.get('blocked'):
         raise ValueError('Only an unblocked town after Seyda and Balmora can be shipped_since: ' + row['id'])
-    return value
+    return None if row.get('withdrawn') else value
+
+
+def withdrawn(row):
+    """The reason a shipped town is withdrawn from default builds, or None (validated like "blocked")."""
+    if 'withdrawn' not in row:
+        return None
+    reason = row['withdrawn']
+    if not isinstance(reason, str) or not reason.strip() or row['id'] in FIXED_TOWNS:
+        raise ValueError('A withdrawn town needs a reason (and cannot be Seyda or Balmora): ' + row['id'])
+    return reason
+
+
+def withdrawn_towns(root=None):
+    """Towns with a "shipped_since" that default builds leave out ("withdrawn"), in table order."""
+    return [row['id'] for row in load_registry(root)['towns'] if withdrawn(row)]
 
 
 def extra_towns(root=None):

@@ -1,5 +1,43 @@
 # Carried torch
 
+<!-- contents start -->
+## Contents
+
+- [Appearance acceptance: 2026-10-06T20:06:10+03:00](#appearance-acceptance-2026-10-06t2006100300)
+- [Indoor/outdoor torch contrast: owner follow-up 2026-10-06T13:53:32+00:00](#indooroutdoor-torch-contrast-owner-follow-up-2026-10-06t1353320000)
+- [RC1 owner torch follow-up: 6 October 2026](#rc1-owner-torch-follow-up-6-october-2026)
+- [RC1 interior NPC follow-up: 6 October 2026](#rc1-interior-npc-follow-up-6-october-2026)
+- [NPC illumination: dev4 report](#npc-illumination-dev4-report)
+- [v0.0.29 open owner reports](#v0029-open-owner-reports)
+- [v0.0.29 required hands and light acceptance matrix](#v0029-required-hands-and-light-acceptance-matrix)
+  - [Scoped v0.0.29-dev1 native F/V replay](#scoped-v0029-dev1-native-fv-replay)
+- [Secrets of the original torch](#secrets-of-the-original-torch)
+- [Fire, smoke and the palette renderer](#fire-smoke-and-the-palette-renderer)
+- [Conversion and runtime](#conversion-and-runtime)
+- [rc7 crash and rc8 correction](#rc7-crash-and-rc8-correction)
+- [Original-model replacement and reported hand flicker](#original-model-replacement-and-reported-hand-flicker)
+- [Shared equipment asset and acceptance](#shared-equipment-asset-and-acceptance)
+- [Guard torches and the clock — scoped native verification passed](#guard-torches-and-the-clock--scoped-native-verification-passed)
+  - [Original pose and bounded runtime cost](#original-pose-and-bounded-runtime-cost)
+  - [Primary-source use rules](#primary-source-use-rules)
+- [Hand-state timing investigation](#hand-state-timing-investigation)
+- [Confirmed converted-world hand metadata defect, 4 October 2026](#confirmed-converted-world-hand-metadata-defect-4-october-2026)
+- [LIGHT-GRADIENT-29: unsigned surface-light interpolation overflow](#light-gradient-29-unsigned-surface-light-interpolation-overflow)
+- [TRANSITION-EQUIPMENT-29: carried torch blinks out during cell handoff (OPEN)](#transition-equipment-29-carried-torch-blinks-out-during-cell-handoff-open)
+- [TORCH-HAND-SEPARATION-29: grip appears to break during idle animation (OPEN)](#torch-hand-separation-29-grip-appears-to-break-during-idle-animation-open)
+  - [5 October torch-light acceptance follow-up](#5-october-torch-light-acceptance-follow-up)
+  - [Later 5 October owner refinement](#later-5-october-owner-refinement)
+  - [Near-field and movement acceptance update, 5 October](#near-field-and-movement-acceptance-update-5-october)
+- [Source-candidate torch controls, 5 October](#source-candidate-torch-controls-5-october)
+  - [Running torch arm: tested source mitigation, target acceptance pending](#running-torch-arm-tested-source-mitigation-target-acceptance-pending)
+  - [Combined source validation, 5 October 2026](#combined-source-validation-5-october-2026)
+  - [5 October: texture-density-dependent surface light, next development candidate](#5-october-texture-density-dependent-surface-light-next-development-candidate)
+- [Subsequent development candidate: proximal arm visibility](#subsequent-development-candidate-proximal-arm-visibility)
+- [Dev4 follow-up: accepted dev3 light and optional sparks](#dev4-follow-up-accepted-dev3-light-and-optional-sparks)
+- [Final-release gates added after dev4 playtesting](#final-release-gates-added-after-dev4-playtesting)
+
+<!-- contents end -->
+
 ## Appearance acceptance: 2026-10-06T20:06:10+03:00
 
 The owner approved the new torch appearance shown in the follow-up capture.

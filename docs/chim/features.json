@@ -1,0 +1,1095 @@
+{
+  "schema": "chim-features 1",
+  "chim_version": "0.1.0",
+  "updated": "2026-10-09",
+  "features": [
+    {
+      "id": "stored-once",
+      "name": "Every asset stored once",
+      "area": "world",
+      "summary": "Every mesh, collision hull and texture of an exterior is stored once and placed by reference, instead of being copied into every region map that can see it.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Balmora exterior: 162.1 MB of legacy region maps to 21.3 MB of CHIM world (7.62 times smaller)",
+          "compared": "the 64 legacy region maps of a v0.0.32 development image against the CHIM world (index, frame and chunk sections) plus its frame map, world format 0.5; interiors are the same in both and left out",
+          "basis": "build",
+          "date": "2026-10-09"
+        },
+        {
+          "headline": true,
+          "text": "Seyda Neen with the intro docks and the courtyard: 190.4 MB to 7.83 MB (24.3 times smaller)",
+          "compared": "the 66 recorded legacy maps v0.0.32 ships against the CHIM world (51 files and 3 frame maps), world format 0.5",
+          "basis": "build",
+          "date": "2026-10-09"
+        },
+        {
+          "text": "Legacy layout: each exterior object is stored about 9.8 times (about 1.4 million copies of 143,147 placements over the island, about 20 GB of maps); CHIM stores each placement once",
+          "compared": "the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the CHIM figure for the whole island comes with the open world on CHIM (milestone M4)",
+          "basis": "estimate",
+          "date": "2026-10-08"
+        }
+      ],
+      "gain_short": "7.62 times smaller for Balmora, 24.3 times for Seyda Neen",
+      "caveats": [
+        "The island-wide CHIM size is not measured yet; only Balmora and Seyda Neen are built as CHIM worlds."
+      ],
+      "vis": "Each placement is linked to the visibility leaves its box touches (Quake's efrags) and is drawn once, from its owner chunk, so the PVS still culls it. Sharing a model never turns it into a brush entity; placements over 16 leaves are counted by the validator.",
+      "links": [
+        {
+          "title": "World streamer design",
+          "path": "docs/WORLD_STREAMER.md"
+        },
+        {
+          "title": "CHIM world format",
+          "path": "docs/chim/WORLD_FORMAT.md"
+        },
+        {
+          "title": "Draft v0.0.33 release notes, disk",
+          "path": "docs/RELEASE-v0.0.33.md#disk-each-asset-once"
+        },
+        {
+          "title": "Measurements behind the release charts",
+          "path": "docs/performance/CHIM-v0.0.33-MEASUREMENTS.json"
+        }
+      ],
+      "bugs": [
+        "WORLD-REGION-DUPLICATION-31"
+      ],
+      "commits": []
+    },
+    {
+      "id": "pure-chim-towns",
+      "name": "Pure CHIM towns: no legacy maps shipped",
+      "area": "world",
+      "summary": "Balmora and Seyda Neen (with the intro docks and the courtyard) are drawn only by CHIM; the legacy region maps of a CHIM town are neither built nor shipped. Seyda Neen is regenerated from your data, so the temporary heap bypass for three recorded maps ends.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "The gain is the disk figure of the entry above; the effect on build time of the legacy exterior chain is not measured yet.",
+      "caveats": [
+        "CHIM builds still run part of the legacy exterior chain (the open world, the Vivec Arena and Balmora's region maps) and record which stages and who reads them; moving the frame maps and town flora off that chain is still to do (CHIM-LEGACY-CHAIN-33).",
+        "The countryside between the towns still ships as legacy region maps, marked \"not yet CHIM\", until milestone M4."
+      ],
+      "vis": "A town runs as one frame map: terrain is world geometry, so Quake's visibility and collision work on it as on any map.",
+      "links": [
+        {
+          "title": "CHIM engine: towns",
+          "path": "docs/chim/ENGINE.md#towns"
+        },
+        {
+          "title": "Builder types",
+          "path": "docs/chim/build_guide/BUILDER_TYPES.md"
+        },
+        {
+          "title": "Draft v0.0.33 release notes",
+          "path": "docs/RELEASE-v0.0.33.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-LEGACY-CHAIN-33",
+        "BUILD-SEYDA-REGEN-30",
+        "HEAP-SEYDA-OVERLAP-32"
+      ],
+      "commits": []
+    },
+    {
+      "id": "chunk-streaming",
+      "name": "Streaming with no region stop",
+      "area": "streaming",
+      "summary": "The land is cut into chunks of 256 units. A ring of chunks around the player is resident and chunks join and leave a little at a time, within a per-frame budget, so crossing a region border no longer loads a whole map.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Bytes read on the Balmora door walk: 73.5 MB to 40.7 MB",
+          "compared": "the same walk through all 70 load doors (16,007 units): 18 legacy region map loads against 83 chunk crossings, from the builder's walk report, world format 0.2",
+          "basis": "build",
+          "date": "2026-10-08"
+        },
+        {
+          "text": "Median read time per area change: 94 ms to 21 ms; longest read stall 112 ms to 71 ms",
+          "compared": "file reads of that walk replayed in FS-UAE (cycle-approximate 68040), busy host, one session with a drift-control rerun",
+          "basis": "emulator",
+          "date": "2026-10-08",
+          "host": "busy"
+        }
+      ],
+      "gain_short": "40.7 MB read instead of 73.5 MB on the door walk",
+      "caveats": [
+        "The total read time over the walk is the same, 1.64 s legacy against 1.65 s CHIM: CHIM spreads it thinner, it does not remove it.",
+        "To be repeated with the release world (format 0.5) on a quiet host."
+      ],
+      "vis": "Chunks are linked into the frame world's leaves; the visibility rows of the chunk the camera is in decide which leaves are visited. Streaming never changes how the PVS culls what is already resident.",
+      "links": [
+        {
+          "title": "CHIM engine: loading",
+          "path": "docs/chim/ENGINE.md#loading"
+        },
+        {
+          "title": "Draft v0.0.33 release notes, loading",
+          "path": "docs/RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop"
+        },
+        {
+          "title": "Measurements behind the release charts",
+          "path": "docs/performance/CHIM-v0.0.33-MEASUREMENTS.json"
+        }
+      ],
+      "bugs": [
+        "CHIM-READ-RUNS-33",
+        "CHIM-READ-BUDGET-33",
+        "BENCH-JIT-PROFILE-32"
+      ],
+      "commits": []
+    },
+    {
+      "id": "incremental-frame-world",
+      "name": "Incremental frame world",
+      "area": "streaming",
+      "summary": "When a chunk joins or leaves the ring, only the leaves it touches are relinked, instead of rebuilding the whole frame world on every crossing. The full rebuild is kept as a selectable method (chim_graft_mode 0).",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504",
+          "compared": "the same walk (1,536 units east and back) on Balmora's frame map, full rebuild against the incremental method with its defaults",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-09"
+        },
+        {
+          "text": "Median update time 0.42 ms against 0.9 ms (1.7 ms in the drift-control rerun)",
+          "compared": "the same session, FS-UAE with the JIT",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-09"
+        }
+      ],
+      "gain_short": "16 KB copied per update instead of 405 KB",
+      "caveats": [
+        "Relative emulator numbers; the cycle-exact run is pending."
+      ],
+      "vis": "On the five benchmark cameras both methods give identical renderer counters (entities sent, BSP nodes per clipped face), so visibility culling is unchanged.",
+      "links": [
+        {
+          "title": "CHIM engine: the frame world",
+          "path": "docs/chim/ENGINE.md#the-frame-world"
+        },
+        {
+          "title": "Renderer counters",
+          "path": "docs/performance/RENDERER-COUNTERS.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-REBUILD-COST-33",
+        "CHIM-TERRAIN-GRAFT-33"
+      ],
+      "commits": [
+        "839b36e"
+      ]
+    },
+    {
+      "id": "chunk-pinning",
+      "name": "Chunk pinning: no holes in the town",
+      "area": "streaming",
+      "summary": "Chunks are pinned only while they load, farther chunks give way first, small blocks come from the high end of the memory zone and the ground never waits for a building. A chunk shows as soon as its ground is in.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Steps with a chunk missing its ground inside the collision margin on the owner's Balmora route: 860 to 0",
+          "compared": "the engine's own zone allocator run over the route twice (1,192 steps), first methods against all methods with defaults; Seyda Neen sweep of the frame with rows 128 units apart: 107 to 0",
+          "basis": "simulation",
+          "date": "2026-10-09"
+        },
+        {
+          "text": "In the emulator on the same route: nearest chunk without ground 69 units to 438 units away, failed chunk loads 180 to 95, bytes read 24.8 MB to 16.7 MB",
+          "compared": "CHIM preview engine against the repaired engine with its defaults, JIT preset, seven poses with a short walk at each, twice",
+          "basis": "count",
+          "date": "2026-10-09"
+        }
+      ],
+      "gain_short": "holes on the owner's route 860 to 0",
+      "caveats": [
+        "Some loads still fail for lack of room (far buildings); a larger zone budget would halve the remaining gaps and waits for the memory measurements (CHIM-ZONE-BUDGET-33).",
+        "The repaired engine awaits the owner's playtest."
+      ],
+      "vis": "Pinning decides which chunks are resident, not how they are culled; placements stay linked to the leaves they touch.",
+      "links": [
+        {
+          "title": "Draft v0.0.33 release notes, Balmora's holes",
+          "path": "docs/RELEASE-v0.0.33.md#lets-fix-those-bugs"
+        },
+        {
+          "title": "CHIM engine: memory",
+          "path": "docs/chim/ENGINE.md#memory"
+        }
+      ],
+      "bugs": [
+        "CHIM-CHUNK-LOAD-FAIL-33",
+        "CHIM-ZONE-BUDGET-33",
+        "CHIM-ZONE-RING-THRASH-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "zone-walk-gate",
+      "name": "Zone walk gate",
+      "area": "builder",
+      "summary": "The builder runs the engine's own zone code over a walk through every frame and fails the build when a step leaves the player without ground.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "A build gate, not a speed or size gain. It is how the chunk-loading fix above is kept from regressing.",
+      "caveats": [],
+      "vis": "Not applicable: the gate checks memory behaviour, not drawing.",
+      "links": [
+        {
+          "title": "Island-wide audits",
+          "path": "docs/chim/IDEAS.md#island-wide-audits-mechanism-classes"
+        },
+        {
+          "title": "CHIM world format: the heap gate",
+          "path": "docs/chim/WORLD_FORMAT.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-CHUNK-LOAD-FAIL-33",
+        "CHIM-ZONE-TMP-NOEXEC-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "heap-gate-and-zone",
+      "name": "Strict heap gate and a fixed chunk zone",
+      "area": "streaming",
+      "summary": "CHIM reserves one chunk zone of fixed size in the Hunk when a town loads. The builder checks every CHIM area against the engine's own numbers (active ring, load ring, largest block) before the game ever runs.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "text": "Seyda Neen passes the strict heap gate with 558 KB to spare inside the zone, where the legacy map sn019 was 238 KB over its budget and shipped through a temporary bypass",
+          "compared": "builder heap gate, legacy v0.0.32 recorded maps against the CHIM world",
+          "basis": "build",
+          "date": "2026-10-09"
+        }
+      ],
+      "gain_short": "Seyda Neen passes the strict heap gate with room to spare",
+      "caveats": [
+        "The zone is taken from the Hunk, so less Hunk is left at the load peak: Balmora 2.32 MB (legacy 3.53 MB), Seyda Neen 1.10 MB (legacy 4.42 MB), which is under the 2 MiB rule (CHIM-SEYDA-HUNK-GAP-33, open).",
+        "The zone size is an interim 7,680 KiB in the builder; the owner decision is pending (CHIM-ZONE-BUDGET-33)."
+      ],
+      "vis": "Not applicable: memory accounting only.",
+      "links": [
+        {
+          "title": "CHIM engine: memory",
+          "path": "docs/chim/ENGINE.md#memory"
+        },
+        {
+          "title": "Draft v0.0.33 release notes, memory",
+          "path": "docs/RELEASE-v0.0.33.md#memory"
+        },
+        {
+          "title": "CHIM ideas: memory",
+          "path": "docs/chim/IDEAS.md#memory"
+        }
+      ],
+      "bugs": [
+        "CHIM-SEYDA-HUNK-GAP-33",
+        "CHIM-ZONE-BUDGET-33",
+        "CHIM-HEAP-CHECK-33",
+        "HEAP-SEYDA-OVERLAP-32"
+      ],
+      "commits": []
+    },
+    {
+      "id": "logs-in-memory",
+      "name": "No disk writes during play",
+      "area": "engine",
+      "summary": "Diagnostic logs stay in memory during play and are written on request or when the game is left, so a closed emulator or a power cut no longer lands in the middle of a write and leaves the volume \"not validated\".",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Time spent \"not validated\" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s",
+          "compared": "previous engine against logs in memory, slow setting (cycle-exact 68040, CPU multiplier 14), three sessions of 510, 311 and 534 s",
+          "basis": "emulator",
+          "date": "2026-10-09",
+          "host": "busy"
+        }
+      ],
+      "gain_short": "time \"not validated\" in play 3.7 % to 0 %",
+      "caveats": [
+        "Autosaves are not covered by these runs."
+      ],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "Draft v0.0.33 release notes",
+          "path": "docs/RELEASE-v0.0.33.md"
+        }
+      ],
+      "bugs": [
+        "BOOT-VOLUME-NOT-VALIDATED-33"
+      ],
+      "commits": [
+        "12a3931"
+      ]
+    },
+    {
+      "id": "vis-kept",
+      "name": "Quake's visibility culling kept effective",
+      "area": "rendering",
+      "summary": "Placements are linked to the leaves they touch, terrain is world geometry with shallow per-chunk trees, and each chunk carries a row of the placements a view from it may see. Nothing is a func_wall that vis ignores.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Brush models sent to the renderer: 512-654 to 46-114; BSP nodes walked per clipped face: 27-52 to 8.6-9.9",
+          "compared": "the five fixed Balmora benchmark cameras, legacy region maps against CHIM (dbg rcount; the legacy figure is its brush-model passes)",
+          "basis": "count",
+          "date": "2026-10-08"
+        },
+        {
+          "text": "Faces clipped 5-25 % fewer; spans drawn 1-6 % more",
+          "compared": "the same cameras; surface cache builds are 0 on both",
+          "basis": "count",
+          "date": "2026-10-08"
+        }
+      ],
+      "gain_short": "46-114 brush models sent instead of 512-654",
+      "caveats": [
+        "CHIM draws slightly more spans than the legacy maps at every camera.",
+        "Per-placement lists block 11.5 % of the visibility tests in Balmora (CHIM-PVS-HOLLOW-33): hollow house shells let rows see through buildings.",
+        "A few models dominate every view; distance detail is the owner (CHIM-VIEW-FACES-33)."
+      ],
+      "vis": "This is the vis story itself: every CHIM change is checked with the renderer counters (entities sent, faces clipped, BSP nodes per face) on fixed cameras, and they may not get worse.",
+      "links": [
+        {
+          "title": "CHIM engine: vis and culling",
+          "path": "docs/chim/ENGINE.md#vis-and-culling"
+        },
+        {
+          "title": "World streamer: visibility requirement",
+          "path": "docs/WORLD_STREAMER.md#visibility-and-culling-requirement"
+        },
+        {
+          "title": "Town visibility",
+          "path": "docs/performance/TOWN-VISIBILITY.md"
+        },
+        {
+          "title": "Renderer counters",
+          "path": "docs/performance/RENDERER-COUNTERS.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-PVS-HOLLOW-33",
+        "CHIM-VIEW-FACES-33",
+        "TOWN-VIS-OCCLUSION-31"
+      ],
+      "commits": []
+    },
+    {
+      "id": "terrain-world-geometry",
+      "name": "Terrain as world geometry",
+      "area": "rendering",
+      "summary": "Each chunk's ground is a small BSP subtree grafted under the frame's world, so Quake's visibility, collision and water work on it as on any map, and the terrain occludes what lies behind it.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "Not measured on its own; its effect is part of the renderer counters under \"Quake's visibility culling kept effective\".",
+      "caveats": [],
+      "vis": "The grafted terrain is part of the world tree, so it occludes and is culled by the PVS; a brush-entity terrain would not.",
+      "links": [
+        {
+          "title": "CHIM overview",
+          "path": "docs/chim/README.md#what-chim-is"
+        },
+        {
+          "title": "CHIM engine: the frame world",
+          "path": "docs/chim/ENGINE.md#the-frame-world"
+        }
+      ],
+      "bugs": [
+        "CHIM-TERRAIN-GRAFT-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "frame-time",
+      "name": "Faster frames in town",
+      "area": "rendering",
+      "summary": "The shallow per-chunk trees and the far smaller number of models sent to the renderer cut the time a frame takes at the Balmora cameras.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Slow preset (cycle-exact 68040 at about 50 MHz): median frame 2.0-4.1 s to 1.1-1.6 s, 1.6-2.6 times faster",
+          "compared": "the five Balmora cameras, legacy v0.0.32 disks against CHIM with the preview engine (0d8bf4f, world format 0.4); a legacy rerun in the same session agrees within 0.3-5 %",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-09"
+        },
+        {
+          "text": "Standard (JIT) preset: median frame 40-87 ms to 15-20 ms, 2.6-4.4 times faster",
+          "compared": "the same cameras, one session, world format 0.4",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-08"
+        }
+      ],
+      "gain_short": "1.6-2.6 times faster on the slow preset",
+      "caveats": [
+        "Emulator numbers are relative until a frame has been measured on a real accelerated Amiga.",
+        "CHIM spends 17-28 % more time outside the 3D view (streaming and the frame world), measured at two of the cameras.",
+        "The JIT figures have no drift-control rerun and vary about 2 times between busy-host sessions; a quiet-host session is still to be measured."
+      ],
+      "vis": "The gain comes from the counters of the previous entry: fewer brush models sent and shallower trees, with the same potentially visible set.",
+      "links": [
+        {
+          "title": "Draft v0.0.33 release notes, frame time",
+          "path": "docs/RELEASE-v0.0.33.md#frame-time-and-renderer-counters"
+        },
+        {
+          "title": "Measurements behind the release charts",
+          "path": "docs/performance/CHIM-v0.0.33-MEASUREMENTS.json"
+        },
+        {
+          "title": "CHIM ideas: the slow-accelerator reality",
+          "path": "docs/chim/IDEAS.md#the-slow-accelerator-reality"
+        }
+      ],
+      "bugs": [
+        "BENCH-JIT-PROFILE-32",
+        "CHIM-VIEW-FACES-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "far-terrain",
+      "name": "Far terrain: the distant view",
+      "area": "rendering",
+      "summary": "A resident low-detail layer of the land for the frame and beyond its edge (maps/<frame map>.far, written once per frame by the builder), drawn past the fog plane in the fog colour like the v0.0.32 horizon, so valleys and far land are not empty fog.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses",
+          "compared": "the far layer on and off at the owner's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost)",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-09"
+        }
+      ],
+      "caveats": [
+        "Distant buildings are not drawn yet: the far layer carries the land only (chim_far_objects 0). The v0.0.32 house silhouettes on the horizon are a known issue of v0.0.33 (CHIM-FAR-OBJECTS-33).",
+        "Emulator numbers are relative until a frame has been measured on a real accelerated Amiga."
+      ],
+      "vis": "The far layer is drawn beyond the ring the way the approved horizon draws land at the fog plane, from the same height samples as the chunk terrain; it is checked with the renderer counters against the v0.0.32 horizon before it counts.",
+      "links": [
+        {
+          "title": "Far terrain: design and measurements",
+          "path": "docs/chim/FAR_TERRAIN.md"
+        },
+        {
+          "title": "CHIM ideas: the distant view",
+          "path": "docs/chim/IDEAS.md#the-distant-view-far-terrain-and-mold-shells"
+        },
+        {
+          "title": "Distant terrain",
+          "path": "docs/DISTANT_TERRAIN.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-FAR-TERRAIN-33",
+        "CHIM-FAR-OBJECTS-33"
+      ],
+      "commits": [],
+      "gain_short": "13.2 KB, 31-44 ms per frame on the slow preset"
+    },
+    {
+      "id": "mold-shells",
+      "name": "Mold shells for distant landmarks",
+      "area": "rendering",
+      "summary": "Closed low-poly shells for landmarks such as Vivec's cantons, so they stand on the horizon without paying for their full detail.",
+      "status": "planned",
+      "version": null,
+      "gains": [],
+      "gain_note": "The shell tool exists and was measured on a Balmora map; the engine switch is designed but not built, so there is no in-game gain yet.",
+      "caveats": [],
+      "vis": "Shells are closed low-poly bodies drawn in place of the full distant model; the renderer counters decide whether they are kept.",
+      "links": [
+        {
+          "title": "Distant shells",
+          "path": "docs/DISTANT_SHELLS.md"
+        },
+        {
+          "title": "CHIM ideas: the distant view",
+          "path": "docs/chim/IDEAS.md#the-distant-view-far-terrain-and-mold-shells"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "modular-npcs",
+      "name": "Modular NPCs",
+      "area": "characters",
+      "summary": "Humanoid NPCs are assembled from shared body parts converted once, with one small recipe per actor, instead of one complete baked model per actor. Equipment changes and looting can then change how an actor looks. The baked whole-actor method stays selectable.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [
+        {
+          "text": "The 2,675 humanoid NPC records resolve to about 3,500 appearances made of only 1,726 distinct body parts (942 mesh files), each used about 39 times; baking whole models processes 12.3 million source triangles, the distinct parts hold about 0.4 million",
+          "compared": "a census of the game's own data",
+          "basis": "census",
+          "date": "2026-10-09"
+        }
+      ],
+      "gain_short": "about 0.4 million triangles in parts against 12.3 million baked",
+      "gain_note": "A census, not a CHIM run. The expected drop of the NPC gallery stage from about half an hour to a few minutes is an expectation, not a measurement.",
+      "caveats": [
+        "The host prototype and its tests exist; the engine side (load-time composition) is not built yet.",
+        "Measured and dropped: attaching parts as follower entities costs about 19 entity setups per actor per frame, too much for the slow 68040 target."
+      ],
+      "vis": "The engine composes one ordinary Quake alias model per appearance when it loads, so the renderer and its culling are unchanged.",
+      "links": [
+        {
+          "title": "Modular NPCs",
+          "path": "docs/MODULAR_NPCS.md"
+        },
+        {
+          "title": "NPC model cache",
+          "path": "docs/NPC_MODEL_CACHE.md"
+        },
+        {
+          "title": "Character equipment roadmap",
+          "path": "docs/CHARACTER_EQUIPMENT_ROADMAP.md"
+        }
+      ],
+      "bugs": [
+        "NPC-BAKED-WHOLE-DUPLICATION-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "npc-pathfinding",
+      "name": "NPC pathfinding and companions",
+      "area": "characters",
+      "summary": "A ladder that starts with plain Quake chase movement and stair climbing, and escalates only when stuck: a local ping, then A* on a small walkable graph stored with the chunks. dbg companion is a prototype follower that tests the first steps.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured yet. Budgets are fixed up front: at most two traces per think and 48 bytes of state per follower.",
+      "caveats": [
+        "dbg companion is a test bed (not saved). Followers through doors and the A* patch are designed, not built.",
+        "A scripted actor step could move the chunk ring to the actor; fixed in source (CHIM-ACTOR-RING-33)."
+      ],
+      "vis": "Pathfinding reads the walkable graph and collision, not the render tree; it does not change what is drawn.",
+      "links": [
+        {
+          "title": "CHIM NPC pathfinding",
+          "path": "docs/chim/CHIM_NPC_PATHFINDING.md"
+        },
+        {
+          "title": "NPC pathfinding",
+          "path": "docs/NPC_PATHFINDING.md"
+        },
+        {
+          "title": "Console commands: dbg companion",
+          "path": "docs/AMIWIND_CONSOLE_COMMANDS.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-ACTOR-RING-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "texture-effects",
+      "name": "Texture effects (.chimfx)",
+      "area": "world",
+      "summary": "An optional effect file can add specks of chosen colours to chosen textures, identical in every build and off unless selected. It began as a bug: the first CHIM worlds showed bright specks because their textures skipped the palette guard.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "A feature, not a speed or size gain. The bug itself is repaired: the CHIM world now goes through the same palette guard as the legacy maps, and the validator refuses sky-bank texels.",
+      "caveats": [],
+      "vis": "Not applicable: effects change texels, not geometry.",
+      "links": [
+        {
+          "title": "CHIM texture effects",
+          "path": "docs/chim/TEXTURE_EFFECTS.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-TEXTURE-SPECKS-33"
+      ],
+      "commits": [
+        "8caf66e"
+      ]
+    },
+    {
+      "id": "island-wide-audits",
+      "name": "Island-wide audits as build gates",
+      "area": "builder",
+      "summary": "Each geometry or collision finding names its mechanism, sweeps every mesh that goes through the same converter path, is fixed once in the shared converter and stays as a gate: seam tears, the stair walk of every flight, terrain hull bevels, sky-bank texels and the memory fit.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "Quality gates. For example, the silt strider's open hull (sky showing through its shell) was fixed once, and every caravan town places the same repaired model.",
+      "caveats": [
+        "Hidden faces (placed-model faces buried under the terrain) are an open audit (CHIM-HIDDEN-FACES-33)."
+      ],
+      "vis": "Not applicable: the audits are about geometry and collision correctness.",
+      "links": [
+        {
+          "title": "CHIM ideas: island-wide audits",
+          "path": "docs/chim/IDEAS.md#island-wide-audits-mechanism-classes"
+        },
+        {
+          "title": "Stair rules",
+          "path": "docs/STAIR_RULES.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-TERRAIN-HULL-BEVELS-33",
+        "CHIM-HIDDEN-FACES-33",
+        "COLLISION-STAIR-SLOPE-32"
+      ],
+      "commits": []
+    },
+    {
+      "id": "routed-hulls",
+      "name": "Routed standing hulls for many-piece models",
+      "area": "builder",
+      "summary": "Models with more than 16 collision pieces get one routed standing hull (same solid set, nested routing) instead of a long chain of pieces, in CHIM and in the legacy converter alike; tools/hull_chain_audit.py sweeps every map for deep hull chains. --model-hull (auto, chain, routed or balanced) keeps every method selectable.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured as a frame-time gain yet. The audit found 183 models of 63 meshes with hull chains 512 or more deep on the v0.0.33-dev1 full build (COLLISION-HULL-CHAINS-33).",
+      "caveats": [
+        "Not the default in v0.0.33: routed hulls pushed an open-world map past its flora collision reserve (BUILD-ROUTED-FLORA-RESERVE-33), so --model-hull chain is the shipped default and auto, routed and balanced stay selectable."
+      ],
+      "vis": "Not a drawing change: collision only.",
+      "links": [
+        {
+          "title": "Collision hull chains",
+          "path": "docs/bugs/COLLISION-HULL-CHAINS-33.md"
+        }
+      ],
+      "bugs": [
+        "BUILD-ROUTED-FLORA-RESERVE-33",
+        "CHIM-HULL-CHAIN-COST-33",
+        "COLLISION-HULL-CHAINS-33",
+        "ROUTED-HULL-NODE-ORDER-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "chim-builder",
+      "name": "The CHIM builder",
+      "area": "builder",
+      "summary": "tools/build.py --builder chim builds the CHIM world from your own Morrowind data with the same stages, --jobs, profiler and receipts as before; receipts record builder, chim_version and world_format. The legacy builder stays in the code and selectable.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "text": "Balmora exterior stage: 5.2 minutes wall and 5.1 CPU minutes on CHIM against 8.5 minutes wall and 24.1 CPU minutes for the 64 legacy region maps",
+          "compared": "two different builds: CHIM on a 6-thread build with the host about 98 % busy, legacy on a 24-thread build on a quiet host",
+          "basis": "build",
+          "host": "mixed",
+          "date": "2026-10-09"
+        }
+      ],
+      "gain_short": "Balmora exterior stage 5.2 minutes against 8.5 (different hosts)",
+      "caveats": [
+        "Different builds and host loads, so wall times are not a matched pair; a matched from-scratch pair on a quiet host is still to be run."
+      ],
+      "vis": "The builder links every placement to its leaves and writes the visibility rows; a build that makes the counters worse fails its gate.",
+      "links": [
+        {
+          "title": "Builder types",
+          "path": "docs/chim/build_guide/BUILDER_TYPES.md"
+        },
+        {
+          "title": "CHIM build statistics",
+          "path": "docs/chim/STATS.md"
+        },
+        {
+          "title": "Draft v0.0.33 release notes, build time",
+          "path": "docs/RELEASE-v0.0.33.md#build-time"
+        }
+      ],
+      "bugs": [
+        "CHIM-LEGACY-CHAIN-33",
+        "CHIM-RECEIPT-COMMIT-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "build-cache",
+      "name": "Build cache and prerendered store",
+      "area": "builder",
+      "summary": "Stage fingerprints let a development build reuse the finished stages of an earlier run, a per-file asset pool reuses converted sounds and movies, a per-map pass cache reuses the image step's optimizer, cull and stair-walk passes, and the prerendered store (--prerendered DIR) keeps finished stage outputs (CHIM worlds, interiors, region maps) across runs and workspaces. Releases write the store but never read it.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Image step on MiniWind maps, warm: BSP optimizer 388 s to 5.7 s, hidden-surface cull 48 s to 6.6 s, byte-identical outputs",
+          "compared": "the same MiniWind maps with and without the per-map pass cache (BUILD-IMAGE-NOT-INCREMENTAL-33)",
+          "basis": "build",
+          "host": "busy",
+          "date": "2026-10-09"
+        }
+      ],
+      "caveats": [
+        "Release candidates and finals are always built from scratch and refuse every shortcut."
+      ],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "CHIM ideas: build speed",
+          "path": "docs/chim/IDEAS.md#build-speed"
+        },
+        {
+          "title": "Build profile",
+          "path": "docs/BUILD_PROFILE.md"
+        }
+      ],
+      "bugs": [
+        "BUILD-CACHE-CHIM-UNITS-33",
+        "BUILD-CACHE-CLOSURE-WIDE-33",
+        "BUILD-CACHE-OVERBROAD-33",
+        "BUILD-IMAGE-NOT-INCREMENTAL-33",
+        "BUILD-PRERENDERED-PRUNE-ORDER-33"
+      ],
+      "commits": [],
+      "gain_short": "image passes 388 s to 6 s when warm"
+    },
+    {
+      "id": "miniwind",
+      "name": "MiniWind quick test build",
+      "area": "builder",
+      "summary": "A builder type for quick playtests: Balmora on CHIM with its interiors and what the engine needs, booting straight into Balmora. Development versions only; marked as a partial-area test.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "Not measured in the public record yet; it is described as building in a fraction of the time of a full build.",
+      "caveats": [
+        "Never a release: areas the build does not hold say \"Area unavailable\"."
+      ],
+      "vis": "Not applicable: the same engine and world as a full build.",
+      "links": [
+        {
+          "title": "MiniWind playtester build",
+          "path": "docs/MINIWIND_PLAYTESTER.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-HARVEST-REMOVED-MAPS-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "tp-and-scene-lookup",
+      "name": "dbg tp, doors and saves on CHIM towns",
+      "area": "engine",
+      "summary": "Every check that a scene exists (dbg tp arrivals, quick start, doors, saves and loads, the scene picker) goes through one function that finds the scene's map or the town's CHIM frame map, so a pure CHIM image works with the same commands as a legacy one. A save made in CHIM Balmora loads in either kind of image.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "Not a performance feature.",
+      "caveats": [],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "CHIM engine: towns",
+          "path": "docs/chim/ENGINE.md#towns"
+        },
+        {
+          "title": "Console commands",
+          "path": "docs/AMIWIND_CONSOLE_COMMANDS.md"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "legacy-side-by-side",
+      "name": "Legacy and CHIM side by side",
+      "area": "engine",
+      "summary": "chim_towns 0 brings back the legacy region maps for an A/B in one session; the console states which mode every town runs in, and start-up prints how many towns are on CHIM. No working method is deleted.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "A tool for measuring; every CHIM against legacy figure on this page was made this way.",
+      "caveats": [],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "CHIM engine: towns",
+          "path": "docs/chim/ENGINE.md#towns"
+        },
+        {
+          "title": "CHIM overview: design rules",
+          "path": "docs/chim/README.md#design-rules"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "memory-estimator",
+      "name": "Memory estimator",
+      "area": "builder",
+      "summary": "A predictor of how many bytes the chunk zone must hold at any position on the island, before anything is built, from the distinct models in the ring, terrain, catalogue entries and textures.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [
+        {
+          "text": "Accuracy about plus or minus 20 % at the load radius on towns like the ones it was fitted on, about 40 % on a town type it has not seen",
+          "compared": "coefficients fitted on built worlds, checked by leaving one town out",
+          "basis": "simulation",
+          "date": "2026-10-09"
+        }
+      ],
+      "gain_short": "about 20 % to 40 % accuracy",
+      "caveats": [
+        "A draft. It flags a handful of dense town cells over budget at the load radius; the heap gate on a built world always has the final word."
+      ],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "CHIM ideas: the memory estimator",
+          "path": "docs/chim/IDEAS.md#the-memory-estimator"
+        },
+        {
+          "title": "World estimate",
+          "path": "docs/WORLD_ESTIMATE.md"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "vivec-m3",
+      "name": "Vivec on CHIM (milestone M3)",
+      "area": "roadmap",
+      "summary": "Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec in one frame (world format 0.6, sectors in one folder per sector row).",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured yet.",
+      "caveats": [
+        "In this release the Vivec Arena exterior is left out and says \"Area unavailable\" until M3 is done."
+      ],
+      "vis": "Canton bodies and the Temple are the first big closed masses CHIM meets: real occluders. Visibility rows and placements per view are measured and may not get worse than the legacy preview.",
+      "links": [
+        {
+          "title": "CHIM ideas: M3",
+          "path": "docs/chim/IDEAS.md#m3-vivec-on-chim"
+        },
+        {
+          "title": "CHIM overview: milestones",
+          "path": "docs/chim/README.md#milestones"
+        }
+      ],
+      "bugs": [
+        "VIVEC-ARENA-FRAME-EDGE-32",
+        "VIVEC-ARENA-ACTORS-32"
+      ],
+      "commits": []
+    },
+    {
+      "id": "open-world-m4",
+      "name": "The open world on CHIM (milestone M4)",
+      "area": "roadmap",
+      "summary": "A fixed grid of frames of 3 x 3 cells covers the whole island; the engine keeps up to four frames resident and shifts the origin when you cross a frame edge, with no map load.",
+      "status": "planned",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured. The first slice is Balmora with the grid frames east and west of it.",
+      "caveats": [
+        "Until then the countryside between the towns ships as legacy region maps, marked \"not yet CHIM\"."
+      ],
+      "vis": "The ring is centred on the player, so the memory peak does not depend on where frame edges are; dense places fit only by simpler distant models, a stated view budget or a larger zone.",
+      "links": [
+        {
+          "title": "CHIM ideas: M4",
+          "path": "docs/chim/IDEAS.md#m4-the-open-world"
+        },
+        {
+          "title": "CHIM engine: frame re-centring plan",
+          "path": "docs/chim/ENGINE.md#frame-re-centring-plan-not-implemented"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "one-disk-image",
+      "name": "The whole game on one legacy-safe hard file",
+      "area": "roadmap",
+      "summary": "With every asset stored once, the world itself should come to about 1 GB, so the whole game fits one hard file that a classic Amiga can use, where today's pipeline would need about 24 GB.",
+      "status": "planned",
+      "version": null,
+      "gains": [
+        {
+          "text": "About 1 GB for the world against about 24 GB with the legacy pipeline",
+          "compared": "estimated from the game's own data; CHIM 1.0 is the release in which the whole island runs on CHIM",
+          "basis": "estimate",
+          "date": "2026-10-08"
+        }
+      ],
+      "gain_short": "about 1 GB against about 24 GB",
+      "caveats": [
+        "An estimate, not a measurement. Every partition must stay under 2 GiB and start below 2 GiB on its drive."
+      ],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "World streamer: disk budget",
+          "path": "docs/WORLD_STREAMER.md#disk-budget"
+        },
+        {
+          "title": "Asset census",
+          "path": "docs/ASSET_CENSUS.md"
+        }
+      ],
+      "bugs": [
+        "WORLD-REGION-DUPLICATION-31"
+      ],
+      "commits": []
+    },
+    {
+      "id": "sprite-statics-streamed",
+      "name": "Statics and flora sprites streamed with their chunks",
+      "area": "streaming",
+      "summary": "The frame map tags its static models and flora sprites with their chunk; the engine loads and links them when the chunk joins the ring and frees them when it leaves, instead of holding all of them in the map's fixed cost in the Hunk.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [
+        {
+          "headline": true,
+          "text": "Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B",
+          "compared": "the same Seyda Neen position with the frame map's statics resident against streamed with their chunks (FS-UAE A/B)",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-09"
+        }
+      ],
+      "caveats": [
+        "The frame map and the engine must match: a frame map with tagged statics needs this engine (both ship together)."
+      ],
+      "vis": "Not a drawing change: the sprites stay ordinary static entities, only their loading moves with the chunks.",
+      "links": [
+        {
+          "title": "CHIM ideas: memory",
+          "path": "docs/chim/IDEAS.md#memory"
+        }
+      ],
+      "bugs": [
+        "CHIM-SEYDA-HUNK-GAP-33"
+      ],
+      "commits": [],
+      "gain_short": "Seyda Neen Hunk gap 1.1 MB to 2.1 MB"
+    },
+    {
+      "id": "heap-mb-option",
+      "name": "--heap-mb builder option",
+      "area": "builder",
+      "summary": "A builder option like --jobs: the map heap in MiB, exact, default 11; beyond the safe profile it prints one loud warning and runs anyway, and every gate uses the build's own value.",
+      "status": "in-release",
+      "version": "0.1.0",
+      "gains": [],
+      "gain_note": "Not a speed feature: it makes the map heap size an explicit, recorded build choice.",
+      "caveats": [],
+      "vis": "Not applicable.",
+      "links": [
+        {
+          "title": "CHIM ideas: memory",
+          "path": "docs/chim/IDEAS.md#memory"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "runtime-scale-tilt",
+      "name": "Run-time scale and tilt of shared models",
+      "area": "world",
+      "summary": "One model per mesh instead of one variant per scale and tilt: the largest model-byte saving left island-wide, though hulls stay per variant.",
+      "status": "idea",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured; to be measured with the engine first.",
+      "caveats": [],
+      "vis": "Not designed in detail yet; any implementation is checked with the renderer counters like every CHIM change.",
+      "links": [
+        {
+          "title": "CHIM ideas: also held back",
+          "path": "docs/chim/IDEAS.md#also-held-back"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "heightfield-terrain",
+      "name": "Terrain generated from a heightfield at load",
+      "area": "world",
+      "summary": "Generate the ground from height samples when a chunk loads instead of storing its faces, once the 68040 cost of doing so is measured.",
+      "status": "idea",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured.",
+      "caveats": [],
+      "vis": "Terrain must stay world geometry, so that it occludes and is culled like stored terrain.",
+      "links": [
+        {
+          "title": "CHIM ideas: also held back",
+          "path": "docs/chim/IDEAS.md#also-held-back"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "shared-interior-props",
+      "name": "Shared interior props with per-placement lighting",
+      "area": "world",
+      "summary": "Store interior props once and light each placement separately, which would remove the per-map model limit indoors.",
+      "status": "idea",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured.",
+      "caveats": [
+        "Interiors stay ordinary Quake maps in CHIM 0.1.0, where Quake's vis works well."
+      ],
+      "vis": "Interiors keep Quake's vis today; shared props would have to keep it, checked with the renderer counters.",
+      "links": [
+        {
+          "title": "World streamer",
+          "path": "docs/WORLD_STREAMER.md"
+        },
+        {
+          "title": "CHIM ideas: also held back",
+          "path": "docs/chim/IDEAS.md#also-held-back"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    }
+  ]
+}

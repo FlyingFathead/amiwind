@@ -1,5 +1,23 @@
 # CONSOLE-HISTORY-EMPTY-32: Console Up past the oldest command shows an empty line and stays there
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 8 October 2026, in v0.0.32-dev1 |
+| Where | Console history (keys.c Key_Console, console.c) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev1 (last seen) |
+| Severity | low: Up past the oldest command shows an empty line; looks like Up does nothing. |
+| Family | Console, keyboard and mouse input (`console-input`) |
+| Playtest version | v0.0.32-dev1 |
+| From commit | source and engine 978475d |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open: fixed in source on the console-history branch, not yet packaged. Present
@@ -63,3 +81,20 @@ an image or played.
 qualifiers through `Key_Event`: recall order, Up past the oldest, Down back to
 the empty line, Shift scrollback, re-running a recalled line, keypad digits)
 and the open/close reset in `tests/aga_console_cycle_test.c`.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Console, keyboard and mouse input (`console-input`). The console line editor, qualifier keys and the emulator key path. See [families](README.md#families).
+
+- AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
+- AW25-05 (no report page): Console typed only uppercase letters and shifted digits
+- CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
+- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+- CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
+- [KEYS-AMIGA-EDIT-32](KEYS-AMIGA-EDIT-32.md): Amiga Del arrived as F11; FS-UAE sent Home/End as keypad ( and Help
+- MAP-VIEW-SWITCH-28 (no report page): Mouse cannot switch DEBUG / IN-GAME map views
+- VIEW-PITCH-CENTER-29 (no report page): Legacy automatic pitch centering during free-look
+
+<!-- END GENERATED CATEGORY -->

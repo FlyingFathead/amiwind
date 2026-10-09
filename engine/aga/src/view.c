@@ -62,6 +62,7 @@ cvar_t	v_ipitch_level = {"v_ipitch_level", "0.3", false};
 cvar_t	v_idlescale = {"v_idlescale", "0", false};
 
 cvar_t	crosshair = {"crosshair", "0", true};
+int (*aw_companion_crosshair)(int x, int y);	/* aw_companion.c */
 cvar_t	cl_crossx = {"cl_crossx", "0", false};
 cvar_t	cl_crossy = {"cl_crossy", "0", false};
 
@@ -1143,9 +1144,20 @@ void V_RenderView (void)
 
 #ifndef GLQUAKE
     AW_TorchDraw ();
-    if (crosshair.value)
-        Draw_Character (scr_vrect.x + scr_vrect.width/2 + cl_crossx.value,
-            scr_vrect.y + scr_vrect.height/2 + cl_crossy.value, '+');
+    {
+        /* dbg companion pick: 2 = drawn red over a pickable NPC, 1 = picking
+         * (crosshair shown even when off), 0 = normal (aw_companion.c). */
+        int x = scr_vrect.x + scr_vrect.width/2 + cl_crossx.value;
+        int y = scr_vrect.y + scr_vrect.height/2 + cl_crossy.value;
+        int pick = aw_companion_crosshair ? aw_companion_crosshair (x, y) : 0;
+        if (pick == 1)
+            Draw_Character (x, y, '+');
+        else if (pick == 0)
+        {
+            if (crosshair.value)
+                Draw_Character (x, y, '+');
+        }
+    }
 #endif
 
 }

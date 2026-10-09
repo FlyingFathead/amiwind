@@ -1,0 +1,177 @@
+{
+  "schema": "amiwind-build-stage-durations-v1",
+  "about": "Expected stage durations for live build progress and ETA when no earlier build of this workspace has a build-profile.json (tools/build_progress.py). Measured: v0.0.32 from-scratch release build, 2026-10-08, Docker on a 24-thread host, --jobs 24; parts of it ran while other work used the machine, so treat these as rough weights. wall and cpu in seconds; jobs = workers the stage started with.",
+  "budget": 24,
+  "stages": {
+    "actor-contact": {
+      "wall": 256.0,
+      "cpu": 356.6,
+      "jobs": 1
+    },
+    "area": {
+      "wall": 160.5,
+      "cpu": 539.5,
+      "jobs": 5
+    },
+    "balmora": {
+      "wall": 510.0,
+      "cpu": 1448.9,
+      "jobs": 1
+    },
+    "balmora-interiors": {
+      "wall": 387.2,
+      "cpu": 3639.2,
+      "jobs": 1
+    },
+    "bsp": {
+      "wall": 121.5,
+      "cpu": 119.3,
+      "jobs": 1
+    },
+    "census": {
+      "wall": 67.7,
+      "cpu": 152.7,
+      "jobs": 24
+    },
+    "character": {
+      "wall": 112.0,
+      "cpu": 1018.0,
+      "jobs": 1
+    },
+    "dialogue-lookup": {
+      "wall": 7.9,
+      "cpu": 4.5,
+      "jobs": 1
+    },
+    "door-audio": {
+      "wall": 7.3,
+      "cpu": 5.4,
+      "jobs": 1
+    },
+    "engine": {
+      "wall": 13.7,
+      "cpu": 29.7,
+      "jobs": 5
+    },
+    "hand-catalog": {
+      "wall": 50.9,
+      "cpu": 255.6,
+      "jobs": 5
+    },
+    "hands": {
+      "wall": 16.4,
+      "cpu": 16.2,
+      "jobs": 1
+    },
+    "harvest": {
+      "wall": 7.5,
+      "cpu": 10.0,
+      "jobs": 5
+    },
+    "image": {
+      "wall": 1211.3,
+      "cpu": 10938.7,
+      "jobs": 24
+    },
+    "interior": {
+      "wall": 119.3,
+      "cpu": 166.7,
+      "jobs": 1
+    },
+    "intro": {
+      "wall": 30.8,
+      "cpu": 189.9,
+      "jobs": 24
+    },
+    "media": {
+      "wall": 259.5,
+      "cpu": 680.6,
+      "jobs": 4
+    },
+    "music": {
+      "wall": 6.8,
+      "cpu": 15.9,
+      "jobs": 5
+    },
+    "npc-gallery": {
+      "wall": 2033.8,
+      "cpu": 23388.1,
+      "jobs": 4
+    },
+    "npcs": {
+      "wall": 27.7,
+      "cpu": 27.3,
+      "jobs": 1
+    },
+    "opening-references": {
+      "wall": 7.8,
+      "cpu": 6.3,
+      "jobs": 1
+    },
+    "reading": {
+      "wall": 4.8,
+      "cpu": 4.2,
+      "jobs": 1
+    },
+    "scene": {
+      "wall": 14.4,
+      "cpu": 21.3,
+      "jobs": 1
+    },
+    "scenery": {
+      "wall": 20.3,
+      "cpu": 24.6,
+      "jobs": 1
+    },
+    "setup": {
+      "wall": 0.3,
+      "cpu": 0.1,
+      "jobs": 1
+    },
+    "terrain": {
+      "wall": 8.9,
+      "cpu": 5.2,
+      "jobs": 1
+    },
+    "town-vivec_arena": {
+      "wall": 200.2,
+      "cpu": 476.4,
+      "jobs": 1
+    },
+    "world-flora": {
+      "wall": 177.1,
+      "cpu": 3125.2,
+      "jobs": 24
+    },
+    "world-flora-assets": {
+      "wall": 29.7,
+      "cpu": 57.7,
+      "jobs": 5
+    },
+    "world-scenery": {
+      "wall": 145.7,
+      "cpu": 1885.2,
+      "jobs": 24
+    },
+    "world-scenery-assets": {
+      "wall": 27.3,
+      "cpu": 27.3,
+      "jobs": 4
+    },
+    "world-survey": {
+      "wall": 132.2,
+      "cpu": 188.8,
+      "jobs": 4
+    },
+    "world-terrain": {
+      "wall": 1007.6,
+      "cpu": 13969.2,
+      "jobs": 24
+    },
+    "world-ui": {
+      "wall": 1.1,
+      "cpu": 0.8,
+      "jobs": 1
+    }
+  }
+}

@@ -23,7 +23,7 @@ class ImageRecoveryTests(unittest.TestCase):
         (old/'world-survey').mkdir(parents=True);(old/'world-terrain').mkdir()
         (old/'intro-scene/id1/maps').mkdir(parents=True)
         (old/'intro-scene/id1/world').mkdir()
-        args=build.parser().parse_args(['--recover-image-from',str(old),'--data-files',str(data)])
+        args=build.parser().parse_args(['--builder','legacy','--recover-image-from',str(old),'--data-files',str(data)])
         args.sdk=Path('/sdk');args.font_options={'bitmap_paper_ink':'filled'}
         tools={n:'/tools/'+n for n in ('qbsp','vis','light','qcc','ffmpeg','xdftool','rdbtool')}
         steps=build.commands(args,tools,root/'next')
@@ -174,7 +174,7 @@ class ImageRecoveryTests(unittest.TestCase):
              patch.object(build,'provenance',return_value={'compiler_jobs':1,'serial_stages':True,
                  'input_sha256':{'Morrowind.esm':'changed'} if changed_inputs else inputs}), \
              contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
-            argv=['--recover-image-from',str(old),'--workspace',str(root/'work'),'--name','retry','--jobs','1']
+            argv=['--builder','legacy','--recover-image-from',str(old),'--workspace',str(root/'work'),'--name','retry','--jobs','1']
             if changed_inputs:
                 with self.assertRaises(SystemExit) as error:build.main(argv)
                 self.assertEqual(error.exception.code,1)

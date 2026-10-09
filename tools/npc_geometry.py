@@ -268,9 +268,12 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
         failed=quota;quota=max(quota+1,quota*2)
     return points, faces
 
-def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None):
-    """One topology shared by every frame, per-face tiny UV atlas patches."""
-    from scipy.spatial import cKDTree
+def bake_quotas(shapes,budget=480,face_limit=666,minimum_faces=None,reference_frames=None):
+    """Per-shape triangle quotas of one complete appearance (the whole-model bake).
+
+    A shape's quota depends on every other shape in the outfit (MODULAR_NPCS.md):
+    the same body part gets a different quota in a different outfit.
+    """
     if face_limit not in (666,777,1024):raise ValueError('Unsupported alias face limit')
     ceiling=face_limit if minimum_faces else 480
     if not 64<=budget<=ceiling:raise ValueError('Triangle budget outside allowed profile')
@@ -287,7 +290,29 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
     quotas=np.array([max(minimum_faces.get(s.get('name',''),0),min(120,len(s['faces'])) if s['part']==0 and (reference_frames if reference_frames is not None else len(s['positions']))>8 else 4) for s in shapes],int);remaining=budget-int(quotas.sum())
     if remaining<0:raise ValueError('Too many separate shapes for budget')
     quotas+=np.floor(weights*remaining).astype(int)
+    return quotas
+
+def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
+         quotas=None,shell_height=None):
+    """One topology shared by every frame, per-face tiny UV atlas patches.
+
+    Default: quotas from bake_quotas (the whole-appearance bake, unchanged).
+    quotas/shell_height: a modular part bake (MODULAR_NPCS.md) with explicit
+    per-shape quotas and the reference actor height for shell preservation.
+    """
+    from scipy.spatial import cKDTree
+    if quotas is None:
+        quotas=bake_quotas(shapes,budget,face_limit,minimum_faces,reference_frames)
+    else:
+        if face_limit not in (666,777,1024):raise ValueError('Unsupported alias face limit')
+        quotas=np.array(quotas,int)
+        if len(quotas)!=len(shapes) or np.any(quotas<1) or int(quotas.sum())>face_limit:
+            raise ValueError('Invalid explicit part quotas')
+    minimum_faces=minimum_faces or {}
     actor_height = max(s['positions'][0,:,2].max() for s in shapes)-min(s['positions'][0,:,2].min() for s in shapes)
+    if shell_height is not None:
+        if not shell_height>0:raise ValueError('Invalid shell reference height')
+        actor_height=float(shell_height)
     skin=Image.new('RGB',(512,256));allframes=[];outfaces=[];outuv=[];fi=0
     for shape,quota in zip(shapes,quotas):
         orig=shape['positions'];faces=shape['faces'];p=orig[0]

@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "about": "Open stair findings a private -devN test may accept by ID (--accept-known-stair-findings ID): the stair gate's failures on these placements are recorded as accepted, never dropped. Refused for release candidates and finals. Each ID is a tracker entry (docs/bugs/<ID>.md).",
+  "findings": {
+    "STAIRS-ADDAMASARTUS-32": {"refs": [89756], "model": "in_moldcave_09"},
+    "STAIRS-BALMORA-B01-32": {"refs": [41499], "model": "x/ex_hlaalu_b_01"},
+    "STAIRS-BALMORA-WESTSOUTH-32": {"refs": [384371], "model": "in_hlaalu_hall_stairsl"},
+    "STAIRS-SEYDA-LIGHTHOUSE-32": {"refs": [114026, 129152], "model": "x/ex_common_lighthouse, in_common_lighthouse"},
+    "STAIRS-SEYDA-WAREHOUSE-32": {"refs": [321953], "model": "in_common_tower_thatch"}
+  }
+}

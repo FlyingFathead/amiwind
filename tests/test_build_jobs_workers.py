@@ -23,6 +23,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -132,7 +133,7 @@ class ImageCallSiteTests(unittest.TestCase):
     PASSES = {'configure_staged_maps', 'cull_staged_maps', 'stamp_staged_hands', 'optimize_maps',
               'require_actor_ground', 'verify_optimized_maps', 'audit_world_map_heap_with_receipt',
               'write_content_fingerprint', 'convert_builder_scene', 'entity_gate', 'pack_world_volumes',
-              'verify_combined', 'annotate', 'bake_ground', 'install_world_scenery', 'install_world_flora'}
+              'assemble_drives', 'annotate', 'bake_ground', 'install_world_scenery', 'install_world_flora'}
 
     def calls(self, function):
         tree = ast.parse((ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
@@ -217,7 +218,7 @@ class ImagePoolTests(unittest.TestCase):
             for index in range(6):
                 (maps / f'm{index}.bsp').write_bytes(fixture())
             cull_staged_maps(maps, base / 'proof', {'m0', 'm1'}, processor=parallel_fixture_processor, jobs=self.JOBS)
-        self.assertEqual(sizes, [self.JOBS])
+        self.assertEqual(sizes, [self.JOBS] * 4)  # the cull, then three hash checks
 
     def test_optimizer_uses_pool_for_preparation_and_hashing(self):
         from optimize_world_maps import optimize_maps, verify_optimized_maps
@@ -369,6 +370,73 @@ class SerialParallelIdentityTests(unittest.TestCase):
         self.assertEqual({r[0][0].get('mesh_contact') for r in results}, {'fitted'})
         for other in results[1:]:
             self.assertEqual(other, results[0])
+
+    def test_backups_are_links_and_survive_replacement(self):
+        # dev3-r2 profile: sky, cull and optimizer wrote a full copy of every map
+        # they change before replacing it; a hard link keeps the same bytes.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); live = root / 'm.bsp'; live.write_bytes(b'original')
+            build_parallel.keep_original(live, root / 'backup.bsp', b'original')
+            if os.name == 'posix':
+                self.assertEqual(os.stat(live).st_ino, os.stat(root / 'backup.bsp').st_ino)
+            (root / 'candidate.bsp').write_bytes(b'changed')
+            (root / 'candidate.bsp').replace(live)
+            self.assertEqual((root / 'backup.bsp').read_bytes(), b'original')
+            self.assertEqual(live.read_bytes(), b'changed')
+            with patch.object(build_parallel.os, 'link', side_effect=OSError('cross-device')):
+                build_parallel.keep_original(live, root / 'copy.bsp', b'changed')
+            self.assertEqual((root / 'copy.bsp').read_bytes(), b'changed')
+
+    def test_support_fitting_uses_one_pool_for_heads_and_all_slices(self):
+        # dev3-r2 profile: the round-by-round search started a pool per round and
+        # waited for each round's slowest slice (2.7 of 24 cores for 95 s).
+        import actor_grounding
+        from test_actor_ground import actor, alias, bsp
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()), \
+                patch.object(actor_grounding, 'SEARCH_SLICE', 3), recorded_pools() as sizes:
+            root = Path(temp); maps = root / 'maps'; maps.mkdir(); (root / 'progs').mkdir()
+            (root / 'progs/test.mdl').write_bytes(alias(4))
+            (maps / 'room.bsp').write_bytes(bsp(actor(ref='1') + actor(ref='4'), 0))
+            (maps / 'hall.bsp').write_bytes(bsp(actor(ref='3'), 0))
+            report = actor_grounding.bake_ground(maps, jobs=4)
+        self.assertEqual([row.get('mesh_contact') for row in report], ['fitted'] * 3)
+        self.assertEqual(sizes, [2, 4, 2])  # map scan, fitting (heads and every slice), map writes
+
+    def test_support_fitting_takes_the_stage_share_not_its_start_value(self):
+        # BUILD-IDLE-STAGES-33: actor-contact started with --jobs 1 beside other
+        # stages and fitted every placement serially while holding 12 workers.
+        import actor_grounding
+        from test_actor_ground import actor, alias, bsp
+        reports = {}
+        for label, allowance in (('serial', None), ('share', '4')):
+            with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()), \
+                    patch.object(actor_grounding, 'SEARCH_SLICE', 3), recorded_pools() as sizes:
+                root = Path(temp); maps = root / 'maps'; maps.mkdir(); (root / 'progs').mkdir()
+                (root / 'progs/test.mdl').write_bytes(alias(4))
+                (maps / 'room.bsp').write_bytes(bsp(actor(ref='1') + actor(ref='4'), 0))
+                (maps / 'hall.bsp').write_bytes(bsp(actor(ref='3'), 0))
+                env = {} if allowance is None else {'AMIWIND_BUILD_JOBS_FILE': str(root / 'allowance')}
+                if allowance is not None:
+                    (root / 'allowance').write_text(allowance + chr(10))
+                with patch.dict(os.environ, env):
+                    reports[label] = (actor_grounding.bake_ground(maps, jobs=1),
+                                      tree_bytes(maps), list(sizes))
+        self.assertEqual(reports['serial'][2], [])           # jobs 1 alone: serial, no pool
+        self.assertIn(4, reports['share'][2])                 # the held share fits in a pool
+        self.assertEqual(reports['serial'][:2], reports['share'][:2])  # same report, same map bytes
+
+    def test_live_jobs_reads_the_allowance(self):
+        from build_parallel import live_jobs
+        with tempfile.TemporaryDirectory() as temp:
+            allowance = Path(temp) / 'allowance'
+            allowance.write_text('6' + chr(10))
+            with patch.dict(os.environ, AMIWIND_BUILD_JOBS_FILE=str(allowance)):
+                self.assertEqual(live_jobs(1), 6)
+            with patch.dict(os.environ, AMIWIND_BUILD_JOBS_FILE=str(Path(temp) / 'missing')):
+                self.assertEqual(live_jobs(3), 3)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('AMIWIND_BUILD_JOBS_FILE', None)
+            self.assertEqual(live_jobs(2), 2)
 
     def test_fingerprint_hashing_equals_serial(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -522,6 +590,149 @@ def reference_audit(maps):
                 tolerance={'minimum_gap':-.5,'maximum_gap':1.0,'sole_band':.5},
                 scope='Initial ground-resident idle poses, packaged point collision, explicit source classification; no moving platforms, footsteps, IK or future animation proof.',
                 rows=rows,errors=errors,payload_sha256=hashes)
+
+
+
+def tree_bytes(root):
+    return {str(path.relative_to(root)): path.read_bytes() for path in sorted(Path(root).rglob('*')) if path.is_file()}
+
+
+class StageParallelTests(unittest.TestCase):
+    """Scene-chain stages on the shared pool give the serial path's bytes (BUILD-IDLE-STAGES-33)."""
+
+    def setUp(self):
+        src = str(ROOT / 'src')
+        order = patch.object(sys, 'path', [src] + [p for p in sys.path if p != src])
+        order.start()
+        self.addCleanup(order.stop)
+
+    def town_regions(self, root, jobs, model_budget=99):
+        """Run import_town.compile_regions with the map tools replaced by deterministic fakes."""
+        import import_town
+
+        def tool(command, cwd, **_):
+            name = Path(command[0]).name
+            target = Path(cwd) / 'terrain.bsp'
+            target.write_bytes((target.read_bytes() if target.exists() else b'') + name.encode())
+
+        def hull(base, map_path, qbsp):
+            base.write_bytes(base.read_bytes() + b'+hull' + map_path.read_bytes()[:8])
+
+        def meshes(base, out, scenery, palette, centre, jobs, references, prepared_models, **_):
+            out.write_bytes(base.read_bytes() + json.dumps([references, sorted(prepared_models)]).encode())
+            return {'unique_models': len(references), 'instances': len(references), 'clipnodes': 7}
+        root.mkdir(parents=True, exist_ok=True)
+        entries = [{'name': 'r%02d' % n, 'core': [[n, 0], [n + 1, 1]], 'coverage': n} for n in range(7)]
+        context = {'entries': entries, 'index': {'refs': 3}, 'settings': {'entity_budget': 99, 'model_budget': model_budget,
+                   'centre': [0, 0]}, 'grids': {}, 'terrain_wad': b'WAD', 'timings': '', 'arrival': [0, 0, 0],
+                   'prepared': {1: 'a', 2: 'b'}, 'out': root, 'scene': root, 'qbsp': '/t/qbsp', 'vis': '/t/vis',
+                   'light': '/t/light', 'vis_mode': 'fast', 'dry_run': False}
+        with recorded_pools() as sizes, \
+                patch.object(build_parallel, 'captured', lambda function, *args: (function(*args), '')), \
+                patch.object(import_town.subprocess, 'run', side_effect=tool), \
+                patch.object(import_town, 'select_references', lambda index, entry, settings: list(range(int(entry['name'][1:]) % 4))), \
+                patch.object(import_town, 'terrain_at', lambda *a: (5,)), \
+                patch.object(import_town, 'terrain_map', lambda entry, grids, settings, spawn, timings: 'map %s %s' % (entry['name'], spawn)), \
+                patch.object(import_town, 'owner', lambda point, entries: 3), \
+                patch.object(import_town, 'collision_coverage', lambda entry, settings: None), \
+                patch.object(import_town, 'rebuild_world_hull', side_effect=hull), \
+                patch.object(import_town, 'append_meshes', side_effect=meshes), \
+                patch.object(import_town, 'bound_visuals', lambda raw, coverage: (raw + bytes([coverage]), {'c': coverage})):
+            import_town._REGION_CONTEXT.clear()
+            rows = [(entry['name'], report, messages) for entry, report, messages in import_town.compile_regions(context, jobs)]
+        return rows, sizes
+
+    def test_town_regions_compile_side_by_side_and_equal_serial(self):
+        with tempfile.TemporaryDirectory() as temp:
+            serial, serial_pools = self.town_regions(Path(temp) / 'a', 1)
+            parallel, pools = self.town_regions(Path(temp) / 'b', 3)
+            self.assertEqual(tree_bytes(Path(temp) / 'a'), tree_bytes(Path(temp) / 'b'))
+        self.assertEqual(serial, parallel)
+        self.assertEqual([name for name, _, _ in parallel], ['r%02d' % n for n in range(7)])
+        self.assertIn(3, pools)
+
+    def test_media_sounds_and_videos_on_one_pool_equal_serial(self):
+        import prepare_media_assets as media
+        import prepare_video
+        assets = {f'sound/fx/s{n:02}.wav': {'source': f'sound/fx/s{n:02}.wav', 'file': f'/data/s{n:02}.wav'}
+                  for n in range(9)}
+        assets.update({'video/' + source: {'source': 'video/' + source, 'file': '/data/' + source}
+                       for _, _, source in prepare_video.VIDEO_CATALOG[:3]})
+        assets['video/extra.bik'] = {'source': 'video/extra.bik', 'file': '/data/extra.bik'}
+
+        def sound(task):
+            record, output, ffmpeg = task
+            time.sleep(.01 * (hash(record['source']) % 3))
+            return {'source': record['source'], 'category': 'effects', 'status': 'included',
+                    'path': media.sound_output(record['source'])}
+
+        def video(task):
+            row, source, relative, lookup, output, ffmpeg = task
+            if source is None:
+                return row
+            target = Path(output) / 'id1' / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.encode())
+            return dict(row, status='included', path=relative, sha256='0' * 64, bytes=len(source), source_sha256='1' * 64,
+                        **({'lookup': lookup} if lookup else {}))
+        outputs = {}
+        for jobs in (1, 4):
+            with tempfile.TemporaryDirectory() as temp, recorded_pools() as sizes, \
+                    contextlib.redirect_stdout(io.StringIO()) as log, \
+                    patch.object(media, 'resolve_data_files', lambda data: Path(data)), \
+                    patch.object(media, 'discover', lambda data: (assets, [], [])), \
+                    patch.object(media, 'lookups', lambda data, found: {'sounds': [], 'voiced_dialogue': []}), \
+                    patch.object(media, 'convert_sound', side_effect=sound), \
+                    patch.object(media, 'convert_video', side_effect=video):
+                media.prepare(temp, Path(temp) / 'media', jobs=jobs)
+                outputs[jobs] = (tree_bytes(Path(temp) / 'media'), log.getvalue(), list(sizes))
+        self.assertEqual(outputs[1][:2], outputs[4][:2])
+        self.assertEqual(outputs[1][2], [])
+        self.assertIn(4, outputs[4][2])
+
+    def test_gallery_dependency_prefetch_equals_serial_identities(self):
+        # The gallery's start parsed every source mesh serially (about 125 s on the
+        # critical path); the pool fills the same caches, so identities are unchanged.
+        import build_gallery
+        import gallery_cache
+
+        class FakeDependencies(gallery_cache.Dependencies):
+            files = {'meshes/b/skel.nif': ['textures/a.dds', 'textures/a.tga'], 'meshes/head.nif': ['textures/h.tga'],
+                     'meshes/crea.nif': ['textures/c.dds']}
+            present = {'textures/a.tga': b'a', 'textures/h.tga': b'h', 'textures/c.dds': b'c',
+                       'meshes/b/skel.nif': b's', 'meshes/head.nif': b'hd', 'meshes/crea.nif': b'cr'}
+
+            def __init__(self, data):
+                self.hashes, self.meshes = {}, {}
+
+            def read(self, name):
+                return self.present.get(name)
+
+            def mesh(self, name):
+                if name not in self.meshes:
+                    if name not in self.files:
+                        raise ValueError('Missing gallery source mesh: ' + name)
+                    self.hashes[name] = gallery_cache.digest(self.present[name])
+                    self.meshes[name] = sorted({name, *self.files[name]})
+                return self.meshes[name]
+        specs = [{'kind': 'NPC_', 'appearance': {'skeleton': 'meshes/b/skel.nif', 'parts': [{'mesh': 'head.nif'}]}},
+                 {'kind': 'CREA', 'mesh': 'crea.nif'}, {'kind': 'CREA', 'mesh': 'crea.nif'}]
+        with patch.object(gallery_cache, 'Dependencies', FakeDependencies), recorded_pools() as sizes:
+            build_gallery._DEPENDENCIES.clear()
+            serial = FakeDependencies('/data')
+            expected = [serial.for_spec(spec) for spec in specs]
+            pooled = FakeDependencies('/data')
+            build_gallery.prefetch_dependencies(pooled, '/data', specs, 3)
+            self.assertEqual(sorted(pooled.meshes), sorted(FakeDependencies.files))  # all parsed by the pool
+            self.assertEqual([pooled.for_spec(spec) for spec in specs], expected)
+            self.assertEqual(pooled.hashes, serial.hashes)
+        self.assertIn(3, sizes)
+
+    def test_town_region_limit_stops_at_the_first_region_in_order(self):
+        for jobs in (1, 3):
+            with self.subTest(jobs=jobs), tempfile.TemporaryDirectory() as temp:
+                with self.assertRaisesRegex(ValueError, 'r02: inline model budget exceeded'):
+                    self.town_regions(Path(temp), jobs, model_budget=1)
 
 
 if __name__ == '__main__':

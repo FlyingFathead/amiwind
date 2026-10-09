@@ -70,6 +70,8 @@ void Cmd_ExecuteString(char *text,cmd_source_t source){
 static void ready(void){cls.state=ca_connected;cls.signon=SIGNONS;AW_IntroTick();}
 static void request(void){key_dest=key_console;debug_scene_command();}
 static void untouched(void){int before=maps,reset=save_resets;request();assert(maps==before && save_resets==reset);}
+/* aw_region.c AW_SceneMapSize: the scene's own map (no CHIM frame maps in this test). */
+int AW_SceneMapSize(const char *n,char *p,int s){char b[64];FILE *f=NULL;int k;sprintf(b,"maps/%s.bsp",n);k=COM_FOpenFile(b,&f);if(f)fclose(f);else k=-1;if(p && s>0){strncpy(p,b,s-1);p[s-1]=0;}return k;}
 int main(void){
     svs.maxclients=1;svs.clients=&client;client.edict=&entities[1];
     argc=1;untouched();argc=2;args[1]="list";untouched();

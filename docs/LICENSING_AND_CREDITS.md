@@ -1,6 +1,19 @@
 # Licensing, provenance and credits
 
-**Last updated:** 6 October 2026 (Europe/Helsinki).
+**Last updated:** 9 October 2026 (Europe/Helsinki).
+
+<!-- contents start -->
+## Contents
+
+- [Public source notice](#public-source-notice)
+- [The CHIM engine (from v0.0.33)](#the-chim-engine-from-v0033)
+- [Renderer adoption review, 27 September 2026](#renderer-adoption-review-27-september-2026)
+- [Acknowledgements](#acknowledgements)
+- [Primary references](#primary-references)
+- [Host build tools](#host-build-tools)
+- [Proposed bundled QCC](#proposed-bundled-qcc)
+
+<!-- contents end -->
 
 **All AmiWind code is free and open source under the GNU General Public
 License (GPL), using the component-specific versions described below.**
@@ -52,6 +65,32 @@ the user's suitable licensed ROM; physical hardware supplies its own firmware.
 Neither the GPL nor this fan-tribute notice grants rights in converted assets,
 sound recordings, trademarks or ROMs. The project is independent and is not
 endorsed by Bethesda/ZeniMax, id Software, Commodore, Cloanto or OpenMW.
+
+## The CHIM engine (from v0.0.33)
+
+AmiWind runs on the CHIM engine, built on GPLv2 code from id Software's Quake
+(John Carmack and the id team) and its Amiga port AmiQuake (Peter McGavin,
+NovaCoder, Stephen Leary). The CHIM builder that converts your own Morrowind
+files is GPLv3.
+
+- **What CHIM is:** AmiWind's overhauled engine, in many places a rewrite of the
+  original AmiWind engine, still built on parts of Quake and the AmiQuake port.
+  Its main change is how the world is kept: every asset stored once and placed by
+  reference, streamed around the player, instead of one self-contained map at a
+  time. See [CHIM engine](chim/README.md).
+- **Licence:** the CHIM engine is an adaptation (a derivative work) of that GPL
+  code and is distributed under GNU GPL version 2; files whose notices say
+  "version 2 or later" keep that grant. Its complete source is in `engine/aga/`.
+- **Notices:** every original copyright notice (id Software, the AmiQuake
+  authors) stays in the files. Changes are recorded in the public history of this
+  repository and summarised in the [changelog](CHANGELOG.md).
+- **Two programs:** the GPLv2 engine and the GPLv3 builder and host tools stay
+  separate programs that exchange files only; neither is linked into the other.
+  The version notes above apply to both.
+- **Names:** "built on Quake code" is a factual description, not a brand; Quake
+  is a trademark of id Software. Nothing here implies endorsement by id Software,
+  the AmiQuake authors, Bethesda Softworks or ZeniMax. "CHIM" is a word from
+  Morrowind's lore, used here as the name of a free fan engine.
 
 ## Renderer adoption review, 27 September 2026
 

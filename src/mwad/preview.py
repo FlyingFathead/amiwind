@@ -67,5 +67,3 @@ def preview(area, output):
     fig.text(.065, .065, "PC-generated inspection view. Buildings, trees, texture baking and the Amiga renderer are not included.", fontsize=10, color="#4e5f61")
     fig.savefig(output, dpi=160, facecolor=fig.get_facecolor())
     plt.close(fig)
-
-

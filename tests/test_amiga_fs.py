@@ -6,7 +6,7 @@ import tempfile
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from amiga_fs import legacy_root, check_payload_names
+from amiga_fs import legacy_root, check_payload_names, check_payload_host_paths
 
 
 def root(marker=0, bitmap=0xffffffff):
@@ -34,6 +34,32 @@ class LegacyRootTests(unittest.TestCase):
             with patch.object(Path, 'rglob', return_value=entries), \
                  self.assertRaisesRegex(ValueError, 'collision'):
                 check_payload_names(directory)
+
+    def test_payload_text_must_not_contain_the_build_workspace_path(self):
+        # BUILD-PATH-IN-PAYLOAD-32: v0.0.32 shipped id1/gfx/sky-palette-bank.json with the build
+        # run folder in it, so the payload depended on where the build ran.
+        with tempfile.TemporaryDirectory() as temp:
+            work = Path(temp)/'vol'/'ws5'/'build'/'run'
+            boot = work/'boot'
+            (boot/'id1'/'gfx').mkdir(parents=True)
+            marker = boot/'id1'/'gfx'/'sky-palette-bank.json'
+            marker.write_text('{"shared_sky_source": "sky-asset-preparation/owned-cloud-sky.lmp"}'+chr(10))
+            (boot/'id1'/'maps').mkdir()
+            # binary payload (a NUL in the first 4 KiB) is not text and is not checked
+            (boot/'id1'/'maps'/'a.bsp').write_bytes(bytes(1) + str(work).encode())
+            check_payload_host_paths(boot, [work])
+            check_payload_host_paths(boot, [Path('/work')])
+            backslash = chr(92)
+            for leaked in (str(work/'sky-asset-preparation'/'owned-cloud-sky.lmp'), work.as_posix() + '/x',
+                           str(work).replace(backslash, backslash * 2)):
+                marker.write_text('{"shared_sky_source": "%s"}' % leaked + chr(10))
+                with self.assertRaisesRegex(ValueError, 'BUILD-PATH-IN-PAYLOAD-32.*sky-palette-bank.json'):
+                    check_payload_host_paths(boot, [work])
+
+    def test_image_step_runs_the_workspace_path_check(self):
+        source = (Path(__file__).resolve().parents[1]/'tools'/'build_aga.py').read_text(encoding='utf-8')
+        self.assertIn('check_payload_host_paths(boot, [out.resolve()])', source)
+        self.assertLess(source.index('check_payload_host_paths(boot,'), source.index('world_images=pack_world_volumes('))
 
     def test_modern_marker_is_rejected_until_normalized(self):
         for dos in range(0x444f5300,0x444f5304):

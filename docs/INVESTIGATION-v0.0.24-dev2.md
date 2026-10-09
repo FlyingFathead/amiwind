@@ -3,6 +3,19 @@
 Development correction, 30 September 2026. The released v0.0.24-dev1 archives
 remain unchanged. Focused acceptance results and unresolved limits follow.
 
+<!-- contents start -->
+## Contents
+
+- [Missing Balmora facades: reproduced and isolated](#missing-balmora-facades-reproduced-and-isolated)
+- [Boat performance](#boat-performance)
+- [Dock guard circling](#dock-guard-circling)
+- [Interaction prompts](#interaction-prompts)
+- [Underpasses and player dimensions](#underpasses-and-player-dimensions)
+- [Native memory and build checks](#native-memory-and-build-checks)
+- [Remaining work](#remaining-work)
+
+<!-- contents end -->
+
 ## Missing Balmora facades: reproduced and isolated
 
 Owner views:

@@ -4,7 +4,7 @@
 viddef_t vid;refdef_t r_refdef;keydest_t key_dest=key_game;double realtime,host_frametime=1;
 client_static_t cls;server_t sv;server_static_t svs;int scr_copyeverything;
 static byte pal[768],glyphs[16384],frame[64004];byte *host_basepal=pal,*draw_chars=glyphs;
-static cvar_t *vars[16];static int count,prompt;
+static cvar_t *vars[16];static int count,prompt;static int photo;
 int AW_IntroPromptActive(void){return prompt;}
 int AW_LoadingScreen(void){return 0;}int AW_MenuFrontEnd(void){return 0;}
 double AW_SpeechRemaining(void){return 0;}
@@ -127,5 +127,17 @@ int main(void){
     realtime=208;clean();AW_UIDraw();host_frametime=0;
     Cvar_SetValue("aw_animate_item_pickups",0);
     AW_UISubtitle("","C",3);clean();AW_UIDraw();assert(!changed(150,176));
+    /* Photo mode: the full-screen view leaves no strip, yet its notice uses this
+     * same message box, risen over the bottom 72 rows; the view above stays clean. */
+    {int top=200;
+     r_refdef.vrect.height=200;host_frametime=1;realtime=300;
+     AW_UISubtitle("","AAAA\nBBBB\nCCCC",4);assert(AW_UISubtitleIs("AAAA\nBBBB\nCCCC") && !AW_UISubtitleIs("AAAA"));
+     clean();AW_UIDraw();for(i=0;i<64000;i++)assert(vid.buffer[i]==137); /* no strip, no photo mode: nothing */
+     photo=1;clean();AW_UIDraw();
+     for(i=0;i<64000;i++)if(vid.buffer[i]!=137 && i/320<top)top=i/320;
+     assert(top>=128 && top<190 && changed(160,199));
+     AW_UISubtitle("Speaker","AAAA",4);assert(!AW_UISubtitleIs("AAAA")); /* speech is not a photo notice */
+     photo=0;r_refdef.vrect.height=152;}
     return 0;
 }
+int AW_PhotoModeActive(void){return photo;}

@@ -42,6 +42,47 @@ class SharedHarvestFingerprintTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'Missing'):
                 helper.fingerprint(root)
 
+    def test_catalogue_of_a_map_left_out_by_a_pure_chim_image(self):
+        # CHIM-HARVEST-REMOVED-MAPS-33: a pure CHIM image removes the town's region maps (bm###.bsp) but
+        # keeps their harvest catalogues, which the engine loads per region on the CHIM frame map.
+        with tempfile.TemporaryDirectory() as temp:
+            base=Path(temp);args,bsp=sample(base/'input')
+            output=base/'converted';convert_plan(**args,output=output)
+            root=base/'id1';root.mkdir();legacy.HarvestFingerprintTests().seed(root)
+            shutil.copytree(output/'progs',root/'progs')
+            (root/'harvest-bm008.txt').write_bytes((output/'harvest-town.txt').read_bytes())
+            with self.assertRaisesRegex(ValueError,'no matching map: harvest-bm008.txt'):
+                build_aga.harvest_fingerprint_entries(root)
+            names=[name for name,_ in build_aga.harvest_fingerprint_entries(root,removed={'maps/bm008.bsp'})]
+            self.assertIn('harvest-bm008.txt',names)
+            with self.assertRaisesRegex(ValueError,'no matching map'):
+                build_aga.harvest_fingerprint_entries(root,removed={'maps/bm009.bsp'})
+            # Callers without the removal list (the heap checks) see the town on CHIM: its region table
+            # names bm008 and maps/balmora-chim.bsp is present.
+            (root/'balmora-regions.txt').write_text('AWBR1 64 96 540 0 0 0 0 1 1 1 1\nbm008 0 0 1 1 0 0 1 1\n')
+            with self.assertRaisesRegex(ValueError,'no matching map'):
+                build_aga.harvest_fingerprint_entries(root)
+            (root/'maps/balmora-chim.bsp').write_bytes(b'frame map')
+            self.assertIn('harvest-bm008.txt',[name for name,_ in build_aga.harvest_fingerprint_entries(root)])
+
+    def test_catalogue_of_a_special_map_on_chim_is_left_out(self):
+        # CHIM-HARVEST-SPECIALS-33: the intro docks run as maps/intro_docks-chim.bsp; the engine would look for
+        # harvest-intro_docks-chim.txt, so the legacy catalogue is left out instead of failing the image step.
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'id1';(root/'maps').mkdir(parents=True)
+            (root/'harvest-intro_docks.txt').write_text('AWH1 0 0 0\n')
+            (root/'harvest-sn001.txt').write_text('AWH1 0 0 0\n')
+            self.assertEqual(build_aga.retire_chim_special_catalogues(root),[])     # no CHIM frame map: kept
+            (root/'maps/intro_docks-chim.bsp').write_bytes(b'frame map')
+            (root/'maps/seyda-chim.bsp').write_bytes(b'frame map')
+            (root/'seyda-regions.txt').write_text('AWBR1 64 96 540 0 0 0 0 1 1 1 1\nsn001 0 0 1 1 0 0 1 1\n')
+            # every caller of the catalogue check (heap checks, interior sections) skips it before the image
+            # step removes it
+            self.assertNotIn('harvest-intro_docks.txt',[n for n,_ in build_aga.harvest_fingerprint_entries(root)])
+            self.assertEqual(build_aga.retire_chim_special_catalogues(root),['harvest-intro_docks.txt'])
+            self.assertFalse((root/'harvest-intro_docks.txt').exists())
+            self.assertTrue((root/'harvest-sn001.txt').exists())                    # a CHIM town region: kept
+
     def test_mixed_indexed_representations_require_same_identity(self):
         with tempfile.TemporaryDirectory() as temp:
             base=Path(temp);args,bsp=sample(base/'input')

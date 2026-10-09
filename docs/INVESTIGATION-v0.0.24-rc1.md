@@ -3,6 +3,24 @@
 30 September 2026. Dev5 source is pushed as `1e1823d`; owner publication is a prerelease.
 Keep v0.0.23 as the stable release. Delivered dev5 archives are immutable.
 
+<!-- contents start -->
+## Contents
+
+- [Owner acceptance checklist](#owner-acceptance-checklist)
+- [Initial findings](#initial-findings)
+- [Verification still required](#verification-still-required)
+- [Additional owner direction](#additional-owner-direction)
+- [Stable release presentation gate](#stable-release-presentation-gate)
+- [Part 3: NPC targeting](#part-3-npc-targeting)
+- [Confirmed: interior coordinate culling](#confirmed-interior-coordinate-culling)
+- [Confirmed: recurring stair-ramp classification mismatch](#confirmed-recurring-stair-ramp-classification-mismatch)
+- [Owner pavement reference](#owner-pavement-reference)
+- [Native acceptance record](#native-acceptance-record)
+- [Legacy disk filename correction](#legacy-disk-filename-correction)
+- [Latest doorway and wedged-player follow-up](#latest-doorway-and-wedged-player-follow-up)
+
+<!-- contents end -->
+
 The [Balmora conversion lessons](BALMORA_CONVERSION_LESSONS.md) consolidate
 problem, cause, implications and resolution for future regions. This file keeps
 the complete coordinate checklist and remaining release acceptance gates.

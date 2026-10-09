@@ -9,6 +9,21 @@ interpreter and full dialogue-topic state remain future work.
 The owner chose maintenance first on 28 September 2026, then this work. Keep
 [the intermittent freezes](BUGS.md) open throughout implementation and testing.
 
+<!-- contents start -->
+## Contents
+
+- [Original source audit](#original-source-audit)
+- [Deliverable sequence](#deliverable-sequence)
+- [Character record and OpenMW comparison](#character-record-and-openmw-comparison)
+- [Acceptance before the next playable](#acceptance-before-the-next-playable)
+- [References inspected](#references-inspected)
+- [Class mechanics reference checklist](#class-mechanics-reference-checklist)
+- [dev4 confirmation and review navigation](#dev4-confirmation-and-review-navigation)
+- [dev5 playtest follow-up](#dev5-playtest-follow-up)
+- [Character UI V2: completion controls and remaining artwork](#character-ui-v2-completion-controls-and-remaining-artwork)
+
+<!-- contents end -->
+
 ## Original source audit
 
 Inspected the owned base Morrowind.esm scripts and object/reference records.

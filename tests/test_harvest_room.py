@@ -9,7 +9,7 @@ import unittest
 
 sys.path[:0]=[str(Path(__file__).resolve().parents[1]/'src'),
                str(Path(__file__).resolve().parents[1]/'tools')]
-from mwad.interior import select_geometry, original_doors, read_interior
+from mwad.interior import select_geometry, original_doors, read_interior, read_interiors
 from prepare_harvest_room import append_registry, world_directory, exterior_target
 
 
@@ -72,6 +72,29 @@ class HarvestRoomTests(unittest.TestCase):
             result=read_interior(path,'B',include_interior_entrances=True)
             self.assertEqual([r['number'] for r in result['entrances']],[1])
             self.assertEqual(result['master_sha256'],hashlib.sha256(raw).hexdigest())
+
+    def test_one_pass_reader_equals_one_call_per_cell(self):
+        # BUILD-DOOR-REFERENCE-SERIAL-33: the door step reads all destination
+        # cells in one pass; every cell must equal its own read_interior call.
+        light=record('LIGH',sub('NAME',b'lamp\0')+sub('MODL',b'l/lamp.nif\0')
+                     +sub('LHDT',struct.pack('<fiiI',1,2,3,256)+bytes([9,8,7,0])+struct.pack('<I',1)))
+        raw=door_source()+light+cell('A',ref(1,target='B')+ref(3,name='lamp')+ref(4,name='lamp'))
+        raw+=cell('B',ref(5,name='lamp')+ref(6,target='A'))+cell('C',b'')
+        raw+=cell('',ref(2,target='A')+ref(7,target='B'),False)+cell('',ref(8,target='C'),False)
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'source.esm';path.write_bytes(raw)
+            for entrances in (False,True):
+                names=['C','A','B']
+                many=read_interiors(path,names,include_interior_entrances=entrances)
+                single=[read_interior(path,n,include_interior_entrances=entrances) for n in names]
+                self.assertEqual(many,single)
+            many=read_interiors(path,['A','B'])
+            self.assertEqual([r['number'] for r in many[0]['entrances']],[2])
+            many[0]['refs'][1]['light']['radius']=1   # cells do not share base records
+            self.assertEqual(many[1]['refs'][0]['light']['radius'],256)
+            self.assertIs(many[0]['refs'][1]['light'],many[0]['refs'][2]['light'])  # refs of one cell do
+            with self.assertRaisesRegex(ValueError,'Interior must resolve uniquely: D'):
+                read_interiors(path,['A','D'])
 
     def test_unknown_non_door_and_deleted_references_are_not_arrivals(self):
         raw=door_source()+record('STAT',sub('NAME',b'fake\0')+sub('MODL',b'floor.nif\0'))

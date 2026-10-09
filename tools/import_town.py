@@ -37,7 +37,7 @@ from player_hull import lumps, pack_lumps, rebuild_world_hull
 from surface_flatten import load_profiles
 from actor_grounding import fields as grounding_fields
 from bound_balmora_visuals import bound_visuals
-from vis_options import DEFAULT_VIS_MODE, add_vis_option, light_args, vis_args
+from vis_options import DEFAULT_VIS_MODE, add_vis_option, light_args, map_threads, vis_args
 from known_inputs import input_sha256
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -434,34 +434,13 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
             raise ValueError(message)
         failures.setdefault(name, []).append(message)
         print(title + ' limit:', message, flush=True)
-    for entry in entries:
-        root = out / entry['name']; root.mkdir(exist_ok=True)
-        selected = select_references(index, entry, settings)
-        if len(selected) + 32 > settings['entity_budget']:
-            limit(entry['name'], f"{entry['name']}: entity budget exceeded ({len(selected)})")
-        (root / 'terrain.wad').write_bytes(terrain_wad)
-        spawn = [(entry['core'][0][i] + entry['core'][1][i]) / 2 for i in range(2)]
-        spawn.append(terrain_at(grids, settings, *spawn)[0] + 40)
-        if entry == entries[owner(arrival, entries)]: spawn = arrival
-        (root / 'terrain.map').write_text(terrain_map(entry, grids, settings, spawn, timings))
-        # Regions compile one at a time, so each vis run gets the whole job budget.
-        with (root / 'compile.log').open('w') as log:
-            for exe, args in ((qbsp, ['-nopercent', 'terrain.map']), (vis, vis_args('terrain.bsp', jobs, vis_mode)),
-                              (light, light_args('-minlight', '24', 'terrain.bsp'))):
-                subprocess.run([str(Path(exe).resolve()), *args], cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
-        base = root / 'base.bsp'; shutil.copyfile(root / 'terrain.bsp', base)
-        rebuild_world_hull(base, root / 'terrain.map', qbsp)
-        report = append_meshes(base, root / 'scene.bsp', out / 'scenery', scene / 'id1/gfx/palette.lmp',
-                               centre=settings['centre'], jobs=jobs, references=selected,
-                               prepared_models=prepared, retain_dressing=True,
-                               collision_bounds=collision_coverage(entry,settings),
-                               collision_compiler=qbsp,collision_cache=out/'collision-cache')
-        if report['unique_models'] > settings['model_budget']:
-            limit(entry['name'], f"{entry['name']}: inline model budget exceeded ({report['unique_models']} > {settings['model_budget']})")
-        bounded, visual_report = bound_visuals((root / 'scene.bsp').read_bytes(), entry['coverage'])
-        (root / 'scene.bsp').write_bytes(bounded)
-        report.update(region=entry, references=selected, visual_coverage=visual_report)
-        write_json(root / 'conversion.json', report); reports.append(report)
+    context = {'entries': entries, 'index': index, 'settings': settings, 'grids': grids, 'terrain_wad': terrain_wad,
+               'timings': timings, 'arrival': arrival, 'prepared': prepared, 'out': out, 'scene': scene,
+               'qbsp': qbsp, 'vis': vis, 'light': light, 'vis_mode': vis_mode, 'dry_run': dry_run}
+    for entry, report, messages in compile_regions(context, jobs):
+        for message in messages:
+            limit(entry['name'], message)
+        reports.append(report)
         print(title + ' region ready:', entry['name'], report['instances'], report['clipnodes'], flush=True)
     rooms = convert_interiors(data, scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings, dry_run)
     if dry_run:
@@ -485,6 +464,96 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
     return {'regions': len(entries), 'arrival': arrival, 'scenery_references': len(index['references']),
             **({'interiors': len(rooms['receipt']), 'excluded_interiors': len(rooms['excluded'])}
                if rooms['receipt'] or rooms['excluded'] else {})}
+
+
+def compile_regions(context, jobs):
+    """Yield (entry, report, limit messages) for every region, in region order.
+
+    Regions are independent (each writes only its own folder; the collision
+    cache is content-addressed): they compile side by side on the shared pool,
+    tool threads and model workers split between them, and each region's log
+    output is printed in region order (BUILD-IDLE-STAGES-33; the serial loop held
+    12 workers on 2.8 cores in the v0.0.32 build). Bytes equal the serial loop's.
+    """
+    import pickle
+    from build_scratch import scratch_dir
+    entries = context['entries']
+    workers = min(jobs, max(1, len(entries)))
+    threads = map_threads(jobs, workers)
+    with scratch_dir('aw-town-regions-') as temporary:
+        path = Path(temporary) / 'context.pickle'
+        path.write_bytes(pickle.dumps(context, protocol=4))
+        tasks = [(str(path), number, threads) for number in range(len(entries))]
+        # Longest first (build_costs): history, else the placed references per region.
+        from build_costs import costed_map
+        sizes = {entry['name']: len(select_references(context['index'], entry, context['settings'])) + 1
+                 for entry in entries}
+        pool = costed_map('town-%s-regions' % town_field(context['settings'], 'id'), _compile_region, tasks,
+                          [entry['name'] for entry in entries], workers, fallback=sizes.get)
+        for entry, ((report, messages), text) in zip(entries, pool):
+            if text:
+                sys.stdout.write(text); sys.stdout.flush()
+            yield entry, report, messages
+
+
+_REGION_CONTEXT = {}
+
+
+def _region_context(path):
+    """The shared region inputs, read once per worker process."""
+    if path not in _REGION_CONTEXT:
+        import pickle
+        _REGION_CONTEXT.clear()
+        _REGION_CONTEXT[path] = pickle.loads(Path(path).read_bytes())
+    return _REGION_CONTEXT[path]
+
+
+def _compile_region(task):
+    """Worker: compile one town region; ((report, limit messages), its output text)."""
+    from build_parallel import captured
+    return captured(_compile_region_now, task)
+
+
+def _compile_region_now(task):
+    path, number, threads = task
+    c = _region_context(path)
+    entries, settings, out = c['entries'], c['settings'], c['out']
+    entry = entries[number]
+    messages = []
+
+    def limit(message):
+        # Without dry_run the first limit stops the stage, as the serial loop did.
+        if not c['dry_run']:
+            raise ValueError(message)
+        messages.append(message)
+    root = out / entry['name']; root.mkdir(exist_ok=True)
+    selected = select_references(c['index'], entry, settings)
+    if len(selected) + 32 > settings['entity_budget']:
+        limit(f"{entry['name']}: entity budget exceeded ({len(selected)})")
+    (root / 'terrain.wad').write_bytes(c['terrain_wad'])
+    spawn = [(entry['core'][0][i] + entry['core'][1][i]) / 2 for i in range(2)]
+    spawn.append(terrain_at(c['grids'], settings, *spawn)[0] + 40)
+    if entry == entries[owner(c['arrival'], entries)]: spawn = c['arrival']
+    (root / 'terrain.map').write_text(terrain_map(entry, c['grids'], settings, spawn, c['timings']))
+    qbsp, vis, light = c['qbsp'], c['vis'], c['light']
+    with (root / 'compile.log').open('w') as log:
+        for exe, args in ((qbsp, ['-nopercent', 'terrain.map']), (vis, vis_args('terrain.bsp', threads, c['vis_mode'])),
+                          (light, light_args('-minlight', '24', 'terrain.bsp'))):
+            subprocess.run([str(Path(exe).resolve()), *args], cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
+    base = root / 'base.bsp'; shutil.copyfile(root / 'terrain.bsp', base)
+    rebuild_world_hull(base, root / 'terrain.map', qbsp)
+    report = append_meshes(base, root / 'scene.bsp', out / 'scenery', c['scene'] / 'id1/gfx/palette.lmp',
+                           centre=settings['centre'], jobs=threads, references=selected,
+                           prepared_models=c['prepared'], retain_dressing=True,
+                           collision_bounds=collision_coverage(entry, settings),
+                           collision_compiler=qbsp, collision_cache=out / 'collision-cache')
+    if report['unique_models'] > settings['model_budget']:
+        limit(f"{entry['name']}: inline model budget exceeded ({report['unique_models']} > {settings['model_budget']})")
+    bounded, visual_report = bound_visuals((root / 'scene.bsp').read_bytes(), entry['coverage'])
+    (root / 'scene.bsp').write_bytes(bounded)
+    report.update(region=entry, references=selected, visual_coverage=visual_report)
+    write_json(root / 'conversion.json', report)
+    return report, messages
 
 
 def convert_interiors(data, scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings, dry_run=False):
@@ -531,5 +600,6 @@ if __name__ == '__main__':
     add_options(p)
     a = p.parse_args()
     apply_options(a)
+    import build_profile; build_profile.instrument('town')  # sub-stage timers (docs/BUILD_PROFILE.md)
     print(json.dumps(prepare(a.town, a.data_files, a.scene, a.out, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs,
                              a.collect_only, a.vis_mode, a.dry_run), indent=2))

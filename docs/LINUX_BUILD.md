@@ -3,6 +3,31 @@
 rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
 coverage and protected model quality remain mandatory.
 
+<!-- contents start -->
+## Contents
+
+- [Bitmap paper readability (integrated in dev8)](#bitmap-paper-readability-integrated-in-dev8)
+- [1. Quickest setup and build](#1-quickest-setup-and-build)
+- [Manual or partial setup](#manual-or-partial-setup)
+- [2. External native tools](#2-external-native-tools)
+- [3. Check, then build](#3-check-then-build)
+- [4. Boot your private image](#4-boot-your-private-image)
+- [Rebuilding only the first NPC slice](#rebuilding-only-the-first-npc-slice)
+- [Repeatable conversion choices](#repeatable-conversion-choices)
+- [World map and journal assets](#world-map-and-journal-assets)
+- [Night lighting tables](#night-lighting-tables)
+- [Completion summary](#completion-summary)
+- [NPC gallery default](#npc-gallery-default)
+- [World flora default](#world-flora-default)
+- [Harvestable mushrooms default](#harvestable-mushrooms-default)
+- [Shipped towns default](#shipped-towns-default)
+- [Game heap size](#game-heap-size)
+- [Disk layout limits](#disk-layout-limits)
+- [MiniWind playtester build](#miniwind-playtester-build)
+- [Quick test builds](#quick-test-builds)
+
+<!-- contents end -->
+
 **Outside approval is required for any exception affecting either gallery.**
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
@@ -77,6 +102,22 @@ select the candidate explicitly. The same setting is available in
 CLI settings override the selected JSON, which overrides the shipped defaults.
 See [paper font options](PAPER_FONT_OPTIONS.md). This option changes bitmap reading-page ink;
 TTF/FNT source selection is automatic and independent of the worker limit.
+
+The exterior world pipeline is `--builder chim` (the default from v0.0.33, with
+the CHIM areas Balmora and Seyda Neen from `config/build-defaults.json`; name
+others with one or more `--chim-area TOWN`) or `--builder legacy` (every
+exterior as region maps, as in v0.0.32 and earlier; still selectable and
+tested). Startup screen: a CHIM build shows "RPG engine powered by CHIM" under
+the logo, a legacy build the v0.0.32 lines. A CHIM build ships no
+legacy exterior map of a CHIM area: the image step writes the town's CHIM frame
+maps, removes its legacy region maps and fails the build if any is still in the
+image (`build.json` `chim_world.legacy_check`). Extra towns that are not CHIM
+areas (the Vivec Arena) are left out of a CHIM image; the open world ships with
+the legacy builder's maps until it is on CHIM. A CHIM build with Seyda Neen
+needs the recorded v0.0.31 Seyda Neen maps from your own v0.0.31 image
+(`--seyda-recorded DIR`). `build-state.json` `chim_plan` lists the legacy
+exterior stages a CHIM plan still runs and which later step reads each one
+(details: [CHIM world format](chim/WORLD_FORMAT.md#a-chim-build-ships-no-legacy-exterior-maps)).
 
 ## 1. Quickest setup and build
 
@@ -264,6 +305,13 @@ space for the installed inputs, SDK, intermediate scenes, staged payload and
 final image at the same time. Keep build runs outside the source checkout and
 allow several times the final payload size; see [storage profiles](STORAGE.md).
 
+Development builds can skip work done before: `--reuse-from OLD_RUN` copies the
+unchanged stages of one earlier run, and `--prerendered DIR` keeps finished
+CHIM worlds, interiors and region maps in a store folder by version and area
+and uses them in any later build whose stage fingerprints match. Both verify
+every copied file; release candidates and finals are built from scratch. See
+[Speed](chim/build_guide/SPEED.md#prerendered-store---prerendered-dir).
+
 For a smaller host-only terrain test with no native toolchain:
 
 ```sh
@@ -384,6 +432,20 @@ fail the build. Use `--no-npc-gallery` only for exceptional, explicitly requeste
 debugging that requires isolating the gallery; this choice is recorded. Gallery conversion does not require recompiling
 retained terrain. See [gallery build details](CHARACTER_MODEL_GALLERY.md).
 
+A build made with `--no-npc-gallery` tells the player so: the image carries the
+marker `id1/npc-gallery-disabled.txt` (also named in `build.json` under
+`npc_gallery`), and every way into the gallery from the F10 console
+(`dbg npcgallery`, `dbg gallery`, `dbg modelgallery`,
+`dbg combattest`, `dbg torchtest npc ...`) prints instead:
+
+```text
+This build was made without the NPC gallery (quick playtest build).
+To include it, build without --no-npc-gallery.
+```
+
+`dbg help` (and `dbg help <word>`) lists those commands with
+"(not in this build)". Normal builds have no marker and behave as before.
+
 **Warning: gallery omission is for debugging builds only. All NPCs and their
 required assets remain necessary for a complete game. `--no-npc-gallery` skips
 inspection-only conversion/packaging; it must never remove world NPC placements,
@@ -427,11 +489,97 @@ cannot be picked), and the image does not match a release.
 ## Shipped towns default
 
 Normal AGA builds import every town after Seyda Neen and Balmora that a release
-ships: the rows of `config/towns.json` with `shipped_since` (the Vivec Arena
-preview since v0.0.32), one `town-<id>` stage each, right after Balmora's
-interiors. `--extra-town <id>` adds a town that is not shipped yet; naming a
+ships: the rows of `config/towns.json` with `shipped_since` and no `withdrawn`
+reason, one `town-<id>` stage each, right after Balmora's interiors. The Vivec
+Arena preview (shipped since v0.0.32) is withdrawn from v0.0.33 by owner
+decision (CHIM-ARENA-MEMORY-33), so a default build no longer imports it;
+`--extra-town vivec_arena` still builds it. `--extra-town <id>` adds a town that
+is not shipped (or is withdrawn); naming a
 shipped town there has no effect. `--no-extra-town <id>` (a shipped town) and
 `--only-core-towns` (Seyda Neen and Balmora only) leave towns out for debugging
 only: the builder prints a warning, `build-state.json` records the selection in
 `extra_town_selection`, and the image does not match a release. Contradictory
 town options stop the build before any work. Details: [TOWN_IMPORT.md](TOWN_IMPORT.md).
+
+## Game heap size
+
+The game heap (Quake's Hunk: maps, models and the CHIM zone) is 11 MiB by default,
+which runs the whole game on an A1200 with 16 MiB of Fast RAM. `--heap-mb N` (or
+`"heap_mb": N` in a `--build-config` file; the command line wins) builds with exactly
+N MiB, like `--jobs N`: it is never refused. Above the size measured to run the whole
+game on 16 MiB of Fast RAM (11 MiB), the build prints one warning and records it in
+`engine-build.json` (`heap_mb`, `heap_mb_selected_by`, `heap_warning`), the boot check
+prints a `Game heap: ... [!] WARN` row, and the engine says so at start. The boot
+check asks for the heap plus 3 MiB of free Fast RAM, and the heap plus 16 bytes in
+one block. The map heap gates measure against the build's own size. The start
+argument `-heapmb N` overrides the built size for one start, with the same warning. What the heap
+holds, the measured figures per map and what 12 MiB costs: [chim/build_guide/MEMORY.md](chim/build_guide/MEMORY.md).
+
+## Disk layout limits
+
+Every image the builder writes (full, MiniWind, release candidates and finals) passes one disk-layout
+gate in the image step, for every drive: each partition starts below 2 GiB of its drive (Kickstart
+3.1 does not mount a partition that starts later) and is below 2 GiB, each file is below 1 GiB (well
+under the 2 GiB file limit of the Amiga file system), and each drive image is below 4 GiB. A
+violation stops the build with the drive, partition or file, its offset or size, and the limit; the
+measured layout is recorded as `disk_layout` in the image's `build.json`. `build.sh`, `build.cmd` and
+`build.ps1` all run it, since they run the same image step.
+
+The gate runs twice. First on the plan, before anything is written: each world partition before its
+files are copied into it, then every drive (partition sizes, their offsets and the drive size, exactly
+as the drives will be written) before the boot partition or any drive image exists, so a layout over a
+limit costs no image writes. Then again on every drive as written and read back. The asset-free
+`--dry-run` boot-notice image passes the same gate after its partition table is read back, and its
+`dry-run-build.json` records `disk_layout` too.
+
+To check the gate itself, run the self-test (no game data, a few seconds):
+
+```sh
+python3 tools/build.py --layout-selftest
+```
+
+It sends dummy payloads through the image step's own packing code and expects a refusal, with the
+matching message, for a 2.5 GB file, a 2048 MiB partition, a partition starting past 2 GiB and a drive
+over 4 GiB. The last two force a drive grouping the packer never makes, and the self-test also checks
+that the packer's own grouping keeps those partitions legal. A layout just under every limit (a file of
+1 GiB minus one byte, 1920 MiB partitions, a partition starting at 1920 MiB + 32 KiB, a 3840 MiB +
+32 KiB drive) must pass, and a tiny payload is written end to end (partitions, drive, readback, gate).
+The dummies are sparse files: several GiB in size, almost nothing on disk, never read, because a
+refused plan stops before any image is written. They live in one scratch folder that is removed on
+success, failure and Ctrl-C, and the run ends with `Disk layout self-test: cleaned N dummy files`. The
+end-to-end case needs `xdftool` and `rdbtool` and writes about 256 MiB for a few seconds;
+`python3 tools/layout_selftest.py --no-write` skips it, and `--scratch DIR` picks the scratch parent.
+The test suite runs the same self-test (`tests/test_layout_selftest.py`).
+
+## MiniWind playtester build
+
+`--miniwind` selects the build type AmiWind "MiniWind" Playtester Build: a
+quick PARTIAL-AREA test of Balmora only (the Balmora exterior on CHIM, the
+Balmora interiors, engine, menus, UI, audio, fonts and music) that boots
+straight into Balmora. Private `-devN` versions only, never a release;
+`--miniwind-description TEXT` adds an "Included:" line to the startup screen.
+Details: [MINIWIND_PLAYTESTER.md](MINIWIND_PLAYTESTER.md).
+
+## Quick test builds
+
+A development build (`VERSION` such as `0.0.33-dev1`) can leave whole content
+groups out to reach a playable test image sooner: `--exclude GROUP[,GROUP...]`
+or one option per group.
+
+| Group | Option | Skips | In the game |
+| --- | --- | --- | --- |
+| `video` | `--exclude-video` | the media stage's videos and the intro movie | New Game goes straight to the ship |
+| `music` | `--exclude-music` | the music stage and the soundtrack | silence, one console line |
+| `voice` | `--exclude-voice` | the recorded dialogue library (`Sound/Vo`) | greetings and the intro lines stay |
+| `npc-gallery` | `--exclude-npc-gallery` (or `--no-npc-gallery`) | the NPC gallery stage | the gallery commands say it is not in the build |
+| `interiors` | `--exclude-interiors` | the Seyda Neen and Balmora room compiles | house doors say "Area unavailable" |
+| `harvest` | `--exclude-harvest` (or `--no-harvest`) | the harvest stage | mushrooms stay, but cannot be picked |
+| `unreferenced` | `--exclude-unreferenced [GROUPS]` | area builds only: what the area does not reference | only the area's NPCs, voices and sounds |
+
+Dressing, flora and every other object with collision always stay. The image
+is named `...-quick-test.hdf`, the receipts record the groups, and the game says
+"This build was made without ... (quick test build)." where it would notice.
+Release candidates and finals refuse every exclusion. Measured savings, the
+reference closure and its receipt: the
+[CHIM build guide](chim/build_guide/README.md), page
+[Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md).

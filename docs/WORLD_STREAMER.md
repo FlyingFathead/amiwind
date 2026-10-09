@@ -7,8 +7,42 @@ per-placement data (origin, angles, scale, and per-placement lighting where it
 is kept) is stored per placement. Today's overlapping region maps remain only
 as the baseline this design is measured against.
 
-Status: design and measurement. No engine change has been made yet. The
-numbers behind the relative results below come from the shipped town maps and
+<!-- contents start -->
+## Contents
+
+- [Why](#why)
+- [Quake first: the mechanisms the streamer reuses](#quake-first-the-mechanisms-the-streamer-reuses)
+- [How choices](#how-choices)
+  - [Chunk size](#chunk-size)
+  - [Resident set](#resident-set)
+  - [Sharing geometry between instances in the engine](#sharing-geometry-between-instances-in-the-engine)
+  - [Collision for instances](#collision-for-instances)
+- [Disk budget](#disk-budget)
+- [Doors, changelevel and region switching](#doors-changelevel-and-region-switching)
+- [Heap accounting](#heap-accounting)
+- [Memory placement (requirement)](#memory-placement-requirement)
+- [Visibility and culling (requirement)](#visibility-and-culling-requirement)
+- [Disk layout](#disk-layout)
+- [Failure modes to test](#failure-modes-to-test)
+- [Measuring it](#measuring-it)
+  - [Census](#census)
+- [Build speed is a CHIM requirement](#build-speed-is-a-chim-requirement)
+- [Staged plan](#staged-plan)
+- [Temporary legacy bypasses that end with CHIM](#temporary-legacy-bypasses-that-end-with-chim)
+- [Engine changes and their size (estimate)](#engine-changes-and-their-size-estimate)
+
+<!-- contents end -->
+
+Open and fixed CHIM bugs, by part and with the build each was found in, are on the
+[CHIM Engine tracker](bugs/CHIM_TRACKER.md), generated from the bug register.
+This design is **CHIM**: the overview (the name, versions, design rules,
+milestones and credits) is in [CHIM](chim/README.md), and every idea that is
+designed, measured or held back is in [CHIM ideas](chim/IDEAS.md). What CHIM has
+done so far, feature by feature with the measured gains, is in the
+[CHIM feature tracker](chim/FEATURES.md).
+
+Status: the CHIM engine and builder run Balmora and Seyda Neen (private playtests,
+CHIM 0.1.0, world format 0.5). The numbers behind the relative results below come from the shipped town maps and
 the whole-world estimate and stay with the private build records, because they
 are derived from the owner's game data.
 
@@ -105,7 +139,7 @@ collision parts loaded.
 ## Disk budget
 
 Owner limits: classic FFS partitions below 2 GiB, drive images below 4 GiB
-([build output](BUILD_OUTPUT.md)); two drive images are the absolute maximum
+([build output](BUILD_OUTPUT.md); the limits, the savings measured so far and the size budget of the whole game are in [disk space](chim/DISK_SPACE.md)); two drive images are the absolute maximum
 for the whole game, and the real target is close to the original game's art
 and world data plus our terrain and lightmaps.
 
@@ -262,7 +296,8 @@ scratch. Every builder change is measured with `tools/build_profile.py report
 1. Measure (done for one town and the island estimate).
 2. Converter: model pack, texture pack, chunk packs and index for one town,
    with a check that every placement, every model and every terrain face is
-   stored exactly once.
+   stored exactly once. Done for Balmora:
+   [CHIM world format](chim/WORLD_FORMAT.md).
 3. Engine: model zone with LRU, library models kept across map changes, chunk
    loader through the existing section loaders, per-chunk placement
    catalogues, collision parts, frame re-centring.

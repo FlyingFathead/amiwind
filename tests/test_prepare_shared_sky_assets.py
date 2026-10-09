@@ -70,6 +70,11 @@ class PipelineTests(unittest.TestCase):
             with patch.object(overlay,'EXPECTED_PALETTE',fingerprint):
                 report=prepare_staged_sky(id1,data,root/'work')
             self.assertTrue(report['vivid_sky']);self.assertEqual(report['status'],'prepared_owned_clouds')
+            # BUILD-PATH-IN-PAYLOAD-32: the shipped marker does not name the build folder.
+            marker=(id1/'gfx/sky-palette-bank.json').read_text(encoding='utf-8')
+            self.assertNotIn(str(root),marker);self.assertNotIn(root.as_posix(),marker)
+            self.assertEqual(json.loads(marker)['shared_sky_source'],'work/owned-cloud-sky.lmp')
+            self.assertTrue(Path(report['shared_sky_source']).is_file())
             self.assertEqual((root/'work/before-originals/gfx/palette.lmp').read_bytes(),before)
             self.assertEqual((root/'work/before-originals/gfx/aw_shared_sky.lmp').read_bytes(),bytes([224])*32768)
             # Model the following configure_staged_maps installation, not a UI test.

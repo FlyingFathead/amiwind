@@ -1,5 +1,20 @@
 # World map and progression journal
 
+<!-- contents start -->
+## Contents
+
+- [Open map reports - 4 October 2026](#open-map-reports---4-october-2026)
+- [M: Vvardenfell overview](#m-vvardenfell-overview)
+- [Region name and debug teleport](#region-name-and-debug-teleport)
+- [J: earned journal entries in two facing pages](#j-earned-journal-entries-in-two-facing-pages)
+- [Persistence and validation](#persistence-and-validation)
+- [v0.0.27-rc4 selector regression and rc5 source correction](#v0027-rc4-selector-regression-and-rc5-source-correction)
+- [v0.0.29 focus cancellation candidate](#v0029-focus-cancellation-candidate)
+- [v0.0.29 lava and weather map study](#v0029-lava-and-weather-map-study)
+- [v0.0.29 click marker and debug-HUD destination selection](#v0029-click-marker-and-debug-hud-destination-selection)
+
+<!-- contents end -->
+
 ## Open map reports - 4 October 2026
 
 The owner reports three post-release v0.0.28 map issues: both F10 command aliases

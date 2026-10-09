@@ -17,6 +17,7 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
@@ -64,6 +65,47 @@ class ReleaseFeatures(unittest.TestCase):
             with self.subTest(feature=feature['id']):
                 self.assertTrue(any(coverage.feature_of(path, [feature]) for path in examples),
                                 'remove the stale feature or record the new release classes')
+
+    def test_new_features_are_made_by_their_builder(self):
+        new = self.config['new_features']
+        self.assertEqual({f['id'] for f in new}, {'chim-world', 'chim-frame-maps'})
+        legacy = dict(default_steps('--builder', 'legacy'))
+        chim = dict(default_steps('--builder', 'chim'))
+        for feature in new:
+            with self.subTest(feature=feature['id']):
+                self.assertEqual(feature['builder'], 'chim')
+                self.assertEqual(set(feature['steps']) - set(chim), set())
+                self.assertIn('chim', set(feature['steps']) - set(legacy))      # opt-in: not a legacy step
+                for flag in feature.get('image_options', []):
+                    self.assertEqual(chim['image'].count(flag), 1)
+                    self.assertEqual(legacy['image'].count(flag), 0)
+
+    def test_new_features_are_not_in_the_release_and_own_their_paths(self):
+        examples = [example(c) for c in self.baseline['classes']]
+        new = self.config['new_features']
+        for path in examples:
+            self.assertEqual(coverage.feature_of(path, new), [], path)
+        chim_paths = ['id1/chim/world.cwi', 'id1/chim/frames/x-03/y-02/frame.ccf',
+                      'id1/chim/frames/x-03/y-02/s07.ccs', 'id1/maps/balmora-chim.bsp']
+        for path in chim_paths:
+            with self.subTest(path=path):
+                self.assertEqual(len(coverage.feature_of(path, self.features + new)), 1)
+
+    def test_chim_payload_needs_the_chim_features(self):
+        base = [example(c) for c in self.baseline['classes']]
+        chim = ['id1/chim/world.cwi', 'id1/chim/frames/x-03/y-02/frame.ccf',
+                'id1/chim/frames/x-03/y-02/s00.ccs', 'id1/maps/balmora-chim.bsp']
+        legacy = coverage.compare(base, self.config, self.baseline)
+        self.assertFalse(coverage.failed(legacy), legacy)
+        self.assertEqual(legacy['builder'], 'legacy')
+        missing = coverage.compare(base, self.config, self.baseline, 'chim')
+        self.assertEqual(missing['missing_features'], ['chim-world', 'chim-frame-maps'])
+        self.assertTrue(coverage.failed(missing))
+        complete = coverage.compare(base + chim, self.config, self.baseline, 'chim')
+        self.assertFalse(coverage.failed(complete), complete)
+        self.assertEqual(complete['features']['chim-world'], 3)
+        with self.assertRaises(ValueError):
+            coverage.compare(base, self.config, self.baseline, 'v2')
 
     def test_every_feature_names_default_builder_steps(self):
         names = {name for name, _ in default_steps()}
@@ -157,10 +199,13 @@ class ReleaseFeatures(unittest.TestCase):
 
     def test_shipped_towns_are_a_release_feature(self):
         # BUILD-EXTRA-TOWN-OPTIN-32: the Vivec Arena preview ships in v0.0.32; its files are
-        # explained by the extra-towns feature, filled in from the town table.
+        # explained by the extra-towns feature, filled in from the town table. v0.0.33 withdraws it
+        # (towns.json "withdrawn", CHIM-ARENA-MEMORY-33): still explained, no longer built or required.
         feature = next(f for f in self.features if f['id'] == 'extra-towns')
-        self.assertIn('town-vivec_arena', feature['steps'])
-        self.assertIn('town-vivec_arena', dict(default_steps()))
+        self.assertNotIn('town-vivec_arena', feature['steps'])
+        self.assertNotIn('town-vivec_arena', dict(default_steps()))
+        self.assertIn('town-vivec_arena', dict(default_steps('--extra-town', 'vivec_arena')))
+        self.assertTrue(feature['withdrawn_only'])
         arena = ['id1/maps/va%03d.bsp' % i for i in range(16)] + [
             'id1/maps/vivec_arena.bsp', 'id1/scene-doors-vivec_arena.txt', 'id1/vivec_arena-regions.txt']
         for path in arena:
@@ -181,7 +226,9 @@ class ReleaseFeatures(unittest.TestCase):
             row['shipped_since'] = 'v0.0.33'
             (config / 'towns.json').write_text(json.dumps(towns), encoding='utf-8')
             feature = next(f for f in coverage.load_features(root=tmp)['features'] if f['id'] == 'extra-towns')
-        self.assertEqual(feature['steps'], ['town-vivec_arena', 'town-vivec_foreign', 'image'])
+        self.assertEqual(feature['steps'], ['town-vivec_foreign', 'image'])
+        self.assertNotIn('withdrawn_only', feature)
+        self.assertIn('id1/maps/vivec_arena.bsp', feature['withdrawn_patterns'])
         self.assertIn('id1/maps/vq[0-9][0-9][0-9].bsp', feature['patterns'])
         self.assertIn('id1/scene-doors-vivec_foreign.txt', feature['patterns'])
         self.assertIn('id1/maps/vqi[0-9][0-9][0-9].bsp', feature['patterns'])  # its rooms, once converted
@@ -232,12 +279,35 @@ class PayloadCheck(unittest.TestCase):
         self.assertTrue(coverage.failed(report))
         self.assertTrue(coverage.failed(report, allow_known_gaps=True))
 
-    def test_payload_without_the_shipped_town_is_a_missing_feature(self):
-        # A build that leaves the Vivec Arena out (an opt-in build before BUILD-EXTRA-TOWN-OPTIN-32,
-        # or --only-core-towns) does not match the release.
+    def test_payload_without_a_withdrawn_town_passes(self):
+        # v0.0.33 withdraws the Vivec Arena (towns.json "withdrawn"): a default payload without it
+        # matches the release; its v0.0.32 classes are listed as withdrawn, not missing.
         arena = ('id1/maps/va', 'id1/maps/vivec_arena', 'id1/scene-doors-vivec_arena', 'id1/vivec_arena-')
+        classes = ['id1/maps/va#.bsp', 'id1/maps/vivec_arena.bsp', 'id1/scene-doors-vivec_arena.txt',
+                   'id1/vivec_arena-regions.txt']
         paths = [p for p in self.paths if not p.startswith(arena)]
         report = coverage.compare(paths, self.config, self.baseline)
+        self.assertEqual((report['missing_features'], report['missing_classes']), ([], []))
+        self.assertEqual(report['withdrawn_classes'], classes)
+        self.assertFalse(coverage.failed(report))
+        self.assertIn('withdrawn towns', coverage.text(report))
+
+    def test_payload_without_the_shipped_town_is_a_missing_feature(self):
+        # A build that leaves a shipped town out (an opt-in build before BUILD-EXTRA-TOWN-OPTIN-32,
+        # or --only-core-towns) does not match the release: the Arena shipped again for the check.
+        import town_config
+        real = town_config.load_registry
+
+        def shipped(root=None):
+            registry = real(root)
+            for row in registry['towns']:
+                row.pop('withdrawn', None)
+            return registry
+        with patch.object(town_config, 'load_registry', shipped):
+            config = coverage.load_features()
+        arena = ('id1/maps/va', 'id1/maps/vivec_arena', 'id1/scene-doors-vivec_arena', 'id1/vivec_arena-')
+        paths = [p for p in self.paths if not p.startswith(arena)]
+        report = coverage.compare(paths, config, self.baseline)
         self.assertEqual(report['missing_features'], ['extra-towns'])
         self.assertEqual(report['missing_classes'], ['id1/maps/va#.bsp', 'id1/maps/vivec_arena.bsp',
                                                      'id1/scene-doors-vivec_arena.txt', 'id1/vivec_arena-regions.txt'])

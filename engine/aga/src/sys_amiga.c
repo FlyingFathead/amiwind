@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 char *ID = "$VER: AmiWind " AMIWIND_VERSION "\r\n";
 
 #include "quakedef.h"
+#include "aw_log.h"
+extern cvar_t aw_logs_live;
 
 
 
@@ -29,6 +31,8 @@ char *ID = "$VER: AmiWind " AMIWIND_VERSION "\r\n";
 #include <proto/exec.h>
 #include <exec/memory.h>
 #include <proto/dos.h>
+#include <dos/dos.h>
+#include <dos/var.h>
 #include <proto/intuition.h>
 #include <intuition/intuition.h>
 #include <intuition/intuitionbase.h>
@@ -113,8 +117,12 @@ static ULONG aw_heap_allocation_size;
 
 
 #ifndef NDEBUG
-static int debugFileHandle = 0;
-
+/* DEBUG.TXT, the console copy, is a diagnostic log held in memory and written
+ * at exit, on a fatal error or with dbg savelogs (aw_log.c); aw_logs_live 1
+ * writes it as it happens. If it cannot be created (for example the volume is
+ * still being validated and the player chose Cancel) the game runs without it
+ * instead of stopping, and it is not retried on every print
+ * (BOOT-VOLUME-NOT-VALIDATED-33). */
 void Sys_Printf (char *message, ...)
 {
 	va_list		argptr;
@@ -124,13 +132,7 @@ void Sys_Printf (char *message, ...)
     vsprintf (text, message, argptr);
     va_end (argptr);
 
-    if (!debugFileHandle) {
-        debugFileHandle = Sys_FileOpenWrite("DEBUG.TXT");
-    }
-
-    if (debugFileHandle) {
-	Sys_FileWrite(debugFileHandle, text, strlen(text));
-    }
+    AW_LogWrite(AW_LOG_DEBUG, text);
 }
 #endif
 
@@ -182,15 +184,50 @@ void Sys_LowFPPrecision (void)
 {
 }
 
-static void Sys_Init(void) {
-
-    // Allocate memory.
+/* The game heap (Quake's Hunk). The builder's --heap-mb N sets it through the
+ * generated amiwind_heap.h; the start argument -heapmb N overrides it for one
+ * start. Both are used exactly as asked; above AMIWIND_HEAP_SAFE_MB, the
+ * largest size measured to run the whole game on the 16 MiB Fast RAM
+ * profile, the start says so and goes on. */
+#include "amiwind_heap.h"
 #ifndef AMIWIND_HEAP_MB
 /* Expanded starting area plus renderer and actor cache, within the existing
  * 16 MiB Fast RAM playtest profile. Chip RAM remains reserved for hardware. */
 #define AMIWIND_HEAP_MB 11
 #endif
-    quakeparms.memsize = AMIWIND_HEAP_MB*1024*1024;
+#define AMIWIND_HEAP_SAFE_MB 11
+
+/* -heapmb N from the start arguments (before COM_InitArgv, which runs after the
+ * heap is allocated); 0 when absent or not a number from 1 to 2047. */
+static int Sys_HeapArgument(int argc, char **argv) {
+    int i, value;
+    const char *p;
+    for (i = 1; i + 1 < argc; i++) {
+        if (strcmp(argv[i], "-heapmb"))
+            continue;
+        for (value = 0, p = argv[i+1]; *p >= '0' && *p <= '9' && value < 4096; p++)
+            value = value*10 + (*p - '0');
+        if (*p || value < 1 || value > 2047) {
+            PutStr("AmiWind: -heapmb takes a whole number of MiB from 1 to 2047; using the built size.\n");
+            return 0;
+        }
+        return value;
+    }
+    return 0;
+}
+
+static void Sys_Init(int heap_mb) {
+    char line[160];
+
+    // Allocate memory.
+    if (heap_mb <= 0)
+        heap_mb = AMIWIND_HEAP_MB;
+    if (heap_mb > AMIWIND_HEAP_SAFE_MB) {
+        sprintf(line, "AmiWind: WARNING: game heap %d MiB is above the %d MiB measured to run the whole game on 16 MiB Fast RAM; starting as asked.\n",
+                heap_mb, AMIWIND_HEAP_SAFE_MB);
+        PutStr(line);
+    }
+    quakeparms.memsize = heap_mb*1024*1024;
 
     /* The SDK malloc failure path can trap before returning NULL. Keep this
      * large, fixed allocation in Fast RAM and report a normal startup error.
@@ -199,8 +236,9 @@ static void Sys_Init(void) {
     aw_heap_allocation_size = (ULONG)quakeparms.memsize + 15;
     aw_heap_allocation = AllocMem(aw_heap_allocation_size, MEMF_FAST|MEMF_PUBLIC);
     if (!aw_heap_allocation) {
-        PutStr("AmiWind: cannot allocate the 11 MiB game heap in Fast RAM.\n"
-               "Use 16 MiB Fast RAM or more, then reboot.\n");
+        sprintf(line, "AmiWind: cannot allocate the %d MiB game heap in Fast RAM.\n"
+                "Use more Fast RAM (16 MiB or more for the 11 MiB heap), or a smaller -heapmb, then reboot.\n", heap_mb);
+        PutStr(line);
         AW_PlatformClose();
         exit(EXIT_FAILURE);
     }
@@ -220,11 +258,9 @@ void Sys_Quit(void) {
         quakeparms.membase = NULL;
     }
 
-#ifndef NDEBUG
-    if (debugFileHandle) {
-	Sys_FileClose(debugFileHandle);
-    }
-#endif
+    /* Exit game: the in-memory diagnostic logs go to disk once, here. */
+    AW_LogFlushAll();
+    AW_LogClose();
 
 
 
@@ -290,6 +326,10 @@ void Sys_Error (char *error, ...)
     }
 
 	Host_Shutdown();
+    /* The in-memory diagnostic logs (heap audit with its fatal-exit phase,
+     * console copy) go to disk after the crash report. */
+    AW_LogFlushAll();
+    AW_LogClose();
 
 	if (quakeparms.membase) {
         FreeMem(aw_heap_allocation, aw_heap_allocation_size);
@@ -428,6 +468,54 @@ static void RunGameLoop(void)
 }
 
 
+/* BOOT-VOLUME-NOT-VALIDATED-33. When the last session ended while the boot
+ * volume had changes in flight (emulator closed, reset or killed during a
+ * save or log write), AmigaOS validates the volume at the next boot. Until
+ * that finishes the volume is read-only: the engine's first write opens
+ * "Volume ... is not validated" (Retry/Cancel; Cancel stopped the game).
+ * On a fast emulated CPU the boot check's countdown hides the validation;
+ * on a slow cycle-exact one it runs about a minute. So wait for it here,
+ * before anything is written. The local shell variable
+ * AmiWindValidateWait=0 (Set in S:startup-sequence) keeps the previous
+ * immediate start. GVF_LOCAL_ONLY: never touch ENV:, which the boot disk
+ * does not assign. The wait gives up after AW_VALIDATE_WAIT_LIMIT seconds. */
+/* aw_validate_wait begin */
+#ifndef AW_VALIDATE_WAIT_LIMIT
+#define AW_VALIDATE_WAIT_LIMIT 900
+#endif
+static int AW_WaitBootVolumeValidated(void)
+{
+    struct InfoData *info;
+    BPTR lock;
+    char value[8];
+    int seconds = 0, waited = 0;
+
+    if (GetVar("AmiWindValidateWait", value, sizeof value, GVF_LOCAL_ONLY) > 0 && value[0] == '0')
+        return -1;
+    lock = Lock("PROGDIR:", ACCESS_READ);
+    if (!lock) return 0;
+    info = AllocVec(sizeof(*info), MEMF_PUBLIC | MEMF_CLEAR);
+    if (info) {
+        while (seconds < AW_VALIDATE_WAIT_LIMIT && Info(lock, info) &&
+               info->id_DiskState == ID_VALIDATING) {
+            if (!waited) {
+                PutStr("The game volume is being validated: the last session\n"
+                       "did not end cleanly. Waiting for AmigaOS to finish...\n");
+                waited = 1;
+            }
+            Delay(50);
+            seconds++;
+        }
+        FreeVec(info);
+    }
+    UnLock(lock);
+    if (waited)
+        PutStr(seconds < AW_VALIDATE_WAIT_LIMIT ? "Volume validated.\n"
+               : "Validation still running; starting anyway.\n");
+    return seconds;
+}
+/* aw_validate_wait end */
+
 /* The boot image uses the AmigaDOS shell. Do not link icon tooltype support:
  * some ROMs load icon.library from disk even before main() is entered. */
 int main(int argc, char *argv[]) {
@@ -436,8 +524,13 @@ int main(int argc, char *argv[]) {
     PutStr("Loading AmiWind v");
     /* Referencing the tag keeps Amiga Version-command metadata in the executable. */
     PutStr(ID + sizeof("$VER: AmiWind ") - 1);
-    Sys_Init();
+    /* Diagnostic logs stay in memory unless aw_logs_live is set (from the
+     * configuration, dbg logs live on or a --live-logs build). */
+    AW_LogUseSwitch(&aw_logs_live.value);
+    /* Before the first write (saves, settings, live logs). */
+    AW_WaitBootVolumeValidated();
     if (argc == 0) { argc = 1; argv = default_argv; }
+    Sys_Init(Sys_HeapArgument(argc, argv));
     COM_InitArgv(argc, argv);
     quakeparms.basedir = "PROGDIR:";
     quakeparms.cachedir = NULL;

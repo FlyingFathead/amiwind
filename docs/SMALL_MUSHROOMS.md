@@ -6,6 +6,15 @@ flora selection remains the default. A custom world-flora policy can instead
 add `small_mushroom` to `source_categories`; keep that policy separate so the
 previous selection remains available.
 
+<!-- contents start -->
+## Contents
+
+- [Direct pickup in the dev4 source candidate](#direct-pickup-in-the-dev4-source-candidate)
+- [Crosshair prompt and pickup notification](#crosshair-prompt-and-pickup-notification)
+- [Dev4 pickup confirmation and repeatable release checkpoint](#dev4-pickup-confirmation-and-repeatable-release-checkpoint)
+
+<!-- contents end -->
+
 Run conversion inside the development container with original inputs mounted
 read-only and a new private output directory:
 

@@ -1,5 +1,20 @@
 # CONVERTER-ROOT-ROTATION-30: NIF root-node rotation applied to placed meshes
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 7 October 2026, in v0.0.30-dev |
+| Where | Scenery converter (tools/prepare_scenery.py), placed meshes |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.30-dev3 (last seen) |
+| Severity | high: Walls turned or missing and see-through holes in interiors; one exterior placement still wrong. |
+| Family | Object placement and in-game geometry (`placement-geometry`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 7 October 2026
 
 Interiors fixed in v0.0.30-dev3 (Balmora Temple, Tharys Ancestral Tomb, five
@@ -47,3 +62,24 @@ correctly; crates rest on the floor only with that offset, so it is kept.
 
 Ordinary walking and collision through the rebuilt interiors, the Balmora
 exterior placement, and owner playtest of the fireplace interiors.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Object placement and in-game geometry (`placement-geometry`). Placed objects match the original (OpenMW A/B at the same pose). See [families](README.md#families).
+
+- AW-20260928-03 (no report page): Silt Strider landing geometry
+- AW-20260928-04 (no report page): Invisible barriers across plank
+- AW-20260928-06 (no report page): Player can leave pier and become stranded
+- AW-20260928-11 (no report page): Census missing floor and wall / falling into void
+- AW-20260928-20 (no report page): Census clipped outside room near captain wing
+- [CENSUS-ENTITIES-30](CENSUS-ENTITIES-30.md): Census Office objects misplaced (upright rug, ceiling hole, tapestry)
+- ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
+- SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+
+Related bugs in other categories:
+
+- [BALMORA-TEMPLE-GEOMETRY-29](BALMORA-TEMPLE-GEOMETRY-29.md): Balmora Temple lower rooms: missing walls and floors, collision holes
+
+<!-- END GENERATED CATEGORY -->

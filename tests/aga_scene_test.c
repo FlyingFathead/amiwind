@@ -106,14 +106,29 @@ static int opening_track=-1,ship_available=1,narrow_room;
 static int world_map_unavailable,map_place_calls,map_place_blocked;static vec3_t last_map_arrival;
 static int picker_file_mode,picker_file_reads,picker_list_rows;
 static char notice[96];
+/* A partial-area build's notice file (aw_miniwind.c) and its missing rooms. */
+#include "aw_miniwind.h"
+static int miniwind_fixture,miniwind_rooms_missing,miniwind_pure_exterior;static void (*quick)(void);
+extern const char *(*aw_chim_town_map)(const char *town);
+static const char *balmora_frame(const char *town){return strcmp(town,"balmora")?NULL:"maps/balmora-chim.bsp";}
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
 void AW_UIPickupNotice(const char *text,double duration){AW_UISubtitle("",text,duration);}
 void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
-void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;else if(!strcmp(name,"aw_teleport"))teleport=fn;else if(!strcmp(name,"aw_scene"))scene=fn;else if(!strcmp(name,"aw_shroompicker"))shroompicker=fn;}
+void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;else if(!strcmp(name,"aw_teleport"))teleport=fn;else if(!strcmp(name,"aw_scene"))scene=fn;else if(!strcmp(name,"aw_shroompicker"))shroompicker=fn;else if(!strcmp(name,"aw_quick_start"))quick=fn;}
 int Cmd_Argc(void){return command_argc;}
 char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
+static int excluded_interiors;
 int COM_FOpenFile(char *name,FILE **f){
+ if(!strcmp(name,"miniwind.txt")){
+  const char *s="AWMW1\ntown balmora\ntitle ATTENTION: THIS IS A MINIWIND PLAYTEST BUILD\n"
+   "features FEATURES ONLY: Balmora exterior (CHIM)\n";
+  if(!miniwind_fixture){*f=NULL;return -1;}
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
+ if(miniwind_rooms_missing && !strcmp(name,"maps/bmcaius.bsp")){*f=NULL;return -1;}
+ /* The exterior scope on a pure CHIM image: no Balmora legacy maps, no rooms; only the frame map. */
+ if(miniwind_pure_exterior && (!strncmp(name,"maps/bm",7) || !strcmp(name,"maps/balmora.bsp"))){*f=NULL;return -1;}
  if(!strcmp(name,"shroompicker.txt")){
   int i,size;long start;picker_file_reads++;
   if(picker_file_mode==1){*f=NULL;return -1;}
@@ -156,6 +171,12 @@ int COM_FOpenFile(char *name,FILE **f){
   fwrite("vf0000\0\0",1,8,*f);fwrite(region,sizeof(region),1,*f);rewind(*f);return 116;
  }
  if(!strcmp(name,"maps/seyda.bsp") && world_map_unavailable){*f=NULL;return -1;}
+ if(!strcmp(name,"excluded-content.txt")){
+  /* A quick test build without interiors (tools/build_exclusions.py marker). */
+  const char *s="AWX1\ninteriors the interiors\n";
+  if(!excluded_interiors){*f=NULL;return -1;}
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
 
  const char *s="AWD3\nprison seyda 1 -5 35 25 5 45 35 0 0 77 90\tSeyda Neen\nprison evil;quit 2 -5 35 25 5 45 35 0 0 77 90\tInvalid\nprison seyda 3 nan 35 25 5 45 35 0 0 77 90\tInvalid\nseyda - 4 -5 35 25 5 45 35 0 0 0 90\tCensus and Excise Office\nseyda census 474482 -5 235 25 5 245 35 0 0 77 90\tOther doorway\nseyda census 113893 -5 235 25 5 245 35 12 34 77 90\tRegistration entrance\n";
  if(!strcmp(name,"seyda-regions.txt"))s="AWBR1 2 96 540 0 0 77 90 0 0 77 90\nsn000 -1024 -1024 1024 1024 -2048 -2048 2048 2048\nsn001 1024 -1024 2048 1024 128 -2048 2944 2048\n";
@@ -244,6 +265,12 @@ int main(void){
  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;queued[0]=0;
  assert(AW_SceneUse());assert(!strcmp(notice,"Interior not found."));
  assert(!queued[0] && clear_buttons==1 && p.v.health==100); /* no transition or state loss */
+ /* Quick test build without interiors: a friendly line instead of the repair message. */
+ excluded_interiors=1;AW_ExcludedReset();
+ assert(AW_SceneUse());assert(!strcmp(notice,"Area unavailable in this quick test build."));
+ assert(!queued[0] && p.v.health==100);
+ excluded_interiors=0;AW_ExcludedReset();
+ assert(AW_SceneUse());assert(!strcmp(notice,"Interior not found."));
  occluded=1;assert(!AW_SceneUse());occluded=0;
  p.v.movetype=MOVETYPE_NOCLIP;assert(!AW_SceneUse());
  AW_SceneInit();assert(start_demo && demo_option && demo_option->value==1);
@@ -601,6 +628,76 @@ int main(void){
   assert(q.v.movetype==MOVETYPE_NOCLIP && q.v.origin[2]==77);
   water_feet=1;assert(!AW_Unstuck(&q));water_feet=0;assert(q.v.origin[2]==77);
  }
+#ifdef BALMORA_AVAILABLE
+ /* A partial-area build (aw_miniwind.c, tools/miniwind.py): the logo and New
+  * Game quick-start in its town with the notice; exits to areas it does not
+  * hold say "Area unavailable"; a normal build is unchanged. */
+ {
+  edict_t q;int before;
+  assert(!AW_MiniwindActive() && quick);
+  /* A normal build (no notice file): a missing room still says "Interior not found." */
+  harvest_fixture=0;AW_SceneCancelTransition();strcpy(sv.name,"balmora");sv.active=true;cls.state=ca_connected;cls.signon=SIGNONS;
+  key_dest=key_game;target_trace=travel_trace=occluded=0;door_duration=0;miniwind_rooms_missing=1;
+  memset(p.v.origin,0,sizeof(p.v.origin));p.v.view_ofs[2]=30;p.v.movetype=MOVETYPE_WALK;p.v.health=73;
+  cl.viewangles[0]=0;cl.viewangles[1]=90;queued[0]=0;
+  assert(AW_SceneUse() && !strcmp(notice,"Interior not found.") && !queued[0]);
+  miniwind_fixture=1;AW_MiniwindInit();assert(AW_MiniwindActive());
+  /* The same door in the partial-area build. */
+  assert(AW_SceneUse() && !strcmp(notice,"Area unavailable") && !queued[0]);
+  miniwind_rooms_missing=0;
+  /* The silt strider back to Seyda Neen, which the build does not hold. */
+  world_map_unavailable=1;travel_trace=1;target.free=0;target.v.modelindex=1;
+  target.v.netname=27+strlen(pr_strings+27)+1;target.v.classname=1;
+  assert(AW_SceneUse() && key_dest==key_menu);queued[0]=0;
+  assert(AW_TravelKey(K_ENTER));drawn[0]=0;assert(AW_TravelDraw());
+  assert(strstr(drawn,"Area unavailable") && !queued[0]);
+  AW_TravelKey(K_ESCAPE);assert(key_dest==key_game);travel_trace=0;world_map_unavailable=0;
+  /* The quick start (after the logo, New Game): Hors at Balmora's arrival, then the notice. */
+  sv.active=false;aw_character.current[0]=40;command_argc=1;command_args[0]="aw_quick_start";queued[0]=0;
+  quick();assert(!strcmp(queued,"map balmora\n") && aw_character.valid && key_dest==key_game);
+  command_argc=2;command_args[1]="atlantis";queued[0]=0;quick();assert(!queued[0]);command_argc=1;
+  sv.active=true;memset(&q,0,sizeof(q));q.v.mins[2]=-16.625f;q.v.maxs[2]=16.625f;q.v.movetype=MOVETYPE_WALK;
+  VectorCopy(vec3_origin,q.v.origin);q.v.origin[2]=77;notice[0]=0;
+  CL_ClearState();strcpy(sv.name,"balmora");AW_SceneSpawn(&q);
+  assert(q.v.health==40 && q.v.origin[2]>50 && q.v.origin[2]<51);
+  assert(!strcmp(notice,"FEATURES ONLY: Balmora exterior (CHIM)"));
+  notice[0]=0;AW_SceneSpawn(&q);assert(!notice[0]);   /* once, not on every arrival */
+  /* The CHIM frame's edge: held inside, "Area unavailable", no crossing. */
+  aw_chim_town_map=balmora_frame;strcpy(sv.modelname,"maps/balmora-chim.bsp");
+  svs.clients[0].edict=&q;cls.signon=SIGNONS;key_dest=key_game;realtime=100;
+  q.v.origin[0]=500;q.v.origin[1]=0;queued[0]=0;notice[0]=0;AW_SceneTick();
+  assert(!queued[0] && !notice[0] && q.v.origin[0]==500);
+  q.v.origin[0]=1010;q.v.velocity[0]=320;AW_SceneTick();
+  assert(q.v.origin[0]==500 && q.v.velocity[0]==0 && !strcmp(notice,"Area unavailable") && !queued[0]);
+  notice[0]=0;q.v.origin[0]=1010;realtime=101;AW_SceneTick();assert(q.v.origin[0]==500 && !notice[0]);
+  realtime=104;q.v.origin[0]=1010;AW_SceneTick();assert(!strcmp(notice,"Area unavailable"));
+  /* Noclip is never held; the legacy region maps (chim_towns 0) are not either. */
+  q.v.movetype=MOVETYPE_NOCLIP;q.v.origin[0]=1010;AW_SceneTick();assert(q.v.origin[0]==1010);
+  q.v.movetype=MOVETYPE_WALK;aw_chim_town_map=NULL;strcpy(sv.modelname,"maps/bm000.bsp");
+  before=(int)q.v.origin[0];notice[0]=0;AW_SceneTick();assert((int)q.v.origin[0]==before && strcmp(notice,"Area unavailable"));
+  svs.clients[0].edict=&p;
+  /* --miniwind-scope exterior on a pure CHIM image: the image step removed balmora.bsp
+   * and every bm*.bsp (the region table stays) and ships no room. The quick start, the
+   * doors and the frame edge work from the frame map alone. */
+  miniwind_pure_exterior=1;aw_chim_town_map=balmora_frame;
+  AW_SceneCancelTransition();strcpy(sv.name,"balmora");strcpy(sv.modelname,"maps/balmora-chim.bsp");
+  sv.active=true;cls.state=ca_connected;cls.signon=SIGNONS;key_dest=key_game;
+  target_trace=travel_trace=occluded=0;door_duration=0;
+  memset(p.v.origin,0,sizeof(p.v.origin));p.v.view_ofs[2]=30;p.v.movetype=MOVETYPE_WALK;p.v.health=73;
+  cl.viewangles[0]=0;cl.viewangles[1]=90;queued[0]=0;notice[0]=0;
+  assert(AW_SceneUse() && !strcmp(notice,"Area unavailable") && !queued[0]);
+  sv.active=false;command_argc=1;command_args[0]="aw_quick_start";queued[0]=0;
+  quick();assert(!strcmp(queued,"map balmora\n") && key_dest==key_game);
+  sv.active=true;memset(&q,0,sizeof(q));q.v.mins[2]=-16.625f;q.v.maxs[2]=16.625f;q.v.movetype=MOVETYPE_WALK;
+  VectorCopy(vec3_origin,q.v.origin);q.v.origin[2]=77;notice[0]=0;
+  CL_ClearState();strcpy(sv.name,"balmora");AW_SceneSpawn(&q);
+  assert(!strcmp(notice,"FEATURES ONLY: Balmora exterior (CHIM)"));
+  svs.clients[0].edict=&q;cls.signon=SIGNONS;key_dest=key_game;realtime=200;
+  q.v.origin[0]=500;q.v.origin[1]=0;AW_SceneTick();q.v.origin[0]=1010;q.v.velocity[0]=320;notice[0]=0;queued[0]=0;
+  AW_SceneTick();assert(q.v.origin[0]==500 && !strcmp(notice,"Area unavailable") && !queued[0]);
+  svs.clients[0].edict=&p;miniwind_pure_exterior=0;aw_chim_town_map=NULL;
+ }
+#endif
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;
 }
@@ -613,3 +710,5 @@ void AW_SaveSpawn(void){}
 void AW_SaveReset(void){}
 
 qboolean AW_MapPlace(edict_t *p,const float *xy){map_place_calls++;VectorCopy(xy,last_map_arrival);return !map_place_blocked;}
+qboolean AW_MapPlaceBelow(edict_t *p,const float *point){map_place_calls++;VectorCopy(point,last_map_arrival);return !map_place_blocked;}
+const char *aw_map_place_failure="";

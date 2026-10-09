@@ -21,6 +21,26 @@ def banked_palette(palette):
 def need(ok,msg):
     if not ok: raise ValueError(msg)
 
+def bank_mapping():
+    """The pixel translation of the sky bank: each banked index to its replacement index."""
+    return bytes(BANK[i][0] if i in BANK else i for i in range(256))
+
+def bank_safe(palette):
+    """The overlay's guard: every banked index lies within two units per channel of its replacement,
+    so translating pixels off the bank does not change a colour visibly."""
+    return len(palette)>=768 and all(max(abs(palette[i*3+k]-palette[r*3+k]) for k in range(3))<=2
+                                     for i,(r,_) in BANK.items())
+
+def remap_miptex(mip):
+    """A BSP miptex with its mip pixels translated off the sky bank, as convert() rewrites a map's
+    textures (the same spans: four mip levels). Shared with the CHIM builder (CHIM-TEXTURE-SPECKS-33)."""
+    w,h,*mips=struct.unpack_from('<6I',mip,16);mapping=bank_mapping();out=bytearray(mip)
+    for level,p in enumerate(mips):
+        if not p:continue
+        size=(w>>level)*(h>>level);need(p>=40 and p+size<=len(mip),'Invalid mip pixels')
+        out[p:p+size]=bytes(mip[p:p+size]).translate(mapping)
+    return bytes(out)
+
 def spans(raw,rel):
     """Return validated nonoverlapping indexed-byte spans, or an exclusion reason."""
     n=len(raw);ext=Path(rel).suffix.lower();name=Path(rel).name.lower();out=[]
@@ -155,9 +175,8 @@ def convert(source,output,expected_palette=None,changed_only=False):
     need(source!=output and source not in output.parents and output not in source.parents,'Separate immutable input/output trees required')
     palette=(source/'gfx/palette.lmp').read_bytes();need(len(palette)==768,'Expected global palette')
     if expected_palette:need(sha(palette)==expected_palette,'Input palette fingerprint does not match approved source')
-    for i,(replacement,_) in BANK.items():
-        need(max(abs(palette[i*3+k]-palette[replacement*3+k]) for k in range(3))<=2,'Palette remap exceeds two units/channel guard')
-    new=bytearray(banked_palette(palette));mapping=bytes(BANK[i][0] if i in BANK else i for i in range(256))
+    need(bank_safe(palette),'Palette remap exceeds two units/channel guard')
+    new=bytearray(banked_palette(palette));mapping=bank_mapping()
     rows=[];total=np.zeros(256,dtype=np.int64)
     # Complete preflight before creating output. Metadata-only manifest, no assets in workspace.
     for path in sorted(source.rglob('*')):

@@ -11,7 +11,7 @@ data: numbers become '#', hashes '<h>'). `check` lists, for a real payload,
 the features it lacks, the release classes it lacks and the files no feature
 explains. The from-scratch release gate runs it on the finished image.
 
-    payload_coverage.py check PAYLOAD [PAYLOAD ...] [--json] [--allow-known-gaps]
+    payload_coverage.py check PAYLOAD [PAYLOAD ...] [--builder legacy|chim] [--json] [--allow-known-gaps]
     payload_coverage.py classes PAYLOAD --release vX.Y.Z [--recorded-from TEXT] > config/release-payload-classes.json
 
 A release that adds a file class (a new feature, or a town that becomes
@@ -22,6 +22,10 @@ that payload, and records them again from the published release payload.
 PAYLOAD is a payload manifest ({"files": [{"path": ...}]}, as written by the
 HDF payload reader), a JSON list of paths, or a staged directory (for example
 an image step's boot/ folder; paths are relative to it).
+
+new_features lists what the last release does not ship yet and an opt-in
+builder type makes (the CHIM world with --builder chim): a payload built with
+that builder must hold them; other payloads need not.
 """
 import argparse
 from collections import Counter
@@ -33,6 +37,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FEATURES = ROOT / 'config/release-features.json'
+BUILDERS = ('legacy', 'chim')
 CLASSES = ROOT / 'config/release-payload-classes.json'
 
 
@@ -70,18 +75,32 @@ def expand_town_features(config, root=None):
 
     Every town config/towns.json marks shipped_since adds its patterns and
     its builder step town-<id>, so a newly shipped town needs no edit here.
+    A withdrawn town (towns.json "withdrawn") adds its patterns only, as
+    "withdrawn_patterns": its files are still explained when --extra-town
+    builds it, but no default build makes it, and its classes of the last
+    release are not expected (compare). A feature left with withdrawn towns
+    only is not required.
     """
-    from town_config import shipped_extra_towns
+    from town_config import shipped_extra_towns, withdrawn_towns
     for feature in config['features']:
         selection = feature.get('towns')
         if selection is None:
             continue
         if selection != 'shipped':
             raise ValueError('Unknown town selection in release feature ' + feature['id'])
-        towns = shipped_extra_towns(root)
-        feature['patterns'] = [*feature.get('patterns', []), *(p for town in towns for p in town_patterns(town, root))]
+        towns, withdrawn = shipped_extra_towns(root), withdrawn_towns(root)
+        own = [*feature.get('patterns', []), *(p for town in towns for p in town_patterns(town, root))]
+        feature['withdrawn_patterns'] = [p for town in withdrawn for p in town_patterns(town, root)]
+        feature['patterns'] = own + feature['withdrawn_patterns']
         feature['steps'] = [*('town-' + town for town in towns), *feature.get('steps', [])]
+        if not own and feature['withdrawn_patterns']:
+            feature['withdrawn_only'] = True
     return config
+
+
+def pattern_classes(patterns):
+    """The path classes of map/table patterns ('[0-9]' runs become '#')."""
+    return {path_class(p.replace('[0-9]', '0')) for p in patterns}
 
 
 def load_features(path=FEATURES, root=None):
@@ -89,9 +108,11 @@ def load_features(path=FEATURES, root=None):
     if config.get('format') != 'AmiWind release features 1':
         raise ValueError('Unknown release feature list format')
     expand_town_features(config, root)
-    ids = [feature['id'] for feature in config['features']]
+    ids = [feature['id'] for feature in config['features'] + config.get('new_features', [])]
     if len(ids) != len(set(ids)):
         raise ValueError('Duplicate release feature id')
+    if any(f.get('builder') not in BUILDERS for f in config.get('new_features', [])):
+        raise ValueError('A new feature names its builder type: ' + ', '.join(BUILDERS))
     return config
 
 
@@ -117,9 +138,17 @@ def feature_of(path, features):
     return [feature['id'] for feature in features if any(matches(p, path) for p in feature['patterns'])]
 
 
-def compare(paths, config, baseline):
-    """Feature counts, missing features/classes, unexplained and new files."""
-    features = config['features']
+def compare(paths, config, baseline, builder='legacy'):
+    """Feature counts, missing features/classes, unexplained and new files. builder: the
+    builder type the payload was made with; its new features are required too."""
+    if builder not in BUILDERS:
+        raise ValueError('Unknown builder type: ' + str(builder))
+    new = config.get('new_features', [])
+    features = config['features'] + new
+    required = [f for f in config['features'] if not f.get('withdrawn_only')] + [
+        f for f in new if f['builder'] == builder]
+    # Classes of withdrawn towns (towns.json "withdrawn"): neither expected nor new.
+    withdrawn = pattern_classes(p for f in config['features'] for p in f.get('withdrawn_patterns', []))
     gaps = config.get('builder_gaps', {})
     counts = Counter()
     unexplained, ambiguous = [], []
@@ -133,15 +162,25 @@ def compare(paths, config, baseline):
             counts[owner] += 1
     classes = Counter(path_class(path) for path in paths)
     expected = baseline['classes']
-    missing_features = [feature['id'] for feature in features if not counts[feature['id']]]
+    if builder == 'chim':
+        # Pure CHIM: the towns' legacy exterior maps are replaced by the CHIM world and frame maps
+        # (features marked replaced_by_chim); their map classes are not expected.
+        replaced = [p for f in features if f.get('replaced_by_chim') for p in f.get('patterns', [])
+                    if p.endswith('.bsp')]
+        replaced = {path_class(p.replace('[0-9]', '0')) for p in replaced}
+        expected = {c: n for c, n in expected.items() if c not in replaced}
+    missing_features = [feature['id'] for feature in required if not counts[feature['id']]]
     return {
         'release': baseline['release'],
+        'builder': builder,
+        'other_builder_features': {f['id']: f['builder'] for f in new if f['builder'] != builder},
         'files': len(paths),
         'features': {feature['id']: counts[feature['id']] for feature in features},
         'missing_features': [f for f in missing_features if f not in gaps],
         'known_gaps': {f: gaps[f] for f in missing_features if f in gaps},
-        'missing_classes': sorted(c for c in expected if c not in classes),
-        'new_classes': sorted(c for c in classes if c not in expected),
+        'missing_classes': sorted(c for c in expected if c not in classes and c not in withdrawn),
+        'new_classes': sorted(c for c in classes if c not in expected and c not in withdrawn),
+        'withdrawn_classes': sorted(c for c in baseline['classes'] if c in withdrawn),
         'unexplained_files': unexplained,
         'ambiguous_files': ambiguous,
     }
@@ -157,7 +196,9 @@ def text(report):
     lines = [f"Payload: {report['files']} files, compared with {report['release']}"]
     width = max(map(len, report['features']))
     for feature, count in report['features'].items():
+        other = report.get('other_builder_features', {})
         note = (' MISSING (known builder gap: ' + report['known_gaps'][feature] + ')' if feature in report['known_gaps']
+                else ' (made with --builder %s)' % other[feature] if feature in other and not count
                 else ' MISSING' if not count else '')
         lines.append(f'  {feature:<{width}} {count:>6}{note}')
     for key, title in (('missing_features', 'Missing features'), ('missing_classes', 'Release classes not in this payload'),
@@ -167,6 +208,9 @@ def text(report):
             lines += ['  ' + item for item in report[key][:50]]
             if len(report[key]) > 50:
                 lines.append(f'  ... {len(report[key]) - 50} more')
+    if report.get('withdrawn_classes'):
+        lines.append('Release classes of withdrawn towns, not expected (%d): %s'
+                     % (len(report['withdrawn_classes']), ', '.join(report['withdrawn_classes'])))
     for path, owners in report['ambiguous_files'][:50]:
         lines.append(f'Ambiguous: {path} -> {", ".join(owners)}')
     return '\n'.join(lines)
@@ -179,6 +223,8 @@ def main(argv=None):
     check.add_argument('payload', nargs='+', type=Path)
     check.add_argument('--features', type=Path, default=FEATURES)
     check.add_argument('--classes', type=Path, default=CLASSES)
+    check.add_argument('--builder', choices=BUILDERS, default='legacy',
+                       help='The builder type the payload was made with (its new features are required)')
     check.add_argument('--json', action='store_true', help='Print the report as JSON')
     check.add_argument('--allow-known-gaps', action='store_true',
                        help='Development builds only: do not fail on recorded builder gaps')
@@ -197,7 +243,7 @@ def main(argv=None):
                   'files': len(paths), 'classes': dict(sorted(counts.items()))}
         sys.stdout.write(json.dumps(record, indent=1) + '\n')
         return 0
-    report = compare(paths, load_features(args.features), load_classes(args.classes))
+    report = compare(paths, load_features(args.features), load_classes(args.classes), args.builder)
     print(json.dumps(report, indent=1) if args.json else text(report))
     return 1 if failed(report, args.allow_known_gaps) else 0
 

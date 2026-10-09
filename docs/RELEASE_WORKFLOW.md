@@ -2,6 +2,29 @@
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
+<!-- contents start -->
+## Contents
+
+- [Historical rc1 handoff (published)](#historical-rc1-handoff-published)
+- [Historical v0.0.25 complete update package](#historical-v0025-complete-update-package)
+- [Release gate: the build tool must match the release](#release-gate-the-build-tool-must-match-the-release)
+- [Game version and engine version](#game-version-and-engine-version)
+- [Release gate](#release-gate)
+- [Boot identity](#boot-identity)
+- [Amiga limitations](#amiga-limitations)
+  - [FFS partition capacity and hardfile capacity are different](#ffs-partition-capacity-and-hardfile-capacity-are-different)
+  - [Preferred partition contents and performance](#preferred-partition-contents-and-performance)
+  - [Legacy filesystem names: 30 bytes per component](#legacy-filesystem-names-30-bytes-per-component)
+  - [Traceable original-to-target mapping](#traceable-original-to-target-mapping)
+  - [AmiQuake's limitations](#amiquakes-limitations)
+- [RC2 diagnostic snapshot boundary](#rc2-diagnostic-snapshot-boundary)
+- [Palette and skin-tone consistency](#palette-and-skin-tone-consistency)
+- [RC3 recovery candidate boundary](#rc3-recovery-candidate-boundary)
+- [v0.0.24 owner release decision - 1 October 2026](#v0024-owner-release-decision---1-october-2026)
+- [Source ZIP portability](#source-zip-portability)
+
+<!-- contents end -->
+
 Current published release: **[v0.0.27 — Rocks, Mushrooms, and Then Some](RELEASE-v0.0.27.md)**,
 3 October 2026, commit `8da838784efa619a12da39d29095be4c0fe6e44d`.
 Exact-commit Docker, Linux/Windows launcher parity and source/asset-free CI passed;
@@ -107,8 +130,13 @@ Passing tests and an archive allowlist do not replace it.
 
 `tools/release.py --check`, candidate creation and candidate validation all reject
 trailing spaces/tabs, whitespace-only lines, space-before-tab indentation and
-blank lines at EOF in new or modified text files. Only byte-identical historical
-base files are exempt; the current patch's base hashes identify them. This also
+blank lines at EOF in new or modified text files. Only byte-identical inherited
+files under `engine/aga/` and `docs/aga/` are exempt; `docs/WHITESPACE-BASELINE.json`
+lists them by hash, taken from the last published release, so a new `VERSION` needs
+no extra file. A file we edit is checked in full, and project-authored files are
+never exempt. After a release is published, refresh the list from its tag with
+`python3 tools/release.py --whitespace-baseline v<VERSION>` (the tag must point to
+the release commit; the list can only shrink). This also
 covers files that are untracked or extracted without Git metadata. Before
 delivery, additionally run `git diff --no-index --check BASE_TREE CANDIDATE_TREE`
 on clean extracted source trees and retain the result. Keep the owner's

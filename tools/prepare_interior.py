@@ -36,7 +36,9 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
                                    'Tri Ex_De_Docks_Steps','Tri Ex_ship_plank']}}
     groups={'prison_interior':{'references':[r['number'] for r in refs],'visual_profiles':profiles}}
     refs=[dict(r,scene_groups=['prison_interior']) for r in refs]
-    lighting={**cell['lighting'],'lights':[dict(r['light'],position=r['position']) for r in cell['refs'] if r.get('light') and not r.get('deleted')]}
+    # Ambient and placed lights plus the cell's profile (OPENING-BRIGHT-31).
+    from interior_lighting import cell_lighting
+    lighting=cell_lighting(cell)
     export_refs(data_files,parts,refs,groups,[0,0,0],4096,32,{'scope':'prison structural/furnishing preview; no opening scripts','cell':cell['name'],'omitted':omitted,'lighting':lighting},jobs=jobs)
     index=json.loads((parts/'scenery-index.json').read_text())
     if index['errors']:raise ValueError('Interior conversion errors: '+str(index['errors']))
@@ -93,4 +95,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','out','qbsp','vis','light'):p.add_argument('--'+n,type=Path,required=True)
     add_jobs(p);add_vis_option(p);add_dressing_option(p);a=p.parse_args();apply_dressing_option(a)
+    import build_profile; build_profile.instrument('interior')  # sub-stage timers (docs/BUILD_PROFILE.md)
     print(json.dumps(prepare(a.data_files,a.scene,a.out,a.qbsp,a.vis,a.light,a.jobs,a.vis_mode),indent=2))

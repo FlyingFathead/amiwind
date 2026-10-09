@@ -1,0 +1,906 @@
+{
+  "schema": "amiwind-release-graphs 1",
+  "release": "0.0.33",
+  "about": "Aggregate measurements behind the v0.0.33 release graphs (tools/release_graphs.py). Totals per area, camera or build stage only; no game data. MB = 1,000,000 bytes. DRAFT: TODO entries are filled at integration.",
+  "charts": [
+    {
+      "id": "disk",
+      "file": "amiwind-v0.0.33-chim-disk.png",
+      "title": "Bytes on disk: legacy region maps vs the CHIM world",
+      "subtitle": "Each town's exterior as shipped: legacy = every region map of the town; CHIM = the town's world (index, frame, chunk sections) plus its frame maps. Interiors are the same in both and left out.",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0"
+      ],
+      "panels": [
+        {
+          "title": "Town exteriors",
+          "unit": "MB",
+          "source": "build",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora",
+              "values": [
+                162.08,
+                21.27
+              ],
+              "notes": [
+                "64 maps",
+                "66 files + 1 frame map"
+              ]
+            },
+            {
+              "label": "Seyda Neen + intro docks + courtyard",
+              "values": [
+                190.36,
+                7.83
+              ],
+              "notes": [
+                "66 maps",
+                "51 files + 3 frame maps"
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Legacy Balmora: the 64 region maps of a v0.0.32 development image. Legacy Seyda Neen: the 66 recorded maps v0.0.32 ships byte for byte (the seyda.bsp alias, a copy of one of them, not counted).",
+        "CHIM: world format 0.5 builds of 9 October 2026 (Balmora 21,261,988 + 10,832 B frame map; Seyda Neen 7,762,532 + 64,868 B frame maps)."
+      ]
+    },
+    {
+      "id": "island",
+      "file": "amiwind-v0.0.33-chim-island.png",
+      "title": "The whole island: copies stored vs each placement once",
+      "subtitle": "Legacy region maps overlap so that every map can be drawn alone; each exterior object is stored in every map that reaches it. CHIM stores each placement once and each mesh once.",
+      "series": [
+        "legacy region maps",
+        "CHIM (each placement once)"
+      ],
+      "panels": [
+        {
+          "title": "Exterior objects stored, whole island",
+          "unit": "objects",
+          "source": "estimate",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Vvardenfell exteriors",
+              "values": [
+                1403340,
+                143147
+              ],
+              "notes": [
+                "about 9.8 copies each",
+                "by design"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Map bytes, whole island",
+          "unit": "GB",
+          "source": "estimate",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Every exterior cell",
+              "values": [
+                20.0,
+                null
+              ],
+              "notes": [
+                "estimate (v0.0.31)",
+                ""
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Open-world maps shipped today (outside the towns)",
+          "unit": "GB",
+          "source": "build",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "2,532 legacy world maps",
+              "values": [
+                3.59,
+                null
+              ],
+              "notes": [
+                "v0.0.31 payload",
+                ""
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Objects and the 20 GB estimate: the whole-world estimate behind WORLD-REGION-DUPLICATION-31 (v0.0.31 rules). The CHIM island projection comes with milestone M4 (the open world on CHIM) and the whole-island trial."
+      ]
+    },
+    {
+      "id": "loading",
+      "file": "amiwind-v0.0.33-chim-loading.png",
+      "title": "Loading while you walk: bytes read and read stalls",
+      "subtitle": "Balmora, the same walk through all 70 load doors (16,007 units): 18 region map loads for legacy, 83 chunk crossings for CHIM. File reads replayed in FS-UAE (cycle-approximate 68040), one session with a drift-control rerun (CHIM again: median 23 ms, longest 76 ms, whole walk 1.74 s).",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0"
+      ],
+      "panels": [
+        {
+          "title": "Read time per area change (median)",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora door walk",
+              "values": [
+                94,
+                21
+              ],
+              "notes": [
+                "per map load (120 in the full folder)",
+                "per chunk crossing, 1 MiB cache"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Longest read stall on the walk",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora door walk",
+              "values": [
+                112,
+                71
+              ],
+              "notes": [
+                "(147 in the full folder)",
+                ""
+              ]
+            }
+          ]
+        },
+        {
+          "title": "All reads over the whole walk",
+          "unit": "s",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora door walk",
+              "values": [
+                1.64,
+                1.65
+              ],
+              "notes": [
+                "",
+                "the same total, spread thinner"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Bytes read over the whole walk",
+          "unit": "MB",
+          "source": "build",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora door walk",
+              "values": [
+                73.5,
+                40.7
+              ],
+              "notes": [
+                "4.43 MB per map load",
+                "about 0.26 MB per crossing"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Seyda Neen: one area change in game (JIT)",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Seyda Neen east walk",
+              "values": [
+                412,
+                null
+              ],
+              "notes": [
+                "median of 18 crossings, 4.33 MB each",
+                ""
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Door walk: world format 0.2 (8 October 2026); bytes from the builder's walk report. Legacy values are for the region maps alone in their folder, the fairer case for legacy. Seyda Neen legacy: v0.0.31 development disks, in-game crossings under JIT. Rerun with the release world at integration."
+      ]
+    },
+    {
+      "id": "frame-jit",
+      "file": "amiwind-v0.0.33-chim-frame-jit.png",
+      "title": "Frame time at the Balmora cameras, standard (JIT) preset",
+      "subtitle": "Median frame time at the five fixed benchmark cameras, legacy region maps and CHIM in one session (chim_towns 0, then 1). JIT timing is fast and noisy: the same legacy camera varied about 2x between busy-host sessions.",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0"
+      ],
+      "panels": [
+        {
+          "title": "Frame time (median)",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                86.7,
+                19.5
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                59.4,
+                15.8
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                49.5,
+                15.3
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                45.7,
+                17.5
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                39.7,
+                15.4
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "8 October 2026, Balmora world format 0.4, busy host, no drift-control rerun in this session. A quiet-host session with a rerun is still to be measured."
+      ]
+    },
+    {
+      "id": "frame-slow",
+      "file": "amiwind-v0.0.33-chim-frame-slow.png",
+      "title": "Frame time on a slow 68040: cycle-exact x14 preset (preview engine 0d8bf4f)",
+      "subtitle": "CHIM preview engine 0d8bf4f, FS-UAE (relative). Cycle-exact 68040 at 49.7 MHz with the JIT off, one session: legacy, then CHIM, then legacy again as the drift control. Noon, day/night cycle off, headlamp off.",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0",
+        "legacy again (drift control)"
+      ],
+      "panels": [
+        {
+          "title": "Frame time (median)",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                4135,
+                1614,
+                4124
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                2352,
+                1358,
+                2236
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                2134,
+                1313,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "teleport failed: not usable"
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                2289,
+                1106,
+                2234
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                2041,
+                1059,
+                2029
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Drawing the placed models (brush models)",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                3466,
+                920,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                1585,
+                639,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                1325,
+                439,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                1588,
+                505,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                1396,
+                461,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Time outside the 3D view (CHIM spends more here)",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "busy",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                190,
+                243,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                532,
+                624,
+                null
+              ],
+              "missing": [
+                "",
+                "",
+                "not split in the rerun"
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "9 October 2026, v0.0.32 release disks with the CHIM preview engine 0d8bf4f (world format 0.4); three other 1-CPU emulator sessions ran at the same time. Legacy and its rerun agree within 0.3-5 %."
+      ]
+    },
+    {
+      "id": "counters",
+      "file": "amiwind-v0.0.33-chim-counters.png",
+      "title": "What the renderer does at the Balmora cameras (dbg rcount)",
+      "subtitle": "Exact counts, the same in every run and preset. Legacy has no entities-sent counter; its brush-model passes are the comparable figure.",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0"
+      ],
+      "panels": [
+        {
+          "title": "Brush models sent to the renderer",
+          "unit": "models",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                654,
+                114
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                590,
+                69
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                634,
+                61
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                555,
+                46
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                512,
+                48
+              ]
+            }
+          ]
+        },
+        {
+          "title": "BSP nodes walked per clipped face",
+          "unit": "nodes",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                51.8,
+                9.9
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                27.7,
+                8.6
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                32.3,
+                9.2
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                41.0,
+                9.1
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                27.0,
+                9.8
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Faces clipped",
+          "unit": "faces",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                4512,
+                3937
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                3366,
+                2836
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                2623,
+                2226
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                2386,
+                2274
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                2955,
+                2228
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Spans drawn (CHIM draws slightly more)",
+          "unit": "spans",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora camera 1",
+              "values": [
+                4913,
+                5150
+              ]
+            },
+            {
+              "label": "Balmora camera 2",
+              "values": [
+                3923,
+                4025
+              ]
+            },
+            {
+              "label": "Balmora camera 3",
+              "values": [
+                3498,
+                3718
+              ]
+            },
+            {
+              "label": "Balmora camera 4",
+              "values": [
+                4278,
+                4336
+              ]
+            },
+            {
+              "label": "Balmora camera 5",
+              "values": [
+                3897,
+                4006
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Surface cache builds: 0 at every Balmora camera on both engines. Alias models (characters) are the same on both."
+      ]
+    },
+    {
+      "id": "memory",
+      "file": "amiwind-v0.0.33-chim-memory.png",
+      "title": "Memory at the load peak: Hunk used and Hunk left",
+      "subtitle": "FS-UAE heap audit, A1200 with 2 MiB Chip + 16 MiB Fast, 11,534,336 B Hunk. CHIM reserves its chunk zone (about 6.9 MB) in the Hunk when the town loads; a legacy map holds its whole region instead. The rule is to leave at least 2 MiB of Hunk free.",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0"
+      ],
+      "panels": [
+        {
+          "title": "Hunk used at the load peak",
+          "unit": "MB",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora",
+              "values": [
+                8.0,
+                9.22
+              ],
+              "notes": [
+                "bm028, the fullest region",
+                "zone 6,656 KiB + 2 x 512 KiB"
+              ]
+            },
+            {
+              "label": "Seyda Neen",
+              "values": [
+                7.11,
+                10.43
+              ],
+              "notes": [
+                "sn029",
+                "zone 6,864 KiB"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Hunk left at the load peak (keep at least 2.10 MB)",
+          "unit": "MB",
+          "source": "emulator-count",
+          "host": "n/a",
+          "lower_is_better": false,
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora",
+              "values": [
+                3.53,
+                2.32
+              ],
+              "notes": [
+                "",
+                ""
+              ]
+            },
+            {
+              "label": "Seyda Neen",
+              "values": [
+                4.42,
+                1.1
+              ],
+              "notes": [
+                "",
+                "under the 2 MiB rule: CHIM-SEYDA-HUNK-GAP-33"
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Balmora: one session (legacy bm028 and CHIM in the same run). Seyda Neen: the v0.0.32 release image with the CHIM world added. CHIM numbers are for the memory defaults of the run named; the release defaults are checked again at integration."
+      ]
+    },
+    {
+      "id": "build",
+      "file": "amiwind-v0.0.33-chim-build.png",
+      "title": "Build time of a town's exterior world",
+      "subtitle": "The builder stage that turns Balmora's exterior into a world: legacy = the region map stage (64 maps), CHIM = the chim stage. Different builds and host loads, labelled per bar; CPU time is less sensitive to the thread budget than wall time.",
+      "series": [
+        "legacy v0.0.32",
+        "CHIM 0.1.0"
+      ],
+      "panels": [
+        {
+          "title": "Wall time, Balmora exterior stage",
+          "unit": "min",
+          "source": "build",
+          "host": "mixed",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora",
+              "values": [
+                8.5,
+                5.19
+              ],
+              "hosts": [
+                "quiet",
+                "busy"
+              ],
+              "notes": [
+                "24-thread build",
+                "6-thread build"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "CPU time, Balmora exterior stage",
+          "unit": "min",
+          "source": "build",
+          "host": "mixed",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Balmora",
+              "values": [
+                24.15,
+                5.14
+              ],
+              "hosts": [
+                "quiet",
+                "busy"
+              ],
+              "notes": [
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Wall time, open-world stages (terrain, scenery, flora)",
+          "unit": "min",
+          "source": "build",
+          "host": "mixed",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "2,532 world maps",
+              "values": [
+                22.17,
+                null
+              ],
+              "hosts": [
+                "busy",
+                null
+              ],
+              "notes": [
+                "24-thread build, mostly busy host",
+                "comes with M4"
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Legacy: the from-scratch v0.0.32 release build (8 October 2026). CHIM: the first pure-CHIM playtest build (MiniWind, 9 October 2026, host about 98 % busy with other jobs). A matched from-scratch pair on a quiet host is still to be run."
+      ]
+    },
+    {
+      "id": "chunkload",
+      "file": "amiwind-v0.0.33-chim-chunkload.png",
+      "title": "Balmora holes: chunk loading before and after the repair",
+      "subtitle": "The owner's route through Balmora (seven poses, a short walk at each, twice), CHIM preview engine against the repaired engine with its defaults (CHIM-CHUNK-LOAD-FAIL-33). JIT preset.",
+      "series": [
+        "CHIM preview engine",
+        "CHIM repaired"
+      ],
+      "panels": [
+        {
+          "title": "Bytes read over the route",
+          "unit": "MB",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Owner's route x2",
+              "values": [
+                24.8,
+                16.7
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Chunk loads that failed for lack of room",
+          "unit": "loads",
+          "source": "emulator-count",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Owner's route x2",
+              "values": [
+                180,
+                95
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Nearest chunk still without ground",
+          "unit": "units",
+          "source": "emulator-count",
+          "host": "n/a",
+          "lower_is_better": false,
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Owner's route x2",
+              "values": [
+                69,
+                438
+              ],
+              "notes": [
+                "holes in view",
+                "farther out"
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "9 October 2026. The remaining failed loads are far buildings; a larger zone budget (CHIM-ZONE-BUDGET-33) would halve the remaining gaps and waits for the memory measurements."
+      ]
+    }
+  ]
+}

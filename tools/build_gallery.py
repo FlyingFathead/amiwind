@@ -57,6 +57,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.paths import ensure_external, child_ci
 from build_jobs import add_jobs, resolve_jobs
+from mwad.audit import normpath
 from vis_options import light_args
 from build_parallel import completed_map
 from prepare_gallery import catalogue, convert_model, finish_catalogue, GALLERY_FACE_LIMIT
@@ -111,9 +112,11 @@ def validate_payload(id1, receipt):
     count, files = catalogue_files(id1/'gallery/catalog.txt')
     if count != receipt['records'] or files != set(receipt['files']):
         raise ValueError('NPC gallery receipt omits required payload')
-    for name in sorted(files):
+    from build_parallel import hash_existing  # every payload file, hashed in the worker pool
+    names = sorted(files)
+    for name, actual in zip(names, hash_existing([id1/name for name in names])):
         info = receipt['files'][name]; path = id1/name
-        if not path.is_file() or path.stat().st_size != info['bytes'] or sha(path) != info['sha256']:
+        if actual is None or path.stat().st_size != info['bytes'] or actual != info['sha256']:
             raise ValueError('Missing or changed NPC gallery payload: ' + name)
     return {'status': 'passed', 'records': count, 'models': receipt['models'],
             'files': len(files), 'payload_bytes': sum(x['bytes'] for x in receipt['files'].values()),
@@ -138,11 +141,19 @@ def stage_required(gallery, id1):
     shutil.copyfile(gallery/'model-budgets.txt', id1/'model-budgets.txt')
     (id1/'maps').mkdir(exist_ok=True)
     shutil.copyfile(gallery/'maps/charplane.bsp', id1/'maps/charplane.bsp')
-    (id1/"npc-gallery-disabled.txt").unlink(missing_ok=True)
+    (id1/DISABLED_MARKER).unlink(missing_ok=True)
     report.update(validate_payload(id1, receipt))
     report['receipt_sha256'] = sha(gallery/'gallery-build.json')
     print(f"NPC gallery verified: {report['records']} records, {report['models']} models, inspection map included.", flush=True)
     return report
+
+
+# Marker written into a --no-npc-gallery image. When a gallery command
+# (dbg gallery/npcgallery/modelgallery, aw charplane, dbg combattest, dbg
+# torchtest npc) finds the gallery's own files missing, the engine looks for
+# this file and prints a friendly "built without the NPC gallery" notice
+# instead of a repair message (engine/aga/src/aw_gallery.c).
+DISABLED_MARKER = 'npc-gallery-disabled.txt'
 
 
 def omit_gallery(id1):
@@ -159,9 +170,59 @@ def omit_gallery(id1):
     if budgets.exists():
         budgets.write_text('\n'.join(line for line in budgets.read_text().splitlines()
                                     if not line.startswith('gallery/'))+'\n')
-    (id1/'npc-gallery-disabled.txt').write_text('NPC gallery disabled by explicit --no-npc-gallery.\n')
+    (id1/DISABLED_MARKER).write_text('NPC gallery disabled by explicit --no-npc-gallery.\n')
     print('WARNING: NPC gallery disabled for debugging only. All NPC assets required by the game remain required; world NPCs are not omitted.', flush=True)
-    return {'status': 'disabled', 'reason': 'explicit --no-npc-gallery'}
+    return {'status': 'disabled', 'reason': 'explicit --no-npc-gallery',
+            'marker': 'id1/' + DISABLED_MARKER, 'in_game_notice': 'gallery commands explain the omission'}
+
+
+_DEPENDENCIES = {}
+
+
+def _scan_dependencies(task):
+    """Worker: one source mesh's dependency names and hashes, by the cache's own code."""
+    from gallery_cache import Dependencies
+    data, mesh = task
+    if data not in _DEPENDENCIES:
+        _DEPENDENCIES.clear()
+        _DEPENDENCIES[data] = Dependencies(data)
+    dependencies = _DEPENDENCIES[data]
+    try:
+        names = dependencies.mesh(mesh)
+    except ValueError:
+        return mesh, None, {}   # missing: the serial pass raises the same error
+    return mesh, names, {name: dependencies.record(name) for name in names}
+
+
+def spec_meshes(spec):
+    """The source meshes Dependencies.for_spec reads for one gallery spec."""
+    if spec['kind'] == 'NPC_':
+        a = spec['appearance']
+        return {normpath(a['skeleton'])} | {normpath('meshes/' + p['mesh']) for p in a['parts']}
+    return {normpath('meshes/' + spec['mesh'])}
+
+
+def prefetch_dependencies(dependencies, data, specs, jobs):
+    """Parse every source mesh and hash its textures on the shared pool before the
+    identities are built (the serial pass took about 125 s of the gallery's start,
+    on the critical path; BUILD-IDLE-STAGES-33). Fills the same caches the serial
+    Dependencies methods fill; identities, cache keys and outputs are unchanged."""
+    from build_parallel import ordered_map
+    meshes = sorted({mesh for spec in specs for mesh in spec_meshes(spec)} - set(dependencies.meshes))
+    for mesh, names, hashes in ordered_map(_scan_dependencies, [(str(data), mesh) for mesh in meshes],
+                                           max(1, min(jobs, len(meshes) or 1))):
+        if names is None:
+            continue
+        dependencies.meshes[mesh] = names
+        dependencies.hashes.update(hashes)
+
+
+def gallery_filter(closure):
+    """{casefolded record IDs} the gallery keeps for an area build's reference closure
+    (the closure's 'npcs' group: its NPCs and creatures), or None for every record."""
+    if not closure or 'npcs' not in (closure.get('groups') or ()):
+        return None
+    return set(closure.get('npcs', ())) | set(closure.get('creatures', ()))
 
 
 def collect_models(tasks, jobs):
@@ -212,7 +273,7 @@ def collect_models(tasks, jobs):
     return ordered, counts, worker_seconds
 
 
-def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_run=None):
+def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_run=None, closure=None):
     """Convert the complete NPC/creature catalogue; unresolved models must fail.
 
     Do not reduce catalogue coverage or protected geometry to save build time.
@@ -233,10 +294,16 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
     started = time.monotonic()
     print("npc-gallery: pre-baking in-game character models...", flush=True)
     cache = cache_location(cache or out.parent/'gallery-cache-v1', data, out)
-    entries, specs = catalogue(data); results = {}
+    # An area build (--exclude-unreferenced npcs): exactly the NPCs and creatures the area references.
+    only = gallery_filter(closure)
+    entries, specs = catalogue(data, only=only); results = {}
+    if only is not None:
+        print(f'NPC gallery: reference closure of {", ".join(closure.get("cells", [])[:4])}'
+              f'{" ..." if len(closure.get("cells", [])) > 4 else ""}: {len(entries)} of the area\'s records.', flush=True)
     print(f'NPC gallery: {len(entries)} source records; {len(specs)} distinct models; {jobs} workers.', flush=True)
     print('Checking gallery source dependencies and persistent cache...', flush=True)
     dependencies = Dependencies(data); sources = converter_sources(); env = environment()
+    prefetch_dependencies(dependencies, data, specs.values(), jobs)
     identities = {key: identity(spec, palette, dependencies.for_spec(spec), sources, env)
                   for key, spec in specs.items()}
     imported = import_rc9(seed_run, data, palette, specs, identities, cache, env) if seed_run else None
@@ -269,6 +336,8 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
     (out/'maps').mkdir(); shutil.move(out/'charplane.bsp', out/'maps/charplane.bsp')
     count, files = catalogue_files(models/'catalog.txt')
     receipt = {'format': FORMAT, 'records': count, 'models': len(results),
+               'scope': ({'reference_closure': closure.get('cells', []), 'records': len(entries)}
+                         if only is not None else 'every NPC and creature'),
                'master_sha256': input_sha256(child_ci(data, 'Morrowind.esm')),
                'palette_sha256': hashlib.sha256(palette).hexdigest(),
                'files': {name: {'bytes': (out/name).stat().st_size, 'sha256': sha(out/name)} for name in sorted(files)}}
@@ -284,9 +353,14 @@ def main():
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--cache', type=Path, help='Persistent verified model cache; defaults beside output')
     parser.add_argument('--seed-run', type=Path, help='Stopped rc9 build run with compatible input/source provenance')
+    parser.add_argument('--reference-closure', type=Path,
+                        help='Area build (--exclude-unreferenced npcs): only the NPCs and creatures this '
+                             'reference closure lists')
     add_jobs(parser); args = parser.parse_args()
+    closure = json.loads(args.reference_closure.read_text(encoding='utf-8')) if args.reference_closure else None
     try:
-        prepare(args.data_files, args.palette, args.out, args.qbsp, args.vis, args.light, resolve_jobs(args.jobs), args.cache, args.seed_run)
+        prepare(args.data_files, args.palette, args.out, args.qbsp, args.vis, args.light, resolve_jobs(args.jobs),
+                args.cache, args.seed_run, closure=closure)
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f'Error: {exc}\n')
 

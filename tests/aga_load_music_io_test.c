@@ -2,6 +2,8 @@
  * Actual asset readers, OST and mixer under deterministic synthetic IO delay.
  * This is a controlled disk-rate experiment, not a native performance claim. */
 #include "../engine/aga/src/model.c"
+/* Diagnostic logs (aw_log.c); without a bound switch they are written live. */
+#include "../engine/aga/src/aw_log.c"
 #include <assert.h>
 #include <sys/stat.h>
 extern int sound_started,soundtime;

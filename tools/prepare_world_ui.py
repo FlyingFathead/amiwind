@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import json
 import re
-import tempfile
 from pathlib import Path
 import struct
 import sys
@@ -13,6 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from PIL import Image
 from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
+from build_scratch import scratch_dir
 
 WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn')
 NO_NAME = 0xFFFFFFFF  # region-names.awn row without a region or place
@@ -147,7 +147,7 @@ def prepare(data_files,survey,scene):
         from npc_geometry import Assets
         from survey_vvardenfell import terrain_arrays
         from world_survey import area_catalogue
-        with tempfile.TemporaryDirectory(prefix='amiwind-world-map-') as directory:
+        with scratch_dir('amiwind-world-map-') as directory:
             temp=Path(directory);source=load_esm(child_ci(data_files,'Morrowind.esm'))
             bounds,stats,terrain=terrain_arrays(source,temp,Assets(data_files,BSA(child_ci(data_files,'Morrowind.bsa'))))
             report={'master_sha256':source['sha256'],'terrain_bounds':bounds,

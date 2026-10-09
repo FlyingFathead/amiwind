@@ -246,6 +246,10 @@ void R_AnimateLight (void)
 		k = k*22;
 		d_lightstylevalue[j] = k;
 	}
+	/* Warm baked faces are steady light like style 0; only their colour
+	 * table differs (unless the game sets the style itself). */
+	if (!cl_lightstyle[AW_WARM_STYLE].length)
+		d_lightstylevalue[AW_WARM_STYLE] = d_lightstylevalue[0];
 }
 
 
@@ -571,4 +575,177 @@ int R_LightPoint (vec3_t p)
 		r = r_refdef.ambientlight*r_daylight>>8;
 
 	return R_InteriorStaticLight(r);
+}
+
+/*
+=============================================================================
+
+ACTOR LIGHT GRID (NPC-LIGHT-COHERENCE-32)
+
+Quake lights a model by the lightmap of the floor straight below it. In the
+converted interiors that floor is often outside the reach of the lamp that
+lights the walls and the character's upper body (the prison ship lantern
+hangs above Jiub's head), so characters did not match the room around them.
+The interior converters bake the same light the walls get (ambient, lamps,
+zones; no facing term) on a coarse grid and store it in the worldspawn:
+"_aw_lightgrid" "step nx ny nz x y z" and "_aw_lightgrid0".. with two hex
+digits per point (x fastest, then y, then z), at most 480 points per key.
+Characters take the grid light at the middle of their model's height
+(trilinear, a few multiplies per character per frame). Maps without a grid
+keep the floor sample; aw_actor_light_grid 0 restores it everywhere.
+=============================================================================
+*/
+
+cvar_t	aw_actor_light_grid = {"aw_actor_light_grid","1",true};
+#define LIGHT_GRID_KEY "_aw_lightgrid"
+#define LIGHT_GRID_CHUNK 480
+#define LIGHT_GRID_MAX (64*1024)
+static byte	*light_grid;
+static int	light_grid_dims[3];
+static float	light_grid_step, light_grid_origin[3];
+static model_t	*light_grid_world;
+
+static int R_LightGridHex (int c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	return -1;
+}
+
+void R_LightGridNewMap (void)
+{
+	char	*data, key[64];
+	int	pass, cells = 0, filled = 0, chunk, i, hi, lo, step;
+	float	origin[3];
+
+	light_grid = NULL;
+	light_grid_world = cl.worldmodel;
+	if (!cl.worldmodel || !cl.worldmodel->entities)
+		return;
+	/* Pass 0 reads the grid size, pass 1 the values (worldspawn only). */
+	for (pass = 0 ; pass < 2 ; pass++)
+	{
+		data = COM_Parse (cl.worldmodel->entities);
+		if (!data || com_token[0] != '{')
+			return;
+		while ((data = COM_Parse (data)) != NULL && com_token[0] != '}')
+		{
+			strncpy (key, com_token, sizeof(key)-1);
+			key[sizeof(key)-1] = 0;
+			if (!(data = COM_Parse (data)))
+				return;
+			if (strncmp (key, LIGHT_GRID_KEY, sizeof(LIGHT_GRID_KEY)-1))
+				continue;
+			if (!key[sizeof(LIGHT_GRID_KEY)-1])
+			{
+				if (pass)
+					continue;
+				if (Q_sscanf (com_token, "%d %d %d %d %f %f %f", &step, &light_grid_dims[0], &light_grid_dims[1],
+					&light_grid_dims[2], &origin[0], &origin[1], &origin[2]) != 7)
+					return;
+				for (i=0 ; i<3 ; i++)
+					if (light_grid_dims[i] < 1 || light_grid_dims[i] > 4096 || !isfinite(origin[i]))
+						return;
+				cells = light_grid_dims[0]*light_grid_dims[1];
+				if (cells > LIGHT_GRID_MAX)
+					return;
+				cells *= light_grid_dims[2];
+				if (step < 1 || step > 1024 || cells > LIGHT_GRID_MAX)
+					return;
+				light_grid_step = (float)step;
+				VectorCopy (origin, light_grid_origin);
+				continue;
+			}
+			if (!pass || !light_grid)
+				continue;
+			chunk = atoi (key + sizeof(LIGHT_GRID_KEY)-1);
+			for (i=0 ; com_token[2*i] && com_token[2*i+1] ; i++)
+			{
+				hi = R_LightGridHex (com_token[2*i]);
+				lo = R_LightGridHex (com_token[2*i+1]);
+				if (hi < 0 || lo < 0 || i >= LIGHT_GRID_CHUNK || chunk*LIGHT_GRID_CHUNK + i >= cells)
+				{
+					light_grid = NULL;
+					return;
+				}
+				light_grid[chunk*LIGHT_GRID_CHUNK + i] = (byte)(hi*16 + lo);
+				filled++;
+			}
+		}
+		if (!pass)
+		{
+			if (!cells)
+				return;
+			light_grid = Hunk_AllocName (cells, "lightgrid");
+		}
+	}
+	if (filled != cells)
+	{
+		Con_DPrintf ("Light grid incomplete (%d of %d points); actors use the floor light\n", filled, cells);
+		light_grid = NULL;
+	}
+}
+
+/* Trilinear grid light at p (clamped to the grid), 0..255. */
+static int R_LightGridSample (vec3_t p)
+{
+	int	k, i[3], n[3], x, y, z;
+	float	f[3], v = 0, w;
+
+	for (k=0 ; k<3 ; k++)
+	{
+		f[k] = (p[k] - light_grid_origin[k]) / light_grid_step;
+		if (!(f[k] > 0))
+			f[k] = 0;
+		if (f[k] > light_grid_dims[k] - 1)
+			f[k] = (float)(light_grid_dims[k] - 1);
+		i[k] = (int)f[k];
+		n[k] = i[k] + 1 < light_grid_dims[k] ? 1 : 0;
+		f[k] -= i[k];
+	}
+	for (z=0 ; z<2 ; z++)
+		for (y=0 ; y<2 ; y++)
+			for (x=0 ; x<2 ; x++)
+			{
+				w = (x ? f[0] : 1-f[0]) * (y ? f[1] : 1-f[1]) * (z ? f[2] : 1-f[2]);
+				if (w <= 0)
+					continue;
+				v += w * light_grid[(i[0] + x*n[0]) + light_grid_dims[0]*((i[1] + y*n[1]) + light_grid_dims[1]*(i[2] + z*n[2]))];
+			}
+	return (int)(v + 0.5f);
+}
+
+int R_ActorLight (entity_t *e, int centre)
+{
+	vec3_t	p;
+	int	r;
+
+	if (!aw_actor_light_grid.value || !light_grid || light_grid_world != cl.worldmodel)
+		return R_LightPoint (e->origin);
+	VectorCopy (e->origin, p);
+	/* Alias bounds cover every frame: their middle is the body's middle,
+	 * whether the model's origin is at its feet or its centre. */
+	if (centre && e->model)
+		p[2] += (e->model->mins[2] + e->model->maxs[2]) * 0.5f;
+	r = R_LightGridSample (p);
+	if (r < r_refdef.ambientlight*r_daylight>>8)
+		r = r_refdef.ambientlight*r_daylight>>8;
+	return R_InteriorStaticLight(r);
+}
+
+/* aw_light_probe: grid and floor light at the player's position. */
+void R_LightProbe_f (void)
+{
+	entity_t	*e = &cl_entities[cl.viewentity];
+	int		floor;
+
+	floor = R_LightPoint (e->origin);
+	if (!light_grid || light_grid_world != cl.worldmodel)
+	{
+		Con_Printf ("Light here: floor %d; this map has no actor light grid\n", floor);
+		return;
+	}
+	Con_Printf ("Light here: grid %d, floor %d (grid %dx%dx%d step %d; aw_actor_light_grid %d)\n",
+		R_ActorLight (e, 0), floor, light_grid_dims[0], light_grid_dims[1], light_grid_dims[2],
+		(int)light_grid_step, (int)aw_actor_light_grid.value);
 }

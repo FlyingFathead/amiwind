@@ -4,6 +4,8 @@
 #include <setjmp.h>
 #include <limits.h>
 #include "../engine/aga/src/zone.c"
+/* Diagnostic logs (aw_log.c); without a bound switch they are written live. */
+#include "../engine/aga/src/aw_log.c"
 static int fail_malloc;
 void *__real_malloc(size_t n);
 void *__wrap_malloc(size_t n){return fail_malloc?NULL:__real_malloc(n);}

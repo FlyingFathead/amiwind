@@ -1,0 +1,71 @@
+{
+  "schema": "amiwind-release-graphs 1",
+  "release": "0.0.0",
+  "charts": [
+    {
+      "id": "tiny",
+      "file": "amiwind-v0.0.0-tiny.png",
+      "title": "Tiny fixture chart",
+      "subtitle": "Two series, two panels, one value not measured yet.",
+      "series": [
+        "old",
+        "new"
+      ],
+      "panels": [
+        {
+          "title": "Bytes on disk",
+          "unit": "MB",
+          "source": "build",
+          "host": "n/a",
+          "ratio": true,
+          "rows": [
+            {
+              "label": "Area A",
+              "values": [
+                100,
+                10
+              ]
+            },
+            {
+              "label": "Area B",
+              "values": [
+                50,
+                null
+              ],
+              "missing": [
+                "",
+                "invalid run"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Frame time",
+          "unit": "ms",
+          "source": "emulator",
+          "host": "mixed",
+          "rows": [
+            {
+              "label": "Camera 1",
+              "values": [
+                40,
+                60
+              ],
+              "hosts": [
+                "quiet",
+                "busy"
+              ],
+              "notes": [
+                "",
+                "slower here"
+              ]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        "Fixture for tests/test_release_graphs.py."
+      ]
+    }
+  ]
+}

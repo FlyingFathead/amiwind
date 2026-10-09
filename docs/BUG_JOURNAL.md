@@ -1,5 +1,1015 @@
 # Bug journal
 
+<!-- contents start -->
+## Contents
+
+- [TEST-ENV-LEAK-HULL-33, 9 October 2026](#test-env-leak-hull-33-9-october-2026)
+- [CHIM-COURT-BARREL-USE-33, 9 October 2026](#chim-court-barrel-use-33-9-october-2026)
+- [CHIM-INTRO-TP-OTHER-TOWN-33, 9 October 2026](#chim-intro-tp-other-town-33-9-october-2026)
+- [BUILD-REUSE-SCRATCH-UNDECLARED-33 fixed in v0.0.33, 9 October 2026](#build-reuse-scratch-undeclared-33-fixed-in-v0033-9-october-2026)
+- [GATE-PRIVACY-SCAN-33, 9 October 2026](#gate-privacy-scan-33-9-october-2026)
+- [BUILD-SCHEDULER-LOWBUDGET-33: a small --jobs budget started no stage, 9 October 2026](#build-scheduler-lowbudget-33-a-small---jobs-budget-started-no-stage-9-october-2026)
+- [CHIM-HARVEST-SPECIALS-33, 9 October 2026](#chim-harvest-specials-33-9-october-2026)
+- [CHIM-SEYDA-ACTOR-CONTACT-33, 9 October 2026](#chim-seyda-actor-contact-33-9-october-2026)
+- [BUILD-ROUTED-FLORA-RESERVE-33, 9 October 2026](#build-routed-flora-reserve-33-9-october-2026)
+- [NPC-IDLE-ONLY-ANIM-33, 9 October 2026](#npc-idle-only-anim-33-9-october-2026)
+- [ROUTED-HULL-NODE-ORDER-33 in the integration line, 9 October 2026](#routed-hull-node-order-33-in-the-integration-line-9-october-2026)
+- [BUILD-CHIM-UNIT-HULL-KEY-33, 9 October 2026](#build-chim-unit-hull-key-33-9-october-2026)
+- [CHIM-BALMORA-RING-OVER-33, 9 October 2026](#chim-balmora-ring-over-33-9-october-2026)
+- [BUILD-INTERIOR-INDEX-ROUTED-33, 9 October 2026](#build-interior-index-routed-33-9-october-2026)
+- [MINIWIND-NO-WINUAE-PROFILE-33, 9 October 2026](#miniwind-no-winuae-profile-33-9-october-2026)
+- [MESH-LOD-OPEN-SEAMS-33 and CHIM-STRIDER-RING-33 in v0.0.33, 9 October 2026](#mesh-lod-open-seams-33-and-chim-strider-ring-33-in-v0033-9-october-2026)
+- [NPC-FOLLOW-FLOORS-33: NPC companion test in FS-UAE, 9 October 2026](#npc-follow-floors-33-npc-companion-test-in-fs-uae-9-october-2026)
+- [AMIGA-DISK-2GIB-LIMIT-33: partitions must also start below 2 GiB, 9 October 2026](#amiga-disk-2gib-limit-33-partitions-must-also-start-below-2-gib-9-october-2026)
+- [LIGHT-ENTITIES-UNWIRED-33: Morrowind lights never become Quake light entities, 9 October 2026](#light-entities-unwired-33-morrowind-lights-never-become-quake-light-entities-9-october-2026)
+- [CHIM-FAR-TERRAIN-33 repaired in source; CHIM-FAR-OBJECTS-33 found, 9 October 2026](#chim-far-terrain-33-repaired-in-source-chim-far-objects-33-found-9-october-2026)
+- [CHIM-ARENA-MEMORY-33: the Arena's canton bodies do not fit the CHIM zone, 9 October 2026](#chim-arena-memory-33-the-arenas-canton-bodies-do-not-fit-the-chim-zone-9-october-2026)
+- [CHIM-HULL-CHAIN-COST-33: canton bodies collide through one long chain, 9 October 2026](#chim-hull-chain-cost-33-canton-bodies-collide-through-one-long-chain-9-october-2026)
+- [COLLISION-HULL-CHAINS-33: long standing-hull chains island-wide, 9 October 2026](#collision-hull-chains-33-long-standing-hull-chains-island-wide-9-october-2026)
+- [CHIM-SEYDA-HUNK-GAP-33: Seyda Neen's statics stream with their chunks (builder), 9 October 2026](#chim-seyda-hunk-gap-33-seyda-neens-statics-stream-with-their-chunks-builder-9-october-2026)
+- [CHIM-ZONE-RESERVE-EARLY-33: reloads of frame maps without a stated figure, 9 October 2026](#chim-zone-reserve-early-33-reloads-of-frame-maps-without-a-stated-figure-9-october-2026)
+- [HEAP-12MB-FAST-ROOM-33: the 12 MiB heap test, 9 October 2026](#heap-12mb-fast-room-33-the-12-mib-heap-test-9-october-2026)
+- [DEBUG-TP-CHIM-33: dbg tp on a pure-CHIM disk, 9 October 2026](#debug-tp-chim-33-dbg-tp-on-a-pure-chim-disk-9-october-2026)
+- [BUILD-LAYOUT-GATE-AFTER-WRITE-33, 9 October 2026](#build-layout-gate-after-write-33-9-october-2026)
+- [BUILD-PRERENDERED-PRUNE-ORDER-33, 9 October 2026](#build-prerendered-prune-order-33-9-october-2026)
+- [BUILD-IMAGE-NOT-INCREMENTAL-33: per-map pass cache, 9 October 2026](#build-image-not-incremental-33-per-map-pass-cache-9-october-2026)
+- [HUD-ENEMY-BAR-COLOUR-33, 9 October 2026](#hud-enemy-bar-colour-33-9-october-2026)
+- [NPC-WEAPON-MESH-33, COMBAT-NOT-SAVED-33, TOOL-ALIAS-FRAMES-33, COMBAT-PLAYER-KNOCKDOWN-33: combat, 9 October 2026](#npc-weapon-mesh-33-combat-not-saved-33-tool-alias-frames-33-combat-player-knockdown-33-combat-9-october-2026)
+- [BUILD-HULL-ROUTE-BUDGET-33: routed hulls overflowed a legacy map's clipnodes, 9 October 2026](#build-hull-route-budget-33-routed-hulls-overflowed-a-legacy-maps-clipnodes-9-october-2026)
+- [BUILD-CHIM-HULL-RING-33: CHIM model hulls grew Balmora's ring past the zone, 9 October 2026](#build-chim-hull-ring-33-chim-model-hulls-grew-balmoras-ring-past-the-zone-9-october-2026)
+- [BUILD-REUSE-SCRATCH-UNDECLARED-33 and BUILD-SURVEY-NOT-REPRODUCIBLE-33, 9 October 2026](#build-reuse-scratch-undeclared-33-and-build-survey-not-reproducible-33-9-october-2026)
+- [CHIM-GRAFT-REPACK-EMPTY-33: the world vanishes in Seyda Neen on CHIM, 9 October 2026](#chim-graft-repack-empty-33-the-world-vanishes-in-seyda-neen-on-chim-9-october-2026)
+- [CHIM-GRAFT-REPACK-EMPTY-33 safety net: the terrain floor, 9 October 2026](#chim-graft-repack-empty-33-safety-net-the-terrain-floor-9-october-2026)
+- [BUILD-TMP-SCRATCH-33, 9 October 2026](#build-tmp-scratch-33-9-october-2026)
+- [TEST-COST-ORDER-LOAD-33, 9 October 2026](#test-cost-order-load-33-9-october-2026)
+- [TRACKER-CHIM-LINK-MERGE-33, 9 October 2026](#tracker-chim-link-merge-33-9-october-2026)
+- [BUILD-WORLD-PARTITION-MOUNT-33, 9 October 2026](#build-world-partition-mount-33-9-october-2026)
+- [MINIWIND-PAYLOAD-NOT-SLIM-33, 9 October 2026](#miniwind-payload-not-slim-33-9-october-2026)
+- [CHIM-HARVEST-REMOVED-MAPS-33, 9 October 2026](#chim-harvest-removed-maps-33-9-october-2026)
+- [BUILD-CACHE-CHIM-UNITS-33: the prerendered store, 9 October 2026](#build-cache-chim-units-33-the-prerendered-store-9-october-2026)
+- [TRACKER-REGISTER-LINK-MERGE-33, 9 October 2026](#tracker-register-link-merge-33-9-october-2026)
+- [BOOT-VOLUME-NOT-VALIDATED-33: diagnostic logs in memory during play, 9 October 2026](#boot-volume-not-validated-33-diagnostic-logs-in-memory-during-play-9-october-2026)
+- [TEST-PROFILE-TIMELINE-SUM-33, 9 October 2026](#test-profile-timeline-sum-33-9-october-2026)
+- [BOOT-VOLUME-NOT-VALIDATED-33 cause measured and repaired in source, 9 October 2026](#boot-volume-not-validated-33-cause-measured-and-repaired-in-source-9-october-2026)
+- [BOOT-VOLUME-NOT-VALIDATED-33 registered, 9 October 2026](#boot-volume-not-validated-33-registered-9-october-2026)
+- [HORIZON-FLORA-SPRITES-32 default accepted; HORIZON-HOLES-31 not re-checked, 8 October 2026](#horizon-flora-sprites-32-default-accepted-horizon-holes-31-not-re-checked-8-october-2026)
+- [BUILD-EXCLUDE-STAGE-CLOSURE-33: quick test builds, 9 October 2026](#build-exclude-stage-closure-33-quick-test-builds-9-october-2026)
+- [CHIM-ZONE-TMP-NOEXEC-33, 9 October 2026](#chim-zone-tmp-noexec-33-9-october-2026)
+- [BUILD-MINIWIND-FINGERPRINT-ENGINE-33, 9 October 2026](#build-miniwind-fingerprint-engine-33-9-october-2026)
+- [TEST-NATIVE-STALE-IMPORT-33: MiniWind exterior scope, 9 October 2026](#test-native-stale-import-33-miniwind-exterior-scope-9-october-2026)
+- [CHIM-ACTOR-RING-33: NPC companion test, 9 October 2026](#chim-actor-ring-33-npc-companion-test-9-october-2026)
+- [RELEASE-WS-BASELINE-VERSION-33: the whitespace baseline followed VERSION, 9 October 2026](#release-ws-baseline-version-33-the-whitespace-baseline-followed-version-9-october-2026)
+- [BUILD-DOOR-REFERENCE-SERIAL-33, BUILD-ORDERED-WINDOW-33; stage repairs measured, 9 October 2026](#build-door-reference-serial-33-build-ordered-window-33-stage-repairs-measured-9-october-2026)
+- [NPC-BAKED-WHOLE-DUPLICATION-33: modular NPCs designed and measured, 9 October 2026](#npc-baked-whole-duplication-33-modular-npcs-designed-and-measured-9-october-2026)
+- [AUDIO-HOST-LOAD-33: crackle on a saturated host, 9 October 2026](#audio-host-load-33-crackle-on-a-saturated-host-9-october-2026)
+- [CHIM Engine tracker and found-in-build records; CHIM-RECEIPT-COMMIT-33, 9 October 2026](#chim-engine-tracker-and-found-in-build-records-chim-receipt-commit-33-9-october-2026)
+- [OPENING-BRIGHT-31, OPENING-JIUB-LANTERN-32 and NPC-LIGHT-COHERENCE-32: the opening scene's light, 9 October 2026](#opening-bright-31-opening-jiub-lantern-32-and-npc-light-coherence-32-the-opening-scenes-light-9-october-2026)
+- [CHIM-TRACE-TAIL-33: a tail of expensive CHIM collision traces, 9 October 2026](#chim-trace-tail-33-a-tail-of-expensive-chim-collision-traces-9-october-2026)
+- [BUILD-IDLE-STAGES-33, BUILD-STAGE-START-SHARE-33 and BUILD-NESTED-POOL-ALLOWANCE-33, 9 October 2026](#build-idle-stages-33-build-stage-start-share-33-and-build-nested-pool-allowance-33-9-october-2026)
+- [BUILD-PROFILE-JOBS-START-ONLY-33: idle cores measured against the start allowance, 9 October 2026](#build-profile-jobs-start-only-33-idle-cores-measured-against-the-start-allowance-9-october-2026)
+- [BUILD-PATH-IN-PAYLOAD-32 and BUILD-STAIR-FLAG-INERT-32, 8 October 2026](#build-path-in-payload-32-and-build-stair-flag-inert-32-8-october-2026)
+- [CHIM-IMAGE-OPTIMIZER-RECEIPT-33 and the Vivec Arena in CHIM builds, 9 October 2026](#chim-image-optimizer-receipt-33-and-the-vivec-arena-in-chim-builds-9-october-2026)
+- [CHIM-LEGACY-CHAIN-33: CHIM builds and the legacy exterior chain, 9 October 2026](#chim-legacy-chain-33-chim-builds-and-the-legacy-exterior-chain-9-october-2026)
+- [BUILD-CACHE-OVERBROAD-33 and BUILD-CACHE-NO-CUTOFF-33: CHIM builds rerun the scene chain, 9 October 2026](#build-cache-overbroad-33-and-build-cache-no-cutoff-33-chim-builds-rerun-the-scene-chain-9-october-2026)
+- [CHIM-HULL-STAIR-EDGE-33 and BUILD-REUSE-TMP-UNDECLARED-33: first MiniWind builds, 9 October 2026](#chim-hull-stair-edge-33-and-build-reuse-tmp-undeclared-33-first-miniwind-builds-9-october-2026)
+- [GATE-SOURCE-RACE-33, 9 October 2026](#gate-source-race-33-9-october-2026)
+- [CHIM-SEYDA-HUNK-GAP-33 and CHIM-ZONE-RESERVE-EARLY-33, 9 October 2026](#chim-seyda-hunk-gap-33-and-chim-zone-reserve-early-33-9-october-2026)
+- [CHIM-CHUNK-LOAD-FAIL-33: Balmora chunks without room on the CHIM preview, 9 October 2026](#chim-chunk-load-fail-33-balmora-chunks-without-room-on-the-chim-preview-9-october-2026)
+- [CHIM-FAR-TERRAIN-33: no distant ground on CHIM, 9 October 2026](#chim-far-terrain-33-no-distant-ground-on-chim-9-october-2026)
+- [Last failing stair flights were gate artefacts, 9 October 2026](#last-failing-stair-flights-were-gate-artefacts-9-october-2026)
+- [CHIM-SEYDA-MEMORY-33: Seyda Neen's ring, cause found, 8 October 2026](#chim-seyda-memory-33-seyda-neens-ring-cause-found-8-october-2026)
+- [CHIM visibility rows: slow on irregular ground, rebuilt per worker count, 8 October 2026](#chim-visibility-rows-slow-on-irregular-ground-rebuilt-per-worker-count-8-october-2026)
+- [CHIM heap gate: the zone default is too small for Seyda Neen, 8 October 2026](#chim-heap-gate-the-zone-default-is-too-small-for-seyda-neen-8-october-2026)
+- [CHIM-TEXTURE-SPECKS-33: owner playtest, gate and opt-in effect, 9 October 2026](#chim-texture-specks-33-owner-playtest-gate-and-opt-in-effect-9-october-2026)
+- [RELEASE-PATCH-SIZE-33, 8 October 2026](#release-patch-size-33-8-october-2026)
+- [ENGINE-FPU-DATA-DECODE-33, 8 October 2026](#engine-fpu-data-decode-33-8-october-2026)
+- [BUILD-ENV-FINGERPRINT-GLOBAL-33, merges for v0.0.33-dev1, 8 October 2026](#build-env-fingerprint-global-33-merges-for-v0033-dev1-8-october-2026)
+- [BUILD-CACHE-CLOSURE-WIDE-33 and BUILD-CACHE-ABSOLUTE-PATHS-33: stage reuse, 9 October 2026](#build-cache-closure-wide-33-and-build-cache-absolute-paths-33-stage-reuse-9-october-2026)
+- [DOCS-TOC-RENDER-FIGHT-33; v0.0.33-bug-fields merged, 8 October 2026](#docs-toc-render-fight-33-v0033-bug-fields-merged-8-october-2026)
+- [TRACKER-REGISTER-SIZE-33: the bug register outgrew the release text limit, 8 October 2026](#tracker-register-size-33-the-bug-register-outgrew-the-release-text-limit-8-october-2026)
+- [DOCS-DEAD-ANCHORS-32 and TEST-PROFILE-STAGE-WALL-32, 8 October 2026](#docs-dead-anchors-32-and-test-profile-stage-wall-32-8-october-2026)
+- [Stair gate merged on v0.0.33-dev; BUILD-NAME-MOJIBAKE-32 closed as a duplicate, 8 October 2026](#stair-gate-merged-on-v0033-dev-build-name-mojibake-32-closed-as-a-duplicate-8-october-2026)
+- [Seyda Neen on CHIM: first world, stair gate and findings, 8 October 2026](#seyda-neen-on-chim-first-world-stair-gate-and-findings-8-october-2026)
+- [Stairs follow Morrowind's rules, and a gate walks them, 8 October 2026](#stairs-follow-morrowinds-rules-and-a-gate-walks-them-8-october-2026)
+- [UI-MENU-LOGO-32, 8 October 2026](#ui-menu-logo-32-8-october-2026)
+- [PHOTO-DEBUG-STRIP-33, 8 October 2026](#photo-debug-strip-33-8-october-2026)
+- [QC-AW-FLAME-SPAWN-32 and CENSUS-LOAD-SLOW-32: repaired in source, A/B/C/D, 8 October 2026](#qc-aw-flame-spawn-32-and-census-load-slow-32-repaired-in-source-abcd-8-october-2026)
+- [CENSUS-LOAD-SLOW-32 cause; REMOTE-CONSOLE-LOG-COST-32 and DEBUG-TP-SHIP-FREEZE-32, 8 October 2026](#census-load-slow-32-cause-remote-console-log-cost-32-and-debug-tp-ship-freeze-32-8-october-2026)
+- [v0.0.32-dev3 owner play reports, 8 October 2026](#v0032-dev3-owner-play-reports-8-october-2026)
+- [v0.0.32-dev3 smoke test findings, 8 October 2026](#v0032-dev3-smoke-test-findings-8-october-2026)
+- [CHIM-ZONE-RING-THRASH-33 and CHIM-REBUILD-COST-33: emulator sweep, 8 October 2026](#chim-zone-ring-thrash-33-and-chim-rebuild-cost-33-emulator-sweep-8-october-2026)
+- [CI-BOOTSTRAP-NUMPY-32, 8 October 2026](#ci-bootstrap-numpy-32-8-october-2026)
+- [HEAP-SEYDA-OVERLAP-32: temporary pre-CHIM heap bypass for three Seyda Neen maps, 8 October 2026](#heap-seyda-overlap-32-temporary-pre-chim-heap-bypass-for-three-seyda-neen-maps-8-october-2026)
+- [Morrowind collision census, 8 October 2026](#morrowind-collision-census-8-october-2026)
+- [First FS-UAE session of Balmora under CHIM, 8 October 2026](#first-fs-uae-session-of-balmora-under-chim-8-october-2026)
+- [Vivec Arena arrival and owner dev1 reports, 8 October 2026](#vivec-arena-arrival-and-owner-dev1-reports-8-october-2026)
+- [TEST-PROFILE-SECTION-CPU-32, 8 October 2026](#test-profile-section-cpu-32-8-october-2026)
+- [BUILD-EXTRA-TOWN-OPTIN-32: the Vivec Arena preview leaves the default build, 8 October 2026](#build-extra-town-optin-32-the-vivec-arena-preview-leaves-the-default-build-8-october-2026)
+- [KEYS-AMIGA-EDIT-32: Del arrived as F11, FS-UAE Home/End as keypad ( and Help, 8 October 2026](#keys-amiga-edit-32-del-arrived-as-f11-fs-uae-homeend-as-keypad--and-help-8-october-2026)
+- [BUILD-DRESSING-EXCLUDED-32: Census office lantern hook, silent converter drops, 8 October 2026](#build-dressing-excluded-32-census-office-lantern-hook-silent-converter-drops-8-october-2026)
+- [AW-20260928-01: ship-to-deck transition sluggish again, 8 October 2026](#aw-20260928-01-ship-to-deck-transition-sluggish-again-8-october-2026)
+- [CONSOLE-HISTORY-ARROWS-32: owner trace shows the arrows arriving, 8 October 2026](#console-history-arrows-32-owner-trace-shows-the-arrows-arriving-8-october-2026)
+- [FLAME-RANGE-NEAREST-32: Census office hearth fire only up close, 8 October 2026](#flame-range-nearest-32-census-office-hearth-fire-only-up-close-8-october-2026)
+- [CHIM parity and terrain hull fixes; test import path, 8 October 2026](#chim-parity-and-terrain-hull-fixes-test-import-path-8-october-2026)
+- [Vivec dev1 owner evidence and CHIM terrain edges, 8 October 2026](#vivec-dev1-owner-evidence-and-chim-terrain-edges-8-october-2026)
+- [CHIM harvest and payload parity findings, 8 October 2026](#chim-harvest-and-payload-parity-findings-8-october-2026)
+- [BUILD-SEYDA-RECORDED-REWRITTEN-32: traced and repaired in source, 8 October 2026](#build-seyda-recorded-rewritten-32-traced-and-repaired-in-source-8-october-2026)
+- [HORIZON-FLORA-SPRITES-32: cause measured, land-outline horizon default, 8 October 2026](#horizon-flora-sprites-32-cause-measured-land-outline-horizon-default-8-october-2026)
+- [FOG-TOWN-HEAVY-32: fog settings identical to v0.0.31, 8 October 2026](#fog-town-heavy-32-fog-settings-identical-to-v0031-8-october-2026)
+- [HORIZON-FLORA-SPRITES-32: owner decisions and planned improvements, 8 October 2026](#horizon-flora-sprites-32-owner-decisions-and-planned-improvements-8-october-2026)
+- [CONSOLE-HISTORY-ARROWS-32: console arrows recall nothing on the owner's FS-UAE, 8 October 2026](#console-history-arrows-32-console-arrows-recall-nothing-on-the-owners-fs-uae-8-october-2026)
+- [CONSOLE-HISTORY-EMPTY-32: Up past the oldest command sticks on an empty line, 8 October 2026](#console-history-empty-32-up-past-the-oldest-command-sticks-on-an-empty-line-8-october-2026)
+- [HORIZON-FLORA-SPRITES-32: horizon silhouetting, not yet perfect, 8 October 2026](#horizon-flora-sprites-32-horizon-silhouetting-not-yet-perfect-8-october-2026)
+- [BUILD-HEAP-RECEIPT-TUPLES-32: dev2 image step refused its final heap receipt, 8 October 2026](#build-heap-receipt-tuples-32-dev2-image-step-refused-its-final-heap-receipt-8-october-2026)
+- [Vivec Arena residents, 8 October 2026](#vivec-arena-residents-8-october-2026)
+- [GATE-SHARED-SOURCE-32: local gate tested the main checkout, 8 October 2026](#gate-shared-source-32-local-gate-tested-the-main-checkout-8-october-2026)
+- [Image-parallel follow-ups merged, 8 October 2026](#image-parallel-follow-ups-merged-8-october-2026)
+- [v0.0.32-dev1 delivery and smoke test findings, 8 October 2026](#v0032-dev1-delivery-and-smoke-test-findings-8-october-2026)
+- [v0.0.32-dev1 playtest findings, 8 October 2026](#v0032-dev1-playtest-findings-8-october-2026)
+- [ENTITY-TRACKER-HARVEST-32: register state corrected, 8 October 2026](#entity-tracker-harvest-32-register-state-corrected-8-october-2026)
+- [Builder harvest step findings, 8 October 2026](#builder-harvest-step-findings-8-october-2026)
+- [CHIM world-format follow-up findings, 8 October 2026](#chim-world-format-follow-up-findings-8-october-2026)
+- [Image-parallel follow-up findings, 8 October 2026](#image-parallel-follow-up-findings-8-october-2026)
+- [BUILD-HARVEST-NOT-BUILT-32: harvest built by default, 8 October 2026](#build-harvest-not-built-32-harvest-built-by-default-8-october-2026)
+- [BUILD-IMAGE-SERIAL-32: cause and repair, 8 October 2026](#build-image-serial-32-cause-and-repair-8-october-2026)
+- [dev1 image build findings, 8 October 2026](#dev1-image-build-findings-8-october-2026)
+- [Parallel test runner findings, 8 October 2026](#parallel-test-runner-findings-8-october-2026)
+- [Second CHIM engine slice, 8 October 2026](#second-chim-engine-slice-8-october-2026)
+- [Build profiler findings, 8 October 2026](#build-profiler-findings-8-october-2026)
+- [BUILD-XDFTOOL-ARGMAX-32, 8 October 2026](#build-xdftool-argmax-32-8-october-2026)
+- [First CHIM engine slice, 8 October 2026](#first-chim-engine-slice-8-october-2026)
+- [Harvest data audit and builder message, 8 October 2026](#harvest-data-audit-and-builder-message-8-october-2026)
+- [First CHIM world-format build of Balmora, 8 October 2026](#first-chim-world-format-build-of-balmora-8-october-2026)
+- [NET-UDP-INIT-CRASH-32, 8 October 2026](#net-udp-init-crash-32-8-october-2026)
+- [Release coverage test; per-race hands built by default, 8 October 2026](#release-coverage-test-per-race-hands-built-by-default-8-october-2026)
+- [Builder defaults audit: stages missing from the builder, 8 October 2026](#builder-defaults-audit-stages-missing-from-the-builder-8-october-2026)
+- [BUILD-IMAGE-SERIAL-32, 8 October 2026](#build-image-serial-32-8-october-2026)
+- [BUILD-FLORA-OPTIN-32 fixed in source, 8 October 2026](#build-flora-optin-32-fixed-in-source-8-october-2026)
+- [BUILD-FLORA-OPTIN-32; world layout verified, 8 October 2026](#build-flora-optin-32-world-layout-verified-8-october-2026)
+- [DEBUG-TP-TOWN-NAMES-32, 8 October 2026](#debug-tp-town-names-32-8-october-2026)
+- [Renderer counters and benchmark findings, 8 October 2026](#renderer-counters-and-benchmark-findings-8-october-2026)
+- [GOG/Steam loose-file A/B findings, 8 October 2026](#gogsteam-loose-file-ab-findings-8-october-2026)
+- [BUILD-WORLD-LAYOUT-DRIFT-32; dev1 actor waiver tracked, 8 October 2026](#build-world-layout-drift-32-dev1-actor-waiver-tracked-8-october-2026)
+- [Known-inputs check merged; BUILD-INPUTCHECK-SLOW-32, 8 October 2026](#known-inputs-check-merged-build-inputcheck-slow-32-8-october-2026)
+- [Vivec cantons import and loader rework findings, 8 October 2026](#vivec-cantons-import-and-loader-rework-findings-8-october-2026)
+- [Font A/B: both font paths show wrong characters, 8 October 2026](#font-ab-both-font-paths-show-wrong-characters-8-october-2026)
+- [Builder breaks fixed; next stop in Seyda Neen culling, 8 October 2026](#builder-breaks-fixed-next-stop-in-seyda-neen-culling-8-october-2026)
+- [BUILD-EDITION-DIFFERENCES-32: GOG and Steam builds differ, 8 October 2026](#build-edition-differences-32-gog-and-steam-builds-differ-8-october-2026)
+- [BUILD-INPUTS-UNVERIFIED-32: user inputs not checked against known versions, 8 October 2026](#build-inputs-unverified-32-user-inputs-not-checked-against-known-versions-8-october-2026)
+- [BUILD-NOT-FROM-SCRATCH-32: releases without a from-scratch build, 8 October 2026](#build-not-from-scratch-32-releases-without-a-from-scratch-build-8-october-2026)
+- [First from-scratch build with the repository builder, 8 October 2026](#first-from-scratch-build-with-the-repository-builder-8-october-2026)
+- [FPU support library findings, 8 October 2026](#fpu-support-library-findings-8-october-2026)
+- [Asset census findings, 8 October 2026](#asset-census-findings-8-october-2026)
+- [Face validator over the shipped v0.0.31 image, 8 October 2026](#face-validator-over-the-shipped-v0031-image-8-october-2026)
+- [ENGINE-FPU-UNIMPL-31, NPC-TARGET-REDUNDANT-31, ENGINE-BUILD-REPRO-31, ENGINE-FPSP-MISSING-31, REMOTE-STATE-WIDTH-31: FPU fixes measured, 8 October 2026](#engine-fpu-unimpl-31-npc-target-redundant-31-engine-build-repro-31-engine-fpsp-missing-31-remote-state-width-31-fpu-fixes-measured-8-october-2026)
+- [REMOTE-CONSOLE-APPEND-31: remote console log overwrites itself, 8 October 2026](#remote-console-append-31-remote-console-log-overwrites-itself-8-october-2026)
+- [TEST-FPU-STRICT-JIT-31: strict FPU emulation needs the JIT off, 8 October 2026](#test-fpu-strict-jit-31-strict-fpu-emulation-needs-the-jit-off-8-october-2026)
+- [Converter face findings from the texture snapping test, 8 October 2026](#converter-face-findings-from-the-texture-snapping-test-8-october-2026)
+- [TOWN-FRAME-CEILING-32: high ground leaks town frames, 8 October 2026](#town-frame-ceiling-32-high-ground-leaks-town-frames-8-october-2026)
+- [Independent review of the open-world plan, 8 October 2026](#independent-review-of-the-open-world-plan-8-october-2026)
+- [World streamer measurement findings, 8 October 2026](#world-streamer-measurement-findings-8-october-2026)
+- [ENGINE-SUBMODEL-LIMIT-32, TOOL-SIMPLIFY-MANIFOLD-32, SHELL-TEXTURE-VOTE-32: distant shell prototype, 8 October 2026](#engine-submodel-limit-32-tool-simplify-manifold-32-shell-texture-vote-32-distant-shell-prototype-8-october-2026)
+- [Vivec limits repaired in source; ERICW-TEXINFO-SIGNED-31, EXTENTS-FPU-RULE-31, VIVEC-HEAP-31 found, 8 October 2026](#vivec-limits-repaired-in-source-ericw-texinfo-signed-31-extents-fpu-rule-31-vivec-heap-31-found-8-october-2026)
+- [ESTIMATE-EVR-BELOW-CUR-31 and TOOLING-HEADLESS-BROWSER-31: map metrics layer, 8 October 2026](#estimate-evr-below-cur-31-and-tooling-headless-browser-31-map-metrics-layer-8-october-2026)
+- [WORLD-REGION-DUPLICATION-31: exterior objects stored about ten times, 8 October 2026](#world-region-duplication-31-exterior-objects-stored-about-ten-times-8-october-2026)
+- [Whole-world measurement findings, 8 October 2026](#whole-world-measurement-findings-8-october-2026)
+- [MODEL-MARKSURF-SIGNED-31 and TOWN-VIS-OCCLUSION-31: visibility prototype, 8 October 2026](#model-marksurf-signed-31-and-town-vis-occlusion-31-visibility-prototype-8-october-2026)
+- [ENGINE-FPU-UNIMPL-31, ENGINE-FPSP-MISSING-31, NPC-TARGET-REDUNDANT-31, CI-ERICW-SKIP-31, CI-SKIPS-UNGUARDED-31: FPU audit and gate skips, 8 October 2026](#engine-fpu-unimpl-31-engine-fpsp-missing-31-npc-target-redundant-31-ci-ericw-skip-31-ci-skips-unguarded-31-fpu-audit-and-gate-skips-8-october-2026)
+- [GATE-NODE-MISSING-31 and TOOLKIT-TEST-POINTERLOCK-31: inspector tests, 8 October 2026](#gate-node-missing-31-and-toolkit-test-pointerlock-31-inspector-tests-8-october-2026)
+- [ENGINE-BUILD-REPRO-31 and VIVEC-TEXINFO-31: from tonight's reports, 8 October 2026](#engine-build-repro-31-and-vivec-texinfo-31-from-tonights-reports-8-october-2026)
+- [MESH-EXTENT-GRID-31 and LIGHTMAP-TAIL-31: Vivec dry run, 8 October 2026](#mesh-extent-grid-31-and-lightmap-tail-31-vivec-dry-run-8-october-2026)
+- [BUILD-SEYDA-PRIVATE-STAGES-31: duplicate of BUILD-SEYDA-REGEN-30, 8 October 2026](#build-seyda-private-stages-31-duplicate-of-build-seyda-regen-30-8-october-2026)
+- [BUILD-NIGHT-TABLES-31: night lighting tables only on hand-made disks, 8 October 2026](#build-night-tables-31-night-lighting-tables-only-on-hand-made-disks-8-october-2026)
+- [BUILD-FINALIZE-SCENE-31: undefined name in image finalisation, 8 October 2026](#build-finalize-scene-31-undefined-name-in-image-finalisation-8-october-2026)
+- [DBG-TOGGLE-WORDS-31: on/off words for settings, 8 October 2026](#dbg-toggle-words-31-onoff-words-for-settings-8-october-2026)
+- [TOWN-VIS-OCCLUSION-31: buildings do not block visibility, 7 October 2026](#town-vis-occlusion-31-buildings-do-not-block-visibility-7-october-2026)
+- [LAMPS-FLICKER-31 and SEYDA-LANTERNS-MISSING-31: dev5 night walk, 7 October 2026](#lamps-flicker-31-and-seyda-lanterns-missing-31-dev5-night-walk-7-october-2026)
+- [BUILD-WINDOWS-DOCKER-SLOW-31: Docker disk steps on Windows, 7 October 2026](#build-windows-docker-slow-31-docker-disk-steps-on-windows-7-october-2026)
+- [NIGHT-0400-DARK-31: sudden darkness near 04:00, 7 October 2026](#night-0400-dark-31-sudden-darkness-near-0400-7-october-2026)
+- [GUARD-TORCH-BRIGHT-31 and LAMPS-RANGE-31: Balmora at night, 7 October 2026](#guard-torch-bright-31-and-lamps-range-31-balmora-at-night-7-october-2026)
+- [LAMPS-RANGE-31: only the nearest lamps light up, 7 October 2026](#lamps-range-31-only-the-nearest-lamps-light-up-7-october-2026)
+- [SEYDA-BLOCK-31 and PLACE-NAMES-INTERIOR-31: dev3 playtest, 7 October 2026](#seyda-block-31-and-place-names-interior-31-dev3-playtest-7-october-2026)
+- [DLIGHT-WALLS-31: cause is the night remap, 7 October 2026](#dlight-walls-31-cause-is-the-night-remap-7-october-2026)
+- [MUSIC-OPENING-CLIP-31: title clip during the opening load, 7 October 2026](#music-opening-clip-31-title-clip-during-the-opening-load-7-october-2026)
+- [MUSIC-STARTUP-TRACK-31: random track under the startup logo, 7 October 2026](#music-startup-track-31-random-track-under-the-startup-logo-7-october-2026)
+- [DLIGHT-WALLS-31: torches light the ground but not town walls, 7 October 2026](#dlight-walls-31-torches-light-the-ground-but-not-town-walls-7-october-2026)
+- [OPENING-BRIGHT-31: ship hold brighter than the original, 7 October 2026](#opening-bright-31-ship-hold-brighter-than-the-original-7-october-2026)
+- [HORIZON-HOLES-31: distant Balmora breaks up against the sky, 7 October 2026](#horizon-holes-31-distant-balmora-breaks-up-against-the-sky-7-october-2026)
+- [HUD-NOTIFY-OVERLAP-31: console line over the title, 7 October 2026](#hud-notify-overlap-31-console-line-over-the-title-7-october-2026)
+- [LIGHT-OFF-31: Off-by-default lights would bake as lit, 7 October 2026](#light-off-31-off-by-default-lights-would-bake-as-lit-7-october-2026)
+- [LIGHT-FALLOFF-31 correction; LIGHTMAP-GRID-31, 7 October 2026](#light-falloff-31-correction-lightmap-grid-31-7-october-2026)
+- [LIGHT-FALLOFF-31 and BALMORA-LAMPS-DIM-31: OpenMW reference, 7 October 2026](#light-falloff-31-and-balmora-lamps-dim-31-openmw-reference-7-october-2026)
+- [SEYDA-WALL-SHAPE-31: likely a tree card drawn through a wall, 7 October 2026](#seyda-wall-shape-31-likely-a-tree-card-drawn-through-a-wall-7-october-2026)
+- [BALMORA-LAMPS-DIM-31, NIGHT-RUST-31, EMISSIVE-UNSHIPPED-31: causes measured, 7 October 2026](#balmora-lamps-dim-31-night-rust-31-emissive-unshipped-31-causes-measured-7-october-2026)
+- [LIGHT-NEGATIVE-31: negative lights bake as white, 7 October 2026](#light-negative-31-negative-lights-bake-as-white-7-october-2026)
+- [BALMORA-LAMPS-DIM-31: Balmora lamps nearly black at night, 7 October 2026](#balmora-lamps-dim-31-balmora-lamps-nearly-black-at-night-7-october-2026)
+- [SEYDA-WALL-SHAPE-31: shape in a Seyda Neen wall, 7 October 2026](#seyda-wall-shape-31-shape-in-a-seyda-neen-wall-7-october-2026)
+- [LIGHT-FALLOFF-31: the opening lantern bakes no light, 7 October 2026](#light-falloff-31-the-opening-lantern-bakes-no-light-7-october-2026)
+- [SEYDA-READ-SLOW-31: owner playtest of dev2, 7 October 2026](#seyda-read-slow-31-owner-playtest-of-dev2-7-october-2026)
+- [AUDIO-03 and AUDIO-LOGO-31: music started under disk-heavy moments, 7 October 2026](#audio-03-and-audio-logo-31-music-started-under-disk-heavy-moments-7-october-2026)
+- [TRACKER-MAP-BLANK-31: world progress map went blank on hover, 7 October 2026](#tracker-map-blank-31-world-progress-map-went-blank-on-hover-7-october-2026)
+- [SEYDA-READ-SLOW-31: 16 KiB file buffer repairs and beats it, 7 October 2026](#seyda-read-slow-31-16-kib-file-buffer-repairs-and-beats-it-7-october-2026)
+- [SEYDA-READ-SLOW-31: dev1 crossings read slower than the test image, 7 October 2026](#seyda-read-slow-31-dev1-crossings-read-slower-than-the-test-image-7-october-2026)
+- [GATE-EMBERS-31: ember commit failed the dev1 gates, 7 October 2026](#gate-embers-31-ember-commit-failed-the-dev1-gates-7-october-2026)
+- [SEYDA-LOAD-HANG-30: the hung read is the music stream, 7 October 2026](#seyda-load-hang-30-the-hung-read-is-the-music-stream-7-october-2026)
+- [CI-HOSTDEPS-30: host CI job failed on the first v0.0.30 push, 7 October 2026](#ci-hostdeps-30-host-ci-job-failed-on-the-first-v0030-push-7-october-2026)
+- [v0.0.30-rc1 owner playtest summary, 7 October 2026](#v0030-rc1-owner-playtest-summary-7-october-2026)
+- [CENSUS-ENTITIES-30: owner-accepted in v0.0.30-rc1, 7 October 2026](#census-entities-30-owner-accepted-in-v0030-rc1-7-october-2026)
+- [AUDIO-NEWGAME-30: rc1 playtest audio reports, 7 October 2026](#audio-newgame-30-rc1-playtest-audio-reports-7-october-2026)
+- [CENSUS-ENTITIES-30: misplaced objects in the Census and Excise Office, 7 October 2026](#census-entities-30-misplaced-objects-in-the-census-and-excise-office-7-october-2026)
+- [SEYDA-LOAD-HANG-30: rare freeze during a Seyda Neen region load, 7 October 2026](#seyda-load-hang-30-rare-freeze-during-a-seyda-neen-region-load-7-october-2026)
+- [BUILD-SEYDA-REGEN-30: public build cannot regenerate Seyda Neen, 7 October 2026](#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)
+- [INTRO-ROLES-30: crash on a region change, 7 October 2026](#intro-roles-30-crash-on-a-region-change-7-october-2026)
+- [CONVERTER-ROOT-ROTATION-30: same cause in more maps, 7 October 2026](#converter-root-rotation-30-same-cause-in-more-maps-7-october-2026)
+- [BALMORA-TEMPLE-GEOMETRY-29: cause found, 7 October 2026](#balmora-temple-geometry-29-cause-found-7-october-2026)
+
+<!-- contents end -->
+
+## TEST-ENV-LEAK-HULL-33, 9 October 2026
+
+[TEST-ENV-LEAK-HULL-33](bugs/TEST-ENV-LEAK-HULL-33.md): the owner's sequential suite run failed the CHIM unit
+fingerprint test because an earlier in-process test left the standing-hull switch set; the parallel gate never
+shares a process between those tests. Tests now restore the environment; the release checks add a sequential run.
+
+## CHIM-COURT-BARREL-USE-33, 9 October 2026
+
+[CHIM-COURT-BARREL-USE-33](bugs/CHIM-COURT-BARREL-USE-33.md): on the v0.0.33 final image the courtyard barrel
+with Fargoth's ring could not be used. The CHIM frame maps put every referenced func_wall into the chunks
+with no edict, and the engine finds the barrel by its edict. The frame maps now keep a faceless marker for
+every object listed in the engine's one list (aw_activated.h), and a gate checks it.
+
+## CHIM-INTRO-TP-OTHER-TOWN-33, 9 October 2026
+
+[CHIM-INTRO-TP-OTHER-TOWN-33](bugs/CHIM-INTRO-TP-OTHER-TOWN-33.md): the final image's smoke test teleported
+from the prison ship to Balmora and landed in the intro docks' frame map (empty water): the docks' frame map
+was chosen for any CHIM town during the intro stages. Now only for Seyda Neen.
+
+## BUILD-REUSE-SCRATCH-UNDECLARED-33 fixed in v0.0.33, 9 October 2026
+
+[BUILD-REUSE-SCRATCH-UNDECLARED-33](bugs/BUILD-REUSE-SCRATCH-UNDECLARED-33.md): measured on the release
+builds: release candidate reruns reused 17, 18 and 25 of 34 stages before the repair; the v0.0.33 final
+reused 30 of 34 with it (engine, harvest, chim and image ran, each for a stated reason).
+
+## GATE-PRIVACY-SCAN-33, 9 October 2026
+
+[GATE-PRIVACY-SCAN-33](bugs/GATE-PRIVACY-SCAN-33.md): the gate's source preflight does not scan file contents
+for tool names and private paths; only the release kit does. The preflight will share the kit's scan.
+
+## BUILD-SCHEDULER-LOWBUDGET-33: a small --jobs budget started no stage, 9 October 2026
+
+[BUILD-SCHEDULER-LOWBUDGET-33](bugs/BUILD-SCHEDULER-LOWBUDGET-33.md): a MiniWind build with
+`--jobs 3` stopped starting stages after its terrain stage. The scheduler reserved a worker for every
+other ready branch before starting a pooled stage, so with more ready branches than the budget it
+started none and spun on one core. Now, with nothing running, the first ready stage starts.
+
+## CHIM-HARVEST-SPECIALS-33, 9 October 2026
+
+[CHIM-HARVEST-SPECIALS-33](bugs/CHIM-HARVEST-SPECIALS-33.md): the rc1 image step stopped on the intro docks'
+harvest catalogue: the docks run as their CHIM frame map, and the engine would never load the legacy-named
+catalogue. It is left out for v0.0.33 (17 plants not pickable on the docks); a frame-map catalogue follows.
+
+## CHIM-SEYDA-ACTOR-CONTACT-33, 9 October 2026
+
+[CHIM-SEYDA-ACTOR-CONTACT-33](bugs/CHIM-SEYDA-ACTOR-CONTACT-33.md): the rc1 build stopped at the frame-map
+parity check: nine Seyda Neen residents, baked on the recorded v0.0.31 terrain, stand up to 3.3 units off the
+CHIM ground. The check now refits them with the legacy fitter's rules (9 of 12 refitted, Balmora unchanged).
+
+## BUILD-ROUTED-FLORA-RESERVE-33, 9 October 2026
+
+[BUILD-ROUTED-FLORA-RESERVE-33](bugs/BUILD-ROUTED-FLORA-RESERVE-33.md): with routed standing hulls the full
+build stopped in world-flora: region vf0779's flora packing needed 33,533 clipnodes against its 32,767
+reserve (32,614 with chains). v0.0.33 ships with chains as the default; routing stays selectable.
+
+## NPC-IDLE-ONLY-ANIM-33, 9 October 2026
+
+[NPC-IDLE-ONLY-ANIM-33](bugs/NPC-IDLE-ONLY-ANIM-33.md): NPCs play only their idle frames, so a moving NPC
+glides; the owner noticed it on the companion test. Planned for the next release as the animation kit.
+
+## ROUTED-HULL-NODE-ORDER-33 in the integration line, 9 October 2026
+
+[ROUTED-HULL-NODE-ORDER-33](bugs/ROUTED-HULL-NODE-ORDER-33.md): the Arena Pit crashed the engine on load
+("SV_RecursiveHullCheck: bad node number") because a routed hull's root sat above nodes it reaches. The same
+routing writes the standing hulls of every legacy map model over 16 pieces since the routed hulls merged, so the
+fix was taken into the integration line before the first full build that ships them.
+
+## BUILD-CHIM-UNIT-HULL-KEY-33, 9 October 2026
+
+[BUILD-CHIM-UNIT-HULL-KEY-33](bugs/BUILD-CHIM-UNIT-HULL-KEY-33.md): a `--model-hull chain` test build reused
+all 692 CHIM variant units of the routed-hull build: the hull form and the routing source were not part of
+the unit fingerprint. Both are now.
+
+## CHIM-BALMORA-RING-OVER-33, 9 October 2026
+
+[CHIM-BALMORA-RING-OVER-33](bugs/CHIM-BALMORA-RING-OVER-33.md): the first full v0.0.33 build stopped at the
+CHIM heap gate on Balmora: the routed standing hulls of large CHIM models add 138,688 bytes to the south-west
+ring, which had 2,528 bytes of headroom with chains. `--model-hull chain` passes meanwhile; repair in progress.
+
+## BUILD-INTERIOR-INDEX-ROUTED-33, 9 October 2026
+
+[BUILD-INTERIOR-INDEX-ROUTED-33](bugs/BUILD-INTERIOR-INDEX-ROUTED-33.md): the first full v0.0.33 build after
+the routed standing hulls stopped in the interior stage: the prison ship's collision index expected a chain of
+convex pieces. The index now keeps a routed standing hull and indexes the point hull only.
+
+## MINIWIND-NO-WINUAE-PROFILE-33, 9 October 2026
+
+[MINIWIND-NO-WINUAE-PROFILE-33](bugs/MINIWIND-NO-WINUAE-PROFILE-33.md): MiniWind playtest packages had an
+FS-UAE profile only, no WinUAE profile and no launcher, unlike the v0.0.32 playtests. The package step will
+write both profiles and the launcher for every build type.
+
+## MESH-LOD-OPEN-SEAMS-33 and CHIM-STRIDER-RING-33 in v0.0.33, 9 October 2026
+
+[MESH-LOD-OPEN-SEAMS-33](bugs/MESH-LOD-OPEN-SEAMS-33.md) and [CHIM-STRIDER-RING-33](bugs/CHIM-STRIDER-RING-33.md):
+the closed-hull strider fix stays on its branch for v0.0.33 by owner decision (on CHIM it puts Balmora's active
+ring 108,672 bytes over the zone); v0.0.33 ships the v0.0.32 strider profile and lists both as known issues.
+
+## NPC-FOLLOW-FLOORS-33: NPC companion test in FS-UAE, 9 October 2026
+
+NPC-FOLLOW-FLOORS-33: first FS-UAE routes of the NPC companion test on the MiniWind (CHIM Balmora).
+Outdoors it followed round a building corner, up and down the river stairs, through the alley
+between two houses, across the bridge and up the west stairway with no teleport (pings and one
+flood fill where it stalled). In the South Wall Cornerclub it cannot find the stairs to another
+floor within its 128-unit flood fill and is placed beside the player after 6 s: the known limit
+of stages 1-2, registered; stage 3 is the repair.
+
+## AMIGA-DISK-2GIB-LIMIT-33: partitions must also start below 2 GiB, 9 October 2026
+
+[AMIGA-DISK-2GIB-LIMIT-33](bugs/AMIGA-DISK-2GIB-LIMIT-33.md): the full two-disk build asked for the volume
+AW_WORLD3 because that partition started past 2 GiB, which Kickstart 3.1 does not mount. Recorded as an accepted
+platform limit (partition size and start below 2 GiB, files well under 2 GiB, drive images below 4 GiB); the builder
+orders partitions accordingly and the layout gate now checks start offsets too.
+
+## LIGHT-ENTITIES-UNWIRED-33: Morrowind lights never become Quake light entities, 9 October 2026
+
+[LIGHT-ENTITIES-UNWIRED-33](bugs/LIGHT-ENTITIES-UNWIRED-33.md): the owner saw the Jiub lantern without its
+warm light; the cause is island-wide. `light_sources.entity()` is never called, 602 of 604 light compiler logs
+report 0 lights, interiors use the own scalar bake and exterior meshes get no lighting. Umbrella cause of the
+lamp, lantern and falloff bugs listed on its page. Open; repair not started.
+
+## CHIM-FAR-TERRAIN-33 repaired in source; CHIM-FAR-OBJECTS-33 found, 9 October 2026
+
+[CHIM-FAR-TERRAIN-33](bugs/CHIM-FAR-TERRAIN-33.md): a resident far terrain layer per frame (exact
+LAND every 512 units over the frame plus one cell, `maps/<frame map>.far`, 13.2 KB of Hunk for
+Balmora) is drawn past the fog plane in the fog colour up to the legacy overlap depth, with the
+distant-LAND rasterizer; branch v0.0.33-chim-farterrain, not yet in a build. FS-UAE A/B against
+v0.0.32 and CHIM Preview 1 at the owner's poses; slow preset 31 to 44 ms a frame.
+[CHIM-FAR-OBJECTS-33](bugs/CHIM-FAR-OBJECTS-33.md): the same A/B shows that much of v0.0.32's
+horizon at Balmora's east bank is houses past the CHIM ring, which CHIM does not draw.
+
+## CHIM-ARENA-MEMORY-33: the Arena's canton bodies do not fit the CHIM zone, 9 October 2026
+
+[CHIM-ARENA-MEMORY-33](bugs/CHIM-ARENA-MEMORY-33.md): the first Vivec Arena CHIM world validates and
+passes the stair gate (341 flight steps), but the heap gate fails. The active ring peaks at
+6,492,688 B against 6,242,304 B, and one canton body alone decodes to 2,514,432 B. The proposed fix
+is to cut such structures by chunk into world geometry.
+
+## CHIM-HULL-CHAIN-COST-33: canton bodies collide through one long chain, 9 October 2026
+
+[CHIM-HULL-CHAIN-COST-33](bugs/CHIM-HULL-CHAIN-COST-33.md): a trace near the Vivec Arena canton
+walks about 6,570 planes, because the canton body's standing hull is one chain of 21,497 clipnodes.
+It made the CHIM Arena stair gate take over 20 minutes, and the engine walks the same chain. The fix
+in progress compiles or routes the hulls of large models.
+
+## COLLISION-HULL-CHAINS-33: long standing-hull chains island-wide, 9 October 2026
+
+[COLLISION-HULL-CHAINS-33](bugs/COLLISION-HULL-CHAINS-33.md): the hull audit of the v0.0.33-dev1 full
+build (2,673 maps) finds 183 brush models of 63 meshes whose standing hull is a chain 512 or more
+clipnodes deep: the prison ship 31,659, the census office 23,127, the Vivec canton bodies up to
+11,211. The legacy converter now routes large models' hulls (in source, not yet built).
+
+## CHIM-SEYDA-HUNK-GAP-33: Seyda Neen's statics stream with their chunks (builder), 9 October 2026
+
+[CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md): the frame map's sprite and model statics
+are tagged to stream with their chunks; Seyda Neen's map then leaves 1,589,344 bytes for after the
+zone instead of 2,580,400, so the zone is back to the full 6,864 KiB. The image step checks each frame
+map's whole-map heap with the models in the ring: the active ring fits with 303,968 bytes of
+headroom (one copy per ring, as the engine holds them). Engine side pending; both must ship together.
+
+## CHIM-ZONE-RESERVE-EARLY-33: reloads of frame maps without a stated figure, 9 October 2026
+
+[CHIM-ZONE-RESERVE-EARLY-33](bugs/CHIM-ZONE-RESERVE-EARLY-33.md): the MiniWind build mw2-033c (from
+c4e14ab) ends 6.8 KB under the 2 MiB Hunk gap after a reload or `dbg tp` into CHIM Balmora (2,090,368
+bytes): its frame map states no `"_chim_hunk_rest"`, so the engine keeps the full zone and says the gap.
+Seyda Neen's tagged frame map (streamed statics) keeps the gap from its second load; the builder will
+state the figure with a 16 KiB margin.
+
+## HEAP-12MB-FAST-ROOM-33: the 12 MiB heap test, 9 October 2026
+
+[HEAP-12MB-FAST-ROOM-33](bugs/HEAP-12MB-FAST-ROOM-33.md): the same route at 11 and 12 MiB of heap
+(ship, Census, Seyda Neen on CHIM, Caius' house, Balmora, the Arena, the gallery, save and load).
+12 MiB loads everything and keeps Seyda Neen's CHIM map above the 2 MiB Hunk gap (2,148,000 bytes),
+but leaves 342,240 bytes of Fast RAM in one block (11 MiB: 1,390,824), so the guard torch's 1 MiB
+probe can never pass. The default stays 11 MiB; `--heap-mb 12` warns.
+
+## DEBUG-TP-CHIM-33: dbg tp on a pure-CHIM disk, 9 October 2026
+
+[DEBUG-TP-CHIM-33](bugs/DEBUG-TP-CHIM-33.md): on a disk with only the CHIM frame maps of the towns,
+`dbg tp X Y` into a CHIM town said the teleport was unavailable (the target check looked for the
+town's legacy map) and the help offered towns the disk does not have. Fixed in source: the check uses
+the scene map (the frame map on CHIM), the lists name only what the disk has, and `dbg tp X Y Z`
+takes a height.
+
+## BUILD-LAYOUT-GATE-AFTER-WRITE-33, 9 October 2026
+
+[BUILD-LAYOUT-GATE-AFTER-WRITE-33](bugs/BUILD-LAYOUT-GATE-AFTER-WRITE-33.md): the disk-layout gate measured each
+drive only after it was written, so an over-limit layout was refused after up to 4 GiB of images, and a
+world map between 1 GiB and 1.5 GiB was copied into a partition first; the dry-run image was not
+measured. The gate now also runs on the plan before any write and on the dry-run image, and
+build.py --layout-selftest proves every refusal end to end with sparse dummies.
+
+## BUILD-PRERENDERED-PRUNE-ORDER-33, 9 October 2026
+
+[BUILD-PRERENDERED-PRUNE-ORDER-33](bugs/BUILD-PRERENDERED-PRUNE-ORDER-33.md): gate 677 failed a prerendered
+store test: with two entries stored within one second, prune chose which one to keep by folder name
+(the fingerprint), so the new fingerprint scope changed the result. Ties now go by the store's usage log.
+
+## BUILD-IMAGE-NOT-INCREMENTAL-33: per-map pass cache, 9 October 2026
+
+[BUILD-IMAGE-NOT-INCREMENTAL-33](bugs/BUILD-IMAGE-NOT-INCREMENTAL-33.md): development builds keep
+the results of the image step's BSP optimizer, hidden-surface cull and stair-walk gate by input
+map SHA-256, options and pass sources (`tools/pass_cache.py`); release candidates and finals run
+every pass. On the 109 maps of the v0.0.33-dev1 MiniWind image a warm run takes 5.7 s for the
+optimizer (388 s without) and 6.6 s for the cull (48 s), maps and receipts byte-identical.
+
+## HUD-ENEMY-BAR-COLOUR-33, 9 October 2026
+
+[HUD-ENEMY-BAR-COLOUR-33](bugs/HUD-ENEMY-BAR-COLOUR-33.md): in the first Vivec Arena emulator run the enemy's
+health bar showed at the right place and time but orange, not yellow: the reserved UI palette has no yellow.
+
+## NPC-WEAPON-MESH-33, COMBAT-NOT-SAVED-33, TOOL-ALIAS-FRAMES-33, COMBAT-PLAYER-KNOCKDOWN-33: combat, 9 October 2026
+
+Found while building melee combat and the Vivec Arena minigame ([combat](COMBAT.md)):
+[NPC-WEAPON-MESH-33](bugs/NPC-WEAPON-MESH-33.md) NPCs carry no visible weapons or shields although
+the rules use them; [COMBAT-NOT-SAVED-33](bugs/COMBAT-NOT-SAVED-33.md) fights and deaths are not saved;
+[TOOL-ALIAS-FRAMES-33](bugs/TOOL-ALIAS-FRAMES-33.md) the alias writer stops at 32 frames, so the Arena
+fighters bake 31; [COMBAT-PLAYER-KNOCKDOWN-33](bugs/COMBAT-PLAYER-KNOCKDOWN-33.md) the player's
+knockdown changes only the rules, not the view or movement.
+
+## BUILD-HULL-ROUTE-BUDGET-33: routed hulls overflowed a legacy map's clipnodes, 9 October 2026
+
+[BUILD-HULL-ROUTE-BUDGET-33](bugs/BUILD-HULL-ROUTE-BUDGET-33.md): with `--model-hull auto`, routed
+standing hulls copied straddling pieces up to each model's own budget, but a legacy map's models share
+one: Seyda Neen's scene map went from 57,181 clipnodes past 65,520. Legacy maps now route without
+copies (57,637 clipnodes, worst chains 1.3 to 3.2 times shallower). Found by the in-map check before any
+build.
+
+## BUILD-CHIM-HULL-RING-33: CHIM model hulls grew Balmora's ring past the zone, 9 October 2026
+
+[BUILD-CHIM-HULL-RING-33](bugs/BUILD-CHIM-HULL-RING-33.md): the pure-CHIM release build stopped at the
+heap gate: routed and compiled hulls of Balmora's houses grew the south-west ring by 138,688 bytes, to
+136,160 over the zone. CHIM now routes only models over 256 pieces, without copies; Balmora measures
+6,239,776 bytes again.
+
+## BUILD-REUSE-SCRATCH-UNDECLARED-33 and BUILD-SURVEY-NOT-REPRODUCIBLE-33, 9 October 2026
+
+[BUILD-REUSE-SCRATCH-UNDECLARED-33](bugs/BUILD-REUSE-SCRATCH-UNDECLARED-33.md): the rc1c rerun reused 1 of
+33 stages: the builder's scratch folder counted as an undeclared output of the first stages, and every later
+stage followed them (about 1,427 s of conversion again). The folder is run-private now, and old records refused
+only for it are reusable. [BUILD-SURVEY-NOT-REPRODUCIBLE-33](bugs/BUILD-SURVEY-NOT-REPRODUCIBLE-33.md): the
+world survey writes its wall time into its report, so a rerun never matches (open, next release line).
+
+## CHIM-GRAFT-REPACK-EMPTY-33: the world vanishes in Seyda Neen on CHIM, 9 October 2026
+
+[CHIM-GRAFT-REPACK-EMPTY-33](bugs/CHIM-GRAFT-REPACK-EMPTY-33.md): in the owner's playtest of v0.0.33
+final3 the ground and buildings of Seyda Neen vanished near the town square and the player fell under
+the world ("frame world repacked (marks full): 0 chunks"). Not a hole in the data: the frame world's
+repack let its block go when the zone had no room for a larger one and laid out 0 chunks. Repaired in
+source: the block is kept and holds the nearest chunks that fit; regression test in the CHIM engine tests.
+
+## CHIM-GRAFT-REPACK-EMPTY-33 safety net: the terrain floor, 9 October 2026
+
+[CHIM-GRAFT-REPACK-EMPTY-33](bugs/CHIM-GRAFT-REPACK-EMPTY-33.md), second layer: with noclip off the
+frame's resident far terrain is the lowest height. A walking or free-falling body below it, with nothing
+of the world under it, is lifted onto the ground with one console line and the player is held there, so an
+emptied frame world no longer means an endless fall. `chim_terrain_floor 0` keeps the old behaviour.
+
+## BUILD-TMP-SCRATCH-33, 9 October 2026
+
+[BUILD-TMP-SCRATCH-33](bugs/BUILD-TMP-SCRATCH-33.md): after CHIM-ZONE-TMP-NOEXEC-33 the owner asked whether /tmp is a bad place
+for the builder at all. Audit of the tool sources: one executed use (already moved), four large ones (movie
+frames, terrain survey, town context, pool item output) and a list of small ones. All executed or large uses
+now go through tools/build_scratch.py (the run's scratch folder); a static test fails on any new use.
+
+## TEST-COST-ORDER-LOAD-33, 9 October 2026
+
+[TEST-COST-ORDER-LOAD-33](bugs/TEST-COST-ORDER-LOAD-33.md): gate 672 failed the scheduler cost-order test on a
+fully loaded host; the merged head passes it 4 of 4 in isolation, so it is a load-dependent test, not a merge
+interaction. The CHIM Engine tracker link in docs/BUGS.md lost in the batch merge is restored.
+
+## TRACKER-CHIM-LINK-MERGE-33, 9 October 2026
+
+[TRACKER-CHIM-LINK-MERGE-33](bugs/TRACKER-CHIM-LINK-MERGE-33.md): the full gate of the integration head
+fc40213 failed the CHIM tracker test: merges had dropped the register's link to the CHIM Engine
+tracker. The link is restored.
+
+## BUILD-WORLD-PARTITION-MOUNT-33, 9 October 2026
+
+[BUILD-WORLD-PARTITION-MOUNT-33](bugs/BUILD-WORLD-PARTITION-MOUNT-33.md): the full v0.0.33-dev1 image stopped at
+"Please insert volume AW_WORLD3". The CHIM world partition DW3 started at 2,281,734,144 bytes of the
+world disk; Kickstart 3.1 (FS-UAE 3.1.66) does not mount a partition that starts at or beyond 2 GiB
+("Not a DOS disk"). Drives now keep every partition start below 2 GiB (largest partition last when
+needed) and the image step refuses a written partition that starts later.
+
+## MINIWIND-PAYLOAD-NOT-SLIM-33, 9 October 2026
+
+[MINIWIND-PAYLOAD-NOT-SLIM-33](bugs/MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 carries every movie and
+voice because the gated exclude flags branch was not merged into its line before the build.
+
+## CHIM-HARVEST-REMOVED-MAPS-33, 9 October 2026
+
+[CHIM-HARVEST-REMOVED-MAPS-33](bugs/CHIM-HARVEST-REMOVED-MAPS-33.md): the second MiniWind image stopped at
+the save fingerprint, which still required the region maps of Balmora's harvest catalogues after the pure
+CHIM step had removed them. Catalogues of removed maps are accepted now.
+
+## BUILD-CACHE-CHIM-UNITS-33: the prerendered store, 9 October 2026
+
+[BUILD-CACHE-CHIM-UNITS-33](bugs/BUILD-CACHE-CHIM-UNITS-33.md): while the prerendered store was
+built on the stage cache, the chim stage's fingerprint turned out to include the content of its
+unit cache folder, which grows with every build, so the stage was never reused. The unit cache is
+now a content-addressed cache option, like the NPC gallery and world terrain caches.
+
+## TRACKER-REGISTER-LINK-MERGE-33, 9 October 2026
+
+[TRACKER-REGISTER-LINK-MERGE-33](bugs/TRACKER-REGISTER-LINK-MERGE-33.md): merging integration head
+1ddb8fe into v0.0.33-boot-validate, the tracker test found the bug register's link to the CHIM
+Engine tracker missing (lost in an integration merge); restored on that branch.
+[TEST-PROFILE-TIMELINE-SUM-33](bugs/TEST-PROFILE-TIMELINE-SUM-33.md) closed as a duplicate of
+[TEST-PROFILE-TIMELINE-BOUND-33](bugs/TEST-PROFILE-TIMELINE-BOUND-33.md).
+
+## BOOT-VOLUME-NOT-VALIDATED-33: diagnostic logs in memory during play, 9 October 2026
+
+[BOOT-VOLUME-NOT-VALIDATED-33](bugs/BOOT-VOLUME-NOT-VALIDATED-33.md): owner decision, the
+diagnostic logs (console copy, walk and stall profiles, heap audit, cell and BSP load profiles,
+music events and profile, console history) stay in fixed memory buffers (41 KiB in all, oldest
+lines drop) and are written at Exit game, after a crash report and with `dbg savelogs`;
+`dbg logs live on` or a `--live-logs` image writes them as they happen, as before (benchmarks).
+FS-UAE, slow cycle-exact setting: 0 writes in 1,355 s of play (previous engine 6 in 410 s, 3.7 %
+of the time "not validated"; 15 % on the fast setting); after a hard kill the volume read
+validated. Saves are still written when made.
+
+## TEST-PROFILE-TIMELINE-SUM-33, 9 October 2026
+
+[TEST-PROFILE-TIMELINE-SUM-33](bugs/TEST-PROFILE-TIMELINE-SUM-33.md): a full gate on a busy host
+failed the build profile test's sampled-timeline check (2.48 s of timeline CPU against 2.01 s
+measured by the stage); the previous commit's gate passed it. Cause not investigated.
+
+## BOOT-VOLUME-NOT-VALIDATED-33 cause measured and repaired in source, 9 October 2026
+
+[BOOT-VOLUME-NOT-VALIDATED-33](bugs/BOOT-VOLUME-NOT-VALIDATED-33.md): measured in FS-UAE. The game
+writes to its boot volume from the first second (debug and music logs at start, diagnostic logs,
+saves, settings at exit); each write leaves the volume marked not validated for about a second,
+15 % of the time while standing in Seyda Neen. Stopping the emulator in such a second makes AmigaOS
+validate the volume at the next boot: hidden by the boot countdown with the fast setting, about a
+minute with a cycle-exact 68040 at multiplier 14, where the engine's first write (DEBUG.TXT) opened
+the request; Retry after the check worked, Cancel stopped the game. Repaired in source on
+v0.0.33-boot-validate: the engine waits for the validation before its first write
+(`Set AmiWindValidateWait 0` keeps the old start) and a failed debug log no longer stops the game;
+checked in FS-UAE with the slow setting, regression tests added.
+
+## BOOT-VOLUME-NOT-VALIDATED-33 registered, 9 October 2026
+
+[BOOT-VOLUME-NOT-VALIDATED-33](bugs/BOOT-VOLUME-NOT-VALIDATED-33.md): owner report from a private
+CHIM preview playtest (the v0.0.32 release image with a CHIM development engine) on FS-UAE 3.1.66
+with a slow cycle-exact 68040 setting: right after the boot check's "Loading AmiWind v0.0.32",
+AmigaOS asked "Volume AMIWIND is not validated" (Retry/Cancel). Cause being measured.
+
+## HORIZON-FLORA-SPRITES-32 default accepted; HORIZON-HOLES-31 not re-checked, 8 October 2026
+
+[BUILD-DOOR-REFERENCE-SERIAL-33](bugs/BUILD-DOOR-REFERENCE-SERIAL-33.md): the door step read the
+whole master once per destination cell, about 72 s on one core in interior, census, area and
+balmora-interiors; now one pass. [BUILD-ORDERED-WINDOW-33](bugs/BUILD-ORDERED-WINDOW-33.md): the
+ordered pool idled behind one slow item (world terrain at 13.9 of 24 cores); four results per
+worker now, and a longest-first cost model from item history. Stage-only runs for
+[BUILD-IDLE-STAGES-33](bugs/BUILD-IDLE-STAGES-33.md), all byte-identical: balmora 716 -> 268 s,
+media 753 -> 258 s, balmora-interiors 904 -> 614 s, actor-contact 346 -> 194 s, bsp 125 -> 53 s
+(4 CPUs, busy host).
+
+## BUILD-EXCLUDE-STAGE-CLOSURE-33: quick test builds, 9 October 2026
+
+[BUILD-EXCLUDE-STAGE-CLOSURE-33](bugs/BUILD-EXCLUDE-STAGE-CLOSURE-33.md): gate 650 caught the new
+exclusion table in every conversion stage's fingerprint (the stage scheduler imported it) and a
+native test that includes `aw_intro.c` without the new marker module. The scheduler, cache and
+profiler now read the skipped stages from the build receipt; gate 651 is green.
+
+## CHIM-ZONE-TMP-NOEXEC-33, 9 October 2026
+
+[CHIM-ZONE-TMP-NOEXEC-33](bugs/CHIM-ZONE-TMP-NOEXEC-33.md): the second MiniWind build stopped in the CHIM
+stage: the zone walk gate builds a host library in /tmp, which the build container mounts noexec. It is
+now built under the CHIM output's work folder.
+
+## BUILD-MINIWIND-FINGERPRINT-ENGINE-33, 9 October 2026
+
+[BUILD-MINIWIND-FINGERPRINT-ENGINE-33](bugs/BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): gate 585 caught the MiniWind module importing the CHIM tools, which put the
+engine sources into every conversion stage's fingerprint (no reuse after an engine edit). The image
+step now passes the CHIM removal function in; a regression test guards the module's imports.
+
+## TEST-NATIVE-STALE-IMPORT-33: MiniWind exterior scope, 9 October 2026
+
+[TEST-NATIVE-STALE-IMPORT-33](bugs/TEST-NATIVE-STALE-IMPORT-33.md): while adding the MiniWind exterior scope, a native engine test run on its
+own in the builder image failed to compile (no `chim_version.h`): it generated its version headers
+with an older tools copy on the image's Python path. The full suite was not affected. The test now
+loads this tree's `tools/project_version.py` from its file.
+
+## CHIM-ACTOR-RING-33: NPC companion test, 9 October 2026
+
+
+
+## RELEASE-WS-BASELINE-VERSION-33: the whitespace baseline followed VERSION, 9 October 2026
+
+
+
+## BUILD-DOOR-REFERENCE-SERIAL-33, BUILD-ORDERED-WINDOW-33; stage repairs measured, 9 October 2026
+
+
+
+## NPC-BAKED-WHOLE-DUPLICATION-33: modular NPCs designed and measured, 9 October 2026
+
+
+
+## AUDIO-HOST-LOAD-33: crackle on a saturated host, 9 October 2026
+
+[AUDIO-HOST-LOAD-33](bugs/AUDIO-HOST-LOAD-33.md): the owner heard music and sound crackle and snap
+throughout CHIM Preview 1 played on a PC whose CPU was at 100 % with build jobs; the same build was
+clean on a second, idle PC. Cause: host CPU starvation of the emulator's audio, not game data and not
+the in-game loading crackle of [AUDIO-LOAD-29](BUGS.md#music-and-sound-audio). Audio is judged only on
+an unloaded host; a controlled idle/loaded A/B on one PC is pending. Checked against the owner's
+v0.0.32-dev3 Vivec reports: the floating resident is
+[VIVEC-ARENA-FLOATING-NPC-32](bugs/VIVEC-ARENA-FLOATING-NPC-32.md), and the broken transition to the
+open world and its flora, and Vivec not being visible from the open world, are
+[TOWN-EDGE-UNBUILT-32](bugs/TOWN-EDGE-UNBUILT-32.md); no new entries for them.
+
+## CHIM Engine tracker and found-in-build records; CHIM-RECEIPT-COMMIT-33, 9 October 2026
+
+[NPC-BAKED-WHOLE-DUPLICATION-33](bugs/NPC-BAKED-WHOLE-DUPLICATION-33.md) registered at the owner's
+request: the 2,675 humanoid records resolve to 3,500 appearances but only 1,726 distinct body parts
+(942 meshes, each part used about 39 times); whole-appearance baking processes 12.3 million source
+triangles against 0.40 million in the distinct parts, and the gallery stage takes 2,034 s (6.5 CPU
+hours) cold. Design in [MODULAR_NPCS.md](MODULAR_NPCS.md): a parts library with a few quota levels
+per part, recipes per appearance, the gallery built from parts (estimate: about 260 s with 4
+levels), then one alias model composed per appearance at load time in the engine. Host prototype on
+v0.0.33-modular-npc: parts baked once with their outfit quotas reproduce the whole bake (6 of 13
+Balmora NPCs byte-identical, the rest within 8 faces); not shipped at the time of writing.
+
+## OPENING-BRIGHT-31, OPENING-JIUB-LANTERN-32 and NPC-LIGHT-COHERENCE-32: the opening scene's light, 9 October 2026
+
+Owner reports on CHIM Preview 1 (v0.0.32 content): the start end of the prison ship should be
+about half as bright with a yellow lantern above Jiub, and "the NPC lighting isn't following any
+coherence". [OPENING-BRIGHT-31](bugs/OPENING-BRIGHT-31.md): repaired in source with a per-cell
+bake profile for the ship (original falloff, facing term, two box zones at the start end); start
+views 0.50 of v0.0.32 on average and 0.94 to 1.04 of OpenMW at the same pose.
+[OPENING-JIUB-LANTERN-32](bugs/OPENING-JIUB-LANTERN-32.md), new: baked light had no colour and the
+lantern's glass is drawn opaque over its candle; baked faces lit mainly by warm lamps now take a
+warm lightstyle (the warm colour table, chosen per surface) and the ship's lantern glass glows.
+[NPC-LIGHT-COHERENCE-32](bugs/NPC-LIGHT-COHERENCE-32.md), new: characters took the light of the
+floor below them; the interior converters now bake an actor light grid and the engine lights
+characters by it (Jiub 2.13 times the wall, the original 2.44; Socucius Ergalla 0.65 of the wall,
+was 0.35, the original 1.04). Exteriors unchanged. All three repaired in source on
+v0.0.33-ship-light, not yet in a built image. [CENSUS-OFFICE-BRIGHT-32](bugs/CENSUS-OFFICE-BRIGHT-32.md), new,
+measured on the way: the office walls are about twice as bright as the original's; no repair yet.
+
+## CHIM-TRACE-TAIL-33: a tail of expensive CHIM collision traces, 9 October 2026
+
+[CHIM-TRACE-TAIL-33](bugs/CHIM-TRACE-TAIL-33.md): counted offline during the NPC pathfinding
+investigation on format 0.5 Balmora and Seyda Neen frames: most standing-hull traces are cheap, a
+few visit thousands of clipnodes (Seyda Neen fan traces: median 171, p90 3,040, mean 2,003 visits).
+Cause unknown; engine counter on the cycle-exact preset pending.
+
+## BUILD-IDLE-STAGES-33, BUILD-STAGE-START-SHARE-33 and BUILD-NESTED-POOL-ALLOWANCE-33, 9 October 2026
+
+[BUILD-IDLE-STAGES-33](bugs/BUILD-IDLE-STAGES-33.md): with the profile now comparing cores with
+the workers held, the v0.0.32 from-scratch build shows eight scene-chain stages far below their
+workers (balmora 2.84 of 12 cores for 510 s, actor-contact 1.39 of 12, bsp 0.98 of 8-12) while the
+NPC gallery on the critical path waited for cores. Two scheduler causes:
+[BUILD-STAGE-START-SHARE-33](bugs/BUILD-STAGE-START-SHARE-33.md), a pooled stage starting beside
+others got `--jobs 1`, so its vis threads stayed at one (bsp: 87.9 s of vis on one thread), and
+[BUILD-NESTED-POOL-ALLOWANCE-33](bugs/BUILD-NESTED-POOL-ALLOWANCE-33.md), pool workers inherited
+the stage allowance, so each room worker opened its own pool (balmora-interiors at about 16 of 12
+cores). Both fixed in source with tests; the per-stage repairs follow on the same branch.
+
+## BUILD-PROFILE-JOBS-START-ONLY-33: idle cores measured against the start allowance, 9 October 2026
+
+[BUILD-PROFILE-JOBS-START-ONLY-33](bugs/BUILD-PROFILE-JOBS-START-ONLY-33.md): the build profile
+compared each stage's cores with the workers it started with, but the scheduler rebalances them
+within a fraction of a second. In the v0.0.32 from-scratch build balmora started with 1 worker,
+held 12 and used 2.84 cores for 510 s; actor-contact, interior, bsp and the Vivec Arena import
+likewise; none was flagged as idle. Fixed in source on the build-progress branch: profile rows
+record the workers held over time and every comparison uses them; regression tests with those
+numbers.
+The register now generates a [CHIM Engine tracker](bugs/CHIM_TRACKER.md): every CHIM bug by part,
+open first, with the build it was found in and the latest journal changes. A bug is on it when its
+`chim` field names its part; CHIM- IDs and the chim-streamer family are marked by `render` and must
+carry it (test). Every CHIM bug and every bug found in a numbered build now also records that build:
+playtest version, source, engine and world commits, CHIM version and world format
+(`set ID --from-build build.json`). Backfilled from the build receipts: v0.0.32-dev1, -dev2, -dev3 and
+v0.0.32 with their source commits; builds before v0.0.32-dev1 record no commit (unknown, with that
+reason); [CHIM-TEXTURE-SPECKS-33](bugs/CHIM-TEXTURE-SPECKS-33.md) as seen in CHIM Preview 1 (engine
+0d8bf4f, world format 0.4). New: [CHIM-RECEIPT-COMMIT-33](bugs/CHIM-RECEIPT-COMMIT-33.md): the CHIM
+world receipts do not record the commit the world was built from, so the preview's world commit is
+unknown.
+Every new `VERSION` failed the release preflight with "trailing whitespace" and "blank line at
+EOF" in untouched inherited engine files until a `docs/PATCH-v<VERSION>.json` was made by hand: the
+check took its list of exempt historical files from the patch manifest of the version being worked
+on. Fixed in source on v0.0.33-ws-baseline, not shipped at the time of writing: the list is
+`docs/WHITESPACE-BASELINE.json`, written from the published v0.0.32 tag by
+`tools/release.py --whitespace-baseline v0.0.32` (72 files under `engine/aga/` and `docs/aga/`);
+only those paths can be exempt, edited files are checked in full, and four of our own files lost
+their extra blank lines at the end. Regression tests in `tests/test_release.py`.
+[Report](bugs/RELEASE-WS-BASELINE-VERSION-33.md).
+[HORIZON-FLORA-SPRITES-32](bugs/HORIZON-FLORA-SPRITES-32.md): the owner, playing v0.0.32-dev3,
+called the default horizon (`aw_skyline_fill 0`) excellent; the default method is accepted and the
+entry stays open for the experimental skyline fill only.
+[HORIZON-HOLES-31](bugs/HORIZON-HOLES-31.md): not re-checked on v0.0.32; needs the
+across-the-river Balmora view on a v0.0.32 build.
+
+## BUILD-PATH-IN-PAYLOAD-32 and BUILD-STAIR-FLAG-INERT-32, 8 October 2026
+
+[BUILD-PATH-IN-PAYLOAD-32](bugs/BUILD-PATH-IN-PAYLOAD-32.md): the v0.0.32 release image payload
+compared with dev3 differed in one file only, `id1/gfx/sky-palette-bank.json`, whose
+`shared_sky_source` field holds the build work folder path. Fixed in source on v0.0.33-dev: the
+marker names the source relative to the work folder, and the image step refuses payload text files
+that contain the build folder path. [BUILD-STAIR-FLAG-INERT-32](bugs/BUILD-STAIR-FLAG-INERT-32.md):
+found by the release payload and notes review: v0.0.32's `follow_original_stair_rules` option is
+read by no converter; the stair work merged on v0.0.33-dev wires it, and a new test shows the
+collision output changing with it.
+
+## CHIM-IMAGE-OPTIMIZER-RECEIPT-33 and the Vivec Arena in CHIM builds, 9 October 2026
+
+[CHIM-IMAGE-OPTIMIZER-RECEIPT-33](bugs/CHIM-IMAGE-OPTIMIZER-RECEIPT-33.md): a pure CHIM image would
+stop at the final heap gate, because the frame maps and the removed legacy maps no longer match the
+optimizer receipt; the receipt now follows the CHIM map set before the gates. Owner decision for
+[CHIM-LEGACY-CHAIN-33](bugs/CHIM-LEGACY-CHAIN-33.md): a CHIM build leaves out extra towns that are
+not on CHIM yet (the Vivec Arena: exterior maps, region and door tables, harvest catalogues),
+recorded per file; the legacy open world stays as "not yet CHIM".
+
+## CHIM-LEGACY-CHAIN-33: CHIM builds and the legacy exterior chain, 9 October 2026
+
+[CHIM-LEGACY-CHAIN-33](bugs/CHIM-LEGACY-CHAIN-33.md): a CHIM build still runs every legacy exterior
+stage (the Balmora region maps, the Vivec Arena, the open world), because the CHIM frame maps copy
+their actors from the final legacy region maps and the image step needs the open-world overlay and
+its town flora. Nothing wrong ships. Now every CHIM build records which legacy stages it still runs
+and why, the image step fails if a legacy exterior map of a CHIM area is packed, and a CHIM build
+with Seyda Neen takes the recorded v0.0.31 Seyda maps (--seyda-recorded).
+
+## BUILD-CACHE-OVERBROAD-33 and BUILD-CACHE-NO-CUTOFF-33: CHIM builds rerun the scene chain, 9 October 2026
+
+[BUILD-CACHE-OVERBROAD-33](bugs/BUILD-CACHE-OVERBROAD-33.md): owner report: after merges, the
+AmiWind "MiniWind" Playtester Builds (v0.0.33-dev1, mw-033a and mw-033c) reran the scene chain although
+the changes could not change its outputs; mw-033c reused 3 of 24 stages. Measured per stage and per
+fingerprint part: the line still had the first fingerprint method; the narrower one still hashed whole
+files, so the MiniWind build plan code in `tools/build_parallel.py` (every stage imports the module for
+its worker pool) changed 20 stages, and `ROOT / 'config' / row['config']` counted the whole `config/`
+folder. Repaired in development: fingerprint scope `units` (import-time code plus each reached
+function), registry-named config files, a call trace in every profiled build; the earlier scopes stay
+selectable. [BUILD-CACHE-NO-CUTOFF-33](bugs/BUILD-CACHE-NO-CUTOFF-33.md): a real change to an early
+scene stage still reruns every stage after it, even when its outputs come out identical (open).
+
+## CHIM-HULL-STAIR-EDGE-33 and BUILD-REUSE-TMP-UNDECLARED-33: first MiniWind builds, 9 October 2026
+
+[CHIM-HULL-STAIR-EDGE-33](bugs/CHIM-HULL-STAIR-EDGE-33.md): the first AmiWind "MiniWind" Playtester
+Build stopped at the CHIM stair gate on Balmora ref 32841, at a chunk edge: the qbsp-compiled
+terrain hull was the default for regular ground too. It is the default for irregular ground only
+now (from the CHIM builder branch). [BUILD-REUSE-TMP-UNDECLARED-33](bugs/BUILD-REUSE-TMP-UNDECLARED-33.md):
+a stage that ran while a reused stage was copied counted the copy's temporary file as its own output
+and became non-reusable; the recorder now ignores those temporaries.
+
+## GATE-SOURCE-RACE-33, 9 October 2026
+
+[GATE-SOURCE-RACE-33](bugs/GATE-SOURCE-RACE-33.md): a local gate copied the working tree after its
+clean check while a merge was being resolved, and tested conflict markers under a clean commit's
+name. The rerun on the untouched tree passed. Fix queued: stage from the committed head.
+
+## CHIM-SEYDA-HUNK-GAP-33 and CHIM-ZONE-RESERVE-EARLY-33, 9 October 2026
+
+[CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md): Seyda Neen's CHIM map ends its load with a
+Hunk gap of 1,099,456 bytes at the default zone (6,864 KiB), under the engine's 2 MiB safety: its
+frame map carries all 229 flora sprites and the actors at once (978,288 bytes, against 352,864 for a
+legacy region map). The largest zone the rule allows there is 5,888 KiB; Balmora's is the default.
+[CHIM-ZONE-RESERVE-EARLY-33](bugs/CHIM-ZONE-RESERVE-EARLY-33.md): `chim_reserve_kib` is checked when
+the zone is taken, before the map's entities and per-map allocations load, so it cannot keep the gap.
+Measured in FS-UAE on the v0.0.32 release images with the CHIM engine and B's Seyda Neen world.
+
+## CHIM-CHUNK-LOAD-FAIL-33: Balmora chunks without room on the CHIM preview, 9 October 2026
+
+[CHIM-CHUNK-LOAD-FAIL-33](bugs/CHIM-CHUNK-LOAD-FAIL-33.md): in the owner's playtest of the private CHIM
+preview, Balmora chunks failed to load ("zone full or bad data"), never recovered, left areas without
+buildings or ground, and the player fell through. Reproduced in FS-UAE at the owner's poses with the same
+chunk numbers. Not bad data: the world reads back whole. The zone (6,864 KiB) held up to 6.1 MB locked;
+1.2 MB were free but in pieces of at most 211 KB while the ring's house models decode to 258-291 KB.
+Chunks stay locked out to the load radius (892 units), past the 636-unit ring the heap gate counts, and
+a chunk's ground waits for every model it places. Related: CHIM-ZONE-BUDGET-33, CHIM-ZONE-RING-THRASH-33.
+Repaired in source on v0.0.33-chim-chunkload: a loading chunk keeps its own parts locked (the first method
+evicted them and loaded for ever), a chunk short of room releases farther chunks, a chunk whose model has no
+room is activated without it (ground and collision stay), small blocks come from the zone's high end. Each
+method is a cvar (0: the first method). The engine's own zone allocator over the owner's route (simulation):
+holes under the player 860 to 0, model loads 1,010,584 to 997; in FS-UAE the nearest chunk without ground
+stays 438 units away (69 before; collision margin 224). New builder gate: the zone walk
+(`tools/chim/zone_sim.py`).
+
+## CHIM-FAR-TERRAIN-33: no distant ground on CHIM, 9 October 2026
+
+[CHIM-FAR-TERRAIN-33](bugs/CHIM-FAR-TERRAIN-33.md): an owner playtest of CHIM Preview 1 found that a
+CHIM frame has no distant ground. Past the active ring the land is missing, valleys look empty and
+Vivec is not visible from the world. This is a release blocker for v0.0.33: the CHIM distant view
+must be at least as good as v0.0.32's HORSTATOR APPROVED horizon.
+
+## Last failing stair flights were gate artefacts, 9 October 2026
+
+[STAIRS-BALMORA-B01-32](bugs/STAIRS-BALMORA-B01-32.md),
+[STAIRS-BALMORA-WESTSOUTH-32](bugs/STAIRS-BALMORA-WESTSOUTH-32.md),
+[STAIRS-SEYDA-WAREHOUSE-32](bugs/STAIRS-SEYDA-WAREHOUSE-32.md) and
+[STAIRS-ADDAMASARTUS-32](bugs/STAIRS-ADDAMASARTUS-32.md): fixed in source on branch
+v0.0.33-stairs-2. Measured on the meshes and maps, none was a collision fault: B01's walk started
+inside the authored collision ramp and settled from inside a low arch lintel (the column between
+is free); the warehouse tower's start box touched the curved wall within the collision plate's
+0.2 thickness; Western Guard Tower South's flight ends at a closed hinged door (AW-20260928-12);
+the Addamasartus "step" is two tilted cave-floor triangles sharing an edge. The gate
+(`tools/stair_walk.py`, shared by the legacy image step and CHIM) now reads a riser as a drop at
+the shared edge, settles from the free part of the start column, and treats starts and walks that
+meet visible geometry within the plate thickness as untestable (sideways retries first).
+Rebuilt legacy maps with the rule: 5 gating failures -> 0; CHIM Balmora 1 -> 0; no passing
+flight step lost. [STAIRS-SEYDA-LIGHTHOUSE-32](bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md): exterior fixed
+by the slanted-riser cut (c1f4d87), interior step untestable (the straight line meets the
+lighthouse wall). Regression fixtures: `tests/test_stair_walk_cases.py`.
+
+## CHIM-SEYDA-MEMORY-33: Seyda Neen's ring, cause found, 8 October 2026
+
+[CHIM-SEYDA-MEMORY-33](bugs/CHIM-SEYDA-MEMORY-33.md): Seyda Neen's modelled CHIM ring (6,536,720
+bytes) exceeded Balmora's because the irregular ground's standing hull was built as routed chains of
+small prisms (107,506 clipnodes in the ring). Compiled by qbsp instead: 11,984 clipnodes, ring
+5,683,920 bytes, within the engine's 6,096 KiB chunk room. Fixed in source, not shipped.
+
+## CHIM visibility rows: slow on irregular ground, rebuilt per worker count, 8 October 2026
+
+[CHIM-PVS-SLOW-33](bugs/CHIM-PVS-SLOW-33.md): Seyda Neen's visibility rows took 331 s (961 CPU s,
+3 workers) and were rebuilt because the worker count had changed. Fixed in source: fixed block
+count, 8-unit plane lookup for irregular ground.
+
+## CHIM heap gate: the zone default is too small for Seyda Neen, 8 October 2026
+
+[CHIM-ZONE-BUDGET-33](bugs/CHIM-ZONE-BUDGET-33.md): the strict CHIM heap gate (the engine's own
+active-ring rule, every 64 units) finds Seyda Neen's ring at 6,536,720 bytes and Balmora's
+south-west corner at 6,239,776, against 5,767,168 at the engine default `chim_zone_kib` 6,656 KiB.
+Interim budget 7,680 KiB in the builder and the engine (owner decision pending); a world-stated
+zone is proposed.
+
+## CHIM-TEXTURE-SPECKS-33: owner playtest, gate and opt-in effect, 9 October 2026
+
+[CHIM-TEXTURE-SPECKS-33](bugs/CHIM-TEXTURE-SPECKS-33.md): the owner's playtest of a CHIM preview
+build showed bright orange and cream specks all over Balmora, glowing at dusk. That build's CHIM
+world was made before the repair of 8 October: 858 texels in 86 of 176 textures still sat on the
+image's seven sky-bank entries. FS-UAE A/B/C/D at six poses (legacy maps, the preview world, the
+repaired world on the same image, the preview world without entities): only the preview world
+specks; the repaired world matches legacy. The CHIM validator now refuses texels on the sky bank,
+and the look is kept as the first opt-in CHIM texture effect, `autumn_glitter_leaves`
+([CHIM texture effects](chim/TEXTURE_EFFECTS.md)).
+
+## RELEASE-PATCH-SIZE-33, 8 October 2026
+
+[RELEASE-PATCH-SIZE-33](bugs/RELEASE-PATCH-SIZE-33.md): the whitespace baseline for v0.0.33-dev1
+(1,811 files of the published v0.0.32) passed the 256 KiB text limit of the release preflight. The
+baselines get a named 1 MiB limit and the early-warning test. The `--accept-known-stair-findings`
+builder option is classified as a private test waiver in the defaults test.
+
+## ENGINE-FPU-DATA-DECODE-33, 8 October 2026
+
+[ENGINE-FPU-DATA-DECODE-33](bugs/ENGINE-FPU-DATA-DECODE-33.md): after the CHIM engine merge the
+engine stage stopped on three `fintrz` instructions reported in `AW_ModelVisible`. They were a
+pointer table in `.text` decoded as instructions; the FPU check now ignores decoded opcodes inside
+relocated longwords. The v0.0.33-dev1 whitespace baseline `docs/PATCH-v0.0.33-dev1.json` (published
+v0.0.32) was added, as for earlier versions.
+
+## BUILD-ENV-FINGERPRINT-GLOBAL-33, merges for v0.0.33-dev1, 8 October 2026
+
+[BUILD-ENV-FINGERPRINT-GLOBAL-33](bugs/BUILD-ENV-FINGERPRINT-GLOBAL-33.md): the v0.0.33-dev1
+build reused 0 of 34 stages from the v0.0.32 release run, because the stair rule setting is an
+environment variable that goes into every stage's fingerprint, so stages that never read it
+rebuild as well. The CHIM builder's tracker entries merged for v0.0.33-dev1 (SEYDA-REGIONS-PIN-33,
+CHIM-HIDDEN-FACES-33, CHIM-STAIRGATE-SLOW-33, CHIM-ZONE-BUDGET-33) got their fact fields.
+The image step's stair gate now takes the same private-test option as the CHIM stage
+(`--accept-known-stair-findings ID`, -devN only, recorded in `stair-walk.json`); the five open
+STAIRS-*-32 findings are listed in `config/known-stair-findings.json` with their placements.
+
+## BUILD-CACHE-CLOSURE-WIDE-33 and BUILD-CACHE-ABSOLUTE-PATHS-33: stage reuse, 9 October 2026
+
+Found while making `--reuse-from` keep what it should (the v0.0.33-dev1 pre-warm reused 0 of 34
+stages). [BUILD-CACHE-CLOSURE-WIDE-33](bugs/BUILD-CACHE-CLOSURE-WIDE-33.md): fingerprints counted
+every module any imported module could import, and whole top folders of data; the media stage
+covered 157 modules and 569 data files. [BUILD-CACHE-ABSOLUTE-PATHS-33](bugs/BUILD-CACHE-ABSOLUTE-PATHS-33.md):
+fingerprints held absolute paths, so reuse needed the checkout and workspace at the old run's
+paths. Repaired in source on v0.0.33 development: fingerprints follow the code a stage can reach
+and the environment variables it names, locations become tokens, and a read trace in every
+profiled build marks a stage not reusable when it read a file its fingerprint left out. The stair
+rule part of the same symptom is BUILD-ENV-FINGERPRINT-GLOBAL-33, registered on the v0.0.33-dev1
+build line; this change repairs it too.
+[BUILD-CACHE-TRACE-PYTHONPATH-33](bugs/BUILD-CACHE-TRACE-PYTHONPATH-33.md): gate 450 found that
+the new read trace refused reuse of an already reused run when another checkout was on
+`PYTHONPATH` (the builder's own modules counted as outside code); repaired before merge, with a
+test in the gate's layout. No stale output was involved.
+
+## DOCS-TOC-RENDER-FIGHT-33; v0.0.33-bug-fields merged, 8 October 2026
+
+The bug fact fields are merged on v0.0.33-dev with the post-release branches; every bug from the
+v0.0.30 series on carries its facts (the hand tables of the v0.0.32 release pages imported, six
+bugs completed by hand). [DOCS-TOC-RENDER-FIGHT-33](bugs/DOCS-TOC-RENDER-FIGHT-33.md): after the
+merge, the contents-list writer and the register renderer moved each other's blocks on eight bug
+pages; fixed in source (the list goes after a generated block under the title), with cross-tool
+tests.
+
+## TRACKER-REGISTER-SIZE-33: the bug register outgrew the release text limit, 8 October 2026
+
+With the bug facts on every entry, `docs/bugs/bugs.json` grew to 320,196 bytes and the release
+preflight refused it (text files at most 262,144 bytes). Repaired in source on v0.0.33-bug-fields,
+not shipped at the time of writing: `tools/release.py` names a 1 MiB limit for `docs/bugs/bugs.json`
+and `docs/BUGS.md` only; a tracker test fails at 75 % of each tracker file's limit. Alternative noted:
+one register file per version series. [Report](bugs/TRACKER-REGISTER-SIZE-33.md).
+
+## DOCS-DEAD-ANCHORS-32 and TEST-PROFILE-STAGE-WALL-32, 8 October 2026
+
+[DOCS-DEAD-ANCHORS-32](bugs/DOCS-DEAD-ANCHORS-32.md): checking the new contents-list anchors
+against the existing links found seven links (five documents) pointing at headings renamed or
+removed since at least v0.0.29. Fixed in source on v0.0.33-doc-toc (ef3c33c), not shipped at the
+time of writing: the links point at the current sections and `tools/doc_toc.py check` now fails on
+any same-repository `#anchor` link without a matching heading.
+[TEST-PROFILE-STAGE-WALL-32](bugs/TEST-PROFILE-STAGE-WALL-32.md): gate 370 failed the build
+profile stage test with the host at 100 % CPU ("2.06 not less than 1.936": wall time compared
+with CPU time). Fixed in source on v0.0.33-doc-toc (1d7b743), not shipped at the time of writing:
+the test compares the profiler with independent readings of the same stage; under load (2 CPUs,
+8 busy loops) the old test failed 5 of 5, the new one passes 10 of 10 and still fails a sampler
+that ignores child processes. Same family as TEST-PROFILE-SECTION-CPU-32 (timing tests on a busy
+host).
+
+## Stair gate merged on v0.0.33-dev; BUILD-NAME-MOJIBAKE-32 closed as a duplicate, 8 October 2026
+
+[COLLISION-STAIR-SLOPE-32](bugs/COLLISION-STAIR-SLOPE-32.md): the stair rule, switch and stair
+walkability gate are merged on v0.0.33-dev. A legacy image build from v0.0.33-dev stops at the gate
+until the five flights [STAIRS-BALMORA-B01-32](bugs/STAIRS-BALMORA-B01-32.md),
+[STAIRS-BALMORA-WESTSOUTH-32](bugs/STAIRS-BALMORA-WESTSOUTH-32.md),
+[STAIRS-SEYDA-WAREHOUSE-32](bugs/STAIRS-SEYDA-WAREHOUSE-32.md),
+[STAIRS-SEYDA-LIGHTHOUSE-32](bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md) and
+[STAIRS-ADDAMASARTUS-32](bugs/STAIRS-ADDAMASARTUS-32.md) are repaired.
+[BUILD-NAME-MOJIBAKE-32](bugs/BUILD-NAME-MOJIBAKE-32.md) closed: duplicate of
+[BUILD-MOJIBAKE-32](bugs/BUILD-MOJIBAKE-32.md), registered separately on two lines before they met.
+
+## Seyda Neen on CHIM: first world, stair gate and findings, 8 October 2026
+
+The CHIM builder regenerates Seyda Neen's exterior (format 0.5) and validates it, but the
+stair gate fails: the rule does not clear the exterior lighthouse
+([STAIRS-SEYDA-LIGHTHOUSE-32](bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md): five flight steps; after the
+step up the box lands on the next riser's sloped plate). New:
+[SEYDA-REGIONS-PIN-33](bugs/SEYDA-REGIONS-PIN-33.md) (the recorded region table has 700-unit
+overlaps, the layout writes 896; the table had one copy, now kept privately with a manifest),
+[CHIM-HIDDEN-FACES-33](bugs/CHIM-HIDDEN-FACES-33.md) (CHIM draws placed-model faces under the
+terrain that the recorded region maps cull; to be measured),
+[CHIM-STAIRGATE-SLOW-33](bugs/CHIM-STAIRGATE-SLOW-33.md) (over 10 minutes on the Balmora and
+Arena world).
+
+## Stairs follow Morrowind's rules, and a gate walks them, 8 October 2026
+
+[COLLISION-STAIR-SLOPE-32](bugs/COLLISION-STAIR-SLOPE-32.md): owner order, stairs follow the
+original rules in the next build. Source on branch v0.0.32-stair-walk: a stair rule in the shared
+collision layer (convex pieces that bury stair treads become the authored plates; plate meshes
+with stairs get exact bevels), the `follow_original_stair_rules` switch (on by default) reaching
+every converter, and an image-step gate that walks every flight of stairs of every map up and
+down with the engine's step (8.5) and slope (0.69) rules. On the v0.0.32-dev2 maps the gate finds
+158 failing flight steps (140 in the dev1 Arena, fixed by VIVEC-ARENA-ACTORS-32); five staircases
+still fail with the rule: [STAIRS-BALMORA-B01-32](bugs/STAIRS-BALMORA-B01-32.md),
+[STAIRS-BALMORA-WESTSOUTH-32](bugs/STAIRS-BALMORA-WESTSOUTH-32.md),
+[STAIRS-SEYDA-WAREHOUSE-32](bugs/STAIRS-SEYDA-WAREHOUSE-32.md),
+[STAIRS-SEYDA-LIGHTHOUSE-32](bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md),
+[STAIRS-ADDAMASARTUS-32](bugs/STAIRS-ADDAMASARTUS-32.md). Also new:
+[COLLISION-SEYDA-PREVIEW-BYPASS-32](bugs/COLLISION-SEYDA-PREVIEW-BYPASS-32.md),
+[BUILD-NAME-MOJIBAKE-32](bugs/BUILD-NAME-MOJIBAKE-32.md).
+
+## UI-MENU-LOGO-32, 8 October 2026
+
+[UI-MENU-LOGO-32](bugs/UI-MENU-LOGO-32.md): the menu logo showed a line above the name and
+reddish-pink letters. The builder used the wordmark (rule above the name) and matched its gold to
+the nearest colours of the whole game palette, which has no saturated gold: 424 of 1,377 letter
+pixels in dev3 landed on the reserved status-bar slots, mean hue 26 degrees. Fixed in source: the
+name-only logo on the palette's own gold ramp, never a reserved UI slot or sky bank entry, no rule
+(an optional rule only below); `--menu-logo legacy` keeps the old method. Startup screen unchanged.
+
+## PHOTO-DEBUG-STRIP-33, 8 October 2026
+
+[PHOTO-DEBUG-STRIP-33](bugs/PHOTO-DEBUG-STRIP-33.md): found in the first in-game check of
+photo mode: with Ctrl+H (`dbg hud`) the coordinate strip blacked out only from x=88, leaving
+the bottom-left corner of the full-screen view beside it. Fixed in source on
+v0.0.33-photomode, not shipped at the time of writing: in photo mode the strip spans the full
+width and the input hint is not drawn. Native HUD test and an in-game frame.
+[PHOTO-GALLERY-TEXT-33](bugs/PHOTO-GALLERY-TEXT-33.md): the second in-game check, in
+`dbg torchtest`, showed the room's instruction lines over the photo mode view. Fixed in source
+on v0.0.33-photomode, not shipped at the time of writing: gallery and test-room text is not
+drawn in photo mode.
+
+## QC-AW-FLAME-SPAWN-32 and CENSUS-LOAD-SLOW-32: repaired in source, A/B/C/D, 8 October 2026
+
+[QC-AW-FLAME-SPAWN-32](bugs/QC-AW-FLAME-SPAWN-32.md): the game logic now declares
+`aw_flame_size`, `aw_flame_shape` and the worldspawn `wad` key and spawns `aw_flame` by removing it,
+as id's `info_null` does; the engine's static-flame table still reads the map text. New
+`tests/test_entity_spawn_contract.py` checks every converter classname and key against the game
+logic. [CENSUS-LOAD-SLOW-32](bugs/CENSUS-LOAD-SLOW-32.md): cause confirmed in one FS-UAE container
+(busy host, relative numbers): dev3 Census 8.8-20.9 s with the remote console on, 0.13-0.16 s off;
+with the repaired game logic 0.20-0.41 s on, 0.12-0.22 s off.
+
 ## CENSUS-LOAD-SLOW-32 cause; REMOTE-CONSOLE-LOG-COST-32 and DEBUG-TP-SHIP-FREEZE-32, 8 October 2026
 
 [CENSUS-LOAD-SLOW-32](bugs/CENSUS-LOAD-SLOW-32.md): cause confirmed in one FS-UAE container (busy host,

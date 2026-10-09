@@ -297,4 +297,3 @@ def audit(data_files, out, center, radius, stride, dialogue_search=""):
     print(json.dumps({"output": str(out), "cells": len(cells), "references": len(placements),
                       "terrain_bytes": len(packets), "unique_models": len(models),
                       "direct_model_bytes": summary["area"]["direct_model_bytes"]}, indent=2))
-

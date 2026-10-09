@@ -20,7 +20,10 @@ class MusicPlayerTests(unittest.TestCase):
             (p / "quakedef.h").write_text('''#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 typedef unsigned char byte;typedef int qboolean;
+/* the combat music switch (AW_MusicDeath) looks tracks up by name */
+static int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 #define MAX_OSPATH 1024
 static char com_gamedir[1024];
 static struct {float value;} bgmvolume={1.0};
@@ -41,6 +44,7 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
             exe = p / "player-test"
             subprocess.run(["cc", "-std=gnu89", "-O2", "-I" + str(p), "-I" + str(ROOT / "engine/aga/src"),
                             str(ROOT / "tests/music_player_test.c"), str(ROOT / "engine/aga/src/aw_format.c"),
+                            str(ROOT / "engine/aga/src/aw_log.c"),
                             "-o", str(exe)], check=True)
             (p / "music").mkdir()
             for number, frames in zip((0, 4, 11, 42, 83), (8200, 9131, 16413, 9001, 11)):

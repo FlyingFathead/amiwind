@@ -1,5 +1,37 @@
 # Seyda Neen follow-up register
 
+<!-- contents start -->
+## Contents
+
+- [Next implementation milestone agreed 28 September 2026](#next-implementation-milestone-agreed-28-september-2026)
+- [Current stability reports, 28 September 2026](#current-stability-reports-28-september-2026)
+- [v0.0.18-dev4 checkpoint status](#v0018-dev4-checkpoint-status)
+- [v0.0.18-dev3 checkpoint status](#v0018-dev3-checkpoint-status)
+- [v0.0.18-dev2 checkpoint status](#v0018-dev2-checkpoint-status)
+- [Immediate correctness and diagnosis](#immediate-correctness-and-diagnosis)
+- [Local gameplay slice](#local-gameplay-slice)
+- [Shared world systems](#shared-world-systems)
+- [Current host audit, not added native residents](#current-host-audit-not-added-native-residents)
+- [Latest playtest reports and debug request](#latest-playtest-reports-and-debug-request)
+- [Opening residency and lighting (owner follow-up, 22:40 Helsinki)](#opening-residency-and-lighting-owner-follow-up-2240-helsinki)
+- [Variable exterior frame cost (owner report, 22:50 Helsinki)](#variable-exterior-frame-cost-owner-report-2250-helsinki)
+- [Post-checkpoint-017 building reports (27 September, 23:06–23:13 Helsinki)](#post-checkpoint-017-building-reports-27-september-23062313-helsinki)
+  - [Exact reproductions](#exact-reproductions)
+  - [Narrow host diagnostic actually completed](#narrow-host-diagnostic-actually-completed)
+  - [Local model counts, not a diagnosed offending model](#local-model-counts-not-a-diagnosed-offending-model)
+  - [Reusable conversion policy to develop](#reusable-conversion-policy-to-develop)
+  - [FPS follow-up](#fps-follow-up)
+- [Roof inspector follow-up (27 September, 23:14–23:15 Helsinki)](#roof-inspector-follow-up-27-september-23142315-helsinki)
+- [Building culling investigation 001 (after checkpoint-017)](#building-culling-investigation-001-after-checkpoint-017)
+- [Owner checkpoint-017 playtest, 27 September 23:28 Helsinki](#owner-checkpoint-017-playtest-27-september-2328-helsinki)
+- [Latest owner playtest and default decision, 27 September 23:29–23:31 Helsinki](#latest-owner-playtest-and-default-decision-27-september-23292331-helsinki)
+- [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
+  - [Actor solidity and attack responses (2026-09-28)](#actor-solidity-and-attack-responses-2026-09-28)
+- [v0.0.18-dev5 follow-up](#v0018-dev5-follow-up)
+- [28 September 15:50 owner follow-up](#28-september-1550-owner-follow-up)
+
+<!-- contents end -->
+
 ## Next implementation milestone agreed 28 September 2026
 
 Maintenance v0.0.20 comes first; then implement the source-backed opening sequence.

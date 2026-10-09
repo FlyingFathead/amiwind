@@ -6,6 +6,19 @@ as before, and the boot check shows a warning line. AmiWind never ships,
 downloads or bundles this library; the builder only copies the file you point
 it at, from your own Workbench or accelerator installation.
 
+<!-- contents start -->
+## Contents
+
+- [Why](#why)
+- [Where to find it on your installation](#where-to-find-it-on-your-installation)
+- [Build option](#build-option)
+- [Known versions](#known-versions)
+- [What you see at boot](#what-you-see-at-boot)
+- [How the loader installs the handlers](#how-the-loader-installs-the-handlers)
+- [Tested](#tested)
+
+<!-- contents end -->
+
 ## Why
 
 The 68040 and 68060 have a smaller FPU than the 68881/68882. Some FPU

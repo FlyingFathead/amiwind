@@ -53,9 +53,9 @@ def runtime_position(position, interior, area="seyda"):
 
 def interior_reference(master,report,scene):
     """Private source layouts, with separate placed references for every door."""
-    from mwad.interior import read_interior
+    from mwad.interior import read_interiors
     names=sorted({r['destination_cell'] for r in report['doors'] if r.get('destination_cell')})
-    cells=[read_interior(master,name) for name in names]
+    cells=read_interiors(master,names)  # one pass over the master (BUILD-DOOR-REFERENCE-SERIAL-33)
     (scene/'interior-reference.json').write_text(json.dumps({'master_sha256':report['master_sha256'],
         'units':'original source units; each interior has its own local coordinates',
         'cells':cells},indent=2)+'\n')

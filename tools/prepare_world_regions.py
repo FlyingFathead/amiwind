@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import struct
@@ -35,6 +36,11 @@ SCALE = .25
 STEP = 128
 OVERLAP = 896
 _terrain = None
+ROOT = Path(__file__).resolve().parents[1]
+# Per-map cache across builds (--cache DIR, development builds; docs/BUILD_PROFILE.md).
+UNIT_CACHE_FORMAT = 'AmiWind world terrain cache 1'
+UNIT_CACHE_FILES = ('scene.bsp', 'compile.log', 'hull.log')
+UNIT_CACHE_PACKAGES = ('numpy', 'Pillow')
 
 
 def town_handoffs(report, root=None):
@@ -271,18 +277,29 @@ def terrain_triangles(terrain, x, y, required_edge_samples=()):
     yield from triangles
 
 
+def ground_miptex(master, assets, key, pal):
+    """The 32 x 32 miptex 'gKEY' of one LAND material (0: the default land texture)."""
+    im = (Image.fromarray(assets.texture(master['textures'][key]['texture'])).convert('RGB')
+          if key else Image.fromarray(assets.texture('_land_default.tga')).convert('RGB'))
+    im = im.resize((32, 32), Image.Resampling.BOX).quantize(palette=pal, dither=Image.Dither.NONE)
+    return miptex('g'+str(key), im)
+
+
+def ground_textures(data, keys, palette):
+    """{'gKEY': miptex} for the given LAND materials, made as terrain_wad makes them."""
+    master = load_esm(child_ci(data, 'Morrowind.esm'))
+    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    pal = Image.new('P', (1, 1)); pal.putpalette(palette)
+    return {'g'+str(key): ground_miptex(master, assets, key, pal) for key in sorted(keys)}
+
+
 def terrain_wad(data, survey, palette):
     master = load_esm(child_ci(data, 'Morrowind.esm'))
     assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
     pal = Image.new('P', (1, 1)); pal.putpalette(palette)
     with np.load(survey / 'terrain-source.npz', allow_pickle=False) as packet:
         used = sorted(set(packet['materials'].flatten().tolist()) | {0})
-    textures = []
-    for key in used:
-        im = (Image.fromarray(assets.texture(master['textures'][key]['texture'])).convert('RGB')
-              if key else Image.fromarray(assets.texture('_land_default.tga')).convert('RGB'))
-        im = im.resize((32, 32), Image.Resampling.BOX).quantize(palette=pal, dither=Image.Dither.NONE)
-        textures.append(('g'+str(key), 68, miptex('g'+str(key), im)))
+    textures = [('g'+str(key), 68, ground_miptex(master, assets, key, pal)) for key in used]
     for name, color, size in [('stone', (80, 79, 70), (64, 64)), ('*water', (65, 87, 91), (64, 64)), ('sky', (102, 119, 136), (256, 128))]:
         im = (Image.fromarray(assets.texture('water/water00.tga')).convert('RGB').resize(size, Image.Resampling.BOX)
               if name == '*water' else Image.new('RGB', size, color))
@@ -326,11 +343,81 @@ def map_text(entry, terrain):
             +'{\n"classname" "info_null"\n'+f'"origin" "0 0 {max(zmax,0)-oz+96}"\n'+ '}\n')
 
 
+def unit_cache_identity(bindir):
+    """What every cached map depends on besides its own map text and texture WAD.
+
+    This converter's code and the data files it names (the code a stage can reach, as
+    the stage fingerprints count it), the map compilers, Python and the packages.
+    """
+    import importlib.metadata
+    import platform
+    from build_cache import SourceIndex, digest_json, sha256_file
+    code, _, uncertain = SourceIndex(ROOT).digest(Path(__file__).resolve())
+    return digest_json({'format': UNIT_CACHE_FORMAT, 'code': code, 'uncertain': uncertain,
+                        'tools': {name: sha256_file(Path(bindir) / name) for name in ('qbsp', 'vis', 'light')},
+                        'python': sys.version, 'machine': platform.machine(),
+                        'packages': {name: importlib.metadata.version(name) for name in UNIT_CACHE_PACKAGES}})
+
+
+def unit_cache_folder(cache, unit):
+    return Path(cache) / unit[:2] / unit
+
+
+def unit_cache_lookup(cache, unit, root, entry, key):
+    """The map from the cache, verified, installed into ROOT; None on a miss or any doubt."""
+    folder = unit_cache_folder(cache, unit)
+    try:
+        record = json.loads((folder / 'conversion.json').read_text())
+    except (OSError, ValueError):
+        return None
+    if record.get('format') != UNIT_CACHE_FORMAT or record.get('unit') != unit:
+        return None
+    expected = (record.get('converted') or {}).get('sha256')
+    try:
+        if not expected or digest(folder / 'scene.bsp') != expected:
+            return None
+        for name in UNIT_CACHE_FILES:
+            if (folder / name).is_file():
+                shutil.copyfile(folder / name, root / name)
+        if digest(root / 'scene.bsp') != expected:
+            (root / 'scene.bsp').unlink()
+            return None
+    except OSError:
+        return None
+    result = dict(entry, converted=record['converted'], input_sha256=key, storage=record['storage'])
+    (root / 'conversion.json').write_text(json.dumps(result, indent=2) + '\n')
+    return result
+
+
+def unit_cache_store(cache, unit, root, result):
+    """Add a converted map to the cache (whole entry or nothing; never fails the build)."""
+    folder = unit_cache_folder(cache, unit)
+    if folder.exists():
+        return
+    temporary = folder.with_name(f'{unit}.tmp-{os.getpid()}')
+    try:
+        shutil.rmtree(temporary, ignore_errors=True)
+        temporary.mkdir(parents=True)
+        for name in UNIT_CACHE_FILES:
+            if (root / name).is_file():
+                shutil.copyfile(root / name, temporary / name)
+        record = {'format': UNIT_CACHE_FORMAT, 'unit': unit, 'converted': result['converted'],
+                  'storage': result['storage']}
+        (temporary / 'conversion.json').write_text(json.dumps(record, indent=2) + '\n')
+        os.rename(temporary, folder)
+    except OSError as exc:
+        shutil.rmtree(temporary, ignore_errors=True)
+        if not folder.exists():
+            print(f"[warning] world terrain cache: {result.get('name')} not stored: {exc}", flush=True)
+
+
 def compile_region(task):
     global _terrain
     survey, out, entry, bindir = task[:4]
     # Optional (vis threads, vis mode); 4-field tasks keep -threads 1 -fast.
-    threads, vis_mode = task[4:] if len(task) > 4 else (1, 'fast')
+    threads, vis_mode = task[4:6] if len(task) > 4 else (1, 'fast')
+    # Optional per-map cache across builds: (folder, identity digest).
+    cache, identity = task[6:8] if len(task) > 6 else (None, None)
     if _terrain is None:
         _terrain = Terrain(survey)
     started = time.monotonic(); root=out/entry['name']; root.mkdir(exist_ok=True)
@@ -342,6 +429,11 @@ def compile_region(task):
         previous=json.loads(receipt.read_text())
         if previous.get('input_sha256')==key and (root/'scene.bsp').exists() and digest(root/'scene.bsp')==previous['converted']['sha256']:
             return previous
+    unit = hashlib.sha256((identity + key).encode()).hexdigest() if cache else None
+    if unit:
+        cached = unit_cache_lookup(cache, unit, root, entry, key)
+        if cached is not None:
+            return dict(cached, _unit_cache='hit')
     shutil.copyfile(out/'terrain.wad', root/'terrain.wad')
     source.write_text(content)
     with (root/'compile.log').open('w') as log:
@@ -366,10 +458,13 @@ def compile_region(task):
     (root/'conversion.json').write_text(json.dumps(result,indent=2)+'\n')
     for path in root.iterdir():
         if path.is_file() and path.name not in ('scene.bsp','conversion.json','compile.log','hull.log'):path.unlink()
+    if unit:
+        unit_cache_store(cache, unit, root, result)
+        return dict(result, _unit_cache='miss')
     return result
 
 
-def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast'):
+def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None):
     survey=survey.resolve();out=ensure_external(out,'world terrain').resolve();out.mkdir(parents=True,exist_ok=True)
     scene=ensure_external(scene,'private scene').resolve();bindir=bindir.resolve()
     report, entries=plan(survey)
@@ -384,9 +479,25 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast'):
     results=[]
     # Maps compile side by side: divide the job budget between them.
     threads=map_threads(jobs,min(jobs,max(1,len(entries))))
-    for result in ordered_map(compile_region,[(survey,out,e,bindir,threads,vis_mode) for e in entries],jobs):
+    extra=()
+    if cache:
+        cache=Path(cache).resolve();cache.mkdir(parents=True,exist_ok=True)
+        extra=(str(cache),unit_cache_identity(bindir))
+    counts={'hit':0,'miss':0}
+    # Longest first (build_costs): history, else the survey's source triangles per region.
+    from build_costs import costed_map
+    cells={tuple(c['cell']):c for c in report['cells']}
+    triangles={e['name']:1+(cells.get(tuple(e['cell']),{}).get('spatial_source_triangles',0) or 0)/e.get('divisions',1)**2
+               for e in entries}
+    for result in costed_map('world-terrain-regions',compile_region,[(survey,out,e,bindir,threads,vis_mode,*extra) for e in entries],
+                             [e['name'] for e in entries],jobs,fallback=triangles.get):
+        action=result.pop('_unit_cache',None)
+        if action:counts[action]+=1
         results.append(result)
         print(result['name'],result['converted'],flush=True)
+    if cache:
+        print(f"World terrain cache: {counts['hit']} maps reused (verified), {counts['miss']} converted.",flush=True)
+        (out/'world-terrain-cache.json').write_text(json.dumps(dict(format=UNIT_CACHE_FORMAT,**counts),indent=2)+'\n')
     receipt=dict(format='AmiWind playable terrain regions 1',master_sha256=report['master_sha256'],
         survey_sha256=digest(survey/'world-survey.json'),terrain_sha256=digest(survey/'terrain-source.npz'),
         scale=SCALE,sample_stride=4,overlap=OVERLAP,draw_distance=540,
@@ -407,8 +518,10 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('survey','data-files','scene','out','bindir'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--only',nargs='+',help='Diagnostic subset; never publishes a partial world directory')
+    p.add_argument('--cache',type=Path,help='Verified per-map cache across builds (development builds); '
+                   'keyed by each map\'s text, the texture WAD, this converter\'s code, the map tools and Python')
     from scenery_reduce import add_options, apply_options
     add_options(p)
     add_jobs(p);add_vis_option(p);a=p.parse_args();apply_options(a)
     import build_profile;build_profile.instrument('world-terrain')
-    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode)
+    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache)

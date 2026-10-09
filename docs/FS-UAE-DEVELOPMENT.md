@@ -10,6 +10,21 @@ AmiWind development package, reached gameplay, observed a restored building
 and quit cleanly. Those scene checks do not add stepping/watchpoint or complete
 game-audio acceptance to the original debugger probe.
 
+<!-- contents start -->
+## Contents
+
+- [Which interface does what?](#which-interface-does-what)
+- [Start with an isolated development configuration](#start-with-an-isolated-development-configuration)
+- [Inspect guest state before automating mutations](#inspect-guest-state-before-automating-mutations)
+- [Catching a bad write: next diagnostic acceptance](#catching-a-bad-write-next-diagnostic-acceptance)
+- [Symbols and loaded segments](#symbols-and-loaded-segments)
+- [A terminal route through the guest serial port](#a-terminal-route-through-the-guest-serial-port)
+- [Repeated scenes, snapshots and frame capture](#repeated-scenes-snapshots-and-frame-capture)
+- [Optional remote interfaces](#optional-remote-interfaces)
+- [Proposed AmiWind development loop](#proposed-amiwind-development-loop)
+
+<!-- contents end -->
+
 FS-UAE can expose the emulated Amiga through its UAE console debugger and its
 serial interface. These are useful starting points for inspecting state and
 driving repeatable development sessions with fewer desktop interactions.

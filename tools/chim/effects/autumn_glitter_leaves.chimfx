@@ -1,0 +1,16 @@
+# Autumn glitter leaves: bright orange and cream specks over textures (opt-in; off by default).
+# A general speckle effect for any CHIM texture set: change `targets` to choose the textures.
+# Origin: the look of CHIM-TEXTURE-SPECKS-33, kept on purpose. Its three colours are the sky-bank
+# entries those specks sat on, in the same shares (47:51:2), so they glow with the sky's tint at
+# dawn and dusk. Density: 2 % of texels, between that world's walls (about 1 %) and its busiest
+# street ground (3 to 5 %).
+# Format: docs/chim/TEXTURE_EFFECTS.md (reader: tools/chim/texfx.py).
+effect  = speckle
+name    = autumn_glitter_leaves
+colour  = 255 174 66 47
+colour  = 255 232 160 51
+colour  = 153 38 79 2
+density = 0.02
+size    = 1
+seed    = 1
+targets = *

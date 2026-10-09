@@ -7,6 +7,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_region.h"
+#include "aw_miniwind.h"
 static int active,pending,jiub_state,guard_state,upper_state,prompt,unlocked,failed;
 /* AUDIO-03: the opening track starts only after the ship scene has loaded and
  * settled; music started before 'map prison' crackled under the load. */
@@ -33,7 +34,8 @@ static int opening_music_hold(void) {
     if(!opening_music_frames++){opening_music_since=opening_fade_start=realtime;opening_fade();return 1;}
     if(opening_music_frames<OPENING_MUSIC_SETTLE_FRAMES || realtime-opening_music_since<OPENING_MUSIC_SETTLE_SECONDS)return 1;
     opening_music_pending=0;
-    if(!AW_MusicStartTrack(4))Con_Printf("Selected opening track unavailable.\n");
+    /* A quick test build without music says so once instead (aw_excluded.c). */
+    if(!AW_MusicStartTrack(4) && !AW_ContentExcludedSay("music",0))Con_Printf("Selected opening track unavailable.\n");
     return 0;
 }
 static double elapsed,jiub_timer,guard_timer,upper_timer,deck_timer;
@@ -102,13 +104,15 @@ void AW_IntroBegin(void) {
 }
 static void new_game(void) {
     FILE *f=NULL;
+    /* A partial-area build has no ship opening: New Game is its quick start (aw_miniwind.c). */
+    if(AW_MiniwindActive()){Cbuf_AddText("aw_quick_start\n");return;}
     if(COM_FOpenFile("intro/chargenname1.txt",&f)<0 || !f){Con_Printf("Convert owned introductory assets before starting a new game.\n");return;}
     fclose(f);debug_scene=NULL;debug_scene_ready=0;active=prompt=pending=0;CL_Disconnect();
     IN_AWClearButtons();key_dest=key_game;
     if(!AW_MovieStart())AW_IntroBegin();
 }
 static void debug_scene_command(void) {
-    const debug_scene_t *scene;FILE *f=NULL;char path[48],command[48];int size;
+    const debug_scene_t *scene;char path[48],command[48];int size;
     vec3_t dock={587.5f,-353.25f,31.5f};
     if(cmd_source!=src_command)return; /* Never accept a remote client request. */
     if(Cmd_Argc()==1 || (Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"list"))){
@@ -123,9 +127,8 @@ static void debug_scene_command(void) {
        AW_ReaderActive() || AW_GalleryModal()){
         Con_Printf("Use tpscene from the local main menu or game, outside video/reader/gallery playback.\n");return;
     }
-    sprintf(path,"maps/%s.bsp",scene->map);size=COM_FOpenFile(path,&f);
-    if(f)fclose(f);
-    if(!f || size<124 || !AW_CharacterLoad()){
+    size=AW_SceneMapSize(scene->map,path,sizeof(path));
+    if(size<124 || !AW_CharacterLoad()){
         Con_Printf("Debug scene needs the converted map and character catalogue; current game retained.\n");return;
     }
     if(!AW_RegionSelect(scene->map,dock,1)){

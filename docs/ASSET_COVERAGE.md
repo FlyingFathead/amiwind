@@ -1,5 +1,39 @@
 # Asset coverage
 
+<!-- contents start -->
+## Contents
+
+- [Temple source completeness audit: 2026-10-06T15:06:48+00:00](#temple-source-completeness-audit-2026-10-06t1506480000)
+- [RC1 Temple runtime coverage failure: 2026-10-06T13:53:32+00:00](#rc1-temple-runtime-coverage-failure-2026-10-06t1353320000)
+- [Current dev4 checkpoint — 6 October 2026](#current-dev4-checkpoint--6-october-2026)
+- [Earlier dated coverage snapshots](#earlier-dated-coverage-snapshots)
+- [Dev4 source and staging checkpoint — 6 October 2026, 00:36 UTC](#dev4-source-and-staging-checkpoint--6-october-2026-0036-utc)
+  - [Global mushroom coverage and next batches](#global-mushroom-coverage-and-next-batches)
+- [Dev4 sealed package readback — 6 October 2026, 04:27 UTC](#dev4-sealed-package-readback--6-october-2026-0427-utc)
+- [Dev4 bounded native result and media reconciliation - 6 October 2026](#dev4-bounded-native-result-and-media-reconciliation---6-october-2026)
+- [Version history](#version-history)
+- [What the counts mean](#what-the-counts-mean)
+- [Media](#media)
+- [Other source files](#other-source-files)
+- [Verified conversion and packaging subsets](#verified-conversion-and-packaging-subsets)
+- [World and gameplay coverage](#world-and-gameplay-coverage)
+  - [Earlier dev4 diagnostic: More mushrooms!](#earlier-dev4-diagnostic-more-mushrooms)
+  - [Dev4 hand catalogue diagnostic](#dev4-hand-catalogue-diagnostic)
+- [Keeping this report current](#keeping-this-report-current)
+  - [Dev4 mushroom cue and preview update](#dev4-mushroom-cue-and-preview-update)
+  - [Earlier dev4 census and persistent-state checkpoint](#earlier-dev4-census-and-persistent-state-checkpoint)
+  - [Earlier dev4 world-map mushroom candidate](#earlier-dev4-world-map-mushroom-candidate)
+  - [Reconciled dev4 media payload](#reconciled-dev4-media-payload)
+  - [Earlier dev4 town brush admission and Caius house clutter](#earlier-dev4-town-brush-admission-and-caius-house-clutter)
+  - [Follow-on diagnostic: retained-topology interior clutter — 6 October 2026, 00:42 UTC](#follow-on-diagnostic-retained-topology-interior-clutter--6-october-2026-0042-utc)
+- [Worldwide mushroom diagnostic stage — 2026-10-06T05:43:10Z](#worldwide-mushroom-diagnostic-stage--2026-10-06t054310z)
+- [Post-dev4 worldwide mushroom preparation — 6 October 2026](#post-dev4-worldwide-mushroom-preparation--6-october-2026)
+  - [6 October 2026: NPC torch-light runtime coverage gap](#6-october-2026-npc-torch-light-runtime-coverage-gap)
+  - [Rc1 loader accounting follow-up](#rc1-loader-accounting-follow-up)
+- [6 October: packed-edge and surface candidate](#6-october-packed-edge-and-surface-candidate)
+
+<!-- contents end -->
+
 ## Temple source completeness audit: 2026-10-06T15:06:48+00:00
 
 For delivered RC1, 31 audited structural model sources used by62 architectural

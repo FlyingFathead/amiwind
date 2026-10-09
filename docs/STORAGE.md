@@ -6,6 +6,20 @@ only the active working set. Bigger images are acceptable when measurements show
 less runtime computation or fewer stalls. Extra bytes alone do not accelerate
 rendering. Repeated disk reads can consume CPU time and compete with audio.
 
+<!-- contents start -->
+## Contents
+
+- [Compatibility profiles](#compatibility-profiles)
+- [Current AGA image layout](#current-aga-image-layout)
+- [Historical v0.0.25 single-HDF layout](#historical-v0025-single-hdf-layout)
+- [Preferred future content placement](#preferred-future-content-placement)
+- [Historical A500 image layout](#historical-a500-image-layout)
+- [Capacity budget](#capacity-budget)
+- [Proposed raw asset archive](#proposed-raw-asset-archive)
+- [Profiling decisions](#profiling-decisions)
+
+<!-- contents end -->
+
 ## Compatibility profiles
 
 | Profile | Intended storage | Status and limits |
@@ -105,6 +119,13 @@ Keep each partition **below 2 GiB** and the entire device **below 4 GiB**, inclu
 RDB/alignment space. Two partitions of exactly 2 GiB plus an RDB would exceed
 the classic device boundary. Budget filesystem overhead and useful free space
 inside each partition as well; capacity is not all available to asset bytes.
+
+Every partition must also **start below 2 GiB** of its device: Kickstart 3.1
+(measured in FS-UAE 3.1.66) does not mount a partition whose first byte lies at
+or beyond 2 GiB ("Not a DOS disk"), although partitions may end beyond it. The
+image step orders each drive so every partition starts below 2 GiB (largest
+partition last when needed) and refuses a written drive that breaks the rule
+(BUILD-WORLD-PARTITION-MOUNT-33).
 
 ### CPU, memory and loading costs
 

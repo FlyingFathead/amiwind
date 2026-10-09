@@ -21,8 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
 
 TOOLS = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
-VARIANTS = ([], ['--extra-town', 'vivec_foreign', '--vis', 'full', '--tree-sprites'],
-            ['--no-npc-gallery', '--no-tree-sprites', '--only-core-towns'])
+# The default is --builder chim (v0.0.33); the legacy plan and the withdrawn Vivec Arena stay covered.
+VARIANTS = ([], ['--extra-town', 'vivec_arena', '--extra-town', 'vivec_foreign', '--vis', 'full', '--tree-sprites'],
+            ['--no-npc-gallery', '--no-tree-sprites', '--only-core-towns'], ['--builder', 'legacy'])
 
 
 def builder_steps(run, data, extra=()):

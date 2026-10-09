@@ -28,6 +28,8 @@ enum {
     RC_SC_ALLOC_BYTES,  /* ... bytes */
     RC_SC_BUILD,        /* surface cache blocks drawn (D_CacheSurface misses) */
     RC_SC_BUILD_BYTES,  /* ... texels drawn */
+    RC_ENTITIES,        /* entities in cl_visedicts this frame (R_StoreEfrags, edicts) */
+    RC_SPRITES,         /* sprite entities drawn (R_DrawSprite) */
     RC_COUNTERS
 };
 enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_TIMERS };
@@ -56,5 +58,7 @@ void AW_RCountInit(void);
 void AW_RCountFrame(void);
 const char *AW_RCountLine(void);        /* last once-a-second line, "" if none */
 #endif
+/* CHIM appends its own fields (chim/chim_world.c sets it with its data). */
+extern int (*aw_chim_rcount)(char *out, int size, long frames);
 
 #endif

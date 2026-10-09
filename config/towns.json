@@ -45,6 +45,7 @@
       "id": "vivec_arena",
       "config": "vivec_arena.json",
       "shipped_since": "v0.0.32",
+      "withdrawn": "Left out of v0.0.33 images by owner decision (CHIM-ARENA-MEMORY-33); --extra-town vivec_arena still builds it",
       "world_slot": -1,
       "flags": [
         "own_doors",

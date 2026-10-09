@@ -1,0 +1,55 @@
+# AmiWind "slow accelerator" FS-UAE preset: an A1200 with a ~50 MHz 68040-class card.
+# Replace the ROM and HDF placeholders with your owned local files.
+#
+# What it approximates: an A1200 with a TF1260-class accelerator, here a 68040
+# at about 50 MHz with its internal FPU, 2 MB Chip RAM and 16 MB Fast RAM.
+# It gives the FEEL of slow real hardware next to the normal (fast, JIT) preset.
+# It is NOT a measurement: FS-UAE only approximates 68040 instruction and memory
+# timing, its hard disk is backed by the PC's file cache (loading is faster than
+# a real drive), and no number from it has been checked on a real card.
+#
+# CPU clock: interpreted 68040 (JIT off) in cycle-exact mode, clock =
+# uae_cpu_multiplier x 3.546895 MHz. 14 = 49.7 MHz, twice the 24.8 MHz
+# benchmark profile (multiplier 7) of the FS-UAE playtesting guide.
+# uae_cpu_frequency is ignored in this mode; only the multiplier sets the clock.
+# Tuning: multiplier up = faster, down = slower (7 = 24.8 MHz, 11 = 39 MHz,
+# 14 = 49.7 MHz, 20 = 70.9 MHz). A real 68060 does more work per clock than the
+# emulated 68040, so for the feel of a 50 MHz 68060 card raise the multiplier.
+# JIT and cycle-exact mode exclude each other. Keep warp mode off.
+# Interpreting a 50 MHz 68040 needs a fast PC core; on a busy PC the whole
+# emulation runs slower than real time (the game's own frame times stay the same).
+#
+# CPU type: 68040 with FPU is the engine's target. A full 68060 also works
+# (cpu = 68060-NOMMU, fpu = 68060), but only with a 68060.library installed on
+# the boot disk: Kickstart 3.1 does not report a 68060's FPU without it and the
+# boot check stops (BOOT-68060-FPU-FAIL-32). CPUs without an FPU (68LC060,
+# 68LC040, 68EC040) cannot run AmiWind.
+[config]
+amiga_model = A1200
+cpu = 68040-NOMMU
+fpu = 68040
+jit_compiler = 0
+uae_cpu_cycle_exact = true
+uae_cpu_multiplier = 14
+uae_cpu_24bit_addressing = false
+chip_memory = 2048
+slow_memory = 0
+fast_memory = 0
+zorro_iii_memory = 16384
+kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
+hard_drive_0 = /path/to/your/AmiWind-v0.0.32.hdf
+hard_drive_0_type = hdf
+# v0.0.32 and later images have a second (world) disk; older images: delete these two lines.
+hard_drive_1 = /path/to/your/AmiWind-v0.0.32-world-01.hdf
+hard_drive_1_type = hdf
+joystick_port_1 = none
+# Send middle-click to the game; use F12+G to release input.
+middle_click_ungrab = 0
+# Deliver page navigation instead of keypad ')' / Right Amiga.
+keyboard_key_pageup = action_key_68
+keyboard_key_pagedown = action_key_69
+# Deliver Home/End (console line, map, menus) instead of keypad ( / Help.
+keyboard_key_home = action_key_6a
+keyboard_key_end = action_key_6c
+floppy_drive_volume = 0
+fullscreen = 0

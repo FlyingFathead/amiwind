@@ -49,7 +49,7 @@ IMPLEMENTED = frozenset('''fabs fadd fsadd fdadd fbeq fbne fbgt fbge fblt fble f
 INSTRUCTION = re.compile(r'^\s*([0-9a-f]+):\s+(?:[0-9a-f]{4} )+\s*(\S+)\s*(.*)$')
 ABSOLUTE = re.compile(r'(?<![#\w@(])0x([0-9a-f]+)|(?:^|\s)([0-9a-f]{3,8})(?= <)')
 PCREL = re.compile(r'%pc@\(0x([0-9a-f]+)\)')
-RELOC = re.compile(r'^\s*[0-9a-f]+:\s+RELOC\S*\s+(\S+)')
+RELOC = re.compile(r'^\s*([0-9a-f]+):\s+RELOC\S*\s+(\S+)')
 MAP_SYMBOL = re.compile(r'^\s+0x([0-9a-f]+)\s+([A-Za-z_.$][\w.$]*)\s*$')
 MAP_SECTION = re.compile(r'^ \.text\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S+)')
 
@@ -116,6 +116,7 @@ def analyse(disassembly, functions):
         return functions[lo][1]
 
     sites, calls = {}, {}
+    relocated = set()   # addresses of relocated longwords (pointers): data, never an opcode
     pending = None      # (function, absolute operands) waiting for their RELOC lines
 
     def refer(function, address):
@@ -126,9 +127,10 @@ def analyse(disassembly, functions):
     for line in disassembly.splitlines():
         r = RELOC.match(line)
         if r:
+            relocated.add(int(r.group(1), 16))
             # objdump -r: an absolute operand is a code address only when it
             # is relocated against .text (data and bss addresses overlap).
-            if pending and r.group(1) == '.text':
+            if pending and r.group(2) == '.text':
                 for address in pending[1]:
                     refer(pending[0], address)
                 pending = None
@@ -142,12 +144,20 @@ def analyse(disassembly, functions):
         if function is None:
             continue
         if unimplemented(mnemonic):
-            sites.setdefault(function, []).append('%x %s %s' % (address, mnemonic, operands.strip()))
+            sites.setdefault(function, []).append((address, '%x %s %s' % (address, mnemonic, operands.strip())))
         for value in PCREL.findall(operands):
             refer(function, int(value, 16))
         absolute = [int(a or b, 16) for a, b in ABSOLUTE.findall(PCREL.sub('', operands))]
         if absolute:
             pending = (function, absolute)
+    # Constant tables sit in .text on this target; objdump decodes them as
+    # instructions. A decoded opcode inside a relocated longword is a pointer
+    # in such a table (e.g. 0x0003f2xx reads as fintrz), never code: real
+    # instructions carry relocations only in their operands
+    # (ENGINE-FPU-DATA-DECODE-33).
+    data = lambda address: any(address - k in relocated for k in range(4))
+    sites = {f: [text for address, text in rows if not data(address)] for f, rows in sites.items()}
+    sites = {f: rows for f, rows in sites.items() if rows}
     return sites, calls
 
 

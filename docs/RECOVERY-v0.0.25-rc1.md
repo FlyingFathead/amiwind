@@ -2,6 +2,20 @@
 
 Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md).
 
+<!-- contents start -->
+## Contents
+
+- [Checkpoint 001: source inventory and executable launchers](#checkpoint-001-source-inventory-and-executable-launchers)
+- [Required rc1 work, preserved from the incident handoff](#required-rc1-work-preserved-from-the-incident-handoff)
+- [Validation boundary](#validation-boundary)
+- [Checkpoint 002: Seyda Neen authored-ground handoff](#checkpoint-002-seyda-neen-authored-ground-handoff)
+- [Checkpoint 003: coordinates, map marker and compass](#checkpoint-003-coordinates-map-marker-and-compass)
+- [Keyboard recovery (checkpoint 004 work)](#keyboard-recovery-checkpoint-004-work)
+- [Checkpoint 005: recovered shoreline source, independently rechecked](#checkpoint-005-recovered-shoreline-source-independently-rechecked)
+- [Checkpoint 006: autosave default and local handoff](#checkpoint-006-autosave-default-and-local-handoff)
+
+<!-- contents end -->
+
 Current handoff: **checkpoint 006**, incomplete source prerelease.
 See [local apply/build/publication commands](LOCAL-CHECKPOINT-v0.0.25-rc1.md).
 Earlier checkpoint sections below are historical status records.

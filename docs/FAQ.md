@@ -2,11 +2,41 @@
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Last updated:** 8 October 2026. **FAQ revision:** 7.
-**Latest release:** v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec
-([release notes](RELEASE-v0.0.32.md)). **Next:** v0.0.33 - Towards CHIM: Replacing the
-Engine Block, the first release on the new world streamer engine. See the
-[roadmap](ROADMAP.md) and [tracker](BUGS.md).
+<!-- contents start -->
+## Contents
+
+- [What is possible on the Amiga?](#what-is-possible-on-the-amiga)
+- [Why Morrowind?](#why-morrowind)
+- [Why build something so demanding before optimizing it?](#why-build-something-so-demanding-before-optimizing-it)
+- [How do non-destructive conversion, fallback paths and versioning fit in?](#how-do-non-destructive-conversion-fallback-paths-and-versioning-fit-in)
+- [Why AGA graphics?](#why-aga-graphics)
+- [Does real AGA hardware have enough graphics bandwidth for this?](#does-real-aga-hardware-have-enough-graphics-bandwidth-for-this)
+- [What hardware is the current version targeting?](#what-hardware-is-the-current-version-targeting)
+- [Can today's heavily upgraded Amigas realistically run AmiWind?](#can-todays-heavily-upgraded-amigas-realistically-run-amiwind)
+- [Can AmiWind use more RAM if my Amiga has it?](#can-amiwind-use-more-ram-if-my-amiga-has-it)
+- [Why can AmiWind in FS-UAE run better than native OpenMW on a small PC?](#why-can-amiwind-in-fs-uae-run-better-than-native-openmw-on-a-small-pc)
+- [Does running in WinUAE or FS-UAE prove real-hardware performance?](#does-running-in-winuae-or-fs-uae-prove-real-hardware-performance)
+- [Why not use PiStorm32, RTG and MiniGL?](#why-not-use-pistorm32-rtg-and-minigl)
+- [Is this a Ship of Theseus question about what counts as an Amiga?](#is-this-a-ship-of-theseus-question-about-what-counts-as-an-amiga)
+- [Why start from AmiQuake?](#why-start-from-amiquake)
+- [Why not just run OpenMW under Linux on a PowerPC Amiga?](#why-not-just-run-openmw-under-linux-on-a-powerpc-amiga)
+- [What does the optimization pipeline actually work on?](#what-does-the-optimization-pipeline-actually-work-on)
+- [Is this complete Morrowind, here and now?](#is-this-complete-morrowind-here-and-now)
+- [How much of Morrowind is currently working?](#how-much-of-morrowind-is-currently-working)
+- [Which tools help inspect the converted world?](#which-tools-help-inspect-the-converted-world)
+- [What can future Amiga and m68k developers get out of this?](#what-can-future-amiga-and-m68k-developers-get-out-of-this)
+- [Do I need my own Morrowind files? What is included in the release?](#do-i-need-my-own-morrowind-files-what-is-included-in-the-release)
+  - [Is AmiWind official? Do I need the game?](#is-amiwind-official-do-i-need-the-game)
+  - [Copyright and public distribution notice](#copyright-and-public-distribution-notice)
+- [What would help establish what lower-spec Amigas can do?](#what-would-help-establish-what-lower-spec-amigas-can-do)
+
+<!-- contents end -->
+
+**Last updated:** 9 October 2026. **FAQ revision:** 7.
+**Latest release:** v0.0.33 - Towards CHIM: Replacing the Engine Block, the first
+release on the CHIM world streamer engine ([release notes](RELEASE-v0.0.33.md)).
+**Next:** the animation kit for all character types, Vivec on CHIM and the CHIM open
+world. See the [roadmap](ROADMAP.md) and [tracker](BUGS.md).
 
 ## What is possible on the Amiga?
 
@@ -446,8 +476,9 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **8 October 2026**, the latest release is **v0.0.32: Last Stop on the Old Line:
-Window-Shopping in Vivec**. "Release" here identifies the project's release track; AmiWind
+As of **9 October 2026**, the latest release is **v0.0.33: Towards CHIM: Replacing the
+Engine Block** (Balmora and Seyda Neen on the CHIM engine; the rest of the world is still on
+the legacy pipeline). "Release" here identifies the project's release track; AmiWind
 as a whole is still an early work in progress.
 
 The documented playable scope now includes:
@@ -480,7 +511,7 @@ and interiors also need further work. Tribunal and Bloodmoon world content are
 outside the current playable scope.
 
 See the [current overview](../README.md),
-[v0.0.32 release notes](RELEASE-v0.0.32.md),
+[v0.0.33 release notes](RELEASE-v0.0.33.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 

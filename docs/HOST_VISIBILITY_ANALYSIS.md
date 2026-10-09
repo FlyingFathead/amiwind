@@ -6,6 +6,18 @@ It is not an implemented GPU visibility sweep, a completed interior-removal pass
 or a performance claim about the Amiga. The current 3D Map Inspector provides
 geometry inspection and proposed exclusion annotations.
 
+<!-- contents start -->
+## Contents
+
+- [Start with a bounded, repeatable experiment](#start-with-a-bounded-repeatable-experiment)
+- [Existing tools to evaluate](#existing-tools-to-evaluate)
+- [Proposed batch pipeline](#proposed-batch-pipeline)
+- [Parallel work and hardware verification](#parallel-work-and-hardware-verification)
+- [From candidates to justified removal](#from-candidates-to-justified-removal)
+- [Required report and first acceptance gates](#required-report-and-first-acceptance-gates)
+
+<!-- contents end -->
+
 ## Start with a bounded, repeatable experiment
 
 Use the host GPU and CPU workers for offline analysis before compilation. Start

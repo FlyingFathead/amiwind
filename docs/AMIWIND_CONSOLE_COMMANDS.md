@@ -16,10 +16,12 @@ a command, for example `dbg headlamp on`. This page is generated from
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg crosshair` | `dbg crosshairs` | [on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs) |
 | `dbg cull` | - | 0/1 or on/off (default 1) |
-| `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..1500 local units; default 540] |
+| `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
 | `dbg fog` | - | on/off or 1/0 (default on) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
+| `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode) |
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
 | `dbg render order` | - | 1 legacy / 2 mesh intersections (default) |
 
@@ -27,9 +29,14 @@ a command, for example `dbg headlamp on`. This page is generated from
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
-| `dbg combattest` | - | [idle/draw/lower/punch/center/help/exit] empty floor, current hands |
+| `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on) |
+| `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
+| `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
+| `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
@@ -48,7 +55,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg reset location` | - | 0 |
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
-| `dbg tp` | - | [X Y original Morrowind global XY / seydaneen / prisonship / balmora / vivec (Vivec Arena) / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / seydaneen / prisonship / balmora / vivec (Vivec Arena) / <map name>; no argument opens menu] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 
@@ -131,11 +138,13 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg hands` | - | - |
 | `dbg heap` | - | (current hunk clearance and load peak) |
 | `dbg hud type` | - | 1 original / 2 compact (default) |
+| `dbg logs live` | - | [on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set) |
 | `dbg npcfloors` | - | (read-only ground-contact report) |
 | `dbg npcs` | - | - |
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |
 | `dbg rcount` | - | [0/1/2] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only |
+| `dbg savelogs` | - | write the in-memory diagnostic logs to the game folder now (also done at Exit game) |
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |
 | `dbg showram` | - | on/off |

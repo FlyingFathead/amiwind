@@ -5,6 +5,20 @@ here is in the game, the engine is unchanged, and no map ships a shell. The
 face budget below is a candidate, not a promise. The FPS effect is not
 measured yet (see the planned A/B at the end).
 
+<!-- contents start -->
+## Contents
+
+- [Why](#why)
+- [Quake first: which mechanisms this reuses](#quake-first-which-mechanisms-this-reuses)
+- [The tool: `tools/mold_shell.py`](#the-tool-toolsmold_shellpy)
+- [Measured on Balmora (bm019)](#measured-on-balmora-bm019)
+- [Engine switch (design, not implemented)](#engine-switch-design-not-implemented)
+- [Planned FPS A/B/C/D](#planned-fps-abcd)
+- [Why pure Python (and not a Blender step)](#why-pure-python-and-not-a-blender-step)
+- [Open questions](#open-questions)
+
+<!-- contents end -->
+
 ## Why
 
 Town frame rate is limited by building faces, not by visibility lists:

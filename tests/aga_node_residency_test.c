@@ -9,6 +9,8 @@ static void *test_calloc(size_t count,size_t size){
 }
 #define calloc test_calloc
 #include "../engine/aga/src/model.c"
+/* Diagnostic logs (aw_log.c); without a bound switch they are written live. */
+#include "../engine/aga/src/aw_log.c"
 #undef calloc
 
 static byte heap[16*1024*1024];

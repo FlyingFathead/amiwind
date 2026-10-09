@@ -42,8 +42,10 @@ SHIPPED_STAGES = {
     'world-flora-assets': 'progs/aw_flora/*.spr (76 files)', 'world-flora': 'trees and grass overlay',
     'media': 'media/catalogue.json, sound/*', 'music': 'music/*.mws', 'engine': 'AmiWind, AmiWindCheck',
     'image': 'the HDF images',
+    # v0.0.33, the first CHIM release: Balmora and Seyda Neen as a CHIM world (config/build-defaults.json).
+    'chim': 'CHIM world (chim/world.cwi, frame maps of Balmora and Seyda Neen)',
     # Towns after Seyda Neen and Balmora that the release ships (BUILD-EXTRA-TOWN-OPTIN-32).
-    'town-vivec_arena': 'Vivec Arena preview (va*, vivec_arena.bsp, its region and door tables; v0.0.32)',
+    # The Vivec Arena preview (town-vivec_arena, v0.0.32) is withdrawn from v0.0.33 (WithdrawnTowns below).
 }
 
 # Image options a default build must pass, with the value v0.0.31 shipped.
@@ -69,20 +71,39 @@ OPTIONS = {
     # Shipped content: on by default; the only way out is a DEBUGGING ONLY opt-out.
     'no_npc_gallery': 'debug opt-out', 'no_tree_sprites': 'debug opt-out', 'no_harvest': 'debug opt-out',
     'no_extra_town': 'debug opt-out', 'only_core_towns': 'debug opt-out',
+    # Quick test builds: --exclude GROUP and its --exclude-* aliases (tools/build_exclusions.py, -devN only).
+    'exclude': 'debug opt-out', 'exclude_unreferenced': 'debug opt-out', 'with_video': 'mode',
     'tree_sprites': 'no-op alias',
     # Defaults that match what v0.0.31 shipped.
     'hands': 'shipped default', 'vis_mode': 'shipped default', 'hidden_surface_cull': 'shipped default',
     'local_skybox': 'shipped default', 'map_budget_policy': 'shipped default',
     'texinfo_snap': 'shipped default', 'scenery_reduce': 'shipped default',
     'scenery_reduce_texels': 'shipped default', 'bitmap_paper_ink': 'shipped default',
-    'build_config': 'shipped default',
+    'build_config': 'shipped default', 'builder': 'shipped default',
+    # v0.0.33: --builder chim with CHIM areas Balmora and Seyda Neen (config/build-defaults.json).
+    'chim_areas': 'shipped default',
+    # CHIM texture effects (.chimfx, e.g. autumn_glitter_leaves): an opt-in look, none by default.
+    'chim_texture_effects': 'opt-in, not shipped',
     # Morrowind's stair/slope collision rules (config/build-defaults.json, true); --no-... is the debug way out.
     'follow_original_stair_rules': 'shipped default',
+    # standing hulls as chains in v0.0.33 (config/build-defaults.json, chain: BUILD-ROUTED-FLORA-RESERVE-33);
+    # --model-hull auto routes large models (selectable, tested)
+    'model_hull': 'shipped default',
+    # CHIM frame maps tag statics to stream with their chunks (the engine reads the tags); --no-... is the debug way out
+    'chim_stream_statics': 'shipped default',
+    # The game heap: the engine's 11 MiB unless --heap-mb / heap_mb asks otherwise (used as asked, warned above
+    # the measured safe size; tests/test_heap_size.py).
+    'heap_mb': 'shipped default',
     # Opt-in content no release ships (owner decisions, private inputs or experiments).
     # --extra-town adds towns not shipped yet; shipped towns are built by default.
     'extra_town': 'opt-in, not shipped', 'intro_captions': 'opt-in, not shipped',
     'amiga_libs': 'opt-in, not shipped', 'shared_sky_source': 'opt-in, not shipped',
-    'allow_known_actor_ground_findings': 'private test waiver',
+    # Benchmark/diagnostic images: live diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33).
+    'live_logs': 'opt-in, not shipped',
+    'allow_known_actor_ground_findings': 'private test waiver', 'accept_known_stair_findings': 'private test waiver',
+    # The AmiWind "MiniWind" Playtester Build: a private -devN partial-area build type (tools/miniwind.py).
+    'miniwind': 'opt-in, not shipped', 'miniwind_description': 'opt-in, not shipped',
+    'miniwind_scope': 'opt-in, not shipped',
     # Entity tracker against the release baseline (BUILD-DRESSING-EXCLUDED-32).
     'no_entity_baseline': 'debug opt-out', 'accept_entity_loss': 'check',
     'skip_dressing': 'debug opt-out',
@@ -93,7 +114,8 @@ OPTIONS = {
     'help': 'tooling', 'data_files': 'input', 'workspace': 'tooling', 'stage': 'mode', 'check': 'mode',
     'plan': 'mode', 'install_dependencies': 'mode', 'autoinstall': 'mode', 'yes': 'mode',
     'install_sdk': 'mode', 'tools_dir': 'tooling', 'versions': 'mode', 'host_plan': 'mode',
-    'fallback_font': 'input', 'check_inputs': 'mode', 'dry_run': 'mode', 'recover_image_from': 'mode',
+    'fallback_font': 'input', 'check_inputs': 'mode', 'layout_selftest': 'mode', 'dry_run': 'mode',
+    'recover_image_from': 'mode',
     'autorun_fs_uae': 'mode', 'kickstart_file': 'input', 'amiga_libs_policy': 'check',
     'game_data_policy': 'check', 'check_hashes': 'check', 'allow_data_differences': 'check',
     'name': 'tooling', 'sdk': 'tooling', 'vasm': 'tooling', 'upstream_archive': 'check',
@@ -102,6 +124,8 @@ OPTIONS = {
     'estimate_world': 'mode', 'estimate_sample': 'mode', 'jobs': 'tooling', 'serial_stages': 'tooling',
     # Build profile and development stage reuse (docs/BUILD_PROFILE.md): outputs unchanged.
     'no_profile': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'allow_release_reuse': 'check',
+    'fingerprint_scope': 'tooling', 'no_unit_cache': 'debug opt-out', 'no_media_cache': 'debug opt-out',
+    'prerendered': 'tooling', 'prerendered_stages': 'tooling',
 }
 
 
@@ -193,18 +217,74 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
             self.assertNotIn(flag, engine)
 
 
+def arena_shipped():
+    """The town table with the Vivec Arena shipped again (its "withdrawn" field dropped):
+    the shipped-town mechanism stays tested while v0.0.33 leaves the Arena out."""
+    import town_config
+    real = town_config.load_registry
+
+    def load(root=None):
+        registry = real(root)
+        for row in registry['towns']:
+            if row['id'] == 'vivec_arena':
+                row.pop('withdrawn', None)
+        return registry
+    return patch.object(town_config, 'load_registry', load)
+
+
+class WithdrawnTowns(unittest.TestCase):
+    """v0.0.33 leaves the Vivec Arena out by owner decision (CHIM-ARENA-MEMORY-33): as data
+    ("withdrawn" on its town row), not a deletion; --extra-town still builds it."""
+
+    def test_the_arena_is_withdrawn_and_still_buildable(self):
+        from town_config import extra_towns, registry_row, shipped_extra_towns, withdrawn_towns
+        self.assertEqual(shipped_extra_towns(), [])
+        self.assertEqual(withdrawn_towns(), ['vivec_arena'])
+        self.assertIn('CHIM-ARENA-MEMORY-33', registry_row('vivec_arena')['withdrawn'])
+        self.assertEqual(registry_row('vivec_arena')['shipped_since'], 'v0.0.32')
+        self.assertIn('vivec_arena', extra_towns())
+        self.assertNotIn('town-vivec_arena', dict(steps()))
+        self.assertIn('town-vivec_arena', dict(steps('--extra-town', 'vivec_arena')))
+        self.assertEqual({name for name in SHIPPED_STAGES if name.startswith('town-')}, set())
+
+    def test_withdrawn_needs_a_reason(self):
+        import json
+        import shutil
+        from town_config import runtime_towns, shipped_extra_towns
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / 'config'
+            shutil.copytree(ROOT / 'config', config)
+            original = json.loads((config / 'towns.json').read_text(encoding='utf-8'))
+            ids = [row['id'] for row in original['towns']]
+            for town, value in (('vivec_arena', ''), ('vivec_arena', '  '), ('vivec_arena', 1),
+                                ('balmora', 'a reason')):
+                data = json.loads(json.dumps(original))
+                data['towns'][ids.index(town)]['withdrawn'] = value
+                (config / 'towns.json').write_text(json.dumps(data), encoding='utf-8')
+                with self.subTest(town=town, value=value):
+                    with self.assertRaises(ValueError):
+                        runtime_towns(tmp)
+                    if town != 'balmora':
+                        with self.assertRaises(ValueError):
+                            shipped_extra_towns(tmp)
+
+
 class ShippedTowns(unittest.TestCase):
     """Towns the release ships are built by default (BUILD-EXTRA-TOWN-OPTIN-32).
 
     The Vivec Arena preview ships in v0.0.32 but was built only with the opt-in
     --extra-town vivec_arena, so a default build lacked 19 files of the payload.
+    v0.0.33 withdraws the Arena; these tests run with it shipped again (arena_shipped).
     """
+
+    def setUp(self):
+        shipped = arena_shipped()
+        shipped.start()
+        self.addCleanup(shipped.stop)
 
     def test_the_town_table_ships_the_arena(self):
         from town_config import shipped_extra_towns
         self.assertEqual(shipped_extra_towns(), ['vivec_arena'])
-        shipped = {name for name in SHIPPED_STAGES if name.startswith('town-')}
-        self.assertEqual(shipped, {'town-' + town for town in shipped_extra_towns()})
 
     def test_default_build_imports_every_shipped_town(self):
         from build_parallel import stage_dependencies

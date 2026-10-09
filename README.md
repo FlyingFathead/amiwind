@@ -29,16 +29,64 @@ what the public package contains. In-game screenshots of every version:
 
 More in the [gallery](docs/GALLERY.md).
 
-## Coming next: v0.0.33 - Towards CHIM: Replacing the Engine Block
+## v0.0.33 - Towards CHIM: Replacing the Engine Block
 
-v0.0.33 is the first release on the **CHIM** engine: the open world moves to a
-**world streamer with no duplicated assets**: every mesh, collision hull and
-texture stored once and placed by reference, streamed around the player.
-Estimated from the game's own data, the world itself then comes to about
-1 GB, so the whole game should fit **one legacy-safe Amiga hard file**, where
-today's pipeline would need about 24 GB. Details, numbers and the plan:
-[roadmap](docs/ROADMAP.md), [world streamer](docs/WORLD_STREAMER.md),
-[asset census](docs/ASSET_CENSUS.md).
+Introducing AmiWind's **CHIM** engine, a.k.a. **[C]hunks and [H]eaps [I]n [M]emory**.
+
+**AmiWind v0.0.33, running on CHIM Engine v0.1.0.**
+
+Balmora and Seyda Neen now run on pure CHIM: the world is cut into chunks, every
+mesh, collision hull and texture is stored once and placed by reference instead of
+being copied into overlapping region maps, and only the chunks around you are in
+memory. It is still the AmiQuake engine underneath; what changed is how the world
+reaches it. A far terrain layer draws the distance, and the CHIM builder is now the
+default builder.
+
+<!-- v0.0.33 photos -->
+<!-- /v0.0.33 photos -->
+
+### What is CHIM?
+
+CHIM is AmiWind's overhauled engine: in many places a rewrite of the original
+AmiWind engine, still built on id Software's Quake and the AmiQuake port. Its main
+change is how the world is kept:
+
+- **Store once.** Every mesh, collision hull and texture is stored once and placed
+  by reference, the way Morrowind places its meshes, instead of being copied into
+  every overlapping region map that can see it.
+- **Stream chunks.** The land is cut into chunks; a ring of chunks around you is in
+  memory and chunks join and leave a little at a time, so there is no "region
+  loading" stop at a border.
+- **Vis kept.** Chunks and placements are linked to the visibility leaves they
+  touch, so Quake's visibility data still culls them.
+- **Memory budgets.** The chunk ring lives in one fixed zone inside Quake's own
+  heap, and the builder checks every CHIM area against the engine's numbers before
+  it ships.
+
+What it gained, measured (bytes and counts are exact; frame times are FS-UAE
+emulator figures, relative until a real Amiga has been measured):
+
+- **Disk:** Balmora's exterior 162.1 MB of legacy maps to 21.3 MB (7.6 times
+  smaller); Seyda Neen with the intro docks 190.4 MB to 7.8 MB (24.3 times).
+- **Loading:** the Balmora door walk reads 40.7 MB instead of 73.5 MB, in small
+  steps instead of region loads.
+- **Renderer work:** 46-114 brush models sent at the Balmora test cameras instead
+  of 512-654, and 9-10 BSP nodes walked per clipped face instead of 27-52.
+- **Frames (emulator, relative):** on a slow preset (a cycle-exact 68040 at about
+  50 MHz) the median Balmora frame falls from 2.0-4.1 s to 1.1-1.6 s.
+
+CHIM also has costs: it leaves less of the heap free at a town's load peak, spends
+more time outside the 3D view and draws slightly more spans. The rest of the open
+world is still on the legacy pipeline for now, and the Vivec Arena preview of
+v0.0.32 is left out of this release; it comes back on CHIM.
+
+Read more:
+
+- [Release notes](docs/RELEASE-v0.0.33.md), with what is known in this build
+- [CHIM engine](docs/chim/README.md)
+- [CHIM features](docs/chim/FEATURES.md): what is done, measured or still to do
+- [Disk space](docs/chim/DISK_SPACE.md): Amiga disk limits and what CHIM saves
+- [CHIM build guide](docs/chim/build_guide/README.md)
 
 ## v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec
 
@@ -664,6 +712,11 @@ this repository, not a second repository. See [repository layout](docs/REPOSITOR
 The Steam GOTY edition remains a supported fallback input when its required game data
 passes AmiWind's validation.
 
+AmiWind runs on the CHIM engine, built on GPLv2 code from **id Software's
+Quake** (John Carmack and the id team) and its Amiga port **AmiQuake** (Peter
+McGavin, NovaCoder, Stephen Leary). The CHIM builder that converts your own
+Morrowind files is GPLv3.
+
 The AGA runtime incorporates code from **id Software's Quake** and the
 **AmiQuake** lineage, modified, extended and adapted for **AmiWind**. These
 components are distributed under the **GNU GPL version 2**, with the original
@@ -760,10 +813,25 @@ to ignored `out/`.
 These commands preview setup and check prerequisites. Follow the linked build
 guide to install the required tools and build the playable HDF.
 
-A normal build includes everything the release ships, including the Vivec
-Arena preview (an outside-only look at the canton, new in v0.0.32); no extra
-option is needed. Options that leave shipped content out are for debugging only
-and say so; see [shipped towns](docs/LINUX_BUILD.md#shipped-towns-default).
+**Build speed:** `--jobs N` sets the exact worker count. While a build runs,
+`./build.sh status out/build/NAME` shows its progress, the cores in use and an
+ETA; afterwards `./build.sh profile report|compare|optimize out/build/NAME`
+shows where the time went and what to parallelize next. Development rebuilds can
+reuse unchanged stages with `--reuse-from`. See
+[performance options](docs/BUILD_PROFILE.md#performance-options).
+
+A normal build includes everything the release ships; no extra option is
+needed. From v0.0.33 the default builder is CHIM, with Balmora and Seyda Neen on
+CHIM; a build with Seyda Neen also needs the recorded v0.0.31 Seyda Neen maps
+(`--seyda-recorded DIR`), and `--builder legacy` still builds the old way (see
+[builder types](docs/chim/build_guide/BUILDER_TYPES.md)). The Vivec Arena preview
+of v0.0.32 is withdrawn from v0.0.33 (`--extra-town vivec_arena` still builds it
+for testing). Options that leave shipped content out are for debugging only and
+say so; see [shipped towns](docs/LINUX_BUILD.md#shipped-towns-default).
+For a quick Balmora-only playtest image (a private test, never a release), add
+`--miniwind`; see [MiniWind playtester build](docs/MINIWIND_PLAYTESTER.md).
+For quick test builds of one spot (fewer videos, voices, rooms or NPCs), see the
+[CHIM build guide](docs/chim/build_guide/README.md).
 
 **FPU support library (optional, your own copy):** a real 68040 or 68060 needs
 `68040.library` or `68060.library` for the rare FPU cases its hardware does not
@@ -789,13 +857,12 @@ For manual setup or WinUAE, use the guides and steps below.
 | [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.28-rc1-FS-UAE.fs-uae) |
 | [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.28-rc1-WinUAE.uae) |
 
-1. Build the v0.0.28 source in preparation from your own Morrowind installation using the guide
+1. Build the current source from your own Morrowind installation using the guide
    above. Keep every HDF listed in the build summary together. The source ZIP
    contains tools and templates; playable images are private build outputs.
 2. Install an emulator from its official homepage above. Prefer the matching
    configuration generated beside your HDFs: it lists every required disk. The
-   historical rc1 templates above provide a starting point for manual setup;
-   final configurations are regenerated with the final v0.0.28 HDF paths.
+   historical rc1 templates above provide a starting point for manual setup.
 3. Follow the matching setup guide to select your licensed **A1200 Kickstart
    3.1 ROM** and all the built HDFs. WinUAE uses RDB hardfiles on the UAE
    controller; FS-UAE uses the ROM and HDF paths in its configuration file.
@@ -811,10 +878,11 @@ and boots to a test notice; it is not the playable demo.
 
 ## Development
 
-The next work is to playtest and profile the expanded world: memory across
-loads and crossings, town geometry, scenery continuity and frame cost. Build-time
-profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
-remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md).
+The next work is the rest of the island on CHIM: the open world converted cell by
+cell, Vivec back on CHIM and joined to the world, NPC animations and Arena combat.
+Build-time profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
+remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md) and the
+[CHIM features](docs/chim/FEATURES.md) page.
 
 [FAQ](docs/FAQ.md) · [Gallery](docs/GALLERY.md) · [Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
 [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·

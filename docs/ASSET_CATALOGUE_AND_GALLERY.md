@@ -9,6 +9,21 @@ approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.
 
+<!-- contents start -->
+## Contents
+
+- [Default inclusion contract](#default-inclusion-contract)
+- [Required target: static assets directly callable by the engine](#required-target-static-assets-directly-callable-by-the-engine)
+- [First implementation step: account for source assets](#first-implementation-step-account-for-source-assets)
+- [Confirmed omission: scaled Bitter Coast trees](#confirmed-omission-scaled-bitter-coast-trees)
+- [Coverage is not the same as catalogue size](#coverage-is-not-the-same-as-catalogue-size)
+- [Proposed command: `dbg assetgallery`](#proposed-command-dbg-assetgallery)
+- [Proposed cell-by-cell scenery layer over existing terrain](#proposed-cell-by-cell-scenery-layer-over-existing-terrain)
+- [Proposed regional scenery pass and loading order](#proposed-regional-scenery-pass-and-loading-order)
+- [Checkpoints and acceptance](#checkpoints-and-acceptance)
+
+<!-- contents end -->
+
 All NPCs and other game assets must remain intact, packaged and loadable by the
 engine for the complete game to function properly. Skipping their creation
 alongside either gallery is pointless and counterproductive: the final product

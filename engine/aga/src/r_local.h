@@ -305,6 +305,10 @@ void R_PrintTimes (void);
 void R_PrintDSpeeds (void);
 void R_AnimateLight (void);
 int R_LightPoint (vec3_t p);
+/* Static light for an alias entity: the map's actor light grid at the body's
+ * centre when the map has one (aw_actor_light_grid), else R_LightPoint. */
+int R_ActorLight (entity_t *e, int centre);
+void R_LightGridNewMap (void);
 void R_InteriorLumaInit(void);
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
 void R_InteriorLumaUpdate(void);

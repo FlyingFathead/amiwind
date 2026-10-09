@@ -1,5 +1,20 @@
 # TOWN-FRAME-CEILING-32: ground above the town frame ceiling leaks the map
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.32-dev |
+| Where | Town converter terrain frame ceiling (tools/import_town.py) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev (last seen) |
+| Severity | high: 320 regions with high ground leak the map and stop vis. |
+| Family | Town and interior import (`town-import`) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 8 October 2026
 
 Open. Found by the public world estimate's sample conversions.
@@ -39,3 +54,18 @@ Pending.
 ## Prevention
 
 The world estimate checks ground height against the frame ceiling (new column).
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Town and interior import (`town-import`). The town importer converts every town and interior within engine limits; doors lead somewhere. See [families](README.md#families).
+
+- AW-20260928-08 (no report page): Census wall/hanging texture quality or mapping
+- [IMPORT-TEST-CELLS-31](IMPORT-TEST-CELLS-31.md): Development test cells would be imported with the world
+- [IMPORT-TOWN-NO-INTERIORS-32](IMPORT-TOWN-NO-INTERIORS-32.md): The town importer converts no interiors; all Vivec Arena doors say "Interior unavailable"
+- TOWN-ARRIVAL-002 (no report page): Town flora fallback picked the wrong Balmora region
+- TOWN-FLORA-BINDING-003 (no report page): Town flora staging rejected a valid legacy sprite binding
+- [VIVEC-ROOMS-UNREACHABLE-32](VIVEC-ROOMS-UNREACHABLE-32.md): Excluded Vivec hub rooms leave converted rooms unreachable
+
+<!-- END GENERATED CATEGORY -->

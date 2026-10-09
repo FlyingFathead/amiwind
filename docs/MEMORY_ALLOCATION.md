@@ -1,5 +1,38 @@
 # Memory allocation and heap clearance
 
+<!-- contents start -->
+## Contents
+
+- [Console history working-set investigation: 6 October 2026](#console-history-working-set-investigation-6-october-2026)
+- [Current v0.0.28 candidate accounting — 4 October 2026](#current-v0028-candidate-accounting--4-october-2026)
+- [Mandatory: LEAVE HEADROOM](#mandatory-leave-headroom)
+- [Current mapping baseline and mandatory checks as it grows](#current-mapping-baseline-and-mandatory-checks-as-it-grows)
+- [Heap is not total Fast RAM](#heap-is-not-total-fast-ram)
+- [Why BSP file size is insufficient](#why-bsp-file-size-is-insufficient)
+- [v0.0.27-rc3 incident: Seyda Neen sn012](#v0027-rc3-incident-seyda-neen-sn012)
+- [Separate loader trap: extra-HDF search paths](#separate-loader-trap-extra-hdf-search-paths)
+- [Build-time audit](#build-time-audit)
+- [Audit while crossing cells](#audit-while-crossing-cells)
+- [Profile, then reduce or subdivide](#profile-then-reduce-or-subdivide)
+- [Whole-cycle profiling and buffer planning](#whole-cycle-profiling-and-buffer-planning)
+- [Incident reporting: correction versus mitigation](#incident-reporting-correction-versus-mitigation)
+- [Complete lifecycle watcher and over-budget regions](#complete-lifecycle-watcher-and-over-budget-regions)
+- [Used/free margins in future build receipts](#usedfree-margins-in-future-build-receipts)
+- [Duplication and deduplication guidelines for future growth](#duplication-and-deduplication-guidelines-for-future-growth)
+- [Standing requirement: dense towns need bounded residency](#standing-requirement-dense-towns-need-bounded-residency)
+  - [Measured adaptive subdivision prototype](#measured-adaptive-subdivision-prototype)
+- [Boundary placement is a measured choice, not an FPS guarantee](#boundary-placement-is-a-measured-choice-not-an-fps-guarantee)
+- [Required pipeline: Heap Watcher → Profiler → Optimizer](#required-pipeline-heap-watcher--profiler--optimizer)
+- [Vertical boundary review — 3 October 2026](#vertical-boundary-review--3-october-2026)
+- [Historical rc4 estimate of the retained 64-core proposal](#historical-rc4-estimate-of-the-retained-64-core-proposal)
+- [Normal-converter bounded-town audit — 3 October 2026](#normal-converter-bounded-town-audit--3-october-2026)
+- [Transactional exact-sharing candidates — 3 October 2026](#transactional-exact-sharing-candidates--3-october-2026)
+- [Oversized interior maps](#oversized-interior-maps)
+- [v0.0.29-rc1 development: bounded residency and compact state](#v0029-rc1-development-bounded-residency-and-compact-state)
+- [Exact edge and surface storage: 6 October follow-up](#exact-edge-and-surface-storage-6-october-follow-up)
+
+<!-- contents end -->
+
 ## Console history working-set investigation: 6 October 2026
 
 The owner requests disk-backed debug output scrollback, loading old pages only
@@ -223,7 +256,9 @@ when prioritizing repairs; do not load or ignore them based on filenames alone.
 The v0.0.27 runtime records the hunk load peak after old-map memory is
 cleared, then reports use/clearance at scene spawn, including automatic sub-cell
 loads. Allocation paths update the peak; no per-frame polling is added. A
-transition or explicit diagnostic appends `heap-audit.log` when writable.
+transition or explicit diagnostic appends to `heap-audit.log`: held in memory and
+written at Exit game, after a fatal error or with `dbg savelogs`, or as it happens with
+`dbg logs live on` / a `--live-logs` image (BOOT-VOLUME-NOT-VALIDATED-33).
 Use `dbg heap` for the current snapshot and load peak. The reported scene name
 identifies the resident world model where available.
 

@@ -14,6 +14,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from mwad.paths import ensure_external
+from build_scratch import scratch_dir
 
 WIDTH, HEIGHT, FPS, RATE = 320, 200, 10, 11025
 HEADER = struct.Struct(">4sHHHHII12x")
@@ -130,7 +131,9 @@ def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=Non
             if not (0 <= card["start"] < card["end"] <= 1800 and
                     isinstance(card["text"], str) and len(card["text"]) <= 1024):
                 raise ValueError("Invalid title-card timing or text")
-    with tempfile.TemporaryDirectory(prefix="amiwind-video-") as tmp:
+    # Raw frames (up to ~3 GB for a 30-minute movie) go to the build scratch, never the system temp
+    # directory, a size-limited RAM tmpfs in the build container (BUILD-TMP-SCRATCH-33).
+    with scratch_dir("amiwind-video-") as tmp:
         raw, pcm = Path(tmp) / "rgb.raw", Path(tmp) / "audio.raw"
         # Fit the source display aspect ratio, then letterbox; never crop titles.
         filters = (f"fps={FPS},scale={width}:{height}:flags=lanczos:force_original_aspect_ratio=decrease:"
@@ -198,6 +201,56 @@ def prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), captions=Non
         result.update(title_cards=cards, title_cards_sha256=digest(captions), font_sha256=digest(font))
     (output / "video-conversion.json").write_text(json.dumps(result, indent=2) + "\n")
     return result
+
+
+def video_cache_identity(ffmpeg):
+    """What a converted movie's bytes depend on besides its source and size (tools/file_cache.py)."""
+    import PIL
+    from file_cache import code_identity, program_identity
+    try:
+        probe = program_identity(ffprobe_for(ffmpeg))
+    except ValueError:
+        probe = None
+    return {'ffmpeg': program_identity(ffmpeg), 'ffprobe': probe, 'pillow': PIL.__version__,
+            'code': code_identity(sys.modules[__name__])}
+
+
+def cached_prepare_video(source, output, ffmpeg="ffmpeg", size=(320, 200), output_name="mw_intro.awv", cache=None):
+    """prepare_video with a per-file cache: OUTPUT gets the same movie and video-conversion.json.
+
+    CACHE: (cache folder, video_cache_identity(ffmpeg)) or None (convert). Title cards are
+    never cached (use prepare_video). Returns (result, 'hit' | 'miss' | 'off').
+    """
+    from file_cache import FileCache
+    root, identity = cache if cache else (None, None)
+    store = FileCache(root, 'video', identity)
+    if not store.enabled:
+        return prepare_video(source, output, ffmpeg, size, output_name=output_name), 'off'
+    resolved = Path(source).resolve()
+    if not resolved.is_file():
+        return prepare_video(source, output, ffmpeg, size, output_name=output_name), 'miss'
+    source_sha256 = digest(resolved)
+    key = store.key(source_sha256, {'size': list(size), 'fps': FPS, 'rate': RATE})
+    output = ensure_external(output, "movie conversion")
+    output.mkdir(parents=True, exist_ok=False)
+    facts = store.fetch(key, output / output_name)
+    if facts and facts.get('source_sha256') == source_sha256 and facts.get('sha256'):
+        result = dict(facts, source=resolved.name)
+        (output / "video-conversion.json").write_text(json.dumps(result, indent=2) + "\n")
+        return result, 'hit'
+    shutil.rmtree(output)
+    result = prepare_video(source, output, ffmpeg, size, output_name=output_name)
+    store.store(key, output / output_name, result)
+    return result, 'miss'
+
+
+def cached_video(source, target, ffmpeg, size, cache, scratch):
+    """Convert (or take from the per-file cache) one movie straight to TARGET; (result, cache result)."""
+    with tempfile.TemporaryDirectory(prefix='video-', dir=scratch) as temporary:
+        converted = Path(temporary) / 'converted'
+        result, outcome = cached_prepare_video(source, converted, ffmpeg, size, output_name='movie.awv', cache=cache)
+        shutil.copyfile(converted / 'movie.awv', target)
+    return result, outcome
 
 
 def _video_sources(data_files):

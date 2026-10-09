@@ -1,14 +1,22 @@
 # REMOTE-CONSOLE-LOG-COST-32: With the remote console on, every console line costs about 7-18 ms in FS-UAE
 
-| | |
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
 | --- | --- |
-| Reported by | A/B/C/D session (FS-UAE) |
-| First noticed | 8 October 2026, v0.0.32-dev3 image |
+| Reported by | audit |
+| First noticed | 8 October 2026, in v0.0.32-dev3 |
 | Where | remote debugging console (aw_remote 1), engine/aga/src/console.c and aw_remote.c |
-| Reproduction | always with the remote console on |
-| Duplicate of | none (cause of CENSUS-LOAD-SLOW-32) |
-| Persists in | v0.0.32 (test sessions only) |
-| Severity | low (test tooling) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.32-dev3, v0.0.32 (last seen) |
+| Severity | low: Test tooling. |
+| Family | Debug commands and remote control (`debug-commands`) |
+| Playtest version | v0.0.32-dev3 |
+| From commit | source and engine 91a7eeb |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
 
 ## Status: 8 October 2026
 
@@ -62,3 +70,26 @@ Pending: the same load with the remote console on and off within a few percent o
 
 Proposed: load-time and frame-time measurements record whether the remote console was on; a
 benchmark of a long console command with the remote console on and off.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Debug commands and remote control (`debug-commands`). dbg commands, teleports, debug map loads and the remote console. See [families](README.md#families).
+
+- AW-20260928-14 (no report page): Master debug toggle omits coordinates
+- [DBG-TOGGLE-WORDS-31](DBG-TOGGLE-WORDS-31.md): dbg on/off words turned settings off
+- DEBUG-ALIASES-29 (no report page): Discoverable video-player aliases and disk-backed help
+- [DEBUG-TP-CHIM-33](DEBUG-TP-CHIM-33.md): dbg tp to original coordinates fails in a CHIM town on a pure-CHIM disk, and its help offers towns the disk does not have
+- [DEBUG-TP-SHIP-FREEZE-32](DEBUG-TP-SHIP-FREEZE-32.md): The game froze once on dbg tp balmora issued 6 s after dbg tp prisonship
+- [DEBUG-TP-TOWN-NAMES-32](DEBUG-TP-TOWN-NAMES-32.md): dbg tp help omits new towns and has no short town names
+- MAP-TELEPORT-28 (no report page): F10 map teleport intermittently fails
+- [REMOTE-CONSOLE-APPEND-31](REMOTE-CONSOLE-APPEND-31.md): Remote console log keeps only the last message
+- [REMOTE-STATE-WIDTH-31](REMOTE-STATE-WIDTH-31.md): Remote state file printed 51.*ld for fractional fields
+- TELEPORT-XY-006 (no report page): No dbg tp X Y; map teleport could land underwater
+
+Related bugs in other categories:
+
+- [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md): The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s
+
+<!-- END GENERATED CATEGORY -->

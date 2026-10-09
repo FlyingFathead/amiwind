@@ -24,6 +24,8 @@ void AW_SetDrawDistance(int n){if(n<100)n=100;if(n>1500)n=1500;distance=n;}
 int Cmd_Argc(void){return 1;}
 void Con_Printf(char *fmt,...){}
 int COM_FOpenFile(char *name,FILE **f){if(missing || (intro_missing && !strcmp(name,"intro/chargenname1.txt"))){*f=NULL;return -1;}*f=tmpfile();return 124;}
+/* aw_region.c AW_SceneMapSize: the scene's own map (no CHIM frame maps in this test). */
+int AW_SceneMapSize(const char *n,char *p,int s){char b[64];FILE *f=NULL;int k;sprintf(b,"maps/%s.bsp",n);k=COM_FOpenFile(b,&f);if(f)fclose(f);else k=-1;if(p && s>0){strncpy(p,b,s-1);p[s-1]=0;}return k;}
 void IN_AWClearButtons(void){clears++;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_scene_menu"))picker=fn;else if(!strcmp(name,"aw_main_menu"))front=fn;}
 void Cbuf_AddText(char *s){if(!strcmp(s,"quit\n"))quit++;else{strcpy(queued,s);changes++;}}
@@ -33,7 +35,17 @@ int AW_UIColor(int r,int g,int b){return r;}
 void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);scroll_top=top;scroll_total=total;}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
-void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);if(!strcmp(s,"Audio"))audio_draws++;}
+static char crosshair_label[64],photo_label[64];static int photo_colour;
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);if(!strcmp(s,"Audio"))audio_draws++;
+ if(!strncmp(s,"Show crosshairs",15))strcpy(crosshair_label,s);
+ if(!strcmp(s,"Photo mode") || !strcmp(s,"Leave photo mode")){strcpy(photo_label,s);photo_colour=c;}}
+/* Photo mode and the crosshair preference (aw_photo.c). */
+static int crosshair_on=1,photo_on,photo_available=1,photo_sets;
+int AW_CrosshairShown(void){return crosshair_on;}
+void AW_CrosshairSet(int on){crosshair_on=on;}
+int AW_PhotoModeActive(void){return photo_on;}
+int AW_PhotoModeAvailable(void){return photo_available;}
+int AW_PhotoModeSet(int on){assert(key_dest==key_game);photo_on=on;photo_sets++;return 1;}
 void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
 void AW_MusicTitle(void){}
 void AW_MusicTitleAfter(double seconds){(void)seconds;}
@@ -47,7 +59,7 @@ static void check_controls(void){
  int i;
  keybindings['w']="+forward";keybindings[K_UPARROW]="+forward";keybindings[K_F9]="aw_quickload";
  open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();
- for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
+ for(i=0;i<7;i++)M_Keydown(K_DOWNARROW);
  M_Keydown(K_ENTER);M_Draw();assert(highlight_y==54); /* Forward */
  M_Keydown(K_ENTER);M_Draw();M_Keydown('k');
  assert(!strcmp(keybindings['k'],"+forward") && !*keybindings['w'] && !*keybindings[K_UPARROW]);
@@ -61,19 +73,42 @@ static void check_controls(void){
  M_Keydown(K_ESCAPE);M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
  for(i=0;i<256;i++)keybindings[i]=NULL;
 }
+/* Options > Show crosshairs (the saved crosshair preference) and Options >
+ * Photo mode: closes the menu first, toggles to Leave photo mode, greyed and
+ * inert on the title screen or without a running game. */
+static void open_options(void){open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();}
+static void check_photo_rows(void){
+ int i;
+ open_options();for(i=0;i<3;i++)M_Keydown(K_DOWNARROW);
+ M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: On") && highlight_y==54+3*19);
+ M_Keydown(K_ENTER);assert(!crosshair_on);M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: Off"));
+ M_Keydown(K_RIGHTARROW);assert(crosshair_on);M_Keydown(K_LEFTARROW);assert(!crosshair_on);
+ M_Keydown(K_ENTER);assert(crosshair_on && key_dest==key_menu);
+ M_Keydown(K_DOWNARROW);photo_available=0;M_Draw();assert(!strcmp(photo_label,"Photo mode") && photo_colour==114);
+ M_Keydown(K_ENTER);assert(key_dest==key_menu && !photo_sets);
+ photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==54+4*19);
+ M_Keydown(K_ENTER);assert(key_dest==key_game && photo_on && photo_sets==1);
+ open_options();for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);
+ M_Draw();assert(!strcmp(photo_label,"Leave photo mode"));
+ M_Keydown(K_ENTER);assert(key_dest==key_game && !photo_on && photo_sets==2);
+ front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
+ for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);
+ M_Draw();assert(photo_colour==114);M_Keydown(K_ENTER);assert(photo_sets==2 && key_dest==key_menu);
+ M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
+}
 static void check_setup_endpoints(void){
  int i,j,down[]={K_DOWNARROW,K_MWHEELDOWN,'s',K_TAB},up[]={K_UPARROW,K_MWHEELUP,'w'};
  front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
  for(j=0;j<4;j++){
   for(i=0;i<24;i++)M_Keydown(down[j]);
-  M_Draw();assert(scroll_total==11 && scroll_top==4 && highlight_y==168 && highlight_w==230);
-  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==4 && highlight_y==149);
+  M_Draw();assert(scroll_total==13 && scroll_top==6 && highlight_y==168 && highlight_w==230);
+  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==6 && highlight_y==149);
   for(i=0;i<24;i++)M_Keydown(up[j%3]);
   M_Draw();assert(scroll_top==0 && highlight_y==54 && highlight_w==230);
   M_Keydown(K_DOWNARROW);M_Draw();assert(scroll_top==0 && highlight_y==73);
  }
  /* Reversing at either end works; the Interface subpanel shares the rule. */
- M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
  for(i=0;i<24;i++)M_Keydown(K_MWHEELUP);
  M_Draw();assert(highlight_y==54 && highlight_w==232);
  for(i=0;i<24;i++)M_Keydown(K_DOWNARROW);
@@ -101,6 +136,7 @@ int main(void){
  M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(gold_frame);
  M_Keydown(K_ENTER);assert(!gold_frame);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW); /* Show crosshairs, Photo mode: check_photo_rows */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw(); /* Interface */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
  M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
@@ -129,6 +165,7 @@ int main(void){
  M_Menu_Quit_f();M_Draw();M_Keydown(K_ENTER);assert(!quit);M_Menu_Quit_f();M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);assert(quit==1);
  open_pause();AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw();
  check_controls();
+ check_photo_rows();
  check_setup_endpoints();
  return 0;
 }

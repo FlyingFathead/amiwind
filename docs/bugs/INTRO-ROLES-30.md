@@ -1,5 +1,24 @@
 # INTRO-ROLES-30: crash after a region change while intro roles are held
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 7 October 2026, in v0.0.30-dev3 |
+| Where | opening sequence roles on Seyda Neen region change (aw_intro.c) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | fixed in v0.0.30-dev4 |
+| Severity | critical: Engine stopped with NUM_FOR_EDICT bad pointer on a region change. |
+| Family | Scene changes, arrivals and handoffs (`transitions-arrivals`) |
+| Playtest version | v0.0.30-dev3 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 7 October 2026
 
 Cause identified and repaired in `engine/aga/src/aw_intro.c`. Present in
@@ -41,3 +60,23 @@ crossings:
 
 Not yet covered: the full opening sequence played through to the town with a
 region change at every stage, and owner playtest.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, region and scene changes keep the player, view, equipment and sound intact. See [families](README.md#families).
+
+- ARRIVAL-CEILING-28 (no report page): Coordinate arrivals start inside solid ceiling shell
+- [AW-20260928-01](AW-20260928-01.md): Prison ship to deck transition is intermittently very slow or freezes (FS-UAE)
+- AW-20260929-04 (no report page): Loading artwork flashes after intro movie
+- AW25-01 (no report page): Seyda Neen walking reaches water before the island handoff
+- [CHIM-INTRO-TP-OTHER-TOWN-33](CHIM-INTRO-TP-OTHER-TOWN-33.md): During the intro stages, travelling to Balmora on CHIM loads Seyda Neen's intro-docks frame map: the player lands in empty water
+- INPUT-01 (no report page): Held Ctrl/Shift flight modifiers reset on cell changes
+- SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
+- TRANSITION-EQUIPMENT-29 (no report page): Carried torch blinks out on cell/sub-cell arrival
+- TRANSITION-VIEW-29 (no report page): Automatic cell handoff forgets mouse orientation
+- TRANSITION-VOICE-29 (no report page): Automatic cell handoff cuts active speech
+- VIEW-AUTOCENTER-29 (no report page): Reported viewport/yaw resets while walking or crossing cells
+
+<!-- END GENERATED CATEGORY -->

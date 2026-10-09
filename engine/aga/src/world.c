@@ -921,11 +921,15 @@ boxmaxs[0] = boxmaxs[1] = boxmaxs[2] = 9999;
 SV_Move
 ==================
 */
+/* Every collision sweep, counted (dbg companiontest reports its share). */
+unsigned long aw_sv_move_calls;
+
 trace_t SV_Move (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, int type, edict_t *passedict)
 {
 	moveclip_t	clip;
 	int			i;
 
+	aw_sv_move_calls++;
 	memset ( &clip, 0, sizeof ( moveclip_t ) );
 
 // clip to world

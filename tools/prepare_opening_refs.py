@@ -16,8 +16,10 @@ from prepare_mesh_bsp import append_meshes
 from player_hull import lumps,pack_lumps
 
 
-def prepare(data_files,scene):
-    data_files=resolve_data_files(data_files);scene=ensure_external(scene,'opening references')
+def opening_references(data_files):
+    """(every exterior reference with its object type and model, the references the opening binds:
+    the ship's disable list of ChargenClassNPC and the tutorial barrel, the disable list ids).
+    One reading of the master for the legacy scene (prepare) and the CHIM builder (chim.seyda)."""
     raw=child_ci(data_files,'Morrowind.esm').read_bytes();objects={};cells=[];disabled=None
     for tag,flags,payload in records(raw):
         if tag not in ('SCPT','CELL','STAT','CONT','ACTI','LIGH','DOOR','NPC_'):continue
@@ -31,7 +33,16 @@ def prepare(data_files,scene):
             objects[string(f['NAME']).casefold()]={'type':tag,'model':string(f.get('MODL',b''))}
     if not disabled:raise ValueError('Original ship disable list missing')
     refs=[dict(r,**objects.get(r['id'].casefold(),{})) for c in cells for r in c['refs'] if not r.get('deleted')]
-    wanted=[r for r in refs if r['id'].casefold() in disabled or r['id'].casefold()=='chargen barrel fatigue']
+    wanted=[r for r in refs if r['id'].casefold() in disabled or r['id'].casefold()==BARREL]
+    return refs,wanted,disabled
+
+
+BARREL='chargen barrel fatigue'
+
+
+def prepare(data_files,scene):
+    data_files=resolve_data_files(data_files);scene=ensure_external(scene,'opening references')
+    refs,wanted,disabled=opening_references(data_files)
     def point(ref):return [(ref['position'][i]-(CENTRE[i] if i<2 else 0))*.25 for i in range(3)]
     path=scene/'id1/maps/seyda.bsp';b=lumps(path.read_bytes());found=set();ent=b[0].rstrip(b'\0').decode('cp1252')
     def bind(match):
@@ -50,7 +61,7 @@ def prepare(data_files,scene):
         block=re.sub(r'\n"aw_story_hidden" "[^"]*"','',block)
         return block[:-1]+extra+'}'
     ent=re.sub(r'\{[^{}]*\}',bind,ent);b[0]=(ent+'\0').encode('cp1252');path.write_bytes(pack_lumps(b))
-    barrel=next(r for r in wanted if r['id'].casefold()=='chargen barrel fatigue')
+    barrel=next(r for r in wanted if r['id'].casefold()==BARREL)
     if barrel['number'] not in found:
         parts=scene/'opening-barrel-source';group='opening_barrel';barrel['scene_groups']=[group]
         export_refs(data_files,parts,[barrel],{group:{'references':[barrel['number']]}},[*CENTRE,0],4096,32,{'scope':'authored tutorial barrel'})

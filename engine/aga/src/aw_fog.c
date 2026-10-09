@@ -40,35 +40,61 @@ static cvar_t aw_cull;
 /* Location fog (aw_fog_location.c) shortens the distance in listed places;
  * NULL until that module is initialised. */
 int (*aw_fog_location_hook)(int);
+/* CHIM (chim_world.c): on a CHIM map, the farthest its world's visibility
+ * data reaches (the builder's draw distance + hysteresis); 0 or NULL on any
+ * other map. */
+int (*aw_chim_view_reach)(void);
+/* CHIM (chim/chim_far.c): the frame's far terrain beyond the fog plane, in the
+ * full fog colour, after the fog pass; NULL on legacy data. */
+void (*aw_chim_far_draw)(byte colour,int distance);
+/* Why the effective distance differs from the setting, for the command. */
+static const char *limit_reason;
 int AW_DrawDistance(void) {
-    int d,town=sv.active?AW_TownFind(sv.name):-1,limit=town>=0?AW_Town(town)->draw_distance:540;
-    /* This exterior's converted overlap is certified for its town table range
-     * (540 for every converted town and the open world). Keep the user's
-     * larger setting available to other scenes. */
-    if(sv.active && (town>=0 || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>limit)d=limit;
+    int d,reach=aw_chim_view_reach?aw_chim_view_reach():0,town=sv.active?AW_TownFind(sv.name):-1;
+    int limit=reach>0?reach:town>=0?AW_Town(town)->draw_distance:540;
+    /* A legacy exterior's converted overlap is certified for its town table
+     * range (540 for every converted town and the open world): its region
+     * maps hold their neighbours that far. A CHIM map has no such cap: the
+     * chunk ring follows the view distance, and the only limit is how far
+     * its world's visibility data reaches. Other scenes keep the user's
+     * setting up to Quake's coordinate range. */
+    limit_reason=NULL;
+    if(sv.active && (reach>0 || town>=0 || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>limit){
+        d=limit;
+        limit_reason=reach>0?"this CHIM world's visibility data (the draw distance + hysteresis it was built with)":
+            "this exterior's region maps (the town table's range)";
+    }
     else if(!(aw_drawdistance.value>=100))d=100;
-    else if(aw_drawdistance.value>4096)d=4096;
+    else if(aw_drawdistance.value>4096){d=4096;limit_reason="Quake's coordinate range";}
     else d=(int)aw_drawdistance.value;
     return aw_fog_location_hook?aw_fog_location_hook(d):d;
 }
 void AW_SetDrawDistance(int value) {
     if(value<100)value=100;
-    if(value>1500)value=1500;
+    if(value>4096)value=4096;
     Cvar_SetValue("aw_drawdistance",value);
+}
+/* Said, never silent: what limits the distance here when it is not the
+ * setting. */
+static void distance_report(void) {
+    int effective=AW_DrawDistance();
+    if(effective!=(int)aw_drawdistance.value)
+        Con_Printf("Here: %ld local units, limited by %s.\n",(long)effective,limit_reason?limit_reason:"location fog");
 }
 static void distance_command(void) {
     char *s;int value=0;
-    if(Cmd_Argc()==1){Con_Printf("Fog/draw distance: %ld local units (default 540).\n",(long)AW_DrawDistance());return;}
+    if(Cmd_Argc()==1){Con_Printf("Fog/draw distance: %ld local units (default 540).\n",(long)aw_drawdistance.value);distance_report();return;}
     if(Cmd_Argc()!=2)goto invalid;
     s=Cmd_Argv(1);if(!*s)goto invalid;
-    while(*s){if(*s<'0'||*s>'9')goto invalid;value=value*10+*s++-'0';if(value>1500)goto invalid;}
+    while(*s){if(*s<'0'||*s>'9')goto invalid;value=value*10+*s++-'0';if(value>4096)goto invalid;}
     if(value<100)goto invalid;
     AW_SetDrawDistance(value);
     Con_Printf("Fog/draw distance: %ld local units = %ld source units.\n",(long)value,(long)value*4);
+    distance_report();
     if(AW_Interior())Con_Printf("Exterior setting; indoor visibility is unchanged.\n");
     return;
 invalid:
-    Con_Printf("Usage: dbg fog distance 100..1500 (default 540)\n");
+    Con_Printf("Usage: dbg fog distance 100..4096 (default 540)\n");
 }
 static void cycle_distance(void) {
     int value=aw_drawdistance.value<540?540:aw_drawdistance.value<1000?1000:450;
@@ -123,6 +149,7 @@ void AW_FogDraw(void) {
         }
     }
     if(fog && aw_terrain_horizon.value==1)AW_HorizonDraw(ramp[15<<8],distance);
+    if(fog && aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);
 }
 
 /* Far clipping uses the same forward depth as palette fog. Radial/cubic

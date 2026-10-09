@@ -1,5 +1,27 @@
 # Hidden in Dirt: Seyda Neen’s graphics performance bottlenecks
 
+<!-- contents start -->
+## Contents
+
+- [Current implementation status: incomplete; acceptance remains open](#current-implementation-status-incomplete-acceptance-remains-open)
+- [Mandatory Morrowind exterior map acceptance requirements](#mandatory-morrowind-exterior-map-acceptance-requirements)
+- [The memory failure](#the-memory-failure)
+- [Historical method 1: bounded local-LAND trial (incomplete)](#historical-method-1-bounded-local-land-trial-incomplete)
+- [File savings versus allocation estimates](#file-savings-versus-allocation-estimates)
+- [Door methods 1 and 2](#door-methods-1-and-2)
+- [Rejected experiments still matter](#rejected-experiments-still-matter)
+- [Inspection nominates geometry; it does not authorize deletion](#inspection-nominates-geometry-it-does-not-authorize-deletion)
+- [Non-destructive acceptance sequence](#non-destructive-acceptance-sequence)
+- [Remaining ground/closure questions](#remaining-groundclosure-questions)
+- [Shared sky: renderer background and map geometry](#shared-sky-renderer-background-and-map-geometry)
+  - [Historical inspector preview readings (not acceptance)](#historical-inspector-preview-readings-not-acceptance)
+- [What we learned today: global topology is the compile basis](#what-we-learned-today-global-topology-is-the-compile-basis)
+  - [World graphics acceptance: sediment, water and sky](#world-graphics-acceptance-sediment-water-and-sky)
+- [Central Seyda Neen must remain continuously resident](#central-seyda-neen-must-remain-continuously-resident)
+  - [Resident footprint and cost investigation](#resident-footprint-and-cost-investigation)
+
+<!-- contents end -->
+
 ## Current implementation status: incomplete; acceptance remains open
 
 Owner review rejected candidate010 with hanging geometry at 24,650 stored faces.
@@ -251,7 +273,7 @@ faces, while replacement appearance and loading remain unverified. Structural
 BSP closure, PVS/content boundaries and collision may have separate requirements;
 validate them independently and do not use them to justify sky render faces.
 
-The current renderer background path is documented in [Day/night and sky](DAY_NIGHT_AND_SKY.md#existing-renderer-background-and-sky-enclosure-geometry); source-to-compiled terrain alignment is documented in [Terrain visual culling](TERRAIN_VISUAL_CULL.md#canonical-source-to-compiled-terrain-mapping). No particular sky plane or dome is selected. Weather and time-of-day behavior remain future design work.
+The current renderer background path is documented in [Day/night and sky](DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate); source-to-compiled terrain alignment is documented in [Terrain visual culling](TERRAIN_VISUAL_CULL.md#canonical-source-to-compiled-terrain-mapping). No particular sky plane or dome is selected. Weather and time-of-day behavior remain future design work.
 
 ### Historical inspector preview readings (not acceptance)
 
@@ -282,7 +304,7 @@ responsibilities remain unchanged by that comparison.
 ### World graphics acceptance: sediment, water and sky
 
 For this Morrowind/AmiWind exterior conversion, consult the authoritative global
-topomap before building each cell/subcell. See [Terrain visual culling](TERRAIN_VISUAL_CULL.md#canonical-source-to-compiled-terrain-mapping) for the source-to-compiled mapping and [Day/night and sky](DAY_NIGHT_AND_SKY.md#existing-renderer-background-and-sky-enclosure-geometry) for the current renderer background path.
+topomap before building each cell/subcell. See [Terrain visual culling](TERRAIN_VISUAL_CULL.md#canonical-source-to-compiled-terrain-mapping) for the source-to-compiled mapping and [Day/night and sky](DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate) for the current renderer background path.
 The requested default is essentially no graphics underneath the varying actual
 terrain surface. Door-entered caves/tombs load separate interior cells and are
 outside this exterior stage. Only verified actual exterior openings need exceptions. Ground includes actual source sediment,

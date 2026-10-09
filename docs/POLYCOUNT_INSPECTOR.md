@@ -2,6 +2,27 @@
 
 **Geometry analysis and optimization planning**
 
+<!-- contents start -->
+## Contents
+
+- [Polycount heatmap inspection method](#polycount-heatmap-inspection-method)
+- [Numbered door optimization recipes](#numbered-door-optimization-recipes)
+- [Recording optimization methods and comparison tables](#recording-optimization-methods-and-comparison-tables)
+  - [File savings versus a current-source heap estimate](#file-savings-versus-a-current-source-heap-estimate)
+- [Exterior prebake exclusion markup](#exterior-prebake-exclusion-markup)
+  - [Exact face paint and undo](#exact-face-paint-and-undo)
+  - [Build014 paint and demo repair](#build014-paint-and-demo-repair)
+  - [Build015 one-sided paint and depth repair](#build015-one-sided-paint-and-depth-repair)
+  - [Build016 draw boxes from the current interior view](#build016-draw-boxes-from-the-current-interior-view)
+  - [Build017 selected mesh polycount](#build017-selected-mesh-polycount)
+  - [Build018 terrain roles and honest unavailable checks](#build018-terrain-roles-and-honest-unavailable-checks)
+- [Build 019: complete placement selection](#build-019-complete-placement-selection)
+- [Build 020: sub-cell cuts and divider](#build-020-sub-cell-cuts-and-divider)
+  - [Overlay format `aw-cuts-1`](#overlay-format-aw-cuts-1)
+  - [Sub-cell divider](#sub-cell-divider)
+
+<!-- contents end -->
+
 The standalone browser inspector is AmiWind's current tool for viewing compiled
 BSP geometry, placements and density, and preparing review plans. It sits within
 the aspirational **AmiWind Map Optimization Toolkit** direction. The inspector

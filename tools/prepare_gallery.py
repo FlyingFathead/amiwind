@@ -161,11 +161,15 @@ def footprint(dimensions, palette):
     return animated_mdl(points[None,:,:],np.array(triangles),np.zeros((8,2)),skin)
 
 
-def catalogue(data):
+def catalogue(data, only=None):
+    """(entries, specs) of every NPC and creature; only: a set of casefolded record IDs
+    (an area build's reference closure, --exclude-unreferenced npcs) keeps just those."""
     kinds, _, _ = load_master(child_ci(data, 'Morrowind.esm'))
     entries = []; specs = {}
     for kind in ('CREA', 'NPC_'):
         for identifier, fields in sorted(kinds[kind].items()):
+            if only is not None and identifier not in only:
+                continue
             entry = dict(number=len(entries)+1, kind=kind, id=identifier, name=text(fields, 'FNAM'), models=[])
             for equipped in ((True, False) if kind == 'NPC_' else (True,)):
                 try:

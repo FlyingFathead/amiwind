@@ -4,6 +4,17 @@ The public `tools/AmiWind-FS-UAE-launcher.py` and private playable-root copy
 are executable on POSIX systems: `./AmiWind-FS-UAE-launcher.py`. The source
 archive preserves mode 0755; Windows can continue using `python` or `py`.
 
+<!-- contents start -->
+## Contents
+
+- [Choosing the latest image](#choosing-the-latest-image)
+- [Launcher settings](#launcher-settings)
+- [FS-UAE configuration](#fs-uae-configuration)
+- [Quitting and the "not validated" request](#quitting-and-the-not-validated-request)
+- [Validation](#validation)
+
+<!-- contents end -->
+
 `tools/AmiWind-FS-UAE-launcher.py` is a standalone Python 3.8+ helper for existing
 local images. It requires no Python packages. Install FS-UAE separately and
 provide your own playable HDF and suitable Kickstart ROM.
@@ -140,6 +151,36 @@ development ROM. Existing configs with different managed machine values are
 backed up and corrected; unrelated custom options such as window/fullscreen
 choices are preserved. This utility does not diagnose or fix the open intermittent
 ship-exit/menu freeze.
+
+## Quitting and the "not validated" request
+
+Each write to the game disk leaves it marked as busy for about a second. If the
+emulator is closed, reset or stopped in that second, AmigaOS checks (validates)
+the whole disk at the next boot. With fast emulator settings this finishes during
+the boot check; with a slow cycle-exact CPU it takes about a minute.
+
+Since BOOT-VOLUME-NOT-VALIDATED-33 the game writes during play only what it must
+keep: saves and autosaves (every 5 minutes by default). Its diagnostic logs
+(`DEBUG.TXT`, `walk-profile.csv`, `frame-stalls.csv`, `heap-audit.log`,
+`cell-load-profile.tsv`, `music-events.csv`, the console history and the
+profiles) are held in fixed memory buffers of about 41 KiB in all, where the
+oldest lines drop, and are written once at Exit game, after a crash report, or
+when you type `dbg savelogs` (it says which folder). Older builds wrote them
+every few seconds.
+
+For benchmarks and diagnostics `dbg logs live on` writes the logs as they
+happen, as before (saved in the settings once you set it; `dbg logs live off`
+returns to memory). Images built with `--live-logs` start that way.
+
+- Quit with Exit game in the main menu, wait for the shell prompt, then close
+  the emulator.
+- Since BOOT-VOLUME-NOT-VALIDATED-33 the game waits for that check before it
+  starts and prints "The game volume is being validated". Older builds instead
+  show the AmigaOS request "Volume AMIWIND is not validated": wait about a
+  minute and choose Retry (Retry too early only shows the request again). Do
+  not choose Cancel; in those builds it stops the game.
+- To start without waiting, as before, add `Set AmiWindValidateWait 0` to
+  `S:startup-sequence` before the line that starts the game.
 
 ## Validation
 

@@ -186,7 +186,8 @@ R_Init
 ===============
 */
 extern cvar_t aw_depthslop, aw_surface_order;
-extern cvar_t aw_emissive, aw_actor_brush_light;
+extern cvar_t aw_emissive, aw_actor_brush_light, aw_actor_light_grid;
+void R_LightProbe_f (void);
 void R_Init (void)
 {
 	int		dummy;
@@ -216,6 +217,8 @@ void R_Init (void)
 	Cvar_RegisterVariable (&r_fullbright);
 	Cvar_RegisterVariable (&aw_emissive);
 	Cvar_RegisterVariable (&aw_actor_brush_light);
+	Cvar_RegisterVariable (&aw_actor_light_grid);
+	Cmd_AddCommand ("aw_light_probe", R_LightProbe_f);
 	Cvar_RegisterVariable (&r_drawentities);
 	Cvar_RegisterVariable (&r_drawviewmodel);
 	Cvar_RegisterVariable (&r_aliasstats);
@@ -263,6 +266,7 @@ void R_NewMap (void)
 	int		i;
     R_SetSkyBackground(cl.worldmodel);
     AW_RenderRangesNewMap();
+    R_LightGridNewMap();
 
 // clear out efrags in case the level hasn't been reloaded
 // FIXME: is this one short?
@@ -554,6 +558,7 @@ void R_DrawEntitiesOnList (void)
 	if (!r_drawentities.value)
 		return;
 
+	AW_RC_ADD (RC_ENTITIES, cl_numvisedicts);
 	for (i=0 ; i<cl_numvisedicts ; i++)
 	{
 		currententity = AW_GuardTorchEntity(cl_visedicts[i]);
@@ -569,6 +574,7 @@ void R_DrawEntitiesOnList (void)
 			VectorCopy (currententity->origin, r_entorigin);
 			VectorSubtract (r_origin, r_entorigin, modelorg);
 			R_DrawSprite ();
+			AW_RC_ADD (RC_SPRITES, 1);
 			break;
 
 		case mod_alias:
@@ -579,7 +585,7 @@ void R_DrawEntitiesOnList (void)
 		// trivial accept status
 			if (R_AliasCheckBBox ())
 			{
-				j = R_LightPoint (currententity->origin);
+				j = R_ActorLight (currententity, 1);
 
 				lighting.ambientlight = j;
 				lighting.shadelight = j;
@@ -678,7 +684,7 @@ void R_DrawViewModel (void)
 	VectorCopy (vup, viewlightvec);
 	VectorInverse (viewlightvec);
 
-	j = R_LightPoint (currententity->origin);
+	j = R_ActorLight (currententity, 0);
 
 	if (j < 64)
 		j = 64;		// allways give some light on gun

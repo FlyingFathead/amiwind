@@ -7,7 +7,6 @@ does not execute its conditions or make text-only dialogue into recorded speech.
 """
 import argparse
 import copy
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 from pathlib import Path
@@ -21,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import BSA, records, subrecords, string
 from mwad.paths import child_ci, ensure_external, resolve_data_files
 from build_jobs import add_jobs, resolve_jobs
+from file_cache import FileCache, code_identity, program_identity, write_report
 
 AUDIO_SUFFIXES = {'.wav', '.mp3', '.ogg', '.flac'}
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
@@ -167,12 +167,43 @@ def sound_output(source):
     return 'sound/pool/a' + hashlib.sha256(source.encode('utf-8')).hexdigest()[:16] + '.wav'
 
 
+SOUND_SETTINGS = {'format': 'wav', 'codec': 'pcm_u8', 'channels': 1, 'rate': 11025}
+
+
+def encode_sound(source, target, ffmpeg):
+    """Convert one owned sound to 8-bit mono 11,025 Hz PCM; its frame count."""
+    subprocess.run([ffmpeg, '-v', 'error', '-nostdin', '-threads', '1', '-i', str(source),
+                    '-threads', '1', '-filter_threads', '1', '-vn', '-ac', '1', '-ar', '11025',
+                    '-c:a', 'pcm_u8', '-n', str(target)], check=True, capture_output=True)
+    with wave.open(str(target)) as audio:
+        if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 1, 11025):
+            raise ValueError('Invalid converted PCM format')
+        frames = audio.getnframes()
+        if frames <= 0 or len(audio.readframes(frames)) != frames:
+            raise ValueError('Empty or truncated converted PCM')
+    return frames
+
+
+def sound_cache_identity(ffmpeg):
+    """What a converted sound's bytes depend on besides its source: the program and the code."""
+    return {'ffmpeg': program_identity(ffmpeg), 'code': code_identity(encode_sound)}
+
+
 def convert_sound(task):
-    record, output, ffmpeg = task
+    """One sound's catalogue row (TASK: record, output folder, ffmpeg[, (cache folder, identity)])."""
+    return convert_sound_cached(task)[0]
+
+
+def convert_sound_cached(task):
+    """(catalogue row, file cache result 'hit'/'miss'/'off') for one sound."""
+    record, output, ffmpeg = task[:3]
+    cache_root, identity = task[3] if len(task) > 3 and task[3] else (None, None)
+    cache = FileCache(cache_root, 'sound', identity)
     record = dict(record)
     relative = sound_output(record['source'])
     target = output / relative
     target.parent.mkdir(parents=True, exist_ok=True)
+    result = 'off' if not cache.enabled else 'miss'
     try:
         with tempfile.TemporaryDirectory(prefix='amiwind-audio-') as temporary:
             if 'archive' in record:
@@ -185,23 +216,78 @@ def convert_sound(task):
             else:
                 source = Path(record['file'])
             record['source_sha256'] = sha(source)
-            subprocess.run([ffmpeg, '-v', 'error', '-nostdin', '-threads', '1', '-i', str(source),
-                            '-threads', '1', '-filter_threads', '1', '-vn', '-ac', '1', '-ar', '11025',
-                            '-c:a', 'pcm_u8', '-n', str(target)], check=True, capture_output=True)
-        with wave.open(str(target)) as audio:
-            if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 1, 11025):
-                raise ValueError('Invalid converted PCM format')
-            frames = audio.getnframes()
-            if frames <= 0 or len(audio.readframes(frames)) != frames:
-                raise ValueError('Empty or truncated converted PCM')
+            key = cache.key(record['source_sha256'], SOUND_SETTINGS)
+            facts = cache.fetch(key, target)
+            if facts and isinstance(facts.get('frames'), int):
+                frames, result = facts['frames'], 'hit'
+            else:
+                target.unlink(missing_ok=True)
+                frames = encode_sound(source, target, ffmpeg)
+                cache.store(key, target, {'frames': frames})
         return {'source': record['source'], 'source_sha256': record['source_sha256'],
                 'category': 'voices' if record['source'].startswith('sound/vo/') else 'effects',
                 'status': 'included', 'path': relative, 'bytes': target.stat().st_size,
-                'sha256': sha(target), 'frames': frames, 'rate': 11025}
+                'sha256': sha(target), 'frames': frames, 'rate': 11025}, result
     except (OSError, ValueError, wave.Error, subprocess.CalledProcessError) as error:
         # Partial files are never referenced as valid assets.
         return {'source': record['source'], 'category': 'voices' if record['source'].startswith('sound/vo/') else 'effects',
-                'path': relative, 'status': 'missing_output', 'error': str(error)[:400]}
+                'path': relative, 'status': 'missing_output', 'error': str(error)[:400]}, result
+
+
+def video_tasks(assets, output, ffmpeg, cache=None):
+    """Video rows in catalogue order, then unrecognized installed videos (never dropped).
+
+    CACHE: (per-file cache folder, prepare_video.video_cache_identity) or None."""
+    from prepare_video import VIDEO_CATALOG
+    video_sources = {Path(k).name: r for k, r in assets.items() if k.startswith('video/')}
+    known = {source for _, _, source in VIDEO_CATALOG}
+    work = []
+    for number, name, source_name in VIDEO_CATALOG:
+        row = {'category': 'videos', 'source': 'video/'+source_name, 'id': number, 'name': name}
+        source = video_sources.get(source_name)
+        if source is None:
+            work.append((dict(row, status='missing_source'), None, None, None, str(output), ffmpeg, cache)); continue
+        relative = 'intro/mw_intro.awv' if number == 15 else f'intro/video/{number:02}.awv'
+        work.append((row, source['file'], relative, None, str(output), ffmpeg, cache))
+    for name, source in video_sources.items():
+        if name not in known:
+            row = {'category': 'videos', 'source': source['source'], 'name': name,
+                   'path': 'intro/extra/v'+hashlib.sha256(source['source'].encode()).hexdigest()[:16]+'.awv'}
+            work.append((row, source['file'], row['path'], 'JSON path; no legacy numeric video ID', str(output), ffmpeg,
+                         cache))
+    return work
+
+
+def convert_video(task):
+    """Worker: one video into its own temporary folder; the row as the serial loop built it."""
+    return convert_video_cached(task)[0]
+
+
+def convert_video_cached(task):
+    """(row, per-file cache result 'hit'/'miss'/'off', or None for a missing source) for one video."""
+    from prepare_video import cached_video
+    row, source, relative, lookup, output, ffmpeg = task[:6]
+    cache = task[6] if len(task) > 6 else None
+    if source is None:
+        return row, None
+    output = Path(output)
+    result = 'off' if not cache else 'miss'
+    try:
+        target = output/'id1'/relative; target.parent.mkdir(parents=True, exist_ok=True)
+        info, result = cached_video(source, target, ffmpeg, (160, 100), cache, scratch=output)
+        if lookup is None:
+            return dict(row, status='included', path=relative, sha256=sha(target),
+                        bytes=target.stat().st_size, source_sha256=info['source_sha256']), result
+        return dict(row, status='included', sha256=sha(target), bytes=target.stat().st_size,
+                    source_sha256=info['source_sha256'], lookup=lookup), result
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        return dict(row, status='missing_output', error=str(error)[:400]), result
+
+
+def _media_task(item):
+    kind, number, task = item
+    row, result = convert_video_cached(task) if kind == 'video' else convert_sound_cached(task)
+    return kind, number, row, result
 
 
 def coverage(rows, references=()):
@@ -222,7 +308,39 @@ def summary_lines(counts):
             for name, r in counts.items()]
 
 
-def prepare(data, output, ffmpeg='ffmpeg', jobs=None, videos=True):
+def is_voice(source):
+    return key(source).startswith('sound/vo/')
+
+
+def closure_filter(closure):
+    """(keep(source) -> bool, receipt) from a reference closure (tools/content_closure.py).
+
+    Only the groups the closure was made for filter: 'voice' keeps exactly the voice
+    files of the included actors' dialogue pool (and lines scripts say); 'sounds'
+    drops only the effects the closure lists as named by left-out records alone.
+    Everything else, music included, is kept."""
+    if not closure:
+        return (lambda source: True), None
+    groups = set(closure.get('groups') or ())
+    voices = {key('sound/' + v) for v in closure.get('voice_files', ())}
+    # The game falls back from a requested .wav to the .mp3 (resolve_sound): keep both spellings.
+    voices |= {v[:-4] + '.mp3' for v in voices if v.endswith('.wav')}
+    dropped ={key('sound/' + v) for v in closure.get('sound_files_dropped', ())}
+
+    def keep(source):
+        source = key(source)
+        if is_voice(source):
+            return 'voice' not in groups or source in voices
+        return 'sounds' not in groups or source not in dropped
+    return keep, {'groups': sorted(groups & {'voice', 'sounds'}), 'cells': closure.get('cells', [])}
+
+
+def prepare(data, output, ffmpeg='ffmpeg', jobs=None, videos=True, voices=True, closure=None, cache=None,
+            cache_report=None):
+    """videos=False / voices=False: a quick test build without them (--exclude video /
+    voice, tools/build_exclusions.py); closure: a reference closure that keeps only the
+    voices/sounds an area build references (--exclude-unreferenced); cache: a per-file cache folder
+    (tools/file_cache.py), None converts every file."""
     data = resolve_data_files(data); output = ensure_external(output, 'complete media catalogue')
     output.mkdir(parents=True, exist_ok=False)
     assets, ignored, archives = discover(data)
@@ -230,51 +348,51 @@ def prepare(data, output, ffmpeg='ffmpeg', jobs=None, videos=True):
     # Source provenance is written before conversion so interruption is inspectable.
     (output / 'source-inventory.json').write_text(json.dumps({'assets': assets, 'ignored': ignored, 'archives': archives}, indent=2)+'\n')
     rows = []
-    tasks = [(r, output/'id1', ffmpeg) for source, r in sorted(assets.items()) if source.startswith('sound/')]
-    paths = [sound_output(r['source']) for r, _, _ in tasks]
+    keep, closure_receipt = closure_filter(closure)
+    excluded = ([] if videos else ['videos']) + ([] if voices else ['voices'])
+    left_out = {'voices': 0, 'voice_bytes': 0, 'effects': 0, 'effect_bytes': 0}
+    sound_cache = (str(cache), sound_cache_identity(ffmpeg)) if cache else None
+    tasks = []
+    for source, r in sorted(assets.items()):
+        if not source.startswith('sound/'):
+            continue
+        voice = is_voice(source)
+        if (voice and not voices) or not keep(source):
+            left_out['voices' if voice else 'effects'] += 1
+            left_out[('voice' if voice else 'effect') + '_bytes'] += r.get('bytes', 0)
+            continue
+        tasks.append((r, output/'id1', ffmpeg, sound_cache))
+    paths = [sound_output(task[0]['source']) for task in tasks]
     if len(paths) != len(set(paths)):
         raise ValueError('Sound output hash collision; no files converted')
-    workers = min(resolve_jobs(jobs), max(1, len(tasks)))
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        for i, row in enumerate(executor.map(convert_sound, tasks), 1):
-            rows.append(row)
-            if i % 100 == 0 or i == len(tasks):
-                print(f'Sound import {i}/{len(tasks)}', flush=True)
+    # Sounds and videos convert side by side on the shared pool (it follows the
+    # stage's share as other stages finish); the long videos are submitted first
+    # and every row keeps its serial position (BUILD-IDLE-STAGES-33: a thread pool
+    # fixed at the start value, then the 17 videos one after another).
+    cache_counts = {'sounds': {'hit': 0, 'miss': 0, 'enabled': bool(cache)},
+                    'videos': {'hit': 0, 'miss': 0, 'enabled': bool(cache)}}
     if videos:
-        from prepare_video import VIDEO_CATALOG, prepare_video
-        video_sources = {Path(k).name: r for k, r in assets.items() if k.startswith('video/')}
-        known = {source for _, _, source in VIDEO_CATALOG}
-        for number, name, source_name in VIDEO_CATALOG:
-            row = {'category': 'videos', 'source': 'video/'+source_name, 'id': number, 'name': name}
-            source = video_sources.get(source_name)
-            if source is None:
-                rows.append(dict(row, status='missing_source')); continue
-            try:
-                relative = 'intro/mw_intro.awv' if number == 15 else f'intro/video/{number:02}.awv'
-                with tempfile.TemporaryDirectory(prefix='video-', dir=output) as temporary:
-                    converted = Path(temporary)/'converted'
-                    info = prepare_video(source['file'], converted, ffmpeg, (160, 100), output_name='movie.awv')
-                    target = output/'id1'/relative; target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(converted/'movie.awv', target)
-                rows.append(dict(row, status='included', path=relative, sha256=sha(target),
-                                 bytes=target.stat().st_size, source_sha256=info['source_sha256']))
-            except (OSError, ValueError, subprocess.CalledProcessError) as error:
-                rows.append(dict(row, status='missing_output', error=str(error)[:400]))
-        # Unrecognized installed videos must never vanish silently.
-        for name, source in video_sources.items():
-            if name not in known:
-                row = {'category': 'videos', 'source': source['source'], 'name': name,
-                       'path': 'intro/extra/v'+hashlib.sha256(source['source'].encode()).hexdigest()[:16]+'.awv'}
-                try:
-                    with tempfile.TemporaryDirectory(prefix='video-', dir=output) as temporary:
-                        converted = Path(temporary)/'converted'
-                        info = prepare_video(source['file'], converted, ffmpeg, (160, 100), output_name='movie.awv')
-                        target = output/'id1'/row['path']; target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copyfile(converted/'movie.awv', target)
-                    rows.append(dict(row, status='included', sha256=sha(target), bytes=target.stat().st_size,
-                                     source_sha256=info['source_sha256'], lookup='JSON path; no legacy numeric video ID'))
-                except (OSError, ValueError, subprocess.CalledProcessError) as error:
-                    rows.append(dict(row, status='missing_output', error=str(error)[:400]))
+        from prepare_video import video_cache_identity
+    video_cache = (str(cache), video_cache_identity(ffmpeg)) if cache and videos else None
+    videos_rows = video_tasks(assets, output, ffmpeg, video_cache) if videos else []
+    work = [('video', number, task) for number, task in enumerate(videos_rows)]
+    work += [('sound', number, task) for number, task in enumerate(tasks)]
+    sounds, converted = [None] * len(tasks), [None] * len(videos_rows)
+    done = 0
+    from build_parallel import completed_map
+    for kind, number, row, result in completed_map(_media_task, work, max(1, min(resolve_jobs(jobs), len(work)))):
+        if result is not None:
+            cache_counts['videos' if kind == 'video' else 'sounds']['hit' if result == 'hit' else 'miss'] += 1
+        if kind == 'video':
+            converted[number] = row
+            continue
+        sounds[number] = row
+        done += 1
+        if done % 100 == 0 or done == len(tasks):
+            print(f'Sound import {done}/{len(tasks)}', flush=True)
+    rows.extend(sounds)
+    if videos:
+        rows.extend(converted)
         catalogue = ['AWVC1'] + [f"{r['id']} {r['name']} {r['path']}" for r in rows
                                 if r['category'] == 'videos' and r['status'] == 'included' and 'id' in r]
         (output/'id1/intro').mkdir(parents=True, exist_ok=True)
@@ -290,6 +408,7 @@ def prepare(data, output, ffmpeg='ffmpeg', jobs=None, videos=True):
     counts = coverage(rows, lookup['sounds']+lookup['voiced_dialogue'])
     report = {'format': 'AWMEDIA1', 'expected_known_videos': 17,
               'status': 'complete' if not any(r['missing_output'] for r in counts.values()) else 'missing_outputs',
+              'excluded': excluded, 'left_out': left_out, 'reference_closure': closure_receipt,
               'categories': counts, 'entries': rows, 'lookups': lookup, 'ignored_nonmedia': ignored,
               'music': 'Converted by the separate complete soundtrack stage; reconciled at image assembly',
               'runtime': 'On-disk converted assets and source lookup tables; does not preload all audio or implement every event trigger'}
@@ -297,22 +416,31 @@ def prepare(data, output, ffmpeg='ffmpeg', jobs=None, videos=True):
     (output/'id1/media/catalogue.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     (output/'media-coverage.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     for line in summary_lines(counts): print(line, flush=True)
+    for category in excluded:
+        print(f'Quick test build: {category} left out (--exclude).', flush=True)
+    if closure_receipt:
+        print(f"Reference closure: left out {left_out['voices']} voice files ({left_out['voice_bytes']} bytes) and "
+              f"{left_out['effects']} effects ({left_out['effect_bytes']} bytes) the area does not reference.", flush=True)
     for category, count in counts.items():
         if count['missing_source']:print(f"[warning: missing source] {category}: {count['missing_source']}", flush=True)
         if count['missing_output']:print(f"[warning: missing output] {category}: {count['missing_output']}", flush=True)
+    write_report(cache_report, 'media', cache_counts)
     return report
 
 
-def stage_catalogue(media, id1, music_manifest, intro_receipt=None):
+def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=()):
     """Copy only validated outputs; bind coverage to the final prepared payload.
 
     Preserve the higher-resolution story intro when its original source digest
     matches. All other collisions must be byte-identical, never overwritten.
+    excluded: categories a quick test build leaves out ('music' when the image
+    takes no soundtrack); the media stage records its own ('videos', 'voices').
     """
     media = ensure_external(media, 'converted media'); id1 = ensure_external(id1, 'image payload')
     report = copy.deepcopy(json.loads((media/'media-coverage.json').read_text()))
     if report.get('format') != 'AWMEDIA1':
         raise ValueError('Unsupported media catalogue')
+    report['excluded'] = sorted(set(report.get('excluded') or ()) | set(excluded))
     seen = set()
     for row in report['entries']:
         if row['status'] != 'included':continue
@@ -338,7 +466,7 @@ def stage_catalogue(media, id1, music_manifest, intro_receipt=None):
             row.update(status='missing_output', error=str(error)[:400])
     inventory = json.loads((media/'source-inventory.json').read_text())['assets']
     music_by_source = {key(r['source']): r for r in music_manifest['tracks']}
-    for source in sorted(k for k in inventory if k.startswith('music/')):
+    for source in sorted(k for k in inventory if k.startswith('music/') and 'music' not in report['excluded']):
         track = music_by_source.get(source)
         row = {'category': 'music', 'source': source, 'status': 'missing_output'}
         if track:
@@ -379,6 +507,19 @@ if __name__ == '__main__':
     parser.add_argument('--data-files', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--ffmpeg', default='ffmpeg')
+    parser.add_argument('--no-videos', action='store_true',
+                        help='Quick test build (--exclude video): leave the videos out')
+    parser.add_argument('--no-voices', action='store_true',
+                        help='Quick test build (--exclude voice): leave the recorded dialogue voices (Sound/Vo) out')
+    parser.add_argument('--cache', type=Path,
+                        help='Per-file cache folder: a sound or movie converted before (same source, settings, '
+                             'ffmpeg and conversion code) is copied and verified instead of converted again')
+    parser.add_argument('--cache-report', type=Path, help='Write the per-file cache hits and misses here (build summary)')
+    parser.add_argument('--reference-closure', type=Path,
+                        help='Area build (--exclude-unreferenced): keep only the voices/sounds this closure lists')
     add_jobs(parser)
     args = parser.parse_args()
-    prepare(args.data_files, args.out, args.ffmpeg, args.jobs)
+    import build_profile; build_profile.instrument('media')  # sub-stage timers (docs/BUILD_PROFILE.md)
+    closure = json.loads(args.reference_closure.read_text(encoding='utf-8')) if args.reference_closure else None
+    prepare(args.data_files, args.out, args.ffmpeg, args.jobs, videos=not args.no_videos,
+            voices=not args.no_voices, closure=closure, cache=args.cache, cache_report=args.cache_report)

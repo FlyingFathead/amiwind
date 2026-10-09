@@ -1,5 +1,24 @@
 # SEYDA-READ-SLOW-31: dev1 Seyda crossings read slower than the ov700 test image
 
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | audit |
+| First noticed | 7 October 2026, in v0.0.31-dev1 |
+| Where | map loader file reads (Seyda Neen sub-cell crossings) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | fixed in v0.0.31-dev2 |
+| Severity | medium: Crossings 0.10-0.21 s slower than the test image; a measured load slowdown. |
+| Family | Loading and disk reads (`disk-loading`) |
+| Playtest version | v0.0.31-dev1 |
+| From commit | source and engine unknown |
+| CHIM engine version | none: legacy engine |
+| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+
+<!-- END GENERATED FACTS -->
+
 ## Status: 7 October 2026
 
 Open; tagged performance. Narrowed to the engine build that added ember
@@ -102,3 +121,23 @@ packaged build and an owner playtest are pending.
 The crossing benchmark against the previous engine for every engine change
 that ships, compared within one batch. Lessons:
 [performance lessons learned](../performance/LESSONS_LEARNED.md).
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Loading and disk reads (`disk-loading`). Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. See [families](README.md#families).
+
+- [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md): The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s
+- [CHIM-READ-RUNS-33](CHIM-READ-RUNS-33.md): CHIM crossings read little but in many separate runs, so FFS seeks dominate
+- [LOADER-STALL-32](LOADER-STALL-32.md): One unexplained stall while loading the Mages Guild with the new loader
+- PERF-READAHEAD-29 (no report page): Outdoor cell/sub-cell crossing pauses and lost read-ahead
+- [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
+- [STREAM-FFS-SEEK-32](STREAM-FFS-SEEK-32.md): Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU
+
+Related bugs in other categories:
+
+- [AW-20260928-01](AW-20260928-01.md): Prison ship to deck transition is intermittently very slow or freezes (FS-UAE)
+- [BENCH-HOST-STORAGE-32](BENCH-HOST-STORAGE-32.md): Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS
+
+<!-- END GENERATED CATEGORY -->

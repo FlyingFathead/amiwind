@@ -31,6 +31,8 @@ INCLUDES = -I. -Isrc -ICDPlayerSDK -Ibuild/version
 PYTHON ?= python3
 VERSION_FILE ?= $(if $(wildcard VERSION),VERSION,../../VERSION)
 VERSION_GENERATOR ?= $(if $(wildcard tools/project_version.py),tools/project_version.py,../../tools/project_version.py)
+# CHIM's own version, beside VERSION (tools/project_version.py)
+CHIM_VERSION_FILE ?= $(wildcard $(dir $(VERSION_FILE))CHIM_VERSION)
 
 CFLAGS = $(ARCH_FLAGS) $(OPT_FLAGS) $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES)
 
@@ -56,11 +58,11 @@ OBJDIR = obj
 SRCS = \
 	amiga_stubs.c \
 	aw_debug.c aw_clock.c aw_wait.c \
-	aw_ui.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c \
+	aw_ui.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_arena.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c \
 	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_gallery.c aw_stream.c \
 	aw_walk.c aw_world.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_hand_models.c \
-	aw_music.c \
-	aw_profile.c aw_render_ranges.c aw_fpu_status.c \
+	aw_music.c aw_log.c \
+	aw_profile.c aw_render_ranges.c aw_fpu_status.c aw_photo.c aw_miniwind.c \
 	aw_platform.c \
 	aw_fog.c aw_horizon.c \
 	chase.c \
@@ -137,6 +139,20 @@ SRCS = \
 	world.c \
 	zone.c
 
+# CHIM world streamer: part of this one engine tree (src/chim/), active only
+# for maps that name a CHIM frame when the CHIM data exists.
+CHIM_SRCS = \
+	chim/chim_format.c \
+	chim/chim_zone.c \
+	chim/chim_models.c \
+	chim/chim_chunks.c \
+	chim/chim_world.c \
+	chim/chim_graft.c \
+	chim/chim_statics.c \
+	chim/chim_far.c
+
+SRCS += $(CHIM_SRCS)
+
 # Release builds use GPL C spans and independent C2P; no extracted assembly.
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 ALLOBJS = $(OBJS)
@@ -145,8 +161,20 @@ ALLOBJS = $(OBJS)
 .PHONY: all fpu nofpu
 all: fpu
 
-build/version/amiwind_version.h: $(VERSION_FILE) $(VERSION_GENERATOR)
-	$(PYTHON) "$(VERSION_GENERATOR)" --version-file "$(VERSION_FILE)" --out build/version
+# The game heap in MiB (the builder's --heap-mb); empty = the engine source's AMIWIND_HEAP_MB.
+HEAP_MB ?=
+build/version/amiwind_version.h: $(VERSION_FILE) $(CHIM_VERSION_FILE) $(VERSION_GENERATOR)
+	$(PYTHON) "$(VERSION_GENERATOR)" --version-file "$(VERSION_FILE)" --out build/version $(if $(HEAP_MB),--heap-mb $(HEAP_MB))
+
+# amiwind_heap.h follows HEAP_MB on every make: the generator rewrites it only when
+# the size changed, so a new size rebuilds what includes it and nothing else.
+build/version/amiwind_heap.h: build/version/amiwind_version.h heap-size-check
+	$(PYTHON) "$(VERSION_GENERATOR)" --version-file "$(VERSION_FILE)" --out build/version $(if $(HEAP_MB),--heap-mb $(HEAP_MB))
+heap-size-check:
+$(OBJDIR)/sys_amiga.o: build/version/amiwind_heap.h
+
+# chim_version.h (CHIM's own version) comes from the same command
+build/version/chim_version.h: build/version/amiwind_version.h
 
 $(ALLOBJS): build/version/amiwind_version.h | $(OBJDIR)
 
@@ -165,7 +193,7 @@ nofpu:
 
 # Create directories
 $(OBJDIR):
-	@mkdir -p $(OBJDIR)
+	@mkdir -p $(OBJDIR) $(OBJDIR)/chim
 
 # Link
 $(TARGET): $(OBJDIR) $(ALLOBJS)

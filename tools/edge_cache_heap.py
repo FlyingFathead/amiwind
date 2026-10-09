@@ -17,11 +17,24 @@ import struct
 # (LOADER-STAGING-PEAK-32): AW_InitEdgeCache and every resident allocation are
 # unchanged; the decoded Hunk of all shipped maps is byte-identical to the
 # staged loader's. Only the temporary input changed (check_world_map_heap).
-# Re-pinned 2026-10-08 for the merge of both changes above (model.c carries
-# both); edge-cache allocation is unchanged.
+# Re-pinned 2026-10-08 for CHIM brush loading (model.c, model.h): the decoders
+# allocate through AW_BrushAlloc, which is Hunk_AllocName unless a CHIM arena
+# is set, and Mod_LoadBrushModel runs the same sections in the same order. Legacy
+# loads, AW_InitEdgeCache and every Hunk allocation are unchanged (decoded Hunk
+# byte-identical on the slice-load fixtures); CHIM models get no edge cache.
+# Re-pinned 2026-10-08 for the merge of v0.0.32-dev (Q_sscanf, renderer edge
+# counters) into the CHIM engine branch; edge-cache allocation is unchanged.
+# Re-pinned 2026-10-08 for CHIM placed models (model.c, model.h): an arena flag
+# decodes a model's chained point hull into hull 0 clipnodes only (no render
+# nodes, no Mod_SetParent). Legacy loads and edge-cache allocation unchanged.
+# Re-pinned 2026-10-09 for the in-memory diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33):
+# model.c writes bsp-load-profile.txt through aw_log.c; edge-cache allocation is unchanged.
+# Re-pinned 2026-10-09 for CHIM streamed statics (model.c): the sprite loader allocates through
+# AW_SpriteAlloc, which is Hunk_AllocName unless Mod_LoadSpriteInto sets a zone allocator; edge-cache
+# allocation is unchanged.
 SOURCE_HASHES={
-    'model.c':'7b710cf96b23bbe5c805906708b96941e01c6f4beb1a02e378f9966144149cdb',
-    'model.h':'c49d4a759229aaaab738aac9857ea5dc8feedf300d1c0dca5193e7d80eafb9d2',
+    'model.c':'2b6084440550513f87a741b543a47fd8ff2abe8287f64f5c3b5d5113c6120fb2',
+    'model.h':'594e162fd26856ce2721319abd0a8e319a17f975b3796de39f25b2a83439da35',
     'r_draw.c':'1e26849d022fa219adfd399f8863118b72e34daab4b6e2b588e22ed8c53c8232',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }

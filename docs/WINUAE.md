@@ -1,5 +1,20 @@
 # WinUAE setup
 
+<!-- contents start -->
+## Contents
+
+- [Automatically generated image configurations](#automatically-generated-image-configurations)
+- [Current Windows checkpoint, 2 October 2026](#current-windows-checkpoint-2-october-2026)
+- [Start directly from PowerShell](#start-directly-from-powershell)
+- [Public versioned preset](#public-versioned-preset)
+- [Mouse works, but WASD cannot move at initial spawn](#mouse-works-but-wasd-cannot-move-at-initial-spawn)
+- [“Error validating AMIWIND / Block 1146049281 out of range”](#error-validating-amiwind--block-1146049281-out-of-range)
+- [Reference settings and historical v0.0.10 / checkpoint-008 record](#reference-settings-and-historical-v0010--checkpoint-008-record)
+- [Preserved A500 v0.0.6 setup](#preserved-a500-v006-setup)
+- [Audio snapping investigation](#audio-snapping-investigation)
+
+<!-- contents end -->
+
 ## Automatically generated image configurations
 
 Full-game assembly writes `AmiWind-v<VERSION>-WinUAE.uae` and

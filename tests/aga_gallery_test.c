@@ -29,7 +29,21 @@ static void (*command)(void),(*combat_command)(void),(*torch_command)(void);stat
 static char queued[64],drawn[8192];
 static int opens,restores,missing_return,many,missing_catalog,disabled;
 static char printed[512];
+/* Exact console text of a --no-npc-gallery build (regression: friendly notice, not a failure). */
+static const char *no_gallery="This build was made without the NPC gallery (quick playtest build).\n"
+    "To include it, build without --no-npc-gallery.\n";
 static aw_character_t character;
+/* The Vivec Arena (aw_arena.c) is its own fixture (aga_arena checks in
+ * test_combat.py); here only that dbg combattest without an argument now
+ * enters it, while dbg combattest gallery keeps the empty floor test. */
+static int arena_commands,arena_inits;
+void AW_ArenaInit(void){arena_inits++;}
+void AW_ArenaEnd(void){}
+void AW_ArenaCommand(int c,char **v){(void)c;(void)v;arena_commands++;}
+void AW_ArenaEntities(void){assert(0);}
+void AW_ArenaSpawn(edict_t *p){(void)p;assert(0);}
+int AW_ArenaKey(int key,int down){(void)key;(void)down;assert(0);return 0;}
+void AW_ArenaDraw(void){assert(0);}
 void Cmd_AddCommand(char *s,void (*f)(void)){if(!strcmp(s,"aw_charplane"))command=f;else if(!strcmp(s,"aw_combattest"))combat_command=f;else if(!strcmp(s,"aw_torchtest"))torch_command=f;else assert(0);}
 int Cmd_Argc(void){return argc;}
 char *Cmd_Argv(int i){return i<argc?args[i]:"";}
@@ -93,6 +107,8 @@ int COM_FOpenFile(char *s,FILE **f){
     rewind(*f);return 1;
 }
 static void draw(void){drawn[0]=0;AW_GalleryDraw();}
+/* aw_region.c AW_SceneMapSize: the scene's own map (no CHIM frame maps in this test). */
+int AW_SceneMapSize(const char *n,char *p,int s){char b[64];FILE *f=NULL;int k;sprintf(b,"maps/%s.bsp",n);k=COM_FOpenFile(b,&f);if(f)fclose(f);else k=-1;if(p && s>0){strncpy(p,b,s-1);p[s-1]=0;}return k;}
 int main(void){
     edict_t player,world;client_t client;memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
     memset(&world,0,sizeof(world));sv.edicts=&world;sv.time=10;
@@ -101,7 +117,13 @@ int main(void){
     AW_StoryReset(1);
     args[0]="aw_charplane";AW_GalleryInit();assert(command);
     missing_catalog=1;command();assert(!captures && !queued[0] && strstr(printed,"catalogue missing"));
-    disabled=1;command();assert(!captures && !queued[0] && strstr(printed,"--no-npc-gallery"));
+    disabled=1;command();assert(!captures && !queued[0] && !strcmp(printed,no_gallery));
+    /* Every console way in (aliases dbg gallery/npcgallery/modelgallery share
+     * aw_charplane), with a lookup or a gallery verb, gets the same notice. */
+    argc=2;args[1]="next";printed[0]=0;command();assert(!captures && !queued[0] && !strcmp(printed,no_gallery));
+    args[1]="Dagoth";printed[0]=0;command();assert(!captures && !queued[0] && !strcmp(printed,no_gallery));argc=1;
+    /* A normal build missing its catalogue keeps the repair message. */
+    disabled=0;command();assert(!captures && !queued[0] && strstr(printed,"catalogue missing") && !strstr(printed,"quick playtest"));
     missing_catalog=disabled=0;command();assert(captures==1 && !strcmp(queued,"map charplane\n"));
     strcpy(sv.name,"charplane");AW_GallerySpawn(&player);draw();assert(strstr(drawn,"#7 Dagoth Ur"));
     assert(!AW_IntroButtons(3) && !AW_IntroImpulse(202)); /* ordinary gallery stays restricted */
@@ -158,11 +180,22 @@ int main(void){
     /* Empty combat mode reuses the map but needs no NPC catalogue, footprint,
      * actor allocation or all-appearance model load. Invalid inputs retain the
      * live game. Hands run the usual action state machine and attack binding. */
-    argc=1;assert(combat_command);queued[0]=0;missing_catalog=1;
+    assert(arena_inits==1);
+    /* dbg combattest alone enters the Vivec Arena; the floor test is "gallery". */
+    argc=1;assert(combat_command);queued[0]=0;
+    {int before=captures;combat_command();assert(captures==before && !queued[0] && arena_commands==1);}
+    argc=2;args[1]="help";combat_command();assert(arena_commands==1 && strstr(printed,"dbg combattest gallery"));
+    argc=2;args[1]="gallery";queued[0]=0;missing_catalog=1;
     {int before=captures;combat_command();assert(captures==before && !queued[0]);}
     timings[0]._float=2;timings[1]._float=.4f;timings[2]._float=.3f;timings[3]._float=.8f;
     missing_return=1;
-    {int before=captures;combat_command();assert(captures==before && !queued[0]);}
+    {int before=captures;combat_command();assert(captures==before && !queued[0] && strstr(printed,"floor missing"));}
+    /* The combat floor is the gallery's room: a gallery-less build explains why. */
+    disabled=1;
+    {int before=captures;combat_command();assert(captures==before && !queued[0]);
+     assert(!strncmp(printed,"Combat test uses the NPC gallery room. ",39) && !strcmp(printed+39,no_gallery));}
+    disabled=0;
+    args[1]="floor";
     missing_return=0;hands[0]._float=1;hands[2]._float=1;
     aw_story.stage=AW_STAGE_RACE;opening_locked=1;
     assert(!AW_IntroButtons(3) && !AW_IntroImpulse(202));
@@ -225,7 +258,8 @@ int main(void){
     queued[0]=0;argc=1;combat_command();assert(!queued[0]);
     /* Optional NPC: missing/rejected records keep the room. Only one fitting
      * model is loaded, and no footprint/all-catalogue model batch is requested. */
-    argc=3;args[1]="npc";args[2]="clagius";torch_command();assert(!queued[0]);
+    argc=3;args[1]="npc";args[2]="clagius";torch_command();assert(!queued[0] && strstr(printed,"catalogue missing"));
+    disabled=1;printed[0]=0;torch_command();assert(!queued[0] && !strcmp(printed,no_gallery));disabled=0;
     missing_catalog=0;args[2]="7";torch_command();assert(!queued[0] && strstr(printed,"needs an NPC"));
     argc=4;args[2]="Clagius";args[3]="Clanler";torch_command();assert(!strcmp(queued,"map torchtest\n"));
     actor_model.mins[0]=-20;actor_model.mins[1]=-10;actor_model.mins[2]=-5;

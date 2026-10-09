@@ -5,6 +5,12 @@
 #include "aw_save.h"
 #include "aw_region.h"
 #include "aw_world.h"
+#include "aw_log.h"
+#ifdef AMIGA
+#include <proto/dos.h>
+#endif
+#include "chim/chim.h"
+#include "aw_miniwind.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -165,10 +171,48 @@ static void blockers(void) {
             (long)(tr.plane.normal[1]*100),(long)(tr.plane.normal[2]*100));
     }
 }
+/* Diagnostic logs (aw_log.c, BOOT-VOLUME-NOT-VALIDATED-33): held in memory and
+ * written at exit or with dbg savelogs; aw_logs_live 1 writes them as they
+ * happen (benchmarks, diagnostics). Saved in config.cfg only once the player
+ * has chosen it with dbg logs live; a --live-logs build sets it in
+ * default-game.cfg. */
+cvar_t aw_logs_live={"aw_logs_live","0",false};
+static void log_folder(char *out,int size)
+{
+#ifdef AMIGA
+    BPTR lock=Lock("",ACCESS_READ);
+    if(lock){if(!NameFromLock(lock,out,size))out[0]=0;UnLock(lock);if(out[0])return;}
+#endif
+    snprintf(out,size,"the game folder");
+}
+static void logs_live_command(void)
+{
+    char *text=Cmd_Argv(1);
+    if(Cmd_Argc()==1){
+        Con_Printf("Diagnostic logs %s. Usage: dbg logs live on/off.\n",AW_LogLive()?"live (written as they happen)":
+                   "in memory (written at Exit game or with dbg savelogs)");return;}
+    if(Cmd_Argc()!=2 || (Q_strcasecmp(text,"on") && Q_strcasecmp(text,"off") && Q_strcasecmp(text,"true") &&
+       Q_strcasecmp(text,"false") && strcmp(text,"1") && strcmp(text,"0"))){
+        Con_Printf("Usage: dbg logs live on/off, true/false or 1/0.\n");return;}
+    Cvar_SetValue(aw_logs_live.name,!Q_strcasecmp(text,"on") || !Q_strcasecmp(text,"true") || !strcmp(text,"1"));
+    aw_logs_live.archive=true;
+    Con_Printf("Diagnostic logs %s (saved).\n",aw_logs_live.value?"live: written as they happen":"in memory: written at Exit game or with dbg savelogs");
+}
+static void savelogs_command(void)
+{
+    char folder[256];int i,files;unsigned long dropped=0;
+    for(i=0;i<AW_LOG_COUNT;i++)dropped+=AW_LogDroppedLines(i);
+    files=AW_LogFlushAll();
+    log_folder(folder,sizeof folder);
+    if(AW_LogLive())Con_Printf("Diagnostic logs are live and already in %s.\n",folder);
+    else Con_Printf("Saved %d diagnostic log files to %s (%lu older lines dropped from the memory logs).\n",files,folder,dropped);
+}
 void AW_DebugInit(void) {
+    Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);
     AW_GalleryInit();AW_WorldUIInit();
-    AW_StreamInit();
-    AW_InputDebugInit();AW_DoorAudioInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
+    AW_StreamInit();AW_PhotoInit();Chim_Init();
+    AW_MiniwindInit();
+    AW_InputDebugInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_dimensions",dimensions);

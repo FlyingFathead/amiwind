@@ -3,6 +3,8 @@
  * Pointer/index addresses may change; no geometry or rendered input may change. */
 #include <assert.h>
 #include "../engine/aga/src/model.c"
+/* Diagnostic logs (aw_log.c); without a bound switch they are written live. */
+#include "../engine/aga/src/aw_log.c"
 static byte arena[16*1024*1024];
 static int used;
 static short same_short(short v){return v;}

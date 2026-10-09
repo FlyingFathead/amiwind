@@ -8,6 +8,28 @@ Intermittent Python worker failures remain open; this success does not establish
 that the Windows path is consistently reliable.
 See [known issues and recovery limits](#windows-build-and-known-issues).
 
+<!-- contents start -->
+## Contents
+
+- [Windows build and known issues](#windows-build-and-known-issues)
+  - [Intermittent Python worker failure (unresolved, 2 October 2026)](#intermittent-python-worker-failure-unresolved-2-october-2026)
+  - [Diagnostic interpretation and performance](#diagnostic-interpretation-and-performance)
+- [Automated setup](#automated-setup)
+  - [Version policy](#version-policy)
+  - [Offline use](#offline-use)
+- [Native Windows launcher](#native-windows-launcher)
+  - [Required tools](#required-tools)
+  - [Linux and Windows parity](#linux-and-windows-parity)
+- [Preferred direction: native Windows/MSYS2](#preferred-direction-native-windowsmsys2)
+- [Fallback: Ubuntu under WSL2](#fallback-ubuntu-under-wsl2)
+- [WSL fallback resources and first checkpoint](#wsl-fallback-resources-and-first-checkpoint)
+- [Run the result on Windows](#run-the-result-on-windows)
+- [Input checks without a full build](#input-checks-without-a-full-build)
+- [Share a checksum inventory without sharing game data](#share-a-checksum-inventory-without-sharing-game-data)
+  - [Historical WinError 206: bounded Windows image commands implemented](#historical-winerror-206-bounded-windows-image-commands-implemented)
+
+<!-- contents end -->
+
 After a failed Windows run, preserve its logs and validated caches, then use a
 fresh run name. Compatible model-cache entries can be reused; general resumption
 of every completed stage is not implemented. Do not assume a retry rate or treat

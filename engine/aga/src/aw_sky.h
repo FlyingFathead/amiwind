@@ -17,6 +17,10 @@ const unsigned char *R_DayNightFogColours(void);
 /* Light-space night: lightstyles from AW_LAMP_STYLE up are lamps and are never
  * dimmed by r_daylight (8.8 fixed point, 256 = full daylight; r_light.c). */
 #define AW_LAMP_STYLE 32
+/* Baked faces lit mainly by a warm (orange) lamp carry this style (the
+ * converter's interior_lighting.WARM_STYLE): shown like style 0, built with
+ * the warm colour table (r_surf.c R_SurfaceWarm). */
+#define AW_WARM_STYLE 31
 extern int r_daylight;
 /* 0 switches lamp styles off (light gallery A/B); 1 by default. */
 extern int r_lamps;

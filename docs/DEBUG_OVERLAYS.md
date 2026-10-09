@@ -1,5 +1,35 @@
 # Development overlays
 
+<!-- contents start -->
+## Contents
+
+- [Named debug scenes and character UI versions (v0.0.29 candidate)](#named-debug-scenes-and-character-ui-versions-v0029-candidate)
+- [v0.0.29 navigation and character-HUD work](#v0029-navigation-and-character-hud-work)
+- [Open map-teleport regression - 4 October 2026](#open-map-teleport-regression---4-october-2026)
+- [Sea-height visibility](#sea-height-visibility)
+- [Flight and recall](#flight-and-recall)
+- [Readable console and space-separated commands](#readable-console-and-space-separated-commands)
+- [Compact console in checkpoint-016](#compact-console-in-checkpoint-016)
+- [Reproducing a reported view](#reproducing-a-reported-view)
+- [Teleport shortcuts and destination menu (v0.0.24-dev4)](#teleport-shortcuts-and-destination-menu-v0024-dev4)
+- [Live exterior fog/draw distance (checkpoint-017)](#live-exterior-fogdraw-distance-checkpoint-017)
+- [FPS display](#fps-display)
+- [Loading presentation](#loading-presentation)
+- [Dialogue, target names and time](#dialogue-target-names-and-time)
+- [dev4 layout and opening quote](#dev4-layout-and-opening-quote)
+- [dev5 playtest controls](#dev5-playtest-controls)
+- [Reconciled input and defaults](#reconciled-input-and-defaults)
+- [rc7 navigation and cave lighting](#rc7-navigation-and-cave-lighting)
+- [Version, world and original region](#version-world-and-original-region)
+- [HUD source-candidate evidence, 4 October 2026](#hud-source-candidate-evidence-4-october-2026)
+- [Modal background controls](#modal-background-controls)
+- [Mushroom pickup checkpoint (next v0.0.29 build)](#mushroom-pickup-checkpoint-next-v0029-build)
+- [Disk-backed debug catalogue and numbered mushroom checks (next build)](#disk-backed-debug-catalogue-and-numbered-mushroom-checks-next-build)
+- [Rc1 video-player aliases](#rc1-video-player-aliases)
+- [NPC companion test](#npc-companion-test)
+
+<!-- contents end -->
+
 ## Named debug scenes and character UI versions (v0.0.29 candidate)
 
 From the local main menu or game, open F10 and enter
@@ -444,7 +474,7 @@ exterior, strictly before 06:00 or after 20:00. `on` includes supported Imperial
 and Hlaalu guard records regardless of inventory or time; it does not equip
 unrelated NPC classes. Corpse/dead, swimming and asset-validity checks still
 apply. Final combined native acceptance is pending. See [guard torch policy,
-source rules and resource limits](TORCH.md#guard-torches-and-the-clock--implementation-in-progress).
+source rules and resource limits](TORCH.md#guard-torches-and-the-clock--scoped-native-verification-passed).
 
 Frame CSV now also records server time and surface-order mode, separating
 movement/logic cost from world rendering. Shift+V stays unchanged.
@@ -601,3 +631,45 @@ These additions are not retroactively present in the shipped dev4 binary.
 candidate also accepts `dbg vidplay`, `dbg playvideo` and `dbg videoplay`, all
 routing to the same player and arguments. The current dev4 uses `dbg playvid`.
 The aliases are listed under VIDEO in the disk-backed debug catalogue.
+
+## NPC companion test
+
+A pathfinding test: one NPC follows the player. Nothing of it is saved.
+
+| Command | What it does |
+| --- | --- |
+| `dbg companion` | Who follows, its distance and the counters (see below). |
+| `dbg companion pick` / `dbg companion choose` | Pick mode: the crosshair turns red while it points at an NPC within 384 units; attack makes that NPC follow. Again, or Escape, leaves pick mode. |
+| `dbg companion test` | Spawns a test companion (a copy of the nearest resident, preferring one with walk frames) beside you. |
+| `dbg companion off` | A picked NPC walks no further and is put back at its home spot with its own behaviour; a test companion is removed. |
+| `dbg companion distance [N]` | How close it keeps, feet to feet: 48..512 game units, default 96 (out of your way in a doorway). No number prints the value. |
+| `dbg companion mimic speed [on/off]` | On (default): it matches your horizontal speed, a quarter faster beyond twice the distance, at most 360 units/s, slowing over the last half distance so it stops at the distance. Off: walk 120, run 200 beyond twice the distance. Also true/false, 1/0. No value prints it. |
+
+Aliases: `dbg companiontest on/off` (= `companion test` / `companion off`; no
+argument prints the status), `dbg pickcompanion` and `dbg choosecompanion`
+(= `companion pick`).
+
+How it moves (the Quake way): the follower is an entity with a think every
+0.1 s (`aw_companion_think`, 0.05..0.2), run where Quake runs entity thinks.
+Each think it walks with the player's own step physics (stairs up to the
+player's 8.5-unit step, slopes up to the walkable limit), so it climbs what
+the player climbs. When it is within the distance it stands and does no
+collision work at all. When walking stops making progress for four thinks it
+"pings": short standing-hull sweeps fanned around it, nearest the player's
+direction first (Quake's chase-direction idea), at most two sweeps a think;
+the first clear one that brings it nearer is walked for half a second. After
+three failed detours it floods an 8 x 8 grid of 16-unit step cells around
+itself, at most two cells a think, and walks the cells to the reached cell
+nearest the player. If it still cannot follow (less than 48 units of net
+movement in six seconds) or falls more than 640 units (or three times the
+distance) behind, it is placed beside the player, behind them first, and the
+console says so. Neither blocks the other: the follower is not solid and the
+player is ignored by its own sweeps. After a scene change the test companion
+rejoins you; a picked NPC stays in its own scene.
+
+Status line counters: thinks, stuck events, pings and their sweeps, detours,
+flood fills and their cells, routes found and lost, teleports (too far /
+stuck), respawns, search and movement traces per second, milliseconds per
+think (average, worst) and the thinks over 20 ms (the console names what a new worst think did: walk, ping, flood or teleport, and its trace count), unstick steps (a step that ran Quake's unstick search because the box started in solid: it costs up to 164 traces, so after two in a row the follower is placed beside you instead), the follow distance, mimic speed, and the memory it
+uses (one 48-byte navigation state, the companion record, the shared flood
+scratch; no allocation). Emulator timings are relative.

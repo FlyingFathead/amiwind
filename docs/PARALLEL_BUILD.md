@@ -1,5 +1,18 @@
 # Parallel host builds
 
+<!-- contents start -->
+## Contents
+
+- [What runs concurrently](#what-runs-concurrently)
+- [vis threads and vis mode](#vis-threads-and-vis-mode)
+- [Image step](#image-step)
+- [Progress and failure handling](#progress-and-failure-handling)
+- [Profile and reuse](#profile-and-reuse)
+- [Validation](#validation)
+- [Automatic RAM headroom limit](#automatic-ram-headroom-limit)
+
+<!-- contents end -->
+
 `--jobs N` (`-j N`, `--j N`) is exact: the build runs N workers in total and every
 stage and every worker pool inside a stage receives N (or its share of N when
 stages overlap). It is never lowered to the CPU count. When N exceeds the usable
@@ -34,6 +47,8 @@ alone gets all N.
 | Character previews | individual heads/hair | one writer, catalogue order |
 | Soundtrack conversion | individual music tracks | one manifest writer, original track order |
 | VIS | tool threads (`N // concurrent maps`) | ordered map stages, including Census |
+| Town imports (Balmora, Vivec Arena) | one region per worker (tool threads `N // concurrent regions`) | regions in order; each region's log output printed in region order |
+| Media | sounds and videos in one pool, long videos first | one catalogue writer, serial row order |
 | Image step | one map, region or file per worker | the image directory; see [Image step](#image-step) |
 
 Scene stages that copy or mutate a prior scene remain ordered. The image stage
@@ -43,13 +58,29 @@ pinned QBSP has no thread flag. More workers cannot remove these dependencies.
 
 The scheduler divides one CPU budget across concurrent stages and rebalances it
 every round: a serial stage holds one worker, running pooled stages share the
-rest evenly, and a ready stage that waits gets a worker taken from them. Each
-pooled stage reads its share from an allowance file, so its worker pools shrink
-or grow (up to the budget) while it runs; map tool threads keep the value the
-stage started with.
+rest evenly, and a ready stage that waits gets a worker taken from them. A pooled
+stage starts with its even share: the running pooled stages shrink first, then it
+starts (earlier it started with the one worker left free and kept that value for
+its tool threads,
+[BUILD-STAGE-START-SHARE-33](bugs/BUILD-STAGE-START-SHARE-33.md)). Each pooled
+stage reads its share from an allowance file, so its worker pools shrink or grow
+(up to the budget) while it runs, and a stage left alone ends up holding the whole
+budget. Choices taken when a pass starts (map tool threads, whether a pass runs
+serially at all) read the current share (`build_parallel.live_jobs`); tool
+threads already running keep theirs. Pool workers do not see the allowance: a
+pool a worker opens keeps the size it asked for, so outer x inner stays within
+the stage's share ([BUILD-NESTED-POOL-ALLOWANCE-33](bugs/BUILD-NESTED-POOL-ALLOWANCE-33.md)).
 Workers use spawn, open their own inputs, and return results in stable order.
-At most twice the stage's worker count is submitted at a time, bounding queued
-results instead of retaining the entire pending conversion in memory.
+An ordered pool runs at most its share at a time and holds at most four
+results per worker ahead of the one it hands back next, so one slow item does
+not idle the others and the pending conversion is not all kept in memory
+([BUILD-ORDERED-WINDOW-33](bugs/BUILD-ORDERED-WINDOW-33.md)). Pools that know
+what their items cost hand them out longest first and still return them in
+input order: town regions and rooms, the area and Balmora interior rooms and the
+open-world terrain regions use the seconds each item took in an earlier build of
+the same workspace (`WORKSPACE/cache/item-costs`, `tools/build_costs.py`), else a
+measure of the item (placed references; the survey's source triangles), scaled
+to seconds. The history only orders work; it is not a stage input.
 BLAS/OpenMP threads and each soundtrack FFmpeg decoder/filter are limited to one
 inside workers. Numerical work therefore cannot silently multiply the budget.
 
@@ -85,9 +116,11 @@ Its passes run one after another, each with N workers from the shared pool
 | Pass | Parallel unit |
 | --- | --- |
 | Seyda Neen regions | one bounded region compile per worker (vis threads share N) |
-| Balmora layout repair | vis threads and model preparation (N) |
-| Exterior sky cleanup | one map per worker |
-| Hidden-surface cull | one map per worker |
+| Balmora layout repair | the three rebuilt cores side by side (vis and models N // 3 each), then one bounded region per worker |
+| Exterior sky cleanup | one map per worker, largest first |
+| Hidden-surface cull | one map per worker, largest first; hash checks |
+| Actor support fitting | one placement per worker, long offset searches in slices, all in one pool |
+| NPC gallery staging | payload hashing; greetings read from every map |
 | First-person hand metadata | one map per worker (plan, then write) |
 | BSP optimizer | one map per worker; verification hashing |
 | Actor contact audit | map reading, then contact measurement per owning map |
@@ -96,7 +129,9 @@ Its passes run one after another, each with N workers from the shared pool
 
 Order-dependent work stays serial and says why: canonical-owner selection and
 receipt order in the actor audit, staging installs and rollbacks, the final
-fingerprint fold, FFS image writing and readback. Every parallel pass produces
+fingerprint fold, FFS image writing and readback. Passes that replace maps keep
+the original as a hard link (a copy only across file systems) instead of
+writing every changed map twice. Every parallel pass produces
 the bytes of the serial path (`--jobs 1`); `tests/test_build_jobs_workers.py`
 checks it with real workers and checks that N reaches every pool.
 
@@ -114,7 +149,10 @@ log and records assigned workers, dependencies, start time, elapsed time and
 status in `build-state.json`; CPU time, cores used and idle cores per stage are in
 the [build profile](BUILD_PROFILE.md). A periodic active-stage line keeps long tasks
 visible. Native make groups compiler diagnostics per target to prevent warning
-messages from interleaving.
+messages from interleaving. `build-progress.json` in the run folder holds the
+live state (stages done, running and pending, cores in use, percent and ETA);
+`python tools/build.py status RUN` prints it on one screen. See
+[Live progress and ETA](BUILD_PROFILE.md#live-progress-and-eta).
 
 A failed stage stops scheduling new work, cancels running sibling process groups
 on POSIX, and never starts dependent stages. Completed files/logs remain in the
@@ -125,9 +163,11 @@ The serial path and `--single-thread` remain available for diagnosis.
 
 Every build records each stage's CPU, average cores against its jobs, memory
 and I/O, a one-second CPU timeline, the critical path and idle-core warnings in
-`build-profile.json`; `tools/build_profile.py report RUN [--compare OLD]` prints
-and diffs it. Development builds can reuse unchanged stages with
-`--reuse-from`. See [BUILD_PROFILE.md](BUILD_PROFILE.md).
+`build-profile.json`; `python tools/build.py profile report RUN`, `profile compare
+RUN OLD` and `profile optimize RUN...` print it, diff it and list where cores went
+idle, with suggestions. Development builds can reuse unchanged stages with
+`--reuse-from`. All performance options in one place:
+[Performance options](BUILD_PROFILE.md#performance-options).
 
 ## Validation
 

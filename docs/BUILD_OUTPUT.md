@@ -3,13 +3,28 @@
 rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
 coverage and protected model quality remain mandatory.
 
+<!-- contents start -->
+## Contents
+
+- [HDF capacity versus installed content](#hdf-capacity-versus-installed-content)
+- [Completion footer](#completion-footer)
+- [HDFs and emulator runners](#hdfs-and-emulator-runners)
+- [Timing](#timing)
+- [Compiler and toolkit inventory](#compiler-and-toolkit-inventory)
+- [Warnings](#warnings)
+- [Failures, modes and saved results](#failures-modes-and-saved-results)
+
+<!-- contents end -->
+
 ## HDF capacity versus installed content
 
 The final HDF's byte size is its virtual disk capacity, including filesystem
 metadata and free space. It is not a count of converted game assets. The current
 full-world layout creates as many world partitions as needed, each sized from its
 payload plus approximately 20 percent and 16 MiB of headroom, then rounded up
-to a 128 MiB boundary. Each partition stays below 2 GiB; the combined legacy
+to a 128 MiB boundary. Each partition stays below 2 GiB and also starts below 2 GiB on its drive,
+because Kickstart 3.1 does not mount a later one (see
+[AMIGA-DISK-2GIB-LIMIT-33](bugs/AMIGA-DISK-2GIB-LIMIT-33.md)); the combined legacy
 hardfile stays below 4 GiB. When the complete partition set will not fit,
 additional HDFs are created automatically and recorded in `hdf_files`.
 All drives must remain mounted together.

@@ -106,7 +106,8 @@ class _Fitter:
 
     def __init__(self, maps):
         self.maps = Path(maps)
-        self.scene = lru_cache(maxsize=3)(self._scene)
+        self.scene = lru_cache(maxsize=8)(self._scene)
+        self.setups = {}  # placement -> (samples, neighbourhood scene, centre support)
         self.soles = lru_cache(maxsize=128)(self._soles)
 
     def _scene(self, name):
@@ -170,12 +171,14 @@ class _Fitter:
 
     def _setup(self, name, e, authored, angles):
         key = (name, e['model'], e.get('aw_intro_role', 0), tuple(authored), angles)
-        if getattr(self, '_last', (None,))[0] == key:
-            return self._last[1]
+        if key in self.setups:
+            return self.setups[key]
         samples = self.soles(e['model'], angles, bool(float(e.get('aw_intro_role', 0))))
         s = self.neighbourhood(name, authored, samples)
         center = s.floor([*authored[:2], authored[2]+8], 40)
-        self._last = (key, (samples, s, center))
+        if len(self.setups) >= 32:  # slices of many placements interleave in one worker
+            self.setups.pop(next(iter(self.setups)))
+        self.setups[key] = (samples, s, center)
         return samples, s, center
 
     def head(self, name, e, authored, angles):
@@ -300,7 +303,84 @@ def _fit_search(task):
     return _fitter(token, maps).search(name, e, authored, angles, original, first, last)
 
 
-SEARCH_SLICE = 512  # offsets per search task (OFFSETS holds 12,861)
+# Offsets per search task (OFFSETS holds 12,861). Small: one offset can cost
+# 0.1 s in a dense interior (measured: a 512-offset slice took 54 s), and slices
+# after the first hit are the only wasted work.
+SEARCH_SLICE = 32
+
+
+def _fit_all(tasks, jobs):
+    """Heads, then the sliced offset searches, in ONE worker pool.
+
+    A placement whose authored spot fails searches OFFSETS in slices. Slices of
+    all such placements are fed round-robin into the pool, so one long search
+    (an unresolvable actor tries all 12,861 offsets) keeps every worker busy,
+    and the pool starts once (each worker builds its scenes once). The first
+    passing offset in OFFSETS order wins, as in the serial search: slices are
+    submitted in order, slices after a placement's first hit are cancelled or
+    ignored, and every slice before it completes. Returns the head results and
+    {task index: (attempt, fields)}.
+    """
+    from concurrent.futures import FIRST_COMPLETED, wait
+    from build_parallel import live_jobs, process_pool, worker_environment
+    slices = -(-len(OFFSETS) // SEARCH_SLICE)
+    # The stage's current share, not its start value: actor-contact started with
+    # one worker and so fitted every placement serially (BUILD-IDLE-STAGES-33).
+    jobs = live_jobs(jobs)
+
+    def search_task(index, number, head):
+        first = number * SEARCH_SLICE
+        return (*tasks[index], head[1], first, min(first + SEARCH_SLICE, len(OFFSETS)))
+    if jobs <= 1 or not tasks:
+        heads = [_fit_head(task) for task in tasks]
+        found = {}
+        for index, head in enumerate(heads):
+            if head[1] is None:
+                continue
+            for number in range(slices):
+                hit = _fit_search(search_task(index, number, head))
+                if hit is not None:
+                    found[index] = hit
+                    break
+        return heads, found
+    workers = max(1, min(jobs, len(tasks) * slices))
+    with worker_environment(), process_pool(workers) as pool:
+        heads = list(pool.map(_fit_head, tasks))
+        open_ = [index for index, head in enumerate(heads) if head[1] is not None]
+        following = dict.fromkeys(open_, 0)
+        first_hit, found, pending = {}, {}, {}
+        turn = [0]
+
+        def wanted(index):
+            return following[index] < min(slices, first_hit.get(index, slices))
+
+        def submit():
+            while len(pending) < 2 * workers:
+                candidates = [index for index in open_ if wanted(index)]
+                if not candidates:
+                    return
+                index = candidates[turn[0] % len(candidates)]
+                turn[0] += 1
+                number = following[index]
+                following[index] += 1
+                pending[pool.submit(_fit_search, search_task(index, number, heads[index]))] = (index, number)
+        try:
+            submit()
+            while pending:
+                done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    index, number = pending.pop(future)
+                    hit = future.result()
+                    if hit is not None and number < first_hit.get(index, slices):
+                        first_hit[index], found[index] = number, hit
+                for future, (index, number) in list(pending.items()):
+                    if number > first_hit.get(index, slices) and future.cancel():
+                        pending.pop(future)
+                submit()
+        finally:
+            for future in pending:
+                future.cancel()
+    return heads, found
 
 
 def _bake_map(task):
@@ -364,26 +444,7 @@ def bake_ground(maps, jobs=1, exclude=()):
     token = uuid.uuid4().hex
     owners = sorted(pending)
     tasks = [(token, str(maps), *item) for o in owners for item in pending[o]]
-    heads = list(ordered_map(_fit_head, tasks, workers(len(tasks))))
-    # Long searches (thousands of offsets) run as slices in rounds: each round
-    # gives every unfinished placement its next slices (about jobs tasks in
-    # all); the first passing offset in OFFSETS order wins, exactly as the
-    # serial search, and a placement stops at its first round with a hit.
-    best, remaining = {}, [index for index, (_, original) in enumerate(heads) if original is not None]
-    reached = dict.fromkeys(remaining, 0)
-    while remaining:
-        per = max(1, jobs // len(remaining))
-        batch = [(index, reached[index] + k * SEARCH_SLICE) for index in remaining for k in range(per)
-                 if reached[index] + k * SEARCH_SLICE < len(OFFSETS)]
-        hits = ordered_map(_fit_search, [(*tasks[index], heads[index][1], first,
-                                          min(first + SEARCH_SLICE, len(OFFSETS))) for index, first in batch],
-                           workers(len(batch)))
-        for (index, _), hit in zip(batch, hits):
-            if hit is not None and index not in best:
-                best[index] = hit
-        for index in remaining:
-            reached[index] += per * SEARCH_SLICE
-        remaining = [index for index in remaining if index not in best and reached[index] < len(OFFSETS)]
+    heads, best = _fit_all(tasks, jobs)
     flat = iter([result if original is None else finish(result, best.get(index))
                  for index, (result, original) in enumerate(heads)])
     fitted = {o: [next(flat) for _ in pending[o]] for o in owners}

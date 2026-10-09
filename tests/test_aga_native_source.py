@@ -9,11 +9,36 @@ import re
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
+
+
+def tree_project_version():
+    """This tree's tools/project_version.py, loaded from its file: compile_run generates the
+    version headers with it, never with an older copy elsewhere on sys.path (a builder image
+    ships one), and sys.path stays as it is (TEST-NATIVE-STALE-IMPORT-33)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('amiwind_tree_project_version', ROOT / 'tools/project_version.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class VersionHeaderSourceTests(unittest.TestCase):
+    def test_version_headers_come_from_this_tree(self):
+        module = tree_project_version()
+        self.assertEqual(Path(module.__file__).resolve(), (ROOT / 'tools/project_version.py').resolve())
+        with tempfile.TemporaryDirectory() as tmp:
+            module.generate_native(ROOT / 'VERSION', Path(tmp))
+            self.assertTrue((Path(tmp) / 'amiwind_version.h').is_file())
+            if (ROOT / 'CHIM_VERSION').is_file():
+                self.assertTrue((Path(tmp) / 'chim_version.h').is_file())
+        source = Path(__file__).read_text(encoding='utf-8')
+        self.assertNotIn('from project_version ' + 'import generate_native', source)
 
 class GuardTorchRenderContractTests(unittest.TestCase):
     def test_world_flames_share_camera_depth_and_precede_hands_and_water_warp(self):
@@ -39,6 +64,24 @@ class VisibleEntityDropContractTests(unittest.TestCase):
         tent = (Path(SOURCE)/'src/cl_tent.c').read_text()
         new = tent[tent.index('entity_t *CL_NewTempEntity'):]
         self.assertRegex(new, r'if \(cl_numvisedicts == MAX_VISEDICTS\)\s*\{\s*AW_VisedictDropped \(\);\s*return NULL;')
+
+
+# Engine sources that write diagnostic logs through aw_log.c.
+LOG_USERS = {"aw_music.c", "keys.c", "aw_stream.c", "model.c", "zone.c", "aw_profile.c",
+             "sys_amiga.c", "aw_debug.c"}
+
+
+def includes_aw_log(fixture, seen=None):
+    """True when a fixture includes aw_log.c itself or through another test fixture."""
+    seen = set() if seen is None else seen
+    if fixture in seen or not fixture.is_file():
+        return False
+    seen.add(fixture)
+    text = fixture.read_text(encoding='utf-8')
+    if 'aw_log.c' in text:
+        return True
+    return any(includes_aw_log(fixture.parent / name, seen)
+               for name in re.findall(r'#include "([^"/]+\.c)"', text))
 
 
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
@@ -79,6 +122,12 @@ class NativeSourceTests(unittest.TestCase):
     def test_harvest_exact_brush_binding_occlusion_hide_and_crossings(self):
         self.compile_run('aga_harvest_runtime_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_harvest.c', 'aw_harvest_runtime.c', 'aw_state.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'])
+
+    def test_chim_town_harvest_follows_the_region(self):
+        # CHIM: per-region harvest catalogues follow the player within a town's frame map.
+        self.compile_run('aga_chim_harvest_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_region.c', 'aw_harvest.c', 'aw_harvest_runtime.c', 'aw_state.c', 'mathlib.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'])
 
     def test_named_headselection_scene_setup_and_registration_resume(self):
@@ -433,6 +482,11 @@ class NativeSourceTests(unittest.TestCase):
     def test_movie_stream_clock_skip_and_bounds(self):
         self.compile_run("aga_movie_test.c", [ROOT/"engine/aga/src/aw_movie.c"])
 
+    def test_quick_test_build_marker_and_missing_movie(self):
+        # tools/build.py --exclude: id1/excluded-content.txt (aw_excluded.c) and aw_movie.c without videos.
+        self.compile_run("aga_excluded_test.c", [ROOT/"engine/aga/src/aw_movie.c", ROOT/"engine/aga/src/aw_excluded.c"],
+            cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
+
     def test_alias_decode_preserves_hot_cache_with_real_allocator(self):
         self.compile_run("aga_alias_residency_test.c", [Path(SOURCE)/"src/model.c", Path(SOURCE)/"src/mathlib.c"],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all", "-Wl,--wrap=malloc"])
@@ -498,6 +552,9 @@ class NativeSourceTests(unittest.TestCase):
     def test_coordinate_toggle_and_reserved_strip(self):
         self.compile_run("aga_hud_test.c", [ROOT/"engine/aga/src/aw_hud.c"])
 
+    def test_photo_mode_hides_restores_and_returns_player(self):
+        self.compile_run("aga_photo_test.c", [ROOT/"engine/aga/src/aw_photo.c"])
+
     def test_unsigned_face_plane_indices_and_bounds(self):
         self.compile_run("aga_face_index_test.c", [Path(SOURCE)/"src/model.c"])
 
@@ -509,6 +566,18 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_interaction_only_on_game_key_down(self):
         self.compile_run('aga_interact_test.c', [Path(SOURCE)/'src/cl_input.c'])
+
+    def test_miniwind_notice_file_from_the_builder(self):
+        # The file tools/miniwind.py writes for a MiniWind plan parses in the engine.
+        sys.path.insert(0, str(ROOT/'tools'))
+        import miniwind
+        names = ['chim', 'balmora', 'balmora-interiors', 'harvest', 'music', 'media', 'image']
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'miniwind.txt'
+            path.write_bytes(miniwind.data_file(miniwind.features_line(names)))
+            self.compile_run('aga_miniwind_test.c', [Path(SOURCE)/'src/aw_miniwind.c'],
+                             cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'],
+                             arguments=[str(path)])
 
     def test_balmora_region_round_trip(self):
         self.compile_run('aga_region_test.c', [Path(SOURCE)/'src/aw_region.c'])
@@ -538,12 +607,26 @@ class NativeSourceTests(unittest.TestCase):
             sources = [*sources, tree/"src/aw_section.c"]
         if any(p.name == "aw_scene.c" for p in sources):
             sources = [*sources, tree/"src/aw_world.c"]
+        # Partial-area builds (aw_miniwind.c): the scene, logo and New Game paths ask it.
+        if any(p.name in ("aw_scene.c", "aw_movie.c", "aw_intro.c") for p in sources) and \
+                not any(p.name == "aw_miniwind.c" for p in sources):
+            sources = [*sources, tree/"src/aw_miniwind.c"]
         if any(p.name == "world.c" for p in sources):
             sources = [*sources, tree/"src/aw_scenery.c"]
         if any(p.name in ("aw_scene.c", "aw_scenery.c") for p in sources):
             sources = [*sources, tree/"src/aw_harvest.c", tree/"src/aw_harvest_runtime.c"]
             if not any(p.name == "aw_state.c" for p in sources):
                 sources.append(tree/"src/aw_state.c")
+        if (any(p.name in LOG_USERS for p in sources) and not any(p.name == "aw_log.c" for p in sources)
+                and not includes_aw_log(ROOT/"tests"/fixture)):
+            # In-memory diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33); live when unbound.
+            sources = [*sources, tree/"src/aw_log.c"]
+        hooked = ("aw_movie.c", "aw_scene.c", "aw_intro.c")
+        fixture_text = (ROOT/'tests'/fixture).read_text(encoding='utf-8', errors='replace')
+        if ((any(p.name in hooked for p in sources) or any('#include "%s"' % n in fixture_text for n in hooked))
+                and not any(p.name == "aw_excluded.c" for p in sources)):
+            # Quick-test-build marker (id1/excluded-content.txt) used by these files.
+            sources = [*sources, tree/"src/aw_excluded.c"]
         if not any(p.name == "aw_format.c" for p in sources):
             # Engine text/number conversion (Q_strtod, Q_sscanf, Q_fscanf).
             sources = [*sources, tree/"src/aw_format.c"]
@@ -551,8 +634,7 @@ class NativeSourceTests(unittest.TestCase):
             if not any(p.name == "aw_harvest_proxy.c" for p in sources):
                 sources.append(tree/"src/aw_harvest_proxy.c")
         with tempfile.TemporaryDirectory() as tmp:
-            from project_version import generate_native
-            generate_native(ROOT/'VERSION', Path(tmp))
+            tree_project_version().generate_native(ROOT/'VERSION', Path(tmp))
             exe = Path(tmp) / 'check'
             cmd = ['cc', *cflags, *['-D'+d for d in defines], '-std='+standard, '-ffunction-sections', '-fdata-sections',
                    '-include', str(ROOT/'tests/aga_test_files.h'),

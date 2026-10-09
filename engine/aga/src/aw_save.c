@@ -73,6 +73,7 @@ static uint32_t actor_id(edict_t *e)
     v=GetEdictFieldValue(e,"aw_intro_role");
     return v && v->_float>0?0x800000U+(uint32_t)v->_float:0;
 }
+int (*aw_companion_home)(edict_t *,vec3_t,vec3_t);   /* aw_companion.c */
 void AW_SaveCapture(void)
 {
     int i,j,k,scene;uint32_t ref;edict_t *e;eval_t *v;aw_saved_actor_t *a;
@@ -84,7 +85,9 @@ void AW_SaveCapture(void)
         for(j=0;j<world.actor_count;j++)if(world.actors[j].reference==ref && world.actors[j].scene==scene)break;
         if(j==world.actor_count){if(j==AW_SAVE_ACTORS){Con_Printf("Save actor limit reached.\n");return;}world.actor_count++;}
         a=&world.actors[j];a->reference=ref;a->scene=scene;
-        VectorCopy(e->v.origin,a->position);VectorCopy(e->v.angles,a->angles);a->angles[1]=anglemod(a->angles[1]);a->health=e->v.health;
+        VectorCopy(e->v.origin,a->position);VectorCopy(e->v.angles,a->angles);
+        if(aw_companion_home)aw_companion_home(e,a->position,a->angles);  /* a picked companion saves at home */
+        a->angles[1]=anglemod(a->angles[1]);a->health=e->v.health;
         for(k=0;k<3;k++){
             v=GetEdictFieldValue(e,(char *)actor_fields[k]);
             if(k==0)a->hello_count=v?(int)v->_float:0;
@@ -236,13 +239,13 @@ int AW_SaveWrite(int slot)
 }
 int AW_SaveRead(uint32_t profile,int slot)
 {
-    aw_save_t candidate,other;FILE *f=NULL;char map[40];int n,i;
+    aw_save_t candidate,other;char map[40];int n,i;
     if(!AW_CharacterLoad() || !content() || newest(profile,slot,&candidate)<0){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
     }
-    snprintf(map,sizeof(map),"maps/%s.bsp",candidate.scene);n=COM_FOpenFile(map,&f);
-    if(!f || n<124){if(f)fclose(f);Con_Printf("Saved scene unavailable; current game retained.\n");return 0;}
-    fclose(f);
+    /* The scene's own map, or its CHIM frame map in a pure-CHIM image. */
+    n=AW_SceneMapSize(candidate.scene,map,sizeof(map));
+    if(n<124){Con_Printf("Saved scene unavailable; current game retained.\n");return 0;}
     /* Loading an older manual save must still produce newer generations than
      * every existing autosave of this character. */
     for(i=0;i<=20;i++)if(newest(profile,i,&other)>=0 && other.sequence>candidate.sequence)candidate.sequence=other.sequence;

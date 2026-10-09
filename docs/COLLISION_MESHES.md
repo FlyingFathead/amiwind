@@ -4,6 +4,23 @@ Status: 8 October 2026 (v0.0.32 development). Measured on the owner's own GOG Ga
 data with the repository's NIF reader (PyFFI, `tools/prepare_scenery.py`) and the OpenMW 0.51.0
 source. Only names, counts and numbers are reported here; no game data is included.
 
+<!-- contents start -->
+## Contents
+
+- [Short answer](#short-answer)
+- [The rules (OpenMW 0.51 as reference)](#the-rules-openmw-051-as-reference)
+- [What the data contains](#what-the-data-contains)
+  - [Morrowind.bsa by folder](#morrowindbsa-by-folder)
+  - [The models AmiWind converts](#the-models-amiwind-converts)
+- [Stairs and ramps](#stairs-and-ramps)
+- [How the AmiWind converter uses collision today](#how-the-amiwind-converter-uses-collision-today)
+- [Cost of using the authored collision](#cost-of-using-the-authored-collision)
+- [Recommendations](#recommendations)
+- [How the numbers were measured](#how-the-numbers-were-measured)
+- [References](#references)
+
+<!-- contents end -->
+
 Related: [COLLISION-RCN-SCOPE-32](bugs/COLLISION-RCN-SCOPE-32.md),
 [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md),
 [COLLISION-CONVEX-LOSS-32](bugs/COLLISION-CONVEX-LOSS-32.md),

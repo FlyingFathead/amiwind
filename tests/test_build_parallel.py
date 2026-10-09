@@ -40,6 +40,58 @@ def wait_for_later_job(task):
     return number
 
 
+def worker_allowance(item):
+    """Worker: the allowance it sees and the pids of a nested one-worker map."""
+    from build_parallel import ALLOWANCE_ENV, BUDGET_ENV
+    nested = list(ordered_map(nested_pid, range(3), 1))
+    time.sleep(.4)  # items overlap, so the stage pool starts more than one worker
+    return (os.environ.get(ALLOWANCE_ENV), os.environ.get(BUDGET_ENV), os.getpid(), nested)
+
+
+def nested_pid(item):
+    return os.getpid()
+
+
+def timed_task(item):
+    start = time.monotonic()
+    time.sleep(.5)
+    return item, start, time.monotonic()
+
+
+def peak_overlap(rows):
+    events = sorted([(start, 1) for _, start, _ in rows] + [(end, -1) for _, _, end in rows])
+    running = peak = 0
+    for _, delta in events:
+        running += delta
+        peak = max(peak, running)
+    return peak
+
+
+def noisy(item):
+    import subprocess
+    print('python', item, flush=True)
+    subprocess.run([sys.executable, '-c', 'print("tool %d")' % item], check=True)
+    return item * 2
+
+
+def captured_noisy(item):
+    from build_parallel import captured
+    return captured(noisy, item)
+
+
+def sleep_for(item):
+    name, seconds = item
+    start = time.monotonic()
+    time.sleep(seconds)
+    return name, start
+
+
+def head_of_line(item):
+    # Item 0 is slow; the others are quick: with a narrow window they waited behind it.
+    time.sleep(2.5 if item == 0 else .05)
+    return item, time.monotonic()
+
+
 def held_events(state):
     """Workers held over time: start share, allowance changes, release at the end."""
     events = []
@@ -94,6 +146,98 @@ class ParallelBuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'worker failed'):
             list(ordered_map(fail, range(5), 2))
 
+    def test_pool_workers_do_not_follow_the_stage_allowance(self):
+        # BUILD-NESTED-POOL-ALLOWANCE-33: a worker's own one-worker map must stay
+        # serial; following the stage allowance made each of N workers open N more.
+        with tempfile.TemporaryDirectory() as temp:
+            allowance = Path(temp) / 'allowance'
+            allowance.write_text('3' + chr(10))
+            with patch.dict(os.environ, AMIWIND_BUILD_JOBS='1', AMIWIND_BUILD_JOBS_FILE=str(allowance),
+                            AMIWIND_BUILD_BUDGET='3'):
+                rows = list(ordered_map(worker_allowance, range(4), 1))
+        self.assertTrue(all(row[0] is None and row[1] is None for row in rows))
+        self.assertTrue(all(set(row[3]) == {row[2]} for row in rows))  # nested map ran in the worker itself
+        self.assertGreater(len({row[2] for row in rows}), 1)          # the stage pool itself followed 3
+
+    def test_running_pool_grows_when_its_allowance_grows(self):
+        # BUILD-SCHEDULER-JOBSHARE-32: a stage that started with one worker and is
+        # later left alone takes the freed workers mid-run (the NPC gallery case).
+        for mapper in (ordered_map, completed_map):
+            with self.subTest(mapper=mapper.__name__), tempfile.TemporaryDirectory() as temp:
+                allowance = Path(temp) / 'allowance'
+                allowance.write_text('1' + chr(10))
+                with patch.dict(os.environ, AMIWIND_BUILD_JOBS='1', AMIWIND_BUILD_JOBS_FILE=str(allowance),
+                                AMIWIND_BUILD_BUDGET='4'):
+                    rows = []
+                    for row in mapper(timed_task, range(24), 1):
+                        rows.append(row)
+                        if len(rows) == 2:
+                            allowance.write_text('4' + chr(10))
+                early = [r for r in rows if r[0] < 2]
+                self.assertEqual(peak_overlap(early), 1)       # one worker while the allowance is 1
+                self.assertGreaterEqual(peak_overlap(rows), 3)  # then the freed workers are used
+                self.assertLessEqual(peak_overlap(rows), 4)     # never more than the allowance
+                self.assertCountEqual([r[0] for r in rows], range(24))
+                if mapper is ordered_map:
+                    self.assertEqual([r[0] for r in rows], list(range(24)))
+
+    def test_captured_output_comes_back_in_item_order(self):
+        # Region workers return their own and their tools' output; the stage prints it in order.
+        rows = list(ordered_map(captured_noisy, range(5), 3))
+        self.assertEqual([result for result, _ in rows], [0, 2, 4, 6, 8])
+        self.assertEqual([text for _, text in rows],
+                         ['python %d\ntool %d\n' % (n, n) for n in range(5)])
+
+    def test_cost_order_starts_the_longest_first_and_keeps_input_order(self):
+        # BUILD-ORDERED-WINDOW-33 cost model: the long items start first, results stay in input order.
+        # The dispatch order is checked, not start times on a shared host (TEST-COST-ORDER-LOAD-33).
+        from concurrent.futures import ThreadPoolExecutor
+        import build_parallel
+        items = [('a', .05), ('b', .05), ('c', .6), ('d', .05), ('e', .4), ('f', .05)]
+        submitted = []
+
+        class Recording(ThreadPoolExecutor):
+            def submit(self, function, *args):
+                submitted.append(args[-1][0])
+                return super().submit(function, *args)
+        timings = []
+        with patch.object(build_parallel, 'process_pool', side_effect=lambda count: Recording(max_workers=count)):
+            rows = list(ordered_map(sleep_for, items, 2, cost=lambda item: item[1], timings=timings))
+        self.assertEqual([name for name, _ in rows], list('abcdef'))
+        self.assertEqual(submitted[:2], ['c', 'e'])          # longest first
+        self.assertEqual(sorted(submitted), list('abcdef'))   # every item once
+        self.assertEqual(len(timings), 6)
+        self.assertGreater(timings[2], timings[0])          # timings follow input order
+        serial = list(ordered_map(sleep_for, items, 1, cost=lambda item: item[1]))
+        self.assertEqual([name for name, _ in serial], list('abcdef'))  # one worker: input order
+
+    def test_one_slow_head_does_not_idle_the_other_workers(self):
+        # BUILD-ORDERED-WINDOW-33: with two results held per worker, quick items behind
+        # a slow head stopped being submitted; four keep the workers busy.
+        rows = list(ordered_map(head_of_line, range(40), 4))
+        self.assertEqual([item for item, _ in rows], list(range(40)))
+        head_done = rows[0][1]
+        finished_before = sum(1 for item, at in rows[1:] if at < head_done)
+        self.assertGreater(finished_before, 8)  # more than the old window of 2 x 4 minus the head
+
+    def test_cost_history_round_trip_and_fallback_scaling(self):
+        import build_costs
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {build_costs.ENV: temp}):
+            self.assertEqual(build_costs.load('pool'), {})
+            self.assertIsNone(build_costs.estimator('pool', ['a', 'b']))
+            build_costs.record('pool', ['a', 'b'], [2.0, 4.0])
+            self.assertEqual(build_costs.load('pool'), {'a': 2.0, 'b': 4.0})
+            cost = build_costs.estimator('pool', ['a', 'b', 'c'], fallback={'a': 1, 'b': 2, 'c': 10}.get)
+            self.assertEqual((cost('a'), cost('b'), cost('c')), (2.0, 4.0, 20.0))  # c scaled by seconds per unit
+            items = [('a', .01), ('b', .01), ('c', .01)]
+            first = list(build_costs.costed_map('pool2', sleep_for, items, ['a', 'b', 'c'], 2))
+            self.assertEqual([name for name, _ in first], ['a', 'b', 'c'])
+            self.assertEqual(sorted(build_costs.load('pool2')), ['a', 'b', 'c'])
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(build_costs.ENV, None)
+            build_costs.record('pool', ['a'], [1.0])  # no history folder: nothing written, no error
+            self.assertEqual(build_costs.load('pool'), {})
+
     def test_inherited_stage_budget(self):
         with patch.dict(os.environ, AMIWIND_BUILD_JOBS='2'):
             self.assertEqual(resolve_jobs(), 2)
@@ -132,6 +276,26 @@ class ParallelBuildTests(unittest.TestCase):
                 peak = max(peak, used)
             self.assertGreater(peak, 1)
             self.assertLessEqual(peak, 3)
+
+    def test_more_ready_branches_than_the_budget_still_run(self):
+        """BUILD-SCHEDULER-LOWBUDGET-33: with a budget of 2 and five ready pooled branches the scheduler
+        reserved a slot for every other branch before starting any, and started none (a busy loop)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            code = 'import time, sys; time.sleep(.1)'
+            steps = [('setup', [sys.executable, '-c', code])] + [
+                (name, [sys.executable, '-c', code, '--jobs', '4']) for name in ('music', 'engine', 'media',
+                                                                                  'world-survey', 'dialogue-lookup')]
+            with contextlib.redirect_stdout(io.StringIO()):
+                execute_parallel(steps, root / 'run', {'compiler_jobs': 2}, root)
+            state = json.loads((root / 'run/build-state.json').read_text())
+            self.assertEqual(state['status'], 'passed')
+            self.assertEqual(len(state['steps']), 6)
+            used = peak = 0
+            for _, delta in sorted(held_events(state)):
+                used += delta
+                peak = max(peak, used)
+            self.assertLessEqual(peak, 2 + 1)    # the stage that starts alone may hold its share
 
     def test_failure_cancels_siblings_and_blocks_dependents(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -172,11 +336,14 @@ class ParallelBuildTests(unittest.TestCase):
             terrain = json.loads((root / 'terrain.json').read_text())
         by_name = {s['name']: s for s in state['steps']}
         self.assertEqual(by_name['engine']['jobs'], 7)
-        self.assertEqual(by_name['terrain']['jobs'], 1)
+        # BUILD-STAGE-START-SHARE-33: terrain starts with its fair share, not
+        # the one worker that was free (its tool threads keep the start value).
+        self.assertEqual(by_name['terrain']['jobs'], 4)
         self.assertEqual(engine[:2], [7, 4])      # shrinks when terrain starts
-        self.assertIn(terrain[0], (1, 4))        # starts with what was free
-        self.assertIn(4, terrain)                # grows to a fair share
+        self.assertEqual(terrain[0], 4)          # starts with a fair share
         self.assertEqual(terrain[-1], 8)         # and takes the freed budget
+        shrink = next(at for at, value in by_name['engine']['worker_changes'] if value == 4)
+        self.assertLessEqual(shrink, by_name['terrain']['started_seconds'])  # shrink first, then start
         used = peak = 0
         for _, delta in sorted(held_events(state)):
             used += delta

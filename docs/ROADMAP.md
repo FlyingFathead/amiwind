@@ -1,12 +1,155 @@
 # Roadmap and implementation options
 
-## Next: v0.0.33 - Towards CHIM: Replacing the Engine Block
+<!-- contents start -->
+## Contents
 
-v0.0.32 (Last Stop on the Old Line: Window-Shopping in Vivec) is out: the last
-release on the AmiQuake-based legacy engine and the legacy builder, with the
-Vivec Arena as an outside-only preview ([release notes](RELEASE-v0.0.32.md)).
-v0.0.33 is the first release on the CHIM engine, the world streamer (plan
-below and [world streamer](WORLD_STREAMER.md)).
+- [v0.0.33 - Towards CHIM: Replacing the Engine Block (released)](#v0033---towards-chim-replacing-the-engine-block-released)
+- [v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec (released)](#v0032---last-stop-on-the-old-line-window-shopping-in-vivec-released)
+  - [Decided: a world streamer with no duplicated assets - the whole game on one hard file](#decided-a-world-streamer-with-no-duplicated-assets---the-whole-game-on-one-hard-file)
+  - [Near future: fires and lava across the world](#near-future-fires-and-lava-across-the-world)
+- [Planned: heap size matched to the host machine, 7 October 2026](#planned-heap-size-matched-to-the-host-machine-7-october-2026)
+- [Other ideas and wildcards](#other-ideas-and-wildcards)
+  - [Weather: ash storms and blight winds](#weather-ash-storms-and-blight-winds)
+  - [Long-term possibility: a reusable Amiga game engine](#long-term-possibility-a-reusable-amiga-game-engine)
+  - [Long-term possibility: Lua scripting](#long-term-possibility-lua-scripting)
+  - [From Quake Arena to Vivec Arena: two-Amiga 1v1 duels](#from-quake-arena-to-vivec-arena-two-amiga-1v1-duels)
+- [HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026](#harvest-bittercoast-29-one-of-three-nearby-mushrooms-usable-6-october-2026)
+- [Latest scoped RC2 playtest confirmations: 6 October 2026](#latest-scoped-rc2-playtest-confirmations-6-october-2026)
+- [Latest v0.0.29-rc2 playtest report: 6 October 2026](#latest-v0029-rc2-playtest-report-6-october-2026)
+- [Current RC2 issue status: 2026-10-06T19:08:08+00:00](#current-rc2-issue-status-2026-10-06t1908080000)
+- [INTERIOR-LIGHT-29: RC2 measured checkpoint, 6 October 2026](#interior-light-29-rc2-measured-checkpoint-6-october-2026)
+- [RC1 regression priorities: 2026-10-06T15:03:42+00:00](#rc1-regression-priorities-2026-10-06t1503420000)
+- [Building brightness and inspection tools: next candidate](#building-brightness-and-inspection-tools-next-candidate)
+- [Next candidate: Seyda lighting boundary correction](#next-candidate-seyda-lighting-boundary-correction)
+- [Balmora Temple geometry/collision report: 6 October 2026](#balmora-temple-geometrycollision-report-6-october-2026)
+- [RC1 comparative traversal feedback: Balmora and Seyda Neen](#rc1-comparative-traversal-feedback-balmora-and-seyda-neen)
+- [Console history working-set investigation: 6 October 2026](#console-history-working-set-investigation-6-october-2026)
+- [Seyda Neen partition review after lighting repair](#seyda-neen-partition-review-after-lighting-repair)
+- [FPV combat action creation pipeline: RC1 baseline](#fpv-combat-action-creation-pipeline-rc1-baseline)
+- [Unarmed right/left sequence request: 6 October 2026](#unarmed-rightleft-sequence-request-6-october-2026)
+- [RC1 fist appearance and punch coverage: 6 October 2026](#rc1-fist-appearance-and-punch-coverage-6-october-2026)
+- [Additional RC1 reproduction gates: 6 October 2026](#additional-rc1-reproduction-gates-6-october-2026)
+- [Post-delivery RC1 priorities: 6 October 2026](#post-delivery-rc1-priorities-6-october-2026)
+- [Historical: v0.0.29-rc1 work, following published dev4](#historical-v0029-rc1-work-following-published-dev4)
+  - [Asset coverage accounting](#asset-coverage-accounting)
+  - [Media source gaps and separate soundtrack events](#media-source-gaps-and-separate-soundtrack-events)
+- [Historical baseline — published v0.0.27, 3 October 2026](#historical-baseline--published-v0027-3-october-2026)
+- [Assemble first, then optimize the measured world](#assemble-first-then-optimize-the-measured-world)
+- [Implemented: generate both emulator configurations during image assembly](#implemented-generate-both-emulator-configurations-during-image-assembly)
+- [v0.0.26 released - validated Windows and Docker builds](#v0026-released---validated-windows-and-docker-builds)
+- [Release progress and planned follow-up](#release-progress-and-planned-follow-up)
+  - [v0.0.27 — published: Rocks, Mushrooms, and Then Some](#v0027--published-rocks-mushrooms-and-then-some)
+  - [v0.0.28 — Trees and Grass, Day and Night](#v0028--trees-and-grass-day-and-night)
+- [Follow-up: static asset gallery and remaining scenery](#follow-up-static-asset-gallery-and-remaining-scenery)
+- [Top engineering priority: world-terrain build time](#top-engineering-priority-world-terrain-build-time)
+- [Asset catalogue and placement completeness](#asset-catalogue-and-placement-completeness)
+- [Windows build host, 1 October 2026](#windows-build-host-1-october-2026)
+- [Docker builder and v0.0.26 validation](#docker-builder-and-v0026-validation)
+- [Build and compiler toolkit](#build-and-compiler-toolkit)
+- [v0.0.25-rc1 regression work](#v0025-rc1-regression-work)
+- [Balmora interiors and loading](#balmora-interiors-and-loading)
+- [Seyda Neen subdivision](#seyda-neen-subdivision)
+- [World-coordinate HUD](#world-coordinate-hud)
+- [World map, inventory and journal TODO (owner request, 1 October 2026)](#world-map-inventory-and-journal-todo-owner-request-1-october-2026)
+- [Optional field-of-view control](#optional-field-of-view-control)
+- [Next implementation milestone agreed 28 September 2026](#next-implementation-milestone-agreed-28-september-2026)
+- [Next world-mapping milestone: entire-world terrain inspection](#next-world-mapping-milestone-entire-world-terrain-inspection)
+- [Recovered follow-up: FREQUENT FLYER BONUS / whole-world scaling harness](#recovered-follow-up-frequent-flyer-bonus--whole-world-scaling-harness)
+- [Fundamental mechanics before attribute effects](#fundamental-mechanics-before-attribute-effects)
+- [UI readability and text scaling](#ui-readability-and-text-scaling)
+- [Opening exterior residency and playtest blockers](#opening-exterior-residency-and-playtest-blockers)
+- [Optional polygonal POI regions](#optional-polygonal-poi-regions)
+- [Graphics and performance: crate geometry options](#graphics-and-performance-crate-geometry-options)
+- [Build parallelism, 29 September 2026](#build-parallelism-29-september-2026)
+- [Next major milestone: the connected starting area](#next-major-milestone-the-connected-starting-area)
+- [Checkpoint-014 delivered work and next acceptance routes](#checkpoint-014-delivered-work-and-next-acceptance-routes)
+- [Priority debugging controls — checkpoint-014](#priority-debugging-controls--checkpoint-014)
+- [Quick usability fixes](#quick-usability-fixes)
+- [Dialogue presentation and font work](#dialogue-presentation-and-font-work)
+- [Checkpoint-013 collision bounds and NPC behavior](#checkpoint-013-collision-bounds-and-npc-behavior)
+- [Checkpoint-012 actor and movement slice](#checkpoint-012-actor-and-movement-slice)
+- [Checkpoint-011 startup repair and NPC handoff](#checkpoint-011-startup-repair-and-npc-handoff)
+- [Checkpoint-010 repair scope](#checkpoint-010-repair-scope)
+- [Player body and first-person hands](#player-body-and-first-person-hands)
+- [First NPC milestone after this repair](#first-npc-milestone-after-this-repair)
+- [Checkpoint-009 progress](#checkpoint-009-progress)
+- [Current repair and expansion queue (27 September 2026)](#current-repair-and-expansion-queue-27-september-2026)
+- [Completed checkpoint history](#completed-checkpoint-history)
+- [Current work: automatic scenery conversion and measured rendering](#current-work-automatic-scenery-conversion-and-measured-rendering)
+- [Previous scenery milestone](#previous-scenery-milestone)
+- [Storage and runtime options](#storage-and-runtime-options)
+- [Next visual checkpoint](#next-visual-checkpoint)
+- [Audio effects and world cache](#audio-effects-and-world-cache)
+- [Host character baker](#host-character-baker)
+- [Later interaction and compatibility](#later-interaction-and-compatibility)
+- [Waterline and topographic diagnostics](#waterline-and-topographic-diagnostics)
+- [First complete vicinity](#first-complete-vicinity)
+- [Open incomplete terrain/rock formation report](#open-incomplete-terrainrock-formation-report)
+- [Checkpoint-016 playtest steering (27 September 2026)](#checkpoint-016-playtest-steering-27-september-2026)
+- [Checkpoint-016 outcome and next priorities](#checkpoint-016-outcome-and-next-priorities)
+- [Recovered owner list, 27 September 2026, 22:17 Helsinki](#recovered-owner-list-27-september-2026-2217-helsinki)
+  - [Water feedback and scene-picker follow-up](#water-feedback-and-scene-picker-follow-up)
+  - [Opening-state residency](#opening-state-residency)
+  - [Adjustable visibility and appearance A/B](#adjustable-visibility-and-appearance-ab)
+- [Next milestone after checkpoint-017 and recovery backup](#next-milestone-after-checkpoint-017-and-recovery-backup)
+- [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
+- [Persistent world and disk loading direction (v0.0.16 planning)](#persistent-world-and-disk-loading-direction-v0016-planning)
+- [Interaction and inventory follow-up, 28 September 2026](#interaction-and-inventory-follow-up-28-september-2026)
+  - [Runtime out-of-bounds safeguard (requested 28 September)](#runtime-out-of-bounds-safeguard-requested-28-september)
+  - [High priority: graphics/culling, door and wall assemblies](#high-priority-graphicsculling-door-and-wall-assemblies)
+- [Next local-area checkpoints](#next-local-area-checkpoints)
+  - [Transport and resident voices](#transport-and-resident-voices)
+- [dev3 feedback follow-up — 29 September 2026](#dev3-feedback-follow-up--29-september-2026)
+- [29 September 2026 / v0.0.23-dev4](#29-september-2026--v0023-dev4)
+- [Next version: world geometry density analysis](#next-version-world-geometry-density-analysis)
+- [FIXES NEEDED IN BALMORA](#fixes-needed-in-balmora)
+  - [Jagged doorway arches](#jagged-doorway-arches)
+  - [Recurring deformed and blocked stairs — reusable conversion fix](#recurring-deformed-and-blocked-stairs--reusable-conversion-fix)
+  - [Proposed module: Balmora stairway optimizer](#proposed-module-balmora-stairway-optimizer)
+  - [Missing street ground texture](#missing-street-ground-texture)
+  - [Hlaalu guard missing/transparent chest armor](#hlaalu-guard-missingtransparent-chest-armor)
+- [Debug teleport expansion](#debug-teleport-expansion)
+- [dev5 follow-up status (30 September 2026)](#dev5-follow-up-status-30-september-2026)
+- [Recurring conversion acceptance: stair ramps](#recurring-conversion-acceptance-stair-ramps)
+- [Dialogue inspection and long menus](#dialogue-inspection-and-long-menus)
+- [Mutable NPC equipment](#mutable-npc-equipment)
+- [v0.0.27 follow-up: target playtest and profiling](#v0027-follow-up-target-playtest-and-profiling)
+- [Reusable polygon-heavy town residency](#reusable-polygon-heavy-town-residency)
+- [Map panel: complete the Debug / In-Game selector after repaired playtest](#map-panel-complete-the-debug--in-game-selector-after-repaired-playtest)
+- [Dialogue, music and video import/runtime milestones](#dialogue-music-and-video-importruntime-milestones)
+  - [Variable voiced dialogue](#variable-voiced-dialogue)
+  - [Music](#music)
+  - [Optional video catalogue and playback](#optional-video-catalogue-and-playback)
+- [Visual quality, visibility and performance follow-up](#visual-quality-visibility-and-performance-follow-up)
+- [Later mapping: Vivec remains inactive](#later-mapping-vivec-remains-inactive)
+  - [Mandatory follow-up: building geometry and collision audit](#mandatory-follow-up-building-geometry-and-collision-audit)
+  - [Entity pressure and safe reclamation (proposed; not implemented)](#entity-pressure-and-safe-reclamation-proposed-not-implemented)
+  - [Selective baked building panels (proposed A/B extension)](#selective-baked-building-panels-proposed-ab-extension)
+  - [Current compiled-density and building overlay diagnostics](#current-compiled-density-and-building-overlay-diagnostics)
+- [Future combat milestone: Time to Fight!](#future-combat-milestone-time-to-fight)
+  - [Deferred: minimal NPC state outside loaded cells](#deferred-minimal-npc-state-outside-loaded-cells)
+- [Main-quest milestone: Just an Old Man with a Skooma Problem](#main-quest-milestone-just-an-old-man-with-a-skooma-problem)
+  - [Conditional v0.0.29 release checkpoint -- More Mushrooms](#conditional-v0029-release-checkpoint----more-mushrooms)
+- [Mandatory roadmap and bug tracking](#mandatory-roadmap-and-bug-tracking)
+
+<!-- contents end -->
+
+## v0.0.33 - Towards CHIM: Replacing the Engine Block (released)
+
+v0.0.33 is out: the first release on the CHIM engine, the world streamer, with
+Balmora and Seyda Neen on CHIM and the CHIM builder as the default
+([release notes](RELEASE-v0.0.33.md); plan below and [world streamer](WORLD_STREAMER.md)).
+The release before it, v0.0.32, was the last on the legacy engine
+([release notes](RELEASE-v0.0.32.md)).
+What CHIM is, its versions and milestones: [CHIM](chim/README.md); every
+idea that is designed, measured or held back, with its status:
+[CHIM ideas](chim/IDEAS.md).
+
+Next: the animation kit for all character types, Vivec on CHIM and the CHIM open
+world (milestones M3 and M4), with no dates promised.
+
+Planned for a later release, "CHIMporting It All": the open world on CHIM, with live cell status in
+[docs/chim/CELL_TRACKER.md](chim/CELL_TRACKER.md) (generated from the conversion tracker).
 
 ## v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec (released)
 
@@ -126,12 +269,14 @@ written last and whole in map order. The builder will check this layout.
    one); a map loader without temporary copies; one shared face builder with a
    validator; builder types: today's region pipeline kept as the "legacy"
    builder, CHIM as the new one (named, not numbered; CHIM has its own version).
-2. **v0.0.33 - Towards CHIM: Replacing the Engine Block** (next, the first CHIM engine release): the streamer (CHIM builder and engine 0.1.0) on Balmora, Seyda Neen and the cells
+2. **v0.0.33 - Towards CHIM: Replacing the Engine Block** (released, the first CHIM engine release): the streamer (CHIM builder and engine 0.1.0) on Balmora, Seyda Neen and the cells
    between them, measured against v0.0.31 on the same routes: worst frame time,
    bytes per crossing, memory peak, saves mid-stream.
 3. **Next:** the south-west corridor (Seyda Neen, Pelagiad, Balmora, Vivec,
    Ebonheart exteriors), then the rest of the island release by release. CHIM 1.0
-   is the release in which the whole island runs; expect months, not weeks.
+   is the release in which the whole island runs; expect months, not weeks. We
+   are aiming for the whole island by Morrowind's 25th anniversary, 1 May 2027:
+   an aim, not a promise.
 
 Repository layout from v0.0.33 (decided 8 October 2026). CHIM is the same AmiQuake
 engine growing a streamer, not a second engine, so the engine stays one tree:
@@ -1393,6 +1538,9 @@ actors are an initial subset, not a complete Seyda Neen population.
 2. Read original pathgrids and choose collision-checked routes inside each
    authored wander radius. Respect stationary/zero-range packages, return after
    interruptions, and handle blocked steps without pushing the player.
+   Investigation, measurements and the staged plan (Quake chase, stuck probe,
+   graph routing): [NPC pathfinding](NPC_PATHFINDING.md); CHIM data and
+   budgets: [CHIM NPC pathfinding](chim/CHIM_NPC_PATHFINDING.md).
 3. Suspend locomotion while greeting/activating, turn smoothly, then resume.
    Nearby actors get bounded updates; distant actors should sleep or tick slowly.
 4. Add separately filtered Idle speech with a time-based chance. Do not recycle
@@ -2528,7 +2676,8 @@ and scheduling algorithm remain undecided; no implementation is claimed.
 - [ ] Measure record size, aggregate memory, update cost and re-entry peaks with
   several pursuers/companions and long outdoor travel before choosing limits.
 
-Behavior constraints: [NPC cell traversal](NPC_CELL_TRAVERSAL.md). The exact
+Behavior constraints: [NPC cell traversal](NPC_CELL_TRAVERSAL.md); movement and
+routing: [NPC pathfinding](NPC_PATHFINDING.md). The exact
 simulation detail for unloaded terrain remains a design and profiling question.
 
 ## Main-quest milestone: Just an Old Man with a Skooma Problem

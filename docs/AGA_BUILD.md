@@ -6,6 +6,19 @@ settlements and wider gameplay remain incomplete. See [current scope and
 validation limits](RELEASE-v0.0.27.md). The A500 runtime remains a separate
 experiment; this accelerated AGA profile is not stock-A1200 performance proof.
 
+<!-- contents start -->
+## Contents
+
+- [Reference configuration](#reference-configuration)
+- [Controls](#controls)
+- [Console and getting unstuck](#console-and-getting-unstuck)
+- [Host conversion](#host-conversion)
+- [Runtime build](#runtime-build)
+- [Correctness regression checks](#correctness-regression-checks)
+- [Checkpoint-016 interior and hand variants](#checkpoint-016-interior-and-hand-variants)
+
+<!-- contents end -->
+
 ## Reference configuration
 
 Tested with FS-UAE 3.1.66, A1200 model, 68040/FPU, 2 MiB Chip, 16 MiB 32-bit
@@ -125,7 +138,7 @@ roll; placements carried position and yaw. That experiment used foliage
 sprites and reported 155 placements / 55 model variants, three NPCs and Nord
 hands. These are historical example counts, not current world/gallery coverage.
 The current planned foliage policy retains mesh foliage in detailed Balmora;
-see the [roadmap](ROADMAP.md#todo-soon-static-asset-gallery-and-cell-by-cell-scenery).
+see the [roadmap](ROADMAP.md#follow-up-static-asset-gallery-and-remaining-scenery).
 An OpenMW-based backend remains future work. The guided build also exports a
 private ordered [voice lookup](DIALOGUE_LOOKUPS.md); it is not loaded by the runtime yet.
 

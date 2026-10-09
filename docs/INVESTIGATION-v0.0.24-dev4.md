@@ -3,6 +3,22 @@
 30 September 2026. Delivered dev3 artifacts remain unchanged. This record
 separates reported symptoms, inspected causes, corrections and remaining limits.
 
+<!-- contents start -->
+## Contents
+
+- [Accepted dev3 behavior](#accepted-dev3-behavior)
+- [Seyda Neen residency](#seyda-neen-residency)
+- [Distance-1000 observation](#distance-1000-observation)
+- [Teleport arrival correction](#teleport-arrival-correction)
+- [Opening restrictions and character UI](#opening-restrictions-and-character-ui)
+- [Balmora stairs: one corrected opening, wider defects still open](#balmora-stairs-one-corrected-opening-wider-defects-still-open)
+- [Jagged door arches](#jagged-door-arches)
+- [Missing street texture](#missing-street-texture)
+- [Hlaalu guard chest armor](#hlaalu-guard-chest-armor)
+- [Validation and limits](#validation-and-limits)
+
+<!-- contents end -->
+
 ## Accepted dev3 behavior
 
 The owner reports that Balmora regions/sub-cells work surprisingly well and are

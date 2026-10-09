@@ -1,5 +1,8 @@
 # Recurring stair failure: authored ramps below the walkable-floor cutoff
 
+Since 8 October 2026 every converted map is checked by the stair walkability gate and stairs
+follow Morrowind's own rules: [STAIR_RULES.md](STAIR_RULES.md).
+
 Found during v0.0.24-rc1 Balmora validation, 30 September 2026.
 
 ## What failed

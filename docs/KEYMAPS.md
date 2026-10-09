@@ -1,5 +1,18 @@
 # Keyboard and command reference — v0.0.25-rc7
 
+<!-- contents start -->
+## Contents
+
+- [v0.0.29 F/V regression gate](#v0029-fv-regression-gate)
+- [Options > Controls](#options--controls)
+- [Configurable gameplay bindings](#configurable-gameplay-bindings)
+- [Reserved and contextual controls](#reserved-and-contextual-controls)
+- [Photo mode and crosshair](#photo-mode-and-crosshair)
+- [Console line editing](#console-line-editing)
+- [Reconciled input and defaults](#reconciled-input-and-defaults)
+
+<!-- contents end -->
+
 ## v0.0.29 F/V regression gate
 
 The 4 October owner playtest reports F no longer raising hands and V printing
@@ -91,6 +104,8 @@ all remappable through gameplay bindings.
 | Console | Up / Down | Previous / next command; Down past the newest returns the typed line |
 | Console | Tab | Complete a command or variable name |
 | Gameplay | Shift+V | Cycle requested draw distance |
+| Photo mode | Ctrl+F | Fog on/off (the fog setting from before photo mode returns when it ends) |
+| Photo mode | Ctrl+H | Debug HUD on/off, the same as `dbg hud on/off` |
 | Gameplay | Shift+F5 / Shift+F6 | Previous / next music track |
 | World map | M, Escape | Close map |
 | World map | Wheel, +/- | Zoom |
@@ -116,6 +131,39 @@ For diagnostics, use `debug all on`, `debug noclip`, `debug pos`, and
 `aw_desktop` also works as an explicit console command when debug is enabled.
 The compass is normal gameplay UI and does not require debug mode.
 
+## Photo mode and crosshair
+
+`dbg photomode` (also `dbg killhud`) toggles photo mode for clean screenshots;
+`dbg photomode on` / `off` set it. Options > Photo mode does the same from the
+pause menu (Leave photo mode while it is on). Photo mode hides everything drawn
+over the view: the health/magicka/fatigue bars, the crosshair, the first-person
+hands, weapon and torch (Quake's `r_drawviewmodel`; the torch light stays, so
+the lighting does not change), door and pickup prompts, names, subtitles, the
+compass, the gold frame, the `dbg hud` overlays (title, coordinates, FPS,
+console notify lines), test-room and gallery text and the `dbg lightgallery`
+strip (its keys keep working), and the 3D view uses the whole screen. By default it
+also switches the fog off (`aw_photomode_nofog 1`) and gives a free noclip
+camera (`aw_photomode_noclip 1`); set either to 0 to keep the fog or to stay on
+foot. `aw_photomode_hands 1` keeps the hands in view (default 0: hidden).
+A short notice in the game's message box says how to leave; it disappears
+after a few seconds, so the following frames are clean.
+
+While photo mode is on, Ctrl+F switches the fog and Ctrl+H the debug HUD
+(`dbg hud`; its coordinate strip then spans the whole bottom edge, and an open
+light gallery strip comes back with it), each with a
+brief notice in the same box. Outside photo mode these keys keep their bindings (F raises the
+hands, Ctrl is the noclip fast-flight key). F10 still opens the console, which
+reminds you how to leave. Leaving photo mode restores every setting it changed
+exactly as before (fog, debug HUD and the rest, whatever Ctrl+F/Ctrl+H did) and
+puts the player back where photo mode started, standing, with no momentum.
+Photo mode is not saved: game saves need the player on foot, and `config.cfg`
+is written with the settings from before photo mode.
+
+`dbg crosshair` (also `dbg crosshairs`) toggles the crosshair; `on` / `off` set
+it. Options > Show crosshairs does the same. It is the player's preference,
+saved in `config.cfg` (Quake's `crosshair` setting, default on). A change made
+during photo mode applies when photo mode ends.
+
 ## Console line editing
 
 The console edits its line like a terminal prompt (`aw_console_mode 1`, the
@@ -124,8 +172,9 @@ the keys are in the table above. Up and Down walk the last 31 commands; Up stops
 at the oldest, each opening of the console starts from the newest, and Down past
 the newest brings back the line you were typing. Empty lines and a command equal
 to the previous one are not stored. The history is kept between sessions in
-`console-history.txt` in the game folder, rewritten only when Enter stores a new
-command. Held Left, Right, Del and Backspace repeat.
+`console-history.txt` in the game folder, written at Exit game or with
+`dbg savelogs` (with `dbg logs live on` it is rewritten whenever Enter stores a new
+command, as before; BOOT-VOLUME-NOT-VALIDATED-33). Held Left, Right, Del and Backspace repeat.
 
 `aw_console_mode 0` (or `false`) restores id's Quake line editor: Left deletes like
 Backspace, Right does nothing, Home/End scroll the text, and nothing is saved.

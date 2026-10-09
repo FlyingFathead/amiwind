@@ -111,6 +111,7 @@ void Hunk_FreeToHighMark (int mark);
 void *Hunk_TempAlloc (int size);
 
 void Hunk_Check (void);
+void Hunk_Print (qboolean all);
 
 typedef struct cache_user_s
 {
