@@ -231,7 +231,8 @@ class BuildSummaryTests(unittest.TestCase):
         return captured.getvalue(), json.loads((root/'build/fixture/build-summary.json').read_text())
 
     def test_default_run_name_carries_date_version_purpose_and_commit(self):
-        """Run names (tools/run_name.py): the default name; an explicit name without the version is refused."""
+        """Run names (tools/run_name.py): the default name; an explicit name without the version only warns outside
+        developer mode (a dry run, CI, public users) and is refused for developer-mode image builds."""
         def commands(options, run):
             output = run/'image'/f'AmiWind-v{build.VERSION}-dry-run.hdf'
             return [('engine', [sys.executable, '-c', f'from pathlib import Path; p=Path({str(output)!r}); '
@@ -240,13 +241,16 @@ class BuildSummaryTests(unittest.TestCase):
             root = Path(temp)
             with patch('setup_build.use_environment'),                  patch.object(build, 'dry_run_prerequisites', return_value={}),                  patch.object(build, 'provenance', return_value={'compiler_jobs': 1, 'tools': {}, 'version_comparison': []}),                  patch.object(build, 'dry_run_commands', side_effect=commands),                  patch.dict('os.environ', {'AMIWIND_SOURCE_COMMIT': '901f8e9'}),                  contextlib.redirect_stdout(io.StringIO()) as captured, contextlib.redirect_stderr(captured):
                 self.assertEqual(build.main(['--dry-run', '--workspace', str(root), '--jobs', '1']), 0)
-                try:
-                    refused = build.main(['--dry-run', '--workspace', str(root), '--name', 'fixture', '--jobs', '1'])
-                except SystemExit as stop:
-                    refused = stop.code
-                self.assertEqual(refused, 1, captured.getvalue()[-2000:])
-            self.assertIn('does not contain the source version', captured.getvalue())
-            runs = sorted(path.name for path in (root/'build').iterdir())
+                self.assertEqual(build.main(['--dry-run', '--workspace', str(root), '--name', 'fixture', '--jobs', '1']),
+                                 0, captured.getvalue()[-2000:])
+            self.assertIn('WARNING: run name', captured.getvalue())
+            ns = lambda **kw: type('A', (), kw)()
+            self.assertFalse(build.run_name_lenient(ns(developer_mode=True, dry_run=False, any_run_name=False)))
+            self.assertTrue(build.run_name_lenient(ns(developer_mode=True, dry_run=True, any_run_name=False)))
+            self.assertTrue(build.run_name_lenient(ns(developer_mode=False, dry_run=False, any_run_name=False)))
+            with self.assertRaisesRegex(ValueError, 'does not contain the source version'):
+                __import__('run_name').check_explicit('ci', build.VERSION, False)
+            runs = sorted(path.name for path in (root/'build').iterdir() if path.name != 'fixture')
             self.assertEqual(len(runs), 1)
             self.assertRegex(runs[0], r'^[0-9]{4}_[0-9]{2}_[0-9]{2}_v' + re.escape(build.VERSION) + r'_dry-run_[0-9a-f]{7}$')
             state = json.loads((root/'build'/runs[0]/'build-state.json').read_text())

@@ -59,6 +59,8 @@ camera), [DEBUG-TP-CHIMTOWNS-33](bugs/DEBUG-TP-CHIMTOWNS-33.md) (dbg tp after ch
 builder rules: the previous-release check refused the one-commit checkout, and the run-name rule refused the
 Docker check's run name. Fixed: a checkout without history leaves the check to the release gate; the Docker check
 passes `--any-run-name`. Regression tests for both.
+Second repair: CI's own engine step (`--dry-run --name ci`) hit the same naming rule; the rule now refuses only
+developer-mode image builds and warns everywhere else (also public users following the docs).
 
 ## ANIMKIT-TORCH-STANDING-35, 10 October 2026
 

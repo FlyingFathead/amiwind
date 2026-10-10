@@ -137,7 +137,7 @@ def parser():
                         "full (every input; use for releases), auto (every input only when changed), off (no checks; loud warning)")
     p.add_argument("--allow-data-differences", action="store_true", help="Explicitly allow unverified edition/file checksum differences; container and required-group errors still block")
     p.add_argument("--name", help="New immutable run name; default YYYY_MM_DD_vX.Y.Z[-suffix]_<purpose>[-tryN]_<gitshort> "
-                                  "(tools/run_name.py); an explicit name must contain the source version")
+                                  "(tools/run_name.py); an explicit name must contain the source version in developer mode; elsewhere a loud warning")
     p.add_argument("--any-run-name", action="store_true",
                    help="Allow a --name without the source version (loud warning)")
     p.add_argument("--developer-mode", "--devmode", dest="developer_mode", action="store_true",
@@ -1770,6 +1770,13 @@ def check_payload(argv):
                             *command[script + 1:], '--payload-preflight-only'])
 
 
+def run_name_lenient(args):
+    """The naming rule refuses only our own image builds (--developer-mode); a dry run, CI and public users
+    following the docs get the loud warning instead (CI-NEW-BUILDER-RULES-35: CI's --dry-run --name ci)."""
+    return bool(getattr(args, "any_run_name", False) or getattr(args, "dry_run", False)
+                or not getattr(args, "developer_mode", False))
+
+
 def main(argv=None):
     # Also cover direct Python invocations and subsequent environment re-exec.
     os.environ['PYTHONUNBUFFERED'] = '1'
@@ -2115,7 +2122,7 @@ def main(argv=None):
             what = (what + '-' + direct_start.area_label(args.direct_start))[:48].rstrip('-.')
         explicit = bool(args.name)
         if explicit:
-            warning = run_name.check_explicit(args.name, VERSION, getattr(args, "any_run_name", False))
+            warning = run_name.check_explicit(args.name, VERSION, run_name_lenient(args))
             if warning:
                 print(warning, flush=True)
         else:

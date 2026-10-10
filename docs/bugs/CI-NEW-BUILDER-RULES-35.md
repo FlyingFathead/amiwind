@@ -20,7 +20,10 @@
 
 ## Status: 10 October 2026
 
-Fixed in v0.0.35 (repair commit on top of the pushed release commit).
+Fixed in v0.0.35 in two repair commits. The first repair (e0d5984) fixed the two failures below; its CI run then
+failed a third time on the same naming rule: the engine step runs `build.py --dry-run --name ci`. The second repair
+makes the naming rule strict only for developer-mode builds; a dry run, CI and public users following the docs
+(`--name first-town`) get the loud warning instead.
 
 ## Symptom
 
@@ -39,6 +42,9 @@ treated that as a missing release. The new run-name rule refused the Docker chec
 
 ## Why it was not caught
 
+The first repair fixed the one caller the CI log showed instead of sweeping every caller of the rule;
+the sweep afterwards found CI's dry run and the public docs' examples.
+
 The local gate and the release suite run on full clones and never on a one-commit checkout, and the
 Docker check's name is only built inside the hosted job.
 
@@ -49,7 +55,8 @@ Docker check's name is only built inside the hosted job.
 ## Repair
 
 A one-commit checkout (no `HEAD^`) leaves the ancestry check to the release gate with a note, as a tree
-without git does. The Docker check passes `--any-run-name`.
+without git does. The Docker check passes `--any-run-name`. The naming rule refuses only developer-mode image builds
+(`build.run_name_lenient`); everyone else gets a warning.
 
 ## Verification
 

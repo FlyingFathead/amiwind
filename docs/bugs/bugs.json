@@ -16168,7 +16168,7 @@
     "state": "fixed",
     "fixed_in": "v0.0.35",
     "owner_accepted": null,
-    "status": "Fixed in v0.0.35 (repair commit)",
+    "status": "Fixed in v0.0.35 (two repair commits)",
     "report": "bugs/CI-NEW-BUILDER-RULES-35.md",
     "reported_by": "ci",
     "found_date": "2026-10-10",
