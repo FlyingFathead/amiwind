@@ -13,9 +13,11 @@ PINNED = 'a' * 40
 OTHER = 'b' * 40
 
 
-def fake_git(present=(PINNED,), ancestors=(PINNED,), repo=True):
+def fake_git(present=(PINNED,), ancestors=(PINNED,), repo=True, shallow=False):
     def git(*args):
         if args[0] == 'rev-parse':
+            if args[-1] == 'HEAD^':
+                return 1 if shallow else 0
             return 0 if repo else 128
         if args[0] == 'cat-file':
             return 0 if args[2].split('^')[0] in present else 1
@@ -101,6 +103,14 @@ class PublishedCommitTests(unittest.TestCase):
     def test_published_commit_passes(self):
         git = fake_git(present=(OTHER, PINNED), ancestors=(OTHER, PINNED))
         self.assertIsNone(pr.require_previous_release(self.root, '0.0.35', git))
+
+    def test_shallow_checkout_leaves_the_check_to_the_release_gate(self):
+        # Hosted CI checks out one commit: the published parent is not there, which is not a refusal.
+        git = fake_git(present=(), ancestors=(), shallow=True)
+        note = pr.require_previous_release(self.root, '0.0.35', git)
+        self.assertIn('shallow checkout', note)
+        with self.assertRaisesRegex(ValueError, 'is not in this repository'):
+            pr.require_previous_release(self.root, '0.0.35', fake_git(present=(), ancestors=()))
 
     def test_private_commit_alone_is_refused_with_the_ours_merge(self):
         git = fake_git(present=(OTHER, PINNED), ancestors=(PINNED,))

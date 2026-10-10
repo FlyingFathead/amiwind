@@ -2280,6 +2280,7 @@
   "docs/bugs/BUILD-FLORA-FALLBACK-RETRY-35.md",
   "docs/PATCH-v0.0.35.json",
   "docs/bugs/ANIMKIT-TORCH-STANDING-35.md",
+  "docs/bugs/CI-NEW-BUILDER-RULES-35.md",
   "docs/RELEASE-v0.0.35.md",
   "docs/bugs/HUD-GLOBAL-NO-REGIONS-33.md",
   "tests/test_cell_numbers.py",

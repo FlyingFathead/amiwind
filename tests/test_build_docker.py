@@ -71,6 +71,8 @@ class DockerBuilderTests(unittest.TestCase):
         self.assertEqual(lines[1], 'python tools/release.py --check')
         self.assertIn('check_nif_reader()', lines[2])
         self.assertTrue(lines[-1].startswith('python tools/build.py --dry-run '))
+        # The CI run name carries no version: the naming rule must not refuse it (CI-NEW-BUILDER-RULES-35).
+        self.assertIn('--name run-1 --any-run-name ', lines[-1])
 
     def test_full_suite_option_keeps_the_previous_method(self):
         script = build_docker.check_script('run-1', 4, full_suite=True)

@@ -6,6 +6,7 @@ Entries for v0.0.35 (from 10 October 2026). Older entries are frozen: [8 October
 ## Contents
 
 - [CHIM-SLOWCPU-FRAMETIME-33: Balmora on CHIM at about 1 frame per second on a slow 68040, 9 October 2026](#chim-slowcpu-frametime-33-balmora-on-chim-at-about-1-frame-per-second-on-a-slow-68040-9-october-2026)
+- [CI-NEW-BUILDER-RULES-35, 10 October 2026](#ci-new-builder-rules-35-10-october-2026)
 - [ANIMKIT-TORCH-STANDING-35, 10 October 2026](#animkit-torch-standing-35-10-october-2026)
 - [TEST-WORKER-SYSPATH-32, 10 October 2026](#test-worker-syspath-32-10-october-2026)
 - [ANIMKIT-ACTOR-ABI-SITES-35, 10 October 2026](#animkit-actor-abi-sites-35-10-october-2026)
@@ -51,6 +52,13 @@ deferred to after v0.0.33. The brush-model clip walk is 65-72 percent of the CHI
 [RENDER-FOG-PASS-COST-33](bugs/RENDER-FOG-PASS-COST-33.md) (fog and day-night sky pass 150-210 ms),
 [SERVER-FRAME-ARRIVAL-33](bugs/SERVER-FRAME-ARRIVAL-33.md) (226 ms server frame at the arrival
 camera), [DEBUG-TP-CHIMTOWNS-33](bugs/DEBUG-TP-CHIMTOWNS-33.md) (dbg tp after chim_towns 0).
+
+## CI-NEW-BUILDER-RULES-35, 10 October 2026
+
+[CI-NEW-BUILDER-RULES-35](bugs/CI-NEW-BUILDER-RULES-35.md): the pushed v0.0.35 commit failed hosted CI on two new
+builder rules: the previous-release check refused the one-commit checkout, and the run-name rule refused the
+Docker check's run name. Fixed: a checkout without history leaves the check to the release gate; the Docker check
+passes `--any-run-name`. Regression tests for both.
 
 ## ANIMKIT-TORCH-STANDING-35, 10 October 2026
 

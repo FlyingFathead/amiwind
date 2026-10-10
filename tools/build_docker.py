@@ -101,7 +101,7 @@ def check_script(run, jobs, full_suite=False):
             "python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'\n"
             + tests +
             'python tools/build.py --dry-run --tools-dir /opt/amiwind-tools '
-            f'--workspace /work --name {run} --jobs {jobs}\n')
+            f'--workspace /work --name {run} --any-run-name --jobs {jobs}\n')
 
 
 def main(argv=None):

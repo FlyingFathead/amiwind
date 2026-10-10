@@ -1,58 +1,63 @@
-# TOOLKIT-TEST-POINTERLOCK-31: inspector test left pointer lock set
+# CI-NEW-BUILDER-RULES-35: Hosted CI failed on v0.0.35 under two new builder rules
 
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
 | --- | --- |
-| Reported by | developer |
-| First noticed | 8 October 2026, in v0.0.32-dev |
-| Where | Inspector JavaScript test (markup tests) |
+| Reported by | ci |
+| First noticed | 10 October 2026, in v0.0.35 |
+| Where | tools/previous_release.py; tools/build_docker.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
-| Severity | low: An earlier test left pointer lock set, so a later drag check misbehaved. |
+| Persists in | fixed in v0.0.35 |
+| Severity | high: blocks the release (no tag or release while CI is red) |
 | Family | Gates, CI and tests (`tests-ci`) |
+| Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
+| From commit | source and engine aefcdb5 |
+| CHIM engine version | none: legacy engine |
 
 <!-- END GENERATED FACTS -->
 
-## Status: 8 October 2026
+## Status: 10 October 2026
 
-Fixed in source on v0.0.32-dev, with the sub-cell cuts work.
+Fixed in v0.0.35 (repair commit on top of the pushed release commit).
 
 ## Symptom
 
-Earlier checks in `tests/test_polycount_markup.js` leave
-`document.pointerLockElement` set, so a later drag check behaves as if the mouse
-were captured.
+The pushed v0.0.35 commit failed hosted CI in two jobs. `source-and-dry-run` stopped after 7 seconds:
+"the published v0.0.34 commit b336341 is not in this repository". `docker-builder` stopped on
+"--name 'docker-ci-...' does not contain the source version 0.0.35".
 
 ## Where
 
-`tests/test_polycount_markup.js`.
+`tools/previous_release.py` (ancestry check) and `tools/build_docker.py` (the Docker check's run name).
 
 ## How it happened
 
-The tests share one page state and the pointer-lock state was never reset.
+Hosted CI checks out one commit without history, so the published parent cannot be found; the check
+treated that as a missing release. The new run-name rule refused the Docker check's own generated name.
 
 ## Why it was not caught
 
-The JavaScript tests do not run in the local gate
-([GATE-NODE-MISSING-31](GATE-NODE-MISSING-31.md)).
+The local gate and the release suite run on full clones and never on a one-commit checkout, and the
+Docker check's name is only built inside the hosted job.
 
 ## Reproduction
 
-Run the markup tests with a drag check after a pointer-lock check.
+`git clone --depth 1` of a release commit, then `python tools/build.py --autoinstall --yes`.
 
 ## Repair
 
-The drag check clears the pointer-lock state first.
+A one-commit checkout (no `HEAD^`) leaves the ancestry check to the release gate with a note, as a tree
+without git does. The Docker check passes `--any-run-name`.
 
 ## Verification
 
-All 16 milestones pass in a browser run.
+`tests/test_previous_release.py` (shallow checkout) and `tests/test_build_docker.py` (run name); hosted CI.
 
 ## Prevention
 
-Run the JavaScript tests in the gate (GATE-NODE-MISSING-31).
+Both regression tests; the release flow's CI run stays the final check before any tag.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -64,7 +69,6 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
 - [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
 - [CI-HOSTDEPS-30](CI-HOSTDEPS-30.md): Host CI job fails: scenery export needs the NIF reader for non-NIF test data
-- [CI-NEW-BUILDER-RULES-35](CI-NEW-BUILDER-RULES-35.md): Hosted CI failed on v0.0.35: the previous-release check refused the one-commit checkout and the run-name rule refused the Docker check's run name
 - [CI-SKIPS-UNGUARDED-31](CI-SKIPS-UNGUARDED-31.md): Hosted CI does not fail on skipped tests; JavaScript test coverage unpinned
 - [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
 - [GATE-EMBERS-31](GATE-EMBERS-31.md): Ember commit broke native torch tests and a header format check
@@ -91,5 +95,6 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a busy host
 - [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded host (timeline CPU above the stage's own CPU)
 - [TEST-WORKER-SYSPATH-32](TEST-WORKER-SYSPATH-32.md): Pool workers started from tests import tools/mwad.py instead of the mwad package
+- [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
 
 <!-- END GENERATED CATEGORY -->

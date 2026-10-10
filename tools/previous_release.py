@@ -67,6 +67,9 @@ def ancestry(root, git=None):
         fix = (f'git merge -s ours --no-edit {published[:7]}' if contained
                else f'git merge {published[:7]}')
         if git('cat-file', '-e', f'{published}^{{commit}}') != 0:
+            if git('rev-parse', '-q', '--verify', 'HEAD^') != 0:
+                # A one-commit (shallow) checkout, as in hosted CI, cannot show its own history.
+                return 'shallow', None
             return 'missing', (f'the published v{pin["version"]} commit {published[:7]} is not in this repository; '
                                f'fix: git fetch origin tag v{pin["version"]}, then {fix}')
         if git('merge-base', '--is-ancestor', published, 'HEAD') == 0:
@@ -92,6 +95,8 @@ def require_previous_release(root, version, git=None):
         return None
     if state == 'no-git':
         return 'Note: no git history in this source tree; the previous-release ancestry check is left to the release gate.'
+    if state == 'shallow':
+        return 'Note: shallow checkout without history; the previous-release ancestry check is left to the release gate.'
     if is_release_version(version):
         raise ValueError(f'Version {version} is a release candidate or final, and {detail}')
     return f'Note: {detail} (development version {version}: not refused)'

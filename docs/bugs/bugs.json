@@ -16161,5 +16161,33 @@
       "chim_version": null,
       "chim_format": null
     }
+  },
+  {
+    "id": "CI-NEW-BUILDER-RULES-35",
+    "title": "Hosted CI failed on v0.0.35: the previous-release check refused the one-commit checkout and the run-name rule refused the Docker check's run name",
+    "state": "fixed",
+    "fixed_in": "v0.0.35",
+    "owner_accepted": null,
+    "status": "Fixed in v0.0.35 (repair commit)",
+    "report": "bugs/CI-NEW-BUILDER-RULES-35.md",
+    "reported_by": "ci",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "tools/previous_release.py; tools/build_docker.py",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": "fixed in v0.0.35",
+    "severity": "high",
+    "severity_reason": "blocks the release (no tag or release while CI is red)",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "aefcdb5",
+      "engine_commit": "aefcdb5",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
   }
 ]
