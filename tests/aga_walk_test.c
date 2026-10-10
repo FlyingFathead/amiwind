@@ -21,6 +21,7 @@ static char console[2048];static int lines;
 void Con_Printf(char *fmt,...){va_list ap;size_t n=strlen(console);va_start(ap,fmt);vsnprintf(console+n,sizeof console-n,fmt,ap);va_end(ap);lines++;}
 qboolean SV_CheckWater(edict_t *p) {return water;}
 void SV_CheckStuck(edict_t *p) {}
+int SV_PointContents(vec3_t p) {return CONTENTS_EMPTY;}   /* no lava here (aw_walk.c feet_in_lava) */
 void SV_LinkEdict(edict_t *p,qboolean touch){}
 void SV_AddGravity(edict_t *p) {p->v.velocity[2]-=800*frame_time;gravity_calls++;}
 void SV_WalkMove(edict_t *p) {

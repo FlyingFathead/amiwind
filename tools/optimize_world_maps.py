@@ -153,12 +153,19 @@ def optimize_maps(maps, report_path, jobs=1):
         cache = PassCache.open('optimize-world-maps', {}, __file__)
         if cache is not None:
             report['pass_cache'] = {'sources_sha256': cache.sources}
-        for index, row in prepare_candidates(candidates, transaction, jobs, report, cache):
-            ordered_rows[index] = row
-            completed += 1
-            report['maps'] = [item for item in ordered_rows if item is not None]
-            if completed == 1 or completed % 100 == 0 or completed == len(candidates):
-                print(f'BSP optimizer verified {completed}/{len(candidates)} maps', flush=True)
+        try:
+            for index, row in prepare_candidates(candidates, transaction, jobs, report, cache):
+                ordered_rows[index] = row
+                completed += 1
+                report['maps'] = [item for item in ordered_rows if item is not None]
+                if completed == 1 or completed % 100 == 0 or completed == len(candidates):
+                    print(f'BSP optimizer verified {completed}/{len(candidates)} maps', flush=True)
+        finally:
+            if cache is not None:
+                # Hits and misses of this run in the receipt (release builds with --allow-release-reuse).
+                report['pass_cache'] = cache.summary()
+                print('BSP optimizer pass cache: %d maps reused, %d prepared.'
+                      % (report['pass_cache']['hits'], report['pass_cache']['misses']), flush=True)
         # Refuse concurrent edits or new/deleted maps before the first replacement.
         if [p.name for p in sorted(maps.glob('*.bsp'))] != [r['map'] for r in report['maps']]:
             raise ValueError('Staged map set changed during optimization')

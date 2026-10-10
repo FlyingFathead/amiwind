@@ -22,7 +22,9 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
 
 TOOLS = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
 # The default is --builder chim (v0.0.33); the legacy plan and the withdrawn Vivec Arena stay covered.
-VARIANTS = ([], ['--extra-town', 'vivec_arena', '--extra-town', 'vivec_foreign', '--vis', 'full', '--tree-sprites'],
+# CHIM-LEGACY-CHAIN-33: a CHIM plan does not import extra towns not on CHIM, so the extra-town variant is legacy
+VARIANTS = ([], ['--builder', 'legacy', '--extra-town', 'vivec_arena', '--extra-town', 'vivec_foreign', '--vis', 'full',
+                 '--tree-sprites'],
             ['--no-npc-gallery', '--no-tree-sprites', '--only-core-towns'], ['--builder', 'legacy'])
 
 
@@ -149,7 +151,8 @@ class ActorContactStage(unittest.TestCase):
         convert.assert_called_once_with(Path('/m/seyda.bsp'), Path('/m'), source_map=Path('/s.map'),
                                         palette=Path('/p.lmp'), ericw_bin=Path('/e'),
                                         jobs=None, work_dir=Path('/w'),
-                                        vis_mode='full', canonical_land_source=Path('/t.npz'))
+                                        vis_mode='full', canonical_land_source=Path('/t.npz'),
+                                        terrain_visual_cull=None)   # the cull policy as configured (legacy)
 
 
 if __name__ == '__main__':

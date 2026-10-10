@@ -46,8 +46,29 @@ def c_list(name, values, per_line):
     return lines + ['}']
 
 
+# Handoff frames: the engine (aw_world.c valid_town and the arrival checks) accepts a core box only
+# within +/-FRAME_BOUND local units of the frame origin. The bound is Quake's coordinate range, not a
+# format limit: positions travel as shorts of eighths of a unit (MSG_WriteCoord), so they wrap past
+# COORD_RANGE (CHIM-FRAME-COORD-RANGE-33). A row outside it would be silently dropped at run time.
+FRAME_BOUND = 4000
+COORD_RANGE = 32767 / 8
+
+
+def check_core(row):
+    """Refuse a handoff row whose core box the engine would drop (outside +/-FRAME_BOUND)."""
+    if not row.get('handoff'):
+        return
+    (x0, y0), (x1, y1) = row['core']
+    if not (-FRAME_BOUND <= x0 < x1 <= FRAME_BOUND and -FRAME_BOUND <= y0 < y1 <= FRAME_BOUND):
+        raise ValueError(f"Town {row['name']}: core box {row['core']} is outside +/-{FRAME_BOUND} local units; "
+                         f"Quake positions wrap past {COORD_RANGE:.0f} (CHIM-FRAME-COORD-RANGE-33): "
+                         "split the frame or move its origin")
+
+
 def render_header(root=None):
     rows = runtime_towns(root)
+    for r in rows:
+        check_core(r)
     extra = rows[len(FIXED_TOWNS):]
     rooms = town_interiors(root)
     ids = [r['id'] for r in rows]

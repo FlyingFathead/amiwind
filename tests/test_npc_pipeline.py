@@ -92,3 +92,15 @@ class AliasFrames(unittest.TestCase):
             blend_keys([0,1],values,.5,interpolation=3)
         q=np.array([[1.,0,0,0],[-1.,0,0,0]])
         np.testing.assert_array_equal(blend_keys([0,1],q,.5,True,3),q[0])
+        # As the reference engine (OpenMW nifosg interpolate): TBC/quadratic quaternions slerp,
+        # quadratic vectors with tangents follow the cubic Hermite spline (Weapon Bone keys).
+        turn=np.array([[1.,0,0,0],[np.cos(np.pi/4),0,0,np.sin(np.pi/4)]])
+        np.testing.assert_allclose(blend_keys([0,1],turn,.5,True,3),blend_keys([0,1],turn,.5,True,1))
+        flat=[(np.zeros(3),np.zeros(3)),(np.zeros(3),np.zeros(3))]
+        np.testing.assert_allclose(blend_keys([0,1],values,.5,interpolation=2,tangents=flat),(values[0]+values[1])/2)
+        np.testing.assert_allclose(blend_keys([0,1],values,.25,interpolation=2,tangents=flat),
+                                   values[0]+(values[1]-values[0])*(3*.25**2-2*.25**3))
+        slope=[(np.zeros(3),values[1]-values[0]),(values[1]-values[0],np.zeros(3))]
+        np.testing.assert_allclose(blend_keys([0,1],values,.25,interpolation=2,tangents=slope),values[0]+(values[1]-values[0])*.25)
+        with self.assertRaisesRegex(ValueError,'authored interpolation'):
+            blend_keys([0,1],values,.5,interpolation=2)      # quadratic without tangents

@@ -418,10 +418,10 @@
   {
     "id": "BUILD-SEYDA-REGEN-30",
     "title": "Public build cannot regenerate the Seyda Neen sub-cells",
-    "state": "open",
-    "fixed_in": null,
+    "state": "fixed",
+    "fixed_in": "v0.0.35",
     "owner_accepted": null,
-    "status": "Recorded exception again for v0.0.32 (owner decision, 8 October 2026): shipped Seyda stages used as a recorded input, now the builder option --seyda-recorded, checked byte for byte after every image pass; one named difference: seyda.bsp ships as the sn029 fallback alias (owner option A; the complete town fails the release actor gate); Seyda Neen is rebuilt by the world streamer (v0.0.33), so the legacy builder is not fixed; sn019, sn026, sn035 pass the strict heap gate through a temporary pre-CHIM bypass (HEAP-SEYDA-OVERLAP-32, until CHIM M2)",
+    "status": "Fixed in source for v0.0.35 (first built on the v0.0.34-dev1 line): --seyda-recorded is optional; a CHIM build converts the Seyda Neen region maps from your data without the terrain visual cull (they are only the CHIM frame maps' check reference and leave the image) and checks the frame maps against them. Measured 9-10 October 2026: the actor-contact stage passes from data (65 Seyda maps, 759 s at 12 workers). The recorded input stays selectable and is checked byte for byte when given; the legacy builder still needs it (BUILD-SEYDA-CULL-STABLE-32). Pending: a full from-scratch image build without the recorded maps",
     "report": "bugs/BUILD-SEYDA-REGEN-30.md",
     "reported_by": "developer",
     "found_date": "2026-10-07",
@@ -429,10 +429,7 @@
     "where": "image step Seyda Neen region conversion (tools/build_aga.py)",
     "reproduction": "always",
     "duplicate_of": null,
-    "persists_in": [
-      "v0.0.29",
-      "v0.0.32"
-    ],
+    "persists_in": "fixed in v0.0.35",
     "severity": "high",
     "severity_reason": "Builder cannot regenerate shipped Seyda maps; recorded exception ships them instead.",
     "family": "seyda-recorded",
@@ -4157,6 +4154,7 @@
     "family": "render-performance",
     "related": [
       "CHIM-PVS-HOLLOW-33",
+      "INTERIOR-HULL-CHAIN-33",
       "VF-VIS-LUMP-32"
     ],
     "tags": [
@@ -4896,7 +4894,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Latent; found by the distant shell prototype. The builder's model budget prevents it today.",
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing: SV_SpawnServer refuses a map with more inline models than the precache holds (map unavailable); the builder's per-map gate (BUILD-BUDGET-ENGINE-LIMITS-35) keeps shipped maps below",
     "report": "bugs/ENGINE-SUBMODEL-LIMIT-32.md",
     "reported_by": "developer",
     "found_date": "2026-10-08",
@@ -5438,7 +5436,9 @@
     "severity": "medium",
     "severity_reason": "Interior collision is about 1.6 times the drawn bytes and the largest kind of world data.",
     "family": "world-storage",
-    "related": []
+    "related": [
+      "INTERIOR-HULL-CHAIN-33"
+    ]
   },
   {
     "id": "VF-VIS-LUMP-32",
@@ -5699,7 +5699,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found by the first from-scratch build with the repository builder (v0.0.32-dev1 attempt).",
+    "status": "Partly repaired in source on v0.0.33-arena-interiors, not shipped at the time of writing: the importer's interior step (added for the cantons) now converts the Arena Pit (vai000) from the Arena's room list; both exterior doors into the Pit and the Pit's two exits to the Arena are linked; the other 27 of 29 Arena door rows (Waistworks, Underworks) stay unavailable until those rooms are listed.",
     "report": "bugs/IMPORT-TOWN-NO-INTERIORS-32.md",
     "reported_by": "build",
     "found_date": "2026-10-08",
@@ -5708,7 +5708,8 @@
     "reproduction": "always",
     "duplicate_of": null,
     "persists_in": [
-      "v0.0.32-dev1"
+      "v0.0.32-dev1",
+      "v0.0.32"
     ],
     "severity": "high",
     "severity_reason": "All 26 Arena doors say Interior unavailable.",
@@ -5837,7 +5838,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found by the from-scratch build after the builder fixes. Part of the Seyda Neen regeneration gap (BUILD-SEYDA-REGEN-30); covered by the recorded exception for v0.0.32.",
+    "status": "Open (legacy builder only). Reproduced 9 October 2026 (sn000). Measured with an experimental keep-uncut fallback: 130 to 2,852 placed faces per region do not settle, water cuts fail the same way, the canonical cull always reports its result INCOMPLETE, which blocks region installation, and one region (sn005) culled for over 40 minutes. The canonical cull cannot complete from scratch. CHIM builds no longer need it (BUILD-SEYDA-REGEN-30: converted Seyda Neen reference maps skip the cull); a legacy build with Seyda Neen still needs --seyda-recorded",
     "report": "bugs/BUILD-SEYDA-CULL-STABLE-32.md",
     "reported_by": "build",
     "found_date": "2026-10-08",
@@ -5846,7 +5847,8 @@
     "reproduction": "always",
     "duplicate_of": null,
     "persists_in": [
-      "v0.0.32-dev"
+      "v0.0.32",
+      "v0.0.33"
     ],
     "severity": "critical",
     "severity_reason": "From-scratch builds stop in Seyda Neen terrain culling; covered only by the recorded exception.",
@@ -5928,7 +5930,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found by the Vivec cantons import.",
+    "status": "Open. Found by the Vivec cantons import. 9 October 2026: the NPC level-of-detail survey (tools/npc_lod.py survey, 149 of the 2,675 NPC records) hits it for one more record, Godros, so about 1 record in 150 cannot be baked by the resident ladder; the gallery has a 1024-face fallback, the resident path has none.",
     "report": "bugs/NPC-BAKE-VERTEX-32.md",
     "reported_by": "build",
     "found_date": "2026-10-08",
@@ -6252,7 +6254,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open: found by the renderer counters work",
+    "status": "Open: found by the renderer counters work; prison ship intro on the slow preset: 798 blocks (2.3 MB) a frame, 2.5 s per frame, d_mipcap 2 gives 1.6 s (CHIM-SLOWCPU-FRAMETIME-33)",
     "report": "bugs/RENDER-SURFCACHE-THRASH-32.md",
     "reported_by": "audit",
     "found_date": "2026-10-08",
@@ -6902,7 +6904,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Fixed in source on v0.0.33-chim-format (9 October 2026), not shipped: the --name message reads 1-64; tests/test_build_builder.py BuilderTextTests fails on double-encoded text in tools/*.py.",
+    "status": "Fixed in source on v0.0.33-chim-format (9 October 2026), not shipped: the --name message reads 1-64; tests/test_build_builder.py BuilderTextTests fails on double-encoded text in tools/*.py",
     "report": "bugs/BUILD-MOJIBAKE-32.md",
     "reported_by": "developer",
     "found_date": "2026-10-08",
@@ -7366,7 +7368,9 @@
     "severity": "medium",
     "severity_reason": "Each crossing rebuilds the whole frame world: 95-184 ms in a cycle-exact run, a visible hitch.",
     "family": "chim-streamer",
-    "related": [],
+    "related": [
+      "CHIM-SLOWCPU-FRAMETIME-33"
+    ],
     "chim": "streaming",
     "build": {
       "name": "source",
@@ -7835,10 +7839,10 @@
   {
     "id": "TEST-WORKER-SYSPATH-32",
     "title": "Pool workers started from tests import tools/mwad.py instead of the mwad package",
-    "state": "open",
-    "fixed_in": null,
+    "state": "fixed",
+    "fixed_in": "v0.0.35",
     "owner_accepted": null,
-    "status": "Open: spawned workers inherit sys.path with tools/ first; second case: test_build_defaults and test_builder_stage_entries put tools/ before src/ in the test process, so test_actor_ground fails to import after them (gate passes in its default order); builder unaffected; proposed: one shared test path helper (src/ first) and a mwad import test after every sys.path-changing module",
+    "status": "Fixed in v0.0.35: pool workers put src/ first",
     "report": "bugs/TEST-WORKER-SYSPATH-32.md",
     "reported_by": "test",
     "found_date": "2026-10-08",
@@ -7846,9 +7850,7 @@
     "where": "pool workers and test import path (tools/mwad.py vs src/mwad)",
     "reproduction": "always",
     "duplicate_of": null,
-    "persists_in": [
-      "v0.0.32-dev"
-    ],
+    "persists_in": "fixed in v0.0.35",
     "severity": "medium",
     "severity_reason": "A test worker can import different code from the parent, which could hide regressions.",
     "family": "tests-ci",
@@ -9752,7 +9754,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Fixed in source on v0.0.33-chim-format, not shipped at the time of writing: fixed block count (PVS_BLOCKS) and an 8-unit plane lookup for irregular ground; measuring.",
+    "status": "Fixed in source on v0.0.33-chim-format, not shipped at the time of writing: fixed block count (PVS_BLOCKS) and an 8-unit plane lookup for irregular ground; measuring",
     "report": "bugs/CHIM-PVS-SLOW-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-08",
@@ -10059,7 +10061,8 @@
     "family": "chim-streamer",
     "related": [
       "CHIM-STAIRGATE-SLOW-33",
-      "COLLISION-HULL-CHAINS-33"
+      "COLLISION-HULL-CHAINS-33",
+      "INTERIOR-HULL-CHAIN-33"
     ],
     "tags": [
       "performance"
@@ -10691,6 +10694,8 @@
     "family": "build-speed",
     "related": [
       "NPC-BAKE-VERTEX-32",
+      "NPC-GALLERY-SPIKE-33",
+      "NPC-JOINT-GAPS-33",
       "WORLD-REGION-DUPLICATION-31"
     ],
     "tags": [
@@ -11041,7 +11046,9 @@
     "severity": "low",
     "severity_reason": "A real change to an early scene stage (intro) reruns the scene chain after it even when that stage output is identical.",
     "family": "build-speed",
-    "related": [],
+    "related": [
+      "BUILD-OUTPUTS-NOT-REPRODUCIBLE-33"
+    ],
     "tags": [
       "performance"
     ],
@@ -11297,7 +11304,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open: measured with tools/hull_chain_audit.py on the v0.0.33-dev1 full build (2,673 maps): 183 models of 63 meshes at depth 512 or more, worst the prison ship 31,659 and the census office 23,127. Repair in source on v0.0.33-chim-format, not yet built: nested routed hulls route all 20 worst meshes and the Arena Pit standalone, 3 to 22 times fewer clipnode visits per test.",
+    "status": "Open: measured with tools/hull_chain_audit.py on the v0.0.33-dev1 full build (2,673 maps): 183 models of 63 meshes at depth 512 or more, worst the prison ship 31,659 and the census office 23,127. Repair in source on v0.0.33-chim-format, not yet built: nested routed hulls route all 20 worst meshes and the Arena Pit standalone, 3 to 22 times fewer clipnode visits per test. In v0.0.35 the routed/auto hull path is selectable, not the default (--model-hull chain stays the default)",
     "report": "bugs/COLLISION-HULL-CHAINS-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -11314,6 +11321,7 @@
     "related": [
       "BUILD-INTERIOR-INDEX-ROUTED-33",
       "CHIM-HULL-CHAIN-COST-33",
+      "INTERIOR-HULL-CHAIN-33",
       "ROUTED-HULL-NODE-ORDER-33"
     ],
     "tags": [
@@ -11361,7 +11369,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Cause established (umbrella cause of the related lighting symptoms); repair not started. Direction: wire light_sources.entity into the converters so the light compiler bakes coloured lights with the original attenuation; the own interior bake stays selectable.",
+    "status": "Open. Design and measurements done 9 October 2026 (docs/chim/LIGHTING.md: one shared light-entity path for CHIM and the legacy maps, sources in styles 32 and up); repair waits for the owner decision.",
     "report": "bugs/LIGHT-ENTITIES-UNWIRED-33.md",
     "reported_by": "owner",
     "found_date": "2026-10-09",
@@ -11376,6 +11384,7 @@
     "severity_reason": "Island-wide lighting quality: lamps, lanterns and fires give no coloured baked light in interiors, towns or terrain.",
     "family": "lighting-night",
     "related": [
+      "CHIM-BALMORA-LIGHT-ROOM-33",
       "SEYDA-LANTERNS-MISSING-31"
     ],
     "chim": "builder",
@@ -11509,36 +11518,6 @@
     }
   },
   {
-    "id": "MESH-LOD-TORN-MESHES-33",
-    "title": "Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)",
-    "state": "open",
-    "fixed_in": null,
-    "owner_accepted": null,
-    "status": "Open: found by the seam audit (tools/seam_audit.py) built for MESH-LOD-OPEN-SEAMS-33; recorded as known findings in config/seam-audit-known.json so the builder gate fails only on new or worse tears; repairs (boundary-locked or shape-preserving profiles) to be weighed against heap and face budgets",
-    "report": "bugs/MESH-LOD-TORN-MESHES-33.md",
-    "reported_by": "audit",
-    "found_date": "2026-10-09",
-    "found_in": "v0.0.32",
-    "where": "town flora/rock profiles, open-world rock scenery, arrival ship (static_lod reduction)",
-    "reproduction": "always",
-    "duplicate_of": null,
-    "persists_in": [
-      "v0.0.32"
-    ],
-    "severity": "medium",
-    "severity_reason": "Open seams on 49 reduced meshes (13,448 placements); visible where the reduced mesh is drawn",
-    "family": "converter-geometry",
-    "related": [],
-    "build": {
-      "name": "source",
-      "source_commit": "9582693",
-      "engine_commit": "9582693",
-      "world_commit": null,
-      "chim_version": null,
-      "chim_format": null
-    }
-  },
-  {
     "id": "CHIM-STRIDER-RING-33",
     "title": "The closed-hull strider (MESH-LOD-OPEN-SEAMS-33, variant E) puts CHIM Balmora's active ring over the heap budget",
     "state": "open",
@@ -11601,7 +11580,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found while building the Vivec Arena minigame. Weapon and shield meshes need attaching to the Weapon Bone and Shield Bone.",
+    "status": "Repaired in source on v0.0.33-arena-combat: Arena fighters hold the rules' weapon and shield in their model; town residents draw theirs while fighting as shared item models on per-frame hand-bone tags (tools/npc_items.py, aw_items.c). Not yet in a build.",
     "report": "bugs/NPC-WEAPON-MESH-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -11645,7 +11624,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found when the first fighter bake failed with 42 frames (Alias budget exceeded); fighters now bake 31 frames.",
+    "status": "Repaired in source: animated_mdl limits frames by bytes (v0.0.33-arena-combat); the animation kit fits each model into the 512 KiB alias staging buffer (npc_anim.fit). Not yet in a build.",
     "report": "bugs/TOOL-ALIAS-FRAMES-33.md",
     "reported_by": "build",
     "found_date": "2026-10-09",
@@ -11667,7 +11646,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Found while building the Vivec Arena minigame.",
+    "status": "Repaired in source on v0.0.33-arena-combat: the player's knockdown or knockout lowers the view to the floor and locks movement, attack and impulses (console stays); the view rises over the last 40 % of the knockdown clip, or 0.8 s after a knockout; not yet in a build.",
     "report": "bugs/COMBAT-PLAYER-KNOCKDOWN-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -11689,7 +11668,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open. Seen in the first Vivec Arena FS-UAE run: the tinted grey bar maps to the palette's nearest orange because the reserved UI bank has no yellow.",
+    "status": "Repaired in source on v0.0.33-arena-combat: yellow in the reserved UI palette bank (format 2, upgraded in place), sky approval independent of the bank; not in a build yet.",
     "report": "bugs/HUD-ENEMY-BAR-COLOUR-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -11809,7 +11788,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Fixed in source on v0.0.33-chim-format c04404f, not shipped: legacy maps route without copies (chain plus one clipnode per cut); measured Seyda Neen scene map 57,637 clipnodes, no chain fallbacks.",
+    "status": "Fixed in source on v0.0.33-chim-format c04404f, not shipped: legacy maps route without copies (chain plus one clipnode per cut); measured Seyda Neen scene map 57,637 clipnodes, no chain fallbacks. In v0.0.35 the routed/auto hull path is selectable, not the default (--model-hull chain stays the default)",
     "report": "bugs/BUILD-HULL-ROUTE-BUDGET-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -11836,7 +11815,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Fixed in source on v0.0.33-chim-format f85baa8 (gate 577), not shipped: CHIM routes only models over 256 pieces, without copies, and compiles no union for large models by default; Balmora ring measured 6,239,776 B (passes, 2,528 B headroom). CHIM-BALMORA-RING-OVER-33 is its duplicate.",
+    "status": "Fixed in source on v0.0.33-chim-format f85baa8 (gate 577), not shipped: CHIM routes only models over 256 pieces, without copies, and compiles no union for large models by default; Balmora ring measured 6,239,776 B (passes, 2,528 B headroom). CHIM-BALMORA-RING-OVER-33 is its duplicate. In v0.0.35 the routed/auto hull path is selectable, not the default (--model-hull chain stays the default)",
     "report": "bugs/BUILD-CHIM-HULL-RING-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -11942,6 +11921,7 @@
     "severity_reason": "The full build stops; one of 2,532 open-world regions",
     "family": "stairs-collision",
     "related": [
+      "BUILD-FLORA-FALLBACK-RETRY-35",
       "ROUTED-HULL-NODE-ORDER-33"
     ],
     "build": {
@@ -12005,6 +11985,8 @@
     "severity_reason": "17 harvestable plants on the intro docks are not pickable in v0.0.33; the rc1 image step stopped on it first",
     "family": "harvest",
     "related": [
+      "BUILD-IMAGE-NO-RESUME-33",
+      "BUILD-SEYDA-CONVERTED-NOT-STAGED-35",
       "CHIM-HARVEST-REMOVED-MAPS-33"
     ],
     "chim": "builder",
@@ -12023,7 +12005,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open: found by CHIMport (counted per cell as deferred lights, no longer as markers). The Quake mechanism is a light entity baked by the light compiler; CHIM terrain and models have no lightmaps yet, so it needs the CHIM light design first (see LIGHT-ENTITIES-UNWIRED-33).",
+    "status": "Open. The CHIM light tracker audits these lights per cell (tools/cell_lighting.py); design and measurements done 9 October 2026 (docs/chim/LIGHTING.md); repair waits for the owner decision.",
     "report": "bugs/CHIM-MESHLESS-LIGHTS-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -12175,7 +12157,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Repair in source on v0.0.33-chim-format, not shipped: with nothing running, the first ready stage starts; a test runs five ready pooled branches on a budget of 2.",
+    "status": "Repair in source on v0.0.33-chim-format, not shipped: ready branches get a reserved worker only while the budget has room, so stages start one per free worker; test (five ready branches on a budget of 2 overlap and pass)",
     "report": "bugs/BUILD-SCHEDULER-LOWBUDGET-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -12216,7 +12198,7 @@
     "persists_in": "fixed in v0.0.33",
     "severity": "high",
     "severity_reason": "Every reuse of a run made since the scratch folder: the first stages and every stage after them run again (about 1,427 s of conversion in the rc1c rerun).",
-    "family": "build-speed",
+    "family": "build-cache-reuse",
     "related": [],
     "tags": [
       "performance"
@@ -12236,7 +12218,7 @@
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Open: the fix (wall time to the log only) is held for the next release line: it changes the stage's fingerprint and would rebuild the survey's dependents in the v0.0.33 final",
+    "status": "Repaired in source on the v0.0.35 builder-performance line and v0.0.33-reuse-keys (wall time to the log only; tests/test_survey_reproducible.py, tests/test_stage_output_determinism.py); a second survey run on the same inputs, compared byte for byte, is pending",
     "report": "bugs/BUILD-SURVEY-NOT-REPRODUCIBLE-33.md",
     "reported_by": "developer",
     "found_date": "2026-10-09",
@@ -12249,7 +12231,7 @@
     ],
     "severity": "medium",
     "severity_reason": "A world-survey stage that runs again never matches its earlier outputs, so every stage depending on it is refused reuse.",
-    "family": "build-speed",
+    "family": "build-cache-reuse",
     "related": [],
     "tags": [
       "performance"
@@ -12259,6 +12241,241 @@
       "source_commit": "a266a40",
       "engine_commit": "a266a40",
       "world_commit": "a266a40",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-KEY-OVERBROAD-33",
+    "title": "A new bug page or release file list change rebuilds interior, census, harvest and the CHIM stages: an import search path counted as a read of every file under tools/",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.33-reuse-keys, not shipped at the time of writing: sys.path entries are import search paths, not data reads; key-coverage tests",
+    "report": "bugs/BUILD-KEY-OVERBROAD-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33",
+    "where": "Stage source fingerprints (tools/build_cache.py SourceIndex, _unit_facts)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33"
+    ],
+    "severity": "high",
+    "severity_reason": "Every tracker commit rebuilt the chain from interior onward for every worker (chim alone 125-210 s); the v0.0.33 final rebuilt harvest and chim for nothing.",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33 final-f583c7b and temple-debug-004/006",
+      "source_commit": "f583c7b",
+      "engine_commit": "f583c7b",
+      "world_commit": "f583c7b",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-REUSE-ATTRIBUTION-33",
+    "title": "Two stages that ran at the same time were both refused reuse when one wrote files under a folder the other only reads",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.33-reuse-keys, not shipped at the time of writing: the stage trace records run-folder writes and a file only one stage wrote is credited to it; tests",
+    "report": "bugs/BUILD-REUSE-ATTRIBUTION-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33",
+    "where": "Stage output recorder (tools/build_cache.py Recorder.close)",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33"
+    ],
+    "severity": "high",
+    "severity_reason": "character (about 19 min) and chim-town ran again in every later build; the scheduler runs independent stages together, so it recurs.",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33 final-f583c7b and temple-debug-004/006",
+      "source_commit": "f583c7b",
+      "engine_commit": "f583c7b",
+      "world_commit": "f583c7b",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-ENGINE-KEY-SDK-33",
+    "title": "The engine stage is never reused: the Amiga SDK is not part of its key",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: the SDK compiler, assembler and libraries by content in the engine stage's key",
+    "report": "bugs/BUILD-ENGINE-KEY-SDK-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33",
+    "where": "Stage cache (tools/build_cache.py), engine stage",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33"
+    ],
+    "severity": "low",
+    "severity_reason": "About 15 s per build; the stage avoids a wrong reuse only by always running, so its key under-declares an input.",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33 final-f583c7b and temple-debug-004/006",
+      "source_commit": "f583c7b",
+      "engine_commit": "f583c7b",
+      "world_commit": "f583c7b",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-STAIR-WALK-SLOW-33",
+    "title": "The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source on the v0.0.35 builder-performance line: identical rows on 48 rc1c maps, 3.67 times less processor time (busy host)",
+    "report": "bugs/BUILD-STAIR-WALK-SLOW-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "Stair walk gate (tools/stair_walk.py, tools/audit_walkability.py Scene.trace), image step",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "medium",
+    "severity_reason": "The longest single pass of every full build: 1,751 s wall, 14,645 CPU-seconds in v0.0.33-rc1c, on the critical path.",
+    "family": "build-speed",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33-rc1 build rc1c",
+      "source_commit": "a266a40",
+      "engine_commit": "a266a40",
+      "world_commit": "a266a40",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-CACHE-PER-WORKSPACE-33",
+    "title": "Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source on the v0.0.35 builder-performance line: per-file caches read the --reuse-from workspace read-only; MiniWind rebuild measurement pending",
+    "report": "bugs/BUILD-CACHE-PER-WORKSPACE-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.34-dev90",
+    "where": "Builder caches (tools/build.py, tools/file_cache.py, tools/pass_cache.py), media and intro stages",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34-dev90"
+    ],
+    "severity": "high",
+    "severity_reason": "A reused build on a new volume converted 4,862 of 4,875 sounds (1,195 s) that the reuse source's pool already held.",
+    "family": "build-speed",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "hudcell-mw1",
+      "source_commit": "unknown",
+      "engine_commit": "unknown",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "job-build-commit-not-in-log"
+    }
+  },
+  {
+    "id": "MINIWIND-NOT-MINUTES-33",
+    "title": "A reused MiniWind build took about two hours instead of minutes",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: media 1,195 s from a cold per-workspace cache (BUILD-CACHE-PER-WORKSPACE-33, repaired in source), engine and CHIM reruns from over-broad stage keys",
+    "report": "bugs/MINIWIND-NOT-MINUTES-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.34-dev90",
+    "where": "MiniWind builds (tools/build.py --miniwind) with --reuse-from",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34-dev90"
+    ],
+    "severity": "high",
+    "severity_reason": "The MiniWind sandbox exists to test one scene in minutes; at about two hours it is not usable for quick checks.",
+    "family": "build-speed",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "hudcell-mw1",
+      "source_commit": "unknown",
+      "engine_commit": "unknown",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "job-build-commit-not-in-log"
+    }
+  },
+  {
+    "id": "BUILD-OUTPUTS-NOT-REPRODUCIBLE-33",
+    "title": "A stage that runs again never matches its old outputs (tool logs, timings, run paths), so every stage after it is rebuilt",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.33-reuse-keys, not shipped at the time of writing: logs and timing reports are diagnostics (not compared, never read by a stage); wall time, worker counts and run paths left the stage receipts; tests",
+    "report": "bugs/BUILD-OUTPUTS-NOT-REPRODUCIBLE-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "Stage outputs (tool logs, receipts) and the reuse comparison (tools/build_cache.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "high",
+    "severity_reason": "rc1d: census, area, balmora and the Balmora interiors differed from rc1c only in logs; 13 later stages ran again.",
+    "family": "build-cache-reuse",
+    "related": [
+      "BUILD-CACHE-NO-CUTOFF-33"
+    ],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33-rc1 builds rc1b, rc1c and rc1d",
+      "source_commit": "d49f324",
+      "engine_commit": "d49f324",
+      "world_commit": "d49f324",
       "chim_version": "0.1.0",
       "chim_format": "0.5"
     }
@@ -12387,12 +12604,132 @@
     }
   },
   {
+    "id": "TEST-PARALLEL-ORDER-LOAD-33",
+    "title": "The process-pool order test fails on a fully loaded host (one worker process takes every item)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: passes 3 of 3 when run alone; the test assumes the pool spreads short items over more than one process",
+    "report": "bugs/TEST-PARALLEL-ORDER-LOAD-33.md",
+    "reported_by": "gate:suite",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "tests/test_build_parallel.py test_processes_keep_order_and_limit_nested_threads",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "A gate can fail on host load alone; the worker pool itself is not wrong.",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "8e63dd9",
+      "engine_commit": "8e63dd9",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "GATE-HOSTPARITY-TEMP-RACE-33",
+    "title": "Two gates running at once share the host-parity step's log file, so one gate can report the other's error",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in the gate tooling (outside the source tree): each gate writes its own host-parity log",
+    "report": "bugs/GATE-HOSTPARITY-TEMP-RACE-33.md",
+    "reported_by": "gate:host-parity",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "Release gate, Windows host-parity step (log file at one fixed temporary path)",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "A gate can fail, or pass, on another gate's host-parity result; the source under test is not wrong.",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "GATE-NUMPY-PATH-SCRATCH-33",
+    "title": "The gate's NumPy and Pillow import folder lived in a temporary per-session folder, so gates broke once it was removed",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in the gate tooling (outside the source tree): the folder lives with the gate itself",
+    "report": "bugs/GATE-NUMPY-PATH-SCRATCH-33.md",
+    "reported_by": "gate:host-parity",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "Release gate, Windows host-parity step (PYTHONPATH folder with only NumPy and Pillow)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "medium",
+    "severity_reason": "Every gate failed its host-parity step after the folder went away, until the gate was repaired.",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "RELEASE-PREVIOUS-FIXES-MISSING-33",
+    "title": "The next release line did not contain the previous release's last fixes, and no gate checked it",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: the v0.0.33 release head is merged; rc and final builds and the release gate refuse a head without the release pinned in tools/previous-release.json (tools/previous_release.py, tests/test_previous_release.py)",
+    "report": "bugs/RELEASE-PREVIOUS-FIXES-MISSING-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33",
+    "where": "Release line merges; tools/build.py (rc/final image builds); release gate",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33"
+    ],
+    "severity": "high",
+    "severity_reason": "A release from the next line would have shipped without the previous release's late fixes.",
+    "family": "builder-from-scratch",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "0407065",
+      "engine_commit": "0407065",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
     "id": "TEST-ENV-LEAK-HULL-33",
     "title": "A sequential run of the suite fails the CHIM unit fingerprint test: an earlier in-process test leaves AMIWIND_MODEL_HULL set",
     "state": "open",
     "fixed_in": null,
     "owner_accepted": null,
-    "status": "Fixed in tests on the release line: the fingerprint test measures from the switch's unset state and restores it; the builder tests that export build switches restore the environment. Why the gate missed it: the gate runs the suite in parallel worker processes, the publish script runs it sequentially in one process; the release checks gain one sequential full-suite run",
+    "status": "Fixed in tests on the release line: the fingerprint test measures from the switch's unset state and restores it; the builder tests that export build switches restore the environment (on the v0.0.35 line with patch.dict(os.environ)), and a suite-wide guard (tests/env_guard.py) fails any test that leaves an AMIWIND_* variable changed. Why the gate missed it: the gate runs the suite in parallel worker processes, the publish script runs it sequentially in one process; the release checks gain one sequential full-suite run",
     "report": "bugs/TEST-ENV-LEAK-HULL-33.md",
     "reported_by": "test",
     "found_date": "2026-10-09",
@@ -12411,6 +12748,168 @@
       "name": "source",
       "source_commit": "3e1fdfa",
       "engine_commit": "3e1fdfa",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "BUILD-STORAGE-DUPLICATES-33",
+    "title": "Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: storage pool and garbage collector in source on v0.0.34-storage-pool (not gated yet); measurements partial, build volume scan pending",
+    "report": "bugs/BUILD-STORAGE-DUPLICATES-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "Build storage: run folders, reuse copies, prerendered entries, packages, played copies",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "high",
+    "severity_reason": "The build machine's system drive filled up twice on 9 October 2026 and stopped the release builds; duplicate bytes measured so far are partial.",
+    "family": "build-speed",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33-rc1 build volumes",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "BUILD-SCHEDULER-TABLE-KEY-35",
+    "title": "A new row in the build scheduler's stage table rebuilds stages that never read it: the table counted as import-time code of every stage",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: a top-level literal table is its own fingerprint unit, counted only by stages whose code reads it; regression test adds a scheduler row and checks that no other stage key changes",
+    "report": "bugs/BUILD-SCHEDULER-TABLE-KEY-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "Stage fingerprints: tools/build_cache.py module_symbols; DEPENDENCIES in tools/build_parallel.py",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "Stages with no real input change (media about 7 minutes cold, music, world-scenery-assets) rebuilt after the seam-audit row was added; hold-level reuse loss",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.34 hotfix build",
+      "source_commit": "70b04e2",
+      "engine_commit": "70b04e2",
+      "world_commit": "70b04e2",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-SURVEY-KEY-CONFIG-35",
+    "title": "World survey, world terrain, world UI and CHIM stage keys counted every file under config/: a path built from a loop name read as the whole folder",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line, not shipped",
+    "report": "bugs/BUILD-SURVEY-KEY-CONFIG-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "Stage fingerprints: tools/build_cache.py _literal_runs; tools/world_survey.py area_catalogue",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "world-survey (62 s) re-ran despite --reuse-from; world-terrain and CHIM keys moved with any config edit",
+    "family": "build-cache-reuse",
+    "related": [],
+    "build": {
+      "name": "v0.0.34 release build",
+      "source_commit": "3707069",
+      "engine_commit": "3707069",
+      "world_commit": "3707069",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-IMAGE-NO-RESUME-33",
+    "title": "A late failure in the image step reruns the whole image step, and the failing check could have run in its first seconds",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "In progress on v0.0.34-image-resume, not shipped at the time of writing: preflight at the start of the image step; per-map, region, room, town region and head units resume",
+    "report": "bugs/BUILD-IMAGE-NO-RESUME-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "Image step (tools/build_aga.py image/finalize_image) and stages without unit caches",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "high",
+    "severity_reason": "The rc1c image step failed 3,082 s in on a check the preflight runs in 7 s; the rerun redid all 2,724 maps of every pass (51.7 min).",
+    "family": "build-cache-reuse",
+    "related": [
+      "BUILD-SEYDA-CONVERTED-NOT-STAGED-35",
+      "CHIM-HARVEST-SPECIALS-33"
+    ],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.33-rc1 builds rc1b and rc1c",
+      "source_commit": "a266a40",
+      "engine_commit": "a266a40",
+      "world_commit": "a266a40",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "MESH-LOD-TORN-MESHES-33",
+    "title": "Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by the seam audit (tools/seam_audit.py) built for MESH-LOD-OPEN-SEAMS-33; recorded as known findings in config/seam-audit-known.json so the builder gate fails only on new or worse tears; repairs (boundary-locked or shape-preserving profiles) to be weighed against heap and face budgets",
+    "report": "bugs/MESH-LOD-TORN-MESHES-33.md",
+    "reported_by": "audit",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.32",
+    "where": "town flora/rock profiles, open-world rock scenery, arrival ship (static_lod reduction)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.32"
+    ],
+    "severity": "medium",
+    "severity_reason": "Open seams on 49 reduced meshes (13,448 placements); visible where the reduced mesh is drawn",
+    "family": "converter-geometry",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "9582693",
+      "engine_commit": "9582693",
       "world_commit": null,
       "chim_version": null,
       "chim_format": null
@@ -12471,6 +12970,3193 @@
       "name": "source",
       "source_commit": "28fbcc30375d13aa29f0ef07457834a2312d3dd9",
       "engine_commit": "28fbcc30375d13aa29f0ef07457834a2312d3dd9",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "BUILD-CACHE-OWNER-FAILS-STAGE-34",
+    "title": "A cache entry owned by another user failed a release build four minutes in, instead of being rebuilt or caught before any stage",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: a cache that cannot be read or written never fails a stage (unit built locally, 'cache write refused' reported); tools/build_preflight.py checks cache ownership, free space and the game data before any stage, with the fix command; tests",
+    "report": "bugs/BUILD-CACHE-OWNER-FAILS-STAGE-34.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "CHIM unit cache (tools/chim/units.py UnitCache.put); no build preflight before the stages",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "2,601 root-owned CHIM unit cache entries stopped the v0.0.34 release build; a seconds-long check failed late (hold-level)",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "v0.0.34 release build",
+      "source_commit": "70b04e2",
+      "engine_commit": "70b04e2",
+      "world_commit": "70b04e2",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "LAVA-NOT-IMPLEMENTED-33",
+    "title": "Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: census done (tools/lava_census.py); liquid conversion, damage and tint in progress on the next-release line (docs/LAVA.md).",
+    "report": "bugs/LAVA-NOT-IMPLEMENTED-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "Converters (rooms, exterior frames, CHIM) and engine game logic: lava pools become solid models",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "No shipped area has molten lava yet; every lava cell would convert as walkable rock without Morrowind's damage contract",
+    "family": "build-content-missing",
+    "related": [],
+    "build": {
+      "name": "none (found by reading the converters)",
+      "source_commit": "unknown",
+      "engine_commit": "unknown",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null,
+      "unknown_reason": "no build contains a lava cell; found by reading the converters and the lava census"
+    }
+  },
+  {
+    "id": "VIVEC-TEMPLE-STAIRS-33",
+    "title": "Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: measured 9 October 2026 on a CHIM build of vivec_temple (with and without the large-model cut): the palace steps start in solid or are blocked under an edge; the High Fane quarters' flights are blocked by a 26.7-degree collision slope (risers 3.7-5.1 units).",
+    "report": "bugs/VIVEC-TEMPLE-STAIRS-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "Vivec Temple frame (vivec_temple): ex_v_palace_steps_01, ex_vivec_hfq_01, ex_vivec_hfq_04",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Flights the player climbs in the original are blocked; the Temple frame cannot pass its stair gate until repaired.",
+    "family": "stairs-collision",
+    "related": [],
+    "chim": "stairs",
+    "build": {
+      "name": "source",
+      "source_commit": "2a5bd0e",
+      "engine_commit": "2a5bd0e",
+      "world_commit": "2a5bd0e",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "note": "vivec_temple CHIM world built from v0.0.33-chim-format with and without --cut-models-over 512"
+    }
+  },
+  {
+    "id": "CHIM-FRAME-COORD-RANGE-33",
+    "title": "One Vivec city frame does not fit Quake's coordinate range (network coordinates are 1/8-unit shorts)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Plan correction, nothing shipped: the engine bound stays 4,000; the one-city-frame plan needs a decision (two frames, a wider coordinate protocol, or M4 frames that span).",
+    "report": "bugs/CHIM-FRAME-COORD-RANGE-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "CHIM Vivec frame plan; engine hand-over bounds in aw_world.c",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Blocks the planned one-frame Vivec, not any shipped build: the district frames work, and the bound stays 4,000.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "format",
+    "build": {
+      "name": "source",
+      "source_commit": "c01cded",
+      "engine_commit": "c01cded",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found by reading the engine's coordinate protocol against the frame plan; no world built"
+    }
+  },
+  {
+    "id": "CHIM-MEASURE-EMPTY-FRAME-33",
+    "title": "CHIM world measurement stops on a frame without models (every empty sea cell)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by CHIMport ring 1; CHIMport skips the measurement for model-less worlds and counts such cells as empty.",
+    "report": "bugs/CHIM-MEASURE-EMPTY-FRAME-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/chim/validate.py measure (largest model of the world)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "The streaming walk and visibility figures of empty cells are lost; 102 of the 171 outer-ring cells are empty sea.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "builder",
+    "build": {
+      "name": "source",
+      "source_commit": "d10af66",
+      "engine_commit": "d10af66",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found in source by CHIMport (per-cell CHIM worlds, not a numbered build)"
+    }
+  },
+  {
+    "id": "CHIM-UNIT-CACHE-RACE-33",
+    "title": "Two processes storing the same CHIM unit at once: the second rename fails",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: CHIMport wraps put with a per-process temporary name while cells share one cache; the builder itself still uses the shared name.",
+    "report": "bugs/CHIM-UNIT-CACHE-RACE-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/chim/units.py UnitCache.put (one temporary name per entry)",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Any parallel build sharing a unit cache can lose a cell build to a FileNotFoundError.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "builder",
+    "build": {
+      "name": "source",
+      "source_commit": "d10af66",
+      "engine_commit": "d10af66",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found in source by CHIMport (per-cell CHIM worlds, not a numbered build)"
+    }
+  },
+  {
+    "id": "CHIM-UNIT-FP-SOURCE-LAYOUT-33",
+    "title": "The same mesh is converted again for every source stage: CHIM mesh unit fingerprints include archive offsets and texture list positions",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source (v0.0.33-chim-format f253923: unit keys from content hashes), not yet in a numbered build. Verified by CHIMport: 319 cells built after the fix wrote 1,156 mesh units for 977 distinct meshes (1.18x: flora and collision-only variants), against 9,526 units for 1,081 meshes before (8.8x)",
+    "report": "bugs/CHIM-UNIT-FP-SOURCE-LAYOUT-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/chim/build.py mesh_fingerprint (scenery index record with offsets)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "high",
+    "severity_reason": "Store-once conversion fails across areas: CHIMport rings 1-4 built 9,526 mesh units for 1,081 distinct meshes (about 8.8 times the work).",
+    "family": "chim-streamer",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "chim": "builder",
+    "build": {
+      "name": "source",
+      "source_commit": "ead67e4",
+      "engine_commit": "ead67e4",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found in source by CHIMport (per-cell CHIM worlds, not a numbered build)"
+    }
+  },
+  {
+    "id": "CHIM-WORLD-AUDIT-SCALING-33",
+    "title": "The CHIM world audits grow much faster than the world: the heap gate took 3.6 s for 171 frames, 473 s for 331, and over an hour for 844",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: measured by CHIMport growing worlds (rings 1, 2 and 5); ring-5 world stopped after 2 h of auditing.",
+    "report": "bugs/CHIM-WORLD-AUDIT-SCALING-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/chim/heap.py require_heap and tools/chim/validate.py on many frames",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "An island-wide world (1,292 frames) cannot be audited in reasonable time; CHIMport builds its growing world only after the last ring for now.",
+    "family": "chim-streamer",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "chim": "builder",
+    "build": {
+      "name": "source",
+      "source_commit": "0580012",
+      "engine_commit": "0580012",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found in source by CHIMport (growing CHIM worlds, not a numbered build)"
+    }
+  },
+  {
+    "id": "CHIM-WINDOW-MOUNT-CROSS-CELL-33",
+    "title": "A one-cell CHIM frame stops when a window placed in it mounts on a façade placed in the next cell",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: found by CHIMport; the window mounting looks for its supporting façade only among the placements of its own source stage.",
+    "report": "bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/surface_flatten.py mount_references on a one-cell source stage",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Four exterior cells (Pelagiad, Dagon Fel, Caldera and a West Gash cell) are not converted at all by CHIMport.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "builder",
+    "build": {
+      "name": "source",
+      "source_commit": "d23217e",
+      "engine_commit": "d23217e",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found in source by CHIMport (per-cell CHIM worlds, not a numbered build)"
+    }
+  },
+  {
+    "id": "MWAD-STRING-DECODE-35",
+    "title": "Data readers decode record strings four different ways",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-mwad-fixes, not shipped at the time of writing.",
+    "report": "bugs/MWAD-STRING-DECODE-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "low",
+    "severity_reason": "Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical).",
+    "family": "game-data-editions",
+    "related": [],
+    "build": {
+      "name": "none",
+      "source_commit": "6979d4f",
+      "engine_commit": "6979d4f",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "MWAD-TEXT-WRITER-LF-35",
+    "title": "Some JSON and text writers do not pin LF and UTF-8",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-mwad-fixes, not shipped at the time of writing.",
+    "report": "bugs/MWAD-TEXT-WRITER-LF-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "low",
+    "severity_reason": "Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical).",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "none",
+      "source_commit": "6979d4f",
+      "engine_commit": "6979d4f",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "MWAD-DELETED-RECORD-35",
+    "title": "Readers disagree on what a deleted record is",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-mwad-fixes, not shipped at the time of writing.",
+    "report": "bugs/MWAD-DELETED-RECORD-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "low",
+    "severity_reason": "Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical).",
+    "family": "game-data-editions",
+    "related": [],
+    "build": {
+      "name": "none",
+      "source_commit": "6979d4f",
+      "engine_commit": "6979d4f",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "MWAD-WALK-ORDER-35",
+    "title": "Input check results depend on directory listing order",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-mwad-fixes, not shipped at the time of writing.",
+    "report": "bugs/MWAD-WALK-ORDER-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "low",
+    "severity_reason": "Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical).",
+    "family": "build-cache-reuse",
+    "related": [],
+    "build": {
+      "name": "none",
+      "source_commit": "6979d4f",
+      "engine_commit": "6979d4f",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "MWAD-READER-CHECKS-35",
+    "title": "Data readers: missing length checks, duplicate FRMR, diverging master lists, lock key",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-mwad-fixes, not shipped at the time of writing.",
+    "report": "bugs/MWAD-READER-CHECKS-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "low",
+    "severity_reason": "Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical).",
+    "family": "game-data-editions",
+    "related": [],
+    "build": {
+      "name": "none",
+      "source_commit": "6979d4f",
+      "engine_commit": "6979d4f",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "HUD-GLOBAL-NO-REGIONS-33",
+    "title": "The debug HUD said \"GLOBAL XYZ: unavailable\" on a CHIM town on a disk without the world directory (MiniWind)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.34-hud-cell (112c562), not shipped at the time of writing: on a CHIM frame the HUD takes the frame transform (world = local x 4 + frame centre) when no world directory carries the town; host tests; seen working in FS-UAE on a MiniWind evidence image.",
+    "report": "bugs/HUD-GLOBAL-NO-REGIONS-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "debug HUD GLOBAL row (aw_hud.c) on a disk without world/regions.awr",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Debug only: the GLOBAL row (and with it the cell readout) was empty on MiniWind disks.",
+    "family": "debug-commands",
+    "related": []
+  },
+  {
+    "id": "BUILD-FLORA-FALLBACK-RETRY-35",
+    "title": "The routed-hull fallback of a flora overlay could not retry: the failed try's candidate folder was looked up from the wrong place",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line before any build: candidate folders are found relative to the region folder; the existing integration test covers it",
+    "report": "bugs/BUILD-FLORA-FALLBACK-RETRY-35.md",
+    "reported_by": "test",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/prepare_world_flora.py _hull_fallback (merge of CHIMport with the reproducible-output fix)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "medium",
+    "severity_reason": "A flora region over its clipnode reserve with routed hulls would stop the build (folder exists) instead of retrying with chains",
+    "family": "build-speed",
+    "related": [
+      "BUILD-ROUTED-FLORA-RESERVE-33"
+    ],
+    "build": {
+      "name": "source",
+      "source_commit": "6979d4f",
+      "engine_commit": "6979d4f",
+      "world_commit": "6979d4f",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-SCHEDULER-EVEN-SHARE-33",
+    "title": "The stage scheduler splits the workers evenly between running stages, so the longest stage gets no more than the shortest (MiniWind media on 1 of 4 workers for 1,195 s)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: repair proposed (shares weighted by the expected remaining work from the reuse run profile)",
+    "report": "bugs/BUILD-SCHEDULER-EVEN-SHARE-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.34-dev90",
+    "where": "Stage scheduler (tools/build_parallel.py execute_parallel, rebalance)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34-dev90"
+    ],
+    "severity": "medium",
+    "severity_reason": "The stage with the most work left runs on the same share as stages that finish in seconds, lengthening the critical path.",
+    "family": "build-speed",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "hudcell-mw1",
+      "source_commit": "unknown",
+      "engine_commit": "unknown",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "job-build-commit-not-in-log"
+    }
+  },
+  {
+    "id": "LIGHT-STYLES-UNDEFINED-33",
+    "title": "The flicker and pulse lightstyles of the light design are never defined, and styles below 32 dim with daylight",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found while designing the CHIM light bake; repair planned with it (sources in styles 32 and up, generated strings for the animated ones).",
+    "report": "bugs/LIGHT-STYLES-UNDEFINED-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "worldspawn sets only style 0; R_BuildLightMap dims styles below 32; light_sources.quake_style",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Nothing bakes Morrowind lights yet; once wired, flickering lights would burn steady and every light source would dim at night.",
+    "family": "lighting-night",
+    "related": [],
+    "chim": "builder",
+    "build": {
+      "name": "source",
+      "source_commit": "05ee452",
+      "engine_commit": "05ee452",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "found in source while designing; no world built for it"
+    }
+  },
+  {
+    "id": "CHIM-BALMORA-LIGHT-ROOM-33",
+    "title": "Balmora's CHIM active ring has 2,528 bytes of headroom: no stored lighting fits",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Measured 9 October 2026 (docs/chim/LIGHTING.md); needs an owner decision on where the room comes from.",
+    "report": "bugs/CHIM-BALMORA-LIGHT-ROOM-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "CHIM heap gate, Balmora frame -3,-2; tools/chim/lighting.py measure",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Every lighting option that stores light (terrain lightmaps 17 KB, per-placement lightmaps 289 KB) overflows the Balmora ring.",
+    "family": "chim-streamer",
+    "related": [
+      "LIGHT-ENTITIES-UNWIRED-33"
+    ],
+    "chim": "performance",
+    "build": {
+      "name": "rc1c-a266a40",
+      "source_commit": "a266a40",
+      "engine_commit": "a266a40",
+      "world_commit": "a266a40",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "ENGINE-PAK-HEADER-TRUST-35",
+    "title": "The pak loader trusted the header: a negative or oversized directory length sized a read into a 128 KiB stack array, and entry offsets were never checked",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-PAK-HEADER-TRUST-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/common.c COM_LoadPackFile",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "A damaged or hostile pak overwrote the stack instead of stopping with a message",
+    "family": "disk-loading",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-STACK-UNCHECKED-35",
+    "title": "The engine never checked the stack it was started with; the pak directory alone needs 128 KiB",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-STACK-UNCHECKED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/sys_amiga.c main",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "Started without the boot disk Stack command, the game overwrote memory instead of stopping with a message",
+    "family": "boot-startup",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-C2P-ROWSTRIDE-35",
+    "title": "The display conversion ignored the bitmap row stride: a screen whose rows are padded for the fetch mode rendered skewed",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py and tests/test_aga.py",
+    "report": "bugs/ENGINE-C2P-ROWSTRIDE-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/aw_c2p.c aw_c2p, vid_amiga.c VID_Init",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Only screen widths whose rows are not padded drew correctly",
+    "family": "render-performance",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-VID-UPDATE-FIRST-RECT-35",
+    "title": "VID_Update converted only the first rectangle of the update list",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-VID-UPDATE-FIRST-RECT-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/vid_amiga.c VID_Update (native AGA path)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A later rectangle below the first was not shown",
+    "family": "render-performance",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-VA-UNBOUNDED-35",
+    "title": "va() formatted into its 1 KiB buffer without a bound",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-VA-UNBOUNDED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/common.c va",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A long argument overwrote memory after the buffer",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-FILEBASE-UNBOUNDED-35",
+    "title": "COM_FileBase copied a name of any length into a 32-byte buffer and walked before the start of a name without a slash",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-FILEBASE-UNBOUNDED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/common.c COM_FileBase",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A long model or file name overwrote memory next to the hunk tag",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-UDP-ADDRESS-OVERFLOW-35",
+    "title": "A typed network connect address longer than 254 characters overflowed a stack buffer",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-UDP-ADDRESS-OVERFLOW-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/net_amigaudp.c PartialIPAddress",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Console input could overwrite the stack",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "AUDIO-DMA-CLOCK-DRIFT-35",
+    "title": "The mixer estimates the audio DMA position from the EClock, not from the hardware, so the two can drift apart over a long session",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: registered from the engine review, not changed. A safe resync needs the audio device restarted with the mixer state; to be measured first (long session, drift per hour)",
+    "report": "bugs/AUDIO-DMA-CLOCK-DRIFT-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/snd_amiga.c SNDDMA_GetSamples",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Drift between the estimate and Paula can cause periodic crackle; not measured yet",
+    "family": "audio",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-FLOATTIME-DIV64-35",
+    "title": "Sys_FloatTime made two 64-bit library divisions per call to build seconds and microseconds",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-FLOATTIME-DIV64-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/sys_amiga.c Sys_FloatTime, amiga_stubs.c timer",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "CPU time only: the mixer and frame loop call it several times per frame",
+    "family": "render-performance",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-ANGLEMOD-RANGE-35",
+    "title": "anglemod returned 360 for -360 and passed NaN and out-of-range values on",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-ANGLEMOD-RANGE-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/mathlib.c anglemod",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "Angles outside [0,360) reach code that assumes the range",
+    "family": "game-logic",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-HARVEST-MESSAGE-BOUND-35",
+    "title": "The harvest pickup message joined lines into a fixed buffer without a bound",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-HARVEST-MESSAGE-BOUND-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/aw_harvest_runtime.c AW_HarvestUse",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "Only reachable with very many or very long item labels",
+    "family": "harvest",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-SCENE-NAME-BOUND-35",
+    "title": "Scene links copied map names into 16-byte fields with strcpy",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-SCENE-NAME-BOUND-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/aw_scene.c (scene links, travel, region crossing)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "Map names are checked shorter today; a longer one would overwrite the record",
+    "family": "transitions-arrivals",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-FOPEN-TEXT-MODE-35",
+    "title": "Binary files (paks, maps) were opened in text mode",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-FOPEN-TEXT-MODE-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/sys_file_amiga.c Sys_FileOpenRead, Sys_FileTime",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "No difference on AmigaOS, wrong on a C library that translates line ends",
+    "family": "disk-loading",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-UNLINK-STUB-35",
+    "title": "unlink was a stub that deleted nothing, so -condebug appended to the previous console log",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-UNLINK-STUB-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/amiga_stubs.c unlink",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "Debug log only",
+    "family": "debug-commands",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-GAMMA-POW-35",
+    "title": "The gamma table called the C library pow, which executes FPU instructions a 68040 does not implement",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line (engine review); regression test in tests/test_engine_review_native.py",
+    "report": "bugs/ENGINE-GAMMA-POW-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/view.c BuildGammaTable",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "Only with gamma other than 1; stopped a 68040 without an FPU support library",
+    "family": "fpu-cpu",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3240e3d",
+      "engine_commit": "3240e3d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "CHIM-PACK-LRU-STREAM-35",
+    "title": "A streamed model keeps a sector file handle the four-file cache may close: the next stream step reads a closed file",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (pin count on the open file while a load streams; Chim_File never closes a pinned file); native host test \"pin\" (every other file of the world opened between stream steps). Not yet in a build.",
+    "report": "bugs/CHIM-PACK-LRU-STREAM-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_models.c (stream begin) and chim_world.c Chim_File (open-file cache)",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "high",
+    "severity_reason": "A crash while walking when a large model streams and its textures or other chunks open four other sector files.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-BRUSH-BAD-DATA-35",
+    "title": "A damaged or truncated CHIM model or terrain image ends the game (Sys_Error) instead of failing that load",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (arena decodes catch decoder errors and return a failed load; the map runs on); native host test \"bad\" (brush test: image and stream) and \"baddata\" (world test). Not yet in a build.",
+    "report": "bugs/CHIM-BRUSH-BAD-DATA-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "engine model.c brush decoders in arena mode (AW_BrushImage, AW_BrushStreamStep), CHIM loads",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "high",
+    "severity_reason": "One damaged byte in a sector file on disk ends the game with a fatal error.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-EFRAG-UNCAPPED-35",
+    "title": "CHIM placements link efrags without a cap: a large ring can reach the efrag pool limit and end the map (Host_Error)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (placements wait unlinked near the limit, farthest chunks first; the builder heap gate reads the same defines); native host test \"efragcap\" (a low limit: nearest linked, farthest waiting, no Host_Error) and the heap gate test. Not yet in a build.",
+    "report": "bugs/CHIM-EFRAG-UNCAPPED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_chunks.c ChimChunks_Link / AddEfrags, r_efrag.c pool limit; builder CHIM heap gate",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "high",
+    "severity_reason": "A larger draw distance or a dense town can end the map with a fatal error.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-GRAFT-FAIL-NO-FLOOR-35",
+    "title": "A CHIM map whose frame world cannot start loses its far terrain too: the player may spawn over void",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (the far terrain loads before the frame world and stays as the floor when a later step fails); native host test \"farfail\". Not yet in a build.",
+    "report": "bugs/CHIM-GRAFT-FAIL-NO-FLOOR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_world.c MapBegin / Fail, chim_far.c floor and horizon",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "medium",
+    "severity_reason": "Rare (no room for the frame world at map start), but then the player falls through the map.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-ZONE-UNSATISFIABLE-EVICT-35",
+    "title": "The CHIM zone evicts every unlocked block for a request no free run can hold",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (early-out when the request is larger than the largest unlocked run); native host test zone test \"unsatisfiable\". Not yet in a build.",
+    "report": "bugs/CHIM-ZONE-UNSATISFIABLE-EVICT-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_zone.c ChimZone_Alloc",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "medium",
+    "severity_reason": "A request larger than any unlocked run empties the model cache for nothing and causes reloads.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "performance",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-MIPTEX-OFFSET-UNCHECKED-35",
+    "title": "CHIM texture mip offsets are taken from disk unchecked: a wrong offset makes the rasterizer read past its block",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (every mip level must lie inside the texture's pixels, else the texture is unavailable (drawn untextured)); native host test \"baddata\" (a mip offset past the pixels). Not yet in a build.",
+    "report": "bugs/CHIM-MIPTEX-OFFSET-UNCHECKED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_models.c LoadTexture",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "medium",
+    "severity_reason": "Damaged data could read outside the texture block when drawn.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-ALIAS-STATIC-HUNK-35",
+    "title": "Streamed alias statics load into the cache mid-map without being counted in the map's Hunk rest",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (alias statics counted in the measured Hunk rest; one that cannot fit the gap is refused); native host test native world tests (statics, rest) and the gate suite. Not yet in a build.",
+    "report": "bugs/CHIM-ALIAS-STATIC-HUNK-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_statics.c ChimStatics_Step, chim_world.c CheckRest",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "medium",
+    "severity_reason": "A cache request larger than the Hunk gap ends the game (Cache_Alloc out of memory).",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "CHIM-VIEW-LEAF-NO-PVS-35",
+    "title": "A view leaf without a visibility row draws everything, with no counter saying so",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-chim-fixes (counted per frame and shown in dbg rcount (\"nv\") and the chim command); native host test native world tests (rcount fields) and the gate suite. Not yet in a build.",
+    "report": "bugs/CHIM-VIEW-LEAF-NO-PVS-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "CHIM engine chim_chunks.c (link pass), chim_world.c dbg rcount",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "low",
+    "severity_reason": "Frames at the ring edge or in the air draw the whole ring; only visible as a frame-rate drop.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "performance",
+    "build": {
+      "name": "source review (no build)",
+      "source_commit": "0dd2086",
+      "engine_commit": "0dd2086",
+      "world_commit": "0dd2086",
+      "chim_version": "0.1.0",
+      "chim_format": "0.6",
+      "note": "found by a source review of the v0.0.35 line, not in a build"
+    }
+  },
+  {
+    "id": "BUILD-MINIWIND-STAGE-CLOSURE-33",
+    "title": "The MiniWind plan puts the CHIM builder modules into every conversion stage's fingerprint",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.33-direct-start, not shipped at the time of writing: the MiniWind stage table moved to tools/miniwind_plan.py (pure data, re-exported by tools/miniwind.py); the scheduler imports only that; the stage cache test passes",
+    "report": "bugs/BUILD-MINIWIND-STAGE-CLOSURE-33.md",
+    "reported_by": "test",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/build_parallel.py stage_dependencies (lazy import of tools/miniwind.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Every engine or CHIM builder source edit changes the fingerprint of every conversion stage, so --reuse-from reuses nothing; outputs are unaffected.",
+    "family": "build-speed",
+    "related": []
+  },
+  {
+    "id": "BUILD-NPCLOD-PATH-ARG-34",
+    "title": "The first --npc-lod on build stopped at its area stage: a Path in the command broke build-state.json",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed on the v0.0.34 NPC levels branch (not shipped)",
+    "report": "bugs/BUILD-NPCLOD-PATH-ARG-34.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.34-dev",
+    "where": "tools/build.py npc_lod_arguments (resident stages' extra arguments)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Unreleased branch only; the build fails at the first resident stage, about 4 minutes in, and resumes from the stages before it.",
+    "family": "build-speed",
+    "related": []
+  },
+  {
+    "id": "NPC-ANIM-IDLE-ONLY-33",
+    "title": "NPCs have only an 8-frame idle: walking, running, swimming, hit and death are not animated",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in source on v0.0.33-anim-kit: animation kit (build.py --npc-anim), engine group choice by speed and footsteps; idle stays the default until accepted.",
+    "report": "bugs/NPC-ANIM-IDLE-ONLY-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/prepare_area.py build_resident (idle_times(8) only); engine/aga/src/aw_companion.c",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "A walking companion or fighter slides in its idle pose; no footsteps",
+    "family": "actors-npc",
+    "related": []
+  },
+  {
+    "id": "NPC-FEMALE-SKELETON-33",
+    "title": "Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. The animation kit takes the groups the female file overrides (walkforward) from it; the skeleton itself is unchanged.",
+    "report": "bugs/NPC-FEMALE-SKELETON-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "src/mwad/npc.py outfit (skeleton choice)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Female walk uses the male cycle without the kit; bind pose difference not measured",
+    "family": "actors-npc",
+    "related": []
+  },
+  {
+    "id": "COMBAT-RUN-ROOT-DRIFT-33",
+    "title": "Arena fighters' run frames carry the root's forward motion: the body slides ahead and snaps back each cycle",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source on v0.0.33-anim-kit: run frames sampled in place (npc_anim.in_place), not yet in a build.",
+    "report": "bugs/COMBAT-RUN-ROOT-DRIFT-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/prepare_combat.py bake_fighter (run frames sampled on the unmodified skeleton)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Visible jitter while a fighter chases",
+    "family": "actors-npc",
+    "related": []
+  },
+  {
+    "id": "NPC-ANIM-MEMORY-33",
+    "title": "Full animation kit models are 2.2 times the idle models; four Balmora residents exceed the 512 KiB alias staging buffer",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Owner decision 9 October 2026: react standing models, full movers worn only while moving (react+full; repaired in source on v0.0.33-anim-kit). Measured in FS-UAE: zone and Hunk unchanged, Cache peak at load +300,464 bytes on Balmora, a worn mover's block freed when it stops.",
+    "report": "bugs/NPC-ANIM-MEMORY-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "tools/npc_anim.py profiles; engine/aga/src/model.c AW_ALIAS_STAGING_LIMIT",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Frames cost 4 bytes per vertex and actors share no vertices (3 per face); memory decides which groups ship",
+    "family": "heap-memory",
+    "related": []
+  },
+  {
+    "id": "TEST-CHIM-BIG-FRAME-TIMEOUT-33",
+    "title": "The Balmora-sized CHIM world test times out on a busy host",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: failed in gates 1004 and 1005 on a busy host (another release image build running, host CPU 100 %), passed in gate 1003 on the same CHIM code; run alone on 2 CPUs under that load it takes 206 s of its 300 s limit. Load-only flake, like TEST-COST-ORDER-LOAD-33.",
+    "report": "bugs/TEST-CHIM-BIG-FRAME-TIMEOUT-33.md",
+    "reported_by": "review",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "tests/test_chim_engine_native.py (compile_and_run, 300 s timeout; graftmodes with CHIM_BIG=1)",
+    "reproduction": "sometimes",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "A gate fails on load alone: the test passed on the same code one gate earlier; no product effect.",
+    "family": "tests-ci",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "77e0f2d",
+      "engine_commit": "77e0f2d",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ARENA-PIT-NO-INTERIOR-33",
+    "title": "The Vivec Arena minigame fights on the test floor: the Arena Pit interior is not in v0.0.33 builds",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, by design for v0.0.33: the Arena Pit (vai000) is converted only on the arena-interiors line, not by the release builder; dbgmode arenapit falls back to the gallery floor and says so on the console only. Later: the Pit in a MiniWind scope (queued) and an on-screen notice.",
+    "report": "bugs/ARENA-PIT-NO-INTERIOR-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "engine/aga/src/aw_arena.c fallback; builder (Arena withdrawn from v0.0.33)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "Intended for v0.0.33 (the Arena was withdrawn); the fight works on the gallery floor, but nothing on screen says why.",
+    "family": "build-content-missing",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format",
+      "note": "owner playtest of a v0.0.33 build; the exact image commit is not in the report"
+    }
+  },
+  {
+    "id": "COMBAT-SETUP-DICE-BLOCK-33",
+    "title": "The Arena setup offers no dice/style choice before a fight, and there is no block button",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (owner request from the playtest). The original blocks automatically (Block skill roll); a block button would be an AmiWind extension.",
+    "report": "bugs/COMBAT-SETUP-DICE-BLOCK-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "engine/aga/src/aw_arena.c setup, aw_menu.c, aw_combat.c",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "Both switches exist (Options > Controls) but not on the fight setup; a manual block is a requested AmiWind extension.",
+    "family": "game-logic",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format",
+      "note": "owner playtest of a v0.0.33 build; the exact image commit is not in the report"
+    }
+  },
+  {
+    "id": "COMBAT-VOICES-SILENT-33",
+    "title": "Player pain grunts and hostile NPC taunts are not heard in fights",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (owner playtest). The NPC voice receiver (attack, hit, flee lines) exists on the animation kit line, not in v0.0.33; the player's own hit voice is not implemented anywhere.",
+    "report": "bugs/COMBAT-VOICES-SILENT-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "engine/aga/src/aw_combat.c voice hook (no receiver); player hit voice",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "medium",
+    "severity_reason": "Fights are silent apart from impact sounds; the original voices hits, deaths and taunts.",
+    "family": "audio",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format",
+      "note": "owner playtest of a v0.0.33 build; the exact image commit is not in the report"
+    }
+  },
+  {
+    "id": "MUSIC-DEATH-SILENT-33",
+    "title": "No death music when the player dies",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (owner playtest), cause unknown. The code plays the death track once when the player dies in a fight; suspects: the track missing from the build's music catalogue, music held at that moment, or a death outside a fight (the call sits in the combat layer only).",
+    "report": "bugs/MUSIC-DEATH-SILENT-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "engine/aga/src/aw_music.c AW_MusicDeath, aw_combat.c caller",
+    "reproduction": "unknown",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "The death track never played in the playtest; the cause is not known yet.",
+    "family": "audio",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format",
+      "note": "owner playtest of a v0.0.33 build; the exact image commit is not in the report"
+    }
+  },
+  {
+    "id": "COMBAT-PLAYER-DEATH-FALL-33",
+    "title": "The player does not collapse on death",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (owner playtest).",
+    "report": "bugs/COMBAT-PLAYER-DEATH-FALL-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "engine/aga/src/aw_combat.c player death view",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "The view stays upright on death; the original shows the body falling.",
+    "family": "game-logic",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format",
+      "note": "owner playtest of a v0.0.33 build; the exact image commit is not in the report"
+    }
+  },
+  {
+    "id": "COMPANION-PICK-RMB-33",
+    "title": "The right mouse button does not pick a companion: \"MOUSE3 is unbound\"",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source on v0.0.33-arena-combat (right button = context action +aw_alt), not yet in a build or gated.",
+    "report": "bugs/COMPANION-PICK-RMB-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "config/keymaps.cfg default binds; vid_amiga.c button mapping",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "low",
+    "severity_reason": "Pick mode works with attack only; the right button the owner expects is unbound.",
+    "family": "debug-commands",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format"
+    }
+  },
+  {
+    "id": "COMPANION-NO-RUN-ANIM-33",
+    "title": "The companion slides instead of walking or running, and mimic mode does not mirror the gait",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open (owner playtest). Cause: the release builds residents with the idle-only profile (no walk/run frames); the animation kit (walk/run cycles, the engine already picks the gait by speed) is on the animation kit line. Follow thresholds differ from the original (see page).",
+    "report": "bugs/COMPANION-NO-RUN-ANIM-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-rc1",
+    "where": "resident models (idle-only default profile); aw_companion.c animate; aw_npcpath.c",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-rc1"
+    ],
+    "severity": "medium",
+    "severity_reason": "The follower moves with an idle pose: it visibly slides behind the player.",
+    "family": "actors-npc",
+    "related": [],
+    "build": {
+      "name": "v0.0.33-rc1",
+      "source_commit": "7ae3ea7",
+      "engine_commit": "7ae3ea7",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "owner playtest report names no image commit or world format"
+    }
+  },
+  {
+    "id": "BUILD-REUSE-KEYS-TOO-BROAD-35",
+    "title": "A whole build reused no stage, and the cost was not visible before the build started",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.35 development (not shipped): reuse preflight before any stage, loud full non-reuse, gallery model key on reached converter code",
+    "report": "bugs/BUILD-REUSE-KEYS-TOO-BROAD-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Stage reuse planning and the NPC gallery model cache key (tools/build_cache.py, gallery_cache.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "medium",
+    "severity_reason": "A build after a large merge reran every stage with no warning before it started, and the gallery model cache key left out modules its converter runs.",
+    "family": "build-speed",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "source",
+      "source_commit": "901f8e9",
+      "engine_commit": "901f8e9",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "BUILD-SEYDA-CONVERTED-NOT-STAGED-35",
+    "title": "A default CHIM build stopped at the image step's payload preflight: the Seyda Neen region maps are converted later in that step",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.35 development (not shipped): the early preflight checks the Seyda Neen files the image step writes itself as planned; the later preflight checks them written",
+    "report": "bugs/BUILD-SEYDA-CONVERTED-NOT-STAGED-35.md",
+    "reported_by": "build",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Image step: early payload preflight before the Seyda Neen region conversion (build_aga.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Every default full build stopped after all its stages, at the image step (50 min into the first v0.0.35 build); the recorded path too.",
+    "family": "seyda-recorded",
+    "related": [
+      "BUILD-IMAGE-NO-RESUME-33",
+      "BUILD-SEYDA-REPORT-HOST-PATHS-35",
+      "CHIM-HARVEST-SPECIALS-33"
+    ],
+    "chim": "builder",
+    "build": {
+      "name": "v0.0.35-dev1 full build (source 901f8e9)",
+      "source_commit": "901f8e9",
+      "engine_commit": "901f8e9",
+      "world_commit": "901f8e9",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "CHIMPORT-NO-SHARED-POOL-35",
+    "title": "The CHIMporter kept its own unit store beside the shared hashed storage pool: no pool flag, every run folder a private copy",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: storage pool, reuse mode and pool folder options for chimport.py; units and whole cells keyed and stored once in the shared pool and linked into runs; default off (unchanged)",
+    "report": "bugs/CHIMPORT-NO-SHARED-POOL-35.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "tools/chimport.py run units and cell outputs; tools/chim/units.py UnitCache",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Store-once rule broken for the island conversion: a second run folder or workspace converts and stores every unit and cell again; no stored-vs-linked figures",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "chim": "builder",
+    "build": {
+      "name": "v0.0.35 integration line",
+      "source_commit": "e998ca3",
+      "engine_commit": "e998ca3",
+      "world_commit": "e998ca3",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "ENGINE-FLOAT-SHORT-STORE-33",
+    "title": "68040 engine build stored float-to-short conversions of the animation layout parser into the wrong group",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Worked around in source on v0.0.33-anim-kit (integers first, one store per field through a pointer); measured in FS-UAE before and after. Island-wide audit of float-to-short stores into struct arrays pending.",
+    "report": "bugs/ENGINE-FLOAT-SHORT-STORE-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "engine/aga/src/aw_anim.c AW_AnimParse (gcc m68k -O1, FPU)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Every group's first frame landed in group 0 on the Amiga while host builds were right; host tests cannot see it",
+    "family": "fpu-cpu",
+    "related": []
+  },
+  {
+    "id": "NPC-VOICE-BARKS-33",
+    "title": "NPCs never say their combat, hit, flee or idle voice lines",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source on v0.0.33-anim-kit: per-actor voice lines from the original voice topics, OpenMW's odds and first-match rule, Random100 and health conditions; combat hook and idle line.",
+    "report": "bugs/NPC-VOICE-BARKS-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "engine: only the greeting plays (world.qc aw_greet); the voice pool already holds the lines",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Fights and towns are silent apart from greetings",
+    "family": "audio",
+    "related": []
+  },
+  {
+    "id": "NPC-GREETING-PICK-33",
+    "title": "Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the voice study; the new voice lines follow OpenMW's first match.",
+    "report": "bugs/NPC-GREETING-PICK-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "src/mwad/npc.py greeting_fixture",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Greeting choice differs from the original rule; one fixed line per actor; a global 8 s voice gap with no source",
+    "family": "audio",
+    "related": []
+  },
+  {
+    "id": "NPC-NO-RUN-ANIM-35",
+    "title": "Companions and hostile NPCs walk but never run, and the walk looks wrong: release residents had only idle frames",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: the animation kit is the default (--anim-kit on = react+full), so residents carry walk and run and the engine picks them by speed; --anim-kit off keeps the previous idle frames; dbg animkit; docs/ANIMKIT.md",
+    "report": "bugs/NPC-NO-RUN-ANIM-35.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "Builder default --npc-anim idle; engine walk/run selection (aw_anim.c)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "Player-visible in every town: followers and fighters slide or walk while they should run",
+    "family": "actors-npc",
+    "related": [],
+    "build": {
+      "name": "v0.0.34 release",
+      "source_commit": "70b04e2",
+      "engine_commit": "70b04e2",
+      "world_commit": "70b04e2",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-BUDGET-ENGINE-LIMITS-35",
+    "title": "Town entity and model budgets were not tied to the engine's per-map tables",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing: every output map is gated on the engine's tables (tools/map_engine_limits.py) in the payload preflight and the image step; config budgets may only tighten",
+    "report": "bugs/BUILD-BUDGET-ENGINE-LIMITS-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "config town budgets; tools/import_town.py; engine MAX_EDICTS, MAX_MODELS, scenery catalogue",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "A map over an engine table stops the game at load (no free edicts, precache overflow, scenery catalogue)",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3b72d32",
+      "engine_commit": "3b72d32",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-MAP-NAME-OVERFLOW-35",
+    "title": "map, changelevel, connect and load copied a name of any length into fixed buffers",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-MAP-NAME-OVERFLOW-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/host_cmd.c map/changelevel/connect/load; sv_main.c SV_SpawnServer",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A long typed map name or a damaged save overwrote memory after 64-byte buffers",
+    "family": "console-input",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3b72d32",
+      "engine_commit": "3b72d32",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-FRAME-TIME-FLOAT-35",
+    "title": "The main loop held the seconds since start in floats: frame times quantise after hours of play",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-FRAME-TIME-FLOAT-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/sys_amiga.c RunGameLoop",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "After about 4.5 hours frame deltas step by 1 ms, after 18 hours by 4 ms: jitter or stalls in long sessions",
+    "family": "fpu-cpu",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3b72d32",
+      "engine_commit": "3b72d32",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-LOADGAME-SYSERROR-35",
+    "title": "A damaged Quake save stopped the program (Sys_Error) and its strings were read without a width",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-LOADGAME-SYSERROR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/host_cmd.c Host_Loadgame_f",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "Console load of a damaged .sav crashed the game or overran a buffer",
+    "family": "console-input",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "3b72d32",
+      "engine_commit": "3b72d32",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-SOUND-NAME-SYSERROR-35",
+    "title": "A sound name of 64 characters or more, or more than 512 sounds in a session, stopped the program",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-SOUND-NAME-SYSERROR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/snd_dma.c S_FindName",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "high",
+    "severity_reason": "The play command or a long session reached Sys_Error",
+    "family": "audio",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-MODEL-NAME-SYSERROR-35",
+    "title": "Model names of any length went into 64-byte model slots, and a missing model file stopped the program",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-MODEL-NAME-SYSERROR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/model.c Mod_ForName, Mod_TouchModel, Mod_LoadModel",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A long QuakeC or map model string overwrote memory; a vanished model crashed",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-WRITE-OPEN-SYSERROR-35",
+    "title": "A write to a full or write-protected disk (screenshot) stopped the program",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-WRITE-OPEN-SYSERROR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/sys_file_amiga.c Sys_FileOpenWrite",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Taking a screenshot on a full volume crashed the game",
+    "family": "console-input",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-CBUF-OVERFLOW-35",
+    "title": "Command text larger than the command buffer or a line over 1023 characters overflowed",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-CBUF-OVERFLOW-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/cmd.c Cbuf_InsertText, Cbuf_Execute",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "exec of a large or long-line file crashed or overwrote the stack",
+    "family": "console-input",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-COM-TOKEN-UNBOUNDED-35",
+    "title": "COM_Parse wrote tokens of any length into the 1 KiB com_token",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-COM-TOKEN-UNBOUNDED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/common.c COM_Parse",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A token over 1023 characters (map entity text, config, save) overwrote memory after com_token",
+    "family": "console-input",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-ENTITY-TEXT-UNBOUNDED-35",
+    "title": "Entity and QuakeC text was copied into fixed buffers without a bound",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-ENTITY-TEXT-UNBOUNDED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/pr_edict.c, pr_cmds.c, sv_main.c, cl_parse.c, cl_demo.c, model.c, console.c, host.c",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Long map or save strings overwrote memory; a map message was used as a format",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-LEAF-LIMIT-UNCHECKED-35",
+    "title": "A map with more leaves than MAX_MAP_LEAFS overflowed the PVS buffers silently",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-LEAF-LIMIT-UNCHECKED-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/model.c Mod_LoadLeafs",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Silent memory corruption on such a map",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ENGINE-QC-ARGS-SYSERROR-35",
+    "title": "Bad QuakeC sound arguments stopped the program; lightstyle had no range check",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/ENGINE-QC-ARGS-SYSERROR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/pr_cmds.c PF_sound, PF_lightstyle",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "low",
+    "severity_reason": "A QuakeC change with a bad argument crashed or wrote past sv.lightstyles",
+    "family": "game-logic",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "CHIM-STATIC-PLACE-HOST-ERROR-35",
+    "title": "Bad flora data at CHIM chunk activation ended the session with zone locks held; the next map then stopped the program",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing",
+    "report": "bugs/CHIM-STATIC-PLACE-HOST-ERROR-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src/chim/chim_statics.c Place",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "A Host_Error during activation left zone blocks locked and the next map load hit Sys_Error",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "streaming",
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": "unknown",
+      "chim_version": "unknown",
+      "chim_format": "unknown",
+      "unknown_reason": "found by reading the source, not in a build"
+    }
+  },
+  {
+    "id": "ENGINE-FATAL-PATH-SWEEP-35",
+    "title": "Sweep of every engine fatal path that data or a player can reach",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open as the record of the sweep: reachable paths fixed in source on v0.0.35-crash-fixes-2 (not shipped at the time of writing); the items left are listed on the page with a reason",
+    "report": "bugs/ENGINE-FATAL-PATH-SWEEP-35.md",
+    "reported_by": "review",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.34",
+    "where": "engine/aga/src (Sys_Error, Host_Error, PR_RunError, allocation failures, unbounded copies)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34"
+    ],
+    "severity": "medium",
+    "severity_reason": "Tracks the reachable crash paths; the left items are listed with a reason",
+    "family": "engine-limits",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "ANIMKIT-GROUND-CHECK-LAYOUT-35",
+    "title": "With the animation kit on, every image step stopped: the actor ground check refused resident models with more than 8 frames",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: the checker reads the model's animation kit layout (<model>.anm) and checks the idle group's standing poses; a kit model without its layout or idle group still fails; test",
+    "report": "bugs/ANIMKIT-GROUND-CHECK-LAYOUT-35.md",
+    "reported_by": "build",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/check_actor_ground.py contact_samples; tools/actor_grounding.py",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Every default build failed in the image step once the kit became the default (first seen in a MiniWind build)",
+    "family": "actors-npc",
+    "related": [],
+    "build": {
+      "name": "v0.0.35-dev1 MiniWind animkit 853d9b2",
+      "source_commit": "853d9b2",
+      "engine_commit": "853d9b2",
+      "world_commit": "853d9b2",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-IMAGE-STALE-PYTHONPATH-35",
+    "title": "Builder container images put an old builder copy on PYTHONPATH",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.35 development (not shipped): import guard on every build, build.py --check-entry, --developer-mode, clean local images",
+    "report": "bugs/BUILD-IMAGE-STALE-PYTHONPATH-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "Builder container images (recipe in tools/build_docker.py); tools/build.py entry",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Any container run of another source tree without its own PYTHONPATH could import old builder code silently; a job read the wrong VERSION from it.",
+    "family": "build-cache-reuse",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "6dcb10e",
+      "engine_commit": "6dcb10e",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "NPC-DAGOTH-BODY-DECIMATION-33",
+    "title": "Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.34-npc-heads, not shipped at the time of writing: shared-vertex encoding keeps all 2,254 triangles on 1,741 vertices (owner chose option 1).",
+    "report": "bugs/NPC-DAGOTH-BODY-DECIMATION-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "Gallery model of r/dagothr.nif (dagoth_ur_1, dagoth_ur_2)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "One model loses 1,351 of 2,254 triangles; the owner wants it whole; needs a format or engine choice.",
+    "family": "actors-npc",
+    "related": []
+  },
+  {
+    "id": "NPC-HEAD-DECIMATION-33",
+    "title": "NPC heads decimated into unrecognisable faces",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.34-npc-heads, not shipped at the time of writing: heads and hair keep every original triangle (--npc-head-detail original, default; budget keeps the previous bake).",
+    "report": "bugs/NPC-HEAD-DECIMATION-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "Whole-model NPC bake (tools/npc_geometry.py), every humanoid head",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "high",
+    "severity_reason": "Every NPC face is a handful of wrong triangles; a major visual break met in normal play.",
+    "family": "actors-npc",
+    "related": []
+  },
+  {
+    "id": "NPC-NEAR-SKIN-TEXELS-33",
+    "title": "Original-head models had blurrier bodies than the budget model",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on v0.0.34-npc-heads, not shipped at the time of writing: mixed 16/8-texel tiles, face and body first.",
+    "report": "bugs/NPC-NEAR-SKIN-TEXELS-33.md",
+    "reported_by": "review",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.34-dev",
+    "where": "NPC bake skin tiles (tools/npc_geometry.py _bake), raised-limit models",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.34-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "Near NPC bodies would look blurrier up close than far away; caught before any build shipped it.",
+    "family": "actors-npc",
+    "related": []
+  },
+  {
+    "id": "ANIMKIT-IMAGE-FORMATS-35",
+    "title": "With the animation kit on, the image step stopped late on the kit's layout files: their format was unknown to the palette overlay",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: .anm and .tag are declared plain-text formats; the payload preflight checks every staged file's format first (file-formats), so a new file type fails in seconds; test",
+    "report": "bugs/ANIMKIT-IMAGE-FORMATS-35.md",
+    "reported_by": "build",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/sky_palette_overlay.py spans; tools/payload_preflight.py",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Every default image build stopped after the image work; the payload preflight did not check file formats",
+    "family": "actors-npc",
+    "related": [],
+    "build": {
+      "name": "v0.0.35-dev1 MiniWind animkit e521e14",
+      "source_commit": "e521e14",
+      "engine_commit": "e521e14",
+      "world_commit": "e521e14",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-SEYDA-REPORT-HOST-PATHS-35",
+    "title": "The converted Seyda Neen region table report (seyda-regions.json) shipped absolute build paths",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in v0.0.35 development (not shipped): the written report names its files relative to the image folder",
+    "report": "bugs/BUILD-SEYDA-REPORT-HOST-PATHS-35.md",
+    "reported_by": "gate:payload-preflight",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/prepare_seyda_regions.py convert: the seyda-regions.json it writes into id1",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Every default CHIM build (converted Seyda Neen) stopped at the image step's host-paths check; the file named the build folder.",
+    "family": "builder-from-scratch",
+    "related": [
+      "BUILD-SEYDA-CONVERTED-NOT-STAGED-35"
+    ],
+    "chim": "builder",
+    "build": {
+      "name": "v0.0.35-dev1 clean build (source 7ec5c03)",
+      "source_commit": "7ec5c03",
+      "engine_commit": "7ec5c03",
+      "world_commit": "7ec5c03",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-CHIM-KEY-UNDERDECLARED-35",
+    "title": "The CHIM stage's fingerprint left out the tracker code it ran (8 files, 2 functions): a wrong-reuse risk",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: the tracker is its own stage (cell-progress) with its own key; names built from literal parts are followed by the fingerprint scan; build_audit wakes on any stage whose trace holds uncovered code",
+    "report": "bugs/BUILD-CHIM-KEY-UNDERDECLARED-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/chim_build.py (cell progress subprocess named in parts), tools/build_cache.py source closure",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "A stage output (BUILD/toolkit) was produced by code its key did not cover; only the read trace refused the reuse",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-try2_901f8e9",
+      "source_commit": "901f8e9",
+      "engine_commit": "901f8e9",
+      "world_commit": "901f8e9",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-POOL-APPLY-READ-MISS-35",
+    "title": "In a pool-mode build every reused stage was refused as the next reuse source: the reuse step's read of tools/storage_pool.py counted as a stage input",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: for a reused stage, reads and calls of the reuse step's own modules (APPLY_STEMS) are not stage inputs; any other uncovered read still refuses",
+    "report": "bugs/BUILD-POOL-APPLY-READ-MISS-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/build_cache.py Recorder.check_trace",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Every reused stage of a --reuse-mode pool build (11 in the dev1 resume) would rebuild in the build after it: hold-level reuse loss",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-try2_901f8e9",
+      "source_commit": "901f8e9",
+      "engine_commit": "901f8e9",
+      "world_commit": "901f8e9",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-SCENE-DIAGNOSTIC-COPY-35",
+    "title": "Scene-chain stages were never reusable: copying the previous scene (logs included) counted as reading another stage's diagnostics",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: a byte copy of a diagnostic into a diagnostic is not a read (shutil.copyfile audit event); any other read of another stage's diagnostic still refuses reuse",
+    "report": "bugs/BUILD-SCENE-DIAGNOSTIC-COPY-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/build_cache.py read trace hook; shutil.copytree in prepare_npcs/hands/interior/intro",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "medium",
+    "severity_reason": "npcs, hands, interior and intro rebuilt in every reuse build although their inputs had not changed",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-try2_901f8e9",
+      "source_commit": "901f8e9",
+      "engine_commit": "901f8e9",
+      "world_commit": "901f8e9",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-POOL-READONLY-SCENE-WRITE-35",
+    "title": "A pool-mode resume failed in 17 s: npcs could not rewrite its copy of seyda.bsp (copytree kept the pool's read-only mode)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: mwad.paths.copy_tree makes each copy owner-writable (the pooled source is never touched); every folder copy in tools/ and src/ uses it (sweep test)",
+    "report": "bugs/BUILD-POOL-READONLY-SCENE-WRITE-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/prepare_npcs.py and every stage that copies an inherited folder (shutil.copytree / copy2)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "A --reuse-mode pool build with a rerun scene-chain stage cannot finish",
+    "family": "build-cache-reuse",
+    "related": [],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-try2_901f8e9",
+      "source_commit": "901f8e9",
+      "engine_commit": "901f8e9",
+      "world_commit": "901f8e9",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-RESUME-OUTPUTS-DIFFER-35",
+    "title": "Every v0.0.35 resume refused the stages after a rerun scene-chain stage as 'outputs differ' without comparing them",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: a complete record refused only for what it read (trace reasons) is compared byte for byte; attribution problems still refuse",
+    "report": "bugs/BUILD-RESUME-OUTPUTS-DIFFER-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/build_cache.py same_outputs",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Resume from the failure point was broken for the line: later stages reran although the rerun stages wrote the same bytes",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-resume-seydafix_7ec5c03",
+      "source_commit": "7ec5c03",
+      "engine_commit": "7ec5c03",
+      "world_commit": "7ec5c03",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-RESUME-HAZARD-STATIC-35",
+    "title": "A resume failed in 'area': the rebuild hazard counted files of a reused stage that had run again after all",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: the hazard is kept per reused stage and only stages that were really reused in this build count",
+    "report": "bugs/BUILD-RESUME-HAZARD-STATIC-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/build_cache.py plan (rebuild_hazard) and apply_stage",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "The resumed build stopped with 'Start a new build without --reuse-from' although nothing was missing",
+    "family": "build-cache-reuse",
+    "related": [],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-resume-seydafix_7ec5c03",
+      "source_commit": "7ec5c03",
+      "engine_commit": "7ec5c03",
+      "world_commit": "7ec5c03",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-GALLERY-JSON-KEY-ORDER-35",
+    "title": "NPC gallery outputs differed between two builds only in JSON key order (cache vs fresh results)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: every gallery JSON writer sorts its keys (test)",
+    "report": "bugs/BUILD-GALLERY-JSON-KEY-ORDER-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/gallery_cache.py materialize, tools/prepare_gallery.py receipts and gallery-audit.json",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "medium",
+    "severity_reason": "3,460 of 10,669 gallery files differed, so npc-gallery and every stage after it counted as changed in a resume",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "2026_10_10_v0.0.35-dev1_full-resume-seydafix_7ec5c03",
+      "source_commit": "7ec5c03",
+      "engine_commit": "7ec5c03",
+      "world_commit": "7ec5c03",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "NPC-JOINT-GAPS-33",
+    "title": "NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Measured 9 October 2026 (joint-seam audit, MODULAR_NPCS.md); rim-locking prototypes close the joints but need about 40% more faces than the alias budget; coordinated rim reduction planned; the parts gallery gates against new gaps",
+    "report": "bugs/NPC-JOINT-GAPS-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.32",
+    "where": "NPC model baker (tools/npc_geometry.py simplify_shape), every humanoid model",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.32"
+    ],
+    "severity": "medium",
+    "severity_reason": "Visible openings at necks, wrists, elbows, knees and clothing edges on many NPCs; gallery and residents alike.",
+    "family": "converter-geometry",
+    "related": [
+      "NPC-BAKED-WHOLE-DUPLICATION-33"
+    ],
+    "build": {
+      "name": "source",
+      "source_commit": "cb44369",
+      "engine_commit": "cb44369",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "NPC-GALLERY-SPIKE-33",
+    "title": "One gallery model has a vertex 12 units outside its source shape (simplifier spike)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Found by the parts-versus-whole gallery comparison on 9 October 2026; residents not yet checked for spikes",
+    "report": "bugs/NPC-GALLERY-SPIKE-33.md",
+    "reported_by": "audit",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.32",
+    "where": "NPC gallery model m733c45e63ae7480a (whole bake, tools/npc_geometry.py)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.32"
+    ],
+    "severity": "low",
+    "severity_reason": "One inspection model shows a spike; the same appearance baked from parts does not.",
+    "family": "converter-geometry",
+    "related": [
+      "NPC-BAKED-WHOLE-DUPLICATION-33"
+    ],
+    "build": {
+      "name": "source",
+      "source_commit": "cb44369",
+      "engine_commit": "cb44369",
+      "world_commit": null,
+      "chim_version": null,
+      "chim_format": null
+    }
+  },
+  {
+    "id": "BUILD-POOL-ARG-UNFINGERPRINTED-35",
+    "title": "The balmora stage was never reusable once the shared storage pool grew past 512 MiB: its --npc-model-pool folder was hashed as an input",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: the storage pool counts as its token (content-addressed), the read trace lists every pool read and refuses any that is not a keyed lookup, and the resident bake's pool key covers the code and packages it runs",
+    "report": "bugs/BUILD-POOL-ARG-UNFINGERPRINTED-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/build_cache.py external_inputs (--npc-model-pool of balmora, area, interiors, towns)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "balmora (and every other stage given the pool folder) rebuilt in every build: hold-level reuse loss under the primary build imperative",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "MiniWind v0.0.35-dev1 animkit-companion",
+      "source_commit": "c2b7a3e",
+      "engine_commit": "c2b7a3e",
+      "world_commit": "c2b7a3e",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "INTERIOR-HULL-CHAIN-33",
+    "title": "The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repaired in source by the shared routed hull (merged from the CHIM builder line, c04404f) with ROUTED-HULL-NODE-ORDER-33 fixed, not shipped at the time of writing: in_v_arena_01 hull depth 36,545 to 6,711 (37,130 clipnodes); Pit stair gate 95 min to 92 s on one core, same results; actor grounding minutes instead of 40+; the chain stays selectable (--model-hull chain).",
+    "report": "bugs/INTERIOR-HULL-CHAIN-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev1",
+    "where": "Interior converter collision (prepare_mesh_bsp collider), Vivec, Arena Pit (vai000)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Every movement trace in the Pit costs tens of thousands of plane tests on a 68040; the stair gate on the room took 95 minutes on one core.",
+    "family": "converter-geometry",
+    "related": [
+      "CHIM-HULL-CHAIN-COST-33",
+      "COLLISION-HULL-CHAINS-33",
+      "INTERIOR-HULLS-HEAVY-32",
+      "TOWN-VIS-OCCLUSION-31"
+    ],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "source",
+      "source_commit": "8f11f40",
+      "engine_commit": "8f11f40",
+      "world_commit": "8f11f40",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "found in source on the legacy interior converter path; no CHIM world involved"
+    }
+  },
+  {
+    "id": "TOWN-INTERIOR-SAVEID-ORDER-33",
+    "title": "Town interior save IDs are numbered across towns: listing a room for an earlier town renumbers every later town's rooms",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open. Listing the Arena Pit (vai000) moved all 143 canton rooms up by one save ID; harmless now (no canton has shipped), guarded by a test that shipped towns' rooms come first.",
+    "report": "bugs/TOWN-INTERIOR-SAVEID-ORDER-33.md",
+    "reported_by": "build",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev1",
+    "where": "Town table (tools/town_table.py): interior save IDs from AW_TOWN_INTERIOR_BASE",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev1"
+    ],
+    "severity": "low",
+    "severity_reason": "No shipped save can hold a canton room yet; it becomes a save break once a canton ships.",
+    "family": "town-import",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "8f11f40",
+      "engine_commit": "8f11f40",
+      "world_commit": "8f11f40",
+      "chim_version": "0.1.0",
+      "chim_format": "unknown",
+      "unknown_reason": "found in source on the legacy interior converter path; no CHIM world involved"
+    }
+  },
+  {
+    "id": "COLLISION-TRACE-COST-33",
+    "title": "Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Repair in source on v0.0.33-chim-format, not shipped (post-v0.0.33 default): --model-hull auto again; CHIM routes chains deeper than 256 clipnodes, a ring over the zone keeps its smallest routed meshes as chains. CHIM Balmora: fits (240 B headroom), 4 of 5 big houses routed. In v0.0.35 the routed/auto hull path is selectable, not the default (--model-hull chain stays the default)",
+    "report": "bugs/COLLISION-TRACE-COST-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "Standing hulls of house-size and larger placed models (chains), legacy maps and CHIM worlds",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "high",
+    "severity_reason": "Emulator-relative: a Balmora house costs 12-33 ms per movement trace on the slow preset; not yet measured on hardware.",
+    "family": "stairs-collision",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "source",
+      "source_commit": "b5ae6ad",
+      "engine_commit": "b5ae6ad",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "measured on private CHIM Balmora worlds built from the branch; no numbered build"
+    }
+  },
+  {
+    "id": "CHIM-TILT-VARIANTS-SPLIT-33",
+    "title": "Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open; measured (base master census). Fix: one model per mesh plus per-placement pitch and roll (record and chunk clip), next release.",
+    "report": "bugs/CHIM-TILT-VARIANTS-SPLIT-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "Shared variant key (prepare_mesh_bsp._instance_key); CHIM placements store yaw only",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "high",
+    "severity_reason": "Ring memory and disk: 22 tilted coda flowers cost 476 KB in the Vivec Temple ring instead of one shared model; island-wide 50,108 placements.",
+    "family": "chim-streamer",
+    "related": [],
+    "chim": "format",
+    "build": {
+      "name": "source",
+      "source_commit": "6a6305f",
+      "engine_commit": "6a6305f",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5",
+      "unknown_reason": "found from the Temple heap report and a census of Morrowind.esm; no numbered build"
+    }
+  },
+  {
+    "id": "ANIMKIT-ACTOR-ABI-SITES-35",
+    "title": "With the animation kit on, the image step stopped late, one tool at a time, on actor models with more than the previous 8 or 21 frames (guard torch companions last)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: one frame layout helper (tools/actor_frames.py) for every site; kit guards get an idle-group torch companion; payload preflight 'actor-frames' check; sweep test",
+    "report": "bugs/ANIMKIT-ACTOR-ABI-SITES-35.md",
+    "reported_by": "build",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "prepare_guard_torches.py, check_actor_ground.py, chim/frame_map.py; fix: tools/actor_frames.py",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "Three default image builds in a row stopped about 10 minutes in, each on the next tool that hard-coded the previous frame counts",
+    "family": "actors-npc",
+    "related": [],
+    "build": {
+      "name": "v0.0.35-dev1 MiniWind animkit companion run c2b7a3e",
+      "source_commit": "c2b7a3e",
+      "engine_commit": "c2b7a3e",
+      "world_commit": "c2b7a3e",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "ANIMKIT-ITEM-TAG-FRAMES-35",
+    "title": "With the animation kit on, residents fought without their weapon and shield: the item tag tables had one row per kit sample, not per model frame, and the mover model had none",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: tags follow the standing and mover model frames, the engine reads the mover's tag; the payload preflight checks every tag's rows",
+    "report": "bugs/ANIMKIT-ITEM-TAG-FRAMES-35.md",
+    "reported_by": "build",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/prepare_area.py, tools/npc_items.py, engine/aga/src/aw_items.c",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "medium",
+    "severity_reason": "Carried weapons and shields (NPC-WEAPON-MESH-33) silently not drawn for every kit resident; no gate compared tag rows with model frames",
+    "family": "actors-npc",
+    "related": [],
+    "build": {
+      "name": "v0.0.35-dev1 MiniWind animkit companion run c2b7a3e",
+      "source_commit": "c2b7a3e",
+      "engine_commit": "c2b7a3e",
+      "world_commit": "c2b7a3e",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "BUILD-CELL-PROGRESS-KEY-BUGS-35",
+    "title": "Every bug registration stopped builds at the reuse preflight: the cell-progress key held all of docs/",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Fixed in source on the v0.0.35 line: a module naming itself is not a run of its main(); the tracker key holds no docs/ file; an advisory stage (--never-fail, nothing depends on it) never stops a build",
+    "report": "bugs/BUILD-CELL-PROGRESS-KEY-BUGS-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35-dev1",
+    "where": "tools/build_cache.py source closure (script-name rule); reuse preflight stop",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35-dev1"
+    ],
+    "severity": "high",
+    "severity_reason": "A docs-only change (any new bug) stopped every build with --reuse-from before any stage ran",
+    "family": "build-cache-reuse",
+    "related": [],
+    "tags": [
+      "performance"
+    ],
+    "build": {
+      "name": "MiniWind animkit-abi build",
+      "source_commit": "02fa893",
+      "engine_commit": "02fa893",
+      "world_commit": "02fa893",
+      "chim_version": "0.1.0",
+      "chim_format": "0.5"
+    }
+  },
+  {
+    "id": "CHIM-SLOWCPU-FRAMETIME-33",
+    "title": "Balmora on CHIM runs at about 1 frame per second on a slow 68040 (cycle-exact emulation)",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, deferred to after v0.0.33 (owner): not a CHIM regression. Slow preset x14, same session, preview engine 0d8bf4f: CHIM 1.06-1.61 s per frame, legacy 2.03-4.13 s at Balmora cameras 1-5; brush-model clip walk 65-72 percent of the view; fog/sky pass and server frame registered separately",
+    "report": "bugs/CHIM-SLOWCPU-FRAMETIME-33.md",
+    "reported_by": "owner",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "engine frame time on a slow CPU: CHIM Balmora exterior (placements, host frame)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Not a CHIM regression: CHIM is 1.5-2.6x faster than legacy on the slow preset; about 1 frame per second either way (relative).",
+    "family": "render-performance",
+    "related": [
+      "CHIM-REBUILD-COST-33",
+      "DEBUG-TP-CHIMTOWNS-33",
+      "RENDER-FOG-PASS-COST-33",
+      "SERVER-FRAME-ARRIVAL-33"
+    ],
+    "chim": "performance",
+    "build": {
+      "name": "CHIM Preview 1",
+      "source_commit": "0f467e4b907e28930e323b31a9db2fcfc17c1c47",
+      "engine_commit": "0d8bf4feacbf6563485e712ffd1ca4201391c25d",
+      "world_commit": "unknown",
+      "chim_version": "0.1.0",
+      "chim_format": "0.4",
+      "unknown_reason": "the CHIM world receipt records no commit (CHIM-RECEIPT-COMMIT-33)",
+      "note": "measured in the CHIM preview engine on the slow accelerator preset, 9 October 2026"
+    }
+  },
+  {
+    "id": "RENDER-FOG-PASS-COST-33",
+    "title": "The per-pixel fog and day-night sky pass costs 150-210 ms per frame on a slow 68040",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open: measured with aw_fog 0 and aw_daynight 0 on the slow preset; not repaired",
+    "report": "bugs/RENDER-FOG-PASS-COST-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "engine aw_fog.c AW_FogDraw and r_sky.c R_DayNightSkyPixel, every exterior frame",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "About 10-15 percent of an exterior frame at 49.7 MHz (cycle-exact emulation, relative); up to 75 percent of a world-only view.",
+    "family": "distance-drawing",
+    "related": [
+      "CHIM-SLOWCPU-FRAMETIME-33"
+    ]
+  },
+  {
+    "id": "SERVER-FRAME-ARRIVAL-33",
+    "title": "The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, cause unknown: QuakeC runs about 750 instructions per frame there; needs a per-function timer",
+    "report": "bugs/SERVER-FRAME-ARRIVAL-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "engine Host_ServerFrame at Balmora camera 3 (legacy and CHIM alike)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "medium",
+    "severity_reason": "About 20 percent of the frame at the Balmora arrival point at 49.7 MHz (relative); 12 ms at camera 4.",
+    "family": "game-logic",
+    "related": [
+      "CHIM-SLOWCPU-FRAMETIME-33"
+    ]
+  },
+  {
+    "id": "DEBUG-TP-CHIMTOWNS-33",
+    "title": "After chim_towns 0, dbg tp from a CHIM town reloads that town on legacy maps at the current position",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Open, seen three times in FS-UAE; workaround in test scripts: switch while in another town",
+    "report": "bugs/DEBUG-TP-CHIMTOWNS-33.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-09",
+    "found_in": "v0.0.33-dev",
+    "where": "engine dbg tp and chim_towns (CHIM preview engine 0d8bf4f)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.33-dev"
+    ],
+    "severity": "low",
+    "severity_reason": "Test sessions only: the A/B switch lands at the wrong place; dbg tp seydaneen from Seyda once left coordinate teleport unavailable.",
+    "family": "debug-commands",
+    "related": [
+      "CHIM-SLOWCPU-FRAMETIME-33"
+    ]
+  },
+  {
+    "id": "ANIMKIT-TORCH-STANDING-35",
+    "title": "With the animation kit, guards hold their torch only while standing; walking and running drop it",
+    "state": "open",
+    "fixed_in": null,
+    "owner_accepted": null,
+    "status": "Known in v0.0.35: the walk and run models have no torch attachment",
+    "report": "bugs/ANIMKIT-TORCH-STANDING-35.md",
+    "reported_by": "developer",
+    "found_date": "2026-10-10",
+    "found_in": "v0.0.35",
+    "where": "animation kit walk/run models (no torch attach frames)",
+    "reproduction": "always",
+    "duplicate_of": null,
+    "persists_in": [
+      "v0.0.35"
+    ],
+    "severity": "low",
+    "severity_reason": "visual only; night light around walking guards is missing",
+    "family": "lighting-night",
+    "related": [],
+    "build": {
+      "name": "source",
+      "source_commit": "61ab0a9c4118e698d2fe9b49dc995347aefdcea0",
+      "engine_commit": "61ab0a9c4118e698d2fe9b49dc995347aefdcea0",
       "world_commit": null,
       "chim_version": null,
       "chim_format": null

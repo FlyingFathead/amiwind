@@ -35,7 +35,9 @@ def profile_reduction(profile):
     """reduce_mesh keyword options a visual profile asks for. One reading for
     the converter and the size estimates (asset census, world estimate)."""
     return {'preserve_shared_seams': bool(profile.get('preserve_shared_seams', False)),
-            'lock_boundaries': bool(profile.get('lock_boundaries', False))}
+            'lock_boundaries': bool(profile.get('lock_boundaries', False)),
+            'agg': float(profile.get('lod_agg', 7.0)),
+            'preserve_border': bool(profile.get('lod_preserve_border', False))}
 
 
 def reduce_for_profile(vertices, faces, profile, materials=None, name='mesh'):
@@ -63,7 +65,7 @@ def reduce_for_profile(vertices, faces, profile, materials=None, name='mesh'):
 
 
 def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_seams=False,
-                lock_boundaries=False):
+                lock_boundaries=False, agg=7.0, preserve_border=False):
     """Reduce each material component to about ratio of its triangles.
 
     Default reducer: fast_simplification, which also collapses rim edges, so
@@ -73,7 +75,10 @@ def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_s
     instead: rim vertices and vertices shared with another component keep
     their exact position, only interior edges collapse, so parts stay joined
     where the source joins them. The default stays selectable per profile
-    (DON'T DELETE ANY METHOD)."""
+    (DON'T DELETE ANY METHOD). agg / preserve_border (profile lod_agg /
+    lod_preserve_border): fast_simplification's aggressiveness (lower keeps the
+    shape better) and its open-boundary lock; the defaults are the reducer's
+    original behaviour."""
     import fast_simplification
     if not 0 < ratio <= 1:
         raise ValueError('Invalid static LOD ratio')
@@ -127,9 +132,12 @@ def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_s
                 if any(tuple(point) not in kept for point in rim):
                     # Gate: a moved rim is exactly the open seam this mode exists to prevent.
                     raise ValueError('Boundary-locked reduction moved a rim vertex')
-            else:
+            elif agg == 7.0 and not preserve_border:
                 points,triangles=fast_simplification.simplify(
                     points,triangles.astype(np.int32),target_count=target)
+            else:
+                points,triangles=fast_simplification.simplify(
+                    points,triangles.astype(np.int32),target_count=target,agg=agg,preserve_border=preserve_border)
             if not len(triangles):
                 raise ValueError('Static LOD removed a component')
             old=vertices[original[:,:3]]

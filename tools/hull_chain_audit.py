@@ -77,6 +77,18 @@ def below_head(children, root, contents_first=CONTENTS_FIRST):
     return sorted(bad)
 
 
+def over_limit(depth, reach=None):
+    """The shared hull rule (routed_hull.CHAIN_DEPTH_LIMIT, or its measurement override): True when a chain of
+    this depth is reported. CHIMport's cell audit and this audit read the same rule as the CHIM router. reach
+    (the clipnodes reachable from the root, hull_depth): a hull that reaches more than its depth is routed or
+    compiled, not a chain, and is not reported (a routed house keeps straddler chains deeper than the limit;
+    the heap fallback may keep a chain: COLLISION-TRACE-COST-33)."""
+    from routed_hull import chain_depth_limit
+    if reach is not None and reach > depth:
+        return False
+    return depth > chain_depth_limit()
+
+
 def audit_map(path):
     data = Path(path).read_bytes()
     if len(data) < 124 or struct.unpack_from('<i', data)[0] != 29:
@@ -117,7 +129,11 @@ def maps_in(paths):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('paths', nargs='+', help='BSP maps or folders of them')
-    ap.add_argument('--min-depth', type=int, default=256, help='list models whose hull depth is at least this')
+    # the shared rule (routed_hull.CHAIN_DEPTH_LIMIT): a hull deeper than the limit is reported
+    from routed_hull import CHAIN_DEPTH_LIMIT
+    ap.add_argument('--min-depth', type=int, default=CHAIN_DEPTH_LIMIT + 1,
+                    help='list models whose hull depth is at least this (default: deeper than '
+                         'routed_hull.CHAIN_DEPTH_LIMIT, %d)' % CHAIN_DEPTH_LIMIT)
     ap.add_argument('--json', type=Path)
     ap.add_argument('--jobs', type=int)
     a = ap.parse_args(argv)

@@ -164,11 +164,18 @@ Leary). The CHIM builder is GPLv3. Details and the reviewed upstream revision:
 | [CHIM ideas](IDEAS.md) | Every idea and held-back item with its status |
 | [World format](WORLD_FORMAT.md) | The files the CHIM builder writes, the M3 and M4 designs, the heap gate, the version rules |
 | [CHIM engine](ENGINE.md) | How the engine loads, keeps, draws and collides with a CHIM world; memory and tests |
+| [CHIMport](CHIMPORT.md) | The whole island converted cell by cell from the sea inwards, every audit per cell |
 | [Disk space](DISK_SPACE.md) | Amiga disk limits, what CHIM saves, and the size budget of the whole game |
 | [CHIM statistics](STATS.md) | `chim-stats.json`: polycounts, disk, memory and streaming figures of every build |
 | [CHIM texture effects](TEXTURE_EFFECTS.md) | Optional `.chimfx` texture effects |
+| [CHIM lighting](LIGHTING.md) | How CHIM lights a cell like the original: the options measured, the hybrid lighting type |
+| [CHIM lights roadmap](LIGHTING_ROADMAP.md) | The lighting milestones, their checks and the pending decisions |
 | [CHIM NPC pathfinding](CHIM_NPC_PATHFINDING.md) | The walkable graph in the world format, budgets and gates |
+| [CHIM cell tracker](CELL_TRACKER.md) | The generated live status of every open-world cell on CHIM |
+| [CHIM Progress Tracker guide](PROGRESS_TRACKER.md) | How the tracker works: statuses, audits, lighting, releases, the Toolkit legend, commands |
+| [Cell result format](CELL_RESULT_FORMAT.md) | `aw-cell-result-1`, the file a conversion run hands to the tracker |
 | [CHIM build guide](build_guide/README.md) | Builder types, MiniWind, quick test builds, speed, emulator presets |
+| [Builder profile](../performance/BUILDER_PROFILE.md) | Where a full build spends its time, the cost of a failure, and the builder fixes and time savings since v0.0.33 (chart) |
 | [World streamer](../WORLD_STREAMER.md) | The original design and its requirements (memory placement, visibility) |
 | [Asset census](../ASSET_CENSUS.md) | The measurement behind "stored once" |
 | [Modular NPCs](../MODULAR_NPCS.md) | NPCs assembled from shared body parts |

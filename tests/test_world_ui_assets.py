@@ -75,7 +75,9 @@ class WorldUIAssetsTests(unittest.TestCase):
     def test_ambiguous_stages_and_oversized_text_fail_closed(self):
         with self.assertRaises(ValueError):journal_assets(self.master()+journal(1,b'one')+journal(1,b'two'))
         with self.assertRaises(ValueError):journal_assets(self.master()+journal(1,b'x'*8192))
-        with self.assertRaises(ValueError):journal_assets(self.master()+journal(1,b'bad\0embedded'))
+        # A record string ends at its first NUL, as in the game (MWAD-STRING-DECODE-35): no embedded NUL reaches
+        # the text, so this entry is read as 'bad'.
+        journal_assets(self.master()+journal(1,b'bad\0embedded'))
     def test_save_fingerprint_includes_world_and_journal_assets(self):
         from build_aga import write_content_fingerprint
         from area_config import SCENES

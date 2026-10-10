@@ -29,7 +29,7 @@ def _repair_region(task):
     if task['source']:
         detail=rebuild_cached_region(Path(task['cache']),Path(task['backups'])/(task['source']+'.bsp'),
                     Path(task['palette']),entry,task['settings'],work/('rebuild-'+name),Path(task['ericw_bin']),
-                    threads=task['threads'],**task['vis'])
+                    threads=task['threads'],**task['vis'],**({'lamps':task['lamps']} if task.get('lamps') else {}))
         shutil.copyfile(detail['candidate_path'],target)
         return name,{'rebuilt':True,'receipt':str(work/('rebuild-'+name)/'repair.json')}
     raw,proof=bound_visuals((Path(task['backups'])/(name+'.bsp')).read_bytes(),entry['coverage'])
@@ -37,7 +37,9 @@ def _repair_region(task):
     return name,proof
 
 
-def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=None, vis_mode='fast'):
+def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=None, vis_mode='fast', night_lamps=None):
+    # night_lamps: Morrowind.esm path for the EXPERIMENTAL night-lamp lightmaps of the rebuilt cores
+    # (--night-lamp-lightmaps, off by default; tools/lamp_lightmaps.py). None: unchanged.
     # threads: the builder's --jobs (None: the stage budget, resolve_jobs).
     from build_jobs import resolve_jobs
     threads=resolve_jobs(threads)
@@ -85,6 +87,11 @@ def repair(maps_dir, *, cache, palette, ericw_bin, work_dir, threads=None, vis_m
         proofs={}
         for group,count,share in ((rebuilt,len(rebuilt),inner),(bounded,len(bounded),1)):
             tasks=[dict(common,entry=e,source=source_names.get(e['name']),threads=share) for e in group]
+            if night_lamps is not None:
+                from lamp_lightmaps import region_lamps
+                master=Path(night_lamps).read_bytes()
+                for task in tasks:
+                    if task['source']:task['lamps']=region_lamps(master,task['entry']['coverage'],settings)
             for name,proof in ordered_map(_repair_region,tasks,max(1,min(threads,count))):
                 proofs[name]=proof
         for entry in entries:

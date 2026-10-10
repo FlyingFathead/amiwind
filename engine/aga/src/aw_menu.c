@@ -6,6 +6,7 @@
 #include "aw_maps.h"
 #include "aw_region.h"
 #include "amiwind_version.h"
+#include "aw_miniwind.h"
 extern qboolean keydown[256];
 extern int scr_copyeverything;
 extern int AW_DrawDistance(void);
@@ -114,7 +115,24 @@ static const control_t controls[]={
     {"Quick save","aw_quicksave"},{"Quick load","aw_quickload"},
     {"Inventory",NULL,"I"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
 #define CONTROL_ACTIONS ((int)(sizeof(controls)/sizeof(controls[0])))
-#define CONTROL_ROWS (CONTROL_ACTIONS+2)
+/* Then the combat options (docs/COMBAT.md; saved with the game config):
+ * Combat style: AmiWind (aw_combat_miss 1, AmiWind extension: a failed roll shows
+ * the defender's dodge or block) / Original Morrowind (0: the swish);
+ * Dice rolls: On (aw_combat_dice 1, the original rolls) / Off (no dice, extension). */
+#define CONTROL_STYLE CONTROL_ACTIONS
+#define CONTROL_DICE (CONTROL_ACTIONS+1)
+#define CONTROL_RESET (CONTROL_ACTIONS+2)
+#define CONTROL_ROWS (CONTROL_ACTIONS+4)
+static void combat_toggle(int row){
+    if(row==CONTROL_STYLE)Cvar_SetValue("aw_combat_miss",Cvar_VariableValue("aw_combat_miss")?0:1);
+    else if(row==CONTROL_DICE)Cvar_SetValue("aw_combat_dice",Cvar_VariableValue("aw_combat_dice")?0:1);
+}
+static void combat_line(int row,char *line){
+    if(row==CONTROL_STYLE){
+        strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat style: AmiWind":"Combat style: Original Morrowind");
+        if(AW_UIWidth(line)>226)strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat: AmiWind":"Combat: Original Morrowind");
+    }else strcpy(line,Cvar_VariableValue("aw_combat_dice")?"Dice rolls: On":"Dice rolls: Off");
+}
 #define CONTROL_VISIBLE 6
 static int controls_options,controls_top,controls_capture;
 static int control_ready(int row){return row>=CONTROL_ACTIONS || controls[row].command!=NULL;}
@@ -323,9 +341,11 @@ void M_Keydown(int key){
         if(selection<controls_top)controls_top=selection;
         if(selection>=controls_top+CONTROL_VISIBLE)controls_top=selection-CONTROL_VISIBLE+1;
         if((key==K_BACKSPACE || key==K_DEL) && selection<CONTROL_ACTIONS)control_clear(selection);
+        if((key==K_LEFTARROW || key==K_RIGHTARROW) && (selection==CONTROL_STYLE || selection==CONTROL_DICE))combat_toggle(selection);
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection<CONTROL_ACTIONS){if(control_ready(selection)){controls_capture=1;mouse_visible=0;}}
-            else if(selection==CONTROL_ACTIONS)Cbuf_AddText("exec keymaps-default.cfg\n");
+            else if(selection==CONTROL_STYLE || selection==CONTROL_DICE)combat_toggle(selection);
+            else if(selection==CONTROL_RESET)Cbuf_AddText("exec keymaps-default.cfg\n");
             else controls_back();
         }
         return;
@@ -421,6 +441,14 @@ static void button(int x,int y,int w,int h,const char *s,int active,int selected
     if(active && selected)AW_UIFill(x+3,y+3,w-6,h-6,colours[3]);
     AW_UITextBox(x,y,w,h,s,active?colours[1]:colours[2]);
 }
+static void header(void){
+    char lines[2][AW_MINIWIND_HEADER];int n,i,h=AW_UIFontSize();
+    if(!AW_MiniwindActive() || !AW_Miniwind()->header[0])return;
+    if(h<10)h=10;
+    n=AW_MenuHeaderLines(AW_Miniwind()->header,300,lines);
+    AW_UIFill(4,2,312,n*(h+4)+6,AW_UIColor(0,0,0));
+    for(i=0;i<n;i++)AW_UITextBox(10,5+i*(h+4),300,h+4,lines[i],colours[1]);
+}
 static void cursor(void){
     if(!mouse_visible)return;
     AW_UIFill(mouse_x,mouse_y,2,6,colours[1]);AW_UIFill(mouse_x,mouse_y,6,2,colours[1]);
@@ -438,6 +466,7 @@ void M_Draw(void){
     if(AW_SaveMenuActive()){AW_SaveMenuDraw();return;}
     if(AW_MenuFrontEnd()){
         if(!AW_UIBackground())AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+        header();
         AW_UIBox(8,front_top()-4,front_width(),front_height()*4+8);
         for(i=0;i<4;i++)label(12,front_top()+i*front_height(),front_width()-8,front_height(),front_items[i],i!=0 || intro_available,i==selection);
         strcpy(line,"AmiWind v" AMIWIND_VERSION);w=AW_UIWidth(line);
@@ -497,7 +526,8 @@ void M_Draw(void){
     }else if(controls_options){
         for(i=controls_top;i<controls_top+CONTROL_VISIBLE && i<CONTROL_ROWS;i++){
             if(i<CONTROL_ACTIONS)control_line(i,line);
-            else strcpy(line,i==CONTROL_ACTIONS?"Reset to defaults":"Back");
+            else if(i==CONTROL_STYLE || i==CONTROL_DICE)combat_line(i,line);
+            else strcpy(line,i==CONTROL_RESET?"Reset to defaults":"Back");
             label(44,54+(i-controls_top)*19,230,19,line,control_ready(i),selection==i);
         }
         AW_UIScrollbar(276,54,CONTROL_VISIBLE*19,CONTROL_ROWS,CONTROL_VISIBLE,controls_top);

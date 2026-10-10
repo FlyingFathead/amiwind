@@ -1,0 +1,9 @@
+{
+  "version": "0.0.34",
+  "published": "b336341dc93cba33327e7974d5bd6bf84ca6576c",
+  "commits": [
+    "b336341dc93cba33327e7974d5bd6bf84ca6576c",
+    "70b04e232c35ff8735804d81d25069703b379936"
+  ],
+  "note": "The previous release: a release candidate or final must contain the published commit (tag v0.0.34, b336341); 70b04e2 is its private release-line commit with the same tree, accepted only together with the published one (tools/previous_release.py). Move the pin when a release ships."
+}

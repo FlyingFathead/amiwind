@@ -29,6 +29,7 @@ Usage: stair_walk.py ID1_DIR [--out stair-walk.json] [--jobs N] [--maps NAME ...
 import argparse
 import json
 import math
+import os
 from pathlib import Path
 import re
 import struct
@@ -268,8 +269,17 @@ def flights(stairs):
 import numpy as np  # noqa: E402
 
 
+GRID = 128.          # plan-view cell of the collision and headroom indexes (units)
+GRID_MAX_CELLS = 256  # a box or query wider than this many cells is tested directly
+
+
 class Headroom:
-    """Visible clearance above a point: placements and terrain, as triangles."""
+    """Visible clearance above a point: placements and terrain, as triangles.
+
+    Queries test only the triangles whose plan bounds share a GRID cell with the
+    query (kept in their original order) with the same per-triangle arithmetic
+    as before, so every answer is identical to testing all of them
+    (BUILD-STAIR-WALK-SLOW-33; tests/test_walk_trace_speed.py)."""
 
     def __init__(self, polys):
         import numpy as np
@@ -278,6 +288,42 @@ class Headroom:
         n = np.cross(self.t[:, 1] - self.t[:, 0], self.t[:, 2] - self.t[:, 0])
         with np.errstate(all='ignore'):
             self.nz = np.abs(n[:, 2]) / np.linalg.norm(n, axis=1)
+        self.tmax = self.t.max(axis=1)
+        self.tmin = self.t.min(axis=1)
+        cells = {}
+        wide = []
+        with np.errstate(all='ignore'):
+            # Bounds grown by a unit: a point a rounding error outside a triangle's bounds
+            # can still pass its barycentric test, so it must find the triangle too.
+            x0 = np.floor((self.tmin[:, 0] - 1.) / GRID); y0 = np.floor((self.tmin[:, 1] - 1.) / GRID)
+            x1 = np.floor((self.tmax[:, 0] + 1.) / GRID); y1 = np.floor((self.tmax[:, 1] + 1.) / GRID)
+        for i in range(len(self.t)):
+            if not (np.isfinite(x0[i]) and np.isfinite(y0[i]) and np.isfinite(x1[i]) and np.isfinite(y1[i])):
+                wide.append(i); continue
+            a, b, c, d = int(x0[i]), int(y0[i]), int(x1[i]), int(y1[i])
+            if (c - a + 1) * (d - b + 1) > GRID_MAX_CELLS:
+                wide.append(i); continue
+            for gx in range(a, c + 1):
+                for gy in range(b, d + 1):
+                    cells.setdefault((gx, gy), []).append(i)
+        self._wide = wide
+        self._cells = {k: np.array(sorted(set(v + wide)), dtype=np.intp) for k, v in cells.items()}
+        self._empty = np.array(sorted(wide), dtype=np.intp)
+
+    def _near(self, x0, y0, x1, y1):
+        """Indices (ascending) of every triangle whose plan bounds can meet the rectangle, or None for all."""
+        import numpy as np
+        try:
+            a, b, c, d = (int(math.floor(x0 / GRID)), int(math.floor(y0 / GRID)),
+                          int(math.floor(x1 / GRID)), int(math.floor(y1 / GRID)))
+        except (OverflowError, ValueError):
+            return None
+        if (c - a + 1) * (d - b + 1) > GRID_MAX_CELLS:
+            return None
+        if a == c and b == d:
+            return self._cells.get((a, b), self._empty)
+        parts = [self._cells.get((gx, gy), self._empty) for gx in range(a, c + 1) for gy in range(b, d + 1)]
+        return np.unique(np.concatenate(parts))
 
     def ground(self, x, y, z, level=False):
         """Height of the highest visible surface at or below z + 0.5 at (x, y), or
@@ -304,8 +350,12 @@ class Headroom:
         ins = [inset if side is None else side] * 2 + [inset]
         lo = np.array([centre[i] + mins[i] + ins[i] for i in range(3)])
         hi = np.array([centre[i] + maxs[i] - ins[i] for i in range(3)])
-        t = self.t
-        near = np.all(t.max(axis=1) >= lo, axis=1) & np.all(t.min(axis=1) <= hi, axis=1)
+        index = self._near(lo[0], lo[1], hi[0], hi[1])
+        if index is None:
+            t, tmax, tmin = self.t, self.tmax, self.tmin
+        else:
+            t, tmax, tmin = self.t[index], self.tmax[index], self.tmin[index]
+        near = np.all(tmax >= lo, axis=1) & np.all(tmin <= hi, axis=1)
         if not near.any():
             return True
         c = (lo + hi) / 2; h = (hi - lo) / 2
@@ -321,8 +371,17 @@ class Headroom:
         return bool(separated.all())
 
     def _heights(self, x, y, normals=False):
+        index = self._near(x, y, x, y)
+        return self._heights_of(self.t if index is None else self.t[index],
+                                self.nz if index is None else self.nz[index], x, y, normals)
+
+    def reference_heights(self, x, y, normals=False):
+        """Every triangle tested (byte-identity reference for tests)."""
+        return self._heights_of(self.t, self.nz, x, y, normals)
+
+    @staticmethod
+    def _heights_of(t, nzs, x, y, normals):
         import numpy as np
-        t = self.t
         a, b, c = t[:, 0], t[:, 1], t[:, 2]
         d = (b[:, 1] - c[:, 1]) * (a[:, 0] - c[:, 0]) + (c[:, 0] - b[:, 0]) * (a[:, 1] - c[:, 1])
         ok = np.abs(d) > 1e-9
@@ -332,7 +391,7 @@ class Headroom:
             l3 = 1 - l1 - l2
         hit = ok & (l1 >= 0) & (l2 >= 0) & (l3 >= 0)
         zz = l1[hit] * a[hit, 2] + l2[hit] * b[hit, 2] + l3[hit] * c[hit, 2]
-        return (zz, self.nz[hit]) if normals else zz
+        return (zz, nzs[hit]) if normals else zz
 
 
 class Collision(Scene):
@@ -356,7 +415,45 @@ class Collision(Scene):
             self.boxes.append(tuple(min(c[k] for c in corners) - margin[k] for k in range(3)) +
                               tuple(max(c[k] for c in corners) + margin[k] for k in range(3)))
 
+        # Plan-view grid of the boxes (BUILD-STAIR-WALK-SLOW-33): a trace tests only the boxes
+        # in the cells its segment's bounds touch, in the original order, with the same test.
+        self._always = [i for i, box in enumerate(self.boxes) if box is None]
+        self._grid = {}
+        for i, box in enumerate(self.boxes):
+            if box is None:
+                continue
+            x0, y0 = math.floor(box[0] / GRID), math.floor(box[1] / GRID)
+            x1, y1 = math.floor(box[3] / GRID), math.floor(box[4] / GRID)
+            if (x1 - x0 + 1) * (y1 - y0 + 1) > GRID_MAX_CELLS:
+                self._always.append(i)
+                continue
+            for gx in range(x0, x1 + 1):
+                for gy in range(y0, y1 + 1):
+                    self._grid.setdefault((gx, gy), []).append(i)
+
     def _trace_brushes(self, start, end):
+        lo = [min(start[k], end[k]) for k in range(3)]
+        hi = [max(start[k], end[k]) for k in range(3)]
+        x0, y0 = math.floor(lo[0] / GRID), math.floor(lo[1] / GRID)
+        x1, y1 = math.floor(hi[0] / GRID), math.floor(hi[1] / GRID)
+        if (x1 - x0 + 1) * (y1 - y0 + 1) > GRID_MAX_CELLS:
+            found = range(len(self.boxes))
+        else:
+            found = set(self._always)
+            grid = self._grid
+            for gx in range(x0, x1 + 1):
+                for gy in range(y0, y1 + 1):
+                    found.update(grid.get((gx, gy), ()))
+            found = sorted(found)
+        brushes, boxes = self.brushes, self.boxes
+        for i in found:
+            box = boxes[i]
+            if box is None or (hi[0] >= box[0] and lo[0] <= box[3] and hi[1] >= box[1] and lo[1] <= box[4]
+                               and hi[2] >= box[2] and lo[2] <= box[5]):
+                yield brushes[i]
+
+    def reference_trace_brushes(self, start, end):
+        """The original box filter (byte-identity reference for tests)."""
         for brush, box in zip(self.brushes, self.boxes):
             if box is None or all(max(start[k], end[k]) >= box[k] and min(start[k], end[k]) <= box[k + 3] for k in range(3)):
                 yield brush
@@ -548,7 +645,31 @@ def check_polys(polys, scene, core=None, contents=None, proxy=None):
     collision surface angle over a failing step. Returns one row per step or
     ramp: kind, ref, point, direction, rise, slope, flight, result
     (passed / failed / covered / untestable) and the walk detail."""
-    items = candidates(polys, core)
+    return _check_items(candidates(polys, core), polys, scene, contents, proxy)
+
+
+# What the walk covers (owner decision 9 October 2026): 'all' walks every step and ramp (development
+# builds, the nightly full report); 'flights' walks only the steps of flights, the rows that can stop a
+# build (release candidates and finals). The builder sets the variable (tools/build.py --stair-walk).
+SCOPE_ENV = 'AMIWIND_STAIR_WALK'
+SCOPES = ('all', 'flights')
+
+
+def scope_setting():
+    value = os.environ.get(SCOPE_ENV, '') or 'all'
+    if value not in SCOPES:
+        raise ValueError('%s must be one of %s, not %r' % (SCOPE_ENV, ', '.join(SCOPES), value))
+    return value
+
+
+def flight_items(items):
+    """The candidates the 'flights' scope walks: every step that belongs to a flight (a sloped strip
+    keeps its flight mark when check_polys later finds it is a ramp, so its row is the same as in a
+    full walk)."""
+    return [item for item in items if item.get('flight')]
+
+
+def _check_items(items, polys, scene, contents=None, proxy=None):
     if not items:
         return []
     room = Headroom(polys)
@@ -610,14 +731,18 @@ def check_polys(polys, scene, core=None, contents=None, proxy=None):
 
 
 def check_map(task):
-    """Worker: _faces + Collision + check_polys for one map."""
-    path, core, models = task
+    """Worker: _faces + Collision + check_polys for one map; TASK (path, core, models[, scope])."""
+    path, core, models = task[:3]
+    scope = task[3] if len(task) > 3 else 'all'
     raw = Path(path).read_bytes()
     polys = _faces(raw)
-    if not candidates(polys, core):
+    items = candidates(polys, core)
+    if scope == 'flights':
+        items = flight_items(items)
+    if not items:
         return Path(path).stem, []
     world = Scene(raw, hull=0)
-    rows = check_polys(polys, Collision(raw), core, lambda p: _contents(world, p), Collision(raw, hull=0))
+    rows = _check_items(items, polys, Collision(raw), lambda p: _contents(world, p), Collision(raw, hull=0))
     for row in rows:
         row['map'] = Path(path).stem
         row['model'] = models.get(str(row['ref']), '')
@@ -628,9 +753,10 @@ def check_map_cached(task):
     """Worker: check_map, or the rows recorded for the same map bytes, core,
     models and stair rule (pass_cache.py, development builds only;
     BUILD-IMAGE-NOT-INCREMENTAL-33)."""
-    path, core, models, cache = task
+    path, core, models, cache = task[:4]
+    scope = task[4] if len(task) > 4 else 'all'
     if cache is None:
-        return check_map((path, core, models))
+        return check_map((path, core, models, scope))
     import hashlib, json
     raw = Path(path).read_bytes()
     key = hashlib.sha256(raw).hexdigest() + ':' + json.dumps(core)
@@ -639,7 +765,7 @@ def check_map_cached(task):
     if found is not None:
         # Same keys in the same order; only the map name is this map's (aliases share bytes).
         return name, [{k: (name if k == 'map' else v) for k, v in row.items()} for row in found[0]['rows']]
-    name, rows = check_map((path, core, models))
+    name, rows = check_map((path, core, models, scope))
     rows = json.loads(json.dumps(rows))  # the form cached rows have
     cache.store(key, {'rows': rows})
     return name, rows
@@ -669,26 +795,49 @@ def map_tasks(id1, models=None, only=None):
     return tasks
 
 
+def _map_cost(task):
+    """Dispatch order of the pass: the map's size (a missing file sorts last; check_map reports it)."""
+    import os
+    try:
+        return os.path.getsize(task[0])
+    except OSError:
+        return 0
+
+
 def family(name):
     head = re.sub(r'\d+$', '', name)
     return head if head in ('sn', 'bm', 'va', 'vf') else 'interiors and other maps'
 
 
-def check(id1, jobs=1, only=None, models=None, exempt=()):
+def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     """The gate over a payload; exempt: maps whose blocking failures are
-    reported but do not fail it (a recorded, owner-approved stage)."""
+    reported but do not fail it (a recorded, owner-approved stage); scope: 'all'
+    (every step and ramp) or 'flights' (only the steps of flights, the rows that can
+    fail the gate); default from AMIWIND_STAIR_WALK, else 'all'."""
     from build_parallel import ordered_map
     from mesh_geometry_env import stair_mode
     from pass_cache import PassCache
     import hashlib
+    scope = scope or scope_setting()
+    if scope not in SCOPES:
+        raise ValueError('Stair walk scope must be one of %s, not %r' % (', '.join(SCOPES), scope))
     tasks = map_tasks(id1, models, only)
-    # Development builds reuse rows for unchanged map bytes (pass_cache.py).
-    cache = PassCache.open('stair-walk', {'stair_mode': stair_mode(), 'models': hashlib.sha256(
-        json.dumps(models or {}, sort_keys=True).encode()).hexdigest()}, __file__)
+    # Development builds (and release builds with --allow-release-reuse) reuse rows for
+    # unchanged map bytes (pass_cache.py).
+    options = {'stair_mode': stair_mode(), 'models': hashlib.sha256(
+        json.dumps(models or {}, sort_keys=True).encode()).hexdigest()}
+    if scope != 'all':
+        options['scope'] = scope
+    cache = PassCache.open('stair-walk', options, __file__)
     rows = []
-    for name, found in ordered_map(check_map_cached, [(*task, cache) for task in tasks],
-                                   max(1, min(jobs, len(tasks) or 1))):
-        rows.extend(found)
+    try:
+        # Largest maps first (their walks take longest; a big map dispatched last left most
+        # workers idle at the end of the pass); rows still come back in map order.
+        for name, found in ordered_map(check_map_cached, [(*task, cache, scope) for task in tasks],
+                                       max(1, min(jobs, len(tasks) or 1)), cost=_map_cost):
+            rows.extend(found)
+    finally:
+        cached = cache.summary() if cache is not None else None
     exempt = set(exempt)
     failures = [r for r in rows if _gating(r) and r['map'] not in exempt]
     exempted = [r for r in rows if _gating(r) and r['map'] in exempt]
@@ -698,12 +847,19 @@ def check(id1, jobs=1, only=None, models=None, exempt=()):
         kind = 'flight step' if r['kind'] == 'step' and r.get('flight') else r['kind']
         bucket = summary.setdefault(family(r['map']), {}).setdefault(kind, {})
         bucket[r['result']] = bucket.get(r['result'], 0) + 1
-    return dict(format=1, status='failed' if failures else 'passed', maps=len(tasks), step_height=STEP_HEIGHT,
-                walkable_normal_z=WALKABLE_Z, walkable_degrees=round(math.degrees(math.acos(WALKABLE_Z)), 2),
-                reference='Morrowind (OpenMW 0.51): step 8.5 (34 units), slope 46 degrees, authored collision',
-                gate='flights of stairs (3+ steps, 2+ vertical risers) the standing box cannot walk up and down',
-                summary=summary, failures=failures, exempt_failures=exempted, advisory_failures=advisory,
-                rows=rows)
+    report = dict(format=1, status='failed' if failures else 'passed', maps=len(tasks), step_height=STEP_HEIGHT,
+                  walkable_normal_z=WALKABLE_Z, walkable_degrees=round(math.degrees(math.acos(WALKABLE_Z)), 2),
+                  reference='Morrowind (OpenMW 0.51): step 8.5 (34 units), slope 46 degrees, authored collision',
+                  gate='flights of stairs (3+ steps, 2+ vertical risers) the standing box cannot walk up and down',
+                  summary=summary, failures=failures, exempt_failures=exempted, advisory_failures=advisory,
+                  rows=rows)
+    if scope != 'all':
+        report['scope'] = ('flight steps only (release build): ramps and single steps are not walked; '
+                           'their advisory findings come from a full walk (development or nightly build)')
+    if cached is not None:
+        report['pass_cache'] = cached
+        print('Stair walk pass cache: %d maps reused, %d walked.' % (cached['hits'], cached['misses']), flush=True)
+    return report
 
 
 def accept_known(report, accepted):
@@ -753,8 +909,9 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--maps', nargs='*')
     parser.add_argument('--jobs', type=int, default=1)
+    parser.add_argument('--scope', choices=SCOPES, help="'all' (default, or AMIWIND_STAIR_WALK) or 'flights'")
     a = parser.parse_args()
-    report = check(a.id1, a.jobs, a.maps)
+    report = check(a.id1, a.jobs, a.maps, scope=a.scope)
     a.out.write_text(json.dumps(report, indent=1) + '\n', newline='\n')
     print(json.dumps(dict(status=report['status'], summary=report['summary'], failures=len(report['failures']))))
     return 1 if report['failures'] else 0

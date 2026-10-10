@@ -32,9 +32,18 @@ import struct
 # Re-pinned 2026-10-09 for CHIM streamed statics (model.c): the sprite loader allocates through
 # AW_SpriteAlloc, which is Hunk_AllocName unless Mod_LoadSpriteInto sets a zone allocator; edge-cache
 # allocation is unchanged.
+# Re-pinned 2026-10-10 for ENGINE-FILEBASE-UNBOUNDED-35 (model.c): loadname is sized by
+# COM_FILEBASE_SIZE (32, as before); edge-cache allocation is unchanged.
+# Re-pinned 2026-10-10 for CHIM bad brush data (model.c, model.h; CHIM-BRUSH-BAD-DATA-35): arena decodes
+# catch decoder errors and return a failed load; legacy loads and edge-cache allocation unchanged.
+# Re-pinned 2026-10-09 for near/far NPC models (model.c, model.h): Mod_ReleaseAlias frees an optional
+# alias model's Cache data and marks its slot unreferenced (aw_npc_lod.c); edge-cache allocation is unchanged.
+# Re-pinned 2026-10-10 for crash paths (model.c; ENGINE-MODEL-NAME-SYSERROR-35, ENGINE-LEAF-LIMIT-UNCHECKED-35,
+# ENGINE-ENTITY-TEXT-UNBOUNDED-35): name length checks, a leaf-count check, a bounded frame name; edge-cache
+# allocation is unchanged.
 SOURCE_HASHES={
-    'model.c':'2b6084440550513f87a741b543a47fd8ff2abe8287f64f5c3b5d5113c6120fb2',
-    'model.h':'594e162fd26856ce2721319abd0a8e319a17f975b3796de39f25b2a83439da35',
+    'model.c':'b1fce5b1b8dff4ef5ec84a20580ae8dec034e7e95c85b3ec1af5169d60d164f5',
+    'model.h':'519e133b4506d831c671f6ec9eac8cc901af808d2c5f2d969d5438d3f621a404',
     'r_draw.c':'1e26849d022fa219adfd399f8863118b72e34daab4b6e2b588e22ed8c53c8232',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }

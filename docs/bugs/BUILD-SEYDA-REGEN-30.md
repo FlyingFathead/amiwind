@@ -9,7 +9,7 @@
 | Where | image step Seyda Neen region conversion (tools/build_aga.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.29, v0.0.32 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Builder cannot regenerate shipped Seyda maps; recorded exception ships them instead. |
 | Family | Seyda Neen recorded stage (`seyda-recorded`) |
 | Playtest version | v0.0.29 |
@@ -19,12 +19,22 @@
 
 <!-- END GENERATED FACTS -->
 
+## Status: 9 October 2026
+
+Fixed in source for v0.0.35 (first built on the v0.0.34-dev1 line, renumbered to v0.0.35): the recorded maps are an optional input. Without
+`--seyda-recorded` a CHIM build converts the Seyda Neen region maps from your own data, without the
+terrain visual cull, and the CHIM frame maps are checked against those converted maps. The
+actor-contact stage passes from data (measured 10 October 2026). Pending: a full from-scratch image
+build without the recorded maps.
+
+See [Which Seyda Neen is in my build?](../LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.
+
 ## Status: 8 October 2026
 
 Open; recorded exception for v0.0.31 and again for v0.0.32 (owner decision, 8 October 2026). The
 shipped Seyda Neen stages are used as a recorded input; Seyda Neen is rebuilt by the world streamer
 (v0.0.33), so the legacy builder is not fixed. Report page written 8 October 2026 from the
-[journal entry](../BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)
+[journal entry](../journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)
 and the closed duplicate [BUILD-SEYDA-PRIVATE-STAGES-31](BUILD-SEYDA-PRIVATE-STAGES-31.md).
 
 ## Symptom
@@ -76,10 +86,33 @@ Intended differences from v0.0.31 (each named here and in the pin):
 | `maps/seyda.bsp` | a copy of the recorded fallback region `maps/sn029.bsp` (3,892,672 bytes) instead of v0.0.31's complete town (4,411,968 bytes) | Owner decision (option A), 8 October 2026. The builder's own region conversion writes the same alias. The v0.0.32 release actor audit refuses the complete town's seven actor copies; the recorded region maps with this alias pass (24 of 24 placements grounded). `dbg tp seydaneen` and region streaming use `seyda-regions.txt` and are unchanged. |
 | `maps/sn019.bsp`, `maps/sn026.bsp`, `maps/sn035.bsp` | the recorded maps, byte for byte, through a temporary pre-CHIM bypass of the strict world-map heap gate | Owner decision A, 8 October 2026: they exceed the modelled reserve allowance only (dev1 estimate -238,180, -104,356 and -12,148 bytes), not the allocation ceiling. A temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone M2); listed by name and SHA-256 in `config/heap-bypass.json` ([HEAP-SEYDA-OVERLAP-32](HEAP-SEYDA-OVERLAP-32.md)). |
 
+v0.0.34-dev1 (9 October 2026): the recorded input is no longer required. v0.0.33 refused a CHIM build with
+Seyda Neen without it, only because its frame maps were checked against the recorded maps. The
+check stays; its reference is now the builder's own Seyda Neen region conversion from your data
+(`prepare_seyda_regions.convert_builder_scene`), the same maps the legacy builder makes. The frame
+map checks against them (statics both ways, origin, harvest representation, actor contact on the
+frame's collision; `tools/chim/frame_map.py`) and the release gates that run on every image (stair
+walk, strict world-map heap gate, actor gate) need no recorded data. The region conversion stops in
+the Seyda Neen canonical terrain cull, which cannot complete from scratch
+([BUILD-SEYDA-CULL-STABLE-32](BUILD-SEYDA-CULL-STABLE-32.md), still open for the legacy builder).
+A CHIM build does not need that cull: these region maps never ship (they leave the image after the
+frame maps are checked), and the cull only removes hidden render faces (collision, entities and
+placements are the same). So the builder passes `--seyda-terrain-cull off` to the actor-contact and
+image steps when it converts Seyda Neen for CHIM (`tools/build.py` `seyda_terrain_cull_options`,
+`prepare_seyda_regions.convert_builder_scene(terrain_cull=False)`). `--seyda-recorded DIR` stays
+selectable and behaves as before (installed, kept and checked byte for byte); a legacy build with
+Seyda Neen still needs it.
+
 ## Verification
 
-Pending: from-scratch build whose Seyda Neen maps equal the recorded stage (with the one named
-alias). Source checks: `tests/test_recorded_stage.py`.
+Source checks (v0.0.34-dev1): `tests/test_chim_no_legacy.py` (a default build needs no recorded
+input, no step of its plan names one, and both converting steps get `--seyda-terrain-cull off`; a
+recorded, legacy or Balmora-only plan keeps the cull) and `tests/test_recorded_stage.py` (the recorded
+input still reaches the actor check and the image step when given). Measured 10 October 2026: the
+actor-contact stage, run alone on the scene of a v0.0.33 from-scratch reference build without the
+recorded maps, converted all 65 Seyda Neen maps and passed the actor check (759 s at 12 workers;
+65 s with the recorded maps). Pending: a full from-scratch image build without `--seyda-recorded`
+(the frame map checks run in the image step).
 
 ## Prevention
 
@@ -92,6 +125,7 @@ exception against the recorded bytes.
 
 Family: Seyda Neen recorded stage (`seyda-recorded`). Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. See [families](README.md#families).
 
+- [BUILD-SEYDA-CONVERTED-NOT-STAGED-35](BUILD-SEYDA-CONVERTED-NOT-STAGED-35.md): A default CHIM build stopped at the image step's payload preflight: the Seyda Neen region maps are converted later in that step
 - [BUILD-SEYDA-CULL-STABLE-32](BUILD-SEYDA-CULL-STABLE-32.md): From-scratch builds stop in Seyda Neen terrain culling (fragment not repeat-stable)
 - [BUILD-SEYDA-PRIVATE-STAGES-31](BUILD-SEYDA-PRIVATE-STAGES-31.md): Repository builder cannot regenerate the shipped Seyda Neen maps
 - [BUILD-SEYDA-RECORDED-REWRITTEN-32](BUILD-SEYDA-RECORDED-REWRITTEN-32.md): Later image passes rewrite the recorded Seyda Neen maps, so the exception is not the recorded stage

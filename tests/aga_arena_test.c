@@ -61,6 +61,17 @@ int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *f,const char *layout){
     (void)e;engages++;engaged=*f;strcpy(last_layout,layout?layout:"(own frames)");seed_at_engage=seed_cvar;return 1;
 }
 void AW_CombatClear(void){clears++;}
+const aw_fighter_t *aw_combat_player_preset;static int preset_file=1;
+static char asked_loadout[32];
+int AW_CombatLoadout(const char *name,aw_fighter_t *out,char *chosen){
+    strcpy(asked_loadout,name?name:"");
+    if(!preset_file || (name && *name && strcmp(name,"fists") && strcmp(name,"sword_shield")))return 0;
+    if(chosen)strcpy(chosen,name && *name?name:"fists");
+    memset(out,0,sizeof(*out));strcpy(out->name,"Arena Challenger");out->level=9;
+    out->health=out->health_max=93;out->fatigue=out->fatigue_max=241;return 1;
+}
+static cvar_t *arena_cvar;
+void Cvar_RegisterVariable(cvar_t *v){v->value=(float)atof(v->string);arena_cvar=v;}
 const aw_combat_stats_t *AW_CombatStats(void){return &stats;}
 const aw_fighter_t *AW_CombatFighter(struct edict_s *e){(void)e;return &engaged;}
 int AW_GalleryArenaEnter(const char *map){enters++;strcpy(entered_map,map);return 1;}
@@ -156,7 +167,9 @@ int main(void){
     assert(p->v.origin[0]==0 && p->v.origin[1]==-150 && fabs(p->v.origin[2]-(-116+16.625f))<.01f);
     assert(foe->v.origin[1]==150 && fabs(foe->v.origin[2]-(-116))<.01f);
     assert(fabs(p->v.angles[1]-90)<.01f && fabs(foe->v.angles[1]-(-90-90))<.01f);   /* face each other */
-    assert(p->v.health==80 && aw_character.current[0]==80 && aw_character.current[2]==300);
+    /* the set fighter (config/arena_player.json): its health and fatigue, the game's sheet comes back on exit */
+    assert(aw_combat_player_preset && aw_combat_player_preset->level==9 && arena_cvar && !strcmp(arena_cvar->name,"aw_arena_player"));
+    assert(p->v.health==93 && aw_character.maximum[0]==93 && aw_character.current[0]==93 && aw_character.current[2]==241);
 
     /* title card, then the fight with the fighter's frames */
     loading=1;draw();realtime+=30;draw();loading=0;                    /* a slow load: the card still shows */
@@ -183,7 +196,11 @@ int main(void){
     AW_ArenaSpawn(p);draw();realtime+=4;draw();draw();assert(engages==3);aw_combat_result(1);
     assert(AW_ArenaKey('p',1) && toggles==1);
     assert(AW_ArenaKey(K_ESCAPE,1) && leaves==1);
-    AW_ArenaEnd();assert(!AW_ArenaActive() && clears>=1);
+    AW_ArenaEnd();assert(!AW_ArenaActive() && clears>=1 && !aw_combat_player_preset);
+    /* aw_arena_player 0: your own character */
+    arena_cvar->value=0;aw_character.maximum[0]=80;aw_character.maximum[2]=300;
+    run("aw_arenapit mevil molor");spawn_scene("vai000");AW_ArenaSpawn(p);
+    assert(!aw_combat_player_preset && p->v.health==80);AW_ArenaEnd();arena_cvar->value=1;
 
     /* a gallery opponent (one pose: its own frames) */
     run("aw_arenapit caius cosades");

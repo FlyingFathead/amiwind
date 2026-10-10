@@ -16,6 +16,8 @@ import build
 import build_font_options as options
 import prepare_reading as reading
 import prepare_ui as ui
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
 def synthetic_fonts(root):
@@ -172,6 +174,7 @@ class PaperInkTests(unittest.TestCase):
                     reading.prepare_paper_font(data, root / 'scene')
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class PaperOptionTests(unittest.TestCase):
     def test_default_and_cli_override(self):
         p = build.parser()

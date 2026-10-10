@@ -23,6 +23,8 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
 import build  # noqa: E402
 import build_exclusions as ex  # noqa: E402
 from build_parallel import stage_dependencies  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 TOOLS = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
 RUN = Path('/private/run')
@@ -197,6 +199,7 @@ class Plans(unittest.TestCase):
         self.assertEqual(record['details']['music']['skipped_stages'], ['music'])
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class Refusals(unittest.TestCase):
     def resolve(self, version, *extra):
         return ex.resolve(build.parser().parse_args(list(extra)), version)

@@ -191,9 +191,11 @@ class BoundaryLockedLODTests(unittest.TestCase):
         # kept) stays selectable through preserve_shape_prefixes but does not fit the ring.
         self.assertLessEqual(shared['ratio'], 0.45)
         self.assertNotIn('preserve_shape_prefixes', shared)
-        self.assertEqual(profile_reduction(shared), {'preserve_shared_seams': False, 'lock_boundaries': True})
+        self.assertEqual(profile_reduction(shared), {'preserve_shared_seams': False, 'lock_boundaries': True,
+                                                     'agg': 7.0, 'preserve_border': False})
         self.assertEqual(visual_profile('meshes/r/siltstrider.nif', 5600), shared)
-        self.assertEqual(profile_reduction({}), {'preserve_shared_seams': False, 'lock_boundaries': False})
+        self.assertEqual(profile_reduction({}), {'preserve_shared_seams': False, 'lock_boundaries': False,
+                                                 'agg': 7.0, 'preserve_border': False})
 
     def test_converter_and_estimates_share_one_profile_reduction(self):
         root = Path(__file__).resolve().parents[1] / 'tools'

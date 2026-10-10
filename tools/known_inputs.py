@@ -32,6 +32,11 @@ import sys
 import threading
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
+from mwad import esm  # noqa: E402  (the shared Morrowind data helpers)
+from mwad.esm import FormatError, sha256_file  # noqa: E402,F401
+from mwad.paths import child_ci  # noqa: E402
+
 TABLE_PATH = ROOT / 'config/known-inputs.json'
 TABLE_SCHEMA = 'amiwind-known-inputs-v1'
 LOCK_SCHEMA = 'amiwind-inputs-lock-v1'
@@ -42,9 +47,9 @@ HASH_MODES = ('core', 'full', 'auto', 'off')
 KINDS = ('tes3-master', 'tes3-archive', 'amiga-library', 'kickstart-rom')
 ENTRY_FIELDS = ('kind', 'name', 'bytes', 'sha256', 'version', 'source', 'tested', 'notes')
 # The Morrowind files the builder identifies; only the base pair is required.
-GAME_FILES = (('Morrowind.esm', 'tes3-master', True), ('Morrowind.bsa', 'tes3-archive', True),
-              ('Tribunal.esm', 'tes3-master', False), ('Tribunal.bsa', 'tes3-archive', False),
-              ('Bloodmoon.esm', 'tes3-master', False), ('Bloodmoon.bsa', 'tes3-archive', False))
+# One list of game files (mwad.esm): Morrowind is required, Tribunal and Bloodmoon are optional.
+GAME_FILES = tuple(item for index, (master, archive) in enumerate(zip(esm.GAME_MASTERS, esm.GAME_ARCHIVES))
+                   for item in ((master, 'tes3-master', index == 0), (archive, 'tes3-archive', index == 0)))
 CORE_NAMES = frozenset(name.casefold() for name, _, _ in GAME_FILES)
 NOUNS = {'tes3-master': 'a Morrowind master file (TES3)', 'tes3-archive': 'a Morrowind archive (BSA)',
          'amiga-library': 'an Amiga library', 'kickstart-rom': 'a Kickstart ROM'}
@@ -52,14 +57,6 @@ NOUNS = {'tes3-master': 'a Morrowind master file (TES3)', 'tes3-archive': 'a Mor
 
 def now():
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
-
-
-def sha256_file(path):
-    digest = hashlib.sha256()
-    with open(path, 'rb') as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b''):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 # ---------------------------------------------------------------- the table
@@ -425,20 +422,18 @@ def tes3_master_info(path):
     if len(body) != length:
         info['reason'] = 'file ends inside the TES3 header record'
         return info
-    position, masters, hedr = 0, [], None
-    while position + 8 <= len(body):
-        tag, size = struct.unpack_from('<4sI', body, position)
-        value = body[position + 8:position + 8 + size]
-        position += 8 + size
-        if tag == b'HEDR' and size == 300:
+    masters, hedr = [], None
+    # The shared subrecord walk raises FormatError on a truncated header or an overrunning subrecord.
+    for tag, value in esm.subrecords(body):
+        if tag == 'HEDR' and len(value) == 300:
             hedr = value
-        elif tag == b'MAST':
-            masters.append(value.split(b'\0', 1)[0].decode('latin-1'))
+        elif tag == 'MAST':
+            masters.append(esm.string(value, 'TES3 MAST', errors='replace'))
     if hedr is None:
         info['reason'] = 'no 300-byte HEDR in the TES3 header'
         return info
     version, file_type = struct.unpack_from('<fI', hedr, 0)
-    text = lambda raw: ' '.join(raw.split(b'\0', 1)[0].decode('cp1252', 'replace').split())
+    text = lambda raw: ' '.join(esm.string(raw, errors='replace').split())
     info.update(valid=True, version=f'{version:.2f}', file_type=file_type,
                 author=text(hedr[8:40]), description=text(hedr[40:296]),
                 records=struct.unpack_from('<I', hedr, 296)[0], masters=masters)
@@ -486,7 +481,10 @@ def identify(kind, path, name=None):
     if kind == 'amiga-library':
         return amiga_library_info(Path(path).read_bytes(), name)
     if kind == 'tes3-master':
-        return tes3_master_info(path)
+        try:
+            return tes3_master_info(path)
+        except FormatError as exc:
+            return {'valid': False, 'reason': str(exc), 'version': None}
     if kind == 'tes3-archive':
         return tes3_archive_info(path)
     if kind == 'kickstart-rom':
@@ -572,14 +570,14 @@ def check_game_data(data, lock, policy='warn', table=None, input_report=None):
     data = Path(data)
     present = []
     absent = []
-    names = {p.name.casefold(): p for p in data.iterdir() if p.is_file()}
     for name, kind, required in GAME_FILES:
-        path = names.get(name.casefold())
+        # child_ci: one case-insensitive lookup; two names differing only by case are an error.
+        path = child_ci(data, name, required=required)
         if path is None:
-            if required:
-                raise ValueError(f'Missing {name} in {data}')
             absent.append(name)
             continue
+        if not path.is_file():
+            raise ValueError(f'Expected a regular file: {name} in {data}')
         present.append((name, kind, required, path))
     lock.prepare([path for _, _, _, path in present], core=True)
     records = []
@@ -675,7 +673,8 @@ def same_stamp(old, new):
 
 
 def lock_key(path):
-    return os.path.abspath(os.fspath(path))
+    """Identity of an input in the lock: symlinks resolved, case-folded where the filesystem is."""
+    return os.path.normcase(os.path.realpath(os.fspath(path)))
 
 
 class InputLock:

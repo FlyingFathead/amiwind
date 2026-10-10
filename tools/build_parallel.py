@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
 import time
 
 from build_jobs import resolve_jobs
@@ -48,6 +49,17 @@ def _pool_worker_init():
     explicit share stays that share, so outer x inner keeps to the budget."""
     os.environ.pop(ALLOWANCE_ENV, None)
     os.environ.pop(BUDGET_ENV, None)
+    # A spawned worker inherits the caller's sys.path; when tools/ comes before src/ there,
+    # `import mwad` finds the tools/mwad.py launcher instead of the mwad package and the
+    # worker dies unpickling its task (TEST-WORKER-SYSPATH-32). The package always wins.
+    src = Path(__file__).resolve().parents[1] / 'src'
+
+    def same(entry):
+        try:
+            return Path(entry or '.').resolve() == src
+        except OSError:
+            return False
+    sys.path[:] = [str(src)] + [entry for entry in sys.path if not same(entry)]
 
 
 def process_pool(count):
@@ -57,6 +69,32 @@ def process_pool(count):
     """
     return ProcessPoolExecutor(max_workers=count, mp_context=multiprocessing.get_context('spawn'),
                                initializer=_pool_worker_init)
+
+
+class Background:
+    """One call run beside the caller in a spawned worker (process_pool(1)); result() waits for it.
+
+    For work a stage needs only at its end and that reads nothing the stage writes, such as
+    the door catalogue of the game's master file (prepare_doors.door_sources). With one job
+    the call runs in the caller when result() first asks for it, as before."""
+
+    def __init__(self, function, *args, jobs=None):
+        self._call = (function, args)
+        self._pool = self._future = None
+        if resolve_jobs(jobs) > 1:
+            with worker_environment():
+                self._pool = process_pool(1)
+                self._future = self._pool.submit(function, *args)
+
+    def result(self):
+        try:
+            if self._future is None:
+                return self._call[0](*self._call[1])
+            return self._future.result()
+        finally:
+            if self._pool is not None:
+                self._pool.shutdown(wait=True)
+                self._pool = None
 
 
 def sha256_file(path):
@@ -341,6 +379,8 @@ DEPENDENCIES = {
     'harvest': ('census',),
     # The CHIM world (--builder chim) reads the census palette too.
     'chim': ('census',),
+    # The tracker data of the CHIM world (BUILD/toolkit), its own stage (BUILD-CHIM-KEY-UNDERDECLARED-35).
+    'cell-progress': ('chim',),
     'media': (), 'music': (), 'engine': (),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
@@ -383,8 +423,17 @@ def stage_dependencies(steps, skipped=()):
         deps = DEPENDENCIES.get(name, tuple(names[index - 1:index]))
         # Quick test builds (--exclude): a stage the plan skips is no one's dependency.
         deps = tuple(d for d in deps if d not in skipped)
+        if name.startswith('chim-town-'):
+            # A CHIM town (tools/chim_town.py) reads the CHIM world and the census palette.
+            deps = ('chim', 'census')
+        # A CHIM town's legacy chain stage is not built (CHIM-LEGACY-CHAIN-33): the ordered
+        # scene chain continues from its predecessor.
+        deps = tuple(dict.fromkeys(d for dep in deps for d in
+                                   (passed_on(dep) if dep == 'balmora' and dep not in names else (dep,))))
         if miniwind:
-            from miniwind import DEPENDENCY_OVERRIDES, IMAGE_AFTER, omitted
+            # The plan's table only (pure data): stage code must not import tools/miniwind.py
+            # (BUILD-MINIWIND-STAGE-CLOSURE-33).
+            from miniwind_plan import DEPENDENCY_OVERRIDES, IMAGE_AFTER, omitted
             deps = DEPENDENCY_OVERRIDES.get(name, deps)
             if name == 'image':
                 deps = (*(d for d in deps if not omitted(d)), *IMAGE_AFTER)
@@ -405,7 +454,7 @@ def stage_dependencies(steps, skipped=()):
         if name == 'image' and 'harvest' in names:
             deps = (*deps, 'harvest')
         if name == 'image' and 'chim' in names:
-            deps = (*deps, 'chim')
+            deps = (*deps, 'chim', *(n for n in names if n.startswith('chim-town-')))
         # the CHIM world leaves out the harvest placements and adds the town flora (payload parity)
         if name == 'chim':
             deps = (*deps, *(d for d in ('harvest', 'world-flora-assets', 'world-survey') if d in names))
@@ -528,10 +577,15 @@ def execute_parallel(steps, run, metadata, root):
                     # stages shrink before it starts (BUILD-STAGE-START-SHARE-33).
                     running_serial = sum(not s['parallel'] for s in active.values())
                     running_pooled = len(active) - running_serial
-                    # With nothing running, the first ready stage starts whatever it would reserve for
-                    # the others: a budget smaller than the ready branches must not leave every branch
-                    # waiting for room that never comes (BUILD-SCHEDULER-LOWBUDGET-33).
-                    if budget - running_serial - serial < running_pooled + 1 + parallel and active:
+                    # The other ready branches get a reserved worker only while the budget has room for
+                    # them: with more ready branches than workers, stages start one per free worker
+                    # instead of every branch waiting for room that never comes (BUILD-SCHEDULER-LOWBUDGET-33:
+                    # first nothing started, then one stage at a time). Large budgets are unchanged.
+                    if len(active) + 1 > budget:
+                        break
+                    room = budget - len(active) - 1
+                    serial, parallel = min(serial, room), min(parallel, max(0, room - min(serial, room)))
+                    if budget - running_serial - serial < running_pooled + 1 + parallel:
                         break
                     jobs = rebalance(serial, 1 + parallel)[0]
                 else:

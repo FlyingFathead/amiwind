@@ -204,7 +204,8 @@ void SV_SendServerinfo (client_t *client)
     else
         MSG_WriteByte (&client->message, GAME_COOP);
 
-    sprintf (message, pr_strings+sv.edicts->v.message);
+    /* the map text is data, never a format (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
+    Q_snprintf (message, sizeof(message), "%s", pr_strings+sv.edicts->v.message);
 
     MSG_WriteString (&client->message,message);
 
@@ -1041,6 +1042,14 @@ This is called at the start of each level
 */
 extern float		scr_centertime_off;
 
+qboolean SV_MapNameFits (const char *name)
+{
+    if (name && strlen (name) <= SV_MAPNAME_MAX)
+        return true;
+    Con_Printf ("Map name too long (at most %d characters).\n", SV_MAPNAME_MAX);
+    return false;
+}
+
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot)
 #else
@@ -1051,6 +1060,10 @@ void SV_SpawnServer (char *server)
     edict_t		*ent;
     int			i;
 
+    /* Every caller (map, changelevel, restart, load) passes through here:
+     * a name that does not fit is refused before anything changes. */
+    if (!SV_MapNameFits (server))
+        return;
     // let's not have any servers with no name
     if (hostname.string[0] == 0)
         Cvar_Set ("hostname", "UNNAMED");
@@ -1093,10 +1106,10 @@ void SV_SpawnServer (char *server)
 
     memset (&sv, 0, sizeof(sv));
 
-    strcpy (sv.name, server);
+    COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);	/* fits: SV_MapNameFits */
 #ifdef QUAKE2
     if (startspot)
-        strcpy(sv.startspot, startspot);
+        COM_FormatPath (sv.startspot, sizeof(sv.startspot), "%s", startspot);
 #endif
 
 // load progs to get entity field count
@@ -1132,11 +1145,12 @@ void SV_SpawnServer (char *server)
 
     sv.time = 1.0;
 
-    strcpy (sv.name, server);
-    sprintf (sv.modelname,"maps/%s.bsp", server);
+    COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);
+    COM_FormatPath (sv.modelname, sizeof(sv.modelname), "maps/%s.bsp", server);
     {
         const char *variant=AW_SceneWorldModel(server);
-        if(variant)strcpy(sv.modelname,variant);
+        if(variant && !COM_FormatPath(sv.modelname,sizeof(sv.modelname),"%s",variant))
+            COM_FormatPath (sv.modelname, sizeof(sv.modelname), "maps/%s.bsp", server);
     }
     AW_HeapAuditPhase(sv.modelname,"before-bsp");
     AW_StreamLoadBegin(sv.modelname);aw_world_start=Sys_FloatTime();
@@ -1145,6 +1159,18 @@ void SV_SpawnServer (char *server)
     if (!sv.worldmodel)
     {
         Con_Printf ("Couldn't spawn server %s\n", sv.modelname);
+        sv.active = false;
+        SCR_EndLoadingPlaque();
+        return;
+    }
+    /* The world and its inline models *1..*N take precache slots 1..N+1 of
+     * MAX_MODELS (ENGINE-SUBMODEL-LIMIT-32): a map with more is refused as
+     * unavailable, as a missing map is; the builder's map gate
+     * (tools/map_engine_limits.py) keeps shipped maps far below. */
+    if (sv.worldmodel->numsubmodels > MAX_MODELS - 1)
+    {
+        Con_Printf ("Map %s unavailable: %ld models, the engine holds %ld\n", sv.modelname,
+                    (long)sv.worldmodel->numsubmodels, (long)(MAX_MODELS - 1));
         sv.active = false;
         SCR_EndLoadingPlaque();
         return;

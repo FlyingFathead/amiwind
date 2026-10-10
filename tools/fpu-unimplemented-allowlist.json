@@ -6,10 +6,6 @@
     {"function": "sqrt", "callers": "*",
      "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument)"},
     {"function": "sqrtf", "callers": "*",
-     "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument)"},
-    {"function": "pow", "callers": ["BuildGammaTable"],
-     "why": "gamma table only, and only when gamma is not 1 (BuildGammaTable returns before pow at the default 1)"},
-    {"function": "__ieee754_pow", "callers": ["pow"],
-     "why": "the body of pow, reached only through the gamma table call above"}
+     "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument)"}
   ]
 }

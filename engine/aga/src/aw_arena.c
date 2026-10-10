@@ -35,6 +35,11 @@ static double phase_started;
 static unsigned long replay_seed;
 static float saved_seed;
 static edict_t *opponent;
+/* The arena player's set sheet (config/arena_player.json -> arena/player.txt);
+ * aw_arena_player 0 fights with the game's own character instead. */
+static aw_fighter_t player_preset;
+static char loadout[24],loadout_used[24];   /* "" = the file's default loadout */
+static cvar_t arena_player={"aw_arena_player","1"};
 static char result_line[4][64];
 /* Planned quick-character module (the quick-start job): set up the player's
  * (and optionally the opponent's) stats before the title card. NULL until it
@@ -238,11 +243,19 @@ void AW_ArenaSpawn(edict_t *p) {
     p->v.movetype=MOVETYPE_WALK;p->v.fixangle=1;
     opponent->v.flags=(int)opponent->v.flags|FL_ONGROUND;
     SV_LinkEdict(p,false);SV_LinkEdict(opponent,false);
+    /* The set fighter (the captured character comes back on exit). */
+    aw_combat_player_preset=NULL;
+    if(arena_player.value && AW_CombatLoadout(loadout,&player_preset,loadout_used)){
+        aw_combat_player_preset=&player_preset;
+        if(aw_character.valid){aw_character.maximum[0]=player_preset.health_max;aw_character.maximum[2]=player_preset.fatigue_max;}
+        Con_Printf("Arena: you fight as %s (level %ld, loadout %s; aw_arena_player 0 = your own character).\n",
+            player_preset.name,(long)player_preset.level,loadout_used);
+    }
     /* Fresh fighters: full health and fatigue, hands raised. */
     if(aw_character.valid){
         aw_character.current[0]=aw_character.maximum[0];aw_character.current[2]=aw_character.maximum[2];
         p->v.health=aw_character.maximum[0];
-    }else p->v.health=100;
+    }else p->v.health=aw_combat_player_preset?player_preset.health_max:100;
     AW_GalleryHandsDrawn(p);
     help=0;result_line[0][0]=0;
     set_phase(aw_arena_setup?PHASE_SETUP:PHASE_TITLE);
@@ -281,11 +294,16 @@ void AW_ArenaCommand(int argc,char **argv) {
     if(argc==2 && !Q_strcasecmp((char *)a,"exit")){AW_GalleryArenaLeave();return;}
     if(argc==2 && !Q_strcasecmp((char *)a,"list")){list();return;}
     if(argc==2 && !Q_strcasecmp((char *)a,"help")){help=phase!=PHASE_NONE;
-        Con_Printf("dbgmode arenapit [opponent | list | next | prev | here | pit | floor | seed N | rematch | setup | exit]\n");return;}
+        Con_Printf("dbgmode arenapit [opponent | list | next | prev | here | pit | floor | seed N | loadout NAME | rematch | setup | exit]\n");return;}
     if(argc==2 && !Q_strcasecmp((char *)a,"setup")){
         if(aw_arena_setup)Con_Printf("Fighter setup runs before the next title card.\n");
         else Con_Printf("Fighter setup arrives with the quick character screen; fighters use their own sheets.\n");
         return;
+    }
+    if(argc==3 && !Q_strcasecmp((char *)a,"loadout")){
+        aw_fighter_t probe;char used[24];
+        if(!AW_CombatLoadout(argv[2],&probe,used)){Con_Printf("No loadout %s in arena/player.txt (config/arena_player.json).\n",argv[2]);return;}
+        strcpy(loadout,used);Con_Printf("Arena loadout: %s%s.\n",used,phase!=PHASE_NONE?" (rematch to use it)":"");return;
     }
     if(argc==3 && !Q_strcasecmp((char *)a,"seed")){
         Cvar_SetValue("aw_combat_seed",Q_atof(argv[2]));
@@ -344,6 +362,7 @@ static void dbgmode(void) {
 }
 static void testarena(void) {command();}
 void AW_ArenaInit(void) {
+    Cvar_RegisterVariable(&arena_player);
     Cmd_AddCommand("aw_arenapit",command);
     Cmd_AddCommand("dbgmode",dbgmode);
     Cmd_AddCommand("testarena",testarena);
@@ -352,7 +371,7 @@ void AW_ArenaInit(void) {
 /* aw_gallery.c: the session ended or the map is not ours any more. */
 void AW_ArenaEnd(void) {
     if(phase==PHASE_NONE)return;
-    AW_CombatClear();phase=PHASE_NONE;opponent=NULL;help=0;
+    AW_CombatClear();phase=PHASE_NONE;opponent=NULL;help=0;aw_combat_player_preset=NULL;
 }
 
 /* ---- keys and drawing ---- */

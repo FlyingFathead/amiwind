@@ -8,19 +8,34 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 import numpy as np
 from mwad.npc import load_master,first,text,PART_NAMES
 from mwad.audit import BSA
-from mwad.paths import ensure_external
-from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl
+from mwad.paths import copy_tree,ensure_external
+from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl,add_root_rule_arg,apply_root_rule
 from player_hull import lumps,pack_lumps
+from build_jobs import add_jobs
+
+# First-person stances: (idle group, weapon group) of base_anim.1st.nif, as the original
+# engine picks them by weapon class (hand to hand; one-handed; two-handed close: long blade,
+# blunt; two-handed wide: spear, axe, staff). Each stance fills the same frame contract.
+STANCES={'hh':('idlehh','handtohand'),'1h':('idle1h','weapononehand'),
+         '2c':('idle2c','weapontwohand'),'2w':('idle2w','weapontwowide')}
+
+def stance_clips(stance='hh'):
+    """The fixed frame contract (idle 8, draw 6, lower 4, punch 10 = 28 frames) for one stance;
+    the runtime state logic is the same for every stance."""
+    if stance not in STANCES:raise ValueError('Unknown first-person stance '+str(stance))
+    idle,group=STANCES[stance]
+    return (('idle',idle+': start',idle+': stop',8,False),
+            ('draw',group+': equip start',group+': equip stop',6,True),
+            ('lower',group+': unequip start',group+': unequip stop',4,True),
+            ('punch',group+': chop start',group+': chop large follow stop',10,True))
 
 # Fixed frame contract shared with independent runtime state logic.
-CLIPS=(('idle','idlehh: start','idlehh: stop',8,False),
-       ('draw','handtohand: equip start','handtohand: equip stop',6,True),
-       ('lower','handtohand: unequip start','handtohand: unequip stop',4,True),
-       ('punch','handtohand: chop start','handtohand: chop large follow stop',10,True))
+CLIPS=stance_clips('hh')
 
-def sample_clips(events):
+def sample_clips(events,stance='hh'):
     times=[];clips={}
-    for name,start,stop,count,endpoint in CLIPS:
+    for name,start,stop,count,endpoint in stance_clips(stance):
+        if start not in events or stop not in events:raise ValueError('Missing first-person animation '+name+' ('+stance+')')
         a=events[start];b=events[stop]
         if not np.isfinite([a,b]).all() or b<=a:raise ValueError('Invalid first-person animation '+name)
         clips[name]={'first':len(times),'count':count,'duration':float(b-a)}
@@ -65,12 +80,21 @@ def nord_parts(kinds):
     return appearance_parts(kinds, 'nord', False)
 
 
-def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=320, topology='reduced'):
-    """Bake one owned appearance without copying or modifying a scene."""
+def hand_kinds(master):
+    """The record kinds bake_appearance reads (RACE, BODY) of the master file (run beside the
+    skeleton read: build_parallel.Background)."""
+    kinds,_,_=load_master(master)
+    return {kind:kinds[kind] for kind in ('RACE','BODY')}
+
+
+def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=320, topology='reduced', skeleton=None):
+    """Bake one owned appearance without copying or modifying a scene.
+    skeleton: Skeleton(assets, 'meshes/base_anim.1st.nif') when already read."""
     if budget not in (320,480):raise ValueError('Hand budget must be 320 or 480')
     if topology not in ('reduced','source'):raise ValueError('Unknown hand topology profile')
     race=str(race).casefold();parts=appearance_parts(kinds,race,female)
-    skeleton=Skeleton(assets,'meshes/base_anim.1st.nif');times,clips=sample_clips(skeleton.events)
+    if skeleton is None:skeleton=Skeleton(assets,'meshes/base_anim.1st.nif')
+    times,clips=sample_clips(skeleton.events)
     shapes,materials,textures=assemble(assets,{'parts':parts,'weight':1,'height':1},skeleton,times)
     camera=skeleton.pose(float(times[0]))('Camera')[3,:3]*.25
     race_data=first(kinds['RACE'][race],'RADT')
@@ -84,7 +108,7 @@ def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=32
         frames,faces,uv,skin=bake_source_hands(shapes,materials,textures,palette)
     else:
         frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=budget)
-    raw=animated_mdl(frames,faces,uv,skin)
+    raw=animated_mdl(frames,faces,uv,skin,vertex_limit=1999)
     report={'scope':'Owned race/sex first-person unarmed appearance; visual animation only, no combat rules',
             'race':race,'female':female,'budget':budget,'topology':topology,
             'model':'progs/v_nord.mdl','bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
@@ -94,14 +118,17 @@ def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=32
             'bounds':[frames.min((0,1)).tolist(),frames.max((0,1)).tolist()]}
     return raw,report
 
-def prepare(data,scene,out):
+def prepare(data,scene,out,jobs=None):
     data=ensure_external(data,'owned data');scene=ensure_external(scene,'source scene');out=ensure_external(out,'hands scene')
     ready=json.loads((scene/'scene-ready.json').read_text())
     if ready.get('hands'):raise ValueError('Scene already has hands')
-    kinds,_,_=load_master(data/'Morrowind.esm');assets=Assets(data,BSA(data/'Morrowind.bsa'))
-    raw,report=bake_appearance(assets,kinds,(scene/'id1/gfx/palette.lmp').read_bytes())
+    # The master file loads beside the first-person skeleton read (two single-core reads).
+    from build_parallel import Background
+    kinds=Background(hand_kinds,data/'Morrowind.esm',jobs=jobs)
+    assets=Assets(data,BSA(data/'Morrowind.bsa'));skeleton=Skeleton(assets,'meshes/base_anim.1st.nif')
+    raw,report=bake_appearance(assets,kinds.result(),(scene/'id1/gfx/palette.lmp').read_bytes(),skeleton=skeleton)
     clips=report['clips'];eye_height=report['eye_above_origin']
-    shutil.copytree(scene,out);(out/'id1/progs/v_nord.mdl').write_bytes(raw)
+    copy_tree(scene,out);(out/'id1/progs/v_nord.mdl').write_bytes(raw)
     # Store derived timing in private worldspawn. Runtime does not hardcode asset times.
     b=lumps((out/'seyda.bsp').read_bytes());entities=b[0].decode('cp1252');end=entities.index('}')
     values=''.join('"aw_hand_'+name+'" "'+str(info['duration'])+'"\n' for name,info in clips.items())
@@ -117,5 +144,5 @@ def prepare(data,scene,out):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for n in ['data-files','scene','out']:p.add_argument('--'+n,type=Path,required=True)
-    a=p.parse_args();print(json.dumps(prepare(a.data_files,a.scene,a.out),indent=2))
+    add_root_rule_arg(p);add_jobs(p);a=p.parse_args();apply_root_rule(a);print(json.dumps(prepare(a.data_files,a.scene,a.out,a.jobs),indent=2))
 if __name__=='__main__':main()

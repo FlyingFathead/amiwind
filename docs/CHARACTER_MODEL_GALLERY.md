@@ -239,10 +239,29 @@ the opt-in allowance. The preceding RC2 had 25 failed conversions and three
 smaller trial allowances. No missing entry is hidden or replaced with a generic
 actor. Conversion success remains separate from individual visual acceptance.
 
-`config/gallery_model_quality.json` records targeted profiles. Dagoth Ur keeps
-all 240 mask, 47 crest and 30 neck-piece triangles; the complete model has 903
-triangles and uses 16-pixel face tiles to retain more of the original gold texture.
-Both source records share the same result. Gallery models receive steady daylight
+**Dagoth Ur keeps his whole original model; every humanoid NPC keeps its
+original head.** A humanoid's head keeps every original triangle and its body
+keeps its silhouette (`--npc-head-detail`; in the game the original head ships
+in the near NPC level, the map model stays the budget bake:
+[NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md); numbers in
+[the NPC model cache notes](NPC_MODEL_CACHE.md#original-heads)).
+
+`config/gallery_model_quality.json` records targeted profiles. Dagoth Ur (both
+records, `dagoth_ur_1` and `dagoth_ur_2`, share `r/dagothr.nif`) uses the
+shared-vertex encoding (`npc_geometry.shared_vertex_mdl`): all 2,254 original
+triangles on their 1,741 original vertices, his three original textures packed
+into one 416 x 256 skin, 170,532 bytes. Under 2,000 vertices the renderer's
+original alias path draws it with no triangle cap, so the engine is unchanged
+([NPC-DAGOTH-BODY-DECIMATION-33](bugs/NPC-DAGOTH-BODY-DECIMATION-33.md)). The
+previous mask profile (903 triangles, mask, crest and neck piece exact) is kept
+under `previous_profiles`.
+
+### Special large models
+
+- Dagoth Ur: done, shared-vertex encoding (above).
+- Heart of Lorkhan: to be decided; measurements below.
+
+Gallery models receive steady daylight
 for inspection; normal scene lighting is unchanged. Skin-tone table repairs
 are documented in [the conversion journal](IMPLEMENTATION_JOURNAL.md#j027--pale-faces-mapped-back-to-sky-grey).
 

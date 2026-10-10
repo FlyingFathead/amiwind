@@ -65,13 +65,18 @@ def main(argv=None):
     parser.add_argument('--stage-inputs', action=argparse.BooleanOptionalAction,
                         default=os.name == 'nt', help='Copy input into Linux runtime storage (Windows default)')
     parser.add_argument('--output', type=Path, required=True, help='New external export/log directory')
-    parser.add_argument('--name', default='docker-full-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ'))
+    parser.add_argument('--name', help='Run name (default: tools/run_name.py scheme, purpose "full-docker")')
     parser.add_argument('--volume', default='amiwind-docker-builds', help='Persistent Linux output/cache volume')
     parser.add_argument('--image', default=IMAGE)
     parser.add_argument('--jobs', type=int, default=os.cpu_count() or 1)
     parser.add_argument('--docker', default='docker')
     parser.add_argument('--docker-host')
     args = parser.parse_args(argv)
+    import run_name
+    root = Path(__file__).resolve().parents[1]
+    commit, _ = run_name.source_commit(root)
+    if not args.name:
+        args.name = run_name.default_name(run_name.source_version(root), 'full-docker', commit)
     for value in (args.name, args.volume, args.input_volume):
         if value and not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', value):
             parser.error('Run/volume names need simple letters, digits, dash, dot or underscore')
@@ -117,7 +122,8 @@ def main(argv=None):
                    f'type=volume,source={args.volume},target=/work', args.image,
                    'python', 'tools/build.py', '--data-files', '/input',
                    '--tools-dir', '/opt/amiwind-tools', '--workspace', '/work',
-                   '--name', args.name, '--jobs', str(args.jobs)]
+                   '--name', args.name, '--jobs', str(args.jobs),
+                   *(['--source-commit', commit] if commit != 'nogit' else [])]
         subprocess.run(command, check=True)
         created = True
         logged(docker + ['start', '--attach', container], output / 'full-build.log')

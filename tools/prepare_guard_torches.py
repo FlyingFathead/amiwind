@@ -17,6 +17,7 @@ from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, rigid_a
 from npc_faces import ActorSkeleton, actor_samples
 from prepare_hand_sprites import decode_mdl
 from prepare_torch import source_nodes
+import actor_frames
 
 GUARD_CLASSES = frozenset(('guard', 'ordinator guard'))
 MAX_RECORDS = 32
@@ -76,7 +77,7 @@ def registry(records_):
             raw.extend(encoded.ljust(64, b'\0'))
         anchors = np.asarray(item['emitters'], dtype=float)
         count = item['frames']
-        if count not in (8, 21) or anchors.shape != (count, 3) or not np.isfinite(anchors).all() or np.max(abs(anchors)) > 128:
+        if count not in actor_frames.LEGACY_FRAME_COUNTS or anchors.shape != (count, 3) or not np.isfinite(anchors).all() or np.max(abs(anchors)) > 128:
             raise ValueError('Invalid guard frame/anchor bounds')
         raw.extend(struct.pack('>HH', count, int(bool(item['auto_inventory_eligible']))))
         raw.extend(np.rint(anchors*65536).astype('>i4').tobytes())
@@ -176,17 +177,30 @@ class AuditedAssets(Assets):
         return raw
 
 
-def _body(assets, appearance, base, raw, palette):
+def _body(assets, appearance, base, raw, palette, layout=None):
+    """The held-torch body companion of a guard model. layout: the model's animation kit layout
+    (<model>.anm) or None. The frame layout comes from tools/actor_frames.py: the previous 8 idle and
+    21 town actor models get a companion of every frame; an animation kit model gets a companion of its
+    idle group (frames 0..7: the engine draws the companion for those frames and the guard's own model,
+    without the torch, for its other groups; ANIMKIT-ACTOR-ABI-SITES-35)."""
     original, faces, uv, skin = decode_mdl(raw)
+    frame_layout = actor_frames.of_model(len(original), layout)
+    extra = {}
+    if frame_layout.kind == 'kit':
+        # Kit idle poses are the base skeleton's idle cycle (npc_anim.plan: idle first, in place, no
+        # override), exactly the previous 8-frame poses; the registry indexes the guard's own frames.
+        idle_base, idle_count = frame_layout.idle
+        if idle_base != 0 or idle_count != actor_frames.IDLE_FRAMES:
+            raise ValueError('Guard animation kit layout must start with the 8-frame idle group')
+        extra = {'base_frames': len(original), 'base_layout': 'kit idle %d:%d' % (idle_base, idle_count)}
+        original = original[idle_base:idle_base+idle_count]
     count = len(original)
-    if count == 8:
-        normal = base; times, _ = base.idle_times(8); samples = None
-    elif count == 21:
+    if count == actor_frames.IDLE_FRAMES:
+        normal = base; times, _ = base.idle_times(count); samples = None
+    else:  # actor_frames.ACTOR_FRAMES (of_model refuses every other undeclared layout)
         override = Skeleton(assets, 'meshes/base_anim_female.nif') if appearance['female'] else None
         normal = ActorSkeleton(base, override)
         times, samples, _, _ = actor_samples(normal)
-    else:
-        raise ValueError('Guard model must retain the original 8/21-frame actor ABI')
     layer = TorchLayer(base, normal, times)
     old_shapes, materials, textures = assemble(assets, appearance, normal, times, samples)
     held_shapes, _, _ = assemble(assets, appearance, layer, np.arange(count), samples)
@@ -211,7 +225,8 @@ def _body(assets, appearance, base, raw, palette):
     held_skin = Image.fromarray(skin, 'P'); held_skin.putpalette(palette)
     held = animated_mdl(positions[count:], faces, uv, held_skin)
     return held, layer, samples, {'frames': count, 'triangles': len(faces), 'vertices': original.shape[1],
-        'base_geometry_reproduced_exactly': True, 'base_file_changed': False, 'skin_indices_preserved_exactly': True}
+        'base_geometry_reproduced_exactly': True, 'base_file_changed': False, 'skin_indices_preserved_exactly': True,
+        **extra}
 
 
 def _equipment(assets, appearance, layer, samples, mesh, palette):
@@ -267,7 +282,8 @@ def prepare(data_files, id1, output_id1=None):
         rig = appearance['skeleton']
         if rig not in skeletons: skeletons[rig] = Skeleton(assets, rig)
         original = (id1 / entry['base_model']).read_bytes()
-        body, layer, samples, proof = _body(assets, appearance, skeletons[rig], original, palette)
+        body, layer, samples, proof = _body(assets, appearance, skeletons[rig], original, palette,
+            actor_frames.layout_text(id1 / entry['base_model']))
         equipment, emitters = _equipment(assets, appearance, layer, samples, mesh, palette)
         body_path = 'progs/gt_b_'+sha(body)[:12]+'.mdl'
         equipment_path = 'progs/gt_t_'+sha(equipment)[:12]+'.mdl'

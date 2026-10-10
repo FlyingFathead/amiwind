@@ -73,14 +73,16 @@ def prepare_staged_sky(id1,data_files,work_dir,*,shared_sky_source=None,local_sk
         path=work/'fallback-warning.json'
         if path.exists():raise ValueError('Existing sky preparation warning: use a fresh build work directory')
         path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8');return with_night(report)
-    if digest(palette)!=overlay.EXPECTED_PALETTE:return fallback('Unsupported original palette fingerprint; no reservation/reindex performed')
+    from ui_palette import legacy_bank_or_none
+    legacy=legacy_bank_or_none(data_files) if digest(palette)!=overlay.EXPECTED_PALETTE else None
+    if not overlay.approved(palette.read_bytes(),legacy):return fallback('Unsupported original palette fingerprint; no reservation/reindex performed')
     if not data_files:return fallback('No owned data files supplied; no cloud artwork or vivid palette asserted')
     try:clouds=owned_clouds(data_files)
     except (FileNotFoundError,KeyError,OSError,ValueError) as exc:return fallback(str(exc))
     if work.exists():raise ValueError('Sky preparation work directory exists; preserve it and use fresh output')
     # Hard format errors stop before any staged mutation. Overlay contains only
     # changed files; every original is backed up before installing a changed file.
-    record=overlay.convert(id1,work/'changed-overlay',overlay.EXPECTED_PALETTE,changed_only=True)
+    record=overlay.convert(id1,work/'changed-overlay',digest(palette),changed_only=True)
     raw,new_report=build_cloud_sky(clouds[0][0],(work/'changed-overlay/gfx/palette.lmp').read_bytes(),secondary=clouds[1][0])
     validate_sky(raw)
     output=work/'owned-cloud-sky.lmp';output.write_bytes(raw)

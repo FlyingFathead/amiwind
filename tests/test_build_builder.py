@@ -1,6 +1,7 @@
 """Builder type (legacy or chim): config precedence, validation and receipts."""
 import contextlib
 import io
+import os
 import json
 from pathlib import Path
 import sys
@@ -13,6 +14,8 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
 import build
 import build_font_options as options
 import chim
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
 def resolve(argv):
@@ -95,9 +98,9 @@ class BuilderOptionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / 'bad.json'
             p.write_text('{"builder":"v2"}')
-            with patch.object(build, 'prerequisites') as setup, contextlib.redirect_stderr(io.StringIO()), \
-                 self.assertRaises(SystemExit):
-                build.main(['--build-config', str(p), '--check'])
+            with patch.dict(os.environ), patch.object(build, 'prerequisites') as setup, \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                build.main(['--build-config', str(p), '--check'])  # sets AMIWIND_* (TEST-ENV-LEAK-HULL-33)
             setup.assert_not_called()
 
     def test_receipt_records_builder_version_and_format(self):
@@ -175,6 +178,7 @@ class ModelHullOptionTests(unittest.TestCase):
                 E.export_model_hull('tree')
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class ChimStageTests(unittest.TestCase):
     def test_legacy_plan_has_no_chim_stage_and_is_unchanged(self):
         legacy = plan(['--jobs', '4', '--builder', 'legacy'])
@@ -185,7 +189,7 @@ class ChimStageTests(unittest.TestCase):
         steps = plan(['--jobs', '4', '--builder', 'chim'])
         names = [name for name, _ in steps]
         legacy = [name for name, _ in plan(['--jobs', '4', '--builder', 'legacy'])]
-        self.assertEqual([n for n in names if n != 'chim'], legacy)
+        self.assertEqual([n for n in names if n not in ('chim', 'cell-progress')], legacy)
         self.assertLess(names.index('census'), names.index('chim'))
         self.assertLess(names.index('chim'), names.index('image'))
         command = [str(part) for part in dict(steps)['chim']]
@@ -198,8 +202,23 @@ class ChimStageTests(unittest.TestCase):
         self.assertEqual(value('--out'), str(RUN / 'chim-world'))
         self.assertEqual(value('--unit-cache'), str(Path('/private/ws/cache/chim-units')))
         self.assertEqual(value('--qbsp'), TOOLS['qbsp'])
+
+    def test_chim_build_writes_the_cell_progress_by_default_in_its_own_stage(self):
+        """BUILD-CHIM-KEY-UNDERDECLARED-35: the tracker runs as its own stage after chim (own key), not inside it."""
+        steps = dict(plan(['--jobs', '4', '--builder', 'chim']))
+        command = [str(part) for part in steps['chim']]
+        self.assertNotIn('--cell-progress', command)
         self.assertIn('--validate', command)
         self.assertIn('--stats', command)
+        tracker = [str(part) for part in steps['cell-progress']]
+        self.assertTrue(tracker[1].endswith('cell_progress_build.py'), tracker)
+        self.assertEqual(tracker[tracker.index('--out') + 1], str(RUN / 'toolkit'))
+        self.assertEqual(tracker[tracker.index('--chim-world') + 1], str(RUN / 'chim-world'))
+        self.assertIn('--never-fail', tracker)
+        names = [name for name, _ in plan(['--jobs', '4', '--builder', 'chim'])]
+        self.assertEqual(names[names.index('chim') + 1], 'cell-progress')
+        self.assertNotIn('cell-progress', dict(plan(['--jobs', '4', '--builder', 'chim', '--no-cell-progress'])))
+        self.assertNotIn('cell-progress', dict(plan(['--jobs', '4', '--builder', 'legacy'])))
 
     def test_image_gets_the_chim_world_only_with_chim(self):
         image = [str(p) for p in dict(plan(['--jobs', '4', '--builder', 'chim']))['image']]

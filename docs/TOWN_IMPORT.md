@@ -188,9 +188,20 @@ v0.0.33 by owner decision (`withdrawn`: the canton bodies do not fit the CHIM
 zone, CHIM-ARENA-MEMORY-33): a default build no longer imports it, and
 `--extra-town vivec_arena` still builds it (BUILD-EXTRA-TOWN-OPTIN-32).
 
+Rooms: the Arena lists its rooms like the cantons (`interiors`, append only).
+The first is "Vivec, Arena Pit" (`vai000`), the combat test spot: 21,992
+faces, 44 placements, four residents on the upper ledge (classified as
+standing, grounded by the actor gate), 3,627,712 B; the stair gate, the actor gate and the
+heap estimate pass (9,381,668 B). Its sand floor is flat and closed (a fair floor for combat
+tests); stairs lead up to the residents' ledge.
+Both Arena doors into the Pit and the Pit's two canton doors out to the frame
+are linked; its two Waistworks doors and the other Arena doors stay
+unavailable until the Waistworks, Underworks and the rooms behind them are
+listed (IMPORT-TOWN-NO-INTERIORS-32). The Pit's main mesh collides through a
+routed hull (depth 6,711 instead of a 36,545-node chain, INTERIOR-HULL-CHAIN-33).
+
 Not yet done for a playable Arena: a target playtest (arrival, region
-crossings, heap on the Amiga); the Arena
-interiors (doors already carry the original destination records); residents
+crossings, heap on the Amiga); the other Arena interiors; residents
 beyond the generic idle/greeting import; the open world's handoff into the
 frame is untested on target.
 
@@ -227,7 +238,11 @@ Rooms: every interior reached through a canton's load doors, directly or
 through other rooms, belongs to the canton of its first entrance (towns in
 table order, then the lowest door reference); 143 rooms in all, including the
 Ministry of Truth cells and the Daedric shrines reached from the Underworks.
-The Arena's nine rooms are not listed yet: `vivec_arena.json` is unchanged.
+The Arena's rooms are listed in `vivec_arena.json` (the Pit first; see
+[Vivec, Arena](#vivec-arena)). Room save IDs run across towns in table order,
+so listing an Arena room moves every canton room up by one; no canton has
+shipped, and a test keeps shipped towns' rooms ahead of unshipped ones
+(TOWN-INTERIOR-SAVEID-ORDER-33).
 
 First owned-data dry run (8 October 2026, 8 jobs, `--dry-run` per town, then
 hidden-surface cull, the map optimizer and the heap estimate per map):

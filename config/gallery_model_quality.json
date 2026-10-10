@@ -1,12 +1,22 @@
 {
   "format": 1,
-  "profiles": {
+  "previous_profiles": {
     "r/dagothr.nif": {
       "id": "dagoth-mask-v1",
       "reason": "Retain the original mask and crest geometry and gold texture detail.",
+      "note": "The face-tile bake before 2026-10-09 (903 triangles); restore it under profiles to select it.",
       "budget": 1000,
       "atlas_tile": 16,
       "minimum_faces": {"Tri neckpart": 30, "Tri mask": 240, "Tri maskpart": 47}
+    }
+  },
+  "profiles": {
+    "r/dagothr.nif": {
+      "id": "dagoth-whole-shared-vertex-v1",
+      "reason": "Keep the whole original model: all 2,254 triangles on its 1,741 original vertices with the original textures in one skin (shared-vertex encoding, owner decision 2026-10-09).",
+      "encoding": "shared-vertex",
+      "budget": 1000,
+      "minimum_faces": {}
     },
     "r/lordvivec.nif": {
       "id": "vivec-authored-idle-v1",

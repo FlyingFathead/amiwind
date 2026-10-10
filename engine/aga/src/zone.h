@@ -121,6 +121,8 @@ typedef struct cache_user_s
 void Cache_Flush (void);
 
 void *Cache_Check (cache_user_t *c);
+/* AmiWind: largest block Cache_Alloc could take now without evicting (read-only). */
+int Cache_LargestFree (void);
 // returns the cached data, and moves to the head of the LRU list
 // if present, otherwise returns NULL
 

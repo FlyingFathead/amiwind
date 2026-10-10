@@ -184,7 +184,9 @@ int AW_HarvestUse(void)
                 amount=AW_StateGet(&aw_state,AW_ITEM,AW_HarvestText(&harvest,harvest.node[j].id))-before[j];
                 if(amount<=0)continue;
                 label=AW_HarvestText(&harvest,harvest.node[j].label);if(!label[0])label="items"; /* AWH1 compatibility. */
-                sprintf(line,"Picked up %ld %s.",(long)amount,label);
+                /* ENGINE-HARVEST-MESSAGE-BOUND-35: bounded line and message. */
+                snprintf(line,sizeof(line),"Picked up %ld %s.",(long)amount,label);
+                if(strlen(message)+strlen(line)+2>sizeof(message))break;
                 if(message[0])strcat(message,"\n");
                 strcat(message,line);
             }

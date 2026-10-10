@@ -354,14 +354,20 @@ def add_heap(track_path, world_heap):
     return track
 
 
-def build_gate(out, maps_dir, master_path, baseline=None, accepted_loss=None, jobs=1, dressing_terms=()):
+def build_gate(out, maps_dir, master_path, baseline=None, accepted_loss=None, jobs=1, dressing_terms=(),
+               extra_maps=None):
     """Image build step: write entity-tracker.json for the final staged maps and
     compare with the previous build's report. An unexplained loss stops the
-    build; --accept-entity-loss REASON records why a loss is intended."""
+    build; --accept-entity-loss REASON records why a loss is intended.
+    extra_maps: {name: reference numbers} placed by something other than a staged map: a
+    town on CHIM made from the game data (its CHIM world placements, frame actors and
+    region harvest catalogues; CHIM-LEGACY-CHAIN-33)."""
     out = Path(out)
     master = Path(master_path).read_bytes()
     rows, unresolved = census(master)
     by_map = refs_by_map([maps_dir], jobs)
+    for name, refs in sorted((extra_maps or {}).items()):
+        by_map[name.lower()] = set(refs)
     placed, full, maps = split_placed(by_map)
     result = report(rows, placed, maps, hashlib.sha256(master).hexdigest(), unresolved, full, private=True)
     result['map_cells'] = map_cells(rows, by_map)

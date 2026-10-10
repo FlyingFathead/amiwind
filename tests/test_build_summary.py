@@ -3,6 +3,7 @@ import contextlib
 import hashlib
 import io
 import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -14,8 +15,11 @@ from unittest.mock import patch
 import build
 import build_summary
 from mwad import progress
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class BuildSummaryTests(unittest.TestCase):
     def test_success_records_timezone_elapsed_bytes_hash_warnings_and_terminal_rules(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -204,7 +208,7 @@ class BuildSummaryTests(unittest.TestCase):
             self.assertIn('Summary save warning:', captured.getvalue())
 
     def run_fixture(self, root, outcome):
-        args = ['--dry-run', '--workspace', str(root), '--name', 'fixture', '--jobs', '1']
+        args = ['--dry-run', '--workspace', str(root), '--name', 'fixture', '--any-run-name', '--jobs', '1']
         def commands(options, run):
             output = run/'image'/f'AmiWind-v{build.VERSION}-dry-run.hdf'
             script = (f'from pathlib import Path; p=Path({str(output)!r}); '
@@ -225,6 +229,30 @@ class BuildSummaryTests(unittest.TestCase):
                 with self.assertRaises(SystemExit) as error: build.main(args)
                 self.assertEqual(error.exception.code, 1)
         return captured.getvalue(), json.loads((root/'build/fixture/build-summary.json').read_text())
+
+    def test_default_run_name_carries_date_version_purpose_and_commit(self):
+        """Run names (tools/run_name.py): the default name; an explicit name without the version is refused."""
+        def commands(options, run):
+            output = run/'image'/f'AmiWind-v{build.VERSION}-dry-run.hdf'
+            return [('engine', [sys.executable, '-c', f'from pathlib import Path; p=Path({str(output)!r}); '
+                                'p.parent.mkdir(); p.write_bytes(b"x")'])]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with patch('setup_build.use_environment'),                  patch.object(build, 'dry_run_prerequisites', return_value={}),                  patch.object(build, 'provenance', return_value={'compiler_jobs': 1, 'tools': {}, 'version_comparison': []}),                  patch.object(build, 'dry_run_commands', side_effect=commands),                  patch.dict('os.environ', {'AMIWIND_SOURCE_COMMIT': '901f8e9'}),                  contextlib.redirect_stdout(io.StringIO()) as captured, contextlib.redirect_stderr(captured):
+                self.assertEqual(build.main(['--dry-run', '--workspace', str(root), '--jobs', '1']), 0)
+                try:
+                    refused = build.main(['--dry-run', '--workspace', str(root), '--name', 'fixture', '--jobs', '1'])
+                except SystemExit as stop:
+                    refused = stop.code
+                self.assertEqual(refused, 1, captured.getvalue()[-2000:])
+            self.assertIn('does not contain the source version', captured.getvalue())
+            runs = sorted(path.name for path in (root/'build').iterdir())
+            self.assertEqual(len(runs), 1)
+            self.assertRegex(runs[0], r'^[0-9]{4}_[0-9]{2}_[0-9]{2}_v' + re.escape(build.VERSION) + r'_dry-run_[0-9a-f]{7}$')
+            state = json.loads((root/'build'/runs[0]/'build-state.json').read_text())
+            self.assertEqual(state['run_name']['version'], build.VERSION)
+            self.assertEqual(state['run_name']['purpose'], 'dry-run')
+            self.assertFalse(state['run_name']['explicit'])
 
     def test_entry_point_summarizes_real_subprocess_output(self):
         with tempfile.TemporaryDirectory() as temp:

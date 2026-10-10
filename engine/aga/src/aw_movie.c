@@ -5,6 +5,7 @@
 #include "quakedef.h"
 #include "sound.h"
 #include "aw_miniwind.h"
+#include "aw_testbox.h"
 #define MAX_PIXELS 64000
 #define RATE 11025
 #define DATA_START 800
@@ -17,7 +18,8 @@ static byte *opening_card;
 static long card_first,card_end;
 static cvar_t intro_text_overlay={"aw_intro_text_overlay","1",true};
 static void playvid(void);
-void AW_MovieInit(void){Cvar_RegisterVariable(&intro_text_overlay);Cmd_AddCommand("playvid",playvid);}
+static void startup_continue(void);
+void AW_MovieInit(void){Cvar_RegisterVariable(&intro_text_overlay);Cmd_AddCommand("playvid",playvid);Cmd_AddCommand("aw_startup_continue",startup_continue);}
 static FILE *video,*audio;
 static long frames,samples,audio_start,clock_start,shown,pcm_start,pcm_count;
 static int broken,branding,width,height,pixels;
@@ -151,6 +153,13 @@ void AW_MovieStartup(void){
     /* A quick test build names what it left out, once, at startup (aw_excluded.c). */
     AW_ContentExcludedStartup();
     IN_AWClearButtons();key_dest=key_game;
+    /* A test drive's AWTEST:test.cfg runs first, then aw_startup_continue (aw_testbox.c). */
+    if(AW_TestBootExec())return;
+    startup_continue();
+}
+/* The startup logo, unless a test start-up option or test.cfg already chose (aw_testbox.c). */
+static void startup_continue(void){
+    if(AW_TestBootSkipLogo())return;
     if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText((char *)AW_MiniwindAfterLogo());
 }
 static int catalogue_path(char *request,char *out,int capacity){
@@ -249,6 +258,13 @@ int AW_MovieKey(int key,int down){
         Con_Printf("Debug video cancelled before playback.\n");return 1;
     }
     if(held_screen()){
+        /* A test build: the console key leaves the startup screen for the main menu
+         * with the console open (the harness types at once). */
+        if(down && (key=='`' || key==K_F10)){
+            close_movie();IN_AWClearButtons();Key_ClearStates();
+            Cbuf_AddText("aw_main_menu\naw_console_fullscreen\n");Con_Printf("Startup screen: console.\n");
+            return 1;
+        }
         if(down && key==K_ENTER)finish("started");
         else if(down && !holding && (key==K_ESCAPE || key==K_SPACE))hold("skipped");
         return 1;

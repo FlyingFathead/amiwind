@@ -8,6 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from .esm import GAME_CONTAINERS
+
 
 GAME_ASSET_TYPES = {
     "meshes": {".nif", ".kf"},
@@ -23,7 +25,7 @@ GAME_ASSET_TYPES = {
 
 
 def is_game_input(relative):
-    """Named base containers and supported assets in their installed folders.
+    """Named game containers (Morrowind, Tribunal, Bloodmoon masters and archives) and supported assets in their installed folders.
 
     Remote-work ZIPs are not GOG/Steam game assets. Positive selection avoids
     treating them, backup files or unrelated root content as installation data.
@@ -31,7 +33,7 @@ def is_game_input(relative):
     path = Path(relative)
     parts = path.parts
     if len(parts) == 1:
-        return path.name.casefold() in {"morrowind.esm", "morrowind.bsa"}
+        return path.name.casefold() in GAME_CONTAINERS
     return path.suffix.casefold() in GAME_ASSET_TYPES.get(parts[0].casefold(), set())
 
 
@@ -60,6 +62,30 @@ def ensure_external(path, label="path"):
                 if any('name = "'+name+'"' in text for name in ("amiwind", "morrowind-amiga-demake")):
                     raise ValueError(f"{label} must be outside AmiWind source checkouts: {path}")
     return resolved
+
+
+def copy_writable(source, target, *, follow_symlinks=True):
+    """shutil.copy2, then the copy is writable by its owner.
+
+    A stage input may be a read-only hard link into the shared storage pool (tools/storage_pool.py); copy2
+    copied that read-only mode onto the stage's own copy, and the next in-place write failed
+    (BUILD-POOL-READONLY-SCENE-WRITE-35: npcs could not rewrite npc-scene/seyda.bsp). Only the new
+    copy changes mode; the pooled source is never touched."""
+    import shutil
+    import stat
+    copied = shutil.copy2(source, target, follow_symlinks=follow_symlinks)
+    if follow_symlinks or not os.path.islink(copied):
+        mode = stat.S_IMODE(os.stat(copied).st_mode)
+        if not mode & stat.S_IWUSR:
+            os.chmod(copied, mode | stat.S_IWUSR)
+    return copied
+
+
+def copy_tree(source, target, **options):
+    """shutil.copytree whose copies are writable (copy_writable): how a stage copies a folder it inherits
+    (the scene chain: bsp-scene -> npc-scene -> hands-scene ...) before it edits the copy in place."""
+    import shutil
+    return shutil.copytree(source, target, copy_function=copy_writable, **options)
 
 
 def child_ci(parent, name, required=True):
@@ -116,7 +142,7 @@ def init_workspace(path):
     path.mkdir(parents=True)
     for name in ("original", "generated", "previews", "build", "cache", "incoming", "releases"):
         (path / name).mkdir()
-    (path / "workspace.json").write_text(json.dumps({"format": 1, "project": "amiwind"}, indent=2)+"\n", encoding="utf-8")
+    (path / "workspace.json").write_text(json.dumps({"format": 1, "project": "amiwind"}, indent=2)+"\n", encoding="utf-8", newline="\n")
     return {"workspace": str(path), "original_data": str(path / "original" / "Data Files")}
 
 
@@ -140,7 +166,7 @@ def setup_workspace(path, data_files, target):
     if target not in ("a500", "a1200"):
         raise ValueError("Unknown target profile")
     state.update({"data_files": str(data_files), "target": target})
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path, delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=path, delete=False) as tmp:
         tmp.write(json.dumps(state, indent=2)+"\n")
         temporary = Path(tmp.name)
     temporary.replace(path / "workspace.json")

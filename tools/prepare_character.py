@@ -225,6 +225,30 @@ def _head(task):
     return head_preview(_preview_context[1], _preview_context[2], part, palette)
 
 
+def _head_cached(task):
+    """Worker: a head preview, or the one recorded for the same part, palette, game data and code
+    (tools/pass_cache.py; the stage resumes from its finished heads, BUILD-IMAGE-NO-RESUME-33)."""
+    data_files, part, palette, cache = task
+    if cache is None:
+        return _head((data_files, part, palette))
+    import hashlib
+    from pass_cache import input_digest
+    key = input_digest({'part': part, 'palette': hashlib.sha256(palette).hexdigest()})
+    found = cache.load(key)
+    if found is not None and found[1] is not None:
+        return found[1]
+    raw = _head((data_files, part, palette))
+    cache.store(key, {'bytes': len(raw)}, raw)
+    return raw
+
+
+def head_cache():
+    """The head preview cache, or None (cache off, or the game data identity unknown)."""
+    from pass_cache import PassCache, game_data_digest
+    identity = game_data_digest()
+    return PassCache.open('character-head', {'game_data': identity}, __file__) if identity else None
+
+
 def prepare(data_files, scene, previews=True, jobs=None):
     from npc_geometry import Assets, Skeleton
     data_files = resolve_data_files(data_files); scene = ensure_external(scene, 'character conversion')
@@ -241,8 +265,9 @@ def prepare(data_files, scene, previews=True, jobs=None):
     if previews:
         palette = (scene/'id1/gfx/palette.lmp').read_bytes()
         workers=min(resolve_jobs(jobs),len(parts));print(f'Character preview workers: {workers}',flush=True)
-        tasks=((data_files,part,palette) for part in parts)
-        for i, raw in enumerate(ordered_map(_head,tasks,workers)):
+        cache=head_cache()
+        tasks=((data_files,part,palette,cache) for part in parts)
+        for i, raw in enumerate(ordered_map(_head_cached,tasks,workers)):
             part=parts[i]
             (dest/f'h{i:03d}.awh').write_bytes(raw)
             print(f'Head preview {i+1}/{len(parts)}: {part["id"]}', flush=True)
@@ -257,5 +282,8 @@ if __name__ == '__main__':
     parser.add_argument('--scene', type=Path, required=True)
     parser.add_argument('--no-previews', action='store_true')
     add_jobs(parser)
+    from npc_geometry import add_root_rule_arg, apply_root_rule
+    add_root_rule_arg(parser)
     args = parser.parse_args()
+    apply_root_rule(args)
     prepare(args.data_files, args.scene, not args.no_previews, args.jobs)

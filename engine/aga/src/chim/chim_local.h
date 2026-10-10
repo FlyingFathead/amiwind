@@ -8,18 +8,28 @@
 #include "chim_format.h"
 #include "chim_zone.h"
 
-#define CHIM_OPEN_FILES		4		/* sector files kept open at once */
+#ifndef CHIM_OPEN_FILES
+#define CHIM_OPEN_FILES		4		/* sector files kept open at once (the host tests may set fewer) */
+#endif
 #define CHIM_MAX_CHUNKS		4096
 #define CHIM_MAX_RECORDS	8192		/* placement records in one chunk */
 #define CHIM_MIN_BUFFER		(AW_BRUSH_SLICE_BYTES)
 #define CHIM_MIN_ZONE		(128*1024)	/* below this a CHIM map does not start */
+/* Efrag links (client.h AW_EFRAG_LIMIT) CHIM placements leave for everything
+ * else; near the limit placements wait unlinked, farthest chunks first
+ * (CHIM-EFRAG-UNCAPPED-35). The builder's CHIM heap gate reads this define
+ * (tools/engine_limits.py). */
+#define CHIM_EFRAG_RESERVE	4096
 
 /* An open CHIM file: the stdio handle, where the file starts (a member may
- * start inside a larger file) and its size. */
+ * start inside a larger file) and its size. pins: loads holding the handle
+ * across frames (a streamed model or terrain); Chim_File never closes a
+ * pinned file to open another (CHIM-PACK-LRU-STREAM-35). */
 typedef struct
 {
 	FILE		*file;
 	long		base, bytes;
+	int			pins;
 	char		path[CHIM_PATH_CHARS+8];
 } chim_pack_t;
 
@@ -134,6 +144,8 @@ int Chim_PackOpen (chim_pack_t *pack, const char *relative);
 void Chim_PackClose (chim_pack_t *pack);
 int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes);
 chim_pack_t *Chim_File (int row);
+long ChimStatics_AliasBytes (void);
+int Chim_FarOnly (void);
 void Chim_FilesClose (void);
 int Chim_FileRow (const char *kind, int cx, int cy, int sector);
 
@@ -157,6 +169,8 @@ void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_
 void ChimChunks_Report (void);
 void ChimChunks_Init (void);
 void ChimChunks_Counts (int *linked, int *efrags, int *one_leaf, int *max_leaves);
+void ChimChunks_EfragCounts (int *waiting, unsigned long *capped, unsigned long *novis_frames);
+extern int chim_efrag_limit;
 int ChimChunks_Hidden (void);
 unsigned long ChimChunks_PrefetchHeld (void);
 void ChimChunks_LastFrame (int *sent, int *one_leaf_path, int *placements);

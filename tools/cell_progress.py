@@ -36,19 +36,23 @@ import argparse
 import collections
 import datetime
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cell_lighting as LT  # noqa: E402
+import cell_lava as LV  # noqa: E402
 import cell_progress_chim as CH  # noqa: E402
 import cell_progress_order as OR  # noqa: E402
+import cell_progress_release as RL  # noqa: E402
 
 FORMAT = 'aw-cell-progress-1'
 AUDIT_FORMAT = 'aw-cell-audit-1'
 CENSUS_FORMAT = 'aw-cell-census-1'
 OUT_FILES = {'progress': 'cell-progress.json', 'next': 'next.json', 'curve': 'mesh-curve.json', 'png': 'mesh-curve.png',
-             'history': 'history.jsonl', 'owner': 'owner-status.json', 'sources': 'sources.json'}
+             'history': 'history.jsonl', 'owner': 'owner-status.json', 'releases': RL.RELEASE_FILE, 'sources': 'sources.json'}
 NEXT_LIMIT = 300
 
 # Audit mechanisms: id -> label. Order is the display order.
@@ -67,11 +71,23 @@ MECHANISMS = collections.OrderedDict([
 ])
 RESULTS = ('passed', 'failed', 'accepted', 'not_measured')   # accepted = failed but owner-accepted
 OWNER_STATES = ('playtested', 'approved')
-BUCKETS = ('complete', 'terrain_complete', 'approved', 'playtested', 'audits_passed', 'converted_failing', 'not_converted', 'converted_unmeasured', 'not_started',
+BUCKETS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'converted_failing', 'not_converted', 'converted_unmeasured', 'not_started',
            'empty_sea', 'hull_policy_pending')
 # SUCCESS = every bucket that counts as passed (complete cells included). Precedence of the statuses, strongest first:
-# complete > terrain_complete > approved > playtested > passed (audits_passed) > hull policy pending > failed > not converted.
-SUCCESS = ('complete', 'terrain_complete', 'approved', 'playtested', 'audits_passed')
+# complete > terrain_complete > complete_unlit > terrain_complete_unlit > approved > playtested > passed (audits_passed) >
+# hull policy pending > failed > not converted. The _unlit levels ("awaiting lighting", owner 2026-10-09): every criterion
+# of the level met except lighting; they count as done, each on its own line.
+SUCCESS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed')
+COMPLETE_UNLIT_LABEL = 'Cell complete, awaiting lighting'
+TERRAIN_COMPLETE_UNLIT_LABEL = 'Terrain complete, awaiting lighting'
+COMPLETE_LEVELS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit')
+# Eligible for the next release (owner, 2026-10-09): every done status, lighting done or not = every passed status
+# (cell / terrain complete, awaiting lighting or not, owner states, passed) and empty sea (it passes as it is; the
+# open world needs the water around the coast).
+ELIGIBLE = SUCCESS + ('empty_sea',)
+ELIGIBLE_RELEASE = 'v0.0.34'
+# The "eligible" selector of the release tool and the Toolkit preset: eligible statuses plus empty sea (done = usable).
+ELIGIBLE_SELECT = tuple(dict.fromkeys(tuple(ELIGIBLE) + ('empty_sea',)))
 # Two completion levels (owner, 2026-10-09). Terrain complete: all audits pass and every placed object except actors is
 # converted (actors may still be deferred). Cell complete: terrain complete and every actor converted too.
 COMPLETE_LABEL = 'Cell complete'
@@ -98,6 +114,11 @@ CATEGORIES = collections.OrderedDict([
 TYPE_CATEGORY = dict([('STAT', 'statics'), ('LIGH', 'lights'), ('DOOR', 'doors'), ('CONT', 'containers'), ('ACTI', 'activators'),
                       ('NPC_', 'npcs'), ('CREA', 'creatures'), ('LEVC', 'creatures')] + [(t, 'items') for t in ITEM_TYPES])
 MARKER_WORD = 'marker'
+# Lit like the original is required for Terrain complete and Cell complete (owner, 2026-10-09: "a cell is only complete
+# when it's lit like Morrowind"). The lighting audit is tools/cell_lighting.py. Lights deferred for want of a CHIM light
+# path (lights without a mesh) are then judged by that audit instead of the Lights category.
+LIGHTING_REQUIRED = True
+LIGHT_PATH_WORDS = ('light without a mesh', 'CHIM-MESHLESS-LIGHTS-33', 'no CHIM light path')
 
 
 def read_json(path):
@@ -107,8 +128,11 @@ def read_json(path):
 
 def write_json(path, value, pretty=False):
     text = json.dumps(value, sort_keys=True, indent=1 if pretty else None, separators=None if pretty else (',', ':'))
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_bytes((text + '\n').encode('utf-8'))
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.tmp')       # atomic: a reader (the live tracker) never sees half a file
+    temporary.write_bytes((text + '\n').encode('utf-8'))
+    os.replace(temporary, path)
 
 
 def ckey(x, y):
@@ -126,8 +150,9 @@ def now_iso(now=None):
 
 # ------------------------------------------------------------------ census (your own Morrowind files)
 
-def _count_refs(e, refs, objects, meshes_of=None):
-    """Count one cell's references into e (counts, meshes, placements, flora) and return its door records."""
+def _count_refs(e, refs, objects, meshes_of=None, exterior=True, molten=()):
+    """Count one cell's references into e (counts, meshes, placements, flora, lights, molten lava pools: objects
+    whose script hurts a standing actor, tools/lava.molten_objects) and return its door records."""
     doors = []
     for r in refs:
         if r.get('del'):
@@ -135,8 +160,12 @@ def _count_refs(e, refs, objects, meshes_of=None):
         o = objects.get(r['id'])
         if not o or o['deleted']:
             continue
+        if r['id'] in molten:
+            e['lava'] = e.get('lava', 0) + 1
         tag = 'ITEM' if o['type'] in ITEM_TYPES else o['type']
         e['counts'][tag] += 1
+        if o['type'] == 'LIGH' and 'lflags' in o:
+            e.setdefault('lights', []).append(LT.census_light(r['id'], o, exterior))
         if r.get('dest'):
             e['counts']['LOAD_DOOR'] += 1
             p = r.get('p')
@@ -154,7 +183,13 @@ def build_census(data_files, progress=print):
     """Parse the masters: per exterior cell what is placed, which meshes it uses and which doors lead where; per
     interior cell its counts and doors (the door links of the interiors tree)."""
     import world_estimate_data as D
+    import lava
+    from mwad.paths import child_ci
     masters = D.census(data_files)
+    molten = {}
+    for name in D.MASTERS:
+        if name in masters:
+            molten.update(lava.molten_objects(child_ci(Path(data_files), name).read_bytes()))
     objects, cells, land, names, shas = {}, {}, set(), {}, {}
     interiors = {}
     base_land, bm_land = set(), set()
@@ -177,14 +212,14 @@ def build_census(data_files, progress=print):
                 e = interiors.setdefault(c['name'].casefold(), {'name': c['name'], 'set': short.get(name, name),
                                                                 'counts': collections.Counter(), 'meshes': set(),
                                                                 'placements': 0, 'flora': 0, 'doors': []})
-                e['doors'].extend(_count_refs(e, c['refs'], objects))
+                e['doors'].extend(_count_refs(e, c['refs'], objects, exterior=False, molten=molten))
                 continue
             xy = (c['x'], c['y'])
             e = cells.setdefault(xy, {'counts': collections.Counter(), 'meshes': set(), 'placements': 0, 'flora': 0,
                                       'doors': []})
             if c['name'] or c['region']:
                 names[xy] = {'name': c['name'], 'region': c['region']}
-            e['doors'].extend(_count_refs(e, c['refs'], objects))
+            e['doors'].extend(_count_refs(e, c['refs'], objects, molten=molten))
         progress('census: %s parsed' % name)
     solstheim = bm_land - base_land
     meshes = sorted({m for e in cells.values() for m in e['meshes']})
@@ -193,10 +228,13 @@ def build_census(data_files, progress=print):
             'land': sorted(ckey(*c) for c in land), 'land_bloodmoon': sorted(ckey(*c) for c in solstheim),
             'cells': {ckey(*xy): {'counts': dict(e['counts']), 'placements': e['placements'], 'flora': e['flora'],
                                   'meshes': sorted(index[m] for m in e['meshes']),
+                                  'lights': LT.light_census_cell(e.get('lights', ())), 'lava': e.get('lava', 0),
                                   'doors': [d for d in e['doors'] if d['to']]} for xy, e in sorted(cells.items())},
             'interiors': {k: {'name': e['name'], 'set': e['set'], 'counts': dict(e['counts']), 'placements': e['placements'],
-                              'unique_meshes': len(e['meshes']), 'doors': e['doors']} for k, e in sorted(interiors.items())},
-            'names': {ckey(*xy): v for xy, v in sorted(names.items())}}
+                              'unique_meshes': len(e['meshes']), 'doors': e['doors'], 'lava': e.get('lava', 0)}
+                          for k, e in sorted(interiors.items())},
+            'names': {ckey(*xy): v for xy, v in sorted(names.items())}, 'lights_census': LT.FORMAT,
+            'lava_census': LV.FORMAT}
 
 
 # ------------------------------------------------------------------ small joins
@@ -348,18 +386,52 @@ def categorize(records_by_type, flora=None):
     return out
 
 
-def is_complete(rec, actors=True):
-    """Every placed object converted: nothing deferred, skipped or failed. actors=False leaves the actor categories out
-    (the test of "terrain complete")."""
+def light_path_reason(reason):
+    """A deferral of a light for want of a CHIM light path: the lighting audit judges those lights, not the category."""
+    return any(w in reason for w in LIGHT_PATH_WORDS)
+
+
+def blockers(rec, actors=True, lighting=True):
+    """Why a converted cell is not complete: [text], empty when it is. actors=False leaves the actor categories out
+    (the test of "terrain complete"). Lit like the original is required at both levels (owner, 2026-10-09);
+    lighting=False leaves that test out (the "awaiting lighting" levels)."""
+    if not rec['chim']['converted']:
+        return ['not converted']
+    out = []
+    lt = rec.get('lighting') or {}
+    if lighting and LIGHTING_REQUIRED and lt.get('status') != 'lit':
+        out.append('lighting %s: %s' % (lt.get('status', 'not_measured').replace('_', ' '), lt.get('reason') or 'not measured'))
     cats = rec.get('categories')
-    if not cats or not rec['chim']['converted']:
-        return False
+    if not cats:
+        return out + ['objects by type not recorded']
     for k, c in cats.items():
         if (not actors and k in ACTOR_CATEGORIES) or (k == 'markers' and not MARKERS_BLOCK_COMPLETE):
             continue
-        if c['failed'] or c['deferred'] or c['skipped'] or (k != 'flora' and c['converted'] != c['placed']):
-            return False
-    return True
+        deferred = dict(c['deferred'])
+        if k == 'lights' and LIGHTING_REQUIRED:
+            deferred = {r: n for r, n in deferred.items() if not light_path_reason(r)}
+        light_path = sum(c['deferred'].values()) - sum(deferred.values())
+        if c['failed'] or deferred or c['skipped'] or (k != 'flora' and c['converted'] + light_path != c['placed']):
+            out.append('%s: %d of %d converted' % (CATEGORIES[k], c['converted'], c['placed']))
+    return out
+
+
+def is_complete(rec, actors=True, lighting=True):
+    """Every placed object converted and the cell lit like the original (see blockers())."""
+    return bool(rec.get('categories')) and rec['chim']['converted'] and not blockers(rec, actors, lighting)
+
+
+def completion_level(rec):
+    """The strongest completion level of a passed cell, or None (precedence in SUCCESS)."""
+    if is_complete(rec):
+        return 'complete'
+    if is_complete(rec, actors=False):
+        return 'terrain_complete'
+    if is_complete(rec, lighting=False):
+        return 'complete_unlit'
+    if is_complete(rec, actors=False, lighting=False):
+        return 'terrain_complete_unlit'
+    return None
 
 
 def promote_complete(cells):
@@ -368,9 +440,11 @@ def promote_complete(cells):
         st = rec.get('stats') or {}
         rec['categories'] = categorize(st.get('records_by_type'), (st.get('records') or {}).get('flora'))
         if rec['chim'].get('bucket') == 'audits_passed':
-            level = 'complete' if is_complete(rec) else 'terrain_complete' if is_complete(rec, actors=False) else None
+            level = completion_level(rec)
             if level:
                 rec['chim']['bucket'] = rec['chim']['status'] = level
+            if level != 'complete':
+                rec['chim']['blockers'] = blockers(rec, actors=level not in ('terrain_complete', 'terrain_complete_unlit'))
 
 
 def island_headlines(cells):
@@ -382,8 +456,10 @@ def island_headlines(cells):
         done = sum(n[b] for b in SUCCESS) + n['empty_sea']
         row = {'island': i, 'name': ISLAND_NAMES.get(i, 'island %d' % i), 'cells': len(mine), 'done': done,
                'percent': round(100.0 * done / len(mine), 1) if mine else 0.0,
-               'passed': sum(n[b] for b in SUCCESS), 'converted': sum(1 for c in mine if c['chim']['converted'])}
+               'passed': sum(n[b] for b in SUCCESS), 'converted': sum(1 for c in mine if c['chim']['converted']),
+               'eligible': done}
         row.update({b: n[b] for b in BUCKETS})
+        row['lighting'] = LT.headline([c['lighting'] for c in mine if c['land'] and c.get('lighting')])
         out.append(row)
     return out
 
@@ -395,7 +471,11 @@ def headline(cells):
     out = {b: n[b] for b in BUCKETS}
     out['empty_sea'] = sum(1 for c in cells.values() if c['chim']['bucket'] == 'empty_sea')     # land or not
     out['islands'] = island_headlines(cells)
+    out['lighting'] = LT.headline([c['lighting'] for c in land if c.get('lighting')])
+    out['lava'] = LV.headline([c['lava'] for c in cells.values() if c.get('lava')])
     out['done'] = passed + out['empty_sea']      # cell complete + terrain complete + passed + empty sea (each has its own line)
+    out['eligible'] = passed + out['empty_sea']      # every done status, empty sea included (= done)
+    out['eligible_release'] = ELIGIBLE_RELEASE
     out.update({'land_cells': len(land), 'passed': passed,
                 'percent': round(100.0 * passed / len(land), 2) if land else 0.0,
                 'converted': sum(1 for c in land if c['chim']['converted']),
@@ -602,6 +682,9 @@ def assemble_stats(cells, cen_cells, met_cells, digest_cell, results):
                     st['memory'] = dict(mem, basis='run-level: shared by the cells of the build')
                 if 'build_cpu_s' in rs:
                     st['time'] = {'cpu_s': rs['build_cpu_s'], 'basis': 'run-level: the whole build'}
+                lv = d.get('lava')
+                if lv:      # the build's lava record (chim.build lava_section): mode and pools by source cell
+                    st['lava'] = {'mode': lv.get('mode'), 'pools': (lv.get('cells') or {}).get(k, 0)}
         r = results.get(k)
         if r and r['stats']:
             deep_merge(st, r['stats'])
@@ -609,7 +692,8 @@ def assemble_stats(cells, cen_cells, met_cells, digest_cell, results):
 
 
 def group_sums(recs):
-    n = {'cells': len(recs), 'converted': 0, 'passed': 0, 'complete': 0, 'terrain_complete': 0, 'failing': 0, 'with_errors': 0, 'stats': {},
+    n = {'cells': len(recs), 'converted': 0, 'passed': 0, 'complete': 0, 'terrain_complete': 0, 'complete_unlit': 0,
+         'terrain_complete_unlit': 0, 'failing': 0, 'with_errors': 0, 'stats': {},
          'by_category': collections.OrderedDict((k, new_category()) for k in CATEGORIES)}
     for r in recs:
         if not r['chim']['converted']:
@@ -617,6 +701,8 @@ def group_sums(recs):
         n['converted'] += 1
         n['complete'] += 1 if r['chim']['bucket'] == 'complete' else 0
         n['terrain_complete'] += 1 if r['chim']['bucket'] == 'terrain_complete' else 0
+        n['complete_unlit'] += 1 if r['chim']['bucket'] == 'complete_unlit' else 0
+        n['terrain_complete_unlit'] += 1 if r['chim']['bucket'] == 'terrain_complete_unlit' else 0
         for k, c in (r.get('categories') or {}).items():
             add_category(n['by_category'][k], c)
         n['passed'] += 1 if r['chim']['bucket'] in SUCCESS else 0
@@ -813,11 +899,14 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     # --- CHIM builds, oldest first, so the latest build to convert a cell sets its record
     digest_cell = {}
     area_cells = collections.defaultdict(set)
+    area_cover = collections.defaultdict(set)      # every cell a frame's chunk grid covers (converted or terrain only)
     for d in digests:
         for k, e in d['cells'].items():
             rec = cells.get(k)
             if rec is None:
                 continue
+            for a in d['areas']:
+                area_cover[a].add(k)
             ch = rec['chim']
             if not e.get('converted'):
                 if not ch['converted']:
@@ -943,6 +1032,18 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     # --- per-cell stats: original records and meshes, the estimator's legacy figures, what the CHIM build wrote,
     #     and whatever the conversion job measured (its numbers win)
     assemble_stats(cells, cen_cells, met_cells, digest_cell, results)
+    # --- the lighting audit (tools/cell_lighting.py): original lights from the census, what the build lit from its stats
+    lights_known = bool((census or {}).get('lights_census'))
+    for k, rec in cells.items():
+        placed = (cen_cells.get(k) or {}).get('lights') if lights_known else None
+        if lights_known and placed is None:
+            placed = LT.light_census_cell(())
+        rec['lighting'] = LT.audit(placed, (rec['stats'] or {}).get('lighting'), rec['chim']['converted'], rec['stats'])
+    # --- the lava audit (tools/cell_lava.py): molten pools from the census, what the build converted from its stats
+    lava_known = bool((census or {}).get('lava_census'))
+    for k, rec in cells.items():
+        molten = (cen_cells.get(k) or {}).get('lava', 0) if lava_known else None
+        rec['lava'] = LV.audit(molten, (rec['stats'] or {}).get('lava'), rec['chim']['converted'])
     promote_complete(cells)
     totals = make_totals(cells)
     # --- mesh-first view
@@ -965,6 +1066,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             'cells_with_no_exclusive_mesh': with_meshes - len(owners),
             'cells_without_new_mesh_spiral': sp['cells_without_new_mesh'],
             'cells_without_new_mesh_risk': rk['cells_without_new_mesh'],
+            'meshes_without_store_once': sp['points'][-1][2] if sp['points'] else 0,
+            'takeaway': OR.reuse_takeaway(total, sp['points'][-1][2] if sp['points'] else 0)[0],
             'spiral': {'points': OR.thin(sp['points']), 'rings': sp['rings']},
             'risk': {'points': OR.thin(rk['points'])},
         }
@@ -973,12 +1076,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             for r in sp['rings']:
                 if r['ring'] and (r['ring'] % 3 == 0 or r['ring'] == 1):
                     marks.append((r['cumulative_cells'], ('' if r['island'] == 1 else 'island %d ' % r['island']) + 'ring %d' % r['ring']))
-            series = [('spiral order: cumulative unique meshes', sp['points'], '#4fc3f7', 1, False),
-                      ('risk order (cells with estimates): cumulative unique meshes', rk['points'], '#ffcf55', 1, False),
-                      ('no reuse: every cell converts its own meshes (spiral order)', sp['points'], '#7a8b9c', 2, True)]
-            OR.draw_curve(out / OUT_FILES['png'], series,
-                          'CHIM store-once mesh reuse: %d unique meshes, %d cells with placements' % (total, curve['cells_with_meshes']),
-                          marks)
+            marks = marks[::2] if len(marks) > 6 else marks
+            OR.draw_reuse_chart(out / OUT_FILES['png'], sp['points'], rk['points'], total, curve['meshes_without_store_once'],
+                                marks, curve['cells_with_meshes'])
         write_json(out / OUT_FILES['curve'], curve, pretty=True)
     # --- summary, next lists, history
     head = headline(cells)
@@ -988,6 +1088,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
                   'world_format': d.get('world_format'), 'areas': d['areas'], 'built_at': d.get('built_at'),
                   'placements': d.get('placements'), 'models': d.get('models'), 'reports': d.get('reports')} for d in digests]
     history = update_history(out, head, [d['name'] for d in digests], now)
+    rel_doc = RL.load(out)         # owner-set, never written by ingest
+    RL.attach(cells, rel_doc)
+    releases = RL.summary(cells, rel_doc)
     interiors, entrances = build_interiors(census, metrics, cells, (cells_detail or {}).get('pois'), bugs, our_maps(config_dir))
     for k, trees in entrances.items():
         if k in cells:
@@ -1008,7 +1111,10 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
                     'names': bool(cells_detail), 'bugs': bool(bugs), 'ledger': bool(ledger_map)},
         'rings': max([r['ring'] for r in cells.values() if r['ring'] is not None] or [0]),
         'mesh_curve': {k: curve[k] for k in ('unique_meshes', 'cells_with_meshes', 'meshes_in_one_cell_only',
-                                              'cells_without_new_mesh_spiral', 'cells_that_own_a_mesh')} if curve else None,
+                                              'cells_without_new_mesh_spiral', 'cells_that_own_a_mesh',
+                                              'meshes_without_store_once', 'takeaway')} if curve else None,
+        'releases': releases, 'area_cells': {a: sorted(ks) for a, ks in area_cells.items()},
+        'area_cover': {a: sorted(ks) for a, ks in area_cover.items()},
         'totals': totals, 'owner_ignored': sorted(ignored), 'result_ignored': sorted(result_ignored),
         'cells': cells, 'interiors': interiors,
     }
@@ -1039,13 +1145,15 @@ def next_lists(cells, now):
 def update_history(out, head, builds, now):
     """Append a history line when the counts changed; return one entry per day (the last of the day)."""
     path = out / OUT_FILES['history']
-    lines = [json.loads(x) for x in path.read_text(encoding='utf-8').splitlines() if x.strip()] if path.is_file() else []
+    every = [json.loads(x) for x in path.read_text(encoding='utf-8').splitlines() if x.strip()] if path.is_file() else []
+    lines = [x for x in every if x.get('type') is None]      # count lines; owner release lines (type "release") stay in the file
     entry = {'date': now, 'passed': head['passed'], 'land_cells': head['land_cells'], 'converted': head['converted'],
              'buckets': {b: head[b] for b in BUCKETS}, 'builds': builds}
     same = lines and {k: v for k, v in lines[-1].items() if k != 'date'} == {k: v for k, v in entry.items() if k != 'date'}
     if not same:
         lines.append(entry)
-        path.write_bytes(('\n'.join(json.dumps(x, sort_keys=True, separators=(',', ':')) for x in lines) + '\n').encode('utf-8'))
+        every.append(entry)
+        path.write_bytes(('\n'.join(json.dumps(x, sort_keys=True, separators=(',', ':')) for x in every) + '\n').encode('utf-8'))
     per_day = collections.OrderedDict()
     for x in lines:
         per_day[x['date'][:10]] = x
@@ -1133,7 +1241,8 @@ def export_csv(doc):
     mech = [m['id'] for m in doc['mechanisms']]
     head = (['x', 'y', 'name', 'region', 'island', 'ring', 'spiral_rank', 'risk_rank', 'risk_score', 'land', 'chim_status',
              'chim_bucket', 'legacy_grade', 'legacy_placed_share', 'open_bugs', 'build', 'source_commit', 'chim_version',
-             'world_format', 'errors'] + ['audit.' + m for m in mech] + keys)
+             'world_format', 'errors', 'lighting', 'lights_active', 'lights_meshless', 'lava', 'lava_pools']
+            + ['audit.' + m for m in mech] + keys)
     import csv
     import io
     buf = io.StringIO()
@@ -1147,6 +1256,10 @@ def export_csv(doc):
                (c.get('risk') or {}).get('score'), c['land'], c['chim']['status'], c['chim']['bucket'], lg.get('grade'),
                lg.get('placed_share'), open_bugs, pv.get('build'), pv.get('source_commit'), pv.get('chim_version'),
                pv.get('world_format'), ' | '.join(error_text(x) for x in c.get('errors') or [])]
+        lt = c.get('lighting') or {}
+        row += [lt.get('status'), lt.get('active'), lt.get('meshless')]
+        lv = c.get('lava') or {}
+        row += [lv.get('status'), lv.get('molten')]
         row += [c['audits'][m]['status'] for m in mech] + [f.get(k) for k in keys]
         w.writerow(['' if v is None else v for v in row])
     return buf.getvalue()
@@ -1184,6 +1297,16 @@ def main(argv=None):
     own.add_argument('--status', required=True, choices=OWNER_STATES)
     own.add_argument('--cells', required=True)
     own.add_argument('--note')
+    rel = sub.add_parser('release', help='owner: set (or clear) the release a cell is approved for')
+    rel.add_argument('--out', type=Path, required=True)
+    rel.add_argument('--version', required=True, help='release name, e.g. v0.0.34')
+    rel.add_argument('--cells', required=True,
+                     help='cell ids and selectors, space separated: "x,y", ring:N, status:BUCKET, eligible, unassigned, '
+                          'release:VERSION, shipped-towns, all')
+    rel.add_argument('--clear', action='store_true', help='remove the assignment instead of setting it')
+    rel.add_argument('--shipped', action='store_true', help='mark the release (and these cells) as shipped')
+    rel.add_argument('--who', default='owner')
+    rel.add_argument('--now', help='timestamp to stamp (tests)')
     res = sub.add_parser('result', help='store per-cell results (stats, audits, errors) of the conversion job')
     res.add_argument('--out', type=Path, required=True)
     res.add_argument('--file', type=Path, required=True, help='an aw-cell-result-1 file (see FORMAT.md)')
@@ -1195,12 +1318,17 @@ def main(argv=None):
     md.add_argument('--out', type=Path, required=True)
     md.add_argument('--md', type=Path, help='page to write (default: docs/chim/CELL_TRACKER.md of this repo)')
     md.add_argument('--now', help='generated stamp to print (tests; default: the host clock)')
+    pb = sub.add_parser('publish', help='write the project reference progress file (cell IDs, statuses, audit results only)')
+    pb.add_argument('--out', type=Path, required=True)
+    pb.add_argument('--file', type=Path, help='file to write (default: docs/chim/cell-progress-reference.json of this repo)')
+    cr = sub.add_parser('check-reference', help='fail when the published reference file has a key outside its allow-list or looks private')
+    cr.add_argument('--file', type=Path)
     ck = sub.add_parser('check-md', help='fail when the committed page lacks its header, shows private content or has a stale policy')
     ck.add_argument('--md', type=Path)
     st = sub.add_parser('status', help='print the headline counts')
     st.add_argument('--out', type=Path, required=True)
     a = ap.parse_args(argv)
-    out = a.out
+    out = getattr(a, 'out', None)
     if a.cmd == 'status':
         doc = read_json(out / OUT_FILES['progress'])
         if not doc:
@@ -1210,6 +1338,26 @@ def main(argv=None):
         print('Cell complete %d | CHIM cells: %d / %d (%.2f%%) | approved %d, playtested %d, audits passed %d, converted with failing audits %d, '
               'converted unmeasured %d, not started %d' % (h['complete'], h['passed'], h['land_cells'], h['percent'], h['approved'],
               h['playtested'], h['audits_passed'], h['converted_failing'], h['converted_unmeasured'], h['not_started']))
+        return 0
+    if a.cmd in ('publish', 'check-reference'):
+        import cell_progress_ref as REF
+        target = a.file or Path(__file__).resolve().parents[1] / REF.REFERENCE_PATH
+        if a.cmd == 'check-reference':
+            problems = REF.check(target.read_bytes().decode('utf-8'))
+            print(chr(10).join(problems) if problems else 'ok: %s' % target)
+            return 1 if problems else 0
+        doc = read_json(a.out / OUT_FILES['progress'])
+        if not doc:
+            print('no tracker data in %s yet; run ingest' % a.out)
+            return 1
+        target.parent.mkdir(parents=True, exist_ok=True)
+        text = REF.dumps(REF.build(doc))
+        problems = REF.check(text)
+        if problems:
+            print('refusing to publish:' + chr(10) + chr(10).join(problems))
+            return 1
+        target.write_bytes(text.encode('utf-8'))
+        print('wrote', target)
         return 0
     if a.cmd in ('render-md', 'check-md'):
         import cell_progress_md as MD
@@ -1249,6 +1397,18 @@ def main(argv=None):
         print('recorded', path)
     elif a.cmd == 'owner':
         print('recorded', record_owner(out, a.status, a.cells.split(), a.note))
+    elif a.cmd == 'release':
+        cur = read_json(out / OUT_FILES['progress'])
+        if not cur:
+            print('no tracker data in %s yet; run ingest' % out)
+            return 1
+        try:
+            keys = RL.resolve(cur['cells'], a.cells.split(), ELIGIBLE_SELECT, cur.get('area_cover') or cur.get('area_cells'))
+        except ValueError as e:
+            print('error: %s' % e)
+            return 2
+        stamp = now_iso(a.now)
+        print('recorded', RL.record(out, a.version, keys, a.who, stamp, a.shipped, a.clear, a.cells), '(%d cells)' % len(keys))
     remembered = read_json(src_path) or {}
     if a.cmd == 'ingest':
         for k in SOURCE_KEYS + ('data_files', 'config_dir'):

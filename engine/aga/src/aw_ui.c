@@ -4,6 +4,7 @@
  */
 #include "quakedef.h"
 #include "aw_character.h"
+#include "aw_quickchar.h"
 extern byte *draw_chars;
 extern int scr_copyeverything;
 static byte font_storage[26624],book_font[26624],skin[4104];
@@ -72,7 +73,7 @@ static cvar_t ui_mode={"aw_ui_mode","2",true};
  * existing explicit pause survive close/cancel/load. Original name entry,
  * follow-guard prompts, subtitles and the sky gallery keep their world context. */
 static int modal_world_active(void) {
-    return key_dest==key_menu || AW_CharacterActive() || AW_ReaderActive() ||
+    return key_dest==key_menu || AW_CharacterActive() || AW_QuickCharActive() || AW_ReaderActive() ||
         AW_GalleryModal();
 }
 static int modal_world_ready(void) {

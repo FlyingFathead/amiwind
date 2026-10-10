@@ -176,6 +176,11 @@ class ChimBrushTests(unittest.TestCase):
         out = self.run_mode('overflow', [dict(boxes=boxes(50))])
         self.assertIn('overflow stopped', out)
 
+    def test_bad_brush_data_ends_the_load_not_the_game(self):
+        # CHIM-BRUSH-BAD-DATA-35: a damaged image is "chunk unavailable" (image 0, stream -1), never Sys_Error.
+        out = self.run_mode('bad', [dict(boxes=boxes(1)), dict(boxes=boxes(300), lighting=40000)])
+        self.assertEqual(out.count('bad data refused'), 2, out)
+
 
 LOW, GRAIN, NX, SECTOR = -384.0, 128, 6, 3
 # pid, model, origin, yaw. Model 0 is placed twice (shared); placement 1
@@ -337,7 +342,7 @@ class ChimWorldTests(unittest.TestCase):
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 
     def run_world(self, modes, with_data=True, env=None, big=False, seam=False, first=0, story=(), rows=False,
-                  far=False):
+                  far=False, extra=()):
         with tempfile.TemporaryDirectory(prefix='amiwind-chim-world-') as tmp:
             if far:
                 # The frame map's far terrain (tools/chim/far.py), frame 0 0 (centre 0 0): 9 x 7 samples.
@@ -357,7 +362,8 @@ class ChimWorldTests(unittest.TestCase):
             old = dict(os.environ)
             os.environ.update(env or {})
             try:
-                return compile_and_run(self, 'aga_chim_world_test.c', self.SOURCES, [(m,) for m in modes], cwd=tmp)
+                return compile_and_run(self, 'aga_chim_world_test.c', self.SOURCES, [(m,) for m in modes], cwd=tmp,
+                                       extra=extra)
             finally:
                 os.environ.clear()
                 os.environ.update(old)
@@ -519,6 +525,24 @@ class ChimWorldTests(unittest.TestCase):
     def test_story_hidden_placements_stay_out_while_the_story_hides_them(self):
         out = self.run_world(['story'], story=(0,))[0]
         self.assertIn('story ok', out)
+
+    # v0.0.35 crash paths (codebase review): each one a failed load or a wait, never the end of the map.
+    def test_a_streamed_model_keeps_its_file_while_others_open(self):
+        # two open files, so the test world's files are more than the cache holds
+        out = self.run_world(['pin'], extra=('-DCHIM_OPEN_FILES=2',))[0]
+        self.assertIn('pin ok', out)
+
+    def test_damaged_model_and_texture_data_leave_the_map_running(self):
+        out = self.run_world(['baddata'])[0]
+        self.assertIn('baddata ok', out)
+
+    def test_efrag_limit_makes_far_placements_wait_not_the_map_end(self):
+        out = self.run_world(['efragcap'])[0]
+        self.assertIn('efragcap ok', out)
+
+    def test_a_failed_frame_world_keeps_the_far_terrain_floor(self):
+        out = self.run_world(['farfail'], far=True)[0]
+        self.assertIn('farfail ok', out)
 
     def test_prefetch_ahead_and_the_ring_follows_the_view_distance(self):
         out = self.run_world(['ahead'])[0]

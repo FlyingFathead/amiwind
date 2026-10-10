@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "about": "Animation groups per NPC model (tools/npc_anim.py, docs/ANIMATION.md). [group, frames] in frame order; idle (8 frames) always first. 'idle' is the previous method. block = the original shield block; dodgel/dodger = an AmiWind extension (in-place sidestep from walkleft/walkright).",
+  "profiles": {
+    "idle": [
+      [
+        "idle",
+        8
+      ]
+    ],
+    "react": [
+      [
+        "idle",
+        8
+      ],
+      [
+        "hit",
+        3
+      ],
+      [
+        "death",
+        5
+      ]
+    ],
+    "move": [
+      [
+        "idle",
+        8
+      ],
+      [
+        "walk",
+        8
+      ],
+      [
+        "run",
+        6
+      ],
+      [
+        "hit",
+        3
+      ],
+      [
+        "death",
+        5
+      ]
+    ],
+    "full": [
+      [
+        "idle",
+        8
+      ],
+      [
+        "walk",
+        8
+      ],
+      [
+        "run",
+        6
+      ],
+      [
+        "swim",
+        6
+      ],
+      [
+        "swimidle",
+        4
+      ],
+      [
+        "hit",
+        3
+      ],
+      [
+        "knock",
+        4
+      ],
+      [
+        "death",
+        6
+      ],
+      [
+        "attack",
+        8
+      ],
+      [
+        "block",
+        5
+      ],
+      [
+        "dodgel",
+        3
+      ],
+      [
+        "dodger",
+        3
+      ]
+    ]
+  }
+}

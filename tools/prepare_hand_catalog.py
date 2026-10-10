@@ -136,12 +136,13 @@ def runtime_palette(data_files,palette_path):
     (BUILD-HANDS-NOT-BUILT-32).
     """
     from ui_palette import reserved_palette
-    from sky_palette_overlay import EXPECTED_PALETTE,banked_palette
+    from sky_palette_overlay import EXPECTED_PALETTE,banked_palette,approved
+    from ui_palette import legacy_bank_or_none
     palette_path=Path(palette_path);raw=palette_path.read_bytes()
     marker=palette_path.parent/'ui-palette.json'
     if not (marker.is_file() and json.loads(marker.read_text()).get('palette_sha256')==hashlib.sha256(raw).hexdigest()):
         raw=reserved_palette(data_files,raw)[0]
-    if hashlib.sha256(raw).hexdigest()==EXPECTED_PALETTE:raw=banked_palette(raw)
+    if hashlib.sha256(raw).hexdigest()==EXPECTED_PALETTE or approved(raw,legacy_bank_or_none(data_files)):raw=banked_palette(raw)
     return raw
 
 def install(catalog,id1):

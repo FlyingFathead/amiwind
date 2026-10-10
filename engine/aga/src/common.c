@@ -863,26 +863,34 @@ char *COM_FileExtension (char *in)
 COM_FileBase
 ============
 */
+/* ENGINE-FILEBASE-UNBOUNDED-35: out holds COM_FILEBASE_SIZE bytes (the hunk
+ * tag buffers); longer names are cut. The old loop also walked before the
+ * start of a name without a '/'. */
 void COM_FileBase (char *in, char *out)
 {
-	char *s, *s2;
+	char *start, *end, *p;
+	int n;
 
-	s = in + strlen(in) - 1;
-
-	while (s != in && *s != '.')
-		s--;
-
-	for (s2 = s ; *s2 && *s2 != '/' ; s2--)
-	;
-
-	if (s-s2 < 2)
-		strcpy (out,"?model?");
-	else
+	start = in;
+	for (p = in; *p; p++)
+		if (*p == '/')
+			start = p + 1;
+	end = NULL;
+	for (p = start; *p; p++)
+		if (*p == '.')
+			end = p;
+	if (!end)
+		end = p;
+	n = end - start;
+	if (n < 1)
 	{
-		s--;
-		strncpy (out,s2+1, s-s2);
-		out[s-s2] = 0;
+		strcpy (out, "?model?");
+		return;
 	}
+	if (n > COM_FILEBASE_SIZE - 1)
+		n = COM_FILEBASE_SIZE - 1;
+	memcpy (out, start, n);
+	out[n] = 0;
 }
 
 
@@ -898,6 +906,13 @@ void COM_DefaultExtension (char *path, char *extension)
 // if path doesn't have a .EXT, append extension
 // (extension should include the .)
 //
+	/* an empty path has no last character to walk back from
+	   (ENGINE-MAP-NAME-OVERFLOW-35); callers leave room for the extension */
+	if (!path[0])
+	{
+		strcat (path, extension);
+		return;
+	}
 	src = path + strlen(path) - 1;
 
 	while (*src != '/' && src != path)
@@ -959,8 +974,13 @@ skipwhite:
 				com_token[len] = 0;
 				return data;
 			}
-			com_token[len] = c;
-			len++;
+			/* a longer token is cut at the buffer, the input still consumed
+			   (ENGINE-COM-TOKEN-UNBOUNDED-35) */
+			if (len < (int)sizeof(com_token) - 1)
+			{
+				com_token[len] = c;
+				len++;
+			}
 		}
 	}
 
@@ -976,9 +996,12 @@ skipwhite:
 // parse a regular word
 	do
 	{
-		com_token[len] = c;
+		if (len < (int)sizeof(com_token) - 1)
+		{
+			com_token[len] = c;
+			len++;
+		}
 		data++;
-		len++;
 		c = *data;
 	if (c=='{' || c=='}'|| c==')'|| c=='(' || c=='\'' || c==':')
 			break;
@@ -1175,7 +1198,7 @@ va
 
 does a varargs printf into a temp buffer, so I don't need to have
 varargs versions of all text functions.
-FIXME: make this buffer size safe someday
+Bounded to the buffer (ENGINE-VA-UNBOUNDED-35); longer text is cut.
 ============
 */
 char    *va(char *format, ...)
@@ -1184,7 +1207,7 @@ char    *va(char *format, ...)
 	static char             string[1024];
 
 	va_start (argptr, format);
-	vsprintf (string, format,argptr);
+	vsnprintf (string, sizeof(string), format, argptr);
 	va_end (argptr);
 
 	return string;
@@ -1390,6 +1413,11 @@ void COM_CopyFile (char *netpath, char *cachepath)
 	remaining = Sys_FileOpenRead (netpath, &in);
 	COM_CreatePath (cachepath);     // create directories up to the cache file
 	out = Sys_FileOpenWrite (cachepath);
+	if (out == -1)
+	{
+		Sys_FileClose (in);
+		return;
+	}
 
 	while (remaining)
 	{
@@ -1606,7 +1634,7 @@ byte *COM_LoadFile (char *path, int usehunk)
 	int             h;
 	int             done,take,limit;
 	byte    *buf;
-	char    base[32];
+	char    base[COM_FILEBASE_SIZE];
 	int             len;
 
 	buf = NULL;     // quiet compiler warning
@@ -1705,25 +1733,35 @@ pack_t *COM_LoadPackFile (char *packfile)
 	int                             numpackfiles;
 	pack_t                  *pack;
 	int                             packhandle;
+	int                             packlen;
 	dpackfile_t             info[MAX_FILES_IN_PACK];
 	unsigned short          crc;
 
-	if (Sys_FileOpenRead (packfile, &packhandle) == -1)
+	packlen = Sys_FileOpenRead (packfile, &packhandle);
+	if (packlen == -1)
 	{
 //              Con_Printf ("Couldn't open %s\n", packfile);
 		return NULL;
 	}
-	Sys_FileRead (packhandle, (void *)&header, sizeof(header));
+	/* ENGINE-PAK-HEADER-TRUST-35: the header and directory come from the disk;
+	 * check every length before it sizes a read into the stack array. */
+	if (Sys_FileRead (packhandle, (void *)&header, sizeof(header)) != (int)sizeof(header))
+		Sys_Error ("%s is too short to be a packfile", packfile);
 	if (header.id[0] != 'P' || header.id[1] != 'A'
 	|| header.id[2] != 'C' || header.id[3] != 'K')
 		Sys_Error ("%s is not a packfile", packfile);
 	header.dirofs = LittleLong (header.dirofs);
 	header.dirlen = LittleLong (header.dirlen);
 
+	if (header.dirlen < 0 || header.dirlen % (int)sizeof(dpackfile_t))
+		Sys_Error ("%s has a bad directory length %i", packfile, header.dirlen);
 	numpackfiles = header.dirlen / sizeof(dpackfile_t);
 
 	if (numpackfiles > MAX_FILES_IN_PACK)
 		Sys_Error ("%s has %i files", packfile, numpackfiles);
+	if (header.dirofs < (int)sizeof(header) || header.dirofs > packlen
+	|| header.dirlen > packlen - header.dirofs)
+		Sys_Error ("%s has its directory outside the file", packfile);
 
 	if (numpackfiles != PAK0_COUNT)
 		com_modified = true;    // not the original file
@@ -1731,7 +1769,8 @@ pack_t *COM_LoadPackFile (char *packfile)
 	newfiles = Hunk_AllocName (numpackfiles * sizeof(packfile_t), "packfile");
 
 	Sys_FileSeek (packhandle, header.dirofs);
-	Sys_FileRead (packhandle, (void *)info, header.dirlen);
+	if (Sys_FileRead (packhandle, (void *)info, header.dirlen) != header.dirlen)
+		Sys_Error ("%s: short directory read", packfile);
 
 // crc the directory to check for modifications
 	// NOTE: CRC check disabled - different shareware versions have different CRCs
@@ -1745,9 +1784,14 @@ pack_t *COM_LoadPackFile (char *packfile)
 // parse the directory
 	for (i=0 ; i<numpackfiles ; i++)
 	{
-		strcpy (newfiles[i].name, info[i].name);
+		memcpy (newfiles[i].name, info[i].name, sizeof(info[i].name));
+		newfiles[i].name[sizeof(info[i].name) - 1] = 0;
 		newfiles[i].filepos = LittleLong(info[i].filepos);
 		newfiles[i].filelen = LittleLong(info[i].filelen);
+		if (newfiles[i].filepos < 0 || newfiles[i].filelen < 0
+		|| newfiles[i].filepos > packlen
+		|| newfiles[i].filelen > packlen - newfiles[i].filepos)
+			Sys_Error ("%s: entry %s lies outside the file", packfile, newfiles[i].name);
 	}
 
 	pack = Hunk_Alloc (sizeof (pack_t));

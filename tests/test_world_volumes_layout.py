@@ -100,6 +100,26 @@ class PartitionStartLimitTests(unittest.TestCase):
                       (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
         self.assertIn('require_mountable(checked)', (ROOT / 'tools/world_volumes.py').read_text(encoding='utf-8'))
 
+    def test_disk_layout_gate_measures_directory_entries(self):
+        # FFS-DIRECTORY-HASH-32: a directory with more entries than the 72 hash chains of one FFS directory
+        # block is reported (legal but slow on a real disk); the same rule as the CHIM layout gate.
+        from world_volumes import require_disk_layout, directory_entries, DIRECTORY_HASH_CHAINS
+        import chim.format as chim_format
+        self.assertEqual(DIRECTORY_HASH_CHAINS, chim_format.FFS_MAX_DIRECTORY_ENTRIES)
+        self.assertEqual(directory_entries(['id1/maps/A.bsp', 'id1/maps/a.bsp', 'id1/pak0.pak']),
+                         {'/': 1, 'id1': 2, 'id1/maps': 1})
+        files = [dict(path='id1/maps/m%03d.bsp' % i, bytes=5) for i in range(DIRECTORY_HASH_CHAINS + 1)]
+        record = require_disk_layout('boot.hdf', 1024**3, [dict(partition='DH0', offset_bytes=RDB_BYTES,
+                                                                  bytes=512 * 1024**2)],
+                                     [dict(partition='DH0', files=files)])
+        row = record['partitions'][0]
+        self.assertEqual(row['max_directory_entries'], DIRECTORY_HASH_CHAINS + 1)
+        self.assertEqual(row['crowded_directories'], {'id1/maps': DIRECTORY_HASH_CHAINS + 1})
+        record = require_disk_layout('boot.hdf', 1024**3, [dict(partition='DH0', offset_bytes=RDB_BYTES,
+                                                                  bytes=512 * 1024**2)],
+                                     [dict(partition='DH0', files=files[:DIRECTORY_HASH_CHAINS])])
+        self.assertEqual(record['partitions'][0]['crowded_directories'], {})
+
     def test_disk_layout_gate_checks_all_four_amiga_limits(self):
         # BUILD-WORLD-PARTITION-MOUNT-33: start and size of every partition below 2 GiB, files well under
         # 2 GiB, drives below 4 GiB; each violation names the drive, partition or file and the limit.

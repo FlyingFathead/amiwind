@@ -4,11 +4,13 @@ import contextlib
 import hashlib
 import io
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
-import build_aga
-import payload_preflight
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+import build_aga  # noqa: E402
+import payload_preflight  # noqa: E402
 
 
 def snapshot(root):
@@ -89,6 +91,68 @@ class PayloadPreflightTests(unittest.TestCase):
                 payload_preflight.check_harvest(id1, [], removed)
             self.assertTrue((id1/'maps/intro_docks.bsp').is_file())
 
+    def test_catalogues_not_yet_installed_are_planned_from_the_harvest_source(self):
+        """The image step installs the harvest catalogues late (after the BSP optimizer); at its start the
+        preflight plans them from the harvest source, so the rc1c error is found in the first minute."""
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            id1 = stage(temp)/'boot/id1'
+            for path in id1.glob('harvest-*.txt'):
+                path.unlink()
+            removed = {'maps/intro_docks.bsp'}
+            self.assertEqual(payload_preflight.check_harvest(id1, [], removed), 0)      # nothing staged, no source
+            with patch.object(payload_preflight, 'planned_catalogues', return_value=['intro_docks', 'town']) as plan:
+                with self.assertRaisesRegex(ValueError, 'Harvest catalogue has no matching map: harvest-intro_docks.txt'):
+                    payload_preflight.check_harvest(id1, [], removed, 'harvest-source', 'data')
+                plan.assert_called_once_with(id1, 'harvest-source', 'data')
+                self.assertEqual(payload_preflight.check_harvest(id1, [], set(), 'harvest-source', 'data'), 2)
+            self.assertEqual(sorted(p.name for p in id1.glob('harvest-*')), [])        # placeholders never staged
+
+    def test_interior_sections_run_and_may_not_bind_removed_maps(self):
+        from unittest.mock import patch
+        import interior_sections
+        with tempfile.TemporaryDirectory() as temp:
+            id1 = stage(temp)/'boot/id1'
+            self.assertEqual(payload_preflight.check_interior_sections(id1, set()), 0)   # no section table
+            entries = [('interior-sections.txt', 'a'), ('maps/town.bsp', 'b')]
+            with patch.object(interior_sections, 'fingerprint_entries', return_value=entries):
+                self.assertEqual(payload_preflight.check_interior_sections(id1, {'maps/other.bsp'}), 2)
+                with self.assertRaisesRegex(ValueError, 'bind files the image removes: maps/town.bsp'):
+                    payload_preflight.check_interior_sections(id1, {'maps/town.bsp'})
+            with patch.object(interior_sections, 'fingerprint_entries', side_effect=ValueError('Missing section content: x')):
+                _, _, error = run_quiet(stage(Path(temp)/'second'))
+            self.assertIn('interior-sections: Missing section content: x', str(error))
+
+    def test_a_chim_town_from_the_game_data_needs_no_legacy_inputs(self):
+        """CHIM-LEGACY-CHAIN-33: a town the chim-town stage made has no legacy region maps; its frame map takes
+        the chim-town entities, so the preflight does not ask for them (the Temple sandbox stopped there)."""
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            id1 = stage(temp)/'boot/id1'
+            (id1/'vivec_temple-regions.txt').write_text('x', encoding='ascii')
+            with patch('build_aga.chim_world_receipt', return_value=({}, ['vivec_temple'])),                     patch('chim.frame_map.region_table', return_value=((0, 0, 0), [('vp000', None), ('vp001', None)])):
+                with self.assertRaisesRegex(ValueError, 'CHIM frame map inputs are not staged: maps/vp000.bsp'):
+                    payload_preflight.check_chim_inputs(id1, Path(temp)/'w')
+                payload_preflight.check_chim_inputs(id1, Path(temp)/'w', chim_towns={'vivec_temple'})
+
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FileFormatTests(unittest.TestCase):
+    """ANIMKIT-IMAGE-FORMATS-35: the image step's palette overlay knows every staged format, checked first."""
+
+    def test_kit_files_are_known_and_a_new_type_fails_in_the_preflight(self):
+        from sky_palette_overlay import unknown_formats
+        self.assertEqual(unknown_formats(['arena/f08c7f92da6db.anm', 'progs/m.tag', 'progs/m.mdl', 'maps/a.bsp',
+                                          'gfx/palette.lmp', 'save-content.bin', 'sound/a.wav']), [])
+        self.assertEqual(unknown_formats(['progs/new.xyz', 'README']), ['progs/new.xyz', 'README'])
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp)
+            (id1 / 'arena').mkdir()
+            (id1 / 'arena' / 'f08c7f92da6db.anm').write_text('idle:0:8:0.1500\n', encoding='ascii')
+            payload_preflight.check_file_formats(id1)
+            (id1 / 'arena' / 'x.newkind').write_bytes(b'1')
+            with self.assertRaisesRegex(ValueError, 'x.newkind'):
+                payload_preflight.check_file_formats(id1)

@@ -18,7 +18,8 @@ import bug_register  # noqa: E402
 DOCS = ROOT / 'docs'
 REGISTER = DOCS / 'BUGS.md'
 JOURNAL = DOCS / 'BUG_JOURNAL.md'
-FROZEN = [DOCS / 'journals' / 'BUG_JOURNAL-v0.0.29.md', DOCS / 'journals' / 'BUGS-NOTES-v0.0.29.md',
+FROZEN = [DOCS / 'journals' / 'BUG_JOURNAL-v0.0.29.md', DOCS / 'journals' / 'BUG_JOURNAL-v0.0.31.md',
+          DOCS / 'journals' / 'BUG_JOURNAL-v0.0.34.md', DOCS / 'journals' / 'BUGS-NOTES-v0.0.29.md',
           DOCS / 'BUGS-v0.0.29-RC1.md', DOCS / 'RC2_ISSUE_CHECKPOINT.md']
 FROZEN_BANNER = 'Frozen history:'
 LINK = re.compile(r'\]\(([^)\s]+)\)')

@@ -15,7 +15,17 @@ cvar_t volume={"volume","0.7",true,false,.7f},bgmvolume={"bgmvolume","1",true,fa
 cvar_t effectsvolume={"effectsvolume","0.75",true,false,.75f},dialoguevolume={"dialoguevolume","1",true,false,1};
 static int audio_sets,audio_draws;
 static int highlight_y,highlight_w,scroll_top,scroll_total;
-void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;assert(value>=0 && value<=1);for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
+/* Controls > Combat style / Dice rolls (aw_combat.c's saved options). */
+static float combat_miss=1,combat_dice=1;
+float Cvar_VariableValue(char *name){
+    if(!strcmp(name,"aw_combat_miss"))return combat_miss;
+    if(!strcmp(name,"aw_combat_dice"))return combat_dice;
+    assert(0);return 0;
+}
+void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;assert(value>=0 && value<=1);
+    if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
+    if(!strcmp(name,"aw_combat_dice")){combat_dice=value;return;}
+    for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 int AW_UIFrameEnabled(void){return gold_frame;}
 void AW_UIFrameToggle(void){gold_frame=!gold_frame;}
@@ -68,7 +78,11 @@ static void check_controls(void){
  M_Keydown(K_DEL);assert(!*keybindings['w'] && !*keybindings['k']);
  for(i=0;i<40;i++)M_Keydown(K_DOWNARROW);
  M_Draw();assert(highlight_y==149);  /* Back is the last row */
- M_Keydown(K_UPARROW);M_Keydown(K_UPARROW);M_Draw(); /* past Reset, over planned rows */
+ /* Reset, Dice rolls, Combat style above Back: Enter and the arrows switch the two options */
+ M_Keydown(K_UPARROW);M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_dice==0 && combat_miss==1);
+ M_Keydown(K_RIGHTARROW);assert(combat_dice==1);
+ M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_miss==0);M_Draw();M_Keydown(K_LEFTARROW);assert(combat_miss==1);
+ M_Keydown(K_UPARROW);M_Draw(); /* over the planned rows */
  M_Keydown(K_ENTER);M_Keydown('q');assert(!strcmp(keybindings['q'],"aw_quickload"));
  M_Keydown(K_ESCAPE);M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
  for(i=0;i<256;i++)keybindings[i]=NULL;

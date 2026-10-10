@@ -7,7 +7,8 @@ conversion tool that fills it (CHIMport) comes with the next release.
 
 ## Goal
 
-Exterior cells converted by the CHIMport runner become playable next to the legacy open world in the
+Exterior cells converted by the CHIMport runner ([CHIMport](CHIMPORT.md): island results and
+[hull policy pending](CHIMPORT.md#hull-policy-pending)) become playable next to the legacy open world in the
 next release: the player walks from a legacy region into a CHIM frame and back, and every gate that a
 CHIM town passes applies to these frames. The legacy open world stays as it is and selectable; nothing
 is deleted. This is a step towards the M4 grid (WORLD_FORMAT.md, "Planned: all of Vivec (M3) and the
@@ -129,9 +130,11 @@ textures once.
 3. Edge checks and the MiniWind sandbox; A/B against the legacy region and OpenMW.
 4. All frames with every cell converted; frames with missing cells wait for CHIMport.
 
-## Open decisions
+## Decisions (owner, 9 October 2026)
 
-- Which frames ship first: only frames whose nine cells all passed, or also frames whose missing cells
-  are water (CHIMport's "empty" cells)?
-- Placements straddling a frame edge before format 0.6: refuse the frame, or ship with the straddling
-  placement drawn from one side and listed as a known finding?
+- Frames whose missing cells are only water (CHIMport's "empty" cells) ship. A frame missing any
+  cell that holds land or placements waits for CHIMport.
+- A frame whose edge cuts a placement is refused until format 0.6 (reach across frames). There is no
+  known-finding route for it.
+- Vivec keeps its eight district frames until M4 frames span edges; two city frames are the possible
+  next step (CHIM-FRAME-COORD-RANGE-33).

@@ -19,6 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#include "aw_items.h"
+#include "aw_anim.h"
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
 
@@ -35,10 +37,15 @@ char *PF_VarString (int	first)
     int		i;
     static char out[256];
 
+    int		n = 0;
+
     out[0] = 0;
-    for (i=first ; i<pr_argc ; i++)
+    /* QuakeC and map strings joined with a bound: a longer text is cut
+       (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
+    for (i=first ; i<pr_argc && n < (int)sizeof(out) - 1 ; i++)
     {
-        strcat (out, G_STRING((OFS_PARM0+i*3)));
+        Q_snprintf (out + n, sizeof(out) - n, "%s", G_STRING((OFS_PARM0+i*3)));
+        n += strlen (out + n);
     }
     return out;
 }
@@ -574,13 +581,13 @@ void PF_sound (void)
     attenuation = G_FLOAT(OFS_PARM4);
 
     if (volume < 0 || volume > 255)
-        Sys_Error ("SV_StartSound: volume = %ld", volume);
+        PR_RunError ("sound: volume = %ld", (long)volume);
 
     if (attenuation < 0 || attenuation > 4)
-        Sys_Error ("SV_StartSound: attenuation = %f", attenuation);
+        PR_RunError ("sound: attenuation out of range");
 
     if (channel < 0 || channel > 7)
-        Sys_Error ("SV_StartSound: channel = %ld", channel);
+        PR_RunError ("sound: channel = %ld", (long)channel);
 
     SV_StartSound (entity, channel, sample, volume, attenuation);
 }
@@ -1231,6 +1238,9 @@ void PF_lightstyle (void)
 
     style = G_FLOAT(OFS_PARM0);
     val = G_STRING(OFS_PARM1);
+    /* sv.lightstyles holds MAX_LIGHTSTYLES (ENGINE-QC-ARGS-SYSERROR-35) */
+    if (style < 0 || style >= MAX_LIGHTSTYLES)
+        PR_RunError ("lightstyle: style %ld out of range", (long)style);
 
 // change the string in sv
     sv.lightstyles[style] = val;
@@ -1860,6 +1870,20 @@ static void PF_aw_npcfloor(void)
     G_FLOAT(OFS_RETURN)=AW_NPCFloor(G_EDICT(OFS_PARM0));
 }
 
+/* Spawn time: the model's animation layout (<model>.anm) and its sounds (aw_anim.c),
+ * and its carried items' tags (<model>.tag, aw_items.c). */
+static void PF_aw_animprep(void)
+{
+    AW_AnimPrep(G_EDICT(OFS_PARM0));
+    AW_ItemsPrep(G_EDICT(OFS_PARM0));
+}
+
+/* A voice bark (aw_anim.c AW_VoiceSay): topic 0 attack, 1 hit, 2 flee, 3 idle; odds in percent (0.15 = 0.15 %). */
+static void PF_aw_bark(void)
+{
+    G_FLOAT(OFS_RETURN)=AW_VoiceSay(G_EDICT(OFS_PARM0),(int)G_FLOAT(OFS_PARM1),(int)(G_FLOAT(OFS_PARM2)*100+.5f));
+}
+
 builtin_t pr_builtin[] =
 {
 PF_Fixme,
@@ -1960,7 +1984,9 @@ PF_precache_file,
 
 PF_setspawnparms,
 PF_aw_npctarget, /* #79: entity(entity player) aw_npctarget */
-PF_aw_npcfloor   /* #80: float(entity actor) aw_npcfloor */
+PF_aw_npcfloor,  /* #80: float(entity actor) aw_npcfloor */
+PF_aw_animprep,  /* #81: void(entity actor) aw_animprep */
+PF_aw_bark       /* #82: float(entity actor, float topic, float odds) aw_bark */
 };
 
 builtin_t *pr_builtins = pr_builtin;

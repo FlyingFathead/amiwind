@@ -9,12 +9,15 @@ from pathlib import Path
 import argparse,json,struct
 import numpy as np
 
+# Alias models decoded here include actor models (prepare_guard_torches); their frame ceiling (tools/actor_frames.py).
+MAX_FRAMES=64
+
 
 def decode_mdl(raw):
     h=struct.unpack_from('<4si3f3ff3f8if',raw)
     if h[:2]!=(b'IDPO',6):raise ValueError('Expected generated MDL6')
     scale=np.array(h[2:5]);origin=np.array(h[5:8]);skins,w,height,nv,nt,nf=h[12:18]
-    if skins!=1 or not 1<=nf<=32 or not 1<=nv<=1999:raise ValueError('Unsupported first-person model')
+    if skins!=1 or not 1<=nf<=MAX_FRAMES or not 1<=nv<=1999:raise ValueError('Unsupported first-person model')
     at=84
     if struct.unpack_from('<i',raw,at)[0]:raise ValueError('Grouped skin unsupported')
     at+=4;skin=np.frombuffer(raw,np.uint8,w*height,at).reshape(height,w);at+=w*height

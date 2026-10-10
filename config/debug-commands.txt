@@ -18,6 +18,7 @@ VIDEO|playvideo|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|render order|aw_surface_order|1 legacy / 2 mesh intersections (default)
 VIDEO|videoplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|vidplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
+PLAYTESTING|animkit|aw_animkit|[on/off / list / play <group> / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off = walk, run and swim by speed (off: movers play idle); list = the groups of the NPC under the crosshair and Morrowind's whole table (wired / not wired yet); play forces a group on that NPC until stop; speed scales playback (not saved)
 PLAYTESTING|arena|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
 PLAYTESTING|arenapit|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
 PLAYTESTING|arenatest|aw_arenapit|same as arenapit
@@ -25,7 +26,7 @@ PLAYTESTING|aw charplane|aw_charplane|[number/name/ID; next/previous/body/exit]
 PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census)
 PLAYTESTING|battlearena|aw_arenapit|same as arenapit
 PLAYTESTING|choosecompanion|aw_pickcompanion|same as companion pick
-PLAYTESTING|combat|aw_combat|[on/off / seed N / readout on/off / music on/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on)
+PLAYTESTING|combat|aw_combat|[on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / bestattack on/off / loadout NAME/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on)
 PLAYTESTING|combattest|aw_combattest|[opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit
 PLAYTESTING|companion|aw_companion|[pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on)
 PLAYTESTING|companiontest|aw_companiontest|[on/off] same as companion test / companion off; no argument: status
@@ -114,6 +115,7 @@ INPUT|input trace|aw_input_trace|on/off true/false 1/0 (alias; default off)
 INPUT|inputtrace|aw_input_trace|on/off true/false 1/0 (raw keys and mouse events; default off)
 DIAGNOSTICS|all|amiwind_show_debug|on/off
 DIAGNOSTICS|blockers|aw_blockers|
+DIAGNOSTICS|cell|aw_cell|(original Morrowind cell here: exterior grid CELL x,y, or interior INT n with its full cell ID; the debug HUD shows the same at the end of its shorter row)
 DIAGNOSTICS|compass|amiwind_debug_compass|on/off true/false 1/0 (default off)
 DIAGNOSTICS|coords|amiwind_debug_coords|on/off
 DIAGNOSTICS|dimensions|aw_dimensions|
@@ -127,6 +129,7 @@ DIAGNOSTICS|hud|amiwind_show_debug|on/off true/false 1/0 (overlay alias)
 DIAGNOSTICS|hud type|aw_debug_hud_type|1 original / 2 compact (default)
 DIAGNOSTICS|logs live|aw_logs_live_set|[on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set)
 DIAGNOSTICS|npcfloors|aw_npc_floors|(read-only ground-contact report)
+DIAGNOSTICS|npclod|aw_npclod|[auto/0/1/2/3 / target <0..3/auto> / show on/off / bands <d0> <d1> <d2> / stats] NPC model levels (--npc-lod on builds): 0..3 forces a level on every NPC, auto = distance bands; target = the NPC under the crosshair; show labels level, triangles, KiB, distance; bands sets the edges live; stats (not saved)
 DIAGNOSTICS|npcs|aw_npcs|
 DIAGNOSTICS|overlay|amiwind_show_debug|on/off true/false 1/0
 DIAGNOSTICS|pos|aw_pos|

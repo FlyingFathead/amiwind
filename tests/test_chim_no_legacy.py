@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools'), str(ROOT / 'tests')]
 import build
 from test_build_builder import plan
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 # The legacy plan at the CHIM no-legacy change (stage, tool script): --builder legacy must keep it.
 LEGACY_PLAN = (
@@ -86,41 +88,90 @@ class ChimPlanTests(unittest.TestCase):
         self.assertIn("metadata['chim_plan'] = chim_plan_record(", source)
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class SeydaInputTests(unittest.TestCase):
-    def test_chim_seyda_requires_the_recorded_maps_before_setup(self):
-        err = io.StringIO()
-        with patch.object(build, 'prerequisites') as setup, contextlib.redirect_stderr(err), \
-                self.assertRaises(SystemExit) as stop:
-            build.main(['--builder', 'chim', '--chim-area', 'seyda', '--check'])
-        self.assertEqual(stop.exception.code, 1)
-        self.assertIn('--seyda-recorded', err.getvalue())
-        setup.assert_not_called()
+    """BUILD-SEYDA-REGEN-30 (closed in v0.0.35): the recorded v0.0.31 Seyda Neen maps are optional."""
 
-    def test_default_build_needs_the_recorded_maps_with_a_clear_message(self):
-        # v0.0.33: the shipped default is --builder chim with Balmora and Seyda Neen.
+    def test_recorded_seyda_is_marked_not_recommended(self):
+        # Owner decision 10 October 2026: optional and NOT RECOMMENDED since v0.0.31, in the help, the warning
+        # the build prints when the option is given, and the receipt.
+        help_text = next(a.help for a in build.parser()._actions if '--seyda-recorded' in a.option_strings)
+        for text in (help_text, build.SEYDA_RECORDED_WARNING):
+            self.assertIn('NOT RECOMMENDED since v0.0.31', text)
+            self.assertIn('the default converts Seyda Neen from your data', text)
+        source = Path(build.__file__).read_text(encoding='utf-8')
+        self.assertIn('print(SEYDA_RECORDED_WARNING, flush=True)', source)
+        self.assertIn('"seyda_recorded_not_recommended": getattr(args, "seyda_recorded", None) is not None', source)
+        self.assertIsNone(build.parser().parse_args([]).seyda_recorded)  # the default build does not use it
+        # The docs say the same: "Which Seyda Neen is in my build?" and the same wording wherever the option is named.
+        root = Path(build.__file__).resolve().parents[1]
+        guide = (root / 'docs/LINUX_BUILD.md').read_text(encoding='utf-8')
+        self.assertIn('## Which Seyda Neen is in my build?', guide)
+        for name in ('README.md', 'docs/LINUX_BUILD.md', 'docs/DEVELOPMENT.md', 'docs/RELEASE_WORKFLOW.md',
+                     'docs/chim/WORLD_FORMAT.md', 'docs/chim/build_guide/BUILDER_TYPES.md'):
+            with self.subTest(doc=name):
+                text = ' '.join((root / name).read_text(encoding='utf-8').split())
+                self.assertIn('NOT RECOMMENDED since v0.0.31', text)
+                self.assertIn('which-seyda-neen-is-in-my-build', text)
+
+    def test_default_build_needs_no_recorded_seyda(self):
+        # v0.0.33 refused a default build (CHIM with Balmora and Seyda Neen) without --seyda-recorded DIR.
         args = build.parser().parse_args([])
-        with self.assertRaises(ValueError) as stop:
-            build.chim_seyda_input(args)
-        for text in ('--seyda-recorded DIR', 'v0.0.31', 'shipped default', 'BUILD-SEYDA-REGEN-30',
-                     '--builder legacy', '--chim-area balmora'):
-            self.assertIn(text, str(stop.exception))
-        for argv in (['--dry-run'], ['--stage', 'terrain'], ['--chim-area', 'balmora'], ['--builder', 'legacy']):
-            with self.subTest(argv=argv):
-                build.chim_seyda_input(build.parser().parse_args(argv))   # asset-free, terrain, no Seyda, legacy
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            build.chim_seyda_input(build.parser().parse_args(['--install-sdk']))   # setup only: a note
-        self.assertIn('Note: ', out.getvalue())
+            self.assertEqual(build.chim_seyda_input(args), 'converted')
+        self.assertIn('converted from your data', out.getvalue())
+        steps = plan(['--jobs', '4'])
+        self.assertIn('chim', dict(steps))
+        for name, command in steps:
+            with self.subTest(step=name):
+                self.assertNotIn('--seyda-recorded', [str(p) for p in command])
+        # The converted Seyda Neen region maps are only the frame maps' reference: no terrain cull
+        # (BUILD-SEYDA-CULL-STABLE-32), in both steps that convert them.
+        for name in ('actor-contact', 'image'):
+            command = [str(p) for p in dict(steps)[name]]
+            self.assertEqual(command[command.index('--seyda-terrain-cull') + 1], 'off')
 
-    def test_given_or_not_needed(self):
-        for argv, given in ((['--builder', 'chim', '--chim-area', 'balmora'], False),
-                            (['--builder', 'chim', '--chim-area', 'seyda', '--dry-run'], False),
-                            (['--builder', 'chim', '--chim-area', 'seyda'], True)):
+    def test_recorded_or_legacy_seyda_keeps_the_terrain_cull(self):
+        for argv in (BOTH + ['--seyda-recorded', '/recorded'], ['--jobs', '4', '--builder', 'legacy'],
+                     ['--jobs', '4', '--chim-area', 'balmora']):
             with self.subTest(argv=argv):
+                for name in ('actor-contact', 'image'):
+                    self.assertNotIn('--seyda-terrain-cull', [str(p) for p in dict(plan(argv))[name]])
+
+    def test_conversion_without_terrain_cull_reaches_convert(self):
+        import prepare_seyda_regions
+        for cull, force in ((True, None), (False, False)):
+            with self.subTest(cull=cull), patch.object(prepare_seyda_regions, 'convert') as convert:
+                prepare_seyda_regions.convert_builder_scene(Path('/maps'), scene_map=Path('/s.map'),
+                    palette=Path('/p.lmp'), ericw_bin=Path('/bin'), work_dir=Path('/w'), terrain_cull=cull)
+                self.assertIs(convert.call_args.kwargs['terrain_visual_cull'], force)
+        for tool in ('check_scene_actors.py', 'build_aga.py'):
+            self.assertIn("'--seyda-terrain-cull'", (ROOT / 'tools' / tool).read_text(encoding='utf-8'))
+
+    def test_chim_seyda_check_reaches_setup_without_recorded_maps(self):
+        with patch.object(build, 'prerequisites', side_effect=SystemExit(7)) as setup,                 contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as stop:
+            build.main(['--builder', 'chim', '--chim-area', 'seyda', '--check'])
+        self.assertEqual(stop.exception.code, 7)
+        setup.assert_called()
+
+    def test_source_of_seyda(self):
+        for argv, given, source in ((['--builder', 'chim', '--chim-area', 'balmora'], False, None),
+                                    (['--builder', 'chim', '--chim-area', 'seyda', '--dry-run'], False, None),
+                                    (['--stage', 'terrain'], False, None),
+                                    (['--builder', 'legacy'], False, None),
+                                    (['--builder', 'chim', '--chim-area', 'seyda'], False, 'converted'),
+                                    (['--builder', 'chim', '--chim-area', 'seyda'], True, 'recorded')):
+            with self.subTest(argv=argv, given=given):
                 args = build.parser().parse_args(argv)
                 if given:
                     args.seyda_recorded = Path('/recorded')
-                build.chim_seyda_input(args)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(build.chim_seyda_input(args), source)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            build.chim_seyda_input(build.parser().parse_args(['--install-sdk']))   # setup only: silent
+        self.assertEqual(out.getvalue(), '')
 
     def test_recorded_maps_reach_the_image_step(self):
         steps = plan(BOTH + ['--seyda-recorded', '/recorded'])
@@ -213,7 +264,7 @@ class NotOnChimTests(unittest.TestCase):
 
     def test_image_step_drops_only_in_chim_builds_and_before_the_gates(self):
         source = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
-        block = source[source.index("chim_frames = chim_frame_maps(args.chim_world, boot/'id1')"):]
+        block = source[source.index("chim_frames = chim_frame_maps(args.chim_world, boot/'id1'"):]
         drop = block.index('remove_towns_not_on_chim(boot/')
         rebind = block.index('rebind_chim_maps(boot/')
         self.assertLess(drop, rebind)

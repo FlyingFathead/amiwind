@@ -61,6 +61,7 @@ GENERATED = {
     'docs/AMIWIND_CONSOLE_COMMANDS.md': 'generated whole by tools/console_commands_doc.py',
     'docs/bugs/CHIM_TRACKER.md': 'generated whole by tools/bug_register.py with the register',
     'docs/chim/FEATURES.md': 'generated whole by tools/chim_features.py from docs/chim/features.json',
+    'docs/chim/CELL_TRACKER.md': 'generated whole by tools/cell_progress.py render-md from the tracker data',
 }
 FROZEN = {'docs/BUGS-v0.0.29-RC1.md', 'docs/RC2_ISSUE_CHECKPOINT.md'}
 FROZEN_PREFIXES = ('docs/journals/', 'docs/RELEASE-v', 'docs/PATCH-')

@@ -11,28 +11,29 @@
 #define AW_TOWN_EXTRA_COUNT 8
 #define AW_TOWN_EXTRA_NAMES {"vivec_arena","vivec_foreign","vivec_hlaalu","vivec_redoran","vivec_telvanni","vivec_temple","vivec_delyn","vivec_olms"}
 #define AW_TOWN_EXTRA_TITLES {"Vivec, Arena","Vivec, Foreign Quarter","Vivec, Hlaalu","Vivec, Redoran","Vivec, Telvanni","Vivec, Temple","Vivec, St. Delyn","Vivec, St. Olms"}
-#define AW_TOWN_INTERIOR_COUNT 143
+#define AW_TOWN_INTERIOR_COUNT 144
 #define AW_TOWN_INTERIOR_NAMES {\
-    "vqi000","vqi001","vqi002","vqi003","vqi004","vqi005","vqi006","vqi007",\
-    "vqi008","vqi009","vqi010","vqi011","vqi012","vqi013","vqi014","vqi015",\
-    "vqi016","vqi017","vqi018","vqi019","vhi000","vhi001","vhi002","vhi003",\
-    "vhi004","vhi005","vhi006","vhi007","vhi008","vhi009","vhi010","vhi011",\
-    "vhi012","vhi013","vhi014","vhi015","vhi016","vhi017","vri000","vri001",\
-    "vri002","vri003","vri004","vri005","vri006","vri007","vri008","vri009",\
-    "vri010","vri011","vri012","vri013","vri014","vri015","vti000","vti001",\
-    "vti002","vti003","vti004","vti005","vti006","vti007","vti008","vti009",\
-    "vti010","vti011","vti012","vti013","vti014","vti015","vti016","vti017",\
-    "vpi000","vpi001","vpi002","vpi003","vpi004","vpi005","vpi006","vpi007",\
-    "vpi008","vpi009","vpi010","vpi011","vpi012","vpi013","vpi014","vpi015",\
-    "vpi016","vpi017","vpi018","vpi019","vpi020","vpi021","vdi000","vdi001",\
-    "vdi002","vdi003","vdi004","vdi005","vdi006","vdi007","vdi008","vdi009",\
-    "vdi010","vdi011","vdi012","vdi013","vdi014","vdi015","vdi016","vdi017",\
-    "vdi018","vdi019","vdi020","vdi021","voi000","voi001","voi002","voi003",\
-    "voi004","voi005","voi006","voi007","voi008","voi009","voi010","voi011",\
-    "voi012","voi013","voi014","voi015","voi016","voi017","voi018","voi019",\
-    "voi020","voi021","voi022","voi023","voi024","voi025","voi026"\
+    "vai000","vqi000","vqi001","vqi002","vqi003","vqi004","vqi005","vqi006",\
+    "vqi007","vqi008","vqi009","vqi010","vqi011","vqi012","vqi013","vqi014",\
+    "vqi015","vqi016","vqi017","vqi018","vqi019","vhi000","vhi001","vhi002",\
+    "vhi003","vhi004","vhi005","vhi006","vhi007","vhi008","vhi009","vhi010",\
+    "vhi011","vhi012","vhi013","vhi014","vhi015","vhi016","vhi017","vri000",\
+    "vri001","vri002","vri003","vri004","vri005","vri006","vri007","vri008",\
+    "vri009","vri010","vri011","vri012","vri013","vri014","vri015","vti000",\
+    "vti001","vti002","vti003","vti004","vti005","vti006","vti007","vti008",\
+    "vti009","vti010","vti011","vti012","vti013","vti014","vti015","vti016",\
+    "vti017","vpi000","vpi001","vpi002","vpi003","vpi004","vpi005","vpi006",\
+    "vpi007","vpi008","vpi009","vpi010","vpi011","vpi012","vpi013","vpi014",\
+    "vpi015","vpi016","vpi017","vpi018","vpi019","vpi020","vpi021","vdi000",\
+    "vdi001","vdi002","vdi003","vdi004","vdi005","vdi006","vdi007","vdi008",\
+    "vdi009","vdi010","vdi011","vdi012","vdi013","vdi014","vdi015","vdi016",\
+    "vdi017","vdi018","vdi019","vdi020","vdi021","voi000","voi001","voi002",\
+    "voi003","voi004","voi005","voi006","voi007","voi008","voi009","voi010",\
+    "voi011","voi012","voi013","voi014","voi015","voi016","voi017","voi018",\
+    "voi019","voi020","voi021","voi022","voi023","voi024","voi025","voi026"\
 }
 #define AW_TOWN_INTERIOR_TITLES {\
+    "Vivec, Arena Pit",\
     "Ibishammus, Shrine",\
     "Vivec, Agrippina Herennia: Clothier",\
     "Vivec, Alusaron: Smith",\
@@ -179,11 +180,11 @@
 }
 /* Town row (AW_Town index) whose door bank leads into each interior. */
 #define AW_TOWN_INTERIOR_TOWNS {\
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,\
-    4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,6,6,6,6,6,6,6,6,6,6,\
-    6,6,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,8,8,\
-    8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9,9,9,9,9,\
-    9,9,9,9,9,9,9,9,9,9,9,9,9,9,9\
+    2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,\
+    4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,6,6,6,6,6,6,6,6,6,\
+    6,6,6,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,8,\
+    8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9,9,9,9,\
+    9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9\
 }
 /* name,title,prefix,regions,travel_npc,travel_target,region_cap,draw_distance,
    world_slot,flags,travel_return,handoff,origin[3],core[4] */

@@ -101,7 +101,29 @@ def check_scene(game):
                     check_pixels(raw[at:at+count],str(path));at+=count
             if at!=stop:raise ValueError('Invalid hand frame length')
 
-def reserved_palette(data,old):
+# The enemy's health bar (docs/COMBAT.md, HUD-ENEMY-BAR-COLOUR-33): the original grey bar tinted
+# (1, 0.729, 0) as OpenMW's MW_BarTrack_Yellow. One implementation for the palette bank and the UI atlas.
+YELLOW_TINT=(1.0,0.729,0.0)
+PALETTE_FORMAT='AmiWind reserved UI palette 2'
+def yellow_bar(image):
+    r,g,b,a=image.convert('RGBA').split()
+    return Image.merge('RGBA',(r.point(lambda v:int(v*YELLOW_TINT[0]+.5)),g.point(lambda v:int(v*YELLOW_TINT[1]+.5)),
+                               b.point(lambda v:int(v*YELLOW_TINT[2]+.5)),a))
+def legacy_bank(data):
+    # The format 1 bank (red, blue and green bars only): the 87 bytes the approved sky palette
+    # fingerprint was taken with (sky_palette_overlay.approved).
+    from mwad.audit import BSA
+    from mwad.paths import child_ci
+    from npc_geometry import Assets
+    assets=Assets(Path(data),BSA(child_ci(Path(data),'Morrowind.bsa')));samples=Image.new('RGB',(48,16))
+    for i,color in enumerate(('red','blue','green')):
+        image=Image.open(io.BytesIO(assets.read('textures/menu_bar_'+color+'.dds'))).convert('RGBA')
+        samples.paste(image,(i*16,0),image)
+    return bytes(samples.quantize(colors=29,dither=Image.Dither.NONE).getpalette()[:87])
+def legacy_bank_or_none(data):
+    try:return legacy_bank(data) if data else None
+    except (FileNotFoundError,KeyError,OSError,ValueError):return None
+def reserved_palette(data,old,upgrade=False):
     """The runtime palette: the scene palette with the original status-bar bank.
 
     One implementation for the image step and for converters that must match
@@ -112,11 +134,13 @@ def reserved_palette(data,old):
     from mwad.paths import child_ci
     from npc_geometry import Assets
     data=Path(data)
-    if len(old)!=768 or any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED):raise ValueError('Scene has no redundant UI palette bank')
-    assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')));samples=Image.new('RGB',(48,16));sources={}
-    for i,color in enumerate(('red','blue','green')):
+    if len(old)!=768 or (not upgrade and any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED)):
+        raise ValueError('Scene has no redundant UI palette bank')
+    assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')));samples=Image.new('RGB',(64,16));sources={}
+    for i,color in enumerate(('red','blue','green','gray')):
         name='textures/menu_bar_'+color+'.dds';raw=assets.read(name);image=Image.open(io.BytesIO(raw)).convert('RGBA')
         if image.size!=(16,16):raise ValueError('Unexpected original status bar')
+        if color=='gray':image=yellow_bar(image)       # the enemy's yellow bar
         samples.paste(image,(i*16,0),image);sources[name]=hashlib.sha256(raw).hexdigest()
     colors=bytes(samples.quantize(colors=29,dither=Image.Dither.NONE).getpalette()[:87])
     return old[:225*3]+colors+old[254*3:],sources
@@ -125,16 +149,20 @@ def reserve(data,game):
     from mwad.paths import ensure_external
     game=ensure_external(Path(game),'private palette');data=Path(data);path=game/'gfx/palette.lmp';old=path.read_bytes()
     marker=game/'gfx/ui-palette.json'
+    upgrade=False
     if marker.exists():
         report=json.loads(marker.read_text())
         if hashlib.sha256(old).hexdigest()!=report['palette_sha256']:raise ValueError('UI palette receipt mismatch')
-        report['lookup_sha256']=sync_lookups(game)
-        replace_bytes(marker,(json.dumps(report,indent=2)+'\n').encode('utf-8'))
-        return report
-    if len(old)!=768 or any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED):raise ValueError('Scene has no redundant UI palette bank')
+        if report.get('format')==PALETTE_FORMAT:
+            report['lookup_sha256']=sync_lookups(game)
+            replace_bytes(marker,(json.dumps(report,indent=2)+'\n').encode('utf-8'))
+            return report
+        upgrade=True       # a bank of the previous format (no yellow): recomputed in place below
+    if not upgrade and (len(old)!=768 or any(old[i*3:i*3+3]!=old[224*3:224*3+3] for i in RESERVED)):
+        raise ValueError('Scene has no redundant UI palette bank')
     check_scene(game)
-    new,sources=reserved_palette(data,old);replace_bytes(path,new)
-    report={'format':'AmiWind reserved UI palette 1','indices':[225,253],
+    new,sources=reserved_palette(data,old,upgrade=upgrade);replace_bytes(path,new)
+    report={'format':PALETTE_FORMAT,'indices':[225,253],
             'world_pixels_unchanged':True,'console_font_unchanged':True,'sources':sources,
             'previous_palette_sha256':hashlib.sha256(old).hexdigest(),'palette_sha256':hashlib.sha256(new).hexdigest()}
     report['lookup_sha256']=sync_lookups(game)

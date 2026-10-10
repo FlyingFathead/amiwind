@@ -1,11 +1,7 @@
 # AmiWind "MiniWind" Playtester Build
 
-A build type of the repository builder for quick playtests: Balmora only, with
-the Balmora exterior on the CHIM engine, the Balmora interiors and what the
-engine needs to run (menus, UI, fonts, audio and music). It builds in a
-fraction of the time of a full build and boots straight into Balmora. It is a
-PARTIAL-AREA test build for private `-devN` versions, never a release. The
-leanest variant, `--miniwind-scope exterior`, holds the Balmora exterior only.
+Start with [MiniWind: the test ground](MINIWIND.md) (what it is for, presets,
+how to add a sandbox). This page is the reference for the build type itself.
 
 <!-- contents start -->
 ## Contents
@@ -13,6 +9,7 @@ leanest variant, `--miniwind-scope exterior`, holds the Balmora exterior only.
 - [How to build it](#how-to-build-it)
 - [What it builds](#what-it-builds)
 - [Scope: the Balmora exterior only](#scope-the-balmora-exterior-only)
+- [Another town and DEBUG ONLY sandboxes](#another-town-and-debug-only-sandboxes)
 - [How the game starts](#how-the-game-starts)
 - [Boot notice](#boot-notice)
 - [Startup logo screen](#startup-logo-screen)
@@ -21,6 +18,13 @@ leanest variant, `--miniwind-scope exterior`, holds the Balmora exterior only.
 - [What it is not](#what-it-is-not)
 
 <!-- contents end -->
+
+A build type of the repository builder for quick playtests: Balmora only, with
+the Balmora exterior on the CHIM engine, the Balmora interiors and what the
+engine needs to run (menus, UI, fonts, audio and music). It builds in a
+fraction of the time of a full build and boots straight into Balmora. It is a
+PARTIAL-AREA test build for private `-devN` versions, never a release. The
+leanest variant, `--miniwind-scope exterior`, holds the Balmora exterior only.
 
 ## How to build it
 
@@ -81,7 +85,8 @@ frame map is made from), `balmora-interiors`, `door-audio`, `character`,
 
 The image step removes every map that is not Balmora's before any pass runs
 (Seyda Neen, the prison ship, Census, other towns and their rooms). The videos
-stay (the media stage ships all of them). Balmora's own region maps stay on the
+are left out by default (`--with-video` keeps them; see
+[Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md#miniwind-builds-are-quick-test-builds-by-default)). Balmora's own region maps stay on the
 disk: they are the source of the CHIM frame map, the town's door and arrival
 data, and the `chim_towns 0` comparison. By default the Balmora exterior runs on CHIM
 (`maps/balmora-chim.bsp`). The pruning is recorded in
@@ -139,6 +144,35 @@ both receipts (`build_type`: `scope`, `label`, `partial_area`
 What it is NOT: not a test of any interior, door transition, door sound or
 the NPC gallery; not the locked MiniWind scope (that is `full`, the default);
 not a release or release candidate.
+
+## Another town and DEBUG ONLY sandboxes
+
+`--miniwind-town TOWN` builds the sandbox from another town table row
+(`config/towns.json`, any row except Seyda Neen, which needs the recorded maps):
+that town's exterior on CHIM, its residents and, in the full scope, its
+interiors. The game boots straight into it. Balmora's scene stage still runs,
+because it is part of the scene chain and the image step reads it, but Balmora's
+interiors do not, and the image removes Balmora's maps. The notice, the marker,
+the receipts (recipe `miniwind-<town>-chim-v1`) and the HDF and run names carry
+the town. Balmora builds keep every name and command line they had.
+
+`--miniwind-debug` marks a DEBUG ONLY sandbox, which is not a playtest. The boot
+notice reads `DEBUG ONLY: MINIWIND DEBUG BUILD, NOT A PLAYTEST`, the startup
+screen reads `MiniWind DEBUG ONLY`, and the marker, receipts (`debug_only`,
+`debug_settings`) and HDF and run names (`-DEBUG-ONLY`) say so. Only a debug
+sandbox takes `--chim-draw-distance N` (128..540): a stated closer view. The
+CHIM world is built and heap-gated for that draw distance, and the image starts
+with it. It is never a playtest or release setting.
+
+Opt-in CHIM settings for any CHIM build: `--chim-detail-budget NAME`
+(`config/chim-detail-budgets.json`) and `--chim-cut-models-over UNITS` (the
+large-model cut). A private -devN build can also accept a known stair finding
+with `--accept-known-stair-findings ID`.
+
+Example: the Vivec Temple debugging sandbox, used for the in-engine stair walk
+and the statue A/B shots:
+
+    tools/build.py --miniwind --miniwind-town vivec_temple --miniwind-debug         --chim-draw-distance 448 --chim-detail-budget vivec-wide --chim-cut-models-over 512         --accept-known-stair-findings VIVEC-TEMPLE-STAIRS-33         --miniwind-description "Vivec Temple: stairs and statues, closer view"
 
 ## How the game starts
 

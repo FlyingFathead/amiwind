@@ -209,3 +209,147 @@ def draw_curve(path, series, title, ring_marks=(), size=(1000, 560)):
         d.text((W - R - 362, ly - 1), label, fill='#edf3fa', font=font)
         ly += 16
     img.save(path, 'PNG', optimize=True)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# The store-once chart (owner, 2026-10-09: "what the hell is this chart trying to tell?"): the title is the takeaway,
+# computed from the data; two panels with big text and every legend outside the plot; the no-reuse line is on a log scale
+# so it fits; ring labels are staggered above the plot.
+
+ORDER_SENTENCE = ('Spiral order grows one contiguous playable area from the coast inwards. Risk order meets the most distinct '
+                  'meshes first, so a bug in a mesh shows up early.')
+
+
+def reuse_takeaway(unique, without):
+    """(title, ratio) in plain words: store-once conversions against every cell converting its own meshes."""
+    if not unique or not without:
+        return 'Store-once mesh reuse: no mesh counts yet', None
+    ratio = without / float(unique)
+    shown = ('%.0fx' % ratio) if ratio >= 10 else ('%.1fx' % ratio)
+    return 'Store-once: {:,} mesh conversions instead of {:,} ({} fewer)'.format(unique, without, shown), ratio
+
+
+def _font(size, bold=False):
+    from PIL import ImageFont
+    try:
+        return ImageFont.truetype('DejaVuSans-Bold.ttf' if bold else 'DejaVuSans.ttf', size)
+    except OSError:
+        return ImageFont.load_default(size=size)
+
+
+def _wrap(draw, text, font, width):
+    lines, line = [], ''
+    for word in text.split():
+        trial = (line + ' ' + word).strip()
+        if draw.textlength(trial, font=font) <= width or not line:
+            line = trial
+        else:
+            lines.append(line)
+            line = word
+    return lines + ([line] if line else [])
+
+
+def draw_reuse_chart(path, spiral, risk, unique, without, rings=(), cells_with_meshes=None, size=(1500, 1520)):
+    """Write the store-once chart as a PNG. spiral / risk: reuse_curve points [cells_done, cumulative_unique, cumulative_own];
+    rings: [(cells_done, label)] for the staggered labels above panel (a). Fonts: 20-24 px text, 34 px title."""
+    from PIL import Image, ImageDraw
+    W, H = size
+    bg, ink, muted, grid = '#101923', '#edf3fa', '#b6c7d8', '#2a3b4d'
+    c_store, c_risk, c_own = '#4fc3f7', '#ffcf55', '#ff7b72'
+    img = Image.new('RGB', (W, H), bg)
+    d = ImageDraw.Draw(img)
+    f_title, f_panel, f_text, f_tick, f_small = _font(34, True), _font(24, True), _font(22), _font(20), _font(18)
+    L, R = 150, 230
+    xmax = max([pt[0] for pt in list(spiral) + list(risk)] or [1])
+
+    def X(v):
+        return L + (W - L - R) * v / float(xmax)
+
+    title, _ = reuse_takeaway(unique, without)
+    d.text((L, 22), title, fill=ink, font=f_title)
+    d.text((L, 70), '%s cells with placements; every mesh is converted once and placed by reference' % '{:,}'.format(cells_with_meshes or xmax),
+           fill=muted, font=f_text)
+
+    def side_label(top, bottom):
+        width = int(d.textlength('meshes converted', font=f_text)) + 8
+        tmp = Image.new('RGB', (width, 34), bg)
+        ImageDraw.Draw(tmp).text((4, 4), 'meshes converted', fill=ink, font=f_text)
+        tmp = tmp.rotate(90, expand=True)
+        img.paste(tmp, (14, int((top + bottom) / 2.0 - width / 2.0)))
+
+    def x_axis(bottom, label_y):
+        for i in range(6):
+            xv = xmax * i / 5.0
+            d.text((X(xv), bottom + 8), '{:,}'.format(int(xv)), fill=muted, font=f_tick, anchor='ma')
+        d.text((L + (W - L - R) / 2.0, label_y), 'cells converted (in sweep order)', fill=ink, font=f_text, anchor='ma')
+
+    def legend(items, top):
+        y = top
+        for label, colour, dashed in items:
+            if dashed:
+                for k in range(0, 44, 14):
+                    d.line([(L + k, y + 13), (L + k + 8, y + 13)], fill=colour, width=6)
+            else:
+                d.line([(L, y + 13), (L + 44, y + 13)], fill=colour, width=6)
+            d.text((L + 62, y), label, fill=ink, font=f_text)
+            y += 36
+        return y
+
+    # (a) log scale: with and without store-once
+    ax_t, ax_b = 215, 565
+    d.text((L, 124), '(a) Meshes converted so far: store-once against every cell converting its own meshes (log scale)', fill=ink, font=f_panel)
+    top = max(without, unique, 10)
+    import math
+    decades = int(math.ceil(math.log10(top)))
+
+    def Ya(v):
+        return ax_b - (ax_b - ax_t) * math.log10(max(v, 1)) / float(decades)
+    for k in range(decades + 1):
+        v = 10 ** k
+        d.line([(L, Ya(v)), (W - R, Ya(v))], fill=grid, width=1)
+        d.text((L - 12, Ya(v)), '{:,}'.format(v), fill=muted, font=f_tick, anchor='rm')
+    d.line([(L, ax_t), (L, ax_b), (W - R, ax_b)], fill=muted, width=2)
+    side_label(ax_t, ax_b)
+    for i, (x, label) in enumerate(rings):                      # staggered over two rows above the plot
+        d.line([(X(x), ax_t - (8 if i % 2 else 30)), (X(x), ax_t)], fill='#6f8aa6', width=1)
+        d.text((X(x) + 3, ax_t - (32 if i % 2 == 0 else 10)), label, fill=muted, font=f_small, anchor='ls' if False else 'lb')
+    own = [(pt[0], pt[2]) for pt in spiral]
+    store = [(pt[0], pt[1]) for pt in spiral]
+    for pts, colour in ((own, c_own), (store, c_store)):
+        if pts:
+            d.line([(X(a), Ya(b)) for a, b in pts], fill=colour, width=5)
+    for pts, colour in ((own, c_own), (store, c_store)):
+        if pts:
+            d.text((W - R + 14, Ya(pts[-1][1])), '{:,}'.format(int(pts[-1][1])), fill=colour, font=f_panel, anchor='lm')
+    x_axis(ax_b, ax_b + 44)
+    end = legend([('Every cell converts its own meshes (no reuse)', c_own, False),
+                  ('Store-once: each mesh converted one time, placed by reference', c_store, False)], ax_b + 92)
+
+    # (b) the two sweep orders, linear
+    bx_t = end + 100
+    bx_b = bx_t + 330
+    d.text((L, end + 36), '(b) Two sweep orders: distinct meshes met so far', fill=ink, font=f_panel)
+    ymax = max([pt[1] for pt in list(spiral) + list(risk)] or [1]) * 1.06
+
+    def Yb(v):
+        return bx_b - (bx_b - bx_t) * v / ymax
+    for i in range(5):
+        v = ymax * i / 4.0
+        d.line([(L, Yb(v)), (W - R, Yb(v))], fill=grid, width=1)
+        d.text((L - 12, Yb(v)), '{:,}'.format(int(v)), fill=muted, font=f_tick, anchor='rm')
+    d.line([(L, bx_t), (L, bx_b), (W - R, bx_b)], fill=muted, width=2)
+    side_label(bx_t, bx_b)
+    for pts, colour in ((spiral, c_store), (risk, c_risk)):
+        if pts:
+            d.line([(X(pt[0]), Yb(pt[1])) for pt in pts], fill=colour, width=5)
+    if spiral:
+        d.text((W - R + 14, Yb(spiral[-1][1])), '{:,}'.format(int(spiral[-1][1])), fill=c_store, font=f_panel, anchor='lm')
+    x_axis(bx_b, bx_b + 44)
+    end = legend([('Spiral order: coast inwards, one contiguous area', c_store, False),
+                  ('Risk order: riskiest cells first (cells with estimates)', c_risk, False)], bx_b + 92)
+    y = end + 14
+    for line in _wrap(d, ORDER_SENTENCE, f_text, W - 2 * L):
+        d.text((L, y), line, fill=muted, font=f_text)
+        y += 30
+    img = img.crop((0, 0, W, min(H, y + 24)))
+    img.save(path, 'PNG', optimize=True)

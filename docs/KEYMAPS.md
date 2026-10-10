@@ -62,6 +62,7 @@ and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
 | E | `+aw_use` | Use / interact; up in noclip |
 | Q | `+movedown` | Down in noclip |
 | Mouse 1 | `+attack` | Attack |
+| Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Context action: picks a companion in pick mode (`dbg companion pick`); in a fight it is kept for a block button (not built yet; the original blocks automatically). Older saved key files get it if `MOUSE3` is unbound. |
 | F | `impulse 202` | Draw / lower hands |
 | V | `aw_torch` | Toggle the placeholder torch while hands are raised |
 | M | `aw_worldmap` | Open world map, including debug/noclip |
@@ -165,6 +166,7 @@ saved in `config.cfg` (Quake's `crosshair` setting, default on). A change made
 during photo mode applies when photo mode ends.
 
 ## Console line editing
+Animation kit console commands (`dbg animkit`): [ANIMKIT.md](ANIMKIT.md#console-dbg-animkit).
 
 The console edits its line like a terminal prompt (`aw_console_mode 1`, the
 default): the cursor moves without deleting, typing inserts at the cursor, and

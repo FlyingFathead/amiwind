@@ -45,10 +45,11 @@ void timer(ULONG *clock) {
 // C2P (Chunky to Planar) conversion functions are now provided by c2p8_040_amlaukka.s
 // (removed stubs - using real assembly implementation)
 
-// unlink stub (should be in libc but might be missing)
+// unlink through dos.library (ENGINE-UNLINK-STUB-35: the old stub deleted
+// nothing, so -condebug appended to the previous qconsole.log).
+#include <proto/dos.h>
 int unlink(const char *path) {
-    // Stub: Would normally delete a file
-    return -1;  // Indicate failure
+    return DeleteFile((STRPTR)path) ? 0 : -1;
 }
 
 // strnicmp - case-insensitive string compare (DOS/Windows name)

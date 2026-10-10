@@ -33,13 +33,38 @@ class LightSourceTests(unittest.TestCase):
         self.assertEqual(L.classify('light_com_candle_01_off', 'l\\candle.nif', 0x21), 'off')
         self.assertEqual(L.entity({'class': 'off', 'radius': 64, 'colour': [1, 2, 3], 'flags': 0x21}, (0, 0, 0)), '')
 
-    def test_styles_follow_original_flags_and_outdoor_lamps_switch_at_night(self):
-        self.assertEqual(L.quake_style('lamp', 1, True), L.STYLE_NIGHT_LAMPS)
-        self.assertEqual(L.quake_style('lamp', 0x41, False), L.STYLE_FLICKER_SOFT)
-        self.assertEqual(L.quake_style('fire', 0x8, True), L.STYLE_FLICKER)
-        self.assertEqual(L.quake_style('other', 0x80, False), L.STYLE_GENTLE_PULSE)
-        self.assertEqual(L.quake_style('other', 0x100, False), L.STYLE_SLOW_PULSE)
-        self.assertEqual(L.quake_style('candle', 1, False), L.STYLE_NORMAL)
+    def test_id_scheme_styles_follow_original_flags_and_outdoor_lamps_switch_at_night(self):
+        self.assertEqual(L.quake_style('lamp', 1, True, 'id'), L.STYLE_NIGHT_LAMPS)
+        self.assertEqual(L.quake_style('lamp', 0x41, False, 'id'), L.STYLE_FLICKER_SOFT)
+        self.assertEqual(L.quake_style('fire', 0x8, True, 'id'), L.STYLE_FLICKER)
+        self.assertEqual(L.quake_style('other', 0x80, False, 'id'), L.STYLE_GENTLE_PULSE)
+        self.assertEqual(L.quake_style('other', 0x100, False, 'id'), L.STYLE_SLOW_PULSE)
+        self.assertEqual(L.quake_style('candle', 1, False, 'id'), L.STYLE_NORMAL)
+
+    def test_source_scheme_puts_every_source_in_styles_32_to_36(self):
+        # LIGHT-STYLES-UNDEFINED-33: sources never dim with daylight; the later animation flag wins
+        self.assertEqual(L.quake_style('candle', 1, False), L.STYLE_SOURCE)
+        self.assertEqual(L.quake_style('lamp', 1, True), L.STYLE_SOURCE)
+        self.assertEqual(L.quake_style('fire', 0x8, True), L.STYLE_SOURCE_FLICKER)
+        self.assertEqual(L.quake_style('lamp', 0x41, False), L.STYLE_SOURCE_FLICKER_SLOW)
+        self.assertEqual(L.quake_style('other', 0x80, False), L.STYLE_SOURCE_PULSE)
+        self.assertEqual(L.quake_style('other', 0x108, False), L.STYLE_SOURCE_PULSE_SLOW)
+        self.assertGreaterEqual(min(L.STYLE_SOURCE, L.STYLE_SOURCE_PULSE_SLOW), 32)
+        with self.assertRaises(ValueError):
+            L.quake_style('lamp', 0, True, 'other')
+
+    def test_every_style_the_mapping_emits_is_defined_in_worldspawn(self):
+        import re
+        qc = (Path(__file__).resolve().parents[1] / 'engine/aga/qc/world.qc').read_text(encoding='utf-8')
+        defined = {int(n): v for n, v in re.findall(r'lightstyle\((\d+),"([a-z]+)"\)', qc)}
+        self.assertEqual(defined[0], 'm')
+        for style, text in L.style_strings().items():
+            self.assertEqual(defined.get(style), text, style)       # generated strings, committed in QuakeC
+            self.assertLessEqual(len(text), 64)                      # MAX_STYLESTRING
+            self.assertTrue(set(text) <= set('defghijklm'))          # 0.25 .. 1.0 of normal
+        emitted = {L.quake_style('other', f, False) for f in (0, 8, 0x40, 0x80, 0x100)}
+        self.assertTrue(all(s in defined or s == L.STYLE_SOURCE for s in emitted))
+        self.assertEqual(L.style_strings(), L.style_strings())     # deterministic
 
     def test_entity_text_uses_local_units_colour_and_style(self):
         light = {'class': 'lamp', 'radius': 223, 'colour': [245, 140, 40], 'flags': 1}
@@ -47,8 +72,13 @@ class LightSourceTests(unittest.TestCase):
         self.assertIn('"origin" "100.00 -200.00 30.00"', text)
         self.assertIn('"light" "56"', text); self.assertIn('"delay" "1"', text)
         self.assertIn('"_color" "0.961 0.549 0.157"', text); self.assertIn('"style" "32"', text)
-        dark = L.entity({'class': 'negative', 'radius': 128, 'colour': [255, 255, 255], 'flags': 4}, (0, 0, 0))
+        dark = L.entity({'class': 'negative', 'radius': 128, 'colour': [255, 255, 255], 'flags': 4}, (0, 0, 0), scheme='id')
         self.assertIn('"light" "-32"', dark); self.assertNotIn('"style"', dark)
+        dark = L.entity({'class': 'negative', 'radius': 128, 'colour': [255, 255, 255], 'flags': 4}, (0, 0, 0))
+        self.assertEqual(dark.count('"light" "-32"'), 2)            # darkens style 0 and the steady sources
+        self.assertEqual(dark.count('"style" "32"'), 1)
+        flick = L.entity({'class': 'fire', 'radius': 128, 'colour': [255, 200, 100], 'flags': 0x8}, (0, 0, 0))
+        self.assertIn('"style" "33"', flick)
 
     def test_lamp_table_lists_exterior_warm_sources_sorted_by_cell(self):
         raw = (ligh(b'light_de_streetlight_01', b'l\\s.nif', 223, (245, 140, 40), 1)
@@ -76,7 +106,7 @@ class LightSourceTests(unittest.TestCase):
         self.assertEqual(report['colours'], {'warm': 4, 'cool': 1})
         self.assertEqual(report['per_cell']['exterior']['max'], 3)
         self.assertEqual(report['per_cell']['interior']['animated_median'], 1)
-        self.assertEqual(report['styles'], {'0': 1, '6': 1, '32': 3})
+        self.assertEqual(report['styles'], {'32': 4, '34': 1})      # 'source' scheme: every source in 32-36
 
 
 if __name__ == '__main__':

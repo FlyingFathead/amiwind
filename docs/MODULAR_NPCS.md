@@ -20,6 +20,8 @@ stay in the builder as a selectable method (comparison and fallback).
   - [Build time and disk (estimate from the measured cost per face)](#build-time-and-disk-estimate-from-the-measured-cost-per-face)
   - [Composition prototype](#composition-prototype)
 - [Build side: a parts library and recipes](#build-side-a-parts-library-and-recipes)
+- [Stage 1 in the builder: the gallery from parts](#stage-1-in-the-builder-the-gallery-from-parts)
+- [Joint seams](#joint-seams)
 - [Runtime method A: load-time composition](#runtime-method-a-load-time-composition)
 - [Runtime method B: attached parts as follower entities](#runtime-method-b-attached-parts-as-follower-entities)
 - [Comparison](#comparison)
@@ -80,6 +82,11 @@ Host side, all in `tools/npc_geometry.py` (PyFFI reads the NIF files):
    panels keep their area and extent if the panel spans at least a fifth of the
    actor's height); each output face gets its own 16 x 16 texel tile sampled
    from the original texture. Faces share no vertices (three per face).
+   Since NPC-HEAD-DECIMATION-33 the head and hair or helmet (slots 0 and 1)
+   are exempt: they keep every original triangle, the split covers only body
+   and clothing, and the face limit rises to 777 or 1,024 where needed
+   (`--npc-head-detail original`, default; `budget` is the split above for the
+   whole outfit). A modular head part is therefore the original head mesh.
 4. **Encode** (`animated_mdl`): one Quake alias model (MDL): a 512-wide skin of
    face tiles, three texture coordinates per face and one vertex frame per
    sampled pose. Residents get 8 idle frames ('idle: start' to 'idle: stop'),
@@ -264,6 +271,88 @@ The whole-appearance bake stays selectable (a builder option, proposed as
 `--npc-models whole|parts`; whole stays the default until the library passes
 its checks) and is the reference for every comparison.
 
+## Stage 1 in the builder: the gallery from parts
+
+`build.py --npc-models parts` (and `build_gallery.py --npc-models parts`)
+builds the NPC gallery's humanoid models from the parts library; `whole` stays
+the default until the library passes its checks, and both methods stay in the
+builder. Options: `--parts-cache DIR` (default `WORKSPACE/cache/npc-parts-v1`),
+`--npc-parts-policy exact|levelsN` (default `exact`) and
+`--npc-parts-face-cap FACES` (default 666; for `levelsN`). Implementation:
+`tools/npc_parts.py`.
+
+1. **Census** (shared worker pool, grouped per mesh so each NIF is parsed once
+   per worker): every distinct part at every race scale it is used at is posed
+   once; the store keeps its posed frame-0 shapes, face counts, extents and
+   materials. 3,500 appearances use 5,335 such parts (1,726 parts, several race
+   scales each).
+2. **Plan and bake** in passes: each appearance gets the quotas and shell flags
+   the whole bake would give its shapes (`bake_quotas` and the whole bake's
+   shell test on the gallery's translated frame); every distinct (part, scale,
+   quotas, shell flags) is baked once, longest first. An appearance whose
+   composed faces exceed the alias limit moves to the next cascade step
+   (666 faces at 480, 384, 320, 256, 192, then the 1,024-face profile), exactly
+   like the whole bake. Parts are baked under the 1,024-face ceiling; the
+   planner applies the step's limit to the composed model. The 51 creature
+   models keep the whole path and run inside the first bake pass.
+3. **Compose** (shared pool): part bakes are concatenated in shape order,
+   translated like the gallery, and written as the same model files with the
+   same receipt fields (`method: parts`, the policy and the cascade step added).
+   `npc-parts-recipes.json` records which bakes make each appearance.
+4. **Joint-seam gate**: see [joint seams](#joint-seams).
+
+The store is keyed by the full input identity of each part (mesh, texture and
+skeleton bytes, race scale, quotas, shell flags, palette, converter sources and
+package versions), never by a file name. A warm rebuild re-bakes only parts
+whose inputs changed.
+
+**Equivalence.** Composed parts are byte-identical to the whole bake done
+without the gallery's translation (40 of 40 appearances checked). The whole
+gallery translates each actor before baking, so floating-point rounding in
+the simplifier differs slightly; the gallery comparison measures what that
+changes (`tools/npc_parts_compare.py`):
+
+STAGE1_TABLE
+
+**Faster bake for both methods.** Half of the bake's time went into one
+pseudo-inverse per output face, vertex and texel sample, always of an original
+triangle's edge matrix. They are now computed once per shape; batched results
+are bitwise equal to the per-call ones (19,754 matrices checked; 60 of 60
+release gallery models reproduced byte for byte), and the bake runs about 1.7
+times faster.
+
+## Joint seams
+
+Owner question (9 October 2026): do the bodies close at the joints? They do
+not always, in the whole bake and in the parts bake alike: each shape is
+reduced alone, and the reducer also collapses rim edges, so a part pulls back
+from the part it meets ([NPC-JOINT-GAPS-33](bugs/NPC-JOINT-GAPS-33.md)).
+
+**Audit** (`tools/npc_seam_audit.py`): from the posed, unreduced source parts
+of each appearance, every rim edge lying within 0.05 units of another part is a
+joint edge (neck/head, wrists, elbows, knees, ankles, chest/groin, clothing and
+armour rims over skin). A point 0.5 units in from the rim on the part's own
+source surface must stay within 0.25 units (two alias grid steps) of the
+reduced model; otherwise the part pulled back and nothing covers the strip.
+A view check renders source and reduced models from 16 directions and counts
+background pixels inside the source silhouette.
+
+SEAM_TABLE
+
+**Repair options measured** (20 appearances, same budgets): locking every rim
+(the boundary-locked quadric reducer used for static meshes) closes the joints
+but needs 686 faces per actor on average instead of 491, and half the outfits
+then need the 1,024-face profile; locking only joint rims is no better (702);
+snapping reduced rim vertices back onto the source rim keeps the faces but
+does not close the joints (open share 0.206 to 0.197). The planned repair is
+coordinated rim reduction: both parts reduce a shared rim to the same subset of
+its source vertices, chosen from the rim's own geometry, and lock that subset.
+
+**Gate.** The parts gallery runs the audit over every appearance and fails when
+the island-wide open joint length, the number of appearances with open joints
+or the largest gap exceeds `config/npc-seam-limits.json`. The limits are the
+measured values of today's reduction; each repair lowers them.
+
 ## Runtime method A: load-time composition
 
 When an actor's model is needed (precached by the map, or entering range in a
@@ -355,7 +444,8 @@ frame-time pair on the slow-CPU preset (CHIM-SLOWCPU-FRAMETIME-33).
 
 ## Recommendation and staged plan
 
-1. **Parts library and recipes on the host; gallery from parts.** Builder only,
+1. **Parts library and recipes on the host; gallery from parts** (implemented:
+   [stage 1](#stage-1-in-the-builder-the-gallery-from-parts)). Builder only,
    no engine change. The gallery composes its files from the library;
    acceptance: every appearance present, face counts within the chosen policy,
    an A/B sheet of all 3,500 appearances against the whole bake, a byte-exact
@@ -374,7 +464,8 @@ frame-time pair on the slow-CPU preset (CHIM-SLOWCPU-FRAMETIME-33).
    [equipment roadmap](CHARACTER_EQUIPMENT_ROADMAP.md) (boots only, shirt,
    armour over clothing, robe, helmet and hair, corpse looting, two actors
    sharing a recipe).
-5. **More animation sets** (walk, death, combat) as frames per part.
+5. **More animation sets** (walk, death, combat) as frames per part: the
+   [animation kit](ANIMATION.md) (one sampler, shared sample times for every part).
 
 ## Risks
 

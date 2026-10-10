@@ -16,12 +16,14 @@ the CHIM plan (CHIM-LEGACY-CHAIN-33).
 # and which later step of a CHIM build still reads it. Stages not listed are
 # shared converter stages (scene chain, interiors, actors, assets) or CHIM's own.
 # Seyda Neen has no such stage: its region maps are made in the image step from
-# the scene chain's seyda.map, or taken from the recorded v0.0.31 maps
-# (--seyda-recorded), which a CHIM build with Seyda Neen requires.
+# the scene chain's seyda.map, or, with the optional --seyda-recorded DIR, taken
+# from the recorded v0.0.31 maps (no longer required from v0.0.34).
 LEGACY_EXTERIOR = {
     'balmora': ('Balmora region maps (bm###.bsp, balmora.bsp) and the Balmora layout cache',
-                'the CHIM frame map balmora-chim.bsp copies its actors and player start from the final '
-                'Balmora region maps; the town flora and night lighting tables read the cache'),
+                'only with --legacy-area balmora (legacy/debugging): the CHIM frame map then copies its actors and '
+                'player start from the final Balmora region maps. By default a CHIM build makes the Balmora '
+                'residents, start, region table and door bank from the game data (stage chim-town-balmora, '
+                'CHIM-LEGACY-CHAIN-33) and builds no Balmora region map'),
     'world-terrain': ('open-world terrain region maps (vf####.bsp)',
                       'the image step installs the open-world overlay; world flora places trees on it'),
     'world-scenery-assets': ('open-world rocks and giant mushrooms (source meshes)', 'world-scenery'),

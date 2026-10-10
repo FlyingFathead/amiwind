@@ -196,14 +196,21 @@ def cull_staged_maps(maps, work, exterior_maps, *, enabled=True, processor=None,
             cache = PassCache.open('hidden-surface-cull', {'enabled': enabled}, __file__, cull_bsp_hidden.__file__)
             if cache is not None:
                 report['pass_cache'] = {'sources_sha256': cache.sources}
-        for source, (row, detail_status) in _prepared_maps(inputs, work, enabled, names, processor, jobs, cache):
-            before, after = row['before'], row['after']
-            report['maps'].append(row)
-            print('[hidden-surface-cull] {}: {}; {}; stored faces {} -> {}; removed {}; {}'.format(
-                source.stem, 'ON' if enabled else 'OFF', row['scene_kind'],
-                before['stored_faces'], after['stored_faces'], row['removed_stored_faces'],
-                detail_status), flush=True)
-            save(progress=True)
+        try:
+            for source, (row, detail_status) in _prepared_maps(inputs, work, enabled, names, processor, jobs, cache):
+                before, after = row['before'], row['after']
+                report['maps'].append(row)
+                print('[hidden-surface-cull] {}: {}; {}; stored faces {} -> {}; removed {}; {}'.format(
+                    source.stem, 'ON' if enabled else 'OFF', row['scene_kind'],
+                    before['stored_faces'], after['stored_faces'], row['removed_stored_faces'],
+                    detail_status), flush=True)
+                save(progress=True)
+        finally:
+            if cache is not None:
+                # Hits and misses of this run in the receipt (release builds with --allow-release-reuse).
+                report['pass_cache'] = cache.summary()
+                print('[hidden-surface-cull] pass cache: %d maps reused, %d culled.'
+                      % (report['pass_cache']['hits'], report['pass_cache']['misses']), flush=True)
         report['maps'].sort(key=lambda row: row['map'])
         # Verify all inputs again before installing anything into build staging.
         # The three checks hash every map (gigabytes): up to `jobs` workers each.

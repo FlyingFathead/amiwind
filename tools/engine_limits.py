@@ -19,7 +19,14 @@ DEFINES = {
     'max_efrags': ('client.h', 'MAX_EFRAGS'),
     'efrag_page_links': ('client.h', 'AW_EFRAG_PAGE_LINKS'),
     'efrag_limit': ('client.h', 'AW_EFRAG_LIMIT'),
+    'chim_efrag_reserve': ('chim/chim_local.h', 'CHIM_EFRAG_RESERVE'),
 }
+
+
+def chim_efrag_budget(source=SOURCE):
+    """Efrag links CHIM placements may use (CHIM-EFRAG-UNCAPPED-35): the engine's AW_EFRAG_LIMIT less
+    CHIM_EFRAG_RESERVE, where ChimChunks_Link makes the farthest placements wait unlinked."""
+    return define('client.h', 'AW_EFRAG_LIMIT', source) - define('chim/chim_local.h', 'CHIM_EFRAG_RESERVE', source)
 
 
 def define(header, name, source=SOURCE):

@@ -247,6 +247,40 @@ class DoorBanks(unittest.TestCase):
         self.assertGreaterEqual(ti.bsp_extent(raw), ti.COORD_LIMIT)
 
 
+class ArenaPit(unittest.TestCase):
+    """IMPORT-TOWN-NO-INTERIORS-32: the Arena lists its rooms; the Pit (combat test spot) is first."""
+
+    def test_pit_is_the_arenas_first_room(self):
+        listed = interiors(load_settings('vivec_arena'))
+        self.assertEqual(listed[0], {'map': 'vai000', 'cell': 'Vivec, Arena Pit', 'exclude': None})
+        rooms = town_interiors()
+        self.assertEqual(rooms[0]['map'], 'vai000')  # first town with rooms in save order: save ID base + 0
+        self.assertEqual(rooms[0]['town'], 'vivec_arena')
+
+    def test_shipped_town_rooms_come_before_unshipped_ones(self):
+        # Rooms are numbered across towns (save order); a shipped town's rooms must never be
+        # renumbered by rooms listed for a town that has not shipped yet (TOWN-INTERIOR-SAVEID-ORDER-33).
+        from town_config import shipped_since
+        shipped = {row['id'] for row in load_registry()['towns'] if shipped_since(row)}
+        order = [r['town'] in shipped for r in town_interiors()]
+        self.assertEqual(order, sorted(order, reverse=True))
+
+    def test_pit_exits_lead_to_the_arena_frame_and_waistworks_stays_unavailable(self):
+        s = load_settings('vivec_arena')
+        x, y = s['centre']
+        towns = ti.frame_towns()
+        rooms = ti.available_rooms()
+        self.assertEqual(rooms['vivec, arena pit'], 'vai000')
+        doors = [door(1, 'Vivec, Arena Pit', '', [x + 2100, y + 120, 2130], math.pi, interior=False),
+                 door(2, 'Vivec, Arena Pit', 'Vivec, Arena Waistworks', [3800, 4800, 18400])]
+        rows = ti.room_bank('vai000', doors, rooms, towns, {n: [[-8, -8, 0], [8, 8, 120]] for n in (1, 2)})
+        outside, waist = (r.split('\t') for r in rows)
+        self.assertEqual(outside[0].split(' ')[:2], ['vai000', 'vivec_arena'])
+        self.assertEqual(outside[1], 'Vivec, Arena')
+        self.assertEqual(list(map(float, outside[0].split(' ')[9:12])), [525.0, 30.0, 2130 * .25 + 16.875])
+        self.assertEqual(waist[0].split(' ')[1], '-')
+
+
 class TownTableInteriors(unittest.TestCase):
     def test_header_lists_every_room_with_its_town(self):
         import town_table

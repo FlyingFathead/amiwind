@@ -250,6 +250,10 @@ void SV_MoveToGoal (void);
 void SV_CheckForNewClients (void);
 void SV_RunClients (void);
 void SV_SaveSpawnparms ();
+/* A map name that fits sv.name and sv.modelname ("maps/<name>.bsp" in
+ * MAX_QPATH); prints why not (ENGINE-MAP-NAME-OVERFLOW-35). */
+#define SV_MAPNAME_MAX (MAX_QPATH - 10)
+qboolean SV_MapNameFits (const char *name);
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot);
 #else

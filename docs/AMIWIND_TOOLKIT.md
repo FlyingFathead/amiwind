@@ -17,6 +17,8 @@
 - [CHIM Progress Tracker](#chim-progress-tracker)
   - [Making the data](#making-the-data)
   - [Showing it](#showing-it)
+  - [One Toolkit, your data loaded locally](#one-toolkit-your-data-loaded-locally)
+  - [Track your own build](#track-your-own-build)
 - [Using it for development](#using-it-for-development)
 - [Other parts](#other-parts)
 
@@ -244,8 +246,9 @@ exterior cell, the interiors reached from it, what is converted, what each audit
 mapped there before, and the order to convert the rest in. It is built on the data the Toolkit already has (the
 World progress table for the legacy mapping quality, the Map metrics layer for risk and cost) and adds the CHIM side.
 
-A headline sits at the top of the Toolkit page, on every tab: **CHIM cells: passed / land cells (percent)**. A cell
-counts as passed only when it is converted **and every audit that was measured passed**. Audits that were not measured are
+A headline sits at the top of the Toolkit page, on every tab: **Done: N of 1,292 (percent)** for Vvardenfell with the
+completion levels beside it, and Solstheim reported separately. A cell counts as passed only when it is converted **and
+every audit that was measured passed**. Audits that were not measured are
 counted apart ("unmeasured audits on N converted cells") and are never counted as passed. Under the headline are the
 breakdown (owner-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
 not started) and a history line (passed cells per day). Click a number to highlight those cells on the map.
@@ -295,6 +298,17 @@ Completion levels (map fill, headline and totals): **Terrain complete** = all au
 actors is converted (bright green); **Cell complete** = terrain complete and every actor converted too (the same bright
 green plus a solid white border around a run of such cells; the legacy full town/area map border is dashed amber).
 
+**Lighting** (`tools/cell_lighting.py`): a cell is only complete when it is lit like the original, so both completion
+levels also need the lighting audit to say **lit**. The audit compares the original light placements of the cell (from
+`--data-files`: by class, with and without a mesh, with their lightstyles) with what the CHIM build lit: how each light
+reaches the frame (baked into the lightmaps, only through the night lamp table, or not at all) and how many terrain and
+model surfaces carry real light data. Status **lit** (every light baked, every surface lit), **partial**, **unlit** or
+**not measured**. A build that does not report its lighting figures (`stats.lighting`: `mode`, `terrain_faces`,
+`terrain_lit`, `model_faces`, `model_lit`, `baked`) is read as lighting mode `lamps` (constant terrain light, models
+without lightmaps, night lamp table), and the cell panel says so. Colour by **Lighting** shows it on the map; the
+headline and the generated page carry an island-wide lighting line. Lights deferred for want of a light path (lights
+without a mesh) are judged by this audit, not by the Lights category.
+
 A cell the conversion job found to hold nothing but terrain and water is sent with `"status": "empty"`: it gets its own
 status and chip, **empty sea**, and is never counted as passed or converted. A converted cell whose only problem is hull-chain depth is sent with
 `"policy_pending": true`: status **hull policy pending**, counted neither as passed nor as failing.
@@ -322,7 +336,8 @@ layer stays selectable.
 
 - **Colour by**: CHIM status; spiral ring; scout risk (the estimator's share of the tightest engine limit); legacy mapping
   quality (grade A full town/area map with 80 % or more of the entities placed, B full map, C terrain with some entities
-  placed, D terrain only, E no terrain); open bugs linked to the cell; last build time; or any single audit.
+  placed, D terrain only, E no terrain); lighting (lit, partial, unlit); open bugs linked to the cell; last build time; or
+  any single audit.
 - **Show**: all cells, any failing audit, any audit not measured, or one mechanism failing or not measured; the other
   cells fade.
 - **Sweep order**: the **spiral** goes from the coast inwards, ring by ring (ring 1 touches the sea; sea-only cells that
@@ -348,8 +363,97 @@ layer stays selectable.
   numbers behind it.
 - **Export CSV** and **Export JSON** write the cells shown (after the filter): status, audits and every numeric stat.
 
-`tests/test_cell_progress.py` checks the schema, the orders, the audit and "not measured" handling, idempotence, results,
-the interiors tree and the serving, on synthetic data only.
+**Seeing the whole island.** The map canvas is sized to the window, so the whole island (Vvardenfell and Solstheim, or what
+the loaded data covers) is visible at once: the **fit** button (next to **-**, **reset** and **+**) returns to that view, and
+it is the view on first load. You can zoom out further, down to a fifth of the fitted size, and in up to 16 times; zoomed out,
+the map sits centred in its frame. Cell-name labels hide when a cell is smaller than 16 pixels on the screen, so a far-out view
+stays clean. The rows of controls (files, layers, map metrics, the CHIM bar) fold away behind the **Controls** button, which is
+closed by default in a window shorter than 900 pixels; your choice, and the last zoom and position you left, are remembered in
+your browser (local storage; the page works without it). The legend wraps beside the map on a wide window and below it on a
+narrow one.
+
+**The store-once mesh chart.** At the bottom of the overview the chart answers one question: what does storing every mesh
+once save? Its title says it in words, computed from the data (for example "Store-once: 1,777 mesh conversions instead of
+38,790 (22x fewer)"). Panel (a) counts meshes converted as cells are converted in sweep order, with store-once against every
+cell converting its own meshes, on a log scale so both lines fit; the ring labels sit above the plot, staggered. Panel (b)
+compares the two sweep orders by the distinct meshes each has met so far: the spiral order grows one contiguous playable area
+from the coast inwards, and the risk order meets the most distinct meshes first, so a bug in a mesh shows up early. The legend
+sits below each panel, never over the lines. `cell_progress.py ingest --png` writes the same chart as a picture
+(`mesh-curve.png`).
+
+**One header.** Every Toolkit page opened on its own carries the same header as the index page: the AmiWind logo, "Toolkit"
+with "Last updated with AmiWind vX" under it, and the page's own name next to it. Inside the Toolkit's tabs only the index
+header shows. The standalone 3D inspector export carries the header too, without the logo picture.
+
+The **legend** has a checkbox on every row (an unticked row dims its cells), **all** and **none** buttons, a **Preset**
+pull-down (everything, eligible for the next release, awaiting lighting, problems only, not started, lighting, release
+content; a hand tick switches it to Custom) and a **Version** pull-down with a summary line per release. Your choices are
+remembered in the browser. The full explanation, every status and the owner's release commands are in the
+[CHIM Progress Tracker guide](chim/PROGRESS_TRACKER.md); the live figures are on the generated
+[CHIM cell tracker](chim/CELL_TRACKER.md).
+
+### One Toolkit, your data loaded locally
+
+There is one Toolkit. The public repository carries all of its code and none of the game-derived data: the map layers made
+from your Morrowind files, the tracker data of your conversion runs and your build outputs stay on your machine and are
+loaded into the same pages with `--data`, `--metrics`, `--progress` or `--build`, or with the import buttons in the page.
+Nothing in the pages needs a different copy for different data; what you see differs only by the data you load.
+
+### Track your own build
+
+You do not need the project's data to use the tracker: your own build produces it.
+
+1. **The builder writes it.** A CHIM build (the default builder) runs the cell ingest over its own CHIM world and your own
+   Morrowind data in its own stage, `cell-progress`, right after the `chim` stage, and leaves
+   `BUILD/toolkit/cell-progress.json` in the build folder. It is on by default and never fails the build;
+   `--no-cell-progress` turns it off. Nothing private is involved: it reads only your build and your game files.
+2. **Look at it.**
+
+   ```bash
+   python3 tools/toolkit_serve.py --build BUILD_FOLDER --open
+   ```
+
+   `--build` finds `toolkit/cell-progress.json` in the build folder (and the World Map layers if the folder holds them) and
+   serves it on 127.0.0.1 only. Without a server, open the Toolkit's World Map page from disk and use **Import progress** on
+   `BUILD/toolkit/cell-progress.json`.
+3. **Compare with the project.** Each release publishes a reference file, `docs/chim/cell-progress-reference.json`: cell IDs,
+   names as in the public docs, statuses, lighting state, release and each audit's result, plus a few size figures, and
+   nothing else (no assets, no textures, no game text). `toolkit_serve.py` serves the repository copy automatically (or give
+   `--reference FILE`); from disk, use **Compare with** and pick the file. The **Compare with the project reference** colouring
+   then shows each of your cells as the same, better or worse than the project's, so you can see how far your build is.
+   `cell_progress.py publish` writes the file; `check-reference` and the test suite scan it for anything private.
+
+#### Live build tracker
+
+A guided build can show its progress on the map while it runs: the cells that have been converted, the current stage, the
+cells done out of the total and a rough time left. At the start of a guided CHIM build the builder asks once, in plain words:
+
+- **[F]ile (the default): no server.** The builder keeps a small page and a data file in `BUILD/toolkit/live/` and prints the
+  `file:` address of the page. You open it from disk; it loads its data with a script tag, which browsers allow from disk
+  (reading files with fetch is what they block), and refreshes the data itself every 10 seconds without reloading, so your
+  zoom and selection stay. Nothing listens on your computer. This is the default because it is the least machinery: no
+  process, no port.
+- **[S]erver:** starts a small local web server (`tools/toolkit_serve.py --build`, Python standard library only) bound to
+  127.0.0.1 only, on a free port. It prints `Track the build on the map: http://127.0.0.1:PORT/` when it is up and again in
+  the final summary. It is read-only on your build data, runs at low priority, serves only this machine and stops when the
+  build ends (or when you press Enter with `--keep-tracker`, or Ctrl+C cancels the build and stops it).
+- **[N]o.**
+
+Either way nothing leaves your computer. The flags: `--live-tracker file|server` starts it without asking (it is off in
+non-guided builds unless you give the flag), `--no-live-tracker` turns the offer off, `--keep-tracker` leaves the server up
+after the build until you press Enter. The map page has a **status strip** in the bar directly above the map (visible even when the controls are folded), in every
+mode: a state dot with its word, **Source** (the live build folder, the server address, the project reference or the imported
+file), **Last updated** (the data's own timestamp, with an "N s ago" that ticks every second) and an **Auto-update** switch
+showing its interval. The dot is green when the data was updated within two intervals ("live"), amber when it is older
+("stale", or still waiting for the first data), grey when auto-update is off or the build is finished ("final"), and red when
+the last load failed. Under it a status line gives the stage, the cells done out of the total and a rough time left from the
+finished stages; the switch unticks itself when the build finishes. Files are written
+atomically, so the page never reads half a file, and a tracker problem is one printed warning, never a failed build. It works
+the same on Linux, macOS and Windows hosts.
+
+`tests/test_cell_progress.py` and `tests/test_live_tracker.py` check the schema, the orders, the audit and "not measured"
+handling, idempotence, results, the interiors tree, the serving, the legend filter, the release field, the reference file,
+the build-side ingest and the live tracker's prompt, files and server lifecycle, on synthetic data only.
 
 ## Using it for development
 

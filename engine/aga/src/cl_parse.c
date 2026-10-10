@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_parse.c  -- parse a message received from the server
 
 #include "quakedef.h"
+#include "aw_anim.h"
 
 char *svc_strings[] =
 {
@@ -262,6 +263,10 @@ void CL_ParseServerInfo (void)
 			Con_Printf ("Server sent too many model precaches\n");
 			return;
 		}
+		/* a demo or server message is data: names longer than MAX_QPATH end
+		   the session (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
+		if (strlen (str) >= MAX_QPATH)
+			Host_Error ("Server sent a model name longer than %d characters", MAX_QPATH - 1);
 		strcpy (model_precache[nummodels], str);
 		Mod_TouchModel (str);
 	}
@@ -278,6 +283,8 @@ void CL_ParseServerInfo (void)
 			Con_Printf ("Server sent too many sound precaches\n");
 			return;
 		}
+		if (strlen (str) >= MAX_QPATH)
+			Host_Error ("Server sent a sound name longer than %d characters", MAX_QPATH - 1);
 		strcpy (sound_precache[numsounds], str);
 		S_TouchSound (str);
 	}
@@ -288,7 +295,8 @@ void CL_ParseServerInfo (void)
 
 	for (i=1 ; i<nummodels ; i++)
 	{
-		cl.model_precache[i] = Mod_ForName (model_precache[i], false);
+		/* animation kit mover models load only while an actor moves (aw_anim.c) */
+		cl.model_precache[i] = AW_AnimLazy (model_precache[i]) ? Mod_FindName (model_precache[i]) : Mod_ForName (model_precache[i], false);
 		if (cl.model_precache[i] == NULL)
 		{
 			Con_Printf("Model %s not found\n", model_precache[i]);
@@ -866,7 +874,7 @@ void CL_ParseServerMessage (void)
 			i = MSG_ReadByte ();
 			if (i >= cl.maxclients)
 				Host_Error ("CL_ParseServerMessage: svc_updatename > MAX_SCOREBOARD");
-			strcpy (cl.scores[i].name, MSG_ReadString ());
+			Q_snprintf (cl.scores[i].name, sizeof(cl.scores[i].name), "%s", MSG_ReadString ());
 			break;
 
 		case svc_updatefrags:

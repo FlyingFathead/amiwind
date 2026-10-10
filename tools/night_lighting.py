@@ -197,12 +197,22 @@ def night_windows(maps_dir, map_names, sources, palette=None, data_files=None):
 
 
 def stage(id1, *, master, maps, sources, palette=None, data_files=None, work_dir=None,
-          fog_source=FOG_SOURCE):
-    """Write the three tables into id1/world and return their receipt."""
+          fog_source=FOG_SOURCE, lighting_type=None):
+    """Write the three tables into id1/world and return their receipt. lighting_type: the CHIM lighting type
+    (tools/chim/light_types.py) choosing the lamp table's classes; None = the warm lamp classes (legacy builds)."""
     from light_sources import lamp_table
     world = Path(id1) / 'world'
     world.mkdir(parents=True, exist_ok=True)
-    lamps = lamp_table(Path(master).read_bytes())
+    # The lava glow of the exterior pools (tools/lava.py glow_rows) joins the night lamps: CHIM frames have no
+    # lightmaps, so the nearest pools light their surroundings at night as the lamps do. --lava static: none.
+    import lava
+    glow = (lava.glow_rows(lava.exterior_pools(data_files))
+            if data_files is not None and lava.lava_mode() == 'quake' else [])
+    classes = None
+    if lighting_type is not None:
+        from chim.light_types import lamp_classes
+        classes = lamp_classes(lighting_type)
+    lamps = lamp_table(Path(master).read_bytes(), glow, classes=classes)
     lamp_count = check_lamp_table(lamps)
     windows, report, summary = night_windows(Path(id1) / 'maps', maps, sources, palette, data_files)
     window_maps = check_window_table(windows)
@@ -212,6 +222,8 @@ def stage(id1, *, master, maps, sources, palette=None, data_files=None, work_dir
         (Path(id1) / name).write_bytes(raw)
     tables = {name: {'bytes': len(raw), 'sha256': sha(raw)} for name, raw in payloads.items()}
     tables['world/lamps.awl']['lamps'] = lamp_count
+    tables['world/lamps.awl']['lava_glow_rows'] = len(glow)
+    tables['world/lamps.awl']['lighting_type'] = lighting_type or 'legacy'
     tables['world/night-windows.txt']['maps'] = window_maps
     tables['world/fog-locations.txt']['places'] = places
     tables['world/fog-locations.txt']['source'] = 'config/fog-locations.txt'

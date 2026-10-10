@@ -83,6 +83,32 @@ class GalleryCacheTests(unittest.TestCase):
                        {'spec':dict(self.spec,appearance=dict(self.spec['appearance'],height=1.1))}):
             self.assertNotEqual(c.token(original),c.token(self.ident(**kwargs)))
 
+    def test_model_key_covers_the_reached_converter_code_exactly(self):
+        """BUILD-REUSE-KEYS-TOO-BROAD-35: every model's key covers the code the converter reaches (also modules
+        the old fixed file list left out) and nothing it does not reach."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'tools').mkdir()
+            (root/'tools/prepare_gallery.py').write_text('from shared import used\ndef main():\n    return used()\n'
+                                                         "if __name__ == '__main__': main()\n")
+            shared = 'def used():\n    return 1\ndef unused():\n    return 2\n'
+            (root/'tools/shared.py').write_text(shared)
+            def key():
+                c._SOURCES.clear()
+                return c.token(c.converter_sources(root))
+            original = key()
+            self.assertIn('tools/shared.py', c.converter_sources(root)['files'])
+            (root/'tools/shared.py').write_text(shared.replace('return 2', 'return 3'))
+            self.assertEqual(key(), original)          # an unreached edit keeps every model
+            (root/'tools/shared.py').write_text(shared.replace('return 1', 'return 4'))
+            self.assertNotEqual(key(), original)       # a reached edit, in a module the old list never named
+        c._SOURCES.clear()
+        real = c.converter_sources()
+        self.assertFalse(real['uncertain'])
+        for path in ('tools/prepare_gallery.py', 'tools/npc_geometry.py', 'tools/nif_common.py', 'src/mwad/npc.py',
+                     'config/gallery_model_quality.json'):
+            self.assertIn(path, real['files'])
+
     def test_complete_pair_roundtrip_and_corrupt_or_missing_files_miss(self):
         with tempfile.TemporaryDirectory() as temp:
             cache=Path(temp);ident=self.ident();raw,result=self.pair()
@@ -143,7 +169,7 @@ class GalleryCacheTests(unittest.TestCase):
         env={'python':sys.version,'packages':{'numpy':'fixture'}}
         state={'schema':'amiwind-build-receipt-v1','runtime_version':'0.0.25-rc9','status':'cancelled','python':sys.version,
                'steps':[{'name':'npc-gallery','command':['python','build_gallery.py','--out',str(source)]}],
-               'source_sha256':c.converter_sources(),'version_comparison':[{'name':'numpy','detected':'fixture'}],
+               'source_sha256':c.converter_files(),'version_comparison':[{'name':'numpy','detected':'fixture'}],
                'input_sha256':{'Morrowind.esm':c.file_sha(data/'Morrowind.esm')}}
         (run/'build-state.json').write_text(json.dumps(state))
         raw,result=self.pair();c.materialize(source/'gallery',self.key,raw,result)

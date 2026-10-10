@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#include "aw_anim.h"
 #include "amiwind_version.h"
 
 extern cvar_t	pausable;
@@ -251,6 +252,33 @@ SERVER TRANSITIONS
 
 
 /*
+Host_JoinArgs: arguments first..Cmd_Argc()-1 of the current command, each
+followed by a space, into dest of size bytes. False (dest emptied) when they
+do not fit: the console accepts any text, these buffers are fixed
+(ENGINE-MAP-NAME-OVERFLOW-35).
+*/
+static qboolean Host_JoinArgs (char *dest, int size, int first)
+{
+	int		i, used = 0, n;
+
+	dest[0] = 0;
+	for (i=first ; i<Cmd_Argc() ; i++)
+	{
+		n = strlen (Cmd_Argv(i));
+		if (used + n + 1 >= size)
+		{
+			dest[0] = 0;
+			return false;
+		}
+		memcpy (dest + used, Cmd_Argv(i), n);
+		used += n;
+		dest[used++] = ' ';
+		dest[used] = 0;
+	}
+	return true;
+}
+
+/*
 ======================
 Host_Map_f
 
@@ -261,11 +289,20 @@ command from the console.  Active clients are kicked off.
 */
 void Host_Map_f (void)
 {
-	int		i;
 	char	name[MAX_QPATH];
 
 	if (cmd_source != src_command)
 		return;
+	/* Refused before the running game is left (ENGINE-MAP-NAME-OVERFLOW-35). */
+	if (!SV_MapNameFits (Cmd_Argv(1)))
+		return;
+	if (!Host_JoinArgs (cls.spawnparms, sizeof(cls.spawnparms), 2))
+	{
+		Con_Printf ("map command too long.\n");
+		return;
+	}
+	Host_JoinArgs (cls.mapstring, sizeof(cls.mapstring) - 1, 0);	// a record only: empty when too long
+	strcat (cls.mapstring, "\n");		// sized for it above
 
 	cls.demonum = -1;		// stop demo loop in case this fails
 
@@ -277,16 +314,8 @@ void Host_Map_f (void)
 	key_dest = key_game;			// remove console or menu
 	SCR_BeginLoadingPlaque ();
 
-	cls.mapstring[0] = 0;
-	for (i=0 ; i<Cmd_Argc() ; i++)
-	{
-		strcat (cls.mapstring, Cmd_Argv(i));
-		strcat (cls.mapstring, " ");
-	}
-	strcat (cls.mapstring, "\n");
-
 	svs.serverflags = 0;			// haven't completed an episode yet
-	strcpy (name, Cmd_Argv(1));
+	COM_FormatPath (name, sizeof(name), "%s", Cmd_Argv(1));	// fits: SV_MapNameFits
 #ifdef QUAKE2
 	SV_SpawnServer (name, NULL);
 #else
@@ -301,14 +330,7 @@ void Host_Map_f (void)
 
 	if (cls.state != ca_dedicated)
 	{
-		strcpy (cls.spawnparms, "");
-
-		for (i=2 ; i<Cmd_Argc() ; i++)
-		{
-			strcat (cls.spawnparms, Cmd_Argv(i));
-			strcat (cls.spawnparms, " ");
-		}
-
+		/* cls.spawnparms was joined (bounded) before the old game was left. */
 		Cmd_ExecuteString ("connect local", src_command);
 	}
 }
@@ -338,14 +360,11 @@ void Host_Changelevel_f (void)
 		return;
 	}
 
-	strcpy (level, Cmd_Argv(1));
-	if (Cmd_Argc() == 2)
-		startspot = NULL;
-	else
-	{
-		strcpy (_startspot, Cmd_Argv(2));
-		startspot = _startspot;
-	}
+	if (!SV_MapNameFits (Cmd_Argv(1)) ||
+		!COM_FormatPath (_startspot, sizeof(_startspot), "%s", Cmd_Argc() == 2 ? "" : Cmd_Argv(2)))
+		return;
+	COM_FormatPath (level, sizeof(level), "%s", Cmd_Argv(1));
+	startspot = Cmd_Argc() == 2 ? NULL : _startspot;
 
 	SV_SaveSpawnparms ();
 	SV_SpawnServer (level, startspot);
@@ -362,8 +381,10 @@ void Host_Changelevel_f (void)
 		Con_Printf ("Only the server may changelevel\n");
 		return;
 	}
+	if (!SV_MapNameFits (Cmd_Argv(1)))
+		return;		// the game goes on where it is
 	SV_SaveSpawnparms ();
-	strcpy (level, Cmd_Argv(1));
+	COM_FormatPath (level, sizeof(level), "%s", Cmd_Argv(1));
 	SV_SpawnServer (level);
 #endif
 }
@@ -387,10 +408,10 @@ void Host_Restart_f (void)
 
 	if (cmd_source != src_command)
 		return;
-	strcpy (mapname, sv.name);	// must copy out, because it gets cleared
+	COM_FormatPath (mapname, sizeof(mapname), "%s", sv.name);	// must copy out, because it gets cleared
 								// in sv_spawnserver
 #ifdef QUAKE2
-	strcpy(startspot, sv.startspot);
+	COM_FormatPath (startspot, sizeof(startspot), "%s", sv.startspot);
 	SV_SpawnServer (mapname, startspot);
 #else
 	SV_SpawnServer (mapname);
@@ -428,7 +449,11 @@ void Host_Connect_f (void)
 		CL_StopPlayback ();
 		CL_Disconnect ();
 	}
-	strcpy (name, Cmd_Argv(1));
+	if (!COM_FormatPath (name, sizeof(name), "%s", Cmd_Argv(1)))
+	{
+		Con_Printf ("Server name too long.\n");
+		return;
+	}
 	CL_EstablishConnection (name);
 	Host_Reconnect_f ();
 }
@@ -523,7 +548,7 @@ void Host_Savegame_f (void)
 		}
 	}
 
-	if (!COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1)))
+	if (!COM_FormatPath (name, sizeof(name) - 4, "%s/%s", com_gamedir, Cmd_Argv(1)))
 	{
 		Con_Printf ("Save path too long.\n");
 		return;
@@ -562,6 +587,7 @@ void Host_Savegame_f (void)
 	/* The debug companion is not saved (aw_companion.c): a spawned one is
 	 * written as a free slot, a picked NPC at its home spot. */
 	AW_CompanionSaveSwap (1);
+	AW_AnimSaveSwap (1);	/* saves name the standing model, never a mover (aw_anim.c) */
 	for (i=0 ; i<sv.num_edicts ; i++)
 	{
 		if (AW_CompanionSkipSave (EDICT_NUM(i)))
@@ -570,6 +596,7 @@ void Host_Savegame_f (void)
 			ED_Write (f, EDICT_NUM(i));
 		fflush (f);
 	}
+	AW_AnimSaveSwap (0);
 	AW_CompanionSaveSwap (0);
 	fclose (f);
 	Con_Printf ("done.\n");
@@ -605,7 +632,7 @@ void Host_Loadgame_f (void)
 
 	cls.demonum = -1;		// stop demo loop in case this fails
 
-	if (!COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1)))
+	if (!COM_FormatPath (name, sizeof(name) - 4, "%s/%s", com_gamedir, Cmd_Argv(1)))
 	{
 		Con_Printf ("Save path too long.\n");
 		return;
@@ -631,7 +658,7 @@ void Host_Loadgame_f (void)
 		Con_Printf ("Savegame is version %i, not %i\n", version, SAVEGAME_VERSION);
 		return;
 	}
-	Q_fscanf(f, "%s\n", str);
+	Q_fscanf(f, "%32767s\n", str);
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
 		Q_fscanf(f, "%f\n", &spawn_parms[i]);
 // this silliness is so we can load 1.06 save files, which have float skill values
@@ -645,8 +672,14 @@ void Host_Loadgame_f (void)
 	Cvar_SetValue ("teamplay", 0);
 #endif
 
-	Q_fscanf(f, "%s\n",mapname);
+	mapname[0] = 0;
+	Q_fscanf(f, "%63s\n",mapname);		// MAX_QPATH - 1
 	Q_fscanf(f, "%f\n",&time);
+	if (!SV_MapNameFits (mapname))
+	{
+		fclose (f);
+		return;
+	}
 
 	CL_Disconnect_f ();
 
@@ -667,7 +700,8 @@ void Host_Loadgame_f (void)
 
 	for (i=0 ; i<MAX_LIGHTSTYLES ; i++)
 	{
-		Q_fscanf(f, "%s\n", str);
+		str[0] = 0;
+		Q_fscanf(f, "%32767s\n", str);
 		sv.lightstyles[i] = Hunk_Alloc (strlen(str)+1);
 		strcpy (sv.lightstyles[i], str);
 	}
@@ -688,15 +722,22 @@ void Host_Loadgame_f (void)
 				break;
 			}
 		}
+		/* A damaged save ends the session, never the program (ENGINE-LOADGAME-SYSERROR-35). */
 		if (i == sizeof(str)-1)
-			Sys_Error ("Loadgame buffer overflow");
+		{
+			fclose (f);
+			Host_Error ("Loadgame buffer overflow: damaged save");
+		}
 		str[i] = 0;
 		start = str;
 		start = COM_Parse(str);
 		if (!com_token[0])
 			break;		// end of file
 		if (strcmp(com_token,"{"))
-			Sys_Error ("First token isn't a brace");
+		{
+			fclose (f);
+			Host_Error ("Loadgame: first token isn't a brace: damaged save");
+		}
 
 		if (entnum == -1)
 		{	// parse the global vars
@@ -704,6 +745,11 @@ void Host_Loadgame_f (void)
 		}
 		else
 		{	// parse an edict
+			if (entnum >= MAX_EDICTS)
+			{
+				fclose (f);
+				Host_Error ("Loadgame: more than %d entities: damaged save", MAX_EDICTS);
+			}
 
 			ent = EDICT_NUM(entnum);
 			memset (&ent->v, 0, progs->entityfields * 4);
@@ -906,14 +952,11 @@ void Host_Changelevel2_f (void)
 		return;
 	}
 
-	strcpy (level, Cmd_Argv(1));
-	if (Cmd_Argc() == 2)
-		startspot = NULL;
-	else
-	{
-		strcpy (_startspot, Cmd_Argv(2));
-		startspot = _startspot;
-	}
+	if (!SV_MapNameFits (Cmd_Argv(1)) ||
+		!COM_FormatPath (_startspot, sizeof(_startspot), "%s", Cmd_Argc() == 2 ? "" : Cmd_Argv(2)))
+		return;
+	COM_FormatPath (level, sizeof(level), "%s", Cmd_Argv(1));
+	startspot = Cmd_Argc() == 2 ? NULL : _startspot;
 
 	SV_SaveSpawnparms ();
 

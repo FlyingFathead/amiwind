@@ -22,11 +22,12 @@
  */
 #include "quakedef.h"
 #include "aw_npcpath.h"
+#include "aw_anim.h"
 
 #define DISTANCE_MIN 48         /* dbg companion distance: follow distance clamp */
 #define DISTANCE_MAX 512
-#define FAR_TELEPORT 640        /* hopelessly far: teleport back (at least 3 x the distance) */
-#define STUCK_THINKS 60         /* net movement under 48 units for this long: teleport */
+#define FAR_TELEPORT 640        /* hopelessly far (at least 3 x the distance): the stuck response */
+#define STUCK_THINKS 60         /* net movement under 48 units for this long: the stuck response */
 #define PICK_REACH 384
 #define STEP_UP 8.5f
 #define HEAVY_STEP 24           /* traces: a normal step costs 3-16, an unstick search far more */
@@ -43,10 +44,15 @@ static struct {
     unsigned char teleport;     /* teleport search: next candidate + 1 (0 = none) */
     unsigned char teleport_why; /* 1 far, 2 stuck */
     unsigned char heavy;        /* steps in a row that ran the unstick search */
+    unsigned char unseen;       /* the placement must stay out of the player's view */
+    unsigned char cooldown;     /* thinks before the stuck response may run again */
+    unsigned char flee;         /* thinks of fleeing left (hostile kind) */
+    unsigned char policy, last_policy;  /* last stuck response (AW_STUCK_*), last printed */
     int anchor[2];              /* net-movement anchor */
     unsigned short stuck;       /* thinks since the anchor */
     float next_think, last_think;
     aw_path_t path;
+    aw_anim_play_t play;        /* animation kit play state (aw_anim.c) */
     /* picked NPC: its own state, restored on release */
     vec3_t home, home_angles;
     float home_solid, home_nextthink, home_frame, home_flags;
@@ -55,6 +61,7 @@ static struct {
 
 static struct {
     unsigned long thinks, teleports_far, teleports_stuck, respawns, move_traces, picks, slow_thinks, heavy_steps;
+    unsigned long wait_unseen, retries, flees;
     double started, think_seconds, think_max;
 } stats;
 
@@ -65,6 +72,15 @@ static cvar_t think_interval={"aw_companion_think","0.1"};
 static cvar_t follow_distance={"aw_companion_distance","96"};
 /* Match the player's speed (aw_npcpath.c AW_PathSpeed); 0: fixed walk/run. */
 static cvar_t mimic_speed={"aw_companion_mimic","1"};
+/* Which kind of actor the test companion plays (the stuck policy differs):
+ * 0 follower or escort, 1 summon, 2 hostile chaser; and a debug "in combat"
+ * switch for the summon rule. Stuck methods per kind: aw_npcpath.h. */
+static cvar_t kind_setting={"aw_companion_kind","0"};
+static cvar_t companion_combat={"aw_companion_combat","0"};
+static cvar_t stuck_follower={"aw_stuck_follower","1"};
+static cvar_t stuck_summon={"aw_stuck_summon","1"};
+static cvar_t stuck_hostile={"aw_stuck_hostile","1"};
+static int companion_kind(void) {int k=(int)kind_setting.value;return k<0||k>=AW_ACTOR_KINDS?0:k;}
 int AW_CompanionDistance(void) {
     int d=(int)follow_distance.value;
     return d<DISTANCE_MIN?DISTANCE_MIN:d>DISTANCE_MAX?DISTANCE_MAX:d;
@@ -106,15 +122,16 @@ static int sweep(void *context,int dx,int dy) {
     tr=SV_Move(start,e->v.mins,e->v.maxs,end,MOVE_NORMAL,e);
     return !tr.startsolid && !tr.allsolid && tr.fraction==1;
 }
-static int standing(edict_t *e,float x,float y,float z,int *floor_z) {
+static int standing(edict_t *e,float x,float y,float z,int *floor_z,float *exact) {
     vec3_t start,end;trace_t tr;
     start[0]=end[0]=x;start[1]=end[1]=y;start[2]=z+AW_PATH_STEP;end[2]=z-AW_PATH_STEP;
     tr=SV_Move(start,e->v.mins,e->v.maxs,end,MOVE_NORMAL,e);
     if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
     if(floor_z)*floor_z=(int)floor(tr.endpos[2]);
+    if(exact)*exact=tr.endpos[2];   /* placement keeps the trace's own height: a whole unit down is in the floor */
     return 1;
 }
-static int cell(void *context,int x,int y,int z,int *floor_z) {return standing(context,x,y,z,floor_z);}
+static int cell(void *context,int x,int y,int z,int *floor_z) {return standing(context,x,y,z,floor_z,NULL);}
 
 /* ---- placement next to the player ---- */
 /* Candidate k: a ring of 8 spots 32 units out, starting behind the player.
@@ -123,9 +140,9 @@ static int candidate(edict_t *e,edict_t *p,int k,vec3_t out) {
     /* behind the player: its yaw as a heading index, plus half a turn (no trig) */
     int yaw=(int)floor(anglemod(p->v.angles[1])*AW_PATH_FAN/360.0f+.5f);
     int h=(yaw+AW_PATH_FAN/2+((k&1)?(k+1)/2:-(k/2))*4)&(AW_PATH_FAN-1);
-    vec3_t eye,spot;int z;trace_t tr;
+    vec3_t eye,spot;float z;trace_t tr;
     spot[0]=p->v.origin[0]+aw_path_fan[h][0]/2;spot[1]=p->v.origin[1]+aw_path_fan[h][1]/2;spot[2]=feet_z(p);
-    if(!standing(e,spot[0],spot[1],spot[2],&z))return 0;
+    if(!standing(e,spot[0],spot[1],spot[2],NULL,&z))return 0;
     spot[2]=z;VectorAdd(p->v.origin,p->v.view_ofs,eye);
     {vec3_t mid;VectorCopy(spot,mid);mid[2]+=16;tr=SV_Move(eye,vec3_origin,vec3_origin,mid,MOVE_NOMONSTERS,e);}
     if(tr.fraction<1)return 0;
@@ -138,43 +155,107 @@ static void put(edict_t *e,vec3_t spot) {
     c.anchor[0]=(int)floor(spot[0]);c.anchor[1]=(int)floor(spot[1]);c.stuck=0;
 }
 static void put_at_player(edict_t *e,edict_t *p) {
-    vec3_t spot;VectorCopy(p->v.origin,spot);spot[2]=feet_z(p);put(e,spot);
+    vec3_t spot;VectorCopy(p->v.origin,spot);spot[2]=p->v.origin[2]+p->v.mins[2];put(e,spot);
 }
 
 /* ---- the think ---- */
 static void face(edict_t *e,int heading) {e->v.angles[1]=heading*360.0f/AW_PATH_FAN-90;e->v.angles[0]=e->v.angles[2]=0;}
-static void animate(edict_t *e,int walking) {
-    float t=(float)sv.time;
+/* speed: units/s actually moved this think (0 = standing). A model with an
+ * animation layout (<model>.anm) picks walk, run or swim by speed with a
+ * speed-matched rate and plays its footsteps; without one, the previous
+ * frames: walk 13..20 on 21-frame town actors, else idle 0..7. */
+static void animate(edict_t *e,float speed,float dt) {
+    float t=(float)sv.time,rate;const aw_anim_t *a=AW_AnimOf(e);int walking=speed>0,group,medium;unsigned long crossed;
+    if(a->from_layout){
+        medium=AW_AnimMedium(e);
+        group=AW_AnimMoveGroup(a,speed,medium==AW_ANIM_SWIMMING,&rate);
+        e->v.frame=(float)AW_AnimAdvance(a,&c.play,group,dt,rate,&crossed);
+        AW_AnimSounds(e,a,group,crossed,medium);
+        return;
+    }
     if(walking && c.walk_frames)e->v.frame=13+((int)(t/field(e,"aw_walk_step",.125f)))%8;
     else if(c.idle_frames)e->v.frame=((int)(t/field(e,"aw_idle_step",.15f)))%8;
     else e->v.frame=0;
 }
+/* Is the actor out of the player's view: behind the player, outside a
+ * 60-degree half-angle in front, or hidden from the eye? Rarely called (only
+ * when a stuck response may place it); the cone test needs no trace. */
+int AW_ActorOutOfView(edict_t *e,edict_t *p) {
+    int yaw=(int)floor(anglemod(p->v.angles[1])*AW_PATH_FAN/360.0f+.5f)&(AW_PATH_FAN-1);
+    int dx=(int)(e->v.origin[0]-p->v.origin[0]),dy=(int)(e->v.origin[1]-p->v.origin[1]),dot,len;
+    vec3_t eye,mid;trace_t tr;
+    dx=dx>16384?16384:dx<-16384?-16384:dx;dy=dy>16384?16384:dy<-16384?-16384:dy;
+    dot=dx*aw_path_fan[yaw][0]+dy*aw_path_fan[yaw][1];len=AW_PathLength(dx,dy);
+    if(dot<=0 || dot*2<len*AW_PATH_FAN_RADIUS)return 1;     /* behind, or beyond 60 degrees */
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);
+    VectorCopy(e->v.origin,mid);mid[2]+=(e->v.mins[2]+e->v.maxs[2])/2;
+    tr=SV_Move(eye,vec3_origin,vec3_origin,mid,MOVE_NOMONSTERS,p);
+    return tr.fraction<1;
+}
+/* The method setting of an actor kind (aw_stuck_follower, _summon, _hostile). */
+int AW_StuckMethod(int kind) {
+    float v=kind==AW_ACTOR_SUMMON?stuck_summon.value:kind==AW_ACTOR_HOSTILE?stuck_hostile.value:stuck_follower.value;
+    return v<0?0:v>2?2:(int)v;
+}
 static void teleport_step(edict_t *e,edict_t *p) {
-    vec3_t spot,from;int found=0;
+    vec3_t spot,from;int found=0,last=c.unseen?5:8;
     VectorCopy(e->v.origin,from);
-    if(c.teleport<=8){found=candidate(e,p,c.teleport-1,spot);c.teleport++;}
-    if(!found && c.teleport<=8)return;      /* next candidate next think (2 traces each) */
+    /* Out of view: only spots behind or beside the player (headings up to 90
+     * degrees from behind), and no placement on the player itself. */
+    if(c.teleport<=last){found=candidate(e,p,c.teleport-1,spot);c.teleport++;}
+    if(!found && c.teleport<=last)return;   /* next candidate next think (2 traces each) */
+    if(!found && c.unseen){c.teleport=0;c.cooldown=10;stats.wait_unseen++;return;}
     if(found)put(e,spot);else put_at_player(e,p);
     if(c.teleport_why==1)stats.teleports_far++;else stats.teleports_stuck++;
-    Con_Printf("Companion teleported (%s): %ld %ld %ld -> %ld %ld %ld\n",c.teleport_why==1?"too far":"stuck",
-        (long)from[0],(long)from[1],(long)from[2],(long)e->v.origin[0],(long)e->v.origin[1],(long)e->v.origin[2]);
+    Con_Printf("Companion placed (%s, %s): %ld %ld %ld -> %ld %ld %ld\n",c.teleport_why==1?"too far":"stuck",
+        AW_PathKindName(companion_kind()),(long)from[0],(long)from[1],(long)from[2],
+        (long)e->v.origin[0],(long)e->v.origin[1],(long)e->v.origin[2]);
     c.teleport=0;c.near=0;c.heavy=0;
 }
+/* The stuck or far response, a policy per actor kind (aw_npcpath.c). */
+static int stuck_response(edict_t *e,edict_t *p,int far_now) {
+    int kind=companion_kind(),method=AW_StuckMethod(kind),r,view=0;
+    if(kind!=AW_ACTOR_HOSTILE && !(kind==AW_ACTOR_SUMMON && companion_combat.value) && method==1)
+        view=AW_ActorOutOfView(e,p);
+    r=AW_PathStuckResponse(kind,method,companion_combat.value!=0,view);
+    c.policy=(unsigned char)r;
+    if(r!=c.last_policy)Con_Printf("Companion stuck (%s): %s, %s\n",far_now?"too far":"no progress",
+        AW_PathKindName(kind),AW_PathStuckName(r));
+    c.last_policy=(unsigned char)r;
+    switch(r){
+    case AW_STUCK_PLACE:
+        c.teleport=1;c.unseen=method==1;c.teleport_why=far_now?1:2;teleport_step(e,p);return 1;
+    case AW_STUCK_WAIT_UNSEEN:
+        c.cooldown=10;stats.wait_unseen++;return 0;                 /* look again in a second */
+    case AW_STUCK_FLEE:
+        c.flee=30;c.cooldown=30;c.heavy=0;c.stuck=0;stats.flees++;
+        AW_PathReset(&c.path,(int)floor(e->v.origin[0]),(int)floor(e->v.origin[1]));return 0;
+    default:                                                        /* keep trying, on a cooldown */
+        c.cooldown=20;c.heavy=0;c.stuck=0;stats.retries++;
+        AW_PathReset(&c.path,(int)floor(e->v.origin[0]),(int)floor(e->v.origin[1]));return 0;
+    }
+}
 static void think(edict_t *e,edict_t *p,float dt) {
-    int self[3],goal[3],dx,dy,dz,gap,step,heading,moved=0,speed,near=AW_CompanionDistance(),far;
+    int self[3],goal[3],dx,dy,dz,gap,step,heading,moved=0,speed,near=AW_CompanionDistance(),far,far_now;
     unsigned long before;aw_path_io_t io;
     far=3*near>FAR_TELEPORT?3*near:FAR_TELEPORT;
     feet(e,self);feet(p,goal);
     dx=goal[0]-self[0];dy=goal[1]-self[1];dz=goal[2]-self[2];
     gap=AW_PathLength(dx,dy);
     if(c.teleport){teleport_step(e,p);return;}
-    if(gap>far || dz>448 || dz<-448 || c.stuck>=STUCK_THINKS){
-        c.teleport=1;c.teleport_why=c.stuck>=STUCK_THINKS?2:1;teleport_step(e,p);return;
-    }
-    /* Early out: close enough (resume a quarter beyond), no traces at all. */
-    if(gap<=(c.near?near+near/4:near) && dz<24 && dz>-24){
+    if(c.cooldown)c.cooldown--;
+    far_now=gap>far || dz>448 || dz<-448;
+    /* Same detectors for every kind; the response is the kind's policy. */
+    if(!c.cooldown && !c.flee && (far_now || c.stuck>=STUCK_THINKS || c.heavy>=2) && stuck_response(e,p,far_now))return;
+    if(c.flee){
+        /* Flee: walk away from the player and keep distance; chase again after it. */
+        c.flee--;goal[0]=self[0]-dx;goal[1]=self[1]-dy;
+        if(!c.flee)AW_PathReset(&c.path,self[0],self[1]);
+        gap=near+AW_PathLength(dx,dy);   /* never "close enough" while fleeing */
+    }else if(gap<=(c.near?near+near/4:near) && dz<24 && dz>-24){
+        /* Early out: close enough (resume a quarter beyond), no traces at all. */
         if(!c.near){AW_PathIdle(&c.path,self[0],self[1]);c.near=1;}
-        c.anchor[0]=self[0];c.anchor[1]=self[1];c.stuck=0;animate(e,0);return;
+        c.anchor[0]=self[0];c.anchor[1]=self[1];c.stuck=0;c.last_policy=255;animate(e,0,dt);return;
     }
     c.near=0;
     /* The player's horizontal speed, read once per think (no square root). */
@@ -188,20 +269,20 @@ static void think(edict_t *e,edict_t *p,float dt) {
         vec3_t move;
         move[0]=aw_path_fan[heading][0]*step/(float)AW_PATH_FAN_RADIUS;
         move[1]=aw_path_fan[heading][1]*step/(float)AW_PATH_FAN_RADIUS;move[2]=0;
-        if(c.heavy>=2)c.stuck=STUCK_THINKS;   /* in solid: place it beside the player next think */
-        else {
+        /* The player's walk runs Quake's unstick search (SV_CheckStuck, up to
+         * 164 position tests) when the box starts in solid. Never pay that
+         * every think: after two such steps in a row no step is taken until
+         * the kind's stuck response has run (placement, retry or flee). */
+        if(c.heavy<2){
             before=aw_sv_move_calls;
             moved=AW_ActorStep(e,move,host_frametime>0?host_frametime:dt);
             before=aw_sv_move_calls-before;stats.move_traces+=before;
-            /* The player's walk runs Quake's unstick search (SV_CheckStuck, up to
-             * 164 position tests) when the box starts in solid. Never pay that
-             * every think: two such steps in a row and the follower is placed. */
             if(before>HEAVY_STEP){c.heavy++;stats.heavy_steps++;}else c.heavy=0;
             face(e,heading);
         }
     }
     pass_player(0);
-    animate(e,moved);
+    animate(e,moved && dt>0?step/dt:0,dt);
     feet(e,self);
     if(abs(self[0]-c.anchor[0])+abs(self[1]-c.anchor[1])>=48){c.anchor[0]=self[0];c.anchor[1]=self[1];c.stuck=0;}
     else if(c.stuck<65535)c.stuck++;
@@ -224,9 +305,10 @@ void AW_CompanionPhysics(void) {
         /* A slow think says what it did: the search is capped, the step is the player's walk. */
         if(t0>.02){
             stats.slow_thinks++;
-            if(t0>stats.think_max)Con_Printf("Companion think %.1f ms: %s, %lu traces (%lu search)\n",t0*1000,
-                tele?"teleport":c.near?"standing":mode==AW_PATH_PING?"ping":mode==AW_PATH_FLOOD?"flood":"walk",
-                aw_sv_move_calls-moves,aw_path_stats.traces-search);
+            if(t0>stats.think_max)Con_Printf("Companion think %.1f ms: %s, %lu traces (%lu search); %s policy: %s\n",t0*1000,
+                tele||c.teleport?"placement":c.near?"standing":mode==AW_PATH_PING?"ping":mode==AW_PATH_FLOOD?"flood":"walk",
+                aw_sv_move_calls-moves,aw_path_stats.traces-search,AW_PathKindName(companion_kind()),
+                c.last_policy<AW_STUCK_RESPONSES?AW_PathStuckName(c.last_policy):"none");
         }
         if(t0>stats.think_max)stats.think_max=t0;
     }
@@ -241,7 +323,9 @@ static void frames_of(edict_t *e) {
     c.walk_frames=n>=21;c.idle_frames=n>=8;
 }
 static void follow(edict_t *e) {
-    c.e=e;c.near=0;c.teleport=0;c.heavy=0;c.next_think=c.last_think=(float)sv.time;
+    c.e=e;c.near=0;c.teleport=0;c.heavy=0;c.cooldown=c.flee=0;c.last_policy=255;c.next_think=c.last_think=(float)sv.time;
+    memset(&c.play,0,sizeof(c.play));c.play.group=255;
+    AW_AnimMover(e,1);              /* the full-kit model while it follows (aw_anim.c) */
     frames_of(e);AW_PathReset(&c.path,(int)floor(e->v.origin[0]),(int)floor(e->v.origin[1]));
     c.anchor[0]=(int)floor(e->v.origin[0]);c.anchor[1]=(int)floor(e->v.origin[1]);c.stuck=0;
 }
@@ -252,6 +336,7 @@ static edict_t *model_source(edict_t *p) {
         e=EDICT_NUM(i);
         if(e->free || !e->v.modelindex || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
         walk=(int)e->v.modelindex<MAX_MODELS && sv.models[(int)e->v.modelindex] && sv.models[(int)e->v.modelindex]->numframes>=21;
+        if(!walk)walk=AW_AnimOf(e)->mover[0]!=0;     /* a standing kit model with a mover walks too (aw_anim.c) */
         VectorSubtract(e->v.origin,p->v.origin,delta);d=DotProduct(delta,delta);
         if(walk>best_walk || (walk==best_walk && d<best_d)){best=e;best_d=d;best_walk=walk;}
     }
@@ -271,12 +356,13 @@ static int spawn_test(edict_t *p) {
     follow(e);
     if(k<8)put(e,spot);else put_at_player(e,p);
     Con_Printf("Test companion: a copy of %s, %s.\n",pr_strings+src->v.netname,
-        c.walk_frames?"walk frames":"no walk frames (idle pose)");
+        AW_AnimMoving(e)?"wearing its mover model":c.walk_frames?"walk frames":"no walk frames (idle pose)");
     return 1;
 }
 static void release(int quiet) {
     edict_t *e=c.e;
     if(!alive()){c.kind=0;return;}
+    AW_AnimMover(e,0);              /* back to the standing model; the mover's memory is freed */
     if(c.kind==1){ED_Free(e);if(!quiet)Con_Printf("Test companion removed.\n");}
     else if(c.kind==2){
         VectorCopy(c.home,e->v.origin);VectorCopy(c.home,e->v.oldorigin);VectorCopy(c.home_angles,e->v.angles);
@@ -362,6 +448,16 @@ int AW_CompanionButtons(int bits) {
     held=bits&1;return bits&~1;
 }
 int AW_CompanionPickMode(void) {return pick.on;}
+/* The right mouse button (+aw_alt) while picking: pick the NPC under the crosshair.
+ * Returns 1 when pick mode handled the press. */
+int AW_CompanionPickAim(void) {
+    edict_t *t;
+    pick_escape();
+    if(!pick.on)return 0;
+    t=pick_target();
+    if(t)pick_npc(t);else Con_Printf("Pick: no NPC under the crosshair.\n");
+    return 1;
+}
 
 /* ---- commands ---- */
 static void report(void) {
@@ -378,11 +474,14 @@ static void report(void) {
     }
     Con_Printf("thinks %lu (%.1f/s) stuck %lu pings %lu (%lu traces) detours %lu\n",thinks,thinks/span,
         aw_path_stats.stuck,aw_path_stats.pings,aw_path_stats.ping_traces,aw_path_stats.detours);
-    Con_Printf("floods %lu (%lu cells) routes %lu lost %lu; teleports: far %lu, stuck %lu; respawns %lu\n",
+    Con_Printf("floods %lu (%lu cells) routes %lu lost %lu; placed: far %lu, stuck %lu; respawns %lu\n",
         aw_path_stats.floods,aw_path_stats.flood_cells,aw_path_stats.routes,aw_path_stats.lost,
         stats.teleports_far,stats.teleports_stuck,stats.respawns);
     Con_Printf("traces/s search %.2f move %.1f; ms/think avg %.3f max %.3f; over 20 ms %lu; unstick steps %lu\n",aw_path_stats.traces/span,
         stats.move_traces/span,thinks?stats.think_seconds*1000/thinks:0.0,stats.think_max*1000,stats.slow_thinks,stats.heavy_steps);
+    Con_Printf("kind %s (stuck method %ld%s): waits for unseen %lu, retries %lu, flees %lu\n",
+        AW_PathKindName(companion_kind()),(long)AW_StuckMethod(companion_kind()),companion_combat.value?", in combat":"",
+        stats.wait_unseen,stats.retries,stats.flees);
     Con_Printf("distance %ld, mimic %s; bytes: path %ld, companion %ld, scratch %ld; no allocation\n",(long)AW_CompanionDistance(),AW_CompanionMimic()?"on":"off",(long)sizeof(aw_path_t),
         (long)sizeof(c),(long)AW_PathScratchBytes());
 }
@@ -405,7 +504,7 @@ static void stop(void) {
 static void toggle_pick(void) {
     if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
     pick.on=!pick.on;pick.frame=-1;pick.target=NULL;
-    Con_Printf(pick.on?"Pick mode: aim at an NPC (red crosshair) and attack to pick; dbg companion pick or Escape leaves.\n":
+    Con_Printf(pick.on?"Pick mode: aim at an NPC (red crosshair) and attack or right-click to pick; dbg companion pick or Escape leaves.\n":
         "Pick mode off.\n");
 }
 static void distance(void) {
@@ -423,7 +522,25 @@ static void mimic(void) {
     Cvar_SetValue(mimic_speed.name,(float)on);
     Con_Printf("Companion mimic speed %s.\n",on?"on":"off");
 }
-/* dbg companion [pick/choose/test/off/distance N/mimic speed on|off]; no argument: status. */
+static void kind(void) {
+    static const char *const words[AW_ACTOR_KINDS]={"follower","summon","hostile"};int k;
+    if(Cmd_Argc()==3){
+        for(k=0;k<AW_ACTOR_KINDS;k++)if(!Q_strcasecmp(Cmd_Argv(2),(char *)words[k]) || (k==0 && !Q_strcasecmp(Cmd_Argv(2),"escort")))break;
+        if(k==AW_ACTOR_KINDS){Con_Printf("Usage: dbg companion kind [follower/escort/summon/hostile]\n");return;}
+        Cvar_SetValue(kind_setting.name,(float)k);c.last_policy=255;
+    }
+    Con_Printf("Companion kind %s, stuck method %ld (aw_stuck_%s).\n",AW_PathKindName(companion_kind()),
+        (long)AW_StuckMethod(companion_kind()),AW_PathKindName(companion_kind()));
+}
+static void combat(void) {
+    int on;
+    if(Cmd_Argc()==3){
+        if((on=AW_CompanionToggleWord(Cmd_Argv(2)))<0){Con_Printf("Usage: dbg companion combat [on/off]\n");return;}
+        Cvar_SetValue(companion_combat.name,(float)on);
+    }
+    Con_Printf("Companion in combat: %s (a summon in combat never warps).\n",companion_combat.value?"yes":"no");
+}
+/* dbg companion [pick/choose/test/off/distance N/mimic speed on|off/kind K/combat on|off]; no argument: status. */
 static void companion(void) {
     char *a=Cmd_Argv(1);int n=Cmd_Argc();
     if(n==1)report();
@@ -432,7 +549,9 @@ static void companion(void) {
     else if(n==2 && !Q_strcasecmp(a,"off"))stop();
     else if(n<=3 && !Q_strcasecmp(a,"distance"))distance();
     else if(n>=3 && n<=4 && !Q_strcasecmp(a,"mimic") && !Q_strcasecmp(Cmd_Argv(2),"speed"))mimic();
-    else Con_Printf("Usage: dbg companion [pick/choose/test/off/distance N/mimic speed on|off]\n");
+    else if(n<=3 && !Q_strcasecmp(a,"kind"))kind();
+    else if(n<=3 && !Q_strcasecmp(a,"combat"))combat();
+    else Con_Printf("Usage: dbg companion [pick/choose/test/off/distance N/mimic speed on|off/kind follower|summon|hostile/combat on|off]\n");
 }
 /* Aliases: dbg companiontest on/off, dbg pickcompanion, dbg choosecompanion. */
 static void companiontest(void) {
@@ -445,6 +564,8 @@ static void companiontest(void) {
 static void pickcompanion(void) {toggle_pick();}
 void AW_CompanionInit(void) {
     Cvar_RegisterVariable(&think_interval);Cvar_RegisterVariable(&follow_distance);Cvar_RegisterVariable(&mimic_speed);
+    Cvar_RegisterVariable(&kind_setting);Cvar_RegisterVariable(&companion_combat);
+    Cvar_RegisterVariable(&stuck_follower);Cvar_RegisterVariable(&stuck_summon);Cvar_RegisterVariable(&stuck_hostile);
     Cmd_AddCommand("aw_companion",companion);
     aw_companion_crosshair=AW_CompanionCrosshair;aw_companion_buttons=AW_CompanionButtons;
     aw_companion_scene=AW_CompanionSceneSpawn;aw_companion_home=AW_CompanionHome;

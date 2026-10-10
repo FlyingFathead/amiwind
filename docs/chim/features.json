@@ -678,13 +678,17 @@
       "gains": [],
       "gain_note": "Not measured as a frame-time gain yet. The audit found 183 models of 63 meshes with hull chains 512 or more deep on the v0.0.33-dev1 full build (COLLISION-HULL-CHAINS-33).",
       "caveats": [
-        "Not the default in v0.0.33: routed hulls pushed an open-world map past its flora collision reserve (BUILD-ROUTED-FLORA-RESERVE-33), so --model-hull chain is the shipped default and auto, routed and balanced stay selectable."
+        "v0.0.33 shipped --model-hull chain: routed hulls pushed an open-world map past its flora collision reserve (BUILD-ROUTED-FLORA-RESERVE-33). After v0.0.33 auto is the default again: that map falls back to chains, CHIM routes every chain deeper than 256 clipnodes (routed_hull.CHAIN_DEPTH_LIMIT, the same rule the hull audits read), and a ring over the zone keeps its smallest routed meshes as chains (chim_build hull fallback). Measured on the emulator (relative numbers): a trace near a Balmora house costs 12-33 ms as a chain and 2.8-3.6 ms routed on the slow preset (COLLISION-TRACE-COST-33). chain, routed and balanced stay selectable."
       ],
       "vis": "Not a drawing change: collision only.",
       "links": [
         {
           "title": "Collision hull chains",
           "path": "docs/bugs/COLLISION-HULL-CHAINS-33.md"
+        },
+        {
+          "title": "CHIMport: hull policy pending",
+          "path": "docs/chim/CHIMPORT.md#hull-policy-pending"
         }
       ],
       "bugs": [
@@ -735,6 +739,38 @@
         "CHIM-RECEIPT-COMMIT-33"
       ],
       "commits": []
+    },
+    {
+      "id": "chimport",
+      "name": "CHIMport: the whole island, cell by cell",
+      "area": "builder",
+      "summary": "An autobuilder that converts every exterior cell with everything placed in it to CHIM, from the sea at the edge of the map inwards ring by ring, runs every builder audit on each cell, records its figures and feeds the CHIM Progress Tracker.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "First island-wide run (9 October 2026): 1,292 cells, 716 done (613 passed, 103 empty sea), 546 hull policy pending, 26 failed, 4 not converted; 1,436 distinct meshes converted about once each with content-keyed units.",
+      "vis": "Each cell frame keeps its own visibility rows, checked by the validator in every cell; the vis figures are recorded per cell.",
+      "links": [
+        {
+          "title": "CHIMport",
+          "path": "docs/chim/CHIMPORT.md"
+        },
+        {
+          "title": "Hull policy pending",
+          "path": "docs/chim/CHIMPORT.md#hull-policy-pending"
+        }
+      ],
+      "bugs": [
+        "CHIM-UNIT-FP-SOURCE-LAYOUT-33",
+        "CHIM-WORLD-AUDIT-SCALING-33",
+        "CHIM-MEASURE-EMPTY-FRAME-33",
+        "CHIM-WINDOW-MOUNT-CROSS-CELL-33"
+      ],
+      "commits": [],
+      "caveats": [
+        "Cells are one-cell frames for now; the open world joins them into 3 x 3 cell frames.",
+        "Actors and creatures are deferred to the actor pipeline and counted per cell."
+      ]
     },
     {
       "id": "build-cache",
@@ -932,6 +968,10 @@
         {
           "title": "CHIM engine: frame re-centring plan",
           "path": "docs/chim/ENGINE.md#frame-re-centring-plan-not-implemented"
+        },
+        {
+          "title": "CHIMport: the whole island converted cell by cell",
+          "path": "docs/chim/CHIMPORT.md"
         }
       ],
       "bugs": [],
@@ -1089,6 +1129,63 @@
         }
       ],
       "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "light-tracker",
+      "name": "Lighting audit in the cell tracker",
+      "area": "builder",
+      "summary": "Every exterior cell is checked for light like the original: its original lights by class, with and without a mesh, how each reaches the frame (baked, night lamps only, not at all) and the share of lit surfaces. Lit is required for both completion levels; cells that wait only for light are shown as awaiting lighting.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "A measurement, not a speed or size gain: island-wide 0 lit, 133 partial and 1,052 unlit converted cells, 2,284 lights without a mesh and 690 with one (9 October 2026).",
+      "caveats": [],
+      "vis": "No effect on drawing: the audit reads the census and the build figures only.",
+      "links": [
+        {
+          "title": "CHIM cell tracker",
+          "path": "docs/chim/CELL_TRACKER.md"
+        },
+        {
+          "title": "CHIM lighting",
+          "path": "docs/chim/LIGHTING.md"
+        }
+      ],
+      "bugs": [
+        "LIGHT-ENTITIES-UNWIRED-33"
+      ],
+      "commits": []
+    },
+    {
+      "id": "lit-like-the-original",
+      "name": "Lit like the original",
+      "area": "rendering",
+      "summary": "The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "In source: light sources in styles 32-36 with generated flicker and pulse strings, and the night lamp table widened from 694 to 2,962 exterior sources. Measured in memory and bake time (docs/chim/LIGHTING.md): terrain lightmaps add 17 KB to the Balmora ring and 27 KB to Seyda Neen. The look is not measured yet.",
+      "caveats": [
+        "Balmora has 2,528 bytes of active-ring headroom: any stored light needs room made there first."
+      ],
+      "vis": "Adds no entity or brush: light entities exist only at bake time and the per-placement level rides in the placement record; renderer counters are compared before and after.",
+      "links": [
+        {
+          "title": "CHIM lighting",
+          "path": "docs/chim/LIGHTING.md"
+        },
+        {
+          "title": "CHIM lights roadmap",
+          "path": "docs/chim/LIGHTING_ROADMAP.md"
+        }
+      ],
+      "bugs": [
+        "CHIM-BALMORA-LIGHT-ROOM-33",
+        "CHIM-LIGHT-CONTENTS-33",
+        "LIGHT-ENTITIES-UNWIRED-33",
+        "LIGHT-STYLES-UNDEFINED-33"
+      ],
       "commits": []
     }
   ]

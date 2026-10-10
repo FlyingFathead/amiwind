@@ -3,6 +3,12 @@
 <!-- contents start -->
 ## Contents
 
+- [v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (in development)](#v0035---chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore-in-development)
+  - [Next: build system](#next-build-system)
+  - [Next: CHIMport region by region, coast first](#next-chimport-region-by-region-coast-first)
+  - [Gameplay](#gameplay)
+  - [Roadmap horizon: one partition with CHIM](#roadmap-horizon-one-partition-with-chim)
+- [v0.0.34 - CHIM: Tightening the Bolts (released)](#v0034---chim-tightening-the-bolts-released)
 - [v0.0.33 - Towards CHIM: Replacing the Engine Block (released)](#v0033---towards-chim-replacing-the-engine-block-released)
 - [v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec (released)](#v0032---last-stop-on-the-old-line-window-shopping-in-vivec-released)
   - [Decided: a world streamer with no duplicated assets - the whole game on one hard file](#decided-a-world-streamer-with-no-duplicated-assets---the-whole-game-on-one-hard-file)
@@ -134,6 +140,52 @@
 
 <!-- contents end -->
 
+## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (in development)
+
+v0.0.35 gathers in the work that was finished over the last releases but left on side
+branches: builder improvements (resumable image step, unit caches and output hashes, a
+shared storage pool, a build preflight, tighter reuse keys), lava, the CHIMport tracker
+and more. Unfinished or experimental work ships behind a switch that is off by default.
+Draft notes: [release notes](RELEASE-v0.0.35.md).
+
+After v0.0.35, with no dates promised:
+
+### Next: build system
+
+- One build tool with the stages described as a table, so a stage's inputs and outputs are
+  declared once and checked by the builder.
+- Smaller units of work for the slow stages (rooms, regions, image parts), each with its own
+  content hash, so a change or a failure rebuilds only what it touches.
+- One shared content store for every cache, with clear cache keys, and a checked build
+  environment.
+- A test harness and continuous checks that run the same way locally and on a second machine.
+
+### Next: CHIMport region by region, coast first
+
+- The open world converted to CHIM region by region, from the sea and the coast inward, with
+  live cell status in [docs/chim/CELL_TRACKER.md](chim/CELL_TRACKER.md).
+- CHIM lighting: the terrain light bake (the "hybrid" lighting type is partial until then).
+- Heightmap terrain collision: a prototype, measured first.
+
+### Gameplay
+
+- Combat and companion leftovers: hit chance, block, voices, death animation and sound,
+  first-person weapons.
+- More of Morrowind's animation groups wired ([ANIMKIT.md](ANIMKIT.md) lists them).
+- Modular NPCs: a shared parts library converted once, with per-character recipes.
+
+### Roadmap horizon: one partition with CHIM
+
+With the whole island on CHIM, the whole game on one disk image, with the world in a single
+partition. This is a horizon, not a promise for a release: the image stays as it is until the
+whole island runs on CHIM. Details and measurements: [IMAGE_SIZE.md](IMAGE_SIZE.md).
+
+## v0.0.34 - CHIM: Tightening the Bolts (released)
+
+A fix release on top of v0.0.33: the silt strider's hull is closed and every Bitter Coast
+mushroom can be picked, each with an island-wide check that runs in every build
+([release notes](RELEASE-v0.0.34.md)).
+
 ## v0.0.33 - Towards CHIM: Replacing the Engine Block (released)
 
 v0.0.33 is out: the first release on the CHIM engine, the world streamer, with
@@ -148,8 +200,12 @@ idea that is designed, measured or held back, with its status:
 Next: the animation kit for all character types, Vivec on CHIM and the CHIM open
 world (milestones M3 and M4), with no dates promised.
 
-Planned for a later release, "CHIMporting It All": the open world on CHIM, with live cell status in
-[docs/chim/CELL_TRACKER.md](chim/CELL_TRACKER.md) (generated from the conversion tracker).
+The open world on CHIM started with v0.0.35 (above); live cell status in
+[docs/chim/CELL_TRACKER.md](chim/CELL_TRACKER.md) (generated from the conversion tracker). A cell is only complete
+when it is lit like the original: the [CHIM lights roadmap](chim/LIGHTING_ROADMAP.md) lists the lighting milestones
+for this release and later (light tracker done; shared light entities and lightstyles; terrain lightmaps; a light
+level per placed model; dynamic lights of every class; per-plant glow; later per-placement lightmaps for an
+increased-memory version, shadows and interiors).
 
 ## v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec (released)
 
@@ -307,10 +363,11 @@ today: [DATA_STREAMING.md](DATA_STREAMING.md).
   brazier, campfire and firepit as maps are rebuilt; each keeps its baked
   light, and Morrowind's flicker and pulse light flags become Quake light
   styles so the firelight flickers (cost measured on the 68040 first).
-- **Lava fields** (Red Mountain and the Ghostgate approaches): Morrowind's lava
-  surfaces converted to Quake liquid surfaces, which the engine already draws
-  with an animated warp and full brightness, with lava contents (orange view
-  tint and damage when entered) and a few embers rising from the surface.
+- **Lava fields** (Molag Amur and Sheogorad outdoors, and 59 interiors such as
+  the Dagoth Ur facility, [lava census](LAVA.md)): Morrowind's lava pools
+  converted to Quake liquid surfaces, which the engine already draws with an
+  animated warp and full brightness, with lava contents (blood-red view tint
+  and Morrowind's damage when entered) and a few embers rising from the surface.
 
 Before building more of the world at scale: the [trackers](trackers/README.md)
 (world progress, entities, points of interest), so nothing is left behind.

@@ -298,5 +298,38 @@ class HeadNodeOrderTests(unittest.TestCase):
         self.assertEqual(A.below_head(lambda n: struct.unpack_from('<iHH', clips, 8 * n)[1:], 1), [0])
 
 
+class ReserveFallbackTests(unittest.TestCase):
+    """BUILD-ROUTED-FLORA-RESERVE-33: a map that routed hulls push past its clipnode reserve is converted once
+    more with chains; any other reserve failure, or a failure with chains, stops as before."""
+
+    def run_attempts(self, mode, violations):
+        import mesh_geometry_env as E
+        from prepare_world_flora import FloraReserveError, _hull_fallback
+        modes = []
+
+        def attempt():
+            modes.append(E.model_hull_mode())
+            if E.model_hull_mode() != 'chain':
+                raise FloraReserveError({'violations': violations})
+            return {'ok': True}
+        with patch.dict(os.environ, {E.MODEL_HULL_VARIABLE: mode}):
+            result = _hull_fallback(attempt)
+            self.assertEqual(E.model_hull_mode(), mode)              # the setting is restored
+        return result, modes
+
+    def test_clipnodes_over_the_reserve_retry_with_chains(self):
+        result, modes = self.run_attempts('auto', [{'metric': 'clipnodes', 'actual': 33533, 'limit': 32767}])
+        self.assertEqual(modes, ['auto', 'chain'])
+        self.assertEqual(result['model_hull_fallback']['from'], 'routed')
+
+    def test_other_failures_still_stop(self):
+        from prepare_world_flora import FloraReserveError
+        with self.assertRaises(FloraReserveError):
+            self.run_attempts('auto', [{'metric': 'entities', 'actual': 600, 'limit': 550}])
+        with self.assertRaises(FloraReserveError):
+            self.run_attempts('auto', [{'metric': 'clipnodes', 'actual': 33533, 'limit': 32767},
+                                       {'metric': 'entities', 'actual': 600, 'limit': 550}])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -377,6 +377,18 @@ int ChimStatics_Step (unsigned model, long *budget)
 	*budget -= bytes;
 	if (!sm->sprite)
 	{
+		/* An alias model's data goes to Quake's cache, in the Hunk's gap
+		 * (Cache_Alloc ends the game when one request is larger than the
+		 * gap). The map counts its alias statics in its Hunk rest
+		 * (Chim_HunkRest); one that would still not fit is refused (H15). */
+		long gap = (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ();
+		if (gap < 2L*bytes + 16384)
+		{
+			sm->bad = 1;
+			Con_Printf ("CHIM: streamed static model %s (%ld bytes) refused: the Hunk gap is %ld bytes\n",
+				sm->name, (long)bytes, gap);
+			return -1;
+		}
 		if (!(sm->alias = Mod_ForName (sm->name, false)) || sm->alias->type != mod_alias)
 		{
 			sm->alias = NULL;
@@ -408,6 +420,18 @@ int ChimStatics_Step (unsigned model, long *budget)
 	ChimZone_Unlock (m);
 	st.sprite_loads++;
 	return 1;
+}
+
+/* The alias statics' file bytes (their cache need, about): counted in the
+ * map's Hunk rest when the player is placed (chim_world.c CheckRest). */
+long ChimStatics_AliasBytes (void)
+{
+	long n = 0;
+	int i;
+	for (i=0 ; i<st.nmodels ; i++)
+		if (!st.models[i].sprite && !st.models[i].bad)
+			n += FileBytes (&st.models[i]);
+	return n;
 }
 
 /* ---------------------------------------------------------------- chunks */
@@ -455,8 +479,16 @@ static int Place (chim_static_t *s)
 	model_t *m = Resident (s->model);
 	if (!m)
 		return 0;
+	/* Bad flora data leaves the static out, never a Host_Error here: chunk
+	 * activation holds zone locks a longjmp would leave behind, and the next
+	 * map's zone drop then stopped the program (CHIM-STATIC-PLACE-HOST-ERROR-35). */
 	if (s->flora && (m->type != mod_sprite || !isfinite (s->scale * m->radius)))
-		Host_Error ("Invalid aw_flora static sprite scale");
+	{
+		if (!st.models[s->model].bad)
+			Con_Printf ("CHIM: invalid aw_flora static sprite scale (%s): left out\n", m->name);
+		st.models[s->model].bad = 1;
+		return 0;
+	}
 	s->ent.model = m;
 	s->ent.frame = s->frame;
 	s->ent.colormap = vid.colormap;

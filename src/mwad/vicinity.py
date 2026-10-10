@@ -3,8 +3,9 @@
 from collections import Counter
 import hashlib
 import struct
-from .audit import records, subrecords, cell_data, require
-from .npc import first, text, behavior_record
+from .audit import cell_data
+from .esm import first, is_deleted, records, require, subrecords, text
+from .npc import behavior_record
 from .dialogue_lookup import build_lookup
 
 BASE_TYPES = ('NPC_', 'CREA', 'CONT', 'DOOR', 'LEVC', 'LIGH', 'ACTI')
@@ -23,8 +24,7 @@ def region_audit(raw, centre=(-2, -9), radius=1):
         fields = list(subrecords(payload))
         # A CELL may contain DELE on a placed reference. Only its header can
         # delete the cell itself; individual reference deletion is handled below.
-        header = fields[:next((i for i, (k, _) in enumerate(fields) if k == 'FRMR'), len(fields))] if tag == 'CELL' else fields
-        deleted = bool(flags & 0x20) or any(k == 'DELE' for k, _ in header)
+        deleted = is_deleted(flags, fields, header_only=tag == 'CELL')
         if tag in BASE_TYPES:
             identifier = text(fields, 'NAME').casefold()
             require(identifier not in bases, 'Duplicate base record: ' + identifier)

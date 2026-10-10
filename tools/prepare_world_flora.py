@@ -233,6 +233,37 @@ def overlay_region(source, out, flora, index, receipt, entry, palette,
     if collision_packing == 'adaptive' and aggregate_sprite_collision:
         raise ValueError('Adaptive packing and forced aggregate comparison are exclusive')
     kwargs={'retained_mesh_keys':retained_mesh_keys,'legacy_sprite_bindings':legacy_sprite_bindings,'admission_profile':admission_profile}
+    return _hull_fallback(lambda: _overlay_region(source, out, flora, index, receipt, entry, palette, kwargs,
+                                                  aggregate_sprite_collision, collision_packing), Path(out).parent)
+
+
+def _hull_fallback(attempt, region=None):
+    """Run a flora overlay; when it fails only the clipnode reserve and routed hulls were on, run it once
+    more with chains (BUILD-ROUTED-FLORA-RESERVE-33: on vf0779 the routed aggregate collision packed 33,533
+    clipnodes against the 32,767 reserve, chains 32,614). The fallback is recorded in the result."""
+    from mesh_geometry_env import model_hull_mode, model_hull_override
+    try:
+        return attempt()
+    except FloraReserveError as error:
+        report = error.report if isinstance(error.report, dict) else {}
+        found = [v for a in report.get('attempts', [report]) for v in a.get('violations', [])]
+        if model_hull_mode() == 'chain' or not found or any(v['metric'] != 'clipnodes' for v in found):
+            raise
+        import shutil
+        for a in report.get('attempts', []):        # the failed try's own candidate folders (relative to the region)
+            if a.get('candidate_directory'):
+                # recorded relative to the region folder (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33)
+                folder = Path(a['candidate_directory'])
+                shutil.rmtree(folder if folder.is_absolute() or region is None else Path(region) / folder,
+                              ignore_errors=True)
+        with model_hull_override('chain'):
+            result = attempt()
+        result['model_hull_fallback'] = {'from': 'routed', 'reason': 'clipnode reserve', 'violations': found}
+        return result
+
+
+def _overlay_region(source, out, flora, index, receipt, entry, palette, kwargs, aggregate_sprite_collision,
+                    collision_packing):
     if collision_packing != 'adaptive':
         result=_overlay_candidate(source,out,flora,index,receipt,entry,palette,
                                   aggregate_sprite_collision=aggregate_sprite_collision,**kwargs)
@@ -251,7 +282,8 @@ def overlay_region(source, out, flora, index, receipt, entry, palette,
                                       aggregate_sprite_collision=strategy=='aggregate',**kwargs)
         except FloraReserveError as error:
             attempts.append({'strategy':strategy,'status':'rejected',**error.report,
-                             'candidate_directory':str(local)})
+                             # Relative to the region: no run path in a stage output (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
+                             'candidate_directory':local.name})
             retry=strategy=='per_instance' and any(v['metric'] in ('entities','models_plus_sprites') for v in error.report['violations'])
             if retry:continue
             failure={'mode':'adaptive','selected_strategy':None,'attempts':attempts}
@@ -413,6 +445,24 @@ def convert_region(task):
     return result
 
 
+def convert_region_cached(task):
+    """Worker: a region from the unit cache when its inputs are unchanged (development builds, and
+    release builds with --allow-release-reuse; tools/pass_cache.py UnitCache), else convert_region,
+    then record it (failed regions are never recorded). A stage that failed late resumes from its
+    finished regions (BUILD-IMAGE-NO-RESUME-33)."""
+    *task, cache, inputs = task
+    if cache is None:
+        return convert_region(tuple(task))
+    local = task[4] / task[5]['name']
+    row = cache.restore_unit(inputs, local)
+    if row is not None:
+        return row
+    result = convert_region(tuple(task))
+    if result.get('conversion_status') != 'failed':
+        cache.store_unit(inputs, json.loads(json.dumps(result)), local)
+    return result
+
+
 def canonical_hash(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
@@ -534,7 +584,15 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
         pending.append(entry)
     (out/'resume-validation.json').write_text(json.dumps(adoption,indent=2)+'\n',encoding='utf-8')
     print('FLORA RESUME',len(results),'validated regions;',len(pending),'to convert',flush=True)
-    for result in ordered_map(convert_region,[(terrain,base,flora,palette,out,e,aggregate_sprite_collision,collision_packing) for e in pending],resolve_jobs(jobs)):
+    from pass_cache import UnitCache
+    cache=UnitCache.open('world-flora-region',{'aggregate_sprite_collision':aggregate_sprite_collision,
+                                               'collision_packing':collision_packing},__file__)
+    # A region's inputs: its record, its base region's bytes and every owned flora input (the contract
+    # without the two whole-directory receipts, which each region's base hash replaces).
+    owned={k:v for k,v in contract['hashes'].items() if k not in ('terrain_directory','base_receipt')}
+    tasks=[(terrain,base,flora,palette,out,e,aggregate_sprite_collision,collision_packing,cache,
+            {'entry':e,'base_sha256':expected_base[e['name']]['sha256'],'owned':owned}) for e in pending]
+    for result in ordered_map(convert_region_cached,tasks,resolve_jobs(jobs)):
         if result.get('conversion_status')=='failed':failures.append(result)
         else:results.append(result)
         print('FLORA REGION',len(results)+len(failures),'/',len(entries),result['name'],result.get('conversion_status','complete'),flush=True)

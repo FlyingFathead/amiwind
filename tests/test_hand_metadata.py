@@ -99,3 +99,7 @@ class HandMetadata(unittest.TestCase):
             self.assertEqual((id1/'maps/charplane.bsp').read_bytes(), raw)
             with self.assertRaises(ValueError):
                 stamp_staged_hands(id1, self.report(), {'../elsewhere'})
+            # a pure CHIM image with no legacy map at all (a town sandbox on CHIM): nothing to stamp, said so
+            empty = stamp_staged_hands(id1, self.report(), set())
+            self.assertEqual((empty['status'], empty['map_count'], empty['changed_maps']), ('no legacy maps', 0, []))
+            self.assertEqual((id1/'maps/charplane.bsp').read_bytes(), raw)

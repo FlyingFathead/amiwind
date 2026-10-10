@@ -110,6 +110,9 @@ static int		hunk_mark = -1;
 int AW_HeapLoadPeak (void);
 static int		zone_taken_at;		/* Hunk low + high right after the zone was taken */
 static int		zone_bytes, rest_stated, rest_used, rest_checked;
+/* The far terrain loaded before a later step failed: it stays as the map's
+ * floor and horizon (H15), with the zone's Hunk below it kept for the map. */
+static int		far_only, keep_far;
 #define CHIM_REST_MAPS	8
 static struct { char map[MAX_QPATH]; int bytes; } rest_seen[CHIM_REST_MAPS];
 static int		rest_next;
@@ -196,7 +199,7 @@ int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes)
  * least recently used closes), and every open checks the recorded size. */
 chim_pack_t *Chim_File (int row)
 {
-	int i, slot = 0;
+	int i, slot;
 	if (row < 0 || row >= chim_world.files)
 		return NULL;
 	for (i=0 ; i<CHIM_OPEN_FILES ; i++)
@@ -205,12 +208,20 @@ chim_pack_t *Chim_File (int row)
 			open_stamp[i] = ++open_clock;
 			return &open_files[i];
 		}
-	for (i=1 ; i<CHIM_OPEN_FILES ; i++)
-		if (!open_files[i].file || open_stamp[i] < open_stamp[slot])
+	/* The least recently used file that no load holds; none free: the
+	 * open fails (the asking load waits), never a pinned handle closes. */
+	slot = -1;
+	for (i=0 ; i<CHIM_OPEN_FILES ; i++)
+		if (!open_files[i].file)
+		{
 			slot = i;
-	if (!open_files[slot].file)
-		;
-	else
+			break;
+		}
+		else if (!open_files[i].pins && (slot < 0 || open_stamp[i] < open_stamp[slot]))
+			slot = i;
+	if (slot < 0)
+		return NULL;
+	if (open_files[slot].file)
 		Chim_PackClose (&open_files[slot]);
 	if (!Chim_PackOpen (&open_files[slot], chim_world.file[row].path))
 		return NULL;
@@ -229,7 +240,10 @@ void Chim_FilesClose (void)
 {
 	int i;
 	for (i=0 ; i<CHIM_OPEN_FILES ; i++)
+	{
 		Chim_PackClose (&open_files[i]);
+		open_files[i].pins = 0;
+	}
 }
 
 int Chim_FileRow (const char *kind, int cx, int cy, int sector)
@@ -368,9 +382,13 @@ static int KeepPersistent (void *data, unsigned id)
 
 static void MapEnd (void)
 {
+	if (far_only && !keep_far)
+		ChimFar_End ();
+	far_only = 0;
 	if (!active && map_bank < 0)
 		return;
-	ChimFar_End ();
+	if (!keep_far)
+		ChimFar_End ();
 	ChimGraft_End ();
 	ChimChunks_End ();
 	ChimStatics_End ();
@@ -444,15 +462,26 @@ static int WorldspawnFrame (const char *entities, int *cx, int *cy)
 	return Q_sscanf (key + 13, " \"%d %d\"", cx, cy) == 2;
 }
 
+int Chim_FarOnly (void)
+{
+	return far_only;
+}
+
 static void Fail (const char *why)
 {
+	int floor = active == 0 && ChimFar_Loaded ();
 	strncpy (failure, why, sizeof(failure)-1);
 	failure[sizeof(failure)-1] = 0;
-	Con_Printf ("CHIM: %s; this map runs without its chunks.\n", why);
+	Con_Printf ("CHIM: %s; this map runs without its chunks%s.\n", why,
+		floor ? " (its far terrain stays as the floor)" : "");
 	active = 1;
+	keep_far = floor;
 	MapEnd ();
-	/* Nothing else used the Hunk since the bank was taken: give it back. */
-	if (hunk_mark >= 0)
+	keep_far = 0;
+	far_only = floor;
+	/* Nothing else used the Hunk since the bank was taken: give it back
+	 * (unless the far terrain above it stays). */
+	if (hunk_mark >= 0 && !floor)
 		Hunk_FreeToLowMark (hunk_mark);
 	hunk_mark = -1;
 }
@@ -523,6 +552,11 @@ static void MapBegin (const char *entities)
 		Fail ("invalid CHIM frame pack");
 		return;
 	}
+	/* The frame's far terrain (chim_far.c, low Hunk, given back with the
+	 * map) before the frame world: if a later step fails, the map keeps it
+	 * as its floor (H15; CHIM-GRAFT-FAIL-NO-FLOOR-35). */
+	ChimFar_Begin (sv.worldmodel ? sv.worldmodel->name : "", (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ()
+		- (long)chim_reserve_kib.value*1024);
 	{
 		/* Statics the frame map streams with their chunks (chim_statics.c). */
 		char text[16];
@@ -537,9 +571,6 @@ static void MapBegin (const char *entities)
 	}
 	active = 1;
 	hunk_mark = -1;
-	/* The frame's far terrain (chim_far.c): low Hunk, given back with the map. */
-	ChimFar_Begin (sv.worldmodel->name, (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ()
-		- (long)chim_reserve_kib.value*1024);
 	{
 		char edge[16];
 		edge_closed = WorldspawnKey (entities, "_chim_edge", edge, sizeof(edge)) && !strcmp (edge, "closed");
@@ -621,15 +652,18 @@ static void Player (vec3_t origin)
  * this map in the session. */
 static void CheckRest (void)
 {
-	int peak, rest, gap, reserve = (int)chim_reserve_kib.value * 1024, keep;
+	int peak, rest, gap, reserve = (int)chim_reserve_kib.value * 1024, keep, alias;
 	if (rest_checked || !active)
 		return;
 	rest_checked = 1;
 	peak = AW_HeapLoadPeak ();
-	rest = peak - zone_taken_at;
+	/* The streamed alias statics load into Quake's cache later, from the
+	 * same gap: counted in the rest the map needs after the zone (H15). */
+	alias = (int)ChimStatics_AliasBytes ();
+	rest = peak - zone_taken_at + alias;
 	if (rest < 0)
 		rest = 0;
-	gap = host_parms.memsize - peak;
+	gap = host_parms.memsize - peak - alias;
 	RestRemember (sv.name, rest);
 	if (gap >= reserve)
 		return;
@@ -773,6 +807,19 @@ static int TownReport (int print)
 				has ? " (chim_towns 0)" : " (no frame map)");
 	}
 	return on;
+}
+
+/* Original Morrowind coordinates of a local position on the active frame
+ * (world = local x 4 + frame centre; the inverse of chim_tp). Used by the
+ * debug HUD where no world directory carries the frame (a MiniWind disk). */
+static int Source (const float *local, float *world)
+{
+	if (!active)
+		return 0;
+	world[0] = local[0] * 4 + chim_frame.frame.centre[0];
+	world[1] = local[1] * 4 + chim_frame.frame.centre[1];
+	world[2] = local[2] * 4;
+	return 1;
 }
 
 /* ---------------------------------------------------------------- teleport */
@@ -940,6 +987,17 @@ static int RCount (char *out, int size, long frames)
 		if (used < size-1)
 			ChimFar_RCount (out + used, size - used);
 	}
+	{
+		/* ef: placements waiting for efrag room (last frame); nv: frames
+		 * since the last line whose view leaf had no PVS row (H15). */
+		static unsigned long last_novis;
+		int used = (int)strlen (out), waiting;
+		unsigned long capped, novis;
+		ChimChunks_EfragCounts (&waiting, &capped, &novis);
+		if (used < size-1)
+			snprintf (out + used, size - used, " ef %ld nv %lu", (long)waiting, novis - last_novis);
+		last_novis = novis;
+	}
 	work_worst = 0;
 	last_bytes = chim_world.bytes_read;
 	last_reads = chim_world.reads;
@@ -1029,6 +1087,7 @@ void Chim_Init (void)
 	aw_chim_rcount = RCount;
 	aw_chim_town_map = TownMap;
 	aw_chim_entity = ChimStatics_Capture;
+	aw_chim_source = Source;
 #ifdef AMIGA
 	chim_story_hidden = AW_OpeningStoryHidden;		/* aw_opening.c */
 #endif

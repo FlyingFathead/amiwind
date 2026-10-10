@@ -387,6 +387,8 @@ void	Mod_Init (void);
 void	Mod_ClearAll (void);
 model_t *Mod_ForName (char *name, qboolean crash);
 qboolean Mod_CanFindName(const char *name);
+/* Free an alias model's cached data and let Mod_FindName reuse its slot. */
+void Mod_ReleaseAlias(model_t *mod);
 void	*Mod_Extradata (model_t *mod);	// handles caching
 void	Mod_TouchModel (char *name);
 
@@ -430,6 +432,8 @@ typedef struct
 
 int AW_BrushHeader (dheader_t *out, const void *raw, long bytes);
 int AW_BrushBound (const dheader_t *header, int texture_refs);
+/* Arena decodes: bad data ends the load (AW_BrushImage 0, AW_BrushStreamStep
+ * -1, the reason on the console), never the game. */
 int AW_BrushImage (model_t *mod, byte *image, long bytes, aw_brush_arena_t *arena);
 int AW_BrushStreamBegin (aw_brush_stream_t *s, model_t *mod, FILE *file, long base, long bytes, aw_brush_arena_t *arena);
 int AW_BrushStreamStep (aw_brush_stream_t *s);

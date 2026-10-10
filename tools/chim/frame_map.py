@@ -418,7 +418,7 @@ EDGE_KEY = '_chim_edge'
 ACTOR_CLASSES = ('aw_npc', 'aw_corpse')
 GAP_MIN, GAP_MAX = -0.5, 1.0         # check_actor_ground's support tolerance
 # Refit of a ground actor on the frame (CHIM-SEYDA-ACTOR-CONTACT-33): the legacy support fitting baked each
-# actor on its region maps' terrain (for Seyda Neen the recorded v0.0.31 maps); the frame's terrain is the
+# actor on its region maps' terrain (for Seyda Neen the converted or recorded region maps); the frame's terrain is the
 # current builder's and can sit a few units off it. The frame map refits an actor that no longer stands with
 # the legacy fitter itself (actor_grounding: the contact interval rule, every sole within GAP_MIN..GAP_MAX,
 # its offset order up to 32 units, its walkable-path check from the original spot): first the height alone
@@ -446,7 +446,7 @@ def actor_contact(id1, rows, world, index):
     hull (chunk terrain and placed models, chim.collision.FrameScene). Actors stay actor records:
     only their model's poses are read."""
     from actor_grounding import initial_state
-    from check_actor_ground import contact_samples, model_frames
+    from check_actor_ground import contact_samples, layout_of, model_frames
     from chim.collision import FrameScene
     scene = FrameScene(world, index, hull=0)
     models, record, refused = {}, [], []
@@ -465,8 +465,9 @@ def actor_contact(id1, rows, world, index):
         angles = tuple(map(float, e.get('angles', '0 0 0').split()))
         name = e.get('model', '')
         if name not in models:
-            models[name] = model_frames((Path(id1) / name).read_bytes())
-        samples = contact_samples(models[name], angles, bool(float(e.get('aw_intro_role', 0) or 0)))
+            # the model's frame layout (tools/actor_frames.py): kit models are checked on their idle group
+            models[name] = (model_frames((Path(id1) / name).read_bytes()), layout_of(Path(id1) / name))
+        samples = contact_samples(models[name][0], angles, bool(float(e.get('aw_intro_role', 0) or 0)), models[name][1])
         gaps, failures = contact(scene, point, samples)
         if failures:
             new = refit(scene, point, samples)
@@ -612,9 +613,11 @@ def frame_walls(lo, hi, thick=64.0):
     return wall_boxes((lo[0], lo[1], hi[0], hi[1]), lo, hi, thick)
 
 
-def build(id1, town, world_dir):
+def build(id1, town, world_dir, entity_rows=None):
     """Write maps/<town>-chim.bsp under id1 from the town's final region maps; returns the record.
-    Raises ValueError when anything cannot be carried."""
+    entity_rows: the town's entities made from the game data (tools/chim_town.py) when the town has
+    no legacy region maps (CHIM-LEGACY-CHAIN-33); the origin check needs region maps and is skipped,
+    every other check runs. Raises ValueError when anything cannot be carried."""
     from entity_tracker import bsp_refs
     from town_config import runtime_towns
     id1 = Path(id1)
@@ -624,7 +627,8 @@ def build(id1, town, world_dir):
     from harvest_build import town_origin
     from town_config import load_settings
     point, regions = region_table(id1 / row['regions'])
-    maps = {name: entities((id1 / 'maps' / (name + '.bsp')).read_bytes()) for name, _ in regions}
+    maps = None if entity_rows is not None else \
+        {name: entities((id1 / 'maps' / (name + '.bsp')).read_bytes()) for name, _ in regions}
     # the town's frame: the frame at its source cell (a world may hold several areas)
     if town == 'seyda':
         from chim.seyda import source_cell     # format 0.5: Seyda Neen's frame (no town converter settings)
@@ -632,10 +636,19 @@ def build(id1, town, world_dir):
     else:
         town_cell = tuple(load_settings(town)['source_cell'])
     placed = chim_placements(world_dir, town_cell)
-    rows, report = frame_entities(maps, set(placed), default_region(point, regions))
+    if entity_rows is None:
+        rows, report = frame_entities(maps, set(placed), default_region(point, regions))
+    else:
+        rows = [dict(e) for e in entity_rows]
+        counts = collections.Counter(e.get('classname', '') for e in rows)
+        report = {'source': 'game data (tools/chim_town.py); no legacy region maps',
+                  'classes': {c: {'written': n} for c, n in sorted(counts.items())}, 'refused': []}
     _, _, _, _, frame_centre = frame_record(world_dir, town_cell)
-    refused, report['origin_check'] = origin_check(maps, placed, frame_centre, town_origin(town))
-    report['refused'] += refused
+    if entity_rows is None:
+        refused, report['origin_check'] = origin_check(maps, placed, frame_centre, town_origin(town))
+        report['refused'] += refused
+    else:
+        report['origin_check'] = 'not applicable: no legacy region maps'
     refused, report['harvest_check'] = harvest_check(id1, [name for name, _ in regions])
     report['refused'] += refused
     refused, report['static_check'] = static_check(rows)

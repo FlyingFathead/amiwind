@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include <limits.h>
 #include <stddef.h>
+#include <setjmp.h>
 
 #define AW_STREAM_SPRITES 1
 
@@ -78,7 +79,7 @@ int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const by
     fclose(f);return 0;
 }
 model_t	*loadmodel;
-char	loadname[32];	// for hunk tags
+char	loadname[COM_FILEBASE_SIZE];	// for hunk tags
 /* Optional main-task music service; unset in asset-free loader tests. */
 void (*aw_load_audio_tick)(void);
 size_t (*aw_load_prefetch_copy)(const char *,long,byte *,size_t);
@@ -296,6 +297,14 @@ qboolean Mod_CanFindName(const char *name)
         if(!strcmp(mod_known[i].name,name) || mod_known[i].needload==NL_UNREFERENCED)return true;
     return false;
 }
+void Mod_ReleaseAlias(model_t *mod)
+{
+    /* Optional render-only models (aw_npc_lod.c): free the data now, and mark the
+     * slot unreferenced like Mod_ClearAll so a later Mod_FindName can reuse it. */
+    if(!mod || mod->type!=mod_alias)return;
+    if(mod->cache.data)Cache_Free(&mod->cache);
+    mod->needload=NL_UNREFERENCED;
+}
 model_t *Mod_FindName (char *name)
 {
     int		i;
@@ -350,6 +359,8 @@ void Mod_TouchModel (char *name)
 {
     model_t	*mod;
 
+    if (!name || !name[0] || strlen (name) >= MAX_QPATH)
+        return;
     mod = Mod_FindName (name);
 
     if (mod->needload == NL_PRESENT)
@@ -460,8 +471,10 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
     buf=alias_file?alias_file:(unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
     if (!buf)
     {
+        /* A missing model file ends the session, never the program
+           (ENGINE-MODEL-NAME-SYSERROR-35). */
         if (crash)
-            Sys_Error ("Mod_NumForName: %s not found", mod->name);
+            Host_Error ("Model %s not found", mod->name);
         return NULL;
     }
 
@@ -516,6 +529,15 @@ model_t *Mod_ForName (char *name, qboolean crash)
 {
     model_t	*mod;
 
+    /* mod->name holds MAX_QPATH: a longer or empty name (QuakeC strings, map
+       "model" keys) is a model that does not load (ENGINE-MODEL-NAME-SYSERROR-35). */
+    if (!name || !name[0] || strlen (name) >= MAX_QPATH)
+    {
+        if (crash)
+            Host_Error ("Model name empty or too long");
+        Con_Printf ("Model name empty or too long\n");
+        return NULL;
+    }
     AW_LoadAudioTick();
     mod = Mod_FindName (name);
 
@@ -555,6 +577,31 @@ typedef struct { lump_t *lump; int size, count, done, next; byte *tail; } aw_rec
 /* CHIM: the arena that brush decoders allocate from (model.h). NULL for every
  * legacy load, which keeps the Hunk calls exactly as before. */
 static aw_brush_arena_t *aw_brush_arena;
+/* CHIM: bad data in an arena decode (a damaged or truncated sector file)
+ * ends that load, not the game. The decoders below say Sys_Error; while an
+ * arena entry point (AW_BrushImage, AW_BrushStreamStep) runs, that returns
+ * to it and the load fails with the reason on the console. Legacy (Hunk)
+ * loads are unchanged: aw_brush_catch is set only around arena decodes
+ * (CHIM-BRUSH-BAD-DATA-35). */
+static jmp_buf *aw_brush_catch;
+static char aw_brush_why[128];
+static void AW_BrushError(char *fmt,...)
+{
+    va_list args;
+    va_start(args,fmt);vsnprintf(aw_brush_why,sizeof(aw_brush_why),fmt,args);va_end(args);
+    if(aw_brush_arena && aw_brush_catch)longjmp(*aw_brush_catch,1);
+    Sys_Error("%s",aw_brush_why);
+}
+#define Sys_Error AW_BrushError
+/* After a caught error: the loader's state as a finished load leaves it. */
+static void AW_BrushCaught(model_t *mod)
+{
+    aw_brush_catch=NULL;aw_brush_arena=NULL;
+    aw_bsp_file=NULL;aw_bsp_position=-1;aw_bsp_lumps=NULL;
+    aw_bsp_slice=NULL;aw_bsp_slice_bytes=0;
+    mod->needload=NL_UNREFERENCED;
+    Con_Printf("CHIM: %s: bad data (%s); chunk unavailable\n",mod->name,aw_brush_why);
+}
 static void *AW_BrushAlloc(int size,char *name)
 {
     byte *p;
@@ -1441,6 +1488,12 @@ void Mod_LoadLeafs (lump_t *l)
     aw_records_t	records;
 
     count = AW_RecordsBegin (&records, l, sizeof(*in));
+    /* The PVS buffers (decompressed, mod_novis, fatpvs, checkpvs) hold
+       MAX_MAP_LEAFS leaves (ENGINE-LEAF-LIMIT-UNCHECKED-35); the builder's map
+       gate keeps every shipped map below it. */
+    if (count > MAX_MAP_LEAFS)
+        Sys_Error ("Mod_LoadLeafs: %s has %ld leaves, the engine holds %ld", loadmodel->name,
+                   (long)count, (long)MAX_MAP_LEAFS);
     out = AW_BrushAlloc ( count*sizeof(*out), loadname);
 
     loadmodel->leafs = out;
@@ -2002,6 +2055,7 @@ int AW_BrushImage (model_t *mod, byte *image, long bytes, aw_brush_arena_t *aren
 {
     model_t *saved_model = loadmodel;
     dheader_t header;
+    jmp_buf caught;
 
     if (!arena || !AW_BrushHeader (&header, image, bytes))
         return 0;
@@ -2009,7 +2063,15 @@ int AW_BrushImage (model_t *mod, byte *image, long bytes, aw_brush_arena_t *aren
     loadmodel = mod;
     mod->needload = NL_PRESENT;
     aw_brush_arena = arena;
+    if (setjmp (caught))
+    {
+        AW_BrushCaught (mod);
+        loadmodel = saved_model;
+        return 0;
+    }
+    aw_brush_catch = &caught;
     Mod_LoadBrushModel (mod, image);
+    aw_brush_catch = NULL;
     aw_brush_arena = NULL;
     loadmodel = saved_model;
     return 1;
@@ -2037,26 +2099,39 @@ int AW_BrushStreamStep (aw_brush_stream_t *s)
 {
     model_t *saved_model = loadmodel;
     char saved_name[sizeof(loadname)];
+    jmp_buf caught;
     int i;
 
     if (s->next >= AW_BRUSH_SECTIONS)
         return 1;
     memcpy (saved_name, loadname, sizeof(saved_name));
+    if (setjmp (caught))
+    {
+        AW_BrushCaught (s->mod);
+        s->next = AW_BRUSH_SECTIONS;
+        loadmodel = saved_model;
+        memcpy (loadname, saved_name, sizeof(saved_name));
+        return -1;
+    }
     COM_FileBase (s->mod->name, loadname);
     loadmodel = s->mod;
     aw_bsp_file = s->file; aw_bsp_base = s->base; aw_bsp_bytes = s->bytes;
     aw_bsp_position = -1; aw_bsp_lumps = NULL; mod_base = NULL;
     aw_brush_arena = s->arena;
+    aw_brush_catch = &caught;
     i = s->next++;
     AW_BrushSection (&s->header, i, true);
     if (s->next == AW_BRUSH_SECTIONS)
         AW_BrushFinish (s->mod);
+    aw_brush_catch = NULL;
     aw_brush_arena = NULL;
     aw_bsp_file = NULL; aw_bsp_position = -1;
     loadmodel = saved_model;
     memcpy (loadname, saved_name, sizeof(saved_name));
     return s->next == AW_BRUSH_SECTIONS;
 }
+
+#undef Sys_Error
 
 /*
 ==============================================================================
@@ -2168,7 +2243,9 @@ void * Mod_LoadAliasFrame (void * pin, int *pframeindex, int numv,
 
     pdaliasframe = (daliasframe_t *)pin;
 
-    strcpy (name, pdaliasframe->name);
+    /* the file's 16-byte frame name need not end in a NUL (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
+    memcpy (name, pdaliasframe->name, sizeof(pdaliasframe->name));
+    name[sizeof(pdaliasframe->name) - 1] = 0;
 
     for (i=0 ; i<3 ; i++)
     {

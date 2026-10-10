@@ -304,14 +304,81 @@ void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point, 
 /*-----------------------------------------------------------------*/
 
 
+/* ENGINE-GAMMA-POW-35: x^g for the gamma table (0 < x <= 1) with add,
+ * multiply and divide only. The C library pow executes FPU instructions the
+ * 68040 does not implement, so a non-default gamma stopped a 68040 without an
+ * FPU support library. Accurate to ~1e-12, far below the table's 1/255 step. */
+double Q_GammaPow (double x, double g)
+{
+	const double ln2 = 0.69314718055994530942;
+	double m, z, z2, term, sum, y, scale, r;
+	int i;
+
+	if (!(x > 0))
+		return 0;
+	/* ln x = ln m - k ln2 with m in [0.5,1], then the atanh series. */
+	m = x;
+	y = 0;
+	while (m < 0.5)
+	{
+		m *= 2;
+		y -= ln2;
+	}
+	while (m > 1)
+	{
+		m *= 0.5;
+		y += ln2;
+	}
+	z = (m - 1) / (m + 1);
+	z2 = z * z;
+	term = z;
+	sum = 0;
+	for (i = 1 ; i < 40 ; i += 2)
+	{
+		sum += term / i;
+		term *= z2;
+	}
+	y = g * (y + 2 * sum);
+	/* exp(y) = 2^n exp(r), r in [0,ln2), Taylor series for exp(r). */
+	if (y < -60)
+		return 0;
+	if (y > 60)
+		y = 60;
+	scale = 1;
+	while (y < 0)
+	{
+		y += ln2;
+		scale *= 0.5;
+	}
+	while (y >= ln2)
+	{
+		y -= ln2;
+		scale *= 2;
+	}
+	r = 1;
+	term = 1;
+	for (i = 1 ; i < 20 ; i++)
+	{
+		term *= y / i;
+		r += term;
+	}
+	return r * scale;
+}
+
 float	anglemod(float a)
 {
 #if defined(__STORM__) || defined(__VBCC__) || defined(__GNUC__)
 	// Use simple modulo for Amiga GCC - fixed-point version has precision issues
+	// ENGINE-ANGLEMOD-RANGE-35: the result is in [0,360): -360 gave 360, and
+	// NaN or a value past the int range (undefined cast) gives 0.
+	if (!(a > -1.0e9f && a < 1.0e9f))
+		return 0;
 	if (a >= 0)
 		a -= 360*(int)(a/360);
 	else
 		a += 360*( 1 + (int)(-a/360) );
+	if (a >= 360)
+		a -= 360;
 #else
 	a = (360.0/65536) * ((int)(a*(65536/360.0)) & 65535);
 #endif

@@ -9,7 +9,12 @@
  *   refs FILE...    CHIM texture references resolved through the arena's
  *                   resolver, image == stream, bound holds.
  *   reject FILE     more than one submodel: refused before decoding.
- *   overflow FILE   an arena below the decoded size stops with an error.
+ *   overflow FILE   an arena below the decoded size stops the load (0), the
+ *                   arena is not overrun and the game goes on.
+ *   bad FILE        a node lump with a plane outside the plane lump (a damaged
+ *                   sector file): the image decode returns 0 and the stream
+ *                   step -1, never Sys_Error; the loader's state is clean and
+ *                   the next load works (CHIM-BRUSH-BAD-DATA-35).
  * Every comparison is of a relocation-independent dump (pointers as indexes).
  */
 #include <assert.h>
@@ -56,7 +61,8 @@ void Sys_Error(char *fmt,...){
     if(!expect_error){va_start(args,fmt);vfprintf(stderr,fmt,args);va_end(args);fputc('\n',stderr);abort();}
     longjmp(failure,1);
 }
-void Con_Printf(char *fmt,...){}
+static char said[512];
+void Con_Printf(char *fmt,...){va_list args;va_start(args,fmt);vsnprintf(said,sizeof said,fmt,args);va_end(args);}
 void *Cache_Check(cache_user_t *c){return NULL;}
 void Cache_Free(cache_user_t *c){abort();}
 vec_t Length(vec3_t v){return (vec_t)sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);}
@@ -263,11 +269,31 @@ int main(int argc,char **argv){
             dheader_t h;aw_brush_arena_t a;model_t mod;
             assert(AW_BrushHeader(&h,image,image_bytes));
             arena_init(&a,AW_BrushBound(&h,0)/2,0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:small");
-            expect_error=1;
-            if(!setjmp(failure)){AW_BrushImage(&mod,image,image_bytes,&a);abort();}
-            expect_error=0;aw_brush_arena=NULL;
-            assert(a.used<=a.size);
+            /* Sys_Error would abort here (expect_error 0): the load says why and returns 0. */
+            assert(!AW_BrushImage(&mod,image,image_bytes,&a));
+            assert(!aw_brush_arena && !aw_brush_catch && a.used<=a.size);
+            assert(strstr(said,"exceeds its decoded-size bound") && strstr(said,"chunk unavailable"));
             printf("%s overflow stopped\n",argv[i]);
+        }else if(!strcmp(argv[1],"bad")){
+            dheader_t h;aw_brush_arena_t a;aw_brush_stream_t st;model_t mod;FILE *f;int used,r=0,steps=0,p=12345678;
+            dump_t d;byte *bad=malloc(image_bytes);
+            assert(bad && AW_BrushHeader(&h,image,image_bytes) && h.lumps[LUMP_NODES].filelen>=(int)sizeof(dnode_t));
+            /* the first node's plane far outside the plane lump */
+            memcpy(bad,image,image_bytes);memcpy(bad+h.lumps[LUMP_NODES].fileofs,&p,4);
+            arena_init(&a,AW_BrushBound(&h,0),0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:bad");said[0]=0;
+            assert(!AW_BrushImage(&mod,bad,image_bytes,&a));
+            assert(!aw_brush_arena && !aw_brush_catch && strstr(said,"Invalid BSP node data"));
+            /* The same image streamed from a file: the failing step returns -1, then 1 (finished). */
+            f=fopen("bad.bin","w+b");assert(f);fwrite(bad,1,image_bytes,f);
+            arena_init(&a,AW_BrushBound(&h,0),0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:badstream");said[0]=0;
+            assert(AW_BrushStreamBegin(&st,&mod,f,0,image_bytes,&a));
+            while(!(r=AW_BrushStreamStep(&st)))steps++;
+            assert(r==-1 && steps<AW_BRUSH_SECTIONS && AW_BrushStreamStep(&st)==1);
+            assert(!aw_brush_arena && !aw_bsp_file && !aw_brush_catch && loadmodel!=&mod && strstr(said,"chunk unavailable"));
+            fclose(f);free(bad);
+            /* A good load right after decodes as before. */
+            d=load_image(0,&used);free(d.data);
+            printf("%s bad data refused\n",argv[i]);
         }else return 2;
     }
     return 0;

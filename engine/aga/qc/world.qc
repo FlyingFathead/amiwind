@@ -105,6 +105,9 @@ void() aw_hands_update = {
 .float aw_hello_count;
 .float aw_manual_count;
 float aw_voice_deadline;
+/* A voice bark (aw_anim.c AW_VoiceSay): topic 0 attack, 1 hit, 2 flee, 3 idle; odds in percent. The engine
+ * rolls the odds and, for idle lines, checks sight and range (OpenMW Actors::playIdleDialogue). */
+float(entity actor, float topic, float odds) aw_bark = #82;
 entity aw_player;
 /* Small independent scene policy, not a full original dialogue evaluator. */
 void(entity npc, entity listener, float automatic) aw_greet = {
@@ -141,6 +144,9 @@ void() aw_npc_idle = {
     if (time < self.aw_next_poll) return;
     self.aw_next_poll = time + 0.25;
     distance = vlen(delta);
+    /* Idle voice line (OpenMW Actors::playIdleDialogue): fVoiceIdleOdds 10 = 0.6 % a second,
+     * within 3000 original units (750), in sight; 0.15 % per 0.25 s poll. */
+    if (distance < 750) aw_bark(self,3,0.15);
     if (distance >= self.aw_hello_reset && distance >= self.aw_hello_distance)
         self.aw_hello_done = 0;
     if (self.aw_hello_done || self.aw_hello_distance <= 0 ||
@@ -167,12 +173,14 @@ void() aw_npc_floor = {
     self.aw_next_pose = time + self.aw_idle_step;
     self.nextthink = time + self.aw_idle_step;
 };
+void(entity actor) aw_animprep = #81;
 void() aw_npc = {
     precache_model(self.model);
     if (self.aw_voice != "") precache_sound(self.aw_voice);
     self.movetype = 0;
     self.solid = 0;
     setmodel(self,self.model);
+    aw_animprep(self);   /* animation layout + footstep sounds (docs/ANIMATION.md) */
     setsize(self,'0 0 0','0 0 0');
     self.think = aw_npc_idle;
     self.yaw_speed = 22.5;
@@ -203,6 +211,12 @@ void() worldspawn = {
     precache_model("progs/player.mdl");
     precache_model("progs/v_nord.mdl");
     lightstyle(0,"m");
+    /* Light sources (tools/light_sources.py 'source' scheme, LIGHT-STYLES-UNDEFINED-33): 32 steady, 33-36
+       flicker, slow flicker, pulse, slow pulse; strings generated from the original's rates (style_strings). */
+    lightstyle(33,"jkmliiffhiklkjhgghjigfhhfefgfgjkmliikjkk");
+    lightstyle(34,"jjllmlkkiihgfffghiijklmlkjihggffghijjihg");
+    lightstyle(35,"jkmlihfeefijlmkigfdehikllkhgedfhjkmlihfe");
+    lightstyle(36,"jjllmlkkiihgfedeffhhijklmlkkiihgfedeffhh");
 };
 void() aw_static = {
     precache_model(self.model);
@@ -258,7 +272,8 @@ void() PlayerPreThink = {
     if (self.impulse == 201) { self.impulse = 0; aw_interact(); }
     aw_hands_update();
     if (self.button2) {
-        if (self.waterlevel >= 2) self.velocity_z = 140;
+        /* No swimming up in lava (contents -5, docs/LAVA.md): it is walked on. */
+        if (self.waterlevel >= 2 && self.watertype != -5) self.velocity_z = 140;
         else if (self.flags & 512) {
             self.velocity_z = 150;
             self.flags = self.flags - 512;
@@ -278,3 +293,8 @@ void(entity e) remove = #15;
 void() aw_flame = { remove(self); };
 /* World field from id's defs.qc: the texture wad named by worldspawn. */
 .string wad;
+/* Lava pools (docs/LAVA.md). The engine reads aw_lava entities (origin,
+ * _aw_lava_radius: an underscore key, so no edict field) straight from the
+ * map's entity text for the rising embers (aw_lava.c); the server removes them
+ * at once. The liquid itself is a world brush (CONTENTS_LAVA). */
+void() aw_lava = { remove(self); };

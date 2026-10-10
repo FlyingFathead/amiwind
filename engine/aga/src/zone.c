@@ -856,6 +856,35 @@ cache_system_t *Cache_TryAlloc (int size, qboolean nobottom)
 
 /*
 ============
+Cache_LargestFree
+
+AmiWind: the largest block Cache_TryAlloc would find now (the same bottom-up
+search), so an optional load can be refused instead of evicting anything.
+Read-only: no LRU change.
+============
+*/
+int Cache_LargestFree (void)
+{
+	cache_system_t	*cs;
+	byte			*start;
+	int				gap, best = 0;
+
+	start = hunk_base + hunk_low_used;
+	for (cs = cache_head.next ; cs != &cache_head ; cs = cs->next)
+	{
+		gap = (byte *)cs - start;
+		if (gap > best)
+			best = gap;
+		start = (byte *)cs + cs->size;
+	}
+	gap = (hunk_base + hunk_size - hunk_high_used) - start;
+	if (gap > best)
+		best = gap;
+	return best;
+}
+
+/*
+============
 Cache_Flush
 
 Throw everything out, so new data will be demand cached

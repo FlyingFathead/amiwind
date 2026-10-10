@@ -26,22 +26,38 @@ input[type=file],button{background:#203346;color:var(--ink);border:1px solid #45
 #options{position:absolute;right:0;top:42px;z-index:5;min-width:260px;background:var(--panel);border:1px solid #6a85a3;border-radius:8px;padding:10px 14px;box-shadow:0 6px 24px #0008;display:flex;flex-direction:column;gap:8px}
 #options[hidden]{display:none}
 #options h2{font-size:14px;margin:0 0 2px;color:#ffe28a}
-main{display:flex;flex-wrap:wrap;gap:16px;padding:16px}
+main{display:flex;flex-wrap:wrap;gap:16px;padding:8px 16px 16px}
 #stage{position:relative;flex:1 1 560px;min-width:0}
 .sbar{position:absolute;background:#0b1118cc;border-radius:5px;display:none;z-index:3}
 .sbar div{position:absolute;background:#9fb3c8aa;border-radius:5px;cursor:grab}
 .sbar div:hover,.sbar div.on{background:#ffd24acc}
-canvas{width:100%;height:auto;display:block;background:var(--empty);border:1px solid var(--line)}
+canvas{width:100%;height:auto;display:block;margin:0 auto;background:var(--empty);border:1px solid var(--line)}
 aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;line-height:1.6}
+#ctlbar{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:4px 16px;border-bottom:1px solid var(--line);background:#13202d}
+#ctlbar button{cursor:pointer;background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:3px 10px}
+#controls[hidden]{display:none}
+#strip{font-size:13px;color:var(--ink)}
+#stdot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#6b7a8a}
+#stdot[data-state="green"]{background:#46c37b;box-shadow:0 0 6px #46c37b}
+#stdot[data-state="amber"]{background:#ffb347}
+#stdot[data-state="red"]{background:#e5484d}
+#stlabel{margin-right:2px}
 #legend div{margin:2px 0}
+#legend label{cursor:pointer}
+#legend input{margin:0 6px 0 0;vertical-align:middle}
+#legendctl{margin:0 0 8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+#legendctl label{display:block;margin:3px 0}
+#legendctl select{max-width:100%;background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:4px}
+#legendctl .lbtns{display:inline-block;margin:2px 0}
+#relsummary{margin-top:4px;font-size:12px}
 #legend span{display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:6px;border:1px solid #0006}
 #tip{position:absolute;pointer-events:none;background:#101923ee;border:1px solid var(--line);padding:6px 8px;border-radius:4px;display:none;white-space:pre}
 .muted{color:var(--muted);font-size:12px}
-#selected{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);font-size:15px}
+#selected{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:4px 16px;border-bottom:1px solid var(--line);font-size:14px}
 #selected b{color:#ffe28a}
 #zoom{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2}
 #zoom button{width:38px;height:34px;font-size:18px;font-weight:700;padding:0;background:#203346ee;border:1px solid #6a85a3;border-radius:6px;cursor:pointer}
-#zoom button#zoomreset{width:auto;padding:0 10px;font-size:13px;font-weight:600}
+#zoom button#zoomreset,#zoom button#zoomfit{width:auto;padding:0 10px;font-size:13px;font-weight:600}
 #gridtoggle{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;z-index:2;background:#101923cc;border:1px solid #456;border-radius:6px;padding:3px 4px 3px 9px;font-size:13px;font-weight:600}
 #gridtoggle button{height:28px;padding:0 10px;font-size:13px;font-weight:600;background:#203346ee;border:1px solid #6a85a3;border-radius:5px;cursor:pointer;color:inherit}
 #gridtoggle button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
@@ -75,6 +91,15 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 #chimbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px;max-width:260px}
 #chimbar button,#chimbar input[type=file]{cursor:pointer}
 #chimcount{color:#46c37b;font-weight:600}
+#chimpanel .meshtitle{font-size:20px;margin:14px 0 4px;color:var(--ink)}
+#chimpanel .meshsub{font-size:14px;margin:0 0 8px}
+#chimpanel .meshpanel{margin:10px 0 14px}
+#chimpanel .meshpanel b{display:block;font-size:15px;margin-bottom:4px}
+#chimpanel .meshcv{display:block;width:100%;border:1px solid var(--line);border-radius:4px}
+#chimpanel .meshlegend{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:6px;font-size:14px}
+#chimpanel .meshkey i{display:inline-block;width:30px;height:5px;margin-right:8px;vertical-align:middle;border-radius:2px}
+#chimpanel .meshsentence{font-size:14px;color:var(--muted);max-width:900px}
+#chimpanel .meshhook{position:absolute;opacity:0;pointer-events:none}
 #chimpanel{flex:1 1 100%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;overflow-x:auto}
 #chimpanel h2{font-size:16px;margin:0 0 8px;color:#ffe28a}
 #chimpanel h3{font-size:14px;margin:14px 0 6px;color:var(--ink)}
@@ -117,6 +142,13 @@ table.mt small{opacity:.8}
 </head>
 <body>
 <div id="chimhead" hidden aria-label="CHIM Progress Tracker headline"></div>
+<div id="ctlbar"><button id="ctltoggle" aria-expanded="true" title="Show or hide the file, layer, metrics and CHIM controls">Controls &#9662;</button>
+  <span id="strip"><i id="stdot" data-state="grey"></i><b id="stlabel">no data</b>
+    · Source: <span id="stsrc">nothing loaded</span>
+    · Last updated: <span id="stupd">not yet</span> <span id="stago"></span>
+    · Auto-update: <label><input type="checkbox" id="chimlive" title="Read the progress again on every interval (a running build keeps it current)"> <b id="stauto">OFF</b></label></span>
+  <span id="livestatus" class="muted"></span></div>
+<div id="controls">
 <header>
   <h1 id="pagetitle">AmiWind Toolkit · World Map</h1>
   <span role="tablist"><button class="mode on" id="mode-world" role="tab">World</button>
@@ -152,8 +184,10 @@ table.mt small{opacity:.8}
   <button id="chimcsv" title="The cells shown (after the filter) as a CSV file: status, audits and every numeric stat">Export CSV</button>
   <button id="chimjson" title="The cells shown (after the filter) as a JSON file, records and stats in full">Export JSON</button>
   <label>Import progress <input id="chimfile" type="file" accept=".json"></label>
+  <label title="The project's reference progress file (cell-progress-reference.json): adds a Compare colouring, same / better / worse per cell">Compare with <input id="chimreffile" type="file" accept=".json"></label>
   <button id="chimreload" title="Read the progress file again (served mode)">Reload progress</button>
   <span id="chimcount">No CHIM progress loaded: serve it with toolkit_serve.py --progress, or import cell-progress.json.</span>
+</div>
 </div>
 <div id="selected">Selected area: click a cell on the map</div>
 <div id="multi" class="muted" style="color:#ffd24a"></div>
@@ -161,12 +195,18 @@ table.mt small{opacity:.8}
   <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="tip"></div>
     <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
     <div id="gridtoggle" role="group" aria-label="Cell grid">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button></div>
-    <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomreset" title="Whole island">reset</button><button id="zoomin" title="Zoom in">+</button></div>
+    <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomfit" title="Fit the whole map to the window">fit</button><button id="zoomreset" title="Back to the fitted view">reset</button><button id="zoomin" title="Zoom in">+</button></div>
     <div id="picked" class="muted">Click a cell to show it here.</div></div>
   <aside>
     <div id="ctaslot"></div>
     <div id="summary" class="muted">Load world-progress.json from an image build.</div>
     <div id="metricssummary"></div>
+    <div id="legendctl" hidden>
+      <label>Preset <select id="chimpreset" aria-label="Legend preset"></select></label>
+      <span class="lbtns"><button id="legall" title="Tick every legend row">all</button><button id="legnone" title="Untick every legend row">none</button></span>
+      <label>Version <select id="chimrelease" aria-label="Release filter"></select></label>
+      <div id="relsummary" class="muted"></div>
+    </div>
     <div id="legend"></div>
     <p class="muted">North is up; one square per exterior cell. The topomap (open-world
     terrain, converted for the whole island) is the basis; every other layer sits on
@@ -207,6 +247,10 @@ table.mt small{opacity:.8}
   <iframe id="inspector3d" title="3D Map Inspector"></iframe>
 </section>
 <script src="chim-head.js"></script>
+<script src="zebra.js"></script>
+<script src="header.js"></script>
+<script src="chim-legend.js"></script>
+<!--AW-LIVE-DATA-->
 <script>
 const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
 let data = null, maxOriginal = 1;
@@ -323,9 +367,57 @@ let bottom = 'topo';
 function on(id) {
   const base = LAYERS.find(L => L.id === id && L.kind === 'base');
   if (base) return bottom === base.style; const el = $('layer-' + id); return el && el.checked; }
+// The canvas is sized to the window: the whole map (every island of the loaded data) fits the visible area at zoom 1, so the
+// "fit" view is the default; zooming out further (down to MIN_ZOOM) shrinks the map inside the canvas, centred.
+// The control rows (files, layers, metrics, CHIM bar) fold away so the map gets the window: collapsed by default in a window
+// shorter than 900 px, and this viewer's choice is remembered.
+function ctlApply(open) {
+  $('controls').hidden = !open; $('ctltoggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('ctltoggle').innerHTML = 'Controls ' + (open ? '&#9662;' : '&#9656;');
+}
+function ctlState() {
+  try { const v = window.localStorage.getItem('amiwind-map-controls-1'); if (v === 'open' || v === 'closed') return v === 'open'; } catch (_) { /* no storage */ }
+  return window.innerHeight >= 900;
+}
+$('ctltoggle').onclick = () => {
+  const open = $('controls').hidden;
+  ctlApply(open);
+  try { window.localStorage.setItem('amiwind-map-controls-1', open ? 'open' : 'closed'); } catch (_) { /* no storage */ }
+  draw();
+};
+ctlApply(ctlState());
+const MIN_ZOOM = 0.2, MAX_ZOOM = 16, LABEL_MIN_PX = 16;
+function fitCanvas(g) {
+  const st = $('stage'), avail = st.clientWidth;
+  if (!avail) return;
+  const docTop = st.getBoundingClientRect().top + window.scrollY, availH = Math.max(160, window.innerHeight - docTop - 8), aspect = g.w / g.h;
+  const w = Math.max(240, Math.floor(Math.min(avail, availH * aspect)));
+  canvas.style.width = w + 'px'; canvas.style.height = Math.floor(w / aspect) + 'px';
+}
+function cellPx(g) { return g.s * view.z * (canvas.clientWidth || g.w) / g.w; }   // one cell's size on the screen, in CSS pixels
+let viewSaveTimer = null;
+function viewSaveSoon() {
+  if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
+  clearTimeout(viewSaveTimer);
+  viewSaveTimer = setTimeout(() => {
+    try {
+      const g = geometry();
+      window.localStorage.setItem('amiwind-map-view-1', JSON.stringify(view.z === 1 && view.x === 0 && view.y === 0 ? {fit: true} :
+        {z: view.z, fx: view.x / g.w, fy: view.y / g.h}));
+    } catch (_) { /* no storage: fine */ }
+  }, 400);
+}
+function viewRestore() {      // the first load: fit, unless this viewer left the map zoomed or panned
+  try {
+    const v = JSON.parse(window.localStorage.getItem('amiwind-map-view-1') || 'null'), g = geometry();
+    if (v && !v.fit && isFinite(v.z)) { view.z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.z)); view.x = v.fx * g.w; view.y = v.fy * g.h; clampView(); }
+  } catch (_) { /* start fitted */ }
+}
+function viewFit() { view.z = 1; view.x = view.y = 0; draw(); }
 function draw() {
   if (!data && !metrics && !chim) return;
   const g = geometry();
+  fitCanvas(g);
   // Backing store at display size x device pixels, so text and lines stay sharp.
   const ratio = Math.max(1, (canvas.clientWidth || g.w) * (window.devicePixelRatio || 1) / g.w);
   const bw = Math.round(g.w * ratio), bh = Math.round(g.h * ratio);
@@ -336,7 +428,8 @@ function draw() {
   const legend = [];
   for (const L of LAYERS) {
     if (!on(L.id)) continue;
-    if (L.legend) legend.push(...L.legend);
+    if (L.legend) legend.push(...L.legend.map((r, i) => [r[0], r[1], L.id + ':' + i]));
+    if (legendOff.has(L.id + ':0') && L.kind !== 'fill' && L.kind !== 'chim' && L.kind !== 'metrics' && L.kind !== 'base') continue;
     if (L.kind === 'base') {
       const im = images[L.style];
       ctx.imageSmoothingEnabled = false;  // terrain images keep crisp cell pixels
@@ -357,6 +450,7 @@ function draw() {
     for (const c of (data ? data.cells : [])) {
       if (L.kind === 'fill') {
         const col = L.colour(c); if (!col) continue;
+        if (legendOff.size && L.legend && legendOff.has(L.id + ':' + L.legend.findIndex(r => r[0] === col))) continue;
         ctx.globalAlpha = anyImage() ? L.alpha : 1; ctx.fillStyle = col;
         ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1); ctx.globalAlpha = 1;
       } else L.mark(g, c);
@@ -371,7 +465,11 @@ function draw() {
   }
   if (picked) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / view.z; ctx.strokeRect(g.px(picked.x) + 1, g.py(picked.y) + 1, g.s - 2, g.s - 2); }
   scrollbars();
-  $('legend').innerHTML = legend.map(([c, t]) => '<div><span style="background:' + c + '"></span>' + t + '</div>').join('');
+  viewSaveSoon();
+  legendKeys = legend.filter(r => r[2]).map(r => r[2]);
+  $('legend').innerHTML = legend.map(([c, t, k]) => '<div><label>' + (k ? '<input type="checkbox" data-k="' + escapeHtml(k) + '"' + (legendOff.has(k) ? '' : ' checked') + ' aria-label="Show ' + escapeHtml(t.replace(/<[^>]*>/g, '')) + '">' :
+    '<input type="checkbox" checked disabled title="A scale, not a set of rows: nothing to untick">') + '<span style="background:' + c + '"></span>' + t + '</label></div>').join('');
+  legendCtl();
 }
 function emptyMessage() {
   ctx.fillStyle = '#9fb3c8'; ctx.font = '20px system-ui, sans-serif'; ctx.textAlign = 'center';
@@ -409,6 +507,8 @@ if (SERVED) autoload();
 // Standalone (not inside the toolkit page): offer the inspector as a link.
 if (window.parent === window) $('toinspector').style.display = 'inline';
 else { $('pagetitle').style.display = 'none'; document.querySelector('[role=tablist]').style.display = 'none'; }
+// Opened on its own, the page carries the Toolkit's shared header (logo, Toolkit, version) with its own name as the subtitle.
+if (window.AmiWindToolkitHeader) window.AmiWindToolkitHeader.mount('World Map');
 // Main layer bar; less-used layers (option: true) live behind the Options cog.
 const layerBox = L => '<label><input type="checkbox" id="layer-' + L.id + '"' + (L.on ? ' checked' : '') + '> ' + L.name + '</label>';
 $('layers').innerHTML = '<span class="bottomsel"><b>Bottom layer</b><button id="bprev" aria-label="Previous bottom layer">&lsaquo;</button>' +
@@ -561,22 +661,24 @@ for (const [id, axis] of [['hbar', 'x'], ['vbar', 'y']]) {
     scrollTo(axis, pos - 0.5 / view.z);  // centre the view on the clicked spot
   });
 }
-window.addEventListener('resize', () => scrollbars());
+window.addEventListener('resize', () => { draw(); scrollbars(); });
 function clampView() {
-  view.z = Math.max(1, Math.min(16, view.z));
+  view.z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, view.z));
   const g = geometry();
+  if (view.z < 1) { view.x = g.w * (1 - view.z) / 2; view.y = g.h * (1 - view.z) / 2; return; }    // zoomed out: centred
   view.x = Math.min(0, Math.max(g.w * (1 - view.z), view.x));
   view.y = Math.min(0, Math.max(g.h * (1 - view.z), view.y));
 }
 function zoomAt(f, cx, cy) {
   const z = view.z;
-  view.z = Math.max(1, Math.min(16, z * f));
+  view.z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z * f));
   view.x = cx - (cx - view.x) * view.z / z; view.y = cy - (cy - view.y) * view.z / z;
   clampView(); draw();
 }
 $('zoomin').onclick = () => { const g = geometry(); zoomAt(1.6, g.w / 2, g.h / 2); };
 $('zoomout').onclick = () => { const g = geometry(); zoomAt(1 / 1.6, g.w / 2, g.h / 2); };
-$('zoomreset').onclick = () => { view.z = 1; view.x = view.y = 0; draw(); };
+$('zoomreset').onclick = viewFit;
+$('zoomfit').onclick = viewFit;
 canvas.addEventListener('wheel', e => {
   if (!data && !metrics && !chim) return;
   e.preventDefault();
@@ -652,7 +754,7 @@ function drawPois(g) {
   }
   ctx.font = '600 ' + (Math.max(10, Math.round(g.s * .55)) / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const p of cellsDetail.pois) {
-    if (p.kind !== 'place') continue;
+    if (p.kind !== 'place' || cellPx(g) < LABEL_MIN_PX) continue;      // small labels are hidden when zoomed far out
     ctx.lineWidth = 3; ctx.strokeStyle = '#000000cc'; ctx.strokeText(p.name, px(p.x), py(p.y));
     ctx.fillStyle = '#ffe28a'; ctx.fillText(p.name, px(p.x), py(p.y));
   }
@@ -726,7 +828,7 @@ function drawMetrics(g) {
   }
   ctx.globalAlpha = 1; ctx.strokeStyle = '#000000'; ctx.lineWidth = 1.5 / view.z;
   for (const c of metrics.cells) if (c.set === 'bloodmoon') ctx.strokeRect(g.px(c.x) + 1, g.py(c.y) + 1, g.s - 2, g.s - 2);
-  if (!$('townlabels').checked) return;
+  if (!$('townlabels').checked || cellPx(g) < LABEL_MIN_PX) return;
   // Town labels as on the chart: a cell name held by two or more cells, at their centre.
   for (const [name, cs] of townGroups()) {
     if (cs.length < 2) continue;
@@ -1107,15 +1209,68 @@ window.addEventListener('keydown', e => {
 // next to it, per-mechanism audits, linked bugs, the sweep orders (spiral from the coast inwards, risk scout list)
 // and the store-once mesh reuse numbers. Unknown is "not measured", never guessed.
 const CHIM_FORMAT = 'aw-cell-progress-1';
+// "Awaiting lighting" cells: the complete green crossed by cyan stripes (zebra.js, the inspector's zebra tile).
+const CHIM_ZEBRA = '#00e5ff';
+// Eligible for the next release (tools/cell_progress.py ELIGIBLE): every done cell, empty sea included, lighting done or not.
+const CHIM_ELIGIBLE = new Set(['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'empty_sea']);
 const CHIM_BUCKETS = {
   complete: ['#7dffa6', 'Cell complete: terrain and every placed object converted, all audits passed (solid white border around a group)'],
   terrain_complete: ['#7dffa6', 'Terrain complete: all audits passed, everything but actors converted'],
+  complete_unlit: ['#7dffa6', 'Cell complete, awaiting lighting: everything but the lighting audit (zebra, white border)', CHIM_ZEBRA],
+  terrain_complete_unlit: ['#7dffa6', 'Terrain complete, awaiting lighting: everything but actors and the lighting audit (zebra)', CHIM_ZEBRA],
   approved: ['#ffd23f', 'owner-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],
   converted_failing: ['#e5484d', 'converted, failing audits'], not_converted: ['#c2185b', 'not converted (tried, could not finish)'], converted_unmeasured: ['#6ea4df', 'converted, nothing measured'],
   not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'], hull_policy_pending: ['#b07ae0', 'hull policy pending']};
 const CHIM_GRADES = {A: '#32cfa0', B: '#7fd36b', C: '#e0c341', D: '#c8803c', E: '#5a2a2a'};
 const CHIM_AUDIT = {passed: '#46c37b', failed: '#e5484d', accepted: '#ffcf55', not_measured: '#4a5d72'};
+// Lighting audit (tools/cell_lighting.py): lit like the original is required for both completion levels.
+const CHIM_LIGHTING = {lit: ['#ffe066', 'lit: every light baked, every surface lit'], partial: ['#d9822b', 'partial: some light reaches the frame (e.g. night lamps only)'],
+  unlit: ['#5b2a86', 'unlit: no light source and no lit surface'], not_measured: ['#3a4f66', 'lighting not measured (not converted)']};
+// Lava audit (tools/cell_lava.py, docs/LAVA.md): molten lava pools of the original, mapped / converted as Quake liquid.
+const CHIM_LAVA = {converted: ['#ffd166', 'lava converted: every pool a Quake liquid'], partial: ['#ff7a3d', 'lava partly converted'],
+  molten: ['#d7261e', 'lava mapped, not converted'], static: ['#8a5a44', 'built with --lava static (pools not liquid)'],
+  not_measured: ['#3a4f66', 'lava not measured (census without lava counts)']};
 const CHIM_NEXT = 25;
+// Legend checkboxes (chim-legend.js): unticked rows dim their cells; remembered per viewer in localStorage.
+let legendOff = new Set(), legendKeys = [], relFilter = '', chimRef = null;
+const CHIM_COMPARE = {same: ['#6c7a89', 'same status as the project reference'], better: ['#35d07f', 'better than the project reference'],
+  worse: ['#ff7a3d', 'worse than the project reference'], missing: ['#2a3a4c', 'no counterpart in the reference']};
+function chimCompareClass(c) { return window.ChimLegend.compareClass(c, chimRef && chimRef.cells[c.x + ',' + c.y], chimRef && chimRef.rank || {}); }
+function legendState() { return {colour: cset.colour, off: [...legendOff].filter(k => k.startsWith(cset.colour === 'lighting' ? 'chim:lighting:' : cset.colour === 'lava' ? 'chim:lava:' : 'chim:status:')), rel: relFilter}; }
+function legendSave() {
+  try { window.ChimLegend.save(window.localStorage, {colour: cset.colour, off: [...legendOff], rel: relFilter}); } catch (_) { /* no storage: fine */ }
+}
+function legendRestore() {
+  let st = null;
+  try { st = window.ChimLegend.load(window.localStorage); } catch (_) { st = null; }
+  if (!st) return;
+  legendOff = new Set(st.off); relFilter = st.rel; if (st.colour) cset.colour = st.colour;
+}
+function legendActive() { return relFilter !== '' || [...legendOff].some(k => k.startsWith('chim:')); }
+function chimVisible(c) {
+  const cmp = cset.colour === 'compare' ? chimCompareClass(c) : null;
+  return window.ChimLegend.visible(legendOff, relFilter, cset.colour, c, cmp);
+}
+// Preset pull-down, all/none, version pull-down and its summary line (shown with the CHIM layer).
+function legendCtl() {
+  const box = $('legendctl'); if (!box) return;
+  box.hidden = !chimOn();
+  if (!chimOn()) return;
+  const rel = chim.headline && chim.headline.eligible_release, L = window.ChimLegend;
+  const cur = L.matchPreset(legendState(), rel);
+  $('chimpreset').innerHTML = L.presets(rel).map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('') +
+    '<option value="custom">Custom (your ticks)</option>';
+  $('chimpreset').value = cur;
+  const names = (chim.releases || []).filter(r => r.release);
+  $('chimrelease').innerHTML = '<option value="">All versions</option>' + names.map(r => '<option value="' + escapeHtml(r.release) + '">' + escapeHtml(r.release) + (r.shipped ? ' (shipped)' : '') + '</option>').join('') +
+    '<option value="__none">Unassigned</option><option value="__any">Assigned to any version</option>';
+  if (![...$('chimrelease').options].some(o => o.value === relFilter)) relFilter = '';
+  $('chimrelease').value = relFilter;
+  const rows = (chim.releases || []).filter(r => r.approved && (!relFilter || relFilter === '__any' ? !!r.release : relFilter === '__none' ? !r.release : r.release === relFilter));
+  $('relsummary').textContent = rows.length ? rows.map(r => (r.release || 'unassigned') + (r.shipped ? ' (shipped)' : '') + ': ' + r.approved.toLocaleString() + ' cells · ' + r.complete +
+    ' complete · ' + r.awaiting_lighting + ' awaiting lighting · ' + r.lit + ' lit · ' + r.failing + ' failing').join(' | ') : 'No cells are assigned to a release yet.';
+}
+function legendSet(state) { legendOff = new Set([...legendOff].filter(k => !k.startsWith('chim:')).concat(state.off)); relFilter = state.rel; cset.colour = state.colour; }
 let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, chimBucket = null, chimSource = null,
   chimImported = false, chimNext = {spiral: new Map(), risk: new Map()}, chimNextDoc = null, chimMaxRing = 1, chimMaxElapsed = 1;
 const cset = {colour: 'status', order: 'spiral', filter: '', nums: true, next: true};
@@ -1127,12 +1282,15 @@ function chimOpenBugs(c) {
 function chimMech(id) { const m = chim.mechanisms.find(m => m.id === id); return m ? m.label : id; }
 function chimColour(c) {
   const m = cset.colour;
+  if (m === 'compare') return chimRef && (c.land || c.chim.bucket === 'empty_sea') ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
   if (m === 'status') return c.land || c.chim.converted || c.chim.bucket === 'empty_sea' ? CHIM_BUCKETS[c.chim.bucket][0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
   if (m === 'ring') {
     if (c.ring == null) return null;
     return c.ring === 0 ? '#7a7a7a' : 'hsl(' + Math.round(205 - 195 * (c.ring - 1) / Math.max(1, chimMaxRing - 1)) + ',68%,48%)';
   }
   if (m === 'scout') return c.risk ? metricColour(c.risk.score) : null;
+  if (m === 'lighting') return c.lighting && (c.land || c.chim.converted) ? CHIM_LIGHTING[c.lighting.status][0] : null;
+  if (m === 'lava') return c.lava && CHIM_LAVA[c.lava.status] ? CHIM_LAVA[c.lava.status][0] : null;
   if (m === 'legacy') return c.legacy ? CHIM_GRADES[c.legacy.grade] : null;
   if (m === 'bugs') { const n = chimOpenBugs(c).length; return n ? heat(Math.min(1, n / 30)) : null; }
   if (m === 'lastbuild') {
@@ -1149,6 +1307,7 @@ function chimMatch(c) {
   const f = cset.filter;
   if (!f) return true;
   if (f === 'failing') return c.audit_counts.failed > 0;
+  if (f === 'eligible') return CHIM_ELIGIBLE.has(c.chim.bucket);
   if (f === 'unmeasured') return c.chim.converted && c.audit_counts.not_measured > 0;
   const [kind, id] = f.split(':'), a = c.audits[id];
   if (!a || !c.chim.converted) return false;
@@ -1156,26 +1315,33 @@ function chimMatch(c) {
 }
 function chimLegend() {
   const m = cset.colour;
-  if (m === 'status') return Object.values(CHIM_BUCKETS).map(([c, t]) => [c, t]);
+  if (m === 'status') return Object.entries(CHIM_BUCKETS).map(([k, [c, t, z]]) => [z ? chimZebraCss(c, z) : c, t, 'chim:status:' + k]);
+  if (m === 'lighting') return Object.entries(CHIM_LIGHTING).map(([k, [c, t]]) => [c, t, 'chim:lighting:' + k]);
+  if (m === 'lava') return Object.entries(CHIM_LAVA).map(([k, [c, t]]) => [c, t, 'chim:lava:' + k]);
+  if (m === 'compare') return Object.entries(CHIM_COMPARE).map(([k, [c, t]]) => [c, t, 'chim:compare:' + k]);
   if (m === 'ring') return [['hsl(205,68%,48%)', 'ring 1 (coast)'], ['hsl(110,68%,48%)', 'inner rings'], ['hsl(10,68%,48%)', 'innermost ring'], ['#7a7a7a', 'ring 0: sea-only cells with content']];
   if (m === 'scout') return [['#e8f1fb', 'share of the tightest engine limit, up to 50 %'], ['#4387d2', '80-90 %'], ['#c8423f', 'over a limit (risk > 100 %)']];
-  if (m === 'legacy') return Object.entries(CHIM_GRADES).map(([g, c]) => [c, 'legacy ' + g + ': ' + ({A: 'full map, 80 %+ placed', B: 'full town/area map', C: 'terrain, some placed', D: 'terrain only', E: 'no terrain'}[g])]);
+  if (m === 'legacy') return Object.entries(CHIM_GRADES).map(([g, c]) => [c, 'legacy ' + g + ': ' + ({A: 'full map, 80 %+ placed', B: 'full town/area map', C: 'terrain, some placed', D: 'terrain only', E: 'no terrain'}[g]), 'chim:grade:' + g]);
   if (m === 'bugs') return [['#1f3b73', 'open bugs linked to the cell (few)'], ['#ef4545', 'many']];
   if (m === 'lastbuild') return [['#1f3b73', 'quick last build'], ['#ef4545', 'slow'], ['#555f6b', 'no ledger entry']];
-  return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, owner-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t]);
+  return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, owner-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t, 'chim:audit:' + k]);
 }
-function chimIsComplete(c) { return c.chim.bucket === 'complete'; }
+function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucket === 'complete_unlit'; }
+// Zebra only for the awaiting-lighting statuses, only in the status colouring.
+function chimZebra(c) { const b = CHIM_BUCKETS[c.chim.bucket]; return cset.colour === 'status' && b && b[2] ? b[2] : null; }
+function chimZebraCss(base, stripe) { return 'repeating-linear-gradient(135deg,' + base + ' 0 4px,' + stripe + ' 4px 7px)'; }
 function chimPx(g) { return g.s * view.z * (canvas.clientWidth || g.w) / g.w; }
 function drawChim(g) {
-  const px = chimPx(g), dim = chimBucket || cset.filter;
+  const px = chimPx(g), dim = chimBucket || cset.filter || legendActive();
   for (const c of chimCellList) {
     const col = chimColour(c); if (!col) continue;
-    const hit = (!cset.filter || chimMatch(c)) && (!chimBucket || (c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket);
-    ctx.globalAlpha = (anyImage() ? .85 : 1) * (dim && !hit ? .14 : 1); ctx.fillStyle = col;
+    const hit = chimVisible(c) && (!cset.filter || chimMatch(c)) && (!chimBucket || (c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket);
+    const zebra = chimZebra(c);
+    ctx.globalAlpha = (anyImage() ? .85 : 1) * (dim && !hit ? .14 : 1); ctx.fillStyle = zebra ? ZebraPattern(ctx, col, zebra) : col;
     ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1);
   }
   ctx.globalAlpha = 1;
-  groupOutline(g, chimCellList.filter(chimIsComplete));
+  groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));
   if (chimBucket) for (const c of chimCellList) if ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket) outline(g, c, '#ffe28a', 2.5);
   const showOrder = cset.next ? chimNext[cset.order] : new Map(), other = cset.next ? chimNext[cset.order === 'spiral' ? 'risk' : 'spiral'] : new Map();
   if (cset.next) {
@@ -1354,7 +1520,7 @@ $('chimsearch').addEventListener('keydown', ev => {
 $('chimresults').addEventListener('click', ev => { const d = ev.target.closest('div[data-i]'); if (d) chimGo(chimIndex[+d.dataset.i]); });
 document.addEventListener('click', ev => { if (!ev.target.closest('#chimsearchwrap')) $('chimresults').hidden = true; });
 // Export what is shown: CSV (status, audits and every numeric stat) or JSON (records in full).
-function chimShown() { return chimCellList.filter(c => chimMatch(c) && (!chimBucket || ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket))); }
+function chimShown() { return chimCellList.filter(c => chimVisible(c) && chimMatch(c) && (!chimBucket || ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket))); }
 function flatNums(o, pre, out) {
   for (const [k, v] of Object.entries(o || {})) {
     if (typeof v === 'number') out[pre + k] = v;
@@ -1402,6 +1568,94 @@ function chimTotalsBlock() {
     '<h4>Per object type</h4>' + [[t.all, 'All land cells']].concat(t.islands.map(i => [i, islandName(i.island)]).concat(t.islands.flatMap(i => i.rings.map(r => [r, islandName(i.island) + ', ring ' + r.ring]))))
       .map(([g, label]) => '<details><summary>' + label + '</summary>' + chimCatTable(g.by_category) + '</details>').join('') + '</details>';
 }
+
+// ---- The store-once chart (owner, 2026-10-09: "what is this chart trying to tell?"). The title is the takeaway; two panels
+// with 14 px+ text, every legend OUTSIDE the plot, a log axis so the no-reuse line fits, ring labels staggered above panel (a).
+const MESH_COL = {store: '#4fc3f7', risk: '#ffcf55', own: '#ff7b72'};
+const MESH_SENTENCE = 'Spiral order grows one contiguous playable area from the coast inwards. Risk order meets the most distinct meshes first, so a bug in a mesh shows up early.';
+let chimCurve = null;      // mesh-curve.json (served as cell-progress-curve.json), the exact reuse curve of the census
+function chimMeshSeries() {
+  const mc = chim.mesh_curve || {};
+  if (chimCurve && chimCurve.spiral && chimCurve.spiral.points.length)
+    return {spiral: chimCurve.spiral.points, risk: chimCurve.risk ? chimCurve.risk.points : null, unique: chimCurve.unique_meshes,
+      rings: (chimCurve.spiral.rings || []).filter(r => r.ring && (r.ring === 1 || r.ring % 3 === 0)).map(r => [r.cumulative_cells, (r.island > 1 ? 'island ' + r.island + ' ' : '') + 'ring ' + r.ring])};
+  if (mc.spiral_points && mc.spiral_points.length)
+    return {spiral: mc.spiral_points, risk: mc.risk_points || null, unique: mc.unique_meshes, rings: mc.ring_marks || []};
+  return null;
+}
+async function loadChimCurve() {
+  if (!SERVED) return;
+  try {
+    const r = await fetch('../data/cell-progress-curve.json?t=' + Date.now(), {cache: 'no-store'});
+    if (r.status === 200) { chimCurve = await r.json(); if (chimOn() && !chimClicked && !chimShownInterior) $('chimpanel').innerHTML = chimOverview(); }
+  } catch (_) { /* no curve served */ }
+}
+function chimMeshView() {
+  const ser = chimMeshSeries(), mc = chim.mesh_curve || {}, n = x => Math.round(x).toLocaleString();
+  const last = ser ? ser.spiral[ser.spiral.length - 1] : null;
+  const unique = ser ? (ser.unique || last[1]) : mc.unique_meshes;
+  const without = last ? last[2] : chimCellList.reduce((t, c) => t + (c.contents && c.contents.unique_meshes || 0), 0);
+  if (!unique || !without) return '<h3 class="meshtitle">Store-once mesh reuse</h3><p class="muted">No mesh figures yet: ingest with --data-files.</p>';
+  const ratio = without / unique;
+  const title = 'Store-once: ' + n(unique) + ' mesh conversions instead of ' + n(without) + ' (' + (ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)) + 'x fewer)';
+  const key = (col, text) => '<span class="meshkey"><i style="background:' + col + '"></i>' + escapeHtml(text) + '</span>';
+  return '<h3 class="meshtitle">' + escapeHtml(title) + '</h3>' +
+    '<p class="muted meshsub">' + n(mc.cells_with_meshes || (last ? last[0] : 0)) + ' cells hold placements; every mesh is converted once and placed by reference. ' + (mc.meshes_in_one_cell_only != null ? n(mc.meshes_in_one_cell_only) + ' meshes appear in one cell only.' : '') + '</p>' +
+    (ser ? '' : '<p class="muted">The curve itself loads with toolkit_serve.py --progress, or from the next ingest of this data.</p>') +
+    (ser ? '<div class="meshpanel"><b>(a) Meshes converted so far: store-once against every cell converting its own meshes (log scale)</b>' +
+    '<canvas class="meshcv" data-mesh="a" height="320"></canvas>' +
+    '<div class="meshlegend">' + key(MESH_COL.own, 'Every cell converts its own meshes (no reuse)') + key(MESH_COL.store, 'Store-once: each mesh converted one time, placed by reference') + '</div></div>' +
+    '<div class="meshpanel"><b>(b) Two sweep orders: distinct meshes met so far</b>' +
+    '<canvas class="meshcv" data-mesh="b" height="260"></canvas>' +
+    '<div class="meshlegend">' + key(MESH_COL.store, 'Spiral order: coast inwards, one contiguous area') + (ser.risk ? key(MESH_COL.risk, 'Risk order: riskiest cells first (cells with estimates)') : '') + '</div>' +
+    (ser.risk ? '' : '<p class="muted">The risk order curve comes with the next ingest of this data.</p>') + '</div>' : '') + '<p class="meshsentence">' + escapeHtml(MESH_SENTENCE) + '</p>' +
+    '<img class="meshhook" alt="" width="1" height="1" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onload="chimMeshDraw(this.parentNode)">';
+}
+function chimMeshDraw(root) {
+  const ser = chim && chimMeshSeries(); if (!ser || !ser.spiral.length) return;      // the curve data may not have arrived yet
+  for (const cv of root.querySelectorAll('canvas[data-mesh]')) {
+    const w = Math.max(360, Math.floor(cv.parentNode.clientWidth || 700)), h = +cv.getAttribute('height'), ratio = window.devicePixelRatio || 1;
+    cv.width = w * ratio; cv.height = h * ratio; cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    const g = cv.getContext('2d'); g.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const L = 74, R = 92, T = cv.dataset.mesh === 'a' ? 54 : 16, B = 58, pw = w - L - R, ph = h - T - B;
+    const xmax = Math.max(1, ...ser.spiral.map(p => p[0]), ...(ser.risk || []).map(p => p[0]));
+    const X = v => L + pw * v / xmax;
+    g.fillStyle = '#101923'; g.fillRect(0, 0, w, h);
+    g.font = '14px system-ui, sans-serif'; g.textBaseline = 'middle';
+    let Y, ticks;
+    if (cv.dataset.mesh === 'a') {
+      const top = Math.max(10, ...ser.spiral.map(p => p[2])), dec = Math.ceil(Math.log10(top));
+      Y = v => T + ph - ph * Math.log10(Math.max(1, v)) / dec;
+      ticks = Array.from({length: dec + 1}, (_, k) => Math.pow(10, k));
+    } else {
+      const top = Math.max(...ser.spiral.map(p => p[1]), ...(ser.risk || []).map(p => p[1])) * 1.06;
+      Y = v => T + ph - ph * v / top;
+      ticks = [0, 1, 2, 3, 4].map(i => top * i / 4);
+    }
+    g.strokeStyle = '#2a3b4d'; g.lineWidth = 1; g.fillStyle = '#b6c7d8'; g.textAlign = 'right';
+    for (const t of ticks) { g.beginPath(); g.moveTo(L, Y(t)); g.lineTo(L + pw, Y(t)); g.stroke(); g.fillText(Math.round(t).toLocaleString(), L - 8, Y(t)); }
+    g.strokeStyle = '#b6c7d8'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L, T); g.lineTo(L, T + ph); g.lineTo(L + pw, T + ph); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    for (let i = 0; i <= 5; i++) g.fillText(Math.round(xmax * i / 5).toLocaleString(), X(xmax * i / 5), T + ph + 6);
+    g.fillStyle = '#edf3fa'; g.fillText('cells converted (in sweep order)', L + pw / 2, T + ph + 28);
+    g.save(); g.translate(16, T + ph / 2); g.rotate(-Math.PI / 2); g.textBaseline = 'middle'; g.fillText('meshes converted', 0, 0); g.restore();
+    const line = (pts, i, col) => { g.strokeStyle = col; g.lineWidth = 3; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p[0]), Y(p[i])) : g.moveTo(X(p[0]), Y(p[i]))); g.stroke(); };
+    const endLabel = (pts, i, col) => { const p = pts[pts.length - 1]; g.fillStyle = col; g.font = '700 15px system-ui, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(Math.round(p[i]).toLocaleString(), L + pw + 8, Y(p[i])); g.font = '14px system-ui, sans-serif'; };
+    if (cv.dataset.mesh === 'a') {
+      line(ser.spiral, 2, MESH_COL.own); line(ser.spiral, 1, MESH_COL.store);
+      endLabel(ser.spiral, 2, MESH_COL.own); endLabel(ser.spiral, 1, MESH_COL.store);
+      g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+      ser.rings.forEach(([x, text], i) => {      // staggered over two rows above the plot, never inside it
+        const row = i % 2 ? 36 : 14;
+        g.strokeStyle = '#6f8aa6'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(x), T - (row === 14 ? 24 : 6)); g.lineTo(X(x), T); g.stroke();
+        g.fillStyle = '#b6c7d8'; const tw = g.measureText(text).width; g.textAlign = X(x) + 6 + tw > w ? 'right' : 'left'; g.fillText(text, X(x) + (g.textAlign === 'right' ? -3 : 3), T - (row === 14 ? 26 : 8)); g.textAlign = 'left';
+      });
+    } else {
+      line(ser.spiral, 1, MESH_COL.store); endLabel(ser.spiral, 1, MESH_COL.store);
+      if (ser.risk) line(ser.risk, 1, MESH_COL.risk);
+    }
+  }
+}
 function chimOverview() {
   const h = chim.headline, o = cset.order;
   const rows = [...chimNext[o].keys()].slice(0, 10).map(k => chimRow(chimCells.get(k))).join('');
@@ -1411,19 +1665,31 @@ function chimOverview() {
   const runs = chim.runs.map(r => '<tr><td class="l">' + escapeHtml(r.name) + '</td><td class="l">' + escapeHtml(r.label || '') + '</td><td>' + escapeHtml((r.areas || []).join(', ')) +
     '</td><td>' + escapeHtml(r.chim_version || '?') + '</td><td>' + escapeHtml(r.world_format || '?') + '</td><td>' + escapeHtml(r.commit || 'not recorded') +
     '</td><td>' + escapeHtml((r.built_at || '').replace('T', ' ').slice(0, 16)) + '</td></tr>').join('');
-  const mc = chim.mesh_curve;
-  const mesh = mc ? '<h3>Mesh-first view (store-once reuse)</h3><p>' + mc.unique_meshes.toLocaleString() + ' unique meshes island-wide; ' + mc.cells_with_meshes.toLocaleString() +
-    ' cells hold placements; ' + mc.meshes_in_one_cell_only.toLocaleString() + ' meshes appear in one cell only (' + mc.cells_that_own_a_mesh +
-    ' cells own one); in the spiral order ' + mc.cells_without_new_mesh_spiral.toLocaleString() + ' cells add no new mesh. With every unique mesh converted first, the other ' +
-    (mc.cells_with_meshes - mc.cells_that_own_a_mesh).toLocaleString() + ' cells need only a placement list.</p>' +
-    (SERVED ? '<img alt="Cumulative unique meshes along the spiral and risk orders" src="../data/cell-progress-curve.png?t=' + Date.now() + '" style="max-width:100%;border:1px solid var(--line)">' : '') : '';
+  const mesh = chimMeshView();
   return '<h2>CHIM Progress Tracker</h2><p class="muted">' + escapeHtml(chimSource || '') + ' · generated ' + escapeHtml(chim.generated) + ' · ' +
     (h.islands || []).map(i => i.name + ' ' + i.cells.toLocaleString() + ' cells, done ' + i.done.toLocaleString() + ' (' + i.percent + ' %)').join(' · ') + ' · ' +
-    h.converted + ' converted · sources: ' +
+    h.converted + ' converted' + (h.lava && h.lava.cells_with_lava ? ' · lava: ' + h.lava.cells_with_lava + ' cells, ' + h.lava.pools + ' pools, ' + h.lava.pools_converted + ' converted' : '') + ' · sources: ' +
     Object.entries(chim.sources).map(([k, v]) => k + (v ? '' : ' (missing)')).join(', ') + '</p>' +
     '<h3>Next cells: ' + (o === 'spiral' ? 'spiral, coast inwards' : 'risk, scout list (riskiest first)') + '</h3><table class="mt"><thead><tr><th class="l">Name</th><th>Cell</th><th>Ring</th><th>Spiral</th><th>Scout</th><th>Risk</th><th>Refs</th><th>Meshes</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<h3>Audits over converted cells</h3><table class="mt"><thead><tr><th class="l">Mechanism</th><th>Passed</th><th>Failed</th><th>Accepted</th><th>Not measured</th></tr></thead><tbody>' + mech + '</tbody></table>' +
     chimTotalsBlock() + '<h3>CHIM builds read</h3><table class="mt"><thead><tr><th class="l">Run</th><th class="l">Label</th><th>Areas</th><th>CHIM</th><th>Format</th><th>Source commit</th><th>Built (UTC)</th></tr></thead><tbody>' + runs + '</tbody></table>' + mesh;
+}
+function chimLightingBlock(c) {
+  const lt = c.lighting, nf = v => v == null ? 'not measured' : Number(v).toLocaleString();
+  const blk = (c.chim.blockers || []).length ? '<p class="muted">Not complete because: ' + c.chim.blockers.map(escapeHtml).join(' · ') + '</p>' : '';
+  if (!lt) return '<h3>Lighting</h3><p>not measured</p>' + blk;
+  const cls = Object.entries((lt.placed || {}).by_class || {}).map(([k, v]) => '<tr><td class="l">' + escapeHtml(k.replace('_', ' ')) + '</td><td>' + nf(v.mesh) + '</td><td>' + nf(v.meshless) + '</td></tr>').join('');
+  const r = lt.reach, s = lt.surfaces;
+  return '<h3>Lighting</h3><p>' + chimSpan(CHIM_LIGHTING[lt.status][0], lt.status.replace('_', ' ')) + ' · ' + escapeHtml(lt.reason || '') + ' · mode ' + escapeHtml(lt.mode) + (lt.assumed ? ' (assumed)' : '') + '</p>' +
+    (cls ? '<table class="mt"><thead><tr><th class="l">Light class</th><th>With a mesh</th><th>Without</th></tr></thead><tbody>' + cls + '</tbody></table>' : '<p>no light placed in the original cell</p>') +
+    (r ? '<p>Reach: baked ' + nf(r.baked) + ' · night lamps only ' + nf(r.lamp_table) + ' · not represented ' + nf(r.none) + '</p>' : '') +
+    (s ? '<p>Surfaces lit: terrain ' + nf(s.terrain_lit) + ' / ' + nf(s.terrain_faces) + ' · models ' + nf(s.model_lit) + ' / ' + nf(s.model_faces) + (s.lit_share != null ? ' (' + Math.round(s.lit_share * 100) + ' %)' : '') + '</p>' : '') + blk;
+}
+function chimLavaBlock(c) {
+  const lv = c.lava;
+  if (!lv || lv.status === 'none') return '';
+  return '<h3>Lava</h3><p>' + (CHIM_LAVA[lv.status] ? chimSpan(CHIM_LAVA[lv.status][0], lv.status.replace('_', ' ')) : escapeHtml(lv.status)) +
+    ' · ' + escapeHtml(lv.reason || '') + (lv.mode ? ' · mode ' + escapeHtml(lv.mode) : '') + '</p>';
 }
 function showChimCell(x, y) {
   chimClicked = {x, y};
@@ -1444,13 +1710,14 @@ function showChimCell(x, y) {
   chimShownInterior = null;
   panel.innerHTML = '<h2>CHIM Progress Tracker: ' + (name ? escapeHtml(name) + ' · ' : '') + 'cell ' + x + ', ' + y + '</h2>' +
     '<p class="muted">Exterior cell ' + x + ', ' + y + (c.region && c.region !== name ? ' · region ' + escapeHtml(c.region) : '') + (c.set ? ' · ' + escapeHtml(c.set) : '') + (c.island ? ' · island ' + c.island : '') + ' · cell ID exterior:' + x + ',' + y + '</p>' +
-    '<p>' + chimSpan(CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][1]) + (c.land ? '' : ' · not land (sea-only cell with content)') +
+    '<p>' + chimSpan(CHIM_BUCKETS[c.chim.bucket][2] ? chimZebraCss(CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][2]) : CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][1]) + (c.land ? '' : ' · not land (sea-only cell with content)') +
     (c.chim.owner ? ' · owner: ' + escapeHtml(c.chim.owner) + (c.chim.owner_date ? ' ' + escapeHtml(c.chim.owner_date) : '') : '') +
     (c.chim.partial_terrain ? ' · terrain only in a CHIM build (no placements owned here)' : '') + '</p>' +
+    '<p class="muted">Release: ' + (c.release ? escapeHtml(c.release.name) + (c.release.shipped ? ' (shipped)' : ' (approved)') + ' · set ' + escapeHtml(c.release.date || '') + ' by ' + escapeHtml(c.release.who || 'owner') : 'not assigned to a release') + '</p>' +
     '<p class="muted">Sweep: ' + (c.ring == null ? 'not in the sweep' : 'ring ' + c.ring + ', spiral #' + c.spiral_rank) + (c.risk_rank ? ' · scout #' + c.risk_rank : '') +
     ' · risk: ' + escapeHtml(r) + (c.cost && c.cost.heap_bytes ? ' · estimated heap ' + Math.round(c.cost.heap_bytes / 1048576 * 10) / 10 + ' MiB' : '') + '</p>' +
     '<h3>Contents</h3><table class="mt"><tbody>' + [0, 2, 4, 6, 8].map(i => '<tr>' + facts[i] + facts[i + 1] + '</tr>').join('') + '</tbody></table>' +
-    '<h3>Objects by type</h3>' + chimCatTable(c.categories) +
+    '<h3>Objects by type</h3>' + chimCatTable(c.categories) + chimLightingBlock(c) + chimLavaBlock(c) +
     '<h3>Stats</h3>' + chimStatsTable(c.stats, c.chim.converted) + chimErrorsBlock(c) +
     '<h3>Legacy mapping quality (before CHIM)</h3>' + (lg ? '<p>' + chimSpan(CHIM_GRADES[lg.grade], 'grade ' + lg.grade + ': ' + lg.grade_label) + '<br>entities placed ' + lg.placed + ' / ' + lg.original +
       (lg.placed_share == null ? '' : ' (' + pct(lg.placed_share, 1) + ')') + ' · interiors converted ' + lg.interiors_converted + ' / ' + lg.interiors + ' · named places ' + lg.places +
@@ -1490,7 +1757,9 @@ function setChim(doc, source, keepView) {
     $('chimcount').textContent = 'Not a CHIM progress file (' + CHIM_FORMAT + ').'; return false;
   }
   const first = !chim;
-  chim = doc; chimSource = source;
+  if (first) legendRestore();
+  chim = doc; chimSource = source; chim.releases = doc.releases || [];
+  if (typeof stripFromDoc === 'function') { stripFromDoc(doc); if (typeof stripRender === 'function') stripRender(); }
   chim.bugs = chim.bugs || {}; chim.interiors = chim.interiors || []; chim.runs = chim.runs || []; chim.sources = chim.sources || {};
   chimCellList = Object.values(doc.cells); chimCells = new Map(chimCellList.map(c => [c.x + ',' + c.y, c]));
   const xs = chimCellList.map(c => c.x), ys = chimCellList.map(c => c.y);
@@ -1503,18 +1772,20 @@ function setChim(doc, source, keepView) {
     chimNext[o] = new Map(list.map((c, i) => [c.x + ',' + c.y, i + 1]));
   }
   const cur = cset.colour, flt = cset.filter;
-  $('chimcolour').innerHTML = [['status', 'CHIM status'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
+  $('chimcolour').innerHTML = [['status', 'CHIM status'], ['lighting', 'Lighting (lit / partial / unlit)'], ['lava', 'Lava (mapped / converted)'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
     ['bugs', 'Open bugs linked'], ['lastbuild', 'Last build time']].concat(doc.mechanisms.map(m => ['audit:' + m.id, 'Audit: ' + m.label]))
     .map(([v, t]) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>').join('');
+  if (chimRef) $('chimcolour').insertAdjacentHTML('beforeend', '<option value="compare">Compare with the project reference</option>');
   $('chimcolour').value = cset.colour = [...$('chimcolour').options].some(o => o.value === cur) ? cur : 'status';
-  $('chimfilter').innerHTML = '<option value="">all cells</option><option value="failing">any failing audit</option><option value="unmeasured">any audit not measured</option>' +
+  $('chimfilter').innerHTML = '<option value="">all cells</option><option value="eligible">eligible for ' + escapeHtml(doc.headline.eligible_release || 'the next release') + ' (every done cell, lighting done or not)</option><option value="failing">any failing audit</option><option value="unmeasured">any audit not measured</option>' +
     doc.mechanisms.map(m => '<option value="fail:' + escapeHtml(m.id) + '">failing: ' + escapeHtml(m.label) + '</option>').join('') +
     doc.mechanisms.map(m => '<option value="unm:' + escapeHtml(m.id) + '">not measured: ' + escapeHtml(m.label) + '</option>').join('');
   $('chimfilter').value = cset.filter = [...$('chimfilter').options].some(o => o.value === flt) ? flt : '';
   if (first) { $('layer-chim').checked = true; $('layer-metrics').checked = false; if (metrics) metricsUi(); }
   if (first || !keepView) { view.z = 1; view.x = view.y = 0; }
+  if (first) viewRestore();
   chimBuildIndex();
-  chimUi(); chimHeadSend(); draw();
+  chimUi(); chimHeadSend(); draw(); loadChimCurve();
   return true;
 }
 // Served by toolkit_serve.py --progress: read again on reload, on window focus and on the Reload button.
@@ -1526,7 +1797,7 @@ async function loadChim(force) {
     const doc = await r.json();
     if (chim && !chimImported && doc.generated === chim.generated && !force) return false;
     chimImported = false;
-    return setChim(doc, 'served: cell-progress.json', !!chim);
+    return setChim(doc, 'server ' + location.origin + ' (cell-progress.json)', !!chim);
   } catch (_) { return false; }
 }
 $('chimfile').onchange = e => {
@@ -1554,6 +1825,90 @@ $('chimpanel').addEventListener('click', e => {
   picked = {x, y}; $('picked').textContent = describe(x, y, data && data.cells.find(c => c.x === x && c.y === y), ' · ');
   showChimCell(x, y); draw();
 });
+$('legend').addEventListener('change', e => {
+  const k = e.target && e.target.dataset && e.target.dataset.k; if (!k) return;
+  if (e.target.checked) legendOff.delete(k); else legendOff.add(k);
+  legendSave(); legendCtl(); draw();
+});
+$('legall').onclick = () => { for (const k of legendKeys) legendOff.delete(k); legendSave(); draw(); };
+$('legnone').onclick = () => { for (const k of legendKeys) legendOff.add(k); legendSave(); draw(); };
+$('chimpreset').onchange = () => {
+  const v = $('chimpreset').value; if (v === 'custom') return;
+  const st = window.ChimLegend.presetState(v, chim.headline && chim.headline.eligible_release);
+  legendSet(st); legendSave();
+  $('chimcolour').value = cset.colour; chimUi(); draw();
+};
+$('chimrelease').onchange = () => { relFilter = $('chimrelease').value; legendSave(); draw(); };
+function setChimRef(doc, source) {
+  if (!doc || doc.format !== 'aw-cell-reference-1' || typeof doc.cells !== 'object') { $('chimcount').textContent = 'Not a project reference file (aw-cell-reference-1).'; return false; }
+  chimRef = doc; chimSource = (chimSource || '') + ' · reference: ' + source;
+  if (chim) setChim(chim, chimSource, true);
+  return true;
+}
+$('chimreffile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  load(f, text => { try { setChimRef(JSON.parse(text), f.name); } catch (err) { $('chimcount').textContent = 'Cannot read ' + f.name + ': ' + err.message; } });
+};
+async function loadChimRef() {
+  if (!SERVED) return;
+  try { const r = await fetch('../data/cell-progress-reference.json', {cache: 'no-store'}); if (r.status === 200) setChimRef(await r.json(), 'project reference'); } catch (_) { /* none served */ }
+}
+loadChimRef();
+// Live build tracker (tools/live_tracker.py). File mode: the build's copy of this page loads cell-progress-data.js with a script
+// tag (works from file://, unlike fetch) and the page injects that script again every 10 s: no reload, your view stays.
+// Server mode (toolkit_serve.py --build): the files are read again every 10 s. A finished build stops the refresh.
+const LIVE_MS = 10000;
+let liveTimer = null, liveStatus = null;
+const FILE_LIVE = typeof window.AW_PROGRESS !== 'undefined';
+function liveText(st) {
+  if (!st) return '';
+  const n = x => (+x).toLocaleString();
+  const eta = st.eta_s != null ? ' · about ' + Math.max(1, Math.round(st.eta_s / 60)) + ' min left (rough)' : '';
+  return 'Live: ' + (st.state === 'finished' || st.state === 'passed' ? 'build finished' : st.state === 'failed' || st.state === 'cancelled' ? 'build ' + st.state : 'stage ' + (st.stage || 'starting') +
+    ' (' + st.stages_done + ' of ' + st.stages_total + ')') + (st.cells_total ? ' · cells ' + n(st.cells_done) + ' / ' + n(st.cells_total) : '') + eta + ' · updated ' + String(st.updated || '').slice(11, 19);
+}
+// The status strip above the map (freshness dot, source, last update with a ticking age, the auto-update switch).
+let stripUpdated = null, stripUpdatedText = '', stripError = false;
+function stripRender() {
+  const L = window.ChimLegend, now = Date.now(), auto = $('chimlive').checked;
+  const fin = !!(liveStatus && ['finished', 'passed', 'failed', 'cancelled'].includes(liveStatus.state));
+  const s = L.stripState({now, updated: stripUpdated, interval: LIVE_MS, auto, finished: fin, error: stripError});
+  $('stdot').dataset.state = s.dot; $('stdot').title = s.label; $('stlabel').textContent = s.label;
+  $('stsrc').textContent = chim ? (chimSource || 'loaded data') : 'nothing loaded';
+  $('stupd').textContent = stripUpdated ? (stripUpdatedText || new Date(stripUpdated).toLocaleString()) : 'not yet';
+  $('stago').textContent = stripUpdated ? '(' + L.agoText(now - stripUpdated) + ')' : '';
+  $('stauto').textContent = auto ? 'ON (' + LIVE_MS / 1000 + ' s)' : 'OFF';
+}
+function stripFromDoc(doc) {
+  if (liveStatus) return;                      // a running build's own timestamp wins
+  const t = Date.parse(doc.generated);
+  stripUpdated = isFinite(t) ? t : null; stripUpdatedText = doc.generated ? String(doc.generated).replace('T', ' ').replace('+00:00', ' UTC') : '';
+}
+function liveApply(st) {
+  liveStatus = st; $('livestatus').textContent = liveText(st);
+  if (st && st.updated_epoch) { stripUpdated = st.updated_epoch * 1000; stripUpdatedText = st.updated || ''; }
+  stripRender();
+  if (st && ['finished', 'passed', 'failed', 'cancelled'].includes(st.state)) liveStop(true);
+}
+function liveStop(done) { if (liveTimer && typeof clearInterval === 'function') { clearInterval(liveTimer); liveTimer = null; } if (done) $('chimlive').checked = false; }
+async function liveTick() {
+  if (FILE_LIVE) {
+    const tag = document.createElement('script');
+    tag.src = 'cell-progress-data.js?t=' + Date.now();
+    tag.onload = () => { stripError = false; setChim(window.AW_PROGRESS, 'live build folder (file, no server)', true); liveApply(window.AW_LIVE); tag.remove(); };
+    tag.onerror = () => { stripError = true; stripRender(); tag.remove(); };
+    document.head.appendChild(tag);
+  } else if (SERVED) {
+    stripError = !(await loadChim(true));
+    try { const r = await fetch('../data/live-status.json?t=' + Date.now(), {cache: 'no-store'}); if (r.status === 200) liveApply(await r.json()); } catch (_) { /* no live build */ }
+    stripRender();
+  }
+}
+function liveStart() { liveStop(false); if (typeof setInterval === 'function') liveTimer = setInterval(liveTick, LIVE_MS); }
+$('chimlive').onchange = () => { if ($('chimlive').checked) { liveTick(); liveStart(); } else liveStop(false); stripRender(); };
+if (typeof setInterval === 'function') setInterval(stripRender, 1000);                 // the "N s ago" ticks
+if (FILE_LIVE) { setChim(window.AW_PROGRESS, 'live build folder (file, no server)', false); liveApply(window.AW_LIVE); $('chimlive').checked = true; liveStart(); stripRender(); }
+else if (SERVED) fetch('../data/live-status.json', {cache: 'no-store'}).then(r => r.status === 200 ? r.json() : null).then(st => { if (st) { liveApply(st); $('chimlive').checked = true; liveStart(); } }).catch(() => {});
 window.addEventListener('focus', () => { if (SERVED) loadChim(false); });
 window.addEventListener('message', e => {
   if (e.source === window.parent && e.data && e.data.type === 'amiwind-chim-pick') chimPickBucket(e.data.bucket || null);

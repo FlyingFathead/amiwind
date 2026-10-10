@@ -186,7 +186,9 @@ class FarLayerEngineContractTests(unittest.TestCase):
         self.assertIn('cvar_t\tchim_far_reach = {"chim_far_reach", "896"};', far_c)       # the legacy overlap depth
         self.assertIn('cvar_t\tchim_far_objects = {"chim_far_objects", "0"};', far_c)   # object stamps: experimental
         world = (SRC / 'chim/chim_world.c').read_text()
-        self.assertIn('ChimFar_Begin (sv.worldmodel->name', world)
+        self.assertIn('ChimFar_Begin (sv.worldmodel ? sv.worldmodel->name', world)
+        # CHIM-GRAFT-FAIL-NO-FLOOR-35: the far terrain loads before the frame world, so a failure keeps a floor
+        self.assertLess(world.index('ChimFar_Begin (sv.worldmodel'), world.index('ChimGraft_Begin (sv.worldmodel)'))
         self.assertIn('ChimFar_End ();\n\tChimGraft_End ();', world)
         self.assertIn('ChimFar_Hook ();', world)
         self.assertIn('chim/chim_far.c', (ROOT / 'engine/aga/Makefile').read_text())

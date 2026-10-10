@@ -332,7 +332,7 @@ static int Floor (const vec3_t origin, float *lowest, float *surface)
 	float fx, fy, h00, h10, h01, h11, low;
 	int i, j, e;
 
-	if (!loaded || stamped || chim_terrain_floor.value <= 0 || !Chim_Active () || !(layer.step > 0))
+	if (!loaded || stamped || chim_terrain_floor.value <= 0 || !(Chim_Active () || Chim_FarOnly ()) || !(layer.step > 0))
 		return 0;
 	fx = (origin[0] - layer.x0) / layer.step;
 	fy = (origin[1] - layer.y0) / layer.step;
@@ -389,7 +389,7 @@ int ChimFar_Floor (const vec3_t origin, float *lowest, float *surface)
 static void Draw (byte colour, int distance)
 {
 	double t;
-	if (!loaded || !Chim_Active () || chim_far.value <= 0)
+	if (!loaded || !(Chim_Active () || Chim_FarOnly ()) || chim_far.value <= 0)
 		return;
 	layer.reach = chim_far_reach.value > 0 ? chim_far_reach.value : 0;
 	t = Sys_FloatTime ();

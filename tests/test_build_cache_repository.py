@@ -22,6 +22,8 @@ MINIWIND_STAGES = {
     'harvest': 'harvest_build.py', 'hand-catalog': 'prepare_hand_catalog.py', 'chim': 'chim_build.py',
     'balmora-interiors': 'prepare_balmora_interiors.py', 'door-audio': 'prepare_door_audio.py',
     'character': 'prepare_character.py', 'reading': 'prepare_reading.py', 'opening-references': 'prepare_opening_refs.py',
+    # the tracker data stage (BUILD-CELL-PROGRESS-KEY-BUGS-35: a bug registration rebuilt it and stopped builds)
+    'cell-progress': 'cell_progress_build.py',
 }
 SCENE_CHAIN = ('scenery', 'scene', 'bsp', 'npcs', 'hands', 'interior', 'census', 'balmora', 'balmora-interiors',
                'character', 'reading', 'opening-references', 'door-audio', 'hand-catalog', 'harvest')
@@ -92,6 +94,27 @@ class RepositoryReuseTests(unittest.TestCase):
         self.assertEqual(self.changed(edited), set())
         whole = build_cache.SourceIndex(self.repository, scope='symbols')
         self.assertIn('tools/build_parallel.py', whole.closure(self.repository / 'tools' / 'prepare_scenery.py')[0])
+
+    def test_scheduler_table_row_reuses_stages_that_do_not_read_it(self):
+        """BUILD-SCHEDULER-TABLE-KEY-35: a new row in the scheduler's DEPENDENCIES table (tools/build_parallel.py)
+        changes only the stages whose code reads the table, never media, music or the scene chain."""
+        readers = {stage for stage, script in MINIWIND_STAGES.items()
+                   if 'DEPENDENCIES' in (self.index.reached_units(self.repository / 'tools' / script) or {})
+                   .get('tools/build_parallel.py', ())}
+        edited = self.edit('tools/build_parallel.py', "    'dry-run-image': ('engine',),\n",
+                           "    'dry-run-image': ('engine',),\n    'new-audit': ('census',),\n")
+        changed = self.changed(edited)
+        self.assertEqual(changed, readers)
+        self.assertFalse({'media', 'music', 'setup', *SCENE_CHAIN} & changed, changed)
+
+    def test_literal_tables_are_their_own_units(self):
+        import ast
+        tree = ast.parse("A = {'x': (1, 2)}\nB = [f()]\nC = (1,)\nC = (2,)\n__all__ = ['A']\n"
+                         "def f():\n    return A\n")
+        self.assertEqual(sorted(build_cache.lazy_tables(tree).values()), ['A'])  # B calls, C is bound twice
+        units = build_cache.module_symbols(tree, "A = {'x': (1, 2)}\n", refined=True)['units']
+        self.assertIn('A', units)
+        self.assertIn('A', units['f']['names'])
 
     def test_real_converter_and_pool_edits_still_rebuild(self):
         """(c) no false reuse: the worker pool function the converters run changes exactly their fingerprints."""

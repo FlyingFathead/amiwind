@@ -131,7 +131,7 @@ def convert(archive, index, model, palette):
         # opposite winding (same conversion as npc_geometry.bake).
         output_faces.append([face[0], face[2], face[1]])
     vertices = np.array(vertices); uv = np.array(uv); output_faces = np.array(output_faces)
-    raw = animated_mdl(vertices[None, :, :], output_faces, uv, skin)
+    raw = animated_mdl(vertices[None, :, :], output_faces, uv, skin, vertex_limit=1999)
     lo = vertices.min(0); scale = np.maximum((vertices.max(0) - lo) / 255, .0001)
     decoded = np.rint((vertices - lo) / scale) * scale + lo
     quantized_seams = {}

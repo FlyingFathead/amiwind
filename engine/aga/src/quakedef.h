@@ -565,6 +565,10 @@ int AW_NavLoad(const char *);
 int AW_NavStart(edict_t *,vec3_t);
 int AW_NavStep(double,int);
 qboolean AW_ActorStep(edict_t *,vec3_t,double);
+/* Character animation kit (aw_anim.c, aw_anim.h). */
+void AW_AnimInit(void);
+void AW_AnimKitInit(void);
+void AW_AnimKitTick(void);
 /* Debug companion (aw_companion.c). */
 void AW_CompanionInit(void);
 void AW_CompanionPhysics(void);
@@ -576,6 +580,7 @@ void AW_CompanionSaveSwap(int begin);
 int AW_CompanionCrosshair(int x,int y);
 int AW_CompanionButtons(int bits);
 int AW_CompanionPickMode(void);
+int AW_CompanionPickAim(void);
 /* Hooks set by AW_CompanionInit, defined beside their callers (NULL in
  * fixtures that compile those files alone): view.c, cl_input.c,
  * aw_scene.c, aw_save.c. */
@@ -588,6 +593,13 @@ extern int (*aw_companion_home)(edict_t *e,vec3_t origin,vec3_t angles);
  * aw_scene.c. */
 void AW_CombatInit(void);
 void AW_CombatPhysics(void);
+int AW_CombatHurtPlayer(float damage,const char *cause);
+/* Lava damage and the in-lava view tint (aw_lava.c, aw_lava.h, docs/LAVA.md). */
+void AW_LavaInit(void);
+void AW_LavaPhysics(void);
+int AW_LavaContentsShift(int eye_contents,int rgb[3],int *percent);
+void AW_LavaEmbersDraw(void);
+int AW_LavaPoolCount(void);
 void AW_MusicCombat(int on);
 void AW_MusicDeath(void);
 extern int (*aw_combat_enemy_bar)(float *fraction,float *alpha);

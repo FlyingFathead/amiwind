@@ -9,11 +9,22 @@ decision 2026-10-08); the converters read it through resolve_font_options()["fol
 builder: legacy or chim, with chim_areas, the areas the CHIM builder writes.
 chim_texture_effects: CHIM texture effects (.chimfx paths or shipped names, tools/chim/effects) the CHIM
 builder applies, in order; none by default (docs/chim/TEXTURE_EFFECTS.md).
+chim_lighting_type: how a CHIM world is lit (tools/chim/light_types.py): none, lamps or hybrid (the default, owner
+decision 2026-10-09); baked-e and full are reserved for an increased-memory version (docs/chim/LIGHTING.md).
 model_hull: how a placed model's standing hull is written when qbsp does not compile it (tools/routed_hull.py):
 auto (default: routed above 16 convex pieces, INTERIOR-HULL-CHAIN-33 / CHIM-HULL-CHAIN-COST-33), chain (every piece
 in one chain, the converters' earlier form), routed (every model) or balanced (the first routing, kept selectable).
+lava: how Morrowind's lava pools are converted (tools/lava.py, docs/LAVA.md): quake (default: Quake liquid brushes
+with a "*lava" warp texture, lava contents, embers and glow) or static (the earlier rule: interior rooms leave the pool
+activator out, exterior frames place the pool mesh as a solid model).
+npc_head_detail: humanoid heads in whole-model NPC bakes (tools/npc_geometry.py head_plan): original (the head
+keeps every original triangle, the body its silhouette, NPC-HEAD-DECIMATION-33), budget (the previous 480-triangle
+split that decimated heads) or auto (shipped default: budget; original heads are EXPERIMENTAL, off by default in v0.0.35 and
+chosen only with --npc-head-detail original; docs/EXPERIMENTAL_FLAGS.md).
 heap_mb: the game heap (Quake's Hunk) in MiB, used exactly as asked like --jobs; not in the shipped defaults:
-the engine source's AMIWIND_HEAP_MB is the default (tools/project_version.heap_plan)."""
+the engine source's AMIWIND_HEAP_MB is the default (tools/project_version.heap_plan).
+storage_pool_dir: the shared storage pool folder (tools/storage_pool.resolve_dir; --storage-pool-dir overrides it,
+relative paths are relative to the config file); not in the shipped defaults: WORKSPACE/cache/asset-pool-v1."""
 import hashlib
 import json
 from pathlib import Path
@@ -22,8 +33,13 @@ DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "config/build-defaults.js
 INK_MODES = ("filled", "original")
 BUILDERS = ("legacy", "chim")
 MODEL_HULLS = ("auto", "chain", "routed", "balanced", "compiled")
+LAVA_MODES = ("quake", "static")
+NPC_HEAD_DETAILS = ("auto", "original", "budget")
 KNOWN_KEYS = {"bitmap_paper_ink", "follow_original_stair_rules", "builder", "chim_areas", "chim_texture_effects",
-              "heap_mb", "model_hull", "chim_stream_statics"}
+              "heap_mb", "model_hull", "chim_stream_statics", "lava", "chim_lighting_type",
+              "storage_pool_dir", "npc_head_detail",
+              # NPC model levels of detail: validated and resolved by tools/npc_lod.py.
+              "npc_lod", "npc_lod_levels", "npc_face_lod", "npc_lod_disk_mib"}
 
 
 def add_font_options(parser):
@@ -38,6 +54,13 @@ def add_font_options(parser):
                         help="Standing hull of large placed models: chain (default in v0.0.33: one chain per model), "
                              "auto (routed above 16 convex pieces; CHIM: above 256), routed (every model) or balanced "
                              "(the first routing: parts by piece counts, xy cuts)")
+    parser.add_argument("--lava", choices=LAVA_MODES, default=None,
+                        help="Lava pools: quake (default: Quake liquid with the warp, lava contents, damage and tint) "
+                             "or static (the earlier rule: rooms leave the pool out, exterior frames place it as a model)")
+    parser.add_argument("--npc-head-detail", choices=NPC_HEAD_DETAILS, default=None,
+                        help="Humanoid NPC heads in baked models: auto (default: budget, the previous bake), original (EXPERIMENTAL, original (head keeps "
+                             "every original triangle, body and clothing keep their silhouette) or budget (the "
+                             "previous 480-triangle bake that decimated heads)")
     stream = parser.add_mutually_exclusive_group()
     stream.add_argument("--chim-stream-statics", dest="chim_stream_statics", action="store_true", default=None,
                         help="CHIM frame maps tag their sprite and model statics to stream with their chunks (default on, "
@@ -70,14 +93,24 @@ def _read(path):
     if "chim_texture_effects" in values and (not isinstance(values["chim_texture_effects"], list)
                                              or not all(isinstance(e, str) and e for e in values["chim_texture_effects"])):
         raise ValueError(f"Invalid chim_texture_effects in {path}: expected a list of effect files or names")
+    if "chim_lighting_type" in values:
+        from chim.light_types import TYPES
+        if values["chim_lighting_type"] not in TYPES:
+            raise ValueError(f"Invalid chim_lighting_type in {path}: expected one of {', '.join(TYPES)}")
     if "heap_mb" in values and (isinstance(values["heap_mb"], bool) or not isinstance(values["heap_mb"], int)):
         raise ValueError(f"Invalid heap_mb in {path}: expected a whole number of MiB")
     if "chim_stream_statics" in values and not isinstance(values["chim_stream_statics"], bool):
         raise ValueError(f"Invalid chim_stream_statics in {path}: expected true or false")
     if "model_hull" in values and values["model_hull"] not in MODEL_HULLS:
         raise ValueError(f"Invalid model_hull in {path}: expected auto, chain, routed, balanced or compiled")
+    if "lava" in values and values["lava"] not in LAVA_MODES:
+        raise ValueError(f"Invalid lava in {path}: expected quake or static")
+    if "npc_head_detail" in values and values["npc_head_detail"] not in NPC_HEAD_DETAILS:
+        raise ValueError(f"Invalid npc_head_detail in {path}: expected auto, original or budget")
     if "follow_original_stair_rules" in values and not isinstance(values["follow_original_stair_rules"], bool):
         raise ValueError(f"Invalid follow_original_stair_rules in {path}: expected true or false")
+    if "storage_pool_dir" in values and not (isinstance(values["storage_pool_dir"], str) and values["storage_pool_dir"]):
+        raise ValueError(f"Invalid storage_pool_dir in {path}: expected a folder path")
     return values, {"path": str(path.resolve()), "sha256": hashlib.sha256(raw).hexdigest()}
 
 
@@ -110,11 +143,27 @@ def resolve_font_options(args):
         hull, hull_origin = values["model_hull"], "build config"
     if getattr(args, "model_hull", None) is not None:
         hull, hull_origin = args.model_hull, "CLI override"
+    if "lava" not in defaults:
+        raise ValueError("Shipped build defaults must define lava")
+    lava, lava_origin = defaults["lava"], "shipped default"
+    if selected is not None and "lava" in values:
+        lava, lava_origin = values["lava"], "build config"
+    if getattr(args, "lava", None) is not None:
+        lava, lava_origin = args.lava, "CLI override"
     stream, stream_origin = bool(defaults.get("chim_stream_statics", False)), "shipped default"
     if selected is not None and "chim_stream_statics" in values:
         stream, stream_origin = values["chim_stream_statics"], "build config"
     if getattr(args, "chim_stream_statics", None) is not None:
         stream, stream_origin = bool(args.chim_stream_statics), "CLI override"
+    heads, heads_origin = defaults.get("npc_head_detail", "auto"), "shipped default"
+    if selected is not None and "npc_head_detail" in values:
+        heads, heads_origin = values["npc_head_detail"], "build config"
+    if getattr(args, "npc_head_detail", None) is not None:
+        heads, heads_origin = args.npc_head_detail, "CLI override"
+    heads_setting = heads
+    if heads == "auto":
+        # v0.0.35: original heads are EXPERIMENTAL and off by default (owner decision 2026-10-10).
+        heads, heads_origin = "budget", heads_origin + ", auto: budget (original heads are experimental)"
     cli = getattr(args, "bitmap_paper_ink", None)
     if cli is not None:
         if cli not in INK_MODES:
@@ -123,7 +172,10 @@ def resolve_font_options(args):
     return {"bitmap_paper_ink": mode, "selected_by": origin, "config_files": records,
             "follow_original_stair_rules": stairs, "follow_original_stair_rules_selected_by": stairs_origin,
             "model_hull": hull, "model_hull_selected_by": hull_origin,
-            "chim_stream_statics": stream, "chim_stream_statics_selected_by": stream_origin}
+            "lava": lava, "lava_selected_by": lava_origin,
+            "chim_stream_statics": stream, "chim_stream_statics_selected_by": stream_origin,
+            "npc_head_detail": heads, "npc_head_detail_selected_by": heads_origin,
+            "npc_head_detail_setting": heads_setting}
 
 
 def add_heap_options(parser):
@@ -150,6 +202,15 @@ def resolve_heap(args):
     return plan
 
 
+def configured_storage_pool_dir(args):
+    """(value, folder of the config file) of the build config's storage_pool_dir, or (None, None)."""
+    selected = getattr(args, "build_config", None)
+    if selected is None:
+        return None, None
+    values, _ = _read(selected)
+    return values.get("storage_pool_dir"), Path(selected).expanduser().absolute().parent
+
+
 def add_builder_options(parser):
     parser.add_argument("--builder", choices=BUILDERS, default=None,
                         help="Exterior world pipeline: chim (default from v0.0.33, with the CHIM areas of "
@@ -163,6 +224,9 @@ def add_builder_options(parser):
                         help="With --builder chim: apply a CHIM texture effect (a .chimfx file or a shipped name such "
                              "as autumn_glitter_leaves; repeatable, in order). Off by default; replaces the build "
                              "config's list (docs/chim/TEXTURE_EFFECTS.md)")
+    from chim.light_types import TYPES, help_text
+    parser.add_argument("--chim-lighting-type", dest="chim_lighting_type", choices=list(TYPES), default=None,
+                        help="With --builder chim: " + help_text())
 
 
 def resolve_builder(args):
@@ -173,6 +237,8 @@ def resolve_builder(args):
             raise ValueError("Shipped build defaults must define " + key)
     builder, areas, origin = defaults["builder"], list(defaults["chim_areas"]), "shipped default"
     effects = list(defaults.get("chim_texture_effects", []))
+    from chim.light_types import DEFAULT as LIGHTING_DEFAULT
+    lighting, lighting_origin = defaults.get("chim_lighting_type", LIGHTING_DEFAULT), "shipped default"
     records = [default_record]
     selected = getattr(args, "build_config", None)
     if selected is not None:
@@ -184,6 +250,10 @@ def resolve_builder(args):
             areas = list(values["chim_areas"])
         if "chim_texture_effects" in values:
             effects = list(values["chim_texture_effects"])
+        if "chim_lighting_type" in values:
+            lighting, lighting_origin = values["chim_lighting_type"], "build config"
+    if getattr(args, "chim_lighting_type", None) is not None:
+        lighting, lighting_origin = args.chim_lighting_type, "CLI override"
     if getattr(args, "builder", None) is not None:
         builder, origin = args.builder, "CLI override"
     if getattr(args, "chim_areas", None):
@@ -191,7 +261,8 @@ def resolve_builder(args):
     if getattr(args, "chim_texture_effects", None):
         effects = list(args.chim_texture_effects)
     record = {"builder": builder, "selected_by": origin, "config_files": records,
-              "chim_version": None, "world_format": None, "chim_areas": [], "chim_texture_effects": []}
+              "chim_version": None, "world_format": None, "chim_areas": [], "chim_texture_effects": [],
+              "chim_lighting_type": None}
     if builder == "chim":
         from chim import CHIM_VERSION, FORMAT_VERSION
         from chim.areas import area_problems
@@ -205,6 +276,8 @@ def resolve_builder(args):
             effect = load_effect(effect_path(value))
             loaded.append({"effect": value, "name": effect["name"], "sha256": effect["sha256"],
                            "path": str(effect_path(value))})
+        from chim.light_types import check as check_lighting
         record.update(chim_version=CHIM_VERSION, world_format="%d.%d" % FORMAT_VERSION, chim_areas=areas,
-                      chim_texture_effects=loaded)
+                      chim_texture_effects=loaded, chim_lighting_type=check_lighting(lighting),
+                      chim_lighting_type_selected_by=lighting_origin)
     return record

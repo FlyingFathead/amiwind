@@ -5,6 +5,11 @@
 Uses the same terrain/scenery/collision path as prepare_balmora. Cache inputs are
 read-only; all generated maps, WADs, logs and collision cache go to a new folder.
 This invokes the explicitly configured installed map tools when called.
+
+Optional night lamps (lamp_lightmaps.region_lamps): the terrain map gets their
+Quake light entities on the lamps' style for the light compiler, the runtime
+entity lump drops them again, and placed meshes get lamp-only maps through
+lamp_lightmaps.add_lamp_pool after the usual sharing passes.
 """
 import hashlib
 import json
@@ -23,9 +28,12 @@ from share_bsp_geometry import share_geometry
 from deduplicate_bsp import deduplicate
 from check_geometry_render_inputs import compare_render_inputs, compare_sample_sharing
 from vis_options import light_args, vis_args
+from lamp_lightmaps import ORIGINAL_FIT, terrain_entities, strip_light_entities, add_lamp_pool
 
 
-def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, ericw_bin, threads=None, vis_mode='fast'):
+def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, ericw_bin, threads=None, vis_mode='fast',
+                          lamps=None, light_keys=None, lamp_light_args=()):
+    # lamps: EXPERIMENTAL night-lamp lightmaps (--night-lamp-lightmaps, off by default); None = unchanged.
     from build_jobs import resolve_jobs
     threads=resolve_jobs(threads)  # the builder's --jobs; None: the stage budget
     cache=Path(cache);source_runtime=Path(source_runtime);palette=Path(palette);out=Path(out)
@@ -46,7 +54,11 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
     # Original region WAD contains the complete shared terrain material set.
     wad=cache/'bm000/terrain.wad'
     shutil.copyfile(wad,out/'terrain.wad')
-    (out/'terrain.map').write_text(terrain_map(entry,grids,settings,spawn,timings),encoding='ascii')
+    source_map=terrain_map(entry,grids,settings,spawn,timings)
+    if lamps:
+        keys=ORIGINAL_FIT if light_keys is None else light_keys
+        source_map+='\n'.join(terrain_entities(lamps,settings,keys,entry['coverage']))+'\n'
+    (out/'terrain.map').write_bytes(source_map.encode('ascii'))
     binary=Path(ericw_bin)
     def exe(name):
         path=binary/name
@@ -54,10 +66,13 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
     with (out/'compile.log').open('w') as log:
         for name,args in (('qbsp',['-nopercent','terrain.map']),
                           ('vis',vis_args('terrain.bsp',threads,vis_mode)),
-                          ('light',light_args('-minlight','24','terrain.bsp'))):
+                          ('light',light_args('-minlight','24',*lamp_light_args,'terrain.bsp'))):
             subprocess.run([str(exe(name)),*args],cwd=out,stdout=log,stderr=subprocess.STDOUT,check=True)
     base=out/'base.bsp';shutil.copyfile(out/'terrain.bsp',base)
     rebuild_world_hull(base,out/'terrain.map',exe('qbsp'))
+    if lamps:
+        compiled=lumps(base.read_bytes());compiled[0]=bytearray(strip_light_entities(compiled[0]))
+        base.write_bytes(pack_lumps(compiled))
     mesh=append_meshes(base,out/'scene.bsp',cache/'scenery',palette,
                        centre=settings['centre'],jobs=threads,references=selected,
                        retain_dressing=True,collision_bounds=collision_coverage(entry,settings),
@@ -76,6 +91,8 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
     geometry_oracle=compare_render_inputs(bounded,shared)
     final,deduplication=deduplicate(shared)
     sample_oracle=compare_sample_sharing(shared,final)
+    lamp_report=None
+    if lamps:final,lamp_report=add_lamp_pool(final,lamps,settings['model_budget'])
     target=out/(entry['name']+'.bsp');target.write_bytes(final)
     inputs={'scenery_index':index_path,'terrain_source':grids_path,'terrain_wad':wad,
             'source_runtime':source_runtime,'palette':palette,'scenery_archive':cache/'scenery/scenery.mwpak'}
@@ -85,5 +102,6 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
             'coverage':coverage_report,'geometry_sharing':sharing,'geometry_oracle':geometry_oracle,
             'sample_sharing':deduplication,'sample_oracle':sample_oracle,
             'acceptance':'rebuilt from complete owned source cache; final heap/contact/target gates pending'}
+    if lamp_report is not None:report['lamp_lighting']=lamp_report  # only with night lamps: default receipts unchanged
     (out/'repair.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     return report

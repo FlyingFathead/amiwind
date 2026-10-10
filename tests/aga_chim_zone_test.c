@@ -258,8 +258,42 @@ static void diagnostics (void)
 	assert (ChimZone_Check_Integrity ());
 }
 
+/* H15: a request no run of unlocked blocks can hold evicts nothing. */
+static void unsatisfiable (void)
+{
+	static unsigned char bank[64*1024];
+	static chim_user_t u[8];
+	chim_zone_stats_t s;
+	int i;
+	unsigned long fails;
+	void *p;
+
+	ChimZone_Reset ();
+	ChimZone_SetEvict (CHIM_KIND_MODEL, on_evict);
+	assert (ChimZone_AddBank (bank, sizeof(bank), 0) == 0);
+	/* eight blocks; every other one locked: the largest unlocked run is one block */
+	for (i=0 ; i<8 ; i++)
+	{
+		p = ChimZone_Alloc (&u[i], 7000, CHIM_KIND_MODEL, i);
+		assert (p);
+		if (i & 1)
+			ChimZone_Lock (p);
+	}
+	evicted = 0;
+	fails = ChimZone_Failures (NULL);
+	assert (ChimZone_LargestUnlocked () < 20000);
+	assert (!ChimZone_Alloc (NULL, 20000, CHIM_KIND_MODEL, 99));
+	assert (!evicted && ChimZone_Failures (NULL) == fails + 1);
+	ChimZone_Stats (&s);
+	assert (s.kind_blocks[CHIM_KIND_MODEL] == 8);
+	/* one that fits a free run still evicts as before */
+	assert (ChimZone_Alloc (NULL, 5000, CHIM_KIND_MODEL, 100) && evicted <= 1);
+	assert (ChimZone_Check_Integrity ());
+}
+
 int main (void)
 {
+	unsatisfiable ();
 	basics ();
 	lru ();
 	banks ();

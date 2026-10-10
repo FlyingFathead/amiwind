@@ -21,8 +21,11 @@ releases).
 - [Sections](#sections)
 - [How it is measured](#how-it-is-measured)
 - [Stage reuse for development builds](#stage-reuse-for-development-builds)
+  - [Reuse audit](#reuse-audit)
+  - [Caches of another workspace](#caches-of-another-workspace)
 - [Build speed in CHIM](#build-speed-in-chim)
 - [Payload preflight](#payload-preflight)
+- [Measured release builds (v0.0.33 -> v0.0.34)](#measured-release-builds-v0033---v0034)
 
 <!-- contents end -->
 
@@ -333,7 +336,11 @@ computed name, `eval()` or `exec()` count every file. A data file counts when
 reached code names it: a path such as `ROOT / 'config' / 'towns.json'` names
 that file, a path that ends at a folder or continues with a computed part
 (`ROOT / 'config' / name`) names the whole folder, and a bare file name names
-every file with that name. A whole path chain counts once
+every file with that name. A folder put on the import path
+(`sys.path.insert(0, str(ROOT / 'tools'))`, `sys.path[:0] = [...]`, `site.addsitedir()`, or a loop over
+folders that only go on `sys.path`) is where Python looks for modules, not a read: the imports are followed
+and no data file counts for it (BUILD-KEY-OVERBROAD-33: it used to count every file under `tools/`, so a new
+bug page rebuilt the scene and CHIM stages). A whole path chain counts once
 (`ROOT / 'config' / 'towns.json'` names that file, not also the folder
 `ROOT / 'config'`), a module string constant in a path counts as its value,
 and `ROOT / 'config' / row['config']` counts the files that JSON registries in
@@ -378,7 +385,10 @@ repository function (`@file<TAB>function`, once per function, through
 source the fingerprint left out marks the outputs as not reusable the same
 way. The hook only observes; `AMIWIND_STAGE_TRACE=off` switches it off.
 It does not see files read by other programs (map compilers, ffmpeg): those
-are named on the command line and fingerprinted there.
+are named on the command line and fingerprinted there. The same hook also lists
+the run-folder files the stage's Python processes write, rename to, link or
+remove (`>path` lines), which credits outputs to the stage that wrote them
+(below).
 
 `--reuse-from OLD_RUN` then copies a stage's outputs from the old run instead
 of running it when all of these hold; otherwise the stage runs, and the build
@@ -386,7 +396,10 @@ prints the reason for every stage:
 
 1. the fingerprint is the same and the stage passed in the old run;
 2. its output manifest is complete and no stage that ran at the same time
-   changed the same path (such outputs cannot be attributed);
+   changed the same path, unless the write trace shows that only one of the
+   two wrote it: the file is then that stage's output and leaves the other's
+   manifest (`attributed` in it; BUILD-REUSE-ATTRIBUTION-33). With a writer the
+   trace cannot see (a map compiler) or two writers, both stay not reusable;
 3. every stage it depends on is reused too;
 4. the files it wrote still exist in the old run: a file a later stage
    replaced is only skipped when that later stage is reused as well;
@@ -394,6 +407,16 @@ prints the reason for every stage:
    starts, and again while copying);
 6. the run-folder files named on its command line have the content they had
    in the old run.
+
+"Wrote the same outputs" (the check that lets a stage after a rebuilt one be
+reused) compares every output except diagnostics: `*.log` files and the
+reports `chim-stats.json`, `chim-timing.json`, `gallery-cache.json` and
+`world-terrain-cache.json`, which carry tool timings, wall time and cache hit
+counts. Diagnostics are recorded and copied like any output, but no stage may
+read one: the stage trace lists every run-folder diagnostic a stage opens
+(`<path` lines), and a stage that reads one another stage wrote is not reused.
+Every other output must be byte-reproducible: receipts carry no wall time,
+worker counts or run paths (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
 
 Reused stages show `reused (fingerprint ...) from OLD_RUN` in `build-state.json`,
 the stage log, the profile and the summary. A copy that fails its SHA-256 check
@@ -405,12 +428,56 @@ Never reused: `engine` (the Amiga SDK is not fingerprinted; it compiles in
 seconds) and the image (`image`, `dry-run-image`), which is always assembled
 and verified from the stage outputs. Inside the image step, development
 (`-devN`) builds reuse the results of per-map passes for map bytes they have
-seen before: the BSP optimizer and the hidden-surface cull look up
-`WORKSPACE/cache/image-passes` by the input map's SHA-256, the pass options and
-the SHA-256 of the pass's own repository sources (`tools/pass_cache.py`), and
-run only on maps without a result. Maps and receipts are byte-identical with and
-without the cache; release candidates and finals never use it
+seen before: the BSP optimizer, the hidden-surface cull and the stair walk look
+up `WORKSPACE/cache/image-passes` by the input map's SHA-256, the pass options
+and the SHA-256 of the pass's own repository sources (`tools/pass_cache.py`),
+and run only on maps without a result; the exterior sky pass does the same. Maps
+and receipts are byte-identical with and without the cache, apart from each
+receipt's `pass_cache` entry, which counts the run's hits and misses
 ([BUILD-IMAGE-NOT-INCREMENTAL-33](bugs/BUILD-IMAGE-NOT-INCREMENTAL-33.md)).
+Release candidates and finals use it only with `--allow-release-reuse` (the
+from-scratch reference build runs separately on the same commit), so a release
+build whose image step failed late resumes from the maps it had finished
+([BUILD-IMAGE-NO-RESUME-33](bugs/BUILD-IMAGE-NO-RESUME-33.md)). Measured on 120
+maps of the v0.0.33 rc1 payload (4 workers): cull, optimizer and stair walk
+1,440 s with an empty cache, 20.3 s with every result cached.
+
+The same rule holds inside long stages: a world scenery or world flora region
+that finished is stored by the content hash of all its inputs
+(`tools/pass_cache.py` `UnitCache`: the region record, its input map, every
+shared input by content, the code that makes it and the settings it reads), so a
+stage that failed late, or runs again after a small change, converts only the
+regions whose inputs changed. See [BUILD_CACHE.md](BUILD_CACHE.md) for the rules
+every unit follows.
+
+### Reuse audit
+
+```text
+python tools/build.py --reuse-report RUN [--json FILE]
+```
+
+Read only. Lists every stage a `--reuse-from` run did not reuse, with the
+recorded reason, as EXPECTED (a real input change, a stage that never reuses,
+the image step, a stage that follows an expected rebuild) or UNEXPECTED (a key
+that changed only with files no output depends on, such as the release file
+list; a refused old record; outputs of a rebuilt stage that differ although its
+inputs did not, with the files that differ). Exit status 1 when anything is
+UNEXPECTED, 2 for a run made without `--reuse-from`.
+
+Release candidates and finals use the pass cache only with
+`--allow-release-reuse` (owner decision, 9 October 2026), the same rule as the
+world terrain and media caches: the from-scratch reference build runs separately
+on the same commit, and its payload is compared file by file with the release
+payload before the release; the hit counts in the optimizer, cull and stair-walk
+receipts show what was reused. Without the option every pass runs on every map.
+
+The image step's stair walk (`--stair-walk`, default `auto`) walks every step
+and ramp in development builds (`all`: the gate rows and the advisory findings)
+and only the steps of flights in release candidates and finals (`flights`: the
+438 rows of the v0.0.33 payload that can stop a build, out of about 615,000); a
+nightly full report builds with `--stair-walk all`. A flight row is the same in
+both walks; the release receipt says that ramps and single steps were not walked
+(`scope`). Measured costs: [performance/BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md).
 
 Scene stages that change an earlier stage's folder in place limit reuse: when
 such a stage is rebuilt, the earlier stages whose files it replaced are rebuilt
@@ -460,7 +527,9 @@ SHA-256 and version text of `ffmpeg` (and `ffprobe`, and the Pillow version,
 for movies) and the source of the conversion code, so a changed input
 converts only the files it touches. A hit is copied and checked against its
 SHA-256; a missing or damaged object is converted again and stored again. The
-builder never deletes pool files. The stage outputs are byte for byte those of a run without
+builder never deletes pool files (the garbage collector decides what expires,
+and the same pool keeps stage outputs, disk images and packages once:
+[BUILD_CACHE.md](BUILD_CACHE.md)). The stage outputs are byte for byte those of a run without
 the cache. The build summary lists, per stage, how many files came from the
 cache and how many were converted (`profile/file-cache/STAGE.json`; a stage
 reused whole writes none). Same rules as above: development builds only,
@@ -489,6 +558,18 @@ is a reuse bug and is registered. It runs before every release, after any
 builder or converter change, and on a schedule; each such build is recorded
 with its date, commit, duration and result.
 
+### Caches of another workspace
+
+The per-file caches (the media and intro stages' asset pool, the image step's
+per-map pass cache) live in the build's workspace. When `--reuse-from` names a
+run in another workspace, the builder also reads that workspace's caches,
+read-only: an entry found there is verified like any other and copied into
+this build's own cache; nothing is written to the other workspace
+(`AMIWIND_CACHE_FALLBACK`, set by the builder; never part of a stage
+fingerprint; BUILD-CACHE-PER-WORKSPACE-33). The whole-builder profile with
+measured stage and section costs, failure costs and open items:
+[performance/BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md).
+
 ## Build speed in CHIM
 
 The streamer's builder keeps this profiler and records a fingerprint per pack,
@@ -514,3 +595,43 @@ Payload preflight: 7 checks, 0 errors, 4.1 s
 `tools/build.py --check-payload RUN` runs it alone on a run folder's staged
 payload, with the image command recorded in its `build-state.json`. The later
 checks still run on what the image step writes.
+
+## Measured release builds (v0.0.33 -> v0.0.34)
+
+Measured on a 24-thread desktop with `--jobs 22`, from the per-stage profiles of
+the two release builds.
+
+Critical path of the v0.0.34 release build: it is mostly stages that use a
+small part of the workers they are given.
+
+| Stage | Wall time | Workers used of given | Note |
+| --- | --- | --- | --- |
+| interior | 52 s | about 2 of 22 | about 1,030 idle core-seconds |
+| intro | 33 s | 7 of 22 | |
+| census | 17 s | about 6 of 22 | |
+| bsp | 32 s | about 2.6 of 7 | |
+| npcs | 21 s | 1 | single core |
+| hands | 8 s | 1 | single core |
+
+The fix is smaller units: per-room and per-region units (the hierarchical
+output hashes in [BUILD_CACHE.md](BUILD_CACHE.md)) and work queues that keep
+every given worker busy.
+
+Over-broad stage keys: a change to the scheduler's stage table made 32 of 35
+stages rebuild for a one-model change. Fixed:
+[BUILD-SCHEDULER-TABLE-KEY-35](bugs/BUILD-SCHEDULER-TABLE-KEY-35.md). The
+world-survey stage still ran again despite reuse; under investigation.
+
+Release flow:
+
+| Step | v0.0.33 | v0.0.34 |
+| --- | --- | --- |
+| Publish run start to published release | about 60 min | about 10 min |
+| CI Docker job | 11 min 21 s | 1 min 34 s ([CI-SUITE-TWICE-33](bugs/CI-SUITE-TWICE-33.md)) |
+| CI source job | 10 min 32 s | 8 min 50 s |
+| Full test-suite runs per release | about 5 | 2 (one local single-interpreter run, one CI run) |
+
+Method: every build's per-stage profile (wall time, CPU seconds, cores used
+against workers given, idle core-seconds) goes into a ledger, and after every
+build an optimizer list ranks idle cores on the critical path and unexpected
+rebuilds (see [Optimizer](#optimizer)).

@@ -11,6 +11,8 @@
 #endif
 #include "chim/chim.h"
 #include "aw_miniwind.h"
+#include "aw_quickchar.h"
+#include "aw_testbox.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -211,8 +213,8 @@ void AW_DebugInit(void) {
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);
     AW_GalleryInit();AW_WorldUIInit();
     AW_StreamInit();AW_PhotoInit();Chim_Init();
-    AW_MiniwindInit();
-    AW_InputDebugInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
+    AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
+    AW_InputDebugInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_dimensions",dimensions);

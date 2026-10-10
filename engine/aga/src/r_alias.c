@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_rcount.h"
 #include "d_local.h"	// FIXME: shouldn't be needed (is needed for patch
                         // right now, but that should move)
 
@@ -804,10 +805,13 @@ static void AW_ALIAS_NOINLINE R_AliasDrawExpanded(alight_t *lighting) {
     auxvert_t auxverts[MAXALIASVERTS];
     R_AliasDrawPrepared(lighting,finalverts,auxverts);
 }
+/* Alias triangles drawn this frame and the last (dbg npclod stats; aw_npc_lod.c rolls them). */
+int aw_alias_tris_frame,aw_alias_tris_last;
 void R_AliasDrawModel(alight_t *lighting) {
     paliashdr=(aliashdr_t *)Mod_Extradata(currententity->model);
     pmdl=(mdl_t *)((byte *)paliashdr+paliashdr->model);
     if(!AW_AliasBudgetAllows(pmdl->numverts,pmdl->numtris))return;
+    AW_RC_ADD(RC_ALIAS_TRIS,pmdl->numtris);aw_alias_tris_frame+=pmdl->numtris;
     if(pmdl->numverts>2000)R_AliasDrawExpanded(lighting);
     else R_AliasDrawSmall(lighting);
 }

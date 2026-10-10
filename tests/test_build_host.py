@@ -13,8 +13,11 @@ from unittest.mock import patch
 import build
 import build_host
 import build_versions
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class BuildHostTests(unittest.TestCase):
     def assertSamePath(self, actual, expected):
         """Discovery returns canonical paths; fixture paths may use 8.3 aliases."""

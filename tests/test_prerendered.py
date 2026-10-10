@@ -20,6 +20,7 @@ import build_cache  # noqa: E402
 import prerendered  # noqa: E402
 from build_parallel import execute_parallel  # noqa: E402
 from test_build_cache import STAGE_D, make_repository, metadata, steps_for, tree  # noqa: E402
+import env_guard  # noqa: E402
 
 MANIFESTS = os.name == 'posix'
 FAIL = '''
@@ -33,6 +34,7 @@ def source_record(repository):
             for path in sorted(repository.rglob('*.py'))}
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class EntryFolderTests(unittest.TestCase):
     def test_versions_area_and_kind_are_in_the_path(self):
         meta = {'runtime_version': '0.0.33-dev1', 'chim_version': '0.1.0', 'world_format': '0.5'}

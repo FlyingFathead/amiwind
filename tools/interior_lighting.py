@@ -8,6 +8,9 @@ surfaces (lighting['warm_style']); the default stays the first-pass linear
 falloff until the original attenuation is judged against OpenMW
 (LIGHT-FALLOFF-31). Per-cell choices live in CELL_PROFILES, judged against
 OpenMW at the same poses (OPENING-BRIGHT-31: the prison ship).
+Lamp-only maps for switchable lightstyles (tools/lamp_lightmaps.py, EXPERIMENTAL night-lamp
+lightmaps) use ambient 0, the original falloff and the facing term; front= gives the face's
+front side when the polygon's winding does not.
 Material colors remain in the shared palette. It is an approximation, not TES3
 lighting parity; no per-frame light solve is added to the Amiga renderer.
 
@@ -111,7 +114,7 @@ def bake_grid(polygon, axes, offset):
     return low,((high-low)/16).astype(int)+1
 
 
-def bake_surface(polygon, axes, offset, rotation, origin, lighting, *, sample_grid=None):
+def bake_surface(polygon, axes, offset, rotation, origin, lighting, *, sample_grid=None, front=None):
     # Converters and repairs pass the engine's grid of the serialized BSP
     # coordinates as sample_grid; without it the unstored polygon's grid is used.
     if sample_grid is None:
@@ -128,7 +131,10 @@ def bake_surface(polygon, axes, offset, rotation, origin, lighting, *, sample_gr
     # value for those materials instead of inventing texture coordinates.
     inverse=np.linalg.inv(matrix) if abs(np.linalg.det(matrix))>1e-10 else None
     samples=[]
-    front=face_normal(polygon) if lighting.get('facing') else None
+    if lighting.get('facing'):
+        front=face_normal(polygon) if front is None else np.asarray(front,float)/np.linalg.norm(front)
+    else:
+        front=None
     world_normal=None if front is None else rotation@front
     for t in range(size[1]):
         for s in range(size[0]):

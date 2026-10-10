@@ -21,7 +21,9 @@ coverage and protected model quality remain mandatory.
 - [World flora default](#world-flora-default)
 - [Harvestable mushrooms default](#harvestable-mushrooms-default)
 - [Shipped towns default](#shipped-towns-default)
+- [Which Seyda Neen is in my build?](#which-seyda-neen-is-in-my-build)
 - [Game heap size](#game-heap-size)
+- [NPC model levels of detail](#npc-model-levels-of-detail)
 - [Disk layout limits](#disk-layout-limits)
 - [MiniWind playtester build](#miniwind-playtester-build)
 - [Quick test builds](#quick-test-builds)
@@ -108,16 +110,28 @@ the CHIM areas Balmora and Seyda Neen from `config/build-defaults.json`; name
 others with one or more `--chim-area TOWN`) or `--builder legacy` (every
 exterior as region maps, as in v0.0.32 and earlier; still selectable and
 tested). Startup screen: a CHIM build shows "RPG engine powered by CHIM" under
-the logo, a legacy build the v0.0.32 lines. A CHIM build ships no
+the logo, a legacy build the v0.0.32 lines. A CHIM town other than Seyda Neen is
+made from the game data and the CHIM world (stage `chim-town-<town>`): no legacy
+region maps are built for it; `--legacy-area TOWN` brings them back for
+debugging only (see
+[builder types](chim/build_guide/BUILDER_TYPES.md#chim-native-towns-experimental---chim-native-towns-on)).
+A CHIM build ships no
 legacy exterior map of a CHIM area: the image step writes the town's CHIM frame
 maps, removes its legacy region maps and fails the build if any is still in the
 image (`build.json` `chim_world.legacy_check`). Extra towns that are not CHIM
 areas (the Vivec Arena) are left out of a CHIM image; the open world ships with
 the legacy builder's maps until it is on CHIM. A CHIM build with Seyda Neen
-needs the recorded v0.0.31 Seyda Neen maps from your own v0.0.31 image
-(`--seyda-recorded DIR`). `build-state.json` `chim_plan` lists the legacy
+converts it from your data and checks its frame maps against the converted
+region maps; from v0.0.35 the recorded v0.0.31 Seyda Neen maps
+(`--seyda-recorded DIR`) are optional and NOT RECOMMENDED since v0.0.31 (legacy; the default converts
+Seyda Neen from your data, and the shipped image holds only the CHIM Seyda Neen frame map). `build-state.json` `chim_plan` lists the legacy
 exterior stages a CHIM plan still runs and which later step reads each one
 (details: [CHIM world format](chim/WORLD_FORMAT.md#a-chim-build-ships-no-legacy-exterior-maps)).
+
+Lava pools become Quake liquid by default (`--lava quake`, config key `lava`): a warp surface with lava contents,
+Morrowind's damage and a blood-red view tint, in interior rooms, region maps and CHIM chunks alike. `--lava static`
+keeps the earlier rule (rooms leave the pools out, exterior frames place them as solid models). See
+[Lava](LAVA.md).
 
 ## 1. Quickest setup and build
 
@@ -501,6 +515,24 @@ only: the builder prints a warning, `build-state.json` records the selection in
 `extra_town_selection`, and the image does not match a release. Contradictory
 town options stop the build before any work. Details: [TOWN_IMPORT.md](TOWN_IMPORT.md).
 
+## Which Seyda Neen is in my build?
+
+- **CHIM builds (the default):** the Seyda Neen you play is the CHIM version, `maps/seyda-chim.bsp`
+  with its far layer `seyda-chim.far`, converted by the CHIM builder from your own Morrowind data files
+  (`Morrowind.esm` and the BSA archives). It is the only Seyda Neen in the image; the shipped v0.0.34
+  image holds none of the 66 recorded v0.0.31 maps.
+- **The check reference:** to check that conversion, the build also converts Seyda Neen the legacy
+  way (region maps) from the same data and compares the two. Those region maps are only a check
+  reference and never go into the image.
+- **Until v0.0.34** that reference was the recorded v0.0.31 maps (`--seyda-recorded DIR`). **From
+  v0.0.35** the reference is the fresh conversion from your data, so no recorded files are needed.
+  `--seyda-recorded` stays optional and is NOT RECOMMENDED since v0.0.31.
+- **Legacy builds (`--builder legacy`):** Seyda Neen ships as the legacy region maps. The builder
+  converts them from your data with the terrain visual cull, which does not finish from scratch
+  today ([BUILD-SEYDA-CULL-STABLE-32](bugs/BUILD-SEYDA-CULL-STABLE-32.md)), so a legacy build with
+  Seyda Neen from scratch stops there; with `--seyda-recorded DIR` it installs the recorded v0.0.31
+  maps instead and ships them byte for byte.
+
 ## Game heap size
 
 The game heap (Quake's Hunk: maps, models and the CHIM zone) is 11 MiB by default,
@@ -514,6 +546,30 @@ check asks for the heap plus 3 MiB of free Fast RAM, and the heap plus 16 bytes 
 one block. The map heap gates measure against the build's own size. The start
 argument `-heapmb N` overrides the built size for one start, with the same warning. What the heap
 holds, the measured figures per map and what 12 MiB costs: [chim/build_guide/MEMORY.md](chim/build_guide/MEMORY.md).
+
+## NPC model levels of detail
+
+With `--npc-lod on`, every resident is baked at several levels of detail from the same
+recipe and the same animation frames, and the engine draws each actor with the level its
+distance calls for ([NPC model levels of detail](NPC_MODEL_CACHE.md#npc-model-levels-of-detail)):
+
+The defaults are `config/build-defaults.json` (`npc_lod`, `npc_lod_levels`, `npc_face_lod`,
+`npc_lod_disk_mib`): the levels stay off until they have been compared in game, and turning them on
+by default is a change of that file. A `--build-config` file overrides it, the command line both.
+
+| Option | Values | Default |
+| --- | --- | --- |
+| `--npc-lod` | `on`, or `off` for one model per resident (the earlier method) | `off` |
+| `--npc-lod-levels` | `2` (near + the map's own model), `3` (+ mid distance), `4` (+ crowds far away) | `3` |
+| `--npc-face-lod` | which residents may use the near level: `all`, `measured`, `named`, or `list` with `--npc-face-lod-list FILE` | `all` |
+| `--npc-lod-disk-mib` | disk for the level files (not the map models): coarse levels first, then near levels by head detail lost, until this many MiB | `96` |
+
+The map's own model (level 1) is the earlier single model, byte for byte; the other
+levels go to `progs/l0/`, `progs/l2/` and `progs/l3/`, listed in `progs/npc-lod.txt`.
+`python3 tools/npc_lod.py check ID1` checks a staged `id1`: every level present, with the
+map model's frame list. On development builds the resident bakes are kept in the asset
+pool (`WORKSPACE/cache/asset-pool-v1`), so a rebuild reuses every level whose inputs did
+not change.
 
 ## Disk layout limits
 
@@ -557,8 +613,18 @@ The test suite runs the same self-test (`tests/test_layout_selftest.py`).
 quick PARTIAL-AREA test of Balmora only (the Balmora exterior on CHIM, the
 Balmora interiors, engine, menus, UI, audio, fonts and music) that boots
 straight into Balmora. Private `-devN` versions only, never a release;
-`--miniwind-description TEXT` adds an "Included:" line to the startup screen.
-Details: [MINIWIND_PLAYTESTER.md](MINIWIND_PLAYTESTER.md).
+`--miniwind-description TEXT` adds a "Scene:" line to the startup screen.
+Overview: [MiniWind: the test ground](MINIWIND.md); build type reference:
+[MINIWIND_PLAYTESTER.md](MINIWIND_PLAYTESTER.md).
+
+Timing: a MiniWind build is meant to take minutes when it reuses a full build
+(`--reuse-from`). The stages its quick test exclusions change (intro, media,
+census and what depends on them) run again; their per-file caches are read
+from the reused run's workspace when the build has its own workspace, so a
+sound or movie converted once is copied, not converted again. Measured cases
+and the remaining causes of slow MiniWind builds:
+[BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md) and MINIWIND-NOT-MINUTES-33
+in the [bug register](BUGS.md).
 
 ## Quick test builds
 
@@ -575,6 +641,18 @@ or one option per group.
 | `interiors` | `--exclude-interiors` | the Seyda Neen and Balmora room compiles | house doors say "Area unavailable" |
 | `harvest` | `--exclude-harvest` (or `--no-harvest`) | the harvest stage | mushrooms stay, but cannot be picked |
 | `unreferenced` | `--exclude-unreferenced [GROUPS]` | area builds only: what the area does not reference | only the area's NPCs, voices and sounds |
+
+Release builds: the image step's stair walk walks only the steps of flights
+(the rows that can stop the build) in release candidates and finals, and every
+step and ramp otherwise; `--stair-walk all` forces the full walk (nightly full
+reports), `--stair-walk flights` the short one. With `--allow-release-reuse`,
+release builds also reuse the image step's per-map pass results, and each pass
+receipt counts its hits; the from-scratch reference build is then compared file
+by file with the release payload. Details: [BUILD_PROFILE.md](BUILD_PROFILE.md).
+
+Each exclusion applies before the work: an excluded movie, voice or sound is
+never read or converted (a Balmora MiniWind imports 4,875 of the 7,164 sounds:
+the referenced voices and the effects).
 
 Dressing, flora and every other object with collision always stay. The image
 is named `...-quick-test.hdf`, the receipts record the groups, and the game says

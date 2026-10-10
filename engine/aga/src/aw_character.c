@@ -17,6 +17,9 @@ static unsigned short eye_heights[16][2];
 static int default_eye_race,default_eye_female;
 static int menu,accepted,row,review_return,page;
 static int confirming,confirm_yes;
+/* Quick character screen (aw_quickchar.c): pages before its last one are
+ * accepted with Enter, without the "Really choose" box. */
+static int skip_confirm;
 static int mouse_x=160,mouse_y=90,mouse_visible;
 static aw_character_t choice;
 static float rotation;
@@ -189,7 +192,7 @@ int AW_CharacterRebuild(aw_character_t *c)
 
 void AW_CharacterReset(void)
 {
-    memset(&aw_character,0,sizeof(aw_character));menu=accepted=review_return=confirming=0;
+    memset(&aw_character,0,sizeof(aw_character));menu=accepted=review_return=confirming=skip_confirm=0;
     AW_HeadClear();
     if(!AW_CharacterLoad())return;
     aw_character.head=part_next(-1,0,0,0,1);aw_character.hair=part_next(-1,0,0,1,1);
@@ -198,18 +201,19 @@ void AW_CharacterReset(void)
 
 /* Explicit development restart. Resolve catalogue IDs and use the ordinary
  * stat builder; never invent a second set of Nord/class/birthsign values. */
-int AW_CharacterHors(void)
+int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name)
 {
     aw_character_t c;int i;
+    if(!race || !clas || !birth || !name || !*name || strlen(name)>=sizeof(aw_story.name) || female<0 || female>1)return 0;
     if(!AW_CharacterLoad())return 0;
-    memset(&c,0,sizeof(c));c.race=c.clas=c.birth=-1;
-    for(i=0;i<aw_race_count;i++)if(!Q_strcasecmp(aw_races[i].id,"nord"))c.race=i;
-    for(i=0;i<aw_class_count;i++)if(!Q_strcasecmp(aw_classes[i].id,"barbarian"))c.clas=i;
-    for(i=0;i<aw_birth_count;i++)if(!Q_strcasecmp(aw_births[i].id,"charioteer"))c.birth=i;
+    memset(&c,0,sizeof(c));c.race=c.clas=c.birth=-1;c.female=female;
+    for(i=0;i<aw_race_count;i++)if(!Q_strcasecmp(aw_races[i].id,(char *)race))c.race=i;
+    for(i=0;i<aw_class_count;i++)if(!Q_strcasecmp(aw_classes[i].id,(char *)clas))c.clas=i;
+    for(i=0;i<aw_birth_count;i++)if(!Q_strcasecmp(aw_births[i].id,(char *)birth))c.birth=i;
     if(c.race<0 || c.clas<0 || c.birth<0)return 0;
-    c.head=part_next(-1,c.race,0,0,1);c.hair=part_next(-1,c.race,0,1,1);
+    c.head=part_next(-1,c.race,female,0,1);c.hair=part_next(-1,c.race,female,1,1);
     if(!AW_CharacterRebuild(&c))return 0;
-    AW_StoryReset(0);strcpy(aw_story.name,"Hors");
+    AW_StoryReset(0);strcpy(aw_story.name,name);
     AW_CourtyardTakeRing();AW_CaptainDuties();
     AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);
     aw_story.stage=AW_STAGE_RELEASED;aw_story.ship_disabled=1;
@@ -218,10 +222,71 @@ int AW_CharacterHors(void)
     aw_character=c;menu=accepted=review_return=confirming=0;AW_HeadClear();apply_eye();
     return 1;
 }
+/* Explicit development restart. Resolve catalogue IDs and use the ordinary
+ * stat builder; never invent a second set of Nord/class/birthsign values. */
+int AW_CharacterHors(void){return AW_CharacterPreset("nord","barbarian","charioteer",0,"Hors");}
 
-int AW_CharacterOpen(int kind)
+#define LOWER(c) ((c)>='A' && (c)<='Z'?(c)+32:(c))
+/* Case-insensitive match that ignores spaces: "longblade" names "Long blade". */
+static int same_name(const char *a,const char *b)
 {
+    for(;;){
+        while(*a==' ')a++;
+        while(*b==' ')b++;
+        if(!*a || !*b)return !*a && !*b;
+        if(LOWER(*a)!=LOWER(*b))return 0;
+        a++;b++;
+    }
+}
+static int catalogue_find(const char *value,int kind)
+{
+    int i,n=kind==0?aw_race_count:kind==1?aw_class_count:kind==2?aw_birth_count:kind==3?8:27;
+    for(i=0;i<n;i++){
+        const char *id=kind==0?aw_races[i].id:kind==1?aw_classes[i].id:kind==2?aw_births[i].id:NULL;
+        const char *label=kind==0?aw_races[i].name:kind==1?aw_classes[i].name:kind==2?aw_births[i].name:kind==3?attributes[i]:skills[i];
+        if((id && same_name(id,value)) || same_name(label,value))return i;
+    }
+    return -1;
+}
+/* One field of a scripted character (aw_quickchar_set, aw_quickchar.c): race, class,
+ * birthsign and sex rebuild the stats with the ordinary builder (so set them first);
+ * attribute NAME N, skill NAME N and level N then override single values. 1 when set. */
+int AW_CharacterSet(aw_character_t *c,const char *field,const char *value,const char *number)
+{
+    int i,n=0;aw_character_t trial;
+    if(!c || !field || !value || !AW_CharacterLoad())return 0;
+    trial=*c;
+    if(!Q_strcasecmp((char *)field,"race") || !Q_strcasecmp((char *)field,"class") ||
+       !Q_strcasecmp((char *)field,"birthsign") || !Q_strcasecmp((char *)field,"birth")){
+        int kind=!Q_strcasecmp((char *)field,"race")?0:!Q_strcasecmp((char *)field,"class")?1:2;
+        if((i=catalogue_find(value,kind))<0)return 0;
+        if(kind==0){trial.race=i;trial.head=part_next(-1,i,trial.female,0,1);trial.hair=part_next(-1,i,trial.female,1,1);}
+        else if(kind==1)trial.clas=i;else trial.birth=i;
+    }else if(!Q_strcasecmp((char *)field,"sex")){
+        if(Q_strcasecmp((char *)value,"m") && Q_strcasecmp((char *)value,"f"))return 0;
+        trial.female=LOWER(value[0])=='f';
+        trial.head=part_next(-1,trial.race,trial.female,0,1);trial.hair=part_next(-1,trial.race,trial.female,1,1);
+    }else if(!Q_strcasecmp((char *)field,"level")){
+        n=Q_atoi((char *)value);if(n<1 || n>100)return 0;
+        c->level=n;return 1;
+    }else if(!Q_strcasecmp((char *)field,"attribute") || !Q_strcasecmp((char *)field,"skill")){
+        int kind=!Q_strcasecmp((char *)field,"attribute")?3:4;
+        if(!number || (i=catalogue_find(value,kind))<0)return 0;
+        n=Q_atoi((char *)number);if(n<0 || n>255)return 0;
+        if(kind==3){c->attributes[i]=(short)(n-c->modifiers[i]);c->current[0]=c->maximum[0]=(c->attributes[0]+c->attributes[5])*.5f;}
+        else c->skills[i]=(short)n;
+        return 1;
+    }else return 0;
+    if(!AW_CharacterRebuild(&trial))return 0;
+    *c=trial;return 1;
+}
+
+int AW_CharacterOpen(int kind){return AW_CharacterOpenQuick(kind,1);}
+int AW_CharacterOpenQuick(int kind,int confirm)
+{
+    skip_confirm=0;
     if(kind<1 || kind>4 || !AW_CharacterLoad() || !aw_character.valid)return 0;
+    skip_confirm=!confirm;
     choice=aw_character;menu=kind;row=page=accepted=review_return=mouse_visible=confirming=0;rotation=0;
     mouse_x=100;mouse_y=kind==1?48:176;
     IN_AWClearButtons();
@@ -229,6 +294,7 @@ int AW_CharacterOpen(int kind)
     return 1;
 }
 int AW_CharacterActive(void){return menu!=0;}
+void AW_CharacterClose(void){menu=confirming=accepted=review_return=skip_confirm=0;AW_HeadClear();IN_AWClearButtons();}
 int AW_CharacterDone(void){int result=accepted;accepted=0;return result;}
 
 static void change(int direction)
@@ -308,6 +374,7 @@ int AW_CharacterKey(int key)
         if(menu==1 && row<4){row++;return 1;}
         if(!AW_CharacterRebuild(&choice))return 1;
         if(review_return){menu=4;review_return=0;page=0;return 1;}
+        if(skip_confirm){aw_character=choice;accepted=menu;menu=0;skip_confirm=0;AW_HeadClear();IN_AWClearButtons();apply_eye();return 1;}
         confirming=1;confirm_yes=1;mouse_visible=0;mouse_x=220;mouse_y=154;return 1;
     }
     return 1;

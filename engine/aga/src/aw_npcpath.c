@@ -77,6 +77,22 @@ int AW_PathSpeed(int mimic,int player_speed,int gap,int distance) {
     return speed;
 }
 
+int AW_PathStuckResponse(int kind,int method,int in_combat,int out_of_view) {
+    if(kind==AW_ACTOR_HOSTILE)return method==1?AW_STUCK_FLEE:AW_STUCK_RETRY;   /* never warp */
+    if(kind==AW_ACTOR_SUMMON && in_combat)return AW_STUCK_RETRY;              /* hold and fight */
+    if(method==0)return AW_STUCK_PLACE;
+    if(method==1)return out_of_view?AW_STUCK_PLACE:AW_STUCK_WAIT_UNSEEN;
+    return AW_STUCK_RETRY;
+}
+const char *AW_PathStuckName(int response) {
+    static const char *const names[AW_STUCK_RESPONSES]={"keep trying","placed","wait until unseen","flee"};
+    return response>=0 && response<AW_STUCK_RESPONSES?names[response]:"?";
+}
+const char *AW_PathKindName(int kind) {
+    static const char *const names[AW_ACTOR_KINDS]={"follower","summon","hostile"};
+    return kind>=0 && kind<AW_ACTOR_KINDS?names[kind]:"?";
+}
+
 static void release(const aw_path_t *s) {if(scratch.owner==s)scratch.owner=NULL;}
 
 void AW_PathReset(aw_path_t *s,int x,int y) {

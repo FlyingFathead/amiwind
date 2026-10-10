@@ -125,6 +125,9 @@ class RepositoryTests(unittest.TestCase):
             self.assertGreater(len(row['why']), 30, row['function'])
         for banned in ('sin', 'cos', 'cexp', 'atan', 'atan2', 'tan', 'exp', '__kernel_sin', '__kernel_cos'):
             self.assertNotIn(banned, names, 'trigonometry must stay unlinked, not allowlisted')
+        for banned in ('pow', '__ieee754_pow'):
+            # ENGINE-GAMMA-POW-35: the gamma table uses Q_GammaPow (mathlib.c).
+            self.assertNotIn(banned, names, 'pow must stay unlinked, not allowlisted')
         for banned in ('_strtod_l', '_dtoa_r', '_svfprintf_r', '_vfprintf_r', '__fixdfdi', '__fixunsdfdi'):
             self.assertNotIn(banned, names, 'C library float parsing/printing must stay unlinked (aw_format.c)')
 

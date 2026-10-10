@@ -382,6 +382,7 @@ INSTRUMENT = {
     'actor-contact': ('convert_builder_scene', 'annotate', 'bake_ground', 'check_recorded', 'require',
                       'frozen_maps'),
     'media': ('discover', 'lookups', 'prepare_video:prepare_video'),
+    'chim-town': ('import_town:residents', 'import_town:ordered_map', 'ground_actors', 'chim.frame_map:frame_world'),
 }
 # The stage script that owns each table's plain names (for the consistency test).
 INSTRUMENT_SCRIPTS = {'build_aga image': 'build_aga', 'build_aga census': 'build_aga',
@@ -389,7 +390,7 @@ INSTRUMENT_SCRIPTS = {'build_aga image': 'build_aga', 'build_aga census': 'build
                       'census': 'prepare_census', 'bsp': 'prepare_mesh_bsp', 'interior': 'prepare_interior',
                       'area': 'prepare_area', 'balmora': 'prepare_balmora', 'town': 'import_town',
                       'balmora-interiors': 'prepare_balmora_interiors', 'actor-contact': 'check_scene_actors',
-                      'media': 'prepare_media_assets'}
+                      'media': 'prepare_media_assets', 'chim-town': 'chim_town'}
 MAP_FUNCTIONS = ('ordered_map', 'completed_map')
 
 

@@ -451,7 +451,9 @@ def compile_region(task):
     packed,storage=deduplicate(target.read_bytes());target.write_bytes(packed)
     data=lumps(packed)
     metrics=dict(bytes=target.stat().st_size,faces=len(data[7])//20,clipnodes=len(data[9])//8,
-                 vertices=len(data[3])//12,sha256=digest(target),seconds=round(time.monotonic()-started,3))
+                 vertices=len(data[3])//12,sha256=digest(target))
+    # No wall time in the region receipt: a stage output is byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
+    print(f"Region {entry['name']}: {time.monotonic()-started:.1f} s",flush=True)
     if metrics['bytes']>4*1024*1024 or metrics['faces']>30000 or metrics['clipnodes']>32767:
         raise ValueError('Converted terrain budget exceeded: '+entry['name'])
     result=dict(entry,converted=metrics,input_sha256=key,storage=storage)

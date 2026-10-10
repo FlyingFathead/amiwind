@@ -65,6 +65,7 @@ long ChimZone_LockedPeak (int which, int reset);
 int ChimZone_Check_Integrity (void);
 unsigned long ChimZone_Failures (int *last_need);
 int ChimZone_LargestUnlocked (void);
+unsigned long ChimZone_Unsatisfiable (void);
 void ChimZone_Map (void (*print)(const char *line));
 void ChimZone_SetEnds (int small);
 

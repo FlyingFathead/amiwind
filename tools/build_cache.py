@@ -70,6 +70,7 @@ ENV_NAME = re.compile(r'AMIWIND_[A-Z0-9_]*[A-Z0-9]')
 ENV_ANY = '*'
 PLAN_NAME = 'reuse-plan.json'
 # Stages whose inputs are not fully fingerprinted always run.
+FORCED_REASON = 'forced to run again (--rebuild-stage)'
 NON_REUSABLE = {
     'engine': 'compiles with the Amiga SDK, whose files are not fingerprinted (about 15 s)',
     'image': 'final image: always assembled and verified from the stage outputs',
@@ -81,11 +82,22 @@ NON_REUSABLE = {
 # (BUILD-CACHE-CHIM-UNITS-33). The media and intro stages use the per-file asset pool the same way.
 CONTENT_ADDRESSED = {('npc-gallery', '--cache'), ('world-terrain', '--cache'), ('chim', '--unit-cache'),
                      ('media', '--cache'), ('intro', '--cache')}
+# The shared storage pool (WORKSPACE/cache/asset-pool-v1, --storage-pool-dir, tools/storage_pool.py) is
+# content-addressed whatever stage or option names it: every object is stored by its own SHA-256 and every
+# reader (tools/file_cache.py FileCache) looks objects up by a reuse key made of the inputs the object depends
+# on (source file hashes, settings, conversion code) and verifies the bytes against the stored SHA-256. What a
+# stage reads from it is therefore fixed by inputs its own fingerprint already covers (game data, code). Hashing
+# the folder made a stage's fingerprint change with every object any build added, and once the pool grew past
+# EXTERNAL_DIRECTORY_LIMIT it made the stage never reusable (BUILD-POOL-ARG-UNFINGERPRINTED-35: balmora's
+# --npc-model-pool). Any argument naming the pool or a folder inside it counts as its token, never by content.
+POOL_TOKEN = '{WORKSPACE}/cache/asset-pool-v1'
+POOL_CONTENT = 'not hashed (content-addressed storage pool)'
 # Worker counts (outputs do not depend on them), bookkeeping, and interpreter locations
 # (the Python version and packages are fingerprinted themselves).
 IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_COST_HISTORY', 'AMIWIND_PASS_CACHE',
                'AMIWIND_BUILD_PROFILE', 'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_BUILD_JOBS_FILE',
-               'AMIWIND_BUILD_BUDGET', 'AMIWIND_ACTIVE_ENV', 'AMIWIND_PYTHON', 'AMIWIND_STAGE_TRACE'}
+               'AMIWIND_BUILD_BUDGET', 'AMIWIND_ACTIVE_ENV', 'AMIWIND_PYTHON', 'AMIWIND_STAGE_TRACE',
+               'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL'}
 SEPARATORS = '/' + os.sep
 EXTERNAL_DIRECTORY_LIMIT = 512 * 1024 ** 2
 SKIP_DIRECTORIES = {'.git', '__pycache__', 'out', 'tests', 'node_modules'}
@@ -98,9 +110,15 @@ PATH_CALLS = {'Path', 'PurePath', 'PurePosixPath', 'joinpath', 'join', 'open', '
 # outputs (tests/test_build_profile.py checks that); they are left out of every fingerprint and
 # not followed further, so a profiler or progress fix does not force a full rebuild. Explicit
 # list, tested (tests/test_build_cache.py): add a module here only if it cannot change outputs.
-INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py'})
+# tools/unit_tree.py: the output-record hashes the stage cache computes (never a stage's outputs).
+INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
+                                     'tools/unit_tree.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 INSTRUMENTATION_STEMS = frozenset(path.rsplit('/', 1)[-1][:-3] for path in INSTRUMENTATION_MODULES)
+# The reuse step of a reused stage (`build_cache.py apply`) also loads the storage pool (tools/storage_pool.py) to
+# link verified files; it never changes their bytes, so where it was loaded from is no reason to refuse the stage's
+# record (it stays in fingerprints that reach it).
+APPLY_STEMS = INSTRUMENTATION_STEMS | {'storage_pool'}
 # scratch: the builder's scratch folder (build_scratch.stage_environment: AMIWIND_SCRATCH = RUN/scratch) holds
 # only transient per-use folders; counted as an undeclared output, it made every stage running when it first
 # appeared non-reusable, and every later stage with them (BUILD-REUSE-SCRATCH-UNDECLARED-33).
@@ -242,6 +260,10 @@ class SourceIndex:
                     imports.append((node.module or '', node.level, [alias.name for alias in node.names]))
                 elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
                     constants.append((node.value, '/' in node.value or id(node) in path_parts))
+                elif isinstance(node, (ast.BinOp, ast.JoinedStr)):
+                    joined = folded_string(node)
+                    if joined is not None:
+                        constants.append((joined, '/' in joined or id(node) in path_parts))
             self._parsed[relative] = (imports, constants, False)
         return self._parsed[relative]
 
@@ -532,7 +554,12 @@ class SourceIndex:
                 if text.endswith('.py') and '\n' not in text and len(text) < 200:
                     for base in ('', 'tools/', folder + '/' if folder else ''):
                         candidate = posixpath.normpath(base + text)
-                        if candidate in self.files:
+                        # A module naming itself ('generator': 'tools/cell_progress.py' in its own output) is a
+                        # label, not a run of its command line: following it reached its main() and every file
+                        # main() can name (BUILD-CELL-PROGRESS-KEY-BUGS-35: all of docs/, the bug register too).
+                        # A unit that starts a Python process (sys.executable) may run itself: followed then.
+                        if candidate in self.files and (candidate != relative
+                                                        or ('sys', ('executable',)) in facts['attributes']):
                             reach_module(candidate, main=True)
         python = {relative for relative, _ in reached}
         units = {}
@@ -722,7 +749,87 @@ def _flatten_path(node):
     return [node]
 
 
-def _literal_runs(operands, constants=None, refined=True):
+# Path expressions with loop names (loop_choices) are read once per combination of the names'
+# values; more combinations than this read the expression as before (computed parts).
+MAX_PATH_CHOICES = 64
+
+
+def loop_choices(walked):
+    """{name: (text, ...)} for names that a unit binds only as the target of ONE for loop (or
+    comprehension) over a written-out sequence, at a position where every element is a string:
+    `for name, file, reader in [('Balmora', 'balmora.json', regions), ('Seyda Neen', 'seyda_area.json', seyda)]`
+    makes file one of the two names. A path built from it (ROOT / 'config' / file) names those
+    files, not the whole folder (BUILD-SURVEY-KEY-CONFIG-35: the world survey's key counted
+    every file under config/). A name bound any other way in the unit (assignment, another
+    loop, with/except/import/def/match, a parameter, global/nonlocal) has no choices, so a key
+    never under-declares."""
+    stores, other = {}, set()
+    for node in walked:
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            stores[node.id] = stores.get(node.id, 0) + 1
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            other.add(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            other.update((alias.asname or alias.name).split('.')[0] for alias in node.names)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            other.add(node.name)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            other.update(node.names)
+        elif isinstance(node, ast.arg):
+            other.add(node.arg)
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+            other.add(node.name)
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            other.add(node.rest)
+    found = {}
+    for node in walked:
+        if not isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+            continue
+        # The sequence is written out ([...] or (...)); only the target's string positions must be
+        # literal (`for name, file, reader in [('Balmora', 'balmora.json', regions), ...]`).
+        if not isinstance(node.iter, (ast.List, ast.Tuple)) or not node.iter.elts:
+            continue
+        target = node.target
+        if isinstance(target, ast.Name):
+            positions = [(None, target.id)]
+        elif isinstance(target, (ast.Tuple, ast.List)) and all(isinstance(e, ast.Name) for e in target.elts):
+            positions = list(enumerate(e.id for e in target.elts))
+        else:
+            continue
+        for index, name in positions:
+            options = []
+            for element in node.iter.elts:
+                if index is not None:
+                    if not isinstance(element, (ast.Tuple, ast.List)) or len(element.elts) != len(target.elts)                             or any(isinstance(e, ast.Starred) for e in element.elts):
+                        options = None
+                        break
+                    element = element.elts[index]
+                if not (isinstance(element, ast.Constant) and isinstance(element.value, str)):
+                    options = None
+                    break
+                options.append(element.value)
+            if options is not None:
+                found[name] = tuple(dict.fromkeys(options))
+    return {name: options for name, options in found.items() if stores.get(name) == 1 and name not in other}
+
+
+def _literal_runs(operands, constants=None, refined=True, choices=None):
+    if refined and choices:
+        # A loop name with known string values (loop_choices): one reading per combination.
+        chosen = [index for index, operand in enumerate(operands)
+                  if isinstance(operand, ast.Name) and operand.id in choices and operand.id not in (constants or {})]
+        combinations = 1
+        for index in chosen:
+            combinations *= len(choices[operands[index].id])
+        if chosen and combinations <= MAX_PATH_CHOICES:
+            from itertools import product
+            runs = []
+            for values in product(*(choices[operands[index].id] for index in chosen)):
+                expanded = list(operands)
+                for index, value in zip(chosen, values):
+                    expanded[index] = ast.Constant(value)
+                runs.extend(_literal_runs(expanded, constants, refined))
+            return runs
     """[(path, open_ended)] for each run of string constants in a path expression.
 
     Constants inside a computed operand ('a' if x else 'b', f'{name}.json') count as
@@ -796,14 +903,71 @@ def module_constants(tree):
     return found
 
 
+def _is_sys_path(node):
+    """sys.path, or a slice/item of it."""
+    if isinstance(node, ast.Subscript):
+        node = node.value
+    return (isinstance(node, ast.Attribute) and node.attr == 'path' and isinstance(node.value, ast.Name)
+            and node.value.id == 'sys')
+
+
+def import_path_nodes(walked):
+    """ids of every node inside an import search path entry: sys.path.insert/append/extend(...) arguments
+    and values assigned to sys.path (or a slice of it), site.addsitedir(...). Such a folder is where Python
+    looks for modules (the imports themselves are followed), not a data file the code reads: counting
+    Path(__file__).parents[1] / 'tools' as a read named every non-Python file under tools/, so a new bug
+    page (tools/release-files.json) rebuilt interior, census, harvest and chim (BUILD-KEY-OVERBROAD-33)."""
+    found = set()
+    for node in walked:
+        values = []
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in ('insert', 'append', 'extend') and _is_sys_path(node.func.value):
+                values = node.args
+            elif node.func.attr == 'addsitedir' and isinstance(node.func.value, ast.Name) and node.func.value.id == 'site':
+                values = node.args
+        elif isinstance(node, (ast.Assign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(_is_sys_path(target) for target in targets):
+                values = [node.value]
+        for value in values:
+            found.update(id(inner) for inner in ast.walk(value))
+    # for p in (ROOT / 'tools', ROOT / 'src'): sys.path.insert(0, str(p)): the loop's folders are search paths
+    # when its variable is only ever used as one.
+    for node in walked:
+        if not (isinstance(node, ast.For) and isinstance(node.target, ast.Name)):
+            continue
+        name = node.target.id
+        uses = [inner for statement in node.body for inner in ast.walk(statement)
+                if isinstance(inner, ast.Name) and inner.id == name]
+        if uses and all(id(use) in found or _search_path_use(node.body, use) for use in uses):
+            found.update(id(inner) for inner in ast.walk(node.iter))
+    return found
+
+
+def _search_path_use(body, use):
+    """USE (a Name) is an argument of sys.path.remove/insert/append or of a str() inside one, or the
+    subject of an `in sys.path` test."""
+    for statement in body:
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and _is_sys_path(node.func.value)                     and node.func.attr in ('insert', 'append', 'remove', 'index', 'count')                     and any(use is inner for argument in node.args for inner in ast.walk(argument)):
+                return True
+            if isinstance(node, ast.Compare) and any(_is_sys_path(c) for c in node.comparators)                     and any(use is inner for inner in ast.walk(node.left)):
+                return True
+    return False
+
+
 def _unit_facts(nodes, docstrings, constants=None, refined=True):
     facts = {'names': set(), 'attributes': set(), 'imports': [], 'bindings': {}, 'star': [], 'constants': [],
              'paths': [], 'whole': set(), 'globals': False, 'dynamic_imports': [], 'uncertain': False}
     under_attribute, path_parts, inner = set(), set(), set()
     walked = [node for root in nodes for node in ast.walk(root)]
+    search_paths = import_path_nodes(walked) if refined else set()
+    choices = loop_choices(walked) if refined else {}
     for node in walked:
         if refined and isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div) and id(node) in inner:
             continue  # part of a longer ROOT / 'a' / 'b' chain, read whole below (ast.walk is breadth-first)
+        if id(node) in search_paths:
+            continue  # an import search path entry (import_path_nodes), not a data read
         if isinstance(node, ast.Attribute):
             chain, value = [node.attr], node.value
             while isinstance(value, ast.Attribute):
@@ -826,12 +990,12 @@ def _unit_facts(nodes, docstrings, constants=None, refined=True):
                     nested += [part.left, part.right]
             operands = _flatten_path(node)
             path_parts.update(id(operand) for operand in operands)
-            facts['paths'].extend(_literal_runs(operands, constants, refined))
+            facts['paths'].extend(_literal_runs(operands, constants, refined, choices))
         elif isinstance(node, ast.Call):
             function = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, 'id', '')
             if function in PATH_CALLS:
                 path_parts.update(id(argument) for argument in node.args)
-                facts['paths'].extend(_literal_runs(node.args, constants, refined))
+                facts['paths'].extend(_literal_runs(node.args, constants, refined, choices))
             if function in INTROSPECTION_CALLS:
                 if node.args and isinstance(node.args[0], ast.Name):
                     facts['whole'].add(node.args[0].id)
@@ -867,7 +1031,37 @@ def _unit_facts(nodes, docstrings, constants=None, refined=True):
             facts['names'].add(node.id)
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
             facts['constants'].append((node.value, '/' in node.value or id(node) in path_parts))
+        elif isinstance(node, (ast.BinOp, ast.JoinedStr)):
+            joined = folded_string(node)
+            if joined is not None:
+                facts['constants'].append((joined, '/' in joined or id(node) in path_parts))
     return facts
+
+
+def folded_string(node):
+    """The text of a string built only from literals ('cell_progress' + '_build.py', f'{"a"}b.py'), else None.
+
+    A name written in parts is still a name: a script started as a subprocess, or a data file, named that
+    way is followed like a plain literal (BUILD-CHIM-KEY-UNDERDECLARED-35: the CHIM stage started
+    tools/cell_progress_build.py by a name in two parts, so its fingerprint left out the 8 files it ran)."""
+    if isinstance(node, ast.Constant):
+        return node.value if isinstance(node.value, str) else None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = folded_string(node.left), folded_string(node.right)
+        return None if left is None or right is None else left + right
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for value in node.values:
+            if isinstance(value, ast.FormattedValue):
+                if value.format_spec is not None or value.conversion != -1:
+                    return None
+                value = value.value
+            text = folded_string(value)
+            if text is None:
+                return None
+            parts.append(text)
+        return ''.join(parts)
+    return None
 
 
 def _is_main_guard(test):
@@ -876,6 +1070,44 @@ def _is_main_guard(test):
     sides = [test.left, test.comparators[0]]
     return (any(isinstance(side, ast.Name) and side.id == '__name__' for side in sides)
             and any(isinstance(side, ast.Constant) and side.value == '__main__' for side in sides))
+
+
+def lazy_tables(tree):
+    """{id(statement): name} of top-level literal tables: `NAME = {...}`, [...], (...) or a set whose value is a
+    literal (ast.literal_eval) and whose NAME no other top-level statement binds. A table only matters to the code
+    that reads it, so it is its own unit like a plain function: a stage whose reached code never names it does
+    not hash it (BUILD-SCHEDULER-TABLE-KEY-35: the scheduler's DEPENDENCIES table in tools/build_parallel.py
+    was import-time code of every stage). A module read whole (globals(), module.__dict__, `from m import *`)
+    still reaches every table."""
+    bound = {}
+    for statement in tree.body:
+        names = set()
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(statement.name)
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+                names.add(node.id)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                names.update((alias.asname or alias.name).split('.')[0] for alias in node.names)
+            elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                names.update(node.names)
+        for name in names:
+            bound[name] = bound.get(name, 0) + 1
+    tables = {}
+    for statement in tree.body:
+        if not (isinstance(statement, ast.Assign) and len(statement.targets) == 1
+                and isinstance(statement.targets[0], ast.Name)
+                and isinstance(statement.value, (ast.Dict, ast.List, ast.Tuple, ast.Set))):
+            continue
+        name = statement.targets[0].id
+        if name.startswith('__') or bound.get(name) != 1:
+            continue
+        try:
+            ast.literal_eval(statement.value)
+        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+            continue
+        tables[id(statement)] = name
+    return tables
 
 
 def module_symbols(tree, text=None, refined=False):
@@ -897,11 +1129,14 @@ def module_symbols(tree, text=None, refined=False):
     docstrings = _docstring_ids(tree)
     constants = module_constants(tree) if refined else {}
     top, main, lazy = [], [], {}
+    tables = lazy_tables(tree)
     for statement in tree.body:
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and not statement.decorator_list:
             lazy.setdefault(statement.name, []).append(statement)
             top.extend([*statement.args.defaults, *(d for d in statement.args.kw_defaults if d is not None)])
             # A name defined twice (a def and an assignment) runs with the top level too.
+        elif id(statement) in tables:
+            lazy.setdefault(tables[id(statement)], []).append(statement)
         elif isinstance(statement, ast.If) and _is_main_guard(statement.test):
             main.extend(statement.body)
             top.extend(statement.orelse)
@@ -938,7 +1173,10 @@ def unit_texts(tree, text, lazy):
     # a removed blank line at the end of a module, keeps every fingerprint). A function's default values
     # run on import: they stay with '<top>', in order.
     top = []
+    tables = lazy_tables(tree)
     for statement in tree.body:
+        if id(statement) in tables:
+            continue  # a literal table: its own unit (lazy_tables)
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name in lazy \
                 and not statement.decorator_list:
             defaults = [*statement.args.defaults, *(d for d in statement.args.kw_defaults if d is not None)]
@@ -991,9 +1229,52 @@ def locations(run, metadata=None, index=None):
     if run.parent.name == 'build':
         workspace = run.parent.parent
         rows += [(value, '{WORKSPACE}', True) for value in {str(workspace), str(workspace.resolve())}]
+        # A storage pool named elsewhere (--storage-pool-dir, AMIWIND_STORAGE_POOL) is the same content-addressed
+        # store as the default WORKSPACE/cache/asset-pool-v1: the same token, so naming it keeps every key.
+        pool = metadata.get('storage_pool_dir')
+        if pool:
+            rows += [(value, POOL_TOKEN, True) for value in {str(pool), str(Path(pool).resolve())}
+                     if Path(value) != workspace / 'cache' / 'asset-pool-v1']
     for value in {sys.executable, str(Path(sys.executable).resolve())}:
         rows.append((value, '{PYTHON}', False))
     return sorted(rows, key=lambda row: len(row[0]), reverse=True)
+
+
+def storage_pool_roots(run, metadata=None):
+    """The shared storage pool folders a build's commands can name (resolved): the configured one
+    (metadata storage_pool_dir: --storage-pool-dir, AMIWIND_STORAGE_POOL, the build config) and the default
+    WORKSPACE/cache/asset-pool-v1 of a run inside a workspace (tools/storage_pool.resolve_dir)."""
+    roots = []
+    pool = (metadata or {}).get('storage_pool_dir')
+    if pool:
+        roots.append(Path(str(pool)))
+    run = Path(run)
+    if run.parent.name == 'build':
+        roots.append(run.parent.parent / 'cache' / 'asset-pool-v1')
+    result = []
+    for root in roots:
+        for value in (root, _resolved(root)):
+            if value not in result:
+                result.append(value)
+    return result
+
+
+def _resolved(path):
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
+def in_storage_pool(path, run, metadata=None):
+    """True when PATH is the shared storage pool or a folder/file inside it (BUILD-POOL-ARG-UNFINGERPRINTED-35)."""
+    path = Path(path)
+    candidates = {path, _resolved(path)}
+    for root in storage_pool_roots(run, metadata):
+        for candidate in candidates:
+            if candidate == root or root in candidate.parents:
+                return True
+    return False
 
 
 def normalize_path(part, rows):
@@ -1066,6 +1347,10 @@ def external_inputs(name, command, run, metadata, skip_hashing=False, index=None
             continue
         if (name, option) in CONTENT_ADDRESSED or skip_hashing:
             result[key] = 'not hashed (content-addressed cache)' if not skip_hashing else 'not hashed'
+            continue
+        if in_storage_pool(path, run, metadata):
+            # Checked after the stage table so the media and intro keys stay as they were.
+            result[key] = POOL_CONTENT
             continue
         if path.is_file():
             result[key] = sha256_file(path)
@@ -1273,9 +1558,58 @@ def _install():
     except OSError:
         return
     seen = set()
+    written = set()
+    copying = set()
+    run = globals().get('RUN')
+    run = run.rstrip('/') + '/' if run else None
+    diagnostic_names = globals().get('DIAGNOSTIC') or ()
+    # Storage pool reads ('%' lines, BUILD-POOL-ARG-UNFINGERPRINTED-35): the pool is not fingerprinted by
+    # content, so every read of it must be a keyed lookup (keys/NAMESPACE/..) or a verified object (objects/..).
+    pools = [path.rstrip('/') + '/' for path in globals().get('POOLS') or ()]
+    fallback = os.environ.get('AMIWIND_CACHE_FALLBACK', '')
+    if fallback and os.path.isabs(fallback):
+        pools.append(fallback.rstrip('/') + '/asset-pool-v1/')
+
+    def is_diagnostic(path):
+        return path.endswith('.log') or os.path.basename(path) in diagnostic_names
+
+    def wrote(path):
+        # Writes into the run folder ('>' lines): which of two stages running at the same time wrote a
+        # file both saw change (Recorder.close; BUILD-REUSE-ATTRIBUTION-33).
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
+        if not isinstance(path, str) or run is None:
+            return
+        if not path.startswith('/'):
+            path = os.path.abspath(path)
+        if path.startswith(run) and path not in written:
+            written.add(path)
+            os.write(handle, ('>' + path[len(run):] + '\\n').encode('utf-8', 'surrogateescape'))
 
     def hook(event, args):
-        if event != 'open' or not args:
+        if not args:
+            return
+        if event == 'shutil.copyfile':
+            # A diagnostic copied byte for byte into another diagnostic (the scene chain's copytree of the
+            # previous scene: bsp-scene/light.log -> npc-scene/light.log) is not read: its bytes only reach a
+            # diagnostic, which no stage reads and no reuse compares (BUILD-SCENE-DIAGNOSTIC-COPY-35). The
+            # copy's own open of the source is not listed; any other read of it still is.
+            try:
+                source, target = (os.fsdecode(os.fspath(part)) for part in args[:2])  # copytree passes DirEntry objects
+                source, target = os.path.abspath(source), os.path.abspath(target)
+                if run is not None and source.startswith(run) and is_diagnostic(source) and is_diagnostic(target):
+                    copying.add(source)
+            except Exception:  # noqa: BLE001 - tracing must never change the stage
+                pass
+            return
+        if event != 'open':
+            try:
+                if event in ('os.rename', 'os.replace', 'os.link', 'os.symlink') and len(args) > 1:
+                    wrote(args[1])
+                elif event in ('os.remove', 'os.rmdir'):
+                    wrote(args[0])
+            except Exception:  # noqa: BLE001 - tracing must never change the stage
+                pass
             return
         try:
             path, mode = args[0], args[1] if len(args) > 1 else None
@@ -1285,15 +1619,29 @@ def _install():
             if not isinstance(path, str):
                 return
             if isinstance(mode, str):
-                if 'w' in mode or 'a' in mode or 'x' in mode:
+                if 'w' in mode or 'a' in mode or 'x' in mode or '+' in mode:
+                    wrote(path)
                     return
-            elif isinstance(flags, int) and flags & 3 == os.O_WRONLY:
-                return
+            elif isinstance(flags, int) and flags & 3 in (os.O_WRONLY, os.O_RDWR):
+                wrote(path)
+                if flags & 3 == os.O_WRONLY:
+                    return
             if not path.startswith('/'):
                 path = os.path.abspath(path)
+            if path in copying:
+                copying.discard(path)  # the copy's own read (shutil.copyfile event above)
+                return
             if path in seen:
                 return
             seen.add(path)
+            if run is not None and path.startswith(run) and is_diagnostic(path):
+                # A run-folder diagnostic read by a stage ('<' lines): not allowed (Recorder.after).
+                os.write(handle, ('<' + path[len(run):] + '\\n').encode('utf-8', 'surrogateescape'))
+                return
+            pool = next((prefix for prefix in pools if path.startswith(prefix)), None)
+            if pool is not None:
+                os.write(handle, ('%' + path[len(pool):] + '\\n').encode('utf-8', 'surrogateescape'))
+                return
             if path.startswith(root):
                 line = path[len(root):]
             elif path.endswith(('.py', '.pyc')) and any(path.startswith(prefix) for prefix in outside):
@@ -1354,15 +1702,19 @@ finally:
 '''
 
 
-def write_trace_hook(run, root):
-    """Install the read-trace hook into RUN (profile/trace-hook); False when switched off."""
+def write_trace_hook(run, root, pools=()):
+    """Install the read-trace hook into RUN (profile/trace-hook); False when switched off. POOLS: the storage
+    pool folders whose reads are listed as '%' lines (pool_read_problems)."""
     if os.environ.get(TRACE_ENV, '') == 'off' or os.name != 'posix':
         return False
     folder = Path(run) / 'profile' / TRACE_HOOK_FOLDER
     folder.mkdir(parents=True, exist_ok=True)
     (Path(run) / 'profile' / READS_FOLDER).mkdir(exist_ok=True)
     text = TRACE_HOOK.replace('import os\n', f'import os\n\nROOT = {str(Path(root).resolve())!r}\n'
-                              f'HOOK_FOLDER = {TRACE_HOOK_FOLDER!r}\n', 1)
+                              f'RUN = {str(Path(run).resolve())!r}\n'
+                              f'DIAGNOSTIC = {sorted(DIAGNOSTIC_NAMES)!r}\n'
+                              f'HOOK_FOLDER = {TRACE_HOOK_FOLDER!r}\n'
+                              f'POOLS = {sorted({str(Path(pool)) for pool in pools})!r}\n', 1)
     temporary = folder / 'sitecustomize.tmp'
     temporary.write_text(text)
     temporary.replace(folder / 'sitecustomize.py')
@@ -1420,6 +1772,12 @@ def stage_units(steps, index):
     return stages, modules
 
 
+def apply_module(path):
+    """True for a repository module of the reuse step (APPLY_STEMS: build_cache.py apply and what it loads)."""
+    folder, _, name = path.rpartition('/')
+    return folder == 'tools' and name.endswith('.py') and name[:-3] in APPLY_STEMS
+
+
 def check_calls(lines, reached, modules, run_inside=None):
     """Functions a stage ran ('@file<TAB>name' trace lines) whose source its fingerprint left out."""
     misses = set()
@@ -1454,7 +1812,7 @@ def check_reads(lines, covered, files, root, run_inside=None):
             # reused stage) may load from another checkout on PYTHONPATH; it never changes outputs.
             folder, _, name = line[1:].rpartition('/')
             stem = name.split('.')[0]
-            if stem not in INSTRUMENTATION_STEMS:  # report the source of a cached .pyc
+            if stem not in APPLY_STEMS:  # report the source of a cached .pyc
                 outside.add((folder[:-len('/__pycache__')] if folder.endswith('/__pycache__') else folder)
                             + '/' + stem + '.py')
             continue
@@ -1475,6 +1833,31 @@ def check_reads(lines, covered, files, root, run_inside=None):
     return sorted(misses), sorted(uncovered), sorted(outside)
 
 
+def pool_read_problems(lines):
+    """(problems, summary) of a stage's storage pool reads ('%' trace lines, paths inside the pool).
+
+    The pool is not fingerprinted by content (in_storage_pool): a stage may read it only through a keyed lookup
+    (tools/file_cache.py: keys/NAMESPACE/KK/KEY.json, the key a hash of inputs the stage's own fingerprint
+    covers) and the verified objects such a key names (objects/KK/SHA256). Any other pool file read is an input
+    no fingerprint covers (BUILD-POOL-ARG-UNFINGERPRINTED-35). summary: {'objects': n, 'keys': {namespace: n}}.
+    """
+    problems, keys, objects = [], {}, 0
+    for line in lines:
+        if not line.startswith('%'):
+            continue
+        parts = line[1:].rstrip('\n').split('/')
+        if len(parts) == 3 and parts[0] == 'objects' and len(parts[1]) == 2 and parts[2].startswith(parts[1]):
+            objects += 1
+        elif len(parts) >= 4 and parts[0] == 'keys' and parts[-1].endswith('.json') \
+                and len(parts[-2]) == 2 and parts[-1].startswith(parts[-2]):
+            namespace = '/'.join(parts[1:-2])
+            keys[namespace] = keys.get(namespace, 0) + 1
+        else:
+            problems.append('/'.join(parts))
+    summary = {'objects': objects, 'keys': dict(sorted(keys.items()))} if objects or keys else {}
+    return sorted(set(problems)), summary
+
+
 class Recorder:
     """Snapshots before and diffs after each stage; writes profile/manifests/STAGE.json."""
 
@@ -1489,6 +1872,7 @@ class Recorder:
         self.all_roots = {root.split('/')[0] for roots in self.roots.values() for root in roots}
         self.state = {}
         self.manifests = {}
+        self.writes = {}  # stage -> run-relative paths its Python processes wrote (read trace '>' lines), or None
         self.start = time.monotonic()
         plan = PLANS.pop(str(self.run), None)
         if plan is not None:
@@ -1510,7 +1894,8 @@ class Recorder:
         if self.closures:
             (self.run / 'profile' / 'closures.json').write_text(json.dumps(self.closures, sort_keys=True) + '\n')
             try:
-                self.traced = write_trace_hook(self.run, self.closures['root'])
+                self.traced = write_trace_hook(self.run, self.closures['root'],
+                                               [str(path) for path in storage_pool_roots(self.run, metadata)])
             except OSError as exc:
                 print(f'[warning] Stage read trace disabled: {exc}', flush=True)
 
@@ -1536,14 +1921,23 @@ class Recorder:
             run_inside = self.run.resolve().relative_to(root.resolve()).as_posix()
         except ValueError:
             run_inside = None
-        misses, uncovered, outside = check_reads([line for line in lines if not line.startswith('@')],
+        pool_problems, pool_summary = pool_read_problems(lines)
+        misses, uncovered, outside = check_reads([line for line in lines if not line.startswith(('@', '>', '<', '%'))],
                                                  self.closures['stages'][name], set(self.closures['files']),
                                                  root, run_inside)
+        if (self.cache.get('reused') or {}).get(name):
+            # A reused stage ran only the reuse step (`build_cache.py apply`), which loads the storage pool
+            # from the checkout to link verified files; that is no input of the stage's outputs
+            # (BUILD-POOL-APPLY-READ-MISS-35: every reused stage of a pool-mode build was marked not reusable).
+            misses = [path for path in misses if not apply_module(path)]
+            lines = [line for line in lines if not (line.startswith('@') and apply_module(line[1:].partition('\t')[0]))]
         calls = None
         if name in self.closures.get('units', {}):
             calls = check_calls(lines, self.closures['units'][name], self.closures.get('module_units', {}), run_inside)
         summary = {'traced': True, 'lines': len(lines), 'misses': misses[:50], 'uncovered': uncovered[:50],
                    'outside': outside[:50]}
+        if pool_summary:
+            summary['pool_reads'] = pool_summary
         if calls is not None:
             summary['calls'] = sum(line.startswith('@') for line in lines)
             summary['call_misses'] = calls[:50]
@@ -1556,15 +1950,40 @@ class Recorder:
             reasons.append(f'read {len(uncovered)} repository files no fingerprint covers (first: {uncovered[0]})')
         if outside:
             reasons.append(f'ran {len(outside)} Python files from outside the checkout (first: {outside[0]})')
+        if pool_problems:
+            reasons.append(f'read {len(pool_problems)} storage pool files outside its keyed lookups, which no '
+                           f'fingerprint covers (first: {pool_problems[0]})')
         if reasons:
             print(f'[warning] {name}: its outputs will not be reused: ' + '; '.join(reasons) +
                   '. The fingerprint missed an input: register a bug (docs/BUILD_PROFILE.md, read trace).', flush=True)
         return reasons, summary
 
+    def diagnostic_reads(self, reads):
+        """Run-folder diagnostics (logs, timing reports) the stage's Python processes read ('<' lines)."""
+        if not self.traced or reads is None:
+            return []
+        try:
+            lines = Path(reads).read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+        except OSError:
+            return []
+        return sorted({line[1:] for line in lines if line.startswith('<')})
+
+    def traced_writes(self, reads):
+        """Run-relative paths the stage's Python processes opened for writing, renamed to, linked or removed
+        ('>' lines of its read trace), or None when the stage was not traced."""
+        if not self.traced or reads is None:
+            return None
+        try:
+            lines = Path(reads).read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+        except OSError:
+            return None
+        return {line[1:] for line in lines if line.startswith('>')}
+
     def after(self, name, entry, reads=None):
         state = self.state.pop(name, None)
         if state is None:
             return None
+        self.writes[name] = self.traced_writes(reads)
         state['window'][1] = round(time.monotonic() - self.start, 3)
         files, directories = snapshot(self.run, state['roots'])
         before = state['files']
@@ -1580,6 +1999,14 @@ class Recorder:
                                     and entry[:-len(TEMPORARY_SUFFIX)] in self.all_roots))
         if undeclared:
             reasons.append('created run-folder entries outside every declared stage path: ' + ', '.join(undeclared[:5]))
+        # Diagnostics are not compared between runs (same_outputs), so a stage that reads another stage's could take
+        # in a difference the reuse planner does not see (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33). Its own, written in
+        # this run, it may read back.
+        foreign = [path for path in self.diagnostic_reads(reads)
+                   if not (path in (self.writes.get(name) or ()) or (path in changed and path in files))]
+        if foreign:
+            reasons.append('read build diagnostics written by other stages, which are not stage inputs: '
+                           + ', '.join(foreign[:3]))
         manifest = {'schema': MANIFEST_SCHEMA, 'stage': name, 'status': 'complete',
                     'fingerprint': (self.cache.get('fingerprints') or {}).get(name),
                     'roots': state['roots'], 'window': state['window'], 'inputs': state['inputs'],
@@ -1591,6 +2018,9 @@ class Recorder:
                     'deleted_directories': sorted(state['directories'] - directories),
                     'reusable': not reasons, 'reasons': reasons, 'reads': trace}
         manifest['counts'] = {'files': len(regular), 'bytes': sum(files[path][0] for path in regular)}
+        # Units -> segments -> stage hash (tools/unit_tree.py): compared in one step, drilled into on a mismatch.
+        from unit_tree import of_manifest
+        manifest['tree'] = of_manifest(manifest)
         self.manifests[name] = manifest
         self._write(name, manifest)
         if self.store is not None:
@@ -1616,6 +2046,24 @@ class Recorder:
                 if not (a[0] < b[1] and b[0] < a[1]):
                     continue
                 shared = sorted(touched[first] & touched[second])
+                writer = attribute(shared, self.writes.get(first), self.writes.get(second))
+                if shared and writer is not None:
+                    # Both saw the files change, but only one stage wrote them (its trace): they are its
+                    # outputs, not the other's (BUILD-REUSE-ATTRIBUTION-33).
+                    observer = second if writer == 0 else first
+                    manifest = self.manifests[observer]
+                    for field in ('files', 'links'):
+                        manifest[field] = {path: value for path, value in manifest[field].items() if path not in shared}
+                    manifest['deleted'] = [path for path in manifest['deleted'] if path not in shared]
+                    manifest['counts'] = {'files': len(manifest['files']),
+                                          'bytes': sum(row['size'] for row in manifest['files'].values())}
+                    from unit_tree import of_manifest
+                    manifest['tree'] = of_manifest(manifest)
+                    manifest.setdefault('attributed', []).append(
+                        {'stage': first if writer == 0 else second, 'paths': len(shared), 'first': shared[0]})
+                    touched[observer] -= set(shared)
+                    self._write(observer, manifest)
+                    continue
                 if shared:
                     for name, other in ((first, second), (second, first)):
                         manifest = self.manifests[name]
@@ -1640,6 +2088,20 @@ class Recorder:
 PLANS = {}    # run -> per-stage file plan, written into the run by Recorder
 CLOSURES = {}  # run -> {stage: repository files its fingerprint covers}, checked against the stage's trace
 DETAILS = {}  # run -> fingerprint components, written into the run by Recorder
+
+
+def attribute(shared, first_writes, second_writes):
+    """Which of two stages that ran at the same time and both saw SHARED change wrote them: 0 (the first), 1
+    (the second), or None when unknown. Known only when both were traced, one wrote every shared path and the
+    other none of them (a native tool's writes are not traced: then nobody is credited)."""
+    if not shared or first_writes is None or second_writes is None:
+        return None
+    shared = set(shared)
+    if shared <= first_writes and not shared & second_writes:
+        return 0
+    if shared <= second_writes and not shared & first_writes:
+        return 1
+    return None
 
 
 def load_manifest(run, name):
@@ -1667,7 +2129,7 @@ def requalify(manifest):
     return manifest
 
 
-def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run):
+def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run, forced=()):
     """({stage: plan}, {stage: reason not reused}) against a completed earlier run."""
     old_run = Path(old_run)
     state_path = old_run / 'build-state.json'
@@ -1693,6 +2155,9 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run)
                                                  if not part.startswith('dependency ')]
         if name in NON_REUSABLE:
             reasons[name] = NON_REUSABLE[name]
+        elif name in forced:
+            # --rebuild-stage: runs again; the stages after it are reused only if it writes the same outputs.
+            reasons[name] = FORCED_REASON
         elif problems.get(name):
             reasons[name] = '; '.join(problems[name])
         elif old_schema != CACHE_SCHEMA:
@@ -1785,10 +2250,12 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run)
                     break
         if not damaged:
             break
-    hazards = {}
+    hazards, hazard_stages = {}, {}
     for name in candidates:
         for path, writer in skips[name].items():
             hazards.setdefault(writer, []).append(path)
+            stages = hazard_stages.setdefault(writer, {})
+            stages[name] = stages.get(name, 0) + 1
     ancestors = {}
 
     def lineage(name):
@@ -1817,11 +2284,57 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run)
                        # Files earlier reused stages left out because this stage replaces them:
                        # if this stage cannot be reused after all, it cannot be rebuilt either.
                        'rebuild_hazard': sorted(hazards.get(name, []))[:20],
-                       'rebuild_hazard_count': len(hazards.get(name, []))}
+                       'rebuild_hazard_count': len(hazards.get(name, [])),
+                       # {reused stage: files it left out}: a stage that ran again in this build after all wrote
+                       # its own versions, so its share is no hazard any more (BUILD-RESUME-HAZARD-STATIC-35).
+                       'rebuild_hazard_stages': dict(sorted(hazard_stages.get(name, {}).items()))}
     return plans, reasons
 
 
-def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scope=DEFAULT_SCOPE, prerendered=None):
+def recorded_sources(state):
+    """The reuse source's recorded source tree (build-state.json source_sha256), without the folders and
+    suffixes no fingerprint covers (tests, prose), so the preflight's source diff lists only candidate inputs."""
+    return {path: digest for path, digest in (state.get('source_sha256') or {}).items()
+            if not set(path.split('/')[:-1]) & SKIP_DIRECTORIES and not path.endswith(SKIP_SUFFIXES)
+            and not path.startswith(SKIP_PREFIXES)}
+
+
+def run_preflight(steps, reasons, components, old_run, index, reused=()):
+    """The reuse preflight (tools/reuse_report.py preflight) of a plan against OLD_RUN."""
+    import reuse_report
+    old_run = Path(old_run)
+    try:
+        state = json.loads((old_run / 'build-state.json').read_text())
+    except (OSError, ValueError):
+        state = {}
+    try:
+        old_details = json.loads((old_run / 'profile' / 'fingerprints.json').read_text())
+    except (OSError, ValueError):
+        old_details = {}
+    return reuse_report.preflight([name for name, _ in steps], reasons, components, old_details,
+                                  recorded_sources(state), index.files, reused)
+
+
+def predict_preflight(old_run, scope=DEFAULT_SCOPE, root=ROOT):
+    """`build.py --reuse-plan OLD_RUN`: the preflight of OLD_RUN's own stages against this checkout (no build)."""
+    old_run = Path(old_run)
+    steps, state = old_run_steps(old_run, root)
+    index = SourceIndex(root, scope=scope)
+    reasons, components = predict(old_run, scope, root, index=index, details=True)
+    reasons = {name: reason for name, reason in reasons.items() if reason is not None}
+    reused = [name for name, _ in steps if name not in reasons]
+    return run_preflight(steps, reasons, components, old_run, index, reused)
+
+
+def advisory_stages(steps, dependencies):
+    """Stages whose command says --never-fail and that no other stage depends on: their outputs reach nothing
+    else, and they never fail the build (the cell-progress tracker data)."""
+    needed = {dep for deps in (dependencies or {}).values() for dep in deps}
+    return {name for name, command in steps if '--never-fail' in map(str, command) and name not in needed}
+
+
+def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scope=DEFAULT_SCOPE, prerendered=None,
+            pool=None, forced=(), accept_rebuild=False):
     """Fingerprint every stage; with REUSE_FROM, swap reusable stages for verified copies.
 
     Records metadata['stage_cache'] (part of build-state.json) and returns the steps.
@@ -1829,7 +2342,12 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
     PRERENDERED: {'dir', 'read', 'write', 'stages'} (tools/prerendered.py): a stage REUSE_FROM does
     not reuse takes the store entry with its fingerprint (same plan, same verified apply);
     captured stages become entries when the whole build passed.
+    MODE: 'copy' (default), 'hardlink' (links to the old run's files) or 'pool' (links to the shared
+    storage pool's objects, tools/storage_pool.py: the old file is pooled by a hard link, never copied;
+    POOL names the pool folder). Linked files are read-only in every run that shares them.
     """
+    if mode == 'pool' and not pool:
+        raise ValueError('--reuse-mode pool needs the storage pool folder')
     began = time.monotonic()
     index = index or SourceIndex(scope=scope)
     fingerprints, components, problems, dependencies = fingerprint_steps(steps, run, metadata, index)
@@ -1844,9 +2362,13 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         reuse_from = Path(reuse_from).resolve()
         if reuse_from == Path(run).resolve():
             raise ValueError('--reuse-from must name an earlier run, not this one')
-        plans, reasons = plan_reuse(steps, fingerprints, dependencies, components, problems, reuse_from)
+        plans, reasons = plan_reuse(steps, fingerprints, dependencies, components, problems, reuse_from,
+                                    forced=set(forced))
+        if forced:
+            cache['forced'] = sorted(forced)
         cache.update(reuse_from=str(reuse_from), not_reused=reasons, reuse_mode=mode)
-        PLANS[str(run)] = {name: dict(plan, mode=mode) for name, plan in plans.items()}
+        PLANS[str(run)] = {name: dict(plan, mode=mode, **({'pool': str(pool)} if mode == 'pool' else {}))
+                           for name, plan in plans.items()}
         result = []
         for name, command in steps:
             if name in plans:
@@ -1863,10 +2385,33 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         for name, _ in steps:
             if name in plans:
                 after = plans[name]['rebuilt_ancestors']
-                print(f'  reused  {name} (fingerprint {fingerprints[name][:12]})'
+                print(f'   reused  {name} (fingerprint {fingerprints[name][:12]})'
                       + (f" if {', '.join(after)} write the same files again" if after else ''), flush=True)
-            else:
-                print(f'  rebuild {name}: {reasons.get(name, "")}', flush=True)
+        # Reuse preflight (BUILD-REUSE-KEYS-TOO-BROAD-35): every rebuild with its reason and the changed files
+        # that touch it, before any stage runs; a rebuild the source diff and the inputs do not explain stops here.
+        import reuse_report
+        check = run_preflight(steps, reasons, components, reuse_from, index, reused=plans)
+        reuse_report.print_preflight(check, sys.stdout, accepted=accept_rebuild)
+        sys.stdout.flush()
+        cache['preflight'] = {key: check[key] for key in ('stages', 'reused', 'rebuilt', 'unexpected', 'policy')}
+        cache['preflight']['source_diff'] = {key: len(value) if isinstance(value, list) else value
+                                             for key, value in check['source_diff'].items()}
+        cache['preflight']['unexpected_stages'] = [row['stage'] for row in check['rows'] if row['class'] == 'UNEXPECTED']
+        # An advisory stage (--never-fail, no stage depends on it: the tracker data) costs at most a rerun of
+        # itself: an over-broad key there is reported, never a stop (BUILD-CELL-PROGRESS-KEY-BUGS-35).
+        advisory = advisory_stages(steps, dependencies)
+        relaxed = [name for name in check['too_broad'] if name in advisory]
+        if relaxed:
+            print(f"Reuse preflight: {', '.join(relaxed)} rebuilt for an over-broad key; advisory stage(s) "
+                  '(never fail the build, nothing depends on them): runs again, the build goes on.', flush=True)
+            check['too_broad'] = [name for name in check['too_broad'] if name not in advisory]
+            cache['preflight']['advisory_rebuilt'] = relaxed
+        cache['preflight']['too_broad'] = check['too_broad']
+        if check['too_broad'] and not accept_rebuild:
+            metadata['stage_cache'] = cache
+            raise ValueError(f"Reuse preflight: {len(check['too_broad'])} stage(s) would be rebuilt although neither "
+                             f"the source diff nor their inputs explain it ({', '.join(check['too_broad'][:6])}); "
+                             'fix the key or pass --accept-rebuild')
     if prerendered:
         import prerendered as store
         hits, cache['prerendered'] = store.plan_hits(steps, fingerprints, problems, dependencies, prerendered,
@@ -1936,7 +2481,38 @@ def _copy_verified(source, target, expected, mode, link):
     return temporary
 
 
+def _pooled(pool, source, digest):
+    """The storage pool's object for DIGEST, pooling SOURCE by a hard link first if needed; SOURCE on any doubt."""
+    try:
+        import storage_pool
+        return storage_pool.ensure(pool, source, digest)
+    except (ImportError, OSError) as exc:
+        print(f'[warning] storage pool not used for {source.name} ({exc}); linking the file of the old run.', flush=True)
+        return source
+
+
 OUTPUT_FIELDS = ('files', 'links', 'deleted', 'directories', 'deleted_directories')
+# Diagnostic outputs (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33): tool logs and reports that carry wall time, cache hit
+# counts or host details, and that no stage reads. A rerun stage whose outputs differ only in these "wrote the
+# same outputs" for the stages after it; they are still recorded and copied on reuse. No stage may read one: the
+# stage trace lists every run-folder diagnostic a stage opens, and such a stage is not reused (Recorder.after).
+DIAGNOSTIC_SUFFIXES = ('.log',)
+DIAGNOSTIC_NAMES = frozenset({'chim-stats.json', 'chim-timing.json', 'gallery-cache.json', 'world-terrain-cache.json'})
+
+
+def diagnostic(path):
+    """True for a run-folder output that no stage reads (DIAGNOSTIC_SUFFIXES, DIAGNOSTIC_NAMES)."""
+    name = path.rsplit('/', 1)[-1]
+    return name.endswith(DIAGNOSTIC_SUFFIXES) or name in DIAGNOSTIC_NAMES
+
+
+def _without_diagnostics(manifest, field):
+    value = manifest.get(field)
+    if isinstance(value, dict):
+        return {path: row for path, row in value.items() if not diagnostic(path)}
+    if isinstance(value, list):
+        return [path for path in value if not diagnostic(path)]
+    return value
 
 
 def ran_manifest(run, stage, depth=0):
@@ -1953,13 +2529,61 @@ def ran_manifest(run, stage, depth=0):
     return load_manifest(run, stage)
 
 
+# Reasons a record is refused as a REUSE SOURCE that say nothing about the outputs it recorded: the stage read
+# something its key left out (repository code or files, outside code, another stage's diagnostics). Its recorded
+# files are still exactly what it wrote, so they can be compared (BUILD-RESUME-OUTPUTS-DIFFER-35). Attribution
+# problems (concurrent writers, undeclared run-folder entries) make the record itself unreliable.
+TRACE_ONLY_REASONS = ('read ', 'ran ')
+
+
+def outputs_recorded(manifest):
+    """True when MANIFEST is a complete record of what its stage wrote (whether or not it may be reused)."""
+    if not manifest or manifest.get('status') != 'complete':
+        return False
+    return bool(manifest.get('reusable')) or all(str(reason).startswith(TRACE_ONLY_REASONS)
+                                                 for reason in manifest.get('reasons') or ())
+
+
 def same_outputs(run, old_run, stage):
     """True when STAGE wrote, in RUN, exactly the files (SHA-256 and mode), links and deletions it wrote
     when it last ran for OLD_RUN."""
     new, old = load_manifest(run, stage), ran_manifest(old_run, stage)
-    if not new or not old or new.get('status') != 'complete' or not new.get('reusable') or not old.get('reusable'):
+    if not outputs_recorded(new) or not outputs_recorded(old):
         return False
-    return all(new.get(field) == old.get(field) for field in OUTPUT_FIELDS)
+    from unit_tree import of_manifest
+    # The stage hash first (units -> segments -> stage, diagnostics left out): one comparison when nothing changed.
+    if (new.get('tree') or of_manifest(new))['stage_hash'] != (old.get('tree') or of_manifest(old))['stage_hash']:
+        return False
+    modes = {path: row.get('mode') for path, row in _without_diagnostics(new, 'files').items()}
+    if modes != {path: row.get('mode') for path, row in _without_diagnostics(old, 'files').items()}:
+        return False
+    return all(_without_diagnostics(new, field) == _without_diagnostics(old, field)
+               for field in ('deleted', 'directories', 'deleted_directories'))
+
+
+def output_differences(run, old_run, stage):
+    """[(segment, unit, change)] between STAGE's outputs in RUN and in OLD_RUN (tools/unit_tree.py), or None
+    when either record is missing."""
+    from unit_tree import differences, of_manifest
+    new, old = load_manifest(run, stage), ran_manifest(old_run, stage)
+    if not new or not old:
+        return None
+    return differences(new.get('tree') or of_manifest(new), old.get('tree') or of_manifest(old))
+
+
+def live_hazard(plan, run):
+    """{reused stage: files it left out that this stage replaces} still missing when this stage must run after
+    all. A stage that ran in this build (its reuse refused: profile/reuse-fallback/STAGE.txt, or planned as rebuilt)
+    wrote its own versions of them. A plan without the per-stage split counts whole (older plans)."""
+    count = plan.get('rebuild_hazard_count') or 0
+    if not count:
+        return {}
+    stages = plan.get('rebuild_hazard_stages')
+    if stages is None:
+        return {'earlier reused stages': count}
+    fallback = Path(run) / 'profile' / 'reuse-fallback'
+    ran = set(plan.get('rebuilt_ancestors', ()))
+    return {name: n for name, n in stages.items() if name not in ran and not (fallback / f'{name}.txt').is_file()}
 
 
 def apply_stage(run, stage, command):
@@ -1971,9 +2595,10 @@ def apply_stage(run, stage, command):
         return _rebuild(run, stage, 'no reuse plan in this run', command)
 
     def refuse(reason):
-        if plan.get('rebuild_hazard_count'):
+        live = live_hazard(plan, run)
+        if live:
             print(f"Reuse of {stage} failed: {reason}. It cannot be rebuilt in this run either: earlier reused "
-                  f"stages left out {plan['rebuild_hazard_count']} files it replaces (first: "
+                  f"stages ({', '.join(live)}) left out {sum(live.values())} files it replaces (first: "
                   f"{', '.join(plan['rebuild_hazard'][:3])}). Start a new build without --reuse-from.", flush=True)
             return 1
         return _rebuild(run, stage, reason, command)
@@ -1995,7 +2620,8 @@ def apply_stage(run, stage, command):
         if not path.is_file() or sha256_file(path) != expected:
             return refuse(f'its input {relative} differs from the old run')
     old = Path(plan['from'])
-    link = plan.get('mode') == 'hardlink'
+    link = plan.get('mode') in ('hardlink', 'pool')
+    pool = plan.get('pool') if plan.get('mode') == 'pool' else None
     if link and hasattr(os, 'geteuid') and os.geteuid() == 0:
         print('Hard links refused as root (read-only protection does not apply); copying instead.', flush=True)
         link = False
@@ -2016,7 +2642,10 @@ def apply_stage(run, stage, command):
         for relative, info in sorted(plan['files'].items()):
             target = run / relative
             make(target.parent)
-            staged.append((_copy_verified(old / relative, target, info['sha256'], info['mode'], link), target))
+            source = old / relative
+            if pool and link:
+                source = _pooled(pool, source, info['sha256'])
+            staged.append((_copy_verified(source, target, info['sha256'], info['mode'], link), target))
     except (OSError, ValueError) as exc:
         # Leave the run exactly as before, so the stage can run on a clean state.
         for temporary, _ in staged:
@@ -2044,7 +2673,8 @@ def apply_stage(run, stage, command):
     size = sum(info['size'] for info in plan['files'].values())
     origin = f"prerendered {plan['prerendered']}" if plan.get('prerendered') else str(old)
     print(f"Reused stage {stage} from {origin} (fingerprint {plan['fingerprint']}): {len(plan['files'])} files, "
-          f"{size:,} bytes, every SHA-256 verified ({'hard links, read-only' if link else 'copies'}); "
+          f"{size:,} bytes, every SHA-256 verified "
+          f"({'links to the storage pool, read-only' if pool and link else 'hard links, read-only' if link else 'copies'}); "
           f"{plan.get('skipped_later_replaced', 0)} files are replaced by later reused stages.", flush=True)
     return 0
 
@@ -2069,7 +2699,7 @@ def old_run_steps(old_run, root=ROOT):
     return steps, state
 
 
-def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None):
+def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=None, details=False):
     """{stage: None (fingerprint unchanged) or reason}: OLD_RUN's stages fingerprinted against ROOT now.
 
     A dry run: no outputs are checked, so the real plan can only reuse fewer stages
@@ -2083,7 +2713,7 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None):
         old_details = json.loads((old_run / 'profile' / 'fingerprints.json').read_text())
     except (OSError, ValueError):
         old_details = {}
-    index = SourceIndex(root, scope=scope)
+    index = index or SourceIndex(root, scope=scope)
     fingerprints, components, problems, _ = fingerprint_steps(steps, old_run, state, index, dependencies)
     result = {}
     for name, _ in steps:
@@ -2095,10 +2725,12 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None):
             result[name] = f"{old_run.name} has {old_cache.get('schema') or 'no'} fingerprints"
         elif (old_cache.get('fingerprints') or {}).get(name) != fingerprints[name]:
             changed = explain(old_details.get(name, {}), components[name]) if name in old_details else ['fingerprint']
-            result[name] = 'changed: ' + ', '.join(changed)
+            # Only stages before it changed: the build reuses it if they write the same outputs again
+            # (early cutoff, BUILD-CACHE-NO-CUTOFF-33), as plan_reuse does; counted as reused (an upper bound).
+            result[name] = None if all(part.startswith('dependency ') for part in changed) else 'changed: ' + ', '.join(changed)
         else:
             result[name] = None
-    return result
+    return (result, components) if details else result
 
 
 def main(argv=None):

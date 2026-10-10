@@ -432,7 +432,10 @@ void SV_ClientThink (void)
 //
 // walk
 //
+	/* No swimming in lava (docs/LAVA.md): Morrowind's lava is walked on, so a
+	 * player in deep lava keeps the ground move and sinks to the bed. */
 	if ( (sv_player->v.waterlevel >= 2)
+	&& (sv_player->v.watertype != CONTENTS_LAVA)
 	&& (sv_player->v.movetype != MOVETYPE_NOCLIP) )
 	{
 		SV_WaterMove ();

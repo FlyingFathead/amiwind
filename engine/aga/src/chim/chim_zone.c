@@ -35,6 +35,7 @@ static int			numbanks;
 static chim_block_t	lru;		/* sentinel: lru.lru_next is the most recent */
 static void			(*evict_callbacks[CHIM_KINDS])(void *data, unsigned id);
 static unsigned long	allocations, evictions, failures, trims;
+static unsigned long	unsatisfiable;
 static int			last_failed_need;	/* the last failed request, header included */
 static int			small_high;		/* ChimZone_SetEnds: blocks below this size come from the high end */
 
@@ -93,7 +94,7 @@ void ChimZone_Reset (void)
 	locked_bytes = locked_peak[0] = locked_peak[1] = 0;
 	numbanks = 0;
 	lru.lru_next = lru.lru_prev = &lru;
-	allocations = evictions = failures = trims = 0;
+	allocations = evictions = failures = trims = unsatisfiable = 0;
 	last_failed_need = 0;
 }
 
@@ -276,6 +277,14 @@ void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id)
 			allocations++;
 			return CHIM_DATA(b);
 		}
+		/* No run of adjacent unlocked blocks is large enough: evicting
+		 * cannot make room, so nothing is thrown out (H15; the caller
+		 * waits or releases, as for any full zone). */
+		if (need > ChimZone_LargestUnlocked () + CHIM_HEADER)
+		{
+			unsatisfiable++;
+			break;
+		}
 		/* Evict the least recently used unlocked block and retry. */
 		for (b=lru.lru_prev ; b != &lru && b->locks ; b=b->lru_prev)
 			;
@@ -286,6 +295,12 @@ void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id)
 	failures++;
 	last_failed_need = need;
 	return NULL;
+}
+
+/* Failed requests no eviction could have satisfied (nothing was evicted for them). */
+unsigned long ChimZone_Unsatisfiable (void)
+{
+	return unsatisfiable;
 }
 
 /* Failed requests so far, and the size (header included) of the last:

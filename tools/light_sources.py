@@ -29,9 +29,15 @@ from mwad.audit import records, subrecords, string
 NEGATIVE, FLICKER, FIRE, OFF_DEFAULT, FLICKER_SLOW, PULSE, PULSE_SLOW = 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100
 ANIMATED = FLICKER | FLICKER_SLOW | PULSE | PULSE_SLOW
 # Quake lightstyles (id's QuakeC worldspawn numbering) plus AmiWind's switchable
-# night-lamp style in Quake's switchable range (32 and up).
+# night-lamp style in Quake's switchable range (32 and up). Kept as the 'id' scheme.
 STYLE_NORMAL, STYLE_FLICKER, STYLE_GENTLE_PULSE, STYLE_FLICKER_SOFT, STYLE_SLOW_PULSE = 0, 1, 5, 6, 11
 STYLE_NIGHT_LAMPS = 32
+# The 'source' scheme (default; LIGHT-STYLES-UNDEFINED-33): style 0 is the sun and ambient light, which the engine
+# dims with daylight; light sources never switch off in the original, so they use styles 32 and up, which the
+# engine never dims (r_surf.c R_BuildLightMap; r_lamps 0 switches them off for A/B). The animated ones get strings
+# generated from the original's flicker and pulse rates (style_strings(), set in QuakeC worldspawn).
+STYLE_SOURCE, STYLE_SOURCE_FLICKER, STYLE_SOURCE_FLICKER_SLOW, STYLE_SOURCE_PULSE, STYLE_SOURCE_PULSE_SLOW = 32, 33, 34, 35, 36
+STYLE_SCHEMES = ('source', 'id')
 CLASSES = ('lamp', 'candle', 'torch', 'fire', 'glow_plant', 'negative', 'pure_light', 'other', 'off')
 
 
@@ -51,15 +57,62 @@ def classify(identifier, model, flags):
     return 'other'
 
 
-def quake_style(kind, flags, exterior):
-    """Lightstyle for a placement. Outdoor lamps switch with night; animation
-    flags pick the nearest of id's standard styles; everything else is steady."""
-    if exterior and kind == 'lamp': return STYLE_NIGHT_LAMPS
-    if flags & FLICKER: return STYLE_FLICKER
-    if flags & FLICKER_SLOW: return STYLE_FLICKER_SOFT
-    if flags & PULSE: return STYLE_GENTLE_PULSE
-    if flags & PULSE_SLOW: return STYLE_SLOW_PULSE
-    return STYLE_NORMAL
+def quake_style(kind, flags, exterior, scheme='source'):
+    """Lightstyle for a placement.
+    'source' (default): every light source in styles 32-36 (never dimmed by daylight): steady 32, flicker 33,
+    slow flicker 34, pulse 35, slow pulse 36. The original applies the first of Flicker, Flicker Slow, Pulse,
+    Pulse Slow that is set, in that order of precedence from the last (OpenMW lightutil: the later one wins).
+    'id' (kept selectable): outdoor lamps 32; animation flags pick the nearest of id's styles; others steady 0."""
+    if scheme == 'id':
+        if exterior and kind == 'lamp': return STYLE_NIGHT_LAMPS
+        if flags & FLICKER: return STYLE_FLICKER
+        if flags & FLICKER_SLOW: return STYLE_FLICKER_SOFT
+        if flags & PULSE: return STYLE_GENTLE_PULSE
+        if flags & PULSE_SLOW: return STYLE_SLOW_PULSE
+        return STYLE_NORMAL
+    if scheme != 'source':
+        raise ValueError('unknown light style scheme: %r' % (scheme,))
+    for bit, style in ((PULSE_SLOW, STYLE_SOURCE_PULSE_SLOW), (PULSE, STYLE_SOURCE_PULSE),
+                       (FLICKER_SLOW, STYLE_SOURCE_FLICKER_SLOW), (FLICKER, STYLE_SOURCE_FLICKER)):
+        if flags & bit: return style
+    return STYLE_SOURCE
+
+
+# The original's animation (OpenMW 0.51 lightcontroller): brightness walks towards a target at a fixed step per tick,
+# 15 ticks a second; the step is 0.1 (0.05 for the slow variants); flicker picks a new random target in 0.25..1 when
+# it gets there, pulse toggles the target between 0.25 and 1. Quake's R_AnimateLight reads a style string ten
+# characters a second, 'a' = 0, 'm' = normal (1.0).
+STYLE_TICKS_PER_SECOND, STYLE_STRING_RATE, STYLE_SECONDS = 15, 10, 4.0
+
+
+def style_brightness(kind, seconds=STYLE_SECONDS, seed=1):
+    """Brightness samples (STYLE_STRING_RATE a second) of one animation kind: flicker, flicker_slow, pulse,
+    pulse_slow. Deterministic: the random targets come from a fixed linear congruential generator."""
+    speed = 0.05 if kind.endswith('_slow') else 0.1
+    state = seed
+
+    def rand():
+        nonlocal state
+        state = (1103515245 * state + 12345) & 0x7fffffff
+        return state / 0x7fffffff
+    b, target = 0.675, 1.0
+    out, ticks = [], int(seconds * STYLE_TICKS_PER_SECOND)
+    for t in range(ticks):
+        if abs(target - b) <= speed:
+            b = target
+            target = (0.25 + 0.75 * rand()) if kind.startswith('flicker') else (0.25 if target >= 1.0 else 1.0)
+        else:
+            b += speed if target > b else -speed
+        out.append(b)
+    step = STYLE_TICKS_PER_SECOND / STYLE_STRING_RATE
+    return [out[int(i * step)] for i in range(int(seconds * STYLE_STRING_RATE))]
+
+
+def style_strings():
+    """{style: Quake lightstyle string} of the animated source styles (33-36), generated from the original's rates."""
+    kinds = {STYLE_SOURCE_FLICKER: 'flicker', STYLE_SOURCE_FLICKER_SLOW: 'flicker_slow',
+             STYLE_SOURCE_PULSE: 'pulse', STYLE_SOURCE_PULSE_SLOW: 'pulse_slow'}
+    return {s: ''.join(chr(ord('a') + round(12 * b)) for b in style_brightness(k)) for s, k in kinds.items()}
 
 
 def colour_class(colour):
@@ -102,36 +155,48 @@ def placements(raw, lights):
                 yield key, current['id'], struct.unpack_from('<3f', v); current = None
 
 
-def entity(light, position, centre=(0.0, 0.0), scale=0.25, exterior=False):
+def entity(light, position, centre=(0.0, 0.0), scale=0.25, exterior=False, scheme='source'):
     """Quake light entity text for the map source (ericw-tools light keys):
     1/d falloff ("delay" 1) like the original attenuation, original colour.
-    Off-by-default lights get none (empty text)."""
+    Off-by-default lights get none (empty text). In the 'source' scheme a darkener
+    is two entities: it darkens the sun and ambient light (style 0) and the steady
+    light sources (style 32), as the original subtracts it from the whole sum."""
     kind = light['class']
     if kind == 'off': return ''
     origin = [(position[0] - centre[0]) * scale, (position[1] - centre[1]) * scale, position[2] * scale]
     value = max(1, round(light['radius'] * scale))
     if kind == 'negative': value = -value
-    style = quake_style(kind, light['flags'], exterior)
     colour = ' '.join('%.3f' % (c / 255) for c in light['colour'])
     text = '{\n"classname" "light"\n"origin" "%.2f %.2f %.2f"\n"light" "%d"\n"delay" "1"\n"_color" "%s"\n' % (
         *origin, value, colour)
+    if kind == 'negative' and scheme == 'source':
+        return text + '}\n' + text + '"style" "%d"\n}' % STYLE_SOURCE
+    style = 0 if kind == 'negative' else quake_style(kind, light['flags'], exterior, scheme)
     if style: text += '"style" "%d"\n' % style
     return text + '}'
 
 
 LAMP_CLASSES = {'lamp': 1, 'torch': 2, 'fire': 3, 'candle': 4}
+# Every class that adds light (dynamic lights cannot darken; off lights give none): the CHIM 'hybrid' lighting
+# type widens the night lamp table to these (docs/chim/LIGHTING.md). The engine reads position, radius and colour.
+LIGHT_CLASS_CODES = dict(LAMP_CLASSES, glow_plant=5, pure_light=6, other=7)
+# The CHIM lava glow rows (tools/lava.py) have their own code; the engine reads position, radius and colour.
+LAVA_GLOW_CLASS = 8
 COLOUR_CODES = {'neutral': 0, 'warm': 1, 'cool': 2}
 LAMP_ROW = struct.Struct('<hh3fHBB')
 
 
-def lamp_table(raw):
-    """AWL1 bytes: exterior warm light sources sorted by cell, then position."""
-    lights = light_records(raw); rows = []
+def lamp_table(raw, extra_rows=(), classes=None):
+    """AWL1 bytes: exterior light sources of the given classes (default the warm lamp classes) sorted by cell,
+    then position. extra_rows: more LAMP_ROW tuples (the CHIM lava glow, tools/lava.glow_rows, class
+    LIGHT_CLASS_CODES['lava_glow']), sorted in with the lamps."""
+    classes = LAMP_CLASSES if classes is None else {k: LIGHT_CLASS_CODES[k] for k in classes}
+    lights = light_records(raw); rows = [tuple(r) for r in extra_rows]
     for key, identifier, position in placements(raw, lights):
         light = lights[identifier]
-        if key[0] != 'exterior' or light['class'] not in LAMP_CLASSES: continue
+        if key[0] != 'exterior' or light['class'] not in classes: continue
         if not (-32768 <= key[1] <= 32767 and -32768 <= key[2] <= 32767): raise ValueError('Cell out of range')
-        rows.append((key[1], key[2], *position, min(light['radius'], 65535), LAMP_CLASSES[light['class']],
+        rows.append((key[1], key[2], *position, min(light['radius'], 65535), classes[light['class']],
                      COLOUR_CODES[colour_class(light['colour'])]))
     rows.sort(key=lambda r: r[:5])
     return b'AWL1' + struct.pack('<I', len(rows)) + b''.join(LAMP_ROW.pack(*r) for r in rows)

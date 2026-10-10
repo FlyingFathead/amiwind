@@ -10,8 +10,8 @@ def verify(area):
     from .paths import ensure_external
     area = ensure_external(area, "area data")
     data = (area / "terrain.mwt").read_bytes()
-    index = json.loads((area / "terrain-index.json").read_text())
-    grids = {tuple(g["cell"]): g for g in json.loads((area / "terrain-source.json").read_text())}
+    index = json.loads((area / "terrain-index.json").read_text(encoding="utf-8"))
+    grids = {tuple(g["cell"]): g for g in json.loads((area / "terrain-source.json").read_text(encoding="utf-8"))}
     position = checked_heights = checked_materials = 0
     for entry in index:
         if entry["offset"] != position:

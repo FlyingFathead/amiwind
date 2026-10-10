@@ -136,23 +136,43 @@ def require_mountable(receipts, start_limit=PARTITION_START_LIMIT):
     return dict(start_limit=start_limit, partitions=len(receipts), ok=True)
 
 
+# One FFS directory block has 72 hash chains (the same figure as the CHIM layout gate, chim/format.py
+# FFS_MAX_DIRECTORY_ENTRIES). More entries in one directory are legal but slow to open on a real disk
+# (FFS-DIRECTORY-HASH-32): the layout gate measures every directory and reports the crowded ones.
+DIRECTORY_HASH_CHAINS = 72
+
+
+def directory_entries(paths):
+    """{directory: number of entries} over volume PATHS (files and the directories they imply)."""
+    children = {}
+    for path in paths:
+        parts = str(path).replace('\\', '/').strip('/').split('/')
+        for k, part in enumerate(parts):
+            children.setdefault('/'.join(parts[:k]) or '/', set()).add(part.lower())
+    return {d: len(names) for d, names in children.items()}
+
+
 def require_disk_layout(drive, drive_bytes, receipts, partitions=()):
     """The disk-layout gate on one drive as written (readback receipts; PARTITIONS: the partition
     payloads with their file lists): every partition starts below 2 GiB of its drive and is below
     2 GiB, every file is below FILE_SIZE_LIMIT (well under the 2 GiB file limit), the drive is below
     4 GiB. A violation names the drive, partition or file, the measured value and the limit. Returns
     the measured layout for the build receipt (BUILD-WORLD-PARTITION-MOUNT-33)."""
-    largest = {}
+    largest, crowded = {}, {}
     for part in partitions:
         rows = [(f['bytes'], f.get('path') or f.get('name')) for f in part.get('files') or []]
         largest[part['partition']] = max(rows, default=(0, None))
+        crowded[part['partition']] = directory_entries([path for _, path in rows if path])
     problems, rows = [], []
     if drive_bytes >= DRIVE_SIZE_LIMIT:
         problems.append('drive %s is %d bytes (limit below %d, 4 GiB)' % (drive, drive_bytes, DRIVE_SIZE_LIMIT))
     for r in receipts:
         size, path = largest.get(r['partition'], (0, None))
+        entries = crowded.get(r['partition'], {})
         rows.append(dict(partition=r['partition'], start_bytes=r['offset_bytes'], bytes=r['bytes'],
-                         largest_file=path, largest_file_bytes=size))
+                         largest_file=path, largest_file_bytes=size,
+                         max_directory_entries=max(entries.values(), default=0),
+                         crowded_directories={d: n for d, n in sorted(entries.items()) if n > DIRECTORY_HASH_CHAINS}))
         if r['offset_bytes'] >= PARTITION_START_LIMIT:
             problems.append('%s %s starts at %d (limit below %d, 2 GiB: Kickstart 3.1 does not mount it)'
                             % (drive, r['partition'], r['offset_bytes'], PARTITION_START_LIMIT))

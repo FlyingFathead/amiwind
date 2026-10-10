@@ -37,8 +37,13 @@ def main(argv=None):
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--qbsp', type=Path, help='qbsp for exact collision unions (as the legacy converter)')
     ap.add_argument('--grain', type=int, default=256, help='Chunk size in map units (divides the frame)')
+    ap.add_argument('--detail-budget', default=None, metavar='NAME',
+                    help='Apply a named per-mesh visual triangle budget (config/chim-detail-budgets.json; default none)')
     ap.add_argument('--cut-models-over', type=float, default=None, metavar='UNITS',
                     help='Cut placements of models wider than UNITS by chunk (chim.cut; default 0: none)')
+    ap.add_argument('--draw-distance', type=float, default=None, metavar='UNITS',
+                    help='World setting draw_distance (default 540): the ring the world is built, culled and '
+                         'heap-gated for; a closer view is a DEBUG ONLY MiniWind setting (tools/build.py)')
     ap.add_argument('--harvest', type=Path,
                     help="The harvest step's output: its placements are left out, as the image removes them")
     ap.add_argument('--flora', type=Path,
@@ -66,6 +71,12 @@ def main(argv=None):
                     help='Apply a CHIM texture effect (a .chimfx file, or the name of one in tools/chim/effects, '
                          'e.g. autumn_glitter_leaves) to the textures it targets; repeatable, in order; none by '
                          'default (docs/chim/TEXTURE_EFFECTS.md)')
+    ap.add_argument('--cell-progress', type=Path, metavar='DIR',
+                    help='Print the command that writes the CHIM Progress Tracker data of this world into DIR '
+                         '(tools/cell_progress_build.py; the builder runs it as its own stage, cell-progress, '
+                         'unless --no-cell-progress)')
+    from chim.light_types import TYPES, help_text
+    ap.add_argument('--lighting-type', choices=list(TYPES), default=None, help=help_text())
     ap.add_argument('--no-far-terrain', action='store_true',
                     help='DEBUGGING ONLY: write no far terrain layer (the frame maps then draw no distant land '
                          'beyond the chunk ring; docs/chim/WORLD_FORMAT.md "Far terrain")')
@@ -80,22 +91,46 @@ def main(argv=None):
             known_stair_findings(a.accept_known_stair_findings)
         except ValueError as exc:
             ap.exit(1, 'Error: %s\n' % exc)
+    from chim.light_types import DEFAULT as LIGHTING_DEFAULT, check as check_lighting
+    try:
+        lighting_type = check_lighting(a.lighting_type or LIGHTING_DEFAULT)
+    except ValueError as exc:
+        ap.exit(1, 'Error: %s\n' % exc)
     from chim.areas import area_problems
     problems = area_problems(areas)
     if problems:
         ap.exit(1, 'Error: %s\n' % '; '.join(problems))
     from chim.build import build_areas
     from chim.texfx import effect_path
-    try:
-        build_areas(areas, a.data_files, a.out, a.palette, a.qbsp, a.jobs, dict({'grain': a.grain}, **({'cut_models_over': a.cut_models_over} if a.cut_models_over is not None else {})), not a.no_cache,
-                    set(a.rebuild_mesh), not a.no_mesh_occluders, a.unit_cache, a.harvest, a.flora,
-                    a.legacy_run, [effect_path(e) for e in a.texture_effect], not a.no_far_terrain)
-    except (OSError, ValueError) as exc:
-        ap.exit(1, 'Error: %s\n' % exc)
+    def build_world():
+        try:
+            build_areas(areas, a.data_files, a.out, a.palette, a.qbsp, a.jobs, dict({'grain': a.grain}, **({'cut_models_over': a.cut_models_over} if a.cut_models_over is not None else {}),
+                     **({'detail_budget': a.detail_budget} if a.detail_budget else {}),
+                     **({'draw_distance': a.draw_distance} if a.draw_distance is not None else {})), not a.no_cache,
+                        set(a.rebuild_mesh), not a.no_mesh_occluders, a.unit_cache, a.harvest, a.flora,
+                        a.legacy_run, [effect_path(e) for e in a.texture_effect], not a.no_far_terrain,
+                        # the routed-hull heap fallback runs inside the shared builder (chim.build.build_areas)
+                        hull_fallback_sdk=a.sdk if a.validate else None)
+        except (OSError, ValueError) as exc:
+            ap.exit(1, 'Error: %s\n' % exc)
+    build_world()
+    # The lighting type and what of it is implemented (docs/chim/LIGHTING_ROADMAP.md) go into the receipt.
+    import json
+    from chim.light_types import record as lighting_record
+    receipt_path = a.out / 'chim-receipt.json'
+    if receipt_path.is_file():
+        receipt = json.loads(receipt_path.read_bytes().decode('utf-8'))
+        receipt['lighting'] = lighting_record(lighting_type)
+        receipt_path.write_bytes((json.dumps(receipt, indent=1, sort_keys=True) + '\n').encode('utf-8'))
     if a.validate:
         from chim.validate import main as validate
         if validate([str(a.out), '--json', str(a.out / 'chim-validate.json'), '--palette', str(a.palette)]) != 0:
             ap.exit(1, 'Error: the CHIM world fails validation (%s)\n' % (a.out / 'chim-validate.json'))
+        import json
+        fallback = json.loads((a.out / 'chim-receipt.json').read_text(encoding='utf-8')).get('hull_fallback')
+        if fallback:
+            print('CHIM hull fallback: chains kept for %s (a ring did not fit with their routed hulls)'
+                  % ', '.join(fallback['kept_as_chain']), flush=True)
         # Every flight of stairs walked on the frame's own collision (COLLISION-STAIR-SLOPE-32).
         from chim.collision import require_stairs
         try:
@@ -118,7 +153,10 @@ def main(argv=None):
         # Every ring fits the engine's CHIM zone: strict, no exceptions (chim.heap).
         from chim.heap import require_heap
         try:
-            heap = require_heap(a.out, a.sdk)
+            # frames in parallel; each frame's result kept by its content key beside the unit cache
+            # (CHIM-WORLD-AUDIT-SCALING-33)
+            heap = require_heap(a.out, a.sdk, jobs=a.jobs or 1,
+                                cache_dir=(a.unit_cache / 'heap') if a.unit_cache and not a.no_cache else None)
         except ValueError as exc:
             ap.exit(1, 'Error: %s\n' % exc)
         print('CHIM heap gate: %s %s' % (heap['status'], ', '.join(
@@ -141,6 +179,11 @@ def main(argv=None):
         from chim.stats import main as stats
         if stats([str(a.out)]) != 0:
             return 1
+    if a.cell_progress:
+        # The tracker is no longer run from here: the builder runs tools/cell_progress_build.py as its own stage
+        # (cell-progress), so its code never keys this stage (BUILD-CHIM-KEY-UNDERDECLARED-35). Same data, same tool:
+        print('CHIM cell progress: run `python3 tools/cell_progress_build.py --out %s --chim-world %s` '
+              '(the builder does it in its cell-progress stage)' % (a.cell_progress, a.out), flush=True)
     return 0
 
 

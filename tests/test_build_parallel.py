@@ -159,6 +159,19 @@ class ParallelBuildTests(unittest.TestCase):
         self.assertTrue(all(set(row[3]) == {row[2]} for row in rows))  # nested map ran in the worker itself
         self.assertGreater(len({row[2] for row in rows}), 1)          # the stage pool itself followed 3
 
+    def test_pool_worker_puts_the_mwad_package_before_the_tools_launcher(self):
+        # TEST-WORKER-SYSPATH-32: with tools/ ahead of src/ on the caller's path, a spawned
+        # worker imported tools/mwad.py as `mwad` and died unpickling its task.
+        import build_parallel
+        root = Path(build_parallel.__file__).resolve().parents[1]
+        src, tools = str(root / 'src'), str(root / 'tools')
+        with patch.object(sys, 'path', [tools, src, *sys.path]), patch.dict(os.environ):
+            build_parallel._pool_worker_init()
+            resolved = [Path(entry or '.').resolve() for entry in sys.path]
+            self.assertEqual(resolved[0], Path(src).resolve())
+            self.assertEqual(resolved.count(Path(src).resolve()), 1)
+            self.assertLess(0, resolved.index(Path(tools).resolve()))
+
     def test_running_pool_grows_when_its_allowance_grows(self):
         # BUILD-SCHEDULER-JOBSHARE-32: a stage that started with one worker and is
         # later left alone takes the freed workers mid-run (the NPC gallery case).
@@ -295,7 +308,11 @@ class ParallelBuildTests(unittest.TestCase):
             for _, delta in sorted(held_events(state)):
                 used += delta
                 peak = max(peak, used)
-            self.assertLessEqual(peak, 2 + 1)    # the stage that starts alone may hold its share
+            self.assertLessEqual(peak, 2)
+            # one stage per free worker: two branches overlap (not one at a time)
+            starts = sorted((st['started_seconds'], st['started_seconds'] + st['elapsed_seconds'])
+                            for st in state['steps'] if st['name'] != 'setup')
+            self.assertTrue(any(b[0] < a[1] for a, b in zip(starts, starts[1:])), starts)
 
     def test_failure_cancels_siblings_and_blocks_dependents(self):
         with tempfile.TemporaryDirectory() as tmp:

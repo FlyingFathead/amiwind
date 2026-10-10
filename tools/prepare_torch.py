@@ -149,7 +149,7 @@ def prepare(data_files,id1,upper_arms='hidden',race='nord',female=False,topology
     elif topology=='reduced':
         frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=620,minimum_faces=protected)
     else:raise ValueError('Unknown hand topology profile')
-    raw=animated_mdl(frames,faces,uv,skin)
+    raw=animated_mdl(frames,faces,uv,skin,vertex_limit=1999)
     # Resolve emitter through exactly the rigid transform used by assemble.
     model=assets.models[normpath('meshes/'+mesh)];nodes=source_nodes(model,skeleton.N)
     offset=rigid_attachment(torch_part,nodes['boneoffset'][0].translation.as_list())

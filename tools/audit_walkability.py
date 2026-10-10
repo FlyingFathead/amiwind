@@ -73,7 +73,82 @@ class Scene:
         return self.brushes
 
     def trace(self, start, end):
-        """First solid interval on a segment through each rotated standing hull."""
+        """First solid interval on a segment through each rotated standing hull.
+
+        Same arithmetic, in the same order, as reference_trace() (every dot product
+        is 0. + x0*y0 + x1*y1 + x2*y2, as sum() computes it), with the products
+        inlined: results are bit-identical (BUILD-STAIR-WALK-SLOW-33)."""
+        best = None
+        best_fraction = None
+        nodes = self.nodes
+        planes = self.planes
+        limit = max(4096, len(nodes)*32)
+        s0, s1, s2 = start
+        e0, e1, e2 = end
+        for root, origin, basis, ref in self._trace_brushes(start, end):
+            o0, o1, o2 = origin
+            u, v, w = basis
+            p0, p1, p2 = s0-o0, s1-o1, s2-o2
+            q0, q1, q2 = e0-o0, e1-o1, e2-o2
+            a0 = 0.+p0*u[0]+p1*u[1]+p2*u[2]
+            a1 = 0.+p0*v[0]+p1*v[1]+p2*v[2]
+            a2 = 0.+p0*w[0]+p1*w[1]+p2*w[2]
+            b0 = 0.+q0*u[0]+q1*u[1]+q2*u[2]
+            b1 = 0.+q0*v[0]+q1*v[1]+q2*v[2]
+            b2 = 0.+q0*w[0]+q1*w[1]+q2*w[2]
+            stack = [(root, 0., 1., None, False)]; visits = 0; states = {}
+            pop = stack.pop; push = stack.append; state = states.get
+            while stack:
+                node, lo, hi, normal, done = pop()
+                key = (node, lo, hi)
+                if done:
+                    states[key] = 2
+                    continue
+                st = state(key)
+                if st == 1:
+                    raise ValueError('Cyclic collision tree')
+                if st == 2:
+                    continue
+                if hi-lo <= 1e-10:
+                    continue
+                if best and lo >= best_fraction:
+                    continue
+                states[key] = 1
+                push((node, lo, hi, normal, True))
+                visits += 1
+                if visits > limit:
+                    raise ValueError('Cyclic or excessive collision tree')
+                if node < 0:
+                    if node == -2:
+                        if normal:
+                            n0, n1, n2 = normal
+                            world_normal = tuple(0.+n0*basis[0][i]+n1*basis[1][i]+n2*basis[2][i] for i in range(3))
+                        else:
+                            world_normal = (0., 0., 0.)
+                        best = dict(fraction=lo, normal=world_normal, reference=ref)
+                        best_fraction = lo
+                    continue
+                pi, front, back = nodes[node]; plane = planes[pi]
+                c0, c1, c2, c3 = plane[0], plane[1], plane[2], plane[3]
+                da = (0.+a0*c0+a1*c1+a2*c2)-c3
+                db = (0.+b0*c0+b1*c1+b2*c2)-c3
+                dl, dh = da+(db-da)*lo, da+(db-da)*hi
+                if dl >= 0 and dh >= 0:
+                    push((front, lo, hi, normal, False)); continue
+                if dl < 0 and dh < 0:
+                    push((back, lo, hi, normal, False)); continue
+                mid = min(hi, max(lo, -da/(db-da)))
+                if dl >= 0:
+                    push((back, mid, hi, (c0, c1, c2), False))
+                    push((front, lo, mid, normal, False))
+                else:
+                    push((front, mid, hi, (c0*-1, c1*-1, c2*-1), False))
+                    push((back, lo, mid, normal, False))
+        return best
+
+    def reference_trace(self, start, end):
+        """The original, unoptimized trace(): kept as the byte-identity reference for tests
+        (tests/test_walk_trace_speed.py) and never used by the builder."""
         best = None
         for root, origin, basis, ref in self._trace_brushes(start, end):
             a = tuple(dot(tuple(start[i]-origin[i] for i in range(3)), axis) for axis in basis)

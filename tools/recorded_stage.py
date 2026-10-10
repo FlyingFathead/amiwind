@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Recorded-stage exception: ship owner-provided recorded maps byte for byte.
+"""Recorded stage (optional): ship owner-provided recorded maps byte for byte.
 
-BUILD-SEYDA-REGEN-30: the repository builder cannot regenerate the shipped Seyda
-Neen sub-cells, so v0.0.31 and v0.0.32 ship the recorded v0.0.31 maps (owner
-decision). `--seyda-recorded DIR` (tools/build.py, build_aga.py image,
+BUILD-SEYDA-REGEN-30 (closed in v0.0.34): v0.0.31 to v0.0.33 used the recorded
+v0.0.31 Seyda Neen maps because the repository builder could not regenerate the
+Seyda Neen sub-cells (owner decision). From v0.0.34 the builder converts them from
+the owner's data and this input is optional; it is kept as a selectable method.
+`--seyda-recorded DIR` (tools/build.py, build_aga.py image,
 check_scene_actors.py) names a folder holding them as the owner's own input:
 
     DIR/id1/maps/sn000.bsp .. sn063.bsp, intro_docks.bsp, sncourt.bsp

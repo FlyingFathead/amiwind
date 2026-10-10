@@ -32,8 +32,8 @@ class CompanionNativeTests(unittest.TestCase):
 
     def test_commands_pick_mode_follow_release_and_saves(self):
         native.NativeSourceTests().compile_run(
-            'aga_companion_test.c', [SRC / n for n in ('aw_companion.c', 'aw_npcpath.c', 'mathlib.c')],
-            cflags=UBSAN)
+            'aga_companion_test.c', [SRC / n for n in ('aw_companion.c', 'aw_npcpath.c', 'mathlib.c', 'aw_anim.c')],
+            defines=['AW_ANIM_HOST_TEST'], cflags=UBSAN)
 
 
 class CompanionSourceContractTests(unittest.TestCase):

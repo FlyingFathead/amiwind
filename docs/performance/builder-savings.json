@@ -1,0 +1,35 @@
+{
+  "title": "Release-day fix and rerun: about 75 min down to about 20 min",
+  "subtitle": "AmiWind builder fixes and time savings, v0.0.33 and beyond (time per item, log scale)",
+  "before_label": "Before (v0.0.33-rc1 builds, 9 October 2026)",
+  "after_label": "After the fixes",
+  "caption": [
+    "Measured: v0.0.33-rc1b and rc1c build profiles (22 workers, busy host); MiniWind hudcell-mw1 media log (4 workers);",
+    "stair walk on 48 rc1c maps old vs new code. Estimated: after-values until the measurement build on the fixed builder.",
+    "Fixes: BUILD-REUSE-SCRATCH-UNDECLARED-33, payload preflight, BUILD-STAIR-WALK-SLOW-33, BUILD-CACHE-PER-WORKSPACE-33,",
+    "release pass cache and flight-only stair walk (owner decisions), BUILD-IMAGE-NOT-INCREMENTAL-33."
+  ],
+  "items": [
+    {"label": "Release rerun after a small fix", "before": 4527, "before_kind": "measured",
+     "after": 1200, "after_kind": "estimated", "fixes": "stage reuse, preflight, release pass cache, flight-only stair walk",
+     "source": "rc1c: 4,527 s from start to the image error, every stage run again"},
+    {"label": "Time until a late check fails", "before": 3099, "before_kind": "measured",
+     "after": 10, "after_kind": "estimated", "fixes": "payload preflight before the image step",
+     "source": "rc1c: harvest catalogue error 3,099 s into the image step"},
+    {"label": "Conversion stages in a rerun", "before": 1427, "before_kind": "measured",
+     "after": 60, "after_kind": "estimated", "fixes": "BUILD-REUSE-SCRATCH-UNDECLARED-33",
+     "source": "rc1c: 1,427 s of stages before the image step, 33 of 34 run again"},
+    {"label": "Stair walk in a release build", "before": 1751, "before_kind": "measured",
+     "after": 90, "after_kind": "estimated", "fixes": "BUILD-STAIR-WALK-SLOW-33, flight-only walk in release builds",
+     "source": "rc1c: 1,751 s; new code 3.67 times less CPU on 48 maps (measured)"},
+    {"label": "Optimizer and cull in a rerun", "before": 808, "before_kind": "measured",
+     "after": 30, "after_kind": "estimated", "fixes": "release pass cache (only changed maps run)",
+     "source": "rc1c: optimizer 685 s + cull 123 s on all 2,724 maps"},
+    {"label": "MiniWind media on a new volume", "before": 1195, "before_kind": "measured",
+     "after": 14, "after_kind": "estimated", "fixes": "BUILD-CACHE-PER-WORKSPACE-33",
+     "source": "hudcell-mw1: 4,862 of 4,875 sounds converted; rc1c with a warm pool: 14 s"},
+    {"label": "Expected loss to failures per full build", "before": 5200, "before_kind": "estimated",
+     "after": 300, "after_kind": "estimated", "fixes": "preflight, resume, faster image step",
+     "source": "6 of 9 image attempts failed, mean 3,339 s to the error (ledger)"}
+  ]
+}

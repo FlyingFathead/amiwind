@@ -4,7 +4,7 @@
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.1.0. 32 features: 21 in this release, 5 in progress, 3 planned, 3 ideas. Updated 9 October 2026.
+CHIM version: 0.1.0. 35 features: 21 in this release, 8 in progress, 3 planned, 3 ideas. Updated 9 October 2026.
 
 ## What CHIM has done so far
 
@@ -30,7 +30,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | --- | --- | --- |
 | Shipped in CHIM 0.1.0 | in a published release | 0 |
 | In this release (CHIM 0.1.0) | in the line that becomes the next release; not yet published | 21 |
-| In progress | being built or measured; not finished | 5 |
+| In progress | being built or measured; not finished | 8 |
 | Planned | decided; no finished design or code | 3 |
 | Idea | written down, not decided | 3 |
 
@@ -67,8 +67,11 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Modular NPCs](#modular-npcs) | Characters | Humanoid NPCs are assembled from shared body parts converted once, with one small recipe per actor, instead of one complete baked model per actor. Equipment changes and looting can then change how an actor looks. The baked whole-actor method stays selectable. | about 0.4 million triangles in parts against 12.3 million baked |
 | [NPC pathfinding and companions](#npc-pathfinding-and-companions) | Characters | A ladder that starts with plain Quake chase movement and stair climbing, and escalates only when stuck: a local ping, then A* on a small walkable graph stored with the chunks. dbg companion is a prototype follower that tests the first steps. | not measured |
 | [Routed standing hulls for many-piece models](#routed-standing-hulls-for-many-piece-models) | Builder and tools | Models with more than 16 collision pieces get one routed standing hull (same solid set, nested routing) instead of a long chain of pieces, in CHIM and in the legacy converter alike; tools/hull_chain_audit.py sweeps every map for deep hull chains. --model-hull (auto, chain, routed or balanced) keeps every method selectable. | not measured |
+| [CHIMport: the whole island, cell by cell](#chimport-the-whole-island-cell-by-cell) | Builder and tools | An autobuilder that converts every exterior cell with everything placed in it to CHIM, from the sea at the edge of the map inwards ring by ring, runs every builder audit on each cell, records its figures and feeds the CHIM Progress Tracker. | not measured |
 | [Memory estimator](#memory-estimator) | Builder and tools | A predictor of how many bytes the chunk zone must hold at any position on the island, before anything is built, from the distinct models in the ring, terrain, catalogue entries and textures. | about 20 % to 40 % accuracy |
 | [Vivec on CHIM (milestone M3)](#vivec-on-chim-milestone-m3) | Roadmap | Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec in one frame (world format 0.6, sectors in one folder per sector row). | not measured |
+| [Lighting audit in the cell tracker](#lighting-audit-in-the-cell-tracker) | Builder and tools | Every exterior cell is checked for light like the original: its original lights by class, with and without a mesh, how each reaches the frame (baked, night lamps only, not at all) and the share of lit surfaces. Lit is required for both completion levels; cells that wait only for light are shown as awaiting lighting. | not measured |
+| [Lit like the original](#lit-like-the-original) | Rendering and visibility | The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time. | not measured |
 
 ### Planned
 
@@ -392,6 +395,24 @@ Closed low-poly shells for landmarks such as Vivec's cantons, so they stand on t
 
 **Read more:** [Distant shells](../DISTANT_SHELLS.md); [CHIM ideas: the distant view](IDEAS.md#the-distant-view-far-terrain-and-mold-shells).
 
+#### Lit like the original
+
+**Status:** In progress. **ID:** `lit-like-the-original`.
+
+The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time.
+
+**Measured gain:** Not measured. In source: light sources in styles 32-36 with generated flicker and pulse strings, and the night lamp table widened from 694 to 2,962 exterior sources. Measured in memory and bake time (docs/chim/LIGHTING.md): terrain lightmaps add 17 KB to the Balmora ring and 27 KB to Seyda Neen. The look is not measured yet.
+
+**Visibility:** Adds no entity or brush: light entities exist only at bake time and the per-placement level rides in the placement record; renderer counters are compared before and after.
+
+**Caveats:**
+
+- Balmora has 2,528 bytes of active-ring headroom: any stored light needs room made there first.
+
+**Read more:** [CHIM lighting](LIGHTING.md); [CHIM lights roadmap](LIGHTING_ROADMAP.md).
+
+**Bugs:** [CHIM-BALMORA-LIGHT-ROOM-33](../bugs/CHIM-BALMORA-LIGHT-ROOM-33.md), [CHIM-LIGHT-CONTENTS-33](../bugs/CHIM-LIGHT-CONTENTS-33.md), [LIGHT-ENTITIES-UNWIRED-33](../bugs/LIGHT-ENTITIES-UNWIRED-33.md), [LIGHT-STYLES-UNDEFINED-33](../bugs/LIGHT-STYLES-UNDEFINED-33.md).
+
 ### Characters
 
 #### Modular NPCs
@@ -530,9 +551,9 @@ Models with more than 16 collision pieces get one routed standing hull (same sol
 
 **Caveats:**
 
-- Not the default in v0.0.33: routed hulls pushed an open-world map past its flora collision reserve (BUILD-ROUTED-FLORA-RESERVE-33), so --model-hull chain is the shipped default and auto, routed and balanced stay selectable.
+- v0.0.33 shipped --model-hull chain: routed hulls pushed an open-world map past its flora collision reserve (BUILD-ROUTED-FLORA-RESERVE-33). After v0.0.33 auto is the default again: that map falls back to chains, CHIM routes every chain deeper than 256 clipnodes (routed_hull.CHAIN_DEPTH_LIMIT, the same rule the hull audits read), and a ring over the zone keeps its smallest routed meshes as chains (chim_build hull fallback). Measured on the emulator (relative numbers): a trace near a Balmora house costs 12-33 ms as a chain and 2.8-3.6 ms routed on the slow preset (COLLISION-TRACE-COST-33). chain, routed and balanced stay selectable.
 
-**Read more:** [Collision hull chains](../bugs/COLLISION-HULL-CHAINS-33.md).
+**Read more:** [Collision hull chains](../bugs/COLLISION-HULL-CHAINS-33.md); [CHIMport: hull policy pending](CHIMPORT.md#hull-policy-pending).
 
 **Bugs:** [BUILD-ROUTED-FLORA-RESERVE-33](../bugs/BUILD-ROUTED-FLORA-RESERVE-33.md), [CHIM-HULL-CHAIN-COST-33](../bugs/CHIM-HULL-CHAIN-COST-33.md), [COLLISION-HULL-CHAINS-33](../bugs/COLLISION-HULL-CHAINS-33.md), [ROUTED-HULL-NODE-ORDER-33](../bugs/ROUTED-HULL-NODE-ORDER-33.md).
 
@@ -555,6 +576,25 @@ tools/build.py --builder chim builds the CHIM world from your own Morrowind data
 **Read more:** [Builder types](build_guide/BUILDER_TYPES.md); [CHIM build statistics](STATS.md); [Draft v0.0.33 release notes, build time](../RELEASE-v0.0.33.md#build-time).
 
 **Bugs:** [CHIM-LEGACY-CHAIN-33](../bugs/CHIM-LEGACY-CHAIN-33.md), [CHIM-RECEIPT-COMMIT-33](../bugs/CHIM-RECEIPT-COMMIT-33.md).
+
+#### CHIMport: the whole island, cell by cell
+
+**Status:** In progress. **ID:** `chimport`.
+
+An autobuilder that converts every exterior cell with everything placed in it to CHIM, from the sea at the edge of the map inwards ring by ring, runs every builder audit on each cell, records its figures and feeds the CHIM Progress Tracker.
+
+**Measured gain:** Not measured. First island-wide run (9 October 2026): 1,292 cells, 716 done (613 passed, 103 empty sea), 546 hull policy pending, 26 failed, 4 not converted; 1,436 distinct meshes converted about once each with content-keyed units.
+
+**Visibility:** Each cell frame keeps its own visibility rows, checked by the validator in every cell; the vis figures are recorded per cell.
+
+**Caveats:**
+
+- Cells are one-cell frames for now; the open world joins them into 3 x 3 cell frames.
+- Actors and creatures are deferred to the actor pipeline and counted per cell.
+
+**Read more:** [CHIMport](CHIMPORT.md); [Hull policy pending](CHIMPORT.md#hull-policy-pending).
+
+**Bugs:** [CHIM-UNIT-FP-SOURCE-LAYOUT-33](../bugs/CHIM-UNIT-FP-SOURCE-LAYOUT-33.md), [CHIM-WORLD-AUDIT-SCALING-33](../bugs/CHIM-WORLD-AUDIT-SCALING-33.md), [CHIM-MEASURE-EMPTY-FRAME-33](../bugs/CHIM-MEASURE-EMPTY-FRAME-33.md), [CHIM-WINDOW-MOUNT-CROSS-CELL-33](../bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md).
 
 #### Build cache and prerendered store
 
@@ -624,6 +664,20 @@ A builder option like --jobs: the map heap in MiB, exact, default 11; beyond the
 
 **Read more:** [CHIM ideas: memory](IDEAS.md#memory).
 
+#### Lighting audit in the cell tracker
+
+**Status:** In progress. **ID:** `light-tracker`.
+
+Every exterior cell is checked for light like the original: its original lights by class, with and without a mesh, how each reaches the frame (baked, night lamps only, not at all) and the share of lit surfaces. Lit is required for both completion levels; cells that wait only for light are shown as awaiting lighting.
+
+**Measured gain:** Not measured. A measurement, not a speed or size gain: island-wide 0 lit, 133 partial and 1,052 unlit converted cells, 2,284 lights without a mesh and 690 with one (9 October 2026).
+
+**Visibility:** No effect on drawing: the audit reads the census and the build figures only.
+
+**Read more:** [CHIM cell tracker](CELL_TRACKER.md); [CHIM lighting](LIGHTING.md).
+
+**Bugs:** [LIGHT-ENTITIES-UNWIRED-33](../bugs/LIGHT-ENTITIES-UNWIRED-33.md).
+
 ### Roadmap
 
 #### Vivec on CHIM (milestone M3)
@@ -658,7 +712,7 @@ A fixed grid of frames of 3 x 3 cells covers the whole island; the engine keeps 
 
 - Until then the countryside between the towns ships as legacy region maps, marked "not yet CHIM".
 
-**Read more:** [CHIM ideas: M4](IDEAS.md#m4-the-open-world); [CHIM engine: frame re-centring plan](ENGINE.md#frame-re-centring-plan-not-implemented).
+**Read more:** [CHIM ideas: M4](IDEAS.md#m4-the-open-world); [CHIM engine: frame re-centring plan](ENGINE.md#frame-re-centring-plan-not-implemented); [CHIMport: the whole island converted cell by cell](CHIMPORT.md).
 
 #### The whole game on one legacy-safe hard file
 

@@ -38,7 +38,7 @@ class HostAssetFormats(unittest.TestCase):
                    'rotation_radians': [0., 0., 0.], 'scale': 1.}
             with patch.object(scenery, 'BSA', return_value=bsa), \
                  patch.object(scenery, 'ordered_map', return_value=[
-                     ('meshes/fictional.nif', b'fictional model', result, None, None)]), \
+                     ('meshes/fictional.nif', b'fictional model', (result, None), None, None)]), \
                  contextlib.redirect_stdout(io.StringIO()):
                 scenery.export_refs(root, root/'scene', [ref], {}, [0., 0., 0.], jobs=1)
             index = json.loads((root/'scene/scenery-index.json').read_text())

@@ -1,5 +1,5 @@
 {
-  "commit": "35720aea5e9750084f2241cd24ab7b833bc01029",
+  "commit": "b336341dc93cba33327e7974d5bd6bf84ca6576c",
   "files": {
     "docs/aga/CHECKPOINT_017_UPSTREAM.patch": "584c7d57cf7ffb6bf43f94e36396111c59c818ceee8368caaed0610828ee7787",
     "docs/aga/COPYING.NEWLIB": "fcfb5ec69b6ab52676dcc4dab7cf4338c8000ef97812dadd35b8592a640a8419",
@@ -75,5 +75,5 @@
     "engine/aga/src/world.h": "2afb7c444c80c276537710c92bb5e0c5e1ccee61a6bdd94d4ca4cbd0776772e1"
   },
   "note": "Inherited files (engine/aga/, docs/aga/) of the last published release that keep their historical whitespace while byte-identical (tools/release.py check_source_whitespace). Written by python3 tools/release.py --whitespace-baseline v<VERSION> after a release is published; a newer release can only shrink this list.",
-  "release": "0.0.33"
+  "release": "0.0.34"
 }

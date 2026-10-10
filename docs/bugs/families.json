@@ -6,6 +6,7 @@
   {"key": "build-content-missing", "title": "Content silently missing from a build", "rule": "Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default."},
   {"key": "builder-from-scratch", "title": "Builder breaks and reproducibility", "rule": "The repository builder builds the whole game from the owner's data with no private step, byte for byte the same each time."},
   {"key": "build-speed", "title": "Build speed", "rule": "Every stage on the shared worker pool; per-stage time and CPU in the build profile."},
+  {"key": "build-cache-reuse", "title": "Build reuse keys and output attribution", "rule": "A unit is rebuilt only when the content hash of all its inputs changes or its output is missing or damaged. Keys never under-declare (a missed input allows a wrong reuse) and should not over-declare (a file no output depends on forces rebuilds); outputs carry no wall-clock values; every changed file is credited to the stage that wrote it."},
   {"key": "console-input", "title": "Console, keyboard and mouse input", "rule": "The console line editor, qualifier keys and the emulator key path."},
   {"key": "audio", "title": "Music and sound", "rule": "The mixer must stay fed through loads and scene changes; music starts after loads settle."},
   {"key": "lighting-night", "title": "Lighting, lamps and night", "rule": "Morrowind lights become Quake light entities baked by the light compiler and animated with lightstyles; night tables and dynamic lights follow the original."},

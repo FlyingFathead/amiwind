@@ -19,6 +19,15 @@
  *              frame (CHIM-REBUILD-COST-33)
  *   budget     chunks join within the per-frame budget; the ground stays
  *   ahead      prefetch ahead of the player; the ring follows the view distance
+ *   pin        a streamed model keeps its file open while every other file
+ *              of the world is opened between its steps (CHIM-PACK-LRU-STREAM-35)
+ *   baddata    damaged model images (one decoded whole, one streamed) and a
+ *              texture with a mip offset outside its pixels: the loads fail,
+ *              the map runs on (CHIM-BRUSH-BAD-DATA-35, H15)
+ *   efragcap   a low efrag limit: placements wait unlinked, the nearest first,
+ *              no Host_Error; all link again when the limit is back (CHIM-EFRAG-UNCAPPED-35)
+ *   farfail    the frame world fails after the far terrain loaded: the map keeps
+ *              the far terrain as its floor (CHIM-GRAFT-FAIL-NO-FLOOR-35)
  */
 #include <assert.h>
 #include <setjmp.h>
@@ -189,6 +198,8 @@ void AW_UISubtitle(const char *name,const char *text,double duration){strncpy(su
 /* aw_fog.c's view distance: the setting (0: the world's draw distance),
  * limited on a CHIM map by its world's data, as AW_DrawDistance does. */
 int (*aw_chim_view_reach)(void);
+/* aw_hud.c: original coordinates on the active frame (the debug HUD's GLOBAL row and cell). */
+int (*aw_chim_source)(const float *local,float *world);
 /* aw_fog.c's far terrain hook and aw_horizon.c's grid rasterizer (tested in
  * aga_chim_far_test.c): here only that the frame's layer is handed over. */
 void (*aw_chim_far_draw)(byte colour,int distance);
@@ -450,7 +461,7 @@ static void same_trace(const trace_t *a,const trace_t *b){
 static void legacy(void){
     reset_engine();Chim_Init();
     assert(!aw_chim_map_begin && !aw_chim_link && !aw_chim_clip && !aw_chim_player && !aw_chim_map_end);
-    assert(!aw_chim_frozen && !aw_chim_spawn && !aw_chim_rcount && !aw_chim_town_map);
+    assert(!aw_chim_frozen && !aw_chim_spawn && !aw_chim_rcount && !aw_chim_town_map && !aw_chim_source);
     begin_map(frame_map);frame_at(0,0,40);
     assert(!Chim_Active() && low==0 && opens==0);
     printf("legacy ok\n");
@@ -459,7 +470,8 @@ static void legacy(void){
 static void inactive(void){
     reset_engine();Chim_Init();
     assert(aw_chim_map_begin && aw_chim_link && aw_chim_clip && aw_chim_player && aw_chim_map_end);
-    assert(aw_chim_frozen && aw_chim_spawn && aw_chim_rcount && aw_chim_town_map);
+    assert(aw_chim_frozen && aw_chim_spawn && aw_chim_rcount && aw_chim_town_map && aw_chim_source);
+    {float l[3]={1,2,3},w[3];assert(!aw_chim_source(l,w));} /* no frame map yet */
     {   /* A town runs as its CHIM frame map when maps/<town>-chim.bsp exists. */
         FILE *f;mkdir("maps",0777);f=fopen("maps/balmora-chim.bsp","wb");assert(f);fputs("x",f);fclose(f);
         assert(!strcmp(aw_chim_town_map("balmora"),"maps/balmora-chim.bsp"));
@@ -496,6 +508,11 @@ static void ring(void){
     reset_engine();Chim_Init();
     begin_map(frame_map);
     assert(Chim_Active() && low>0);
+    {   /* The inverse of chim_tp: world = local x 4 + frame centre (Z x 4). */
+        float l[3]={10,-3.5f,5},w[3];
+        assert(aw_chim_source(l,w));
+        assert(w[0]==40+chim_frame.frame.centre[0] && w[1]==-14+chim_frame.frame.centre[1] && w[2]==20);
+    }
     /* Prime: the whole ring is loaded before the first frame. */
     frame_at(64,64,40);
     assert(active_count()>0 && !ChimModels_Busy());
@@ -741,7 +758,10 @@ static void evict(void){
     ChimZone_Stats(&s);
     printf("evict: evictions=%lu failures=%lu model_loads=%lu chunk_loads=%lu failed=%lu\n",
         s.evictions,s.failures,chim_world.model_loads,chim_world.chunk_loads,chim_world.failed_loads);
-    assert(s.evictions>0);
+    /* A small zone evicts (LRU) or, when locked blocks leave no run large
+     * enough, fails at once without evicting anything (H15). */
+    printf("evict: unsatisfiable requests %lu%c",ChimZone_Unsatisfiable(),10);
+    assert(s.evictions>0 || ChimZone_Unsatisfiable()>0);
     end_map();
     printf("evict ok\n");
 }
@@ -1581,6 +1601,137 @@ static void statics(void){
     (void)at;
 }
 
+
+/* ---------------------------------------------------------------- v0.0.35 crash paths */
+
+/* CHIM-PACK-LRU-STREAM-35: more than CHIM_OPEN_FILES other files opened while
+ * a model streams must not close the stream's file. */
+static void pin(void){
+    long budget;int r,row,i,steps=0,others=0;long before;chim_pack_t *held[CHIM_OPEN_FILES];
+    reset_engine();Chim_Init();
+    begin_map(frame_map);assert(Chim_Active());
+    assert(!ChimModels_Find(2) && (long)chim_world.model[2].bytes>chim_world.buffer_bytes);
+    row=chim_world.model[2].file;
+    for(i=0;i<chim_world.files;i++)if(i!=row)others++;
+    assert(others>CHIM_OPEN_FILES);
+    budget=1<<20;r=ChimModels_Step(2,&budget);assert(r==0 && ChimModels_Busy());
+    while(r==0){
+        for(i=0;i<chim_world.files;i++)if(i!=row)assert(Chim_File(i));
+        budget=1<<20;r=ChimModels_Step(2,&budget);steps++;
+    }
+    assert(r==1 && ChimModels_Find(2) && !ChimModels_Busy() && steps>1);
+    /* the model's file was never closed: no reopen */
+    before=opens;assert(Chim_File(row) && opens==before);
+    /* every file pinned: the next open fails instead of closing a held one */
+    for(i=0;i<CHIM_OPEN_FILES;i++){held[i]=Chim_File(i);assert(held[i]);held[i]->pins++;}
+    assert(!Chim_File(CHIM_OPEN_FILES));
+    for(i=0;i<CHIM_OPEN_FILES;i++)held[i]->pins--;
+    assert(Chim_File(CHIM_OPEN_FILES));
+    end_map();
+    printf("pin: %d steps, %d other files opened between them%c",steps,others,10);
+    printf("pin ok%c",10);
+}
+
+/* Overwrite 4 bytes of a CHIM file at [offset] (the index's file row). */
+static void poke(int row,long offset,int value){
+    char path[256];FILE *f;
+    snprintf(path,sizeof path,"chim/%s",chim_world.file[row].path);
+    f=fopen(path,"r+b");assert(f);assert(!fseek(f,offset,SEEK_SET));
+    assert(fwrite(&value,1,4,f)==4);fclose(f);
+}
+/* The first node's plane of model m, far outside its plane lump. */
+static void damage_model(int m){
+    chim_pack_t *pack=Chim_File(chim_world.model[m].file);dheader_t h;
+    assert(pack && Chim_PackRead(pack,chim_world.model[m].offset,&h,sizeof h));
+    poke(chim_world.model[m].file,chim_world.model[m].offset+h.lumps[LUMP_NODES].fileofs,12345678);
+    Chim_FilesClose();
+}
+
+static void baddata(void){
+    int t,said=0;char *at;unsigned long failed;
+    reset_engine();Chim_Init();
+    begin_map(frame_map);assert(Chim_Active());
+    damage_model(1);        /* decoded whole (fits the loading buffer) */
+    damage_model(2);        /* streamed */
+    /* texture 0: its second mip level starts past its pixels */
+    poke(chim_world.texture[0].file,chim_world.texture[0].offset+16+8+4,1<<20);
+    console_used=0;console[0]=0;console_capture=1;
+    for(t=0;t<300;t++)frame_at(t<150?64:-300,t<150?64:-300,40);
+    console_capture=0;
+    for(at=console;(at=strstr(at,"chunk unavailable"))!=NULL;at++)said++;
+    failed=chim_world.failed_loads;
+    printf("baddata: %d bad-data lines, %lu failed loads%c",said,failed,10);
+    assert(said>=2 && failed>=2);
+    /* bad data is not read again every frame: a failed load waits */
+    assert(said<=40);
+    assert(!ChimModels_Find(1) && !ChimModels_Find(2) && ChimModels_Find(0));
+    /* the ground stays (partial activation) */
+    assert(!ground_holes(-300,-300) && active_count()>0);
+    end_map();
+    printf("baddata ok%c",10);
+}
+
+/* CHIM-EFRAG-UNCAPPED-35 */
+static void efragcap(void){
+    int t,full,linked,efrags,one,most,waiting,k;unsigned long capped,novis;chim_place_t *near;
+    reset_engine();Chim_Init();
+    begin_map(frame_map);assert(Chim_Active());
+    for(t=0;t<20;t++)frame_at(64,64,40);
+    full=aw_efrags_used;assert(full>4);
+    end_map();
+    reset_engine();Chim_Init();
+    begin_map(frame_map);assert(Chim_Active());
+    chim_efrag_limit=full/2;
+    for(t=0;t<40;t++){frame_at(64,64,40);assert(aw_efrags_used<=chim_efrag_limit);}
+    ChimChunks_EfragCounts(&waiting,&capped,&novis);
+    ChimChunks_Counts(&linked,&efrags,&one,&most);
+    near=placement(0);
+    printf("efragcap: limit %d of %d, %d in use, %d waiting, %lu waits%c",chim_efrag_limit,full,aw_efrags_used,waiting,capped,10);
+    assert(waiting>0 && capped>0 && near && near->leaves>0);
+    /* the nearest chunks keep their links: every linked placement is no farther than every waiting one */
+    {
+        float far_linked=0,near_waiting=1e30f;int i,j;
+        for(i=0;i<chim_frame.count;i++){chim_entry_t *e=&chim_frame.entries[i];chim_chunk_t *c=e->chunk.data;
+            if(e->state!=CHIM_STATE_ACTIVE)continue;
+            for(j=0;j<c->records;j++){chim_place_t *p=&c->places[j];if(!p->linked)continue;
+                if(p->leaves && e->distance>far_linked)far_linked=e->distance;
+                if(!p->leaves && e->distance<near_waiting)near_waiting=e->distance;}}
+        assert(far_linked<=near_waiting);
+    }
+    /* the limit back: after the calm period every placement links again */
+    chim_efrag_limit=AW_EFRAG_LIMIT-CHIM_EFRAG_RESERVE;
+    for(k=0;k<300;k++)frame_at(64,64,40);
+    ChimChunks_EfragCounts(&waiting,&capped,&novis);
+    assert(!waiting && aw_efrags_used==full);
+    end_map();
+    printf("efragcap ok%c",10);
+}
+
+/* CHIM-GRAFT-FAIL-NO-FLOOR-35: the frame world gets no room after the far
+ * terrain loaded (the streamed statics' table, taken just before it, is
+ * sized to leave too little): the map keeps the far terrain as its floor. */
+#define CHIM_FARFAIL_MAX 2048
+static char farfail_map[256];
+static void farfail(void){
+    float lowest,surface;vec3_t p;int stated;
+    for(stated=CHIM_FARFAIL_MAX;stated>0;stated-=2){
+        reset_engine();Chim_Init();
+        set_cvar("chim_zone_kib",256);set_cvar("chim_reserve_kib",0);set_cvar("chim_pool_kib",1);
+        snprintf(farfail_map,sizeof farfail_map,"{\n\"classname\" \"worldspawn\"\n\"_chim_frame\" \"0 0\"\n\"_chim_streamed_statics\" \"%d\"\n}\n",stated);
+        console_used=0;console[0]=0;console_capture=1;
+        begin_map(farfail_map);
+        console_capture=0;
+        if(Chim_FarOnly())break;
+        end_map();
+    }
+    printf("farfail: %d statics stated leave the frame world no room%c",stated,10);
+    assert(stated>0 && !Chim_Active());
+    assert(strstr(console,"far terrain stays as the floor") && Chim_FarOnly() && ChimFar_Loaded());
+    VectorSet(p,64,64,40);assert(aw_chim_floor && aw_chim_floor(p,&lowest,&surface));
+    end_map();assert(!Chim_FarOnly() && !ChimFar_Loaded());
+    printf("farfail ok%c",10);
+}
+
 int main(int argc,char **argv){
     setvbuf(stdout,NULL,_IONBF,0);
     heap=calloc(1,HEAP_BYTES);assert(heap);
@@ -1608,6 +1759,10 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"story"))story();
     else if(!strcmp(argv[1],"statics"))statics();
     else if(!strcmp(argv[1],"far"))far();
+    else if(!strcmp(argv[1],"pin"))pin();
+    else if(!strcmp(argv[1],"baddata"))baddata();
+    else if(!strcmp(argv[1],"efragcap"))efragcap();
+    else if(!strcmp(argv[1],"farfail"))farfail();
     else return 2;
     return 0;
 }

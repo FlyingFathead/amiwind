@@ -21,7 +21,8 @@ from mwad.audit import BSA, normpath
 from mwad.npc import load_master, outfit, text
 from mwad.paths import child_ci, ensure_external
 from mwad.scene import unpack_geometry
-from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl
+import npc_geometry
+from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, add_root_rule_arg, apply_root_rule, get_root_rule, shared_vertex_mdl
 from prepare_scenery import model_geometry, nif_reader
 from prepare_quake import box, miptex, wad
 from build_parallel import ordered_map
@@ -41,6 +42,12 @@ def quality_profiles():
 
 def model_quality(spec):
     return quality_profiles().get(normpath(spec.get('mesh',''))) if spec['kind']=='CREA' else None
+
+
+def head_detail(spec):
+    """original|budget for a humanoid appearance (npc_geometry.head_plan); None for creatures."""
+    from mesh_geometry_env import npc_head_detail
+    return npc_head_detail() if spec['kind']=='NPC_' else None
 
 
 def creature_shapes(assets, mesh, pose_event=None):
@@ -83,7 +90,8 @@ def convert_model(task):
     data, output, key, spec, palette = task
     quality=model_quality(spec)
     quality_id=hashlib.sha256(json.dumps(quality,sort_keys=True).encode()).hexdigest() if quality else ''
-    atlas_profile='face16-v1' if quality and quality.get('atlas_tile')==16 else 'face8-v1'
+    atlas_profile=('shared-vertex-v1' if quality and quality.get('encoding')=='shared-vertex' else
+                   'face16-v1' if quality and quality.get('atlas_tile')==16 else 'face8-v1')
     face_limit=spec.get('face_limit',666)
     if quality:face_limit=GALLERY_FACE_LIMIT
     path = Path(output) / (key + '.mdl'); receipt = path.with_suffix('.json')
@@ -93,12 +101,13 @@ def convert_model(task):
         needs_upgrade=(face_limit==GALLERY_FACE_LIMIT and saved.get('vertices',0)>2000
                        and saved.get('geometry_profile')!=EXTENDED_PROFILE)
         needs_upgrade=needs_upgrade or saved.get('quality_profile','')!=quality_id
-        needs_upgrade=needs_upgrade or (atlas_profile=='face16-v1' and saved.get('atlas_profile')!=atlas_profile)
+        needs_upgrade=needs_upgrade or saved.get('npc_head_detail',head_detail(spec) and 'budget')!=head_detail(spec)
+        needs_upgrade=needs_upgrade or (atlas_profile!='face8-v1' and saved.get('atlas_profile')!=atlas_profile)
         if not needs_upgrade and saved.get('sha256') == hashlib.sha256(raw).hexdigest():
             if saved.get('atlas_profile')!=atlas_profile:
                 raw=compact_atlas(raw);path.write_bytes(raw)
                 saved.update(atlas_profile='face8-v1',bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
-                receipt.write_text(json.dumps(saved,indent=2)+'\n')
+                receipt.write_text(json.dumps(saved,indent=2,sort_keys=True)+'\n')
             return saved
     try:
         source_repairs=[]
@@ -117,6 +126,11 @@ def convert_model(task):
         shift = np.array([(low[0]+high[0])/2, (low[1]+high[1])/2, low[2]])
         for shape in shapes: shape['positions'] -= shift
         budgets=(quality['budget'],) if quality else ((480,) if face_limit==GALLERY_FACE_LIMIT else (480,384,320,256,192))
+        if quality and quality.get('encoding')=='shared-vertex':
+            # Every original triangle on the original vertices (npc_geometry.shared_vertex_mdl):
+            # the renderer's original path, at most 1,999 vertices, no triangle cap.
+            frames, faces, uv, skin = shared_vertex_mdl(shapes, materials, textures, palette)
+            raw = animated_mdl(frames, faces, uv, skin, vertex_limit=1999); budgets=()
         for budget in budgets:
             try:
                 frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget,face_limit=face_limit,
@@ -133,13 +147,14 @@ def convert_model(task):
         result = dict(key=key, status='ready', source_bounds=[low.tolist(), high.tolist()],
                       dimensions=(high-low).tolist(), triangles=len(faces), vertices=frames.shape[1], bytes=len(raw),
                       face_limit=face_limit,geometry_profile=EXTENDED_PROFILE if face_limit==GALLERY_FACE_LIMIT else 'normal-v1',
-                      quality_profile=quality_id,quality_settings=quality,
+                      quality_profile=quality_id,quality_settings=quality,npc_head_detail=head_detail(spec),
+                      head_plan=dict(npc_geometry.LAST_PLAN) if spec['kind']=='NPC_' else None,
                       gallery_lift=max(0,float(low[2])) if quality and quality.get('preserve_airborne') else 0,
                       palette_sha256=hashlib.sha256(palette).hexdigest(),
                       sha256=hashlib.sha256(raw).hexdigest(),atlas_profile=atlas_profile,source_repairs=source_repairs)
     except Exception as exc:
         result = dict(key=key, status='failed', error=type(exc).__name__ + ': ' + str(exc))
-    receipt.write_text(json.dumps(result, indent=2) + '\n'); return result
+    receipt.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n'); return result
 
 
 def safe_label(value):
@@ -176,6 +191,7 @@ def catalogue(data, only=None):
                     if kind == 'NPC_':
                         app = outfit(kinds, identifier, equipped=equipped)
                         app = {k: app[k] for k in ('parts', 'skeleton', 'height', 'weight')}
+                        app['root_rule'] = get_root_rule()  # part of the model key: a different rule is a different model
                         spec = dict(kind=kind, appearance=app)
                     else: spec = dict(kind=kind, mesh=text(fields, 'MODL'))
                     key = 'm' + hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
@@ -245,7 +261,8 @@ def finish_catalogue(entries,results,out,palette,reviews=None):
     (models/'catalog.txt').write_text('\n'.join(lines)+'\n', encoding='ascii')
     (models/'poses.txt').write_text('AWGP1\n'+''.join(f"{key}\t{r['gallery_lift']:.5f}\n"
         for key,r in sorted(results.items()) if r.get('status')=='ready' and r.get('gallery_lift',0)>0),encoding='ascii')
-    (out/'gallery-audit.json').write_text(json.dumps(dict(entries=entries, models=results), indent=2)+'\n')
+    # Sorted keys: the same gallery writes the same bytes, from the cache or fresh (BUILD-GALLERY-JSON-KEY-ORDER-35).
+    (out/'gallery-audit.json').write_text(json.dumps(dict(entries=entries, models=results), indent=2, sort_keys=True)+'\n')
     inspection_table(entries,results,models/'inspection.tsv',reviews)
     gallery_map(out, palette)
     failed = sum(r['status'] != 'ready' for r in results.values())
@@ -255,9 +272,9 @@ def finish_catalogue(entries,results,out,palette,reviews=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--data-files', type=Path, required=True); p.add_argument('--palette', type=Path, required=True)
-    p.add_argument('--out', type=Path, required=True); add_jobs(p)
+    p.add_argument('--out', type=Path, required=True); add_jobs(p); add_root_rule_arg(p)
     p.add_argument('--reviews',type=Path,help='Private model-key/checksum inspection decisions to carry forward')
-    a = p.parse_args(); out = ensure_external(a.out, 'gallery'); out.mkdir(parents=True, exist_ok=True)
+    a = p.parse_args(); apply_root_rule(a); out = ensure_external(a.out, 'gallery'); out.mkdir(parents=True, exist_ok=True)
     models = out/'gallery'; models.mkdir(exist_ok=True); palette = a.palette.read_bytes()
     if len(palette) != 768: raise ValueError('Expected 256-colour palette')
     entries, specs = catalogue(a.data_files)

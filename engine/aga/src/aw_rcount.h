@@ -30,6 +30,10 @@ enum {
     RC_SC_BUILD_BYTES,  /* ... texels drawn */
     RC_ENTITIES,        /* entities in cl_visedicts this frame (R_StoreEfrags, edicts) */
     RC_SPRITES,         /* sprite entities drawn (R_DrawSprite) */
+    RC_ALIAS_TRIS,      /* alias model triangles sent to the alias renderer (R_AliasDrawModel) */
+    RC_LOD_NEAR,        /* NPCs drawn with their near level, level 0 (aw_npc_lod.c) */
+    RC_LOD_COARSE,      /* NPCs drawn with a coarse level, 2 or 3 */
+    RC_LOD_SLOTS,       /* NPC level models resident (per frame) */
     RC_COUNTERS
 };
 enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_TIMERS };

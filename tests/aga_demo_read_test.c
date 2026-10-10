@@ -16,6 +16,10 @@ int NET_GetMessage(struct qsocket_s *socket){(void)socket;return 0;}
 int Cmd_Argc(void){return 2;}
 char *Cmd_Argv(int index){return index?"fixture":"timedemo";}
 void COM_DefaultExtension(char *name,char *extension){(void)name;(void)extension;}
+qboolean COM_FormatPath(char *out,int size,const char *format,...){
+    va_list ap;int n;va_start(ap,format);n=vsnprintf(out,size,format,ap);va_end(ap);
+    if(n<0 || n>=size){if(size>0)out[0]=0;return false;}return true;
+}
 int COM_FOpenFile(char *name,FILE **file){
     (void)name;if(missing){*file=NULL;return -1;}
     *file=tmpfile();assert(*file);assert(fwrite(mock_track,1,strlen(mock_track),*file)==strlen(mock_track));

@@ -23,8 +23,22 @@ static struct
 	int				active, kind;
 	unsigned		id;
 	chim_model_t	*block;
+	chim_pack_t		*pack;		/* a stream's file, pinned until the load ends */
 	aw_brush_stream_t	stream;
 } job;
+
+/* The last load that failed in a stream step (bad data): the next ask for
+ * it is answered -1 at once, so its chunk waits as for any failed load
+ * instead of reading the same bad image again every frame. */
+static int		bad_kind;
+static unsigned	bad_id;
+
+static void Unpin (void)
+{
+	if (job.pack && job.pack->pins > 0)
+		job.pack->pins--;
+	job.pack = NULL;
+}
 
 /* ---------------------------------------------------------------- textures */
 
@@ -54,6 +68,12 @@ static texture_t *LoadTexture (unsigned id)
 	pixels = mt->width*mt->height/64*85;
 	if ((unsigned)pixels > e->bytes - sizeof(miptex_t))
 		return NULL;
+	/* Every mip level inside the pixels read (H15): a wrong offset would
+	 * make the rasterizer read past the zone block. */
+	for (j=0 ; j<MIPLEVELS ; j++)
+		if (mt->offsets[j] < (int)sizeof(miptex_t) ||
+			mt->offsets[j] - (int)sizeof(miptex_t) > pixels - (mt->width>>j)*(mt->height>>j))
+			return NULL;
 	if (chim_debug.value >= 2)
 		Con_Printf ("CHIM: texture %lu %ldx%ld\n", (unsigned long)id, (long)mt->width, (long)mt->height);
 	tx = ChimZone_Alloc (NULL, sizeof(texture_t) + pixels, CHIM_KIND_TEXTURE, id);
@@ -207,6 +227,7 @@ void ChimModels_Abort (void)
 	if (!job.active)
 		return;
 	job.active = 0;
+	Unpin ();
 	ChimZone_Unlock (job.block);
 	ReleaseModel (job.block);
 	ChimZone_FreeData (job.block);
@@ -229,6 +250,7 @@ static void Finish (void)
 	}
 	job.active = 0;
 	job.block = NULL;
+	Unpin ();
 }
 
 /* Start a load of a brush image at [offset, offset+bytes) of a pack: decode
@@ -286,6 +308,10 @@ static int Begin (int kind, unsigned id, chim_user_t *user, chim_pack_t *pack, l
 		ChimModels_Abort ();
 		return -1;
 	}
+	/* The stream keeps this stdio handle over several frames: texture loads
+	 * and other chunks open other files meanwhile (CHIM-PACK-LRU-STREAM-35). */
+	job.pack = pack;
+	pack->pins++;
 	chim_world.streamed_models++;
 	return 0;
 }
@@ -301,6 +327,16 @@ static int Continue (long *budget)
 	unsigned long before = chim_world.bytes_read;
 	done = AW_BrushStreamStep (&job.stream);
 	*budget -= 1 + (aw_load_disk_bytes - disk) + (long)(chim_world.bytes_read - before);
+	if (done < 0)
+	{
+		/* Bad data in the image (model.c said why): this load ends, the
+		 * game goes on (CHIM-BRUSH-BAD-DATA-35). */
+		bad_kind = job.kind;
+		bad_id = job.id;
+		chim_world.failed_loads++;
+		ChimModels_Abort ();
+		return -1;
+	}
 	if (done)
 	{
 		Finish ();
@@ -318,13 +354,21 @@ int ChimModels_Step (unsigned id, long *budget)
 	if (job.active)
 	{
 		if (job.kind != CHIM_KIND_MODEL || job.id != id)
-			return Continue (budget) && 0;
-		return Continue (budget);
+			return Continue (budget) > 0 && 0;
+		/* The asker hears of a failure itself: nothing left to remember. */
+		if ((r = Continue (budget)) < 0)
+			bad_kind = 0;
+		return r;
 	}
 	if (ChimModels_Find (id))
 		return 1;
 	if (id >= chim_world.models)
 		return -1;
+	if (bad_kind == CHIM_KIND_MODEL && bad_id == id)
+	{
+		bad_kind = 0;
+		return -1;
+	}
 	e = &chim_world.model[id];
 	if (!(pack = Chim_File (e->file)))
 		return -1;
@@ -347,11 +391,18 @@ int ChimModels_TerrainStep (int entry, long *budget)
 	if (job.active)
 	{
 		if (job.kind != CHIM_KIND_TERRAIN || job.id != (unsigned)entry)
-			return Continue (budget) && 0;
-		return Continue (budget);
+			return Continue (budget) > 0 && 0;
+		if ((r = Continue (budget)) < 0)
+			bad_kind = 0;
+		return r;
 	}
 	if (e->terrain.data)
 		return 1;
+	if (bad_kind == CHIM_KIND_TERRAIN && bad_id == (unsigned)entry)
+	{
+		bad_kind = 0;
+		return -1;
+	}
 	if (!(pack = Chim_File (e->file)) || !Chim_PackRead (pack, e->disk.offset, raw, sizeof(raw)) ||
 		!ChimFormat_ChunkHead (raw, &head))
 		return -1;

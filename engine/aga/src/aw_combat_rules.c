@@ -18,7 +18,7 @@ static const char *const names[AW_COMBAT_SETTING_COUNT]={
     "iBlockMinChance","iBlockMaxChance","fSwingBlockBase","fSwingBlockMult","fBlockStillBonus",
     "fFatigueBlockBase","fFatigueBlockMult","fWeaponFatigueBlockMult",
     "fCombatBlockLeftAngle","fCombatBlockRightAngle","fCombatDelayNPC",
-    "fNPCHealthBarTime","fNPCHealthBarFade"
+    "fNPCHealthBarTime","fNPCHealthBarFade","fWeaponDamageMult"
 };
 /* The struct holds the floats in the order of names[]. */
 const char *AW_CombatSettingName(int index) {
@@ -93,12 +93,38 @@ float AW_CombatUnarmoredRating(const aw_combat_settings_t *s,const aw_fighter_t 
     float u=f->skills[AW_SK_UNARMORED];
     return (s->fUnarmoredBase1*u)*(s->fUnarmoredBase2*u);
 }
-/* blockMeleeAttack: shield, facing the attacker, not knocked down or busy. */
+int aw_combat_dice=1;
+/* Player attack type (character.cpp getMovementBasedAttackType): forward/back
+ * beats sideways by 0.2 = thrust, sideways = slash, else chop. Inputs -1..1. */
+int AW_CombatMovementAttack(float forward,float side) {
+    float f=forward<0?-forward:forward,sd=side<0?-side:side;
+    if(f>sd+.2f)return AW_ATTACK_THRUST;
+    if(sd>f+.2f)return AW_ATTACK_SLASH;
+    return AW_ATTACK_CHOP;
+}
+/* "Always use best attack" (character.cpp getBestAttack): the highest min+max;
+ * all equal = slash; thrust wins ties with the others, then slash. */
+int AW_CombatBestAttackPlayer(const aw_fighter_t *f) {
+    int slash=f->damage[1][0]+f->damage[1][1],chop=f->damage[0][0]+f->damage[0][1],thrust=f->damage[2][0]+f->damage[2][1];
+    if(!f->weapon)return AW_ATTACK_CHOP;               /* no best attack for hand to hand */
+    if(slash==chop && slash==thrust)return AW_ATTACK_SLASH;
+    if(thrust>=chop && thrust>=slash)return AW_ATTACK_THRUST;
+    if(slash>=chop && slash>=thrust)return AW_ATTACK_SLASH;
+    return AW_ATTACK_CHOP;
+}
+/* Can the victim block at all: a shield with a one-handed weapon (fists and
+ * two-handed weapons hide it), facing the attacker, not down, staggered,
+ * swinging or dead (combat.cpp blockMeleeAttack, npcanimation.cpp). */
+int AW_CombatCanBlock(const aw_combat_settings_t *s,const aw_fighter_t *v,float angle) {
+    if(!v->shield || AW_TWO_HANDED(v->weapon) || v->knocked || v->staggered || v->attacking || v->dead)return 0;
+    return angle>=s->fCombatBlockLeftAngle && angle<=s->fCombatBlockRightAngle;
+}
+static float ratio(float now,float most) {return most>0?(now>0?now/most:0):1;}
+/* blockMeleeAttack: the chance, the roll, the blocker's fatigue, the shield's wear. */
 static int blocks(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,float strength,float angle,
-                  int still,aw_combat_rng_t *r,aw_swing_t *out) {
+                  int still,float damage,aw_combat_rng_t *r,aw_swing_t *out) {
     float blocker,attacker;int x;
-    if(!v->shield || v->knocked || v->attacking || v->dead)return 0;
-    if(angle<s->fCombatBlockLeftAngle || angle>s->fCombatBlockRightAngle)return 0;
+    if(!AW_CombatCanBlock(s,v,angle))return 0;
     blocker=(v->skills[AW_SK_BLOCK]+.2f*v->attributes[AW_AGI]+.1f*v->attributes[AW_LUC])*
         (strength*s->fSwingBlockMult+s->fSwingBlockBase);
     if(still)blocker*=s->fBlockStillBonus;
@@ -110,7 +136,21 @@ static int blocks(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,
     out->block_chance=x;out->blocked_roll=AW_CombatRoll100(r);
     if(out->blocked_roll>=x)return 0;
     v->fatigue-=s->fFatigueBlockBase+(a->weapon?a->weight*strength*s->fWeaponFatigueBlockMult:0);
+    if(v->shield_health_max>0){
+        v->shield_health-=v->shield_health<(int)damage?v->shield_health:(int)damage;
+        if(v->shield_health<=0){v->shield_health=0;v->shield=0;out->shield_broke=1;}  /* unequipped */
+    }
     return 1;
+}
+/* reduceWeaponCondition: max(1, fWeaponDamageMult x damage); a miss in reach costs 1. */
+static void wear(const aw_combat_settings_t *s,aw_fighter_t *a,float damage,aw_swing_t *out) {
+    float x;
+    if(!a->weapon || a->weapon_health_max<=0)return;
+    x=s->fWeaponDamageMult*damage;if(x<1)x=1;
+    x=(float)(int)x;
+    if(x>a->weapon_health)x=a->weapon_health;
+    a->weapon_health-=x;out->weapon_wear=x;
+    if(a->weapon_health<=0){a->weapon_health=0;a->weapon=0;a->weapon_skill=AW_SK_H2H;out->weapon_broke=1;}
 }
 void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,int attack,float strength,
                     float angle,int still,aw_combat_rng_t *r,aw_swing_t *out) {
@@ -119,12 +159,19 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
     /* applyFatigueLoss: every swing, hit or miss (no encumbrance yet). */
     a->fatigue-=s->fFatigueAttackBase+(a->weapon?a->weight*strength*s->fWeaponFatigueMult:0);
     if(v->dead){out->outcome=AW_HIT_MISS;out->roll=-1;return;}
-    out->chance=AW_CombatHitChance(s,a,v);out->roll=AW_CombatRoll100(r);
-    if(out->roll>=out->chance){out->outcome=AW_HIT_MISS;return;}
+    out->chance=AW_CombatHitChance(s,a,v);
+    out->roll=aw_combat_dice?AW_CombatRoll100(r):-2;      /* dice off: every swing in reach hits */
+    if(aw_combat_dice && out->roll>=out->chance){
+        out->outcome=AW_HIT_MISS;wear(s,a,0,out);
+        out->miss_style=AW_CombatCanBlock(s,v,angle)?2:1;
+        return;
+    }
     if(a->weapon){
-        /* Npc::hit + adjustWeaponDamage (a weapon in full condition) */
+        /* Npc::hit + adjustWeaponDamage: condition ratio, strength modifier */
         int lo=a->damage[attack][0],hi=a->damage[attack][1];
-        d=(lo+(hi-lo)*strength)*(s->fDamageStrengthBase+a->attributes[AW_STR]*s->fDamageStrengthMult*.1f);
+        d=(lo+(hi-lo)*strength)*ratio(a->weapon_health,a->weapon_health_max)*
+            (s->fDamageStrengthBase+a->attributes[AW_STR]*s->fDamageStrengthMult*.1f);
+        wear(s,a,d,out);
         health=1;
     }else{
         /* getHandToHandDamage: fatigue damage unless the victim is down
@@ -136,7 +183,7 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
     out->raw=d;
     if(!v->aware){d*=s->fCombatCriticalStrikeMult;out->critical=1;}
     if(v->knocked)d*=s->fCombatKODamageMult;
-    if(blocks(s,a,v,strength,angle,still,r,out)){out->outcome=AW_HIT_BLOCKED;out->damage=0;return;}
+    if(aw_combat_dice && blocks(s,a,v,strength,angle,still,d,r,out)){out->outcome=AW_HIT_BLOCKED;out->damage=0;return;}
     if(health && d>0){
         /* combat/local.lua adjustDamageForArmor, at least 1 */
         float x=d/(d+v->armor);
@@ -149,7 +196,7 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
     if(d>=.001f){
         agility=v->attributes[AW_AGI];
         if(health && agility*s->fKnockDownMult<=d &&
-           agility*s->iKnockDownOddsMult*.01f+s->iKnockDownOddsBase<=AW_CombatRoll100(r)){
+           (!aw_combat_dice || agility*s->iKnockDownOddsMult*.01f+s->iKnockDownOddsBase<=AW_CombatRoll100(r))){
             if(!v->knocked)v->knocked=1;
             out->knockdown=1;
         }

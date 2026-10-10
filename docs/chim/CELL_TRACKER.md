@@ -6,19 +6,29 @@ Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: d
 
 **Done: 716 of 1,292 (55.4 %)**
 
-- Cell complete: 96
-- Terrain complete: 108
+- Cell complete: 0
+- Terrain complete: 0
+- Cell complete, awaiting lighting: 96
+- Terrain complete, awaiting lighting: 108
 - Passed (something still deferred): 409
 - Empty sea: 103
 
-Generated 2026-10-09 14:06 +0300. Tracker data generated 2026-10-09T11:06:31+00:00.
+**Eligible for v0.0.34: 716 of 1,292** (every done cell, lighting done or not; definition in the import policy).
+
+Lighting: lit 0, partial 133, unlit 1,052, not measured 107 (cells; lit is required for both completion levels).
+
+Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 647 night lamps only, 2,279 not represented.
+
+Generated 2026-10-09 15:55 +0300. Tracker data generated 2026-10-09T12:55:00+00:00.
 
 ## Totals
 
 | Status | Cells | Share |
 | :-- | --: | --: |
-| Cell complete | 96 | 7.4 % |
-| Terrain complete | 108 | 8.4 % |
+| Cell complete | 0 | 0.0 % |
+| Terrain complete | 0 | 0.0 % |
+| Cell complete, awaiting lighting | 96 | 7.4 % |
+| Terrain complete, awaiting lighting | 108 | 8.4 % |
 | Passed (something still deferred) | 409 | 31.7 % |
 | Empty sea | 103 | 8.0 % |
 | Hull policy pending | 546 | 42.3 % |
@@ -28,23 +38,32 @@ Generated 2026-10-09 14:06 +0300. Tracker data generated 2026-10-09T11:06:31+00:
 
 Definitions are in the import policy below.
 
+## Releases
+
+Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results never change it).
+
+| Release | State | Cells | Complete | Awaiting lighting | Lit | Empty sea | Failing | Hull policy pending |
+| :-- | --: | --: | --: | --: | --: | --: | --: | --: |
+| v0.0.33 | shipped | 25 | 0 | 0 | 0 | 0 | 1 | 9 |
+| unassigned | - | 1,411 | 0 | 204 | 0 | 103 | 29 | 537 |
+
 ## Per ring (ring 1 touches the sea)
 
-| Ring | Cells | Cell complete | Terrain complete | Passed (something still deferred) | Empty sea | Hull policy pending | Failed | Not converted | Not started |
-| :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| 1 | 171 | 56 | 5 | 8 | 102 | 0 | 0 | 0 | 0 |
-| 2 | 160 | 38 | 9 | 111 | 1 | 1 | 0 | 0 | 0 |
-| 3 | 149 | 0 | 4 | 123 | 0 | 16 | 6 | 0 | 0 |
-| 4 | 138 | 1 | 21 | 97 | 0 | 10 | 8 | 1 | 0 |
-| 5 | 125 | 1 | 42 | 66 | 0 | 12 | 4 | 0 | 0 |
-| 6 | 114 | 0 | 7 | 4 | 0 | 102 | 0 | 1 | 0 |
-| 7 | 104 | 0 | 6 | 0 | 0 | 96 | 2 | 0 | 0 |
-| 8 | 94 | 0 | 8 | 0 | 0 | 85 | 0 | 1 | 0 |
-| 9 | 81 | 0 | 4 | 0 | 0 | 73 | 3 | 1 | 0 |
-| 10 | 66 | 0 | 2 | 0 | 0 | 62 | 2 | 0 | 0 |
-| 11 | 50 | 0 | 0 | 0 | 0 | 49 | 1 | 0 | 0 |
-| 12 | 33 | 0 | 0 | 0 | 0 | 33 | 0 | 0 | 0 |
-| 13 | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 |
+| Ring | Cells | Cell complete | Terrain complete | Cell complete, awaiting lighting | Terrain complete, awaiting lighting | Passed (something still deferred) | Empty sea | Hull policy pending | Failed | Not converted | Not started |
+| :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
+| 1 | 171 | 0 | 0 | 56 | 5 | 8 | 102 | 0 | 0 | 0 | 0 |
+| 2 | 160 | 0 | 0 | 38 | 9 | 111 | 1 | 1 | 0 | 0 | 0 |
+| 3 | 149 | 0 | 0 | 0 | 4 | 123 | 0 | 16 | 6 | 0 | 0 |
+| 4 | 138 | 0 | 0 | 1 | 21 | 97 | 0 | 10 | 8 | 1 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 42 | 66 | 0 | 12 | 4 | 0 | 0 |
+| 6 | 114 | 0 | 0 | 0 | 7 | 4 | 0 | 102 | 0 | 1 | 0 |
+| 7 | 104 | 0 | 0 | 0 | 6 | 0 | 0 | 96 | 2 | 0 | 0 |
+| 8 | 94 | 0 | 0 | 0 | 8 | 0 | 0 | 85 | 0 | 1 | 0 |
+| 9 | 81 | 0 | 0 | 0 | 4 | 0 | 0 | 73 | 3 | 1 | 0 |
+| 10 | 66 | 0 | 0 | 0 | 2 | 0 | 0 | 62 | 2 | 0 | 0 |
+| 11 | 50 | 0 | 0 | 0 | 0 | 0 | 0 | 49 | 1 | 0 | 0 |
+| 12 | 33 | 0 | 0 | 0 | 0 | 0 | 0 | 33 | 0 | 0 | 0 |
+| 13 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 |
 
 ## Failures by mechanism class
 
@@ -63,7 +82,7 @@ A cell can fail more than one mechanism. Hull policy pending cells are not failu
 | :-- | --: | --: | --: | --: | --: |
 | Statics | 106,813 | 106,791 | 0 | 22 | 0 |
 | Flora | 58,565 | in statics | - | - | - |
-| Lights | 2,926 | 643 | 2,283 | 0 | 0 |
+| Lights | 2,926 | 643 | 4,566 | 0 | 0 |
 | Doors | 1,041 | 1,041 | 0 | 0 | 0 |
 | Containers | 22,193 | 22,193 | 0 | 0 | 0 |
 | Activators | 2,762 | 2,761 | 0 | 1 | 0 |
@@ -73,12 +92,13 @@ A cell can fail more than one mechanism. Hull policy pending cells are not failu
 | Markers | 15 | not drawn, not required | - | - | - |
 
 - Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (22)
+- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (2,283)
 - Lights, deferred: nonvisual source marker (2,283)
 - Activators, skipped: not in the frame (outside the cell bounds or removed by a selection) (1)
 - NPCs, deferred: resident conversion (546)
 - Creatures, deferred: creature simulation pending (5,409)
 
-Counts are every placed reference in converted cells, from the conversion job. Door and light figures in the Toolkit contents panel (original census) and the door audit (links per cell) are different measures. Light emitters without a mesh stay under Lights: they cast light, so they keep a cell from being terrain complete.
+Counts are every placed reference in converted cells, from the conversion job. Door and light figures in the Toolkit contents panel (original census) and the door audit (links per cell) are different measures. Light emitters without a mesh stay under Lights: they cast light, so the lighting audit keeps a cell from both completion levels until it is lit.
 
 ## Import policy
 
@@ -86,8 +106,10 @@ Generated from the constants of the tracker code, so it cannot drift from what t
 
 ### What the statuses mean
 
-- Cell complete: terrain and every placed object converted, actors included, all measured audits passed.
-- Terrain complete: all measured audits passed and every placed object except actors converted (statics, flora, lights, doors, containers, activators, items); actors may still be deferred. Nonvisual markers are not required.
+- Cell complete: terrain and every placed object converted, actors included, all measured audits passed, and the cell lit like the original (lighting audit: lit).
+- Terrain complete: all measured audits passed and every placed object except actors converted (statics, flora, lights, doors, containers, activators, items); actors may still be deferred. Nonvisual markers are not required. The cell must also be lit like the original (lighting audit: lit).
+- Cell complete, awaiting lighting: everything cell complete needs except the lighting audit (lit). Counts as done; becomes cell complete once lit.
+- Terrain complete, awaiting lighting: everything terrain complete needs except the lighting audit (lit). Counts as done; becomes terrain complete once lit.
 - Passed: converted and every measured audit passed, but something placed is still deferred or skipped (owner-approved and playtested cells also count here).
 - Empty sea: terrain and water only, nothing placed. Counts as done.
 - Hull policy pending: converted; the only problem is a standing-hull chain deeper than the limit below, waiting for one shared routing rule. Neither passed nor failed.
@@ -95,9 +117,11 @@ Generated from the constants of the tracker code, so it cannot drift from what t
 - Not converted: the conversion was tried and could not finish the cell (for example an object placed across a cell edge). A failure-type state, never counted as done.
 - Not started: the conversion has not reached the cell yet.
 
-Done = cell complete + terrain complete + passed + empty sea, each kept on its own line. Empty sea cells count as done: there is nothing to convert there but the terrain and the water.
+Done = cell complete + terrain complete + cell complete, awaiting lighting + terrain complete, awaiting lighting + passed + empty sea, each kept on its own line. Empty sea cells count as done: there is nothing to convert there but the terrain and the water.
 
-Status precedence, strongest first: cell complete > terrain complete > passed > hull policy pending > failed > not converted > not started.
+Eligible for v0.0.34 = every done cell: cell complete, terrain complete, cell complete, awaiting lighting, terrain complete, awaiting lighting, passed (owner-approved and playtested included) and empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to be done.
+
+Status precedence, strongest first: cell complete > terrain complete > cell complete, awaiting lighting > terrain complete, awaiting lighting > passed > hull policy pending > failed > not converted > not started.
 
 ### Audits and their pass criteria
 
@@ -122,10 +146,22 @@ An audit that was not measured is never counted as passed. Hull chain depth limi
 | Object | Handling |
 | :-- | :-- |
 | Statics, flora, containers, activators, items, doors and lights | converted by the cell conversion. |
+| Lights without a mesh (plain lights, glowing plants, darkeners, fires) | not placed as models: judged by the lighting audit (baked as Quake light entities, or not represented). They keep a cell from both completion levels until it is lit. |
 | NPCs | deferred to the actor pipeline (resident conversion). |
 | Creatures and leveled creatures | deferred to the actor pipeline (creature simulation pending). |
 | Nonvisual source markers (door, travel, north and editor markers) | not drawn, not required: never block a completion level; door destinations come from the door records. |
 | References outside the cell frame | skipped in this cell: the neighbouring cell frame that contains them places them. |
+
+### Lighting
+
+A cell is only complete when it is lit like the original. The lighting audit compares the original light placements of the cell (by class, with and without a mesh) with what the CHIM build lit:
+
+- Lit: every light source of the cell baked (as the original lights it), every terrain and model surface lit.
+- Partial: some light reaches the frame (for example the night lamp table) or some surfaces are lit, but not all.
+- Unlit: no light source reaches the frame and no surface carries real light data.
+- Not measured: the cell is not converted, or its light census is missing.
+
+A light reaches the frame baked (a light entity in the lightmaps, animated by its lightstyle), through the night lamp table (dynamic light at night only, the nearest few lamps: partial), or not at all. A surface is lit when it carries real light data; one constant value for a whole terrain chunk, or no lightmap at all, is not lit. Lights flagged Off by default give no light in the original either and are not counted. Builds from before the lighting figures are read as lighting mode "lamps" (constant terrain light, models without lightmaps, night lamp table).
 
 Object categories in the table above: Statics, Flora, Lights, Doors, Containers, Activators, Items, NPCs, Creatures, Markers, Other. A deferred or skipped object keeps its cell from being terrain complete (actors: from being cell complete).
 

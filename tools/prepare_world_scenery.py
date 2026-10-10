@@ -58,11 +58,22 @@ def convert_region(task):
                     model = _INDEX['models'][mi]
                     _, prepared = _prepare_model((mi, model, profiles[model['source']], packet, _INDEX['textures']))
                     _MODELS[mi] = prepared
-            report = append_meshes(source, local / 'scene.bsp', local, palette,
-                                   centre=[x / .25 for x in entry['origin'][:2]], jobs=1,
-                                   references=[r['number'] for r in selected], prepared_models=_MODELS,
-                                   retain_dressing=True, collision_bounds=entry['coverage'],
-                                   map_identity=entry['name'],cell_identity=','.join(map(str,entry['cell'])) if entry.get('cell') else None,subcell_identity=entry['name'] if entry.get('subcell') is not None else None)
+            def convert():
+                return append_meshes(source, local / 'scene.bsp', local, palette,
+                                     centre=[x / .25 for x in entry['origin'][:2]], jobs=1,
+                                     references=[r['number'] for r in selected], prepared_models=_MODELS,
+                                     retain_dressing=True, collision_bounds=entry['coverage'],
+                                     map_identity=entry['name'],cell_identity=','.join(map(str,entry['cell'])) if entry.get('cell') else None,subcell_identity=entry['name'] if entry.get('subcell') is not None else None)
+            report = convert()
+            # routed hulls add a clipnode per cut: a region they push past its reserve keeps the chains
+            # (BUILD-ROUTED-FLORA-RESERVE-33); the region's other budgets are checked as before
+            from mesh_geometry_env import model_hull_mode, model_hull_override
+            if report['clipnodes'] > 32767 and model_hull_mode() != 'chain' and report.get('model_hull', {}).get('routed'):
+                routed = report['clipnodes']
+                with model_hull_override('chain'):
+                    report = convert()
+                report['model_hull_fallback'] = {'from': 'routed', 'clipnodes_routed': routed,
+                                                 'clipnodes_chain': report['clipnodes'], 'reserve': 32767}
         if report['instances'] != len(selected):
             raise ValueError('Scenery placement count mismatch: ' + entry['name'])
         if report['unique_models'] > 240 or report['instances'] > 550:
@@ -74,7 +85,9 @@ def convert_region(task):
         report = {'instances': 0, 'unique_models': 0, 'retained_terrain_only': True}
     if hashlib.sha256(source.read_bytes()).hexdigest() != source_hash:
         raise ValueError('Retained terrain changed during overlay: ' + entry['name'])
-    report.update(name=entry['name'], seconds=round(time.monotonic() - started, 3),
+    # No wall time in the region receipt: a stage output is byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
+    print(f"Region {entry['name']}: {time.monotonic() - started:.1f} s", flush=True)
+    report.update(name=entry['name'],
                   bytes=(local / 'scene.bsp').stat().st_size,
                   original_terrain_sha256=source_hash,
                   sha256=hashlib.sha256((local / 'scene.bsp').read_bytes()).hexdigest(),
@@ -86,6 +99,37 @@ def convert_region(task):
         if path.exists():
             path.unlink()
     return report
+
+
+def convert_region_cached(task):
+    """Worker: a region from the unit cache when its inputs are unchanged (development builds, and
+    release builds with --allow-release-reuse; tools/pass_cache.py UnitCache), else convert_region,
+    then record it. A stage that failed late resumes from its finished regions (BUILD-IMAGE-NO-RESUME-33)."""
+    terrain, scenery, palette, out, entry, cache, shared = task
+    if cache is None:
+        return convert_region((terrain, scenery, palette, out, entry))
+    source = terrain / entry['name'] / 'scene.bsp'
+    if hashlib.sha256(source.read_bytes()).hexdigest() != entry['converted']['sha256']:
+        raise ValueError('Retained terrain hash mismatch: ' + entry['name'])
+    inputs = {'entry': entry, 'shared': shared}
+    row = cache.restore_unit(inputs, out / entry['name'])
+    if row is not None:
+        return row
+    report = convert_region((terrain, scenery, palette, out, entry))
+    cache.store_unit(inputs, json.loads(json.dumps(report)), out / entry['name'])
+    return report
+
+
+def unit_cache(scenery, palette):
+    """(the region unit cache or None, the inputs every region shares, by content)."""
+    from pass_cache import UnitCache
+    cache = UnitCache.open('world-scenery-region', {}, __file__)
+    if cache is None:
+        return None, None
+    from build_parallel import sha256_file
+    names = {'scenery_index': scenery / 'scenery-index.json', 'scenery_packet': scenery / 'scenery.mwpak',
+             'palette': palette}
+    return cache, {key: sha256_file(path) if path.is_file() else None for key, path in names.items()}
 
 
 def prepare(terrain, scenery, palette, out, jobs, only=None):
@@ -106,9 +150,11 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
             raise ValueError('Unknown diagnostic region')
     started = time.monotonic()
     results = []
-    for result in ordered_map(convert_region, [(terrain, scenery, palette, out, e) for e in entries], jobs):
+    cache, shared = unit_cache(scenery, palette)
+    for result in ordered_map(convert_region_cached, [(terrain, scenery, palette, out, e, cache, shared)
+                                                      for e in entries], jobs):
         results.append(result)
-        print(f"REGION {len(results)}/{len(entries)} {result['name']} references={result['instances']} seconds={result['seconds']}", flush=True)
+        print(f"REGION {len(results)}/{len(entries)} {result['name']} references={result['instances']}", flush=True)
     covered = {(tuple(r['cell']), r['number']) for result in results for r in result['source_references']}
     expected = {(tuple(r['cell']), r['number']) for r in index['references']}
     if not only and covered != expected:
@@ -117,10 +163,11 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
                'terrain_directory_sha256': hashlib.sha256((terrain / 'world-regions.json').read_bytes()).hexdigest(),
                'scenery_index_sha256': hashlib.sha256((scenery / 'scenery-index.json').read_bytes()).hexdigest(),
                'palette_sha256': hashlib.sha256(palette.read_bytes()).hexdigest(),
-               'seconds': round(time.monotonic() - started, 3), 'covered_source_references': len(covered),
+               'covered_source_references': len(covered),
                'scope': 'Retained terrain BSPs with original rock/giant-mushroom placements. Town handoff and emulator acceptance remain separate.',
                'regions': results}
     (out / 'world-scenery.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+    print(f'World scenery: {time.monotonic() - started:.1f} s', flush=True)
     return receipt
 
 
@@ -137,7 +184,7 @@ def main():
     import build_profile
     build_profile.instrument('world-scenery')
     result = prepare(args.terrain, args.scenery, args.palette, args.out, resolve_jobs(args.jobs), args.only)
-    print('OVERLAY PASSED', len(result['regions']), 'regions;', result['covered_source_references'], 'source references;', result['seconds'], 'seconds', flush=True)
+    print('OVERLAY PASSED', len(result['regions']), 'regions;', result['covered_source_references'], 'source references', flush=True)
 
 
 if __name__ == '__main__':

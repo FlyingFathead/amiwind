@@ -150,8 +150,9 @@ def bsp_extent(raw):
 
 
 def build_room_checked(task):
-    """prepare_area.build_room plus the coordinate range; returns (status, value)."""
-    from prepare_area import build_room
+    """prepare_area.build_room plus the coordinate range; returns (status, value). Finished rooms come from the
+    room unit cache (prepare_area.build_room_cached; BUILD-IMAGE-NO-RESUME-33)."""
+    from prepare_area import build_room_cached as build_room
     data, scene, entry = task[:3]
     try:
         report, cell = build_room(task)

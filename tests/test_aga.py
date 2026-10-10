@@ -14,22 +14,28 @@ class DisplayTests(unittest.TestCase):
     def test_native_c2p_against_pixel_oracle(self):
         with tempfile.TemporaryDirectory() as temp:
             p=Path(temp);(p/'exec').mkdir();(p/'graphics').mkdir()
-            (p/'exec/types.h').write_text('#include <stdint.h>\ntypedef uint32_t ULONG; typedef uint8_t UBYTE;\n')
-            (p/'graphics/gfx.h').write_text('struct BitMap {unsigned char *Planes[8];};\n')
+            (p/'exec/types.h').write_text('#include <stdint.h>\ntypedef uint32_t ULONG; typedef uint8_t UBYTE; typedef uint16_t UWORD;\n')
+            (p/'graphics/gfx.h').write_text('struct BitMap {UWORD BytesPerRow; UWORD Rows; UBYTE Flags, Depth; UWORD pad; unsigned char *Planes[8];};\n')
             so=p/'c2p.so'
             subprocess.run(['cc','-shared','-fPIC','-O2','-I'+str(p),str(ROOT/'engine/aga/src/aw_c2p.c'),'-o',str(so)],check=True)
             lib=ctypes.CDLL(str(so))
             class Bitmap(ctypes.Structure):
-                _fields_=[('planes',ctypes.POINTER(ctypes.c_uint8)*8)]
+                _fields_=[('bytes_per_row',ctypes.c_uint16),('rows',ctypes.c_uint16),('flags',ctypes.c_uint8),
+                          ('depth',ctypes.c_uint8),('pad',ctypes.c_uint16),('planes',ctypes.POINTER(ctypes.c_uint8)*8)]
             rng=random.Random(3100)
-            pixels=bytes(range(256))+bytes(rng.randrange(256) for _ in range(8192))
-            src=(ctypes.c_uint8*len(pixels)).from_buffer_copy(pixels)
-            planes=[(ctypes.c_uint8*(len(pixels)//8))() for _ in range(8)]
-            bm=Bitmap((ctypes.POINTER(ctypes.c_uint8)*8)(*planes))
-            lib.aw_c2p(None,ctypes.byref(bm),src,ctypes.c_uint32(len(pixels)))
-            for plane in range(8):
-                expected=bytes(sum(((pixels[n+j]>>plane)&1)<<(7-j) for j in range(8)) for n in range(0,len(pixels),8))
-                self.assertEqual(bytes(planes[plane]),expected)
+            # Unpadded rows (stride = width/8) and rows padded for the fetch
+            # mode (ENGINE-C2P-ROWSTRIDE-35): padding bytes stay untouched.
+            for width,rows,stride in ((256,33,32),(360,20,48),(320,7,64)):
+                pixels=bytes(range(256))[:width]+bytes(rng.randrange(256) for _ in range(width*rows-min(width,256)))
+                src=(ctypes.c_uint8*len(pixels)).from_buffer_copy(pixels)
+                planes=[(ctypes.c_uint8*(stride*rows))(*([0xA5]*(stride*rows))) for _ in range(8)]
+                bm=Bitmap(stride,rows,0,8,0,(ctypes.POINTER(ctypes.c_uint8)*8)(*planes))
+                lib.aw_c2p(None,ctypes.byref(bm),src,ctypes.c_uint32(width),ctypes.c_uint32(rows))
+                for plane in range(8):
+                    expected=b''.join(
+                        bytes(sum(((pixels[r*width+n+j]>>plane)&1)<<(7-j) for j in range(8)) for n in range(0,width,8))
+                        +bytes([0xa5])*(stride-width//8) for r in range(rows))
+                    self.assertEqual(bytes(planes[plane]),expected,(width,stride,plane))
 
 class PerformanceGateTests(unittest.TestCase):
     def setUp(self):

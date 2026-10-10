@@ -112,7 +112,7 @@ void AW_RCountFrame(void)
     snprintf(line, sizeof line,
         "%ld frames fps10 %ld | bm %ld/%ld/%ld/%ld/%ld bf %ld/%ld cf %ld frag %ld/%ld lf %ld wf %ld"
         " | q %ld/%ld/%ld e %ld/%ld/%ld s %ld sp %ld | sc %ld/%ld scb %ld/%ld al %ld"
-        " | us %ld/%ld/%ld/%ld/%ld/%ld/%ld pk %ld | vd %ld ne %ld/%ld",
+        " | us %ld/%ld/%ld/%ld/%ld/%ld/%ld pk %ld | vd %ld ne %ld/%ld | at %ld ln %ld/%ld/%ld",
         frames, (long)(frames * 10.0 / (now - start)),
         avg(sum[RC_BM_PASSES]), avg(sum[RC_BM_VISIBLE]), avg(sum[RC_BM_INVIEW]),
         avg(sum[RC_BM_CLIPPED]), avg(sum[RC_BM_ONELEAF]),
@@ -125,7 +125,8 @@ void AW_RCountFrame(void)
         avg(sum[RQ_ALIAS]),
         us(time_sum[RT_WORLD]), us(time_sum[RT_BMODELS]), us(time_sum[RT_SCAN]), us(time_sum[RT_DRAW]),
         us(time_sum[RT_ALIAS]), us(time_sum[RT_VIEW]), us(frame_sum), (long)(frame_peak * 1e6 + .5),
-        avg(sum[RQ_VISEDICTS_DROPPED]), avg(sum[RC_ENTITIES]), avg(sum[RC_SPRITES]));
+        avg(sum[RQ_VISEDICTS_DROPPED]), avg(sum[RC_ENTITIES]), avg(sum[RC_SPRITES]),
+        avg(sum[RC_ALIAS_TRIS]), avg(sum[RC_LOD_NEAR]), avg(sum[RC_LOD_COARSE]), avg(sum[RC_LOD_SLOTS]));
     if (aw_chim_rcount) {
         int used = (int)strlen(line);
         aw_chim_rcount(line + used, (int)sizeof line - used, frames);

@@ -111,7 +111,7 @@ class PassCacheTests(unittest.TestCase):
         from test_stair_walk import build
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            reports = {}
+            reports, counts = {}, {}
             for label, cache in (('off', 'off'), ('cold', str(root / 'cache')), ('warm', str(root / 'cache'))):
                 maps = root / label / 'maps'
                 maps.mkdir(parents=True)
@@ -119,19 +119,49 @@ class PassCacheTests(unittest.TestCase):
                 (maps / 'hall.bsp').write_bytes(build())
                 with patch.dict(os.environ, {pass_cache.ENV: cache}):
                     report = stair_walk.require(root / label, root / label / 'stair-walk.json', jobs=2, exempt=['room'])
-                reports[label] = (root / label / 'stair-walk.json').read_bytes()
+                saved = json.loads((root / label / 'stair-walk.json').read_text())
+                counts[label] = saved.pop('pass_cache', None)
+                reports[label] = json.dumps(saved, indent=1)
                 self.assertTrue(report['exempt_failures'])
             if label == 'warm':
                 with patch.dict(os.environ, {pass_cache.ENV: str(root / 'cache')}),                         patch.object(stair_walk, 'check_map', side_effect=AssertionError('checked again')):
                     stair_walk.check(root / 'warm', jobs=1, exempt=['room'])
             self.assertEqual(reports['off'], reports['cold'])
             self.assertEqual(reports['off'], reports['warm'])
+            # The receipt counts the pass cache's hits (owner decision 9 October 2026).
+            self.assertIsNone(counts['off'])
+            self.assertEqual((counts['cold']['hits'], counts['cold']['misses']), (0, 2))
+            self.assertEqual((counts['warm']['hits'], counts['warm']['misses']), (2, 0))
+            self.assertFalse(list((root / 'cache' / '.tally').glob('*/*')))  # nothing left behind
+
+    def test_exterior_sky_maps_and_receipt_identical_cold_warm_and_off(self):
+        # BUILD-IMAGE-NO-RESUME-33: the sky pass is a per-map unit too.
+        import exterior_sky_build
+        from test_exterior_sky_build import sky_fixture
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            root = Path(temp)
+            results = {}
+            for label, cache in (('off', 'off'), ('cold', str(root / 'cache')), ('warm', str(root / 'cache'))):
+                maps = root / label / 'id1' / 'maps'
+                maps.mkdir(parents=True)
+                for name in ('outside', 'inside', 'unknown'):
+                    (maps / (name + '.bsp')).write_bytes(sky_fixture())
+                guard = (patch.object(exterior_sky_build, 'transform', side_effect=AssertionError('transformed again'))
+                         if label == 'warm' else contextlib.nullcontext())
+                with patch.dict(os.environ, {pass_cache.ENV: cache}), guard:
+                    exterior_sky_build.configure_staged_maps(root / label / 'id1', exterior_maps=['outside'],
+                                                             interior_maps=['inside'], work_dir=root / label / 'work')
+                results[label] = (tree(root / label / 'id1'), tree(root / label / 'work'))
+            self.assertNotEqual(results['off'][0]['maps/outside.bsp'], sky_fixture())
+            for label in ('cold', 'warm'):
+                self.assertEqual(results['off'], results[label], label)
 
     def test_release_builds_turn_the_cache_off(self):
         for version in ('0.0.33', '0.0.33-rc1', '0.0.33-rc12'):
             self.assertEqual(pass_cache.setting(version, '/w'), 'off', version)
         self.assertEqual(Path(pass_cache.setting('0.0.33-dev1', '/w')).parts[-2:], ('cache', 'image-passes'))
-        self.assertIn('pass_cache_setting(VERSION, args.workspace)', (ROOT / 'tools/build.py').read_text(encoding='utf-8'))
+        self.assertIn("pass_cache_setting(VERSION, args.workspace, getattr(args, 'allow_release_reuse', False))",
+                      (ROOT / 'tools/build.py').read_text(encoding='utf-8'))
         with patch.dict(os.environ, {pass_cache.ENV: 'off'}):
             self.assertIsNone(pass_cache.folder())
             self.assertIsNone(pass_cache.PassCache.open('p', {}, __file__))

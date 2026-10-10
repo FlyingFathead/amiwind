@@ -293,11 +293,18 @@ sfx_t *S_FindName (char *name)
 	int		i;
 	sfx_t	*sfx;
 
-	if (!name)
-		Sys_Error ("S_FindName: NULL\n");
+	/* A missing, too long or table-full name is a sound that does not play,
+	 * never a stopped program: `play` takes any typed name and the table is
+	 * never emptied during a session (ENGINE-SOUND-NAME-SYSERROR-35). Every
+	 * caller handles NULL as it does with nosound. */
+	if (!name || !name[0])
+		return NULL;
 
 	if (Q_strlen(name) >= MAX_QPATH)
-		Sys_Error ("Sound name too long: %s", name);
+	{
+		Con_Printf ("Sound name too long (at most %d characters)\n", MAX_QPATH - 1);
+		return NULL;
+	}
 
 // see if already loaded
 	for (i=0 ; i < num_sfx ; i++)
@@ -307,7 +314,13 @@ sfx_t *S_FindName (char *name)
 		}
 
 	if (num_sfx == MAX_SFX)
-		Sys_Error ("S_FindName: out of sfx_t");
+	{
+		static qboolean warned;
+		if (!warned)
+			Con_Printf ("Sound table full (%d names): new sounds are not played\n", MAX_SFX);
+		warned = true;
+		return NULL;
+	}
 
 	sfx = &known_sfx[i];
 	strcpy (sfx->name, name);
@@ -332,7 +345,8 @@ void S_TouchSound (char *name)
 		return;
 
 	sfx = S_FindName (name);
-	Cache_Check (&sfx->cache);
+	if (sfx)
+		Cache_Check (&sfx->cache);
 }
 
 /*
@@ -349,6 +363,8 @@ sfx_t *S_PrecacheSound (char *name)
 		return NULL;
 
 	sfx = S_FindName (name);
+	if (!sfx)
+		return NULL;
 
 // cache it in
 	if (precache.value)

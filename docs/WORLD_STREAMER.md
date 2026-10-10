@@ -138,6 +138,8 @@ collision parts loaded.
 
 ## Disk budget
 
+The image as it ships today, file group by file group, and the one-partition goal on the roadmap horizon: [IMAGE_SIZE.md](IMAGE_SIZE.md).
+
 Owner limits: classic FFS partitions below 2 GiB, drive images below 4 GiB
 ([build output](BUILD_OUTPUT.md); the limits, the savings measured so far and the size budget of the whole game are in [disk space](chim/DISK_SPACE.md)); two drive images are the absolute maximum
 for the whole game, and the real target is close to the original game's art

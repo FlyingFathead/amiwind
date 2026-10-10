@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 import re
 import struct
@@ -210,6 +211,12 @@ def main():
         palette_hash = hashlib.sha256(palette).hexdigest()
     serialized = json.dumps(scene, separators=(',', ':'), ensure_ascii=True)
     html = args.viewer.read_text(encoding='utf-8')
+    # The shared Toolkit header is inlined (the export is one standalone file); its logo is not available there, so it hides itself.
+    header = args.viewer.with_name('header.js')
+    if header.is_file():
+        tag = re.search(r'<script src="header.js"([^>]*)></script>', html)
+        if tag:
+            html = html.replace(tag.group(0), '<script%s>%s</script>' % (tag.group(1), header.read_text(encoding='utf-8')), 1)
     # Escape '<' so any untrusted entity names cannot terminate the data script.
     embedded = '<script>window.AMIWIND_PRIVATE_SCENE=' + script_safe_json(scene) + ';</script>'
     html = html.replace('<script>\n', embedded + '\n<script>\n', 1)

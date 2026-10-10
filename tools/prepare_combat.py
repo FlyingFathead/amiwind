@@ -39,7 +39,7 @@ SETTINGS = ('fFatigueBase', 'fFatigueMult', 'fCombatDistance', 'fHandToHandReach
             'iBlockMinChance', 'iBlockMaxChance', 'fSwingBlockBase', 'fSwingBlockMult', 'fBlockStillBonus',
             'fFatigueBlockBase', 'fFatigueBlockMult', 'fWeaponFatigueBlockMult',
             'fCombatBlockLeftAngle', 'fCombatBlockRightAngle', 'fCombatDelayNPC',
-            'fNPCHealthBarTime', 'fNPCHealthBarFade')
+            'fNPCHealthBarTime', 'fNPCHealthBarFade', 'fWeaponDamageMult')
 # Settings only the builder needs (armour classes, magicka).
 BUILD_SETTINGS = ('iBaseArmorSkill', 'fLightMaxMod', 'fMedMaxMod', 'iHelmWeight', 'iCuirassWeight',
                   'iPauldronWeight', 'iGreavesWeight', 'iBootsWeight', 'iGauntletWeight', 'iShieldWeight',
@@ -63,8 +63,8 @@ SLOT_WEIGHT = {'helmet': .1, 'cuirass': .3, 'lpauldron': .1, 'rpauldron': .1, 'g
 ARMOR_TYPE_GMST = {0: 'iHelmWeight', 1: 'iCuirassWeight', 2: 'iPauldronWeight', 3: 'iPauldronWeight',
                    4: 'iGreavesWeight', 5: 'iBootsWeight', 6: 'iGauntletWeight', 7: 'iGauntletWeight',
                    8: 'iShieldWeight', 9: 'iGauntletWeight', 10: 'iGauntletWeight'}
-# 31 frames: the alias writer's limit is 32 (npc_geometry.animated_mdl).
-FRAME_GROUPS = (('idle', 4), ('run', 6), ('attack', 8), ('hit', 3), ('knock', 4), ('death', 6))
+# 42 frames, inside the alias writer's byte budget (npc_geometry.ALIAS_FRAME_BYTES, TOOL-ALIAS-FRAMES-33).
+FRAME_GROUPS = (('idle', 8), ('run', 8), ('attack', 8), ('hit', 4), ('knock', 6), ('death', 8))
 
 
 def first(fields, tag, default=b''):
@@ -246,9 +246,105 @@ def sheet(kinds, identifier, settings):
     name = text(string(first(npc, 'FNAM')))
     row = [identifier, name, level, ' '.join(map(str, attributes)), ' '.join(map(str, skills)),
            f'{health} {magicka} {fatigue}', f'{fight} {flee}', ' '.join(map(str, wfield)),
-           f'{rating:.3f} {1 if "shield" in armor else 0}', source]
+           f'{rating:.3f} {1 if "shield" in armor else 0}', source,
+           condition_field(kinds, weapon[3] if weapon else None, armor, settings)]
     return '\t'.join(map(str, row)), {'weapon': item, 'weapon_type': typ, 'armor': sorted(a for a, _ in armor.values()),
                                        'level': level, 'source': source, 'name': name}
+
+
+ATTRIBUTE_NAMES = ('strength', 'intelligence', 'willpower', 'agility', 'speed', 'endurance', 'personality', 'luck')
+SKILL_NAMES = ('block', 'armorer', 'medium armor', 'heavy armor', 'blunt weapon', 'long blade', 'axe', 'spear',
+               'athletics', 'enchant', 'destruction', 'alteration', 'illusion', 'conjuration', 'mysticism',
+               'restoration', 'alchemy', 'unarmored', 'security', 'sneak', 'acrobatics', 'light armor',
+               'short blade', 'marksman', 'mercantile', 'speechcraft', 'hand to hand')
+
+
+def condition_field(kinds, wpdt, armor, settings):
+    # Field 11 of a sheet row: weapon condition, shield condition, shield armour class (0 light,
+    # 1 medium, 2 heavy: its block sound). Condition = the records' full health (WPDT/AODT).
+    weapon_health = struct.unpack_from('<h', wpdt, 10)[0] if wpdt else 0
+    shield_health, shield_class = 0, 0
+    if 'shield' in armor:
+        item, _ = armor['shield']
+        _, weight, _, health, _, _ = struct.unpack_from('<ifiiii', first(kinds['ARMO'][item], 'AODT'))
+        limit = settings['iShieldWeight']
+        shield_health = health
+        shield_class = 0 if weight <= limit * settings['fLightMaxMod'] + .0005 else \
+            1 if weight <= limit * settings['fMedMaxMod'] + .0005 else 2
+    return f'{weapon_health} {shield_health} {shield_class}'
+
+
+def weapon_field(kinds, item):
+    # (sheet field 8, WPDT bytes) for a weapon record ID, or fists.
+    if not item:
+        return [0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0], None
+    key = item.casefold()
+    if key not in kinds['WEAP']:
+        raise ValueError('Arena player: unknown weapon ' + item)
+    w = first(kinds['WEAP'][key], 'WPDT')
+    typ = struct.unpack_from('<h', w, 8)[0]
+    if typ not in WEAPON_SKILL:
+        raise ValueError('Arena player: not a melee weapon ' + item)
+    weight, speed, reach = (struct.unpack_from('<f', w, o)[0] for o in (0, 12, 16))
+    return [1 + typ, WEAPON_SKILL[typ], *w[22:28], round(reach, 4), round(speed, 4), round(weight, 4)], w
+
+
+def player_sheet(kinds, settings, preset, loadout=None):
+    # The arena player's sheet (config/arena_player.json): the original autocalculation for the
+    # race, class and level, then the overrides, then one loadout (weapon or fists, armour, shield).
+    # One row in the combat/actors.txt format, id "loadout:NAME".
+    race, cls = preset['race'].casefold(), preset['class'].casefold()
+    if race not in kinds['RACE'] or cls not in kinds['CLAS']:
+        raise ValueError('Arena player: unknown race or class')
+    level = int(preset['level'])
+    if not 1 <= level <= 100:
+        raise ValueError('Arena player: level 1..100')
+    loadouts = preset.get('loadouts') or {'fists': {'weapon': None, 'armor': preset.get('armor', [])}}
+    loadout = loadout or preset.get('loadout') or next(iter(loadouts))
+    if loadout not in loadouts or not loadout.isascii() or ' ' in loadout or len(loadout) > 22:
+        raise ValueError('Arena player: unknown or bad loadout name ' + str(loadout))
+    gear = loadouts[loadout]
+    npc = [('FLAG', struct.pack('<I', 1 if preset.get('female') else 0)), ('RNAM', race.encode() + b'\0'),
+           ('CNAM', cls.encode() + b'\0')]
+    attributes, skills, health = autocalc(kinds, npc, level)
+    for name, value in preset.get('attributes', {}).items():
+        attributes[ATTRIBUTE_NAMES.index(name.casefold())] = int(value)
+    for name, value in preset.get('skills', {}).items():
+        skills[SKILL_NAMES.index(name.casefold())] = int(value)
+    if any(not 0 <= v <= 255 for v in attributes + skills):
+        raise ValueError('Arena player: values 0..255')
+    wfield, wpdt = weapon_field(kinds, gear.get('weapon'))
+    armor = {}
+    for item in gear.get('armor', []):
+        key = item.casefold()
+        if key not in kinds['ARMO']:
+            raise ValueError('Arena player: unknown armour ' + item)
+        typ = struct.unpack_from('<i', first(kinds['ARMO'][key], 'AODT'))[0]
+        armor[ARMOR_SLOT[typ]] = (key, typ)
+    if 'shield' in armor and (wfield[0] == 0 or wfield[0] - 1 in TWO_HANDED):
+        raise ValueError('Arena player: a shield needs a one-handed weapon (fists and two-handed weapons cannot block)')
+    fatigue = attributes[0] + attributes[2] + attributes[3] + attributes[5]
+    magicka = int(attributes[1] * settings['fNPCbaseMagickaMult'])
+    rating = armor_rating(kinds, armor, skills, settings)
+    row = ['loadout:' + loadout, text(preset.get('name', 'Arena Challenger'))[:31], level,
+           ' '.join(map(str, attributes)), ' '.join(map(str, skills)), f'{health} {magicka} {fatigue}', '0 0',
+           ' '.join(map(str, wfield)), f'{rating:.3f} {1 if "shield" in armor else 0}', 'p',
+           condition_field(kinds, wpdt, armor, settings)]
+    return '\t'.join(map(str, row)), {'loadout': loadout, 'level': level, 'race': race, 'class': cls,
+                                      'health': health, 'fatigue': fatigue, 'armor_rating': round(rating, 3),
+                                      'hand_to_hand': skills[26], 'agility': attributes[3],
+                                      'weapon': gear.get('weapon'), 'shield': 'shield' in armor}
+
+
+def player_file(kinds, settings, preset):
+    # arena/player.txt: "AWAP2", the default loadout's name, then one row per loadout.
+    loadouts = preset.get('loadouts') or {'fists': {}}
+    default = preset.get('loadout') or next(iter(loadouts))
+    rows, report = [], {}
+    for name in loadouts:
+        row, report[name] = player_sheet(kinds, settings, preset, name)
+        rows.append(row)
+    return 'AWAP2\n' + 'default ' + default + '\n' + '\n'.join(rows) + '\n', report
 
 
 def bucket(identifier):
@@ -347,12 +443,20 @@ def bake_fighter(task):
     from mwad.npc import load_master, outfit
     from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl
     kinds, _, _ = _master(data)
-    appearance = outfit(kinds, identifier)
+    # The fighter holds what the rules use (equipment(): best melee weapon, the shield
+    # unless the weapon is two-handed); NPC-WEAPON-MESH-33.
+    npc = kinds['NPC_'][identifier.casefold()]
+    weapon, armor = equipment(kinds, npc, struct.unpack_from('<h', first(npc, 'NPDT'))[0])
+    carried = {'weapon': weapon[1] if weapon else None, 'shield': armor.get('shield', (None,))[0]}
+    appearance = outfit(kinds, identifier, carried=carried)
     assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
     skeleton = Skeleton(assets, appearance['skeleton'])
     groups, hit_fraction = frame_times(skeleton, stance)
-    times = [t for name, _ in FRAME_GROUPS for t in groups[name][0]]
-    shapes, materials, textures = assemble(assets, appearance, skeleton, np.array(times))
+    # Run frames in place (the root's forward motion removed, as the original does; npc_anim.py).
+    import npc_anim
+    entries = [(t, name == 'run' and groups['run'][2] is not None) for name, _ in FRAME_GROUPS for t in groups[name][0]]
+    kit = npc_anim.in_place(skeleton, entries)
+    shapes, materials, textures = assemble(assets, appearance, kit, np.arange(len(entries), dtype=float))
     for budget in (480, 384, 320, 256, 192):
         try:
             frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget, reference_frames=8)
@@ -372,6 +476,9 @@ def bake_fighter(task):
 
 
 _masters = {}
+
+
+NL_ = chr(10)
 
 
 def _master(data):
@@ -403,10 +510,26 @@ def prepare(data_files, id1, jobs=None, fighters=None):
         seconds = convert_wav(raw, id1 / 'sound/combat' / f'{key}.wav')
         lines.append(f'sound {key} combat/{key}.wav')
         sounds[key] = {'record': record, 'source': source, 'seconds': round(seconds, 3)}
+    # Clip lengths the engine times states by (the player's knockdown, a block without frames):
+    # the original base_anim text keys.
+    from npc_geometry import Skeleton
+    events = Skeleton(assets).events
+    clips = {}
+    for key, start, stop, extra in (('knockdown', 'knockdown: start', 'knockdown: stop', None),
+                                    ('block', 'shield: block start', 'shield: block stop', 'shield: block hit')):
+        if start in events and stop in events and events[stop] > events[start]:
+            length = events[stop] - events[start]
+            hit = (events[extra] - events[start]) / length if extra and extra in events else 0
+            lines.append(f'anim {key} {length:.4f} {hit:.4f}')
+            clips[key] = round(length, 4)
     (id1 / 'combat/settings.txt').write_text('\n'.join(lines) + '\n', encoding='ascii', newline='\n')
     count, size, skipped = write_actors(kinds, settings, id1 / 'combat/actors.txt')
-    report = {'settings': {k: settings[k] for k in SETTINGS}, 'sounds': sounds,
+    report = {'settings': {k: settings[k] for k in SETTINGS}, 'sounds': sounds, 'clips': clips,
               'actors': {'count': count, 'bytes': size, 'skipped_non_ascii_or_long_ids': skipped}}
+    preset = json.loads((ROOT / 'config/arena_player.json').read_text(encoding='utf-8'))
+    player_text, report['arena_player'] = player_file(kinds, settings, preset)
+    (id1 / 'arena').mkdir(parents=True, exist_ok=True)
+    (id1 / 'arena/player.txt').write_text(player_text, encoding='ascii', newline='\n')
     config = json.loads((ROOT / 'config/arena_fighters.json').read_text(encoding='utf-8'))
     chosen = fighters if fighters is not None else [row['id'] for row in config['fighters']]
     if chosen:
@@ -425,6 +548,15 @@ def prepare(data_files, id1, jobs=None, fighters=None):
         for identifier, raw, record in ordered_map(bake_fighter, tasks, min(resolve_jobs(jobs), len(tasks))):
             stem = 'f' + hashlib.sha256(identifier.encode()).hexdigest()[:12]
             (id1 / 'arena' / f'{stem}.mdl').write_bytes(raw)
+            # Voice lines beside the model (the animation kit's layout file; docs/ANIMATION.md "Voices"):
+            # the Pit's fights say their original attack, hit, flee and death lines.
+            import npc_anim
+            from mwad.npc import outfit
+            master = _master(data)
+            voices = npc_anim.voices_of(master[2], outfit(master[0], identifier))
+            (id1 / 'arena' / f'{stem}.anm').write_text(record['layout'] + ' ' + npc_anim.voice_words(voices) + NL_,
+                                                       encoding='ascii', newline=NL_)
+            record['voice_lines'] = {t: len(v) for t, v in voices.items()}
             rows.append('\t'.join((identifier, f'arena/{stem}.mdl', text(record['name']), record['layout'])))
             baked[identifier] = {**record, 'model': f'arena/{stem}.mdl'}
             print('Arena fighter ready:', identifier, record['bytes'], 'bytes', file=sys.stderr, flush=True)
@@ -440,5 +572,8 @@ if __name__ == '__main__':
     p.add_argument('--fighter', action='append', help='bake only these NPC records (default: config/arena_fighters.json)')
     p.add_argument('--no-fighters', action='store_true', help='combat sheets and sounds only')
     p.add_argument('--jobs', type=int)
+    from npc_geometry import add_root_rule_arg, apply_root_rule
+    add_root_rule_arg(p)
     a = p.parse_args()
+    apply_root_rule(a)
     print(json.dumps(prepare(a.data_files, a.id1, a.jobs, [] if a.no_fighters else a.fighter), indent=2))

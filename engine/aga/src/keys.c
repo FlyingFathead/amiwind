@@ -750,6 +750,8 @@ void AW_ControlsMigrate(void)
     if(!keybindings['m'] || !*keybindings['m'])Key_SetBinding('m',"aw_worldmap");
     if(!keybindings[K_UPARROW] || !*keybindings[K_UPARROW])Key_SetBinding(K_UPARROW,"+forward");
     if(!keybindings[K_DOWNARROW] || !*keybindings[K_DOWNARROW])Key_SetBinding(K_DOWNARROW,"+back");
+    /* The Amiga right button is K_MOUSE3: the context action (aw_combat.c +aw_alt). */
+    if(!keybindings[K_MOUSE3] || !*keybindings[K_MOUSE3])Key_SetBinding(K_MOUSE3,"+aw_alt");
 }
 
 void Key_Init (void)

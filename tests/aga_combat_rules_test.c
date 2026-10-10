@@ -22,7 +22,7 @@ static void settings(void) {
         {"iBlockMinChance",10},{"iBlockMaxChance",50},{"fSwingBlockBase",1},{"fSwingBlockMult",1},{"fBlockStillBonus",1.25f},
         {"fFatigueBlockBase",4},{"fFatigueBlockMult",0},{"fWeaponFatigueBlockMult",1},
         {"fCombatBlockLeftAngle",-90},{"fCombatBlockRightAngle",30},{"fCombatDelayNPC",.1f},
-        {"fNPCHealthBarTime",3},{"fNPCHealthBarFade",.5f}};
+        {"fNPCHealthBarTime",3},{"fNPCHealthBarFade",.5f},{"fWeaponDamageMult",.1f}};
     int i;
     assert(sizeof(aw_combat_settings_t)==AW_COMBAT_SETTING_COUNT*sizeof(float));
     assert(sizeof(rows)/sizeof(*rows)==AW_COMBAT_SETTING_COUNT);
@@ -186,8 +186,71 @@ int main(void) {
     assert(counts[AW_ATTACK_THRUST]>20 && counts[AW_ATTACK_THRUST]<220);
     assert(counts[AW_ATTACK_CHOP]>600 && counts[AW_ATTACK_SLASH]>600);
 
+    /* --- weapon and shield rules (see docs/COMBAT.md) --- */
+    /* fists and two-handed weapons cannot block (OpenMW: hand to hand counts as two-handed) */
+    m=mevil();
+    assert(AW_CombatCanBlock(&s,&m,0) && !AW_CombatCanBlock(&s,&m,-91) && !AW_CombatCanBlock(&s,&m,31));
+    m.weapon=0;assert(!AW_CombatCanBlock(&s,&m,0));                     /* fists */
+    m.weapon=3;assert(!AW_CombatCanBlock(&s,&m,0));                     /* long blade two-handed */
+    m.weapon=9;assert(!AW_CombatCanBlock(&s,&m,0));                     /* two-handed axe */
+    m.weapon=8;assert(AW_CombatCanBlock(&s,&m,0));                      /* one-handed axe */
+    m.weapon=4;m.staggered=1;assert(!AW_CombatCanBlock(&s,&m,0));       /* hit recovery */
+    m=mevil();
+    for(i=1;i<=10;i++)assert(AW_TWO_HANDED(i)==(i==3 || i==5 || i==6 || i==7 || i==9));
+    /* the player's attack type by movement (forward/back beats sideways by 0.2) and best attack */
+    assert(AW_CombatMovementAttack(1,0)==AW_ATTACK_THRUST && AW_CombatMovementAttack(-1,0)==AW_ATTACK_THRUST);
+    assert(AW_CombatMovementAttack(0,1)==AW_ATTACK_SLASH && AW_CombatMovementAttack(0,-.5f)==AW_ATTACK_SLASH);
+    assert(AW_CombatMovementAttack(0,0)==AW_ATTACK_CHOP && AW_CombatMovementAttack(1,1)==AW_ATTACK_CHOP);
+    assert(AW_CombatMovementAttack(.5f,.35f)==AW_ATTACK_CHOP && AW_CombatMovementAttack(.6f,.35f)==AW_ATTACK_THRUST);
+    /* best attack: steel longsword chop 2-14 (16), slash 1-20 (21), thrust 4-18 (22) -> thrust */
+    {aw_fighter_t w=mevil();w.weapon=2;w.damage[0][0]=2;w.damage[0][1]=14;w.damage[1][0]=1;w.damage[1][1]=20;w.damage[2][0]=4;w.damage[2][1]=18;
+     assert(AW_CombatBestAttackPlayer(&w)==AW_ATTACK_THRUST);
+     w.damage[2][1]=10;assert(AW_CombatBestAttackPlayer(&w)==AW_ATTACK_SLASH);
+     w.damage[0][1]=30;assert(AW_CombatBestAttackPlayer(&w)==AW_ATTACK_CHOP);
+     w.damage[0][0]=w.damage[1][0]=w.damage[2][0]=1;w.damage[0][1]=w.damage[1][1]=w.damage[2][1]=9;
+     assert(AW_CombatBestAttackPlayer(&w)==AW_ATTACK_SLASH);              /* all equal */
+     w.weapon=0;assert(AW_CombatBestAttackPlayer(&w)==AW_ATTACK_CHOP);}   /* no best attack for fists */
+    /* condition: damage x condition ratio; wear max(1, 0.1 x damage) per hit; a miss in reach wears 1 */
+    m=mevil();y=player();m.skills[AW_SK_BLUNT]=200;m.weapon_health=900;m.weapon_health_max=1800;
+    r=seeded_for(1);
+    AW_CombatSwing(&s,&m,&y,AW_ATTACK_CHOP,.5f,0,1,&r,&out);
+    assert(near(out.raw,9.52f*.5f) && near(out.weapon_wear,1) && near(m.weapon_health,899));
+    m.weapon_health=m.weapon_health_max=1800;m.damage[0][1]=200;r=seeded_for(1);y=player();
+    AW_CombatSwing(&s,&m,&y,AW_ATTACK_CHOP,1,0,1,&r,&out);              /* 200 x 1.12 = 224 -> wear 22 */
+    assert(near(out.weapon_wear,22) && near(m.weapon_health,1778));
+    m=mevil();y=player();m.weapon_health=m.weapon_health_max=1800;r=seeded_for(0);
+    AW_CombatSwing(&s,&m,&y,AW_ATTACK_CHOP,1,0,1,&r,&out);
+    assert(out.outcome==AW_HIT_MISS && near(m.weapon_health,1799));
+    m.weapon_health=1;m.skills[AW_SK_BLUNT]=200;r=seeded_for(1);y=player();
+    AW_CombatSwing(&s,&m,&y,AW_ATTACK_CHOP,1,0,1,&r,&out);
+    assert(out.weapon_broke && !m.weapon && m.weapon_skill==AW_SK_H2H);     /* broken: unequipped, fists */
+    /* shield wear on a block: loses the blocked damage; at 0 it is gone */
+    m=mevil();y=player();m.skills[AW_SK_BLOCK]=100;m.shield_health=m.shield_health_max=5;
+    y.weapon=2;y.weapon_skill=AW_SK_LONG;y.skills[AW_SK_LONG]=60;y.damage[0][0]=20;y.damage[0][1]=20;y.weight=20;
+    r=seeded_for(1);
+    AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,1,0,1,&r,&out);
+    assert(out.outcome==AW_HIT_BLOCKED && out.shield_broke && !m.shield && near(m.shield_health,0));
+    assert(near(m.fatigue,208-4-20*1*1));                                 /* fFatigueBlockBase + weight x swing x mult */
+    /* a miss is classified for the AmiWind style: block-like with a usable shield, else dodge */
+    m=mevil();y=player();r=seeded_for(0);
+    AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&out);
+    assert(out.outcome==AW_HIT_MISS && out.miss_style==2);
+    m.shield=0;r=seeded_for(0);AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&out);
+    assert(out.outcome==AW_HIT_MISS && out.miss_style==1);
+    /* dice off (AmiWind extension): every swing in reach hits, no block, knockdown by threshold only */
+    aw_combat_dice=0;
+    m=mevil();y=player();m.skills[AW_SK_BLOCK]=100;r=seeded_for(0);       /* rolls that would all miss */
+    y.skills[AW_SK_H2H]=1;y.attributes[AW_AGI]=0;
+    AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&out);
+    assert(out.outcome==AW_HIT_FATIGUE && out.roll==-2 && out.blocked_roll<0);
+    {aw_fighter_t weak=player();weak.attributes[AW_AGI]=10;m=mevil();m.skills[AW_SK_BLUNT]=5;r=seeded_for(0);
+     AW_CombatSwing(&s,&m,&weak,AW_ATTACK_CHOP,1,0,1,&r,&out);           /* 14 x 1.12 = 15.7 vs 10 x 0.5: down */
+     assert(out.outcome==AW_HIT_HEALTH && out.knockdown && weak.knocked==1);}
+    aw_combat_dice=1;
+    m=mevil();y=player();
+
     /* a fighter sheet stays small (bytes per actor) */
-    assert(sizeof(aw_fighter_t)<=160);
+    assert(sizeof(aw_fighter_t)<=180);
     printf("combat rules ok: fighter %lu bytes, settings %lu bytes\n",(unsigned long)sizeof(aw_fighter_t),(unsigned long)sizeof(s));
     return 0;
 }

@@ -6,11 +6,15 @@
 #include <graphics/gfx.h>
 void *aw_c2p_reloc(struct BitMap *bm) { return bm; }
 void aw_c2p_deinit(void *unused) { (void)unused; }
-void aw_c2p(void *unused, struct BitMap *bm, UBYTE *src, ULONG size)
+/* width chunky pixels per row (a multiple of 8), rows rows from the top.
+ * Each plane row starts BytesPerRow apart: screens whose rows are padded for
+ * the fetch mode no longer render skewed (ENGINE-C2P-ROWSTRIDE-35). */
+void aw_c2p(void *unused, struct BitMap *bm, UBYTE *src, ULONG width, ULONG rows)
 {
-    ULONG n,a,b,t,u;
+    ULONG n,a,b,t,u,r,end,stride=bm->BytesPerRow,groups=width/8;
     (void)unused;
-    for (n=0;n<size/8;n++) {
+    for (r=0;r<rows;r++)
+    for (n=r*stride,end=n+groups;n<end;n++) {
         a=((ULONG)src[0]<<24)|((ULONG)src[1]<<16)|((ULONG)src[2]<<8)|src[3];
         b=((ULONG)src[4]<<24)|((ULONG)src[5]<<16)|((ULONG)src[6]<<8)|src[7];src+=8;
         t=(a^(a>>7))&0x00aa00aaUL;

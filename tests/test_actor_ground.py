@@ -11,14 +11,16 @@ from check_actor_ground import audit, require
 from player_hull import pack_lumps, PROFILE
 
 
-def alias(bottom=0):
-    # Three independent feet vertices, eight declared idle poses, one skin.
+def alias(bottom=0, moving=0):
+    # Three independent feet vertices, eight declared idle poses, one skin; MOVING more frames (an animation
+    # kit model's walk/run poses) whose feet are 4 units up, which a check of every frame would fail.
     raw=bytearray(struct.pack('<4si3f3ff3f8if',b'IDPO',6,1,1,1,0,0,bottom,4,0,0,0,
-                              1,4,4,3,1,8,0,0,1))
+                              1,4,4,3,1,8+moving,0,0,1))
     raw+=struct.pack('<i',0)+bytes(16)+bytes(3*12)+struct.pack('<4i',1,0,1,2)
-    for i in range(8):
-        raw+=struct.pack('<i4B4B16s',0,0,0,0,0,2,2,0,0,b'idle')
-        raw+=bytes((0,0,0,0,2,0,0,0,0,2,0,0))
+    for i in range(8+moving):
+        raw+=struct.pack('<i4B4B16s',0,0,0,0,0,2,2,0,0,b'idle' if i<8 else b'walk')
+        z=0 if i<8 else 4
+        raw+=bytes((0,0,z,0,2,0,z,0,0,2,z,0))
     return raw
 
 
@@ -55,6 +57,21 @@ class GroundGateTests(unittest.TestCase):
         self.assertEqual(r['summary'],{'failed-contact':1})
         with self.assertRaisesRegex(ValueError,'gate failed'):require(self.maps,self.id1/'receipt.json')
         self.assertEqual(json.loads((self.id1/'receipt.json').read_text())['status'],'failed')
+
+    def test_animation_kit_models_are_checked_on_their_idle_group(self):
+        # ANIMKIT-GROUND-CHECK-LAYOUT-35: a kit model carries idle + walk/run frames; the layout beside it
+        # (<model>.anm) names the idle group, and only those standing poses are checked (never skipped).
+        (self.id1/'progs/test.mdl').write_bytes(alias(moving=6))
+        self.put(actor())
+        r=audit(self.maps);self.assertEqual(r['status'],'failed')               # without its layout: refused
+        self.assertIn('Undeclared ground-resident pose layout',json.dumps(r))
+        (self.id1/'progs/test.anm').write_text('idle:0:8:0.1500 walk:8:6:0.1250:40.00\n',encoding='ascii')
+        self.assertEqual(audit(self.maps)['status'],'passed')
+        (self.id1/'progs/test.mdl').write_bytes(alias(4,moving=6))              # floating idle feet still fail
+        self.assertEqual(audit(self.maps)['status'],'failed')
+        (self.id1/'progs/test.anm').write_text('walk:8:6:0.1250:40.00\n',encoding='ascii')
+        r=audit(self.maps);self.assertEqual(r['status'],'failed')
+        self.assertIn('without an idle group',json.dumps(r))
 
     def test_embedded_or_unsupported_placements_fail_without_moving_them(self):
         for z in (-3,40):

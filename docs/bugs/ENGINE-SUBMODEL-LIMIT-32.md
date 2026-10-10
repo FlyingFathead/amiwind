@@ -15,9 +15,11 @@
 
 <!-- END GENERATED FACTS -->
 
-## Status: 8 October 2026
+## Status: 10 October 2026
 
-Open. Latent; found by the distant shell prototype. The builder's model budget prevents it today.
+Fixed in source on v0.0.35-crash-fixes-2, not shipped at the time of writing.
+
+Earlier (8 October 2026): open, latent; found by the distant shell prototype.
 
 ## Symptom
 
@@ -43,12 +45,15 @@ Load a map with more than 255 submodels.
 
 ## Repair
 
-Not yet: check `numsubmodels` against the precache size and stop with a clear error; needed
-before any change that widens MAX_MODELS (world streamer).
+10 October 2026 (v0.0.35-crash-fixes-2): `SV_SpawnServer` checks `numsubmodels` against `MAX_MODELS - 1`
+before the precache loop and refuses the map as unavailable (as a missing map), with a message. The builder
+counts every map's model precaches against `MAX_MODELS` before it ships
+([BUILD-BUDGET-ENGINE-LIMITS-35](BUILD-BUDGET-ENGINE-LIMITS-35.md)).
 
 ## Verification
 
-Pending.
+`tests/test_engine_crash_paths.py` (the check precedes the precache loop); `tests/test_map_engine_limits.py`
+(a map one model over the table is refused by the builder gate).
 
 ## Prevention
 
@@ -63,7 +68,15 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - AW-20260928-16 (no report page): Two compiler-reported array bounds violations
 - AW-20260929-02 (no report page): NPCs missing from expanded town render
 - BALMORA-CAPACITY-005 (no report page): Bounded Balmora maps exceed the 600-entity limit
+- [BUILD-BUDGET-ENGINE-LIMITS-35](BUILD-BUDGET-ENGINE-LIMITS-35.md): Town entity and model budgets were not tied to the engine's per-map tables
 - EFRAG-01 (no report page): Static foliage leaf links exhausted ('Too many efrags!')
+- [ENGINE-ENTITY-TEXT-UNBOUNDED-35](ENGINE-ENTITY-TEXT-UNBOUNDED-35.md): Entity and QuakeC text was copied into fixed buffers without a bound
+- [ENGINE-FATAL-PATH-SWEEP-35](ENGINE-FATAL-PATH-SWEEP-35.md): Sweep of every engine fatal path that data or a player can reach
+- [ENGINE-FILEBASE-UNBOUNDED-35](ENGINE-FILEBASE-UNBOUNDED-35.md): COM_FileBase copied a name of any length into a 32-byte buffer and walked before the start of a name without a slash
+- [ENGINE-LEAF-LIMIT-UNCHECKED-35](ENGINE-LEAF-LIMIT-UNCHECKED-35.md): A map with more leaves than MAX_MAP_LEAFS overflowed the PVS buffers silently
+- [ENGINE-MODEL-NAME-SYSERROR-35](ENGINE-MODEL-NAME-SYSERROR-35.md): Model names of any length went into 64-byte model slots, and a missing model file stopped the program
+- [ENGINE-UDP-ADDRESS-OVERFLOW-35](ENGINE-UDP-ADDRESS-OVERFLOW-35.md): A typed network connect address longer than 254 characters overflowed a stack buffer
+- [ENGINE-VA-UNBOUNDED-35](ENGINE-VA-UNBOUNDED-35.md): va() formatted into its 1 KiB buffer without a bound
 - ENTITY-DIAGNOSTIC-009 (no report page): Entity-exhaustion warning reports the high-water count as live slots
 - [ENTITY-EXHAUSTION-007](ENTITY-EXHAUSTION-007.md): Entity slot exhaustion terminated the game with Sys_Error
 - [ERICW-TEXINFO-SIGNED-31](ERICW-TEXINFO-SIGNED-31.md): ericw vis crashes and ericw light leaves faces unlit above texinfo 32,767

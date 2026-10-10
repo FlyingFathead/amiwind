@@ -72,7 +72,7 @@ extern void ppc_c2p_line (int line, int src, struct BitMap *dst, int cnt);
 // GCC-compatible C2P stub - will link to assembly implementation
 extern void *aw_c2p_reloc(struct BitMap *bitmap );
 extern void aw_c2p_deinit(void *c2p );
-extern void aw_c2p(void *c2p , struct BitMap *bmp , UBYTE *chunky , ULONG size );
+extern void aw_c2p(void *c2p , struct BitMap *bmp , UBYTE *chunky , ULONG width , ULONG rows );
 #else
 #include "c2p8_040_amlaukka.h"
 #endif
@@ -398,6 +398,13 @@ void	VID_Init (unsigned char *palette)
     nextsbuffer = sbuffer[1];
     rp.BitMap = nextsbuffer->sb_BitMap;
 #ifndef __PPC__
+    /* aw_c2p writes width/8 bytes per plane row, BytesPerRow apart. */
+    for (d = 0; d < 3; d++)
+      if ((width & 7) || sbuffer[d]->sb_BitMap->BytesPerRow < width / 8 ||
+          sbuffer[d]->sb_BitMap->Depth < 8)
+        Sys_Error ("Screen buffer %d: %d bytes per row, depth %d, cannot hold %d pixels per row at 8 planes",
+                   d, (int)sbuffer[d]->sb_BitMap->BytesPerRow,
+                   (int)sbuffer[d]->sb_BitMap->Depth, width);
     c2p[0] = aw_c2p_reloc (sbuffer[0]->sb_BitMap);
     c2p[1] = aw_c2p_reloc (sbuffer[1]->sb_BitMap);
     c2p[2] = aw_c2p_reloc (sbuffer[2]->sb_BitMap);
@@ -735,9 +742,18 @@ void	VID_Update (vrect_t *rects)
     }
 #else
     AW_Mark(2);
-    if (rects != NULL)
-      aw_c2p (nextc2p, nextsbuffer->sb_BitMap, vid.buffer,
-            vid.width * (rects->y + rects->height));
+    {
+      /* Every rect, not just the first: convert rows 0 to the lowest edge. */
+      vrect_t *r;
+      int rows = 0;
+      for (r = rects; r != NULL; r = r->pnext)
+        if (r->y + r->height > rows)
+          rows = r->y + r->height;
+      if (rows > (int)vid.height)
+        rows = vid.height;
+      if (rows > 0)
+        aw_c2p (nextc2p, nextsbuffer->sb_BitMap, vid.buffer, vid.width, rows);
+    }
     AW_EndMark(2);
 #endif
   } else {

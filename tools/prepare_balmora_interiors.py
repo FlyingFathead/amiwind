@@ -14,7 +14,7 @@ from area_config import BALMORA_INTERIORS
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from player_hull import lumps
-from prepare_area import build_room, populate
+from prepare_area import build_room_cached, populate
 from vis_options import add_vis_option, map_threads
 
 
@@ -24,7 +24,10 @@ def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis
     written, so Balmora's doors say the area is unavailable."""
     data = resolve_data_files(data_files)
     scene = ensure_external(scene, 'Balmora interiors')
-    exterior = lumps((scene / 'id1/maps/balmora.bsp').read_bytes())[0].decode('cp1252')
+    # The hand timings every exterior carries (import_town copies them from seyda.bsp); Balmora on CHIM
+    # has no legacy balmora.bsp (CHIM-LEGACY-CHAIN-33), so they come from where it got them.
+    source = scene / 'id1/maps/balmora.bsp'
+    exterior = lumps((source if source.is_file() else scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', exterior))
     # Rooms compile side by side: divide the job budget between them.
     threads = map_threads(resolve_jobs(jobs), min(resolve_jobs(jobs), max(1, len(BALMORA_INTERIORS))))
@@ -37,7 +40,7 @@ def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis
     from build_costs import costed_map, room_sizes
     sizes = room_sizes(data, [(e['map'], e['cell']) for e in BALMORA_INTERIORS])
     # A quick test build without interiors runs no room (and records no room times).
-    for report, cell in (costed_map('balmora-interiors-rooms', build_room, tasks, [t[2]['map'] for t in tasks],
+    for report, cell in (costed_map('balmora-interiors-rooms', build_room_cached, tasks, [t[2]['map'] for t in tasks],
                                     max(1, min(resolve_jobs(jobs), len(tasks))), fallback=sizes.get if sizes else None)
                          if tasks else ()):
         slug = report['map']
@@ -58,7 +61,10 @@ if __name__ == '__main__':
     add_vis_option(p)
     p.add_argument('--no-rooms', action='store_true',
                    help='Quick test build (--exclude interiors): do not compile the rooms')
+    import npc_lod
+    npc_lod.add_converter_options(p)
     a = p.parse_args()
+    npc_lod.apply_options(a)
     import build_profile; build_profile.instrument('balmora-interiors')  # sub-stage timers (docs/BUILD_PROFILE.md)
     report = prepare(a.data_files, a.scene, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs, a.vis_mode, rooms=not a.no_rooms)
     print(json.dumps({'interiors': len(report['rooms']), 'residents': len(report['cast'])}))

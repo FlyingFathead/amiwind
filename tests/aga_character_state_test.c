@@ -70,6 +70,18 @@ int main(void)
     assert(AW_CharacterHors());assert(!strcmp(aw_story.name,"Hors") && aw_character.valid && !aw_character.female);
     assert(aw_story.stage==AW_STAGE_RELEASED && !AW_StoryRestricted() && AW_Ring() && AW_Package());
     assert(AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87 && aw_character.maximum[0]==50);
+    /* A direct start's ready-made character (tools/direct_start.py --quick-character):
+     * catalogue IDs (any case), sex and name; the opening is done, so saving is allowed
+     * once the player walks (AW_SaveAllowed: released stage, valid character). */
+    assert(!AW_CharacterPreset("Nord","Barbarian","Charioteer",0,""));
+    assert(!AW_CharacterPreset("Dremora","Barbarian","Charioteer",0,"X"));
+    assert(!AW_CharacterPreset("Nord","Barbarian","Charioteer",2,"X"));
+    assert(!AW_CharacterPreset("Nord","Barbarian","Charioteer",0,"A name far too long for the story buffer"));
+    assert(AW_CharacterPreset("nord","BARBARIAN","charioteer",1,"Ilmeni"));
+    assert(!strcmp(aw_story.name,"Ilmeni") && aw_character.valid && aw_character.female);
+    assert(aw_character.head==2 && aw_character.hair==3);
+    assert(aw_story.stage==AW_STAGE_RELEASED && !AW_StoryRestricted() && aw_story.ship_disabled);
+    assert(AW_CharacterHors() && !strcmp(aw_story.name,"Hors") && !aw_character.female);
     memset(&c,0,sizeof(c));c.head=0;c.hair=1;
     assert(AW_CharacterRebuild(&c));assert(c.attributes[0]==50 && c.attributes[5]==50);
     assert(c.modifiers[5]==25 && c.maximum[0]==50 && c.maximum[1]==60 && c.maximum[2]==205);

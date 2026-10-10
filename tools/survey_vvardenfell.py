@@ -239,7 +239,7 @@ def run(a):
         terrain=terrain_report,summary=dict(exterior_cells=len(master['cells']),terrain_cells=len(terrain),
             measured_placements=len(rows),unique_meshes=len(scans),unresolved_meshes=sum(r['status']!='measured' for r in scans.values()),
             unresolved_placements=len(issues),placed_source_triangles=expected,excluded=dict(excluded),types=dict(types),
-            candidate_counts=dict(Counter(str(r['screen']['candidate']) for r in cells)),seconds=round(time.monotonic()-start,2)),
+            candidate_counts=dict(Counter(str(r['screen']['candidate']) for r in cells))),
         boundaries=['Base master only; no expansions or plugin merging.','Actors/leveled lists are counted, not meshed.',
                     'Centroid bins conserve source triangles; complete transformed object bounds determine residency.',
                     'Source triangle counts are not converted BSP faces, frame cost or RAM.',
@@ -252,6 +252,9 @@ def run(a):
     from render_world_survey import render
     render(report,out)
     print(json.dumps(report['summary'],indent=2),flush=True)
+    # Wall time to the log only: a stage output that holds it never matches a rerun on the same inputs
+    # (BUILD-SURVEY-NOT-REPRODUCIBLE-33); the build profile records stage times.
+    print(f'World survey: {time.monotonic()-start:.2f} s', flush=True)
 
 
 def main():

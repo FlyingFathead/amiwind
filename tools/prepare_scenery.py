@@ -12,18 +12,16 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import BSA, normpath
+from mwad.esm import NIF_MAGIC, NIF_TES3_HEADER, read_bsa_asset
 from mwad.paths import child_ci, ensure_external, read_workspace, resolve_data_files
 from mwad.scene import pack_geometry, unpack_geometry, visible_refs, resident_set, read_asset
 from build_jobs import add_jobs, resolve_jobs
+from nif_common import root_local
 from build_parallel import ordered_map
 from scenery_selection import load_groups, select_source_refs, validate_groups
 from area_config import BOUNDS, inside
 from exterior_visibility import (DRAW_MODES, VisibilityPolicyError, validate_policy,
                                  select_exterior_faces, source_visibility_issues)
-
-
-# Every Morrowind NIF starts with this header; flame extraction only parses real NIFs.
-NIF_MAGIC = b'NetImmerse File Format'
 
 
 def nif_reader():
@@ -40,7 +38,26 @@ def nif_reader():
             self._num_uv_sets_value_ = NifFormat.ushort()
         NifFormat.NiGeometryData.__init__ = init
         NifFormat._mwad_tes3_adapter = True
+    quiet_struct_logging()
     return NifFormat
+
+
+def quiet_struct_logging():
+    """PyFFI formats a debug line for every attribute it reads (StructBase._log_struct:
+    the value, its type and the stream offset) before the logger drops it: about a fifth of
+    every NIF read (base_anim.nif 3.8 s -> 3.1 s). Format it only when that logger really
+    writes debug lines; what is read is unchanged."""
+    import logging
+    from pyffi.object_models.xml import struct_
+    original = struct_.StructBase._log_struct
+    if getattr(original, '_mwad_quiet', False):
+        return
+
+    def _log_struct(self, stream, attr):
+        if self.logger.isEnabledFor(logging.DEBUG):
+            original(self, stream, attr)
+    _log_struct._mwad_quiet = True
+    struct_.StructBase._log_struct = _log_struct
 
 
 def check_nif_reader():
@@ -58,19 +75,12 @@ def check_nif_reader():
     print('[ok] PyFFI TES3 reader: synthetic NIF write/read passed; no game files used.', flush=True)
 
 
-def bsa_read(bsa, name):
-    e = bsa.entries[normpath(name)]
-    with bsa.path.open('rb') as f:
-        f.seek(e['offset'])
-        raw = f.read(e['bytes'])
-    if len(raw) != e['bytes']:
-        raise ValueError('Truncated BSA asset')
-    return raw
+bsa_read = read_bsa_asset  # the one shared BSA asset read (mwad.esm)
 
 
 def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
     import numpy as np
-    if not raw.startswith(b'NetImmerse File Format, Version 4.0.0.2\n'):
+    if not raw.startswith(NIF_TES3_HEADER):
         raise ValueError('Only base-game TES3 NIF 4.0.0.2 is supported')
     data = N.Data(); data.read(io.BytesIO(raw))
     vertices, faces, materials = [], [], []
@@ -87,7 +97,7 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
             # BALMORA-TEMPLE-GEOMETRY-29.
             # Round the recovered scale: a rotated unit-scale root gives e.g.
             # 0.99999994, which breaks exact vertex sharing between pieces.
-            local[:3, :3] = np.eye(3) * round(float(np.linalg.norm(local[0, :3])), 6)
+            local = root_local(local)
         transform = local @ parent
         if pose_world and isinstance(node,N.NiNode):transform=pose_world(node.name.decode('cp1252'))
         worlds[id(node)] = transform
@@ -213,7 +223,7 @@ def model_flames(raw, N, name=''):
         if not isinstance(node, N.NiAVObject): return
         local = np.array(node.get_transform().as_list())
         if root:
-            local[:3, :3] = np.eye(3) * round(float(np.linalg.norm(local[0, :3])), 6)
+            local = root_local(local)
         world = local @ parent; worlds[id(node)] = world
         for child in getattr(node, 'children', []):
             if child is not None: collect(child, world)
@@ -285,9 +295,26 @@ def _read_model(task):
             try:collision_result = model_geometry(raw, N, collision=True)
             except ValueError as exc:
                 if collision != 'root_node_or_visual' or str(exc) != 'No supported visible static triangles':raise
-        return name, raw, result, collision_result, None
+        # The flame emitters are read here too, beside the other models, not in the single writer
+        # (export_refs read every model a second time there). A failure is handed back and raised
+        # where the writer used to read them, so the archive and the error list stay the same.
+        flames = None
+        if raw.startswith(NIF_MAGIC):
+            try:flames = model_flames(raw, N, name)
+            except (ValueError, KeyError, struct.error) as exc:flames = FlamesError(str(exc))
+        return name, raw, (result, flames), collision_result, None
     except (ValueError, KeyError, struct.error) as exc:
         return name, None, None, None, str(exc)
+
+
+class FlamesError(str):
+    """A model_flames failure in a _read_model worker, raised again by the writer (_flames)."""
+
+
+def _flames(flames):
+    if isinstance(flames, FlamesError):
+        raise ValueError(str(flames))
+    return [] if flames is None else flames
 
 
 def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None,jobs=None,
@@ -323,7 +350,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
             try:
                 if error is not None:
                     raise ValueError(error)
-                packet, materials, bounds, skipped = result
+                (packet, materials, bounds, skipped), flames = result
                 visibility_selection = None
                 if visibility_policy is not None:
                     visibility_selection = select_exterior_faces(visibility_policy, name,
@@ -363,8 +390,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                                         'source_visibility_issues': source_visibility_issues(materials),
                                         'exterior_visibility': visibility_selection,
                                         'skipped_shapes': skipped,
-                                        'flames': (model_flames(raw, nif_reader(), name)
-                                                   if raw.startswith(NIF_MAGIC) else []), **put(f, packet)})
+                                        'flames': _flames(flames), **put(f, packet)})
                 print('model',len(index['models']),'/',len(names),name,flush=True)
             except VisibilityPolicyError:
                 raise
@@ -383,7 +409,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                 index['chunks'].setdefault(f'{x},{y}', []).append(n)
     # A failed hull conversion must not silently leave an orphan hatch again.
     if index['errors']:
-        (out/'conversion-errors.json').write_text(json.dumps(index['errors'],indent=2)+'\n')
+        (out/'conversion-errors.json').write_text(json.dumps(index['errors'],indent=2)+'\n',encoding='utf-8',newline='\n')
     try:
         validate_groups(index['references'], groups)
     except ValueError as exc:
@@ -404,8 +430,8 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                   for m in index['models'] if m.get('exterior_visibility')),
               'camera_spheres': {str(d): resident_set(index, visible_refs(index, centre, d)) for d in (768,1536,2304,3840)},
               'note': 'Host geometry/cache accounting only. No Amiga frame-rate or disk-throughput claim. RGBA textures are an intermediate, not a Paula/AGA format.'}
-    (out/'scenery-index.json').write_text(json.dumps(index,indent=2)+'\n')
-    (out/'scenery-report.json').write_text(json.dumps(report,indent=2)+'\n')
+    (out/'scenery-index.json').write_text(json.dumps(index,indent=2)+'\n',encoding='utf-8',newline='\n')
+    (out/'scenery-report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n')
     return report
 
 

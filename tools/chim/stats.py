@@ -292,6 +292,10 @@ def main(argv=None):
     source = json.loads(src.read_text(encoding='utf-8')) if src.is_file() else None
     rec = a.receipt or (a.out / 'chim-receipt.json')
     receipt = json.loads(rec.read_text(encoding='utf-8')) if rec.is_file() else {}
+    # The build figures moved beside the receipt (chim.build.TIMING_FILE; BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
+    from chim.build import TIMING_FILE
+    if (a.out / TIMING_FILE).is_file():
+        receipt = dict(receipt, **json.loads((a.out / TIMING_FILE).read_text(encoding='utf-8')))
     fails, world = validate(a.out, source)
     if fails:
         sys.stderr.write('CHIM world fails validation (%d); no stats written:\n  %s\n' % (len(fails), '\n  '.join(fails[:20])))

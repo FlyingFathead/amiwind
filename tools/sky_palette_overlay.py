@@ -7,12 +7,36 @@ import numpy as np
 
 BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
       156:(158,(250,104,45)),140:(138,(255,174,66)),83:(82,(255,232,160)),221:(223,(153,38,79))}
-OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl'}
+# .anm: animation kit layouts beside actor models (tools/npc_anim.py); .tag: carried-item tags beside them
+# (tools/npc_items.py): plain ASCII text, no pixels (ANIMKIT-IMAGE-FORMATS-35).
+OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl',
+        '.anm','.tag'}
+# Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
+PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws'}
+NAMED={'save-content.bin'}
+
+
+def unknown_formats(paths):
+    """The relative payload paths whose format spans() does not know (the image step's palette overlay would
+    stop on them): checked by the payload preflight before any image work."""
+    out=[]
+    for rel in paths:
+        rel=str(rel).replace('\\','/');ext=('.'+rel.rsplit('.',1)[1].lower()) if '.' in rel.rsplit('/',1)[-1] else ''
+        if ext in OPAQUE or ext in PARSED or rel.lower() in NAMED:continue
+        out.append(rel)
+    return out
 RAW_LMP={'font-readable.lmp':16384,'font-retro.lmp':16384}
 QPIC_LMP={'conback.lmp','loading.lmp','pause.lmp'}
 EXPECTED_PALETTE='a0f74c36edc83962b99cd254026659466b1932898636f8ccc1a814a06cb7986c'
 
 def sha(b): return hashlib.sha256(b).hexdigest()
+def approved(palette,legacy_bank=None):
+    # The approved source palette, whatever the reserved UI bank (indices 225..253) now holds: the
+    # fingerprint was taken with the format 1 bank, so the palette is checked with that bank put back
+    # (ui_palette.legacy_bank). Since the enemy's yellow bar (format 2) the bank differs, the rest not.
+    if sha(palette)==EXPECTED_PALETTE:return True
+    return bool(legacy_bank) and len(palette)==768 and len(legacy_bank)==87 and \
+        sha(bytes(palette[:225*3])+bytes(legacy_bank)+bytes(palette[254*3:]))==EXPECTED_PALETTE
 def banked_palette(palette):
     """The palette with the sky colour bank; convert() and the hand catalogue share it."""
     new=bytearray(palette)

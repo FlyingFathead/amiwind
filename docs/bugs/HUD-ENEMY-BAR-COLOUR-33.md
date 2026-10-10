@@ -17,7 +17,8 @@
 
 ## Status: 9 October 2026
 
-Open. Seen in the first Vivec Arena run in the emulator (docs/COMBAT.md).
+Repaired in source on v0.0.33-arena-combat (owner decision: yellow in the reserved UI palette),
+not yet in a build. Seen in the first Vivec Arena run in the emulator (docs/COMBAT.md).
 
 ## Symptom
 
@@ -45,12 +46,18 @@ Always: `dbgmode arenapit`, punch at the opponent, look at the bar above the hea
 
 ## Repair
 
-Not yet. Add the yellow bar's colours to the reserved UI bank (and rebuild the hand catalogues that
-follow it), or pick the nearest true yellow of the world palette for the fill.
+`tools/ui_palette.py`: the reserved bank (format 2) is quantized from the red, blue, green and the
+yellow bar (`yellow_bar`, one implementation shared with the UI atlas in `tools/prepare_ui.py`); a scene
+with a format 1 bank is upgraded in place. The hand catalogue follows the reserved palette as before
+(`prepare_hand_catalog.runtime_palette`). The sky palette approval (`sky_palette_overlay.approved`) checks
+the approved fingerprint with the format 1 bank put back (`ui_palette.legacy_bank`, from the owned bars),
+so the sky bank and the world colours are unchanged; only indices 225..253 differ.
 
 ## Verification
 
-None yet.
+`tests/test_ui_palette.py` EnemyBarYellow: the tint, the bank-independent sky approval (a change outside
+the bank is refused) and the in-place upgrade. In the emulator (the Vivec Arena, private evidence image)
+the bar shows amber-yellow after, orange before, at the same place.
 
 ## Prevention
 

@@ -62,7 +62,19 @@ static struct
 	int		efrags, placements_linked, one_leaf, max_leaves, hidden;
 	unsigned long	activations, deactivations, reconciles;
 	unsigned long	zone_maps;
+	/* CHIM-EFRAG-UNCAPPED-35: placements waiting for efrag room this frame,
+	 * all frames, and frames whose view leaf had no PVS row (H15). */
+	int				efrag_waiting;
+	unsigned long	efrag_capped, novis_frames;
 } counts;
+
+/* The efrag limit CHIM placements stop at (a variable for the host tests),
+ * and the chunk distance (squared) past which placements wait while the
+ * limit is near; it opens again when the ring changes. */
+int chim_efrag_limit = AW_EFRAG_LIMIT - CHIM_EFRAG_RESERVE;
+static float			efrag_horizon = 1e30f;
+static unsigned long	efrag_ring;
+static int				efrag_short, efrag_calm;
 /* A full zone (CHIM-CHUNK-LOAD-FAIL-33): chunks released for a nearer one
  * (past the active radius, inside it), partial activations, and failed
  * loads by reason. Kept across maps, like the zone's own counters. */
@@ -193,16 +205,43 @@ static int CountLeaves (const entity_t *ent)
 	return n;
 }
 
+/* R_SplitEntityOnNode's walk, counting the leaves it would link. */
+static int CountBoxLeaves (mnode_t *node)
+{
+	int sides, n = 0;
+	if (node->contents == CONTENTS_SOLID)
+		return 0;
+	if (node->contents < 0)
+		return 1;
+	sides = BOX_ON_PLANE_SIDE (r_emins, r_emaxs, node->plane);
+	if (sides & 1)
+		n += CountBoxLeaves (node->children[0]);
+	if (sides & 2)
+		n += CountBoxLeaves (node->children[1]);
+	return n;
+}
+
 /* R_AddEfrags with an explicit drawn box: R_AddEfrags uses the model's
- * unrotated bounds, which miss leaves of a yawed placement. */
+ * unrotated bounds, which miss leaves of a yawed placement. Within a
+ * quarter of the reserve of chim_efrag_limit the leaves are counted first
+ * and a placement that would pass the limit waits unlinked (0 leaves,
+ * efrag_short), instead of the efrag pool's Host_Error ending the map. */
 static int AddEfrags (entity_t *ent, const vec3_t mins, const vec3_t maxs)
 {
-	r_addent = ent;
 	ent->efrag = NULL;
-	lastlink = &ent->efrag;
-	r_pefragtopnode = NULL;
 	VectorCopy (mins, r_emins);
 	VectorCopy (maxs, r_emaxs);
+	if (aw_efrags_used + CHIM_EFRAG_RESERVE/4 > chim_efrag_limit &&
+		aw_efrags_used + CountBoxLeaves (cl.worldmodel->nodes) > chim_efrag_limit)
+	{
+		counts.efrag_waiting++;
+		counts.efrag_capped++;
+		efrag_short = 1;
+		return 0;
+	}
+	r_addent = ent;
+	lastlink = &ent->efrag;
+	r_pefragtopnode = NULL;
 	R_SplitEntityOnNode (cl.worldmodel->nodes);
 	ent->topnode = r_pefragtopnode;
 	return CountLeaves (ent);
@@ -213,7 +252,7 @@ static int AddEfrags (entity_t *ent, const vec3_t mins, const vec3_t maxs)
 static int Linkable (int index)
 {
 	chim_entry_t *e = &chim_frame.entries[index];
-	return e->state == CHIM_STATE_ACTIVE && (e->grafted || !ChimGraft_Incremental ());
+	return e->state == CHIM_STATE_ACTIVE && (e->grafted || !ChimGraft_Incremental ()) && e->distance <= efrag_horizon;
 }
 
 static void DropEfrags (entity_t *ent)
@@ -405,7 +444,25 @@ void ChimChunks_Link (void)
 		}
 		counts.efrags = counts.one_leaf = 0;
 		link_world = cl.worldmodel;
+		efrag_horizon = 1e30f;
 	}
+	/* The ring changed: every active chunk may link again (the limit
+	 * pushes the horizon back in if it is still near). */
+	/* Or the pool has stayed well below the limit for a while (256 frames
+	 * with no wait: no relink-and-drop cycle every frame). */
+	if (efrag_calm < 256)
+		efrag_calm++;
+	if (counts.activations + counts.deactivations != efrag_ring ||
+		(efrag_calm >= 256 && aw_efrags_used + CHIM_EFRAG_RESERVE/2 < chim_efrag_limit))
+	{
+		efrag_ring = counts.activations + counts.deactivations;
+		efrag_horizon = 1e30f;
+	}
+	counts.efrag_waiting = 0;
+	/* H15: a view leaf without a PVS row (void, grid leaves, a chunk without
+	 * a row) sees everything; counted for dbg rcount ("nv"). */
+	if (r_viewleaf && (r_viewleaf == cl.worldmodel->leafs || !r_viewleaf->compressed_vis))
+		counts.novis_frames++;
 	view = ViewEntry ();
 	if (view != chim_frame.view_entry && view >= 0 && chim_frame.entries[view].state == CHIM_STATE_ACTIVE)
 		chim_frame.view_entry = ViewRow (view) ? view : -1;
@@ -429,6 +486,21 @@ void ChimChunks_Link (void)
 			 * only to be linked again a frame later. */
 			if (!e->grafted && ChimGraft_Incremental ())
 				continue;
+			/* Past the efrag horizon: the farthest chunks give their links
+			 * to the nearer ones while the limit is near. */
+			if (e->distance > efrag_horizon)
+			{
+				if (p->leaves)
+				{
+					counts.efrags -= p->leaves;
+					if (p->leaves == 1)
+						counts.one_leaf--;
+					DropEfrags (&p->ent);
+					p->leaves = 0;
+				}
+				counts.efrag_waiting++;
+				continue;
+			}
 			if (!ViewSees (p))
 			{
 				counts.hidden++;
@@ -445,6 +517,13 @@ void ChimChunks_Link (void)
 			if (p->leaves)
 				continue;
 			p->leaves = AddEfrags (&p->ent, p->mins, p->maxs);
+			if (efrag_short)
+			{
+				efrag_short = 0;
+				efrag_calm = 0;
+				if (e->distance < efrag_horizon)
+					efrag_horizon = e->distance;
+			}
 			counts.efrags += p->leaves;
 			if (p->leaves == 1)
 				counts.one_leaf++;
@@ -454,6 +533,16 @@ void ChimChunks_Link (void)
 	}
 	/* Streamed statics (chim_statics.c): placed while their chunk is active. */
 	ChimStatics_Link (AddEfrags, Linkable);
+	efrag_short = 0;
+}
+
+/* CHIM-EFRAG-UNCAPPED-35: placements waiting for efrag room in the last
+ * frame and in all; frames whose view leaf had no PVS row. */
+void ChimChunks_EfragCounts (int *waiting, unsigned long *capped, unsigned long *novis_frames)
+{
+	*waiting = counts.efrag_waiting;
+	*capped = counts.efrag_capped;
+	*novis_frames = counts.novis_frames;
 }
 
 /* ---------------------------------------------------------------- catalogue */
@@ -1370,6 +1459,9 @@ void ChimChunks_Report (void)
 		if (chim_frame.entries[i].state == CHIM_STATE_ACTIVE)
 			flagged += ((chim_chunk_t *)chim_frame.entries[i].chunk.data)->over_16_leaves;
 	Con_Printf ("active records over 16 leaves (builder flag): %ld\n", (long)flagged);
+	Con_Printf ("efrags in use %ld of %ld for CHIM (limit %ld, reserve %ld): %ld placements waiting, %lu waits so far; view leaf without a PVS row in %lu frames\n",
+		(long)aw_efrags_used, (long)chim_efrag_limit, (long)AW_EFRAG_LIMIT, (long)CHIM_EFRAG_RESERVE,
+		(long)counts.efrag_waiting, counts.efrag_capped, counts.novis_frames);
 	Con_Printf ("last frame: %ld of %ld placements sent from visible leaves, %ld of them unclipped (one leaf)\n",
 		(long)sent, (long)placements, (long)one_path);
 }

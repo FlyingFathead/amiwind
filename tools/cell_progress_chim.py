@@ -14,7 +14,10 @@ import math
 from pathlib import Path
 
 RUN_FORMAT = 'aw-cell-run-1'
-CELL_UNITS = 8192            # Morrowind world units per exterior cell (CHIM frames use the same units)
+CELL_UNITS = 8192            # Morrowind world units per exterior cell
+# A frame's centre is in Morrowind units, but its low corner, chunk grid and local points are in Quake units, 4 per Morrowind
+# unit (tools/chim/areas.py: the ground box is centre + 4 * bounds). A frame of 24 x 24 chunks of 256 is 3 x 3 cells.
+FRAME_LOCAL_SCALE = 4
 REPORTS = {'receipt': 'receipt', 'validate': 'validate', 'stairs': 'stairs', 'heap': 'heap', 'zone': 'zone-walk',
            'stats': 'stats'}
 
@@ -38,7 +41,7 @@ def frame_path(cell):
 def cell_of(frame, local_x, local_y):
     """Exterior cell of a point given relative to a frame's centre."""
     cx, cy = frame['centre']
-    return (int(math.floor((cx + local_x) / CELL_UNITS)), int(math.floor((cy + local_y) / CELL_UNITS)))
+    return (int(math.floor((cx + FRAME_LOCAL_SCALE * local_x) / CELL_UNITS)), int(math.floor((cy + FRAME_LOCAL_SCALE * local_y) / CELL_UNITS)))
 
 
 def key(cell):
@@ -176,5 +179,6 @@ def digest(name, base, label=None, commit=None, built_at=None):
         'placements': receipt.get('placements'), 'models': models,
         'cells': {key(c): dict(cells[c], converted=(c in converted)) for c in sorted(cells)},
         'audits': audits, 'run_stats': run_stats,
+        'lava': receipt.get('lava'),        # docs/LAVA.md: {mode, pools, cells: {cell: pools}}; None before the lava record
         'reports': sorted(k for k, v in rep.items() if v is not None),
     }

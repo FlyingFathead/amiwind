@@ -16,6 +16,12 @@ byte *AW_UIMenuPalette(void){return menu_active?menu:NULL;}
 int MSG_ReadByte(void){return reads++ ? 40 : 0;}
 float MSG_ReadCoord(void){return 0;}
 void VID_ShiftPalette(unsigned char *pal){memcpy(output,pal,768);shifts++;}
+/* aw_lava.c's contents shift, as it answers with its defaults when the eye is in lava (aw_lava_tint 128 4 4,
+ * aw_lava_tint_max 230); out of lava it leaves the shift to view.c. */
+int AW_LavaContentsShift(int contents,int rgb[3],int *percent){
+ if(contents!=CONTENTS_LAVA)return 0;
+ rgb[0]=128;rgb[1]=4;rgb[2]=4;*percent=230;return 1;
+}
 void V_SetContentsColor(int);
 void V_ParseDamage(void);
 void V_UpdatePalette(void);
@@ -48,6 +54,12 @@ int main(void) {
  memset(cl.cshifts,0,sizeof(cl.cshifts));memset(cl.prev_cshifts,0,sizeof(cl.prev_cshifts));
  V_UpdatePalette();assert(shifts==previous_shifts); /* Disconnect cannot recolour the frozen world. */
  frozen=0;V_UpdatePalette();assert(shifts==previous_shifts+1 && output[0]==128 && output[1]==128);
- puts("blue water, red damage, combined shifts, fading and surfacing passed");
+ /* Lava: the blood-red contents shift replaces id's orange preset; green and blue fall far below red. */
+ V_SetContentsColor(CONTENTS_LAVA);V_UpdatePalette();
+ assert(cl.cshifts[CSHIFT_CONTENTS].destcolor[0]==128 && cl.cshifts[CSHIFT_CONTENTS].destcolor[1]==4);
+ assert(output[0]>output[1]+40 && output[1]==output[2]);
+ V_SetContentsColor(CONTENTS_EMPTY);V_UpdatePalette();
+ assert(output[0]==128 && output[1]==128 && output[2]==128);
+ puts("blue water, red damage, blood-red lava, combined shifts, fading and surfacing passed");
  return 0;
 }

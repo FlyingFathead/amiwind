@@ -29,6 +29,8 @@ import build_aga
 import build_font_options as options
 import build_parallel
 import miniwind
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 TOOLS = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
 RUN = Path('/private/run')
@@ -57,9 +59,10 @@ def value(command, flag):
 EXPECTED_STAGES = ['setup', 'terrain', 'scenery', 'scene', 'bsp', 'npcs', 'hands', 'interior', 'dialogue-lookup',
                    'intro', 'census', 'balmora', 'balmora-interiors', 'door-audio', 'character', 'reading',
                    'opening-references', 'seam-audit', 'media', 'music', 'engine', 'harvest', 'hand-catalog', 'chim',
-                   'image']  # seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33)
+                   'cell-progress', 'image']  # seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33)
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class BuildTypeTests(unittest.TestCase):
     def test_help_names_the_build_type(self):
         text = ' '.join(build.parser().format_help().split())
@@ -176,7 +179,8 @@ class PlanTests(unittest.TestCase):
                     seen.add(dep)
                     before(dep, seen)
             return seen
-        self.assertEqual(before('image'), set(names(steps)) - {'image'})
+        self.assertEqual(before('image'), set(names(steps)) - {'image', 'cell-progress'})
+        self.assertEqual(deps['cell-progress'], ('chim',))  # tracker data only: the image does not wait for it
         # the same holds for the normal plan
         # the normal plan keeps its full dependency check
         normal, _ = plan(['--jobs', '4'])
@@ -582,6 +586,7 @@ class ImageTests(unittest.TestCase):
 EXTERIOR_STAGES = [name for name in EXPECTED_STAGES if name not in ('balmora-interiors', 'door-audio')]
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class ScopeTests(unittest.TestCase):
     """--miniwind-scope exterior: the Balmora exterior on CHIM only (quick playtest, no NPC gallery)."""
 
@@ -656,7 +661,8 @@ class ScopeTests(unittest.TestCase):
                     seen.add(dep)
                     before(dep, seen)
             return seen
-        self.assertEqual(before('image'), set(names(steps)) - {'image'})
+        self.assertEqual(before('image'), set(names(steps)) - {'image', 'cell-progress'})
+        self.assertEqual(deps['cell-progress'], ('chim',))  # tracker data only: the image does not wait for it
         # the full scope keeps its chain
         full = build_parallel.stage_dependencies(plan(['--jobs', '4', '--miniwind'])[0])
         self.assertEqual(full['door-audio'], ('balmora-interiors',))
@@ -819,6 +825,117 @@ class ScopeTests(unittest.TestCase):
         setup.assert_called_once()
         self.assertIn('MiniWind scope: exterior (quick playtest, no NPC gallery)', out.getvalue())
         self.assertIn('Balmora exterior only', out.getvalue())
+
+
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
+class TownSandboxTests(unittest.TestCase):
+    """--miniwind-town: a MiniWind sandbox of another town table row; --miniwind-debug: DEBUG ONLY
+    (the Vivec Temple debugging sandbox: a stated closer view and the accepted known stair finding)."""
+    TEMPLE = ['--jobs', '4', '--miniwind', '--miniwind-town', 'vivec_temple']
+
+    def test_town_plan_runs_its_import_and_chim_area(self):
+        steps, args = plan(self.TEMPLE)
+        n = names(steps)
+        self.assertIn('town-vivec_temple', n)
+        self.assertNotIn('balmora', n)                  # another town's sandbox builds no Balmora (CHIM format line)
+        self.assertNotIn('balmora-interiors', n)
+        self.assertEqual([x for x in n if x.startswith('town-')], ['town-vivec_temple'])
+        self.assertEqual(value(dict(steps)['chim'], '--area'), 'vivec_temple')
+        self.assertEqual(args.chim_areas, ['vivec_temple'])
+        image = [str(p) for p in dict(steps)['image']]
+        self.assertEqual(value(image, '--miniwind-town'), 'vivec_temple')
+        self.assertNotIn('--miniwind-debug', image)
+        record = args.miniwind_record
+        self.assertEqual((record['town'], record['chim_areas'], record['debug_only']), ('vivec_temple', ['vivec_temple'], False))
+        self.assertIn('Vivec, Temple exterior (CHIM)', record['features'])
+        self.assertIn('Vivec, Temple residents and interiors', record['features'])
+        self.assertNotIn('Balmora residents', record['features'])
+        self.assertIn('Vivec, Temple only', record['partial_area'])
+        self.assertTrue(all(record['left_out'].values()))
+        # the stage chain: the town follows Balmora's scene stage (its interiors are left out)
+        deps = build_parallel.stage_dependencies(steps)
+        self.assertEqual(deps['town-vivec_temple'], ('census',))   # no Balmora in another town's sandbox
+
+    def test_balmora_names_and_commands_stay_unchanged(self):
+        steps, args = plan(['--jobs', '4', '--miniwind'])
+        image = [str(p) for p in dict(steps)['image']]
+        for flag in ('--miniwind-town', '--miniwind-debug', '--default-draw-distance'):
+            self.assertNotIn(flag, image)
+        self.assertNotIn('--draw-distance', [str(p) for p in dict(steps)['chim']])
+        self.assertEqual(miniwind.hdf_tag(), miniwind.HDF_TAG)
+        self.assertEqual(miniwind.run_name('build-x'), 'build-x')
+        self.assertEqual(miniwind.partial_area(), miniwind.PARTIAL_AREA)
+
+    def test_debug_sandbox_states_its_settings(self):
+        steps, args = plan([*self.TEMPLE, '--miniwind-debug', '--chim-draw-distance', '448',
+                            '--chim-detail-budget', 'vivec-wide', '--chim-cut-models-over', '512',
+                            '--accept-known-stair-findings', 'VIVEC-TEMPLE-STAIRS-33',
+                            '--miniwind-description', 'Vivec Temple: stairs and statues, closer view'])
+        chim = [str(p) for p in dict(steps)['chim']]
+        self.assertEqual(value(chim, '--draw-distance'), '448')
+        self.assertEqual(value(chim, '--detail-budget'), 'vivec-wide')
+        self.assertEqual(value(chim, '--cut-models-over'), '512.0')
+        self.assertEqual(value(chim, '--accept-known-stair-findings'), 'VIVEC-TEMPLE-STAIRS-33')
+        image = [str(p) for p in dict(steps)['image']]
+        self.assertIn('--miniwind-debug', image)
+        self.assertEqual(value(image, '--default-draw-distance'), '448')
+        record = args.miniwind_record
+        self.assertTrue(record['debug_only'])
+        self.assertEqual(record['notice'][0], miniwind.DEBUG_TITLE)
+        self.assertEqual(record['debug_settings'], {'draw_distance': 448, 'detail_budget': 'vivec-wide',
+                                                    'cut_models_over': 512.0,
+                                                    'accepted_stair_findings': ['VIVEC-TEMPLE-STAIRS-33']})
+        self.assertIn('DEBUG ONLY', build.miniwind_mode('full', 'vivec_temple', True))
+
+    def test_debug_labels_in_notice_logo_and_names(self):
+        self.assertLessEqual(len(miniwind.DEBUG_TITLE), miniwind.TITLE_CHARS)
+        data = miniwind.data_file('FEATURES ONLY: x', 'vivec_temple', debug=True).decode('ascii')
+        self.assertIn('town vivec_temple\n', data)
+        self.assertIn('title ' + miniwind.DEBUG_TITLE + '\n', data)
+        lines = miniwind.logo_lines('0.0.33-dev1', '0.1.0', debug=True)
+        self.assertEqual(lines[0], miniwind.DEBUG_LOGO_TITLE)
+        self.assertEqual(miniwind.hdf_name('0.0.33-dev1', town='vivec_temple', debug=True),
+                         'AmiWind-v0.0.33-dev1-MiniWind-PARTIAL-AREA-vivec-temple-DEBUG-ONLY.hdf')
+        self.assertEqual(miniwind.run_name('b', town='vivec_temple', debug=True), 'b-vivec-temple-DEBUG-ONLY')
+        marker = miniwind.marker_text('0.0.33-dev1', 'FEATURES ONLY: x', town='vivec_temple', debug=True)
+        self.assertIn(miniwind.DEBUG_TITLE, marker)
+        self.assertIn('Vivec, Temple only', marker)
+
+    def test_closer_view_is_debug_only_and_bounded(self):
+        for argv, message in (([*self.TEMPLE, '--chim-draw-distance', '448'], 'DEBUG ONLY'),
+                              ([*self.TEMPLE, '--miniwind-debug', '--chim-draw-distance', '700'], '128..540'),
+                              ([*self.TEMPLE, '--chim-area', 'balmora'], 'vivec_temple only'),
+                              (['--miniwind', '--miniwind-town', 'seyda'], 'must be one of'),
+                              (['--miniwind', '--miniwind-town', 'nowhere'], 'must be one of')):
+            with self.subTest(argv=argv), self.assertRaisesRegex(ValueError, message):
+                plan(argv)
+        with patch.object(build, 'VERSION', DEV), patch.object(build, 'prerequisites') as setup, \
+                contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()), \
+                self.assertRaises(SystemExit):
+            build.main(['--chim-draw-distance', '448', '--check', '--tools-dir', '/nonexistent-tools'])
+        setup.assert_not_called()
+        self.assertIn('DEBUG ONLY', err.getvalue())
+        # the image step and the game config
+        self.assertIn('aw_drawdistance 448\n', build_aga.startup_config('map seyda\n', 448))
+        self.assertIn('aw_drawdistance 540\n', build_aga.startup_config('map seyda\n'))
+
+    def test_town_image_keeps_the_town_and_its_rooms(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            (id1 / 'maps').mkdir(parents=True)
+            for name in ('seyda', 'balmora', 'bm000', 'bmcaius', 'vivec_arena', 'va000',
+                         'vivec_temple', 'vp000', 'vpi000', 'vpi011', 'vqi000'):
+                (id1 / 'maps' / (name + '.bsp')).write_bytes(b'x' * 4)
+            record = miniwind.prune(id1, town='vivec_temple')
+            self.assertEqual(record['maps_kept'], ['vivec_temple.bsp', 'vp000.bsp', 'vpi000.bsp', 'vpi011.bsp'])
+            self.assertEqual(record['town'], 'vivec_temple')
+            for name in ('vivec_temple', 'vp000', 'vpi000'):
+                (id1 / 'maps' / (name + '.bsp')).write_bytes(b'x' * 4)
+            ext = miniwind.prune(id1, scope='exterior', town='vivec_temple')
+            self.assertEqual(ext['maps_kept'], ['vivec_temple.bsp', 'vp000.bsp'])
+            (id1 / 'maps/vivec_temple.bsp').unlink()
+            with self.assertRaisesRegex(ValueError, 'no Vivec, Temple map'):
+                miniwind.prune(id1, town='vivec_temple')
 
 
 class FingerprintTests(unittest.TestCase):

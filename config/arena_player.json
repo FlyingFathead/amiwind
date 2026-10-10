@@ -1,0 +1,22 @@
+{
+  "format": 2,
+  "about": "The Vivec Arena minigame's player fighter (dbgmode arenapit, docs/COMBAT.md): a set sheet so arena fights test the rules with a capable fighter instead of whatever character the game started with. tools/prepare_combat.py computes it from the owned master with the original autocalculation (race, class, level), applies the overrides and writes one row per loadout to arena/player.txt. In game: aw_arena_player 1 (default) uses it, 0 fights with your own character sheet; dbgmode arenapit loadout NAME picks a loadout. A shield needs a one-handed weapon (fists and two-handed weapons cannot block). Until the first-person weapon views land, weapon loadouts fight with the weapon's rules while the view shows the hands. The quick character screen will replace this file's role when it lands.",
+  "name": "Arena Challenger",
+  "race": "nord",
+  "class": "monk",
+  "female": false,
+  "level": 9,
+  "attributes": {},
+  "skills": {"long blade": 40, "block": 40, "blunt weapon": 35, "axe": 30, "spear": 30, "short blade": 30},
+  "loadout": "fists",
+  "loadouts": {
+    "fists": {"weapon": null, "armor": ["netch_leather_boiled_cuirass", "netch_leather_boiled_helm"]},
+    "sword_shield": {"weapon": "steel longsword", "armor": ["steel_shield", "netch_leather_boiled_cuirass", "netch_leather_boiled_helm"]},
+    "mace_shield": {"weapon": "steel mace", "armor": ["iron_shield", "netch_leather_boiled_cuirass", "netch_leather_boiled_helm"]},
+    "axe_shield": {"weapon": "steel war axe", "armor": ["chitin_shield", "netch_leather_boiled_cuirass"]},
+    "shortsword": {"weapon": "steel shortsword", "armor": ["netch_leather_boiled_cuirass"]},
+    "spear": {"weapon": "steel spear", "armor": ["netch_leather_boiled_cuirass"]},
+    "claymore": {"weapon": "steel claymore", "armor": ["steel_cuirass", "steel_helm"]}
+  },
+  "note": "Skill overrides lift the Monk's weapon and block skills so weapon loadouts are fair tests; Hand-to-hand stays the class's own (a major skill)."
+}

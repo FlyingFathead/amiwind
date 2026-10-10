@@ -12,6 +12,11 @@ kbutton_t in_mlook;
 static float door_duration;static int audio_open,audio_close;
 float AW_DoorSound(unsigned ref,int close){if(close)audio_close++;else audio_open++;return door_duration;}
 int AW_CharacterHors(void){aw_character.valid=1;strcpy(aw_story.name,"Hors");return 1;}
+static int preset_calls,preset_female;static char preset_race[32];
+int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name){
+ preset_calls++;preset_female=female;strcpy(preset_race,race);(void)clas;(void)birth;
+ aw_character.valid=1;strcpy(aw_story.name,name);return 1;
+}
 keydest_t key_dest=key_game;double realtime;
 #define ORIGINAL_STRINGS "\0aw_npc\0Fargoth\0worldspawn\0Darvame Hleran\0Selvil Sareloth\0progs/v_nord.mdl"
 char *pr_strings=ORIGINAL_STRINGS "\0func_wall\0*1";
@@ -108,7 +113,7 @@ static int picker_file_mode,picker_file_reads,picker_list_rows;
 static char notice[96];
 /* A partial-area build's notice file (aw_miniwind.c) and its missing rooms. */
 #include "aw_miniwind.h"
-static int miniwind_fixture,miniwind_rooms_missing,miniwind_pure_exterior;static void (*quick)(void);
+static int miniwind_fixture,miniwind_rooms_missing,miniwind_pure_exterior,miniwind_direct;static void (*quick)(void);
 extern const char *(*aw_chim_town_map)(const char *town);
 static const char *balmora_frame(const char *town){return strcmp(town,"balmora")?NULL:"maps/balmora-chim.bsp";}
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
@@ -121,7 +126,10 @@ int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 static int excluded_interiors;
 int COM_FOpenFile(char *name,FILE **f){
  if(!strcmp(name,"miniwind.txt")){
-  const char *s="AWMW1\ntown balmora\ntitle ATTENTION: THIS IS A MINIWIND PLAYTEST BUILD\n"
+  const char *s=miniwind_direct?
+   "AWMW1\ntown balmora\ntitle ATTENTION: THIS IS A QUICK TEST BUILD\nfeatures DIRECT TO: Caius Cosades House\n"
+   "start map bmcaius 22 44 77 90\ncharacter Dark Elf|Battlemage|Charioteer|f|Ilmeni\n":
+   "AWMW1\ntown balmora\ntitle ATTENTION: THIS IS A MINIWIND PLAYTEST BUILD\n"
    "features FEATURES ONLY: Balmora exterior (CHIM)\n";
   if(!miniwind_fixture){*f=NULL;return -1;}
   *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
@@ -696,6 +704,25 @@ int main(void){
   q.v.origin[0]=500;q.v.origin[1]=0;AW_SceneTick();q.v.origin[0]=1010;q.v.velocity[0]=320;notice[0]=0;queued[0]=0;
   AW_SceneTick();assert(q.v.origin[0]==500 && !strcmp(notice,"Area unavailable") && !queued[0]);
   svs.clients[0].edict=&p;miniwind_pure_exterior=0;aw_chim_town_map=NULL;
+  /* A direct start (tools/direct_start.py --direct-to-game-map, --quick-character): the
+   * builder's map, spot and heading, and its ready-made character, instead of the town's
+   * arrival and the Hors preset; the notice on arrival names the start. */
+  miniwind_direct=1;AW_MiniwindInit();assert(AW_MiniwindActive());
+  AW_SceneCancelTransition();sv.active=false;command_argc=1;command_args[0]="aw_quick_start";queued[0]=0;
+  preset_calls=0;aw_character.valid=0;aw_character.current[0]=61;
+  quick();assert(!strcmp(queued,"map bmcaius\n") && key_dest==key_game);
+  assert(preset_calls==1 && preset_female==1 && !strcmp(preset_race,"Dark Elf") && !strcmp(aw_story.name,"Ilmeni"));
+  assert(aw_character.valid);
+  sv.active=true;memset(&q,0,sizeof(q));q.v.mins[2]=-16.625f;q.v.maxs[2]=16.625f;q.v.movetype=MOVETYPE_WALK;
+  VectorCopy(vec3_origin,q.v.origin);notice[0]=0;
+  CL_ClearState();strcpy(sv.name,"bmcaius");strcpy(sv.modelname,"maps/bmcaius.bsp");AW_SceneSpawn(&q);
+  assert(q.v.health==61 && q.v.movetype==MOVETYPE_WALK);
+  assert(fabs(q.v.origin[0]-22)<17 && fabs(q.v.origin[1]-44)<17 && q.v.angles[1]==90);
+  assert(!strcmp(notice,"DIRECT TO: Caius Cosades House"));
+  /* An explicit town still wins (aw_quick_start balmora). */
+  sv.active=false;command_argc=2;command_args[1]="balmora";queued[0]=0;quick();
+  assert(!strcmp(queued,"map balmora\n"));command_argc=1;
+  miniwind_direct=0;AW_MiniwindInit();
  }
 #endif
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");

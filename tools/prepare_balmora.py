@@ -20,6 +20,7 @@ def prepare(data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None
 
 if __name__ == '__main__':
     a = parser(__doc__, town=False).parse_args()
+    import npc_lod; npc_lod.apply_options(a)
     import build_profile; build_profile.instrument('balmora')  # sub-stage timers (docs/BUILD_PROFILE.md)
     print(json.dumps(prepare(a.data_files, a.scene, a.out, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs,
                              a.collect_only, a.vis_mode), indent=2))

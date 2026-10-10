@@ -41,7 +41,7 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.31-toolkit-{name}.png" fo
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 TEXT_LIMIT = 262144
 # The bug register grows with every bug: its JSON source and the generated table (docs/bugs/README.md).
-LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576}
+LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576, "docs/chim/cell-progress-reference.json": 1048576}
 # Whitespace baselines (docs/PATCH-v<version>.json) list every file of the published base release and
 # grow with the repository (RELEASE-PATCH-SIZE-33).
 LARGE_TEXT_PATTERNS = ((re.compile(r"docs/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),)
@@ -89,6 +89,9 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-chim-specks-{name}.png
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-chim-{name}.png" for name in ("disk", "island", "loading", "frame-jit", "frame-slow", "counters", "memory", "build", "chunkload"))
 # v0.0.33 release notes, "Let's fix those bugs": before/after frames (FS-UAE, headlamp off) and one OpenMW reference.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-fix-{name}.png" for name in ("strider-before", "strider-after", "ship-light-before", "ship-light-after", "ship-light-openmw"))
+# Builder profile: fixes and time savings since v0.0.33, drawn by tools/builder_savings_chart.py from
+# docs/performance/builder-savings.json.
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-builder-savings.png")
 # Project-authored text graphic; retain bounded UTF-8 source validation.
 DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
 # Performance charts written by tools/perf_charts.py from measured numbers.
@@ -115,7 +118,7 @@ def allowed_files(root):
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
         preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES or (p.suffix == ".chimfx" and p.parent == CHIM_EFFECTS_DIR)
-        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/header.js", "tests/test_cell_progress_legend.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)

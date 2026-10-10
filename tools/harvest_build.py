@@ -182,12 +182,16 @@ def town_rows(table, prefix, origin):
     return rows
 
 
-def plan_rows(id1):
+def plan_rows(id1, native=()):
     """Every exterior map the image ships, with its origin and coverage.
 
     The world maps come from world/regions.awr, the Seyda Neen and Balmora
     sub-cells from their region tables, the intro docks from its fixed route
-    bounds. Only maps present in maps/ count. Sorted by name.
+    bounds. Only maps present in maps/ count, except the sub-cells of the towns
+    in `native`: towns on CHIM made from the game data (tools/chim_town.py), which
+    have a region table and no region maps. Their rows say chim=True; the engine
+    loads their catalogues by region on the CHIM frame (aw_harvest_runtime.c
+    AW_HarvestFollow). Sorted by name.
     """
     id1 = Path(id1)
     rows = []
@@ -197,10 +201,14 @@ def plan_rows(id1):
         rows += [dict(name=r['name'], origin=r['origin'], coverage=r['coverage'])
                  for r in world_directory(directory.read_bytes()) if not r['town']]
     from town_config import runtime_towns
+    chim = set()
     for town in runtime_towns()[:2]:  # the fixed towns: Seyda Neen and Balmora
         table = id1 / town['regions']
         if table.is_file():
-            rows += town_rows(table, town['prefix'], town_origin(town['id']))
+            found = town_rows(table, town['prefix'], town_origin(town['id']))
+            if town['id'] in native:
+                chim.update(r['name'] for r in found)
+            rows += found
     if (id1 / 'maps/intro_docks.bsp').is_file():
         from prepare_intro_docks import BOUNDS
         rows.append(dict(name='intro_docks', origin=town_origin('seyda'),
@@ -213,7 +221,8 @@ def plan_rows(id1):
         if len(row['origin']) != 3 or not all(math.isfinite(v) for v in values) or any(
                 row['coverage'][0][i] >= row['coverage'][1][i] for i in range(2)):
             raise ValueError('Invalid harvest map coverage: ' + row['name'])
-    return sorted((r for r in rows if (id1 / 'maps' / (r['name'] + '.bsp')).is_file()), key=lambda r: r['name'])
+    return sorted((dict(r, chim=True) if r['name'] in chim else r for r in rows
+                   if r['name'] in chim or (id1 / 'maps' / (r['name'] + '.bsp')).is_file()), key=lambda r: r['name'])
 
 
 def select(row, refs):
@@ -315,9 +324,9 @@ def source_placements(source, data_files):
     return receipt, context, refs
 
 
-def map_selections(id1, refs):
+def map_selections(id1, refs, native=()):
     """(plan rows, {map: placements}) for every shipped exterior map with plants."""
-    rows = plan_rows(id1)
+    rows = plan_rows(id1, native)
     return rows, {row['name']: selected for row in rows for selected in [select(row, refs)] if selected}
 
 
@@ -341,7 +350,7 @@ def _clear(task):
                                          removed=[str(r['number']) for r in targets])
 
 
-def clear_baked(source, id1, work, *, data_files, jobs=None):
+def clear_baked(source, id1, work, *, data_files, jobs=None, native=()):
     """Image step, before the final passes: remove baked harvestable mushrooms.
 
     Some converters (Balmora) bake every mushroom as a brush entity bound to its
@@ -353,9 +362,11 @@ def clear_baked(source, id1, work, *, data_files, jobs=None):
     from build_parallel import ordered_map
     id1, work = Path(id1), Path(work)
     _, _, refs = source_placements(source, data_files)
-    rows, selections = map_selections(id1, refs)
+    rows, selections = map_selections(id1, refs, native)
     origins = {row['name']: row['origin'] for row in rows}
-    tasks = [(str(id1 / 'maps' / (name + '.bsp')), selections[name], origins[name]) for name in sorted(selections)]
+    chim = {row['name'] for row in rows if row.get('chim')}  # no map: the CHIM world leaves them out
+    tasks = [(str(id1 / 'maps' / (name + '.bsp')), selections[name], origins[name]) for name in sorted(selections)
+             if name not in chim]
     cleared = {}
     for name, count, report in ordered_map(_clear, tasks, jobs):
         if count:
@@ -369,7 +380,7 @@ def clear_baked(source, id1, work, *, data_files, jobs=None):
     return receipt
 
 
-def install(source, id1, work, *, data_files, sizes, jobs=None):
+def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
     """Image step: catalogues for the final maps, geometry gate, heap admission.
 
     ``sizes`` are the target ABI sizes of the heap check
@@ -397,7 +408,8 @@ def install(source, id1, work, *, data_files, sizes, jobs=None):
     models = {row['packet_model']: row for row in receipt['models']}
     order = {row['packet_model']: i for i, row in enumerate(receipt['models'])}
     limits = runtime_limits()
-    rows, found = map_selections(id1, refs)
+    rows, found = map_selections(id1, refs, native)
+    chim = {row['name'] for row in rows if row.get('chim')}
     candidates, selections, capacity = {}, {}, {}
     for row in rows:
         selected = found.get(row['name'])
@@ -412,7 +424,10 @@ def install(source, id1, work, *, data_files, sizes, jobs=None):
         candidates[row['name']] = dict(row=row, raw=raw, plants=len(selected),
                                        models=[models[n]['path'] for n in used])
         selections[row['name']] = (selected, row['origin'])
-    failures = geometry_gate(id1 / 'maps', selections, jobs)
+    # A CHIM town's sub-cells have no map: no baked mushroom to find (the CHIM world leaves the harvest
+    # placements out, chim.build harvest_numbers) and no per-map heap check (the CHIM heap gate counts
+    # the frame); the runtime capacity bounds above still apply.
+    failures = geometry_gate(id1 / 'maps', {n: v for n, v in selections.items() if n not in chim}, jobs)
     if failures:
         raise ValueError('Harvest geometry gate failed (baked mushroom where a harvestable one is placed) on '
                          f'{len(failures)} map(s): ' + '; '.join(f'{n}: {e}' for n, e in sorted(failures.items())))
@@ -424,7 +439,9 @@ def install(source, id1, work, *, data_files, sizes, jobs=None):
             if not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source / 'payload' / path, target)
-    heap = heap_admission(id1, candidates, sizes, jobs)
+    heap = heap_admission(id1, [n for n in candidates if n not in chim], sizes, jobs)
+    heap.update({n: dict(gate='pass', estimated_clearance_bytes=None, estimated_total_bytes=None, harvest=None,
+                         rule='CHIM frame: no per-map heap check') for n in candidates if n in chim})
     admitted = sorted(n for n in candidates if heap[n]['gate'] == 'pass')
     lost = sorted(set(removal['maps']) - set(admitted))
     if lost:
@@ -443,7 +460,8 @@ def install(source, id1, work, *, data_files, sizes, jobs=None):
                 intern_root_spans=settings['intern_root_spans'], compact_models=settings['compact_models'],
                 global_catalogue_sha256=receipt['global_catalogue_sha256'], global_slots=receipt['global_slots'],
                 inputs={k: receipt[k] for k in ('master', 'index', 'packet', 'palette')},
-                maps=[dict(name=n, path=f'maps/{n}.bsp', **pin((id1 / 'maps' / (n + '.bsp')).read_bytes()),
+                maps=[dict(name=n, **(dict(path=None, chim=True) if n in chim else
+                                       dict(path=f'maps/{n}.bsp', **pin((id1 / 'maps' / (n + '.bsp')).read_bytes()))),
                            origin=candidates[n]['row']['origin'], coverage=candidates[n]['row']['coverage'],
                            keys=[identity_key(r['source_key']) for r in selections[n][0]])
                       for n in sorted(candidates)])
@@ -482,6 +500,12 @@ def install(source, id1, work, *, data_files, sizes, jobs=None):
     return staging
 
 
+def native_towns(args):
+    """Towns of the image's --chim-town outputs (tools/chim_town.py): on CHIM, no legacy region maps."""
+    return [json.loads((Path(path) / 'entities.json').read_text(encoding='utf-8'))['town']
+            for path in getattr(args, 'chim_town', None) or []]
+
+
 def image_step(args, id1, work, *, jobs=None):
     """build_aga.py finalize_image hook: install, print and summarize for build.json."""
     if not getattr(args, 'harvest', None):
@@ -490,7 +514,7 @@ def image_step(args, id1, work, *, jobs=None):
         return dict(status='not_requested')
     from check_world_map_heap import compile_target_sizes
     staging = install(args.harvest, id1, work, data_files=args.data_files,
-                      sizes=compile_target_sizes(args.sdk)[0], jobs=jobs)
+                      sizes=compile_target_sizes(args.sdk)[0], jobs=jobs, native=native_towns(args))
     print(f"Harvest: {staging['admitted']}/{staging['candidates']} maps with mushrooms admitted by the heap check, "
           f"{staging['plants']} plants, {staging['models']} shared models; not admitted: "
           f"{', '.join(staging['not_admitted']) or 'none'}.", flush=True)

@@ -29,6 +29,19 @@ what the public package contains. In-game screenshots of every version:
 
 More in the [gallery](docs/GALLERY.md).
 
+**What's new in v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](docs/RELEASE-v0.0.35.md).
+
+## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore
+
+**AmiWind v0.0.35, running on CHIM Engine v0.1.0.**
+
+A sync release: finished work that waited on side branches is gathered in. NPCs walk and run, fighters
+use weapons and shields, lava glows and burns, Seyda Neen is built from your own game data, about 30
+engine crash paths are closed and the builder resumes a failed build from where it stopped. Unfinished
+work ships behind switches that are off by default.
+
+- [Release notes](docs/RELEASE-v0.0.35.md)
+
 ## v0.0.34 - CHIM: Tightening the Bolts
 
 **AmiWind v0.0.34, running on CHIM Engine v0.1.0.**
@@ -632,6 +645,8 @@ outside only: its doors do not open yet. `dbg tp` opens the destination picker. 
 world-map teleport picker. `dbg daynight off` holds the clock at 12:00 midday
 (sky, light, lamps and windows as by day) until `dbg daynight on`. See
 [debug controls](docs/DEBUG_OVERLAYS.md).
+The animation kit (walk and run by speed, its build switch and `dbg animkit`):
+[docs/ANIMKIT.md](docs/ANIMKIT.md).
 
 Automatic cell changes preserve held input and gameplay state in the transition
 checks; doors and explicit travel retain their own loading behavior. The default
@@ -833,14 +848,20 @@ reuse unchanged stages with `--reuse-from`. See
 
 A normal build includes everything the release ships; no extra option is
 needed. From v0.0.33 the default builder is CHIM, with Balmora and Seyda Neen on
-CHIM; a build with Seyda Neen also needs the recorded v0.0.31 Seyda Neen maps
-(`--seyda-recorded DIR`), and `--builder legacy` still builds the old way (see
+CHIM, both converted from your own data (from v0.0.35 the recorded v0.0.31
+Seyda Neen maps, `--seyda-recorded DIR`, are optional and NOT RECOMMENDED since v0.0.31:
+the default converts Seyda Neen from your data; which Seyda Neen an image holds:
+[docs/LINUX_BUILD.md](docs/LINUX_BUILD.md#which-seyda-neen-is-in-my-build); what fills the disk images and
+where their size is going: [docs/IMAGE_SIZE.md](docs/IMAGE_SIZE.md)), and `--builder legacy`
+still builds the old way (see
 [builder types](docs/chim/build_guide/BUILDER_TYPES.md)). The Vivec Arena preview
 of v0.0.32 is withdrawn from v0.0.33 (`--extra-town vivec_arena` still builds it
 for testing). Options that leave shipped content out are for debugging only and
 say so; see [shipped towns](docs/LINUX_BUILD.md#shipped-towns-default).
 For a quick Balmora-only playtest image (a private test, never a release), add
-`--miniwind`; see [MiniWind playtester build](docs/MINIWIND_PLAYTESTER.md).
+`--miniwind` or a ready-made sandbox such as `--miniwind-balmora-exterior`; see
+[MiniWind: the test ground](docs/MINIWIND.md) and the
+[build type reference](docs/MINIWIND_PLAYTESTER.md).
 For quick test builds of one spot (fewer videos, voices, rooms or NPCs), see the
 [CHIM build guide](docs/chim/build_guide/README.md).
 

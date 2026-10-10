@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import build
 import run_fs_uae as runner
 import setup_build
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
 def symlink_or_skip(link, target, **kwargs):
@@ -30,6 +32,7 @@ def symlink_or_skip(link, target, **kwargs):
         raise
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class FsUaeTests(unittest.TestCase):
     def test_missing_emulator_stops_before_setup_or_conversion(self):
         output = io.StringIO()
@@ -238,7 +241,7 @@ class FsUaeTests(unittest.TestCase):
                  patch.object(build, 'dry_run_commands', return_value=[]), \
                  patch.object(build, 'provenance', return_value={}), \
                  patch.object(build, 'execute') as execute, contextlib.redirect_stdout(io.StringIO()) as output:
-                argv = ['--autorun-fs-uae', '--workspace', tmp, '--name', 'fixture', '--builder', 'legacy']
+                argv = ['--autorun-fs-uae', '--workspace', tmp, '--name', 'fixture', '--any-run-name', '--builder', 'legacy']
                 if dry_run:
                     argv.append('--dry-run')
                 suffix = '-dry-run' if dry_run else ''

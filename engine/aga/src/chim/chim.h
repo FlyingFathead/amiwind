@@ -25,6 +25,7 @@ extern int (*aw_chim_floor)(const vec3_t origin, float *lowest, float *surface);
 extern void (*aw_chim_spawn)(vec3_t origin);			/* aw_scene.c */
 extern const char *(*aw_chim_town_map)(const char *town);	/* aw_region.c */
 extern int (*aw_chim_entity)(char **data);				/* pr_edict.c: a streamed static taken (chim_statics.c) */
+extern int (*aw_chim_source)(const float *local, float *world);	/* aw_hud.c: CHIM frame -> original coordinates */
 
 void Chim_Init (void);
 int Chim_Active (void);

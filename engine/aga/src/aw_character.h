@@ -33,8 +33,20 @@ float AW_CharacterEyeHeight(void);
 int AW_CharacterRebuild(aw_character_t *c);
 void AW_CharacterReset(void);
 int AW_CharacterHors(void);
+/* A ready-made character by catalogue IDs (race, class, birthsign; case-insensitive) and
+ * name: the quick start of a direct-start build (tools/direct_start.py). 0 when an ID is
+ * not in the catalogue. AW_CharacterHors is the Nord Barbarian preset. */
+int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name);
 int AW_CharacterOpen(int kind);
+/* The same menu; confirm 0 accepts with Enter, without the "Really choose" box
+ * (the quick character screen's pages before its last, aw_quickchar.c). */
+int AW_CharacterOpenQuick(int kind,int confirm);
+/* One field of a scripted character: race/class/birthsign/sex VALUE (rebuilds the stats),
+ * attribute NAME N, skill NAME N, level N (overrides). 1 when set; c unchanged otherwise. */
+int AW_CharacterSet(aw_character_t *c,const char *field,const char *value,const char *number);
 int AW_CharacterActive(void);
+/* Closes an open menu without accepting it (the quick character screen's cancel). */
+void AW_CharacterClose(void);
 int AW_CharacterDone(void);
 int AW_CharacterKey(int key);
 void AW_CharacterMouse(int dx,int dy);

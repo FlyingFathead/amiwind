@@ -6,8 +6,8 @@ for playback: disposition, faction rank, player/cell state, SCVR predicates and
 result scripts still need evaluation. Preserve unsupported bytes for auditing.
 """
 import struct
-from .npc import first, text
-from .audit import string, normpath
+from .esm import first, string, text, unpack
+from .audit import normpath
 
 IDENTITY = {'ONAM':'id', 'RNAM':'race', 'CNAM':'class', 'FNAM':'faction'}
 VOICE_TOPICS = ('hello','idle','intruder','thief','hit','attack','flee','alarm')
@@ -16,11 +16,11 @@ def response(fields, topic, order):
     data = first(fields, 'DATA')
     if len(data) != 12:
         raise ValueError('Malformed INFO DATA')
-    kind, disposition, rank, sex, pc_rank, padding = struct.unpack('<iibbbb', data)
+    kind, disposition, rank, sex, pc_rank, padding = unpack('<iibbbb', data, 'INFO DATA', exact=True)
     conditions = []
     for tag, raw in fields:
         if tag == 'SCVR':
-            conditions.append({'expression':string(raw), 'raw_hex':raw.hex(), 'operand':None})
+            conditions.append({'expression':string(raw, 'INFO SCVR'), 'raw_hex':raw.hex(), 'operand':None})
         elif tag in ('INTV','FLTV'):
             if len(raw)!=4 or not conditions or conditions[-1]['operand'] is not None:
                 raise ValueError('Unpaired INFO condition operand')

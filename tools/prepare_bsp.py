@@ -3,7 +3,7 @@
 import argparse,json,math,re,shutil,struct,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.paths import ensure_external
+from mwad.paths import copy_tree,ensure_external
 from prepare_quake import wad,miptex
 
 def read_wad(path):
@@ -23,7 +23,7 @@ def prepare(scene,out,scenery):
     from mwad.scene import read_asset,unpack_geometry
     from preview_scenery import render
     scene=ensure_external(scene,'input scene');out=ensure_external(out,'BSP scene');scenery=ensure_external(scenery,'original scenery')
-    shutil.copytree(scene,out)
+    copy_tree(scene,out)
     source=(out/'seyda.map').read_text();lumps=read_wad(out/'town.wad');models={};details=[];refs=faces_total=0
     index=json.loads((scenery/'scenery-index.json').read_text());archive=(scenery/'scenery.mwpak').open('rb');textures={}
     palette=(out/'id1/gfx/palette.lmp').read_bytes();pal=Image.new('P',(1,1));pal.putpalette(palette)

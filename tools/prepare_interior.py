@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.paths import ensure_external,resolve_data_files,child_ci
+from mwad.paths import copy_tree,ensure_external,resolve_data_files,child_ci
 from mwad.interior import read_interior,select_geometry
 from prepare_scenery import export_refs
 from prepare_mesh_bsp import add_dressing_option, append_meshes, apply_dressing_option, interior_dressing
@@ -21,12 +21,16 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
     if vis_mode not in VIS_MODES:raise ValueError('Unknown vis mode')
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'exterior scene');out=ensure_external(out,'interior bundle')
     if out.exists():raise ValueError('Choose a new interior output')
+    # The door catalogue reads only the master file: it runs beside the conversion.
+    from build_parallel import Background
+    from prepare_doors import door_sources
+    doors=Background(door_sources,data_files,jobs=jobs)
     cell=read_interior(child_ci(data_files,'Morrowind.esm'),'Imperial Prison Ship')
     refs,omitted=select_geometry(cell)
     shell=next(r for r in refs if r['id'].casefold()=='in_prison_ship')
     door=next(r for r in refs if r['type']=='DOOR' and r.get('destination'))
     entrance=next(r for r in cell['entrances'] if r['id'].casefold()=='chargen_ship_trapdoor')
-    shutil.copytree(scene,out);parts=out/'interior-source'
+    copy_tree(scene,out);parts=out/'interior-source'
     # Aggressive reduction of the curved shell flattened it into hammocks and
     # furnishings. Keep structural source surfaces/UVs; reduce separate detail.
     profiles={'meshes/i/in_prison_ship.nif':{'ratio':.08,'texture_size':32,
@@ -84,7 +88,7 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
            {'source':'seyda','target':'prison','point':outside_point,'arrival':enter_dest,'yaw':yaw(entrance['destination']['rotation_radians'])}]
     (out/'id1/scene-links.txt').write_text(''.join(f"{r['source']} {r['target']} "+' '.join(f'{x:.5f}' for x in [*r['point'],*r['arrival'],r['yaw']])+'\n' for r in links))
     from prepare_doors import prepare as prepare_doors
-    prepare_doors(data_files,out)
+    prepare_doors(data_files,out,sources=doors.result())
     report.update({'cell':cell['name'],'master_sha256':cell['master_sha256'],'omitted':omitted+report['omitted'],'lighting':lighting,'links':links,'spawn':spawn,
                    'notes':'static furnishing/lighting preview; no items, inventory, NPCs or opening scripts; no shadows/flicker in this bake'})
     (out/'interior-report.json').write_text(json.dumps(report,indent=2)+'\n')

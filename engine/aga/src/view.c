@@ -338,7 +338,7 @@ void BuildGammaTable (float g)
 
     for (i=0 ; i<256 ; i++)
     {
-        inf = 255 * pow ( (i+0.5)/255.5 , g ) + 0.5;
+        inf = 255 * Q_GammaPow ( (i+0.5)/255.5 , g ) + 0.5;
         if (inf < 0)
             inf = 0;
         if (inf > 255)
@@ -477,6 +477,11 @@ Underwater, lava, etc each has a color shift
 */
 void V_SetContentsColor (int contents)
 {
+    /* Lava (aw_lava.c): the blood-red tint when the eye or the player's feet are
+     * in lava, deepening with time; replaces id's orange cshift_lava preset. */
+    if (AW_LavaContentsShift (contents, cl.cshifts[CSHIFT_CONTENTS].destcolor,
+                              &cl.cshifts[CSHIFT_CONTENTS].percent))
+        return;
     switch (contents)
     {
     case CONTENTS_EMPTY:

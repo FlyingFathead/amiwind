@@ -1563,6 +1563,8 @@ void SV_Physics (void)
 	AW_CompanionPhysics ();
 	/* Hostile NPCs and the player's punch (aw_combat.c), after the companion. */
 	AW_CombatPhysics ();
+	/* Lava damage (aw_lava.c), after combat: the player's health as combat left it. */
+	AW_LavaPhysics ();
 
 	if (pr_global_struct->force_retouch)
 		pr_global_struct->force_retouch--;

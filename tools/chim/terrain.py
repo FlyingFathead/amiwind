@@ -36,6 +36,7 @@ TERRAIN_CEILING = 2048   # import_town: the legacy frame box closes here; leaves
 TERRAIN_HULL_GRID = 64    # lattice of the compiled terrain hull's expanded corners (collision_bsp.compile_standing;
                           # 1024 leaves qbsp slivers: seam holes in tests/test_chim_ground.py)
 CONTENTS_EMPTY, CONTENTS_SOLID, CONTENTS_WATER = -1, -2, -3
+CONTENTS_LAVA = -5
 
 # qbsp TextureAxisFromPlane: (normal, s, t) per base axis; first best wins.
 BASE_AXES = (((0, 0, 1), (1, 0, 0), (0, -1, 0)), ((0, 0, -1), (1, 0, 0), (0, -1, 0)),
@@ -120,6 +121,27 @@ def split_keep(poly, n, d, keep):
         if (dp > 1e-9 and dq < -1e-9) or (dp < -1e-9 and dq > 1e-9):
             t = dp / (dp - dq)
             out.append(tuple(p[k] + (q[k] - p[k]) * t for k in range(3)))
+    return out
+
+
+def clip_convex_xy(subject, clip):
+    """The part of a convex plan polygon inside another (both counter-clockwise, (x, y) rows)."""
+    out = [tuple(map(float, p[:2])) for p in subject]
+    c = [tuple(map(float, p[:2])) for p in clip]
+    for (ax, ay), (bx, by) in zip(c, c[1:] + c[:1]):
+        if not out:
+            break
+        n = (by - ay, ax - bx)          # outward normal of a counter-clockwise edge: keep n.p <= d
+        d = n[0] * ax + n[1] * ay
+        pts, out = out, []
+        for i in range(len(pts)):
+            p, q = pts[i], pts[(i + 1) % len(pts)]
+            dp, dq = n[0] * p[0] + n[1] * p[1] - d, n[0] * q[0] + n[1] * q[1] - d
+            if dp <= 1e-9:
+                out.append(p)
+            if (dp < -1e-9 and dq > 1e-9) or (dp > 1e-9 and dq < -1e-9):
+                t = dp / (dp - dq)
+                out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
     return out
 
 
@@ -234,7 +256,8 @@ def box_leaves(nodes, leaves, lo, hi, root=0):
 
 def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_id,
                   water_level=WATER_LEVEL, light=TERRAIN_LIGHT, ceiling=TERRAIN_CEILING, collision_box=None,
-                  tiles=None, hull='routed', qbsp=None, collision_cache=None):
+                  tiles=None, hull='routed', qbsp=None, collision_cache=None, liquids=None, lava_texture_id=None,
+                  lava_depth=8.0, lava_bed=16.0):
     """Lumps of one chunk's terrain as a world BSP subtree.
 
     box: (x0, y0, x1, y1) on the tile grid; height(x, y) and material(x, y)
@@ -267,6 +290,12 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
     into one BSP, as collision_bsp.compile_standing compiles a model's exact union. The solid set is
     the same; the compiled tree is 5-70 times smaller (Seyda Neen's port chunks: 2,540-7,045 routed
     clipnodes against 456-724; flat sea: 513 against 7).
+    liquids (docs/LAVA.md): lava prisms [{'hull': [[x, y], ...] counter-clockwise, 'top': z}] in the
+    chunk's units (tools/lava.py). The open air above the ground is carved by each prism's planes (top,
+    sides, bottom) into a CONTENTS_LAVA leaf, with the "*lava" warp face (lava_texture_id) on the top
+    plane seen from above and below, as qbsp compiles a liquid brush; the bed under it (lava_bed units
+    from top - lava_depth down) joins the standing hull as a convex piece, so a player stands in lava up
+    to the shins and never swims (the legacy maps' tools/lava.pool_brushes).
     Returns (lumps, info) with info['tree'] the TerrainTree."""
     from mesh_geometry import split_surface
     from scipy.spatial import ConvexHull
@@ -278,10 +307,112 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
     w.lumps[10] = bytearray(SOLID_LEAF)
     tree = TerrainTree()
     node_rows, leaf_rows, marks, pieces, zs = [], [], [], [], []
-    counts = {'tiles': 0, 'ground_faces': 0, 'water_faces': 0}
+    counts = {'tiles': 0, 'ground_faces': 0, 'water_faces': 0, 'lava_faces': 0, 'lava_leaves': 0}
+    lavas = []
+    for k, l in enumerate(liquids or ()):
+        hull_xy = [(float(x), float(y)) for x, y in l['hull']]
+        if len(hull_xy) < 3 or polygon_area_xy(np.array([(x, y, 0.0) for x, y in hull_xy])) <= 0:
+            raise ValueError('A lava prism needs a counter-clockwise plan polygon')
+        lavas.append({'k': k, 'hull': hull_xy, 'top': float(l['top']), 'bottom': float(l['top']) - lava_depth,
+                      'box': (min(x for x, _ in hull_xy), min(y for _, y in hull_xy),
+                              max(x for x, _ in hull_xy), max(y for _, y in hull_xy))})
+    if lavas and lava_texture_id is None:
+        raise ValueError('Lava prisms need the lava texture')
 
     def texture_of(m):
-        return water_texture_id if m[0] == 'water' else texture_id(m[1])
+        if m[0] == 'water':
+            return water_texture_id
+        if m[0] == 'lava':
+            return lava_texture_id
+        return texture_id(m[1])
+
+    def overlaps(region, l):
+        b = l['box']
+        if b[2] <= min(x for x, _ in region) or b[0] >= max(x for x, _ in region) or \
+                b[3] <= min(y for _, y in region) or b[1] >= max(y for _, y in region):
+            return False
+        piece = clip_convex_xy(l['hull'], region)
+        return len(piece) >= 3 and abs(polygon_area_xy(np.array([(x, y, 0.0) for x, y in piece]))) > 1e-6
+
+    def lava_plan(region, ls):
+        """A plan BSP of a convex region (counter-clockwise (x, y) rows) over the lava prisms ls, as qbsp splits a
+        liquid brush: ['split', normal, dist, front, back] on a pool's side line that crosses the region,
+        ['lava', region, top, bottom] where the region lies inside pools (overlapping pools merge: the highest top,
+        the lowest bottom), ['air'] where no pool reaches. Each side line is used once per region it crosses, so
+        neighbouring and overlapping pools cost a node per side, not a copy of every other pool."""
+        if len(region) < 3:
+            return ['air']
+        ls = [l for l in ls if overlaps(region, l)]
+        if not ls:
+            return ['air']
+        for l in ls:
+            for (ax, ay), (bx, by) in zip(l['hull'], l['hull'][1:] + l['hull'][:1]):
+                nx, ny = by - ay, ax - bx
+                length = math.hypot(nx, ny)
+                if length < 1e-9:
+                    continue
+                n = np.array([nx / length, ny / length, 0.0])
+                d = float(n[0] * ax + n[1] * ay)
+                sides = [n[0] * x + n[1] * y - d for x, y in region]
+                if max(sides) > 1e-6 and min(sides) < -1e-6:
+                    halves = [clean_xy([(p[0], p[1]) for p in split_keep([(x, y, 0.0) for x, y in region], n, d, k)])
+                              for k in (1.0, -1.0)]
+                    return ['split', n, d, lava_plan(halves[0], ls), lava_plan(halves[1], ls)]
+        return ['lava', region, max(l['top'] for l in ls), min(l['bottom'] for l in ls)]
+
+    def lava_over(poly, faces):
+        """The lava plan over one ground polygon's plan area and its warp faces (both sides, on the top plane)."""
+        if not lavas:
+            return faces, ['air']
+        area = [(float(p[0]), float(p[1])) for p in poly]
+        if polygon_area_xy(np.array([(x, y, 0.0) for x, y in area])) < 0:
+            area = area[::-1]
+        zfloor = min(float(p[2]) for p in poly)
+        # a pool under this ground gets no face inside the solid
+        plan = lava_plan(area, [l for l in lavas if l['top'] > zfloor])
+        up = np.array([0., 0., 1.])
+        extra = []
+
+        def walk(p):
+            if p[0] == 'split':
+                walk(p[3])
+                walk(p[4])
+            elif p[0] == 'lava':
+                flat = np.array([(x, y, p[2]) for x, y in p[1]])
+                ids = emit([(flat, up, quake_texture_axes(up), np.zeros(2), ('lava', None)),
+                            (flat[::-1].copy(), -up, quake_texture_axes(-up), np.zeros(2), ('lava', None))],
+                           w.plane(up, p[2]), lambda s: 0 if s[1][2] > 0 else 1)
+                counts['lava_faces'] += len(ids)
+                p.append(ids)
+                extra.extend(ids)
+        walk(plan)
+        return faces + extra, plan
+
+    def carve(plan, bounds, faces):
+        """The open air of one tile region with the lava plan carved into it: vertical splits on the pools' sides,
+        then per lava cell the top plane (holding its warp faces) and the bottom plane around a CONTENTS_LAVA leaf."""
+        if plan[0] == 'air':
+            return add_leaf(CONTENTS_EMPTY, bounds, faces)
+        if plan[0] == 'split':
+            me = add_node(plan[1], plan[2], bounds)
+            w.plane(plan[1], plan[2])
+            node_rows[me][2] = carve(plan[3], bounds, faces)
+            node_rows[me][3] = carve(plan[4], bounds, faces)
+            return me
+        _, region, top, bottom, ids = plan
+        up = np.array([0., 0., 1.])
+        me = add_node(up, top, bounds)
+        w.plane(up, top)
+        node_rows[me][5:7] = [ids[0], len(ids)]
+        node_rows[me][2] = add_leaf(CONTENTS_EMPTY, bounds, faces)
+        low = add_node(-up, -bottom, bounds)
+        w.plane(-up, -bottom)
+        node_rows[me][3] = low
+        node_rows[low][2] = add_leaf(CONTENTS_EMPTY, bounds, faces)
+        counts['lava_leaves'] += 1
+        xs, ys = [x for x, _ in region], [y for _, y in region]
+        node_rows[low][3] = add_leaf(CONTENTS_LAVA, (min(xs), min(ys), bottom, max(xs), max(ys), top), faces)
+        return me
 
     def add_node(normal, dist, bounds):
         node_rows.append([normal, dist, None, None, bounds, 0, 0])
@@ -295,8 +426,8 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
         return -1 - (len(tree.leaves) - 1)
 
     def emit(surfaces, pi, side_of):
-        first, num = w.faces(surfaces, texture_of, flags_of=lambda s: TEX_SPECIAL if s[4][0] == 'water' else 0,
-                             light_of=lambda s: None if s[4][0] == 'water' else 0,
+        first, num = w.faces(surfaces, texture_of, flags_of=lambda s: TEX_SPECIAL if s[4][0] in ('water', 'lava') else 0,
+                             light_of=lambda s: None if s[4][0] in ('water', 'lava') else 0,
                              plane_of=lambda s: (pi, side_of(s)))
         return list(range(first, first + num))
 
@@ -332,12 +463,13 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
                          wpi, lambda s: 0 if s[1][2] > 0 else 1)
             counts['water_faces'] += len(water)
             node_rows[wn][5:7] = [water[0], len(water)]
-            tile_faces = faces + water
-            node_rows[wn][2] = add_leaf(CONTENTS_EMPTY, (xy[0], xy[1], water_level, xy[2], xy[3], ceiling), tile_faces)
+            tile_faces, plan = lava_over(poly, faces + water)
+            node_rows[wn][2] = carve(plan, (xy[0], xy[1], water_level, xy[2], xy[3], ceiling), tile_faces)
             node_rows[wn][3] = add_leaf(CONTENTS_WATER, (xy[0], xy[1], zlo, xy[2], xy[3], water_level), tile_faces)
             node_rows[me][2] = wn
         else:
-            node_rows[me][2] = add_leaf(CONTENTS_EMPTY, (xy[0], xy[1], zlo, xy[2], xy[3], ceiling), faces)
+            tile_faces, plan = lava_over(poly, faces)
+            node_rows[me][2] = carve(plan, (xy[0], xy[1], zlo, xy[2], xy[3], ceiling), tile_faces)
         node_rows[me][3] = -1                          # solid leaf 0 below the ground
         return me
 
@@ -490,6 +622,14 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
                 points = np.vstack([poly, bottom])
                 pieces.append((points, SimpleNamespace(equations=ConvexHull(points).equations), [], 0.))
             ring += 1
+    # The lava beds join the standing hull (every prism reaching the collision box).
+    for l in lavas:
+        b = l['box']
+        if b[2] <= cx0 or b[0] >= cx1 or b[3] <= cy0 or b[1] >= cy1:
+            continue
+        points = np.array([(x, y, l['bottom']) for x, y in l['hull']] +
+                          [(x, y, l['bottom'] - lava_bed) for x, y in l['hull']])
+        pieces.append((points, SimpleNamespace(equations=ConvexHull(points).equations), [], 0.))
     if hull == 'compiled':
         from collision_bsp import compile_standing
         if qbsp is None or collision_cache is None:
@@ -505,6 +645,7 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
     lumps = w.finish([x0, y0, floor], [x1, y1, ceiling], 0, croot, 0, len(faces),
                      lighting=bytes([light]) * samples)
     info = {'tiles': counts['tiles'], 'faces': counts['ground_faces'], 'water_faces': counts['water_faces'],
+            'lava_faces': counts['lava_faces'], 'lava_leaves': counts['lava_leaves'],
             'pieces': len(pieces), 'ring_tiles': ring,
             'hull_chain_max': max(getattr(w, 'hull_chains', None) or [0]),
             'clipnodes': len(w.lumps[9]) // 8, 'hull': hull, 'zmin': zmin, 'zmax': zmax, 'nodes': len(node_rows),
@@ -541,7 +682,9 @@ def terrain_unit(task):
     lumps, info = chunk_terrain(task['box'], step, height, material, task['floor'],
                                 lambda m: ('ground', 'g%d' % m), ('ground', '*water'), task['water'],
                                 task['light'], task['ceiling'], task.get('collision_box'), tiles,
-                                task.get('hull', 'routed'), task.get('qbsp'), task.get('collision_cache'))
+                                task.get('hull', 'routed'), task.get('qbsp'), task.get('collision_cache'),
+                                liquids=task.get('liquids'),
+                                lava_texture_id=('ground', '*lava') if task.get('liquids') else None)
     return {'lumps': [bytes(x) for x in lumps], 'texture_keys': info.pop('texture_keys'), 'info': info}
 
 

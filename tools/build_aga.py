@@ -51,7 +51,7 @@ import sys
 import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.paths import ensure_external
+from mwad.paths import copy_tree, ensure_external
 from prepare_music import playlists, unpack_stream
 from check_aga_binary import check_binary
 import check_fpu_unimplemented
@@ -279,8 +279,9 @@ def stage_game_config(id1, debug_luma=False, live_logs=False):
     return {'diagnostic_logs': 'live' if live_logs else 'memory'}
 
 
-def startup_config(config):
-    """Configure controls first; quake.rc selects the named start after autoexec."""
+def startup_config(config, draw_distance=540):
+    """Configure controls first; quake.rc selects the named start after autoexec.
+    draw_distance: the starting fog/draw distance (540; a DEBUG ONLY MiniWind image states a closer one)."""
     config=re.sub(r'(?m)^r_max(?:surfs|edges) [^\n]*\n?', '', config)
     config=re.sub(r'(?m)^aw_drawdistance [^\n]*\n?', '', config)
     config=re.sub(r'(?m)^bind "?[123]"? "aw_drawdistance (?:450|540|700|1000)"\n?', "", config)
@@ -289,7 +290,7 @@ def startup_config(config):
         'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
     config=re.sub(r'(?m)^(?:bind |unbindall)[^\n]*\n?', '', config)
-    return 'exec keymaps-default.cfg\naw_drawdistance 540\n'+config.rstrip()+'\n'
+    return 'exec keymaps-default.cfg\naw_drawdistance %d\n' % int(draw_distance)+config.rstrip()+'\n'
 
 def validate_quakec(path):
     """Reject incompatible compiler output before it reaches an Amiga image."""
@@ -731,7 +732,7 @@ def staged_extra_towns(id1):
     return [town for town in runtime_towns()[len(FIXED_TOWNS):] if (Path(id1)/town['regions']).is_file()]
 
 
-def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=()):
+def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(), kept_extra=()):
     """Hash every bound asset (up to `jobs` hashing workers); fold in fixed order.
 
     partial: a MiniWind partial-area image (tools/miniwind.py) binds the maps it
@@ -741,7 +742,8 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
     removed: legacy town maps a pure CHIM image left out (id1-relative 'maps/x.bsp'); they are not
     required, and the CHIM frame maps (maps/*-chim.bsp) are bound instead.
     excluded: quick-test groups; with 'interiors' the room maps the build left out
-    (every interior except the prison ship and the Census office) are not required."""
+    (every interior except the prison ship and the Census office) are not required.
+    kept_extra: maps a MiniWind image keeps for its direct start (tools/miniwind.py start_maps)."""
     from build_parallel import hash_files
     fingerprint=hashlib.sha256()
     from area_config import SCENES
@@ -752,7 +754,9 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
     names=[*(f"maps/{s['map']}.bsp" for s in scenes), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', 'balmora-regions.txt', *town_maps, 'progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj', 'world/entries.dat', 'world/quests.awq', 'world/region-names.awn']
     if partial:
         import miniwind
-        kept,prefix=miniwind.kept_maps(scope=miniwind.DEFAULT_SCOPE if partial is True else partial)
+        scope,town=(partial if isinstance(partial,tuple) else
+                    (miniwind.DEFAULT_SCOPE if partial is True else partial,miniwind.TOWN))
+        kept,prefix=miniwind.kept_maps(scope=scope,town=town,extra=kept_extra)
         names=[name for name in names if name!='seyda-regions.txt' and
                not (name.startswith('maps/') and not miniwind.keep_map(name[5:-4],kept,prefix))]
     # Optional extra towns follow, so images without them keep their fingerprint.
@@ -814,7 +818,10 @@ def image_waivers(args):
         ('--allow-known-actor-ground-findings', getattr(args, 'allow_known_actor_ground_findings', None)),
         ('--accept-known-stair-findings', getattr(args, 'accept_known_stair_findings', None)),
         ('--map-budget-policy warning', getattr(args, 'map_budget_policy', 'strict') == 'warning'),
-        ('--exclude ' + ','.join(excluded_groups(args)), bool(excluded_groups(args)))) if used]
+        ('--exclude ' + ','.join(excluded_groups(args)), bool(excluded_groups(args))),
+        ('--direct-start', getattr(args, 'direct_start', None)),
+        ('--skip-census', getattr(args, 'skip_census', None)),
+        ('--quick-character', getattr(args, 'quick_character', None))) if used]
 
 
 def excluded_groups(args):
@@ -843,6 +850,63 @@ def stage_excluded_content(boot, groups):
     return build_exclusions.record(groups)
 
 
+def chim_native_towns(args):
+    """The towns of --chim-town outputs (tools/chim_town.py): on CHIM with no legacy region maps."""
+    towns=[]
+    for path in getattr(args,'chim_town',None) or []:
+        towns.append(json.loads((Path(path)/'entities.json').read_text(encoding='utf-8'))['town'])
+    return towns
+
+
+def chim_town_rows(args):
+    """{town: frame-map entity rows} of the --chim-town outputs, with the shared exterior sky keys the
+    sky pass gives every exterior map's worldspawn (exterior_sky_build.transform)."""
+    from exterior_sky_build import SHARED_SKY_PATH
+    rows={}
+    for path in getattr(args,'chim_town',None) or []:
+        record=json.loads((Path(path)/'entities.json').read_text(encoding='utf-8'))
+        town=[dict(e) for e in record['rows']]
+        town[0]['_aw_sky_mode']='exterior'
+        town[0]['_aw_sky_asset']=SHARED_SKY_PATH
+        rows[record['town']]=town
+    return rows
+
+
+def chim_town_placements(args, id1):
+    """{'<town>-chim': reference numbers} for each --chim-town town: its CHIM world placements, its frame
+    actors and its region harvest catalogues (the entity tracker counts them as the legacy region maps
+    would have)."""
+    if not getattr(args,'chim_town',None):
+        return {}
+    from chim.frame_map import chim_placements
+    from entity_tracker import harvest_refs
+    from town_config import load_settings, runtime_towns
+    out={}
+    for town, rows in chim_town_rows(args).items():
+        refs={int(e['aw_ref']) for e in rows if str(e.get('aw_ref','')).isdigit()}
+        refs|=set(chim_placements(args.chim_world, tuple(load_settings(town)['source_cell'])))
+        row=next(t for t in runtime_towns() if t['id']==town)
+        for name in town_region_map_names(Path(id1)/row['regions'], row['prefix']):
+            catalogue=Path(id1)/('harvest-'+Path(name).stem+'.txt')
+            if catalogue.is_file():
+                refs|=harvest_refs(catalogue.read_bytes())
+        out[town+'-chim']=refs
+    return out
+
+
+def never_built_maps(id1, towns):
+    """id1-relative legacy exterior maps of CHIM towns built without them (their region tables name them)."""
+    from town_config import runtime_towns
+    names=[]
+    for town in runtime_towns():
+        if town['id'] in towns:
+            names.append('maps/'+town['name']+'.bsp')
+            table=Path(id1)/town['regions']
+            if table.is_file():
+                names+=town_region_map_names(table,town['prefix'])
+    return names
+
+
 def chim_world_receipt(chim_world):
     """Read and check a CHIM world's receipts (read only): its files are there, it passed validation
     against its source and names the chim builder. Returns (receipt, areas). Shared by chim_frame_maps
@@ -863,7 +927,7 @@ def chim_world_receipt(chim_world):
     return receipt, areas
 
 
-def chim_frame_maps(chim_world, id1):
+def chim_frame_maps(chim_world, id1, town_rows=None):
     """Check a CHIM world's receipts and write its frame maps into id1: maps/<town>-chim.bsp for each
     area (the engine loads it instead of the town's region maps when CHIM is on), and for Seyda Neen
     its special maps (format 0.5). Each is checked against the town's final legacy maps, which must
@@ -872,7 +936,9 @@ def chim_frame_maps(chim_world, id1):
     receipt, areas = chim_world_receipt(chim_world)
     # Written before the partition, so a refused entity stops the image here.
     from chim.frame_map import SPECIALS, build as build_frame_map, build_docks
-    frame_maps = [build_frame_map(id1, area, chim_world) for area in areas]
+    town_rows = town_rows or {}
+    frame_maps = [build_frame_map(id1, area, chim_world, **({'entity_rows': town_rows[area]} if area in town_rows else {}))
+                  for area in areas]
     # Seyda Neen's special maps (the intro docks, the Census courtyard) become further frame maps of
     # its frame (format 0.5): maps/intro_docks-chim.bsp, maps/sncourt-chim.bsp.
     if 'seyda' in areas:
@@ -941,8 +1007,10 @@ def miniwind_options(args):
     a private -devN version, the generated feature line and the optional description."""
     if not getattr(args, 'miniwind', False):
         if getattr(args, 'miniwind_features', None) or getattr(args, 'miniwind_description', None) or \
-                getattr(args, 'miniwind_scope', None):
-            raise ValueError('--miniwind-features/--miniwind-description/--miniwind-scope require --miniwind')
+                getattr(args, 'miniwind_scope', None) or getattr(args, 'miniwind_town', None) or \
+                getattr(args, 'miniwind_debug', False) or getattr(args, 'default_draw_distance', None):
+            raise ValueError('--miniwind-features/--miniwind-description/--miniwind-scope/--miniwind-town/'
+                             '--miniwind-debug/--default-draw-distance require --miniwind')
         if getattr(args, 'world_scenery', None) is None:
             raise ValueError('--world-scenery is required (a complete world scenery overlay)')
         return None
@@ -951,15 +1019,147 @@ def miniwind_options(args):
     features = getattr(args, 'miniwind_features', None)
     if not features:
         raise ValueError('--miniwind needs --miniwind-features (tools/build.py generates it from its stage plan)')
-    miniwind.data_file(features)
+    town = miniwind.check_town(getattr(args, 'miniwind_town', None) or miniwind.TOWN)
+    debug = bool(getattr(args, 'miniwind_debug', False))
+    boot = miniwind.boot_line([c for c in (getattr(args, 'miniwind_boot', None) or '').split(';') if c.strip()])
+    miniwind.data_file(features, town, debug=debug, boot=boot)
     for name in ('world_scenery', 'world_terrain', 'world_flora', 'seyda_recorded', 'gallery'):
         if getattr(args, name, None) is not None:
-            raise ValueError('--miniwind builds Balmora only; drop --' + name.replace('_', '-'))
+            raise ValueError('--miniwind builds one town only; drop --' + name.replace('_', '-'))
     scope = miniwind.check_scope(getattr(args, 'miniwind_scope', None) or miniwind.DEFAULT_SCOPE)
     if miniwind.label(scope) and not getattr(args, 'no_npc_gallery', False):
         raise ValueError(miniwind.SCOPE_OPTION + ' ' + scope + ' implies --no-npc-gallery')
-    return {'features': features, 'scope': scope,
+    draw = getattr(args, 'default_draw_distance', None)
+    if draw is not None and (not debug or not 128 <= draw <= 540):
+        raise ValueError('--default-draw-distance is DEBUG ONLY (--miniwind-debug) and 128..540')
+    return {'features': features, 'scope': scope, 'town': town, 'debug': debug, 'draw_distance': draw or 540, 'boot': boot,
             'description': miniwind.check_description(getattr(args, 'miniwind_description', None))}
+
+
+_DIRECT_START = [None]
+
+
+def direct_start_option(args=None):
+    """The image's parsed --direct-start (tools/direct_start.py), or None."""
+    if args is not None:
+        text = getattr(args, 'direct_start', None)
+        import direct_start
+        _DIRECT_START[0] = direct_start.parse(text) if text else None
+    return _DIRECT_START[0]
+
+
+def direct_start_map(args):
+    """The map of an interior direct start (the scene rows' cell ID), or None."""
+    start = direct_start_option()
+    if start is None or start.kind != 'interior':
+        return None
+    import direct_start
+    scenes = {row['cell'].casefold(): row['map'] for row in direct_start.scene_rows() if row.get('cell')}
+    return scenes.get(start.cell.casefold())
+
+
+def mini_start_maps(args):
+    """Maps outside Balmora a MiniWind image keeps for its direct start (the prison ship), else ()."""
+    import miniwind
+    return miniwind.start_maps(direct_start_map(args)) if getattr(args, 'miniwind', False) else ()
+
+
+def test_header(mini, start, font_path=None):
+    """The title screen header of a test build (id1/miniwind.txt "header", aw_menu.c): MiniWind
+    "MINIWIND TEST UNIT: <description>", another direct start "QUICK TEST BUILD: <scene>".
+    Returns (text, record with the lines the game font wraps it to)."""
+    import miniwind
+    from prepare_logo import fallback_width, load_font, text_width
+    if mini:
+        text = miniwind.header_line(mini.get('description'))
+    else:
+        text = miniwind.header_line(start.describe() if start else None, prefix='QUICK TEST BUILD: ',
+                                    fallback='direct start')
+    if font_path and Path(font_path).is_file():
+        font = load_font(font_path)
+        measure = lambda line: text_width(font, line)
+    else:
+        measure = fallback_width
+    lines, cut = miniwind.header_lines(text, measure)
+    if cut:
+        print('[warning] Title screen header cut to two lines: ' + ' / '.join(lines), flush=True)
+    return text, {'text': text, 'lines': lines, 'cut': cut, 'width_px': miniwind.HEADER_WIDTH}
+
+
+def stage_skip_census(args, id1):
+    """--skip-census: aw_skip_census 1 at the end of the game's default settings (default-game.cfg), so
+    New Game makes the character on the quick character screen (aw_quickchar.c). Returns the record."""
+    if not getattr(args, 'skip_census', False):
+        return {'on': False}
+    path = Path(id1) / 'default-game.cfg'
+    raw = path.read_bytes()
+    if not raw.endswith(b'\n'):
+        raw += b'\n'
+    raw += SKIP_CENSUS_LINES
+    path.write_bytes(raw)
+    print('Quick character screen: New Game skips the ship and the census (aw_skip_census 1)', flush=True)
+    return {'on': True, 'config': 'id1/default-game.cfg', 'line': 'aw_skip_census 1'}
+
+
+SKIP_CENSUS_LINES = (b'// --skip-census (quick test build): New Game makes the character on the quick character\n'
+                     b'// screen and goes straight to the scene, without the ship and the census office.\n'
+                     b'aw_skip_census 1\n')
+
+
+def stage_direct_start(args, boot, out, mini, excluded):
+    """Resolve the direct start against the final maps and write the quick-start lines
+    (id1/miniwind.txt, aw_miniwind.c): a MiniWind build adds them to its notice file; any other
+    build gets the file with the quick-test title. Returns the build.json record, or None."""
+    import direct_start, miniwind
+    from town_config import runtime_towns
+    start = direct_start_option()
+    character = direct_start.parse_character(
+        getattr(args, 'quick_character', None), getattr(args, 'data_files', None)) if getattr(args, 'quick_character', None) else None
+    if start is None and character is None:
+        return None
+    id1 = Path(boot)/'id1'
+    towns = direct_start.town_rows(runtime_towns())
+    if start is not None:
+        if start.kind == 'interior':
+            scenes = {row['cell'].casefold(): row['map'] for row in direct_start.scene_rows() if row.get('cell')}
+            start.map = scenes.get(start.cell.casefold())
+            if start.map is None:
+                raise ValueError('%s "%s": the interior "%s" is not in this build. %s.'
+                                 % (direct_start.OPTION, start.text, start.cell, direct_start.NO_INTERIORS_NOTE))
+        if start.kind == 'area' and start.town not in {t['name'] for t in towns if (id1/t['regions']).is_file()}:
+            raise ValueError('%s %s: %s is not in this image' % (direct_start.OPTION, start.text, start.title))
+        if start.kind == 'area' and not any(t['name'] == start.town and 'teleport_arrival' in t['flags'] for t in towns):
+            # A town without a teleport arrival (Seyda Neen): its region table's arrival point.
+            from arrival_spot import read_directory
+            table = read_directory(id1/next(t['regions'] for t in towns if t['name'] == start.town))
+            line = 'map %s %s %s %s %s' % (start.town, *(direct_start._number(v) for v in (*table['arrival'], table['yaw'])))
+            resolved = {'kind': 'map', 'map': start.town, 'arrival': list(table['arrival']), 'yaw': table['yaw'],
+                        'from': 'the town region table arrival'}
+        else:
+            line, resolved = direct_start.resolve(start, id1, towns)
+    else:
+        line, resolved = None, None
+    character_value = direct_start.character_line(character) if character else None
+    path = id1/miniwind.DATA_FILE
+    if mini:
+        data = miniwind.data_file(mini['features'], mini.get('town', miniwind.TOWN), start=line, character=character_value,
+                                  debug=mini.get('debug', False),
+                                  header=test_header(mini, start, id1/'gfx/magic16.awf')[0], boot=mini.get('boot'))
+    else:
+        data = miniwind.data_file(direct_start.notice_features(start, excluded) if start else 'QUICK TEST BUILD',
+                                  town=direct_start.town_of(start, resolved or {}) if start else 'seyda',
+                                  start=line, character=character_value, title=direct_start.QUICK_TITLE,
+                                  features_prefix=None, header=test_header(None, start, id1/'gfx/magic16.awf')[0])
+    path.write_bytes(data)
+    record = {'start': start.record() if start else None, 'summary': direct_start.summary(start) if start else None,
+              'engine_line': line, 'resolved': resolved,
+              'character': character or direct_start.parse_character(None), 'notice_file': 'id1/' + miniwind.DATA_FILE,
+              'notice_sha256': digest(path)}
+    (Path(out)/'direct-start.json').write_text(json.dumps(record, indent=2)+'\n', encoding='utf-8', newline='\n')
+    print('Direct start: ' + (record['summary'] or 'MiniWind town') + (' -> ' + line if line else '')
+          + '; character ' + record['character']['race'] + ' ' + record['character']['class'] + ' ' + record['character']['name'],
+          flush=True)
+    return record
 
 
 def startup_lines(mini, font_path, chim=False):
@@ -972,7 +1172,21 @@ def startup_lines(mini, font_path, chim=False):
     from prepare_logo import (CHIM_STARTUP_LINES, STARTUP_LINES, TEXT_WIDTH, fallback_width, load_font,
                               text_width)
     if not mini:
-        return CHIM_STARTUP_LINES if chim else STARTUP_LINES
+        start = direct_start_option()
+        if start is None:
+            return CHIM_STARTUP_LINES if chim else STARTUP_LINES
+        import direct_start
+        from project_version import chim_version
+        if font_path and Path(font_path).is_file():
+            font = load_font(font_path)
+            measure = lambda text: text_width(font, text)
+        else:
+            measure = fallback_width
+        try:
+            chim_ver = chim_version(ROOT/'VERSION') if (ROOT/'CHIM_VERSION').is_file() else None
+        except (OSError, ValueError):
+            chim_ver = None
+        return tuple(direct_start.logo_lines(VERSION, chim_ver, start.describe(), measure=measure, width=TEXT_WIDTH))
     import miniwind
     from project_version import chim_version
     if font_path and Path(font_path).is_file():
@@ -981,7 +1195,7 @@ def startup_lines(mini, font_path, chim=False):
     else:
         measure = fallback_width
     return tuple(miniwind.logo_lines(VERSION, chim_version(ROOT/'VERSION'), mini['description'],
-                                     measure=measure, width=TEXT_WIDTH))
+                                     measure=measure, width=TEXT_WIDTH, debug=mini.get('debug', False)))
 
 
 def image(args):
@@ -993,9 +1207,10 @@ def image(args):
     if getattr(args, 'payload_preflight_only', False):
         # Read-only: the payload preflight alone on an existing run's staged payload (tools/build.py --check-payload).
         return payload_preflight(args, ensure_external(args.out, 'prepared AGA image'), excluded_groups(args),
-                                 image_jobs(args))
+                                 image_jobs(args), pending=seyda_pending(args, args.scene))
     require_private_test_version(VERSION, image_waivers(args))
     mini = miniwind_options(args)
+    direct_start_option(args)
     jobs = image_jobs(args)
     if getattr(args, 'allow_known_actor_ground_findings', None):
         from check_actor_ground import load_approved_report
@@ -1022,12 +1237,14 @@ def image(args):
         raise ValueError('--music is required unless the quick test build leaves the music out (--exclude music)')
     scene=ensure_external(args.scene,'AGA scene');out=new_output(args.out)
     if 'music' not in excluded:ensure_external(args.music,'converted music')
-    boot=out/'boot';shutil.copytree(scene/'id1',boot/'id1');(boot/'S').mkdir()
+    boot=out/'boot';copy_tree(scene/'id1',boot/'id1');(boot/'S').mkdir()
     if mini:
         # Balmora only: every other area's maps leave before any pass runs.
         import miniwind
         from chim.frame_map import remove_legacy_areas
-        mini['prune']=miniwind.prune(boot/'id1',scope=mini['scope'],remove_legacy=remove_legacy_areas)
+        mini['prune']=miniwind.prune(boot/'id1',scope=mini['scope'],remove_legacy=remove_legacy_areas,town=mini['town'],
+                                     extra=mini_start_maps(args),census_files=bool(getattr(args,'skip_census',False)),
+                                     chim_town=mini['town'] in chim_native_towns(args))
         (out/'miniwind-prune.json').write_text(json.dumps(mini['prune'],indent=2)+'\n',encoding='utf-8',newline='\n')
     excluded_content=stage_excluded_content(boot, excluded)
     (out/'excluded-content.json').write_text(json.dumps(excluded_content,indent=2)+'\n',encoding='utf-8',newline='\n')
@@ -1046,12 +1263,20 @@ def image(args):
         from install_world_flora import install as install_world_flora
         flora_acceptance = install_world_flora(flora, boot/'id1', world_scenery_acceptance, jobs=jobs)
         (out/'world-flora-staging.json').write_text(json.dumps(flora_acceptance, indent=2)+'\n', encoding='utf-8', newline='\n')
+    # The payload preflight as soon as the payload it reads is staged (scene copy, world terrain, scenery and
+    # flora installed): an error is reported in the image step's first minute instead of after its passes
+    # (BUILD-IMAGE-NO-RESUME-33). finalize_image runs it again on what the steps in between added.
+    # The Seyda Neen region maps this step converts (or installs, --seyda-recorded) further down are
+    # checked as planned here and as written there (BUILD-SEYDA-CONVERTED-NOT-STAGED-35).
+    payload_preflight(args, out, excluded, jobs, pending=None if mini else seyda_pending(args, scene))
     cfg=boot/'id1/default.cfg'
-    cfg.write_text(startup_config(cfg.read_text()), newline='\n')
+    cfg.write_text(startup_config(cfg.read_text(), mini['draw_distance'] if mini else 540), newline='\n')
     shutil.copyfile(ROOT/'config/keymaps.cfg',boot/'id1/keymaps-default.cfg')
     logs_record=stage_game_config(boot/'id1', debug_luma=engine_record.get('debug_luma',False),
                                   live_logs=getattr(args,'live_logs',False))
-    (out/'diagnostic-logs.json').write_text(json.dumps(logs_record,indent=2)+'\n', newline='\n')
+    skip_census_record=stage_skip_census(args, boot/'id1')
+    args.image_skip_census_record=skip_census_record  # finalize_image writes it into build.json
+    (out/'diagnostic-logs.json').write_text(json.dumps(logs_record,indent=2)+'\n', encoding='utf-8', newline='\n')
     if logs_record['diagnostic_logs']=='live':
         print('[diagnostics] --live-logs: this image writes its diagnostic logs as they happen (benchmark/diagnostic image)',flush=True)
     stage_debug_catalogues(boot/'id1', debug_luma=engine_record.get('debug_luma',False))
@@ -1107,7 +1332,7 @@ def image(args):
     # MiniWind: the stream ends on the full screen, which the engine holds with its
     # "Press ENTER to start" line until Enter (aw_movie.c); normal builds fade out.
     prepare_logo(logo,logo_stream,boot/'id1/gfx/magic16.awf',lines=startup_lines(mini,boot/'id1/gfx/magic16.awf',chim=bool(getattr(args,'chim_world',None))),
-                 **({'prompt_top':miniwind.PROMPT_Y} if mini else {}))
+                 **({'prompt_top':miniwind.PROMPT_Y} if mini or direct_start_option() else {}))
     movie=boot/'id1/intro/mw_intro.awv'
     if movie.exists():
         from prepare_video import validate as validate_video
@@ -1121,11 +1346,15 @@ def image(args):
     (boot/'id1/quake.rc').write_text('exec default.cfg\nexec default-game.cfg\nexec config.cfg\nexec keymap.cfg\nexec keymaps.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_horizon_migrate\naw_startup\n', newline='\n')
     if mini:
         # The engine reads the notice and starts in the town (aw_miniwind.c, aw_scene.c aw_quick_start).
-        (boot/'id1'/miniwind.DATA_FILE).write_bytes(miniwind.data_file(mini['features']))
+        mini['header']=test_header(mini,None,boot/'id1/gfx/magic16.awf')[1]
+        (boot/'id1'/miniwind.DATA_FILE).write_bytes(miniwind.data_file(mini['features'],mini['town'],debug=mini['debug'],
+                                                                     header=mini['header']['text'],boot=mini.get('boot')))
         (boot/miniwind.MARKER_FILE).write_text(miniwind.marker_text(VERSION,mini['features'],mini['description'],
-                                                                    scope=mini['scope']),newline='\n')
-        print('Default start: logo fade, "'+miniwind.PROMPT+'", then '+miniwind.TOWN+' (Hors preset); New Game starts '
-              'there again. '+miniwind.partial_area(mini['scope'])+'.',flush=True)
+                                                                    scope=mini['scope'],town=mini['town'],
+                                                                    debug=mini['debug']),newline='\n')
+        print('Default start: logo fade, "'+miniwind.PROMPT+'", then '+mini['town']+' (Hors preset); New Game starts '
+              'there again. '+('DEBUG ONLY, not a playtest. ' if mini['debug'] else '')
+              +miniwind.partial_area(mini['scope'],mini['town'])+'.',flush=True)
     else:
         print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
@@ -1151,16 +1380,25 @@ def image(args):
                               palette=boot/'id1/gfx/palette.lmp', ericw_bin=args.qbsp.parent,
                               work_dir=out/'bounded-seyda', vis_mode=getattr(args,'vis_mode','fast'),
                               canonical_land_source=getattr(args,'canonical_land_source',None), jobs=jobs,
-                              recorded=getattr(args,'seyda_recorded',None))
+                              recorded=getattr(args,'seyda_recorded',None),
+                              terrain_cull=getattr(args,'seyda_terrain_cull','on')!='off')
     # Recorded-stage exception (BUILD-SEYDA-REGEN-30): later passes keep these maps byte for byte.
     import recorded_stage
     frozen=recorded_stage.frozen_maps(out/'bounded-seyda')
+    native=chim_native_towns(args)
+    if native:
+        from chim_town import install as install_chim_town
+        installed=[install_chim_town(path,boot/'id1') for path in args.chim_town]
+        (out/'chim-towns.json').write_text(json.dumps(installed,indent=2)+'\n',encoding='utf-8',newline='\n')
+        print('CHIM towns from the game data (no legacy region maps): '+', '.join(native),flush=True)
     if getattr(args, 'balmora_cache', None):
         from repair_balmora_maps import repair as repair_balmora_maps
         print('Preparing measured bounded Balmora layout from complete source cache...', flush=True)
         repair_balmora_maps(boot/'id1/maps', cache=args.balmora_cache,
                            palette=boot/'id1/gfx/palette.lmp', ericw_bin=args.qbsp.parent,
-                           work_dir=out/'bounded-balmora', threads=jobs, vis_mode=getattr(args,'vis_mode','fast'))
+                           work_dir=out/'bounded-balmora', threads=jobs, vis_mode=getattr(args,'vis_mode','fast'),
+                           night_lamps=(__import__('mwad.paths',fromlist=['child_ci']).child_ci(args.data_files,'Morrowind.esm')
+                                        if getattr(args,'night_lamp_lightmaps',False) else None))
     if flora:
         from install_town_flora import install as install_town_flora
         from prepare_quake import CENTRE
@@ -1176,23 +1414,27 @@ def image(args):
                 town_scene_report=args.town_flora_scene_report, work_dir=out/'town-flora-seyda')}
             shutil.copyfile(boot/'id1/maps'/(actual['fallback_alias']+'.bsp'), boot/'id1/maps/seyda.bsp')
         from install_town_flora import town_entries
-        towns['balmora'] = install_town_flora(boot, flora, town_palette,
-            entries=town_entries('balmora'),
-            town_source_index=args.balmora_cache/'scenery/scenery-index.json',
-            work_dir=out/'town-flora-balmora')
-        # Match the installed runtime directory's named fallback alias.
-        rows=(boot/'id1/balmora-regions.txt').read_text(encoding='ascii').splitlines()
-        point=tuple(map(float,rows[0].split()[4:6]))
-        fallback=next(row.split()[0] for row in rows[1:] if
-            float(row.split()[1]) <= point[0] < float(row.split()[3]) and
-            float(row.split()[2]) <= point[1] < float(row.split()[4]))
-        shutil.copyfile(boot/'id1/maps'/(fallback+'.bsp'), boot/'id1/maps/balmora.bsp')
+        if 'balmora' in native:
+            # The CHIM world holds Balmora's town flora as meshes (chim_build --flora); no legacy maps.
+            towns['balmora'] = {'status': 'in the CHIM world (no legacy region maps)'}
+        else:
+            towns['balmora'] = install_town_flora(boot, flora, town_palette,
+                entries=town_entries('balmora'),
+                town_source_index=args.balmora_cache/'scenery/scenery-index.json',
+                work_dir=out/'town-flora-balmora')
+            # Match the installed runtime directory's named fallback alias.
+            rows=(boot/'id1/balmora-regions.txt').read_text(encoding='ascii').splitlines()
+            point=tuple(map(float,rows[0].split()[4:6]))
+            fallback=next(row.split()[0] for row in rows[1:] if
+                float(row.split()[1]) <= point[0] < float(row.split()[3]) and
+                float(row.split()[2]) <= point[1] < float(row.split()[4]))
+            shutil.copyfile(boot/'id1/maps'/(fallback+'.bsp'), boot/'id1/maps/balmora.bsp')
         flora_acceptance['towns'] = {name:{k:v for k,v in result.items() if k!='maps'} for name,result in towns.items()}
         (out/'world-flora-staging.json').write_text(json.dumps(flora_acceptance,indent=2)+'\n',encoding='utf-8',newline='\n')
     if getattr(args,'harvest',None):
         # Harvestable mushrooms replace baked ones before the final map passes (BUILD-HARVEST-NOT-BUILT-32).
         from harvest_build import clear_baked
-        clear_baked(args.harvest,boot/'id1',out/'harvest',data_files=args.data_files,jobs=jobs)
+        clear_baked(args.harvest,boot/'id1',out/'harvest',data_files=args.data_files,jobs=jobs,native=native)
     qc=out/'qc';qc.mkdir()
     for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
     if args.hands=='sprites':
@@ -1217,14 +1459,16 @@ def miniwind_hdf_tag(args):
     if not getattr(args, 'miniwind', False):
         return ''
     import miniwind
-    return miniwind.hdf_tag(getattr(args, 'miniwind_scope', None) or miniwind.DEFAULT_SCOPE)
+    return miniwind.hdf_tag(getattr(args, 'miniwind_scope', None) or miniwind.DEFAULT_SCOPE,
+                            getattr(args, 'miniwind_town', None) or miniwind.TOWN,
+                            bool(getattr(args, 'miniwind_debug', False)))
 
 
-def miniwind_start():
+def miniwind_start(town=None):
     """build.json default_start of a MiniWind image (aw_movie.c, aw_scene.c aw_quick_start)."""
     import miniwind
     return {'profile': 'logo-fade-enter-then-quick-start', 'movie': 'intro/amiwind.awv', 'prompt': miniwind.PROMPT,
-            'new_game_map': miniwind.TOWN,
+            'new_game_map': town or miniwind.TOWN,
             'character': 'Hors preset (Nord, Barbarian, The Steed)', 'notice_file': 'id1/' + miniwind.DATA_FILE}
 
 
@@ -1235,9 +1479,12 @@ def miniwind_receipt(args, out, boot):
     notice = boot / 'id1' / miniwind.DATA_FILE
     logo = startup_lines(miniwind_options(args), boot / 'id1/gfx/magic16.awf')
     scope = miniwind.check_scope(getattr(args, 'miniwind_scope', None) or miniwind.DEFAULT_SCOPE)
+    town = getattr(args, 'miniwind_town', None) or miniwind.TOWN
+    debug = bool(getattr(args, 'miniwind_debug', False))
     return {'name': miniwind.NAME, 'scope': scope, 'label': miniwind.label(scope),
-            'partial_area': miniwind.partial_area(scope), 'town': miniwind.TOWN,
-            'notice': [miniwind.NOTICE_TITLE, args.miniwind_features],
+            'partial_area': miniwind.partial_area(scope, town), 'town': town,
+            'debug_only': debug, 'draw_distance': getattr(args, 'default_draw_distance', None) or 540,
+            'notice': [miniwind.notice_title(debug), args.miniwind_features],
             'notice_file': 'id1/' + miniwind.DATA_FILE, 'notice_sha256': digest(notice),
             'marker_file': miniwind.MARKER_FILE, 'description': getattr(args, 'miniwind_description', None),
             'logo_lines': [miniwind.line_text(line) for line in logo],
@@ -1259,7 +1506,9 @@ def staged_exterior_map_names(id1):
     for town in towns:
         directory = id1 / town['regions']
         if directory.is_file():
-            names.update(Path(name).stem for name in town_region_map_names(directory, town['prefix']))
+            # A CHIM town built from the game data has a region table but no region maps.
+            names.update(Path(name).stem for name in town_region_map_names(directory, town['prefix'])
+                         if (id1 / name).is_file())
     directory = id1 / 'world/regions.awr'
     if directory.is_file():
         raw = directory.read_bytes()
@@ -1317,12 +1566,50 @@ def require_complete_media_outputs(media_coverage):
         raise ValueError('Media coverage status is not complete; see media-coverage.json')
     return True
 
-def payload_preflight(args, out, excluded, jobs):
+# The special scenes prepare_seyda_regions.convert writes after the regions (its `specials`).
+SEYDA_SPECIAL_MAPS = ('intro_docks', 'sncourt')
+
+def seyda_pending(args, scene):
+    """The Seyda Neen files the image step writes itself before its CHIM frame maps, read only:
+    {id1-relative file: the region names a table lists, or None}, or None when it writes none (MiniWind) or its inputs are not
+    there (then the preflight reports them missing). Converted (the default): the region conversion's
+    plan, from the scene's complete seyda.bsp and seyda.map; --seyda-recorded DIR: the pinned recorded
+    set, after the same pin check the install makes (BUILD-SEYDA-CONVERTED-NOT-STAGED-35)."""
+    if getattr(args, 'miniwind', False):
+        return None
+    recorded = getattr(args, 'seyda_recorded', None)
+    if recorded is not None:
+        # The same pin check install() makes (tools/recorded_stage.py), then its shipped set.
+        import recorded_stage
+        from chim.frame_map import region_table
+        _, files, aliases = recorded_stage.check_source(recorded)
+        plan = {}
+        for name, source in recorded_stage.shipped(files, aliases).items():
+            plan[name] = (tuple(n for n, _ in region_table(Path(recorded)/'id1'/source)[1])
+                          if name.endswith('-regions.txt') else None)
+        return plan
+    if scene is None or not all((Path(scene)/name).is_file() for name in ('seyda.bsp', 'seyda.map')):
+        return None
+    # convert() (tools/prepare_seyda_regions.py): one map per layout region, the special scenes, the
+    # fallback seyda.bsp, and the region table listing the regions in layout order.
+    import prepare_seyda_regions as seyda_regions
+    names = tuple(entry['name'] for entry in seyda_regions.regions())
+    plan = {'seyda-regions.txt': names}
+    for name in names + SEYDA_SPECIAL_MAPS + ('seyda',):
+        plan['maps/'+name+'.bsp'] = None
+    return plan
+
+def payload_preflight(args, out, excluded, jobs, pending=None):
     """The image step's read-only payload checks over the staged payload, before it writes anything
-    (tools/payload_preflight.py; CHIM-HARVEST-SPECIALS-33 stopped three image runs at their end)."""
+    (tools/payload_preflight.py; CHIM-HARVEST-SPECIALS-33 stopped three image runs at their end).
+    pending: files the image step still writes before its frame maps (seyda_pending); finalize_image
+    passes none, so the written files are checked there."""
     import payload_preflight as preflight
-    return preflight.run(out, chim_world=getattr(args, 'chim_world', None),
-                         music=None if 'music' in excluded else getattr(args, 'music', None), jobs=jobs)
+    return preflight.run(out, chim_world=getattr(args, 'chim_world', None), pending=pending,
+                         music=None if 'music' in excluded else getattr(args, 'music', None), jobs=jobs,
+                         harvest=getattr(args, 'harvest', None), data_files=getattr(args, 'data_files', None),
+                         report_path=None if getattr(args, 'payload_preflight_only', False) else out/'payload-preflight.json',
+                         chim_towns=chim_native_towns(args))
 
 def finalize_image(args):
     """Finalize an already prepared private image stage through every normal gate.
@@ -1385,6 +1672,12 @@ def finalize_image(args):
     from prepare_guard_torches import prepare as prepare_guard_torches
     guard_torches = prepare_guard_torches(args.data_files, boot / 'id1')
     (out/'guard-torch-conversion.json').write_text(json.dumps(guard_torches,indent=2)+'\n', newline='\n')
+    # Original NPC heads take world, combat and guard models past 2,000 vertices:
+    # each gets its byte-matching model-budgets.txt line (NPC-HEAD-DECIMATION-33).
+    from audit_gallery_budgets import world_allowances
+    world_budgets = world_allowances(boot / 'id1')
+    (out/'world-model-budgets.json').write_text(json.dumps(world_budgets,indent=2)+'\n', newline='\n')
+    print(f"World model allowances: {len(world_budgets['added'])} extended NPC models listed in model-budgets.txt.", flush=True)
     # Apply explicit sky policy after every mesh/overlay, before all final gates.
     from exterior_sky_build import configure_staged_maps
     exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
@@ -1419,6 +1712,12 @@ def finalize_image(args):
         staged_exterior_map_names(boot/'id1') | staged_interior_map_names(boot/'id1'), jobs=jobs)
     (out/'hand-metadata.json').write_text(json.dumps(hand_metadata,indent=2)+'\n', newline='\n')
     check_recorded(boot/'id1', out/'bounded-seyda', 'first-person hand metadata', jobs=jobs)
+    # Stable interior cell numbers + full cell IDs for the debug HUD and `dbg cell`;
+    # the lookup table goes into the build folder.
+    from cell_numbers import stamp_staged_cells
+    cell_numbers = stamp_staged_cells(boot/'id1', args.data_files, staged_interior_map_names(boot/'id1'),
+                                      out/'cell-numbers.json', jobs=jobs)
+    check_recorded(boot/'id1', out/'bounded-seyda', 'interior cell numbers', jobs=jobs)
     # Finish immutable BSP sharing before contact/heap gates and fingerprinting.
     # This step is interpreted Python only; it never creates a native helper.
     from optimize_world_maps import optimize_maps, verify_optimized_maps, bind_heap_report
@@ -1444,7 +1743,7 @@ def finalize_image(args):
     from prepare_mesh_bsp import DRESSING_EXCLUDED
     entity_tracker = entity_gate(out, boot/'id1/maps', child_ci(args.data_files,'Morrowind.esm'),
         getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None), jobs=jobs,
-        dressing_terms=DRESSING_EXCLUDED)
+        dressing_terms=DRESSING_EXCLUDED, extra_maps=chim_town_placements(args, boot/'id1'))
     # World progress map data: topomap coverage plus entity and POI layers.
     from world_progress import build_step as world_progress_step
     if getattr(args, 'miniwind', False):
@@ -1459,20 +1758,26 @@ def finalize_image(args):
     # Every town arrival and return point is a standing spot on the final
     # collision, by the engine's own arrival search (VIVEC-ARENA-TP-ARRIVAL-32).
     from arrival_spot import require as require_arrivals
-    require_arrivals(boot/'id1', out/'arrival-check.json')
+    from town_config import runtime_towns
+    require_arrivals(boot/'id1', out/'arrival-check.json',
+                     towns=[t for t in runtime_towns() if t['id'] not in chim_native_towns(args)])
+        # A direct start (tools/direct_start.py): resolved here, on the final maps, before a pure CHIM
+    # image removes the legacy maps (the region maps hold the same collision as the CHIM chunks).
+    direct_start_record=stage_direct_start(args, boot, out, miniwind_options(args), excluded)
     # Night lamp, glowing glass and location fog tables from the final maps (read only; before a pure CHIM image
     # removes the CHIM towns' legacy maps below).
     from night_lighting import stage as stage_night_lighting, image_sources
     night_lighting = stage_night_lighting(boot/'id1', master=child_ci(args.data_files,'Morrowind.esm'),
         maps=staged_exterior_map_names(boot/'id1'), sources=image_sources(args),
-        palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting')
+        palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting',
+        lighting_type=getattr(args, 'chim_lighting_type', None))
     # Pure CHIM (--builder chim): each CHIM town's frame maps are written and checked against its
     # final legacy maps (statics both ways, origin, harvest representation), then those legacy maps
     # leave the image (chim.frame_map.remove_legacy_areas, recorded): the stair and heap gates below
     # see only what ships, and the CHIM world carries its own (tools/chim_build.py).
     chim_frames, removed_legacy, not_on_chim = None, [], []
     if getattr(args, 'chim_world', None):
-        chim_frames = chim_frame_maps(args.chim_world, boot/'id1')
+        chim_frames = chim_frame_maps(args.chim_world, boot/'id1', town_rows=chim_town_rows(args))
         from chim.frame_map import remove_legacy_areas, remove_towns_not_on_chim
         removed_legacy = remove_legacy_areas(boot/'id1', chim_frames['areas'], 'the town runs on CHIM')
         # Extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image whole: exterior maps, region and
@@ -1494,6 +1799,14 @@ def finalize_image(args):
         from optimize_world_maps import rebind_chim_maps
         optimization = rebind_chim_maps(boot/'id1/maps', optimization, optimization_path,
                                         [row['file'] for row in removed_legacy], jobs=jobs)
+    # Every map that ships fits the engine's per-map tables: edicts, model and sound precaches, static
+    # entities, the scenery catalogue (tools/map_engine_limits.py, BUILD-BUDGET-ENGINE-LIMITS-35); a map
+    # over one stops the game at load ("no free edicts", precache overflow), so it never ships.
+    from map_engine_limits import check_maps as check_engine_map_limits
+    engine_map_limits = check_engine_map_limits(boot/'id1/maps', out/'engine-map-limits.json')
+    print('Engine map limits passed: %d maps; tightest: %s.' % (engine_map_limits['maps'], ', '.join(
+        '%s %s %d/%d' % (key, row['top'][0]['map'], row['top'][0]['value'], row['limit'])
+        for key, row in engine_map_limits['worst'].items() if row['top'])), flush=True)
     # Every flight of stairs in every map can be walked up and down by the
     # standing box (COLLISION-STAIR-SLOPE-32); on with follow_original_stair_rules.
     # The recorded Seyda Neen stage (BUILD-SEYDA-REGEN-30) is reported, not gated.
@@ -1538,8 +1851,10 @@ def finalize_image(args):
     recorded_stage = check_recorded(boot/'id1', out/'bounded-seyda', 'final image payload', jobs=jobs,
                                     removed=removed_files)
     write_content_fingerprint(boot/'id1', jobs=jobs, partial=getattr(args, 'miniwind', False) and
-                              (getattr(args, 'miniwind_scope', None) or True), removed=removed_files,
-                              excluded=excluded)
+                              ((getattr(args, 'miniwind_scope', None) or 'full', args.miniwind_town)
+                               if getattr(args, 'miniwind_town', None) else
+                               (getattr(args, 'miniwind_scope', None) or True)), removed=removed_files+never_built_maps(boot/'id1', chim_native_towns(args)),
+                              excluded=excluded, kept_extra=mini_start_maps(args))
     if 'music' in excluded:
         # Quick test build without music (--exclude music): no soundtrack, no playlist;
         # the game stays silent and says so once (aw_excluded.c).
@@ -1632,6 +1947,8 @@ def finalize_image(args):
         'guard_torches':guard_torches,
         'night_lighting':night_lighting,
         'hand_metadata':hand_metadata,
+        'cell_numbers':{'report':'cell-numbers.json','interior_cells':cell_numbers['interior_cells'],
+            'stamped_maps':len(cell_numbers['maps']),'masters_sha256':cell_numbers['masters_sha256']},
         'exterior_sky':{'local_skybox':exterior_sky['local_skybox'],
             'report':str(exterior_sky_path.relative_to(out)),
             'report_sha256':digest(exterior_sky_path),'status':exterior_sky['status'],
@@ -1670,7 +1987,7 @@ def finalize_image(args):
             'new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,
             'new_game_music_track':4,
             'new_game_music_source':opening_track['source'] if opening_track else None}
-            if not getattr(args, 'miniwind', False) else miniwind_start(),
+            if not getattr(args, 'miniwind', False) else miniwind_start(getattr(args, 'miniwind_town', None)),
         'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),
         'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(checker),
         'fpu_support':fpu_receipt,
@@ -1678,6 +1995,8 @@ def finalize_image(args):
         'media_coverage':{'report':media_coverage_path.name,'sha256':digest(media_coverage_path),
             'categories':media_coverage['categories'],'excluded':media_coverage.get('excluded',[]),
             'payload_readback':'passed'},
+        'direct_start':direct_start_record,
+        'skip_census':getattr(args,'image_skip_census_record',None),
         'excluded_content':(json.loads((out/'excluded-content.json').read_text(encoding='utf-8'))
             if (out/'excluded-content.json').is_file() else stage_excluded_content(boot, excluded)),
         'music_tracks':len(manifest['tracks']),'music_catalogue':music_catalogue,'heap_reservation_bytes':world_heap['heap_budget_bytes'],
@@ -1732,21 +2051,34 @@ def main():
     i.add_argument('--live-logs',action='store_true',help='BENCHMARK/DIAGNOSTIC IMAGES: write the engine diagnostic logs (walk-profile.csv, frame-stalls.csv, heap-audit.log, ...) as they happen (aw_logs_live 1), as before BOOT-VOLUME-NOT-VALIDATED-33; default keeps them in memory until Exit game or dbg savelogs')
     i.add_argument('--menu-logo',choices=['gold','legacy'],default='gold',help='Menu logo method: gold (default, name only on the palette gold ramp) or legacy (previous wordmark, whole-palette nearest colours; comparison only)')
     i.add_argument('--intro-captions',type=Path,help='Private JSON title cards; first card becomes a switchable opening overlay')
-    i.add_argument('--seyda-recorded',type=Path,help='Recorded-stage exception BUILD-SEYDA-REGEN-30: owner-provided recorded Seyda Neen maps (tools/recorded_stage.py), kept byte for byte by every later pass')
+    i.add_argument('--seyda-terrain-cull',choices=('on','off'),default='on',help='off: convert Seyda Neen without the terrain visual cull (a CHIM build: its Seyda Neen region maps are only a check reference for the frame maps and leave the image)')
+    i.add_argument('--seyda-recorded',type=Path,help='Optional: owner-provided recorded v0.0.31 Seyda Neen maps (tools/recorded_stage.py, BUILD-SEYDA-REGEN-30), kept byte for byte by every later pass; without it Seyda Neen is converted from the data files')
     i.add_argument('--canonical-land-source',type=Path,help='World-survey terrain-source.npz (survey_vvardenfell.py); required while Seyda terrain culling is enabled')
     i.add_argument('--world-terrain',type=Path,help='Complete validated refined terrain receipt and runtime directory, staged before scenery')
     i.add_argument('--world-scenery',type=Path,help='Complete validated full-world rock and giant-mushroom overlay directory; required except with --miniwind')
     i.add_argument('--miniwind',action='store_true',help='AmiWind "MiniWind" Playtester Build (tools/miniwind.py; tools/build.py --miniwind): a PARTIAL-AREA test image of Balmora on CHIM; private -devN versions only')
     i.add_argument('--miniwind-features',help='With --miniwind: the boot notice feature line tools/build.py generated from its stage plan ("FEATURES ONLY: ...")')
     i.add_argument('--miniwind-description',help='With --miniwind: optional "Scene:" line of the startup screen')
+    i.add_argument('--miniwind-boot',metavar='CMD[;CMD]',help='With --miniwind: dbg commands run once on arrival')
+    i.add_argument('--miniwind-town',help='With --miniwind: the town the image holds and boots into (default balmora)')
+    i.add_argument('--miniwind-debug',action='store_true',help='With --miniwind: a DEBUG ONLY image, not a playtest')
+    i.add_argument('--default-draw-distance',type=int,help='DEBUG ONLY (--miniwind-debug): the starting draw distance, '
+                   '128..540 (default 540)')
     i.add_argument('--miniwind-scope',choices=('full','exterior'),help='With --miniwind: full (default; Balmora exterior and interiors) or exterior (the Balmora exterior only; implies --no-npc-gallery)')
     i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')
     i.add_argument('--hand-catalog',type=Path,help='Per-race first-person hand catalogue from prepare_hand_catalog.py --runtime-palette; the builder default')
     i.add_argument('--chim-world',type=Path,help='CHIM world (tools/chim_build.py output: chim/, chim-receipt.json, '
                    'chim-validate.json, chim-stats.json), added as one more world volume; tools/build.py --builder chim')
+    i.add_argument('--chim-lighting-type',default=None,help='With --chim-world: the CHIM lighting type (tools/chim/light_types.py); it selects the night lamp table classes (none: empty, lamps: the warm lamp classes, hybrid: every class that adds light); default: the legacy lamp table')
     i.add_argument('--town-flora-source-index',type=Path,help='Exact original Seyda scenery reference bindings for flora installation')
     i.add_argument('--town-flora-scene-report',type=Path,help='Original alias conversion model mapping; required with --world-flora')
+    i.add_argument('--chim-town',dest='chim_town',type=Path,action='append',default=[],
+                   help='A CHIM town made from the game data (tools/chim_town.py output), repeatable: its residents, '
+                        'region table and door bank are installed and its CHIM frame map takes its entities; the '
+                        'town has no legacy region maps (CHIM-LEGACY-CHAIN-33)')
+    i.add_argument('--night-lamp-lightmaps',action='store_true',help='EXPERIMENTAL (off by default): bake night-lamp '
+                   'lightmaps (lightstyle 32) into the rebuilt Balmora cores (tools/lamp_lightmaps.py, prototype)')
     i.add_argument('--balmora-cache',type=Path,help='Complete owned Balmora preparation cache for measured layout repair before final actor/heap audits')
     i.add_argument('--town-scenery',type=Path,help='Seyda Neen scenery (prepare_scenery.py output) for the night window table; defaults to the directory of --town-flora-source-index')
     i.add_argument('--balmora-scenery',type=Path,help='Balmora scenery (the Balmora cache scenery/) for the night window table; defaults to --balmora-cache/scenery')
@@ -1764,6 +2096,14 @@ def main():
     for name in ['scene','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     i.add_argument('--music',type=Path,help='Converted soundtrack (prepare_music.py); required unless --exclude music')
     i.add_argument('--payload-preflight-only',action='store_true',help='Read only: run the payload preflight of the image step (tools/payload_preflight.py) on the already staged payload in --out and stop')
+    i.add_argument('--direct-start',metavar='START',
+                   help='Quick test build (-devN only): boot straight into START (tools/direct_start.py forms); '
+                        'resolved against the final maps and written to id1/miniwind.txt')
+    i.add_argument('--quick-character',metavar='RACE,CLASS[,NAME]',
+                   help='The ready-made character of the quick start (default: the Hors preset)')
+    i.add_argument('--skip-census',action='store_true',
+                   help='Quick test builds (-devN only): New Game makes the character on the quick character '
+                        'screen, without the ship and the census (aw_skip_census 1 in default-game.cfg)')
     i.add_argument('--exclude',metavar='GROUP[,GROUP...]',
                    help='DEBUGGING ONLY (quick test builds, -devN only): content groups the builder left out '
                         '(tools/build_exclusions.py); written to id1/excluded-content.txt for the game')

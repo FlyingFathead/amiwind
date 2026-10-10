@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_hand_models.h"
 #include "aw_torch.h"
 #include "aw_rcount.h"
+#include "aw_npc_lod.h"
 
 //define	PASSAGES
 
@@ -559,6 +560,8 @@ void R_DrawEntitiesOnList (void)
 		return;
 
 	AW_RC_ADD (RC_ENTITIES, cl_numvisedicts);
+	AW_NpcLodFrame ();
+	AW_RC_ADD (RC_LOD_SLOTS, AW_NpcLodResident (NULL));
 	for (i=0 ; i<cl_numvisedicts ; i++)
 	{
 		currententity = AW_GuardTorchEntity(cl_visedicts[i]);
@@ -578,6 +581,11 @@ void R_DrawEntitiesOnList (void)
 			break;
 
 		case mod_alias:
+		{
+			/* Near/far NPC models (aw_npc_lod.c): a render-only swap for
+			 * this draw; the entity keeps its own model and frame. */
+			model_t	*own = currententity->model;
+			currententity->model = AW_NpcLodModel (currententity);
 			VectorCopy (currententity->origin, r_entorigin);
 			VectorSubtract (r_origin, r_entorigin, modelorg);
 
@@ -585,6 +593,13 @@ void R_DrawEntitiesOnList (void)
 		// trivial accept status
 			if (R_AliasCheckBBox ())
 			{
+				if (currententity->model != own)
+				{
+					if (!strncmp (currententity->model->name, "progs/l0/", 9))
+						AW_RC_ADD (RC_LOD_NEAR, 1);
+					else
+						AW_RC_ADD (RC_LOD_COARSE, 1);
+				}
 				j = R_ActorLight (currententity, 1);
 
 				lighting.ambientlight = j;
@@ -635,8 +650,9 @@ void R_DrawEntitiesOnList (void)
 
 				R_AliasDrawModel (&lighting);
 			}
-
+			currententity->model = own;
 			break;
+		}
 
 		default:
 			break;
@@ -1098,6 +1114,7 @@ SetVisibilityByPassages ();
 	AW_FogDraw();
     AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
     AW_StaticFlamesDraw();
+    AW_LavaEmbersDraw();
     AW_Mark(4);R_DrawViewModel();AW_EndMark(4);
 	if (r_dowarp)
 		D_WarpScreen ();

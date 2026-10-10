@@ -1,0 +1,47 @@
+{
+  "format": 1,
+  "about": "Per-mesh visual triangle targets for dense CHIM areas (chim_build --detail-budget NAME). Collision keeps the source geometry; the open rim stays locked (lod_preserve_border). Not applied unless named. 'vivec-deep' (owner decision 2026-10-09: simplify the Temple's dense meshes) fits the Vivec Temple frame at the full 540 view (20,016 B headroom); it becomes the Vivec default after the A/B shots.",
+  "budgets": {
+    "vivec": {
+      "meshes/x/ex_vivec_prisonmoon_01.nif": 3000,
+      "meshes/x/ex_v_vivecstatue_02.nif": 1200,
+      "meshes/x/ex_v_vivecstatue_01.nif": 1200,
+      "meshes/x/ex_vivec_waterspout_01.nif": 600,
+      "meshes/x/ex_vivec_waterspout_03.nif": 600,
+      "meshes/x/ex_vivec_waterfall_01.nif": 600,
+      "meshes/x/ex_vivec_hfq_03.nif": 900,
+      "meshes/x/ex_vivec_hfq_04.nif": 900
+    },
+    "vivec-wide": {
+      "meshes/x/ex_vivec_prisonmoon_01.nif": 3000,
+      "meshes/x/ex_v_vivecstatue_02.nif": 1200,
+      "meshes/x/ex_v_vivecstatue_01.nif": 1200,
+      "meshes/x/ex_vivec_waterspout_01.nif": 600,
+      "meshes/x/ex_vivec_waterspout_03.nif": 600,
+      "meshes/x/ex_vivec_waterfall_01.nif": 600,
+      "meshes/x/ex_vivec_hfq_03.nif": 900,
+      "meshes/x/ex_vivec_hfq_04.nif": 900,
+      "meshes/x/ex_v_dock_01.nif": 800,
+      "meshes/x/ex_vivec_hf_01.nif": 1000,
+      "meshes/x/ex_vivec_hf_02.nif": 600,
+      "meshes/x/ex_vivec_hf_03.nif": 600,
+      "meshes/x/ex_gondola_01.nif": 400
+    },
+    "vivec-deep": {
+      "meshes/x/ex_vivec_prisonmoon_01.nif": 1500,
+      "meshes/x/ex_v_vivecstatue_02.nif": 900,
+      "meshes/x/ex_v_vivecstatue_01.nif": 900,
+      "meshes/x/ex_vivec_waterspout_01.nif": 600,
+      "meshes/x/ex_vivec_waterspout_03.nif": 600,
+      "meshes/x/ex_vivec_waterfall_01.nif": 600,
+      "meshes/x/ex_vivec_hfq_03.nif": 900,
+      "meshes/x/ex_vivec_hfq_04.nif": 900,
+      "meshes/x/ex_v_dock_01.nif": 800,
+      "meshes/x/ex_vivec_hf_01.nif": 700,
+      "meshes/x/ex_vivec_hf_02.nif": 600,
+      "meshes/x/ex_vivec_hf_03.nif": 600,
+      "meshes/x/ex_gondola_01.nif": 400,
+      "meshes/n/ingred_bc_coda_flower.nif": 150
+    }
+  }
+}

@@ -33,6 +33,9 @@ from prepare_scenery import export_refs, bsa_read
 from prepare_mesh_bsp import append_meshes, _prepare_model
 from prepare_quake import box, brush, miptex, wad
 from prepare_area import build_resident, entity
+import npc_lod
+from npc_anim import foot_class, publish as publish_anim, voices_of
+import npc_items
 from player_hull import lumps, pack_lumps, rebuild_world_hull
 from surface_flatten import load_profiles
 from actor_grounding import fields as grounding_fields
@@ -115,6 +118,38 @@ def split_references(references):
     return selected, deferred
 
 
+def lava_split(data, selected, deferred):
+    """Lava pools leave the scenery and become Quake liquid (tools/lava.py, docs/LAVA.md): returns
+    (selected, deferred, pools) with the pools in world units. --lava static keeps them as models."""
+    import lava
+    if lava.lava_mode() != 'quake':
+        return selected, deferred, []
+    molten = lava.molten_objects_of(child_ci(data, 'Morrowind.esm'))
+    hot = [r for r in selected if r.get('id', '').casefold() in molten]
+    if not hot:
+        return selected, deferred, []
+    pools = lava.pools_of(data, hot, molten)
+    numbers = {r['number'] for r in hot}
+    return ([r for r in selected if r['number'] not in numbers],
+            deferred + [dict(r, status='lava liquid (tools/lava.py)') for r in hot], pools)
+
+
+def lava_pools(out, data=None, references=None):
+    """The pools a source stage converted (lava-pools.json). A source stage from before the lava
+    conversion has no file: it is valid only when its town has no lava pool, checked again here."""
+    path = out / 'lava-pools.json'
+    if path.is_file():
+        return json.loads(path.read_text())['pools']
+    if data is not None and references is not None:
+        import lava
+        if lava.lava_mode() == 'quake':
+            molten = lava.molten_objects_of(child_ci(data, 'Morrowind.esm'))
+            if any(r.get('id', '').casefold() in molten for r in references):
+                raise ValueError('This source stage predates the lava conversion and its town has lava pools: '
+                                 'use a new work folder (or --lava static)')
+    return []
+
+
 def scenery_groups(settings, selected):
     profiles = {normpath('meshes/' + r['model']): {'collision_source': 'root_node_or_visual'}
                 for r in selected}
@@ -142,12 +177,16 @@ def footprint_references(data, out, placements, settings, jobs):
 
 def collect(data, out, jobs, settings):
     title = town_field(settings, 'title')
-    audit(data, out / 'audit', tuple(settings['source_cell']), settings['source_radius'], 2)
+    audit(data, out / 'audit', tuple(settings['source_cell']), settings['source_radius'], 2,
+          missing_land=settings.get('missing_land'))
     placements = json.loads((out / 'audit/placements.json').read_text())
     footprint = (footprint_references(data, out, placements, settings, jobs)
                  if settings.get('reference_margin') is not None else set())
     references = [r for r in placements if in_frame(r, settings) or r['number'] in footprint]
     selected, deferred = split_references(references)
+    selected, deferred, pools = lava_split(data, selected, deferred)
+    import lava
+    write_json(out / 'lava-pools.json', {'mode': lava.lava_mode(), 'pools': pools})
     groups = scenery_groups(settings, selected)
     report = export_refs(data, out / 'scenery', selected, groups, [*settings['centre'], 0],
                          metadata={'runtime_bounds': settings['bounds']}, jobs=jobs)
@@ -160,7 +199,7 @@ def collect(data, out, jobs, settings):
     return settings, index, entries, references
 
 
-def ground_assets(data, audit_path, palette):
+def ground_assets(data, audit_path, palette, pools=()):
     pal = Image.new('P', (1, 1)); pal.putpalette(palette)
     materials = json.loads((audit_path / 'materials.json').read_text())
     bsa = BSA(child_ci(data, 'Morrowind.bsa'))
@@ -179,6 +218,11 @@ def ground_assets(data, audit_path, palette):
         im = (Image.open(io.BytesIO(bsa_read(bsa, 'textures/water/water00.dds'))).convert('RGB').resize((64, 64), Image.Resampling.BOX)
               if name == '*water' else Image.new('RGB', (256, 128) if name == 'sky' else (64, 64), color))
         textures.append((name, 68, miptex(name, im.quantize(palette=pal, dither=Image.Dither.NONE))))
+    if pools:
+        import lava
+        from npc_geometry import Assets
+        layers = max((p['layers'] for p in pools), key=len)
+        textures += lava.wad_entries(Assets(data, bsa).texture, layers, pal)
     return wad(textures)
 
 
@@ -213,7 +257,7 @@ def terrain_at(grids, settings, x, y):
     return grid['heights'][round(iy)][round(ix)] * settings['scale'], terrain_material(grids, settings, x, y)
 
 
-def terrain_map(entry, grids, settings, spawn, timings):
+def terrain_map(entry, grids, settings, spawn, timings, pools=(), lava_volumes=None):
     low, high = entry['coverage']; step = settings['terrain_step']; brushes = []
     for y in range(low[1], high[1], step):
         for x in range(low[0], high[0], step):
@@ -236,9 +280,17 @@ def terrain_map(entry, grids, settings, spawn, timings):
                 box([x1, y0 - 32, TERRAIN_FLOOR], [x1 + 32, y1 + 32, TERRAIN_CEILING], 'sky'),
                 box([x0, y0 - 32, TERRAIN_FLOOR], [x1, y0, TERRAIN_CEILING], 'sky'),
                 box([x0, y1, TERRAIN_FLOOR], [x1, y1 + 32, TERRAIN_CEILING], 'sky')]
+    # Lava pools whose centre lies in this region's coverage (tools/lava.py: one liquid brush over a bed each).
+    import lava
+    centre = [*settings['centre'], 0]
+    mine = [p for p in pools if low[0] <= (lava.polygon_centroid(p['hull'])[0] - centre[0]) * settings['scale'] < high[0]
+            and low[1] <= (lava.polygon_centroid(p['hull'])[1] - centre[1]) * settings['scale'] < high[1]]
+    lava_brushes, lava_entities, _ = lava.map_parts(mine, centre, settings['scale'])
+    lava_entities += lava.loop_entities(mine, centre, settings['scale'], lava_volumes or {})
     return ('{\n"classname" "worldspawn"\n"wad" "terrain.wad"\n"message" "' + town_field(settings, 'message') + '"\n'
-            + timings + '\n' + '\n'.join(brushes) + '\n}\n'
-            + entity({'classname': 'info_player_start', 'origin': ' '.join(map(str, spawn)), 'angle': 90}) + '\n')
+            + timings + '\n' + '\n'.join(brushes + lava_brushes) + '\n}\n'
+            + entity({'classname': 'info_player_start', 'origin': ' '.join(map(str, spawn)), 'angle': 90}) + '\n'
+            + ''.join(text + '\n' for text in lava_entities))
 
 
 def travel_pose(values, settings):
@@ -290,17 +342,23 @@ def residents(data, scene, out, references, settings, kinds, topics, palette, ff
     cast = [r for r in references if r['type'] == 'NPC_' and r['id'].casefold() not in skip]
     tasks, models = [], {}
     for identifier in sorted({r['id'].casefold() for r in cast}):
-        appearance = outfit(kinds, identifier)
-        tasks.append((data, palette, appearance, greeting_fixture(topics, appearance), ffmpeg))
+        appearance = npc_items.attach_items(kinds, identifier, outfit(kinds, identifier))
+        appearance['foot'] = foot_class(kinds, appearance)
+        appearance['voices'] = voices_of(topics, appearance)
+        tasks.append((data, palette, appearance, greeting_fixture(topics, appearance), ffmpeg, npc_lod.task_settings()))
     for identifier, raw, voice, record in ordered_map(build_resident, tasks, min(jobs, len(tasks))):
         stem = 'a_' + hashlib.sha256(identifier.encode()).hexdigest()[:12]
         record.update(model='progs/' + stem + '.mdl', voice='npc/' + stem + '.wav')
         (scene / 'id1' / record['model']).write_bytes(raw)
+        publish_anim(scene / 'id1', record)
+        npc_items.publish(scene / 'id1', record)
         (scene / 'id1/sound' / record['voice']).write_bytes(voice)
         record['settings'] = greeting_settings(kinds, behavior_record(kinds['NPC_'][identifier], settings['scale']), settings['scale'])
         models[identifier] = record
         print(town_field(settings, 'title') + ' resident ready:', identifier, flush=True)
-    write_json(out / 'residents.json', {'cast': cast, 'models': models})
+    # Near/far models (tools/npc_lod.py): near files and the pairing manifest.
+    lod = npc_lod.publish(scene / 'id1', models, kinds)
+    write_json(out / 'residents.json', {'cast': cast, 'models': models, 'npc_lod': lod})
     return resident_entities(cast, models, settings)
 
 
@@ -409,7 +467,11 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
     ext = lumps((scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', ext))
     grids = {tuple(g['cell']): g for g in json.loads((out / 'audit/terrain-source.json').read_text())}
-    terrain_wad = ground_assets(data, out / 'audit', palette)
+    pools = lava_pools(out, data, references)
+    # the pools' loop sound (their script's "lava layer"), from the user's own files, beside the residents' voices
+    import lava
+    lava_volumes = lava.convert_sounds(data, pools, scene / 'id1/sound', ffmpeg)[0] if pools else {}
+    terrain_wad = ground_assets(data, out / 'audit', palette, pools)
     kinds, cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
     arrival, yaw = arrival_point(kinds, settings)
     returning, return_yaw = return_point(kinds, settings)
@@ -435,6 +497,7 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
         failures.setdefault(name, []).append(message)
         print(title + ' limit:', message, flush=True)
     context = {'entries': entries, 'index': index, 'settings': settings, 'grids': grids, 'terrain_wad': terrain_wad,
+               'pools': pools, 'lava_volumes': lava_volumes,
                'timings': timings, 'arrival': arrival, 'prepared': prepared, 'out': out, 'scene': scene,
                'qbsp': qbsp, 'vis': vis, 'light': light, 'vis_mode': vis_mode, 'dry_run': dry_run}
     for entry, report, messages in compile_regions(context, jobs):
@@ -483,12 +546,19 @@ def compile_regions(context, jobs):
     with scratch_dir('aw-town-regions-') as temporary:
         path = Path(temporary) / 'context.pickle'
         path.write_bytes(pickle.dumps(context, protocol=4))
-        tasks = [(str(path), number, threads) for number in range(len(entries))]
+        try:
+            cache, shared = region_cache(context)
+        except (TypeError, ValueError, OSError):  # an input that has no content key: convert every region
+            cache, shared = None, None
+        owner_index = owner(context['arrival'], entries)
+        tasks = [(str(path), number, threads, cache,
+                  None if cache is None else dict(shared, entry=entries[number], arrival_region=number == owner_index))
+                 for number in range(len(entries))]
         # Longest first (build_costs): history, else the placed references per region.
         from build_costs import costed_map
         sizes = {entry['name']: len(select_references(context['index'], entry, context['settings'])) + 1
                  for entry in entries}
-        pool = costed_map('town-%s-regions' % town_field(context['settings'], 'id'), _compile_region, tasks,
+        pool = costed_map('town-%s-regions' % town_field(context['settings'], 'id'), _compile_region_cached, tasks,
                           [entry['name'] for entry in entries], workers, fallback=sizes.get)
         for entry, ((report, messages), text) in zip(entries, pool):
             if text:
@@ -506,6 +576,49 @@ def _region_context(path):
         _REGION_CONTEXT.clear()
         _REGION_CONTEXT[path] = pickle.loads(Path(path).read_bytes())
     return _REGION_CONTEXT[path]
+
+
+def region_cache(context):
+    """(the town region unit cache, the inputs every region shares by content), or (None, None) when the cache
+    is off or the game data identity is unknown. A region's key adds its record and whether it holds the town's
+    arrival (BUILD-IMAGE-NO-RESUME-33: the stage resumes from its finished regions)."""
+    import hashlib
+    from pass_cache import UnitCache, game_data_digest, input_digest, tool_digest
+    cache = UnitCache.open('town-region', {}, __file__)
+    identity = game_data_digest() if cache is not None else None
+    if identity is None or context.get('dry_run'):
+        return None, None
+    out, scene = Path(context['out']), Path(context['scene'])
+
+    def file_digest(path):
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest() if Path(path).is_file() else None
+    shared = {'game_data': identity, 'settings': input_digest(context['settings']),
+              'index': input_digest(context['index']),
+              'grids': input_digest(sorted([list(k), v] for k, v in context['grids'].items())),
+              'terrain_wad': hashlib.sha256(context['terrain_wad']).hexdigest(), 'timings': context['timings'],
+              'arrival': context['arrival'], 'vis_mode': context['vis_mode'],
+              'scenery_packet': file_digest(out / 'scenery/scenery.mwpak'),
+              'palette': file_digest(scene / 'id1/gfx/palette.lmp'),
+              'tools': tool_digest(context['qbsp'], context['vis'], context['light'])}
+    return cache, shared
+
+
+def _compile_region_cached(task):
+    """Worker: _compile_region, or the region recorded for the same inputs (its folder, receipt and log text).
+    Rows that do not survive JSON exactly are never cached."""
+    path, number, threads, cache, inputs = task
+    if cache is None:
+        return _compile_region((path, number, threads))
+    from pass_cache import json_exact
+    root = Path(_region_context(path)['out']) / inputs['entry']['name']
+    row = cache.restore_unit(inputs, root) if not root.exists() else None
+    if row is not None:
+        return (row['report'], row['messages']), row['text']
+    (report, messages), text = _compile_region((path, number, threads))
+    row = {'report': report, 'messages': messages, 'text': text}
+    if json_exact(row):
+        cache.store_unit(inputs, row, root)
+    return (report, messages), text
 
 
 def _compile_region(task):
@@ -534,7 +647,10 @@ def _compile_region_now(task):
     spawn = [(entry['core'][0][i] + entry['core'][1][i]) / 2 for i in range(2)]
     spawn.append(terrain_at(c['grids'], settings, *spawn)[0] + 40)
     if entry == entries[owner(c['arrival'], entries)]: spawn = c['arrival']
-    (root / 'terrain.map').write_text(terrain_map(entry, c['grids'], settings, spawn, c['timings']))
+    pools = c.get('pools') or ()          # lava pools (tools/lava.py); a town without lava calls the map writer as before
+    (root / 'terrain.map').write_text(terrain_map(entry, c['grids'], settings, spawn, c['timings'], pools,
+                                                  c.get('lava_volumes')) if pools
+                                      else terrain_map(entry, c['grids'], settings, spawn, c['timings']))
     qbsp, vis, light = c['qbsp'], c['vis'], c['light']
     with (root / 'compile.log').open('w') as log:
         for exe, args in ((qbsp, ['-nopercent', 'terrain.map']), (vis, vis_args('terrain.bsp', threads, c['vis_mode'])),
@@ -591,6 +707,7 @@ def parser(description=__doc__, town=True):
         p.add_argument('--dry-run', action='store_true',
                        help='Convert every region and room, record limit failures in <out>/dry-run.json, publish nothing')
     add_vis_option(p)
+    npc_lod.add_converter_options(p)
     return p
 
 
@@ -600,6 +717,7 @@ if __name__ == '__main__':
     add_options(p)
     a = p.parse_args()
     apply_options(a)
+    npc_lod.apply_options(a)
     import build_profile; build_profile.instrument('town')  # sub-stage timers (docs/BUILD_PROFILE.md)
     print(json.dumps(prepare(a.town, a.data_files, a.scene, a.out, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs,
                              a.collect_only, a.vis_mode, a.dry_run), indent=2))

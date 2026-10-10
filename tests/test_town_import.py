@@ -254,6 +254,27 @@ class ArenaFootprint(unittest.TestCase):
 
 
 class TownTable(unittest.TestCase):
+    def test_handoff_core_stays_in_quakes_coordinate_range(self):
+        """CHIM-FRAME-COORD-RANGE-33: a frame core past +/-4,000 is refused by the generator, the bound
+        matches the engine's checks, and the engine still sends positions as 1/8-unit shorts."""
+        import re
+        import town_table
+        row = {'name': 'vivec', 'handoff': 1, 'core': [[-4992, -4608], [4992, 4608]]}
+        with self.assertRaisesRegex(ValueError, 'CHIM-FRAME-COORD-RANGE-33'):
+            town_table.check_core(row)
+        town_table.check_core({**row, 'core': [[-4000, -4000], [4000, 4000]]})
+        town_table.check_core({**row, 'handoff': 0})
+        for r in runtime_towns():
+            town_table.check_core(r)
+        src = ROOT / 'engine/aga/src'
+        world = (src / 'aw_world.c').read_text(encoding='utf-8')
+        bound = town_table.FRAME_BOUND
+        self.assertIn(f't->core[k]>=-{bound} && t->core[k+2]<={bound}', world)
+        self.assertIn(f'fabs(arrival[k])<{bound}', world)
+        self.assertLessEqual(bound, town_table.COORD_RANGE)
+        common = (src / 'common.c').read_text(encoding='utf-8')
+        self.assertRegex(common, re.compile(r'MSG_WriteCoord \(sizebuf_t \*sb, float f\)\s*\{\s*MSG_WriteShort \(sb, \(int\)\(f\*8\)\);'))
+
     def test_checked_in_engine_table_matches_configs(self):
         import town_table
         self.assertTrue(town_table.check(), 'run tools/town_table.py --write')

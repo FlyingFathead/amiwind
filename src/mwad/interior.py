@@ -1,16 +1,18 @@
 """Bounded base-master interior audit. No script execution or asset redistribution."""
 from pathlib import Path
 import hashlib, math, struct
-from .audit import records, subrecords, cell_data, string, require
+from .audit import cell_data
+from .esm import is_deleted, records, require, string, subrecords
 
 
 def original_doors(raw):
     """Return only authored directed DOOR/DODT links, never inferred reverses."""
     objects={};cells=[]
     for tag,flags,payload in records(raw):
-        if tag not in ('DOOR','CELL') or flags&0x20:continue
+        if tag not in ('DOOR','CELL'):continue
         subs=list(subrecords(payload));fields=dict(subs)
-        if tag=='DOOR' and 'NAME' in fields and 'DELE' not in fields:
+        if is_deleted(flags,subs,header_only=tag=='CELL'):continue
+        if tag=='DOOR' and 'NAME' in fields:
             objects[string(fields['NAME']).casefold()]={
                 'model':string(fields.get('MODL',b'')),
                 'script':string(fields.get('SCRI',b'')),
@@ -24,7 +26,10 @@ def original_doors(raw):
                 if subtag=='NAM0':
                     require(len(data)==4,'Invalid temporary reference section marker')
                     markers.append({'tag':subtag,'hex':data.hex(),'after_reference':current})
-                elif subtag=='FRMR':current=struct.unpack('<I',data)[0];fields[current]=[]
+                elif subtag=='FRMR':
+                    current=struct.unpack('<I',data)[0]
+                    require(current not in fields,'Duplicate original reference number: %d'%current)
+                    fields[current]=[]
                 elif current is not None:
                     fields[current].append({'tag':subtag,'hex':data.hex()})
             for ref in cell['refs']:ref['original_subrecords']=fields[ref['number']]
@@ -71,6 +76,7 @@ def read_interiors(path, names, *, include_interior_entrances=False):
         if tag not in kinds and tag!='CELL':continue
         subs=list(subrecords(payload));s=dict(subs)
         if tag=='CELL':
+            if is_deleted(flags,subs,header_only=True):continue
             header={}
             for t,b in subs:
                 if t=='FRMR':break
@@ -100,7 +106,7 @@ def read_interiors(path, names, *, include_interior_entrances=False):
             cell['lighting']={'ambient':list(ambient[:3]),'sunlight':list(ambient[4:7]),
                               'fog':list(ambient[8:11]),'fog_density':struct.unpack_from('<f',ambient,12)[0]}
             wanted[key]['cells'].append(cell)
-        elif 'NAME' in s and 'DELE' not in s:
+        elif 'NAME' in s and not is_deleted(flags,s):
             obj={'type':tag,'model':string(s.get('MODL',b'')),'display_name':string(s.get('FNAM',b''))}
             if tag=='LIGH':
                 require(len(s.get('LHDT',b''))==24,'Invalid light record')
@@ -127,8 +133,8 @@ def read_interiors(path, names, *, include_interior_entrances=False):
             ref.update(bases[key])
         entrances=found['entrances']
         if include_interior_entrances:
-            entrances=[r for r in (copy.deepcopy(doors) if len(names)>1 else doors)
-                       if r['destination_cell'].casefold()==cell['name'].casefold()]
+            entrances=[r for r in doors if r['destination_cell'].casefold()==cell['name'].casefold()]
+            if len(names)>1:entrances=copy.deepcopy(entrances)
         cell['entrances']=entrances
         cell['master_sha256']=digest
         result.append(cell)

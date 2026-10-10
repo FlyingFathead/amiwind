@@ -346,6 +346,26 @@ leaves before its model is loaded. A chunk is resident whenever it is inside
 the ring, so a placement that can be seen from the ring is always in a
 resident chunk; the engine draws it once per frame by its placement id.
 
+#### Planned: tilt per placement (next release, CHIM-TILT-VARIANTS-SPLIT-33)
+
+Today a placement turns its model by yaw only, so every placement tilted off the vertical (pitch or roll)
+gets its own model: the base island has 50,108 tilted placements of 1,476 meshes in 39,103 models, and
+the Vivec Temple ring holds 22 coda-flower models where one would do. The planned record carries the
+whole rotation, as a Quake entity's `angles` do:
+
+- the record grows to 56 bytes: pitch and roll as two more f32 (Quake `angles[0]` and `angles[2]`) after
+  the flags, a format version step that the engine checks (older worlds keep 48-byte records);
+- one model per mesh (and scale): the variant key no longer holds the tilt;
+- the drawn box is the model's bounds turned by all three angles;
+- the engine draws the placement with its full angles (`R_RotateBmodel` already turns brush models in
+  three axes), and the chunk clip turns a trace into the model's frame with `AngleVectors` (as
+  `SV_ClipMoveToEntity` does), in place of the yaw sine and cosine;
+- the Python collision mirror (`chim.collision`) and the stair and walk gates follow the same rule.
+
+Quake turns the trace, not the standing box: a tilted model's standing hull is exact for the point hull
+and approximate for the standing box (it stays axis-aligned in the model's frame). The walk and stair
+gates measure that on tilted placements before the change ships.
+
 ### Terrain image (a world subtree)
 
 A brush image in local coordinates whose nodes and leaves are a piece of the
@@ -743,6 +763,54 @@ the legacy preview at the A/B poses.
 - Source: the town converter once per district (`import_town.collect`), with references merged
   by reference number. Shared meshes must have equal visual profiles in every district, or the
   build stops.
+- Memory, measured per district frame (9 October 2026, the large-model cut on at 512 units, tiles;
+  active ring against the 6,242,304-byte chunk room). The district frames overlap, so each one also
+  holds its neighbours' edges; one city frame changes where the peaks sit, not what a ring around a
+  position holds:
+
+  | District frame | Active ring peak | |
+  | --- | ---: | --- |
+  | Arena | 5,337,232 | fits (6,492,688 whole) |
+  | Foreign Quarter | 4,762,912 | fits |
+  | Hlaalu | 5,722,112 | fits |
+  | Redoran | 4,947,728 | fits |
+  | Telvanni | 3,705,424 | fits |
+  | St. Delyn | 7,776,368 | over |
+  | St. Olms | 7,746,288 | over |
+  | Temple | 8,254,320 | over |
+
+  Every frame over the room peaks in the Temple district: the two Vivec statues (727 and 526 KB), the
+  Ministry of Truth's tiles, the dock and the High Fane. Named detail budgets
+  (`config/chim-detail-budgets.json`, not applied by default) bring the Temple frame to 6,776,624
+  ('vivec') and 6,423,456 bytes ('vivec-wide'), still 181,152 over. The rest is an owner decision: deeper
+  budgets, simpler distant detail beyond about 300 units, or a stated closer view in that district.
+  Owner decision (9 October 2026): simplify the dense meshes, with the open rim locked. Budget 'vivec-deep'
+  ('vivec-wide' plus the coda flowers at 150 triangles, the Ministry of Truth at 1,500, the statues at 900,
+  and the High Fane's main body at 700) fits the Temple frame at the full 540 view: active ring peak
+  6,222,288 B, 20,016 B of headroom, stair gate passing. No closer view and no distant detail level are
+  needed. It becomes the Vivec default after the in-game and OpenMW A/B shots.
+- Frame plan (9 October 2026): one city frame, not grid frames.
+  - Grid frames (the M4 grid, 3 x 3 cells) would cover the city with six frames, but until the engine's
+    ring spans frames (M4), every frame edge inside the city is a hand-over: a map load and a visible end
+    of the world mid-street. One city frame keeps the walk through Vivec seamless with today's engine.
+  - The eight district frames overlap; one frame holds every placement once (no district stored twice)
+    and one ring at every position.
+  - What one city frame needs:
+    1. format 0.6 row folders: 195 sector files exceed the 72-entry directory rule in one frame folder
+       (the 0.6 reader is in the engine; the writer is ready and waits for this frame);
+    2. BLOCKED (CHIM-FRAME-COORD-RANGE-33): the engine's hand-over bound for table frames keeps core
+       boxes and arrivals within 4,000 local units (`aw_world.c` valid_town). That bound is Quake's
+       coordinate range, not a format limit: positions travel as shorts of eighths of a unit, so they
+       wrap past about 4,096. The district cores span 8,192 by 9,216 units, so one frame cannot hold
+       the walk. The options are two frames (for example, Temple, St. Delyn and St. Olms in the south
+       and the rest in the north), a wider coordinate protocol (an engine-wide change), or M4 frames
+       that span;
+    3. one `vivec` area merging the eight districts' sources by reference number, and one `vivec` town
+       row with `vivec-chim.bsp`, the districts' doors and arrivals and `dbg tp` names by district; the
+       eight district rows and their legacy maps stay selectable;
+    4. 1,677 chunks, within the engine's 4,096.
+  - Memory is the same either way: the ring is centred on the player, so the Temple district's peak is
+    there in both plans (the per-district figures above).
 
 *Format 0.6 (stage B).* The only change is the folder layout of a large frame.
 
@@ -1180,9 +1248,14 @@ CHIM yet"); the engine finds no such destination. The open world ships with
 the legacy builder's maps until it is on CHIM. After these changes the map
 optimizer's receipt follows the new map set (`optimize_world_maps.rebind_chim_maps`).
 Interiors stay Quake maps, built as before.
-Seyda Neen's frame maps are checked against the recorded v0.0.31 Seyda Neen
-maps, given as an input folder (`--seyda-recorded DIR`); a CHIM build with
-Seyda Neen stops before any work without it.
+Seyda Neen's frame maps are checked against the Seyda Neen region maps the
+builder converts from your data (without the terrain visual cull: these maps
+never ship, `--seyda-terrain-cull off`). From v0.0.35 the recorded v0.0.31 Seyda Neen
+maps (`--seyda-recorded DIR`) are optional and NOT RECOMMENDED since v0.0.31 (legacy: the shipped
+image holds only `seyda-chim.bsp` and its far layer for Seyda Neen); given, they are the reference
+instead (v0.0.33 stopped a CHIM build with Seyda Neen without them).
+
+See [Which Seyda Neen is in my build?](../LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.
 
 The plan still runs some legacy exterior stages because later steps read their
 outputs: the town's region conversion (the frame maps copy their actors and

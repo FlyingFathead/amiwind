@@ -47,7 +47,7 @@ TOOLS = {
 # The standing-hull form (--model-hull, mesh_geometry_env.model_hull_mode) changes every big model's hull:
 # a cached unit of one form must never be reused for another (BUILD-CHIM-UNIT-HULL-KEY-33).
 SWITCHES = ('AMIWIND_NO_EMISSIVE', 'AMIWIND_NO_FLAMES', 'AMIWIND_SCENERY_REDUCE', 'AMIWIND_SCENERY_REDUCE_TEXELS',
-            'AMIWIND_TEXINFO_SNAP', 'AMIWIND_STAIR_MITIGATION', 'AMIWIND_MODEL_HULL')
+            'AMIWIND_TEXINFO_SNAP', 'AMIWIND_STAIR_MITIGATION', 'AMIWIND_MODEL_HULL', 'AMIWIND_LAVA')
 _TOOL_HASH = {}
 
 
@@ -109,9 +109,9 @@ class UnitCache:
         if self.folder is None:
             return None
         path = self._path(kind, fp)
-        if not path.is_file():
-            return None
         try:
+            if not path.is_file():
+                return None
             stored_fp, value = pickle.loads(path.read_bytes())
         except Exception:  # noqa: BLE001 - a damaged entry is rebuilt and counted
             self.stats.setdefault(kind, {}).setdefault('damaged', 0)
@@ -120,18 +120,114 @@ class UnitCache:
         return value if stored_fp == fp else None
 
     def put(self, kind, fp, value):
+        """Store a built unit. A cache that cannot be written never fails the stage: the unit was built
+        locally, the refusal is counted ('write_refused') and reported once per kind
+        (BUILD-CACHE-OWNER-FAILS-STAGE-34: entries owned by another user stopped a release build)."""
         if self.folder is None:
             return
         path = self._path(kind, fp)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix('.tmp')
-        tmp.write_bytes(pickle.dumps((fp, value), protocol=4))
-        tmp.replace(path)
+        tmp = path.with_name(f'{path.stem}.{os.getpid()}.tmp')
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_bytes(pickle.dumps((fp, value), protocol=4))
+            tmp.replace(path)
+        except OSError as exc:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            s = self.stats.setdefault(kind, {})
+            if not s.get('write_refused'):
+                print(f'[warning] cache write refused: {path.parent} ({exc.strerror or exc}); the unit was built '
+                      f'locally and the build continues (fix: make {self.folder} writable by this user)', flush=True)
+            s['write_refused'] = s.get('write_refused', 0) + 1
 
     def count(self, kind, built, reused):
         s = self.stats.setdefault(kind, {})
         s['built'] = s.get('built', 0) + built
         s['reused'] = s.get('reused', 0) + reused
+
+
+# Unit keys in the shared storage pool: POOL/keys/chim-unit/<kind>/FP[:2]/FP.json names the SHA-256 of the
+# pickled unit, stored once in POOL/objects (tools/storage_pool.py, tools/file_cache.py key layout, so the one
+# garbage collector, tools/build_gc.py, sees every unit an index names).
+POOL_NAMESPACE = 'chim-unit'
+
+
+class PooledUnitCache(UnitCache):
+    """A unit cache backed by the shared, content-addressed storage pool (CHIMPORT-NO-SHARED-POOL-35).
+
+    get: a unit missing from this run's folder is looked up by its fingerprint in the pool and placed into the
+    folder (a read-only hard link with link=True, else a verified copy), so a unit any earlier run or workspace
+    built is never built again. put: the built unit is written as before, then stored once in the pool (by a hard
+    link: no second copy) and its key recorded; a unit whose key already names an intact object links to it.
+    A pool problem never fails the stage: the unit stays in the run folder and the problem is counted."""
+
+    def __init__(self, folder, pool, link=True, store=True):
+        """LINK: units found in the pool are hard-linked into FOLDER (else copied); STORE: built units go to the pool."""
+        super().__init__(folder)
+        from file_cache import FileCache
+        self.pool = Path(pool)
+        self.link = link
+        self.store = store
+        self._keys = {}
+        self._FileCache = FileCache
+        self.pool_stats = {'reused_units': 0, 'reused_bytes': 0, 'stored_units': 0, 'stored_bytes': 0,
+                           'linked_units': 0, 'linked_bytes': 0, 'errors': 0}
+
+    def _index(self, kind):
+        if kind not in self._keys:
+            self._keys[kind] = self._FileCache(self.pool, '%s/%s' % (POOL_NAMESPACE, kind), None, fallback=False)
+        return self._keys[kind]
+
+    def _pool_count(self, kind, name, size):
+        self.pool_stats[name + '_units'] += 1
+        self.pool_stats[name + '_bytes'] += size
+        s = self.stats.setdefault(kind, {})
+        s['pool_' + name] = s.get('pool_' + name, 0) + 1
+
+    def get(self, kind, fp):
+        if self.folder is not None and not self._path(kind, fp).is_file():
+            meta = self._index(kind).lookup(fp)
+            if meta is not None:
+                import storage_pool
+                try:
+                    if storage_pool.place(self.pool, meta['sha256'], self._path(kind, fp), link=self.link):
+                        self._pool_count(kind, 'reused', int(meta.get('bytes') or 0))
+                except OSError:
+                    self.pool_stats['errors'] += 1
+        return super().get(kind, fp)
+
+    def put(self, kind, fp, value):
+        UnitCache.put(self, kind, fp, value)
+        if self.folder is None or not self.store:
+            return
+        import storage_pool
+        path = self._path(kind, fp)
+        try:
+            digest = storage_pool.sha256_file(path)
+            size = path.stat().st_size
+            index = self._index(kind)
+            known = index.lookup(fp)
+            if known is not None and known['sha256'] != digest and self.link and \
+                    storage_pool.place(self.pool, known['sha256'], path, link=True):
+                # Same key, other pickle bytes (an equal value): keep the pooled object, drop this copy.
+                self._pool_count(kind, 'linked', size)
+                return
+            existed = storage_pool.object_path(self.pool, digest).is_file()
+            # Stored by a hard link (the run's file becomes the pooled inode); across mounts the pool gets one
+            # verified copy. As root or on Windows nothing is written to the shared pool (read-only use: shared
+            # caches are written only by the build user), as for the builder's own pooling.
+            if storage_pool.put(self.pool, path, digest)[0] == 'skipped':
+                return
+            if known is None or known['sha256'] != digest:
+                index.point(fp, digest, size, {'kind': kind})
+            self._pool_count(kind, 'linked' if existed else 'stored', size)
+        except OSError as exc:
+            if not self.pool_stats['errors']:
+                print('[warning] storage pool not used for a %s unit (%s); the unit stays in the run folder and '
+                      'the build continues' % (kind, exc), flush=True)
+            self.pool_stats['errors'] += 1
 
 
 def run_units(kind, items, worker, jobs, cache):

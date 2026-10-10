@@ -72,6 +72,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 
 - AUDIO-APPEARANCE-29 (no report page): Music pause entering character race selection
 - AUDIO-CLOCK-29 (no report page): Long audio DMA gaps lose elapsed playback time
+- [AUDIO-DMA-CLOCK-DRIFT-35](AUDIO-DMA-CLOCK-DRIFT-35.md): The mixer estimates the audio DMA position from the EClock, not from the hardware, so the two can drift apart over a long session
 - AUDIO-EFFECTS-DEFAULT-29 (no report page): Effects volume should default to 75%
 - AUDIO-ENTER-29 (no report page): Sub-second soundtrack cut on Enter to follow the guard
 - [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
@@ -82,8 +83,13 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - AW-20260928-15 (no report page): Prison wave ambience masks dialogue
 - AW-20260929-03 (no report page): Music cuts during loading
 - AW-20260929-05 (no report page): Ship waves too quiet
+- [COMBAT-VOICES-SILENT-33](COMBAT-VOICES-SILENT-33.md): Player pain grunts and hostile NPC taunts are not heard in fights
+- [ENGINE-SOUND-NAME-SYSERROR-35](ENGINE-SOUND-NAME-SYSERROR-35.md): A sound name of 64 characters or more, or more than 512 sounds in a session, stopped the program
+- [MUSIC-DEATH-SILENT-33](MUSIC-DEATH-SILENT-33.md): No death music when the player dies
 - [MUSIC-OPENING-CLIP-31](MUSIC-OPENING-CLIP-31.md): A clip of another track plays while the opening scene loads
 - [MUSIC-STARTUP-TRACK-31](MUSIC-STARTUP-TRACK-31.md): A random world track plays under the startup logo
+- [NPC-GREETING-PICK-33](NPC-GREETING-PICK-33.md): Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches
+- [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
 - PUNCH-AUDIO-COVERAGE-29 (no report page): Original punch swing/hit sound coverage unverified
 - WIN-05 (no report page): Intermittent WinUAE background-music snapping
 

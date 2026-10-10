@@ -21,8 +21,14 @@ opens any map without picking a folder. Python standard library only.
                without restarting the server; without it the tracker is empty
                until you use "Import progress" in the page
 
+  --build DIR  a build folder of your own (tools/build.py run folder): its toolkit/cell-progress.json becomes
+               --progress and, when the folder holds them, its world-progress.json / island files become --data,
+               so `toolkit_serve.py --build BUILD` shows your own build's cell progress with nothing else to pass
+  --reference F  the project's reference progress file (default: docs/chim/cell-progress-reference.json of this
+               repository, if present); the World Map's Compare layer shows your cells next to it
+
 Usage:
-  toolkit_serve.py --data DIR [--maps DIR] [--metrics FILE] [--progress DIR|FILE] [--port 8031] [--open]
+  toolkit_serve.py [--build DIR] --data DIR [--maps DIR] [--metrics FILE] [--progress DIR|FILE] [--port 8031] [--open]
 Then open http://127.0.0.1:8031/ (printed).
 """
 import argparse, json, mimetypes, sys, webbrowser
@@ -39,11 +45,26 @@ METRICS_FILE = 'world-metrics.json'   # served from --metrics, never from the da
 # The CHIM Progress Tracker files, served from --progress under these names (the progress folder's own file names).
 PROGRESS_FILES = {'cell-progress.json': 'application/json', 'cell-progress-next.json': 'application/json',
                   'cell-progress-curve.json': 'application/json', 'cell-progress-curve.png': 'image/png'}
-PROGRESS_SOURCES = {'cell-progress.json': 'cell-progress.json', 'cell-progress-next.json': 'next.json',
+PROGRESS_SOURCES = {'live-status.json': 'live-status.json', 'cell-progress.json': 'cell-progress.json', 'cell-progress-next.json': 'next.json',
                     'cell-progress-curve.json': 'mesh-curve.json', 'cell-progress-curve.png': 'mesh-curve.png'}
 
 
+REFERENCE_FILE = 'cell-progress-reference.json'
+REFERENCE_DEFAULT = ROOT / 'docs' / 'chim' / REFERENCE_FILE
+
+
+def build_folders(build):
+    """(progress folder, data folder) of a build folder: toolkit/ (or the folder itself) with cell-progress.json, and the
+    folder that holds the world-progress layers; either may be None."""
+    build = Path(build).resolve()
+    progress = next((c for c in (build / 'toolkit', build, *sorted(build.glob('*/toolkit')), *sorted(build.glob('*/*/toolkit')))
+                     if (c / 'cell-progress.json').is_file()), None)
+    data = next((c for c in (build, build / 'toolkit', *sorted(build.glob('*/toolkit'))) if (c / 'world-progress.json').is_file()), None)
+    return progress, data
+
+
 class Handler(SimpleHTTPRequestHandler):
+    reference = None   # the project's reference progress file, or None
     data_dir = None
     maps_dir = None
     metrics = None   # the Map metrics layer as JSON bytes, or None
@@ -59,6 +80,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store')
         self.end_headers()
         self.wfile.write(body)
+
+    def send_nothing(self):
+        self.send_response(204)
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
 
     def send_file(self, path):
         if not path.is_file():
@@ -81,6 +107,12 @@ class Handler(SimpleHTTPRequestHandler):
         if len(parts) == 2 and parts[0] == 'data' and parts[1] in PROGRESS_FILES:
             f = self.progress_dir / PROGRESS_SOURCES[parts[1]] if self.progress_dir else None
             return self.send_bytes(f.read_bytes(), PROGRESS_FILES[parts[1]]) if f and f.is_file() else self.send_error(404)
+        # Optional files answer 204 (nothing) when absent, so the browser console shows no 404 for them.
+        if parts == ['data', REFERENCE_FILE]:
+            return self.send_file(self.reference) if self.reference else self.send_nothing()
+        if parts == ['data', 'live-status.json']:
+            f = self.progress_dir / PROGRESS_SOURCES['live-status.json'] if self.progress_dir else None
+            return self.send_bytes(f.read_bytes(), 'application/json') if f and f.is_file() else self.send_nothing()
         if len(parts) == 2 and parts[0] == 'data' and parts[1] in DATA_FILES and self.data_dir:
             return self.send_file(self.data_dir / parts[1])
         if parts == ['maps', 'index.json']:
@@ -105,20 +137,31 @@ def progress_folder(path):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--data', type=Path, required=True)
+    p.add_argument('--data', type=Path)
+    p.add_argument('--build', type=Path, help='your own build folder: loads its toolkit/cell-progress.json (and layers)')
+    p.add_argument('--reference', type=Path, help='the project reference progress file (default: the repository copy)')
     p.add_argument('--maps', type=Path)
     p.add_argument('--metrics', type=Path, help='Map metrics layer, or a world estimate metrics.json/.csv')
     p.add_argument('--progress', type=Path, help='CHIM Progress Tracker folder (tools/cell_progress.py --out) or its cell-progress.json')
     p.add_argument('--port', type=int, default=8031)
     p.add_argument('--open', action='store_true', help='open the toolkit in your browser')
     a = p.parse_args(argv)
-    Handler.data_dir = a.data.resolve()
+    build_progress = build_data = None
+    if a.build:
+        build_progress, build_data = build_folders(a.build)
+        if not build_progress:
+            p.error('no toolkit/cell-progress.json found under %s (build with the CHIM builder, or run cell_progress.py ingest)' % a.build)
+    data = a.data or build_data
+    if not data and not a.build:
+        p.error('give --data DIR or --build DIR')
+    Handler.reference = (a.reference or REFERENCE_DEFAULT).resolve() if (a.reference or REFERENCE_DEFAULT.is_file()) else None
+    Handler.data_dir = data.resolve() if data else None
     Handler.maps_dir = a.maps.resolve() if a.maps else None
     Handler.metrics = load_metrics(a.metrics) if a.metrics else None
-    Handler.progress_dir = progress_folder(a.progress) if a.progress else None
+    Handler.progress_dir = progress_folder(a.progress or build_progress) if (a.progress or build_progress) else None
     server = ThreadingHTTPServer(('127.0.0.1', a.port), Handler)
     url = 'http://127.0.0.1:%d/' % a.port
-    present = [n for n in DATA_FILES if (Handler.data_dir / n).is_file()]
+    present = [n for n in DATA_FILES if Handler.data_dir and (Handler.data_dir / n).is_file()]
     maps = len(list(Handler.maps_dir.glob('*.bsp'))) if Handler.maps_dir else 0
     print('AmiWind Toolkit at %s (this machine only; Ctrl+C stops)\n  data: %s\n  maps: %d\n  CHIM progress: %s' %
           (url, ', '.join(present) or 'none', maps, Handler.progress_dir or 'none (use Import progress in the page)'), flush=True)

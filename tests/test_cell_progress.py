@@ -77,7 +77,8 @@ def census_doc():
     }
     return {'format': cp.CENSUS_FORMAT, 'masters': {}, 'meshes': ['meshes/a.nif', 'meshes/b.nif', 'meshes/c.nif',
             'meshes/d.nif', 'meshes/e.nif', 'meshes/f.nif'], 'land': ['%d,%d' % c for c in LAND], 'land_bloodmoon': [],
-            'cells': cells, 'interiors': ints, 'names': {'2,2': {'name': 'Synthetic Town', 'region': 'Synthetic Region'}}}
+            'cells': cells, 'interiors': ints, 'names': {'2,2': {'name': 'Synthetic Town', 'region': 'Synthetic Region'}},
+            'lights_census': 'aw-cell-lighting-1'}
 
 
 def write(path, obj):
@@ -164,6 +165,36 @@ class OrderTests(unittest.TestCase):
             order.draw_curve(p, [('a', [[1, 1, 2], [2, 2, 4]], '#fff', 1, False), ('b', [[1, 1, 2], [2, 2, 4]], '#888', 2, True)],
                              'test', [(1, 'ring 1')])
             self.assertEqual(p.read_bytes()[:4], b'\x89PNG')
+
+
+    def test_reuse_chart_title_is_the_takeaway_and_the_png_is_written(self):
+        title, ratio = order.reuse_takeaway(1777, 38790)
+        self.assertEqual(title, 'Store-once: 1,777 mesh conversions instead of 38,790 (22x fewer)')
+        self.assertAlmostEqual(ratio, 21.8, 1)
+        self.assertIn('2.5x fewer', order.reuse_takeaway(100, 250)[0])
+        self.assertIsNone(order.reuse_takeaway(0, 0)[1])
+        self.assertIn('Risk order meets the most distinct meshes first', order.ORDER_SENTENCE)
+        try:
+            import PIL  # noqa: F401
+        except ImportError:
+            self.skipTest('Pillow not installed')
+        from PIL import Image
+        pts = [[i, min(i, 5) + i // 4, i * 3] for i in range(1, 40)]
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / 'chart.png'
+            order.draw_reuse_chart(p, pts, pts, 14, 117, [(5, 'ring 1'), (20, 'ring 3'), (30, 'island 2 ring 1')], 39)
+            self.assertEqual(p.read_bytes()[:4], b'\x89PNG')
+            width, height = Image.open(p).size
+            self.assertGreaterEqual(width, 1400)        # big: the text is 18-34 px
+            self.assertGreaterEqual(height, 1100)
+
+    def test_world_map_mesh_chart_has_the_takeaway_and_big_text_outside_the_plot(self):
+        page = (ROOT / 'amiwind-toolkit' / 'world-map.html').read_text(encoding='utf-8')
+        for needle in ("'Store-once: ' + n(unique) + ' mesh conversions instead of '", 'meshlegend', 'MESH_SENTENCE', 'log scale',
+                       'cells converted (in sweep order)', "'14px system-ui", 'staggered over two rows', 'meshes converted'):
+            self.assertIn(needle, page, needle)
+        self.assertIn('#chimpanel .meshtitle{font-size:20px', page)
+        self.assertNotIn('no reuse: every cell converts its own meshes (spiral order) (off the chart', page)
 
 
 class IngestTests(unittest.TestCase):
@@ -593,8 +624,10 @@ class CompleteAndPageTests(unittest.TestCase):
         self.out = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
 
-    def stats(self, **types):
-        return {'records_by_type': types, 'records': {'flora': 0}}
+    LIT = {'mode': 'baked', 'terrain_faces': 10, 'terrain_lit': 10, 'model_faces': 4, 'model_lit': 4}
+
+    def stats(self, lighting=LIT, **types):
+        return {'records_by_type': types, 'records': {'flora': 0}, 'lighting': lighting}
 
     def doc(self):
         ok = {'placed': 4, 'converted': 4, 'deferred': {}, 'failed': 0, 'skipped': {}}
@@ -678,6 +711,87 @@ class CompleteAndPageTests(unittest.TestCase):
             r['island'] = 1
         self.assertIn('| Not converted | 1 |', md.render(d, 'now'))
 
+    def test_lighting_is_required_for_both_completion_levels(self):
+        ok = {'placed': 3, 'converted': 3, 'deferred': {}, 'failed': 0, 'skipped': {}}
+        npc = {'placed': 1, 'converted': 0, 'deferred': {'resident conversion': 1}, 'failed': 0, 'skipped': {}}
+        meshless = {'placed': 2, 'converted': 0, 'deferred': {
+            'light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33)': 2}, 'failed': 0, 'skipped': {}}
+        cen = census_doc()
+        cen['cells']['0,0']['lights'] = {'placed': 2, 'by_class': {'pure_light': {'mesh': 0, 'meshless': 2}},
+                                         'styles': {'0': 2}, 'animated': 0}
+        cen['cells']['1,0']['lights'] = cen['cells']['0,0']['lights']
+        cp.record_result(self.out, {'format': cp.RESULT_FORMAT, 'build': 'b', 'generated': NOW, 'cells': {
+            '0,0': {'converted': True, 'audits': self.AUD, 'stats': self.stats(STAT=ok, LIGH=meshless)},        # baked: complete
+            '1,0': {'converted': True, 'audits': self.AUD, 'stats': self.stats(None, STAT=ok, LIGH=meshless)},  # today: unlit
+            '2,0': {'converted': True, 'audits': self.AUD, 'stats': self.stats(STAT=ok, NPC_=npc)},             # terrain complete
+            '3,0': {'converted': True, 'audits': self.AUD, 'stats': self.stats(dict(self.LIT, model_lit=2), STAT=ok, NPC_=npc)},
+            '4,0': {'converted': True, 'audits': self.AUD, 'stats': self.stats(dict(self.LIT, mode='lamps'), STAT=ok)}}})
+        d = ingest(self.out, census=cen)
+        c = d['cells']
+        self.assertEqual(c['0,0']['lighting']['status'], 'lit')
+        self.assertEqual(c['0,0']['chim']['bucket'], 'complete')          # the light-path deferral is judged by the audit
+        self.assertEqual(c['1,0']['lighting']['status'], 'unlit')
+        self.assertTrue(c['1,0']['lighting']['assumed'])
+        self.assertEqual(c['1,0']['lighting']['reach'], {'baked': 0, 'lamp_table': 0, 'none': 2})
+        self.assertEqual(c['1,0']['chim']['bucket'], 'complete_unlit')    # everything but the lighting: awaiting lighting
+        self.assertTrue(c['1,0']['chim']['blockers'][0].startswith('lighting unlit'))
+        self.assertEqual(c['2,0']['chim']['bucket'], 'terrain_complete')
+        self.assertEqual(c['3,0']['lighting']['status'], 'partial')      # half the model faces lit
+        self.assertEqual(c['3,0']['chim']['bucket'], 'terrain_complete_unlit')
+        self.assertEqual(c['4,0']['lighting']['status'], 'lit')          # no light sources, every surface lit
+        lt = d['headline']['lighting']
+        self.assertEqual((lt['status']['lit'], lt['status']['partial'], lt['status']['unlit']), (3, 1, 1))
+        self.assertEqual(lt['lights']['pure_light'], {'mesh': 0, 'meshless': 4})
+        self.assertEqual(d['headline']['islands'][0]['lighting']['status']['lit'], 3)
+        self.assertIn('lighting', cp.export_csv(d).splitlines()[0].split(','))
+        import cell_progress_md as md
+        for r in c.values():
+            r['island'] = 1
+        text = md.render(d, 'now')
+        self.assertIn('Lighting: lit 3, partial 1, unlit 1', text)
+        self.assertIn('### Lighting', md.policy_section(text))
+        for label in (cp.COMPLETE_UNLIT_LABEL, cp.TERRAIN_COMPLETE_UNLIT_LABEL):
+            self.assertIn('- %s: 1' % label, text)
+            self.assertIn('| %s | 1 |' % label, text)
+            self.assertIn(label.lower(), md.policy_section(text))
+        self.assertEqual(d['headline']['done'], 5)                        # both awaiting-lighting cells count as done
+        self.assertEqual((d['headline']['complete_unlit'], d['headline']['terrain_complete_unlit']), (1, 1))
+        self.assertEqual((d['headline']['eligible'], d['headline']['eligible_release']), (5, cp.ELIGIBLE_RELEASE))
+        self.assertIn('**Eligible for %s: 5 of 25**' % cp.ELIGIBLE_RELEASE, text)
+        self.assertIn('Eligible for %s = every done cell' % cp.ELIGIBLE_RELEASE, md.policy_section(text))
+        self.assertIn('empty_sea', cp.ELIGIBLE)
+        self.assertEqual(d['headline']['eligible'], d['headline']['done'])
+        self.assertIn("if (f === 'eligible')", (self.KIT / 'world-map.html').read_text(encoding='utf-8'))
+
+    def test_awaiting_lighting_precedence(self):
+        order = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'audits_passed')
+        self.assertEqual([b for b in cp.BUCKETS if b in order], list(order))
+        self.assertTrue(all(b in cp.SUCCESS for b in order))
+        rec = {'chim': {'converted': True}, 'lighting': {'status': 'unlit', 'reason': 'x'},
+               'categories': cp.categorize({'STAT': {'placed': 1, 'converted': 1, 'deferred': {}, 'failed': 0, 'skipped': {}}})}
+        self.assertEqual(cp.completion_level(rec), 'complete_unlit')
+        rec['lighting']['status'] = 'lit'
+        self.assertEqual(cp.completion_level(rec), 'complete')
+        rec['categories']['statics']['deferred'] = {'other': 1}
+        self.assertIsNone(cp.completion_level(rec))                     # something else missing: not awaiting lighting
+
+    def test_zebra_only_for_the_awaiting_lighting_statuses(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        rows = re.findall(r"^  (\w+): \['(#[0-9a-f]{6})', '([^']*)'(, CHIM_ZEBRA)?\]", page, re.M)
+        zebra = {k for k, _, _, z in rows if z}
+        self.assertEqual(zebra, {'complete_unlit', 'terrain_complete_unlit'})
+        self.assertIn('awaiting lighting', ' '.join(t for _, _, t, _ in rows))
+        self.assertIn("c.chim.bucket === 'complete_unlit'", page)      # white border like Cell complete
+        self.assertIn('<script src="zebra.js"></script>', page)
+        head = (self.KIT / 'chim-head.js').read_text(encoding='utf-8')
+        self.assertIn("['complete_unlit', 'cell complete, awaiting lighting'", head)
+        # the shared tile is the inspector's markup-zone tile
+        tile = (self.KIT / 'zebra.js').read_text(encoding='utf-8')
+        insp = (self.KIT / 'map-inspector.html').read_text(encoding='utf-8')
+        for part in ('tile.width=12;tile.height=12', 't.lineWidth=4', 't.moveTo(-3,12);t.lineTo(12,-3);t.moveTo(3,15);t.lineTo(15,3)', "'#444b53'"):
+            self.assertIn(part, insp)
+            self.assertIn(part, tile.replace(' ', ''))
+
     def test_kept_as_chain_passes(self):
         cp.record_result(self.out, {'format': cp.RESULT_FORMAT, 'build': 'b', 'generated': NOW, 'cells': {
             '0,0': {'converted': True, 'audits': {'hull_bevels': {'status': 'failed', 'outcome': cp.KEPT_CHAIN_OUTCOME}}}}})
@@ -739,11 +853,265 @@ class CompleteAndPageTests(unittest.TestCase):
         self.assertIn("['complete', 'cell complete'", head)
         self.assertIn("['terrain_complete', 'terrain complete'", head)
         # the white outline is drawn around complete cells only; the legacy full-town border is dashed amber
-        self.assertIn("function chimIsComplete(c) { return c.chim.bucket === 'complete'; }", page)
-        self.assertIn('groupOutline(g, chimCellList.filter(chimIsComplete));', page)
+        self.assertIn("function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucket === 'complete_unlit'; }", page)
+        self.assertIn('groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));', page)
         self.assertIn("data.cells.filter(c => c.map === 'full'), 'dashed')", page)
         self.assertIn("legacy full town/area map (dashed amber border", page)
         self.assertNotIn('full town/area map (white border', page)
+
+
+class ReleaseUiTests(unittest.TestCase):
+    """The owner's release field, the legend filter, the reference file, and tracking your own build."""
+    KIT = ROOT / 'amiwind-toolkit'
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.out = Path(self._tmp.name) / 'out'
+        self.addCleanup(self._tmp.cleanup)
+
+    def doc(self):
+        ok = {'placed': 2, 'converted': 2, 'deferred': {}, 'failed': 0, 'skipped': {}}
+        aud = {'seam_tears': {'status': 'passed'}}
+        cells = {'0,0': {'converted': True, 'audits': aud, 'stats': {'records_by_type': {'STAT': ok}}},
+                 '1,0': {'converted': True, 'audits': aud, 'stats': {'records_by_type': {'STAT': ok}}},
+                 '2,0': {'converted': True, 'audits': {'seam_tears': {'status': 'failed'}}},
+                 '3,0': {'converted': True, 'empty': True, 'status': 'empty'}}
+        cp.record_result(self.out, {'format': cp.RESULT_FORMAT, 'build': 'syn-1', 'generated': NOW, 'cells': cells})
+        return ingest(self.out)
+
+    def release(self, *argv):
+        return cp.main(['release', '--out', str(self.out), '--now', '2026-10-09T15:00:00+03:00'] + list(argv))
+
+    def test_release_is_owner_set_dated_and_survives_ingest(self):
+        d = self.doc()
+        self.assertFalse((self.out / 'releases.json').exists())                 # results and ingest never create it
+        self.assertTrue(all(c['release'] is None for c in d['cells'].values()))
+        self.assertEqual(self.release('--version', 'v0.0.34', '--cells', '0,0 3,0'), 0)
+        rel = json.loads((self.out / 'releases.json').read_text())
+        self.assertEqual(rel['cells']['0,0'], {'release': 'v0.0.34', 'date': '2026-10-09', 'who': 'owner', 'shipped': False})
+        hist = [json.loads(x) for x in (self.out / 'history.jsonl').read_text().splitlines()]
+        last = [h for h in hist if h.get('type') == 'release'][-1]
+        self.assertEqual((last['who'], last['date'], last['release']), ('owner', '2026-10-09T15:00:00+03:00', 'v0.0.34'))
+        # new conversion results and a fresh ingest keep it; the release line does not confuse the count history
+        cp.record_result(self.out, {'format': cp.RESULT_FORMAT, 'build': 'syn-2', 'generated': NOW, 'cells': {
+            '0,0': {'converted': True, 'audits': {'seam_tears': {'status': 'failed'}}}}})
+        d = ingest(self.out)
+        self.assertEqual(d['cells']['0,0']['release']['name'], 'v0.0.34')
+        self.assertEqual(d['cells']['0,0']['release']['who'], 'owner')
+        self.assertEqual(json.loads((self.out / 'releases.json').read_text())['cells']['0,0']['release'], 'v0.0.34')
+        self.assertTrue(d['history'])
+        row = [r for r in d['releases'] if r['release'] == 'v0.0.34'][0]
+        self.assertEqual((row['approved'], row['empty_sea'], row['failing']), (2, 1, 1))
+
+    def test_bulk_selectors(self):
+        d = self.doc()
+
+        def keys(*spec):
+            return cp.RL.resolve(d['cells'], list(spec), cp.ELIGIBLE_SELECT)
+        self.assertEqual(keys('0,0', '1,0'), ['0,0', '1,0'])
+        self.assertEqual(keys('eligible'), ['0,0', '1,0', '3,0'])                # passed cells and empty sea, not the failing one
+        self.assertEqual(keys('status:converted_failing'), ['2,0'])
+        self.assertEqual(keys('unassigned'), keys('all'))
+        self.assertEqual(self.release('--version', 'v0.0.34', '--cells', 'eligible'), 0)
+        self.assertEqual(self.release('--version', 'v0.0.34', '--cells', '3,0', '--clear'), 0)
+        d = ingest(self.out)
+        self.assertEqual(sorted(k for k, c in d['cells'].items() if c['release']), ['0,0', '1,0'])
+        self.assertEqual(cp.RL.resolve(d['cells'], ['release:v0.0.34'], cp.ELIGIBLE_SELECT), ['0,0', '1,0'])
+        with self.assertRaises(ValueError):
+            keys('nonsense')
+        self.assertEqual(self.release('--version', 'v0.0.34', '--cells', 'nonsense'), 2)
+        self.assertEqual(self.release('--version', 'v0.0.33', '--cells', 'shipped-towns', '--shipped'), 2)   # no town cells in the fixture
+
+    def test_shipped_towns_seed_is_the_frame_coverage(self):
+        """v0.0.33 = every cell the shipped towns' CHIM frames cover, not only the cells that own placements."""
+        run = self.out.parent / 'run'
+        frame = {'cell': [2, 2], 'centre': [2 * 8192 + 4096.0, 2 * 8192 + 4096.0], 'grain': 256, 'low': [-3072.0, -3072.0],
+                 'nx': 24, 'ny': 24}
+        path = ch.frame_path(frame['cell'])
+        write(run / 'chim-receipt.json', {'areas': ['balmora'], 'builder': 'chim', 'chim_version': '9.9.9', 'placements': 5,
+                                          'models': 2, 'frames': [{'frame': frame, 'placements': 5}]})
+        # a 24 x 24 chunk grid of 256 Quake units (4 per Morrowind unit) is 3 x 3 cells; only the middle cell owns placements
+        per = [{'frame': path, 'cell': [i, j], 'owned': 1 if 8 <= i < 16 and 8 <= j < 16 else 0, 'terrain_faces': 10,
+                'placed_faces': 20, 'bytes': 100} for i in range(24) for j in range(24)]
+        write(run / 'chim-stats.json', {'chim_version': '9.9.9', 'world_format': '0.5', 'chunks': {'per_chunk': per}})
+        d = ingest(self.out, ['syn=%s' % run])
+        # the geometry, worked out here independently: x and y reach centre +- 12288 Morrowind units = cells 1, 2 and 3
+        expected = sorted('%d,%d' % (x, y) for x in (1, 2, 3) for y in (1, 2, 3))
+        self.assertEqual(d['area_cover']['balmora'], expected)
+        self.assertEqual(d['area_cells']['balmora'], ['2,2'])                   # converted: owns placements
+        self.assertEqual(self.release('--version', 'v0.0.33', '--cells', 'shipped-towns', '--shipped'), 0)
+        d = ingest(self.out)
+        shipped = sorted(k for k, c in d['cells'].items() if c['release'] and c['release']['shipped'])
+        self.assertEqual(shipped, expected)                                    # the seed equals the frame coverage
+        self.assertTrue(all(d['cells'][k]['release']['name'] == 'v0.0.33' for k in shipped))
+        self.assertTrue([r for r in d['releases'] if r['release'] == 'v0.0.33'][0]['shipped'])
+
+    def test_page_has_a_per_release_table(self):
+        import cell_progress_md as md
+        d = self.doc()
+        for r in d['cells'].values():
+            r['island'] = 1
+        self.assertIn('No cells are assigned to a release yet.', md.render(d, 'now'))
+        self.release('--version', 'v0.0.34', '--cells', 'eligible')
+        d = ingest(self.out)
+        for r in d['cells'].values():
+            r['island'] = 1
+        text = md.render(d, 'now')
+        self.assertIn('## Releases', text)
+        self.assertRegex(text, r'\| v0\.0\.34 \| open \| 3 \|')
+        self.assertEqual(md.private_hits(text), [])
+
+    def test_legend_filter_presets_and_releases_in_node(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable; the legend checks need an existing interpreter')
+        r = subprocess.run([node, str(ROOT / 'tests' / 'test_cell_progress_legend.js'), str(self.KIT / 'chim-legend.js')],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('legend ok', r.stdout)
+
+    def test_toolkit_header_is_unchanged_from_the_lighting_branch(self):
+        # Owner rule (2026-10-09): the Toolkit's logo header (logo, "Toolkit", "Last updated with AmiWind ...", the World / Local /
+        # 3D Inspector buttons, the browser note, then the headline line and chips) keeps its layout, logo, fonts and colours.
+        # New controls go below it or into the legend panel. These fingerprints are those of the lighting branch
+        # (v0.0.34-chim-light); change them only on purpose, together with the header.
+        import hashlib
+        index = (self.KIT / 'index.html').read_text(encoding='utf-8')
+        header = re.search(r'<header\b.*?</header>', index, re.S).group(0)
+        css = ''.join(re.findall(r'[^{}]*header[^{}]*\{[^}]*\}', index))
+        sha = lambda text: hashlib.sha256(text.encode('utf-8')).hexdigest()
+        self.assertEqual(sha(header), 'fac1cc24a87b581836ae2b6691de7f11bdc2f7856172a3cd6a573f07c311e294')
+        self.assertEqual(sha(css), '209fa0e28e1aece0bf890cba4c38319d17648755f5f0386ba1b6d83c2d1c9a60')
+        head = (self.KIT / 'chim-head.js').read_bytes()
+        self.assertEqual(hashlib.sha256(head).hexdigest(), 'a60e9593cad3c01f99d4e2fc221907bbfbe43136a5308f5faaf92f2d8a46779c')
+
+    def test_one_header_for_every_toolkit_page(self):
+        # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their
+        # own mount it with their name as the subtitle; embedded pages show nothing (the index header is above them).
+        header = (self.KIT / 'header.js').read_text(encoding='utf-8')
+        index = (self.KIT / 'index.html').read_text(encoding='utf-8')
+        logo = re.search(r'<img src="([^"]+)" alt="AmiWind">', index).group(1)
+        version = re.search(r'<small id="toolkit-version"[^>]*>([^<]+)</small>', index).group(1)
+        self.assertIn("const LOGO = '%s';" % logo, header)
+        self.assertIn("const VERSION_TEXT = '%s';" % version, header)
+        self.assertIn('Everything here runs in your browser.', header)
+        world = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        self.assertIn('<script src="header.js"></script>', world)
+        self.assertIn("AmiWindToolkitHeader.mount('World Map')", world)
+        inspector = (self.KIT / 'map-inspector.html').read_text(encoding='utf-8')
+        self.assertIn('<script src="header.js" data-subtitle="3D Map Inspector" data-hide="header h1"></script>', inspector)
+        # the page's own script is still the first plain <script> (tests/test_polycount_markup.js evaluates it)
+        self.assertNotRegex(inspector.split('<script>')[0], r'<script>')
+        self.assertIn('root.parent !== root', header)                  # embedded pages stay as they are
+        exporter = (ROOT / 'tools' / 'export_mesh_inspection.py').read_text(encoding='utf-8')
+        self.assertIn('header.js', exporter)                           # the standalone export inlines it
+
+    def test_status_strip_above_the_map(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        for needle in ('id="strip"', 'id="stdot"', 'id="stlabel"', 'Source: <span id="stsrc">', 'Last updated: <span id="stupd">', 'id="stago"',
+                       'Auto-update: <label>', 'id="stauto"', 'function stripRender()', 'setInterval(stripRender, 1000)', 'stripError = true',
+                       "stripError = !(await loadChim(true))", "'live build folder (file, no server)'", 'st.updated_epoch'):
+            self.assertIn(needle, page, needle)
+        self.assertEqual(page.count('id="chimlive"'), 1)             # one switch, in the strip
+        self.assertLess(page.index('id="strip"'), page.index('<div id="controls">'))       # visible even with the controls folded
+        import live_tracker as lt
+        self.assertIn("updated_epoch=round(time.time(), 1)", (ROOT / 'tools' / 'live_tracker.py').read_text(encoding='utf-8'))
+        self.assertTrue(lt.INTERVAL == 10)
+
+    def test_map_fits_the_window_and_folds_its_controls(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        for needle in ('id="zoomfit"', 'id="zoomreset"', 'const MIN_ZOOM = 0.2', 'function fitCanvas(g)', 'window.innerHeight - docTop',
+                       'function viewFit()', "'amiwind-map-view-1'", 'function viewRestore()', 'LABEL_MIN_PX = 16', 'cellPx(g) < LABEL_MIN_PX',
+                       'id="ctltoggle"', 'id="controls"', "'amiwind-map-controls-1'", 'window.innerHeight >= 900'):
+            self.assertIn(needle, page, needle)
+        self.assertNotIn('view.z = Math.max(1, Math.min(16', page)        # the zoom floor is MIN_ZOOM, not 1
+        # the header and its rows stay in the page: the controls are only wrapped
+        self.assertEqual(page.count('<div id="controls">'), 1)
+
+    def test_mesh_chart_does_not_draw_before_its_data_arrives(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        self.assertIn("const ser = chim && chimMeshSeries(); if (!ser || !ser.spiral.length) return;", page)
+        self.assertIn('async function loadChimCurve()', page)
+        self.assertIn("$('chimpanel').innerHTML = chimOverview();", page)            # redrawn when the curve lands
+        # no canvas is written while there is no series
+        self.assertIn("(ser ? '<div class=\"meshpanel\">", page)
+
+    def test_map_page_wires_the_legend_controls(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        for needle in ('<script src="chim-legend.js">', 'id="chimpreset"', 'id="legall"', 'id="legnone"', 'id="chimrelease"',
+                       'id="relsummary"', 'data-k="', 'Release: ', 'id="chimreffile"', "'compare'", 'legendSave', 'localStorage'):
+            self.assertIn(needle, page, needle)
+        self.assertIn('amiwind-toolkit/chim-legend.js', json.loads((ROOT / 'tools' / 'release-files.json').read_text()))
+
+    def test_reference_file_has_only_the_allowed_content(self):
+        import cell_progress_ref as ref
+        d = self.doc()
+        for r in d['cells'].values():
+            r['island'] = 1
+        d['headline']['islands'] = [{'name': 'Vvardenfell', 'cells': 4, 'done': 3}]
+        built = ref.build(d)
+        self.assertEqual(built['format'], ref.REFERENCE_FORMAT)
+        self.assertEqual(set(built['cells']['0,0']) - set(ref.CELL_KEYS), set())
+        self.assertEqual(ref.check(ref.dumps(built)), [])
+        self.assertNotIn('detail', ref.dumps(built))
+        bad = json.loads(ref.dumps(built))
+        bad['cells']['0,0']['path'] = 'x'
+        self.assertTrue(ref.check(json.dumps(bad)))
+        for leak in ('C:' + chr(92) + 'x', '/vol/build', 'amiwind-example-001', 'someone@example.org'):
+            bad = json.loads(ref.dumps(built))
+            bad['cells']['0,0']['name'] = leak
+            self.assertTrue(ref.check(json.dumps(bad, indent=1)), leak)
+        self.assertEqual(ref.compare(d['cells'], built)['0,0'], 'same')
+        built['cells']['0,0']['status'] = 'not_started'
+        self.assertEqual(ref.compare(d['cells'], built)['0,0'], 'better')
+        self.assertEqual(cp.main(['publish', '--out', str(self.out), '--file', str(self.out / 'ref.json')]), 0)
+        self.assertEqual(cp.main(['check-reference', '--file', str(self.out / 'ref.json')]), 0)
+
+    def test_committed_reference_file_is_clean(self):
+        import cell_progress_ref as ref
+        page = ROOT / ref.REFERENCE_PATH
+        if page.is_file():
+            self.assertEqual(ref.check(page.read_bytes().decode('utf-8')), [])
+            self.assertIn(ref.REFERENCE_PATH, json.loads((ROOT / 'tools' / 'release-files.json').read_text()))
+
+    def test_a_build_writes_its_own_progress_and_the_server_finds_it(self):
+        import cell_progress_build as cb
+        import toolkit_serve as srv
+        build = Path(self._tmp.name) / 'build'
+        chim_run(build / 'chim-world')
+        written = cb.write(build / 'chim-world', build / 'toolkit', label='my build', now=NOW)
+        self.assertEqual(written, build / 'toolkit' / 'cell-progress.json')
+        doc = json.loads(written.read_text())
+        self.assertEqual(doc['format'], cp.FORMAT)
+        self.assertTrue(doc['cells']['2,2']['chim']['converted'])
+        self.assertEqual(srv.build_folders(build)[0], (build / 'toolkit').resolve())
+        # a tracker problem is a warning, never a failed build
+        (build / 'blocked').write_text('a file where the folder should be')
+        self.assertIsNone(cb.write(build / 'chim-world', build / 'blocked', now=NOW))
+
+    def test_server_serves_the_reference_next_to_a_build(self):
+        import toolkit_serve as srv
+        build = Path(self._tmp.name) / 'build'
+        (build / 'toolkit').mkdir(parents=True)
+        (build / 'toolkit' / 'cell-progress.json').write_text('{}')
+        ref = Path(self._tmp.name) / 'cell-progress-reference.json'
+        ref.write_text('{"format": "aw-cell-reference-1", "cells": {}}')
+        srv.Handler.reference, srv.Handler.progress_dir, srv.Handler.data_dir, srv.Handler.maps_dir, srv.Handler.metrics = (
+            ref, build / 'toolkit', None, None, None)
+        httpd = srv.ThreadingHTTPServer(('127.0.0.1', 0), srv.Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        base = 'http://127.0.0.1:%d' % httpd.server_address[1]
+        self.assertEqual(json.loads(urllib.request.urlopen(base + '/data/cell-progress-reference.json').read())['format'],
+                         'aw-cell-reference-1')
+        self.assertEqual(json.loads(urllib.request.urlopen(base + '/data/cell-progress.json').read()), {})
+        srv.Handler.reference = None
+        for name in ('cell-progress-reference.json', 'live-status.json'):          # optional files: 204, never a 404 in the console
+            answer = urllib.request.urlopen(base + '/data/' + name)
+            self.assertEqual((answer.status, answer.read()), (204, b''))
 
 
 class PageTests(unittest.TestCase):
@@ -769,8 +1137,11 @@ class PageTests(unittest.TestCase):
     def test_files_ship_in_the_release(self):
         shipped = set(json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8')))
         for name in ('tools/cell_progress.py', 'tools/cell_progress_chim.py', 'tools/cell_progress_order.py',
-                     'tools/cell_progress_md.py', 'docs/chim/CELL_TRACKER.md',
-                     'amiwind-toolkit/chim-head.js', 'config/cell-progress-areas.json', 'tests/test_cell_progress.py'):
+                     'tools/cell_progress_md.py', 'docs/chim/CELL_TRACKER.md', 'tools/cell_progress_release.py',
+                     'tools/cell_progress_ref.py', 'tools/cell_progress_build.py', 'amiwind-toolkit/chim-legend.js',
+                     'tests/test_cell_progress_legend.js', 'amiwind-toolkit/header.js',
+                     'amiwind-toolkit/chim-head.js', 'amiwind-toolkit/zebra.js', 'config/cell-progress-areas.json',
+                     'tests/test_cell_progress.py'):
             self.assertIn(name, shipped)
             self.assertTrue((ROOT / name).is_file(), name)
 

@@ -579,6 +579,19 @@ class NativeSourceTests(unittest.TestCase):
                              cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'],
                              arguments=[str(path)])
 
+    def test_quick_character_screen_sequence_and_callers(self):
+        # aw_quickchar.c: one entry point for New Game (--skip-census), dbg quickchar and test set-ups.
+        self.compile_run('aga_quickchar_test.c', [Path(SOURCE)/'src/aw_quickchar.c'],
+                         cflags=['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined',
+                                 '-fno-sanitize-recover=all'])
+
+    def test_test_mailbox_drive_and_startup_options(self):
+        # aw_testbox.c: the AWCMDBOX mailbox, the AWTEST: drive (a host folder here), test.cfg and the poll.
+        with tempfile.TemporaryDirectory() as drive:
+            self.compile_run('aga_testbox_test.c', [Path(SOURCE)/'src/aw_testbox.c'],
+                             cflags=['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined',
+                                     '-fno-sanitize-recover=all'], arguments=[drive])
+
     def test_balmora_region_round_trip(self):
         self.compile_run('aga_region_test.c', [Path(SOURCE)/'src/aw_region.c'])
 
@@ -617,16 +630,19 @@ class NativeSourceTests(unittest.TestCase):
             sources = [*sources, tree/"src/aw_harvest.c", tree/"src/aw_harvest_runtime.c"]
             if not any(p.name == "aw_state.c" for p in sources):
                 sources.append(tree/"src/aw_state.c")
-        if (any(p.name in LOG_USERS for p in sources) and not any(p.name == "aw_log.c" for p in sources)
-                and not includes_aw_log(ROOT/"tests"/fixture)):
-            # In-memory diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33); live when unbound.
-            sources = [*sources, tree/"src/aw_log.c"]
         hooked = ("aw_movie.c", "aw_scene.c", "aw_intro.c")
         fixture_text = (ROOT/'tests'/fixture).read_text(encoding='utf-8', errors='replace')
         if ((any(p.name in hooked for p in sources) or any('#include "%s"' % n in fixture_text for n in hooked))
                 and not any(p.name == "aw_excluded.c" for p in sources)):
             # Quick-test-build marker (id1/excluded-content.txt) used by these files.
             sources = [*sources, tree/"src/aw_excluded.c"]
+        if (any(p.name in LOG_USERS for p in sources) and not any(p.name == "aw_log.c" for p in sources)
+                and not includes_aw_log(ROOT/"tests"/fixture)):
+            # In-memory diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33); live when unbound.
+            sources = [*sources, tree/"src/aw_log.c"]
+        # Weak stand-ins for the quick character screen, the test channels and the notice
+        # (tests/aga_hook_stubs.c): fixtures that link the real modules keep them.
+        sources = [*sources, ROOT/"tests/aga_hook_stubs.c"]
         if not any(p.name == "aw_format.c" for p in sources):
             # Engine text/number conversion (Q_strtod, Q_sscanf, Q_fscanf).
             sources = [*sources, tree/"src/aw_format.c"]

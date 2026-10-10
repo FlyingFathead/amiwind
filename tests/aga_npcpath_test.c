@@ -151,11 +151,36 @@ static void speeds(void) {
     assert(AW_PathSpeed(0,300,180,96)==AW_PATH_WALK_SPEED && AW_PathSpeed(0,0,250,96)==AW_PATH_RUN_SPEED);
 }
 
+/* Stuck responses per actor kind (owner decision, 9 October 2026). */
+static void stuck_policy(void) {
+    int combat,view;
+    /* followers and escorts: 0 always placed (the first prototype), 1 only out of view, 2 never */
+    assert(AW_PathStuckResponse(AW_ACTOR_FOLLOWER,0,0,0)==AW_STUCK_PLACE);
+    assert(AW_PathStuckResponse(AW_ACTOR_FOLLOWER,1,0,1)==AW_STUCK_PLACE);
+    assert(AW_PathStuckResponse(AW_ACTOR_FOLLOWER,1,0,0)==AW_STUCK_WAIT_UNSEEN);
+    assert(AW_PathStuckResponse(AW_ACTOR_FOLLOWER,2,0,1)==AW_STUCK_RETRY);
+    /* summons: as followers out of combat; in combat never warped, whatever the method or view */
+    assert(AW_PathStuckResponse(AW_ACTOR_SUMMON,1,0,1)==AW_STUCK_PLACE);
+    assert(AW_PathStuckResponse(AW_ACTOR_SUMMON,1,0,0)==AW_STUCK_WAIT_UNSEEN);
+    for(view=0;view<2;view++){
+        assert(AW_PathStuckResponse(AW_ACTOR_SUMMON,0,1,view)==AW_STUCK_RETRY);
+        assert(AW_PathStuckResponse(AW_ACTOR_SUMMON,1,1,view)==AW_STUCK_RETRY);
+    }
+    /* hostiles never warp: flee (default method 1) or keep trying (0) */
+    for(combat=0;combat<2;combat++)for(view=0;view<2;view++){
+        assert(AW_PathStuckResponse(AW_ACTOR_HOSTILE,1,combat,view)==AW_STUCK_FLEE);
+        assert(AW_PathStuckResponse(AW_ACTOR_HOSTILE,0,combat,view)==AW_STUCK_RETRY);
+        assert(AW_PathStuckResponse(AW_ACTOR_HOSTILE,2,combat,view)!=AW_STUCK_PLACE);
+    }
+    assert(AW_STUCK_METHOD_DEFAULT==1);
+    assert(!strcmp(AW_PathStuckName(AW_STUCK_PLACE),"placed") && !strcmp(AW_PathKindName(AW_ACTOR_HOSTILE),"hostile"));
+}
+
 int main(void) {
     setvbuf(stdout,NULL,_IONBF,0);
     assert(sizeof(aw_path_t)<64);
     assert(AW_PathScratchBytes()<512);
-    headings();speeds();idle_costs_nothing();
+    headings();speeds();idle_costs_nothing();stuck_policy();
     ping_picks_nearer_direction();ping_takes_open_side();
     flood_finds_exit();flood_lost_when_enclosed();flood_refuses_ledge();
     assert(max_calls<=AW_PATH_TRACES);

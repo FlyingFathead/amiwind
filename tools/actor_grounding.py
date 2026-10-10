@@ -114,10 +114,11 @@ class _Fitter:
         return Scene((self.maps/(name+'.bsp')).read_bytes(), hull=0)
 
     def _soles(self, model, angles, intro):
-        from check_actor_ground import model_frames, contact_samples
+        from check_actor_ground import model_frames, layout_of, contact_samples
         name = Path(model)
         if name.is_absolute() or '..' in name.parts: raise ValueError('Unsafe actor model path')
-        return tuple(contact_samples(model_frames((self.maps.parent/name).read_bytes()), angles, intro))
+        path = self.maps.parent/name
+        return tuple(contact_samples(model_frames(path.read_bytes()), angles, intro, layout_of(path)))
 
     @staticmethod
     def contact(s, point, samples):
@@ -199,13 +200,10 @@ class _Fitter:
     def search(self, name, e, authored, angles, original, first, last):
         """The first passing offset in OFFSETS[first:last]: (attempt, fields) or None."""
         import math
-        from check_actor_ground import owner
         samples, s, center = self._setup(name, e, authored, angles)
         for attempt, (dx, dy) in enumerate(OFFSETS[first:last], first+1):
             candidate = [authored[0]+dx, authored[1]+dy, 0]
-            try: target = owner(self.maps, name, candidate)
-            except ValueError: continue
-            if target != name: continue
+            if not self.owned(name, candidate): continue
             support = s.floor([*candidate[:2], authored[2]+8], 40)
             if support['status'] != 'supported' or abs(support['height']-center['height']) > 16: continue
             low = authored[2]-32; high = authored[2]+8
@@ -222,6 +220,14 @@ class _Fitter:
             return attempt, dict(placed_origin=candidate, placed_z=candidate[2], mesh_contact='fitted', attempts=attempt,
                                  correction_from_origin_grounding=[round(candidate[k]-original[k], 5) for k in range(3)])
         return None
+
+    def owned(self, name, candidate):
+        """A candidate spot stays in the map that owns the authored one (never crosses an owner core)."""
+        from check_actor_ground import owner
+        try:
+            return owner(self.maps, name, candidate) == name
+        except ValueError:
+            return False
 
     def fit(self, name, e, authored, angles):
         result, original = self.head(name, e, authored, angles)

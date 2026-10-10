@@ -7,9 +7,9 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.audit import BSA
 from mwad.npc import load_master,outfit,greeting_fixture,behavior_record,greeting_settings
-from mwad.paths import ensure_external
+from mwad.paths import copy_tree,ensure_external
 from known_inputs import input_sha256
-from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl
+from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl,add_root_rule_arg,apply_root_rule
 from player_hull import lumps,pack_lumps,PROFILE
 from prepare_quake import CENTRE,SCALE
 
@@ -33,7 +33,7 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
     ready=json.loads((scene/'scene-ready.json').read_text())
     if ready.get('standing_hull_profile')!=PROFILE:raise ValueError('Rebuild matching standing hull first')
     if ready.get('npcs'):raise ValueError('Scene already has NPCs')
-    shutil.copytree(scene,out)
+    copy_tree(scene,out)
     kinds,cells,topics=load_master(data/'Morrowind.esm');assets=Assets(data,BSA(data/'Morrowind.bsa'))
     skeleton=Skeleton(assets);times,step=skeleton.idle_times(8)
     palette=(scene/'id1/gfx/palette.lmp').read_bytes();models={};actors=[];entities=[]
@@ -82,7 +82,7 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('data-files','scene','out'):p.add_argument('--'+n,type=Path,required=True)
-    p.add_argument('--ffmpeg',default='ffmpeg');a=p.parse_args()
+    p.add_argument('--ffmpeg',default='ffmpeg');add_root_rule_arg(p);a=p.parse_args();apply_root_rule(a)
     try:print(json.dumps(prepare(a.data_files,a.scene,a.out,a.ffmpeg),indent=2))
     except (OSError,ValueError,KeyError,subprocess.CalledProcessError) as e:p.exit(1,str(e)+'\n')
 if __name__=='__main__':main()

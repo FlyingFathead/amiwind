@@ -9,6 +9,8 @@
   const PARTS = [
     ['complete', 'cell complete', '#7dffa6'],
     ['terrain_complete', 'terrain complete', '#7dffa6'],
+    ['complete_unlit', 'cell complete, awaiting lighting', 'repeating-linear-gradient(135deg,#7dffa6 0 4px,#00e5ff 4px 7px)'],
+    ['terrain_complete_unlit', 'terrain complete, awaiting lighting', 'repeating-linear-gradient(135deg,#7dffa6 0 4px,#00e5ff 4px 7px)'],
     ['approved', 'owner-approved', '#ffd23f'],
     ['playtested', 'playtested', '#2ec4b6'],
     ['audits_passed', 'passed (something deferred)', '#46c37b'],
@@ -27,6 +29,14 @@
     return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="passed cells per day">' +
       '<polyline points="' + xy.join(' ') + '" fill="none" stroke="#46c37b" stroke-width="1.6"/></svg>';
   }
+  // Island-wide lighting line (tools/cell_lighting.py): lit is required for both completion levels.
+  function lightLine(lt) {
+    if (!lt || !lt.status) return '';
+    const s = lt.status, r = lt.reach || {};
+    return '<span class="chimnote" title="A cell is only complete when it is lit like the original">lighting: lit ' + (s.lit || 0).toLocaleString() +
+      ' · partial ' + (s.partial || 0).toLocaleString() + ' · unlit ' + (s.unlit || 0).toLocaleString() + ' · lights baked ' + (r.baked || 0).toLocaleString() +
+      ', night lamps only ' + (r.lamp_table || 0).toLocaleString() + ', not represented ' + (r.none || 0).toLocaleString() + '</span>';
+  }
   function render(el, h, history, onPick, picked) {
     if (!el) return;
     if (!h) { el.innerHTML = ''; el.hidden = true; return; }
@@ -37,11 +47,13 @@
     const hist = (history || []).slice(-5).map(x => esc(x.date.slice(5, 10)) + ' ' + x.passed).join(' · ');
     el.innerHTML = '<span class="chimtitle">' + esc(isl.name || 'CHIM cells') + ' <b>Done: ' + isl.done.toLocaleString() + ' of ' + isl.cells.toLocaleString() +
       ' (' + pct + ')</b> · cell complete ' + (isl.complete || 0).toLocaleString() + ' · terrain complete ' + (isl.terrain_complete || 0).toLocaleString() +
+      ' · awaiting lighting ' + ((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)).toLocaleString() +
+      (isl.eligible != null ? ' · <b>eligible for ' + esc(h.eligible_release || 'next release') + ': ' + isl.eligible.toLocaleString() + '</b>' : '') +
       (others ? ' · ' + others : '') + '</span><span class="chimparts">' +
       PARTS.map(([k, t, c]) => '<button type="button" data-bucket="' + k + '" aria-pressed="' + (picked === k ? 'true' : 'false') +
         '" title="Highlight these cells on the map"><i style="background:' + c + '"></i>' + esc(t) + ' <b>' + (h[k] || 0).toLocaleString() +
         '</b></button>').join('') +
-      '</span><span class="chimnote">unmeasured audits on ' + (h.with_unmeasured_audits || 0) + ' converted cell' +
+      '</span>' + lightLine(h.lighting) + '<span class="chimnote">unmeasured audits on ' + (h.with_unmeasured_audits || 0) + ' converted cell' +
       (h.with_unmeasured_audits === 1 ? '' : 's') + ' (never counted as passed)</span>' +
       (hist ? '<span class="chimhist" title="Passed cells per day, last five days">' + spark(history) + ' ' + hist + '</span>' : '');
     for (const b of el.querySelectorAll('button[data-bucket]')) b.onclick = () => onPick && onPick(b.dataset.bucket);

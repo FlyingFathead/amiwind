@@ -48,6 +48,31 @@ def write_allowances(directory, results, entries, output):
                 exceptions=exceptions,unresolved=unresolved)
 
 
+def world_allowances(id1):
+    """Append model-budgets.txt lines for every extended (more than 2,000 vertex)
+    alias model of the game payload outside gallery/: world residents, combat and
+    guard models whose original heads (npc_geometry.head_plan) take them past 666
+    faces. The engine loads such a model only with a byte-matching line. Existing
+    lines are kept; a model beyond the renderer ceiling is an error."""
+    id1=Path(id1);table=id1/'model-budgets.txt'
+    lines=table.read_text(encoding='utf-8').splitlines() if table.is_file() else ['AWPB1']
+    if not lines or lines[0]!='AWPB1':raise ValueError('Unknown model-budgets.txt format')
+    known={line.split()[0] for line in lines[1:] if line.strip()}
+    added=[]
+    for path in sorted(id1.rglob('*.mdl')):
+        name=path.relative_to(id1).as_posix()
+        if name.startswith('gallery/') or name in known:continue
+        raw=path.read_bytes()
+        if len(raw)<84 or raw[:8]!=b'IDPO\x06\0\0\0':continue
+        vertices,triangles=struct.unpack_from('<ii',raw,60)
+        if vertices<=2000:continue
+        if vertices>GALLERY_FACE_LIMIT*3 or triangles>GALLERY_FACE_LIMIT:raise ValueError('Beyond renderer ceiling: '+name)
+        added.append(dict(model=name,vertices=vertices,triangles=triangles,bytes=len(raw),crc32=f'{zlib.crc32(raw):08x}'))
+    lines+=[f"{e['model']} {e['vertices']} {e['triangles']} {e['bytes']} {e['crc32']}" for e in added]
+    table.write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
+    return dict(format=1,added=added,table='model-budgets.txt')
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--data-files',type=Path,required=True);p.add_argument('--gallery',type=Path,required=True)

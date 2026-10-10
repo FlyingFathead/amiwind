@@ -32,11 +32,13 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import build  # noqa: E402
 import build_jobs  # noqa: E402
 import build_parallel  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 TOOLS = {k: '/tools/' + k for k in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
 # Stages whose tool has no worker pool: one process each, budgeted as one slot.
 SERIAL_BY_DESIGN = {'setup', 'terrain', 'npcs', 'hands', 'dialogue-lookup', 'door-audio',
-                    'reading', 'opening-references', 'world-ui'}
+                    'reading', 'opening-references', 'world-ui', 'cell-progress'}  # cell-progress: one ingest pass
 # Independent per-item loops not yet in the pool (tracked; remove when pooled).
 SERIAL_NOT_YET_POOLED = set()
 
@@ -447,6 +449,7 @@ class SerialParallelIdentityTests(unittest.TestCase):
             self.assertEqual(build_parallel.hash_files(paths, 1), build_parallel.hash_files(paths, 4))
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class ResolveJobsTests(unittest.TestCase):
     def test_explicit_n_is_returned_unchanged(self):
         with patch.object(build_jobs, 'usable_cpus', return_value=4):
@@ -482,7 +485,7 @@ class ResolveJobsTests(unittest.TestCase):
             self.assertEqual(build_jobs.auto_jobs(), 1)
 
     def run_build(self, root, jobs):
-        args = ['--dry-run', '--workspace', str(root), '--name', 'fixture', '--jobs', str(jobs)]
+        args = ['--dry-run', '--workspace', str(root), '--name', 'fixture', '--any-run-name', '--jobs', str(jobs)]
 
         def commands(options, run):
             output = run / 'image' / f'AmiWind-v{build.VERSION}-dry-run.hdf'

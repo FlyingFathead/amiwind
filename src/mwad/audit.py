@@ -12,40 +12,7 @@ import struct
 from collections import Counter
 from pathlib import Path
 
-
-class FormatError(ValueError):
-    pass
-
-
-def require(condition, message):
-    if not condition:
-        raise FormatError(message)
-
-
-def string(data):
-    return data.rstrip(b"\0").decode("cp1252")
-
-
-def records(data):
-    pos = 0
-    while pos < len(data):
-        require(pos + 16 <= len(data), f"Truncated record header at {pos}")
-        tag, size, unused, flags = struct.unpack_from("<4sIII", data, pos)
-        end = pos + 16 + size
-        require(end <= len(data), f"Record {tag!r} overruns file at {pos}")
-        yield tag.decode("ascii"), flags, data[pos + 16:end]
-        pos = end
-
-
-def subrecords(data):
-    pos = 0
-    while pos < len(data):
-        require(pos + 8 <= len(data), f"Truncated subrecord header at {pos}")
-        tag, size = struct.unpack_from("<4sI", data, pos)
-        end = pos + 8 + size
-        require(end <= len(data), f"Subrecord {tag!r} overruns record at {pos}")
-        yield tag.decode("ascii"), data[pos + 8:end]
-        pos = end
+from .esm import FormatError, is_deleted, records, require, string, subrecords  # noqa: F401  (re-exported)
 
 
 def decode_heights(data):
@@ -97,7 +64,7 @@ class BSA:
             require(name_offset < len(names), "BSA filename offset out of range")
             end = names.find(b"\0", name_offset)
             require(end >= 0, "Unterminated BSA filename")
-            name = normpath(string(names[name_offset:end]))
+            name = normpath(string(names[name_offset:end], "BSA filename"))
             require(name not in self.entries, f"Duplicate BSA path: {name}")
             require(start + offset + length <= size, "BSA asset overruns archive")
             self.entries[name] = {"bytes": length, "offset": start + offset}
@@ -116,7 +83,7 @@ def cell_data(subs):
         elif ref is None:
             header[tag] = data
         elif tag == "NAME":
-            ref["id"] = string(data)
+            ref["id"] = string(data, "reference NAME")
         elif tag == "DATA":
             require(len(data) == 24, "Invalid reference transform")
             values = struct.unpack("<6f", data)
@@ -135,11 +102,11 @@ def cell_data(subs):
             require(all(math.isfinite(x) for x in values), "Nonfinite door destination")
             ref["destination"] = {"position": list(values[:3]), "rotation_radians": list(values[3:])}
         elif tag == "DNAM":
-            ref["destination_cell"] = string(data)
+            ref["destination_cell"] = string(data, "reference DNAM")
     require(len(header.get("DATA", b"")) == 12, "Invalid CELL header")
     flags, x, y = struct.unpack("<Iii", header["DATA"])
-    return {"name": string(header.get("NAME", b"")), "flags": flags,
-            "x": x, "y": y, "refs": refs, "region": string(header.get("RGNN", b""))}
+    return {"name": string(header.get("NAME", b""), "CELL NAME"), "flags": flags,
+            "x": x, "y": y, "refs": refs, "region": string(header.get("RGNN", b""), "CELL RGNN")}
 
 
 def load_esm(path, dialogue_search=""):
@@ -168,23 +135,23 @@ def load_esm(path, dialogue_search=""):
             require(len(s.get("INTV", b"")) == 8, "Invalid LAND location")
             key = struct.unpack("<ii", s["INTV"])
             require(key not in lands, "Duplicate LAND record")
-            if "VHGT" in s and "DELE" not in s:
+            if "VHGT" in s and not is_deleted(flags, s):
                 lands[key] = {"heights": decode_heights(s["VHGT"]),
                               "materials": decode_materials(s["VTEX"]) if "VTEX" in s else [[0] * 16 for _ in range(16)]}
-        elif tag == "LTEX" and "DELE" not in s:
+        elif tag == "LTEX" and not is_deleted(flags, s):
             index = struct.unpack("<I", s["INTV"])[0] + 1
-            textures[index] = {"id": string(s["NAME"]), "texture": string(s["DATA"])}
-        elif tag in object_tags and "NAME" in s and "DELE" not in s:
-            key = string(s["NAME"]).lower()
+            textures[index] = {"id": string(s["NAME"], "LTEX NAME"), "texture": string(s["DATA"], "LTEX DATA")}
+        elif tag in object_tags and "NAME" in s and not is_deleted(flags, s):
+            key = string(s["NAME"], tag + " NAME").casefold()
             require(key not in objects, f"Duplicate object ID: {key}")
-            objects[key] = {"type": tag, "model": string(s.get("MODL", b"")),
-                            "display_name": string(s.get("FNAM", b""))}
+            objects[key] = {"type": tag, "model": string(s.get("MODL", b""), tag + " MODL"),
+                            "display_name": string(s.get("FNAM", b""), tag + " FNAM")}
         elif tag == "DIAL":
-            topic = string(s.get("NAME", b""))
-        elif tag == "INFO" and dialogue_search and dialogue_search.casefold() in string(s.get("NAME", b"")).casefold():
-            voice_matches.append({"topic": topic, "id": string(s["INAM"]),
-                                  "text": string(s["NAME"]), "sound": string(s.get("SNAM", b"")),
-                                  "race": string(s.get("RNAM", b"")), "faction": string(s.get("FNAM", b""))})
+            topic = string(s.get("NAME", b""), "DIAL NAME")
+        elif tag == "INFO" and dialogue_search and dialogue_search.casefold() in string(s.get("NAME", b""), "INFO NAME").casefold():
+            voice_matches.append({"topic": topic, "id": string(s["INAM"], "INFO INAM"),
+                                  "text": string(s["NAME"], "INFO NAME"), "sound": string(s.get("SNAM", b""), "INFO SNAM"),
+                                  "race": string(s.get("RNAM", b""), "INFO RNAM"), "faction": string(s.get("FNAM", b""), "INFO FNAM")})
     require(counts["TES3"] == 1, "Missing TES3 header")
     require(expected == sum(counts.values()) - 1, "HEDR record count mismatch")
     return {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "counts": dict(counts),
@@ -210,10 +177,22 @@ def terrain_packet(land, cx, cy, tx, ty, stride):
 
 
 def json_write(path, value):
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
 
-def audit(data_files, out, center, radius, stride, dialogue_search=""):
+# Height of a cell without a LAND record (OpenMW's ESM::Land::DEFAULT_HEIGHT, world units): open sea
+# cells of the base master hold wrecks, rocks and kelp over a flat seabed at this depth.
+DEFAULT_LAND_HEIGHT = -2048
+
+
+def default_land():
+    """Flat land of a cell without a LAND record: DEFAULT_LAND_HEIGHT, default terrain material."""
+    return {"heights": [[DEFAULT_LAND_HEIGHT] * 65 for _ in range(65)], "materials": [[0] * 16 for _ in range(16)],
+            "default": True}
+
+
+def audit(data_files, out, center, radius, stride, dialogue_search="", missing_land=None):
+    """missing_land: None refuses a square with cells without land; 'flat' gives them default_land()."""
     from .paths import ensure_external, resolve_data_files, child_ci
     data_files = resolve_data_files(data_files)
     out = ensure_external(out, "output")
@@ -224,7 +203,13 @@ def audit(data_files, out, center, radius, stride, dialogue_search=""):
     bsa = BSA(child_ci(data_files, "Morrowind.bsa"))
     selected = [(x, y) for y in range(center[1] - radius, center[1] + radius + 1)
                 for x in range(center[0] - radius, center[0] + radius + 1)]
-    require(all(p in esm["lands"] for p in selected), "Selected square has missing terrain; choose a smaller region")
+    require(missing_land in (None, "flat"), "missing_land must be None or 'flat'")
+    defaulted = [p for p in selected if p not in esm["lands"]]
+    if missing_land == "flat":
+        for p in defaulted:
+            esm["lands"][p] = default_land()
+    else:
+        require(not defaulted, "Selected square has missing terrain; choose a smaller region")
     placements, cells, models, missing, types, materials = [], [], set(), set(), Counter(), set()
     packets, index, grids = bytearray(), [], []
     seam_pairs, seam_max = 0, 0
@@ -235,7 +220,7 @@ def audit(data_files, out, center, radius, stride, dialogue_search=""):
         cells.append({"x": cx, "y": cy, "name": cell["name"], "region": cell["region"], "references": len(refs)})
         for ref in refs:
             require("id" in ref and "position" in ref, "Incomplete placed reference")
-            obj = esm["objects"].get(ref["id"].lower())
+            obj = esm["objects"].get(ref["id"].casefold())
             if obj is None:
                 missing.add(ref["id"])
             else:
@@ -247,7 +232,7 @@ def audit(data_files, out, center, radius, stride, dialogue_search=""):
             packet = terrain_packet(land, cx, cy, tx, ty, stride)
             index.append({"chunk": [cx * 4 + tx, cy * 4 + ty], "offset": len(packets), "bytes": len(packet)})
             packets.extend(packet)
-        grids.append({"cell": [cx, cy], **land})
+        grids.append({"cell": [cx, cy], **{k: v for k, v in land.items() if k != "default"}})
         materials.update(v for row in land["materials"] for v in row)
         for neighbor, edge, other in [((cx + 1, cy), [r[-1] for r in land["heights"]], "west"),
                                      ((cx, cy + 1), land["heights"][-1], "south")]:
@@ -272,7 +257,8 @@ def audit(data_files, out, center, radius, stride, dialogue_search=""):
                  "references": len(placements), "reference_types": dict(types), "missing_object_ids": sorted(missing),
                  "direct_unique_models": len(models), "direct_model_bytes": sum(m.get("bytes", 0) for m in manifest),
                  "missing_direct_models": [m["path"] for m in manifest if m.get("missing")],
-                 "terrain_material_ids": sorted(materials)},
+                 "terrain_material_ids": sorted(materials),
+                 "default_land_cells": [list(p) for p in defaulted] if missing_land == "flat" else []},
         "terrain": {"selected_stride": stride, "packet_stream_bytes": len(packets), "profiles": profiles,
                     "neighbor_seams_checked": seam_pairs, "max_seam_error_world_units": seam_max,
                     "note": "Height and material IDs only; no texture blending, meshes, sprites, collision structures or runtime memory included."},

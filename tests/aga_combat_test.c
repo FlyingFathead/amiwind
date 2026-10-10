@@ -7,6 +7,7 @@
  * a resident hit by the player starting a fight, the player's fatigue
  * return outside fights, the scene change and the cost counters. */
 #include "quakedef.h"
+#include "aw_anim.h"
 #include "aw_combat.h"
 #include "aw_character.h"
 #include <assert.h>
@@ -17,7 +18,14 @@ server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;keydest_t 
 int host_framecount;double host_frametime=.02;char *pr_strings;dprograms_t *progs;double realtime;
 unsigned long aw_sv_move_calls;aw_character_t aw_character;
 /* the hooks live beside their callers (aw_ui.c, aw_scene.c) */
-int (*aw_combat_enemy_bar)(float *,float *);void (*aw_combat_scene)(void);
+int (*aw_combat_enemy_bar)(float *,float *);void (*aw_combat_scene)(void);int (*aw_combat_input_locked)(void);
+/* aw_items.c (carried weapon/shield entities; its own fixture aga_items_test.c): counted here. */
+#include "aw_items.h"
+static int items_shown,items_hidden;
+int AW_CompanionPickAim(void){return 0;}      /* aw_companion.c: the right button in pick mode */
+int AW_ItemsShow(edict_t *a,edict_t *o[AW_ITEMS_KINDS]){(void)a;o[0]=o[1]=NULL;items_shown++;return 0;}
+void AW_ItemsUpdate(edict_t *a,edict_t *i[AW_ITEMS_KINDS]){(void)a;(void)i;}
+void AW_ItemsHide(edict_t *i[AW_ITEMS_KINDS]){i[0]=i[1]=NULL;items_hidden++;}
 static char strings[256];static int string_at=1;
 static edict_t edicts[16];static client_t client;static dprograms_t program;static model_t model;
 static eval_t fields[16][8];
@@ -45,6 +53,13 @@ void S_LocalSound(char *s){sounds++;strcpy(last_sound,s);}
 void AW_MusicCombat(int on){if(on)music_on++;else music_off++;}
 void AW_MusicDeath(void){music_death++;}
 double Sys_FloatTime(void){return clock_now+=.0001;}
+/* aw_anim.c engine glue: test models have no layout file (previous frames). */
+const aw_anim_t *AW_AnimOf(edict_t *e){
+    static aw_anim_t a;int i=(int)e->v.modelindex;AW_AnimDefault(&a,i>0 && i<MAX_MODELS && sv.models[i]?sv.models[i]->numframes:1);return &a;
+}
+int aw_test_mover_on,aw_test_mover_off;static edict_t *aw_test_worn;
+int AW_AnimMover(edict_t *e,int on){if(on){if(aw_test_worn)return 0;aw_test_worn=e;aw_test_mover_on++;return 1;}if(aw_test_worn!=e)return 0;aw_test_worn=NULL;aw_test_mover_off++;return 1;}
+int AW_AnimMoving(edict_t *e){return e && aw_test_worn==e;}
 void Con_Printf(char *f,...){(void)f;printed++;}
 void Sys_Error(char *f,...){(void)f;abort();}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
@@ -75,6 +90,7 @@ static void run(const char *line){
     assert(!"command not registered");
 }
 static void result(int won){results[won!=0]++;}
+static int voices[5];static void bark(edict_t *e,int event){assert(e && event>=0 && event<5);voices[event]++;}
 static void write_file(const char *name,const char *text){
     char path[160];FILE *f;sprintf(path,"%s/%s",dir,name);
     f=fopen(path,"wb");assert(f);fputs(text,f);fclose(f);
@@ -110,7 +126,8 @@ int main(void){
         "fWeaponFatigueMult 0.25\nfFatigueReturnBase 2.5\nfFatigueReturnMult 0.02\nfUnarmoredBase1 0.1\nfUnarmoredBase2 0.065\n"
         "iBlockMinChance 10\niBlockMaxChance 50\nfSwingBlockBase 1\nfSwingBlockMult 1\nfBlockStillBonus 1.25\n"
         "fFatigueBlockBase 4\nfFatigueBlockMult 0\nfWeaponFatigueBlockMult 1\nfCombatBlockLeftAngle -90\n"
-        "fCombatBlockRightAngle 30\nfCombatDelayNPC 0.1\nfNPCHealthBarTime 3\nfNPCHealthBarFade 0.5\n"
+        "fCombatBlockRightAngle 30\nfCombatDelayNPC 0.1\nfNPCHealthBarTime 3\nfNPCHealthBarFade 0.5\nfWeaponDamageMult 0.1\n"
+        "anim knockdown 2.667\nanim block 1.333 0.25\n"
         "sound health combat/health.wav\nsound miss combat/miss.wav\nsound ../bad x\n");
     write_actors();
     {char from[160],to[160];sprintf(from,"%s/actors.txt",dir);sprintf(to,"%s/combat/actors.txt",dir);assert(!rename(from,to));}
@@ -127,7 +144,7 @@ int main(void){
     npc->v.mins[0]=-7.32f;npc->v.mins[1]=-7.12f;npc->v.maxs[0]=7.32f;npc->v.maxs[1]=7.12f;npc->v.maxs[2]=33.25f;
     *resident=*npc;resident->v.origin[1]=500;resident->v.netname=add_string("A Guard");
     fields[3][3].string=add_string("a guard");
-    AW_CombatInit();aw_combat_result=result;
+    AW_CombatInit();aw_combat_result=result;aw_combat_voice=bark;
     assert(aw_combat_enemy_bar && aw_combat_scene);
 
     /* data files */
@@ -138,6 +155,23 @@ int main(void){
     assert(AW_CombatActorLoad("weakling",&f) && f.health==3);
     assert(AW_CombatActorLoad("a guard",&f) && f.level==5);
     assert(!AW_CombatActorLoad("mevil",&f) && !AW_CombatActorLoad("nobody",&f) && !AW_CombatActorLoad("",&f));
+    /* the arena's set fighter replaces the character's sheet while set */
+    {
+        aw_fighter_t preset;char sub[96];sprintf(sub,"%s/arena",dir);mkdir(sub,0700);
+        char used[24];
+        write_file("arena/player.txt","AWAP2\ndefault fists\nloadout:fists\tArena Challenger\t9\t67 36 59 60 66 55 35 40\t"
+            "23 6 16 11 33 11 16 11 38 6 6 6 6 6 6 23 6 38 15 47 47 32 15 32 15 15 47\t93.0 72 241\t0 0\t0 26 0 0 0 0 0 0 0 0 0\t8.618 0\tp\t0 0 0\n"
+            "loadout:sword_shield\tArena Challenger\t9\t67 36 59 60 66 55 35 40\t"
+            "40 6 16 11 33 40 16 11 38 6 6 6 6 6 6 23 6 38 15 47 47 32 15 32 15 15 47\t93.0 72 241\t0 0\t2 5 2 14 1 20 4 18 1.0 1.35 20.0\t9.5 1\tp\t900 300 2\n");
+        assert(AW_CombatLoadout("",&preset,used) && !strcmp(used,"fists") && preset.skills[AW_SK_H2H]==47 && preset.health_max==93);
+        assert(AW_CombatLoadout("sword_shield",&preset,used) && preset.weapon==2 && preset.shield && preset.weapon_health_max==900 &&
+               preset.shield_health_max==300 && preset.shield_class==2);
+        assert(!AW_CombatLoadout("claymore",&preset,used) && !AW_CombatLoadout("sword",&preset,used));
+        assert(AW_CombatLoadout(NULL,&preset,used));
+        aw_combat_player_preset=&preset;AW_CombatPlayerSheet(&f);
+        assert(f.skills[AW_SK_H2H]==47 && f.health==60 && f.health_max==93 && !strcmp(f.name,"You") && f.armor>8.6f);
+        aw_combat_player_preset=NULL;
+    }
     AW_CombatPlayerSheet(&f);
     assert(f.health==60 && f.fatigue_max==200 && f.skills[AW_SK_H2H]==30 && !f.weapon && f.armor>5.84f && f.armor<5.86f);
 
@@ -145,6 +179,7 @@ int main(void){
     assert(AW_CombatActorLoad("mevil molor",&f));
     run("aw_combat seed 777");
     assert(AW_CombatEngage(npc,&f,"idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 knock:21:4:0.6667 death:25:6:0.3333"));
+    assert(items_shown==1);                       /* engage draws the carried items */
     assert(AW_CombatHostiles()==1 && npc->v.nextthink==0 && AW_CombatSeedUsed()==777);
     tick(1);assert(music_on==1);                                     /* battle music at once */
     tick(10);assert(steps>0 && npc->v.frame>=4 && npc->v.frame<10);  /* run frames */
@@ -176,6 +211,7 @@ int main(void){
         fields[1][0]._float=2;tick(1);
     }
     assert(results[1]==1 && sheet->dead && npc->v.solid==SOLID_NOT);
+    assert(voices[AW_VOICE_START]==1 && voices[AW_VOICE_SWING]>=1 && voices[AW_VOICE_DEATH]==1);
     assert(AW_CombatHostiles()==0);
     tick(2);assert(music_off==1);
     assert(npc->v.frame>=25 && npc->v.frame<31);                      /* death frames */
@@ -194,7 +230,7 @@ int main(void){
         assert(AW_CombatEngage(npc,&runner,NULL));
         walled=1;
         for(i=0;i<3000 && !AW_CombatStats()->npc_flees;i++)tick(1);
-        assert(AW_CombatStats()->npc_flees>=1);
+        assert(AW_CombatStats()->npc_flees>=1 && voices[AW_VOICE_FLEE]>=1);
         walled=0;x0=npc->v.origin[0];gap0=p->v.origin[0]-x0;
         tick(25);assert(p->v.origin[0]-npc->v.origin[0]>gap0+50);           /* runs away, no warp */
         tick(25);x0=npc->v.origin[0];tick(50);assert(npc->v.origin[0]==x0);   /* stands and watches */
@@ -223,5 +259,6 @@ int main(void){
     assert(!AW_CombatEngage(npc,&f,NULL));
     run("aw_combat on");
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
+    AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;
 }

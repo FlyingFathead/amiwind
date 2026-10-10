@@ -72,7 +72,8 @@ int Sys_FileOpenRead (char *path, int *hndl)
 
 	i = findhandle ();
 
-	f = fopen(path, "r");
+	/* Binary data (paks, maps): "rb" (ENGINE-FOPEN-TEXT-MODE-35). */
+	f = fopen(path, "rb");
 	if (!f)
 	{
 		*hndl = -1;
@@ -92,8 +93,13 @@ int Sys_FileOpenWrite (char *path)
 	i = findhandle ();
 
 	f = fopen(path, "wb");
+	/* A full or write-protected volume is a refused write (screenshot,
+	   COM_WriteFile), not a stopped program (ENGINE-WRITE-OPEN-SYSERROR-35). */
 	if (!f)
-		Sys_Error ("Error opening %s: %s", path, strerror(errno));
+	{
+		Con_Printf ("Error opening %s: %s\n", path, strerror(errno));
+		return -1;
+	}
 	sys_handles[i] = f;
 
 	return i;
@@ -127,7 +133,7 @@ int     Sys_FileTime (char *path)
 {
 	FILE    *f;
 
-	f = fopen(path, "r");
+	f = fopen(path, "rb");
 	if (f)
 	{
 		fclose(f);
@@ -140,11 +146,3 @@ int     Sys_FileTime (char *path)
 void Sys_mkdir (char *path)
 {
 }
-
-
-
-
-
-
-
-

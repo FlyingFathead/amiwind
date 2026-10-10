@@ -24,6 +24,8 @@ from build_aga import check_quakec, validate_quakec
 from mwad import input_check
 from mwad.paths import ensure_external, installed_game_path, is_wsl
 from test_workflow import synthetic_install
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
 def symlink_or_skip(link, target, **kwargs):
@@ -38,6 +40,7 @@ def symlink_or_skip(link, target, **kwargs):
         raise
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class BuildSetupTests(unittest.TestCase):
     def test_package_detection_handles_native_foreign_and_all_architectures(self):
         for statuses, missing in (
@@ -182,7 +185,7 @@ class BuildSetupTests(unittest.TestCase):
                  patch('builtins.input', return_value='yes') as prompt, \
                  contextlib.redirect_stdout(io.StringIO()):
                 result = build.main(['--autoinstall', '--dry-run', '--tools-dir', str(root/'tools'),
-                                     '--workspace', str(output), '--name', 'test'])
+                                     '--workspace', str(output), '--name', 'test', '--any-run-name'])
             self.assertEqual(result, 0)
             prompt.assert_called_once()
             self.assertEqual((output/'build/test/finished').read_text(), 'built')

@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 from actor_grounding import annotate, bake_ground
 from check_actor_ground import require
-from mwad.paths import child_ci, ensure_external
+from mwad.paths import child_ci, copy_tree, ensure_external
 from prepare_seyda_regions import convert_builder_scene
 from recorded_stage import check as check_recorded, frozen_maps
 from vis_options import add_vis_option
@@ -18,7 +18,7 @@ from build_jobs import add_jobs, resolve_jobs
 
 
 def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_land_source=None, vis_mode='fast',
-          jobs=None, seyda_recorded=None):
+          jobs=None, seyda_recorded=None, seyda_terrain_cull=True):
     scene = Path(scene)
     jobs = resolve_jobs(jobs)  # --jobs exactly; otherwise the stage budget or auto
     output = ensure_external(output, 'actor preflight')
@@ -26,7 +26,7 @@ def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_l
     # Work on copies. The retained scene and later terrain inputs stay untouched.
     id1 = output/'id1'
     maps = id1/'maps'; maps.mkdir(parents=True)
-    shutil.copytree(scene/'id1/progs', id1/'progs')
+    copy_tree(scene/'id1/progs', id1/'progs')
     for source in sorted((scene/'id1/maps').glob('*.bsp')):
         if not re.fullmatch(r'vf[0-9]{4}\.bsp', source.name):
             shutil.copyfile(source, maps/source.name)
@@ -40,7 +40,7 @@ def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_l
     convert_builder_scene(maps, scene_map=scene/'seyda.map', palette=scene/'id1/gfx/palette.lmp',
                           ericw_bin=ericw_bin, work_dir=output/'bounded-seyda',
                           canonical_land_source=canonical_land_source, vis_mode=vis_mode, jobs=jobs,
-                          recorded=seyda_recorded)
+                          recorded=seyda_recorded, terrain_cull=seyda_terrain_cull)
     # Recorded-stage maps (BUILD-SEYDA-REGEN-30) keep their recorded placements.
     frozen = frozen_maps(output/'bounded-seyda')
     annotate(maps, child_ci(data_files, 'Morrowind.esm'), jobs=jobs, exclude=frozen)
@@ -65,13 +65,17 @@ def main():
     parser.add_argument('--seyda-recorded', type=Path,
                         help='Recorded-stage exception BUILD-SEYDA-REGEN-30: owner-provided recorded Seyda Neen maps '
                              '(tools/recorded_stage.py) instead of the Seyda region conversion')
+    parser.add_argument('--seyda-terrain-cull', choices=('on', 'off'), default='on',
+                        help='off: convert Seyda Neen without the terrain visual cull (a CHIM build, whose Seyda Neen '
+                             'region maps are a check reference and do not ship)')
     add_vis_option(parser)
     add_jobs(parser)
     args = parser.parse_args()
     import build_profile; build_profile.instrument('actor-contact')  # sub-stage timers (docs/BUILD_PROFILE.md)
     try: check(args.scene, args.data_files, args.out, args.allow_known_actor_ground_findings,
                ericw_bin=args.ericw_bin, canonical_land_source=args.canonical_land_source, vis_mode=args.vis_mode,
-               jobs=args.jobs, seyda_recorded=args.seyda_recorded)
+               jobs=args.jobs, seyda_recorded=args.seyda_recorded,
+               seyda_terrain_cull=args.seyda_terrain_cull == 'on')
     except (ValueError, OSError) as exc: parser.exit(1, f'Error: {exc}\n')
 
 

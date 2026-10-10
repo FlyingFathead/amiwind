@@ -211,9 +211,10 @@ def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, 
                'unique_models': len(assets),
                'exported_geometry_models': len(index['models']),
                'resident_pixel_bytes_all_types': sum(a['pixel_bytes'] for a in assets),
-               'workers': workers, 'seconds': round(time.monotonic() - started, 3),
+               # No worker count or wall time: a stage output is byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
                'assets': assets, 'placements': placements}
     (out / 'tree-sprites.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8', newline='\n')
+    print(f'Tree sprites: {workers} workers, {time.monotonic() - started:.1f} s', flush=True)
     return receipt
 
 

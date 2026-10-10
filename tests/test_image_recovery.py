@@ -14,8 +14,11 @@ import build
 from build_parallel import stage_dependencies
 from recover_image import inspect_run, recovery_commands
 from prepare_world_regions import layout_refinements, plan, region_directory
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
+import env_guard  # noqa: E402
 
 
+@env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
 class ImageRecoveryTests(unittest.TestCase):
     def fixture(self, root):
         old=root/'old';source=root/'source';data=root/'data'
@@ -174,7 +177,7 @@ class ImageRecoveryTests(unittest.TestCase):
              patch.object(build,'provenance',return_value={'compiler_jobs':1,'serial_stages':True,
                  'input_sha256':{'Morrowind.esm':'changed'} if changed_inputs else inputs}), \
              contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
-            argv=['--builder','legacy','--recover-image-from',str(old),'--workspace',str(root/'work'),'--name','retry','--jobs','1']
+            argv=['--builder','legacy','--recover-image-from',str(old),'--workspace',str(root/'work'),'--name','retry','--any-run-name','--jobs','1']
             if changed_inputs:
                 with self.assertRaises(SystemExit) as error:build.main(argv)
                 self.assertEqual(error.exception.code,1)

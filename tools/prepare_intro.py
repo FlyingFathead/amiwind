@@ -7,14 +7,14 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.audit import BSA,records,subrecords,string
 from mwad.npc import load_master,outfit,text,first
 from mwad.interior import read_interior
-from mwad.paths import ensure_external
-from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl
+from mwad.paths import copy_tree,ensure_external
+from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl,add_root_rule_arg,apply_root_rule
 from npc_faces import ActorSkeleton,actor_samples,envelope
 from player_hull import lumps,pack_lumps
 from prepare_npcs import quote
 from prepare_quake import CENTRE
 from build_jobs import add_jobs, resolve_jobs
-from build_parallel import ordered_map
+from build_parallel import Background, ordered_map
 
 
 def voice_convert(assets,source,target,ffmpeg='ffmpeg',speech=True,gain_db=0):
@@ -63,6 +63,12 @@ def navigation(master,name):
 
 def ship_ambience(data,out,ffmpeg='ffmpeg'):
     """The prison's two scripted hull barrels loop Boat Hull at volume 0.4."""
+    return add_ship_ambience(out,*ship_ambience_sound(data,out,ffmpeg))
+
+
+def ship_ambience_sound(data,out,ffmpeg='ffmpeg'):
+    """(emitter entities, receipt) of ship_ambience: the sound conversion, which writes only its own
+    sound file, so it can run beside the actor bakes (intro_sounds); add_ship_ambience edits the map."""
     assets=Assets(data,BSA(data/'Morrowind.bsa'));objects={};sounds={};scripts={}
     for tag,flags,raw in records((data/'Morrowind.esm').read_bytes()):
         if tag not in ('CONT','SOUN','SCPT'):continue
@@ -80,10 +86,43 @@ def ship_ambience(data,out,ffmpeg='ffmpeg'):
         fields={'classname':'aw_loop','aw_voice':voice,'origin':' '.join(str(v*.25) for v in ref['position']),
                 'aw_volume':str(.4*sound['DATA'][0]/255),'aw_attenuation':'2'}
         entities.append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
+    return entities,{**receipt,'emitters':len(entities),'source_script':script,'runtime_loop_start':0,'volume':.4*sound['DATA'][0]/255,
+            'attenuation':'Quake spatial falloff approximation; not original distance-model parity'}
+
+
+def add_ship_ambience(out,entities,receipt):
+    """Append ship_ambience_sound's emitters to the prison map; its receipt."""
     path=out/'id1/maps/prison.bsp';b=lumps(path.read_bytes());b[0]=b[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
     path.write_bytes(pack_lumps(b));(out/'prison.bsp').write_bytes(path.read_bytes())
-    return {**receipt,'emitters':len(entities),'source_script':script,'runtime_loop_start':0,'volume':.4*sound['DATA'][0]/255,
-            'attenuation':'Quake spatial falloff approximation; not original distance-model parity'}
+    return receipt
+
+
+def intro_sounds(data,out,ffmpeg='ffmpeg'):
+    """(scripts, navigation, speech, ship ambience parts) of prepare(): the character-generation
+    speech lines, the prison path grid and the hull sound. They read only the game data and write
+    only their own files (id1/intro, id1/sound/intro, id1/sound/env), so prepare() runs them beside
+    the actor bakes (build_parallel.Background); the map edits stay in prepare()."""
+    assets=Assets(data,BSA(data/'Morrowind.bsa'));scripts={};speech={}
+    # Convert all authored Say lines from the base game's character-generation scripts.
+    lines={};allrecords=list(records((data/'Morrowind.esm').read_bytes()))
+    for tag,flags,raw in allrecords:
+        if tag!='SCPT':continue
+        fields=dict(subrecords(raw));name=string(fields['SCHD'][:32]);script=string(fields.get('SCTX',b''))
+        if not name.casefold().startswith('chargen'):continue
+        scripts[name]=script
+        for source,subtitle in re.findall(r'(?im)^\s*say\s*,?\s*"([^"]+)"\s*,?\s*"([^"]*)"',script):
+            stem=Path(source.replace('\\','/')).stem.lower().replace(' ','_')
+            if stem in lines and lines[stem]['text']!=subtitle:raise ValueError('Conflicting introductory line '+stem)
+            lines[stem]={'voice':source,'text':subtitle,'script':name}
+    dest=out/'id1/intro';dest.mkdir(exist_ok=True)
+    nav=navigation(data/'Morrowind.esm','Imperial Prison Ship');(dest/'prison.awn').write_bytes(nav)
+    navigation_report={'prison':{'sha256':hashlib.sha256(nav).hexdigest(),'nodes':struct.unpack_from('<H',nav,4)[0]}}
+    for i,(stem,line) in enumerate(sorted(lines.items())):
+        voice='intro/'+stem+'.wav';receipt=voice_convert(assets,line['voice'],out/'id1/sound'/voice,ffmpeg)
+        # No original dialogue is copied into the public runtime source.
+        (dest/(stem+'.txt')).write_bytes(line['text'].encode('cp1252')+b'\0')
+        speech[stem]={**line,**receipt,'runtime_voice':voice}
+    return scripts,navigation_report,speech,ship_ambience_sound(data,out,ffmpeg)
 
 
 _actor_context = None
@@ -111,8 +150,10 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None,movie=True,cache=None,cache
     """CACHE: a per-file cache folder for the movie (tools/file_cache.py); None converts it. movie=False: quick test build."""
     data=ensure_external(data,'owned data');scene=ensure_external(scene,'existing scene');out=ensure_external(out,'intro conversion')
     if out.exists():raise ValueError('Choose a new output')
-    shutil.copytree(scene,out)
-    assets=Assets(data,BSA(data/'Morrowind.bsa'));kinds,cells,topics=load_master(data/'Morrowind.esm')
+    copy_tree(scene,out)
+    # Speech, path grid and hull sound convert beside the actor bakes (intro_sounds).
+    sounds=Background(intro_sounds,data,out,ffmpeg,jobs=jobs)
+    kinds,cells,topics=load_master(data/'Morrowind.esm')
     palette=(out/'id1/gfx/palette.lmp').read_bytes();report={'actors':{},'speech':{},'scripts':{}}
     prison=read_interior(data/'Morrowind.esm','Imperial Prison Ship')
     actors=[('chargen name','jiub',1),('chargen boat guard 2','escort',2),('chargen boat guard 3','upper',3),
@@ -143,30 +184,12 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None,movie=True,cache=None,cache
         path=out/f'id1/maps/{name}.bsp';b=lumps(path.read_bytes());ent=b[0].rstrip(b'\0').decode('cp1252')
         ent=ent.replace('"progs/fargoth.mdl"','"progs/np_fargoth.mdl"').replace('"progs/imperial_guard.mdl"','"progs/np_imperial_guard.mdl"')
         b[0]=(ent+'\n'+'\n'.join(entities[name])+'\n\0').encode('cp1252');raw=pack_lumps(b);path.write_bytes(raw);(out/(name+'.bsp')).write_bytes(raw)
-    # Convert all authored Say lines from the base game's character-generation scripts.
-    lines={};allrecords=list(records((data/'Morrowind.esm').read_bytes()))
-    for tag,flags,raw in allrecords:
-        if tag!='SCPT':continue
-        fields=dict(subrecords(raw));name=string(fields['SCHD'][:32]);script=string(fields.get('SCTX',b''))
-        if not name.casefold().startswith('chargen'):continue
-        report['scripts'][name]=script
-        for source,subtitle in re.findall(r'(?im)^\s*say\s*,?\s*"([^"]+)"\s*,?\s*"([^"]*)"',script):
-            stem=Path(source.replace('\\','/')).stem.lower().replace(' ','_')
-            if stem in lines and lines[stem]['text']!=subtitle:raise ValueError('Conflicting introductory line '+stem)
-            lines[stem]={'voice':source,'text':subtitle,'script':name}
-    dest=out/'id1/intro';dest.mkdir(exist_ok=True)
-    nav=navigation(data/'Morrowind.esm','Imperial Prison Ship');(dest/'prison.awn').write_bytes(nav)
-    report['navigation']={'prison':{'sha256':hashlib.sha256(nav).hexdigest(),'nodes':struct.unpack_from('<H',nav,4)[0]}}
-    for i,(stem,line) in enumerate(sorted(lines.items())):
-        voice='intro/'+stem+'.wav';receipt=voice_convert(assets,line['voice'],out/'id1/sound'/voice,ffmpeg)
-        # No original dialogue is copied into the public runtime source.
-        (dest/(stem+'.txt')).write_bytes(line['text'].encode('cp1252')+b'\0')
-        report['speech'][stem]={**line,**receipt,'runtime_voice':voice}
+    report['scripts'],report['navigation'],report['speech'],ambience=sounds.result()
     for identifier in ('fargoth','imperial_guard'):
         wav=out/f'id1/sound/npc/{identifier}.wav'
         if wav.exists():wav.with_suffix('.lip').write_bytes(envelope(wav))
     # Authoritative scripts/conditions, for auditing rather than a compatibility claim.
-    report['ambience']=ship_ambience(data,out,ffmpeg)
+    report['ambience']=add_ship_ambience(out,*ambience)
     # Movies are optional loose installation files, not entries in Morrowind.bsa.
     videos=[p for p in data.rglob('*') if p.is_file() and
             p.name.casefold()=='mw_intro.bik' and p.parent.name.casefold()=='video']
@@ -196,4 +219,4 @@ if __name__=='__main__':
     p.add_argument('--no-movie',action='store_true',help='Quick test build (--exclude video): leave the intro movie out')
     p.add_argument('--cache',type=Path,help='Per-file cache folder: the movie converted before (same source, size, ffmpeg and code) is copied and verified instead of converted again')
     p.add_argument('--cache-report',type=Path,help='Write the per-file cache hits and misses here (build summary)')
-    add_jobs(p);a=p.parse_args();prepare(a.data_files,a.scene,a.out,a.ffmpeg,a.jobs,movie=not a.no_movie,cache=a.cache,cache_report=a.cache_report)
+    add_jobs(p);add_root_rule_arg(p);a=p.parse_args();apply_root_rule(a);prepare(a.data_files,a.scene,a.out,a.ffmpeg,a.jobs,movie=not a.no_movie,cache=a.cache,cache_report=a.cache_report)

@@ -42,7 +42,8 @@ void AW_SceneryBegin(const char *entities)
     if(aw_chim_map_begin)aw_chim_map_begin(entities);
     if(!AW_SceneryMapEnabled(sv.name))return;
     while((p=strstr(p,"\"classname\" \"func_wall\""))!=NULL){capacity++;p++;}
-    if(capacity>1000)Host_Error("Balmora scenery catalogue exceeds 1000 placements");
+    if(capacity>AW_SCENERY_MAX_PLACEMENTS)
+        Host_Error("Scenery catalogue of %s exceeds %d placements",sv.name,AW_SCENERY_MAX_PLACEMENTS);
     if(capacity)placements=Hunk_AllocName(capacity*sizeof(*placements),"scenery");
 }
 int AW_SceneryCapture(edict_t *e)

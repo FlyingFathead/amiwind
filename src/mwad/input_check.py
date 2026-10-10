@@ -6,38 +6,37 @@ Resolve the named Morrowind.esm/Morrowind.bsa pair beneath the selected root,
 then read original assets from that installation's known folders/subfolders.
 """
 from collections import Counter
-import hashlib
 import json
 import os
 from pathlib import Path
 import struct
 
 from .audit import BSA
+from .esm import GAME_CONTAINERS, GAME_MASTERS, sha256_file
 from .paths import child_ci, ensure_external, installed_game_path, resolve_data_files, is_game_input, GAME_ASSET_TYPES
 from . import font_sources
 
 REFERENCE_DIR = Path(__file__).resolve().parents[2] / "config/input-reference"
 
 
-def digest(path):
-    h = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            h.update(block)
-    return h.hexdigest()
+digest = sha256_file  # the one shared SHA-256 file digest (mwad.esm)
+
+# Required core pair (the base game); Tribunal/Bloodmoon are game inputs too but optional.
+REQUIRED_CORE = GAME_CONTAINERS[:2]
+REQUIRED_CORE_NAMES = (GAME_MASTERS[0], "Morrowind.bsa")
 
 
 def reference_files():
-    manifest = json.loads((REFERENCE_DIR / "reference.json").read_text())
+    manifest = json.loads((REFERENCE_DIR / "reference.json").read_text(encoding="utf-8"))
     files = {}
     for shard in manifest["shards"]:
-        files.update(json.loads((REFERENCE_DIR / shard).read_text()))
+        files.update(json.loads((REFERENCE_DIR / shard).read_text(encoding="utf-8")))
     return files
 
 
 def matches_core(data):
     """A detected installation is offered only if both core files match."""
-    records = json.loads((REFERENCE_DIR / "reference.json").read_text())["core"]
+    records = json.loads((REFERENCE_DIR / "reference.json").read_text(encoding="utf-8"))["core"]
     for name, reference in records.items():
         path = child_ci(data, name)
         if path.stat().st_size != reference["bytes"] or digest(path) != reference["sha256"]:
@@ -57,7 +56,7 @@ def fingerprints(loose, stage, reference=None, hasher=None):
     for name, expected in reference.items():
         if not is_game_input(name):
             continue
-        core = name in ("morrowind.esm", "morrowind.bsa")
+        core = name in REQUIRED_CORE
         if stage == "terrain" and not core:
             continue
         required = core or name.startswith(("sound/", "music/"))
@@ -181,12 +180,14 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
     def walk_error(exc):
         raise exc
     for parent, dirs, files in os.walk(data, onerror=walk_error, followlinks=False):
+        # Sorted walk: the report (error order, ambiguity messages) must not depend on the filesystem.
         if Path(parent) == data:
             dirs[:] = [name for name in dirs if name.casefold() in GAME_ASSET_TYPES]
+        dirs.sort()
         for name in dirs:
             if (Path(parent) / name).is_symlink():
                 errors.append("Directory symlink is not scanned: " + str(Path(parent) / name))
-        for name in files:
+        for name in sorted(files):
             candidate = Path(parent) / name
             if not is_game_input(candidate.relative_to(data)):
                 ignored_files += 1
@@ -203,7 +204,7 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
         # One parallel stat (and hash where needed) of every input.
         hasher.prepare([item["path"] for item in loose.values()])
     archive = {}
-    for name in ("Morrowind.esm", "Morrowind.bsa"):
+    for name in REQUIRED_CORE_NAMES:
         item = loose.get(name.casefold())
         if not item or not item["bytes"]:
             errors.append("Missing or empty required input: " + name)

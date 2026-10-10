@@ -42,6 +42,16 @@ def engine_memory(heap_mb=None):
 SAMPLE = 64.0          # player positions sampled every 64 units
 
 
+def efrag_report(links, budget_links):
+    """CHIM-EFRAG-UNCAPPED-35: the active ring's placements, one efrag each at least, against the CHIM
+    efrag budget (engine_limits.chim_efrag_budget, the engine's own defines). Past it the engine makes
+    the farthest placements wait unlinked; a ring whose placements alone pass it fails the gate."""
+    return {'ring_placements_peak': int(links), 'budget_links': budget_links,
+            'ok': budget_links is None or links <= budget_links,
+            'method': 'placements owned by the active chunks (one efrag each at least; the engine counts '
+                      'the leaves of each when the limit is near)'}
+
+
 def _a16(n):
     return (int(n) + 15) & ~15
 
@@ -72,9 +82,11 @@ def texture_bytes(width, height, sizes):
     return sizes['hunk'] + _a16(sizes['texture'] + width * height // 64 * 85)
 
 
-def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=(), zone_bytes=None,
-              chunk_extra=None, chunk_models=None):
-    """Per frame: the largest active ring (bytes) over player positions on a grid, against the zone
+def ring_peak_whole(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=(), zone_bytes=None,
+                    chunk_extra=None, chunk_models=None):
+    """The whole-world form of ring_peak (the reference; CHIM-WORLD-AUDIT-SCALING-33): every frame indexes
+    the whole world's models and textures, so its cost grows with the world, not with the frame.
+    Per frame: the largest active ring (bytes) over player positions on a grid, against the zone
     bank minus the frame-world slots. world: chim.validate's world (settings, models, textures, frames).
     points: [(name, x, y)] frame-local positions also reported (the benchmark cameras), in the frame
     that holds them. zone_bytes: {frame cell: zone bytes} where the whole-map rule makes the zone
@@ -94,6 +106,8 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
     # policy (engine_limits.chim_memory 'locked_ring' == 'load').
     load_radius = radius + float(s.get('prefetch_margin', 0))
     gate_ring = memory.get('locked_ring', 'active')
+    from engine_limits import chim_efrag_budget
+    efrag_budget = chim_efrag_budget()
     models = world['models']
     model_size = np.zeros(len(models))
     model_tex = []
@@ -116,6 +130,7 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
         g, (lx, ly) = frame['grain'], frame['low']
         n = len(chunks)
         own = np.zeros(n)
+        placed = np.zeros(n)
         uses_model = np.zeros((n, len(models)), np.int32)
         uses_tex = np.zeros((n, len(tex_size)), np.int32)
         uses_s = np.zeros((n, len(snames)), np.int32)
@@ -125,6 +140,7 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
             records = c['owned'] + c['reach']
             own[k] = (image_bytes(lumps, sizes) + sizes['hunk']
                       + _a16(len(records) * (entry + sizes['pointer'])) + extra.get(c['index'], 0))
+            placed[k] = len(c['owned'])
             for t in F.read_texture_refs(lumps[2]):
                 uses_tex[k, t] = 1
             for r in records:
@@ -150,13 +166,17 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
             total = active @ own + need_m @ model_size + need_t @ tex_size + ((active @ uses_s) > 0) @ ssize
             return total, active, need_m, need_t
         best, totals, load_best, load_totals, largest = None, [], None, [], 0.0
+        links = 0
         for start in range(0, len(P), 512):
             p = P[start:start + 512]
             total, active, need_m, need_t = rings(p)
+            if n:
+                links = max(links, int((active @ placed).max()))
             totals.append(total)
             k = int(np.argmax(total))
             if best is None or total[k] > best[0]:
-                best = (float(total[k]), p[k], int(active[k].sum()), int(need_m[k].sum()), int(need_t[k].sum()))
+                best = (float(total[k]), p[k], int(active[k].sum()), int(need_m[k].sum()), int(need_t[k].sum()),
+                        [int(i) for i in np.nonzero(need_m[k])[0]])
             ltotal, lactive, lneed_m, _ = rings(p, load_radius)
             load_totals.append(ltotal)
             k = int(np.argmax(ltotal))
@@ -166,7 +186,7 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
             if lneed_m.any():
                 largest = max(largest, float((lneed_m * model_size[None, :]).max()))
         largest = max(largest, float(own.max()) if len(own) else 0.0)
-        total, where, nchunks, nmodels, ntex = best
+        total, where, nchunks, nmodels, ntex, peak_models = best
         totals = np.concatenate(totals)
         load_totals = np.concatenate(load_totals)
         inside = [(nm, x, y) for nm, x, y in points
@@ -180,19 +200,247 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
                 'peak_position': [round(float(v), 1) for v in load_best[1]],
                 'positions_over_budget': int((load_totals > budget).sum()), 'headroom_bytes': budget - int(load_best[0])}
         gated = total if gate_ring == 'active' else load_best[0]
-        frames.append({'frame': path, 'points': at, 'median_bytes': int(np.median(totals)),
+        efrags = efrag_report(links, efrag_budget)
+        frames.append({'frame': path, 'points': at, 'efrags': efrags, 'median_bytes': int(np.median(totals)),
                        'positions_over_budget': int((totals > budget).sum()), 'peak_bytes': int(total),
                        'peak_position': [round(float(v), 1) for v in where],
                        'ring_chunks': nchunks, 'ring_models': nmodels, 'ring_textures': ntex,
+            'peak_models': peak_models,
                        'budget_bytes': budget, 'headroom_bytes': budget - int(total),
                        'load_ring': load, 'largest_block_bytes': int(largest),
-                       'gated_ring': gate_ring, 'ok': gated <= budget, 'positions': int(len(P)),
+                       'gated_ring': gate_ring, 'ok': gated <= budget and efrags['ok'], 'positions': int(len(P)),
                        'zone_bytes': int(zone), 'streamed_bytes': int(sum(extra.values()) + ssize.sum())})
     return {'zone_kib': zone_kib, 'pool_kib': pool_kib, 'pool_slots': POOL_SLOTS, 'sample_units': sample,
             'active_radius': radius, 'load_radius': load_radius, 'gated_ring': gate_ring,
             'method': 'engine active ring (chunk boxes within view distance + hysteresis of the player) at '
                       'positions every %g units; blocks sized as AW_BrushBound with the target ABI' % sample,
             'frames': frames, 'ok': all(f['ok'] for f in frames)}
+
+
+# ---------------------------------------------------------------- per-frame audit (CHIM-WORLD-AUDIT-SCALING-33)
+#
+# The engine holds one ring, and a ring never leaves its frame (chim_chunks.c: the active and load rings are
+# chunk boxes of the current frame). So a frame's audit needs only that frame's chunks and the models and
+# textures they use. ring_peak indexes each frame by what it uses (its own model and texture numbering),
+# audits the frames in parallel (jobs) and keeps each frame's result in a cache by its content key (cache_dir),
+# with the same result as ring_peak_whole (tests/test_chim_heap.py proves it on small worlds). The whole-world
+# form cost ~ frames x world models x world textures: 3.6 s at 171 frames, 473 s at 331, over 2 h at 844.
+
+HEAP_AUDIT_VERSION = 2      # bump when the per-frame audit's arithmetic changes (cache keys)
+# 2: the ring's placements against the CHIM efrag budget (CHIM-EFRAG-UNCAPPED-35)
+
+
+def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=(), zone_bytes=None,
+              chunk_extra=None, chunk_models=None, jobs=1, cache_dir=None):
+    """Per frame: the largest active ring (bytes) over player positions on a grid, against the zone bank
+    minus the frame-world slots; the same report as ring_peak_whole (its docstring has the arguments),
+    computed frame by frame on what each frame uses. jobs: frames audited in parallel (processes);
+    cache_dir: a folder keeping each frame's result by its content key (the frame's chunks, the sizes of
+    the models and textures it uses, the target sizes and the gate's settings)."""
+    import json
+    from pathlib import Path
+    from chim import format as F
+    memory = engine_memory() if zone_kib is None or pool_kib is None else {}
+    zone_kib = memory['zone_kib'] if zone_kib is None else zone_kib
+    pool_kib = memory['pool_kib'] if pool_kib is None else pool_kib
+    s = world['settings']
+    radius = float(s['draw_distance'] + s['hysteresis'])
+    load_radius = radius + float(s.get('prefetch_margin', 0))
+    gate_ring = memory.get('locked_ring', 'active')
+    from engine_limits import chim_efrag_budget
+    efrag_budget = chim_efrag_budget()
+    models, textures = world['models'], world['textures']
+    model_size, model_tex = {}, {}
+
+    def model(i):
+        if i not in model_size:
+            lumps = F.read_brush_image(models[i]['image'])
+            model_size[i] = image_bytes(lumps, sizes)
+            model_tex[i] = sorted(set(F.read_texture_refs(lumps[2])))
+        return model_size[i], model_tex[i]
+    tasks = []
+    for path, frame, chunks in world['frames']:
+        cell = tuple(frame['cell'])
+        used_m = sorted({r['model'] for c in chunks for r in c['owned'] + c['reach']})
+        msizes = [model(i)[0] for i in used_m]
+        mtex = [model(i)[1] for i in used_m]
+        g, (lx, ly) = frame['grain'], frame['low']
+        task = {'path': path, 'frame': frame, 'chunks': chunks, 'used_models': used_m, 'model_sizes': msizes,
+                'model_tex': mtex,
+                'sizes': sizes, 'zone': min(zone_kib * 1024, (zone_bytes or {}).get(cell, zone_kib * 1024)),
+                'pool_bytes': POOL_SLOTS * pool_kib * 1024, 'extra': (chunk_extra or {}).get(cell, {}),
+                'shared': (chunk_models or {}).get(cell, {}), 'radius': radius, 'load_radius': load_radius,
+                'gate_ring': gate_ring, 'sample': sample, 'efrag_budget': efrag_budget,
+                'points': [(nm, x, y) for nm, x, y in points
+                           if lx <= x < lx + frame['nx'] * g and ly <= y < ly + frame['ny'] * g]}
+        task['textures'] = {t: (textures[t]['width'], textures[t]['height']) for t in _frame_textures(task)}
+        tasks.append(task)
+    cache = Path(cache_dir) if cache_dir else None
+    keys = [_frame_key(t) if cache else None for t in tasks]
+    results = [None] * len(tasks)
+    if cache:
+        cache.mkdir(parents=True, exist_ok=True)
+        for i, k in enumerate(keys):
+            f = cache / (k + '.json')
+            if f.is_file():
+                results[i] = json.loads(f.read_text(encoding='utf-8'))
+    todo = [i for i, r in enumerate(results) if r is None]
+    if jobs and jobs > 1 and len(todo) > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(max_workers=min(jobs, len(todo))) as pool:
+            for i, r in zip(todo, pool.map(_frame_ring, [tasks[i] for i in todo])):
+                results[i] = r
+    else:
+        for i in todo:
+            results[i] = _frame_ring(tasks[i])
+    if cache:
+        for i in todo:
+            (cache / (keys[i] + '.json')).write_text(json.dumps(results[i], sort_keys=True), encoding='utf-8',
+                                                    newline='\n')
+    frames = [dict(r, frame=t['path']) for r, t in zip(results, tasks)]
+    return {'zone_kib': zone_kib, 'pool_kib': pool_kib, 'pool_slots': POOL_SLOTS, 'sample_units': sample,
+            'active_radius': radius, 'load_radius': load_radius, 'gated_ring': gate_ring,
+            'method': 'engine active ring (chunk boxes within view distance + hysteresis of the player) at '
+                      'positions every %g units; blocks sized as AW_BrushBound with the target ABI' % sample,
+            'frames': frames, 'ok': all(f['ok'] for f in frames)}
+
+
+def _frame_textures(task):
+    """The textures a frame's ring can need: its chunks' own and its models'."""
+    from chim import format as F
+    out = set()
+    for c in task['chunks']:
+        out.update(F.read_texture_refs(F.read_brush_image(c['image'])[2]))
+    for ts in task['model_tex']:
+        out.update(ts)
+    return sorted(out)
+
+
+def _frame_key(task):
+    """A frame's content key: everything its audit reads (cache by content, CHIM-WORLD-AUDIT-SCALING-33)."""
+    import hashlib
+    import json
+    h = hashlib.sha256()
+    tlocal = {t: i for i, t in enumerate(sorted(task['textures']))}
+    meta = {'v': HEAP_AUDIT_VERSION, 'frame': {k: v for k, v in task['frame'].items()},
+            'sizes': task['sizes'], 'zone': task['zone'], 'pool': task['pool_bytes'],
+            'extra': sorted((str(k), v) for k, v in task['extra'].items()),
+            'shared': sorted((str(k), sorted(v.items())) for k, v in task['shared'].items()),
+            'radius': task['radius'], 'load': task['load_radius'], 'gate': task['gate_ring'],
+            'sample': task['sample'], 'points': task['points'], 'model_sizes': task['model_sizes'],
+            'efrag_budget': task.get('efrag_budget'),
+            # textures by the frame's own numbering (which models share one) with their sizes; the chunk
+            # images below carry the world's texture numbers
+            'model_tex': [[tlocal[t] for t in ts] for ts in task['model_tex']],
+            'textures': [task['textures'][t] for t in sorted(task['textures'])]}
+    h.update(json.dumps(meta, sort_keys=True, default=str).encode())
+    local = {m: i for i, m in enumerate(task['used_models'])}
+    for c in task['chunks']:
+        h.update(json.dumps([c['index'], c['cx'], c['cy'],
+                             [local[r['model']] for r in c['owned'] + c['reach']]], default=str).encode())
+        h.update(hashlib.sha256(c['image']).digest())
+    return h.hexdigest()
+
+
+def _frame_ring(task):
+    """One frame's ring report (ring_peak), on the frame's own model and texture numbering."""
+    import numpy as np
+    from chim import format as F
+    sizes = task['sizes']
+    frame, chunks = task['frame'], task['chunks']
+    used = task['used_models']
+    mlocal = {m: i for i, m in enumerate(used)}
+    tex_ids = sorted(task['textures'])
+    tlocal = {t: i for i, t in enumerate(tex_ids)}
+    model_size = np.array(task['model_sizes'], float)
+    tex_size = np.array([texture_bytes(*task['textures'][t], sizes) for t in tex_ids], float)
+    entry = sizes.get('scenery', sizes['entity'])
+    budget = task['zone'] - task['pool_bytes']
+    extra, shared = task['extra'], task['shared']
+    radius, load_radius, gate_ring, sample = task['radius'], task['load_radius'], task['gate_ring'], task['sample']
+    snames = sorted({m for v in shared.values() for m in v})
+    sindex = {m: i for i, m in enumerate(snames)}
+    ssize = np.zeros(len(snames))
+    g, (lx, ly) = frame['grain'], frame['low']
+    n = len(chunks)
+    own = np.zeros(n)
+    placed = np.zeros(n)        # placements a chunk owns: each links at least one efrag when active
+    uses_model = np.zeros((n, len(used)), np.int32)
+    uses_tex = np.zeros((n, len(tex_ids)), np.int32)
+    uses_s = np.zeros((n, len(snames)), np.int32)
+    lo = np.zeros((n, 2))
+    for k, c in enumerate(chunks):
+        lumps = F.read_brush_image(c['image'])
+        records = c['owned'] + c['reach']
+        own[k] = (image_bytes(lumps, sizes) + sizes['hunk']
+                  + _a16(len(records) * (entry + sizes['pointer'])) + extra.get(c['index'], 0))
+        placed[k] = len(c['owned'])
+        for t in F.read_texture_refs(lumps[2]):
+            uses_tex[k, tlocal[t]] = 1
+        for r in records:
+            uses_model[k, mlocal[r['model']]] = 1
+        for m, b in shared.get(c['index'], {}).items():
+            uses_s[k, sindex[m]] = 1
+            ssize[sindex[m]] = b
+        lo[k] = (lx + c['cx'] * g, ly + c['cy'] * g)
+    hi = lo + g
+    model_uses_tex = np.zeros((len(used), len(tex_ids)), np.int32)
+    for i, ts in enumerate(task['model_tex']):
+        model_uses_tex[i, [tlocal[t] for t in ts]] = 1
+    xs = np.arange(lx + sample / 2, lx + frame['nx'] * g, sample)
+    ys = np.arange(ly + sample / 2, ly + frame['ny'] * g, sample)
+    P = np.array([(x, y) for y in ys for x in xs])
+
+    def rings(p, r=radius):
+        dx = np.maximum(np.maximum(lo[None, :, 0] - p[:, None, 0], p[:, None, 0] - hi[None, :, 0]), 0)
+        dy = np.maximum(np.maximum(lo[None, :, 1] - p[:, None, 1], p[:, None, 1] - hi[None, :, 1]), 0)
+        active = (dx * dx + dy * dy <= r * r).astype(np.int32)
+        need_m = (active @ uses_model) > 0
+        need_t = ((active @ uses_tex) > 0) | ((need_m.astype(np.int32) @ model_uses_tex) > 0)
+        total = active @ own + need_m @ model_size + need_t @ tex_size + ((active @ uses_s) > 0) @ ssize
+        return total, active, need_m, need_t
+    best, totals, load_best, load_totals, largest = None, [], None, [], 0.0
+    links = 0
+    for start in range(0, len(P), 512):
+        p = P[start:start + 512]
+        total, active, need_m, need_t = rings(p)
+        if n:
+            links = max(links, int((active @ placed).max()))
+        totals.append(total)
+        k = int(np.argmax(total))
+        if best is None or total[k] > best[0]:
+            best = (float(total[k]), p[k], int(active[k].sum()), int(need_m[k].sum()), int(need_t[k].sum()),
+                    [int(used[i]) for i in np.nonzero(need_m[k])[0]])
+        ltotal, lactive, lneed_m, _ = rings(p, load_radius)
+        load_totals.append(ltotal)
+        k = int(np.argmax(ltotal))
+        if load_best is None or ltotal[k] > load_best[0]:
+            load_best = (float(ltotal[k]), p[k])
+        if lneed_m.any():
+            largest = max(largest, float((lneed_m * model_size[None, :]).max()))
+    largest = max(largest, float(own.max()) if len(own) else 0.0)
+    total, where, nchunks, nmodels, ntex, peak_models = best
+    totals = np.concatenate(totals)
+    load_totals = np.concatenate(load_totals)
+    at = []
+    if task['points']:
+        t = rings(np.array([(x, y) for _, x, y in task['points']], float))[0]
+        at = [{'name': nm, 'position': [x, y], 'bytes': int(v), 'ok': bool(v <= budget)}
+              for (nm, x, y), v in zip(task['points'], t)]
+    load = {'radius': load_radius, 'peak_bytes': int(load_best[0]),
+            'peak_position': [round(float(v), 1) for v in load_best[1]],
+            'positions_over_budget': int((load_totals > budget).sum()), 'headroom_bytes': budget - int(load_best[0])}
+    gated = total if gate_ring == 'active' else load_best[0]
+    efrags = efrag_report(links, task.get('efrag_budget'))
+    return {'points': at, 'efrags': efrags, 'median_bytes': int(np.median(totals)),
+            'positions_over_budget': int((totals > budget).sum()), 'peak_bytes': int(total),
+            'peak_position': [round(float(v), 1) for v in where],
+            'ring_chunks': nchunks, 'ring_models': nmodels, 'ring_textures': ntex,
+            'peak_models': peak_models,
+            'budget_bytes': budget, 'headroom_bytes': budget - int(total),
+            'load_ring': load, 'largest_block_bytes': int(largest),
+            'gated_ring': gate_ring, 'ok': bool(gated <= budget) and efrags['ok'], 'positions': int(len(P)),
+            'zone_bytes': int(task['zone']), 'streamed_bytes': int(sum(extra.values()) + ssize.sum())}
 
 
 def streamed_chunk_models(rows, id1, sizes):
@@ -223,6 +471,32 @@ STREAMED_MODELS = 'shared'
 def streamed_chunk_bytes(rows, id1, sizes):
     """{chunk index: bytes} the streamed statics bring into the zone with their chunk ('chunk' policy)."""
     return {k: sum(v.values()) for k, v in streamed_chunk_models(rows, id1, sizes).items()}
+
+
+MOVERS_AT_ONCE = 2     # the companion and one opponent wear their mover models at the same time
+
+
+def actor_cache(id1, rows, sizes, gap_bytes, movers=MOVERS_AT_ONCE):
+    """The actors' alias models in Quake's Cache (they never enter the CHIM zone: Mod_LoadAliasModel puts
+    them in the Cache, which lives in the Hunk gap the zone leaves, chim_reserve_kib). Measured in FS-UAE on
+    the Balmora MiniWind: the zone and the Hunk are byte-identical with idle-only, react or react+full
+    actors; the Cache peak at load grows (docs/ANIMATION.md "Memory"). Reports the distinct standing models
+    every placed actor precaches, the largest mover models (animation kit: <model>_m.mdl, loaded only while
+    an actor moves) and whether they fit the gap; LRU eviction makes an overflow slower, not fatal, so this
+    is recorded, not a failure."""
+    from pathlib import Path
+    from chim.frame_map import ACTOR_CLASSES
+    models = sorted({e['model'] for e in rows if e.get('classname') in ACTOR_CLASSES and e.get('model')
+                     and (Path(id1) / e['model']).is_file()})
+    block = lambda path: _a16(path.stat().st_size + sizes['hunk'])
+    standing = sum(block(Path(id1) / m) for m in models)
+    mover_sizes = sorted((block(Path(id1) / (m[:-4] + '_m.mdl')) for m in models
+                          if (Path(id1) / (m[:-4] + '_m.mdl')).is_file()), reverse=True)
+    peak = standing + sum(mover_sizes[:movers])
+    return {'actor_models': len(models), 'standing_bytes': standing, 'movers': len(mover_sizes),
+            'mover_bytes_at_once': sum(mover_sizes[:movers]), 'movers_at_once': movers, 'peak_bytes': peak,
+            'gap_bytes': gap_bytes, 'fits_gap': peak <= gap_bytes,
+            'note': 'Cache, not the CHIM zone: an overflow evicts least recently used models (recorded, not fatal)'}
 
 
 def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=None, streamed=None):
@@ -258,7 +532,8 @@ def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=
                            pool_kib if pool_kib is not None else memory['pool_kib'], zone_bytes={cell: zone}, **per)
         frame = report['frames'][0]
         frame.update(map=path.name, heap_mb=memory['heap_mb'], before_zone_bytes=before, after_zone_bytes=after,
-                     whole_map_zone_bytes=zone, streamed_models=policy)
+                     whole_map_zone_bytes=zone, streamed_models=policy,
+                     actor_cache=actor_cache(id1, rows, sizes, memory['gap_bytes']))
         out[path.stem] = frame
     return out
 
@@ -292,10 +567,11 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
     return report
 
 
-def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, pool_kib=None):
+def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, pool_kib=None, jobs=1, cache_dir=None):
     """The build's CHIM heap gate: OUT/chim-heap.json, and a ValueError naming the frame whose largest
     ring does not fit. sizes: the target ABI sizes (default: probed with the SDK's compiler, as the
-    strict world-map heap gate does). Without either the gate is recorded as not run."""
+    strict world-map heap gate does). Without either the gate is recorded as not run. jobs and
+    cache_dir: ring_peak's (frames in parallel, each frame's result kept by its content key)."""
     import json
     from pathlib import Path
     from chim.validate import Failures, load_world
@@ -311,10 +587,17 @@ def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, poo
         if fails:
             raise ValueError('CHIM heap gate: the world does not read back (%s)' % fails[0])
         report = ring_peak({'settings': settings, 'textures': textures, 'models': models, 'frames': frames},
-                           sizes, zone_kib, pool_kib)
+                           sizes, zone_kib, pool_kib, jobs=jobs, cache_dir=cache_dir)
         report['status'] = 'passed' if report['ok'] else 'failed'
     report_path.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
     bad = [f for f in report.get('frames', []) if not f['ok']]
+    links = [f for f in bad if not f.get('efrags', {'ok': True})['ok']]
+    if links:
+        f = links[0]
+        raise ValueError('CHIM heap gate failed: %s places %d placements in one active ring, more than the %d '
+                         'efrag links CHIM may use (client.h AW_EFRAG_LIMIT less CHIM_EFRAG_RESERVE); see %s'
+                         % (f['frame'], f['efrags']['ring_placements_peak'], f['efrags']['budget_links'],
+                            report_path))
     if bad:
         f = bad[0]
         zone_kib, pool_kib = report['zone_kib'], report['pool_kib']

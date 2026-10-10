@@ -55,9 +55,86 @@ class ChimHeapGateTests(unittest.TestCase):
         self.assertEqual(report['status'], 'failed')
         self.assertEqual(heap.require_heap(self.tmp.name, sizes=SIZES)['status'], 'passed')
 
+    def test_ring_placements_are_gated_on_the_engine_efrag_budget(self):
+        # CHIM-EFRAG-UNCAPPED-35: one source for the limit (engine_limits reads client.h and chim_local.h)
+        from unittest import mock
+        import engine_limits
+        self.assertEqual(engine_limits.chim_efrag_budget(),
+                         engine_limits.limits()['efrag_limit'] - engine_limits.limits()['chim_efrag_reserve'])
+        f = heap.ring_peak(self.world, SIZES)['frames'][0]
+        self.assertTrue(f['efrags']['ok'])
+        self.assertGreater(f['efrags']['ring_placements_peak'], 0)
+        self.assertEqual(f['efrags']['budget_links'], engine_limits.chim_efrag_budget())
+        with mock.patch.object(engine_limits, 'chim_efrag_budget', return_value=0):
+            self.assertFalse(heap.ring_peak(self.world, SIZES)['ok'])
+            with self.assertRaisesRegex(ValueError, 'efrag links CHIM may use'):
+                heap.require_heap(self.tmp.name, sizes=SIZES)
+        self.assertEqual(heap.require_heap(self.tmp.name, sizes=SIZES)['status'], 'passed')
+
     def test_without_sizes_the_gate_says_it_did_not_run(self):
         self.assertIsNone(heap.require_heap(self.tmp.name)['ok'])
 
+
+
+class PerFrameAuditTests(unittest.TestCase):
+    """CHIM-WORLD-AUDIT-SCALING-33: ring_peak audits each frame on what it uses (its own model and texture
+    numbering), in parallel and cached by content, with the same report as the whole-world form."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        fixture(Path(cls.tmp.name))
+        fails, world = validate(cls.tmp.name)
+        assert not fails, fails
+        path, frame, chunks = world['frames'][0]
+        # a second frame with half the chunks (another model set), and unused models in the world's list
+        half = [c for c in chunks if (c['cx'] + c['cy']) % 2 == 0]
+        second = ('frames/x+01/y+00/frame.ccf', dict(frame, cell=(1, 0)), half)
+        cls.world = dict(world, frames=[world['frames'][0], second], models=world['models'] + world['models'])
+        cls.cells = [(0, 0), (1, 0)]
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def options(self):
+        _, frame, chunks = self.world['frames'][0]
+        g, (lx, ly) = frame['grain'], frame['low']
+        some = [c['index'] for c in chunks[:3]]
+        return {'points': [('cam', lx + g * 1.5, ly + g * 1.5), ('far', lx + g * 3.5, ly + g * 0.5)],
+                'chunk_extra': {(0, 0): {some[0]: 5000}},
+                'chunk_models': {(1, 0): {some[1]: {'progs/a.mdl': 7000}, some[2]: {'progs/a.mdl': 7000}}},
+                'zone_bytes': {(1, 0): 5000 * 1024}}
+
+    def test_same_report_as_the_whole_world_audit(self):
+        for opts in ({}, self.options()):
+            with self.subTest(options=sorted(opts)):
+                whole = heap.ring_peak_whole(self.world, SIZES, **opts)
+                per = heap.ring_peak(self.world, SIZES, **opts)
+                # the whole-world form leaves numpy booleans in its point rows; compare as JSON
+                plain = lambda r: json.loads(json.dumps(r, default=lambda o: o.item()))
+                self.assertEqual(plain(per), plain(whole))
+                self.assertEqual(len(per['frames']), 2)
+
+    def test_parallel_and_cached_runs_give_the_same_report(self):
+        opts = self.options()
+        serial = heap.ring_peak(self.world, SIZES, **opts)
+        self.assertEqual(heap.ring_peak(self.world, SIZES, jobs=2, **opts), serial)
+        with tempfile.TemporaryDirectory() as cache:
+            first = heap.ring_peak(self.world, SIZES, cache_dir=cache, **opts)
+            self.assertEqual(len(list(Path(cache).glob('*.json'))), 2)
+            again = heap.ring_peak(self.world, SIZES, cache_dir=cache, **opts)
+            self.assertEqual(json.loads(json.dumps(first)), json.loads(json.dumps(serial)))
+            self.assertEqual(json.loads(json.dumps(again)), json.loads(json.dumps(serial)))
+            # another frame setting is another key: no stale result
+            other = heap.ring_peak(self.world, dict(SIZES, scenery=SIZES['scenery'] + 1000), cache_dir=cache, **opts)
+            self.assertEqual(len(list(Path(cache).glob('*.json'))), 4)
+            self.assertGreater(other['frames'][0]['peak_bytes'], serial['frames'][0]['peak_bytes'])
+
+    def test_a_frame_audit_does_not_grow_with_the_world(self):
+        # the per-frame task holds only what the frame uses, however many models the world lists
+        big = dict(self.world, models=self.world['models'] * 20)
+        self.assertEqual(heap.ring_peak(big, SIZES), heap.ring_peak(self.world, SIZES))
 
 
 class StreamedStaticsHeapTests(unittest.TestCase):

@@ -26,6 +26,26 @@ import subprocess
 import threading
 
 SCHEMA = 'amiwind-asset-pool-v1'
+# Read-only second cache root (BUILD-CACHE-PER-WORKSPACE-33): the builder sets it to the cache
+# folder of the --reuse-from run's workspace when that is another workspace, so a build on a new
+# volume finds what the earlier build converted instead of converting everything again. A hit
+# there is verified like any other and copied into this build's own pool; nothing is written
+# to the fallback.
+FALLBACK_ENV = 'AMIWIND_CACHE_FALLBACK'
+
+
+def fallback_root(root):
+    """The same-named folder under AMIWIND_CACHE_FALLBACK, or None (unset, missing or the same folder)."""
+    value = os.environ.get(FALLBACK_ENV, '')
+    if not value or root is None:
+        return None
+    candidate = Path(value) / Path(root).name
+    try:
+        if not candidate.is_dir() or candidate.resolve() == Path(root).resolve():
+            return None
+    except OSError:
+        return None
+    return candidate
 
 
 def sha256_file(path):
@@ -64,12 +84,15 @@ def code_identity(*objects):
 class FileCache:
     """One namespace of reuse keys over the shared pool; ROOT None = disabled (every lookup misses)."""
 
-    def __init__(self, root, namespace, identity):
+    def __init__(self, root, namespace, identity, fallback=True):
         self.pool = Path(root) if root else None
         self.root = self.pool / 'keys' / namespace if root else None
         self.identity = identity
         self.counts = {'hits': 0, 'misses': 0, 'stored': 0, 'rejected': 0}
+        self.fallback_hits = 0
         self._lock = threading.Lock()
+        other = fallback_root(root) if fallback else None
+        self.fallback = FileCache(other, namespace, identity, fallback=False) if other else None
 
     @property
     def enabled(self):
@@ -90,9 +113,20 @@ class FileCache:
         return self.pool / 'objects' / digest[:2] / digest
 
     def fetch(self, key, target):
-        """Copy the pooled output of KEY to TARGET when present and intact; its recorded facts, or None."""
+        """Copy the pooled output of KEY to TARGET when present and intact; its recorded facts, or None.
+        A miss here is looked up in the read-only fallback pool; a hit there is pooled here too."""
         if not self.enabled:
             return None
+        facts = self._fetch(key, target)
+        if facts is None and self.fallback is not None:
+            facts = self.fallback._fetch(key, target)
+            if facts is not None:
+                with self._lock:
+                    self.fallback_hits += 1
+                self.store(key, target, facts)
+        return facts
+
+    def _fetch(self, key, target):
         try:
             meta = json.loads(self._key_path(key).read_text(encoding='utf-8'))
         except (OSError, ValueError):
@@ -122,6 +156,38 @@ class FileCache:
         os.replace(temporary, target)
         self._count('hits')
         return meta.get('facts') or {}
+
+    def lookup(self, key):
+        """KEY's record ({schema, key, sha256, bytes, facts}) when it names a pooled object, else None. The object
+        itself is not read here: callers verify it when they place it (tools/storage_pool.place)."""
+        if not self.enabled:
+            return None
+        try:
+            meta = json.loads(self._key_path(key).read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(meta, dict) or meta.get('schema') != SCHEMA or meta.get('key') != key \
+                or not meta.get('sha256'):
+            return None
+        return meta
+
+    def point(self, key, digest, size, facts=None):
+        """Point KEY at DIGEST, an object already in the pool (stored by tools/storage_pool.py, by a hard link);
+        False when the key cannot be written (the build continues)."""
+        if not self.enabled:
+            return False
+        key_path = self._key_path(key)
+        temporary = Path(f'{key_path}.{os.getpid()}.{threading.get_ident()}.tmp')
+        try:
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_bytes((json.dumps({'schema': SCHEMA, 'key': key, 'sha256': digest, 'bytes': size,
+                                               'facts': facts or {}}) + chr(10)).encode('utf-8'))
+            os.replace(temporary, key_path)
+        except OSError as error:
+            temporary.unlink(missing_ok=True)
+            print(f'[warning] Asset pool key not written ({error}); the build continues.', flush=True)
+            return False
+        return True
 
     def store(self, key, path, facts=None):
         """Pool a converted file (once per content) and point KEY at it; a pool that cannot be written is skipped."""

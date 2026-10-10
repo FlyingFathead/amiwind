@@ -152,6 +152,13 @@ void AW_WalkPlayer(edict_t *p)
 /* Use the same stair/slide behavior for scripted humanoids. The old monster
  * corner-support test rejects parts of the ship that the player can walk.
  * A failed trial restores every movement field and cannot step off a ledge. */
+/* Feet in lava (CONTENTS_LAVA, docs/LAVA.md): the point SV_CheckWater tests first. */
+static int feet_in_lava(edict_t *p,const vec3_t at)
+{
+    vec3_t feet;
+    feet[0]=at[0];feet[1]=at[1];feet[2]=at[2]+p->v.mins[2]+1;
+    return SV_PointContents(feet)==CONTENTS_LAVA;
+}
 qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
 {
     vec3_t origin,oldorigin,velocity,delta;float flags,groundentity,movetype;trace_t floor;int i;
@@ -167,7 +174,10 @@ qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
     p->v.velocity[2]=0;p->v.movetype=MOVETYPE_WALK;AW_WalkPlayer(p);p->v.movetype=movetype;
     aw_chim_player=ring;actor_step=0;
     VectorSubtract(p->v.origin,origin,delta);
-    if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && fabs(delta[2])<=8.75f && support(p,8.75f,&floor)) {
+    /* Actors keep out of lava as Morrowind's AvoidNode on the pools makes them path around it: a step into lava
+     * fails, so the navigation ladder (aw_npcpath.c) takes another way; an actor already in lava may step out. */
+    if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && fabs(delta[2])<=8.75f && support(p,8.75f,&floor) &&
+       !(feet_in_lava(p,p->v.origin) && !feet_in_lava(p,origin))) {
         ground(p,&floor);VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,true);return true;
     }
     VectorCopy(origin,p->v.origin);VectorCopy(oldorigin,p->v.oldorigin);VectorCopy(velocity,p->v.velocity);

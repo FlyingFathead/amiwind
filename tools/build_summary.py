@@ -209,6 +209,59 @@ def file_cache_lines(record):
     return lines
 
 
+
+def reuse_and_reference(run, version):
+    """(record, lines) of the end summary's reuse and reference section (docs/BUILD_CACHE.md): stages reused and
+    rebuilt with their causes, time saved, stage output hashes, the payload preflight and the reference check
+    against this version's release checksums. Read only; any problem becomes a line, never a failure."""
+    record, lines = {}, []
+    run = Path(run)
+    if not (run / 'build-state.json').is_file():
+        return record, lines  # not a builder run (no stages): no section
+    try:
+        import reuse_report
+        audit = reuse_report.report(run)
+        if audit is None:
+            lines.append('Reuse: none (built without --reuse-from)')
+        else:
+            causes = ', '.join(f"{row['stage']}: {row['cause']}" for row in audit['rows'])
+            lines.append(f"Reuse: {audit['reused']} of {audit['stages']} stages reused, {audit['rebuilt']} rebuilt"
+                         + (f' ({causes})' if causes else ''))
+            if audit['unexpected']:
+                lines.append(f"WARNING: {audit['unexpected']} unexpected rebuild(s): "
+                             + ', '.join(row['stage'] for row in audit['rows'] if row['class'] == 'UNEXPECTED')
+                             + ' (tools/build.py --reuse-report RUN)')
+            old = json.loads((Path(audit['reuse_from']) / 'build-state.json').read_text(encoding='utf-8'))
+            elapsed = {step['name']: step.get('elapsed_seconds') or 0 for step in old.get('steps', [])}
+            state = json.loads((run / 'build-state.json').read_text(encoding='utf-8'))
+            reused = [name for name, row in ((state.get('stage_cache') or {}).get('reused') or {}).items()
+                      if not row.get('refused')]
+            saved = sum(elapsed.get(name, 0) for name in reused)
+            lines.append(f'Time saved by reuse: about {saved / 60:.0f} min (the old run\'s time for the reused stages)')
+            record['reuse'] = dict(audit, saved_seconds=round(saved, 1))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        lines.append(f'Reuse: not readable ({exc})')
+    try:
+        import build_reference
+        hashes = build_reference.stage_hashes(run)
+        record['stage_hashes'] = hashes
+        lines.append(f'Stage hashes: {len(hashes)} recorded')
+        check = build_reference.verify(run, version)
+        record['reference_check'] = check
+        lines.append(build_reference.verify_line(check))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        lines.append(f'Stage hashes: not recorded ({exc})')
+    preflight = run / 'image' / 'payload-preflight.json'
+    if preflight.is_file():
+        try:
+            report = json.loads(preflight.read_text(encoding='utf-8'))
+            record['payload_preflight'] = report
+            lines.append(f"Payload preflight: {'passed' if not report.get('errors') else 'FAILED'} in "
+                         f"{report.get('seconds')} s ({report.get('checks')} checks)")
+        except (OSError, ValueError) as exc:
+            lines.append(f'Payload preflight: not readable ({exc})')
+    return record, lines
+
 class BuildSummary:
     def __init__(self, run, version, mode):
         self.run = Path(run)
@@ -378,6 +431,17 @@ class BuildSummary:
         if save_error:
             lines.append('Summary save warning: ' + save_error)
         section('\n'.join(lines))
+        # Reuse, stage hashes, preflight and the reference check: their own section (docs/BUILD_CACHE.md).
+        reuse_record, reuse_lines = reuse_and_reference(self.run, self.version)
+        if reuse_lines and self.run.is_dir():
+            section('Reuse and reference\n' + '\n'.join(reuse_lines))
+            if saved:
+                result.update(reuse_record)
+                try:
+                    temporary.write_text(json.dumps(result, indent=2) + '\n')
+                    temporary.replace(saved)
+                except OSError:
+                    pass
         if artifacts:
             from emulator_configs import print_outputs
             print_outputs(Path(identity['path']))

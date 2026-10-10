@@ -200,7 +200,8 @@ class BuilderWiringTests(unittest.TestCase):
 
     def test_guided_build_passes_the_town_scenery(self):
         import build
-        args = build.parser().parse_args([])
+        # the legacy Balmora chain (--builder legacy; a CHIM Balmora has no legacy maps, CHIM-LEGACY-CHAIN-33)
+        args = build.parser().parse_args(['--builder', 'legacy'])
         args.data_files = Path('/owned/Data Files'); args.sdk = Path('/sdk')
         tools = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
         steps = dict(build.commands(args, tools, Path('/private/run')))

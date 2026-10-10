@@ -43,6 +43,7 @@ void Cvar_RegisterVariable(cvar_t *v){v->value=(float)atof(v->string);}
 double Sys_FloatTime(void){return 0;}
 static int chim_on=1;
 int Chim_Active(void){return chim_on;}
+int Chim_FarOnly(void){return 0;}
 static byte hunk[1<<20];static int hunk_used;
 void *Hunk_AllocName(int size,char *name){void *p=hunk+hunk_used;(void)name;hunk_used+=(size+15)&~15;assert(hunk_used<=(int)sizeof hunk);return p;}
 int Hunk_LowMark(void){return hunk_used;}

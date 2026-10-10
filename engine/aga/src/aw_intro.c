@@ -8,6 +8,7 @@
 #include "aw_character.h"
 #include "aw_region.h"
 #include "aw_miniwind.h"
+#include "aw_quickchar.h"
 static int active,pending,jiub_state,guard_state,upper_state,prompt,unlocked,failed;
 /* AUDIO-03: the opening track starts only after the ship scene has loaded and
  * settled; music started before 'map prison' crackled under the load. */
@@ -106,6 +107,8 @@ static void new_game(void) {
     FILE *f=NULL;
     /* A partial-area build has no ship opening: New Game is its quick start (aw_miniwind.c). */
     if(AW_MiniwindActive()){Cbuf_AddText("aw_quick_start\n");return;}
+    /* --skip-census: the quick character screen in Seyda Neen, no ship (aw_scene.c). */
+    if(AW_SkipCensus()){Cbuf_AddText("aw_quick_start\n");return;}
     if(COM_FOpenFile("intro/chargenname1.txt",&f)<0 || !f){Con_Printf("Convert owned introductory assets before starting a new game.\n");return;}
     fclose(f);debug_scene=NULL;debug_scene_ready=0;active=prompt=pending=0;CL_Disconnect();
     IN_AWClearButtons();key_dest=key_game;
@@ -237,44 +240,63 @@ void AW_IntroTick(void) {
     if(unlocked && roles[3] && distance(roles[3],player())<45 && (!upper_state || upper_timer>6) &&
        AW_IntroSpeak(3,upper_state?"chargenwoman2":"chargenwoman1")){upper_state=1;upper_timer=0;}
 }
+/* aw_combat.c: the player is knocked down or out (controls locked). Defined
+ * here, beside its callers, NULL in fixtures without the combat layer. */
+int (*aw_combat_input_locked)(void);
+/* Character panels: the census menus and the quick character screen (aw_quickchar.c). */
+static int character_modal(void){return AW_CharacterActive() || AW_QuickCharActive();}
 void AW_IntroMove(usercmd_t *cmd) {
-    if(AW_DebugTestInputActive() && !AW_CharacterActive())return;
-    if((active && !failed && !unlocked) || AW_OpeningLocked() || AW_CharacterActive()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;}
+    if(aw_combat_input_locked && aw_combat_input_locked()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;return;}
+    if(AW_DebugTestInputActive() && !character_modal())return;
+    if((active && !failed && !unlocked) || AW_OpeningLocked() || character_modal()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;}
 }
 int AW_IntroButtons(int bits){
-    if(AW_DebugTestInputActive() && !AW_CharacterActive())return bits;
-    if((active && !failed) || AW_OpeningLocked() || AW_CharacterActive())return 0;
+    if(aw_combat_input_locked && aw_combat_input_locked())return 0;
+    if(AW_DebugTestInputActive() && !character_modal())return bits;
+    if((active && !failed) || AW_OpeningLocked() || character_modal())return 0;
     if(!AW_StoryFighting())bits&=~1;
     if(AW_StoryRestricted())bits&=~2;
     return bits;
 }
 int AW_IntroImpulse(int impulse){
-    if(AW_DebugTestInputActive() && !AW_CharacterActive())return impulse;
-    return ((active && !failed) || !AW_StoryFighting() || AW_OpeningLocked() || AW_CharacterActive()) && impulse==202?0:impulse;
+    if(aw_combat_input_locked && aw_combat_input_locked())return 0;
+    if(AW_DebugTestInputActive() && !character_modal())return impulse;
+    return ((active && !failed) || !AW_StoryFighting() || AW_OpeningLocked() || character_modal()) && impulse==202?0:impulse;
 }
-int AW_IntroUse(void){return (active && !failed && !unlocked) || AW_OpeningLocked() || AW_CharacterActive();}
+int AW_IntroUse(void){return (active && !failed && !unlocked) || AW_OpeningLocked() || character_modal();}
 int AW_IntroPromptActive(void){return prompt!=0;}
+/* The original name entry's editing, shared by the ship's prompt and the quick
+ * character screen's name page (aw_quickchar.c): 1 when Enter accepts a name. */
+int AW_NameEdit(char *name,int capacity,int key) {
+    int n=strlen(name);
+    if(key==K_BACKSPACE && n)name[n-1]=0;
+    else if(key>=32 && key<127 && n<capacity-1){name[n]=key;name[n+1]=0;}
+    else if(key==K_ENTER && n)return 1;
+    return 0;
+}
+/* The name line and its caret. Original font punctuation can be ornamental:
+ * the input caret is geometry. */
+void AW_NameDraw(int x,int y,const char *name) {
+    int caret_height;
+    AW_UIText(x,y,name,-1);
+    caret_height=AW_UIFontSize();if(!caret_height)caret_height=8;
+    AW_UIFill(x+1+AW_UIWidth(name),y,1,caret_height,AW_UIColor(223,199,144));
+}
 int AW_IntroKey(int key) {
-    int n;if(AW_ReaderKey(key) || AW_CharacterKey(key))return 1;
+    if(AW_ReaderKey(key) || AW_CharacterKey(key) || AW_QuickCharKey(key))return 1;
     if(!active || !prompt || key_dest!=key_game)return 0;
     if(key==K_ESCAPE)return 0;
-    n=strlen(player_name);
     if(prompt==1){
-        if(key==K_BACKSPACE && n)player_name[n-1]=0;
-        else if(key>=32 && key<127 && n<31){player_name[n]=key;player_name[n+1]=0;}
-        else if(key==K_ENTER && n){prompt=0;jiub_state=20;jiub_timer=0;Con_Printf("Player name accepted.\n");}
+        if(AW_NameEdit(player_name,sizeof(player_name),key)){prompt=0;jiub_state=20;jiub_timer=0;Con_Printf("Player name accepted.\n");}
     }else if(prompt==2 && key==K_ENTER){prompt=0;unlocked=1;if(travel(195,100,170))guard_state=50;}
     return 1;
 }
 void AW_IntroDraw(void) {
-    int y,caret_height;extern int scr_copyeverything;
-    if(key_dest==key_game && (AW_CharacterActive() || AW_ReaderActive() || prompt))scr_copyeverything=1;
-    AW_CharacterDraw();AW_ReaderDraw();if(!prompt || key_dest!=key_game)return;
+    int y;extern int scr_copyeverything;
+    if(key_dest==key_game && (character_modal() || AW_ReaderActive() || prompt))scr_copyeverything=1;
+    AW_CharacterDraw();AW_QuickCharDraw();AW_ReaderDraw();if(!prompt || key_dest!=key_game)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;AW_UIBox(0,y,vid.width,vid.height-y);
-    if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_UIText(10,y+22,player_name,-1);
-        /* Original font punctuation can be ornamental: the input caret is geometry. */
-        caret_height=AW_UIFontSize();if(!caret_height)caret_height=8;
-        AW_UIFill(11+AW_UIWidth(player_name),y+22,1,caret_height,AW_UIColor(223,199,144));}
+    if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_NameDraw(10,y+22,player_name);}
     else AW_UICenteredLines(0,y,vid.width,vid.height-y,"WASD: move. E: activate.\nEnter to follow the guard.");
 }
 static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",

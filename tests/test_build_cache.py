@@ -91,9 +91,9 @@ STAGE_HIDDEN = '''
 import sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
-name = 'hid' + 'den.json'
+name = ''.join(['hid', 'den.json'])  # built at run time: no static scan sees it (literal parts are folded)
 out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir(parents=True)
-(out / 'h.txt').write_text((root / ('con' + 'fig') / name).read_text())
+(out / 'h.txt').write_text((root / ''.join(['con', 'fig']) / name).read_text())
 '''
 
 # A town registry: config/registry.json rows name the town files (BUILD-CACHE-OVERBROAD-33).
@@ -293,7 +293,8 @@ class FingerprintTests(unittest.TestCase):
     def test_instrumentation_modules_never_count(self):
         """Profiler/progress edits keep reuse; a converter edit does not (explicit, reviewed list)."""
         self.assertEqual(build_cache.INSTRUMENTATION_MODULES,
-                         {'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py'})
+                         {'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
+                          'tools/unit_tree.py'})
         tools = self.repository / 'tools'
         (tools / 'build_progress.py').write_text('def show(text):\n    print(text)\n')
         (tools / 'build_profile.py').write_text('from build_progress import show\ndef instrument(stage):\n    show(stage)\n')
@@ -458,7 +459,7 @@ class ReuseTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def build(self, name, reuse_from=None, parallel=False, mode='copy'):
+    def build(self, name, reuse_from=None, parallel=False, mode='copy', pool=None, forced=()):
         run = self.root / 'workspace' / name
         index = build_cache.SourceIndex(self.repository)
         meta = metadata()
@@ -466,13 +467,29 @@ class ReuseTests(unittest.TestCase):
         meta['runtime_version'] = '0.0.0-dev1'
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            steps = build_cache.prepare(steps_for(self.repository, run, self.data), run, meta, reuse_from, mode, index)
+            steps = build_cache.prepare(steps_for(self.repository, run, self.data), run, meta, reuse_from, mode, index,
+                                        pool=pool, forced=forced)
             if parallel:
                 execute_parallel(steps, run, meta, self.repository)
             else:
                 build.execute(steps, run, meta)
         state = json.loads((run / 'build-state.json').read_text())
         return run, state, output.getvalue()
+
+    @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
+    def test_a_forced_stage_runs_again_and_the_stages_after_it_follow_their_keys(self):
+        # --rebuild-stage (docs/BUILD_CACHE.md): the forced stage writes the same outputs, so the stages after it
+        # are reused; nothing else runs.
+        first, _, _ = self.build('first')
+        second, state, _ = self.build('second', reuse_from=first, forced=['alpha'])
+        cache = state['stage_cache']
+        self.assertEqual(cache['forced'], ['alpha'])
+        self.assertEqual(cache['not_reused']['alpha'], build_cache.FORCED_REASON)
+        reused = sorted(name for name, row in cache['reused'].items() if not row.get('refused'))
+        self.assertEqual(reused, ['beta', 'delta', 'gamma'])
+        for name in ('beta', 'gamma', 'delta'):
+            self.assertEqual(build_cache.load_manifest(second, name)['files'],
+                             build_cache.load_manifest(first, name)['files'])
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_reused_outputs_are_byte_identical_to_a_fresh_build(self):
@@ -578,6 +595,33 @@ class ReuseTests(unittest.TestCase):
         self.assertEqual(os.stat(blob).st_ino, os.stat(first / 'alpha' / 'deep' / 'blob.bin').st_ino)
         with self.assertRaises(PermissionError):
             blob.open('r+b')
+
+    @unittest.skipUnless(MANIFESTS and hasattr(os, 'geteuid') and os.geteuid() != 0, 'hard links need a non-root POSIX user')
+    def test_pool_mode_links_reused_files_to_one_pooled_object(self):
+        import storage_pool
+        pool = self.root / 'workspace' / 'pool'
+        first, _, _ = self.build('first')
+        second, state, _ = self.build('second', reuse_from=first, mode='pool', pool=pool)
+        third, third_state, _ = self.build('third', reuse_from=second, mode='pool', pool=pool)
+        self.assertEqual(state['stage_cache']['reuse_mode'], 'pool')
+        relative = Path('alpha') / 'deep' / 'blob.bin'
+        digest = build_cache.sha256_file(first / relative)
+        blob = storage_pool.object_path(pool, digest)
+        inodes = {os.stat(path).st_ino for path in (first / relative, second / relative, third / relative, blob)}
+        self.assertEqual(len(inodes), 1, [(str(path), os.stat(path).st_ino, os.stat(path).st_nlink, os.stat(path).st_dev,
+                                          oct(os.stat(path).st_mode)) for path in (first / relative, second / relative,
+                                                                                 third / relative, blob)]
+                         + [third_state['stage_cache'].get('not_reused')])  # stored once, never copied
+        self.assertIn('links to the storage pool', (second / 'logs' / '01-alpha.log').read_text())
+        with self.assertRaises(PermissionError):
+            (third / relative).open('r+b')
+        fresh, _, _ = self.build('fresh')
+        self.assertEqual(build_cache.sha256_file(third / relative), build_cache.sha256_file(fresh / relative))
+
+    def test_pool_mode_needs_a_pool_folder(self):
+        with self.assertRaises(ValueError):
+            build_cache.prepare([], self.root / 'workspace' / 'nopool', metadata(), self.root / 'other', 'pool',
+                                build_cache.SourceIndex(self.repository))
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_concurrent_stages_touching_one_path_are_never_reused(self):
@@ -737,6 +781,48 @@ class ReuseTests(unittest.TestCase):
         clean, _, _ = self.build('clean')
         self.assertEqual(tree(third), tree(clean))
 
+    @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
+    def test_reuse_preflight_stops_an_unexplained_rebuild_before_any_stage_runs(self):
+        """BUILD-REUSE-KEYS-TOO-BROAD-35: with --reuse-from, a stage rebuilt for a source key change that no changed
+        file explains stops the build before any stage runs, unless --accept-rebuild; --reuse-plan says the same,
+        read only. A real edit is explained and named."""
+        first, _, _ = self.build('first')
+        index = build_cache.SourceIndex(self.repository)
+        state_path = first / 'build-state.json'
+        state = json.loads(state_path.read_text())
+        state['source_sha256'] = {path: index.files[path] for path in index.files}
+        details_path = first / 'profile' / 'fingerprints.json'
+        details = json.loads(details_path.read_text())
+        # A key that changed with no file changed: the recorded per-file part of alpha differs from today's.
+        details['alpha']['sources']['by_file']['tools/stage_a.py'] = 'units:recorded-differently'
+        state['stage_cache']['fingerprints']['alpha'] = build_cache.digest_json(details['alpha'])
+        state_path.write_text(json.dumps(state))
+        details_path.write_text(json.dumps(details))
+        with self.assertRaisesRegex(ValueError, 'Reuse preflight: 1 stage'):
+            with contextlib.redirect_stdout(io.StringIO()):
+                build_cache.prepare(steps_for(self.repository, self.root / 'workspace' / 'refused', self.data),
+                                    self.root / 'workspace' / 'refused', metadata(), first, 'copy', index)
+        self.assertFalse((self.root / 'workspace' / 'refused').exists())
+        result = build_cache.predict_preflight(first, root=self.repository)
+        self.assertEqual([row['stage'] for row in result['rows'] if row['class'] == 'UNEXPECTED'], ['alpha'])
+        run = self.root / 'workspace' / 'accepted'
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            build_cache.prepare(steps_for(self.repository, run, self.data), run, metadata(), first, 'copy', index,
+                                accept_rebuild=True)
+        self.assertIn('accepted with --accept-rebuild', output.getvalue())
+        # A real edit: explained by the source diff, which names the file; the stages after it stay reusable.
+        details['alpha']['sources']['by_file']['tools/stage_a.py'] = index.selection(
+            self.repository / 'tools' / 'stage_a.py')[0]['tools/stage_a.py']
+        state['stage_cache']['fingerprints']['alpha'] = build_cache.digest_json(details['alpha'])
+        state_path.write_text(json.dumps(state))
+        details_path.write_text(json.dumps(details))
+        (self.repository / 'tools' / 'stage_d.py').write_text(STAGE_D.replace("'d:'", "'D:'"))
+        result = build_cache.predict_preflight(first, root=self.repository)
+        self.assertEqual(result['unexpected'], 0)
+        self.assertEqual([(row['stage'], row['diff_files']) for row in result['rows']], [('delta', ['tools/stage_d.py'])])
+        self.assertEqual(result['reused'], 3)
+
     @unittest.skipUnless(MANIFESTS and hasattr(sys, 'monitoring'), 'the call trace needs POSIX and Python 3.12+')
     def test_call_trace_catches_a_function_the_fingerprint_missed(self):
         """Scope 'units': a function that ran although no static scan reached it makes the outputs not reusable."""
@@ -802,6 +888,10 @@ class ReuseTests(unittest.TestCase):
         self.assertIn('amiwind-stage-cache-v1 fingerprints', state['stage_cache']['not_reused']['alpha'])
 
     def test_release_versions_refuse_reuse(self):
+        with patch.dict(os.environ):  # build.main sets AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
+            self._release_versions_refuse_reuse()
+
+    def _release_versions_refuse_reuse(self):
         for version in ('0.0.32', '0.0.32-rc1', '1.0.0', '0.0.33'):
             with self.assertRaisesRegex(ValueError, 'from scratch'):
                 build_cache.require_reuse_allowed(version)
@@ -838,6 +928,214 @@ class ReuseTests(unittest.TestCase):
         self.assertEqual(roots, ['a', 'b/c'])
         self.assertEqual(build_cache.normalize_command(['p', '--out', '/w/run/x', '--jobs', '12'], Path('/w/run')),
                          ['p', '--out', '{RUN}/x', '--jobs', '{JOBS}'])
+
+
+class StageKeyCoverageTests(unittest.TestCase):
+    """BUILD-KEY-OVERBROAD-33: an import search path entry (sys.path.insert(0, str(ROOT / 'tools'))) named
+    every non-Python file under tools/, so a new bug page (tools/release-files.json) rebuilt interior,
+    census, harvest, chim and chim-town. The key stays complete: a computed read under tools/ still counts."""
+
+    IDIOMS = (
+        "import sys\nfrom pathlib import Path\nROOT = Path(__file__).resolve().parents[1]\n"
+        "sys.path.insert(0, str(ROOT / 'tools'))\n"
+        "sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]\n"
+        "for p in (ROOT / 'tools', ROOT / 'src'):\n"
+        "    while str(p) in sys.path:\n"
+        "        sys.path.remove(str(p))\n"
+        "    sys.path.insert(0, str(p))\n"
+        "def main():\n    return 1\n"
+        "main()\n")
+
+    def repository(self, root, extra=''):
+        (root / 'tools').mkdir(parents=True)
+        (root / 'src').mkdir()
+        (root / 'tools' / 'stage.py').write_text(self.IDIOMS + extra)
+        (root / 'tools' / 'release-files.json').write_text('[]\n')
+        (root / 'tools' / 'table.json').write_text('{}\n')
+        (root / 'src' / 'notes.json').write_text('{}\n')
+        return build_cache.SourceIndex(root)
+
+    def test_import_search_paths_are_not_data_reads(self):
+        with tempfile.TemporaryDirectory() as temp:
+            index = self.repository(Path(temp))
+            _, data, uncertain = index.closure(Path(temp) / 'tools' / 'stage.py')
+            self.assertFalse(uncertain)
+            self.assertEqual(data, set())
+
+    def test_a_computed_read_under_tools_still_counts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            extra = "def load(name):\n    return (ROOT / 'tools' / name).read_text()\nload('table.json')\n"
+            index = self.repository(Path(temp), extra)
+            _, data, _ = index.closure(Path(temp) / 'tools' / 'stage.py')
+            self.assertIn('tools/table.json', data)
+            self.assertIn('tools/release-files.json', data)   # an open-ended read of the folder: all of it
+
+    def test_no_builder_stage_keys_the_release_file_list_or_the_tracker(self):
+        """Editing tools/release-files.json or adding a bug page rebuilds no stage (the real repository)."""
+        import re
+        scripts = sorted(set(re.findall(r"tool\([\"']([a-z_]+\.py)", (ROOT / 'tools' / 'build.py').read_text())))
+        self.assertIn('prepare_interior.py', scripts)
+        index = build_cache.SourceIndex(ROOT)
+        for script in scripts:
+            if script == 'build_aga.py':
+                continue  # engine (never reused: BUILD-ENGINE-KEY-SDK-33) and image (always assembled)
+            _, data, _ = index.closure(ROOT / 'tools' / script)
+            tracker = sorted(path for path in data if path == 'tools/release-files.json' or path.startswith('docs/bugs/')
+                             or path in ('docs/BUGS.md', 'docs/BUG_JOURNAL.md'))
+            self.assertEqual(tracker, [], script)
+
+
+class WriteAttributionTests(unittest.TestCase):
+    """BUILD-REUSE-ATTRIBUTION-33: two stages ran at the same time (character and chim-town); both saw
+    intro-scene/id1/character/*.awh change and both were refused. The read trace now records each stage's
+    writes into the run folder, and a file only one of them wrote is that stage's output."""
+
+    def run_pair(self, run, character_writes, town_writes):
+        steps = [('character', [sys.executable, 'tools/x.py', '--scene', str(run / 'scene')]),
+                 ('town', [sys.executable, 'tools/y.py', '--scene', str(run / 'scene'), '--out', str(run / 'town')])]
+        (run / 'scene').mkdir(parents=True)
+        recorder = build_cache.Recorder(run, steps, {})
+        recorder.traced = True
+        recorder.before('character', steps[0][1])
+        recorder.before('town', steps[1][1])
+        import time
+        time.sleep(0.01)  # windows are kept in milliseconds: make the two runs overlap on a fast host
+        (run / 'scene' / 'h106.awh').write_bytes(b'head')
+        (run / 'town').mkdir()
+        (run / 'town' / 'entities.json').write_text('{}')
+        traces = {}
+        for name, writes in (('character', character_writes), ('town', town_writes)):
+            if writes is None:
+                traces[name] = None
+                continue
+            traces[name] = run.parent / f'{name}.txt'
+            traces[name].write_text(''.join('>' + path + '\n' for path in writes) + 'tools/x.py\n')
+        recorder.after('town', {}, traces['town'])
+        recorder.after('character', {}, traces['character'])
+        recorder.close({'status': 'passed'})
+        return build_cache.load_manifest(run, 'character'), build_cache.load_manifest(run, 'town')
+
+    def test_the_traced_writer_owns_the_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            character, town = self.run_pair(Path(temp) / 'run', ['scene/h106.awh'], ['town/entities.json'])
+            self.assertTrue(character['reusable'], character['reasons'])
+            self.assertTrue(town['reusable'], town['reasons'])
+            self.assertIn('scene/h106.awh', character['files'])
+            self.assertNotIn('scene/h106.awh', town['files'])
+            self.assertIn('town/entities.json', town['files'])
+            self.assertEqual(town['attributed'][0]['stage'], 'character')
+
+    def test_unknown_or_shared_writers_still_refuse_both(self):
+        for character_writes, town_writes in ((None, ['town/entities.json']),            # not traced
+                                              ([], ['town/entities.json']),              # a native tool wrote it
+                                              (['scene/h106.awh'], ['scene/h106.awh'])):  # both wrote it
+            with tempfile.TemporaryDirectory() as temp:
+                character, town = self.run_pair(Path(temp) / 'run', character_writes, town_writes)
+                self.assertFalse(character['reusable'])
+                self.assertFalse(town['reusable'])
+                self.assertIn('outputs cannot be attributed', town['reasons'][-1])
+
+    @unittest.skipUnless(MANIFESTS, 'the read trace runs with the stage wrapper on POSIX')
+    def test_the_trace_hook_records_run_folder_writes(self):
+        """The generated hook, run in a child process, lists opens for writing, renames and removals in the run."""
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp) / 'run'
+            (run / 'profile').mkdir(parents=True)
+            self.assertTrue(build_cache.write_trace_hook(run, ROOT))
+            target = run / 'profile' / build_profile.READS_FOLDER / 'stage.txt'
+            code = ("import os\nfrom pathlib import Path\nr = Path(os.environ['R'])\n"
+                    "(r / 'a.txt').write_text('x')\nopen(r / 'b.tmp', 'wb').close()\nos.replace(r / 'b.tmp', r / 'b.txt')\n"
+                    "(r / 'a.txt').read_text()\nos.remove(r / 'a.txt')\n"
+                    "(r / 'x.log').write_text('t')\n(r / 'x.log').read_text()\n")
+            env = dict(os.environ, R=str(run), PYTHONPATH=str(run / 'profile' / build_profile.TRACE_HOOK_FOLDER),
+                       **{build_profile.TRACE_ENV: str(target)})
+            subprocess.run([sys.executable, '-c', code], env=env, check=True)
+            recorder = build_cache.Recorder.__new__(build_cache.Recorder)
+            recorder.traced = True
+            self.assertEqual(recorder.traced_writes(target), {'a.txt', 'b.tmp', 'b.txt', 'x.log'})
+            self.assertEqual(recorder.diagnostic_reads(target), ['x.log'])
+
+
+class DiagnosticOutputTests(unittest.TestCase):
+    """BUILD-OUTPUTS-NOT-REPRODUCIBLE-33: tool logs ("0.306 seconds elapsed") and timing reports made a rerun
+    stage's outputs differ, which refused every stage after it. They are diagnostics: not compared, and no stage
+    may read one."""
+
+    def manifests(self, run, old, new_files, old_files):
+        for folder, files in ((run, new_files), (old, old_files)):
+            target = folder / 'profile' / 'manifests'
+            target.mkdir(parents=True)
+            (folder / 'build-state.json').write_text('{}')
+            (target / 'census.json').write_text(json.dumps({
+                'schema': build_cache.MANIFEST_SCHEMA, 'stage': 'census', 'status': 'complete', 'reusable': True,
+                'reasons': [], 'files': {k: {'size': 1, 'sha256': v, 'mode': 420} for k, v in files.items()},
+                'links': {}, 'deleted': [], 'directories': [], 'deleted_directories': []}))
+
+    def test_outputs_that_differ_only_in_diagnostics_are_the_same(self):
+        same = {'scene/census.txt': 'a' * 64}
+        cases = (({'scene/light.log': 'b' * 64}, {'scene/light.log': 'c' * 64}, True),
+                 ({'chim-world/chim-stats.json': 'b' * 64}, {'chim-world/chim-stats.json': 'c' * 64}, True),
+                 ({'scene/light.log': 'b' * 64}, {}, True),
+                 ({'scene/table.json': 'b' * 64}, {'scene/table.json': 'c' * 64}, False))
+        for new_extra, old_extra, expected in cases:
+            with tempfile.TemporaryDirectory() as temp:
+                run, old = Path(temp) / 'new', Path(temp) / 'old'
+                self.manifests(run, old, dict(same, **new_extra), dict(same, **old_extra))
+                self.assertIs(build_cache.same_outputs(run, old, 'census'), expected, new_extra)
+
+    def test_a_stage_that_reads_another_stages_diagnostic_is_not_reused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp) / 'run'
+            steps = [('reader', [sys.executable, 'tools/x.py', '--scene', str(run / 'scene')])]
+            (run / 'scene').mkdir(parents=True)
+            recorder = build_cache.Recorder(run, steps, {})
+            recorder.traced = True
+            recorder.before('reader', steps[0][1])
+            (run / 'scene' / 'out.txt').write_text('x')
+            trace = Path(temp) / 'reads.txt'
+            trace.write_text('>scene/out.txt\n<scene/own.log\n<other/compile.log\n')
+            (run / 'scene' / 'own.log').write_text('mine')
+            manifest = recorder.after('reader', {}, trace)
+            self.assertFalse(manifest['reusable'])
+            self.assertIn('read build diagnostics written by other stages', manifest['reasons'][-1])
+            self.assertIn('other/compile.log', manifest['reasons'][-1])
+            self.assertNotIn('own.log', manifest['reasons'][-1])
+
+    def test_no_repository_code_reads_a_log_file(self):
+        """Static half of the rule (the stage trace is the run-time half): every '.log' literal in tools/ is in a
+        write, a removal, a message, or one of the reviewed uses below (none reads a stage's log)."""
+        import re
+        writes = re.compile(r"""open\([^)]*['"](w|a|ab|wb|w\+|x)['"]|\.open\(['"](w|a|ab|wb)['"]|write_text|write_bytes|"""
+                            r"""stdout=|stderr=|unlink|help=|print\(|^\s*#|Error\(""")
+        reviewed = {  # path: why it is not a stage reading another stage's log
+            'tools/build.py': 'the builder names its own per-stage log under RUN/logs (run-private)',
+            'tools/build_parallel.py': 'the scheduler names its own per-stage log under RUN/logs (run-private)',
+            'tools/build_summary.py': 'the summary reads the engine log under RUN/logs (run-private) for warnings',
+            'tools/build_cache.py': 'the diagnostic rule itself',
+            'tools/build_aga.py': 'names the engine runtime log on the Amiga disk',
+            'tools/prepare_world_regions.py': 'a region unit cache copy of its own logs',
+            'tools/build_docker.py': 'host-side image build log', 'tools/run_docker.py': 'host-side logs',
+            'tools/fsuae_headless_probe.py': 'emulator probe logs', 'tools/package_opening.py': 'opening package',
+            'tools/profile_demo.py': 'demo profiler', 'tools/capture_opening.py': 'opening capture',
+            'tools/run_tests.py': 'test runner log', 'tools/world_estimate_sample.py': 'estimate sample tool logs',
+            'tools/chimport.py': 'the island conversion tool (not a builder stage) quotes a failed cell process log'}
+        found = []
+        for path in sorted((ROOT / 'tools').rglob('*.py')):
+            relative = path.relative_to(ROOT).as_posix()
+            for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                if re.search(r"""\.log['"]""", line) and not writes.search(line) and relative not in reviewed:
+                    found.append(f'{relative}:{number}: {line.strip()}')
+        self.assertEqual(found, [])
+
+
+class ApplyTraceTests(unittest.TestCase):
+    def test_storage_pool_loaded_by_the_reuse_step_is_not_outside_code(self):
+        """The pool-mode reuse step loads tools/storage_pool.py; a third run must still reuse the second."""
+        _, _, outside = build_cache.check_reads(['!/elsewhere/tools/storage_pool.py',
+                                                 '!/elsewhere/tools/__pycache__/storage_pool.cpython-312.pyc',
+                                                 '!/elsewhere/tools/converter.py'], None, set(), '/repo')
+        self.assertEqual(sorted(outside), ['/elsewhere/tools/converter.py'])
 
 
 if __name__ == '__main__':

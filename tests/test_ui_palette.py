@@ -40,3 +40,41 @@ class PaletteSafety(unittest.TestCase):
     def test_indices_outside_bank_preserved(self):
         check_pixels(bytes([0,224,254,255]),'test')
         for i in range(225,254):self.assertRaises(ValueError,check_pixels,bytes([i]),'test')
+
+class EnemyBarYellow(unittest.TestCase):
+    """HUD-ENEMY-BAR-COLOUR-33: the reserved bank carries the enemy bar's yellow (format 2); the sky
+    palette approval does not depend on the bank; a format 1 scene is upgraded in place."""
+    def test_yellow_tint_matches_the_original_bar(self):
+        from PIL import Image
+        import ui_palette
+        bar=ui_palette.yellow_bar(Image.new('RGBA',(2,2),(200,200,200,255)))
+        self.assertEqual(bar.getpixel((0,0)),(200,146,0,255))
+        self.assertEqual(ui_palette.PALETTE_FORMAT,'AmiWind reserved UI palette 2')
+    def test_sky_approval_ignores_the_ui_bank(self):
+        import hashlib,sky_palette_overlay as sky
+        from unittest.mock import patch
+        legacy=bytes(range(87));v1=bytes(225*3)+legacy+bytes(range(2*3))
+        with patch.object(sky,'EXPECTED_PALETTE',hashlib.sha256(v1).hexdigest()):
+            v2=v1[:225*3]+bytes([7])*87+v1[254*3:]
+            self.assertTrue(sky.approved(v1))
+            self.assertFalse(sky.approved(v2))
+            self.assertTrue(sky.approved(v2,legacy))
+            self.assertFalse(sky.approved(v2[:3]+b'\x09'+v2[4:],legacy))      # outside the bank: refused
+    def test_format_1_scene_is_upgraded_in_place(self):
+        import hashlib,json,ui_palette
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            game=Path(td);gfx=game/'gfx';gfx.mkdir()
+            old=bytes([40,35,30])*225+bytes([9,9,9])*29+bytes([1,2,3])*2
+            (gfx/'palette.lmp').write_bytes(old)
+            for name,rows in (('colormap.lmp',64),('fog.lmp',16)):(gfx/name).write_bytes(bytes([224])*(256*rows))
+            (gfx/'ui-palette.json').write_text(json.dumps({'format':'AmiWind reserved UI palette 1',
+                'palette_sha256':hashlib.sha256(old).hexdigest()}),encoding='utf-8')
+            new=old[:225*3]+bytes([200,146,0])*29+old[254*3:]
+            sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
+            sys.modules.pop('mwad',None)       # tools/mwad.py (the CLI) must not shadow the package
+            with patch.object(ui_palette,'reserved_palette',return_value=(new,{})) as reserve:
+                report=ui_palette.reserve(game,game)
+            self.assertTrue(reserve.call_args.kwargs['upgrade'])
+            self.assertEqual(report['format'],'AmiWind reserved UI palette 2')
+            self.assertEqual((gfx/'palette.lmp').read_bytes(),new)

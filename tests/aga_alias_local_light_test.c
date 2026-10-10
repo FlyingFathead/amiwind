@@ -42,6 +42,10 @@ static int world_light,inside,gallery_active,draws,torch_test_active;
 static cvar_t *daynight,*fog_enabled;
 
 entity_t *AW_GuardTorchEntity(entity_t *e){return e;}
+/* NPC model levels (aw_npc_lod.c): every actor keeps its own model here. */
+void AW_NpcLodFrame(void){}
+model_t *AW_NpcLodModel(entity_t *e){return e->model;}
+int AW_NpcLodResident(int *bytes){if(bytes)*bytes=0;return 0;}
 int AW_HandModelsApply(void){return 1;}
 void AW_TorchViewModel(void){assert(0);}
 float R_SpriteEntityScale(const entity_t *e){return 1;}

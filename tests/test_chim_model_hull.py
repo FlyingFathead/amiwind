@@ -64,15 +64,93 @@ class ModelHullTests(unittest.TestCase):
             routed_visits += vb
         self.assertLess(routed_visits * 3, chain_visits)
 
-    def test_auto_routes_only_large_models(self):
-        # BUILD-CHIM-HULL-RING-33: a house-size model's hull is the chain, byte for byte (every byte of it is
-        # in each ring that holds the model; Balmora's south-west ring has 2,528 B of headroom)
-        self.assertEqual(MODEL_ROUTE_PIECES, 256)
-        self.assertEqual(self.build('auto', 60)[0], self.build('chain', 60)[0])
-        small = self.build('auto', MODEL_ROUTE_PIECES)[0]
-        self.assertEqual(small, self.build('chain', MODEL_ROUTE_PIECES)[0])
+    def test_auto_routes_chains_deeper_than_the_shared_limit(self):
+        """One rule for the router and the audits (routed_hull.CHAIN_DEPTH_LIMIT, in clipnodes of chain depth):
+        auto keeps a chain at or under the limit byte for byte and routes a deeper one; the audit's
+        over_limit agrees model by model; the measurement override moves both."""
+        import os
+        from unittest.mock import patch
+        from hull_chain_audit import hull_depth, over_limit
+        from routed_hull import CHAIN_DEPTH_LIMIT, CHAIN_DEPTH_VARIABLE, chain_depth_limit, trace_cost_us
+        self.assertEqual(CHAIN_DEPTH_LIMIT, 256)
+        self.assertAlmostEqual(trace_cost_us(256), 348.16)
+        seen = set()
+        for n in (8, 20, 40, 60):
+            chain, croot = self.build('chain', n)
+            depth = hull_depth(chain[9], croot)[1]
+            auto = self.build('auto', n)[0]
+            deep = depth > chain_depth_limit()
+            seen.add(deep)
+            self.assertEqual(auto != chain, deep, (n, depth))
+            self.assertEqual(over_limit(depth), deep)
+            reach, rdepth = hull_depth(auto[9], self.build('auto', n)[1])
+            self.assertFalse(over_limit(rdepth, reach) and deep)       # a routed hull is not a chain to report
+        self.assertEqual(seen, {True, False})
+        with patch.dict(os.environ, {CHAIN_DEPTH_VARIABLE: '100000'}):
+            self.assertEqual(self.build('auto', 60)[0], self.build('chain', 60)[0])
+            self.assertFalse(over_limit(5000))
+        with patch.dict(os.environ, {CHAIN_DEPTH_VARIABLE: 'x'}), self.assertRaises(ValueError):
+            chain_depth_limit()
+        # district-size models are routed by the piece rule as before
         self.assertNotEqual(self.build('auto', MODEL_ROUTE_PIECES + 1)[0],
                             self.build('chain', MODEL_ROUTE_PIECES + 1)[0])
+
+class HullFallbackTests(unittest.TestCase):
+    """COLLISION-TRACE-COST-33: the shared builder (chim.build.build_areas, so every caller: chim_build,
+    CHIMport) keeps the smallest routed mesh of a peak ring that does not fit as a chain and builds the world
+    again, until it fits or nothing routed is left; the receipt records it."""
+
+    def run_fallback(self, fits_after, candidates, mode='auto', sdk='/sdk'):
+        import json
+        import os
+        import tempfile
+        from unittest.mock import patch
+        from chim import build as B
+        calls = {'build': 0, 'heap': 0, 'env': []}
+
+        def heap(*args, **kwargs):
+            calls['heap'] += 1
+            if calls['heap'] <= fits_after:
+                raise ValueError('CHIM heap gate failed')
+            return {'ok': True}
+
+        def world(*args):
+            calls['build'] += 1
+            calls['env'].append(os.environ.get('AMIWIND_CHIM_KEEP_CHAIN', ''))
+            return {'frames': 1}
+        queue = list(candidates)
+        with tempfile.TemporaryDirectory() as tmp,                 patch.dict(os.environ, {'AMIWIND_MODEL_HULL': mode, 'AMIWIND_CHIM_KEEP_CHAIN': ''}),                 patch.object(B, 'build_world', side_effect=world),                 patch('chim.heap.require_heap', side_effect=heap),                 patch('check_world_map_heap.compile_target_sizes', return_value=({}, None)),                 patch.object(B, 'routed_peak_mesh', side_effect=lambda out, kept: queue.pop(0) if queue else None):
+            receipt = B.build_areas(['balmora'], '/data', Path(tmp), '/pal', hull_fallback_sdk=sdk)
+            written = (Path(tmp) / 'chim-receipt.json')
+            on_disk = json.loads(written.read_text()) if written.is_file() else None
+            env_after = os.environ.get('AMIWIND_CHIM_KEEP_CHAIN')
+        return receipt, calls, on_disk, env_after
+
+    def test_build_areas_keeps_chains_until_the_ring_fits(self):
+        receipt, calls, on_disk, env_after = self.run_fallback(2, ['x/ex_hlaalu_b_18', 'x/ex_hlaalu_b_23', 'x/other'])
+        self.assertEqual(receipt['hull_fallback']['kept_as_chain'], ['x/ex_hlaalu_b_18', 'x/ex_hlaalu_b_23'])
+        self.assertEqual(receipt['hull_fallback']['kept_as_chain_for_memory'], 2)
+        self.assertEqual(on_disk['hull_fallback'], receipt['hull_fallback'])
+        self.assertEqual((calls['build'], calls['heap']), (3, 3))
+        self.assertEqual(calls['env'], ['', 'x/ex_hlaalu_b_18', 'x/ex_hlaalu_b_18,x/ex_hlaalu_b_23'])
+        self.assertEqual(env_after, '')                 # the caller's setting is restored
+
+    def test_no_fallback_without_sdk_without_auto_or_when_it_fits(self):
+        for kwargs in ({'sdk': None}, {'mode': 'chain'}):
+            receipt, calls, _, _ = self.run_fallback(99, ['x/a'], **kwargs)
+            self.assertNotIn('hull_fallback', receipt)
+            self.assertEqual((calls['build'], calls['heap']), (1, 0))
+        receipt, calls, _, _ = self.run_fallback(0, ['x/a'])
+        self.assertNotIn('hull_fallback', receipt)
+        self.assertEqual((calls['build'], calls['heap']), (1, 1))
+        receipt, calls, _, _ = self.run_fallback(99, ['x/a'])       # nothing more to fall back on
+        self.assertEqual(receipt['hull_fallback']['kept_as_chain'], ['x/a'])
+
+
+def contextlib_quiet():
+    import contextlib
+    import io
+    return contextlib.redirect_stdout(io.StringIO())
 
 
 if __name__ == '__main__':

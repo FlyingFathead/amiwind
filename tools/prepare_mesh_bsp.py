@@ -3,13 +3,14 @@
 """Compile owned static meshes to shared BSP29 submodels with original UVs."""
 import os
 import argparse, json, math, re, shutil, struct, subprocess, sys
+from collections import deque
 from pathlib import Path
 import numpy as np
 from PIL import Image
 from mesh_geometry import surface_polygons, split_surface, collision_pieces
 from prepare_quake import miptex, CENTRE, SCALE
-from mwad.paths import ensure_external
-from player_hull import MINS, MAXS, PROFILE, rebuild_world_hull
+from mwad.paths import copy_tree, ensure_external
+from player_hull import MINS, MAXS, PROFILE, compile_standing_hull, rebuild_world_hull
 from mwad.scene import read_asset, unpack_geometry
 from scenery_selection import select_runtime_refs
 from static_lod import reduce_for_profile, rock_profile
@@ -225,11 +226,39 @@ def _placement_frame(ref, centre):
     return origin,np.array([[math.cos(yr),-math.sin(yr),0],[math.sin(yr),math.cos(yr),0],[0,0,1]])
 
 
+def placement_grid(polygon, axes, offset):
+    """The lightmap grid (low, size) a placement worker bakes a face with (no texinfo snap).
+
+    The engine sizes a face's lightmap from the STORED single-precision vertices and
+    mapping (surface_grid.engine_grid); the unstored double-precision grid
+    (interior_lighting.bake_grid) differs from it on about a third of the faces of a
+    lit interior, and the single assembly writer rebaked each of those serially
+    (8,181 of 26,614 faces in the prison ship: most of the interior stage). The worker
+    now bakes on the engine grid of the face's own values as they will be stored; the
+    writer compares it with the grid of the values actually stored (vertices and
+    mappings are shared within 1e-5) and rebakes only where they still differ, so every
+    face is baked on its stored grid exactly as before. The unstored grid is still
+    checked first (same error as before), and used when the stored-value grid would not
+    fit the runtime budget."""
+    from interior_lighting import bake_grid
+    low, size = bake_grid(polygon, axes, offset)
+    if np.any(size < 1) or np.any(size > 17):
+        raise ValueError('Lightmap extent exceeds runtime budget')
+    mins, extents = engine_grid(polygon, [[*axes[:, 0], offset[0]], [*axes[:, 1], offset[1]]])
+    dims = np.array(sample_dimensions(extents), dtype=int)
+    if np.any(dims < 1) or np.any(dims > 17):
+        return low, size
+    return np.array(mins, dtype=float), dims
+
+
 def _prepare_placement(task):
     from scipy.spatial import ConvexHull
     from types import SimpleNamespace
     ref, data, texsize, centre, lighting, *options = task
     stable_planes=bool(options and options[0])
+    # Bake on the grid the face's values will have once stored (placement_grid), when the writer
+    # asks for it (no texinfo snap); else on the unstored grid, as before.
+    stored_grid=len(options)>1 and bool(options[1])
     snap_planes=scenery_reduce.texinfo_snap() is not None
     v,f,polys,components,lod=data
     origin,rotation=_placement_frame(ref,centre)
@@ -255,7 +284,8 @@ def _prepare_placement(task):
         samples=None
         if lighting:
             from interior_lighting import bake_surface
-            samples=bake_surface(q,ax,off,rotation,origin,lighting)
+            samples=bake_surface(q,ax,off,rotation,origin,lighting,
+                                 sample_grid=placement_grid(q,ax,off) if stored_grid else None)
         surfaces.append((q,n,ax,off,material,samples))
     worldparts=[]
     for points,hull,ids,error in components:
@@ -264,6 +294,53 @@ def _prepare_placement(task):
     points=v[:,:3]@r.T*SCALE*scale+o
     bounds=np.concatenate([points, *(surface[0] for surface in surfaces)])
     return surfaces,worldparts,bounds.min(axis=0)-1,bounds.max(axis=0)+1
+
+
+# Faces per lit placement task: a lit placement with more faces is split into a head task
+# (collision pieces, model bounds) and face-run tasks (split_placement), and the writer's
+# rebakes go to the pool in runs of this many faces (_rebake_chunk).
+BAKE_CHUNK = 64
+
+
+def split_placement(task):
+    """The tasks of one lit placement: the task itself when it has at most BAKE_CHUNK faces, else
+    a head task (no faces: collision pieces and the model's own bounds) and one task per run of
+    BAKE_CHUNK faces (no collision pieces, no vertices).
+
+    One worker used to convert and bake every face of a placement, so one large lit model (the
+    prison ship's hull: about 18,000 faces) kept one worker busy for most of the interior stage
+    while the others idled. Every face is converted and baked by the same per-face code with the
+    same arguments, so join_placement gives exactly the single task's result."""
+    ref, data, *rest = task
+    v, f, polys, components, lod = data
+    if len(polys) <= BAKE_CHUNK:
+        return [task]
+    empty = v[:0]
+    return [(ref, (v, f, [], components, lod), *rest)] + [
+        (ref, (empty, None, polys[start:start + BAKE_CHUNK], [], None), *rest)
+        for start in range(0, len(polys), BAKE_CHUNK)]
+
+
+def join_placement(results):
+    """The result of a placement split by split_placement, from its tasks' results in order:
+    the faces in order, the head's collision pieces, the bounds over every part (each part's
+    bounds are its minimum - 1 and maximum + 1, so the minimum over the parts is exact)."""
+    if len(results) == 1:
+        return results[0]
+    (_, worldparts, lo, hi), *parts = results
+    surfaces = []
+    for part, _, part_lo, part_hi in parts:
+        surfaces.extend(part)
+        lo, hi = np.minimum(lo, part_lo), np.maximum(hi, part_hi)
+    return surfaces, worldparts, lo, hi
+
+
+def _rebake_chunk(task):
+    """Worker: the writer's rebakes of a run of faces (bake_surface on the stored grid), in order."""
+    from interior_lighting import bake_surface
+    lighting, faces = task
+    return [bake_surface(q, ax, off, rotation, origin, lighting, sample_grid=grid)
+            for q, ax, off, rotation, origin, grid in faces]
 
 
 def order_face_planes(lumps, face_planes):
@@ -336,7 +413,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     texture_cache={};planes_cache={};texinfo_cache={};models={};report=[];collision_fallbacks=[];hull_routes=[]
     from routed_hull import routed_standing, routing, wants_route
     from mesh_geometry_env import model_hull_mode
-    base_faces=len(lumps[7])//20;regrids=0
+    base_faces=len(lumps[7])//20;regrids=0;rebakes=[]
     snap=scenery_reduce.snap_budget();snap=None if snap is None else snap[1];snap_buckets={};texinfo_vectors={};texinfo_keys={};snap_shared=[0,0.,0]
     from surface_flatten import load_profiles
     # Interior exporters record the named cell. Keep their authored window
@@ -494,11 +571,19 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        if key in seen:continue
        seen.add(key)
        # Explicit Temple opt-in only; inferred filenames must not alter other maps.
-       yield ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting,map_identity=='bmtemple'
+       task=(ref,models[mi],profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),centre,lighting,map_identity=='bmtemple',snap is None)
+       # A large lit placement goes to the pool as runs of faces (split_placement, join_placement).
+       parts=split_placement(task) if lighting else [task]
+       split_counts.append(len(parts));yield from parts
+    split_counts=deque()
+    def next_placement():
+     # The head first: the generator records a placement's task count before handing out its tasks.
+     head=next(placements)
+     return join_placement([head]+[next(placements) for _ in range(split_counts.popleft()-1)])
     # Geometry and lightmaps are private worker results. BSP offsets, shared
     # palettes and entity order are assigned by this single assembly writer.
     from contextlib import closing
-    with closing(ordered_map(_prepare_placement,placement_tasks(),workers)) as placements:
+    with closing(ordered_map(_prepare_placement,placement_tasks(),resolve_jobs(jobs) if lighting else workers)) as placements:
      for ref in selected:
       mi=ref['model_index'];m=index['models'][mi];name=m['source']
       if any(t in name for t in excluded):continue
@@ -518,7 +603,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
         struct.pack_into('<4i',header,36,nroot,croot,croot,croot)
         instance_models[variant]=len(lumps[14])//64;lumps[14]+=header
        entities.append(entity(instance_models[variant],origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre));continue
-      surfaces,worldparts,lo,hi=next(placements);part_cache[key]=worldparts
+      surfaces,worldparts,lo,hi=next_placement();part_cache[key]=worldparts
       if terrain is not None and terrain.prisms:
        surfaces,cull_counts=cull_surfaces(surfaces,terrain,placement_groups[key])
        cull_reports.append({'model':name,'reference':ref['number'],**cull_counts})
@@ -579,9 +664,17 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
        if samples is not None:
         from interior_lighting import bake_grid, bake_surface
         dims=sample_dimensions(extents);low,size=bake_grid(q,ax,off)
+        # The report counts the faces whose stored grid differs from the unstored one (as
+        # always); the writer rebakes only where the grid the face was baked with differs
+        # (placement_grid; bake_grid with a texinfo snap).
+        if samples_stale or tuple(low)!=mins or tuple(size)!=dims:regrids+=1
+        if snap is None:low,size=placement_grid(q,ax,off)
         if samples_stale or tuple(low)!=mins or tuple(size)!=dims:
+         # Rebaked on the stored grid by the pool after assembly (_rebake_chunk); the face's
+         # lightmap bytes are reserved here, so every offset stays as it was.
          if frame is None:frame=_placement_frame(ref,centre)
-         samples=bake_surface(q,ax,off,frame[1],frame[0],lighting,sample_grid=(mins,dims));regrids+=1
+         rebakes.append((len(lumps[8]),dims[0]*dims[1],(q,ax,off,frame[1],frame[0],(mins,dims))))
+         samples=bytes(dims[0]*dims[1])
         if len(samples)!=dims[0]*dims[1]:raise ValueError('Lightmap sample count differs from the engine grid')
         # Faces lit mainly by warm lights take the warm style (cells that opt in).
         style=0
@@ -605,6 +698,16 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
       visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre))
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
+    if rebakes:
+     # The writer's rebakes in runs of BAKE_CHUNK faces over the pool (in the writer when few).
+     runs=[rebakes[i:i+BAKE_CHUNK] for i in range(0,len(rebakes),BAKE_CHUNK)]
+     tasks=[(lighting,[job for _,_,job in run]) for run in runs]
+     baked=ordered_map(_rebake_chunk,tasks,resolve_jobs(jobs)) if len(runs)>2 else map(_rebake_chunk,tasks)
+     for run,results in zip(runs,baked):
+      for (offset,count,_),samples in zip(run,results):
+       if len(samples)!=count:raise ValueError('Lightmap sample count differs from the engine grid')
+       lumps[8][offset:offset+count]=samples
+    if lighting:print(f'Lightmaps rebaked on the stored grid: {len(rebakes)} of {regrids} faces whose stored grid differs from the unstored one',flush=True)
     order_face_planes(lumps,face_planes)
     # Every converted face must fit 256 texels under any FPU rule
     # (MESH-EXTENT-GRID-31); world faces from qbsp keep their own checks.
@@ -664,7 +767,7 @@ from build_parallel import live_jobs, ordered_map
 def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None, vis_mode='fast'):
     scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
     scenery=ensure_external(scenery,'scenery input')
-    shutil.copytree(scene,out)
+    copy_tree(scene,out)
     text=(out/'seyda.map').read_text()
     pattern=r'\{\n"classname" "aw_static"\n"model" "([^"\n]+\.mdl)"\n"origin" "[^"\n]+"\n"angles" "[^"\n]+"\n\}'
     removed=re.findall(pattern,text)
@@ -674,10 +777,16 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cul
     text=re.sub(r'\{[^{}]*\bclip\b[^{}]*\}', '', text)
     (out/'seyda.map').write_text(text)
     for name in set(removed):(out/'id1'/name).unlink()
-    for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'] if vis_mode=='fast' else [],'seyda.bsp'),(light,light_args('-minlight','100'),'seyda.bsp')]:
-        subprocess.run([str(Path(executable).resolve()),*(['-threads',str(live_jobs(resolve_jobs(jobs)))] if executable==vis else []),*options,target],cwd=out,check=True)
+    # The standing hull compiles from the map alone (its own standing-collision.* files), so it
+    # runs beside qbsp, vis and light of the visible map instead of after them.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(1) as hull_thread:
+        standing=hull_thread.submit(compile_standing_hull,out/'seyda.map',qbsp)
+        for executable,options,target in [(qbsp,['-nopercent'],'seyda.map'),(vis,['-fast'] if vis_mode=='fast' else [],'seyda.bsp'),(light,light_args('-minlight','100'),'seyda.bsp')]:
+            subprocess.run([str(Path(executable).resolve()),*(['-threads',str(live_jobs(resolve_jobs(jobs)))] if executable==vis else []),*options,target],cwd=out,check=True)
+        collision=standing.result()
     base=out/'seyda-base.bsp';(out/'seyda.bsp').rename(base)
-    rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True)
+    rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True,collision=collision)
     result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs,terrain_visual_cull=terrain_visual_cull,terrain_cull_config=terrain_cull_config,map_identity=map_identity,cell_identity=cell_identity,subcell_identity=subcell_identity,terrain_cull_overlap=terrain_cull_overlap)
     shutil.copyfile(out/'seyda.bsp',out/'id1/maps/seyda.bsp')
     result['format']='AmiWind compiled mesh BSP29'

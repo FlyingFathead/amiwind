@@ -51,11 +51,26 @@ def runtime_position(position, interior, area="seyda"):
             (position[1]-(0 if interior else centre[1]))*.25,position[2]*.25]
 
 
-def interior_reference(master,report,scene):
-    """Private source layouts, with separate placed references for every door."""
+def destination_names(report):
+    return sorted({r['destination_cell'] for r in report['doors'] if r.get('destination_cell')})
+
+
+def door_sources(data_files):
+    """(door catalogue, destination interior layouts): the part of prepare() that reads only the
+    master file, so a stage can run it beside its own work (build_parallel.Background) and pass
+    it to prepare() as sources."""
     from mwad.interior import read_interiors
-    names=sorted({r['destination_cell'] for r in report['doors'] if r.get('destination_cell')})
-    cells=read_interiors(master,names)  # one pass over the master (BUILD-DOOR-REFERENCE-SERIAL-33)
+    master=child_ci(resolve_data_files(data_files),'Morrowind.esm')
+    report=catalogue(master)
+    return report,read_interiors(master,destination_names(report))
+
+
+def interior_reference(master,report,scene,cells=None):
+    """Private source layouts, with separate placed references for every door.
+    cells: read_interiors(master, destination_names(report)) when already read (door_sources)."""
+    from mwad.interior import read_interiors
+    if cells is None:
+        cells=read_interiors(master,destination_names(report))  # one pass over the master (BUILD-DOOR-REFERENCE-SERIAL-33)
     (scene/'interior-reference.json').write_text(json.dumps({'master_sha256':report['master_sha256'],
         'units':'original source units; each interior has its own local coordinates',
         'cells':cells},indent=2)+'\n')
@@ -107,18 +122,25 @@ def name_mapping(report):
             'filename_limit_bytes': 30, 'scenes': rows}
 
 
-def prepare(data_files, scene):
+def prepare(data_files, scene, sources=None):
+    """sources: door_sources(data_files) already computed (for example beside the stage's work)."""
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'door conversion')
-    report=catalogue(child_ci(data_files,'Morrowind.esm'))
+    report,cells=sources if sources is not None else (catalogue(child_ci(data_files,'Morrowind.esm')),None)
     bsa=BSA(child_ci(data_files,'Morrowind.bsa'));N=nif_reader();cache={};links=[]
+    # A town on CHIM made from the game data has no legacy map but is converted (CHIM-LEGACY-CHAIN-33).
+    from chim_town import native_towns
+    from town_config import runtime_towns
+    native={t['name'] for t in runtime_towns() if t['id'] in native_towns()}
+    def converted(name):
+        return bool(name) and (name in native or (scene/'id1/maps'/f'{name}.bsp').is_file())
     for r in report['doors']:
         # A visible source entrance remains inspectable before its interior exists.
         names=MAP_NAMES
         source=names.get(r['source_cell'].casefold()) if r['source_interior'] else exterior_area(r['position'])
         target=names.get(r.get('destination_cell','').casefold()) if r['destination_interior'] else exterior_area(r['destination']['position'])
-        if not source or not (scene/'id1/maps'/f'{source}.bsp').is_file():
+        if not converted(source):
             r['runtime_status']='source scene not converted';continue
-        available=bool(target and (scene/'id1/maps'/f'{target}.bsp').is_file())
+        available=converted(target)
         model='meshes/'+r['model']
         if model not in cache:
             raw=bsa_read(bsa,model);_,_,bounds,_=model_geometry(raw,N);cache[model]=bounds
@@ -150,7 +172,7 @@ def prepare(data_files, scene):
     write_bank(scene/'id1/scene-doors.txt',[r for r in links if r['source'] in original])
     (scene/'door-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     (scene/'asset-name-map.json').write_text(json.dumps(name_mapping(report),indent=2)+'\n')
-    interior_reference(child_ci(data_files,'Morrowind.esm'),report,scene)
+    interior_reference(child_ci(data_files,'Morrowind.esm'),report,scene,cells)
     return {'catalogued':len(report['doors']),'mapped':len(links),
             'available':sum(r['target']!='-' for r in links),'links':links}
 

@@ -20,6 +20,13 @@ enum {
 };
 enum {AW_ATTACK_CHOP,AW_ATTACK_SLASH,AW_ATTACK_THRUST};
 enum {AW_HIT_MISS,AW_HIT_BLOCKED,AW_HIT_FATIGUE,AW_HIT_HEALTH};
+/* Combat voice events (aw_combat_voice): the fight starts (once, on the calm to
+ * hostile transition: the aggro line), the NPC swings (a taunt/attack chance),
+ * it takes a hit, it flees, it dies. No event but DEATH follows a death. The
+ * receiver owns the speech rules: the original odds, a taunt cooldown, no
+ * repeat or overlap per actor, DEATH and HIT over taunts, a bound on voices
+ * at once (docs/ROADMAP.md, combat speech). */
+enum {AW_VOICE_START,AW_VOICE_SWING,AW_VOICE_HIT,AW_VOICE_FLEE,AW_VOICE_DEATH};
 
 /* Game settings the rules read; names are the master file's GMST names. */
 typedef struct {
@@ -32,9 +39,9 @@ typedef struct {
     float iBlockMinChance,iBlockMaxChance,fSwingBlockBase,fSwingBlockMult,fBlockStillBonus;
     float fFatigueBlockBase,fFatigueBlockMult,fWeaponFatigueBlockMult;
     float fCombatBlockLeftAngle,fCombatBlockRightAngle,fCombatDelayNPC;
-    float fNPCHealthBarTime,fNPCHealthBarFade;
+    float fNPCHealthBarTime,fNPCHealthBarFade,fWeaponDamageMult;
 } aw_combat_settings_t;
-#define AW_COMBAT_SETTING_COUNT 35
+#define AW_COMBAT_SETTING_COUNT 36
 
 /* One fighter's sheet: about 150 bytes. Values as the original data holds
  * them (attributes and skills 0..255, dynamic stats as floats). */
@@ -50,7 +57,13 @@ typedef struct {
     float health,health_max,fatigue,fatigue_max,magicka;
     unsigned char knocked;              /* 1 knocked down (hit), 2 knocked out (fatigue) */
     unsigned char dead,aware,moving,attacking;
+    unsigned char staggered;            /* hit recovery: cannot block */
+    unsigned char shield_class;         /* 0 light, 1 medium, 2 heavy (its block sound) */
+    float weapon_health,weapon_health_max,shield_health,shield_health_max;  /* condition; max 0 = unknown (full) */
 } aw_fighter_t;
+/* Two-handed weapon types (and hand to hand, which OpenMW's weapon table also marks
+ * two-handed): no shield block. weapon = 1 + original type. */
+#define AW_TWO_HANDED(w) ((w)==0 || (w)==3 || (w)==5 || (w)==6 || (w)==7 || (w)==9)
 
 /* Deterministic rolls: one xorshift32 per encounter (seeded). */
 typedef struct {unsigned long state;} aw_combat_rng_t;
@@ -61,8 +74,17 @@ float AW_CombatRoll01(aw_combat_rng_t *r);          /* 0..1 inclusive, as rollCl
 /* One resolved swing, for the readout and the HUD. */
 typedef struct {
     int chance,roll,outcome,critical,knockdown,blocked_roll,block_chance;
-    float strength,damage,raw;
+    int miss_style;                     /* a miss: 1 dodge, 2 block-like (AmiWind extension presentation) */
+    int weapon_broke,shield_broke;
+    float strength,damage,raw,weapon_wear;
 } aw_swing_t;
+/* aw_combat_dice: 1 (default) the original rolls; 0 (AmiWind extension) no dice:
+ * every swing in reach hits, nothing is blocked, knockdown by the damage threshold
+ * alone, NPC swing strength the mean. docs/COMBAT.md. */
+extern int aw_combat_dice;
+int AW_CombatCanBlock(const aw_combat_settings_t *s,const aw_fighter_t *v,float angle);
+int AW_CombatBestAttackPlayer(const aw_fighter_t *f);
+int AW_CombatMovementAttack(float forward,float side);
 
 int AW_CombatSettingIndex(const char *name);
 int AW_CombatSettingSet(aw_combat_settings_t *s,const char *name,float value);
@@ -97,8 +119,12 @@ extern aw_combat_settings_t aw_combat_settings;
 int AW_CombatSettingsLoad(void);
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
+int AW_CombatLoadout(const char *loadout,aw_fighter_t *out,char *chosen);
+extern int (*aw_combat_input_locked)(void);
+extern const aw_fighter_t *aw_combat_player_preset;
 void AW_CombatInit(void);
 void AW_CombatPhysics(void);
+int AW_CombatHurtPlayer(float damage,const char *cause);  /* world damage (lava); 1 = died now */
 void AW_CombatSceneSpawn(void);
 int AW_CombatEnemyBar(float *fraction,float *alpha);
 int AW_CombatHostiles(void);
@@ -110,4 +136,7 @@ const aw_combat_stats_t *AW_CombatStats(void);
 const aw_fighter_t *AW_CombatPlayer(void);
 unsigned long AW_CombatSeedUsed(void);
 extern void (*aw_combat_result)(int won);
+extern void (*aw_combat_voice)(struct edict_s *e,int event);
+/* An engaged NPC's health in percent (its fighter sheet), or -1 when it is not fighting (aw_anim.c voices). */
+int AW_CombatHealthPercent(struct edict_s *e);
 #endif

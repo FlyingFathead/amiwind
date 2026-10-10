@@ -2,10 +2,12 @@
 #include "quakedef.h"
 #include "input.h"
 #include <assert.h>
+#include <math.h>
 
 client_state_t cl;
 client_static_t cls;
 double host_frametime=.02;
+double Q_GammaPow(double x,double g){return pow(x,g);} /* mathlib.c is not linked here */
 qboolean noclip_anglehack;
 keydest_t key_dest=key_game;
 kbutton_t in_mlook, in_strafe;

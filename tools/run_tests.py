@@ -191,9 +191,20 @@ def _keep(suite, wanted, suite_class):
     return kept
 
 
+def _install_env_guard():
+    """The suite-wide AMIWIND_* leak guard (tests/env_guard.py) in this worker; one-process discovery gets it from
+    tests/test_env_guard.py (TEST-ENV-LEAK-HULL-33)."""
+    try:
+        import env_guard
+    except ImportError:
+        return False
+    return env_guard.install()
+
+
 def worker(module, start_dir, pattern, events_path, plan_path):
     """Load one module as discovery does, check its IDs, run (a shard of) it."""
     mirror_unittest_path(start_dir)
+    _install_env_guard()
     plan = json.loads(Path(plan_path).read_text(encoding='utf-8'))
     loader = unittest.TestLoader()
     with open(events_path, 'w', encoding='utf-8', newline='\n') as events:

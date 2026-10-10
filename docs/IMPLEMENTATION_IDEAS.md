@@ -38,6 +38,23 @@ the behavior as inspiration and implement AmiWind's version independently.
 Do not copy the mod's code or redistribute its assets. Use our own implementation
 and the existing local conversion pipeline for user-owned animation data.
 
+Found (9 October 2026): "Can't Touch This - Combat Miss Feedback (OpenMW)",
+version 1.0.3 (6 June 2026), by MrArrean and Dubiousnpc,
+<https://www.nexusmods.com/morrowind/mods/59155>; the miss-feedback part of their
+N'Garde combat mod, as an OpenMW Lua script. From its public description only
+(nothing downloaded): when the player's attack misses a humanoid NPC, the NPC
+plays one of 11 short "bob and weave" dodge animations, authored for the mod (8
+by Dubiousnpc), loaded as additional animation sources; the hit chance itself
+is the original's (no re-roll), only the feedback is added; creatures are not
+covered. The description does not say how the pose is timed against the swing
+or how a miss is told from a block. What AmiWind takes from it: a miss deserves
+its own visible reaction distinct from a block. Our version uses only the
+player's own game data: `dodgel`/`dodger` (3 in-place frames of the original
+walkleft/walkright) and the original shield block group, chosen by the combat
+layer from the swing's result at its contact time ([ANIMATION.md](ANIMATION.md)
+"Block and dodge"). A recoil from the start of hit2 or hit3 (3 frames, about
+16 to 22 KB) is a possible lean-back alternative to the sidestep.
+
 Possible AmiWind experiment after basic actors and combat outcomes work:
 
 - Resolve the attack once at its defined contact time, then select an appropriate

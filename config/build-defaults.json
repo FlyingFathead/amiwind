@@ -6,7 +6,14 @@
     "seyda"
   ],
   "chim_texture_effects": [],
+  "chim_lighting_type": "hybrid",
   "follow_original_stair_rules": true,
   "chim_stream_statics": true,
-  "model_hull": "chain"
+  "model_hull": "chain",
+  "lava": "quake",
+  "npc_lod": "off",
+  "npc_lod_levels": 3,
+  "npc_face_lod": "all",
+  "npc_lod_disk_mib": 96,
+  "npc_head_detail": "auto"
 }

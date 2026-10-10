@@ -66,5 +66,6 @@ Family: Town and interior import (`town-import`). The town importer converts eve
 - TOWN-ARRIVAL-002 (no report page): Town flora fallback picked the wrong Balmora region
 - TOWN-FLORA-BINDING-003 (no report page): Town flora staging rejected a valid legacy sprite binding
 - [TOWN-FRAME-CEILING-32](TOWN-FRAME-CEILING-32.md): Ground above the town frame ceiling (2,048 units) leaks the map
+- [TOWN-INTERIOR-SAVEID-ORDER-33](TOWN-INTERIOR-SAVEID-ORDER-33.md): Town interior save IDs are numbered across towns: listing a room for an earlier town renumbers every later town's rooms
 
 <!-- END GENERATED CATEGORY -->

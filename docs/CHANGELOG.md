@@ -3,6 +3,7 @@
 <!-- contents start -->
 ## Contents
 
+- [v0.0.35: CHIMporting It All: Gathering Up The Loose Branches From The Seashore](#v0035-chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore)
 - [v0.0.34: CHIM: Tightening the Bolts](#v0034-chim-tightening-the-bolts)
 - [v0.0.33: Towards CHIM: Replacing the Engine Block](#v0033-towards-chim-replacing-the-engine-block)
 - [v0.0.32: Last Stop on the Old Line: Window-Shopping in Vivec](#v0032-last-stop-on-the-old-line-window-shopping-in-vivec)
@@ -94,6 +95,52 @@
 
 <!-- contents end -->
 
+## v0.0.35: CHIMporting It All: Gathering Up The Loose Branches From The Seashore
+
+- The debug HUD shows the original Morrowind cell at the end of the shorter
+  coordinate row: `CELL x,y` outdoors (the grid cell of the GLOBAL position)
+  and `INT n` indoors (a stable interior number), `C x,y` / `I n` when the
+  row is short of room. `dbg cell` prints the full cell ID; the builder
+  writes the number table to `cell-numbers.json` in the build folder.
+  Details: [debug overlays](DEBUG_OVERLAYS.md#original-cell-in-the-debug-hud).
+- The debug HUD shows `NOCLIP: ON` (and `FLY: ON`, `GOD: ON`) while that mode is on.
+  Details: [debug overlays](DEBUG_OVERLAYS.md#noclip-and-god-mode-in-the-debug-hud).
+- Builder fixes since v0.0.33, with measured and estimated time savings in one chart:
+  [builder profile](performance/BUILDER_PROFILE.md#builder-fixes-and-time-savings-v0033-and-beyond).
+- The image step's stair walk gives the same rows for about a quarter of the processor time
+  (BUILD-STAIR-WALK-SLOW-33); release candidates and finals walk only the steps of flights, the rows
+  that can stop a build (`--stair-walk`, owner decision).
+- Release candidates and finals may reuse the image step's per-map pass results with
+  `--allow-release-reuse` (owner decision); every pass receipt counts its hits.
+- A build on a new workspace reads the per-file caches of its `--reuse-from` run
+  (BUILD-CACHE-PER-WORKSPACE-33): a MiniWind on its own volume no longer converts every sound again.
+- The world survey keeps its wall time out of its outputs (BUILD-SURVEY-NOT-REPRODUCIBLE-33).
+- CHIM light tracker: every exterior cell gets a lighting audit (lit, partial, unlit). Lit is required for both
+  completion levels. Cells waiting only for light show as "awaiting lighting" (zebra). Eligible for v0.0.35 counts
+  every done cell ([cell tracker](chim/CELL_TRACKER.md)).
+- CHIM lighting design, measured: [CHIM lighting](chim/LIGHTING.md) and the [CHIM lights roadmap](chim/LIGHTING_ROADMAP.md).
+- New builder option `--chim-lighting-type`:
+  - `none`, `lamps` (the v0.0.33 lighting) and `hybrid` (the default) are available;
+  - `baked-e` and `full` are reserved for an increased-memory version.
+- `hybrid` so far:
+  - light sources in styles 32-36, never dimmed by daylight, with flicker and pulse strings generated from the
+    original's rates (LIGHT-STYLES-UNDEFINED-33);
+  - the night lamp table widened to every class that adds light.
+- NPC model levels of detail: every resident is baked at up to four levels from the
+  same frames (near with the head as authored, the map's own model as before, mid
+  distance, far crowds), and the engine draws each actor at the level of its
+  distance band that fits a memory budget, the map's own model otherwise
+  (`--npc-lod on`, off by default until the levels have been compared in game;
+  `--npc-lod-levels`, `--npc-face-lod`, `--npc-lod-disk-mib`; cvars `aw_npc_lod*`;
+  `dbg npclod` forces, targets, labels and measures the levels live; `dbg rcount`
+  counts alias triangles and levels). Details:
+  [NPC model levels of detail](NPC_MODEL_CACHE.md#npc-model-levels-of-detail).
+- NPC heads keep their original geometry: every humanoid's head and hair or
+  helmet keep all their original triangles, and body and clothing are reduced
+  instead (`--npc-head-detail original`, the default; `budget` keeps the
+  previous bake, which left a median face 124 of its 775 triangles).
+  [NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md).
+
 ## v0.0.34: CHIM: Tightening the Bolts
 
 - The silt strider's hull is closed: boundary-locked mesh reduction keeps every seam and
@@ -127,6 +174,19 @@
   then rematch, same seed, next or previous opponent, pick, or leave with
   the game restored. Opponents: the Arena fighters baked with combat frames,
   any NPC of the gallery or any NPC record, with the record's own stats.
+- Vivec Arena: you fight as a set fighter (config/arena_player.json, a level 9 Nord Monk;
+  `aw_arena_player 0` = your own character); the enemy's health bar is yellow (the reserved UI
+  palette bank holds its colours); fighters bake 42 combat frames (alias frames limited by bytes,
+  not count); a combat voice hook for the original combat lines.
+- Combat follows the original weapon and shield rules more closely: the attack
+  type comes from your movement (or the best attack option), the swing
+  strength from how long you hold the attack, weapons and shields wear and
+  break, fists cannot block, every damaging hit staggers, and knockdowns last
+  their clip. You can be knocked down too: the view drops and the controls
+  lock until you get up. Options > Controls: "Combat style" (AmiWind: a missed
+  blow is dodged or blocked, an AmiWind extension; Original Morrowind: the
+  swish) and "Dice rolls" (on, or off: every swing in reach hits). Arena
+  loadouts: `dbgmode arenapit loadout sword_shield` and others.
 - `dbg combattest` now enters the Vivec Arena too; the previous empty-floor
   hands test is `dbg combattest gallery` (or `floor`, `dbgmode combattest`).
 - Photo mode for clean screenshots: `dbg photomode` (also `dbg killhud`) or
@@ -185,6 +245,17 @@
   of a repair message. Release candidates and finals refuse every exclusion.
   Details: [Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md), in the
   new [CHIM build guide](chim/build_guide/README.md).
+- Builder: start straight in the game. `--direct-to-game-map START` (an area,
+  `interior:<cell id>`, `cell:X,Y` or `pos:X,Y,Z[@HEADING]` in the debug HUD's
+  global coordinates) boots a development build into that spot with a
+  ready-made character (`--quick-character RACE,CLASS[,NAME]`, default the Hors
+  preset), through the MiniWind quick start; the builder checks the start is in
+  the build and moves a spot in a wall to the nearest standing place. MiniWind
+  test spots come from one table (`config/miniwind-presets.json`):
+  `--miniwind-preset NAME|list` and one `--miniwind-<name>` option per spot;
+  MiniWind builds keep only what their area references by default. Details:
+  [Start straight in the game](chim/build_guide/DIRECT_START.md) and
+  [MiniWind](chim/build_guide/MINIWIND.md).
 - Bug register: every bug carries its facts (who reported it, when, where,
   reproduction, severity, family) and each report page lists the bugs in the
   same category.

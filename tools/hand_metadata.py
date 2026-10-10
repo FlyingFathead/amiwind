@@ -97,6 +97,12 @@ def stamp_staged_hands(id1, report, map_names=None, jobs=1):
         if any(not re.fullmatch(r'[A-Za-z0-9_]+', name) for name in names):
             raise ValueError('Invalid map name for first-person metadata')
         maps = [id1/'maps'/(name+'.bsp') for name in names]
+    if not maps and map_names is not None:
+        # a pure CHIM image without any legacy map (a MiniWind sandbox of a town on CHIM): the frame maps carry
+        # the hand fields from their own worldspawn (chim_town entities), nothing to stamp here
+        return {'status': 'no legacy maps', 'map_count': 0, 'changed_maps': [], 'model_sha256': model_hash,
+                'source_model_sha256': report.get('sha256'), 'worldspawn_fields': fields,
+                'scope': 'hand animation timing and eye height; geometry and collision unchanged'}
     if not maps:
         raise ValueError('No staged maps for first-person metadata')
     # Validate all inputs before the first write. Holding every world's bytes

@@ -26,8 +26,11 @@ from prepare_scenery import nif_reader
 ROOT = Path(__file__).resolve().parents[1]
 FORMAT = 'AmiWind gallery cache 1'
 PACKAGES = ('numpy', 'scipy', 'Pillow', 'PyFFI', 'fast-simplification')
-# These files implement model extraction, assembly, simplification and encoding.
-# Engine, HUD, torch and release-version edits do not invalidate character models.
+# The rc9 seed import (import_rc9) still compares these files with the seed run's source receipt. The cache key
+# itself covers the converter's reached code (converter_sources): this fixed list left out modules the converter
+# runs (src/mwad/esm.py, src/mwad/npc.py, tools/nif_common.py: an edit there reused stale models) and hashed whole
+# files the converter only partly reaches (an edit to an unreached function missed every model)
+# (BUILD-REUSE-KEYS-TOO-BROAD-35).
 CONVERTER_FILES = (
     'tools/prepare_gallery.py', 'tools/npc_geometry.py', 'tools/prepare_scenery.py',
     'src/mwad/audit.py', 'src/mwad/scene.py', 'src/mwad/paths.py',
@@ -56,8 +59,29 @@ def environment():
             'platform': sys.platform, 'packages': {n: importlib.metadata.version(n) for n in PACKAGES}}
 
 
-def converter_sources(root=ROOT):
+# The model converter: its main() reaches convert_model and everything a model's conversion runs.
+CONVERTER_ENTRY = 'tools/prepare_gallery.py'
+KEY_FORMAT = 'reached code 1'
+_SOURCES = {}
+
+
+def converter_files(root=ROOT):
+    """{file: SHA-256} of CONVERTER_FILES (the rc9 seed import's comparison)."""
     return {name: file_sha(root/name) for name in CONVERTER_FILES}
+
+
+def converter_sources(root=ROOT):
+    """The code part of every model's key: {file: digest} of what the converter can reach (build_cache.SourceIndex,
+    scope 'units': each reached module's import-time code plus each reached function, the data files it names).
+    An edit the converter never reaches keeps every model; any reached edit changes every key. Dynamic code makes
+    the selection uncertain: then every repository file counts."""
+    root = Path(root).resolve()
+    if root not in _SOURCES:
+        from build_cache import SourceIndex
+        selected, uncertain = SourceIndex(root, scope='units').selection(root/CONVERTER_ENTRY)
+        _SOURCES[root] = {'key_format': KEY_FORMAT, 'entry': CONVERTER_ENTRY, 'uncertain': uncertain,
+                          'files': dict(sorted(selected.items()))}
+    return _SOURCES[root]
 
 
 class Dependencies:
@@ -123,11 +147,15 @@ class Dependencies:
 
 
 def identity(spec, palette, dependencies, sources, env):
+    from prepare_gallery import head_detail
     from prepare_gallery import model_quality
+    # head_detail: --npc-head-detail original|budget (npc_geometry.head_plan); the
+    # two bakes of one appearance never share a cache entry.
     return {'format': FORMAT, 'spec': spec, 'palette_sha256': digest(palette),
             'dependencies': dependencies, 'sources': sources, 'environment': env,
             'cache_implementation': file_sha(Path(__file__)),
-            'quality': model_quality(spec), 'retry_policy': 'unchanged bounded 666 then 1024'}
+            'quality': model_quality(spec), 'retry_policy': 'unchanged bounded 666 then 1024',
+            'npc_head_detail': head_detail(spec)}
 
 
 def checked_result(raw, result, key, palette_sha):
@@ -137,8 +165,11 @@ def checked_result(raw, result, key, palette_sha):
             raw[:8] != b'IDPO\x06\0\0\0'):
         raise ValueError('Incomplete or changed gallery model/receipt pair')
     vertices, triangles = struct.unpack_from('<ii', raw, 60)
+    # Face-tile models: at most 1,024 triangles on 3,072 vertices; a shared-vertex
+    # model (npc_geometry.shared_vertex_mdl) stays within 2,000 vertices, where the
+    # renderer has no triangle cap.
     if (vertices != result.get('vertices') or triangles != result.get('triangles') or
-            not 0 < vertices <= 3072 or not 0 < triangles <= 1024):
+            not 0 < vertices <= 3072 or not 0 < triangles <= (8192 if vertices <= 2000 else 1024)):
         raise ValueError('Gallery cache model budget differs from receipt')
     return result
 
@@ -183,7 +214,9 @@ def publish(cache, ident, key, raw, result):
 
 def materialize(output, key, raw, result):
     atomic_write(Path(output)/(key+'.mdl'), raw)
-    atomic_write(Path(output)/(key+'.json'), (json.dumps(result, indent=2)+'\n').encode())
+    # Sorted keys: a result loaded from the cache (stored sorted) and a fresh one write the same bytes
+    # (BUILD-GALLERY-JSON-KEY-ORDER-35: 3,460 model receipts differed between two builds only in key order).
+    atomic_write(Path(output)/(key+'.json'), (json.dumps(result, indent=2, sort_keys=True)+'\n').encode())
 
 
 _worker_assets = None
@@ -247,7 +280,7 @@ def import_rc9(run, data, palette, specs, identities, cache, env):
     recorded = {r['name']: r.get('detected') for r in state.get('version_comparison', [])}
     if any(recorded.get(n) != version for n, version in env['packages'].items()):
         raise ValueError('Seed conversion package versions differ')
-    sources = converter_sources()
+    sources = converter_files()
     # rc9's source receipt records Python files, not JSON; protected quality
     # settings are checked against each model's original conversion receipt.
     if any(state.get('source_sha256', {}).get(n) != sha for n, sha in sources.items() if n.endswith('.py')):

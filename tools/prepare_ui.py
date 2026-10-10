@@ -246,10 +246,9 @@ def convert(data, palette_path, out):
     # The enemy's health bar (docs/COMBAT.md): the grey bar tinted yellow
     # (1, 0.729, 0), as OpenMW's MW_BarTrack_Yellow; the palette is unchanged
     # (nearest colours), so the reserved UI bank and the hand catalogues stay.
+    from ui_palette import yellow_bar
     path = 'textures/menu_bar_gray.dds'; raw = assets.read(path)
-    gray = Image.open(io.BytesIO(raw)).convert('RGBA').resize((16,16),Image.Resampling.BOX)
-    r, g, b, a = gray.split()
-    yellow = Image.merge('RGBA', (r, g.point(lambda v: int(v*0.729+0.5)), b.point(lambda v: 0), a))
+    yellow = yellow_bar(Image.open(io.BytesIO(raw)).convert('RGBA').resize((16,16),Image.Resampling.BOX))
     atlas.paste(yellow, (48,32), yellow); sources[path] = hashlib.sha256(raw).hexdigest()
     pal = Image.new('P',(1,1)); pal.putpalette(palette)
     indexed = atlas.convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE)

@@ -26,7 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_save.h"
 #include "aw_remote.h"
 #include "r_local.h"
+#include "aw_npc_lod.h"
 #include "aw_rcount.h"
+#include "aw_quickchar.h"
+#include "aw_testbox.h"
 
 /*
 
@@ -99,7 +102,7 @@ void Host_EndGame (char *message, ...)
     char		string[1024];
 
     va_start (argptr,message);
-    vsprintf (string,message,argptr);
+    vsnprintf (string, sizeof(string),message,argptr);
     va_end (argptr);
     Con_DPrintf ("Host_EndGame: %s\n",string);
 
@@ -137,7 +140,7 @@ void Host_Error (char *error, ...)
     SCR_EndLoadingPlaque ();		// reenable screen updates
 
     va_start (argptr,error);
-    vsprintf (string,error,argptr);
+    vsnprintf (string, sizeof(string),error,argptr);
     va_end (argptr);
     Con_Printf ("Host_Error: %s\n",string);
 
@@ -301,7 +304,7 @@ void SV_ClientPrintf (char *fmt, ...)
     char		string[1024];
 
     va_start (argptr,fmt);
-    vsprintf (string, fmt,argptr);
+    vsnprintf (string, sizeof(string), fmt,argptr);
     va_end (argptr);
 
     MSG_WriteByte (&host_client->message, svc_print);
@@ -322,7 +325,7 @@ void SV_BroadcastPrintf (char *fmt, ...)
     int			i;
 
     va_start (argptr,fmt);
-    vsprintf (string, fmt,argptr);
+    vsnprintf (string, sizeof(string), fmt,argptr);
     va_end (argptr);
 
     for (i=0 ; i<svs.maxclients ; i++)
@@ -346,7 +349,7 @@ void Host_ClientCommands (char *fmt, ...)
     char		string[1024];
 
     va_start (argptr,fmt);
-    vsprintf (string, fmt,argptr);
+    vsnprintf (string, sizeof(string), fmt,argptr);
     va_end (argptr);
 
     MSG_WriteByte (&host_client->message, svc_stufftext);
@@ -504,6 +507,7 @@ void Host_ClearMemory (void)
     Con_DPrintf ("Clearing memory\n");
     D_FlushCaches ();
     AW_HandModelsReset();
+    AW_NpcLodReset();
     Mod_ClearAll ();
     if (host_hunklevel)
         Hunk_FreeToLowMark (host_hunklevel);
@@ -760,8 +764,11 @@ void _Host_Frame (float time)
         S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
 
     AW_EndMark(3);
+    AW_QuickCharTick();
+    AW_TestBoxFrame();AW_TestPollFrame();
     if(!AW_ModalWorldFrozen())AW_IntroTick();
     if(!AW_ModalWorldFrozen())AW_WaitTick();
+    AW_AnimKitTick();
     AW_SaveTick();
     if(!AW_ModalWorldFrozen())AW_SceneTick();
     CDAudio_Update();
@@ -861,6 +868,8 @@ void Host_InitVCR (quakeparms_t *parms)
     if ( (n = COM_CheckParm("-record")) != 0)
     {
         vcrFile = Sys_FileOpenWrite("quake.vcr");
+        if (vcrFile == -1)
+            Sys_Error ("-record: cannot write quake.vcr");
 
         i = VCR_SIGNATURE;
         Sys_FileWrite(vcrFile, &i, sizeof(int));
@@ -968,6 +977,7 @@ void Host_Init (quakeparms_t *parms)
         AW_FpuCountInit ();
         AW_FpuStatusInit ();
         AW_RCountInit ();
+        AW_NpcLodInit ();
         AW_HandSpritesInit();
         AW_TorchLoadAssets();
         AW_HandModelsLoad();

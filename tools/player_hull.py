@@ -144,13 +144,16 @@ def compile_standing_hull(map_path, qbsp, log=None):
                    cwd=collision.parent,check=True,**output)
     return collision.with_suffix('.bsp').read_bytes()
 
-def rebuild_world_hull(base, map_path, qbsp, discard_stock_hulls=False, records=None, log=None):
+def rebuild_world_hull(base, map_path, qbsp, discard_stock_hulls=False, records=None, log=None, collision=None):
     """The one standing-hull path for every converted map.
 
     records optionally filters the entity list kept when stock hulls are
     discarded; log receives the compiler output (default: inherited).
+    collision: the standing hull compile_standing_hull(map_path, qbsp) already
+    made (a caller may run it beside the visible map's compile); None compiles it.
     """
-    collision=compile_standing_hull(map_path,qbsp,log)
+    if collision is None:
+        collision=compile_standing_hull(map_path,qbsp,log)
     raw=base.read_bytes()
     if discard_stock_hulls:
         # Towns use the source-sized standing player, like streamed world maps.

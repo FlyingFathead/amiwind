@@ -6,6 +6,8 @@
 - [Named debug scenes and character UI versions (v0.0.29 candidate)](#named-debug-scenes-and-character-ui-versions-v0029-candidate)
 - [v0.0.29 navigation and character-HUD work](#v0029-navigation-and-character-hud-work)
 - [Open map-teleport regression - 4 October 2026](#open-map-teleport-regression---4-october-2026)
+- [Original cell in the debug HUD](#original-cell-in-the-debug-hud)
+- [Noclip and god mode in the debug HUD](#noclip-and-god-mode-in-the-debug-hud)
 - [Sea-height visibility](#sea-height-visibility)
 - [Flight and recall](#flight-and-recall)
 - [Readable console and space-separated commands](#readable-console-and-space-separated-commands)
@@ -136,6 +138,42 @@ for performance/visibility comparisons. Hiding overlays restores the view area.
 The blue square was the cache-thrashing indicator, not a gameplay element. Its
 absence with showram disabled does not prove cache thrashing has stopped; retain
 profiles and model-load diagnostics during memory-budget changes.
+
+## Original cell in the debug HUD
+
+The debug HUD also names the original Morrowind cell, at the end of whichever
+coordinate row is shorter (the block keeps its two rows):
+
+- Outdoors: `CELL x,y`, the original exterior grid cell, from the GLOBAL
+  position: `floor(global / 8192)` on each axis (8,192 original units per
+  cell; floor, so the cell west or south of zero is -1). Balmora is around
+  `CELL -3,-2`, Seyda Neen around `CELL -2,-9`. On CHIM frames and legacy
+  region maps alike it uses the same transform as GLOBAL XYZ. On a disk
+  without the world directory (a MiniWind) both come from the active CHIM
+  frame: global = local x 4 + the frame centre, the inverse of `chim_tp`.
+- Indoors: `INT n`, a plain interior number. The builder numbers every
+  interior cell of the masters the same way in every build: the base
+  master's interior cells sorted by cell ID take 1..N, then each expansion
+  (Tribunal, then Bloodmoon) appends the cells it adds, sorted the same way,
+  so a missing expansion never renumbers the others. Each interior map
+  carries its number and full cell ID in worldspawn (`_aw_cell_int`,
+  `_aw_cell_id`); the whole table is written to `cell-numbers.json` in the
+  build folder (also listed in `build.json` under `cell_numbers`), and
+  `python3 tools/cell_numbers.py DATA_FILES [--find TEXT]` prints it from
+  the game data.
+- When the full form does not fit the row at the current screen width, the
+  compact `C x,y` / `I n` is used; when neither fits, the cell is left out
+  rather than cutting a coordinate.
+
+`dbg cell` prints the cell in full: the grid, global X/Y, region and scene
+outdoors, or `INT n = "<cell ID>"` and the map name indoors.
+
+## Noclip and god mode in the debug HUD
+
+While noclip, fly or god mode is on, the debug HUD says so on the same two rows as the
+cell, by the same rule (the shorter row that still has room): `NOCLIP: ON`, `FLY: ON`,
+`GOD: ON`, or the short forms `NOCLIP`, `FLY`, `GOD` when the row is short of room.
+The text disappears when the mode is turned off.
 
 ## Sea-height visibility
 

@@ -25,8 +25,22 @@ from build_jobs import add_jobs, resolve_jobs
 from vis_options import add_vis_option, light_args, vis_args
 
 
+CENSUS_ACTORS = [('chargen class','census',6),('chargen captain','captain',7),('chargen door guard','hall',8)]
+
+
+def actor_names(master, identifiers):
+    """{identifier: displayed name} of NPC records (run beside the conversion: Background)."""
+    kinds,_,_=load_master(master)
+    return {identifier:text(kinds['NPC_'][identifier],'FNAM') for identifier in identifiers}
+
+
 def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'census conversion')
+    # Master-only reads (door catalogue, actor names) run beside the conversion.
+    from build_parallel import Background
+    from prepare_doors import door_sources
+    doors=Background(door_sources,data_files,jobs=jobs)
+    names=Background(actor_names,child_ci(data_files,'Morrowind.esm'),[i for i,_,_ in CENSUS_ACTORS],jobs=jobs)
     from ui_palette import reserve
     reserve(data_files,scene/'id1')
     target=scene/'id1/maps/census.bsp'
@@ -72,18 +86,18 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
     base=scene/'census-base.bsp';(scene/'census.bsp').rename(base);rebuild_world_hull(base,scene/'census.map',qbsp)
     report=append_meshes(base,scene/'census.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs,
                          retain_dressing=interior_dressing())
-    kinds,_,_=load_master(child_ci(data_files,'Morrowind.esm'));entities=[]
-    for identifier,stem,role in [('chargen class','census',6),('chargen captain','captain',7),('chargen door guard','hall',8)]:
+    netnames=names.result();entities=[]
+    for identifier,stem,role in CENSUS_ACTORS:
         ref=next(r for r in cell['refs'] if r['id'].casefold()==identifier and not r.get('deleted'))
         model='progs/np_'+stem+'.mdl'
         if not (scene/'id1'/model).is_file():raise ValueError('Run intro actor conversion first: '+model)
         fields={'classname':'aw_npc','model':model,'origin':' '.join(f'{v*.25:.5f}' for v in ref['position']),
-                'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",'netname':text(kinds['NPC_'][identifier],'FNAM'),
+                'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",'netname':netnames[identifier],
                 'aw_intro_role':role,'aw_ref':ref['number'],'aw_idle_step':'.15','aw_walk_step':'.125'}
         entities.append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
     b=lumps((scene/'census.bsp').read_bytes());b[0]=b[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
     target.write_bytes(pack_lumps(b));shutil.copyfile(target,scene/'census.bsp')
-    prepare_doors(data_files,scene)
+    prepare_doors(data_files,scene,sources=doors.result())
     report.update(cell=cell['name'],master_sha256=cell['master_sha256'],omitted=omitted+report['omitted'],spawn=spawn)
     (scene/'census-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     return report

@@ -39,6 +39,8 @@ extern cvar_t aw_logs_live;
 #include <devices/input.h>
 #include <devices/inputevent.h>
 #include <exec/interrupts.h>
+#include <devices/timer.h>
+#include <proto/timer.h>
 
 
 
@@ -129,7 +131,7 @@ void Sys_Printf (char *message, ...)
 	char		text[1024];
 
     va_start (argptr, message);
-    vsprintf (text, message, argptr);
+    vsnprintf (text, sizeof(text), message, argptr);
     va_end (argptr);
 
     AW_LogWrite(AW_LOG_DEBUG, text);
@@ -143,16 +145,57 @@ void IN_MLookDown (void);
 void timer(unsigned int *clock);
 
 // Timer functions from original awinquake
+/* ENGINE-FLOATTIME-DIV64-35: seconds between two EClock readings with one
+ * 64-bit subtraction and one multiply. timer() divides the 64-bit tick count
+ * twice per call (library routines, not FPU instructions) to make seconds and
+ * microseconds that Sys_FloatTime then joined again; the mixer and the frame
+ * loop call it several times per frame. */
+/* aw_eclock_seconds begin */
+static double AW_EClockSeconds (unsigned long hi, unsigned long lo,
+                                unsigned long base_hi, unsigned long base_lo,
+                                double tick_seconds)
+{
+  unsigned long dlo = (lo - base_lo) & 0xffffffffUL;
+  unsigned long dhi = (hi - base_hi - (lo < base_lo)) & 0xffffffffUL;
+  return ((double)dhi * 4294967296.0 + (double)dlo) * tick_seconds;
+}
+/* aw_eclock_seconds end */
+
+#ifndef __PPC__
+extern struct Device *TimerBase;
+extern ULONG eclocks_per_second;
+#endif
+
 double Sys_FloatTime (void)
 {
 #ifndef __PPC__
   static unsigned int basetime=0;
+  static int eclock_based = 0;
+  static ULONG base_hi, base_lo;
+  static double tick_seconds, offset, last;
   unsigned int clock[2];
 
+  if (TimerBase != NULL && eclocks_per_second > 0) {
+    struct EClockVal e;
+    ReadEClock (&e);
+    if (!eclock_based) {
+      /* Continue from the last value of the start-up path below. */
+      eclock_based = 1;
+      base_hi = e.ev_hi;
+      base_lo = e.ev_lo;
+      tick_seconds = 1.0 / eclocks_per_second;
+      offset = last;
+    }
+    last = offset + AW_EClockSeconds (e.ev_hi, e.ev_lo, base_hi, base_lo, tick_seconds);
+    return last;
+  }
+  if (eclock_based)
+    return last;   /* timer closed at shutdown: hold the clock */
   timer (clock);
   if (!basetime)
     basetime = clock[0];
-  return (clock[0]-basetime) + clock[1] / 1000000.0;
+  last = (clock[0]-basetime) + clock[1] / 1000000.0;
+  return last;
 #else
   unsigned int clock[2];
 
@@ -282,7 +325,7 @@ void Sys_Error (char *error, ...)
 
 
     va_start (argptr, error);
-    vsprintf (text, error, argptr);
+    vsnprintf (text, sizeof(text), error, argptr);
     va_end (argptr);
 
     /* Capture allocator state before shutdown releases caches and heap. */
@@ -451,10 +494,15 @@ void Sys_SendKeyEvents(void) {
 
 
 
+/* Frame times in double, as id's own Sys loops (sys_linux.c): a float holds
+ * Sys_FloatTime's seconds since start to 1 ms after about 4.5 hours and to
+ * 4 ms after about 18, so long sessions quantised or stalled their frame
+ * deltas (ENGINE-FRAME-TIME-FLOAT-35). The 68040/060 FPU subtracts doubles
+ * natively; only the difference goes to Host_Frame as before. */
 static void RunGameLoop(void)
 {
-    float newtime;
-    float oldtime;
+    double newtime;
+    double oldtime;
 
     // Never exits
     oldtime = Sys_FloatTime();
@@ -518,8 +566,30 @@ static int AW_WaitBootVolumeValidated(void)
 
 /* The boot image uses the AmigaDOS shell. Do not link icon tooltype support:
  * some ROMs load icon.library from disk even before main() is entered. */
+/* ENGINE-STACK-UNCHECKED-35: the pak directory alone takes 128 KiB of
+ * stack (COM_LoadPackFile), and nothing checked the stack the game was
+ * started with: a small one overwrote memory instead of stopping. The boot
+ * disk runs "Stack 300000"; tc_SPUpper - tc_SPLower is the stack this program
+ * runs on (RunCommand and Workbench start-up both set it). */
+#define AW_MIN_STACK 262144UL
+static int AW_StackTooSmall(void)
+{
+    struct Task *task = FindTask(NULL);
+    unsigned long size = (unsigned long)task->tc_SPUpper - (unsigned long)task->tc_SPLower;
+    char message[200];
+    if (size >= AW_MIN_STACK)
+        return 0;
+    snprintf(message, sizeof(message),
+             "AmiWind needs a stack of at least %lu bytes; it was started with %lu.\nRun \"Stack 300000\" first (the AmiWind boot disk does).\n",
+             AW_MIN_STACK, size);
+    PutStr(message);
+    return 1;
+}
+
 int main(int argc, char *argv[]) {
     static char *default_argv[] = {"AmiWind", NULL};
+    if (AW_StackTooSmall())
+        return RETURN_FAIL;
     AW_PlatformInit();
     PutStr("Loading AmiWind v");
     /* Referencing the tag keeps Amiga Version-command metadata in the executable. */

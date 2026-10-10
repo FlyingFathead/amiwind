@@ -198,11 +198,23 @@ def _sky_map(task):
 
     The parent installs nothing until every map is prepared and re-verified.
     """
-    path, kind, local_skybox, work = task
+    path, kind, local_skybox, work, *rest = task
+    cache = rest[0] if rest else None
     path, work = Path(path), Path(work)
     raw = path.read_bytes()
-    if kind is not None:
+    found = None
+    if kind is not None and cache is not None:
+        # The per-map pass cache (tools/pass_cache.py): same bytes and scene kind, same result.
+        key = digest(raw) + ':' + kind
+        found = cache.load(key)
+    if found is not None:
+        detail, cached = found
+        output = raw if cached is None else cached
+    elif kind is not None:
         output, detail = transform(raw, scene_kind=kind, local_skybox=local_skybox)
+        if cache is not None:
+            detail = json.loads(json.dumps(detail))  # the form a cached detail has
+            cache.store(key, detail, None if output == raw else output)
     else:
         output, detail = raw, {'scene_kind': 'unknown', 'unchanged': True, 'not_claimed_complete': True}
     if output != raw:
@@ -260,8 +272,12 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
     report = {'local_skybox': local_skybox, 'status': 'preparing', 'maps': [],
               'shared_resource_source': source, 'shared_resource_sha256': digest(resource) if resource is not None else None,
               'unknown_maps_preserved': sorted(names - exterior - interior)}
+    # Development builds, and release builds with --allow-release-reuse, reuse results for unchanged map
+    # bytes (tools/pass_cache.py; BUILD-IMAGE-NO-RESUME-33).
+    from pass_cache import PassCache
+    cache = PassCache.open('exterior-sky', {'local_skybox': local_skybox}, __file__)
     tasks = [(str(path), 'exterior' if path.stem in exterior else 'interior' if path.stem in interior else None,
-              local_skybox, str(work)) for path in inputs]
+              local_skybox, str(work), cache) for path in inputs]
     # Largest maps first, results as they finish (no wait behind one slow map);
     # the receipt and the log keep map order.
     expected, details = {}, {}

@@ -241,12 +241,34 @@ def convert(source, destination, *, source_map, palette, ericw_bin,
             'world_terrain':'independently compiled bounded LAND/PVS with complete intersecting triangles',
             'special_routes':'existing names, selection masks and standing boundaries retained',
             'acceptance':'final actor/heap gates and target transition playtest required','regions':reports}
-    (destination.parent/'seyda-regions.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    # The shipped table holds no build path (BUILD-SEYDA-REPORT-HOST-PATHS-35): paths under the folder the
+    # work directory sits in are written relative to it (the recorded v0.0.31 table's names without its
+    # host root, same schema and hashes); the full-path report stays in the build folder (work directory)
+    # and is returned to the caller.
+    (work/'seyda-regions-full.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    (destination.parent/'seyda-regions.json').write_text(
+        json.dumps(neutral_paths(report,work.parent),indent=2)+'\n',encoding='utf-8',newline='\n')
     return report
 
 
+def neutral_paths(value, root):
+    """A copy of a JSON value with every absolute path string under `root` made relative to it
+    (POSIX form); every other value unchanged."""
+    if isinstance(value,dict):
+        return {k:neutral_paths(v,root) for k,v in value.items()}
+    if isinstance(value,list):
+        return [neutral_paths(v,root) for v in value]
+    if isinstance(value,str) and Path(value).is_absolute():
+        try:
+            return Path(value).resolve().relative_to(Path(root).resolve()).as_posix()
+        except (ValueError,OSError):
+            return value
+    return value
+
+
 def convert_builder_scene(maps, *, scene_map, palette, ericw_bin, work_dir,
-                          canonical_land_source=None, vis_mode='fast', jobs=None, recorded=None):
+                          canonical_land_source=None, vis_mode='fast', jobs=None, recorded=None,
+                          terrain_cull=True):
     """The builder's one Seyda region conversion (actor preflight and image).
 
     Replaces maps/seyda.bsp, the complete converted town, by the bounded
@@ -254,6 +276,11 @@ def convert_builder_scene(maps, *, scene_map, palette, ericw_bin, work_dir,
     reaches them together (BUILD-ACTOR-CONTACT-CALL-32). With `recorded`
     (--seyda-recorded), the recorded-stage exception BUILD-SEYDA-REGEN-30
     installs the owner's recorded maps instead (tools/recorded_stage.py).
+    terrain_cull=False converts without the terrain visual cull: a CHIM build
+    whose Seyda Neen is a CHIM area ships none of these maps (the frame maps are
+    checked against them, then they leave the image), and the canonical cull
+    cannot complete from scratch (BUILD-SEYDA-CULL-STABLE-32). The cull only
+    removes render faces; collision, entities and placements are the same.
     """
     maps=Path(maps)
     if recorded is not None:
@@ -261,7 +288,8 @@ def convert_builder_scene(maps, *, scene_map, palette, ericw_bin, work_dir,
         return install(recorded,maps,work_dir=work_dir,jobs=jobs)
     return convert(maps/'seyda.bsp',maps,source_map=scene_map,palette=palette,ericw_bin=ericw_bin,
                    jobs=jobs,work_dir=work_dir,vis_mode=vis_mode,
-                   canonical_land_source=canonical_land_source)
+                   canonical_land_source=canonical_land_source,
+                   terrain_visual_cull=None if terrain_cull else False)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)

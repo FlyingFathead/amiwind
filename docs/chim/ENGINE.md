@@ -43,8 +43,23 @@ CHIM runs only for a map whose worldspawn has `"_chim_frame" "X Y"` (the CHIM
 frame the map's exterior belongs to) and only when `chim/world.cwi` exists.
 Without `chim/world.cwi` no hook is installed and the game is the legacy
 engine, unchanged (one failed file open at start-up). A map without the key
-does not load anything. If a CHIM map cannot start (Hunk too small, a pack
-fails its checks) the console says why and the map runs without its chunks.
+does not load anything. If a CHIM map cannot start (Hunk too small, the index
+or the frame pack fails its checks) the console says why and the map runs
+without its chunks; when the frame's far terrain has already loaded, it stays
+as the map's floor and horizon.
+
+Data that goes bad while the map runs ends only the load that reads it, never
+the map: a model or chunk terrain whose brush image does not decode (a
+damaged or truncated sector file) prints `CHIM: <model>: bad data (<reason>);
+chunk unavailable` and counts as a failed load (the chunk waits and tries
+again later, its ground and other placements activate without it); a texture
+whose header or mip offsets point outside its data is drawn untextured. A
+streamed load keeps its sector file open (pinned) until it ends, however many
+other files are opened meanwhile. Near the efrag limit (`AW_EFRAG_LIMIT` less
+`CHIM_EFRAG_RESERVE`) the farthest chunks' placements wait unlinked (not
+drawn, still solid) instead of the map ending; the `chim` command and `dbg
+rcount` (`ef`) say how many wait, and `nv` counts frames whose view leaf had
+no visibility row (everything drawn).
 
 On a CHIM map the frame's terrain **replaces the map's own world tree** (see
 "The frame world"): the map's world brushes are not drawn or collided while
@@ -281,6 +296,12 @@ links). The decoded size of every brush image is bounded before it is loaded
 trimmed to the decoded size afterwards. The frame world pool is one zone block
 sized exactly for the grafted chunks; during a rebuild the old and the new
 pool exist together.
+
+NPC model levels of detail (`aw_npc_lod*`) take no CHIM zone memory: the level models
+live in Quake's Cache beside the actors' own models, within `aw_npc_lod_budget` and only
+where the Cache has a free block with `aw_npc_lod_reserve_kib` beside it, so loading one
+never evicts a sound or another actor ([NPC model levels of
+detail](../NPC_MODEL_CACHE.md#npc-model-levels-of-detail)).
 
 ## Loading
 

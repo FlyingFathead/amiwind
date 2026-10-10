@@ -46,10 +46,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
-from mwad.audit import records, subrecords  # noqa: E402
+from mwad import esm  # noqa: E402  (the shared Morrowind data helpers)
+from mwad.esm import is_deleted, records, subrecords  # noqa: E402
+from mwad.paths import child_ci  # noqa: E402
 
 FORMAT = 'AWCLOSURE1'
-MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
+MASTERS = esm.GAME_MASTERS
 GROUPS = {
     'npcs': 'NPC and creature records the area does not place or script (the NPC gallery holds exactly the included ones)',
     'voice': 'recorded dialogue lines no included NPC or creature can ever say',
@@ -81,8 +83,10 @@ def parse_groups(value):
 
 
 def string(data):
-    """A record string: up to the first NUL (fixed-width fields carry bytes after it)."""
-    return data.split(b'\0', 1)[0].decode('cp1252', 'replace')
+    """A record string: up to the first NUL (fixed-width fields carry bytes after it).
+
+    Tolerant on purpose: the closure keeps (and lists) whatever it cannot resolve."""
+    return esm.string(data, errors='replace')
 
 
 def norm_path(value):
@@ -94,7 +98,7 @@ def fields_of(raw):
 
 
 def first(fields, tag):
-    return next((data for name, data in fields if name == tag), None)
+    return esm.first(fields, tag, None)
 
 
 def text(fields, tag):
@@ -120,7 +124,7 @@ class Master:
         master = cls()
         data_files = Path(data_files)
         for name in MASTERS:
-            path = next((p for p in data_files.iterdir() if p.name.casefold() == name.casefold()), None)
+            path = child_ci(data_files, name, required=False)
             if path is None:
                 continue
             master.masters.append(name)
@@ -165,13 +169,13 @@ class Master:
                     'speaker': text(f, 'ONAM').casefold(), 'race': text(f, 'RNAM').casefold(),
                     'class': text(f, 'CNAM').casefold(), 'faction': text(f, 'FNAM').casefold(),
                     'cell': text(f, 'ANAM').casefold(), 'sex': sex, 'result': result,
-                    'deleted': bool(flags & 0x20)})
+                    'deleted': is_deleted(flags, f)})
 
     def read_object(self, tag, flags, f):
         identifier = text(f, 'NAME').casefold()
         if not identifier:
             return
-        if flags & 0x20 or first(f, 'DELE') is not None:
+        if is_deleted(flags, f):
             self.objects.pop(identifier, None)
             return
         row = {'tag': tag, 'model': norm_path(text(f, 'MODL')), 'script': text(f, 'SCRI').casefold(), 'refs': []}

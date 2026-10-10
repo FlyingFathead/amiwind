@@ -17,9 +17,9 @@ def preview(area, output):
     if output.exists():
         raise ValueError("Preview output already exists; choose a new name")
     output.parent.mkdir(parents=True, exist_ok=True)
-    grids = json.loads((area / "terrain-source.json").read_text())
-    audit = json.loads((area / "audit.json").read_text())
-    placements = json.loads((area / "placements.json").read_text())
+    grids = json.loads((area / "terrain-source.json").read_text(encoding="utf-8"))
+    audit = json.loads((area / "audit.json").read_text(encoding="utf-8"))
+    placements = json.loads((area / "placements.json").read_text(encoding="utf-8"))
     xmin, ymin = np.min([g["cell"] for g in grids], axis=0)
     xmax, ymax = np.max([g["cell"] for g in grids], axis=0)
     h = np.full(((ymax - ymin + 1) * 64 + 1, (xmax - xmin + 1) * 64 + 1), np.nan)

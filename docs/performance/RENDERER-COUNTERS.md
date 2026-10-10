@@ -42,6 +42,9 @@ All figures are averages per frame over the last second, except `frames`, `fps10
 | `scb` blocks/texels | surface cache blocks drawn (`D_CacheSurface` misses) and their texels |
 | `al` | alias models drawn (`r_amodels_drawn`, the hands included) |
 | `us` | microseconds: `R_RenderWorld` / brush models (`R_DrawBEntitiesOnList`) / `R_ScanEdges` including span drawing / `D_DrawSurfaces` alone / alias models (`R_DrawEntitiesOnList`) / the whole `R_RenderView` / the host frame |
+| `vd`, `ne` | entities refused because the visible list was full; entities in the visible list / sprites drawn |
+| `at` | alias model triangles sent to the alias renderer (`R_AliasDrawModel`, the hands included) |
+| `ln` near/coarse/resident | NPCs drawn with their near level (level 0) / with a coarse level (2 or 3) / NPC level models resident ([NPC model levels of detail](../NPC_MODEL_CACHE.md#npc-model-levels-of-detail)) |
 
 The counters are plain integer increments, like Quake's `c_faceclip` and
 `r_polycount`; the timers run only while `dbg rcount` is on. The output uses integer

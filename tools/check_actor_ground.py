@@ -19,6 +19,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from actor_grounding import initial_state
 from audit_walkability import Scene, axes
 from player_hull import lumps
+from actor_frames import MAX_FRAMES
 
 
 def entities(raw):
@@ -31,7 +32,7 @@ def model_frames(raw):
     if len(raw)<84:raise ValueError('Truncated actor model')
     h=struct.unpack_from('<4si3f3ff3f8if',raw)
     ns,w,height,nv,nt,nf=h[12:18]
-    if h[:2]!=(b'IDPO',6) or not 0<nv<=1999 or not 0<nf<=32 or not 0<ns<=32:
+    if h[:2]!=(b'IDPO',6) or not 0<nv<=1999 or not 0<nf<=MAX_FRAMES or not 0<ns<=32:
         raise ValueError('Unsupported actor model')
     if not 0<w<=4096 or not 0<height<=480 or not 0<nt<=4096:
         raise ValueError('Invalid actor model counts')
@@ -69,17 +70,38 @@ def owner(maps, name, point):
     return name
 
 
-def contact_samples(frames, angles, intro=False):
+def layout_idle(text):
+    """(base, count) of the idle group in an animation kit layout (<model>.anm), or None when the layout
+    has no idle group (ANIMKIT-GROUND-CHECK-LAYOUT-35). The layout is read by tools/actor_frames.py."""
+    from actor_frames import parse
+    return parse(text)[0].get('idle')
+
+
+def resident_frames(raw, layout=None, intro=False):
+    """A resident model's standing poses to check for ground contact: its idle group, as the model's
+    frame layout declares it (tools/actor_frames.py: an animation kit layout <model>.anm beside the model,
+    else the previous 8-frame idle or 21-frame town actor layout; anything else is refused)."""
+    from actor_frames import of_model
+    frames = model_frames(raw)
+    return [frames[i] for i in of_model(len(frames), layout, intro).idle_range()]
+
+
+def layout_of(model_path):
+    """The animation kit layout beside a model (<model>.anm), or None."""
+    from actor_frames import layout_text
+    return layout_text(model_path)
+
+
+def contact_samples(frames, angles, intro=False, layout=None):
     """Every distinct low rendered vertex in the supported initial idle poses.
 
-    The intro has eight idle poses followed by talk/walk poses. Ordinary resident
-    models contain only their idle cycle. Future pose layouts must be declared.
+    frames: a whole model's poses; its idle group comes from its frame layout (tools/actor_frames.py:
+    the kit layout given as `layout`, else the previous 8 idle / 21 town actor layouts; the intro has
+    eight idle poses followed by talk/walk poses). An undeclared layout is refused, never skipped.
     This tests low mesh contact, not semantic left/right foot IK or all animation.
     """
-    if intro:
-        if len(frames)!=21:raise ValueError('Unexpected intro pose layout')
-        frames=frames[:8]
-    elif len(frames)!=8:raise ValueError('Undeclared ground-resident pose layout')
+    from actor_frames import of_model
+    frames=[frames[i] for i in of_model(len(frames), layout, intro).idle_range()]
     basis=axes(angles);samples={}
     for fi,points in enumerate(frames):
         low=min(p[2] for p in points)
@@ -159,7 +181,7 @@ def audit(maps, jobs=1):
         if name not in model_cache:
             raw = (maps.parent/p).read_bytes()
             hashes[name] = hashlib.sha256(raw).hexdigest()
-            model_cache[name] = model_frames(raw)
+            model_cache[name] = (model_frames(raw), layout_of(maps.parent/p))
         return model_cache[name]
     for name, sha, actors in ordered_map(_scan_map, paths, max(1, min(jobs, len(paths)))):
         stem = name[:-4]
@@ -192,7 +214,8 @@ def audit(maps, jobs=1):
                 placements[key] = signature; row['position'] = point
                 if state != 'ground':
                     row['status'] = 'explicit-exception'; rows.append(row); continue
-                samples = contact_samples(poses(row['model']), angles, bool(float(e.get('aw_intro_role', 0))))
+                frames, layout = poses(row['model'])
+                samples = contact_samples(frames, angles, bool(float(e.get('aw_intro_role', 0))), layout)
                 requests = pending.setdefault(target, [])
                 row['_pending'] = (target, len(requests))
                 requests.append((point, list(samples.items())))

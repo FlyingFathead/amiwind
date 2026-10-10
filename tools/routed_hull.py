@@ -34,6 +34,49 @@ ROUTE_PIECES = 16             # auto: models with more convex pieces than this a
 # per trace. House-size models keep the chain: Balmora's south-west ring has 2,528 B of headroom with chains
 # and goes 1,920 B over when its 17-60-piece houses are routed (BUILD-CHIM-HULL-RING-33).
 CHIM_ROUTE_PIECES = 256
+# ONE rule for the router and the hull audits (CHIMport's cell audit, hull_chain_audit): a standing hull
+# whose longest chain is deeper than CHAIN_DEPTH_LIMIT clipnodes is routed on CHIM (auto) and reported by
+# the audits. Measured cost (a 68k bench of the engine's same-side descent, FS-UAE cycle-exact
+# 68040): 1.36 us per clipnode visit with general planes at 49.7 MHz (the slow preset), 2.72 us at 24.8 MHz
+# (the benchmark profile); a trace near a model walks its chain once. 256 clipnodes = 0.35 ms per trace on
+# the slow preset, about 2.8 ms for a player frame's ~8 movement traces (6 % of a 20 fps frame).
+CHAIN_DEPTH_LIMIT = 256
+CHAIN_DEPTH_VARIABLE = 'AMIWIND_CHIM_CHAIN_DEPTH'     # measurement override of the limit (a positive integer)
+US_PER_VISIT = {'slow-preset-49.7MHz': 1.36, 'benchmark-24.8MHz': 2.72}
+
+
+KEEP_CHAIN_VARIABLE = 'AMIWIND_CHIM_KEEP_CHAIN'   # meshes whose CHIM hull stays the chain (the heap fallback)
+
+
+def mesh_stem(source):
+    """A mesh's key in the keep-chain list: its path under meshes/, lower case, without .nif."""
+    stem = source.replace(chr(92), '/')
+    stem = stem[len('meshes/'):] if stem.lower().startswith('meshes/') else stem
+    stem = stem[:-4] if stem.lower().endswith('.nif') else stem
+    return stem.lower()
+
+
+def keep_chain_set():
+    """The meshes the CHIM heap fallback keeps as chains (chim_build: a ring that does not fit with their
+    routed hulls), from AMIWIND_CHIM_KEEP_CHAIN (comma-separated mesh stems)."""
+    import os
+    return {v.strip().lower() for v in os.environ.get(KEEP_CHAIN_VARIABLE, '').split(',') if v.strip()}
+
+
+def chain_depth_limit():
+    """CHAIN_DEPTH_LIMIT, or the measurement override in AMIWIND_CHIM_CHAIN_DEPTH."""
+    import os
+    value = os.environ.get(CHAIN_DEPTH_VARIABLE)
+    if not value:
+        return CHAIN_DEPTH_LIMIT
+    if not value.isdigit() or int(value) < 1:
+        raise ValueError('%s must be a positive integer, not %r' % (CHAIN_DEPTH_VARIABLE, value))
+    return int(value)
+
+
+def trace_cost_us(depth, profile='slow-preset-49.7MHz'):
+    """Microseconds one trace spends walking a chain `depth` clipnodes deep (US_PER_VISIT)."""
+    return depth * US_PER_VISIT[profile]
 LEAF_STEPS = (HULL_LEAF_PIECES, 4 * HULL_LEAF_PIECES, 16 * HULL_LEAF_PIECES)
 TERRAIN_AXES = (0, 1)         # chunk terrain: xy cuts (its pieces are columns of ground)
 MODEL_AXES = (0, 1, 2)        # placed models: x, y and z cuts

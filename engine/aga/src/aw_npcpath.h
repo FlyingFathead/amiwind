@@ -84,6 +84,23 @@ int AW_PathLength(int dx, int dy);
 #define AW_PATH_SPEED_MAX 360   /* the player's top speed (320) plus a little */
 #define AW_PATH_SPEED_MIN 24
 int AW_PathSpeed(int mimic, int player_speed, int gap, int distance);
+/* What a stuck actor does is a policy per actor kind (owner decision,
+ * 9 October 2026; docs/chim/CHIM_NPC_PATHFINDING.md "Stuck responses per
+ * actor kind"). Every kind keeps the same detectors (no progress for a few
+ * seconds; two steps in a row that ran Quake's unstick search); only the
+ * response differs. Methods, one setting per kind:
+ *   followers and escorts, summons: 0 place beside the player even in view
+ *     (the first prototype), 1 place only out of the player's view (default),
+ *     2 never place; summons in combat never warp, whatever the method;
+ *   hostiles never warp; the method is the outcome when the player cannot be
+ *     reached: 0 keep trying on a cooldown, 1 flee and keep distance, checking
+ *     again on the cooldown (default until the OpenMW behaviour study lands). */
+enum { AW_ACTOR_FOLLOWER, AW_ACTOR_SUMMON, AW_ACTOR_HOSTILE, AW_ACTOR_KINDS };
+enum { AW_STUCK_RETRY, AW_STUCK_PLACE, AW_STUCK_WAIT_UNSEEN, AW_STUCK_FLEE, AW_STUCK_RESPONSES };
+#define AW_STUCK_METHOD_DEFAULT 1
+int AW_PathStuckResponse(int kind, int method, int in_combat, int out_of_view);
+const char *AW_PathStuckName(int response);
+const char *AW_PathKindName(int kind);
 /* Bytes of shared scratch (the flood fill's grid, queue, parents, heights). */
 int AW_PathScratchBytes(void);
 

@@ -204,5 +204,47 @@ class CutWorldTests(unittest.TestCase):
             C.piece_ref(41499, 128)
 
 
+class DetailBudgetTests(unittest.TestCase):
+    def test_named_budget_and_default_none(self):
+        from chim.build import detail_budget
+        self.assertEqual(detail_budget(None), {})
+        vivec = detail_budget('vivec')
+        self.assertEqual(vivec['meshes/x/ex_v_vivecstatue_02.nif'], 1200)
+        # the owner-approved deep budget: every 'vivec-wide' mesh, at or below its 'vivec-wide' target
+        wide, deep = detail_budget('vivec-wide'), detail_budget('vivec-deep')
+        self.assertTrue(set(wide) <= set(deep))
+        self.assertTrue(all(deep[k] <= wide[k] for k in wide))
+        self.assertEqual((deep['meshes/x/ex_v_vivecstatue_02.nif'], deep['meshes/n/ingred_bc_coda_flower.nif']),
+                         (900, 150))
+        with self.assertRaises(ValueError):
+            detail_budget('nowhere')
+
+
+class ReducerOptionTests(unittest.TestCase):
+    def test_border_lock_keeps_the_open_rim_and_defaults_are_unchanged(self):
+        from static_lod import reduce_mesh
+        # an open, curved sheet: 16 x 16 quads, one material, uv in columns 3-4
+        n = 16
+        verts, faces = [], []
+        for j in range(n + 1):
+            for i in range(n + 1):
+                verts.append([i, j, 0.05 * ((i - n / 2) ** 2 + (j - n / 2) ** 2), i / n, j / n])
+        for j in range(n):
+            for i in range(n):
+                a, b, c, d = j * (n + 1) + i, j * (n + 1) + i + 1, (j + 1) * (n + 1) + i + 1, (j + 1) * (n + 1) + i
+                faces += [[a, b, c, 0], [a, c, d, 0]]
+        v = np.array([[*p[:3], *p[3:5], 1.0, 1.0, 1.0] for p in verts], float)
+        f = np.array(faces)
+        plain_v, plain_f, _ = reduce_mesh(v, f, 0.25)
+        again_v, again_f, _ = reduce_mesh(v, f, 0.25, (), False, agg=7.0, preserve_border=False)
+        np.testing.assert_array_equal(plain_v, again_v)                    # defaults: the original call
+        locked_v, locked_f, _ = reduce_mesh(v, f, 0.25, preserve_border=True)
+        rim = {(x, y) for x in range(n + 1) for y in range(n + 1) if x in (0, n) or y in (0, n)}
+        corners = {(0, 0), (0, n), (n, 0), (n, n)}
+        kept = {(round(p[0]), round(p[1])) for p in locked_v[:, :3] if abs(p[0] - round(p[0])) < 1e-6 and abs(p[1] - round(p[1])) < 1e-6}
+        self.assertTrue(corners <= kept)
+        self.assertGreaterEqual(len(rim & kept), len(rim) // 2)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -16,6 +16,9 @@
 #define AW_TOWN_OWN_DOORS 4
 /* func_wall placements go to the shared scenery catalogue (aw_scenery.c). */
 #define AW_TOWN_SCENERY 8
+/* The scenery catalogue of one map (aw_scenery.c); the builder gates every
+ * region map on it (tools/map_engine_limits.py). */
+#define AW_SCENERY_MAX_PLACEMENTS 1000
 /* dbg tp <town> uses the region directory's arrival point. */
 #define AW_TOWN_TELEPORT 16
 /* Arrival and respawn use interior-style ground placement. */

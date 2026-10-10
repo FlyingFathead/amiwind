@@ -33,13 +33,19 @@ from routed_hull import HULL_LEAF_PIECES, CHIM_ROUTE_PIECES as MODEL_ROUTE_PIECE
 
 # ---------------------------------------------------------------- textures
 
-def material_texture_key(model, material, size, no_emissive):
-    """prepare_mesh_bsp texture() identity: (texture, size, tint, glow) or the flattened panel."""
+def material_texture_key(model, material, size, no_emissive, texture_shas=None):
+    """prepare_mesh_bsp texture() identity: (texture, size, tint, glow) or the flattened panel. texture is
+    the texture's content hash when texture_shas (the stage's texture hashes, by index) is given: a unit's
+    result then holds no position in a stage's texture list and can be reused by another stage
+    (CHIM-UNIT-FP-SOURCE-LAYOUT-33); without it, the stage's texture index (the legacy identity)."""
     if material == len(model['materials']):
         return ('flatten', model['source'], size)
     mat = model['materials'][material]
     glow = 0 if no_emissive else int(mat.get('emissive', 0))
-    return (mat['texture_index'], size, tuple(round(x, 2) for x in mat['diffuse']), glow)
+    texture = mat['texture_index']
+    if texture_shas is not None and texture is not None:
+        texture = texture_shas[texture]
+    return (texture, size, tuple(round(x, 2) for x in mat['diffuse']), glow)
 
 
 def material_texture_image(archive, index, model, material, size, palette_image, flat_rgb=None):
@@ -236,7 +242,7 @@ def hull_pieces(parts):
 
 
 def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled=None, entities=b'',
-                      hull=None):
+                      hull=None, report=None):
     """Lumps of one shared model (faces, collision chain, dmodel) and its texture list.
 
     texture_of(material) gives a global texture id or a texture key; the
@@ -253,9 +259,24 @@ def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled
     if hull is None:
         from mesh_geometry_env import model_hull_mode
         hull = model_hull_mode()
-    if wants_route(len(pieces), hull, compiled is not None, CHIM_ROUTE_PIECES):
+    route = wants_route(len(pieces), hull, compiled is not None, CHIM_ROUTE_PIECES)
+    if not route and hull == 'auto' and compiled is None and pieces:
+        # the shared depth rule (routed_hull.CHAIN_DEPTH_LIMIT): a chain deeper than the limit is routed
+        from routed_hull import chain_depth_limit
+        probe = BrushLumps()
         try:
-            return _routed_model(w, surfaces, pieces, exact, lo, hi, first, num, entities, hull)
+            probe.collider(pieces, exact, None, point_hull=False)
+            route = len(probe.lumps[9]) // 8 > chain_depth_limit()
+        except ValueError:          # a chain past the clipnode budget: routed (or the chain, below)
+            route = True
+    # report (a dict, optional): 'hull' is the standing hull's form, 'routed', 'compiled' or 'chain'
+    report = report if report is not None else {}
+    report['hull'] = 'compiled' if compiled is not None else 'chain'
+    if route:
+        try:
+            out = _routed_model(w, surfaces, pieces, exact, lo, hi, first, num, entities, hull)
+            report['hull'] = 'routed'
+            return out
         except ValueError as error:
             if 'budget' not in str(error) or hull in ('routed', 'balanced'):
                 raise
@@ -290,7 +311,7 @@ def variant_unit(task):
     surfaces, parts, lo, hi = _prepare_placement((ref, task['data'], size, centre, None, False))
     keys = {}
     for s in surfaces:
-        keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE)
+        keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE, task.get('texture_shas'))
     compiled = None
     fallback = None
     # A large model's standing hull is routed (model_image_lumps), not compiled by qbsp: a compiled union
@@ -308,7 +329,9 @@ def variant_unit(task):
             fallback = str(error)[-200:]
     local = dict(ref, position=[*centre, 0.0])
     flames = variant_flames(flame_entities(local, model, centre), local, centre)
-    lumps, tkeys = model_image_lumps(surfaces, parts, lo, hi, lambda m: keys[m], task['exact'], compiled, flames)
+    form = {}
+    lumps, tkeys = model_image_lumps(surfaces, parts, lo, hi, lambda m: keys[m], task['exact'], compiled, flames,
+                                     hull='chain' if task.get('keep_chain') else None, report=form)
     occluder_grid = None
     if task['hollow']:
         # hollow collision shells do not occlude; the closed render mesh does (CHIM-PVS-HOLLOW-33)
@@ -317,7 +340,8 @@ def variant_unit(task):
     return {'lumps': [bytes(x) for x in lumps], 'texture_keys': tkeys, 'lo': [float(v) for v in lo],
             'hi': [float(v) for v in hi], 'occluders': [] if task['hollow'] else [p for p, *_ in parts],
             'occluder_grid': occluder_grid,
-            'materials': {k: m for m, k in keys.items()}, 'collision_fallback': fallback}
+            'materials': {k: m for m, k in keys.items()}, 'collision_fallback': fallback,
+            'hull_form': form.get('hull')}
 
 
 def texture_unit(task):

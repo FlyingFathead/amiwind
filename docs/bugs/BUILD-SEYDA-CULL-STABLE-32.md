@@ -9,11 +9,23 @@
 | Where | actor-contact stage, region sn000 terrain cull |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | v0.0.32, v0.0.33 (last seen) |
 | Severity | critical: From-scratch builds stop in Seyda Neen terrain culling; covered only by the recorded exception. |
 | Family | Seyda Neen recorded stage (`seyda-recorded`) |
 
 <!-- END GENERATED FACTS -->
+
+## Status: 9 October 2026
+
+Open, for the legacy builder only. Reproduced on 9 October 2026 with a current from-scratch scene
+(region sn000, the same message). An experimental fallback that kept each non-settling placed face
+whole (not shipped) showed the cut cannot complete from scratch: 130 to 2,852 placed faces per
+region do not settle, water cuts fail the same way, the canonical cull always reports its result
+as incomplete, which blocks the region installation, and one region (sn005) was still being culled
+after 40 minutes. CHIM builds no longer need this cull: their converted Seyda Neen region maps are
+only the frame maps' check reference and are made without it
+([BUILD-SEYDA-REGEN-30](BUILD-SEYDA-REGEN-30.md)). A legacy build with Seyda Neen still needs
+`--seyda-recorded`.
 
 ## Status: 8 October 2026
 
@@ -60,6 +72,7 @@ From-scratch builds before every release.
 
 Family: Seyda Neen recorded stage (`seyda-recorded`). Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. See [families](README.md#families).
 
+- [BUILD-SEYDA-CONVERTED-NOT-STAGED-35](BUILD-SEYDA-CONVERTED-NOT-STAGED-35.md): A default CHIM build stopped at the image step's payload preflight: the Seyda Neen region maps are converted later in that step
 - [BUILD-SEYDA-PRIVATE-STAGES-31](BUILD-SEYDA-PRIVATE-STAGES-31.md): Repository builder cannot regenerate the shipped Seyda Neen maps
 - [BUILD-SEYDA-RECORDED-REWRITTEN-32](BUILD-SEYDA-RECORDED-REWRITTEN-32.md): Later image passes rewrite the recorded Seyda Neen maps, so the exception is not the recorded stage
 - [BUILD-SEYDA-REGEN-30](BUILD-SEYDA-REGEN-30.md): Public build cannot regenerate the Seyda Neen sub-cells

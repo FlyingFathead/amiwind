@@ -273,7 +273,101 @@ def collect_models(tasks, jobs):
     return ordered, counts, worker_seconds
 
 
-def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_run=None, closure=None):
+def parts_models(data, out, palette, specs, identities, cache, parts_cache, jobs, dependencies,
+                 sources, env, policy, face_cap):
+    """--npc-models parts (docs/MODULAR_NPCS.md): each body part converted once.
+
+    Humanoid appearances are composed from the parts library; the 51 creature
+    models keep the whole path and its cache. Same files, same receipt fields,
+    same complete-coverage gate. Failures stay visible as failed models.
+    """
+    import npc_parts
+    from build_parallel import completed_map
+    from gallery_cache import file_sha
+    models = out/'gallery'; started = time.monotonic()
+    npc = {k: v for k, v in specs.items() if v['kind'] == 'NPC_'}
+    creatures = [(str(data), str(models), key, spec, palette, str(cache), identities[key])
+                 for key, spec in specs.items() if spec['kind'] != 'NPC_']
+    part_sources = dict(sources, **{n: file_sha(Path(__file__).resolve().parents[1]/n) for n in npc_parts.PARTS_SOURCES})
+    recipes, failures, report, creature_results = npc_parts.run(
+        npc, data, palette, parts_cache, dependencies, part_sources, env, jobs, policy, face_cap,
+        log=lambda line: print(line, flush=True), extra=creatures)
+    results = {}; counts = {'reused': 0, 'converted': 0, 'failed': 0}; worker_seconds = 0.
+    for result, action, seconds in creature_results:
+        results[result['key']] = result; worker_seconds += seconds
+        if result['status'] != 'ready': counts['failed'] += 1
+        else: counts['reused' if action == 'hit' else 'converted'] += 1
+    phase = time.monotonic()
+    ordered = [recipes[k] for k in npc if k in recipes]
+    chunks = [(str(parts_cache), str(models), palette, ordered[i:i+64]) for i in range(0, len(ordered), 64)]
+    composed = 0
+    for batch in completed_map(npc_parts.compose_task, chunks, jobs):
+        for result, seconds in batch:
+            results[result['key']] = result; worker_seconds += seconds; composed += 1
+            if result['status'] != 'ready':
+                counts['failed'] += 1
+                print(f"Gallery model {result['key']} failed: {result.get('error')}", flush=True)
+    for key, error in failures.items():
+        result = dict(key=key, status='failed', error=error, method='parts')
+        (models/(key+'.json')).write_text(json.dumps(result, indent=2)+'\n', encoding='utf-8', newline='\n')
+        results[key] = result; counts['failed'] += 1
+        print(f'Gallery model {key} failed: {error}', flush=True)
+    report['compose'] = {'models': composed, 'seconds': round(time.monotonic()-phase, 3)}
+    # Recipes: which part bakes make each appearance (seam audit, later stages).
+    (out/'npc-parts-recipes.json').write_text(json.dumps({'format': npc_parts.FORMAT, 'recipes': [
+        {'key': r['key'], 'census': [npc_parts.token(i) for i in r['census']],
+         'bakes': [npc_parts.token(i) for i in r['bakes']], 'shift': r['shift'], 'step': r['step'],
+         'policy': r['policy']} for r in ordered]}, separators=(',', ':')) + '\n', encoding='utf-8', newline='\n')
+    print(f"NPC parts: {composed} appearances composed in {time.monotonic()-phase:.1f}s; "
+          f"{report['distinct_part_bakes']} distinct part bakes; total {time.monotonic()-started:.1f}s.", flush=True)
+    report['joint_seams'] = seam_gate(out, parts_cache, ordered, jobs)
+    ordered_results = {key: results[key] for key in specs}
+    return ordered_results, counts, worker_seconds, report
+
+
+SEAM_LIMITS = Path(__file__).resolve().parents[1]/'config/npc-seam-limits.json'
+
+
+def seam_gate(out, parts_cache, recipes, jobs, limits_path=SEAM_LIMITS):
+    """Joint-seam audit of every composed appearance (NPC-JOINT-GAPS-33) and its gate.
+
+    Writes npc-seam-audit.json. Fails when the island-wide open joint length, the
+    number of appearances with open joints or the largest gap exceeds the recorded
+    limits (config/npc-seam-limits.json): no new joint gaps, a closed one stays closed.
+    """
+    import npc_seam_audit
+    from build_parallel import completed_map
+    started = time.monotonic()
+    by_key = {r['key']: r for r in json.loads((out/'npc-parts-recipes.json').read_text())['recipes']}
+    chunks = [(str(parts_cache), str(out/'gallery'), [by_key[r['key']] for r in recipes[i:i+32]], 0)
+              for i in range(0, len(recipes), 32)]
+    rows = [row for batch in completed_map(npc_seam_audit.recipe_task, chunks, jobs) for row in batch]
+    rows.sort(key=lambda r: r['key'])
+    summary = npc_seam_audit.summarise(rows, 'candidate')
+    summary['errors'] = [r for r in rows if 'error' in r][:20]
+    summary['seconds'] = round(time.monotonic()-started, 3)
+    limits = json.loads(Path(limits_path).read_text())['parts'] if Path(limits_path).is_file() else None
+    failures = []
+    if summary['errors']:
+        failures.append(f"{len(summary['errors'])} appearances could not be audited")
+    if limits:
+        for name, value in (('open_length', summary['open_length']), ('with_open_joints', summary['with_open_joints']),
+                            ('max_gap_max', summary['max_gap_max'])):
+            if value > limits[name]:
+                failures.append(f'{name} {value} exceeds the recorded limit {limits[name]}')
+    summary.update(limits=limits, failures=failures)
+    (out/'npc-seam-audit.json').write_text(json.dumps({'summary': summary, 'appearances': rows}, indent=1)+'\n',
+                                           encoding='utf-8', newline='\n')
+    print(f"NPC joint seams: {summary['with_open_joints']} of {summary['appearances']} appearances with open joints, "
+          f"open {summary['open_length']} of {summary['joint_length']} units, largest gap {summary['max_gap_max']}; "
+          f"{summary['seconds']:.1f}s.", flush=True)
+    if failures:
+        raise ValueError('NPC joint-seam gate: ' + '; '.join(failures) + ' (npc-seam-audit.json)')
+    return {k: v for k, v in summary.items() if k not in ('worst_pairs', 'errors')}
+
+
+def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_run=None, closure=None,
+            npc_models='whole', parts_cache=None, parts_policy='exact', parts_face_cap=666):
     """Convert the complete NPC/creature catalogue; unresolved models must fail.
 
     Do not reduce catalogue coverage or protected geometry to save build time.
@@ -310,9 +404,21 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
     capacity = preflight(cache, out, identities)
     print(f"Gallery cache: {capacity['verified_hits']} verified hits, {capacity['misses']} conversions required.", flush=True)
     if imported:print('Compatible rc9 pairs imported:', imported['imported'], flush=True)
-    tasks = [(str(data), str(models), key, spec, palette, str(cache), identities[key]) for key, spec in specs.items()]
-    print('Gallery scheduling: completion order; bounded queue; stable catalogue export.', flush=True)
-    results, counts, worker_seconds = collect_models(tasks, jobs)
+    parts_report = None
+    if npc_models == 'parts':
+        from gallery_cache import cache_location as parts_location
+        parts_cache = parts_location(parts_cache or cache.parent/'npc-parts-v1', data, out)
+        print(f'NPC models: parts library ({parts_policy}, per-actor cap {parts_face_cap} faces); '
+              'creatures: whole path.', flush=True)
+        results, counts, worker_seconds, parts_report = parts_models(
+            data, out, palette, specs, identities, cache, parts_cache, jobs, dependencies, sources, env,
+            parts_policy, parts_face_cap)
+    elif npc_models == 'whole':
+        tasks = [(str(data), str(models), key, spec, palette, str(cache), identities[key]) for key, spec in specs.items()]
+        print('Gallery scheduling: completion order; bounded queue; stable catalogue export.', flush=True)
+        results, counts, worker_seconds = collect_models(tasks, jobs)
+    else:
+        raise ValueError('Unknown --npc-models method: ' + str(npc_models))
     dependencies.verify_unchanged()
     if sources != converter_sources() or env != environment():
         raise ValueError('Gallery converter environment changed during conversion')
@@ -321,7 +427,8 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
                     'completed': len(results), 'scheduler': 'bounded-completion-v1',
                     'imported_rc9': imported, 'capacity': capacity,
                     'dependency_and_model_seconds': round(time.monotonic()-started, 3),
-                    'worker_seconds_sum': round(worker_seconds, 3),
+                    'worker_seconds_sum': round(worker_seconds, 3), 'npc_models': npc_models,
+                    'npc_parts': parts_report,
                     'scope': 'host-only reuse; every model and catalogue entry remains required'}
     (out/'gallery-cache.json').write_text(json.dumps(cache_report, indent=2)+'\n')
     failed = finish_catalogue(entries, results, out, palette)
@@ -335,7 +442,7 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
         subprocess.run(command, cwd=out, check=True)
     (out/'maps').mkdir(); shutil.move(out/'charplane.bsp', out/'maps/charplane.bsp')
     count, files = catalogue_files(models/'catalog.txt')
-    receipt = {'format': FORMAT, 'records': count, 'models': len(results),
+    receipt = {'format': FORMAT, 'records': count, 'models': len(results), 'npc_models': npc_models,
                'scope': ({'reference_closure': closure.get('cells', []), 'records': len(entries)}
                          if only is not None else 'every NPC and creature'),
                'master_sha256': input_sha256(child_ci(data, 'Morrowind.esm')),
@@ -347,6 +454,19 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
     return report
 
 
+def add_npc_model_options(parser):
+    """Shared by build.py and build_gallery.py; whole stays the default method."""
+    parser.add_argument('--npc-models', choices=('whole', 'parts'), default='whole',
+                        help='Humanoid gallery models: whole (each appearance baked whole; default) or parts '
+                             '(each body part converted once, appearances composed; docs/MODULAR_NPCS.md)')
+    parser.add_argument('--parts-cache', type=Path, help='Persistent NPC parts library (default: beside the gallery cache)')
+    parser.add_argument('--npc-parts-policy', default='exact', metavar='exact|levelsN',
+                        help='Part quota policy for --npc-models parts: exact (every outfit quota; default) or '
+                             'levelsN (at most N quota levels per part, N 1-16)')
+    parser.add_argument('--npc-parts-face-cap', type=int, default=666, metavar='FACES',
+                        help='Per-actor face cap for levelsN recipes (64-666); an outfit over it uses its exact recipe')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('data-files', 'palette', 'out', 'qbsp', 'vis', 'light'):
@@ -356,11 +476,18 @@ def main():
     parser.add_argument('--reference-closure', type=Path,
                         help='Area build (--exclude-unreferenced npcs): only the NPCs and creatures this '
                              'reference closure lists')
+    add_npc_model_options(parser)
     add_jobs(parser); args = parser.parse_args()
     closure = json.loads(args.reference_closure.read_text(encoding='utf-8')) if args.reference_closure else None
     try:
+        if args.npc_models == 'parts':
+            from npc_parts import parse_policy
+            parse_policy(args.npc_parts_policy)
+            if not 64 <= args.npc_parts_face_cap <= 666:
+                raise ValueError('--npc-parts-face-cap must be 64-666')
         prepare(args.data_files, args.palette, args.out, args.qbsp, args.vis, args.light, resolve_jobs(args.jobs),
-                args.cache, args.seed_run, closure=closure)
+                args.cache, args.seed_run, closure=closure, npc_models=args.npc_models, parts_cache=args.parts_cache,
+                parts_policy=args.npc_parts_policy, parts_face_cap=args.npc_parts_face_cap)
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f'Error: {exc}\n')
 

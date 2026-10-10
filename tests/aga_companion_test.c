@@ -6,6 +6,8 @@
  * test companion is spawned and removed cleanly, and saves never store it. */
 #include "quakedef.h"
 #include <assert.h>
+#include "aw_anim.h"
+#include <stdarg.h>
 
 server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;keydest_t key_dest;
 int host_framecount;double host_frametime=.02;char *pr_strings;dprograms_t *progs;byte *host_basepal;
@@ -38,7 +40,19 @@ qboolean AW_ActorStep(edict_t *e,vec3_t move,double dt){(void)dt;e->v.origin[0]+
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)angles;assert(reach>=300);return target;}
 void Draw_Fill(int x,int y,int w,int h,int c){(void)x;(void)y;(void)w;(void)h;fills++;fill_colour=c;}
 double Sys_FloatTime(void){return clock_now+=.0001;}
-void Con_Printf(char *f,...){(void)f;}
+/* aw_anim.c engine glue: models here have no layout file (previous frames). */
+const aw_anim_t *AW_AnimOf(edict_t *e){
+    static aw_anim_t a;int i=(int)e->v.modelindex;AW_AnimDefault(&a,i>0 && i<MAX_MODELS && sv.models[i]?sv.models[i]->numframes:1);return &a;
+}
+void AW_AnimSounds(edict_t *e,const aw_anim_t *a,int group,unsigned long crossed,int medium){(void)e;(void)a;(void)group;(void)crossed;(void)medium;}
+int AW_AnimMedium(edict_t *e){(void)e;return AW_ANIM_DRY;}
+int aw_test_mover_on,aw_test_mover_off;static edict_t *aw_test_worn;
+int AW_AnimMover(edict_t *e,int on){if(on){if(aw_test_worn)return 0;aw_test_worn=e;aw_test_mover_on++;return 1;}if(aw_test_worn!=e)return 0;aw_test_worn=NULL;aw_test_mover_off++;return 1;}
+int AW_AnimMoving(edict_t *e){return e && aw_test_worn==e;}
+static char console[4096];
+void Con_Printf(char *f,...){va_list v;size_t n=strlen(console);va_start(v,f);
+    if(n<sizeof(console)-256){vsnprintf(console+n,sizeof(console)-n,f,v);}
+    va_end(v);}
 void Sys_Error(char *f,...){(void)f;abort();}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 float Q_atof(char *s){return (float)atof(s);}
@@ -104,13 +118,16 @@ int main(void){
 
     /* pick mode: off -> no effect on the crosshair or the attack */
     assert(!AW_CompanionPickMode() && AW_CompanionCrosshair(0,0)==0 && AW_CompanionButtons(3)==3);
+    assert(AW_CompanionPickAim()==0);          /* the right button (+aw_alt) leaves it to the next context */
     run("aw_companion pick");assert(AW_CompanionPickMode());
     target=NULL;host_framecount++;assert(AW_CompanionCrosshair(0,0)==1 && fills==0);
+    assert(AW_CompanionPickAim()==1 && !AW_CompanionEdict(npc));   /* right button in pick mode: handled, nothing aimed at */
     assert(AW_CompanionButtons(1)==0 && !AW_CompanionEdict(npc));   /* swallowed, nothing to pick */
     AW_CompanionButtons(0);
     target=npc;host_framecount++;assert(AW_CompanionCrosshair(10,10)==2 && fills==2 && fill_colour==5);
     assert(AW_CompanionButtons(1|2)==2);                               /* attack swallowed, jump kept */
     assert(AW_CompanionEdict(npc) && npc->v.solid==SOLID_NOT && npc->v.nextthink==0);
+    assert(aw_test_mover_on==1 && AW_AnimMoving(npc));      /* it wears its full-kit model while it follows */
     run("aw_companion choose");assert(!AW_CompanionPickMode());
     run("aw_pickcompanion");assert(AW_CompanionPickMode());
     key_dest=key_menu;assert(AW_CompanionCrosshair(0,0)==0 && !AW_CompanionPickMode());   /* Escape */
@@ -136,6 +153,7 @@ int main(void){
     /* release: home spot, own solid and think again */
     run("aw_companion off");
     assert(!AW_CompanionEdict(npc) && npc->v.origin[0]==0 && npc->v.solid==SOLID_SLIDEBOX && npc->v.think==7 && npc->v.nextthink>sv.time);
+    assert(aw_test_mover_off==1 && !AW_AnimMoving(npc));    /* back in its standing model */
     assert(!AW_CompanionHome(npc,o,a));
 
     /* test companion: a copy of the resident, not an aw_npc, removed cleanly */
@@ -150,7 +168,25 @@ int main(void){
     p->v.origin[0]+=150;step_cost=60;
     {int s0=steps;tick(12);assert(steps-s0==2);}
     step_cost=3;assert(gap(spawned,p)<64);
+    /* stuck responses per actor kind (owner decision): a follower in the
+     * player's view waits; once out of view it is placed behind the player */
+    p->v.angles[1]=180;                                 /* looking back at it */
+    p->v.origin[0]+=150;step_cost=60;console[0]=0;
+    {int s0=steps;tick(30);assert(steps-s0==2);}
+    assert(gap(spawned,p)>96 && strstr(console,"follower, wait until unseen"));
+    p->v.angles[1]=0;tick(30);assert(gap(spawned,p)<64);    /* looks away: placed */
+    /* a summon in combat never warps; out of combat it is placed like a follower */
+    run("aw_companion kind summon");run("aw_companion combat on");
+    p->v.origin[0]+=150;console[0]=0;tick(40);
+    assert(gap(spawned,p)>96 && strstr(console,"summon, keep trying") && !strstr(console,"placed"));
+    run("aw_companion combat off");tick(40);assert(gap(spawned,p)<64);
+    /* a hostile chaser never warps: stuck, it flees and tries again later */
+    run("aw_companion kind hostile");
+    p->v.origin[0]+=150;console[0]=0;tick(60);
+    assert(gap(spawned,p)>96 && strstr(console,"hostile, flee") && !strstr(console,"placed"));
+    run("aw_companion kind escort");run("aw_companion kind follower");step_cost=3;
     run("aw_companiontest off");assert(spawned->free && frees==1 && !AW_CompanionEdict(spawned) && !AW_CompanionSkipSave(spawned));
+    assert(aw_test_mover_on==2 && aw_test_mover_off==2 && !AW_AnimMoving(spawned));
     run("aw_companiontest on");assert(sv.num_edicts==5 && AW_CompanionEdict(&edicts[4]));
     /* a scene load: the test companion rejoins in the new scene */
     sv.num_edicts=4;memset(&edicts[3],0,2*sizeof(edict_t));

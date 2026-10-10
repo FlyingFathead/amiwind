@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "about": "MiniWind test spots: tools/build.py --miniwind-preset NAME (or --miniwind-NAME). Each preset is a MiniWind build with a scope, an optional direct start (--direct-to-game-map), exclusions and an optional --quick-character profile and the quick character screen choice, the console commands run once on arrival (boot_commands: dbg commands only) (skip_census: true, false or null for the default: on unless the row or the command gives a character). The description is the startup screen's Scene: line. Add a spot by adding a row; tools/miniwind_presets.py checks every row. docs/chim/build_guide/MINIWIND.md",
+  "presets": [
+    {
+      "name": "balmora",
+      "description": "Balmora: exterior and interiors",
+      "scope": "full",
+      "start": null,
+      "exclude": [],
+      "unreferenced": "voice,npcs",
+      "character": null,
+      "skip_census": null,
+      "boot_commands": []
+    },
+    {
+      "name": "balmora-exterior",
+      "description": "Balmora exterior (map only)",
+      "scope": "exterior",
+      "start": null,
+      "exclude": [],
+      "unreferenced": "voice,npcs",
+      "character": null,
+      "skip_census": null,
+      "boot_commands": []
+    },
+    {
+      "name": "vivec-arena-pit",
+      "description": "Vivec Arena Pit: combat test",
+      "scope": "full",
+      "start": "interior:Vivec, Arena Pit",
+      "exclude": [
+        "npc-gallery"
+      ],
+      "unreferenced": "voice,npcs",
+      "character": null,
+      "skip_census": null,
+      "boot_commands": []
+    },
+    {
+      "name": "opening-ship",
+      "description": "Opening ship: lantern and ship lighting check",
+      "scope": "exterior",
+      "start": "interior:Imperial Prison Ship",
+      "exclude": [
+        "npc-gallery"
+      ],
+      "unreferenced": "voice,npcs",
+      "character": null,
+      "skip_census": false,
+      "boot_commands": []
+    },
+    {
+      "name": "animkit",
+      "description": "Animation kit: walk and run with a companion and hostiles",
+      "scope": "exterior",
+      "start": "balmora",
+      "exclude": [],
+      "unreferenced": "voice,npcs",
+      "character": null,
+      "skip_census": null,
+      "boot_commands": [
+        "dbg companion test",
+        "dbg combat on"
+      ]
+    }
+  ]
+}

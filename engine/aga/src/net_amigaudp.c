@@ -202,6 +202,10 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 	int port;
 
 //	Con_Printf ("UDP_PartialIPAddress()\n");
+	/* ENGINE-UDP-ADDRESS-OVERFLOW-35: a typed connect address longer than
+	 * the buffer overflowed the stack; such an address is invalid anyway. */
+	if (strlen(in) > sizeof(buff) - 2)
+		return -1;
 	buff[0] = '.';
 	b = buff;
 	strcpy(buff+1, in);

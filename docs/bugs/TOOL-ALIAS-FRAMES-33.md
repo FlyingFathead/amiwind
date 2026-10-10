@@ -17,8 +17,12 @@
 
 ## Status: 9 October 2026
 
-Open. Found when the first Arena fighter bake (42 combat frames) stopped with "Alias budget
-exceeded"; the fighters now bake 31 frames (idle 4, run 6, attack 8, hit 3, knockdown 4, death 6).
+Repaired in source on v0.0.33-arena-combat (owner decision: a byte budget), not yet in a build. The
+writer limits a model's vertex frames by bytes (`ALIAS_FRAME_BYTES`, 28 + 4 x vertices per frame;
+default = the previous worst case of 64 frames at 1,999 vertices) and at most 256 frames, named or not.
+The Arena fighters bake 42 frames again (idle 8, run 8, attack 8, hit 4, knockdown 6, death 8).
+History: the first fighter bake (42 frames) stopped with "Alias budget exceeded" and baked 31 frames;
+v0.0.33-anim-kit then allowed 64 named frames; one implementation now replaces both limits.
 
 ## Symptom
 
@@ -44,14 +48,15 @@ Always: bake an NPC with more than 32 sample times through `animated_mdl`.
 
 ## Repair
 
-Not yet; worked around by baking 31 frames. Owner choice: raise the limit with a per-model memory
-budget instead of a frame count (a first-person weapon view needs about 48 frames: idle, equip and
-three attacks), or split long animations over two models.
+`tools/npc_geometry.py`: `alias_frame_bytes(frames, vertices)`, `ALIAS_FRAME_BYTES`, `ALIAS_MAX_FRAMES`
+(256); `animated_mdl(..., frame_bytes=...)` refuses only a model over its byte budget. Unnamed frames
+past 99 are named `idleNNN`.
 
 ## Verification
 
-The fighters bake with 31 frames (318 to 404 KB each); `tests/test_combat.py` checks that the
-fighter layout fits the writer's limit.
+`tests/test_npc_anim.py` AliasWriterTests: 40 light unnamed frames are written, a budget one frame short
+refuses, 257 frames refuse, 65 frames of a 1,999-vertex model refuse; `tests/test_combat.py` checks the
+fighters' 42 frames against the budget.
 
 ## Prevention
 
@@ -79,11 +84,14 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - GEO-01 (no report page): Giant mushroom cap gaps after material-wise mesh reduction
 - GEO-03 (no report page): Canonical clipping stored reversed-winding fragments
 - INLAND-SHORE-29 (no report page): v0.0.29-dev1: Angular/jagged inland shoreline
+- [INTERIOR-HULL-CHAIN-33](INTERIOR-HULL-CHAIN-33.md): The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it
 - [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
 - [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump
 - [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
 - [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md): Static mesh reduction pulls open parts apart: the Silt Strider's hull shows the sky through its shell seams
 - [MESH-LOD-TORN-MESHES-33](MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)
+- [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
+- [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
 - SKY-GROUND-28 (no report page): Rebuilt LAND faces invisible; clouds scroll too fast
 - [TOOL-SIMPLIFY-MANIFOLD-32](TOOL-SIMPLIFY-MANIFOLD-32.md): Mesh reduction can return open or non-manifold meshes

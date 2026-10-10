@@ -301,7 +301,7 @@ char *PR_ValueString (etype_t type, eval_t *val)
 	switch (type)
 	{
 	case ev_string:
-		sprintf (line, "%s", pr_strings + val->string);
+		Q_snprintf (line, sizeof(line), "%s", pr_strings + val->string);	/* ENGINE-ENTITY-TEXT-UNBOUNDED-35 */
 		break;
 	case ev_entity:
 		sprintf (line, "entity %ld", (long)NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)) );
@@ -353,7 +353,7 @@ char *PR_UglyValueString (etype_t type, eval_t *val)
 	switch (type)
 	{
 	case ev_string:
-		sprintf (line, "%s", pr_strings + val->string);
+		return pr_strings + val->string;	/* saved whole, never through line[] (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
 		break;
 	case ev_entity:
 		sprintf (line, "%ld", (long)NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
@@ -406,7 +406,7 @@ char *PR_GlobalString (int ofs)
 	else
 	{
 		s = PR_ValueString (def->type, val);
-		sprintf (line,"%ld(%s)%s", (long)ofs, pr_strings + def->s_name, s);
+		Q_snprintf (line, sizeof(line) - 21, "%ld(%s)%s", (long)ofs, pr_strings + def->s_name, s);	/* room for the padding below */
 	}
 
 	i = strlen(line);
@@ -671,17 +671,17 @@ void ED_ParseGlobals (char *data)
 		if (com_token[0] == '}')
 			break;
 		if (!data)
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
+			Host_Error ("ED_ParseEntity: EOF without closing brace");
 
-		strcpy (keyname, com_token);
+		Q_snprintf (keyname, sizeof(keyname), "%s", com_token);	/* ENGINE-ENTITY-TEXT-UNBOUNDED-35 */
 
 	// parse value
 		data = COM_Parse (data);
 		if (!data)
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
+			Host_Error ("ED_ParseEntity: EOF without closing brace");
 
 		if (com_token[0] == '}')
-			Sys_Error ("ED_ParseEntity: closing brace without data");
+			Host_Error ("ED_ParseEntity: closing brace without data");
 
 		key = ED_FindGlobal (keyname);
 		if (!key)
@@ -760,7 +760,7 @@ qboolean	ED_ParseEpair (void *base, ddef_t *key, char *s)
 		break;
 
 	case ev_vector:
-		strcpy (string, s);
+		Q_snprintf (string, sizeof(string), "%s", s);	/* ENGINE-ENTITY-TEXT-UNBOUNDED-35 */
 		v = string;
 		w = string;
 		for (i=0 ; i<3 ; i++)
@@ -828,15 +828,15 @@ static char *ED_SkipRenderMetadata(char *data, int capacity)
         break;
     }
     if(!*data || *data=='{' || *data=='}')
-        Sys_Error("ED_ParseEntity: missing render metadata value");
+        Host_Error ("ED_ParseEntity: missing render metadata value");
     quoted=*data=='"';if(quoted)data++;
     while(*data && (quoted?*data!='"':(unsigned char)*data>32 &&
           *data!='{' && *data!='}')){
-        if(++n>=capacity)Sys_Error("ED_ParseEntity: render metadata too long");
+        if(++n>=capacity)Host_Error ("ED_ParseEntity: render metadata too long");
         data++;
     }
     if(quoted){
-        if(*data!='"')Sys_Error("ED_ParseEntity: unclosed render metadata");
+        if(*data!='"')Host_Error ("ED_ParseEntity: unclosed render metadata");
         data++;
     }
     return data;
@@ -864,7 +864,7 @@ char *ED_ParseEdict (char *data, edict_t *ent)
 		if (com_token[0] == '}')
 			break;
 		if (!data)
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
+			Host_Error ("ED_ParseEntity: EOF without closing brace");
 
 // anglehack is to allow QuakeEd to write single scalar angles
 // and allow them to be turned into vectors. (FIXME...)
@@ -880,7 +880,7 @@ else
 if (!strcmp(com_token, "light"))
 	strcpy (com_token, "light_lev");	// hack for single light def
 
-		strcpy (keyname, com_token);
+		Q_snprintf (keyname, sizeof(keyname), "%s", com_token);	/* ENGINE-ENTITY-TEXT-UNBOUNDED-35 */
 
 		// another hack to fix heynames with trailing spaces
 		n = strlen(keyname);
@@ -901,10 +901,10 @@ if (!strcmp(com_token, "light"))
 	// parse value
 		data = COM_Parse (data);
 		if (!data)
-			Sys_Error ("ED_ParseEntity: EOF without closing brace");
+			Host_Error ("ED_ParseEntity: EOF without closing brace");
 
 		if (com_token[0] == '}')
-			Sys_Error ("ED_ParseEntity: closing brace without data");
+			Host_Error ("ED_ParseEntity: closing brace without data");
 
 		init = true;
 
@@ -923,8 +923,8 @@ if (!strcmp(com_token, "light"))
 if (anglehack)
 {
 char	temp[32];
-strcpy (temp, com_token);
-sprintf (com_token, "0 %s 0", temp);
+Q_snprintf (temp, sizeof(temp), "%s", com_token);
+Q_snprintf (com_token, sizeof(com_token), "0 %s 0", temp);
 }
 
 		if (!ED_ParseEpair ((void *)&ent->v, key, com_token))
@@ -975,7 +975,7 @@ void ED_LoadFromFile (char *data)
 		if (!data)
 			break;
 		if (com_token[0] != '{')
-			Sys_Error ("ED_LoadFromFile: found %s when expecting {",com_token);
+			Host_Error ("ED_LoadFromFile: found %s when expecting {",com_token);
 
 		/* CHIM: a frame map's streamed static (tagged aw_static/aw_flora) is
 		 * taken by its chunk, not spawned (chim/chim_statics.c). */

@@ -234,7 +234,7 @@ void CL_Record_f (void)
 	else
 		track = -1;
 
-	if (!COM_FormatPath (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1)))
+	if (!COM_FormatPath (name, sizeof(name) - 4, "%s/%s", com_gamedir, Cmd_Argv(1)))
 	{
 		Con_Printf ("Demo path too long.\n");
 		return;
@@ -312,7 +312,11 @@ void CL_PlayDemo_f (void)
 //
 // open the demo file
 //
-	strcpy (name, Cmd_Argv(1));
+	if (!COM_FormatPath (name, sizeof(name) - 4, "%s", Cmd_Argv(1)))
+	{
+		Con_Printf ("Demo name too long.\n");
+		return;
+	}
 	COM_DefaultExtension (name, ".dem");
 
 	Con_Printf ("Playing demo from %s.\n", name);

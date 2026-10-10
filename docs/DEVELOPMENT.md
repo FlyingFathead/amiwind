@@ -52,9 +52,11 @@ entire game from the builder's own Morrowind data, from scratch: no private
 stage, no reused image, no hand-applied patch. This is checked regularly, before
 every release and after any builder or converter change, by a from-scratch
 build compared file by file with the latest release image; every difference is
-a bug in the [register](BUGS.md). Known gap as of v0.0.31:
-[BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026); the
-release gate in [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) applies from v0.0.32.
+a bug in the [register](BUGS.md). Known gap from v0.0.31 to v0.0.33:
+[BUILD-SEYDA-REGEN-30](bugs/BUILD-SEYDA-REGEN-30.md) (the recorded Seyda Neen maps; optional from
+v0.0.35, and NOT RECOMMENDED since v0.0.31); the release gate in [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) applies from v0.0.32.
+
+See [Which Seyda Neen is in my build?](LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.
 
 ## Mandatory build rule: ALWAYS CHECK COMPILER WARNINGS
 

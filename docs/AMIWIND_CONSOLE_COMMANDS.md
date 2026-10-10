@@ -29,11 +29,12 @@ a command, for example `dbg headlamp on`. This page is generated from
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg animkit` | - | [on/off / list / play <group> / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off = walk, run and swim by speed (off: movers play idle); list = the groups of the NPC under the crosshair and Morrowind's whole table (wired / not wired yet); play forces a group on that NPC until stop; speed scales playback (not saved) |
 | `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
-| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on) |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / bestattack on/off / loadout NAME/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
@@ -128,6 +129,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | --- | --- | --- |
 | `dbg all` | `dbg hud`, `dbg overlay` | on/off |
 | `dbg blockers` | - | - |
+| `dbg cell` | - | (original Morrowind cell here: exterior grid CELL x,y, or interior INT n with its full cell ID; the debug HUD shows the same at the end of its shorter row) |
 | `dbg compass` | - | on/off true/false 1/0 (default off) |
 | `dbg coords` | - | on/off |
 | `dbg dimensions` | - | - |
@@ -140,6 +142,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg hud type` | - | 1 original / 2 compact (default) |
 | `dbg logs live` | - | [on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set) |
 | `dbg npcfloors` | - | (read-only ground-contact report) |
+| `dbg npclod` | - | [auto/0/1/2/3 / target <0..3/auto> / show on/off / bands <d0> <d1> <d2> / stats] NPC model levels (--npc-lod on builds): 0..3 forces a level on every NPC, auto = distance bands; target = the NPC under the crosshair; show labels level, triangles, KiB, distance; bands sets the edges live; stats (not saved) |
 | `dbg npcs` | - | - |
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |

@@ -16,6 +16,8 @@
 #include "aw_character.h"
 #include "aw_harvest_runtime.h"
 #include "aw_miniwind.h"
+#include "aw_quickchar.h"
+#include "aw_testbox.h"
 #include "amiwind_version.h"
 /* CHIM: the harvest catalogue of the region the player is in while a town
  * runs its frame map; 0 on a legacy map. */
@@ -37,6 +39,13 @@ static int region_crossing,map_jump;
  * hold says, and the quick start's notice still to show on arrival. */
 #define AREA_UNAVAILABLE "Area unavailable"
 static int quick_notice;
+/* A quick start with aw_skip_census: the quick character screen opens on arrival. */
+static int quick_screen;
+/* The partial-area notice waits for the quick character screen to close. */
+static void quick_screen_done(int accepted) {
+    (void)accepted;
+    if(AW_MiniwindActive())AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);
+}
 static vec3_t area_last;static int area_last_ok;static double area_said=-10;
 static int area_hold(edict_t *p);
 /* 1: requested, 2: checked spawn awaiting the final signon angle packet. */
@@ -197,12 +206,14 @@ const char *AW_SceneWorldModel(const char *name) {
     return NULL;
 }
 int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_MapId(sv.name)>=0 && AW_TownFind(sv.name)<0 && AW_TerrainId(sv.name)<0));}
+/* ENGINE-SCENE-NAME-BOUND-35: map names go into 16-byte fields; copy bounded. */
+static void copy_name(char *out,size_t size,const char *in){strncpy(out,in,size-1);out[size-1]=0;}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
 static void read_links_for(const char *map) {
     FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
     if(!map_valid(map))return;
     if(loaded && !strcmp(links_map,map))return;
-    strcpy(links_map,map);loaded=1;count=0;
+    copy_name(links_map,sizeof(links_map),map);loaded=1;count=0;
     sprintf(path,"doors-%s.txt",map);
     COM_FOpenFile(path,&f);
     if(!f){sprintf(path,"scene-doors-%s.txt",map);COM_FOpenFile(path,&f);}
@@ -361,7 +372,7 @@ int AW_TravelKey(int key) {
     if(key==K_ENTER){
         aw_scene_link_t r;const aw_town_t *town=AW_Town(travel_town);memset(&r,0,sizeof(r));
         if(travel_choice==0 && town && AW_TownArrival(travel_return?town->name:town->travel_target,travel_return,r.arrival,&r.yaw)){
-            strcpy(r.target,town->travel_target);
+            copy_name(r.target,sizeof(r.target),town->travel_target);
             travel_open=0;key_dest=key_game;load_scene(&r,0);
         }else travel_message=AW_MiniwindActive()?AREA_UNAVAILABLE:"Destination not found.";
     }
@@ -629,8 +640,19 @@ void AW_SceneSpawn(edict_t *p) {
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
     /* The partial-area build's notice, in the game's own message box, once the
      * quick start has arrived (the build's data file, aw_miniwind.c). */
+    if(quick_screen){
+        quick_screen=0;
+        if(AW_QuickCharOpen(AW_QC_ALL|AW_QC_VOICE,quick_screen_done))quick_notice=0;
+    }
     if(quick_notice && AW_MiniwindActive()){
         quick_notice=0;AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);
+        /* The sandbox's own setup (miniwind.txt "boot"), once per arrival of the quick start:
+         * e.g. "dbg companion test;dbg combat on" (docs/MINIWIND.md). */
+        if(AW_Miniwind()->boot[0]){
+            char line[AW_MINIWIND_BOOT+2];int i;
+            for(i=0;AW_Miniwind()->boot[i] && i<AW_MINIWIND_BOOT;i++)line[i]=AW_Miniwind()->boot[i]==';'?'\n':AW_Miniwind()->boot[i];
+            line[i++]='\n';line[i]=0;Cbuf_AddText(line);
+        }
     }
     AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
@@ -658,7 +680,7 @@ void AW_SceneTick(void) {
         VectorCopy(p->v.origin,r.arrival);
     }else if(AW_StoryRestricted() || !AW_WorldDestination(sv.name,p->v.origin,r.target,r.arrival)){
         if(!AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
-        strcpy(r.target,sv.name);VectorCopy(p->v.origin,r.arrival);
+        copy_name(r.target,sizeof(r.target),sv.name);VectorCopy(p->v.origin,r.arrival);
     }
     r.yaw=p->v.angles[1];
     /* The displayed local view can differ from the last rounded movement
@@ -715,6 +737,13 @@ static void scene_command(void) {
         for(i=0;i<AW_MAP_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_MapName(i))){s=AW_MapName(i);break;}
         if(i==AW_MAP_COUNT)for(i=0;i<AW_TOWN_COUNT;i++)if(!Q_strcasecmp((char *)s,(char *)AW_Town(i)->name)){s=AW_Town(i)->name;break;}
     }
+    /* A test build without a game yet (main menu, boot console): a town loads as the quick start. */
+    if(!sv.active && Cmd_Argc()==2 && AW_MiniwindActive() && AW_TownFind(s)>=0 && (AW_Town(AW_TownFind(s))->flags&AW_TOWN_TELEPORT)){
+        Cbuf_AddText((char *)va("aw_quick_start town %s\n",s));return;
+    }
+    if(!sv.active && Cmd_Argc()==2){
+        Con_Printf("dbg tp needs a game running: New Game first%s.\n",AW_MiniwindActive()?", or aw_quick_start":"");return;
+    }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
         if(sv.active && Cmd_Argc()==2)Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));
         scene_help();return;
@@ -724,7 +753,7 @@ static void scene_command(void) {
     if(size<124){Con_Printf("Destination not on this disk: %s.\n",s);scene_help();return;}
     if(map_valid(s)){
         if(AW_TownFlag(s,AW_TOWN_TELEPORT)){
-            memset(&r,0,sizeof(r));strcpy(r.target,s);
+            memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),s);
             if(AW_TownArrival(s,0,r.arrival,&r.yaw)){
                 if(!aw_character.valid || !aw_story.name[0]){
                     if(!AW_CharacterHors()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
@@ -752,7 +781,7 @@ static void scene_command(void) {
         for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){load_scene(&links[i],1);return;}
         Con_Printf("No converted entrance to %s.\n",s);return;
     }
-    memset(&r,0,sizeof(r));strcpy(r.target,!strcmp(s,"ship")?"prison":"seyda");
+    memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),!strcmp(s,"ship")?"prison":"seyda");
     if(!strcmp(s,"ship")){r.arrival[1]=-35;r.arrival[2]=-4;r.yaw=90;}
     else {r.arrival[0]=0;r.arrival[1]=0;r.arrival[2]=64;r.yaw=90;}
     load_scene(&r,1);
@@ -766,7 +795,7 @@ static void hors_command(void) {
     door_ready=0;door_close=0;
     AW_SaveReset();svs.clients[0].edict->v.health=aw_character.current[0];
     svs.clients[0].edict->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
-    memset(&r,0,sizeof(r));strcpy(r.target,"seyda");r.arrival[2]=64;r.yaw=90;
+    memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),"seyda");r.arrival[2]=64;r.yaw=90;
     Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");load_scene(&r,1);
 }
 static int teleport_coordinate(const char *text,float *result) {
@@ -872,29 +901,86 @@ static void teleport_command(void) {
     if(Cmd_Argc()==1 && sv.active){Cbuf_InsertText("aw_scene_menu\n");return;}
     scene_command();
 }
-/* aw_quick_start [town]: a fresh game straight in a town (default: the
- * partial-area build's town, aw_miniwind.c), as the Hors preset dbg tp
- * creates, at the town's directory arrival, placed as a door arrival is. A
- * partial-area build runs it after the startup logo and for New Game. */
+/* aw_quick_start [town] [NAME] | map MAP X Y Z YAW: a fresh game straight in a town
+ * (default: the partial-area build's town or start line, aw_miniwind.c), as the
+ * Hors preset dbg tp creates, at the town's directory arrival, placed as a door
+ * arrival is; or on a map at a local point and heading (the start line's format).
+ * A partial-area build runs it after the startup logo and for New Game; a normal
+ * build with aw_skip_census runs it for New Game (Seyda Neen after the census).
+ * With aw_skip_census the quick character screen opens on arrival, unless a test
+ * already set the character (aw_quickchar_set). */
+/* The build's ready-made character (a direct start's character line), else the Hors
+ * preset; a character a test set with aw_quickchar_set is kept over either. */
+static int quick_character(void) {
+    char race[32],clas[32],birth[32],name[32],kept_name[32];int female,ok,scripted=AW_QuickCharScripted();
+    aw_character_t kept;
+    kept=aw_character;strcpy(kept_name,aw_story.name);
+    if(AW_MiniwindActive() && AW_MiniwindCharacter(AW_Miniwind(),race,clas,birth,&female,name,sizeof(name)))
+        ok=AW_CharacterPreset(race,clas,birth,female,name);
+    else ok=AW_CharacterHors();
+    if(ok && scripted){aw_character=kept;if(kept_name[0])strcpy(aw_story.name,kept_name);}
+    return ok;
+}
+int AW_SceneStarting(void){return pending;}
+static void quick_go(aw_scene_link_t *r,const char *title) {
+    char command[48];
+    AW_SaveReset();AW_SceneCancelTransition();
+    health=aw_character.current[0];next=*r;pending=1;started=Sys_FloatTime();
+    quick_notice=1;
+    quick_screen=AW_SkipCensus() && !AW_QuickCharScripted();
+    IN_AWClearButtons();key_dest=key_game;
+    Con_Printf("Quick start: %s as %s%s.\n",title,aw_story.name,quick_screen?"; quick character screen on arrival":"");
+    sprintf(command,"map %s\n",r->target);Cbuf_AddText(command);
+}
 static void quick_start(void) {
-    aw_scene_link_t r;const char *s;int town;char command[32];
-    s=Cmd_Argc()>=2?Cmd_Argv(1):AW_MiniwindActive()?AW_Miniwind()->town:"";
-    town=AW_TownFind(s);
-    if(Cmd_Argc()>2 || town<0 || !(AW_Town(town)->flags&AW_TOWN_TELEPORT)){
-        Con_Printf("Usage: aw_quick_start <town with an arrival point, e.g. balmora>\n");return;
+    aw_scene_link_t r;const char *s="";int town,n=Cmd_Argc();aw_quick_start_t start;
+    memset(&r,0,sizeof(r));memset(&start,0,sizeof(start));
+    if(n==7 && !strcmp(Cmd_Argv(1),"map")){
+        /* The start line's own format and checks (aw_miniwind.c AW_MiniwindStart). */
+        aw_miniwind_t line;memset(&line,0,sizeof(line));
+        if(snprintf(line.start,sizeof(line.start),"map %s %s %s %s %s",Cmd_Argv(2),Cmd_Argv(3),Cmd_Argv(4),
+                    Cmd_Argv(5),Cmd_Argv(6))>=(int)sizeof(line.start) || !AW_MiniwindStart(&line,&start)){
+            Con_Printf("Usage: aw_quick_start map MAP X Y Z YAW (local units, yaw 0..359)\n");return;
+        }
     }
-    memset(&r,0,sizeof(r));strcpy(r.target,AW_Town(town)->name);
-    if(!AW_TownArrival(r.target,0,r.arrival,&r.yaw) || !AW_CharacterHors()){
+    /* A direct-start build's start line (tools/direct_start.py): a town, or a map at a spot
+     * the builder checked (a door arrival, or the arrival search on its collision). */
+    else if(n==1 && AW_MiniwindActive())AW_MiniwindStart(AW_Miniwind(),&start);
+    if(start.kind==2){
+        if(!map_valid(start.map) || AW_SceneMapSize(start.map,NULL,0)<0 || !quick_character()){
+            Con_Printf("Quick start: %s or the character catalogue not found.\n",start.map);
+            if(!sv.active)Cbuf_AddText("aw_main_menu\n");
+            return;
+        }
+        copy_name(r.target,sizeof(r.target),start.map);VectorCopy(start.point,r.arrival);r.yaw=start.yaw;
+        quick_go(&r,start.map);
+        return;
+    }
+    if(n==1 && !AW_MiniwindActive() && AW_SkipCensus()){
+        /* A normal build with --skip-census: Seyda Neen after the census, where dbg aw hors 0 arrives. */
+        if(!quick_character()){
+            Con_Printf("Quick start: character catalogue not found.\n");
+            if(!sv.active)Cbuf_AddText("aw_main_menu\n");
+            return;
+        }
+        copy_name(r.target,sizeof(r.target),"seyda");r.arrival[2]=64;r.yaw=90;
+        quick_go(&r,"Seyda Neen");
+        return;
+    }
+    if(n==3 && !strcmp(Cmd_Argv(1),"town"))s=Cmd_Argv(2);
+    else if(n==2)s=Cmd_Argv(1);
+    else if(n==1)s=start.kind==1?start.map:AW_MiniwindActive()?AW_Miniwind()->town:"";
+    town=AW_TownFind(s);
+    if(n>3 || town<0 || !(AW_Town(town)->flags&AW_TOWN_TELEPORT)){
+        Con_Printf("Usage: aw_quick_start [town] <town with an arrival point, e.g. balmora> | map MAP X Y Z YAW\n");return;
+    }
+    memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),AW_Town(town)->name);
+    if(!AW_TownArrival(r.target,0,r.arrival,&r.yaw) || !quick_character()){
         Con_Printf("Quick start: %s or the character catalogue not found.\n",AW_Town(town)->title);
         if(!sv.active)Cbuf_AddText("aw_main_menu\n");
         return;
     }
-    AW_SaveReset();AW_SceneCancelTransition();
-    health=aw_character.current[0];next=r;pending=1;started=Sys_FloatTime();
-    quick_notice=AW_MiniwindActive();
-    IN_AWClearButtons();key_dest=key_game;
-    Con_Printf("Quick start: %s as %s.\n",AW_Town(town)->title,aw_story.name);
-    sprintf(command,"map %s\n",r.target);Cbuf_AddText(command);
+    quick_go(&r,AW_Town(town)->title);
 }
 static void demo_start(void) {
     FILE *f;
