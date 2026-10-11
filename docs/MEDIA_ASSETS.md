@@ -3,12 +3,13 @@
 `resources/media/AmiWind_logo.png` is the AmiWind logo: the gold AmiWind name
 under the line "An open-source RPG engine for the Commodore Amiga", on a
 transparent background. It is the project's own logo, supplied by FlyingFathead
-on 8 October 2026, and is stored exactly as supplied. The README shows it at a
+on 8 October 2026, and is stored with the pixels exactly as supplied (asset fixed on 11 October 2026).
+The README shows it at a
 reduced display width; the stored PNG is not resampled or replaced.
 
 Dimensions: 2172 × 724 pixels, 8-bit RGBA.
 
-SHA-256: `9863d887449616ac0ba9780a4a55a0e40af4d38eefe89a872d3256f4e080b261`.
+SHA-256: `ee59ba43c7c47fd0df725ee7a55d36b7bf577944653d45991e7c2b5f93d8704a`.
 
 These named project assets are included in the public source allowlist.
 Converted Morrowind artwork, fonts, audio, movies and ROMs remain private build
