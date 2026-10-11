@@ -1,14 +1,6 @@
 # Hardware benchmark for owners of accelerated Amigas
 
-Every frame rate and loading time measured so far comes from an emulator, mostly
-with its JIT compiler at unlimited speed on a fast PC disk. Those figures are only
-good for comparing builds with each other, not for predicting what a real 68040 or
-68060 with an IDE or CompactFlash drive does
-([BENCH-JIT-PROFILE-32](bugs/BENCH-JIT-PROFILE-32.md)). One set of numbers from real
-hardware calibrates all of them. `awbench` is a small program that measures what
-matters for AmiWind: disk reads in the request sizes the game uses, how much CPU
-time the disk transfer leaves for everything else, and plain CPU, FPU and memory
-speed. It reads no game data and needs nothing from Morrowind.
+Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +13,16 @@ speed. It reads no game data and needs nothing from Morrowind.
 - [Emulator numbers are not hardware numbers](#emulator-numbers-are-not-hardware-numbers)
 
 <!-- contents end -->
+
+Every frame rate and loading time measured so far comes from an emulator, mostly
+with its JIT compiler at unlimited speed on a fast PC disk. Those figures are only
+good for comparing builds with each other, not for predicting what a real 68040 or
+68060 with an IDE or CompactFlash drive does
+([BENCH-JIT-PROFILE-32](bugs/BENCH-JIT-PROFILE-32.md)). One set of numbers from real
+hardware calibrates all of them. `awbench` is a small program that measures what
+matters for AmiWind: disk reads in the request sizes the game uses, how much CPU
+time the disk transfer leaves for everything else, and plain CPU, FPU and memory
+speed. It reads no game data and needs nothing from Morrowind.
 
 The developers have not run it on real hardware; your results are the first.
 

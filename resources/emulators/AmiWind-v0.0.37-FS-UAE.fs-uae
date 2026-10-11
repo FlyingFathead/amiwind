@@ -1,4 +1,4 @@
-# AmiWind v0.0.36 accelerated Linux playtest preset.
+# AmiWind v0.0.37 accelerated Linux playtest preset.
 # Replace ROM and HDF placeholders with your owned local files.
 # This is not a stock A1200 performance configuration.
 [config]
@@ -13,7 +13,7 @@ slow_memory = 0
 fast_memory = 0
 zorro_iii_memory = 16384
 kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
-hard_drive_0 = /path/to/your/AmiWind-v0.0.36.hdf
+hard_drive_0 = /path/to/your/AmiWind-v0.0.37.hdf
 hard_drive_0_type = hdf
 joystick_port_1 = none
 # Send middle-click to the game; use F12+G to release input.

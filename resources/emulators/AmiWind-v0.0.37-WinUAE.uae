@@ -1,8 +1,8 @@
-; AmiWind v0.0.36 - public machine preset, no game data or ROMs.
+; AmiWind v0.0.37 - public machine preset, no game data or ROMs.
 ; Load this preset, select your licensed A1200 Kickstart ROM, and add your
 ; locally generated RDB HDF on the UAE controller. Save a private copy.
 ; See docs/WINUAE.md. Reference hardware profile used by the Windows game-entry smoke test.
-config_description=AmiWind v0.0.36 Windows reference profile | AGA 040/FPU | 2M Chip + 16M Z3 | JIT/max | select owned ROM and HDF
+config_description=AmiWind v0.0.37 Windows reference profile | AGA 040/FPU | 2M Chip + 16M Z3 | JIT/max | select owned ROM and HDF
 config_hardware=true
 config_host=true
 config_version=6.0.3

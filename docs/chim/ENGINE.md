@@ -273,6 +273,7 @@ requirement](../WORLD_STREAMER.md#memory-placement-requirement)):
   prefer it and survive map changes there. Without it, at the 2 MiB Chip +
   16 MiB Fast baseline, shared models go with the map, as Quake's brush
   models do.
+  For real machines with more Fast RAM, see [real hardware](../REAL_HARDWARE.md).
 
 Sizes on the 68k target (measured with the target compiler): `model_t` 400
 bytes, `entity_t` 184, a run-time placement 236 (the 48-byte placement

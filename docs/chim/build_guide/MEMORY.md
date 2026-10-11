@@ -1,10 +1,6 @@
 # Memory on the Amiga: the game heap, the CHIM zone and what the builder checks
 
-This page explains, in plain terms, where AmiWind's memory goes on an Amiga, what the CHIM
-engine adds, which rules keep a map from running out, and how to read the numbers the game and the
-builder print. All figures were measured in FS-UAE with the A1200 profile (2 MiB Chip RAM, 16 MiB
-Fast RAM) on 9 October 2026, with the v0.0.32 release image and the CHIM engine of v0.0.33 (CHIM
-0.1.0); counts of bytes are exact, they do not depend on emulator speed.
+On a real Amiga with more Fast RAM: [real hardware](../../REAL_HARDWARE.md) (cache and heap settings).
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +17,12 @@ Fast RAM) on 9 October 2026, with the v0.0.32 release image and the CHIM engine 
 - [Reading the numbers](#reading-the-numbers)
 
 <!-- contents end -->
+
+This page explains, in plain terms, where AmiWind's memory goes on an Amiga, what the CHIM
+engine adds, which rules keep a map from running out, and how to read the numbers the game and the
+builder print. All figures were measured in FS-UAE with the A1200 profile (2 MiB Chip RAM, 16 MiB
+Fast RAM) on 9 October 2026, with the v0.0.32 release image and the CHIM engine of v0.0.33 (CHIM
+0.1.0); counts of bytes are exact, they do not depend on emulator speed.
 
 ## The picture
 

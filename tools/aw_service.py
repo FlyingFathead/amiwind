@@ -894,6 +894,32 @@ def existing_runs(config, request, runner, notes):
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
+def release_guard_refusals(config, request, facts):
+    """Release guard FIRST (fail fast): an rc or final build request is refused unless the config's release guard
+    passes on the commit (schema, characters, syntax of rendered scripts, version against the repo, notes format, test
+    list, privacy). Config: "release_guard": {"command": [...], "releases": DIR}; release configs DIR/vX.Y.Z.json."""
+    guard = config.get('release_guard')
+    purpose = str(request.get('purpose') or '')
+    if not guard or not (purpose.startswith('rc') or purpose in ('release', 'final')):
+        return []
+    plain = facts['version'].lstrip('v')
+    base = plain.split('-')[0]
+    release_cfg = Path(guard['releases']) / ('v%s.json' % base)
+    if not release_cfg.is_file():
+        return ['release guard: no release config %s for %s' % (release_cfg, facts['version'])]
+    cmd = list(guard['command']) + [str(release_cfg), facts['full'], '--repo', request['repo']]
+    if '-' not in plain:
+        cmd.append('--final')
+    out = Path(guard.get('out') or Path(release_cfg).parent / 'guard') / facts['commit']   # RELEASE-GUARD.json per commit
+    out.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(cmd + ['--out', str(out)], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if r.returncode == 0:
+        print('aw submit: release guard PASS on %s' % facts['commit'])
+        return []
+    failed = [line for line in r.stdout.splitlines() if line.startswith('FAIL')]
+    return ['release guard FAILED (%d): %s' % (len(failed), ' | '.join(failed[:8]) or r.stderr.strip()[:400])]
+
+
 def submit_build(config, request, dry_run, runner):
     started, t0 = aw.stamp(), time.time()
     notes, refusals = [], []
@@ -906,6 +932,7 @@ def submit_build(config, request, dry_run, runner):
     if facts['version'] != request['version']:
         refusals.append(f'the request says {request["version"]} but commit {facts["commit"]} has VERSION '
                         f'{facts["version"]}')
+    refusals += release_guard_refusals(config, request, facts)
     accept = request['override']['reason'] if allowed(request, 'version-mismatch') else None
     entry_refusals, warnings, entry = aw.entry_findings(config, request['repo'], accept, rev=facts['full'],
                                                         version=facts['version'])

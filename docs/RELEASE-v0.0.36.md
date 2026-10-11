@@ -60,8 +60,8 @@ So far, on the development line:
   Quarter, the canals and the east edge of Ebonheart, with their residents and 130 of their rooms, so you walk
   from canton to canton without a load. It replaces the Arena-only Vivec of the earlier development builds
   (`vivec_city` is a default CHIM area; the single-canton frames are kept for comparisons only, see
-  [Retired flags](EXPERIMENTAL_FLAGS.md#retired-flags)). Stair flights in the Temple, at Ebonheart and in three
-  rooms are still blocked (known issues).
+  [Retired flags](EXPERIMENTAL_FLAGS.md#retired-flags)). Every stair flight in Vivec climbs, the Temple, Ebonheart and
+  the rooms included (see Fixed since v0.0.35).
 - **Wider coordinates, so all of Vivec fits one map:** the engine now sends positions with 24 bits of 1/256 units
   instead of Quake's 16-bit eighths, so a CHIM map can reach +/-32,000 units from its centre instead of about
   +/-4,000. It costs one byte per coordinate in the game's messages (measured on every map of a full build: the
@@ -178,8 +178,8 @@ So far, on the development line:
   carries a current along it, so swimming out you are turned aside and carried along the coast and slowly
   back in; out of the water, outward motion fades before the edge. `dbg worldbounds on/off` switches it while
   playing; the builder's `--world-bounds off` leaves the game as before. See [World bounds](WORLD_BOUNDS.md).
-- **CHIM cells inside the open world** (experimental, off by default: `--chim-regions seabed|coast|sea-ring|`
-  a region name or a cell file): finished CHIMport cells replace their legacy open-world maps one cell at a
+- **CHIM cells inside the open world** (`--chim-regions seabed|coast|sea-ring|` a region name or a cell file; off in a
+  plain build, on in the release: the v0.0.36 release recipe `config/recipes/release-coast2.json` builds `coast2`): finished CHIMport cells replace their legacy open-world maps one cell at a
   time, under the same map names, so the engine changes maps between them exactly as before. Denser cells,
   which the legacy world splits into 2 x 2 or 4 x 4 maps, can now go on CHIM too: each is one CHIM cell, so
   more than twice as many finished cells can join (661 instead of 270 with today's tracker). `--chim-regions coast2` takes the whole coastline: all of
@@ -198,10 +198,10 @@ So far, on the development line:
   becomes a call for fixes to every worker (with an optional build hold); a gated builder head is published to
   every worker with what it contains, and a worker's gates and builds on an older base are refused until it
   merged the new head or replied why and when. See [AW.md](AW.md#broadcast).
-- **Shared terrain stored once in CHIM cells** (experimental, off by default: `--chim-terrain-hull compiled
+- **Shared terrain stored once in CHIM cells** (on by default: `--chim-terrain-hull compiled
   --chim-terrain-refs on`, world format 0.7): each piece of terrain a CHIM cell needs is built once and referenced
   by every cell that shows it, and the standing hull is compiled the way Seyda Neen's already is. Engines before
-  this format refuse 0.7 worlds with a clear message; the default world format stays 0.5 byte for byte. Every
+  this format refuse 0.7 worlds with a clear message; a build with `--chim-terrain-refs off` keeps world format 0.5 byte for byte. Every
   compiled hull is checked against its ground and falls back to the routed hull where it would leave a gap. See
   [WORLD_FORMAT.md](chim/WORLD_FORMAT.md).
 - **Physics review** ([PHYSICS.md](PHYSICS.md)): how AmiWind uses Quake's physics, area by area; movement uses
@@ -340,13 +340,10 @@ Next, v0.0.37 moves every finished (green) cell on the CHIM progress map onto CH
 
 - [NPC-WANDER-NOT-EXECUTED-35](bugs/NPC-WANDER-NOT-EXECUTED-35.md): residents stand still instead of following their original wander behaviour.
 
-- [PLAYER-DEATH-LIMBO-35](bugs/PLAYER-DEATH-LIMBO-35.md): after the player dies there is no way out, and NPCs still talk.
+- [PLAYER-DEATH-LIMBO-35](bugs/PLAYER-DEATH-LIMBO-35.md): repaired in this release (the death scene and **Retry fight** above);
+  it stays listed until it is checked in game.
 
 - [COMBAT-MUSIC-AIR-SWING-35](bugs/COMBAT-MUSIC-AIR-SWING-35.md): swinging at the air can start the combat music.
-
-- [HANG-IDLE-DUSK-35](bugs/HANG-IDLE-DUSK-35.md) and [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md): the music read that froze the game when idle outdoors no longer waits; other disk reads during play still wait.
-
-- [BUILD-LEGACY-CHAIN-DEFAULT-36](bugs/BUILD-LEGACY-CHAIN-DEFAULT-36.md): the v0.0.36-dev1 playtest images prepared Balmora's CHIM frame through the legacy chain; later builds use the CHIM-native path.
 
 - [BUILD-REUSE-PLAN-ENV-36](bugs/BUILD-REUSE-PLAN-ENV-36.md): the standalone reuse plan can report environment changes the build does not have; the build's own preflight is correct.
 

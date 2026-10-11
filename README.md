@@ -20,6 +20,7 @@ Morrowind installation for an experimental native Amiga runtime. Read the
 [licensing and credits](docs/LICENSING_AND_CREDITS.md) for source provenance and
 what the public package contains. In-game screenshots of every version:
 [gallery](docs/GALLERY.md).
+Have a real Amiga? [Running AmiWind on real hardware](docs/REAL_HARDWARE.md).
 
 <p align="center">
   <img src="docs/images/amiwind-v0.0.32-gallery.gif" width="800" alt="AmiWind v0.0.32 in Vivec: ten in-game screenshots in turn">
@@ -29,15 +30,17 @@ what the public package contains. In-game screenshots of every version:
 
 More in the [gallery](docs/GALLERY.md).
 
-**In development, v0.0.36, running on CHIM Engine v0.2.0:** CHIM starts replacing the legacy open world from the coast inward (CHIM cells for the converted coast and seabed, shared terrain stored once), CHIM-native towns by default, lava pools on the world map, `dbg godmode`, builds by request through the build server, and the idle freeze with looping music traced to a blocked music read. Draft notes: [docs/RELEASE-v0.0.36.md](docs/RELEASE-v0.0.36.md).
+**v0.0.37 - Proofreading the Cantons:** a small fix release: the v0.0.36 release notes and this page now match the released code, and the logo images are fixed. Release notes: [docs/RELEASE-v0.0.37.md](docs/RELEASE-v0.0.37.md).
+
+**v0.0.36, running on CHIM Engine v0.2.0:** the whole coastline and the next ring inland are on CHIM, all of Vivec is one CHIM map with 130 of its rooms, Seyda Neen and Balmora are CHIM-native, terrain is stored once, and the engine gets wider coordinates, third person, blocking and a death scene. Release notes: [docs/RELEASE-v0.0.36.md](docs/RELEASE-v0.0.36.md).
 
 ### CHIM progress map
 
 ![CHIM progress map of Vvardenfell, 2026-10-11: green cells are done, gold rings are planned for v0.0.36](docs/images/amiwind-v0.0.36-progress-map.png)
 
-Each square is one map cell, north up (2026-10-11, v0.0.36 development line). **Green:** converted to CHIM with every measured check passed, or open coast with nothing to place. **Violet:** converted, hull policy still pending. **Red:** failing a check, or not converted yet. **Dark grey:** not started (Solstheim). **Silver:** open ocean. **Gold rings:** planned for v0.0.36 (367 cells: the whole coastline ring, all of Vivec, Seyda Neen and Balmora). Done: 1,021 of 1,292 Vvardenfell land cells (79.0 %). The map is drawn by `tools/cell_progress_map.py` from the progress tracker data. What every colour means: [the CHIM progress map](docs/chim/CHIM_PROGRESS_MAP.md).
+Each square is one map cell, north up: the map at the v0.0.36 release freeze (2026-10-11). Done means converted to CHIM and audited, not yet in the game: v0.0.36 runs the coast rings and the named CHIM areas, and the next releases bring the other done cells in. The current count is on the [cell tracker](docs/chim/CELL_TRACKER.md). **Green:** converted to CHIM with every measured check passed, or open coast with nothing to place. **Violet:** converted, hull policy still pending. **Red:** failing a check, or not converted yet. **Dark grey:** not started (Solstheim). **Silver:** open ocean. **Gold rings:** planned for v0.0.36 (367 cells: the whole coastline ring, all of Vivec, Seyda Neen and Balmora). Done: 1,021 of 1,292 Vvardenfell land cells (79.0 %). The map is drawn by `tools/cell_progress_map.py` from the progress tracker data. What every colour means: [the CHIM progress map](docs/chim/CHIM_PROGRESS_MAP.md).
 
-**What's new in v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](docs/RELEASE-v0.0.35.md).
+**Previous release, v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](docs/RELEASE-v0.0.35.md).
 
 ## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore
 

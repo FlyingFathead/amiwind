@@ -44,7 +44,7 @@ The full table, with every record kind and where each file is specified:
 ## Versions so far
 
 CHIM has its own version, separate from AmiWind's: CHIM 0.1.0 shipped with AmiWind v0.0.33 and
-is still 0.1.0 (the `CHIM_VERSION` file; [versions](chim/README.md#versions)). CHIM 1.0 is the
+CHIM 0.2.0 with AmiWind v0.0.36 (the `CHIM_VERSION` file; [versions](chim/README.md#versions)). CHIM 1.0 is the
 release in which the whole island runs on CHIM. The world files carry a format version of their
 own, in every file header; each step below was measured before it was kept
 ([version rules](chim/WORLD_FORMAT.md#version-rules)).
@@ -55,9 +55,9 @@ own, in every file header; each step below was measured before it was kept
 | 0.2 | Sector files: 3 x 3 chunks per small file, read whole, in the order a walk meets them. |
 | 0.3 | Placement lists: each chunk knows which placements a view from it may see. |
 | 0.4 | Seamless ground: each chunk's standing hull also holds its neighbours' ground at the border. |
-| 0.5 | Seyda Neen: irregular ground and placements hidden by the opening story. The default today. |
+| 0.5 | Seyda Neen: irregular ground and placements hidden by the opening story. |
 | 0.6 | Large frames: one folder per sector row, for a frame of more than 64 sectors such as all of Vivec (designed; the engine reads it, the builder does not write it yet). |
-| 0.7 | Terrain references: identical ground stored once and placed where it repeats (opt-in, `--chim-terrain-refs on`). |
+| 0.7 | Terrain references: identical ground stored once and placed where it repeats (the default since v0.0.36: `--chim-terrain-refs on`). |
 
 The engine reads 0.4 to 0.7 and refuses anything else with a message naming both versions.
 

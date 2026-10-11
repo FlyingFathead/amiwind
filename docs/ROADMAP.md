@@ -3,7 +3,8 @@
 <!-- contents start -->
 ## Contents
 
-- [v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)](#v0036---36-lessons-of-vivecs-cantons-and-vvardenfell-shorelines)
+- [v0.0.37 - Proofreading the Cantons (fix release)](#v0037---proofreading-the-cantons-fix-release)
+- [v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines) (released)](#v0036---36-lessons-of-vivecs-cantons-and-vvardenfell-shorelines-released)
 - [v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (released)](#v0035---chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore-released)
   - [Next: build system](#next-build-system)
   - [Build pipeline speed (very near term, after Vivec)](#build-pipeline-speed-very-near-term-after-vivec)
@@ -147,7 +148,22 @@
 
 <!-- contents end -->
 
-## v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)
+## v0.0.37 - Proofreading the Cantons (fix release)
+
+The v0.0.36 release notes and README brought in line with the released code, and the logo images fixed. No
+game change. The next feature release is v0.0.38, "Piece By Piece, Cell By Cell": the lava cells first, then the
+objects still missing in the CHIM coast, then every green cell on the map.
+For real machines with lots of Fast RAM (first tester: A4000 with a 68060 accelerator), v0.0.38 also sizes the CHIM
+cache and heap from the free Fast RAM at start and makes CHIM disk reads non-blocking; the cache, prefetch and
+lookahead themselves exist already ([real hardware](REAL_HARDWARE.md)).
+The v0.0.38 work is adaptive CHIM caching and non-blocking world streaming: keep `-chimcache` as the manual
+override; detect usable Fast RAM and grow the cache conservatively without touching the tested baseline heap; count
+cache hits, misses and evictions; and turn CHIM's blocking pack reads (`Chim_PackRead`,
+[ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)) into reads that complete in the background,
+starting from the asynchronous music reader (`aw_aread.c`). A cache only makes a hit faster; only asynchronous reads
+stop a miss from stalling a frame. The 2 MiB Chip + 16 MiB Fast machine stays a supported, tested fallback.
+
+## v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines) (released)
 
 v0.0.36 starts moving the open world onto CHIM inside the game itself. Converted areas sit inside
 the legacy island, the border between the two is measured and made seamless, and CHIM takes over
@@ -155,7 +171,7 @@ cell by cell, from the sea and the coast inward. Draft notes: [release notes](RE
 
 Scope: v0.0.36 = the whole coastline on CHIM (every cell of the outer ring and every passing cell of the second ring),
 the open ocean placed in the game (one shared ocean chunk), the whole city of Vivec by default, and Seyda Neen and
-Balmora. After v0.0.36 comes v0.0.37, which moves every green zone on the map onto CHIM (see below).
+Balmora. After v0.0.36 comes v0.0.38, which moves every green zone on the map onto CHIM (see below).
 
 Steps, each one a playtest build:
 
@@ -186,10 +202,10 @@ Still to do along the way: buildings of a CHIM area appear only when the player 
 (seen from legacy land the area shows its ground and rocks); harvestable plants in extra CHIM
 areas; collision for thin underwater plants; and rebuild cascades in the builder.
 
-Next, v0.0.37: all green zones. Every cell shown green (finished) on the CHIM Progress Tracker map, about 670 cells,
+Next, v0.0.38: all green zones. Every cell shown green (finished) on the CHIM Progress Tracker map, about 670 cells,
 moves onto CHIM in the game and is tested there, with bug fixes along the way. The first item is the lava
 stale-source fix (CHIMPORT-RETRY-LAVA-STALE-SOURCE-36). The tracker already shows this plan in pale gold.
-Also for v0.0.37, from the owner's dev5 playtest: the NPC you are fighting must stay visible in third person
+Also for v0.0.38, from the owner's dev5 playtest: the NPC you are fighting must stay visible in third person
 (CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36), and, longer term, blocking: NPCs block by their Block skill with a block animation, and the player
 blocks with the right mouse button, with the companion pick on another key (COMBAT-BLOCKING-36; the original rules are
 researched first).

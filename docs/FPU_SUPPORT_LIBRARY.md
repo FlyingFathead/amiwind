@@ -1,10 +1,6 @@
 # FPU support library (optional, your own copy)
 
-AmiWind can put your own `68040.library` or `68060.library` on its boot disk
-and open it at start-up. It is optional: without one the game builds and boots
-as before, and the boot check shows a warning line. AmiWind never ships,
-downloads or bundles this library; the builder only copies the file you point
-it at, from your own Workbench or accelerator installation.
+Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +14,12 @@ it at, from your own Workbench or accelerator installation.
 - [Tested](#tested)
 
 <!-- contents end -->
+
+AmiWind can put your own `68040.library` or `68060.library` on its boot disk
+and open it at start-up. It is optional: without one the game builds and boots
+as before, and the boot check shows a warning line. AmiWind never ships,
+downloads or bundles this library; the builder only copies the file you point
+it at, from your own Workbench or accelerator installation.
 
 ## Why
 

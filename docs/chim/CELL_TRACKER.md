@@ -4,25 +4,25 @@
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
 
-**Done: 1,021 of 1,292 (79.0 %)**
+**Done: 1,240 of 1,292 (96.0 %)**
 
-Map cells 2,157: land and empty-sea cells 1,292 (done 1,021, 79.0 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
+Map cells 2,158: land and empty-sea cells 1,292 (done 1,240, 96.0 %) and open-ocean cells 866 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
-- Cell complete, awaiting lighting: 96
-- Terrain complete, awaiting lighting: 367
-- Passed (something still deferred): 455
+- Cell complete, awaiting lighting: 98
+- Terrain complete, awaiting lighting: 451
+- Passed (something still deferred): 588
 - Empty sea: 103
-- Open ocean (silver, not counted as done): 865
+- Open ocean (silver, not counted as done): 866
 
-**Eligible for v0.0.36: 1,021 of 1,292** (every done cell, lighting done or not; definition in the import policy).
+**Eligible for v0.0.36: 1,240 of 1,292** (every done cell, lighting done or not; definition in the import policy).
 
 Lighting: lit 0, partial 133, unlit 1,027, not measured 132 (cells; lit is required for both completion levels).
 
 Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 647 night lamps only, 2,207 not represented.
 
-Generated 2026-10-11 10:25 +0300. Tracker data generated 2026-10-11T07:15:06+00:00.
+Generated 2026-10-11 13:09 +0300. Tracker data generated 2026-10-11T10:09:55+00:00.
 
 ## Totals
 
@@ -30,12 +30,12 @@ Generated 2026-10-11 10:25 +0300. Tracker data generated 2026-10-11T07:15:06+00:
 | :-- | --: | --: |
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
-| Cell complete, awaiting lighting | 96 | 7.4 % |
-| Terrain complete, awaiting lighting | 367 | 28.4 % |
-| Passed (something still deferred) | 455 | 35.2 % |
+| Cell complete, awaiting lighting | 98 | 7.6 % |
+| Terrain complete, awaiting lighting | 451 | 34.9 % |
+| Passed (something still deferred) | 588 | 45.5 % |
 | Empty sea | 103 | 8.0 % |
-| Open sea | 865 | 67.0 % |
-| Hull policy pending | 219 | 17.0 % |
+| Open sea | 866 | 67.0 % |
+| Hull policy pending | 0 | 0.0 % |
 | Failed | 23 | 1.8 % |
 | Not converted | 29 | 2.2 % |
 | Not started | 0 | 0.0 % |
@@ -52,20 +52,20 @@ No cells are assigned to a release yet.
 
 | Ring | Cells | Cell complete | Terrain complete | Cell complete, awaiting lighting | Terrain complete, awaiting lighting | Passed (something still deferred) | Empty sea | Open sea | Hull policy pending | Failed | Not converted | Not started |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 | 1 | 171 | 0 | 0 | 56 | 5 | 8 | 102 | 0 | 0 | 0 | 0 | 0 |
-| 2 | 160 | 0 | 0 | 38 | 9 | 111 | 1 | 0 | 1 | 0 | 0 | 0 |
-| 3 | 149 | 0 | 0 | 0 | 6 | 125 | 0 | 0 | 11 | 7 | 0 | 0 |
-| 4 | 138 | 0 | 0 | 1 | 27 | 99 | 0 | 0 | 6 | 4 | 1 | 0 |
-| 5 | 125 | 0 | 0 | 1 | 46 | 67 | 0 | 0 | 5 | 5 | 1 | 0 |
-| 6 | 114 | 0 | 0 | 0 | 33 | 8 | 0 | 0 | 71 | 1 | 1 | 0 |
-| 7 | 104 | 0 | 0 | 0 | 43 | 1 | 0 | 0 | 59 | 1 | 0 | 0 |
-| 8 | 94 | 0 | 0 | 0 | 52 | 0 | 0 | 0 | 39 | 0 | 3 | 0 |
-| 9 | 81 | 0 | 0 | 0 | 58 | 6 | 0 | 0 | 10 | 2 | 5 | 0 |
-| 10 | 66 | 0 | 0 | 0 | 38 | 10 | 0 | 0 | 8 | 1 | 9 | 0 |
-| 11 | 50 | 0 | 0 | 0 | 25 | 11 | 0 | 0 | 6 | 2 | 6 | 0 |
-| 12 | 33 | 0 | 0 | 0 | 21 | 8 | 0 | 0 | 2 | 0 | 2 | 0 |
-| 13 | 7 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
+| 2 | 160 | 0 | 0 | 38 | 9 | 112 | 1 | 0 | 0 | 0 | 0 | 0 |
+| 3 | 149 | 0 | 0 | 0 | 7 | 135 | 0 | 0 | 0 | 7 | 0 | 0 |
+| 4 | 138 | 0 | 0 | 1 | 29 | 103 | 0 | 0 | 0 | 4 | 1 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 48 | 70 | 0 | 0 | 0 | 5 | 1 | 0 |
+| 6 | 114 | 0 | 0 | 0 | 53 | 59 | 0 | 0 | 0 | 1 | 1 | 0 |
+| 7 | 104 | 0 | 0 | 1 | 64 | 38 | 0 | 0 | 0 | 1 | 0 | 0 |
+| 8 | 94 | 0 | 0 | 1 | 68 | 22 | 0 | 0 | 0 | 0 | 3 | 0 |
+| 9 | 81 | 0 | 0 | 0 | 66 | 8 | 0 | 0 | 0 | 2 | 5 | 0 |
+| 10 | 66 | 0 | 0 | 0 | 44 | 12 | 0 | 0 | 0 | 1 | 9 | 0 |
+| 11 | 50 | 0 | 0 | 0 | 30 | 12 | 0 | 0 | 0 | 2 | 6 | 0 |
+| 12 | 33 | 0 | 0 | 0 | 23 | 8 | 0 | 0 | 0 | 0 | 2 | 0 |
+| 13 | 7 | 0 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
 
 ## Failures by mechanism class
 
