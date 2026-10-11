@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aw-request-1",
+  "title": "AmiWind master builder request (aw-request-1)",
+  "description": "A worker asks the master builder for one unit of work. Written by tools/aw.py; see docs/AW.md. The options of each kind are described in $defs (checked by aw for the request's kind).",
+  "type": "object",
+  "required": ["schema", "id", "kind", "repo", "commit", "purpose", "version", "reason", "requester", "time"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "aw-request-1"},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "kind": {"enum": ["gate", "build", "miniwind", "chimport-region", "smoke"]},
+    "repo": {"type": "string", "minLength": 1},
+    "commit": {"type": "string", "pattern": "^([0-9a-f]{4,40}|nogit)$"},
+    "purpose": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]*$"},
+    "version": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$"},
+    "reason": {"type": "string"},
+    "requester": {"type": "string", "minLength": 1},
+    "time": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [+-][0-9]{4}$"},
+    "options": {"type": "object"},
+    "override": {
+      "type": "object",
+      "description": "Lifts named refusals for this one request; the reason is recorded in the result and the trial log.",
+      "required": ["reason", "allow"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {"type": "string", "minLength": 12},
+        "allow": {"type": "array", "items": {"enum": ["retired-flags", "unexplained-rebuilds", "version-mismatch", "build-hold", "stair-walk-full"]}}
+      }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "range": {"type": ["string", "null"]},
+        "number": {"type": ["integer", "null"], "minimum": 0},
+        "allow_dirty": {"type": "boolean"},
+        "quiet": {"type": "boolean"}
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "flags": {"type": "array", "items": {"type": "string"}},
+        "reuse_from": {"type": ["string", "null"], "pattern": "^/"},
+        "reuse_from_commit": {"type": ["string", "null"], "pattern": "^[0-9a-f]{4,40}$"},
+        "inputs": {
+          "type": "array",
+          "description": "Input files in the build volume the flags name (e.g. --chim-regions @FILE): each is hashed before the build and refused when its sha256 differs; the result records them",
+          "items": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {"type": "string", "pattern": "^/"},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "role": {"type": "string"}
+            }
+          }
+        },
+        "workspace": {"type": "string", "pattern": "^/"},
+        "cpus": {"type": "integer", "minimum": 1},
+        "memory": {"type": "string", "pattern": "^[0-9]+[kmgKMG]?$"},
+        "jobs": {"type": "integer", "minimum": 1},
+        "priority": {"enum": ["release", "dev", "optional"], "description": "core lease priority (aw core leases): release-critical > dev > optional/experimental; default release for release/rc purposes, else dev"},
+        "dry_run": {"type": "boolean"},
+        "recipe": {
+          "type": "object",
+          "description": "A build recipe (build-recipe-1, docs/BUILD_RECIPES.md): its text byte for byte, the SHA-256 of that text, its name and the host file it came from; staged into the build volume and given to the builder with --recipe (flags win over it, each difference recorded)",
+          "required": ["name", "sha256", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "file": {"type": "string"},
+            "text": {"type": "string", "minLength": 2}
+          }
+        }
+      }
+    },
+    "miniwind": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": {"type": "string", "minLength": 1, "description": "A row of config/miniwind-presets.json of the requested commit"},
+        "description": {"type": "string"},
+        "flags": {"type": "array", "items": {"type": "string"}},
+        "reuse_from": {"type": ["string", "null"], "pattern": "^/"},
+        "reuse_from_commit": {"type": ["string", "null"], "pattern": "^[0-9a-f]{4,40}$"},
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {"type": "string", "pattern": "^/"},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "role": {"type": "string"}
+            }
+          }
+        },
+        "workspace": {"type": "string", "pattern": "^/"},
+        "cpus": {"type": "integer", "minimum": 1},
+        "memory": {"type": "string", "pattern": "^[0-9]+[kmgKMG]?$"},
+        "jobs": {"type": "integer", "minimum": 1},
+        "priority": {"enum": ["release", "dev", "optional"], "description": "core lease priority (aw core leases): release-critical > dev > optional/experimental; default release for release/rc purposes, else dev"},
+        "dry_run": {"type": "boolean"}
+      }
+    },
+    "chimport-region": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {"type": "string", "minLength": 1},
+        "areas": {"type": "array", "items": {"type": "string"}},
+        "flags": {"type": "array", "items": {"type": "string"}},
+        "dry_run": {"type": "boolean"}
+      }
+    },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run": {"type": "string", "minLength": 1},
+        "script": {"type": "string"},
+        "dry_run": {"type": "boolean"}
+      }
+    }
+  }
+}

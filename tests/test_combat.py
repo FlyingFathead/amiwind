@@ -92,6 +92,27 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('if(AW_CompanionPickAim())return;', combat)
         self.assertIn('int AW_CompanionPickAim(void)', code('aw_companion.c'))
 
+    def test_blocking_hold_to_block_default_and_original_kept(self):
+        # COMBAT-BLOCKING-36: the right button (+aw_alt) is the block button; aw_combat_block 1 (hold to
+        # block, an AmiWind extension) is the default, 0 keeps the original automatic block; the original
+        # formula decides every blow (rules: AW_CombatCanBlock checks block_off, the player's readiness).
+        combat = code('aw_combat.c')
+        self.assertIn('static cvar_t block_cvar={"aw_combat_block","1",true};', combat)
+        self.assertIn('you.block_off=(unsigned char)(block_cvar.value && !AW_CombatGuarding());', combat)
+        self.assertIn('svs.clients[0].cmd.forwardmove<=0', combat)   # fBlockStillBonus: not moving forward
+        self.assertIn('aw_combat_buttons=guard_buttons', combat)
+        self.assertIn('v->block_off', code('aw_combat_rules.c').split('int AW_CombatCanBlock')[1].split('}')[0])
+        self.assertIn('bits = aw_combat_buttons (bits);', code('cl_input.c'))
+        self.assertIn('AW_CombatGuarding()', code('aw_view.c'))      # the body's block group
+        self.assertIn('aw_combat_guard_marker()', code('aw_ui.c'))
+        menu = code('aw_menu.c')
+        self.assertIn('{"Block","+aw_alt"}', menu)
+        self.assertIn('"Blocking: Hold to block":"Blocking: Automatic"', menu)
+        self.assertIn('block hold/auto', (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8'))
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import prepare_player_view
+        self.assertIn(('block', 5), prepare_player_view.BODY_EXTRA)
+
     def test_world_loadout_uses_the_arena_sheets(self):
         combat = code('aw_combat.c')
         world = combat[combat.index('static void loadout_command'):combat.index('static void command')]
@@ -125,7 +146,10 @@ class CombatSourceContractTests(unittest.TestCase):
             self.assertIn(guard, body)
         self.assertIn('advance(want?"combat":"combat-end")', body)
         death = music[music.index('void AW_MusicDeath(void)'):]
-        self.assertIn('manual_lookup("mw_death",&g)', death[:400])
+        # the death track is looked up once at start, never read during play (HANG-IDLE-DUSK-35)
+        self.assertIn('open_track(death_id,"death")', death[:600])
+        self.assertNotIn('manual_lookup', death[:600])
+        self.assertIn('death_id=manual_lookup("mw_death",&g)', music[music.index('int CDAudio_Init(void)'):])
         combat = code('aw_combat.c')
         self.assertIn('AW_MusicCombat(want)', combat)
         self.assertIn('AW_MusicDeath()', combat)
@@ -137,12 +161,12 @@ class CombatSourceContractTests(unittest.TestCase):
         for word in ('arenapit', 'battlearena', 'arenatest', 'arena'):
             self.assertEqual(routes[word], 'aw_arenapit', word)
         self.assertEqual(routes['combattest'], 'aw_combattest')
-        self.assertEqual(routes['combat'], 'aw_combat')
+        self.assertEqual(routes['combat'], 'aw_combat_cmd')   # not the cvar aw_combat (CONSOLE-COMMAND-SHADOWED-BY-CVAR-36)
         self.assertIn('combattest gallery', catalogue)
         arena = code('aw_arena.c')
         for handler in ('aw_arenapit', 'dbgmode', 'testarena'):
             self.assertIn('Cmd_AddCommand("%s",' % handler, arena)
-        self.assertIn('Cmd_AddCommand("aw_combat",', code('aw_combat.c'))
+        self.assertIn('Cmd_AddCommand("aw_combat_cmd",', code('aw_combat.c'))
         docs = (ROOT / 'docs' / 'COMBAT.md').read_text(encoding='utf-8')
         for words in ('dbgmode arenapit', 'dbg battlearena', 'dbg arenatest', 'testarena', 'dbg arena',
                       'dbg combattest gallery', 'dbg combat readout', 'aw_combat_seed', 'fNPCHealthBarTime',

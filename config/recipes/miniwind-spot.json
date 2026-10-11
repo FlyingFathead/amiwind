@@ -1,0 +1,17 @@
+{
+  "schema": "build-recipe-1",
+  "name": "miniwind-spot",
+  "description": "A MiniWind spot: the Balmora exterior only, started straight at one exterior cell (cell:-3,-2) with the ready-made character; voices and NPCs not referenced there left out. Copy it and change the start point for another spot (docs/chim/build_guide/DIRECT_START.md).",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Balmora exterior: one street cell",
+    "direct_to_game_map": "cell:-3,-2",
+    "exclude_unreferenced": "voice,npcs",
+    "chim_frame_ext": "chim"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

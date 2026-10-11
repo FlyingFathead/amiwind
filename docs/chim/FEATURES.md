@@ -4,7 +4,7 @@
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.1.0. 35 features: 21 in this release, 8 in progress, 3 planned, 3 ideas. Updated 9 October 2026.
+CHIM version: 0.2.0. 38 features: 21 shipped, 11 in progress, 3 planned, 3 ideas. Updated 11 October 2026.
 
 ## What CHIM has done so far
 
@@ -21,20 +21,22 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Far terrain: the distant view:** Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. *emulator, relative, busy host, 9 October 2026.* [Details](#far-terrain-the-distant-view)
 - **Build cache and prerendered store:** Image step on MiniWind maps, warm: BSP optimizer 388 s to 5.7 s, hidden-surface cull 48 s to 6.6 s, byte-identical outputs. *builder output, busy host, 9 October 2026.* [Details](#build-cache-and-prerendered-store)
 - **Statics and flora sprites streamed with their chunks:** Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B. *emulator, relative, busy host, 9 October 2026.* [Details](#statics-and-flora-sprites-streamed-with-their-chunks)
+- **Ground stored once:** Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. *builder output, 10 October 2026.* [Details](#ground-stored-once)
+- **Fewer faces per mesh (planar merge, meshoptimizer for large shells):** Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. *exact counts, 11 October 2026.* [Details](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells)
 
-Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. CHIM 0.1.0 is not published yet; the features marked "in this release" are in the development line for AmiWind v0.0.33.
+Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.0, not yet published.
 
 ## Features by status
 
 | Status | Meaning | Features |
 | --- | --- | --- |
-| Shipped in CHIM 0.1.0 | in a published release | 0 |
-| In this release (CHIM 0.1.0) | in the line that becomes the next release; not yet published | 21 |
-| In progress | being built or measured; not finished | 8 |
+| Shipped | in a published release | 21 |
+| In this release (CHIM 0.2.0) | in the line that becomes the next release; not yet published | 0 |
+| In progress | being built or measured; not finished | 11 |
 | Planned | decided; no finished design or code | 3 |
 | Idea | written down, not decided | 3 |
 
-### In this release (CHIM 0.1.0)
+### Shipped
 
 | Feature | Area | What it does | Measured gain |
 | --- | --- | --- | --- |
@@ -69,9 +71,12 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Routed standing hulls for many-piece models](#routed-standing-hulls-for-many-piece-models) | Builder and tools | Models with more than 16 collision pieces get one routed standing hull (same solid set, nested routing) instead of a long chain of pieces, in CHIM and in the legacy converter alike; tools/hull_chain_audit.py sweeps every map for deep hull chains. --model-hull (auto, chain, routed or balanced) keeps every method selectable. | not measured |
 | [CHIMport: the whole island, cell by cell](#chimport-the-whole-island-cell-by-cell) | Builder and tools | An autobuilder that converts every exterior cell with everything placed in it to CHIM, from the sea at the edge of the map inwards ring by ring, runs every builder audit on each cell, records its figures and feeds the CHIM Progress Tracker. | not measured |
 | [Memory estimator](#memory-estimator) | Builder and tools | A predictor of how many bytes the chunk zone must hold at any position on the island, before anything is built, from the distinct models in the ring, terrain, catalogue entries and textures. | about 20 % to 40 % accuracy |
-| [Vivec on CHIM (milestone M3)](#vivec-on-chim-milestone-m3) | Roadmap | Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec in one frame (world format 0.6, sectors in one folder per sector row). | not measured |
+| [Vivec on CHIM (milestone M3)](#vivec-on-chim-milestone-m3) | Roadmap | Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec on CHIM (one city frame does not fit the engine's coordinate range: the frame layout is an open decision). | not measured |
+| [CHIM cells inside the legacy open world](#chim-cells-inside-the-legacy-open-world) | World format and disk | Finished CHIMport cells (the seabed, the coast, a region or a cell list) replace their legacy open-world maps one cell at a time, in place and under the same map names, so the island moves to CHIM area by area. | not measured |
 | [Lighting audit in the cell tracker](#lighting-audit-in-the-cell-tracker) | Builder and tools | Every exterior cell is checked for light like the original: its original lights by class, with and without a mesh, how each reaches the frame (baked, night lamps only, not at all) and the share of lit surfaces. Lit is required for both completion levels; cells that wait only for light are shown as awaiting lighting. | not measured |
 | [Lit like the original](#lit-like-the-original) | Rendering and visibility | The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time. | not measured |
+| [Ground stored once](#ground-stored-once) | World format and disk | Terrain references (world format 0.7, --chim-terrain-refs, off by default): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record. | 9.0 MB to 1.9 MB for seven region cells |
+| [Fewer faces per mesh (planar merge, meshoptimizer for large shells)](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells) | Builder and tools | Every CHIM mesh's coplanar triangles with one texture mapping become one convex Quake face (planar merge, lossless, never more faces); large hard-surface shells that a profile reduces use meshoptimizer's simplifier with locked borders instead of the profile's reducer (the arrival ship). A method table chooses per mesh by a measured rule; the earlier method stays selectable. | -2.1 % faces island-wide; the ship -9 %, shape error /7 |
 
 ### Planned
 
@@ -95,7 +100,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 
 #### Every asset stored once
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `stored-once`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `stored-once`.
 
 Every mesh, collision hull and texture of an exterior is stored once and placed by reference, instead of being copied into every region map that can see it.
 
@@ -117,7 +122,7 @@ Every mesh, collision hull and texture of an exterior is stored once and placed 
 
 #### Pure CHIM towns: no legacy maps shipped
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `pure-chim-towns`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `pure-chim-towns`.
 
 Balmora and Seyda Neen (with the intro docks and the courtyard) are drawn only by CHIM; the legacy region maps of a CHIM town are neither built nor shipped. Seyda Neen is regenerated from your data, so the temporary heap bypass for three recorded maps ends.
 
@@ -136,7 +141,7 @@ Balmora and Seyda Neen (with the intro docks and the courtyard) are drawn only b
 
 #### Texture effects (.chimfx)
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `texture-effects`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `texture-effects`.
 
 An optional effect file can add specks of chosen colours to chosen textures, identical in every build and off unless selected. It began as a bug: the first CHIM worlds showed bright specks because their textures skipped the palette guard.
 
@@ -149,6 +154,26 @@ An optional effect file can add specks of chosen colours to chosen textures, ide
 **Bugs:** [CHIM-TEXTURE-SPECKS-33](../bugs/CHIM-TEXTURE-SPECKS-33.md).
 
 **Commits:** `8caf66e`.
+
+#### CHIM cells inside the legacy open world
+
+**Status:** In progress. **ID:** `chim-regions`.
+
+Finished CHIMport cells (the seabed, the coast, a region or a cell list) replace their legacy open-world maps one cell at a time, in place and under the same map names, so the island moves to CHIM area by area.
+
+**Measured gain:** Not measured. Built and gated on a scratch world of three cells; not yet in a playtest image. Each cell frame carries a terrain margin, so storage grows for now (CHIM-REGION-MARGIN-STORAGE-36).
+
+**Visibility:** Each cell is a CHIM frame (placements linked to the leaves they touch, a visibility row per chunk); across a hand-over only one map is loaded, as between legacy maps.
+
+**Caveats:**
+
+- Harvest catalogues of replaced cells are not carried over yet.
+- A divided cell (2 x 2 or 4 x 4 legacy maps) is one frame: the first map's directory row owns the cell, the others are aliases (CHIM-REGION-DIVIDED-CELLS-36).
+- Open sea without LAND waits for the engine to read the shared ocean chunk.
+
+**Read more:** [CHIM regions](CHIM_REGIONS.md).
+
+**Bugs:** [CHIM-REGION-MARGIN-STORAGE-36](../bugs/CHIM-REGION-MARGIN-STORAGE-36.md), [CHIM-REGION-DIVIDED-CELLS-36](../bugs/CHIM-REGION-DIVIDED-CELLS-36.md).
 
 #### Run-time scale and tilt of shared models
 
@@ -190,11 +215,34 @@ Store interior props once and light each placement separately, which would remov
 
 **Read more:** [World streamer](../WORLD_STREAMER.md); [CHIM ideas: also held back](IDEAS.md#also-held-back).
 
+#### Ground stored once
+
+**Status:** In progress. **ID:** `terrain-stored-once`.
+
+Terrain references (world format 0.7, --chim-terrain-refs, off by default): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record.
+
+**Measured gain:**
+
+- Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. Compared: scratch CHIM worlds of the same cells (chim_build --chim-regions-cells, one frame per cell, 896-unit margin) with copies and the routed hull, against the same cells with --terrain-hull compiled --terrain-refs on; the open-world maps of the same build. *builder output, 10 October 2026.*
+
+Six coastal land cells: 10.0 MB to 2.6 MB (0.93 times their open-world maps). Memory unchanged (each chunk keeps its own decoded copy); every CHIM gate passed on both worlds.
+
+**Visibility:** No change: the grafted world holds the same nodes, leaves and faces at the same place; chunk and placement visibility rows are unchanged.
+
+**Caveats:**
+
+- Experimental and off by default until a sea-ring build has been played.
+- A record homed in another frame's sector file costs one more file seek when it loads.
+
+**Read more:** [Terrain references](WORLD_FORMAT.md); [CHIM regions](CHIM_REGIONS.md).
+
+**Bugs:** [CHIM-REGION-MARGIN-STORAGE-36](../bugs/CHIM-REGION-MARGIN-STORAGE-36.md).
+
 ### Streaming and memory
 
 #### Streaming with no region stop
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `chunk-streaming`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `chunk-streaming`.
 
 The land is cut into chunks of 256 units. A ring of chunks around the player is resident and chunks join and leave a little at a time, within a per-frame budget, so crossing a region border no longer loads a whole map.
 
@@ -216,7 +264,7 @@ The land is cut into chunks of 256 units. A ring of chunks around the player is 
 
 #### Incremental frame world
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `incremental-frame-world`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `incremental-frame-world`.
 
 When a chunk joins or leaves the ring, only the leaves it touches are relinked, instead of rebuilding the whole frame world on every crossing. The full rebuild is kept as a selectable method (chim_graft_mode 0).
 
@@ -239,7 +287,7 @@ When a chunk joins or leaves the ring, only the leaves it touches are relinked, 
 
 #### Chunk pinning: no holes in the town
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `chunk-pinning`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `chunk-pinning`.
 
 Chunks are pinned only while they load, farther chunks give way first, small blocks come from the high end of the memory zone and the ground never waits for a building. A chunk shows as soon as its ground is in.
 
@@ -261,7 +309,7 @@ Chunks are pinned only while they load, farther chunks give way first, small blo
 
 #### Strict heap gate and a fixed chunk zone
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `heap-gate-and-zone`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `heap-gate-and-zone`.
 
 CHIM reserves one chunk zone of fixed size in the Hunk when a town loads. The builder checks every CHIM area against the engine's own numbers (active ring, load ring, largest block) before the game ever runs.
 
@@ -274,7 +322,7 @@ CHIM reserves one chunk zone of fixed size in the Hunk when a town loads. The bu
 **Caveats:**
 
 - The zone is taken from the Hunk, so less Hunk is left at the load peak: Balmora 2.32 MB (legacy 3.53 MB), Seyda Neen 1.10 MB (legacy 4.42 MB), which is under the 2 MiB rule (CHIM-SEYDA-HUNK-GAP-33, open).
-- The zone size is an interim 7,680 KiB in the builder; the owner decision is pending (CHIM-ZONE-BUDGET-33).
+- The zone is the engine's chim_zone_kib (6,864 KiB) less the frame-world pool (2 x 384 KiB): 6,242,304 bytes of chunk room, read by the builder from the engine source; a zone the world states itself is still proposed (CHIM-ZONE-BUDGET-33).
 
 **Read more:** [CHIM engine: memory](ENGINE.md#memory); [Draft v0.0.33 release notes, memory](../RELEASE-v0.0.33.md#memory); [CHIM ideas: memory](IDEAS.md#memory).
 
@@ -282,7 +330,7 @@ CHIM reserves one chunk zone of fixed size in the Hunk when a town loads. The bu
 
 #### Statics and flora sprites streamed with their chunks
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `sprite-statics-streamed`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `sprite-statics-streamed`.
 
 The frame map tags its static models and flora sprites with their chunk; the engine loads and links them when the chunk joins the ring and frees them when it leaves, instead of holding all of them in the map's fixed cost in the Hunk.
 
@@ -304,7 +352,7 @@ The frame map tags its static models and flora sprites with their chunk; the eng
 
 #### Quake's visibility culling kept effective
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `vis-kept`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `vis-kept`.
 
 Placements are linked to the leaves they touch, terrain is world geometry with shallow per-chunk trees, and each chunk carries a row of the placements a view from it may see. Nothing is a func_wall that vis ignores.
 
@@ -327,7 +375,7 @@ Placements are linked to the leaves they touch, terrain is world geometry with s
 
 #### Terrain as world geometry
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `terrain-world-geometry`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `terrain-world-geometry`.
 
 Each chunk's ground is a small BSP subtree grafted under the frame's world, so Quake's visibility, collision and water work on it as on any map, and the terrain occludes what lies behind it.
 
@@ -341,7 +389,7 @@ Each chunk's ground is a small BSP subtree grafted under the frame's world, so Q
 
 #### Faster frames in town
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `frame-time`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `frame-time`.
 
 The shallow per-chunk trees and the far smaller number of models sent to the renderer cut the time a frame takes at the Balmora cameras.
 
@@ -364,7 +412,7 @@ The shallow per-chunk trees and the far smaller number of models sent to the ren
 
 #### Far terrain: the distant view
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `far-terrain`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `far-terrain`.
 
 A resident low-detail layer of the land for the frame and beyond its edge (maps/<frame map>.far, written once per frame by the builder), drawn past the fog plane in the fog colour like the v0.0.32 horizon, so valleys and far land are not empty fog.
 
@@ -461,7 +509,7 @@ A ladder that starts with plain Quake chase movement and stair climbing, and esc
 
 #### No disk writes during play
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `logs-in-memory`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `logs-in-memory`.
 
 Diagnostic logs stay in memory during play and are written on request or when the game is left, so a closed emulator or a power cut no longer lands in the middle of a write and leaves the volume "not validated".
 
@@ -483,7 +531,7 @@ Diagnostic logs stay in memory during play and are written on request or when th
 
 #### dbg tp, doors and saves on CHIM towns
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `tp-and-scene-lookup`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `tp-and-scene-lookup`.
 
 Every check that a scene exists (dbg tp arrivals, quick start, doors, saves and loads, the scene picker) goes through one function that finds the scene's map or the town's CHIM frame map, so a pure CHIM image works with the same commands as a legacy one. A save made in CHIM Balmora loads in either kind of image.
 
@@ -495,7 +543,7 @@ Every check that a scene exists (dbg tp arrivals, quick start, doors, saves and 
 
 #### Legacy and CHIM side by side
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `legacy-side-by-side`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `legacy-side-by-side`.
 
 chim_towns 0 brings back the legacy region maps for an A/B in one session; the console states which mode every town runs in, and start-up prints how many towns are on CHIM. No working method is deleted.
 
@@ -509,7 +557,7 @@ chim_towns 0 brings back the legacy region maps for an A/B in one session; the c
 
 #### Zone walk gate
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `zone-walk-gate`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `zone-walk-gate`.
 
 The builder runs the engine's own zone code over a walk through every frame and fails the build when a step leaves the player without ground.
 
@@ -523,7 +571,7 @@ The builder runs the engine's own zone code over a walk through every frame and 
 
 #### Island-wide audits as build gates
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `island-wide-audits`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `island-wide-audits`.
 
 Each geometry or collision finding names its mechanism, sweeps every mesh that goes through the same converter path, is fixed once in the shared converter and stays as a gate: seam tears, the stair walk of every flight, terrain hull bevels, sky-bank texels and the memory fit.
 
@@ -559,7 +607,7 @@ Models with more than 16 collision pieces get one routed standing hull (same sol
 
 #### The CHIM builder
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `chim-builder`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `chim-builder`.
 
 tools/build.py --builder chim builds the CHIM world from your own Morrowind data with the same stages, --jobs, profiler and receipts as before; receipts record builder, chim_version and world_format. The legacy builder stays in the code and selectable.
 
@@ -591,14 +639,15 @@ An autobuilder that converts every exterior cell with everything placed in it to
 
 - Cells are one-cell frames for now; the open world joins them into 3 x 3 cell frames.
 - Actors and creatures are deferred to the actor pipeline and counted per cell.
+- Open sea without LAND (10 October 2026): one shared ocean chunk of 10,528 bytes, stored once and referenced by 867 cells (chimport.py ocean); the engine places it once the open-world frames read it.
 
-**Read more:** [CHIMport](CHIMPORT.md); [Hull policy pending](CHIMPORT.md#hull-policy-pending).
+**Read more:** [CHIMport](CHIMPORT.md); [Hull policy pending](CHIMPORT.md#hull-policy-pending); [Open sea: one shared ocean chunk](CHIMPORT.md#open-sea-one-shared-ocean-chunk).
 
 **Bugs:** [CHIM-UNIT-FP-SOURCE-LAYOUT-33](../bugs/CHIM-UNIT-FP-SOURCE-LAYOUT-33.md), [CHIM-WORLD-AUDIT-SCALING-33](../bugs/CHIM-WORLD-AUDIT-SCALING-33.md), [CHIM-MEASURE-EMPTY-FRAME-33](../bugs/CHIM-MEASURE-EMPTY-FRAME-33.md), [CHIM-WINDOW-MOUNT-CROSS-CELL-33](../bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md).
 
 #### Build cache and prerendered store
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `build-cache`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `build-cache`.
 
 Stage fingerprints let a development build reuse the finished stages of an earlier run, a per-file asset pool reuses converted sounds and movies, a per-map pass cache reuses the image step's optimizer, cull and stair-walk passes, and the prerendered store (--prerendered DIR) keeps finished stage outputs (CHIM worlds, interiors, region maps) across runs and workspaces. Releases write the store but never read it.
 
@@ -618,7 +667,7 @@ Stage fingerprints let a development build reuse the finished stages of an earli
 
 #### MiniWind quick test build
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `miniwind`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `miniwind`.
 
 A builder type for quick playtests: Balmora on CHIM with its interiors and what the engine needs, booting straight into Balmora. Development versions only; marked as a partial-area test.
 
@@ -654,7 +703,7 @@ A predictor of how many bytes the chunk zone must hold at any position on the is
 
 #### --heap-mb builder option
 
-**Status:** In this release (CHIM 0.1.0). **ID:** `heap-mb-option`.
+**Status:** Shipped in CHIM 0.1.0. **ID:** `heap-mb-option`.
 
 A builder option like --jobs: the map heap in MiB, exact, default 11; beyond the safe profile it prints one loud warning and runs anyway, and every gate uses the build's own value.
 
@@ -678,13 +727,33 @@ Every exterior cell is checked for light like the original: its original lights 
 
 **Bugs:** [LIGHT-ENTITIES-UNWIRED-33](../bugs/LIGHT-ENTITIES-UNWIRED-33.md).
 
+#### Fewer faces per mesh (planar merge, meshoptimizer for large shells)
+
+**Status:** In progress. **ID:** `mesh-methods`.
+
+Every CHIM mesh's coplanar triangles with one texture mapping become one convex Quake face (planar merge, lossless, never more faces); large hard-surface shells that a profile reduces use meshoptimizer's simplifier with locked borders instead of the profile's reducer (the arrival ship). A method table chooses per mesh by a measured rule; the earlier method stays selectable.
+
+**Measured gain:**
+
+- Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. Compared: the converter against the mesh methods on the same meshes and profiles (prepare_mesh_bsp._prepare_model), owner's data. *exact counts, 11 October 2026.*
+
+Lossless for every mesh except the meshopt+merge rows, each chosen by measurement (config/mesh-methods.json).
+
+**Visibility:** No change: the same surfaces in fewer faces; placements and leaves unchanged.
+
+**Caveats:**
+
+- Not yet in a played build: MiniWind look of the ship and a strider pending.
+
+**Read more:** [Mesh methods](MESH_METHODS.md).
+
 ### Roadmap
 
 #### Vivec on CHIM (milestone M3)
 
 **Status:** In progress. **ID:** `vivec-m3`.
 
-Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec in one frame (world format 0.6, sectors in one folder per sector row).
+Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec on CHIM (one city frame does not fit the engine's coordinate range: the frame layout is an open decision).
 
 **Measured gain:** Not measured yet.
 
@@ -693,10 +762,11 @@ Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; st
 **Caveats:**
 
 - In this release the Vivec Arena exterior is left out and says "Area unavailable" until M3 is done.
+- Preflight of 10 October 2026, measured without a build: with the large-model cut, five district frames fit the chunk room and the Temple, St. Delyn and St. Olms frames are 1.5-2.0 MB over at one hotspot (the north end of the Temple plaza); every Vivec memory figure is from the builds of 9 October and is measured again on the current builder first.
 
-**Read more:** [CHIM ideas: M3](IDEAS.md#m3-vivec-on-chim); [CHIM overview: milestones](README.md#milestones).
+**Read more:** [CHIM ideas: M3](IDEAS.md#m3-vivec-on-chim); [CHIM overview: milestones](README.md#milestones); [CHIM ideas: M3 preflight](IDEAS.md#m3-preflight-10-october-2026).
 
-**Bugs:** [VIVEC-ARENA-FRAME-EDGE-32](../bugs/VIVEC-ARENA-FRAME-EDGE-32.md), [VIVEC-ARENA-ACTORS-32](../bugs/VIVEC-ARENA-ACTORS-32.md).
+**Bugs:** [VIVEC-ARENA-FRAME-EDGE-32](../bugs/VIVEC-ARENA-FRAME-EDGE-32.md), [VIVEC-ARENA-ACTORS-32](../bugs/VIVEC-ARENA-ACTORS-32.md), [CHIM-ARENA-MEMORY-33](../bugs/CHIM-ARENA-MEMORY-33.md), [CHIM-FRAME-COORD-RANGE-33](../bugs/CHIM-FRAME-COORD-RANGE-33.md), [VIVEC-TEMPLE-STAIRS-33](../bugs/VIVEC-TEMPLE-STAIRS-33.md), [CHIM-PREDICT-VIVEC-LOW-36](../bugs/CHIM-PREDICT-VIVEC-LOW-36.md), [CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36](../bugs/CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36.md), [DOCS-VIVEC-FRAME-PLAN-36](../bugs/DOCS-VIVEC-FRAME-PLAN-36.md).
 
 #### The open world on CHIM (milestone M4)
 

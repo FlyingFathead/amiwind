@@ -74,7 +74,12 @@ def render(text):
            'Open the console with F10 or the backquote key and type',
            'a command, for example `dbg headlamp on`. This page is generated from',
            '`config/debug-commands.txt`, the catalogue the game itself reads, by',
-           '`tools/console_commands_doc.py`; do not edit it by hand.', '']
+           '`tools/console_commands_doc.py`; do not edit it by hand.', '',
+           'At start-up, on every map load and with the `version` command the console shows the',
+           'game and CHIM versions, the AmiQuake version and where help is (on a map load the',
+           'AmiQuake line ends with `SERVER (<game code CRC>)`):', '',
+           '```text', 'AmiWind v<version> / CHIM v<CHIM version>', 'AmiQuake: VERSION 1.09',
+           'Type: "dbg help" for help.', '```', '']
     for group, cmds in groups.items():
         out += ['## ' + group.title(), '', '| Command | Also | Arguments and notes |', '| --- | --- | --- |']
         for cmd in cmds.values():

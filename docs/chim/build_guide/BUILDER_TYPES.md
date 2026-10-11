@@ -13,10 +13,19 @@ the image step deciding what ships.
 
 See [Which Seyda Neen is in my build?](../../LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.
 
-### CHIM-native towns (EXPERIMENTAL, `--chim-native-towns on`)
+### CHIM regions (EXPERIMENTAL, `--chim-regions SET`)
 
-With `--chim-native-towns on` (off by default in v0.0.35), builds have one Balmora: the
-CHIM one. A CHIM town other than Seyda Neen has no legacy region maps
+With `--builder chim --chim-regions SET --chim-regions-status FILE` (off by default), finished CHIMport cells
+join the build inside the legacy open world: `seabed`, `coast`, `sea-ring`, a region name or `@FILE` (a CSV
+with x and y, an `aw-chim-cells-1` JSON list or a Toolkit World Map state export). Every cell becomes one CHIM
+frame whose frame map replaces that cell's open-world map under the same name, so the engine's hand-over and
+every open-world tool stay as they are. The selection is checked before any stage (finished cells only, no
+town frame, no enclosed legacy pocket). See [CHIM regions](../CHIM_REGIONS.md).
+
+### CHIM-native towns (the default, `--chim-native-towns on`)
+
+`--chim-native-towns on` is the default since v0.0.36 (it was experimental and off in v0.0.35): builds
+have one Balmora, the CHIM one. A CHIM town other than Seyda Neen has no legacy region maps
 ([CHIM-LEGACY-CHAIN-33](../../bugs/CHIM-LEGACY-CHAIN-33.md)):
 
 - its legacy chain stage (`balmora`, or `town-<id>`) is not in the plan;
@@ -37,9 +46,12 @@ player start, worldspawn and resident files byte for byte, the same 18 actors, 1
 and one 0.003 units lower (its support fitted on the CHIM frame's collision instead of the legacy
 region map's).
 
-The legacy chain stays selectable: `--legacy-area balmora` (debugging and legacy comparisons only;
-the build warns) builds Balmora's region maps in a CHIM build and the frame map copies its entities
-from them, as before; `--builder legacy` builds no CHIM world at all.
+The legacy chain stays in the source for historical regression tests only: `--legacy-area balmora`
+and `--chim-native-towns off` are RETIRED since CHIM v0.1.0 ([retired flags](../../EXPERIMENTAL_FLAGS.md#retired-flags)):
+a developer-mode build refuses them unless named with `--override legacy-area` /
+`--override chim-native-towns-off`, and every use is recorded in the receipts. With them, Balmora's region
+maps are built in a CHIM build and the frame map copies its entities from them, as before;
+`--builder legacy` builds no CHIM world at all.
 
 ### What still runs, and why
 
@@ -64,7 +76,10 @@ A CHIM plan still runs these legacy stages, because a later step reads their out
 ### What ships
 
 - The CHIM towns as a CHIM world (one more world volume) with their frame maps
-  (`maps/<town>-chim.bsp`; for Seyda Neen also `intro_docks-chim.bsp` and `sncourt-chim.bsp`).
+  (`maps/<town>-chim.chim`; for Seyda Neen also `intro_docks-chim.chim` and `sncourt-chim.chim`).
+  A frame map is a BSP29 file that is not a playable map without its CHIM world, hence the `.chim`
+  extension; `--chim-frame-ext bsp` keeps the earlier `.bsp` names
+  ([WORLD_FORMAT.md](../WORLD_FORMAT.md#frame-maps-are-chim-files)).
 - Interiors as Quake maps, built as before.
 - The open world with the legacy builder's maps, as "not yet CHIM".
 - No Vivec Arena: a CHIM build leaves extra towns that are not CHIM areas out whole (exterior maps,
@@ -90,6 +105,8 @@ Tracked as CHIM-LEGACY-CHAIN-33, in this order:
 
 1. Frame maps from the converter's entity list instead of the compiled region maps: done for every
    CHIM town except Seyda Neen (`chim-town-<town>`).
+   A town's listed rooms: `chim-rooms-<town>` (`tools/chim_rooms.py`), the legacy room converter without the
+   region maps.
 2. Town flora for CHIM towns from the flora assets alone (no open-world terrain).
 3. The image step without the open-world overlay when no open-world area is built, with the entity
    tracker scoped to the areas built; then the open-world stages leave the CHIM plan.

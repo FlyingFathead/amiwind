@@ -22,6 +22,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 
+/* aw_view.c (docs/THIRD_PERSON.md): the player's view mode, once per frame before the view is
+ * set up, and its camera in place of Chase_Update while it owns the chase camera. NULL in
+ * fixtures without it. */
+void (*aw_view_frame)(void);
+int (*aw_view_camera)(void);
+
 /*
 
 The view is allowed to move slightly from it's true position for bobbing,
@@ -889,9 +895,9 @@ void V_CalcViewRoll (void)
         v_dmg_time -= host_frametime;
     }
 
-    if (cl.stats[STAT_HEALTH] <= 0)
+    if (cl.stats[STAT_HEALTH] <= 0 && !(aw_view_camera && chase_active.value))
     {
-        r_refdef.viewangles[ROLL] = 80;	// dead view angle
+        r_refdef.viewangles[ROLL] = 80;	// dead view angle (kept by the first-person death view)
         return;
     }
 
@@ -1058,7 +1064,7 @@ void V_CalcRefdef (void)
     else
         oldz = ent->origin[2];
 
-    if (chase_active.value)
+    if (chase_active.value && !(aw_view_camera && aw_view_camera ()))
         Chase_Update ();
 }
 
@@ -1089,6 +1095,8 @@ void V_RenderView (void)
 {
     if (con_forcedup)
         return;
+    if (aw_view_frame)
+        aw_view_frame ();
 
 // don't allow cheats in multiplayer
     if (cl.maxclients > 1)
@@ -1155,12 +1163,17 @@ void V_RenderView (void)
         int x = scr_vrect.x + scr_vrect.width/2 + cl_crossx.value;
         int y = scr_vrect.y + scr_vrect.height/2 + cl_crossy.value;
         int pick = aw_companion_crosshair ? aw_companion_crosshair (x, y) : 0;
-        if (pick == 1)
-            Draw_Character (x, y, '+');
-        else if (pick == 0)
+        /* No crosshair while dead (PLAYER-DEATH-LIMBO-35) or behind the player (chase camera:
+         * OpenMW camera.lua updateCrosshair shows it in first person only). */
+        if (!AW_PlayerDead () && !chase_active.value)
         {
-            if (crosshair.value)
+            if (pick == 1)
                 Draw_Character (x, y, '+');
+            else if (pick == 0)
+            {
+                if (crosshair.value)
+                    Draw_Character (x, y, '+');
+            }
         }
     }
 #endif

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "build-recipe-1",
+  "title": "AmiWind build recipe (build-recipe-1)",
+  "description": "A build's options as named fields (the builder's own option names, tools/build.py), its input files by path, role and SHA-256, and the build that checked it. Read and written by tools/build_recipe.py (tools/build.py --recipe FILE / --save-recipe FILE); see docs/BUILD_RECIPES.md.",
+  "type": "object",
+  "required": ["schema", "name", "description", "options", "inputs", "written_with", "checked_with", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "build-recipe-1"},
+    "name": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "description": {"type": "string", "minLength": 1},
+    "options": {
+      "type": "object",
+      "description": "Option name (the builder's argparse destination, e.g. chim_terrain_hull for --chim-terrain-hull) -> value: a string, number, true/false, a list for repeatable options, or null for the builder's default. An option left out is the builder's default too."
+    },
+    "inputs": {
+      "type": "array",
+      "description": "Every file or folder an option names, pinned by SHA-256 (a folder: the SHA-256 of its hash list, docs/BUILD_RECIPES.md); the builder refuses a file whose SHA-256 differs.",
+      "items": {
+        "type": "object",
+        "required": ["option", "role", "path", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "option": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "role": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "kind": {"enum": ["file", "folder"]},
+          "how": {"type": "string", "description": "How to make this input with the repository's tools"}
+        }
+      }
+    },
+    "written_with": {
+      "type": ["object", "null"],
+      "description": "The builder that wrote the recipe; null for a recipe kept with this source tree (config/recipes/)",
+      "required": ["amiwind_version", "chim_version", "builder_commit", "date"],
+      "additionalProperties": false,
+      "properties": {
+        "amiwind_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(dev|rc)[0-9]+)?$"},
+        "chim_version": {"type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "builder_commit": {"type": "string", "pattern": "^([0-9a-f]{4,40}|nogit)$"},
+        "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}(:[0-9]{2})? [+-][0-9]{4}$"},
+        "run": {"type": ["string", "null"]},
+        "result": {"enum": ["passed", "failed", "cancelled", "planned", null]}
+      }
+    },
+    "checked_with": {
+      "type": ["object", "null"],
+      "description": "The passed build that verified the recipe (filled in by the master builder, tools/aw.py); null = unverified",
+      "required": ["amiwind_version", "chim_version", "builder_commit", "run", "date", "result_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "amiwind_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(dev|rc)[0-9]+)?$"},
+        "chim_version": {"type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "builder_commit": {"type": "string", "pattern": "^([0-9a-f]{4,40}|nogit)$"},
+        "run": {"type": "string", "minLength": 1},
+        "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}(:[0-9]{2})? [+-][0-9]{4}$"},
+        "result_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "status": {"enum": ["verified", "unverified"]}
+  }
+}

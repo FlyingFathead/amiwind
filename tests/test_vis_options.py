@@ -83,7 +83,10 @@ class BuilderOption(unittest.TestCase):
         self.assertEqual(default, self.steps(['--vis-mode', 'fast']))
         for name, command in default:
             self.assertNotIn('--vis-mode', command, name)
-        balmora = dict(default)['balmora']
+        # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): no Balmora legacy chain stage.
+        self.assertNotIn('balmora', dict(default))
+        self.assertTrue(dict(default)['chim-town-balmora'][1].endswith('chim_town.py'))
+        balmora = dict(self.steps(['--chim-native-towns', 'off']))['balmora']  # RETIRED, still selectable
         self.assertTrue(balmora[1].endswith('prepare_balmora.py'))
         # The only town imports of a default build are the shipped towns (BUILD-EXTRA-TOWN-OPTIN-32).
         from town_config import shipped_extra_towns
@@ -93,14 +96,15 @@ class BuilderOption(unittest.TestCase):
     def test_full_reaches_every_map_converter(self):
         for name, command in self.steps(['--vis', 'full', '--extra-town', 'vivec_arena']):
             with self.subTest(step=name):
-                expected = name in VIS_STEPS or name.startswith('town-')
+                expected = name in VIS_STEPS or name.startswith(('town-', 'chim-rooms-'))  # chim-rooms: the rooms (tools/chim_rooms.py)
                 self.assertEqual(command.count('--vis-mode'), int(expected))
                 if expected:
                     self.assertEqual(command[command.index('--vis-mode') + 1], 'full')
 
     def test_extra_town_joins_the_scene_chain(self):
         from build_parallel import stage_dependencies
-        steps = self.steps(['--extra-town', 'vivec_arena', '--extra-town', 'vivec_arena'])
+        # A town not on CHIM is imported by the legacy builder (a CHIM-native plan leaves it out).
+        steps = self.steps(['--builder', 'legacy', '--extra-town', 'vivec_arena', '--extra-town', 'vivec_arena'])
         names = [name for name, _ in steps]
         self.assertEqual(names.count('town-vivec_arena'), 1)
         self.assertEqual(names.index('town-vivec_arena'), names.index('balmora-interiors') + 1)

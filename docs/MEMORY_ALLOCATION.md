@@ -3,6 +3,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Memory-saving candidates for the next round: 10 October 2026](#memory-saving-candidates-for-the-next-round-10-october-2026)
 - [Console history working-set investigation: 6 October 2026](#console-history-working-set-investigation-6-october-2026)
 - [Current v0.0.28 candidate accounting — 4 October 2026](#current-v0028-candidate-accounting--4-october-2026)
 - [Mandatory: LEAVE HEADROOM](#mandatory-leave-headroom)
@@ -32,6 +33,18 @@
 - [Exact edge and surface storage: 6 October follow-up](#exact-edge-and-surface-storage-6-october-follow-up)
 
 <!-- contents end -->
+
+## Memory-saving candidates for the next round: 10 October 2026
+
+A list to pick from the next time memory has to be found; each entry is measured before it is done.
+
+| Candidate | Resident today | Idea | Notes |
+| --- | --- | --- | --- |
+| Console commands | 98 AmiWind commands registered the Quake way (`Cmd_AddCommand`): 16 bytes each, plus a 16-byte hunk header, so 32 bytes each, about 3 KiB of hunk for the session | Most become routes in the on-disk `dbg` catalogue, behind a few dispatchers per module | The `dbg` names, aliases and help are already on disk (read only when a command is submitted). Commands bound to held keys (`+aw_pov` and the like) stay registered. Hunk, not the CHIM heap zone. |
+| Rare rule lookups | none yet (planned) | Coordinates to a cell index, one byte read from disk when the question comes up; interior facts ride in the map that is loaded anyway | Pattern for where sleeping is allowed ([WAIT_AND_REST.md](WAIT_AND_REST.md)), and later crime zones and similar rules. |
+| Balmora's ring, CHIM heap zone | worst position 11,312 bytes under the zone | About 13 KB is needed to switch on the exact building collision for all 11 short models (CHIM-COMPILED-HULL-SHORT-36) | Measure what fills the worst position (chunks, models, textures) first. |
+| Console output history | 16 KiB ring + 8 KiB command recall | Disk-backed history (see the investigation below) | Requested 6 October 2026, not started. |
+| Growth guard (all registries) | Whole engine: 266 console commands (8,512 bytes of hunk) and 321 console variables (7,704 bytes of structures + 10,496 bytes of zone for their value strings); no static name table of 1 KiB or more | A ratchet: `tests/test_resident_registry.py` fails when any of these numbers rises above `tests/resident_registry_budget.json` and names the new entries; lower numbers are written back with `python tools/resident_registry.py --lower-budget` | New debug commands go into the on-disk `dbg` catalogue; a raise needs a dated, owner-approved reason in the budget (ENGINE-RESIDENT-REGISTRY-GROWTH-36). |
 
 ## Console history working-set investigation: 6 October 2026
 

@@ -14,6 +14,9 @@ or more components share is a seam edge. Each such edge is sampled; a sample is 
 farther than the tolerance (max(1 unit, 0.5 % of the model diagonal)) from the reduced surface. The
 result is the torn share of seam length and of free-rim length. Unreduced meshes tear nothing.
 
+The audit also rebuilds the reference models (config/reference-models.json, tools/reference_models.py) from
+the same data files and checks every step by SHA-256: a mismatch is a loud warning, not a failure.
+
 Usage:
   seam_audit.py gate --data-files DIR --out REPORT.json [--jobs N]   (builder stage: audit, then check)
   seam_audit.py audit --data-files DIR --out REPORT.json [--jobs N] [--limit N]
@@ -308,6 +311,10 @@ def main(argv=None):
     args = p.parse_args(argv)
     if args.cmd in ('audit', 'gate'):
         report = audit(args.data_files, args.jobs, args.limit)
+        # the reference models (config/reference-models.json) rebuilt from these data files and checked step by step
+        # by SHA-256; a mismatch is a loud warning naming the step, never a failure (tools/reference_models.py)
+        from reference_models import check as reference_check
+        report['reference_models'] = reference_check(args.data_files)
         args.out.write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')
         top = report['ranked'][:20]
         print('Seam audit: %d meshes, %d reduced mesh/space pairs, %d above %.0f %% seam tear' % (

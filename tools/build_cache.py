@@ -65,6 +65,13 @@ CACHE_SCHEMA = 'amiwind-stage-cache-v2'
 # 'symbols': the same code, whole files hashed; 'modules': every import of every imported module.
 SCOPES = ('units', 'symbols', 'modules')
 DEFAULT_SCOPE = 'units'
+# Forms of a module's import-time code in scope 'units' (unit_texts): 1 counts every function's default values,
+# 2 only defaults that run code on import. Stage fingerprints use 2; a reuse source fingerprinted with 1 is
+# compared in its own form (comparable), so the change costs no rebuild (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
+TOP_FORMATS = (1, 2)
+STAGE_TOP_FORMAT = 2
+TOP_TEXT = {1: '<top>', 2: '<top>#2'}
+UNIT_PREFIX = {1: 'units:', 2: 'units2:'}
 ENV_PREFIX = 'AMIWIND_'
 ENV_NAME = re.compile(r'AMIWIND_[A-Z0-9_]*[A-Z0-9]')
 ENV_ANY = '*'
@@ -97,7 +104,17 @@ POOL_CONTENT = 'not hashed (content-addressed storage pool)'
 IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_COST_HISTORY', 'AMIWIND_PASS_CACHE',
                'AMIWIND_BUILD_PROFILE', 'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_BUILD_JOBS_FILE',
                'AMIWIND_BUILD_BUDGET', 'AMIWIND_ACTIVE_ENV', 'AMIWIND_PYTHON', 'AMIWIND_STAGE_TRACE',
-               'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL'}
+               'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL',
+               'AMIWIND_BUILD_RECIPE',
+               # the stair walk's reuse and its check sample: the same rows either way (stair_walk.walk_cache_mode)
+               'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE',
+               # what the stages print and when the builder's heartbeat speaks: logs only (build_profile.phase)
+               'AMIWIND_LOG_LEVEL', 'AMIWIND_HEARTBEAT_SECONDS', 'AMIWIND_BUILD_EPOCH',
+               # who wrote a stair-walk record (tools/stair_records.py): provenance, not an input
+               'AMIWIND_RUN_NAME', 'AMIWIND_RUN_COMMIT', 'AMIWIND_RUN_VERSION', 'AMIWIND_AW_REQUEST',
+               # who wrote any cache entry (tools/cache_provenance.py): provenance, not an input (CACHE-NO-PROVENANCE-36)
+               'AMIWIND_RUN_JOB', 'AMIWIND_RUN_TOOLS_SHA256', 'AMIWIND_RUN_CHIM_VERSION', 'AMIWIND_RUN_WORLD_FORMAT',
+               'AMIWIND_RUN_KIND'}
 SEPARATORS = '/' + os.sep
 EXTERNAL_DIRECTORY_LIMIT = 512 * 1024 ** 2
 SKIP_DIRECTORIES = {'.git', '__pycache__', 'out', 'tests', 'node_modules'}
@@ -111,8 +128,12 @@ PATH_CALLS = {'Path', 'PurePath', 'PurePosixPath', 'joinpath', 'join', 'open', '
 # not followed further, so a profiler or progress fix does not force a full rebuild. Explicit
 # list, tested (tests/test_build_cache.py): add a module here only if it cannot change outputs.
 # tools/unit_tree.py: the output-record hashes the stage cache computes (never a stage's outputs).
+# tools/progress_line.py: the one form of the stages' progress lines (print only, never an output file).
+# tools/cache_provenance.py: who/when/which version wrote a cache entry (CACHE-NO-PROVENANCE-36); it reads only
+# the environment, never a repository file, and its statements in the cache writers are left out of every key
+# (strip_provenance below).
 INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
-                                     'tools/unit_tree.py'})
+                                     'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 INSTRUMENTATION_STEMS = frozenset(path.rsplit('/', 1)[-1][:-3] for path in INSTRUMENTATION_MODULES)
 # The reuse step of a reused stage (`build_cache.py apply`) also loads the storage pool (tools/storage_pool.py) to
@@ -125,6 +146,60 @@ APPLY_STEMS = INSTRUMENTATION_STEMS | {'storage_pool'}
 RUN_PRIVATE = {'logs', 'profile', 'scratch', 'build-state.json', 'build-state.tmp', 'build-profile.json',
                'build-profile.json.tmp', 'build-summary.json', 'build-summary.tmp'}
 TEMPORARY_SUFFIX = '.amiwind-reuse-tmp'
+
+
+# Provenance statements (tools/cache_provenance.py) in the cache writers: `import cache_provenance` and bare calls
+# `cache_provenance.NAME(...)`, each on lines of its own. They record who, when and from which version a cache
+# entry was written, check an entry's output SHA-256 on read (a mismatch is a miss: the unit is built again) and
+# append reuse lines; they never change an output. Every key computation reads module source with them removed
+# (strip_provenance), so adding provenance to a writer keeps every stage, unit and pass key (owner order
+# 2026-10-11: "KEEP USING all existing results and hashes WITHOUT REDOING ANYTHING"; tests/test_cache_provenance.py).
+PROVENANCE_MODULE = 'cache_provenance'
+
+
+def _provenance_statement(node):
+    if isinstance(node, ast.Import):
+        return all(alias.name == PROVENANCE_MODULE and alias.asname is None for alias in node.names)
+    if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)):
+        return False
+    func = node.value.func
+    while isinstance(func, ast.Attribute):
+        func = func.value
+    return isinstance(func, ast.Name) and func.id == PROVENANCE_MODULE and isinstance(node.value.func, ast.Attribute)
+
+
+def strip_provenance(text):
+    """TEXT without its provenance statements (whole lines), or TEXT itself when it has none (or any doubt)."""
+    if PROVENANCE_MODULE not in text:
+        return text
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    lines = text.splitlines(keepends=True)
+    drop = set()
+    for node in ast.walk(tree):
+        for field in ('body', 'orelse', 'finalbody', 'handlers'):
+            block = getattr(node, field, None)
+            if not isinstance(block, list):
+                continue
+            statements = [item for item in block if isinstance(item, ast.stmt)]
+            found = [item for item in statements if _provenance_statement(item)]
+            if not found or len(found) == len(statements):
+                continue  # never empty a block: the statement stays (and counts)
+            for item in found:
+                first, last = lines[item.lineno - 1], lines[item.end_lineno - 1]
+                if first[:item.col_offset].strip() or last[item.end_col_offset:].strip().split('#')[0].strip():
+                    continue  # shares a line with other code: it stays
+                drop.update(range(item.lineno, item.end_lineno + 1))
+    if not drop:
+        return text
+    stripped = ''.join(line for number, line in enumerate(lines, 1) if number not in drop)
+    try:
+        ast.parse(stripped)
+    except SyntaxError:
+        return text
+    return stripped
 
 
 def sha256_file(path):
@@ -194,11 +269,16 @@ class SourceIndex:
     every imported module. All are kept.
     """
 
-    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE):
+    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1):
         if scope not in SCOPES:
             raise ValueError(f'fingerprint scope must be one of {", ".join(SCOPES)}')
+        if top_format not in TOP_FORMATS:
+            raise ValueError(f'top_format must be one of {TOP_FORMATS}')
         self.root = Path(root)
         self.scope = scope
+        # Stage fingerprints use STAGE_TOP_FORMAT; the per-unit caches (gallery models, image passes, world
+        # regions) keep format 1 until their own key format changes (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
+        self.top_format = top_format
         self._files = None
         self._closures = {}
         self._parsed = {}
@@ -231,7 +311,7 @@ class SourceIndex:
 
     def _parse(self, relative):
         if relative not in self._parsed:
-            text = (self.root / relative).read_text(encoding='utf-8', errors='replace')
+            text = strip_provenance((self.root / relative).read_text(encoding='utf-8', errors='replace'))
             try:
                 tree = ast.parse(text)
             except SyntaxError:
@@ -378,7 +458,7 @@ class SourceIndex:
 
     def _module_symbols(self, relative):
         if relative not in self._symbols:
-            text = (self.root / relative).read_text(encoding='utf-8', errors='replace')
+            text = strip_provenance((self.root / relative).read_text(encoding='utf-8', errors='replace'))
             try:
                 tree = ast.parse(text)
             except SyntaxError:
@@ -403,14 +483,17 @@ class SourceIndex:
         self._analysis(script)
         return self._reached.get(str(script))
 
-    def unit_digest(self, relative, units):
-        """SHA-256 over a module's import-time code and the source of each reached function."""
+    def unit_digest(self, relative, units, top_format=None):
+        """SHA-256 over a module's import-time code and the source of each reached function.
+        TOP_FORMAT (default: the index's): which form of the import-time code (TOP_FORMATS)."""
+        top_format = top_format or self.top_format
         texts = self._module_symbols(relative).get('texts') or {}
-        rows = {unit: hashlib.sha256(texts[unit].encode('utf-8', 'surrogateescape')).hexdigest()
-                for unit in sorted(set(units) | {'<top>'}) if unit in texts}
-        return 'units:' + digest_json(rows)
+        text = {'<top>': TOP_TEXT[top_format]}
+        rows = {unit: hashlib.sha256(texts[text.get(unit, unit)].encode('utf-8', 'surrogateescape')).hexdigest()
+                for unit in sorted(set(units) | {'<top>'}) if text.get(unit, unit) in texts}
+        return UNIT_PREFIX[top_format] + digest_json(rows)
 
-    def _closure_symbols(self, start, key=None):
+    def _closure_symbols(self, start, key=None, entry=None):
         """(python files, data files, uncertain, constants) reachable from START run as a script.
 
         A module's top level runs when it is imported (its `if __name__ == '__main__'`
@@ -509,7 +592,12 @@ class SourceIndex:
                 return symbols['bindings'][name]
             return symbols['fallback'].get(name)
 
-        reach_module(start, main=True)
+        if entry is None:
+            reach_module(start, main=True)
+        else:
+            # one function of the module (entry_digest): its import-time code and that function
+            reach_module(start)
+            reach(start, entry)
         while pending:
             relative, unit = pending.pop()
             symbols = self._module_symbols(relative)
@@ -681,7 +769,7 @@ class SourceIndex:
             self._json_values[(relative, key)] = found
         return self._json_values[(relative, key)]
 
-    def selection(self, script):
+    def selection(self, script, top_format=None):
         """({path: digest} a stage's fingerprint covers, uncertain).
 
         Scope 'units': a reached module counts as its import-time code plus the source of
@@ -698,14 +786,48 @@ class SourceIndex:
             if path not in files:
                 continue
             if units is not None and path in units and path.endswith('.py'):
-                selected[path] = self.unit_digest(path, units[path])
+                selected[path] = self.unit_digest(path, units[path], top_format)
             else:
                 selected[path] = files[path]
         return selected, False
 
-    def digest(self, script):
+    def digest(self, script, exclude=()):
+        """(digest, files, uncertain) of SCRIPT's selection; EXCLUDE: repository paths left out (a cache's own
+        key code in that cache's keys, pass_cache.PASS_KEY_NEUTRAL)."""
         selected, uncertain = self.selection(script)
+        selected = {path: value for path, value in selected.items() if path not in exclude}
         return digest_json(selected), len(selected), uncertain
+
+    def entry_digest(self, script, function, exclude=()):
+        """(digest, files, uncertain) of the code one function of SCRIPT can reach: the module's import-time code,
+        the function, and everything they reach (scope 'units' or 'symbols'), not the script's main flow. A per-unit
+        cache keyed by its worker function is not rekeyed by an edit elsewhere in the same tool. EXCLUDE: as in
+        digest()."""
+        if self.scope == 'modules':
+            return self.digest(script, exclude)
+        script = Path(script).resolve()
+        key = '%s::%s' % (script, function)
+        if key not in self._closures:
+            start = script.relative_to(self.root.resolve()).as_posix()
+            if function not in self._module_symbols(start)['units']:
+                raise ValueError('No function %s in %s' % (function, start))
+            python, data, uncertain, constants = self._closure_symbols(start, key, entry=function)
+            self._closures[key] = (python, data, uncertain, environment_names(constants, uncertain))
+        python, data, uncertain, _ = self._closures[key]
+        files = self.files
+        if uncertain:
+            selected = {path: value for path, value in files.items() if path not in exclude}
+            return digest_json(selected), len(selected), True
+        units = self._reached.get(key) if self.scope == 'units' else None
+        selected = {}
+        for path in python | data:
+            if path not in files or path in exclude:
+                continue
+            if units is not None and path in units and path.endswith('.py'):
+                selected[path] = self.unit_digest(path, units[path])
+            else:
+                selected[path] = files[path]
+        return digest_json(selected), len(selected), False
 
 
 # --------------------------------------------------------------------------
@@ -1172,7 +1294,11 @@ def unit_texts(tree, text, lazy):
     # in order; blank lines and comments between statements do not count (a whitespace-only edit, such as
     # a removed blank line at the end of a module, keeps every fingerprint). A function's default values
     # run on import: they stay with '<top>', in order.
-    top = []
+    # Two forms (TOP_FORMATS): format 1 lists every plain function's default values, so adding a function
+    # changed the module's import-time code and every key that reached it; format 2 lists only defaults that
+    # run code on import (anything but literals). A literal default is part of its function's own text, which
+    # only that function's callers reach (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
+    top, top2 = [], []
     tables = lazy_tables(tree)
     for statement in tree.body:
         if id(statement) in tables:
@@ -1180,12 +1306,27 @@ def unit_texts(tree, text, lazy):
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name in lazy \
                 and not statement.decorator_list:
             defaults = [*statement.args.defaults, *(d for d in statement.args.kw_defaults if d is not None)]
-            top.append(f'\0defaults {statement.name}: ' + ' | '.join(ast.dump(d) for d in defaults) + '\n')
+            line = f'\0defaults {statement.name}: ' + ' | '.join(ast.dump(d) for d in defaults) + '\n'
+            top.append(line)
+            if not all(_literal(d) for d in defaults):
+                top2.append(line)
             continue
         first = min([statement.lineno] + [d.lineno for d in getattr(statement, 'decorator_list', ())])
-        top.append(''.join(lines[first - 1:statement.end_lineno]).rstrip() + '\n')
+        source = ''.join(lines[first - 1:statement.end_lineno]).rstrip() + '\n'
+        top.append(source)
+        top2.append(source)
     texts['<top>'] = ''.join(top)
+    texts[TOP_TEXT[2]] = ''.join(top2)
     return texts
+
+
+def _literal(node):
+    """True for a default value that runs no code on import (a literal; also negative numbers, containers)."""
+    try:
+        ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return False
+    return True
 
 
 # --------------------------------------------------------------------------
@@ -1398,6 +1539,10 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
         if not uncertain:
             # Per file, so `explain` names the files that changed (BUILD-CACHE-OVERBROAD-33).
             components['sources']['by_file'] = selected
+            if index.top_format != 1:
+                # The same files in the import-time form of format 1, for reuse sources fingerprinted with it
+                # (comparable); kept out of the fingerprint itself.
+                PREVIOUS_SOURCES[(str(run), name)] = index.selection(script, 1)[0]
     else:
         components['sources'] = {'digest': digest_json(dict(index.files)), 'files': len(index.files), 'scope': 'all files (not a repository tool)'}
     tools = metadata.get('tools') or {}
@@ -1427,7 +1572,7 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
 
 def fingerprint_steps(steps, run, metadata, index=None, dependencies=None):
     """({stage: fingerprint}, {stage: components}, {stage: [problems]}) for every stage."""
-    index = index or SourceIndex()
+    index = index or SourceIndex(top_format=STAGE_TOP_FORMAT)
     if dependencies is None:
         try:
             from build_parallel import plan_skipped, stage_dependencies
@@ -1452,6 +1597,37 @@ def fingerprint_steps(steps, run, metadata, index=None, dependencies=None):
     for name, _ in steps:
         visit(name)
     return fingerprints, components, problems, {name: list(deps) for name, deps in dependencies.items()}
+
+
+# {(run, stage): {file: digest}}: a stage's sources in import-time form 1 (TOP_FORMATS), set by stage_components.
+PREVIOUS_SOURCES = {}
+
+
+def source_format(components):
+    """The import-time form (TOP_FORMATS) of a stage fingerprint's per-file sources, or None (no unit digests)."""
+    values = [str(value) for value in (((components or {}).get('sources') or {}).get('by_file') or {}).values()]
+    for top_format in sorted(UNIT_PREFIX, reverse=True):
+        if any(value.startswith(UNIT_PREFIX[top_format]) for value in values):
+            return top_format
+    return None
+
+
+def comparable(old_components, new_components, run, name):
+    """NEW_COMPONENTS as OLD_COMPONENTS' import-time form (TOP_FORMATS) sees them: a reuse source fingerprinted
+    with format 1 is compared with this checkout's format-1 digests, so a change of form alone rebuilds nothing
+    while a real edit still shows (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36). Unchanged when the forms agree."""
+    if source_format(old_components) != 1 or source_format(new_components) in (None, 1):
+        return new_components
+    previous = PREVIOUS_SOURCES.get((str(run), name))
+    if previous is None:
+        return new_components
+    sources = dict(new_components['sources'], by_file=previous, digest=digest_json(previous))
+    return dict(new_components, sources=sources)
+
+
+def comparable_all(components, old_details, run):
+    """{stage: comparable components} for every stage (see comparable)."""
+    return {name: comparable(old_details.get(name), parts, run, name) for name, parts in components.items()}
 
 
 def explain(old_components, new_components):
@@ -2005,8 +2181,14 @@ class Recorder:
         foreign = [path for path in self.diagnostic_reads(reads)
                    if not (path in (self.writes.get(name) or ()) or (path in changed and path in files))]
         if foreign:
-            reasons.append('read build diagnostics written by other stages, which are not stage inputs: '
-                           + ', '.join(foreign[:3]))
+            # Such a read is a declared input from here on: its SHA-256 joins the record's inputs, and the
+            # reuse step reuses the stage only when the file has those exact bytes again (apply_stage: "its
+            # input ... differs"). Unreadable: not reusable, as before (BUILD-DIAGNOSTIC-INPUT-REFUSED-36).
+            try:
+                state['inputs'] = {**state['inputs'], **hash_files(self.run, foreign)}
+            except OSError:
+                reasons.append('read build diagnostics written by other stages, which are not stage inputs: '
+                               + ', '.join(foreign[:3]))
         manifest = {'schema': MANIFEST_SCHEMA, 'stage': name, 'status': 'complete',
                     'fingerprint': (self.cache.get('fingerprints') or {}).get(name),
                     'roots': state['roots'], 'window': state['window'], 'inputs': state['inputs'],
@@ -2021,14 +2203,34 @@ class Recorder:
         # Units -> segments -> stage hash (tools/unit_tree.py): compared in one step, drilled into on a mismatch.
         from unit_tree import of_manifest
         manifest['tree'] = of_manifest(manifest)
+        # Who, when and from which version (tools/cache_provenance.py, CACHE-NO-PROVENANCE-36): never compared.
+        import cache_provenance
+        cache_provenance.attach_stage(manifest, self.run)
         self.manifests[name] = manifest
         self._write(name, manifest)
+        self._keep_ran(name)
         if self.store is not None:
             try:
                 self.store.capture(name, manifest)
             except Exception as exc:  # noqa: BLE001
                 print(f'[warning] {name}: not captured for the prerendered store: {exc}', flush=True)
         return manifest
+
+    def _keep_ran(self, name):
+        """A reused stage: keep its original output record in this run (RAN_FOLDER), so early cutoff and the
+        reuse audit can compare with it after the run it came from is retired (BUILD-REUSE-RECORD-RETIRED-36)."""
+        reused = (self.cache.get('reused') or {}).get(name)
+        if not reused or (self.run / 'profile' / 'reuse-fallback' / f'{name}.txt').is_file():
+            return
+        source = str(reused.get('from') or '')
+        original = ran_manifest(source, name) if source and not source.startswith('prerendered ') else None
+        if not original:
+            return
+        folder = self.run / 'profile' / RAN_FOLDER
+        folder.mkdir(parents=True, exist_ok=True)
+        temporary = folder / f'{name}.tmp'
+        temporary.write_text(json.dumps(original, separators=(',', ':')) + '\n', encoding='utf-8', newline='\n')
+        temporary.replace(folder / f'{name}.json')
 
     def _write(self, name, manifest):
         temporary = self.folder / f'{name}.tmp'
@@ -2105,7 +2307,16 @@ def attribute(shared, first_writes, second_writes):
 
 
 def load_manifest(run, name):
-    path = Path(run) / 'profile' / 'manifests' / f'{name}.json'
+    return read_manifest(Path(run) / 'profile' / 'manifests' / f'{name}.json')
+
+
+# A reused stage's record of what it wrote when it last really ran, copied into the run that reused it, so the
+# run stays a complete reuse source after the run it came from is retired (BUILD-REUSE-RECORD-RETIRED-36).
+RAN_FOLDER = 'manifests-ran'
+
+
+def read_manifest(path):
+    path = Path(path)
     if not path.is_file():
         return None
     try:
@@ -2145,7 +2356,7 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
     except (OSError, ValueError):
         old_details = {}
     names = [name for name, _ in steps]
-    reasons, manifests = {}, {}
+    reasons, manifests, left_out = {}, {}, {}
     # Conditional reuse (BUILD-CACHE-NO-CUTOFF-33): a stage whose own fingerprint parts are unchanged
     # but which depends on a stage that is rebuilt is reused only if, when it starts, every rebuilt
     # stage before it wrote exactly the files it wrote in the old run (apply_stage checks).
@@ -2170,6 +2381,18 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
             reasons[name] = 'changed: ' + ', '.join(changed)
         else:
             manifest = load_manifest(old_run, name)
+            if manifest is not None:
+                # A stage the old run itself reused recorded only what it copied: files a later reused stage
+                # replaced there are left out. They are checked below like replaced files of a stage that ran
+                # (BUILD-REUSE-REDUCED-RECORD-36).
+                # The full record belongs to the same outputs when every file the short record lists is in it
+                # with the same SHA-256 (the stage key may differ between the runs: a key-form change with
+                # unchanged outputs, BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
+                ran = ran_manifest(old_run, name)
+                ran_files, own_files = (ran or {}).get('files') or {}, manifest.get('files') or {}
+                if ran is not None and all(path in ran_files and ran_files[path].get('sha256') == info.get('sha256')
+                                           for path, info in own_files.items()):
+                    left_out[name] = sorted(set(ran_files) - set(own_files))
             if manifest is None:
                 reasons[name] = 'no output manifest in the old run'
             elif manifest.get('status') != 'complete' or manifest.get('fingerprint') != old_fingerprints.get(name):
@@ -2178,8 +2401,6 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
                 reasons[name] = 'old outputs not reusable: ' + '; '.join(manifest.get('reasons') or ['unknown'])
             else:
                 manifests[name] = manifest
-                if old_fingerprints.get(name) != fingerprints[name]:
-                    conditional.add(name)
     candidates = set(manifests)
     # Every manifest of the old run, in completion order, decides who wrote each path last.
     old_manifests = {}
@@ -2193,17 +2414,44 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
         manifest = old_manifests[name]
         for path in (*manifest['files'], *manifest['links'], *manifest['deleted']):
             writers.setdefault(path, []).append(name)
+    # Who touched each left-out file where it really ran (the old run's own record of a reused stage lists only
+    # what it copied or changed, so it may not show the stage that replaced the file).
+    touched = {}
+    if any(left_out.values()):
+        for other in old_fingerprints:
+            record = ran_manifest(old_run, other)
+            for path in (*(record or {}).get('files', {}), *(record or {}).get('links', {}),
+                         *(record or {}).get('deleted', [])):
+                touched.setdefault(path, set()).add(other)
     skips, verified = {}, {}
     while True:
         changed = True
         while changed:
             changed = False
             for name in sorted(candidates):
-                missing = [dep for dep in dependencies.get(name, []) if dep not in candidates]
+                # Conditional: a stage before it is rebuilt, or may be (conditional itself). A fingerprint that
+                # differs only through its dependencies' keys, with every one of them reused unconditionally,
+                # has the old inputs: the key form changed, not the outputs (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
+                missing = [dep for dep in dependencies.get(name, []) if dep not in candidates or dep in conditional]
                 if missing and name not in conditional:
                     # Reused only if the rebuilt stages' outputs come out unchanged (checked when it starts).
                     conditional.add(name)
                     changed = True
+                # Files the old run's own reuse of this stage left out (a later stage replaced them there): the
+                # stage is whole only if every stage that replaced them is reused unconditionally in this build;
+                # otherwise it runs again, never with those files missing (BUILD-REUSE-REDUCED-RECORD-36).
+                gone = next((path for path in left_out.get(name, ())
+                             if not touched.get(path, set()) - {name}
+                             or any(w not in candidates or w in conditional
+                                    for w in touched.get(path, set()) - {name})), None)
+                if gone is not None:
+                    candidates.discard(name)
+                    replaced = sorted(touched.get(gone, set()) - {name})
+                    reasons[name] = (f'{old_run.name} reused it without {gone} (replaced there by '
+                                     f'{", ".join(replaced) or "a stage no longer recorded"}), which this build '
+                                     'runs again')
+                    changed = True
+                    continue
                 # A path a later stage replaced is delivered by that stage, if it is reused too;
                 # otherwise this stage's version no longer exists in the old run.
                 skip = {}
@@ -2319,7 +2567,7 @@ def predict_preflight(old_run, scope=DEFAULT_SCOPE, root=ROOT):
     """`build.py --reuse-plan OLD_RUN`: the preflight of OLD_RUN's own stages against this checkout (no build)."""
     old_run = Path(old_run)
     steps, state = old_run_steps(old_run, root)
-    index = SourceIndex(root, scope=scope)
+    index = SourceIndex(root, scope=scope, top_format=STAGE_TOP_FORMAT)
     reasons, components = predict(old_run, scope, root, index=index, details=True)
     reasons = {name: reason for name, reason in reasons.items() if reason is not None}
     reused = [name for name, _ in steps if name not in reasons]
@@ -2349,7 +2597,7 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
     if mode == 'pool' and not pool:
         raise ValueError('--reuse-mode pool needs the storage pool folder')
     began = time.monotonic()
-    index = index or SourceIndex(scope=scope)
+    index = index or SourceIndex(scope=scope, top_format=STAGE_TOP_FORMAT)
     fingerprints, components, problems, dependencies = fingerprint_steps(steps, run, metadata, index)
     cache = {'schema': CACHE_SCHEMA, 'scope': index.scope, 'fingerprints': fingerprints, 'reuse_from': None,
              'reused': {}, 'not_reused': {}, 'reuse_mode': None}
@@ -2362,7 +2610,13 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         reuse_from = Path(reuse_from).resolve()
         if reuse_from == Path(run).resolve():
             raise ValueError('--reuse-from must name an earlier run, not this one')
-        plans, reasons = plan_reuse(steps, fingerprints, dependencies, components, problems, reuse_from,
+        # Compared in the reuse source's own fingerprint form (comparable); recorded in this run's form.
+        try:
+            old_details = json.loads((reuse_from / 'profile' / 'fingerprints.json').read_text())
+        except (OSError, ValueError):
+            old_details = {}
+        compared = comparable_all(components, old_details, run)
+        plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, reuse_from,
                                     forced=set(forced))
         if forced:
             cache['forced'] = sorted(forced)
@@ -2390,7 +2644,7 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         # Reuse preflight (BUILD-REUSE-KEYS-TOO-BROAD-35): every rebuild with its reason and the changed files
         # that touch it, before any stage runs; a rebuild the source diff and the inputs do not explain stops here.
         import reuse_report
-        check = run_preflight(steps, reasons, components, reuse_from, index, reused=plans)
+        check = run_preflight(steps, reasons, compared, reuse_from, index, reused=plans)
         reuse_report.print_preflight(check, sys.stdout, accepted=accept_rebuild)
         sys.stdout.flush()
         cache['preflight'] = {key: check[key] for key in ('stages', 'reused', 'rebuilt', 'unexpected', 'policy')}
@@ -2517,16 +2771,40 @@ def _without_diagnostics(manifest, field):
 
 def ran_manifest(run, stage, depth=0):
     """STAGE's output manifest from the run where it last actually ran (a reused stage's manifest
-    lists only what was copied; follow its source run)."""
+    lists only what was copied). In order: the copy the reusing run kept (RAN_FOLDER), the source run's
+    record, and, when that run is gone, the record rebuilt from the reuse plan (planned_manifest)."""
     run = Path(run)
     try:
         reused = (json.loads((run / 'build-state.json').read_text()).get('stage_cache') or {}).get('reused') or {}
     except (OSError, ValueError):
         reused = {}
     if stage in reused and not (run / 'profile' / 'reuse-fallback' / f'{stage}.txt').is_file() and depth < 16:
-        source = reused[stage].get('from')
-        return ran_manifest(source, stage, depth + 1) if source else None
+        kept = read_manifest(run / 'profile' / RAN_FOLDER / f'{stage}.json')
+        if kept:
+            return kept
+        source = str(reused[stage].get('from') or '')
+        found = ran_manifest(source, stage, depth + 1) if source and not source.startswith('prerendered ') else None
+        return found or planned_manifest(run, stage)
     return load_manifest(run, stage)
+
+
+def planned_manifest(run, stage):
+    """STAGE's original output record rebuilt from RUN's reuse plan, or None. Exact only when the plan left
+    nothing out (no file of it replaced by a later reused stage): then the plan holds every file (SHA-256 and
+    mode), link, folder and deletion the stage wrote when it ran (BUILD-REUSE-RECORD-RETIRED-36)."""
+    try:
+        plan = json.loads((Path(run) / 'profile' / PLAN_NAME).read_text()).get(stage)
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not isinstance(plan, dict) or plan.get('skipped_later_replaced', 1) != 0 or 'files' not in plan:
+        return None
+    manifest = {'schema': MANIFEST_SCHEMA, 'stage': stage, 'status': 'complete', 'reusable': True, 'reasons': [],
+                'fingerprint': plan.get('fingerprint'), 'from_plan': True,
+                **{field: plan.get(field) or ({} if field in ('files', 'links') else [])
+                   for field in OUTPUT_FIELDS}}
+    from unit_tree import of_manifest
+    manifest['tree'] = of_manifest(manifest)
+    return manifest
 
 
 # Reasons a record is refused as a REUSE SOURCE that say nothing about the outputs it recorded: the stage read
@@ -2544,6 +2822,12 @@ def outputs_recorded(manifest):
                                                  for reason in manifest.get('reasons') or ())
 
 
+def output_modes(manifest):
+    """{path: mode without the write bits} of a manifest's non-diagnostic files."""
+    return {path: (row.get('mode') & ~0o222 if isinstance(row.get('mode'), int) else row.get('mode'))
+            for path, row in _without_diagnostics(manifest, 'files').items()}
+
+
 def same_outputs(run, old_run, stage):
     """True when STAGE wrote, in RUN, exactly the files (SHA-256 and mode), links and deletions it wrote
     when it last ran for OLD_RUN."""
@@ -2554,8 +2838,10 @@ def same_outputs(run, old_run, stage):
     # The stage hash first (units -> segments -> stage, diagnostics left out): one comparison when nothing changed.
     if (new.get('tree') or of_manifest(new))['stage_hash'] != (old.get('tree') or of_manifest(old))['stage_hash']:
         return False
-    modes = {path: row.get('mode') for path, row in _without_diagnostics(new, 'files').items()}
-    if modes != {path: row.get('mode') for path, row in _without_diagnostics(old, 'files').items()}:
+    # Modes without the write bits: a stage reused by hard link is read-only in the reusing run (link_file), so its
+    # recorded mode is 0o444 where the same file written fresh is 0o644 (BUILD-REUSE-CUTOFF-MODE-36: dev3's bsp
+    # rerun wrote byte-identical files and 11 stages after it were refused). Read and execute bits still count.
+    if output_modes(new) != output_modes(old):
         return False
     return all(_without_diagnostics(new, field) == _without_diagnostics(old, field)
                for field in ('deleted', 'directories', 'deleted_directories'))
@@ -2713,8 +2999,9 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=No
         old_details = json.loads((old_run / 'profile' / 'fingerprints.json').read_text())
     except (OSError, ValueError):
         old_details = {}
-    index = index or SourceIndex(root, scope=scope)
+    index = index or SourceIndex(root, scope=scope, top_format=STAGE_TOP_FORMAT)
     fingerprints, components, problems, _ = fingerprint_steps(steps, old_run, state, index, dependencies)
+    components = comparable_all(components, old_details, old_run)
     result = {}
     for name, _ in steps:
         if name in NON_REUSABLE:

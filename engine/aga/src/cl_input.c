@@ -52,6 +52,7 @@ kbutton_t	in_lookup, in_lookdown, in_moveleft, in_moveright;
 kbutton_t	in_strafe, in_speed, in_fastflight, in_use, in_jump, in_attack;
 kbutton_t	in_up, in_down;
 int (*aw_companion_buttons)(int bits);	/* aw_companion.c */
+int (*aw_combat_buttons)(int bits);	/* aw_combat.c: no swing while guarding */
 
 int			in_impulse;
 
@@ -403,6 +404,8 @@ void CL_SendMove (usercmd_t *cmd)
 
     if (aw_companion_buttons)
         bits = aw_companion_buttons (bits);	/* pick mode takes the attack */
+    if (aw_combat_buttons)
+        bits = aw_combat_buttons (bits);
     MSG_WriteByte (&buf, AW_IntroButtons(bits));
 
     MSG_WriteByte (&buf, AW_IntroImpulse(in_impulse));

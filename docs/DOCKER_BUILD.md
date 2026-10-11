@@ -4,6 +4,17 @@ The tools/source-only builder wraps the established Linux pipeline. Native
 Linux remains the reference; Windows Docker testing uses Docker Desktop's WSL 2
 Linux engine. Docker sign-in is not required for this local builder.
 
+<!-- contents start -->
+## Contents
+
+- [Build and validate](#build-and-validate)
+- [Privacy and storage](#privacy-and-storage)
+- [GitHub Actions and remaining work](#github-actions-and-remaining-work)
+- [Full private build (game-entry checkpoint passed)](#full-private-build-game-entry-checkpoint-passed)
+- [Watch a build in the Monitor](#watch-a-build-in-the-monitor)
+
+<!-- contents end -->
+
 Install Docker separately and start its Linux engine before using this helper.
 Do not enable Windows login autostart unless you want it. Shut Docker down after
 use if you want its CPU/RAM released; images and named volumes remain retained.
@@ -65,9 +76,9 @@ full-game Docker peak storage has not yet been measured.
 The `docker-builder` job builds the same allowlisted context, bootstraps tools,
 runs synthetic regressions and performs an asset-free Amiga compile. Diagnostic
 logs/receipts upload on success or failure. Existing native Linux and Windows
-checks remain separate. The hosted Docker job passed for published v0.0.26
-and v0.0.27. Each later source release still requires its own exact-commit CI;
-local prototype success does not establish hosted CI success.
+checks remain separate. The hosted Docker job runs for every published release (most recently
+[v0.0.35](RELEASE-v0.0.35.md)). Each source release requires its own exact-commit CI; local prototype
+success does not establish hosted CI success.
 
 The owner-input/export helper completed the full v0.0.26 conversion and exported
 the verified final-identity HDF. The strict actor-ground gate passed with zero
@@ -76,7 +87,7 @@ passed. Those are dated full-game results. Published v0.0.27 subsequently
 passed all four hosted jobs, its full Linux Docker suite and asset-free compile,
 with release/download verification complete; these do not establish another
 full-game Docker conversion or target playthrough. See the
-[v0.0.26 record](RELEASE-v0.0.26.md), [current release](RELEASE-v0.0.27.md) and
+[v0.0.26 record](RELEASE-v0.0.26.md), [v0.0.27 release](RELEASE-v0.0.27.md) and
 [Docker roadmap](DOCKER_BUILD_ROADMAP.md).
 
 ## Full private build (game-entry checkpoint passed)
@@ -103,9 +114,46 @@ The converter rechecks inputs on every full run. Never mount the input volume
 as the writable output volume. Conversion always runs with `--network none`.
 
 Full output and cache use `amiwind-docker-builds` by default; `--volume` changes
-it. The helper exports a successful run to the requested new results directory.
+it. Each run is a folder `/work/build/<run>/` in that volume, named
+`YYYY_MM_DD_vVERSION_full-docker_<commit>` unless you pass `--name`. The helper exports a
+successful run to the requested new results directory.
 Failures retain logs, receipts, volume and container for diagnosis. A completed
 HDF still requires host-side emulator testing using your own Kickstart ROM.
+## Watch a build in the Monitor
+
+The AmiWind Toolkit's **Monitor** tab follows a Docker build while it runs: the live log of the running
+stage, every stage against its expected time, the ETA and the cores in use
+([Monitor](AMIWIND_TOOLKIT.md#monitor)). It needs nothing installed: Python's standard library and Docker.
+
+1. Build, as above (one command):
+
+   ```sh
+   python tools/run_docker.py --data-files "/path/to/Morrowind/Data Files" --output ../docker-full-results-001
+   ```
+
+2. In a second terminal, from the source checkout, start the Monitor on the same volume (one command):
+
+   ```sh
+   python tools/toolkit_serve.py --monitor-docker amiwind-docker-builds --open
+   ```
+
+   `--monitor-docker VOLUME[:PATH]` reads the run folders under `PATH` in the volume (default `build`, where
+   the helpers write them) through a throwaway container of the image the helper built
+   (`amiwind-builder:local`; `--monitor-image` picks another image that has `python3`). Without `--open`,
+   open the address it prints (`http://127.0.0.1:8031/amiwind-toolkit/monitor.html`).
+
+What it guarantees: the container is started with the volume and the reader mounted read-only, a read-only
+root, no network, no capabilities, an unprivileged user and half a core, and it is removed when the server
+stops. The page and the server only read: the `/monitor/` endpoints answer GET only, every run and log name is
+checked and must lie inside the builds folder, and logs are read in capped byte ranges. Nothing a page sends can
+change the container's command.
+
+**From a phone.** The server listens on this machine only (127.0.0.1) by default, so a phone cannot reach it.
+To watch from a phone on your own network, start it with `--bind` and this machine's LAN address, for example
+`--bind 192.168.1.20`, and open `http://192.168.1.20:8031/amiwind-toolkit/monitor.html` on the phone. Do this
+only on a network you trust: everyone who can reach that address can read what the server serves (the Toolkit,
+your data and your build logs). It prints a warning when it does, and refuses an every-interface address: it always listens on the one address you name.
+
 ### Historical cold rc1-identity build
 
 The cold private full conversion on Windows 11 / WSL 2 completed on 2 October

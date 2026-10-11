@@ -136,6 +136,21 @@ void Q_memcpy (void *dest, void *src, int count);
 int Q_memcmp (void *m1, void *m2, int count);
 void Q_strcpy (char *dest, char *src);
 void Q_strncpy (char *dest, char *src, int count);
+/* strncpy(dest,src,size-1) then dest[size-1]=0, without strncpy: the same bytes (the copy, then
+ * zeros to the end of dest), and no -Wstringop-truncation at -O2 where GCC inlines a bounded
+ * strncpy whose source may be as long as the field (ENGINE-O2-STRNCPY-WARNINGS-36). Inline, so
+ * every file that copies a name has it without linking common.c. */
+static inline void Q_strcpy_bounded (char *dest, const char *src, size_t size)
+{
+	size_t	n = 0;
+
+	if (!size)
+		return;
+	while (n < size - 1 && src[n])
+		n++;
+	memcpy (dest, src, n);
+	memset (dest + n, 0, size - n);
+}
 int Q_strlen (char *str);
 char *Q_strrchr (char *s, char c);
 void Q_strcat (char *dest, char *src);

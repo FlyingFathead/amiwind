@@ -163,6 +163,19 @@ def read_fpu_support(run):
     return None
 
 
+def read_engine_profile(run):
+    """The engine profile the run's engine was built with (engine/engine-build.json); None without an
+    engine receipt (terrain builds, failures before the engine stage)."""
+    path = Path(run) / 'engine' / 'engine-build.json'
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    return record.get('engine_profile') or {'label': 'c', 'note': 'engine receipt predates engine profiles'}
+
+
 def read_harvest(run):
     """The image receipt's harvest record (BUILD-HARVEST-NOT-BUILT-32); None when
     no image receipt exists."""
@@ -272,6 +285,8 @@ class BuildSummary:
         self.environment = None
         self.known_inputs = None  # known-inputs verdicts and hash mode (tools/known_inputs.py)
         self.build_type = None  # a build type other than the normal one (tools/miniwind.py)
+        self.retired_flags = []  # flags retired since CHIM v0.1.0 that this build used
+        self.build_recipe = None  # the build's recipe record (tools/build_recipe.py)
         print('Compilation started: ' + self.started_at, flush=True)
 
     def record_environment(self, metadata):
@@ -282,6 +297,11 @@ class BuildSummary:
         Selection is not proof of execution (especially on a failed build).
         """
         self.build_type = metadata.get('build_type')
+        self.retired_flags = metadata.get('retired_flags_used') or []  # tools/retired_flags.py
+        self.build_recipe = metadata.get('build_recipe')  # tools/build_recipe.py (docs/BUILD_RECIPES.md)
+        if self.retired_flags:
+            from retired_flags import summary_line
+            print(summary_line(self.retired_flags), flush=True)  # the start banner, after "Compilation started"
         rows = metadata.get('version_comparison', [])
         by_name = {row['name']: row for row in rows}
         native = []
@@ -333,6 +353,7 @@ class BuildSummary:
         diagnostic = bool(actor_acceptance and not actor_acceptance['production_gate_passed'])
         fpu_receipt = read_fpu_support(self.run)
         harvest = read_harvest(self.run)
+        engine = read_engine_profile(self.run)
         file_cache = read_file_cache(self.run)
         elapsed = max(0, time.monotonic() - self.started)
         result = {'schema': 'amiwind-build-summary-v1', 'version': self.version,
@@ -345,10 +366,13 @@ class BuildSummary:
                   'build_environment': self.environment,
                   'actor_ground_audit': actor_acceptance,
                   'fpu_support': fpu_receipt,
+                  'engine_profile': engine,
                   'harvest': harvest,
                   'file_cache': file_cache,
                   'known_inputs': self.known_inputs,
                   **({'build_type': self.build_type} if self.build_type else {}),
+                  'retired_flags_used': self.retired_flags,
+                  'build_recipe': self.build_recipe,
                   'profile': build_profile.summary_record(self.run),
                   'validation': 'private-test-only' if diagnostic else 'selected-pipeline'}
         saved, save_error = None, None
@@ -367,6 +391,12 @@ class BuildSummary:
         lines = [titles[status], f'AmiWind v{self.version} | {self.mode}',
                  'Started: ' + self.started_at, 'Finished: ' + result['finished_at'],
                  'Elapsed: ' + result['elapsed']]
+        if self.retired_flags:
+            from retired_flags import summary_line
+            lines.append(summary_line(self.retired_flags))
+        recipe = (self.build_recipe or {}).get('recipe')
+        if recipe:
+            lines.append('Recipe: %s (SHA-256 %s, %s)' % (recipe['name'], recipe['sha256'], recipe['status']))
         if self.build_type:
             lines.append('Build type: ' + self.build_type['name'] + ' | ' + self.build_type['partial_area'])
             if self.build_type.get('label'):
@@ -398,6 +428,9 @@ class BuildSummary:
             lines.append(f"Worker budget: {env['worker_budget']} | stage scheduling: {env['stage_scheduling']}")
         else:
             lines.append('Compiler/toolkit inventory: not captured')
+        if engine:
+            from engine_profile import short
+            lines.append('Engine profile: ' + (short(engine) if 'asm_linked' in engine else engine['label']))
         if warnings['count'] is not None:
             lines.append(f"Compiler warning lines: {warnings['count']} (engine log)")
             if warnings['count']:

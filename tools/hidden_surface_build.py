@@ -77,6 +77,8 @@ def _prepare_hidden_map(source, work, enabled, exterior, processor, cache=None):
         output, detail = _hidden_output(raw, enabled, exterior, processor)
         if cache is not None:
             detail = json.loads(json.dumps(detail))  # the form a cached detail has
+            import cache_provenance
+            cache_provenance.name_unit(cache, digest(raw) + (':exterior' if exterior else ':other'), lambda: source.name, lambda: [('map bytes', digest(raw)), ('scene', 'exterior' if exterior else 'other')])
             cache.store(digest(raw) + (':exterior' if exterior else ':other'), detail,
                         None if output == raw else output)
     return _hidden_row(source, work, enabled, exterior, raw, output, detail)
@@ -197,13 +199,14 @@ def cull_staged_maps(maps, work, exterior_maps, *, enabled=True, processor=None,
             if cache is not None:
                 report['pass_cache'] = {'sources_sha256': cache.sources}
         try:
-            for source, (row, detail_status) in _prepared_maps(inputs, work, enabled, names, processor, jobs, cache):
+            import progress_line
+            for number, (source, (row, detail_status)) in enumerate(
+                    _prepared_maps(inputs, work, enabled, names, processor, jobs, cache), 1):
                 before, after = row['before'], row['after']
                 report['maps'].append(row)
-                print('[hidden-surface-cull] {}: {}; {}; stored faces {} -> {}; removed {}; {}'.format(
-                    source.stem, 'ON' if enabled else 'OFF', row['scene_kind'],
-                    before['stored_faces'], after['stored_faces'], row['removed_stored_faces'],
-                    detail_status), flush=True)
+                progress_line.emit('Hidden-surface cull', source.stem, '{}; {}; stored faces {} -> {}; removed {}; {}'.format(
+                    'ON' if enabled else 'OFF', row['scene_kind'], before['stored_faces'], after['stored_faces'],
+                    row['removed_stored_faces'], detail_status), (number, len(inputs), 'maps'))
                 save(progress=True)
         finally:
             if cache is not None:

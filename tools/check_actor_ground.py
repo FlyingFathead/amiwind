@@ -158,7 +158,7 @@ def _measure_target(task):
     return results
 
 
-def audit(maps, jobs=1):
+def audit(maps, jobs=1, chim_frames=None):
     """Audit every packaged actor; jobs > 1 reads maps and measures in workers.
 
     Map reading/parsing and contact measurement are independent per map and run
@@ -244,14 +244,30 @@ def audit(maps, jobs=1):
                 continue
         if row.get('status') == 'invalid':
             errors.append(row.copy())
-    if not copies: errors.append(dict(error='No actor placements found'))
+    # CHIM-native town residents live in their frame and are fitted on its collision by the town stage
+    # (tools/chim_town.py ground_actors); its fit results are judged here like the map actors
+    # (BUILD-ACTOR-GATE-CHIM-FRAMES-36): only 'supported' passes, anything else is unresolved
+    frame_rows = []
+    for town, results in sorted((chim_frames or {}).items()):
+        for r in results:
+            row = dict(map=town + '-chim', reference=r.get('reference'), source_id=r.get('source_id'),
+                       status='grounded' if r.get('status') == 'supported' else 'failed-frame-fit',
+                       frame_status=r.get('status'), mesh_contact=r.get('mesh_contact'))
+            frame_rows.append(row)
+            if row['status'] != 'grounded':
+                errors.append(dict(map=row['map'], reference=row['reference'], source_id=row['source_id'],
+                                   error='CHIM frame resident not supported on the frame collision (%s)'
+                                   % r.get('status')))
+    rows += frame_rows
+    if not copies and not frame_rows: errors.append(dict(error='No actor placements found'))
     for key in sorted(placements.keys()-owner_seen):  # set order varies between runs
         errors.append(dict(owner=key[0], reference=key[1], error='Canonical owner omits its actor placement'))
     return dict(format=1, status='failed' if errors else 'passed', placement_copies=copies,
                 distinct_placements=len(placements), summary=dict(Counter(r['status'] for r in rows)),
                 tolerance={'minimum_gap': -.5, 'maximum_gap': 1.0, 'sole_band': .5},
                 scope='Initial ground-resident idle poses, packaged point collision, explicit source classification; no moving platforms, footsteps, IK or future animation proof.',
-                rows=rows, errors=errors, payload_sha256=hashes)
+                rows=rows, errors=errors, payload_sha256=hashes,
+                **({'chim_frame_actors': len(frame_rows)} if frame_rows else {}))
 
 
 def load_approved_report(path):
@@ -287,7 +303,7 @@ def evidence(report, before_world=False, findings_only=False):
     return json.dumps(view, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
-def require(maps, output, allow_known=None, before_world=False, findings_only=False, jobs=1):
+def require(maps, output, allow_known=None, before_world=False, findings_only=False, jobs=1, chim_frames=None):
     approved = None
     if before_world and findings_only:
         raise ValueError('Choose one actor comparison scope')
@@ -295,7 +311,7 @@ def require(maps, output, allow_known=None, before_world=False, findings_only=Fa
         if Path(allow_known).resolve() == Path(output).resolve():
             raise ValueError('Approved actor report must be separate from the new audit output')
         approved, approved_hash = load_approved_report(allow_known)
-    report = audit(maps, jobs=jobs)
+    report = audit(maps, jobs=jobs, chim_frames=chim_frames)
     raw = json.dumps(report, indent=2) + '\n'
     Path(output).write_bytes(raw.encode('utf-8'))
     acceptance = {'status': 'passed', 'unresolved': len(report['errors']),

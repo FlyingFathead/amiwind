@@ -27,15 +27,23 @@ static int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 #define MAX_OSPATH 1024
 static char com_gamedir[1024];
 static struct {float value;} bgmvolume={1.0};
-static double Sys_FloatTime(void){return 0;}
+static double test_now;
+static double Sys_FloatTime(void){return test_now;}
 static double realtime;
-static int debug_overlay,track_notices,status_queries;
+static int debug_overlay,track_notices,status_queries,stall_notices;
 static int AW_DebugOverlaysEnabled(void){return debug_overlay;}
 static void Con_Printf(const char *fmt,...){
     if(strstr(fmt,"OST %s: track"))track_notices++;
     if(strstr(fmt,"OST group="))status_queries++;
+    if(strstr(fmt,"music read stalled"))stall_notices++;
 }
 static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn;}
+typedef struct cvar_s {char *name;char *string;qboolean archive;qboolean server;float value;struct cvar_s *next;} cvar_t;
+static cvar_t *test_cvars;
+static int Cmd_Argc(void){return 1;}
+static char *Cmd_Argv(int i){(void)i;return "";}
+static void Cvar_RegisterVariable(cvar_t *v){v->value=(float)atof(v->string);v->next=test_cvars;test_cvars=v;}
+static void Cvar_SetValue(char *name,float value){cvar_t *v;for(v=test_cvars;v;v=v->next)if(!strcmp(v->name,name))v->value=value;}
 ''')
             (p / "sound.h").write_text("typedef struct {int left,right;} portable_samplepair_t;\n")
             # Keep the exact production code beside the synthetic headers so
@@ -44,7 +52,7 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
             exe = p / "player-test"
             subprocess.run(["cc", "-std=gnu89", "-O2", "-I" + str(p), "-I" + str(ROOT / "engine/aga/src"),
                             str(ROOT / "tests/music_player_test.c"), str(ROOT / "engine/aga/src/aw_format.c"),
-                            str(ROOT / "engine/aga/src/aw_log.c"),
+                            str(ROOT / "engine/aga/src/aw_log.c"), str(ROOT / "engine/aga/src/aw_aread.c"),
                             "-o", str(exe)], check=True)
             (p / "music").mkdir()
             for number, frames in zip((0, 4, 11, 42, 83), (8200, 9131, 16413, 9001, 11)):
@@ -56,6 +64,24 @@ static void Cmd_AddCommand(const char *name,void(*fn)(void)){(void)name;(void)fn
             (p / "music/track11.mws").write_bytes(pack_stream(long_pcm))
             subprocess.run([str(exe), str(p), "buffered"], cwd=p, check=True, timeout=10)
             subprocess.run([str(exe), str(p), "notifications"], cwd=p, check=True, timeout=10)
+            # HANG-IDLE-DUSK-35: a read that is late or never answered never stops the game loop.
+            for case in ("stall-late", "stall-never"):
+                subprocess.run([str(exe), str(p), case], cwd=p, check=True, timeout=10)
+                events = (p / "music-events.csv").read_text().splitlines()
+                self.assertEqual(sum(",read-stalled," in line for line in events),
+                                 1 if case == "stall-late" else 3, case)
+                if case == "stall-late":
+                    self.assertTrue(any(",read-recovered," in line for line in events))
+                    self.assertFalse(any(",read-abandoned," in line for line in events))
+                else:
+                    self.assertEqual(sum(",read-abandoned," in line for line in events), 3)
+                    self.assertTrue(any(",stall-off," in line for line in events))
+                    self.assertTrue(any(",stall-recovered," in line for line in events))
+            # ENGINE-MUSIC-NO-OFF-SWITCH-36: dbg music off/on with a read outstanding.
+            subprocess.run([str(exe), str(p), "switch"], cwd=p, check=True, timeout=10)
+            events = (p / "music-events.csv").read_text().splitlines()
+            self.assertEqual(sum(",music-off," in line for line in events), 1)
+            self.assertEqual(sum(",music-on," in line for line in events), 1)
             subprocess.run([str(exe), str(p), "normal"], cwd=p, check=True, timeout=10)
             events = (p / "music-events.csv").read_text().splitlines()
             completed = [line.split(",") for line in events[1:] if ",complete," in line]

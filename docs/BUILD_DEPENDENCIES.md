@@ -18,6 +18,7 @@ The full AGA build has three kinds of dependency:
 | Ubuntu/Debian APT | Python 3.10+, python3-venv, python3-pip, build-essential, FFmpeg, unzip, xz-utils, fonts-dejavu-core | Host scripts, compilation, audio conversion, extraction and diagnostic text |
 | Python virtual environment | setuptools (PyFFI distutils compatibility), PyFFI, NumPy, Pillow, SciPy, fast-simplification, amitools | Models, geometry, images and Amiga disk filesystems |
 | Separate public tools | AmigaPorts GCC SDK/vasm, ericw-tools, id Quake-Tools qcc | Amiga executable, BSP maps and QuakeC |
+| Vendored in the repository | meshoptimizer 1.3 simplifier (MIT, `third_party/meshoptimizer`), compiled with the host C++ compiler (build-essential) the first time a build uses it | CHIM mesh method `meshopt+merge` ([mesh methods](chim/MESH_METHODS.md)) |
 
 The terrain-only converter needs Python and the owner's base game data. The
 asset-free test image needs Make, the Amiga SDK/vasm and amitools; it does not

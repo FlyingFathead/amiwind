@@ -210,8 +210,10 @@ class SkyBankGateTests(unittest.TestCase):
         self.assertEqual(sky_bank_texels([dirty], None), [])                 # no palette: not checked
 
     def test_chim_build_validates_with_the_palette(self):
+        # the build's one validation runs in process (BUILD-CHIM-STATS-SERIAL-TAIL-36) and gets the build's palette
         text = (ROOT / 'tools/chim_build.py').read_text(encoding='utf-8')
-        self.assertIn("'--palette', str(a.palette)", text)
+        call = text[text.index('report_world(a.out'):]
+        self.assertIn('a.palette.read_bytes()', call[:call.index('text = report_text(report)')])
 
     def test_effects_run_after_the_sky_bank_translation(self):
         text = (ROOT / 'tools/chim/build.py').read_text(encoding='utf-8')

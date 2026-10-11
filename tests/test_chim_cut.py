@@ -246,5 +246,35 @@ class ReducerOptionTests(unittest.TestCase):
         self.assertGreaterEqual(len(rim & kept), len(rim) // 2)
 
 
+
+class AreaCutSettingTests(unittest.TestCase):
+    """The cut as an area setting (Vivec M3 stage A, owner decision 2026-10-10): the Arena's config turns it on at
+    512 units, Balmora and Seyda Neen keep every model whole, a build-wide value still wins, and flora stays
+    whole until tiling it is measured."""
+
+    def test_arena_cuts_at_512_and_the_core_towns_stay_whole(self):
+        from chim.build import area_cut_settings
+        from town_config import load_settings
+        arena = area_cut_settings(load_settings('vivec_arena'), {'grain': 256})
+        self.assertEqual(arena['cut_models_over'], 512)
+        balmora = area_cut_settings(load_settings('balmora'), {'grain': 256})
+        self.assertNotIn('cut_models_over', balmora)
+        # Seyda Neen's frame takes the build settings only (chim.seyda), never an area cut
+        self.assertEqual(area_cut_settings({}, {'grain': 256}), {'grain': 256})
+        # a build-wide value (chim_build --cut-models-over) wins over the area's own
+        self.assertEqual(area_cut_settings(load_settings('vivec_arena'), {'cut_models_over': 0})['cut_models_over'], 0)
+
+    def test_flora_stays_whole_and_wide_buildings_are_cut(self):
+        from chim.build import CUT_KEEP_WHOLE, cut_candidate
+        wide = {'lo': (0, 0, 0), 'hi': (776, 700, 100)}
+        self.assertTrue(cut_candidate(dict(wide, name='x/ex_vivec_c_04@s1'), 512))
+        self.assertFalse(cut_candidate(dict(wide, name='f/flora_tree_02@s1.4'), 512))
+        self.assertFalse(cut_candidate(dict(wide, name='F/Flora_emp_parasol_02@s1'), 512))
+        self.assertTrue(cut_candidate(dict(wide, name='f/flora_tree_02@s1.4'), 512, keep_whole=()))
+        self.assertFalse(cut_candidate(dict(wide, name='x/ex_vivec_c_04@s1'), 0))
+        self.assertFalse(cut_candidate({'lo': (0, 0, 0), 'hi': (500, 512, 9), 'name': 'x/house'}, 512))
+        self.assertEqual(CUT_KEEP_WHOLE, ('f/flora_',))
+
+
 if __name__ == '__main__':
     unittest.main()

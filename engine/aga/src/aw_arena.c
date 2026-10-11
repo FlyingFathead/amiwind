@@ -17,6 +17,7 @@
 #include "quakedef.h"
 #include "aw_combat.h"
 #include "aw_character.h"
+#include "aw_mappath.h"
 
 #define MAP_PIT "vai000"
 #define MAP_FLOOR "charplane"
@@ -91,8 +92,8 @@ static int take(const char *id,const char *name,const char *model,const char *la
     if(!AW_CombatSettingsLoad()){Con_Printf("Combat data missing (combat/settings.txt); rebuild the image.\n");return 0;}
     if(!AW_CombatActorLoad(id,&sheet)){Con_Printf("No combat sheet for %s (combat/actors.txt); rebuild the image or choose another NPC.\n",id);return 0;}
     memset(&foe,0,sizeof(foe));
-    strncpy(foe.id,id,31);strncpy(foe.name,name && *name?name:sheet.name,31);
-    strncpy(foe.model,model?model:"",63);strncpy(foe.layout,layout?layout:"",127);
+    Q_strcpy_bounded(foe.id,id,sizeof(foe.id));Q_strcpy_bounded(foe.name,name && *name?name:sheet.name,sizeof(foe.name));
+    Q_strcpy_bounded(foe.model,model?model:"",sizeof(foe.model));Q_strcpy_bounded(foe.layout,layout?layout:"",sizeof(foe.layout));
     foe.source=source;foe.pick=pick;foe.sheet=sheet;
     return 1;
 }
@@ -153,9 +154,11 @@ static void list(void) {
 /* ---- the map ---- */
 static const char *map_name(void) {
     int c=map_choice;
-    if(c<0)c=file_size("maps/" MAP_PIT ".bsp")>=124?0:file_size("maps/" MAP_FLOOR ".bsp")>=124?1:2;
-    if(c==0 && file_size("maps/" MAP_PIT ".bsp")<124){Con_Printf("The Arena Pit is not in this build; using the gallery floor.\n");c=1;}
-    if(c==1 && file_size("maps/" MAP_FLOOR ".bsp")<124){Con_Printf("No gallery floor in this build; fighting here.\n");c=2;}
+    char pit[AW_MAP_PATH_SIZE],floor[AW_MAP_PATH_SIZE];
+    AW_MapPath(MAP_PIT,pit,sizeof(pit));AW_MapPath(MAP_FLOOR,floor,sizeof(floor));
+    if(c<0)c=file_size(pit)>=124?0:file_size(floor)>=124?1:2;
+    if(c==0 && file_size(pit)<124){Con_Printf("The Arena Pit is not in this build; using the gallery floor.\n");c=1;}
+    if(c==1 && file_size(floor)<124){Con_Printf("No gallery floor in this build; fighting here.\n");c=2;}
     return c==0?MAP_PIT:c==1?MAP_FLOOR:"";        /* "" = the current scene */
 }
 

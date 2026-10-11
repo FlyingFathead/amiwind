@@ -221,6 +221,19 @@ class IngestTests(unittest.TestCase):
         self.assertFalse(doc['sources']['metrics'])
         self.assertIsNone(doc['mesh_curve'])
 
+    def test_land_cells_take_their_island_from_the_land_records(self):
+        # TRACKER-SEA-CELL-SET-36: a land cell without a metrics row (terrain and sea, nothing placed) kept no set and
+        # dropped out of the island view; one sea cell even carried another island's set from the metrics layer.
+        census = census_doc()
+        census['land'].append('9,9')
+        census['land_bloodmoon'] = ['9,9']
+        metrics = metrics_layer(cells=[c for c in LAND if c != (0, 0)])
+        metrics['cells'] = [dict(c, set='bloodmoon') if (c['x'], c['y']) == (4, 4) else c for c in metrics['cells']]
+        doc = ingest(self.out, census=census, metrics=metrics)
+        self.assertEqual(doc['cells']['0,0']['set'], 'vvardenfell')     # no metrics row
+        self.assertEqual(doc['cells']['4,4']['set'], 'vvardenfell')     # metrics said another island
+        self.assertEqual(doc['cells']['9,9']['set'], 'bloodmoon')       # Solstheim land
+
     def test_a_chim_run_converts_its_cell_and_audits_it_per_mechanism(self):
         chim_run(self.run)
         doc = ingest(self.out, [self.run_spec()], labels={'syn': 'Synthetic run'}, commits={'syn': 'abc1234'})
@@ -450,6 +463,39 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(h['not_started'], 23)         # the empty land cell 0,1 is neither started nor passed
         nxt = json.loads((self.out / 'next.json').read_text())
         self.assertNotIn((0, 1), {(c['x'], c['y']) for c in nxt['spiral']['cells']})
+
+    def test_open_sea_cells_are_done_map_cells_but_never_land(self):
+        """K-OCEAN: cells without LAND written as references to the shared ocean chunk (chimport.py ocean)."""
+        seam = {'seam_tears': {'status': 'passed', 'detail': 'largest step 0', 'numbers': {'max_step': 0.0}}}
+        cp.record_result(self.out, self.result(**{'6,6': {'converted': True, 'status': 'ocean', 'ocean': True, 'audits': seam},
+                                                  '-1,2': {'converted': True, 'status': 'ocean'},
+                                                  '9,9': {'status': 'empty'},
+                                                  '0,0': {'converted': True, 'audits': {'seam_tears': {'status': 'passed'}}}}))
+        doc = ingest(self.out)
+        h = doc['headline']
+        c = doc['cells']['6,6']
+        self.assertEqual((c['chim']['bucket'], c['land'], c['chim']['converted']), ('ocean', False, False))
+        self.assertEqual(c['audits']['seam_tears']['numbers'], {'max_step': 0.0})
+        self.assertEqual((h['ocean'], h['empty_sea'], h['passed'], h['land_cells']), (2, 1, 1, 25))
+        self.assertEqual(h['done'], 1 + 1)                  # passed + empty sea: the open ocean is NOT done (TRACKER-OCEAN-COUNTED-DONE-36)
+        self.assertEqual(h['eligible'], 1 + 1)
+        self.assertEqual(h['map_cells'], 25 + 1 + 2)
+        self.assertEqual(h['percent'], 4.0)                 # passed of land cells: unchanged by the sea
+        land_island = doc['cells']['0,0']['island']
+        self.assertEqual((c['island'], doc['cells']['-1,2']['island']), (land_island, land_island))
+        isl = [r for r in h['islands'] if r['island'] == land_island][0]
+        self.assertEqual((isl['map_cells'], isl['land_cells'], isl['ocean']), (isl['cells'] + 2, isl['cells'], 2))   # cells = the counted ones
+        self.assertEqual(isl['land_done'], isl['done'])
+        self.assertEqual(isl['percent'], round(100.0 * isl['done'] / isl['cells'], 1))
+        self.assertNotIn('ocean', cp.ELIGIBLE)
+        self.assertNotIn('ocean', cp.ELIGIBLE_SELECT)
+        self.assertIn('empty_sea', cp.ELIGIBLE)
+        self.assertIn('ocean', cp.BUCKETS)
+        import cell_progress_md as md
+        page = md.render(doc, today='2026-10-10 15:00 +0300')
+        self.assertIn('- Open ocean (silver, not counted as done): 2', page)
+        self.assertIn('open-ocean cells 2', page)
+        self.assertIn('not counted as done', page)
 
     def test_hull_policy_pending_is_neither_passed_nor_failed(self):
         cp.record_result(self.out, self.result(**{'0,0': {'converted': True, 'policy_pending': True,
@@ -758,7 +804,7 @@ class CompleteAndPageTests(unittest.TestCase):
         self.assertEqual((d['headline']['complete_unlit'], d['headline']['terrain_complete_unlit']), (1, 1))
         self.assertEqual((d['headline']['eligible'], d['headline']['eligible_release']), (5, cp.ELIGIBLE_RELEASE))
         self.assertIn('**Eligible for %s: 5 of 25**' % cp.ELIGIBLE_RELEASE, text)
-        self.assertIn('Eligible for %s = every done cell' % cp.ELIGIBLE_RELEASE, md.policy_section(text))
+        self.assertIn('Eligible for the next release = every done cell', md.policy_section(text))
         self.assertIn('empty_sea', cp.ELIGIBLE)
         self.assertEqual(d['headline']['eligible'], d['headline']['done'])
         self.assertIn("if (f === 'eligible')", (self.KIT / 'world-map.html').read_text(encoding='utf-8'))
@@ -981,11 +1027,23 @@ class ReleaseUiTests(unittest.TestCase):
         index = (self.KIT / 'index.html').read_text(encoding='utf-8')
         header = re.search(r'<header\b.*?</header>', index, re.S).group(0)
         css = ''.join(re.findall(r'[^{}]*header[^{}]*\{[^}]*\}', index))
+        css = re.sub(r'Last updated with AmiWind v\d+\.\d+\.\d+', 'Last updated with AmiWind vX', css)
         sha = lambda text: hashlib.sha256(text.encode('utf-8')).hexdigest()
-        self.assertEqual(sha(header), 'fac1cc24a87b581836ae2b6691de7f11bdc2f7856172a3cd6a573f07c311e294')
-        self.assertEqual(sha(css), '209fa0e28e1aece0bf890cba4c38319d17648755f5f0386ba1b6d83c2d1c9a60')
+        # The version number is not layout: tools/toolkit_version.py bumps it when the Toolkit changes in a release
+        # (fingerprint of the lighting branch's header with its v0.0.33 written as vX).
+        header = re.sub(r'Last updated with AmiWind v\d+\.\d+\.\d+', 'Last updated with AmiWind vX', header)
+        # 2026-10-10 (owner): one more tab button, "Monitor" (amiwind-toolkit/monitor.html), after 3D Inspector; nothing
+        # else in the header changed (the CSS rules are the lighting branch's; the CSS fingerprint also spans the header
+        # markup up to the first script brace, so it moves with the new button).
+        # 2026-10-11 (owner): one more tab button, "Mesh Compare" (amiwind-toolkit/mesh-compare.html), after Monitor;
+        # nothing else changed (same reason the CSS fingerprint moves with it).
+        # 2026-10-11 (owner): the "Everything here runs in your browser ..." sentence moved behind a small grey circled "?"
+        # (the same text as its mouseover title); nothing else changed.
+        self.assertEqual(sha(header), '8671d753f463c2fccbdace4b0a568d2f3ea99c39f1b2dce0cff6d4b58b305e31')
+        self.assertEqual(sha(css), 'fe54d571c143bc412f9d7c7ca224031a8d0a193d390e8b8a6f7347b34637a602')
         head = (self.KIT / 'chim-head.js').read_bytes()
-        self.assertEqual(hashlib.sha256(head).hexdigest(), 'a60e9593cad3c01f99d4e2fc221907bbfbe43136a5308f5faaf92f2d8a46779c')
+        # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (owner, 2026-10-11) made it silver and renamed it.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), '75dd04747ef2f4f09e305702541046252809b55c2d0552db4358ee65b534aef6')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their
@@ -1022,7 +1080,7 @@ class ReleaseUiTests(unittest.TestCase):
 
     def test_map_fits_the_window_and_folds_its_controls(self):
         page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
-        for needle in ('id="zoomfit"', 'id="zoomreset"', 'const MIN_ZOOM = 0.2', 'function fitCanvas(g)', 'window.innerHeight - docTop',
+        for needle in ('id="zoomfit"', 'id="zoomreset"', 'const MIN_ZOOM = 0.2', 'function fitCanvas(g)', 'window.innerHeight, docTop', 'window.ChimLegend.mapLayout', 'new ResizeObserver', 'SCROLLBARS = false', 'ringLabelsVisible(px)',
                        'function viewFit()', "'amiwind-map-view-1'", 'function viewRestore()', 'LABEL_MIN_PX = 16', 'cellPx(g) < LABEL_MIN_PX',
                        'id="ctltoggle"', 'id="controls"', "'amiwind-map-controls-1'", 'window.innerHeight >= 900'):
             self.assertIn(needle, page, needle)
@@ -1114,6 +1172,191 @@ class ReleaseUiTests(unittest.TestCase):
             self.assertEqual((answer.status, answer.read()), (204, b''))
 
 
+class PlanTests(ReleaseUiTests):
+    """The release plan layer: planned / in_build / shipped per cell, generic for any release, never touching conversion status."""
+
+    def plan(self, *argv):
+        rc = cp.main(['plan', '--out', str(self.out), '--now', '2026-10-11T09:00:00+03:00'] + list(argv))
+        ingest(self.out)                       # the CLI re-ingests from remembered sources; the fixture ingests directly
+        return rc
+
+    def ship(self, version):
+        rc = cp.main(['ship', '--out', str(self.out), '--release', version, '--now', '2026-10-12T09:00:00+03:00'])
+        ingest(self.out)
+        return rc
+
+    def read(self):
+        return json.loads((self.out / cp.OUT_FILES['progress']).read_text(encoding='utf-8'))
+
+    def test_plan_is_its_own_layer_and_keeps_conversion_status(self):
+        before = self.doc()
+        self.assertFalse((self.out / 'plan.json').exists())                          # results and ingest never create it
+        self.assertTrue(all(c['plan'] is None for c in before['cells'].values()))
+        self.assertEqual((before['plan_next'], before['schema']), (None, 2))
+        buckets = {k: c['chim']['bucket'] for k, c in before['cells'].items()}
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '1,0', '--title', '36 Lessons', '--source', 'test'), 0)
+        d = self.read()
+        self.assertEqual({k: c['chim']['bucket'] for k, c in d['cells'].items()}, buckets)   # conversion status untouched
+        e = d['cells']['0,0']['plan']
+        self.assertEqual((e['release'], e['state'], e['since'], e['source'], e['tier']),
+                         ('v0.0.36', 'planned', '2026-10-11T09:00:00+03:00', 'test', 'next'))
+        self.assertIsNone(d['cells']['2,0']['plan'])
+        self.assertEqual(d['plan_next'], 'v0.0.36')
+        row = [r for r in d['plans'] if r['release'] == 'v0.0.36'][0]
+        self.assertEqual((row['planned'], row['next'], row['shipped'], row['title']), (2, True, False, '36 Lessons'))
+        self.assertEqual(row['states'], {'planned': 2, 'in_build': 0, 'shipped': 0})
+        hist = [json.loads(x) for x in (self.out / 'history.jsonl').read_text().splitlines() if x]
+        self.assertEqual([h for h in hist if h.get('type') == 'plan'][-1]['release'], 'v0.0.36')
+        # a fresh ingest and new results keep the plan
+        cp.record_result(self.out, {'format': cp.RESULT_FORMAT, 'build': 'syn-2', 'generated': NOW, 'cells': {'2,0': {'converted': True}}})
+        self.assertEqual(ingest(self.out)['cells']['1,0']['plan']['release'], 'v0.0.36')
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '--state', 'in_build', '--source', 'builder'), 0)
+        self.assertEqual(self.read()['cells']['0,0']['plan']['state'], 'in_build')
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', 'nonsense'), 2)
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', 'area:nowhere'), 2)
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '1,0', '--clear'), 0)
+        self.assertIsNone(self.read()['cells']['1,0']['plan'])
+
+    def test_plan_record_is_open_unknown_keys_survive_and_export(self):
+        self.doc()
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '--set', 'district=canton', '--set', 'weight=3'), 0)
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '--state', 'in_build'), 0)
+        e = self.read()['cells']['0,0']['plan']
+        self.assertEqual((e['district'], e['weight'], e['state']), ('canton', '3', 'in_build'))   # kept by a later plan call
+        raw = json.loads((self.out / 'plan.json').read_text())
+        raw['cells']['0,0']['future_key'] = {'a': 1}                                   # a newer tool's key: preserved, shown
+        (self.out / 'plan.json').write_text(json.dumps(raw), encoding='utf-8')
+        ingest(self.out)
+        self.assertEqual(self.read()['cells']['0,0']['plan']['future_key'], {'a': 1})
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '--state', 'planned'), 0)
+        self.assertEqual(json.loads((self.out / 'plan.json').read_text())['cells']['0,0']['future_key'], {'a': 1})
+        csv_text = cp.export_csv(self.read())
+        head = csv_text.splitlines()[0].split(',')
+        self.assertTrue({'plan_release', 'plan_state', 'plan_since', 'plan_source'} <= set(head))
+        row = [r for r in csv_text.splitlines() if r.startswith('0,0,')][0].split(',')
+        self.assertEqual(row[head.index('plan_release')], 'v0.0.36')
+        self.assertEqual(row[head.index('plan_state')], 'planned')
+        # a plan file from a newer schema is never overwritten
+        raw['schema'] = 99
+        (self.out / 'plan.json').write_text(json.dumps(raw), encoding='utf-8')
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '1,0'), 2)
+        self.assertEqual(json.loads((self.out / 'plan.json').read_text())['schema'], 99)
+
+    def test_upcoming_release_is_data_and_ship_moves_the_gold_on(self):
+        self.doc()
+        self.assertEqual(self.plan('--release', 'v0.0.37', '--cells', '2,0'), 0)
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '1,0'), 0)
+        d = self.read()
+        self.assertEqual(d['plan_next'], 'v0.0.36')                                    # lowest unshipped, whatever order it was added
+        self.assertEqual((d['cells']['0,0']['plan']['tier'], d['cells']['2,0']['plan']['tier']), ('next', 'later'))
+        self.assertEqual([r['release'] for r in d['plans']], ['v0.0.36', 'v0.0.37', None])
+        self.assertEqual(self.ship('v0.0.36'), 0)
+        d = self.read()
+        self.assertEqual(d['plan_next'], 'v0.0.37')                                    # no code change: the next one is gold now
+        self.assertEqual((d['cells']['0,0']['plan']['state'], d['cells']['0,0']['plan']['tier']), ('shipped', 'shipped'))
+        self.assertEqual(d['cells']['0,0']['plan']['since'], '2026-10-12T09:00:00+03:00')
+        self.assertEqual(d['cells']['2,0']['plan']['tier'], 'next')
+        self.assertTrue([r for r in d['plans'] if r['release'] == 'v0.0.36'][0]['shipped'])
+        self.assertEqual(json.loads((self.out / 'plan.json').read_text())['releases']['v0.0.36']['shipped_at'], '2026-10-12T09:00:00+03:00')
+        self.assertEqual(self.ship('v0.0.99'), 2)                                      # no such plan
+        self.assertEqual(self.ship('v0.0.37'), 0)
+        self.assertIsNone(self.read()['plan_next'])                                    # nothing upcoming: no gold anywhere
+        # version order is numeric, not alphabetical
+        self.assertEqual(self.plan('--release', 'v0.0.100', '--cells', '3,0'), 0)
+        self.assertEqual(self.plan('--release', 'v0.0.99', '--cells', '3,0'), 0)
+        self.assertEqual(self.read()['plan_next'], 'v0.0.99')
+
+    def test_eligible_label_follows_the_upcoming_plan_release(self):
+        import cell_progress_md as md
+        d = self.doc()
+        self.assertEqual(d['headline']['eligible_release'], cp.ELIGIBLE_RELEASE)         # no plan: the old constant
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0'), 0)
+        d = self.read()
+        self.assertEqual(d['headline']['eligible_release'], 'v0.0.36')
+        self.assertIn('**Eligible for v0.0.36:', md.render(d, 'now'))
+        self.assertNotIn('Eligible for %s:' % cp.ELIGIBLE_RELEASE, md.render(d, 'now'))
+        self.assertEqual(self.plan('--release', 'v0.0.37', '--cells', '1,0'), 0)
+        self.assertEqual(self.read()['headline']['eligible_release'], 'v0.0.36')        # the lowest unshipped
+        self.assertEqual(self.ship('v0.0.36'), 0)
+        d = self.read()
+        self.assertEqual(d['headline']['eligible_release'], 'v0.0.37')                  # no code change after a release
+        self.assertIn('**Eligible for v0.0.37:', md.render(d, 'now'))
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        self.assertIn("doc.headline.eligible_release || 'the next release'", page)      # the page takes the label from the data
+
+    def test_plan_selectors(self):
+        self.doc()
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', 'build:syn-1'), 0)
+        self.assertEqual(sorted(k for k, c in self.read()['cells'].items() if c['plan']), ['0,0', '1,0', '2,0'])
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '--state', 'in_build'), 0)
+        cells = self.read()['cells']
+        self.assertEqual(cp.PL.resolve(cells, ['state:in_build'], cp.ELIGIBLE_SELECT, doc=cp.PL.load(self.out)), ['0,0'])
+        self.assertEqual(cp.PL.resolve(cells, ['plan:v0.0.36'], cp.ELIGIBLE_SELECT, doc=cp.PL.load(self.out)), ['0,0', '1,0', '2,0'])
+        listing = self.out / 'cells.txt'
+        listing.write_text('1,0\n2,0\n', encoding='utf-8')
+        self.assertEqual(cp.PL.resolve(cells, ['@' + str(listing)], cp.ELIGIBLE_SELECT), ['1,0', '2,0'])
+        listing.write_text('9,9\n', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            cp.PL.resolve(cells, ['@' + str(listing)], cp.ELIGIBLE_SELECT)
+
+    def test_map_page_runs_fits_and_zooms_without_errors(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable; the page run needs an existing interpreter')
+        self.doc()
+        self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0', '1,0'), 0)
+        r = subprocess.run([node, str(ROOT / 'tests' / 'test_cell_progress_page_run.js'), str(self.KIT), str(self.out / cp.OUT_FILES['progress'])],
+                           capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('page run ok', r.stdout)
+
+    def test_open_ocean_is_silver_and_not_done(self):
+        js = (self.KIT / 'chim-legend.js').read_text(encoding='utf-8')
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        head = (self.KIT / 'chim-head.js').read_text(encoding='utf-8')
+        silver = re.search(r"OCEAN_SILVER = '(#[0-9a-f]{6})'", js).group(1)
+        self.assertEqual(silver, '#c0c6cc')
+        self.assertIn("ocean: ['" + silver + "', 'Open ocean: shared ocean chunk made, not yet placed in the game", page)
+        self.assertIn("'" + silver + "'],", head)
+        self.assertIn("'audits_passed', 'empty_sea']);", page)          # CHIM_ELIGIBLE has no ocean
+        others = set(re.findall(r"'(#[0-9a-fA-F]{6})'", page.split('const CHIM_BUCKETS')[1].split('const CHIM_GRADES')[0]))
+        others.discard(silver)
+        self.assertNotIn(silver, others)
+        self.assertNotIn(silver.lower(), {js.split("PLAN_GOLD = '")[1][:7], js.split("PLAN_LATER = '")[1][:7]})
+
+    def test_progress_map_legend_page_is_linked_and_covers_every_colour(self):
+        page = (ROOT / 'docs' / 'chim' / 'CHIM_PROGRESS_MAP.md').read_text(encoding='utf-8')
+        for heading in ('What CHIMport is', 'Why: what Quake', 'What CHIM does instead', 'Violet: hull policy pending', 'Red: failing a check',
+                        'Magenta: not converted', 'Dark grey: not started', 'Blue: empty sea', 'Silver: open ocean',
+                        'Gold: planned for a release', 'Who decides what', 'Awaiting lighting', 'Passed, something still deferred'):
+            self.assertIn(heading, page, heading)
+        self.assertIn('**TOTALS**', page)
+        for name in ('README.md', 'docs/RELEASE-v0.0.36.md', 'docs/chim/PROGRESS_TRACKER.md', 'docs/chim/README.md'):
+            self.assertIn('CHIM_PROGRESS_MAP.md', (ROOT / name).read_text(encoding='utf-8'), name)
+        self.assertIn('href="../docs/chim/CHIM_PROGRESS_MAP.md"', (self.KIT / 'world-map.html').read_text(encoding='utf-8'))   # the legend's "what do these colours mean?"; no external URL
+        self.assertIn("['docs', 'chim', 'CHIM_PROGRESS_MAP.md']", (ROOT / 'tools' / 'toolkit_serve.py').read_text(encoding='utf-8'))      # and the server shows it
+        self.assertIn('docs/chim/CHIM_PROGRESS_MAP.md', json.loads((ROOT / 'tools' / 'release-files.json').read_text()))
+        # every colour of the Toolkit legend is explained: each status name appears in the page
+        for word in ('hull policy pending', 'open ocean', 'empty sea', 'not started', 'not converted'):
+            self.assertIn(word, page.lower(), word)
+
+    def test_toolkit_page_wires_the_gold_plan(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        for needle in ('id="plansummary"', "'chim:plan:'", 'planRows(chim.plans)', 'planTable(chim.plans, ', 'planLine(c.plan)',
+                       'chim.plan_next', "['plan', 'Release plan"):
+            self.assertIn(needle, page, needle)
+        js = (self.KIT / 'chim-legend.js').read_text(encoding='utf-8')
+        header = (self.KIT / 'header.js').read_text(encoding='utf-8')
+        gold = re.search(r"PLAN_GOLD = '(#[0-9a-f]{6})'", js).group(1)
+        self.assertIn('color:' + gold, header)                                         # the gold of the shared Toolkit header
+        self.assertIn('tools/cell_progress_plan.py', json.loads((ROOT / 'tools' / 'release-files.json').read_text()))
+        text = (ROOT / 'tools' / 'cell_progress_plan.py').read_text(encoding='utf-8')
+        self.assertIsNone(re.search(r'C:[\\/]|/vol/', text, re.I))
+        self.assertNotIn('\r', text)
+
+
 class PageTests(unittest.TestCase):
     KIT = ROOT / 'amiwind-toolkit'
 
@@ -1137,9 +1380,9 @@ class PageTests(unittest.TestCase):
     def test_files_ship_in_the_release(self):
         shipped = set(json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8')))
         for name in ('tools/cell_progress.py', 'tools/cell_progress_chim.py', 'tools/cell_progress_order.py',
-                     'tools/cell_progress_md.py', 'docs/chim/CELL_TRACKER.md', 'tools/cell_progress_release.py',
+                     'tools/cell_progress_md.py', 'docs/chim/CELL_TRACKER.md', 'tools/cell_progress_release.py', 'tools/cell_progress_plan.py',
                      'tools/cell_progress_ref.py', 'tools/cell_progress_build.py', 'amiwind-toolkit/chim-legend.js',
-                     'tests/test_cell_progress_legend.js', 'amiwind-toolkit/header.js',
+                     'tests/test_cell_progress_legend.js', 'tests/test_cell_progress_page_run.js', 'amiwind-toolkit/header.js',
                      'amiwind-toolkit/chim-head.js', 'amiwind-toolkit/zebra.js', 'config/cell-progress-areas.json',
                      'tests/test_cell_progress.py'):
             self.assertIn(name, shipped)

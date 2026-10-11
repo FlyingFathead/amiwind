@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "comment": "CHIMport test area (v0.0.36-dev): the 3 x 3 Bitter Coast block centred on cell (-7, 2), every cell passed in the island-wide CHIMport run. First CHIMport cells inside the legacy open world, built CHIM-native (--chim-native-towns on), to inspect the CHIM/legacy edge cell by cell. Centre = the middle of cell (-7, 2), already on the 512-unit terrain material grid. Bounds +-3072 = the three cells per axis (Balmora's frame) = the handoff core (the player changes maps on the cell edges); the frame's ground reaches 768 units further (terrain_margin, terrain only: three chunks, at least draw distance + 32 past the core, so there is ground up to the fog plane from every handover point, CHIM-FAR-BAND-GAP-36). Not shipped (no shipped_since): built only with --extra-town. Interiors (Gnaar Mok at -8, 3) not listed yet: their doors show as unavailable.",
+  "source_cell": [
+    -7,
+    2
+  ],
+  "source_radius": 1,
+  "centre": [
+    -53248,
+    20480
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -3072,
+      -3072
+    ],
+    [
+      3072,
+      3072
+    ]
+  ],
+  "reference_margin": 0,
+  "terrain_margin": 768,
+  "handoff_core": [
+    [
+      -3072,
+      -3072
+    ],
+    [
+      3072,
+      3072
+    ]
+  ],
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "town": {
+    "id": "bcoast_x7y2",
+    "title": "Bitter Coast (CHIMport test)",
+    "map": "bcoast_x7y2",
+    "map_prefix": "bc",
+    "region_cap": 64,
+    "message": "Bitter Coast (CHIMport test)",
+    "region_file": "bcoast_x7y2-regions.txt",
+    "door_file": "scene-doors-bcoast_x7y2.txt",
+    "visual_group": "bcoast_x7y2",
+    "arrival": {
+      "source_position": [
+        -53120,
+        20736,
+        88
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "Nearest dry ground to the block centre (the centre itself is marsh 48 units under water), from the cell's LAND heights."
+    },
+    "return": null
+  },
+  "interiors": []
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aw-message-1",
+  "title": "AmiWind master builder message (aw-message-1)",
+  "description": "One broadcast of the master builder to the workers holding a lease: a call for fixes (builder-bug, builder-update) or a new builder head (new-builder). Written by tools/aw_broadcast.py; see docs/AW.md.",
+  "type": "object",
+  "required": ["schema", "id", "kind", "time", "version", "integration_head", "ids", "summary", "hold", "reply_by",
+               "from"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "aw-message-1"},
+    "id": {"type": "string", "pattern": "^msg-[0-9]+$"},
+    "kind": {"enum": ["builder-bug", "builder-update", "new-builder"]},
+    "time": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [+-][0-9]{4}$"},
+    "version": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$"},
+    "integration_head": {"type": ["string", "null"], "pattern": "^[0-9a-f]{4,40}$"},
+    "ids": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9-]*[A-Z0-9]$"}},
+    "summary": {"type": "string", "minLength": 1},
+    "hold": {"type": "boolean"},
+    "reply_by": {"type": ["string", "null"],
+                 "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [+-][0-9]{4}$"},
+    "from": {"type": "string", "minLength": 1},
+    "to": {"type": "string", "minLength": 1},
+    "text": {"type": "string"},
+    "reply_how": {"type": "string"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+    "contains": {"type": "string"},
+    "closes": {"type": "array", "items": {"type": "string", "pattern": "^msg-[0-9]+$"}},
+    "hold_level": {"type": "boolean"},
+    "gate": {
+      "type": "object",
+      "required": ["result", "sha256"],
+      "properties": {
+        "result": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "number": {"type": ["integer", "null"]},
+        "tests_run": {"type": ["integer", "null"], "minimum": 0}
+      }
+    }
+  }
+}

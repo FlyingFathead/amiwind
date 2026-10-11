@@ -84,11 +84,14 @@ it a release build runs every unit.
    same time and both saw a file change, the write trace decides: a file only one
    of them wrote is that stage's output; with an unknown writer (a map compiler) or
    two writers, neither stage is reused.
-4. **Diagnostics are not compared, and never read.** Tool logs (`*.log`) and the
-   reports `chim-stats.json`, `chim-timing.json`, `gallery-cache.json` and
-   `world-terrain-cache.json` carry timings; a rerun stage whose outputs differ
-   only in these still "wrote the same outputs" for the stages after it. A stage
-   that reads another stage's diagnostic is not reused.
+4. **Diagnostics are not compared; a read of one is a hashed input.** Tool logs
+   (`*.log`) and the reports `chim-stats.json`, `chim-timing.json`,
+   `gallery-cache.json` and `world-terrain-cache.json` carry timings; a rerun stage
+   whose outputs differ only in these still "wrote the same outputs" for the stages
+   after it. A stage that reads another stage's diagnostic (the tracker data reads
+   `chim-stats.json`) records the file's SHA-256 as an input and is reused only when
+   the file has exactly those bytes again (BUILD-DIAGNOSTIC-INPUT-REFUSED-36); a file
+   it could not read makes the stage not reusable.
 5. **The from-scratch build is the final check.** A release image is reproduced by
    a build without any reuse and compared file by file; any difference blocks the
    release.
@@ -108,6 +111,26 @@ it runs. A code change that leaves a stage's outputs byte-identical therefore co
 stage's run, not the rest of the build. A stage whose own key changed (its reached code,
 the game inputs it reads, the settings its code reads) always runs: whether its outputs
 would come out the same cannot be known without running it.
+
+A reused stage's record in a run lists only the files the reuse step copied; the
+comparison needs what the stage wrote when it last really ran. Every run that reuses
+a stage keeps that original record in `profile/manifests-ran/STAGE.json`, so a run
+stays a complete reuse source after older runs are retired. For runs made before
+this, the record is rebuilt from the run's reuse plan when the plan left nothing out
+(BUILD-REUSE-RECORD-RETIRED-36).
+
+Stage keys count a module's import-time code in key form 2: only the default values
+that run code on import (anything but a literal). Adding or changing a function no
+stage reaches changes no stage key. A reuse source recorded in form 1 is compared in
+form 1, so the change of form costs no rebuild (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
+
+The image-pass and unit caches (`tools/pass_cache.py`) use form 2 as well. Their keys
+also leave out `tools/pass_cache.py` itself: that is the cache's own key and storage
+code, and a change in what a stored result means changes its `FORMAT`. On a miss, a
+pass looks the input up once under the form-1 key, verifies the entry by SHA-256, and
+records it under the new key, so the change of form recomputes nothing
+(BUILD-PASS-KEY-OVERBROAD-36: Vivec stage A try3 recomputed all 275 head previews after
+a new function was added to `tools/build_parallel.py`).
 
 ## Reuse preflight
 
@@ -132,6 +155,13 @@ plan says. Example: the first v0.0.35 development build against the v0.0.34 buil
 inputs or settings.
 
 ## Run names
+
+A build's options can also come from a recipe file (`--recipe FILE`, schema `build-recipe-1`): the
+options as named fields, the input files by SHA-256 and the build that checked it; `--save-recipe FILE`
+writes the recipe of the build being run. The recipe record is in `build-state.json`,
+`build-summary.json` and `image/build.json` and is never part of a stage key. See
+[Build recipes](BUILD_RECIPES.md).
+
 
 A build run folder is named
 

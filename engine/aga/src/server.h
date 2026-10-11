@@ -48,7 +48,7 @@ typedef struct
 #ifdef QUAKE2
 	char		startspot[64];
 #endif
-	char		modelname[64];		// maps/<name>.bsp, for model_precache[0]
+	char		modelname[64];		// maps/<name>.bsp or .chim (AW_MapPath), for model_precache[0]
 	struct model_s 	*worldmodel;
 	char		*model_precache[MAX_MODELS];	// NULL terminated
 	struct model_s	*models[MAX_MODELS];
@@ -250,9 +250,10 @@ void SV_MoveToGoal (void);
 void SV_CheckForNewClients (void);
 void SV_RunClients (void);
 void SV_SaveSpawnparms ();
-/* A map name that fits sv.name and sv.modelname ("maps/<name>.bsp" in
- * MAX_QPATH); prints why not (ENGINE-MAP-NAME-OVERFLOW-35). */
-#define SV_MAPNAME_MAX (MAX_QPATH - 10)
+/* A map name that fits sv.name and sv.modelname ("maps/<name>.bsp", or
+ * "maps/<name>.chim" for a CHIM frame map, in MAX_QPATH); prints why not
+ * (ENGINE-MAP-NAME-OVERFLOW-35). */
+#define SV_MAPNAME_MAX (MAX_QPATH - 11)
 qboolean SV_MapNameFits (const char *name);
 #ifdef QUAKE2
 void SV_SpawnServer (char *server, char *startspot);

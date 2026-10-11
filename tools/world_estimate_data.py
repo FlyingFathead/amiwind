@@ -380,7 +380,8 @@ def scan_meshes(data_files, names, cache_path=None, jobs=1, progress=None):
     for i, row in enumerate(ordered_map(_scan_worker, [(str(data_files), n) for n in todo], jobs)):
         rows[row['model']] = row
         if progress and (i % 250 == 0 or i == len(todo) - 1):
-            progress('mesh scan %d/%d' % (i + 1, len(todo)))
+            import progress_line
+            progress(progress_line.line('Mesh scan', None, None, (i + 1, len(todo), 'meshes')))
     if cache_path is not None:
         Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
         Path(cache_path).write_text(json.dumps(rows, sort_keys=True) + '\n', encoding='utf-8', newline='\n')

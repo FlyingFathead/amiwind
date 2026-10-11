@@ -14,12 +14,12 @@ import build_cache  # noqa: E402
 import reuse_report  # noqa: E402
 
 
-def manifest(folder, stage, files, reusable=True, reasons=()):
+def manifest(folder, stage, files, reusable=True, reasons=(), mode=420):
     target = folder / 'profile' / 'manifests'
     target.mkdir(parents=True, exist_ok=True)
     (target / f'{stage}.json').write_text(json.dumps({
         'schema': build_cache.MANIFEST_SCHEMA, 'stage': stage, 'status': 'complete', 'reusable': reusable,
-        'reasons': list(reasons), 'files': {k: {'size': 1, 'sha256': v, 'mode': 420} for k, v in files.items()},
+        'reasons': list(reasons), 'files': {k: {'size': 1, 'sha256': v, 'mode': mode} for k, v in files.items()},
         'links': {}, 'deleted': [], 'directories': [], 'deleted_directories': []}))
 
 
@@ -81,6 +81,28 @@ class ReuseReportTests(unittest.TestCase):
             self.assertIn('census: 1 units differ (scene/census.txt changed)', rows['character']['detail'])
             self.assertEqual(result['reused'], 0)
 
+    def test_dependants_of_a_real_change_are_expected_and_of_identical_outputs_unexpected(self):
+        """The upstream stage is compared again by content: one that really changed after an expected rebuild makes
+        its dependants' rebuild EXPECTED; one whose outputs are identical (a read-only reused copy, 0o444 against
+        0o644: BUILD-REUSE-CUTOFF-MODE-36) makes it UNEXPECTED, named."""
+        refused = 'an earlier stage it depends on ran again and its outputs differ from the old run: '
+        with tempfile.TemporaryDirectory() as temp:
+            run, old = Path(temp) / 'new', Path(temp) / 'old'
+            details(old, {'intro': {'sources': {'by_file': {'tools/intro.py': 'a'}}}})
+            details(run, {'intro': {'sources': {'by_file': {'tools/intro.py': 'b'}}}})
+            manifest(old, 'intro', {'intro-scene/video.awv': 'a' * 64})
+            manifest(run, 'intro', {'intro-scene/video.awv': 'b' * 64})
+            manifest(old, 'bsp', {'bsp-scene/maps/a.bsp': 'c' * 64}, mode=0o444)
+            manifest(run, 'bsp', {'bsp-scene/maps/a.bsp': 'c' * 64}, mode=0o644)
+            state(run, old, ['intro', 'bsp', 'character', 'hands'],
+                  {'character': {'refused': refused + 'intro, bsp'}, 'hands': {'refused': refused + 'bsp'}},
+                  {'intro': 'changed: sources (tools/intro.py)', 'bsp': 'changed: sources (tools/collision_bsp.py)'})
+            rows = {row['stage']: row for row in reuse_report.report(run)['rows']}
+        self.assertEqual((rows['character']['class'], rows['character']['cause']), ('EXPECTED', 'upstream changed'))
+        self.assertIn('changed by content: intro (identical by content: bsp)', rows['character']['detail'])
+        self.assertEqual((rows['hands']['class'], rows['hands']['cause']),
+                         ('UNEXPECTED', 'refused with identical outputs'))
+
     def test_preflight_names_the_changed_files_and_flags_keys_the_diff_does_not_explain(self):
         """BUILD-REUSE-KEYS-TOO-BROAD-35: the reuse preflight explains every rebuild by the source diff against the
         reuse source's recorded tree, or by a real input change; a source key that changed with no file changed is
@@ -112,6 +134,44 @@ class ReuseReportTests(unittest.TestCase):
         # A file the reuse source did not record cannot be proven unchanged: it explains the rebuild.
         result = reuse_report.preflight(order, reasons, new, old, {'src/mwad/esm.py': '3'}, files)
         self.assertEqual(result['unexpected'], 0)
+
+    def test_a_stage_the_old_run_reused_without_a_replaced_file_follows_the_stage_that_replaced_it(self):
+        """BUILD-REUSE-AUDIT-WITHOUT-REASON-36: the BUILD-REUSE-REDUCED-RECORD-36 reason was classed 'other',
+        UNEXPECTED. It is an explained rebuild: EXPECTED unless a stage that replaced the file was itself rebuilt
+        UNEXPECTED; the recorded reason is kept as the detail."""
+        old_name = '2026_10_10_v0.0.36-dev3_full-coast-chim-regions-270-resume_e8f03ea'
+        # The reason exactly as the v0.0.36-dev3 resume2 preflight printed it.
+        unrecorded = (f'{old_name} reused it without intro-scene/asset-name-map.json (replaced there by a stage no '
+                      'longer recorded), which this build runs again')
+        named = (f'{old_name} reused it without intro-scene/asset-name-map.json (replaced there by harvest, '
+                 'balmora), which this build runs again')
+        self.assertEqual(reuse_report.followed_stages(named), ['harvest', 'balmora'])
+        self.assertEqual(reuse_report.followed_stages(unrecorded), [])
+        with tempfile.TemporaryDirectory() as temp:
+            run, old = Path(temp) / 'new', Path(temp) / 'old'
+            state(run, old, ['intro', 'scenery', 'harvest', 'balmora'], {'scenery': {}},
+                  {'intro': unrecorded, 'harvest': 'changed: sources (tools/prepare_harvest.py)',
+                   'balmora': f'{old_name} reused it without scene/b.txt (replaced there by harvest), which this '
+                              'build runs again'})
+            result = reuse_report.report(run)
+            rows = {row['stage']: row for row in result['rows']}
+            self.assertEqual((rows['intro']['class'], rows['intro']['cause']), ('EXPECTED', 'reduced record'))
+            self.assertEqual(rows['intro']['detail'], unrecorded)
+            self.assertEqual(rows['balmora']['class'], 'EXPECTED')
+            self.assertEqual(result['unexpected'], 0)
+            code, text = self.audit(run)
+            self.assertEqual(code, 0, text)
+            self.assertIn('reduced record: ' + unrecorded[:80], text)
+            # The stage that replaced the file was rebuilt for an over-broad key: the follower is unexpected too.
+            state(run, old, ['intro', 'harvest'], {},
+                  {'intro': named, 'harvest': 'changed: sources (tools/release-files.json)'})
+            rows = {row['stage']: row for row in reuse_report.report(run)['rows']}
+            self.assertEqual((rows['harvest']['class'], rows['intro']['class']), ('UNEXPECTED', 'UNEXPECTED'))
+        # The reuse preflight classes it the same way.
+        result = reuse_report.preflight(['intro', 'engine'], {'intro': unrecorded,
+                                                              'engine': build_cache.NON_REUSABLE['engine']},
+                                        {}, {}, {}, {})
+        self.assertEqual(([row['class'] for row in result['rows']], result['unexpected']), (['EXPECTED', 'EXPECTED'], 0))
 
     def test_not_a_reuse_run(self):
         with tempfile.TemporaryDirectory() as temp:

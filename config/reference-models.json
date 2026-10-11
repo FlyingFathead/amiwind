@@ -1,0 +1,37 @@
+{
+ "format": "amiwind-reference-models-1",
+ "note": "Reference models are recipes, not files: tools/reference_models.py rebuilds each one from your own game data and checks every step against these SHA-256 values; docs/chim/REFERENCE_MODELS.md describes them.",
+ "models": [
+  {
+   "name": "base silt strider",
+   "source": "meshes/r/siltstrider.nif",
+   "source_bytes": 270437,
+   "editions": "Morrowind Game of the Year edition: GOG (loose file and Morrowind.bsa) and Steam (Morrowind.bsa) hold the same bytes",
+   "group": "silt_strider",
+   "method": {
+    "reducer": "boundary-locked quadric simplification (static_lod.reduce_mesh, lock_boundaries)",
+    "method_version": "MESH-LOD-OPEN-SEAMS-33 / v0.0.34",
+    "ratio": 0.45,
+    "lock_boundaries": true,
+    "texture_size": 64,
+    "faces": "coplanar polygons (mesh_geometry.surface_polygons), split at 240 texels (split_surface)",
+    "variants": "every placement scale and tilt is this mesh transformed after the reduction; vertices shared as in this mesh (model weld 'base')"
+   },
+   "expected": {
+    "sha256": {
+     "source": "78c624c580ba9927821d37b75c64a22347777fe386f521c16e4a268e5502ac88",
+     "geometry": "87522167e941ba16c68c1c48e08c1baffe10f05219af8b434af9c9de4486335e",
+     "visible": "87522167e941ba16c68c1c48e08c1baffe10f05219af8b434af9c9de4486335e",
+     "reduced": "62f2929c41d71455fd81e9dd5a149e2bc3e20c36fece64794d718016c5829f5b",
+     "faces": "4d8e73c7d1f5e712de5abdef33593319548022f4d41782774eb9c994b7826a08"
+    },
+    "counts": {
+     "source_triangles": 5600,
+     "visible_triangles": 5600,
+     "reduced_triangles": 2926,
+     "faces": 3219
+    }
+   }
+  }
+ ]
+}

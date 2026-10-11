@@ -9,7 +9,8 @@ designed, measured or held back are collected in [CHIM ideas](IDEAS.md), and
 what CHIM has already achieved, with the measured gains, is in the
 [CHIM feature tracker](FEATURES.md). How far the open world has been
 converted, cell by cell, is on the generated
-[CHIM cell tracker](CELL_TRACKER.md).
+[CHIM cell tracker](CELL_TRACKER.md), and the colours of its map are explained on
+[the CHIM progress map](CHIM_PROGRESS_MAP.md).
 
 <!-- contents start -->
 ## Contents
@@ -51,10 +52,12 @@ collision, sound and QuakeC are Quake's. What changes is the outdoor world:
 - **Interiors stay Quake maps.** Houses, caves and the prison ship are
   ordinary Quake maps behind doors, built as before; Quake's `vis` works well
   indoors.
-- **One frame map per area.** A small Quake map (`maps/<town>-chim.bsp`) holds
+- **One frame map per area.** A small Quake map (`maps/<town>-chim.chim`) holds
   what is not chunk data: actors, flora sprites, the start point and the
   frame's position. Loading it switches the engine to CHIM for that area.
 
+CHIM maps are `.chim` files, not `.bsp`: a CHIM map is no longer directly compatible with Quake's `.bsp`
+format, and the separate extension avoids confusion ([.chim map format](CHIM_MAP_FORMAT.md)).
 The data files are specified in the [world format](WORLD_FORMAT.md); the
 engine side is in [CHIM engine](ENGINE.md).
 
@@ -78,6 +81,7 @@ CHIM has its own version number, separate from AmiWind's:
 | | |
 | --- | --- |
 | First release | CHIM 0.1.0 with AmiWind v0.0.33 |
+| Current | CHIM 0.2.0 with AmiWind v0.0.36 (minor step: new features; world format major unchanged) |
 | Where it is kept | the `CHIM_VERSION` file at the repository root, the one source for the builder receipts, the engine header and the boot check |
 | How it is shown | short form on the boot check, "AmiWind vX / CHIM vY"; long form "Running on CHIM Engine vY" in the README and release notes |
 | Numbering | semantic versions: a new world format major version is a new CHIM major version (the engine refuses a world of another major with a clear message); minor = features; patch = fixes |
@@ -85,8 +89,10 @@ CHIM has its own version number, separate from AmiWind's:
 | Receipts | every CHIM build records `builder: chim`, `chim_version` and `world_format` |
 | CHIM 1.0 | the release in which the whole island runs on CHIM |
 
-The world format has a version of its own (0.5 in source, 0.6 for large
-frames); the engine reads the range it knows and refuses the rest.
+The world format has a version of its own: the builder writes 0.5, or 0.7
+with terrain references; the engine reads 0.4 to 0.7 and refuses the rest. The
+file types, the format history and the roadmap of the format, in short:
+[CHIM file format](../CHIM_FILE_FORMAT.md).
 
 ## Design rules
 
@@ -162,16 +168,22 @@ Leary). The CHIM builder is GPLv3. Details and the reviewed upstream revision:
 | --- | --- |
 | [CHIM feature tracker](FEATURES.md) | What CHIM has done so far: every feature with its status, measured gain and visibility story |
 | [CHIM ideas](IDEAS.md) | Every idea and held-back item with its status |
-| [World format](WORLD_FORMAT.md) | The files the CHIM builder writes, the M3 and M4 designs, the heap gate, the version rules |
+| [CHIM file format](../CHIM_FILE_FORMAT.md) | The overview for newcomers: what CHIM stores and why, the file types (`.bsp`, `.chim`, the CHIM world), the format versions so far, how to look inside, the roadmap |
+| [World format](WORLD_FORMAT.md) | The files the CHIM builder writes, byte by byte (the file-type table at the top), the M3 and M4 designs, the heap gate, the version rules |
+| [.chim map format](CHIM_MAP_FORMAT.md) | CHIM maps as `.chim` files, never Quake `.bsp`; the planned own header, loader and contents (approved 10 October 2026) |
 | [CHIM engine](ENGINE.md) | How the engine loads, keeps, draws and collides with a CHIM world; memory and tests |
 | [CHIMport](CHIMPORT.md) | The whole island converted cell by cell from the sea inwards, every audit per cell |
+| [Border audit](STITCH_AUDIT.md) | Where a CHIM area meets the legacy world: heights, arrival, far layer and objects at its edges |
 | [Disk space](DISK_SPACE.md) | Amiga disk limits, what CHIM saves, and the size budget of the whole game |
+| [Mesh methods](MESH_METHODS.md) | How meshes become faces: planar merge for every mesh, meshoptimizer with locked borders for the large reduced shells, the method table and its rule |
+| [Reference models](REFERENCE_MODELS.md) | The models held up as the good version (the base silt strider): each a recipe from your own data, checked by SHA-256 at every step |
 | [CHIM statistics](STATS.md) | `chim-stats.json`: polycounts, disk, memory and streaming figures of every build |
 | [CHIM texture effects](TEXTURE_EFFECTS.md) | Optional `.chimfx` texture effects |
 | [CHIM lighting](LIGHTING.md) | How CHIM lights a cell like the original: the options measured, the hybrid lighting type |
 | [CHIM lights roadmap](LIGHTING_ROADMAP.md) | The lighting milestones, their checks and the pending decisions |
 | [CHIM NPC pathfinding](CHIM_NPC_PATHFINDING.md) | The walkable graph in the world format, budgets and gates |
 | [CHIM cell tracker](CELL_TRACKER.md) | The generated live status of every open-world cell on CHIM |
+| [The CHIM progress map](CHIM_PROGRESS_MAP.md) | What CHIMport is and why Quake's map format is not enough, then every colour of the progress map: what it means, the usual problems behind it, today's counts, what fixes it and who decides |
 | [CHIM Progress Tracker guide](PROGRESS_TRACKER.md) | How the tracker works: statuses, audits, lighting, releases, the Toolkit legend, commands |
 | [Cell result format](CELL_RESULT_FORMAT.md) | `aw-cell-result-1`, the file a conversion run hands to the tracker |
 | [CHIM build guide](build_guide/README.md) | Builder types, MiniWind, quick test builds, speed, emulator presets |

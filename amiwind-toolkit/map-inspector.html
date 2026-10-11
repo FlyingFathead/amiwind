@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<html lang="en" data-inspector-version="0.0.31" data-inspector-build="020"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en" data-inspector-version="0.0.36" data-inspector-build="021"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AmiWind Toolkit · 3D Map Inspector</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#101923;color:#edf3fa;font:14px system-ui}header{height:64px;padding:12px 18px;border-bottom:1px solid #345;display:flex;align-items:center;gap:8px;overflow-x:auto;overflow-y:hidden}h1{font-size:18px;margin:0;white-space:nowrap;flex-shrink:0;line-height:1.15}button,select,input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:5px;padding:7px}button{cursor:pointer}main{display:flex;height:calc(100vh - 64px - var(--awh,0px))}aside{width:310px;min-width:310px;padding:16px;overflow:auto}#stage{position:relative;flex:1;min-width:0}canvas{width:100%;height:100%;display:block}#hint,#status{position:absolute;background:#101923dc;padding:10px;pointer-events:none}#hint{top:12px;left:12px;max-width:510px}#status{bottom:12px;left:12px}#selectionstatus{position:absolute;left:12px;right:12px;background:#101923ed;color:#ffe56a;padding:8px 10px;pointer-events:none;display:none;font-weight:600}#cross{position:absolute;left:50%;top:50%;pointer-events:none;color:#ffe28a;font-size:22px;transform:translate(-50%,-50%)}#emptyload{position:absolute;left:50%;top:calc(50% + 24px);transform:translateX(-50%);pointer-events:none;color:#8494a6;font-size:14px;text-align:center;max-width:80%}#emptyload[hidden]{display:none}label{display:block;margin:12px 0}#objects{width:100%;height:230px;padding:0}#objects option{padding:6px}#info{line-height:1.7;white-space:pre-wrap}.small{font-size:12px;color:#b6c7d8;line-height:1.5}.error{color:#ffaaaa}#legend{height:12px;background:linear-gradient(90deg,#4478ee,#32cfa0,#ffcf55,#ef4545);margin:8px 0}
@@ -11,8 +11,23 @@ button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff;color:#fff;b
 #orientationgizmo{position:absolute;right:132px;top:16px;width:146px;background:#101923df;border:1px solid #456;border-radius:8px;text-align:center;padding:3px;user-select:none}#gizmo{width:138px;height:128px;touch-action:none;cursor:grab}#gizmo:active{cursor:grabbing}
 </style>
 <script src="header.js" data-subtitle="3D Map Inspector" data-hide="header h1"></script>
-<header><h1>AmiWind · Polycount inspector<br><small style="font-size:11px;color:#abc">Last updated with AmiWind v0.0.31 · first made in v0.0.28</small></h1><label style="margin:0">Open BSP / JSON <input id="file" type="file" accept=".bsp,.json"></label><button id="demo">Synthetic cube</button><button id="painttoggle" aria-pressed="false" title="Click a face to mark it; drag is one undo step" style="white-space:nowrap;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3l7 7-9 9-7-7zM5 12l-3 9 9-3"/></svg> Paint mode OFF</button><button id="exportall" title="Camera, display settings and planning annotations; source assets are referenced, not embedded">Export all</button><button id="copysession" title="Copy inspection session JSON" aria-label="Copy inspection session JSON"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><label class="sessionload">Load session<input id="sessionimport" type="file" accept=".json" hidden></label></header>
+<script src="chim-reader.js"></script>
+<script src="view-camera.js"></script>
+<header><h1>AmiWind · Polycount inspector<br><small style="font-size:11px;color:#abc">Last updated with AmiWind v0.0.36 · first made in v0.0.28</small></h1><label style="margin:0">Open BSP / CHIM / JSON <input id="file" type="file" accept=".bsp,.chim,.json"></label><button id="demo">Synthetic cube</button><button id="painttoggle" aria-pressed="false" title="Click a face to mark it; drag is one undo step" style="white-space:nowrap;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3l7 7-9 9-7-7zM5 12l-3 9 9-3"/></svg> Paint mode OFF</button><button id="exportall" title="Camera, display settings and planning annotations; source assets are referenced, not embedded">Export all</button><button id="copysession" title="Copy inspection session JSON" aria-label="Copy inspection session JSON"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><label class="sessionload">Load session<input id="sessionimport" type="file" accept=".json" hidden></label></header>
 <main><aside><b>Inspect compiled geometry</b><p class="small">Offline, read-only. No uploads, collision simulation or game execution. Owner-supplied scenes remain local.</p>
+<details open id="chimpanel"><summary><b>CHIM world</b></summary>
+<p class="small">A CHIM world is the build's <code>chim-world</code> folder: <code>chim/world.cwi</code>, the frames and their sector files, and the reports (<code>chim-heap.json</code>). It is read here, in this browser; nothing is uploaded. A <code>.chim</code> map holds only its frame's entities: the frame's ground and objects are in the world.</p>
+<label>Open CHIM world folder <input id="chimfolder" type="file" webkitdirectory multiple style="width:100%"></label>
+<label>or a zip of that folder <input id="chimzip" type="file" accept=".zip" style="width:100%"></label>
+<label>Frame <select id="chimframe" style="width:100%"></select></label>
+<p><button id="chimload">Show frame</button></p>
+<label>Heap report (chim-heap.json) <input id="chimheapfile" type="file" accept=".json" style="width:100%"></label>
+<label>Target sizes (the image's world-map-heap.json) <input id="chimsizes" type="file" accept=".json" style="width:100%"></label>
+<label><input type="checkbox" id="chimheat" checked> Memory overlay: active ring at every position</label>
+<label><input type="checkbox" id="chimworst" checked> Worst positions and the picked ring</label>
+<p><button id="chimpick" aria-pressed="false">Pick ring position</button> X <input id="chimx" type="number" step="1" style="width:76px"> Y <input id="chimy" type="number" step="1" style="width:76px"> <button id="chimring">Ring here</button></p>
+<div id="chiminfo" class="small" style="white-space:pre-wrap">No CHIM world loaded.</div>
+</details>
 <button id="fly">Enter mouse look</button> <button id="reset">Overview</button><p><b>Inspection method</b></p><p><button id="above" aria-pressed="false">From above</button> <button id="returnfly" aria-pressed="true">Fly view</button> <button id="vieworbit" aria-pressed="false">Orbit</button></p><label><input type="checkbox" id="showcompass" checked> Viewport compass</label><label><input id="showgizmo" type="checkbox" checked> Orientation gizmo</label>
 <label>Display <select id="mode"><option value="white">White wireframe</option><option value="density">Vertex density</option></select></label>
 <label><input type="checkbox" id="textures"> Load textures</label>
@@ -67,18 +82,21 @@ button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff;color:#fff;b
 <p id="cutinfo" class="small">Drag a cut or its end squares in From above (top-down) view; elsewhere use the number boxes and slider. Every cut divides the whole map along its axis; From/To and Z give its portal rectangle.</p>
 </details>
 <p><b>Plan a polygon area</b></p><label>Reference plane Z <input id="planez" type="number" value="0" step="any" style="width:90px"> compiled units</label><p><button id="drawarea" aria-pressed="false">Draw area</button> <button id="finisharea">Finish</button> <button id="cleararea">Clear</button></p><p><button id="areaJSON">Export polygon JSON</button> <button id="areaPNG">Export marked PNG</button></p><div id="areainfo" class="small">Click corners from above. Horizontal reference-plane projection, not terrain tracing. Planning only; no map edits.</div>
-<label>Speed <input id="speed" type="range" min="20" max="1600" value="200"> <span id="speedvalue">200</span> units/s</label>
+<label>Speed <input id="speed" type="range" min="0" max="1000" step="any" value="683.67"> <span id="speedvalue">×1.00</span> <span class="small">(scaled to the map; Shift faster, Ctrl or Alt slower)</span></label>
 <label>Density bin <input id="bin" type="number" min="1" max="8192" value="64" style="width:80px"> compiled units</label>
 <label><input type="checkbox" id="filterdensity"> Filter density range</label><div style="display:flex;justify-content:space-between"><span>Min <b id="minlabel">0</b></span><span>Max <b id="maxlabel">1</b></span></div><div id="legend"></div><div style="display:flex;justify-content:space-between;gap:12px"><input id="densitymin" type="range" min="0" max="1" value="0" style="width:47%"><input id="densitymax" type="range" min="0" max="1" value="1" style="width:47%"></div><p><button id="resetdensity">Reset density range</button></p><p id="densitylabel" class="small">Density = placed unique vertices per 3D spatial bin; not heap bytes, original NIF triangles, or collision complexity.</p>
 <input id="search" placeholder="Find model, reference, name" style="width:100%"><select id="objects" size="10"></select>
-<p><button id="fit">Fit selected</button> <button id="export">Export scene JSON</button></p><div id="info">Load a locally converted BSP or exported scene.</div>
-<p class="small">Bindings follow AmiWind default keymaps: WASD move, E ascend, Q descend, Shift faster, Ctrl fast flight, left/right arrows turn. Mouse look; Escape releases cursor. Space is jump in AmiWind and has no jump action in this noclip inspector. Unlocked: drag to look, wheel zooms the view (field of view in fly mode; position unchanged); Overview resets zoom. Click selects a surface; in mouse look, click selects under the centre reticle.</p></aside>
-<div id="stage"><canvas id="view" tabindex="0"></canvas><canvas id="areaoverlay" style="position:absolute;inset:0;pointer-events:none"></canvas><div id="hint">Open a converted BSP to navigate its actual polygons. This viewer does not change the game.</div><div id="cross">+</div><div id="emptyload">Please load a map to continue: Local &rarr; Show in 3D, or Open BSP / JSON above.</div><div id="orientationgizmo"><b class="small">Orientation</b><canvas id="gizmo" width="138" height="128" aria-label="Orientation axes; drag to orbit, click plus or minus axes to snap"></canvas><span class="small">Drag to orbit · click axes</span></div><div id="compass"><div id="rose"><span class="n">N</span><span class="e">E</span><span class="s">S</span><span class="w">W</span><div id="needle">↑</div></div><div id="compassvalue">0° N</div></div><div id="terrainwarning"><span id="terrainwarninglabel">Terrain culling preview ON — requires pre-baking to affect the map</span><div id="previewcounts"></div></div><div id="selectionstatus" role="status" aria-live="polite"></div><div id="status">No scene</div><div id="cuttip" style="position:absolute;display:none;pointer-events:none;background:#101923ee;border:1px solid #8bd5ff;border-radius:4px;padding:5px 7px;font-size:12px;white-space:pre;color:#edf3fa"></div></div></main>
+<p><button id="fit">Fit selected</button> <button id="export">Export scene JSON</button></p><div id="info">Load a locally converted BSP, a CHIM map or world, or an exported scene.</div>
+<p class="small">Bindings follow AmiWind default keymaps: WASD move, E ascend, Q descend, Shift 4x faster, Ctrl or Alt 4x slower (the Speed slider sets the base, scaled to the loaded map), left/right arrows turn. Mouse look; Escape releases cursor. Space is jump in AmiWind and has no jump action in this noclip inspector. Unlocked: drag to look, wheel zooms the view (field of view in fly mode; position unchanged); Overview resets zoom. Click selects a surface; in mouse look, click selects under the centre reticle.</p></aside>
+<div id="stage"><canvas id="view" tabindex="0"></canvas><canvas id="areaoverlay" style="position:absolute;inset:0;pointer-events:none"></canvas><div id="hint">Open a converted BSP, a CHIM map (.chim) or a CHIM world to navigate its actual polygons. This viewer does not change the game.</div><div id="cross">+</div><div id="emptyload">Please load a map to continue: Local &rarr; Show in 3D, Open BSP / CHIM / JSON above, or Open CHIM world on the left.</div><div id="orientationgizmo"><b class="small">Orientation</b><canvas id="gizmo" width="138" height="128" aria-label="Orientation axes; drag to orbit, click plus or minus axes to snap"></canvas><span class="small">Drag to orbit · click axes</span></div><div id="compass"><div id="rose"><span class="n">N</span><span class="e">E</span><span class="s">S</span><span class="w">W</span><div id="needle">↑</div></div><div id="compassvalue">0° N</div></div><div id="terrainwarning"><span id="terrainwarninglabel">Terrain culling preview ON — requires pre-baking to affect the map</span><div id="previewcounts"></div></div><div id="selectionstatus" role="status" aria-live="polite"></div><div id="status">No scene</div><div id="cuttip" style="position:absolute;display:none;pointer-events:none;background:#101923ee;border:1px solid #8bd5ff;border-radius:4px;padding:5px 7px;font-size:12px;white-space:pre;color:#edf3fa"></div></div></main>
 <script>
 'use strict';
 const $=id=>document.getElementById(id),canvas=$('view');let gl=canvas.getContext('webgl');
 function reportError(e){$('hint').textContent='Inspector error: '+(e.message||e);$('hint').className='error';}
 window.addEventListener('error',e=>reportError(e.error||e.message));window.addEventListener('unhandledrejection',e=>reportError(e.reason));
+// Shared view controls (view-camera.js): the same orbit and movement speed as Mesh Compare.
+function VC(){return (typeof window!=='undefined'&&window.AmiWindViewCamera)||(typeof AmiWindViewCamera!=='undefined'?AmiWindViewCamera:null);}
+let moveBase=200;
 let overhead=false,overheadScale=1,savedFly=null,drawArea=false,areaClosed=false,areaPoints=[],areaPlane=0,areaProjection='Orthographic overhead rays onto horizontal reference plane; not terrain elevation';let scene=null,objects=[],selected=-1,eye=[0,-10,5],yaw=Math.PI/2,pitch=-.2,keys=new Set(),drag=false,dirty=true,last=performance.now(),densityMax=1,focal=1.4;
 const add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,s)=>a.map(v=>v*s),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],norm=a=>mul(a,1/(Math.hypot(...a)||1));
 function basis(){let f=[Math.cos(pitch)*Math.cos(yaw),Math.cos(pitch)*Math.sin(yaw),Math.sin(pitch)],r=[Math.sin(yaw),-Math.cos(yaw),0];return {f,r,u:cross(r,f)};}
@@ -185,7 +203,7 @@ function inspectionExportFilename(kind,data,extension='json'){
 function inspectionJSONText(data){return JSON.stringify(data,null,2);}
 function downloadInspectionJSON(kind,data){downloadBlob(new Blob([inspectionJSONText(data)],{type:'application/json'}),inspectionExportFilename(kind,data));}
 
-function inspectionIdentity(){return {...inspectionExportTime(),program:{name:'AmiWind Polycount inspector',version:'0.0.31'},loaded_filename:loadedFilename||(scene&&scene.source)||null,source_filename:(scene&&scene.source_filename)||(scene&&scene.source)||null,coordinate_system:'Compiled BSP/world XYZ units; +X east, +Y north; not original cell coordinates'};}
+function inspectionIdentity(){return {...inspectionExportTime(),program:{name:'AmiWind Polycount inspector',version:'0.0.36'},loaded_filename:loadedFilename||(scene&&scene.source)||null,source_filename:(scene&&scene.source_filename)||(scene&&scene.source)||null,coordinate_system:'Compiled BSP/world XYZ units; +X east, +Y north; not original cell coordinates'};}
 function exportSceneInfo(){return {...scene,...inspectionIdentity()};}
 async function loadedHash(raw){if(!window.crypto||!window.crypto.subtle)return null;let digest=await window.crypto.subtle.digest('SHA-256',raw);return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');}
 function storedFaceKey(o, i) {
@@ -576,6 +594,7 @@ function snapOrientation(axis){
 }
 function orbitDrag(dx,dy){
   if(!Number.isFinite(dx)||!Number.isFinite(dy))return;if(!orbitMode)enterOrbit();if(!orbitPivot)return;
+  if(VC()){eye=VC().orbit(eye,orbitPivot,dx,dy).eye;overhead=false;aimAtPivot();dirty=true;return;}
   const offset=sub(eye,orbitPivot),radius=Math.max(.1,Math.hypot(...offset)),azimuth=Math.atan2(offset[1],offset[0])-dx*.008,elevation=Math.max(-Math.PI/2+.001,Math.min(Math.PI/2-.001,Math.atan2(offset[2],Math.hypot(offset[0],offset[1]))+dy*.008));
   eye=add(orbitPivot,[radius*Math.cos(elevation)*Math.cos(azimuth),radius*Math.cos(elevation)*Math.sin(azimuth),radius*Math.sin(elevation)]);overhead=false;aimAtPivot();dirty=true;
 }
@@ -594,7 +613,7 @@ function gizmoPointerUp(event){
 }
 function initializeGizmo(){const canvas=$('gizmo');canvas.addEventListener('pointerdown',gizmoPointerDown);canvas.addEventListener('pointermove',gizmoPointerMove);canvas.addEventListener('pointerup',gizmoPointerUp);canvas.addEventListener('pointercancel',e=>{e.stopPropagation();gizmoGesture=null;});canvas.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();});$('showgizmo').onchange=()=>{updateOrientationGizmo();dirty=true;};$('vieworbit').onclick=enterOrbit;}
 
-function load(s,filename){validate(s);$('emptyload').hidden=true;resetNavigation();closeSessionCopy();orbitMode=false;orbitOrtho=false;orbitPivot=null;clearZones(false);faceMarks=[];markupUndo=[];markupRedo=[];paintStroke=null;$('markmode').value='inspect';markupStatus();if(!demoSwitching){demoReturn=null;demoActive=false;$('demo').textContent='Synthetic cube';}pendingInspectionImport=null;loadedPaletteFilename=null;requiredPaletteFilename=null;selectedPaletteKind=s.palette?'local':'builtin';loadedFilename=filename||s.loaded_filename||s.source_filename||s.source;areaPoints=[];areaClosed=false;drawArea=false;if(!gl)throw Error('WebGL unavailable');disposeSolids();for(let o of objects){gl.deleteBuffer(o.buffer);}scene=s;baseFaceTotals=previewFaceTotals(s,null);terrainPreview=null;objects=s.objects.map(o=>({...o,bounds:bounds(o.vertices)}));for(let o of objects)componentStats(o);cachePlacementFaceTotals();cacheSceneBatchStats();selected=-1;updateSelectedFooter();density();list();textureList();overview();if($('terraincull').checked)updateTerrainPreview();cutsSceneChanged();$('hint').textContent='Actual compiled edges. Wireframe is see-through. Load textures adds depth-tested unlit surfaces. Click a surface to inspect.';}
+function load(s,filename){validate(s);$('emptyload').hidden=true;resetNavigation();closeSessionCopy();orbitMode=false;orbitOrtho=false;orbitPivot=null;clearZones(false);faceMarks=[];markupUndo=[];markupRedo=[];paintStroke=null;$('markmode').value='inspect';markupStatus();if(!demoSwitching){demoReturn=null;demoActive=false;$('demo').textContent='Synthetic cube';}pendingInspectionImport=null;loadedPaletteFilename=null;requiredPaletteFilename=null;selectedPaletteKind=s.palette?'local':'builtin';loadedFilename=filename||s.loaded_filename||s.source_filename||s.source;areaPoints=[];areaClosed=false;drawArea=false;if(!gl)throw Error('WebGL unavailable');disposeSolids();for(let o of objects){gl.deleteBuffer(o.buffer);}scene=s;baseFaceTotals=previewFaceTotals(s,null);terrainPreview=null;objects=s.objects.map(o=>({...o,bounds:bounds(o.vertices)}));if(VC()&&objects.length){const lo=[0,1,2].map(k=>Math.min(...objects.map(o=>o.bounds[0][k]))),hi=[0,1,2].map(k=>Math.max(...objects.map(o=>o.bounds[1][k])));moveBase=VC().baseSpeed(lo,hi);}for(let o of objects)componentStats(o);cachePlacementFaceTotals();cacheSceneBatchStats();selected=-1;updateSelectedFooter();density();list();textureList();overview();if($('terraincull').checked)updateTerrainPreview();cutsSceneChanged();$('hint').textContent='Actual compiled edges. Wireframe is see-through. Load textures adds depth-tested unlit surfaces. Click a surface to inspect.';}
 function density(){
   if(!scene)return;
   let size=Math.max(1,Math.min(8192,Number($('bin').value)||64)),bins=new Map(),key=p=>p.map(x=>Math.floor(x/size)).join(',');
@@ -632,7 +651,7 @@ function updateSelectedFooter(){
  element.style.display='block';const statusHeight=$('status').offsetHeight||40;element.style.bottom=(12+statusHeight+8)+'px';$('terrainwarning').style.bottom=(12+statusHeight+8+(element.offsetHeight||40)+8)+'px';
 }
 
-function select(i,keepOrbit=false){selected=i;if(orbitMode&&!keepOrbit){orbitPivot=inspectionPivot();aimAtPivot();}list();let o=objects[i];$('info').textContent=o?o.name+'\nModel *'+o.model+' · ref '+(o.reference||'none')+'\n'+o.faceCount+' original stored BSP faces in active batch\n'+(previewEnabled()?'Preview: '+shownFaceCount(o)+' current faces\n':'')+o.vertices.length+' unique vertices in active batch\n'+o.edges.length+' polygon edges · '+o.triangles.length+' fan triangles\n'+o.materialCount+' texinfo mappings\nBounds: '+o.bounds.map(p=>p.map(x=>x.toFixed(1)).join(', ')).join(' → ')+'\nFinal BSP connected components: '+o.components.length+'\n'+o.components.slice(0,12).map((c,i)=>'#'+(i+1)+': '+(o.polygons?c.faces+' faces / ':'')+c.vertices+' vertices').join('\n')+'\nFaces per texinfo: '+(o.materialFaces.map(([t,n])=>t+': '+n).join(', ')||'unavailable')+'\nStage counts (provided metadata): '+(o.stageCounts?JSON.stringify(o.stageCounts):'not supplied; earlier pipeline stages cannot be inferred from final BSP')+'\nCounts describe compiled visual geometry, not collision or live engine allocations.':'No selection';updateSelectedFooter();dirty=true;}
+function select(i,keepOrbit=false){selected=i;if(orbitMode&&!keepOrbit){orbitPivot=inspectionPivot();aimAtPivot();}list();let o=objects[i];$('info').textContent=o?o.name+(o.chim?'\n'+chimDescribe(o):'\nModel *'+o.model+' · ref '+(o.reference||'none'))+'\n'+o.faceCount+' original stored BSP faces in active batch\n'+(previewEnabled()?'Preview: '+shownFaceCount(o)+' current faces\n':'')+o.vertices.length+' unique vertices in active batch\n'+o.edges.length+' polygon edges · '+o.triangles.length+' fan triangles\n'+o.materialCount+' texinfo mappings\nBounds: '+o.bounds.map(p=>p.map(x=>x.toFixed(1)).join(', ')).join(' → ')+'\nFinal BSP connected components: '+o.components.length+'\n'+o.components.slice(0,12).map((c,i)=>'#'+(i+1)+': '+(o.polygons?c.faces+' faces / ':'')+c.vertices+' vertices').join('\n')+'\nFaces per texinfo: '+(o.materialFaces.map(([t,n])=>t+': '+n).join(', ')||'unavailable')+'\nStage counts (provided metadata): '+(o.stageCounts?JSON.stringify(o.stageCounts):'not supplied; earlier pipeline stages cannot be inferred from final BSP')+'\nCounts describe compiled visual geometry, not collision or live engine allocations.':'No selection';updateSelectedFooter();dirty=true;}
 function fit(i){orbitMode=false;orbitOrtho=false;orbitPivot=null;zoneDrawing=null;zoneCorners=[];zoneCornerWorld=[];zoneHoverWorld=null;drawArea=false;overhead=false;savedFly=null;let o=objects[i];if(!o)return;let[lo,hi]=selectionBounds(i),c=mul(add(lo,hi),.5),r=Math.max(30,Math.hypot(...sub(hi,lo))*.9);eye=add(c,[0,-r,r*.35]);yaw=Math.PI/2;pitch=-Math.atan(.35);dirty=true;}
 function overview(){orbitMode=false;orbitOrtho=false;orbitPivot=null;zoneDrawing=null;zoneCorners=[];zoneCornerWorld=[];zoneHoverWorld=null;drawArea=false;overhead=false;savedFly=null;focal=1.4;if(!objects.length)return;let vv=objects.filter(o=>!isWorldTerrainObject(o)).flatMap(o=>o.vertices);if(!vv.length)vv=objects[0].vertices;let[lo,hi]=bounds(vv),c=mul(add(lo,hi),.5),r=Math.max(20,Math.hypot(...sub(hi,lo))*.65);eye=add(c,[0,-r,r*.7]);yaw=Math.PI/2;pitch=-Math.atan(.7);dirty=true;}
 function visible(o,i){return ($('terrain').checked||!isWorldTerrainObject(o))&&(!$('only').checked||selected<0||selectionContains(i));}
@@ -641,7 +660,7 @@ function cursorOrigin(x,y){if(!overhead&&!orbitOrtho)return eye;let b=basis(),r=
 function areaCorner(x,y){let ray=cursorRay(x,y),origin=cursorOrigin(x,y);if(Math.abs(ray[2])<1e-8)throw Error('View ray is parallel to the reference plane');let distance=(areaPlane-origin[2])/ray[2];if(distance<=0)throw Error('Reference plane is behind the camera');let p=add(origin,mul(ray,distance));return [p[0],p[1],areaPlane];}
 function projectPoint(point){let b=basis(),q=sub(point,eye),z=dot(q,b.f);if(z<=.1)return null;let scale=(overhead||orbitOrtho)?overheadScale:z;return [canvas.width/2+dot(q,b.r)*focal/scale*canvas.height/2,canvas.height/2-dot(q,b.u)*focal/scale*canvas.height/2];}
 function polygonInfo(){let signed=0;if(areaClosed)for(let i=0;i<areaPoints.length;i++){let a=areaPoints[i],b=areaPoints[(i+1)%areaPoints.length];signed+=a[0]*b[1]-b[0]*a[1];}return {format:'amiwind-polygon-area-plan-1',...inspectionIdentity(),source:scene?scene.source:null,source_sha256:scene?scene.source_sha256:null,coordinate_system:'Compiled BSP/game units; +X east, +Y north; not original Morrowind cell coordinates',reference_plane_z:areaPlane,projection:areaProjection,closed:areaClosed,density_filter:{enabled:$('filterdensity').checked,min:Number($('densitymin').value),max:Number($('densitymax').value),metric:'maximum placed vertex-bin density per line/triangle primitive'},vertices_xy:areaPoints.map(p=>p.slice(0,2)),area_square_units:areaClosed?Math.abs(signed)/2:null,purpose:'Planning overlay only; does not edit subcells, maps, converter or engine'};}
-function drawPolygonOverlay(){let layer=$('areaoverlay');if(layer.width!==canvas.width||layer.height!==canvas.height){layer.width=canvas.width;layer.height=canvas.height;}let c=layer.getContext('2d');c.clearRect(0,0,layer.width,layer.height);drawZoneOverlays(c);drawCutOverlays(c);if(!areaPoints.length){$('areainfo').textContent='Click corners from above. Horizontal reference-plane projection, not terrain tracing. Planning only; no map edits.';return;}let p=areaPoints.map(projectPoint);c.strokeStyle='#f8ff70';c.lineWidth=3;c.fillStyle='#f8ff7030';if(areaClosed&&p.every(Boolean)){c.beginPath();p.forEach((v,i)=>i?c.lineTo(...v):c.moveTo(...v));c.closePath();c.fill();c.stroke();}else{for(let i=1;i<p.length;i++)if(p[i-1]&&p[i]){c.beginPath();c.moveTo(...p[i-1]);c.lineTo(...p[i]);c.stroke();}}c.font='13px system-ui';for(let i=0;i<p.length;i++)if(p[i]){c.fillStyle='#f8ff70';c.beginPath();c.arc(p[i][0],p[i][1],4,0,Math.PI*2);c.fill();c.fillText(String(i+1),p[i][0]+7,p[i][1]-7);}let info=polygonInfo();$('areainfo').textContent=(drawArea?'Drawing — ':'')+areaPoints.length+' corners · Z '+areaPlane+' · '+(areaClosed?info.area_square_units.toFixed(1)+' square units':'open')+'\n'+areaPoints.map((v,i)=>(i+1)+': X '+v[0].toFixed(3)+', Y '+v[1].toFixed(3)).join('\n');}
+function drawPolygonOverlay(){let layer=$('areaoverlay');if(layer.width!==canvas.width||layer.height!==canvas.height){layer.width=canvas.width;layer.height=canvas.height;}let c=layer.getContext('2d');c.clearRect(0,0,layer.width,layer.height);drawZoneOverlays(c);drawCutOverlays(c);drawChimOverlay(c);if(!areaPoints.length){$('areainfo').textContent='Click corners from above. Horizontal reference-plane projection, not terrain tracing. Planning only; no map edits.';return;}let p=areaPoints.map(projectPoint);c.strokeStyle='#f8ff70';c.lineWidth=3;c.fillStyle='#f8ff7030';if(areaClosed&&p.every(Boolean)){c.beginPath();p.forEach((v,i)=>i?c.lineTo(...v):c.moveTo(...v));c.closePath();c.fill();c.stroke();}else{for(let i=1;i<p.length;i++)if(p[i-1]&&p[i]){c.beginPath();c.moveTo(...p[i-1]);c.lineTo(...p[i]);c.stroke();}}c.font='13px system-ui';for(let i=0;i<p.length;i++)if(p[i]){c.fillStyle='#f8ff70';c.beginPath();c.arc(p[i][0],p[i][1],4,0,Math.PI*2);c.fill();c.fillText(String(i+1),p[i][0]+7,p[i][1]-7);}let info=polygonInfo();$('areainfo').textContent=(drawArea?'Drawing — ':'')+areaPoints.length+' corners · Z '+areaPlane+' · '+(areaClosed?info.area_square_units.toFixed(1)+' square units':'open')+'\n'+areaPoints.map((v,i)=>(i+1)+': X '+v[0].toFixed(3)+', Y '+v[1].toFixed(3)).join('\n');}
 function downloadBlob(blob,name){let a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function startArea(){if(!scene)return;zoneDrawing=null;zoneCorners=[];zoneCornerWorld=[];zoneHoverWorld=null;if(!Number.isFinite(Number($('planez').value))){reportError('Reference plane must be finite');return;}if(document.exitPointerLock)document.exitPointerLock();inspectAbove();areaPlane=Number($('planez').value);areaProjection='Orthographic overhead rays onto horizontal reference plane; not terrain elevation';areaPoints=[];areaClosed=false;drawArea=true;dirty=true;}
 function simplePolygon(points){
@@ -676,9 +695,9 @@ function editingNavigationTarget(target){return !!(target&&(['INPUT','SELECT','T
 function viewportNavigationActive(){return !!(scene&&!document.hidden&&!editingNavigationTarget(document.activeElement)&&(document.activeElement===canvas||document.pointerLockElement===canvas));}
 function resetNavigation(){keys.clear();drag=false;last=performance.now();}
 function focusViewportNavigation(){const active=document.activeElement;if(active&&active!==canvas&&active.blur)active.blur();resetNavigation();canvas.focus({preventScroll:true});}
-function navigationModifiers(event){if(event.shiftKey)keys.add('shift');else keys.delete('shift');if(event.ctrlKey)keys.add('control');else keys.delete('control');}
+function navigationModifiers(event){if(event.shiftKey)keys.add('shift');else keys.delete('shift');if(event.ctrlKey)keys.add('control');else keys.delete('control');if(event.altKey)keys.add('alt');else keys.delete('alt');}
 function navigationKeyDown(event){
-  if(!viewportNavigationActive()||editingNavigationTarget(event.target)||event.altKey||event.metaKey){keys.clear();return;}
+  if(!viewportNavigationActive()||editingNavigationTarget(event.target)||event.metaKey){keys.clear();return;}
   const key=String(event.key).toLowerCase();if(event.ctrlKey&&(key==='z'||key==='y')){event.preventDefault();if(key==='y'||event.shiftKey)redoMarkup();else undoMarkup();return;}navigationModifiers(event);
   if(navigationKeys.has(key)){event.preventDefault();keys.add(key);}
 }
@@ -694,21 +713,207 @@ function navigationDelta(now){
   return Number.isFinite(elapsed)&&elapsed>=0&&elapsed<=.5?elapsed:0;
 }
 
-function tick(now){let dt=navigationDelta(now);if(viewportNavigationActive()){let b=basis();if(overhead)b.f=[Math.cos(yaw),Math.sin(yaw),0];let speed=Number($('speed').value)*(keys.has('shift')?2:1)*(keys.has('control')?4:1),v=[0,0,0];if(keys.has('w'))v=add(v,b.f);if(keys.has('s'))v=sub(v,b.f);if(keys.has('d'))v=add(v,b.r);if(keys.has('a'))v=sub(v,b.r);if(keys.has('e'))v[2]+=1;if(keys.has('q'))v[2]-=1;if(keys.has('arrowleft')){if(orbitMode)orbitDrag(-dt/.008,0);else yaw+=dt;dirty=true;}if(keys.has('arrowright')){if(orbitMode)orbitDrag(dt/.008,0);else yaw-=dt;dirty=true;}if(v.some(Boolean)){let shift=mul(v,speed*dt);eye=add(eye,shift);if(orbitMode&&orbitPivot)orbitPivot=add(orbitPivot,shift);dirty=true;}}if(dirty&&gl){render();dirty=false;}}
+function tick(now){let dt=navigationDelta(now);if(viewportNavigationActive()){let b=basis();if(overhead)b.f=[Math.cos(yaw),Math.sin(yaw),0];let speed=VC()?VC().keySpeed(moveBase,VC().factorOf($('speed').value),{fast:keys.has('shift'),slow:keys.has('control')||keys.has('alt')}):moveBase*(keys.has('shift')?4:1)*(keys.has('control')||keys.has('alt')?.25:1),v=[0,0,0];if(keys.has('w'))v=add(v,b.f);if(keys.has('s'))v=sub(v,b.f);if(keys.has('d'))v=add(v,b.r);if(keys.has('a'))v=sub(v,b.r);if(keys.has('e'))v[2]+=1;if(keys.has('q'))v[2]-=1;if(keys.has('arrowleft')){if(orbitMode)orbitDrag(-dt/.008,0);else yaw+=dt;dirty=true;}if(keys.has('arrowright')){if(orbitMode)orbitDrag(dt/.008,0);else yaw-=dt;dirty=true;}if(v.some(Boolean)){let shift=mul(v,speed*dt);eye=add(eye,shift);if(orbitMode&&orbitPivot)orbitPivot=add(orbitPivot,shift);dirty=true;}}if(dirty&&gl){render();dirty=false;}}
 function safeTick(now){try{tick(now);}catch(e){reportError(e);dirty=false;}finally{requestAnimationFrame(safeTick);}}
 window.addEventListener('keydown',navigationKeyDown);window.addEventListener('keyup',navigationKeyUp);window.addEventListener('blur',resetNavigation);window.addEventListener('focusin',resetNavigation);window.addEventListener('focusout',resetNavigation);document.addEventListener('visibilitychange',resetNavigation);document.addEventListener('pointerlockchange',resetNavigation);
-canvas.addEventListener('pointerdown',e=>{focusViewportNavigation();drag=true;if($('markmode').value!=='inspect'&&!zoneDrawing&&!drawArea){paintStroke=markupSnapshot();try{paintAtEvent(e);}catch(error){reportError(error);}}});window.addEventListener('pointerup',()=>{drag=false;endPaintStroke();});window.addEventListener('blur',endPaintStroke);let moved=0;canvas.addEventListener('mousemove',e=>{updateZoneHover(e);if(document.pointerLockElement===canvas||drag){moved+=Math.abs(e.movementX)+Math.abs(e.movementY);if(drawArea||(zoneDrawing&&overhead))return;if(paintStroke!==null&&document.pointerLockElement!==canvas){try{paintAtEvent(e);}catch(error){reportError(error);}return;}if(orbitMode){orbitDrag(e.movementX,e.movementY);}else if(overhead){let scale=overheadScale*2/(Math.max(1,canvas.clientHeight)*focal);let b=basis();eye=add(eye,add(mul(b.r,-e.movementX*scale),mul(b.u,e.movementY*scale)));}else{yaw-=e.movementX*.003;pitch=Math.max(-1.55,Math.min(1.55,pitch-e.movementY*.003));}if(paintStroke!==null){try{paintAtEvent(e);}catch(error){reportError(error);}}updateZoneHover(e);dirty=true;}});canvas.addEventListener('mousedown',()=>moved=0);canvas.addEventListener('click',e=>{if($('markmode').value!=='inspect')return;if(moved<5){let r=canvas.getBoundingClientRect(),x=document.pointerLockElement===canvas?r.width/2:e.clientX-r.left,y=document.pointerLockElement===canvas?r.height/2:e.clientY-r.top;if(zoneDrawing){addZoneCorner(x,y);}else if(drawArea){try{if(areaPoints.length>=256)throw Error('Planning area is limited to 256 corners');areaPoints.push(areaCorner(x,y));dirty=true;}catch(error){reportError(error);}}else pick(x,y);}});canvas.addEventListener('wheel',e=>{focal=Math.max(.65,Math.min(6,focal*Math.exp(-e.deltaY*.001)));dirty=true;e.preventDefault();},{passive:false});
+canvas.addEventListener('pointerdown',e=>{focusViewportNavigation();drag=true;if($('markmode').value!=='inspect'&&!zoneDrawing&&!drawArea){paintStroke=markupSnapshot();try{paintAtEvent(e);}catch(error){reportError(error);}}});window.addEventListener('pointerup',()=>{drag=false;endPaintStroke();});window.addEventListener('blur',endPaintStroke);let moved=0;canvas.addEventListener('mousemove',e=>{updateZoneHover(e);if(document.pointerLockElement===canvas||drag){moved+=Math.abs(e.movementX)+Math.abs(e.movementY);if(drawArea||(zoneDrawing&&overhead))return;if(paintStroke!==null&&document.pointerLockElement!==canvas){try{paintAtEvent(e);}catch(error){reportError(error);}return;}if(orbitMode){orbitDrag(e.movementX,e.movementY);}else if(overhead){let scale=overheadScale*2/(Math.max(1,canvas.clientHeight)*focal);let b=basis();eye=add(eye,add(mul(b.r,-e.movementX*scale),mul(b.u,e.movementY*scale)));}else{yaw-=e.movementX*.003;pitch=Math.max(-1.55,Math.min(1.55,pitch-e.movementY*.003));}if(paintStroke!==null){try{paintAtEvent(e);}catch(error){reportError(error);}}updateZoneHover(e);dirty=true;}});canvas.addEventListener('mousedown',()=>moved=0);canvas.addEventListener('click',e=>{if($('markmode').value!=='inspect')return;if(moved<5){let r=canvas.getBoundingClientRect(),x=document.pointerLockElement===canvas?r.width/2:e.clientX-r.left,y=document.pointerLockElement===canvas?r.height/2:e.clientY-r.top;if(chim.picking){chimPickAt(x,y);}else if(zoneDrawing){addZoneCorner(x,y);}else if(drawArea){try{if(areaPoints.length>=256)throw Error('Planning area is limited to 256 corners');areaPoints.push(areaCorner(x,y));dirty=true;}catch(error){reportError(error);}}else pick(x,y);}});canvas.addEventListener('wheel',e=>{focal=Math.max(.65,Math.min(6,focal*Math.exp(-e.deltaY*.001)));dirty=true;e.preventDefault();},{passive:false});
 $('terraincull').onchange=updateTerrainPreview;$('terrainoverlap').onchange=()=>{if($('terraincull').checked)updateTerrainPreview();};
 $('densitymin').oninput=()=>setDensityRange('densitymin');$('densitymax').oninput=()=>setDensityRange('densitymax');$('resetdensity').onclick=resetDensityRange;
 $('drawarea').onclick=()=>{setPaintMode('inspect');startArea();};$('finisharea').onclick=finishArea;$('cleararea').onclick=()=>{areaPoints=[];areaClosed=false;drawArea=false;dirty=true;};$('areaJSON').onclick=()=>{if(areaPoints.length)downloadInspectionJSON('polygon-area-plan',polygonInfo());};$('areaPNG').onclick=exportAreaPNG;
-$('fly').onclick=()=>{returnFly();if(canvas.requestPointerLock)canvas.requestPointerLock();};$('reset').onclick=overview;$('above').onclick=inspectAbove;$('returnfly').onclick=returnFly;$('showcompass').onchange=()=>{updateCompass();dirty=true;};$('fit').onclick=()=>fit(selected);$('objects').onchange=()=>select(Number($('objects').value));$('search').oninput=list;for(let id of ['mode','terrain','only','textures','overlay','heattextures','textureoverride','filterdensity'])$(id).onchange=()=>dirty=true;$('bin').onchange=density;$('speed').oninput=()=>$('speedvalue').textContent=$('speed').value;
+$('fly').onclick=()=>{returnFly();if(canvas.requestPointerLock)canvas.requestPointerLock();};$('reset').onclick=overview;$('above').onclick=inspectAbove;$('returnfly').onclick=returnFly;$('showcompass').onchange=()=>{updateCompass();dirty=true;};$('fit').onclick=()=>fit(selected);$('objects').onchange=()=>select(Number($('objects').value));$('search').oninput=list;for(let id of ['mode','terrain','only','textures','overlay','heattextures','textureoverride','filterdensity'])$(id).onchange=()=>dirty=true;$('bin').onchange=density;$('speed').oninput=()=>{if(!VC())return;const f=VC().factorOf($('speed').value);$('speedvalue').textContent=VC().label(f);VC().saveFactor(f);};if(VC()){$('speed').value=VC().sliderOf(VC().loadFactor());$('speedvalue').textContent=VC().label(VC().loadFactor());}
 $('textures').onchange=()=>{updateTextureControls();dirty=true;};$('texturebw').onclick=()=>setTextureColorMode('bw');$('texturecolor').onclick=()=>setTextureColorMode('color');$('palettebuiltin').onclick=()=>setPreviewPaletteKind('builtin');$('palettelocal').onclick=()=>setPreviewPaletteKind('local');
 $('palette').onchange=async()=>{let file=$('palette').files[0];if(!file||!scene)return;try{if(file.size!==768)throw Error('Palette must be exactly 768 bytes');scene.palette=Array.from(new Uint8Array(await file.arrayBuffer()));loadedPaletteFilename=file.name;requiredPaletteFilename=null;selectedPaletteKind='local';disposeSolids();textureList();dirty=true;}catch(e){reportError(e);}};
-// Autoload: map-inspector.html?map=<url of a .bsp or .json> loads it on open (same as Open BSP / JSON).
-// A bare name (?map=bmhlaalucouncil) loads <name>.bsp from the local map server (?maps=<base url>, default 127.0.0.1:8061).
-if(typeof addEventListener==='function')addEventListener('load',async()=>{let q=new URLSearchParams(location.search),u=q.get('map');if(!u)return;if(!/[\/:]/.test(u))u=(q.get('maps')||'http://127.0.0.1:8061').replace(/\/$/,'')+'/'+(/\.(bsp|json)$/i.test(u)?u:u+'.bsp');try{let r=await fetch(u);if(!r.ok)throw Error('HTTP '+r.status+' for '+u);let b=await r.blob();await openFile(new File([b],decodeURIComponent(u.split('/').pop().split('?')[0])));}catch(e){$('hint').textContent='Cannot autoload: '+e.message;$('hint').className='error';}});
-async function openFile(f){if(!f)return;try{if(f.size>128*1024*1024)throw Error('File exceeds 128 MiB inspection limit');if(f.name.toLowerCase().endsWith('.bsp')){let raw=await f.arrayBuffer(),parsed=bsp(raw,f.name);parsed.source_sha256=await loadedHash(raw);cutsAttachFacts(parsed,raw);load(parsed,f.name);}else load(JSON.parse(await f.text()),f.name);}catch(e){$('hint').textContent='Cannot load: '+e.message;$('hint').className='error';}}
+// Autoload: map-inspector.html?map=<url of a .bsp, .chim or .json> loads it on open (same as Open BSP / CHIM / JSON).
+// A bare name (?map=bmhlaalucouncil) loads <name>.bsp from the local map server (?maps=<base url>, default 127.0.0.1:8061);
+// a map server that resolves names as the engine does answers with the frame's .chim, recognised by its "_chim_frame" key.
+// ?world=<url of a chim-world folder>[&frame=frames/x-03/y-02] opens a CHIM world served over HTTP (Open CHIM world).
+if(typeof addEventListener==='function')addEventListener('load',async()=>{let q=new URLSearchParams(location.search),w=q.get('world'),u=q.get('map');if(w){try{await chimOpenWorld(AmiWindChim.urlSource(w),w,q.get('frame'));}catch(e){$('hint').textContent='Cannot autoload the CHIM world: '+e.message;$('hint').className='error';}return;}if(!u)return;if(!/[\/:]/.test(u))u=(q.get('maps')||'http://127.0.0.1:8061').replace(/\/$/,'')+'/'+(/\.(bsp|chim|json)$/i.test(u)?u:u+'.bsp');try{let r=await fetch(u);if(!r.ok)throw Error('HTTP '+r.status+' for '+u);let b=await r.blob();await openFile(new File([b],decodeURIComponent(u.split('/').pop().split('?')[0])));}catch(e){$('hint').textContent='Cannot autoload: '+e.message;$('hint').className='error';}});
+// Two readers: .bsp is a Quake BSP29 map (bsp() above); .chim is a CHIM map, CHIM's own format, read by the CHIM
+// reader (chim-reader.js). A file named .bsp whose worldspawn names a CHIM frame ("_chim_frame", the builder's own
+// test) is a CHIM frame map of a build before v0.0.36 and goes to the CHIM reader too.
+async function openFile(f){if(!f)return;try{if(f.size>128*1024*1024)throw Error('File exceeds 128 MiB inspection limit');let lower=f.name.toLowerCase();if(lower.endsWith('.chim')){await chimOpenMap(await f.arrayBuffer(),f.name,false);}else if(lower.endsWith('.bsp')){let raw=await f.arrayBuffer();if(chimReader()&&chimReader().isChimFrameMap(raw)){await chimOpenMap(raw,f.name,true);return;}let parsed=bsp(raw,f.name);parsed.source_sha256=await loadedHash(raw);cutsAttachFacts(parsed,raw);load(parsed,f.name);}else load(JSON.parse(await f.text()),f.name);}catch(e){$('hint').textContent='Cannot load: '+e.message;$('hint').className='error';}}
 $('file').onchange=()=>openFile($('file').files[0]);
+// CHIM (build 021): CHIM maps (.chim) and CHIM worlds. The reader is chim-reader.js, a port of the builder's
+// tools/chim/format.py and of the heap gate's ring model (tools/chim/heap.py); this part turns what it reads into
+// inspector scenes and draws the memory overlay. Read-only and local: files are read in this browser, never uploaded.
+const chim={world:null,label:'',frameData:null,heap:null,heapLabel:'',sizes:null,sizesLabel:'',tables:null,scan:null,ring:null,row:null,radius:0,budget:0,picking:false,map:null,chunkAt:new Map()};
+function chimReader(){return (typeof window!=='undefined'&&window.AmiWindChim)||(typeof AmiWindChim!=='undefined'?AmiWindChim:null);}
+const chimFmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString('en-US'):'?';
+function chimInfo(text){$('chiminfo').textContent=text;}
+async function chimRun(fn){try{await fn();}catch(e){chimInfo('CHIM: '+(e.message||e));reportError(e);}}
+function chimBox(lo,hi){
+  const vertices=[];for(let i=0;i<8;i++)vertices.push([i&1?hi[0]:lo[0],i&2?hi[1]:lo[1],i&4?hi[2]:lo[2]]);
+  const quads=[[0,2,3,1],[4,5,7,6],[0,1,5,4],[2,6,7,3],[0,4,6,2],[1,3,7,5]];
+  return {vertices,edges:[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]],triangles:quads.flatMap(q=>[[q[0],q[1],q[2]],[q[0],q[2],q[3]]]),faceCount:6,materialCount:0};
+}
+// A CHIM map as markers: the frame bounds, the collision-only clip models and every point entity. It has no faces.
+function chimMapObjects(m,key0){
+  const objects=[];let key=key0||0;const push=(o,lo,hi)=>{objects.push(Object.assign(chimBox(lo,hi),o,{storedFaceRange:[key,6]}));key+=6;};
+  const w=m.models[0];
+  if(w)push({name:'CHIM frame '+(m.frame_key||'?')+' · map bounds (no faces: the geometry is in the CHIM world)',model:0,terrainRole:'world_legacy',reference:'',entityIndex:0,chim:{kind:'map-bounds',map:m}},w.mins,w.maxs);
+  m.entities.forEach((e,i)=>{
+    if(i===0)return;
+    const origin=(e.origin||'').trim().split(/\s+/).map(Number),has=origin.length===3&&origin.every(Number.isFinite),mm=/^\*(\d+)$/.exec(e.model||'');
+    if(mm&&m.models[Number(mm[1])]){const md=m.models[Number(mm[1])],o=has?origin:[0,0,0];push({name:(e.classname||'entity')+' · *'+mm[1]+' (collision only, '+md.numfaces+' faces)',model:Number(mm[1]),reference:e.aw_ref||'',entityIndex:i,entityClassname:e.classname||null,chim:{kind:'map-clip',entity:e,model:md}},add(md.mins,o),add(md.maxs,o));return;}
+    if(!has)return;
+    const r=e.classname==='aw_npc'?12:8;
+    push({name:(e.classname||'entity')+' · ref '+(e.aw_ref||'?')+(e._chim_chunk!==undefined?' · streams with chunk '+e._chim_chunk:''),model:-1,reference:e.aw_ref||'',entityIndex:i,entityClassname:e.classname||null,chim:{kind:'map-entity',entity:e}},sub(origin,[r,r,r]),add(origin,[r,r,2*r]));
+  });
+  return {objects,key};
+}
+function chimMapScene(m,name){return {format:'amiwind-mesh-inspector-1',source:name,metric:'CHIM map markers (entities, clip boxes, frame bounds); frame-local units',objects:chimMapObjects(m,0).objects,textures:[]};}
+async function chimOpenMap(raw,name,legacyName){
+  const R=chimReader();if(!R)throw Error('The CHIM reader (chim-reader.js) did not load');
+  const m=R.readChimMap(raw),s=chimMapScene(m,name);s.source_sha256=await loadedHash(raw);
+  s.chim_map={frame:m.frame_key,frame_path:m.frame_path,layout:m.layout,bytes:m.bytes,faces:m.faces,entities:m.entities.length};
+  chim.map=m;load(s,name);
+  $('hint').className='';
+  $('hint').textContent=(m.frame_cell?'This .chim names CHIM frame '+m.frame_key+' ('+m.frame_path+'); its geometry lives in the CHIM world: open the world (CHIM world, left) to see it. ':'This CHIM map names no CHIM frame (no "_chim_frame" key), so the engine refuses it. ')
+    +'Shown: '+Math.max(0,m.entities.length-1)+' entities as markers, '+Math.max(0,m.models.length-1)+' collision-only clip models and the frame bounds. '
+    +(legacyName?'The file is named .bsp but its "_chim_frame" key makes it a CHIM frame map (builds before v0.0.36 wrote them as .bsp). ':'')
+    +'CHIM map, '+m.layout+' layout today: '+m.faces+' faces, '+chimFmt(m.bytes)+' bytes'+(m.tail_bytes?', '+m.tail_bytes+' bytes after the last lump':'')+'.';
+  if(chim.world&&m.frame_path&&chim.world.frames.some(f=>f.path===m.frame_path))$('chimframe').value=m.frame_path;
+}
+// A loaded CHIM frame as an inspector scene: one object per chunk's ground and per placement (owned records; a
+// reach copy is the same placement), in frame-local units; a stored record keeps one face range wherever it is placed.
+function chimFrameScene(fd,name){
+  const R=chimReader(),textures=[],tindex=new Map();
+  for(const [id,t] of fd.textures){if(!t.miptex)continue;try{const m=R.readMiptex(t.miptex);tindex.set(id,textures.length);textures.push({name:m.name,width:m.width,height:m.height,pixels:m.pixels});}catch(e){fd.problems.push(String(e.message||e));}}
+  const objects=[],terrainKey=new Map(),modelKey=new Map();let key=0,vertexTotal=0,skipped=0;
+  const finish=g=>{
+    const polygons=g.polygons.map(p=>{const q={vertices:p.vertices,texinfo:p.texinfo,lightmapped:p.lightmapped};if(p.planeNormalZ!==undefined)q.planeNormalZ=p.planeNormalZ;if(tindex.has(p.texture)){q.texture=tindex.get(p.texture);if(p.uv)q.uv=p.uv;}return q;});
+    const triangles=[],edges=new Set();
+    for(const p of polygons){for(let k=1;k+1<p.vertices.length;k++)triangles.push([p.vertices[0],p.vertices[k],p.vertices[k+1]]);for(let k=0;k<p.vertices.length;k++){const a=p.vertices[k],b=p.vertices[(k+1)%p.vertices.length];edges.add(a<b?a+','+b:b+','+a);}}
+    return {vertices:g.vertices,polygons,triangles,edges:Array.from(edges,x=>x.split(',').map(Number)),faceCount:polygons.length,materialCount:new Set(polygons.map(p=>p.texinfo)).size};
+  };
+  for(const c of fd.chunks){
+    const g=finish(R.brushGeometry(c.image,{shift:c.shift||[0,0,0]}));if(!g.vertices.length)continue;
+    let base;if(c.terrain){if(!terrainKey.has(c.terrain.id)){terrainKey.set(c.terrain.id,key);key+=g.faceCount;}base=terrainKey.get(c.terrain.id);}else{base=key;key+=g.faceCount;}
+    vertexTotal+=g.vertices.length;
+    objects.push(Object.assign(g,{name:'CHIM chunk '+c.index+' ('+c.cx+', '+c.cy+') · ground',model:0,terrainRole:'world_legacy',reference:'chunk '+c.index,entityIndex:0,storedFaceRange:[base,g.faceCount],chim:{kind:'chunk',chunk:c}}));
+  }
+  for(const c of fd.chunks)for(const r of c.owned){
+    const m=fd.models.get(r.model);if(!m)continue;
+    if(vertexTotal>1900000||objects.length>=9900){skipped++;continue;}
+    let g=finish(R.brushGeometry(m.image,{origin:r.origin,yaw:r.yaw})),solidOnly=!g.vertices.length;
+    if(solidOnly)g=chimBox(r.box[0],r.box[1]);           // a collision-only model (drawn as a sprite elsewhere): its drawn box
+    if(!modelKey.has(r.model)){modelKey.set(r.model,key);key+=g.faceCount;}
+    vertexTotal+=g.vertices.length;
+    objects.push(Object.assign(g,{name:'CHIM placement '+r.pid+' · '+m.name+(solidOnly?' (collision only, no faces: its drawn box)':''),model:r.model+1,reference:String(r.ref),entityIndex:r.pid+1,storedFaceRange:[modelKey.get(r.model),g.faceCount],origin:r.origin,angles:'0 '+r.yaw+' 0',chim:{kind:'placement',record:r,chunk:c.index,model:m}}));
+  }
+  if(chim.map&&chim.map.frame_path&&fd.path.startsWith(chim.map.frame_path+'/')){const extra=chimMapObjects(chim.map,key).objects.filter(o=>o.chim.kind!=='map-bounds');objects.push(...extra.slice(0,Math.max(0,9990-objects.length)));}
+  if(skipped)fd.problems.push(skipped+' placements not drawn (the inspector draws at most 10,000 objects and 2 million vertices)');
+  return {format:'amiwind-mesh-inspector-1',source:name,metric:'placed unique vertices per 3D bin; CHIM frame-local units',objects,textures,chim_frame:fd.path};
+}
+function chimFrameRows(){
+  const w=chim.world;if(!w)return [];
+  const rows=w.frames.map(f=>({f,row:chim.heap?chim.heap.frames.get(f.path):null}));
+  rows.sort((a,b)=>{const ha=a.row?a.row.headroom_bytes:Infinity,hb=b.row?b.row.headroom_bytes:Infinity;return ha!==hb?ha-hb:a.f.path<b.f.path?-1:a.f.path>b.f.path?1:0;});
+  return rows;
+}
+function chimFillFrames(){
+  const sel=$('chimframe'),keep=sel.value;sel.replaceChildren();
+  for(const {f,row} of chimFrameRows()){const o=document.createElement('option');o.value=f.path;o.textContent=f.path+' · cell '+f.cell.join(' ')+(row?(row.ok?' · fits, headroom ':' · OVER the CHIM zone by ')+chimFmt(Math.abs(row.headroom_bytes))+' B':'');sel.append(o);}
+  if(keep&&chim.world.frames.some(f=>f.path===keep))sel.value=keep;
+}
+async function chimOpenWorld(source,label,framePath){
+  const R=chimReader();if(!R)throw Error('The CHIM reader (chim-reader.js) did not load');
+  chimInfo('Reading the CHIM world index ...');
+  const w=await R.openWorld(source);chim.world=w;chim.label=label;chim.heap=null;chim.heapLabel='';chim.frameData=null;chim.scan=null;chim.ring=null;
+  try{const raw=await source.read(w.reportBase+'chim-heap.json');if(raw){chim.heap=R.parseHeapReport(JSON.parse(new TextDecoder().decode(raw)));chim.heapLabel=w.reportBase+'chim-heap.json';}}catch(e){chim.heapLabel='chim-heap.json not read: '+(e.message||e);}
+  chimFillFrames();
+  if(framePath)$('chimframe').value=framePath.replace(/\/frame\.ccf$/,'').replace(/\/$/,'');
+  await chimShowFrame();
+}
+function chimSizes(){const R=chimReader();return chim.sizes||R.DEFAULT_SIZES;}
+async function chimShowFrame(){
+  if(!chim.world)return;const R=chimReader(),path=$('chimframe').value;if(!path)return;
+  chimInfo('Reading frame '+path+' ...');
+  const fd=await R.loadFrame(chim.world,path,chimSizes());chim.frameData=fd;chim.ring=null;chim.scan=null;
+  const s=chimFrameScene(fd,(chim.label||'CHIM world')+' · '+path);load(s,s.source);
+  chimHeapUpdate();
+  const sum=R.frameSummary(fd);
+  $('hint').className='';
+  $('hint').textContent='CHIM frame '+fd.cell.join(' ')+' ('+path+'), world format '+fd.version.join('.')+': '+sum.chunks+' chunks, '+sum.owned+' placements, '+sum.models+' models, '+sum.textures+' textures. Ground colours: the active ring\'s bytes at each player position against the CHIM zone (green below 80 %, yellow to 90 %, orange to 100 %, red over). Pick ring position, then click the ground (From above is exact).';
+}
+function chimHeapUpdate(){
+  const R=chimReader(),fd=chim.frameData;if(!R||!fd){chimInfoUpdate();return;}
+  const sizes=chimSizes();
+  for(const c of fd.chunks)c.heap_bytes=R.imageBytes(c.lump_lengths,sizes);
+  for(const m of fd.models.values())m.heap_bytes=R.imageBytes(m.lump_lengths,sizes);
+  chim.chunkAt=new Map(fd.chunks.map(c=>[c.cx+','+c.cy,c]));
+  chim.tables=R.ringTables(fd,sizes);
+  const row=chim.heap?chim.heap.frames.get(fd.path.replace(/\/frame\.ccf$/,'')):null,st=chim.world.index.settings;
+  chim.radius=chim.heap&&Number.isFinite(chim.heap.active_radius)?chim.heap.active_radius:st.draw_distance+st.hysteresis;
+  const mem=chim.heap&&Number.isFinite(chim.heap.zone_kib)?chim.heap:R.DEFAULT_MEMORY;
+  chim.row=row||null;chim.budget=row?row.budget_bytes:(mem.zone_kib-(mem.pool_slots||2)*mem.pool_kib)*1024;
+  chim.scan=R.ringScan(chim.tables,chim.radius,chim.budget,(chim.heap&&chim.heap.sample_units)||64);
+  if(chim.ring)chimRingAt(chim.ring.position[0],chim.ring.position[1]);else chimInfoUpdate();
+  dirty=true;
+}
+function chimRingAt(x,y){const R=chimReader();if(!chim.tables)return;chim.ring=R.ringAt(chim.tables,x,y,chim.radius,true);chim.ring.position=[x,y];chimInfoUpdate();dirty=true;}
+function chimPickAt(x,y){
+  const fd=chim.frameData;if(!fd)return;const ray=cursorRay(x,y),origin=cursorOrigin(x,y);if(Math.abs(ray[2])<1e-8)return;
+  let z=0,p=null;
+  for(let k=0;k<3;k++){const d=(z-origin[2])/ray[2];if(d<=0){chimInfo('Pick a point on the ground in front of the camera (From above is exact).');return;}p=add(origin,mul(ray,d));const ch=chim.chunkAt.get(Math.floor((p[0]-fd.frame.low[0])/fd.frame.grain)+','+Math.floor((p[1]-fd.frame.low[1])/fd.frame.grain));if(!ch)break;z=ch.zmax;}
+  chim.picking=false;$('chimpick').ariaPressed='false';$('chimx').value=Math.round(p[0]);$('chimy').value=Math.round(p[1]);chimRingAt(p[0],p[1]);
+}
+function chimInfoUpdate(){
+  const w=chim.world,fd=chim.frameData,R=chimReader();if(!w){chimInfo('No CHIM world loaded.');return;}
+  const L=[],st=w.index.settings,pct=(a,b)=>(100*a/b).toFixed(1)+' %';
+  L.push('World: '+chim.label+' · format '+w.index.version.join('.')+' · '+st.frames+' frames, '+chimFmt(st.placements)+' placements, '+chimFmt(st.models)+' models, '+st.textures+' textures');
+  if(fd){
+    const s=R.frameSummary(fd);
+    L.push('Frame '+fd.path.replace(/\/frame\.ccf$/,'')+' (cell '+fd.cell.join(' ')+'): '+s.chunks+' chunks'+(s.terrain_references?' ('+s.terrain_references+' with terrain references)':'')+', '+chimFmt(s.owned)+' placements (+'+chimFmt(s.reach)+' reach copies), '+s.models+' models, '+s.textures+' textures');
+    L.push('On disk: chunk records '+chimFmt(s.chunk_record_bytes)+' B, models '+chimFmt(s.model_bytes)+' B, textures '+chimFmt(s.texture_bytes)+' B');
+  }
+  const r=chim.row;
+  if(r)L.push('Heap report ('+chim.heapLabel+'): '+(r.ok?'fits':'OVER THE CHIM ZONE')+'\n  peak '+chimFmt(r.peak_bytes)+' B at ('+r.peak_position.join(', ')+') · budget '+chimFmt(r.budget_bytes)+' B · headroom '+chimFmt(r.headroom_bytes)+' B\n  '+chimFmt(r.positions_over_budget)+' of '+chimFmt(r.positions)+' positions over budget · median '+chimFmt(r.median_bytes)+' B\n  peak ring: '+r.ring_chunks+' chunks, '+r.ring_models+' models, '+r.ring_textures+' textures · largest block '+chimFmt(r.largest_block_bytes)+' B'+(r.load_ring?'\n  load ring (radius '+r.load_ring.radius+'): peak '+chimFmt(r.load_ring.peak_bytes)+' B at ('+r.load_ring.peak_position.join(', ')+'), '+chimFmt(r.load_ring.positions_over_budget)+' positions over':''));
+  else if(fd)L.push(chim.heap?'Heap report: no row for this frame':(chim.heapLabel||'No heap report (chim-heap.json) loaded')+': budget from the engine defaults (zone '+R.DEFAULT_MEMORY.zone_kib+' KiB minus 2 x '+R.DEFAULT_MEMORY.pool_kib+' KiB)');
+  const sc=chim.scan;
+  if(sc){
+    const label=chim.sizes?'target sizes from '+chim.sizesLabel:'default target sizes (v0.0.35 probe; load the image\'s world-map-heap.json for the build\'s own)';
+    const same=r&&r.peak_bytes===sc.peak_bytes&&r.positions_over_budget===sc.positions_over_budget;
+    L.push('Recomputed here ('+label+', radius '+chim.radius+'):\n  peak '+chimFmt(sc.peak_bytes)+' B at ('+sc.peak_position.join(', ')+') · '+pct(sc.peak_bytes,sc.budget_bytes)+' of the budget · '+chimFmt(sc.positions_over_budget)+' of '+chimFmt(sc.positions)+' positions over'+(r?(same?'\n  matches the heap report':'\n  differs from the heap report by '+chimFmt(sc.peak_bytes-r.peak_bytes)+' B at the peak (other target sizes or a newer builder)'):''));
+  }
+  const g=chim.ring;
+  if(g){
+    const top=(g.models||[]).map(m=>fd.models.get(m)).filter(Boolean).sort((a,b)=>b.heap_bytes-a.heap_bytes).slice(0,5);
+    L.push('Ring at ('+g.position.map(v=>Math.round(v)).join(', ')+'): '+chimFmt(g.bytes)+' B of '+chimFmt(chim.budget)+' B ('+pct(g.bytes,chim.budget)+(g.bytes>chim.budget?', OVER by '+chimFmt(g.bytes-chim.budget)+' B':', headroom '+chimFmt(chim.budget-g.bytes)+' B')+')\n  chunks '+chimFmt(g.chunk_bytes)+' B + models '+chimFmt(g.model_bytes)+' B + textures '+chimFmt(g.texture_bytes)+' B\n  '+g.ring_chunks+' chunks, '+g.ring_models+' models, '+g.ring_textures+' textures, '+g.ring_placements+' placements'+(top.length?'\n  largest models: '+top.map(m=>m.name+' '+chimFmt(m.heap_bytes)+' B').join(', '):''));
+  }
+  if(fd&&fd.problems.length)L.push('Problems: '+fd.problems.slice(0,8).join('; ')+(fd.problems.length>8?' ...':''));
+  chimInfo(L.join('\n'));
+}
+function chimDescribe(o){
+  const c=o.chim,t=chim.tables,fd=chim.frameData;
+  if(c.kind==='chunk'){const k=c.chunk,i=fd?fd.chunks.indexOf(k):-1;return 'CHIM chunk '+k.index+', chunk ('+k.cx+', '+k.cy+') of the frame, sector s'+String(k.sector).padStart(2,'0')+' ('+k.file+')\nRecord '+chimFmt(k.record_bytes)+' B on disk (render '+chimFmt(k.render)+' B, collision '+chimFmt(k.collision)+' B)\n'+(k.terrain?'Ground: a terrain reference to TERR '+k.terrain.id+' in '+k.terrain.file+' ('+chimFmt(k.terrain.bytes)+' B), placed at '+k.terrain.shift.join(', '):'Ground: stored in the chunk record')+'\nZone block with its placement catalogue: '+(t&&i>=0?chimFmt(t.own[i]):'?')+' B\n'+k.owned.length+' owned + '+k.reach.length+' reach placement records · drawn z '+k.zmin+' to '+k.zmax;}
+  if(c.kind==='placement'){const r=c.record,m=c.model;return 'CHIM placement '+r.pid+' · reference '+r.ref+' · owner chunk '+r.owner+'\nModel '+m.id+' '+m.name+': record '+chimFmt(m.bytes)+' B on disk (render '+chimFmt(m.render)+' B) in '+m.file+'\nZone block: '+chimFmt(m.heap_bytes)+' B, once per ring for every placement of the model\nOrigin '+r.origin.map(v=>v.toFixed(1)).join(', ')+' · yaw '+r.yaw.toFixed(1)+'° · '+r.leaves+' leaves'+(r.flags&1?' · more than 16 leaves':'')+(r.flags&2?' · hidden by the opening story':'');}
+  const e=c.entity||{};return 'CHIM map '+(c.kind==='map-bounds'?'frame bounds':c.kind==='map-clip'?'clip model (collision only)':'entity')+'\n'+Object.entries(c.kind==='map-bounds'?c.map.worldspawn:e).filter(([k])=>/^(classname|model|origin|aw_ref|aw_source_id|_chim_[a-z_]+)$/.test(k)).map(([k,v])=>k+' '+v).join('\n');
+}
+function drawChimOverlay(c){
+  const fd=chim.frameData;if(!scene||!scene.chim_frame||!fd||scene.chim_frame!==fd.path)return;
+  const f=fd.frame,g=f.grain,lx=f.low[0],ly=f.low[1];
+  const zAt=(x,y)=>{const ch=chim.chunkAt.get(Math.floor((x-lx)/g)+','+Math.floor((y-ly)/g));return ch?ch.zmax:0;};
+  const quad=(x0,y0,x1,y1,z)=>{const p=[[x0,y0,z],[x1,y0,z],[x1,y1,z],[x0,y1,z]].map(projectPoint);return p.every(Boolean)?p:null;};
+  const path=p=>{c.beginPath();p.forEach((v,i)=>i?c.lineTo(v[0],v[1]):c.moveTo(v[0],v[1]));c.closePath();};
+  if($('chimheat').checked&&chim.scan){
+    const s=chim.scan,h=((chim.heap&&chim.heap.sample_units)||64)/2;let i=0;
+    for(const y of s.ys)for(const x of s.xs){const r=s.totals[i++]/s.budget_bytes,p=quad(x-h,y-h,x+h,y+h,zAt(x,y));if(!p)continue;c.fillStyle=r>1?'rgba(255,50,50,.6)':r>.9?'rgba(255,150,40,.45)':r>.8?'rgba(255,230,80,.32)':'rgba(60,220,120,.16)';path(p);c.fill();}
+  }
+  if(!$('chimworst').checked)return;
+  const mark=(x,y,color,label)=>{const p=projectPoint([x,y,zAt(x,y)+8]);if(!p)return;c.fillStyle=color;c.strokeStyle='#000';c.lineWidth=2;c.beginPath();c.arc(p[0],p[1],6,0,Math.PI*2);c.fill();c.stroke();c.font='12px system-ui';c.lineWidth=3;c.strokeText(label,p[0]+9,p[1]-8);c.fillText(label,p[0]+9,p[1]-8);};
+  if(chim.ring){const over=chim.ring.bytes>chim.budget;c.strokeStyle=over?'#ff5050':'#8bd5ff';c.lineWidth=1.5;for(const k of chim.ring.chunks){const ch=fd.chunks[k],p=quad(lx+ch.cx*g,ly+ch.cy*g,lx+(ch.cx+1)*g,ly+(ch.cy+1)*g,ch.zmax);if(p){path(p);c.stroke();}}mark(chim.ring.position[0],chim.ring.position[1],over?'#ff5050':'#8bd5ff','ring '+chimFmt(chim.ring.bytes)+' B');}
+  if(chim.row){if(chim.row.load_ring&&chim.row.load_ring.peak_position)mark(chim.row.load_ring.peak_position[0],chim.row.load_ring.peak_position[1],'#ffa040','load ring peak '+chimFmt(chim.row.load_ring.peak_bytes)+' B');mark(chim.row.peak_position[0],chim.row.peak_position[1],'#ff3030','peak '+chimFmt(chim.row.peak_bytes)+' B (report)');}
+  else if(chim.scan&&chim.scan.peak_position)mark(chim.scan.peak_position[0],chim.scan.peak_position[1],'#ff3030','peak '+chimFmt(chim.scan.peak_bytes)+' B');
+}
+$('chimfolder').onchange=()=>{const fl=$('chimfolder').files;if(fl&&fl.length)chimRun(()=>chimOpenWorld(chimReader().filesSource(fl),'folder '+(((fl[0].webkitRelativePath||'').split('/')[0])||'chosen')));};
+$('chimzip').onchange=()=>{const f=$('chimzip').files&&$('chimzip').files[0];if(f)chimRun(async()=>chimOpenWorld(await chimReader().zipSource(f),f.name));};
+$('chimload').onclick=()=>chimRun(chimShowFrame);
+$('chimheapfile').onchange=()=>{const f=$('chimheapfile').files&&$('chimheapfile').files[0];if(f)chimRun(async()=>{chim.heap=chimReader().parseHeapReport(JSON.parse(await f.text()));chim.heapLabel=f.name;if(chim.world)chimFillFrames();chimHeapUpdate();});};
+$('chimsizes').onchange=()=>{const f=$('chimsizes').files&&$('chimsizes').files[0];if(f)chimRun(async()=>{chim.sizes=chimReader().sizesFrom(JSON.parse(await f.text()));chim.sizesLabel=f.name;chimHeapUpdate();});};
+$('chimheat').onchange=()=>{dirty=true;};$('chimworst').onchange=()=>{dirty=true;};
+$('chimpick').onclick=()=>{if(!chim.tables)return;chim.picking=!chim.picking;$('chimpick').ariaPressed=String(chim.picking);};
+$('chimring').onclick=()=>{const x=Number($('chimx').value),y=Number($('chimy').value);if(chim.tables&&Number.isFinite(x)&&Number.isFinite(y))chimRingAt(x,y);};
 // AmiWind Toolkit: the toolkit page (or a World Map that opened this window) hands over a map file.
 window.addEventListener('message',e=>{if((e.source===window.parent||e.source===window.opener)&&e.data&&e.data.type==='amiwind-open-map'&&e.data.file instanceof File)openFile(e.data.file);});
 $('export').onclick=()=>{if(scene)downloadInspectionJSON('mesh',exportSceneInfo());};

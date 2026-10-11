@@ -107,7 +107,14 @@ void Sys_Error(char *fmt,...){
     if(!expect_error){va_start(args,fmt);vfprintf(stderr,fmt,args);va_end(args);fputc('\n',stderr);abort();}
     longjmp(failure,1);
 }
-void Host_Error(char *fmt,...){va_list args;va_start(args,fmt);vfprintf(stderr,fmt,args);va_end(args);abort();}
+/* A refusal (a CHIM frame map without a matching CHIM world) ends the map with Host_Error: kept for the
+ * scenario that expects it (expect_host_error), else the test stops. */
+static int expect_host_error;static char host_error_text[512];static jmp_buf host_error_jump;
+void Host_Error(char *fmt,...){
+    va_list args;va_start(args,fmt);vsnprintf(host_error_text,sizeof(host_error_text),fmt,args);va_end(args);
+    if(!expect_host_error){fprintf(stderr,"%s\n",host_error_text);abort();}
+    longjmp(host_error_jump,1);
+}
 static char console[8192];static int console_used,console_capture;
 void Con_Printf(char *fmt,...){
     va_list args;
@@ -1353,22 +1360,28 @@ static void set_version(int major,int minor){
     assert(f);b[0]=(byte)(major>>8);b[1]=(byte)major;b[2]=(byte)(minor>>8);b[3]=(byte)minor;
     fseek(f,8,SEEK_SET);assert(fwrite(b,1,4,f)==4);fclose(f);
 }
-/* 0.4 to 0.6 are read; 0.7 and 1.5 are refused whole, with a console line. */
+/* 0.4 to 0.7 are read; 0.8 and 1.5 are refused whole, with a console line. */
 static void formats(void){
-    static const int version[5][2]={{0,4},{0,5},{0,6},{0,7},{1,5}};int k;
-    for(k=0;k<5;k++){
+    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,8},{1,5}};static int k;
+    for(k=0;k<6;k++){
         set_version(version[k][0],version[k][1]);
         reset_engine();Chim_Init();
         console_used=0;console[0]=0;console_capture=1;
-        begin_map(frame_map);
-        console_capture=0;
-        if(k<3){
+        if(k<4){
+            begin_map(frame_map);
+            console_capture=0;
             assert(Chim_Active() && chim_world.minor==version[k][1]);
             frame_at(64,64,40);assert(active_count()>0);check_once();check_world();
         }else{
+            /* A frame map whose CHIM world is of another format has no world to run with: refused
+             * loudly (Host_Error), never loaded as an empty map. */
             char said[96];
-            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.6",version[k][0],version[k][1]);
+            expect_host_error=1;host_error_text[0]=0;
+            if(!setjmp(host_error_jump)){begin_map(frame_map);assert(!"the frame map was not refused");}
+            expect_host_error=0;console_capture=0;
+            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.7",version[k][0],version[k][1]);
             assert(!Chim_Active() && strstr(console,said));
+            assert(strstr(host_error_text,"cannot be read") && strstr(host_error_text,"not a playable map without its CHIM world"));
         }
         end_map();
     }

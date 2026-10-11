@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "vivec-city-chim",
+  "description": "MiniWind preset --miniwind-vivec-city-chim: All of Vivec on CHIM, one frame: cantons, Temple, frame edge",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "full",
+    "miniwind_description": "All of Vivec on CHIM, one frame: cantons, Temple, frame edge",
+    "direct_to_game_map": "vivec_city",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

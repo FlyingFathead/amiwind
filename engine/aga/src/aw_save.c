@@ -315,6 +315,18 @@ int AW_SaveProfiles(uint32_t *ids,char names[][32],int capacity)
 #endif
     return count;
 }
+/* The most recent save of a character (the highest generation of every slot), as the original's
+ * "Load your last save" after death (OpenMW StateManager::askLoadRecent); label = its description.
+ * Returns the slot or -1. */
+int AW_SaveLatest(uint32_t profile,char *label,int capacity)
+{
+    aw_save_t info;int slot,best=-1;uint32_t sequence=0;
+    if(capacity>0)label[0]=0;
+    if(!profile || !AW_CharacterLoad())return -1;
+    for(slot=0;slot<=20;slot++)if(newest(profile,slot,&info)>=0 && (best<0 || info.sequence>sequence)){best=slot;sequence=info.sequence;}
+    if(best>=0 && capacity>0)AW_SaveDescription(profile,best,label,capacity);
+    return best;
+}
 static void quicksave(void){AW_SaveWrite(0);}
 static void quickload(void){if(world.profile)AW_SaveRead(world.profile,0);else Con_Printf("Choose a character in Load game first.\n");}
 void AW_SaveInit(void)

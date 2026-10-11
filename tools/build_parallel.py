@@ -108,9 +108,16 @@ def sha256_file(path):
 
 
 def hash_files(paths, jobs=None):
-    """SHA-256 of every path, in input order, hashed by up to `jobs` workers."""
+    """SHA-256 of every path, in input order, hashed by up to `jobs` workers.
+
+    Threads of this process (tools/parallel_hash.py: size batches, largest first; reading and hashing
+    release the interpreter lock), the default since BUILD-IMAGE-HASH-UNDERUSED-36. The earlier method,
+    one spawned-process task per file, stays selectable: AMIWIND_HASH_METHOD=process. Same digests."""
     paths = list(paths)
-    return list(ordered_map(sha256_file, paths, max(1, min(resolve_jobs(jobs), len(paths) or 1))))
+    if os.environ.get('AMIWIND_HASH_METHOD') == 'process':
+        return list(ordered_map(sha256_file, paths, max(1, min(resolve_jobs(jobs), len(paths) or 1))))
+    import parallel_hash
+    return parallel_hash.hash_files(paths, live_jobs(resolve_jobs(jobs)))
 
 
 def _sha256_existing(path):
@@ -118,9 +125,12 @@ def _sha256_existing(path):
 
 
 def hash_existing(paths, jobs=None):
-    """Like hash_files, with None for a path that is not a regular file."""
+    """Like hash_files, with None for a path that is not a regular file (same methods)."""
     paths = [str(p) for p in paths]
-    return list(ordered_map(_sha256_existing, paths, max(1, min(resolve_jobs(jobs), len(paths) or 1))))
+    if os.environ.get('AMIWIND_HASH_METHOD') == 'process':
+        return list(ordered_map(_sha256_existing, paths, max(1, min(resolve_jobs(jobs), len(paths) or 1))))
+    import parallel_hash
+    return parallel_hash.hash_existing(paths, live_jobs(resolve_jobs(jobs)))
 
 
 def keep_original(path, backup, raw):
@@ -424,8 +434,10 @@ def stage_dependencies(steps, skipped=()):
         # Quick test builds (--exclude): a stage the plan skips is no one's dependency.
         deps = tuple(d for d in deps if d not in skipped)
         if name.startswith('chim-town-'):
-            # A CHIM town (tools/chim_town.py) reads the CHIM world and the census palette.
-            deps = ('chim', 'census')
+            # A CHIM town (tools/chim_town.py) reads the CHIM world and the census palette; Seyda Neen also reads
+            # the scene chain's complete town, which the area and opening-references stages finish last.
+            deps = ('chim', 'census', *(d for d in (('area', 'opening-references') if name == 'chim-town-seyda' else ())
+                                        if d in names))
         # A CHIM town's legacy chain stage is not built (CHIM-LEGACY-CHAIN-33): the ordered
         # scene chain continues from its predecessor.
         deps = tuple(dict.fromkeys(d for dep in deps for d in
@@ -454,7 +466,9 @@ def stage_dependencies(steps, skipped=()):
         if name == 'image' and 'harvest' in names:
             deps = (*deps, 'harvest')
         if name == 'image' and 'chim' in names:
-            deps = (*deps, 'chim', *(n for n in names if n.startswith('chim-town-')))
+            # the image installs every CHIM town's stage output and its rooms (BUILD-CHIM-ROOMS-IMAGE-RACE-36: the
+            # image ran beside chim-rooms-vivec_city and read its record before it existed)
+            deps = (*deps, 'chim', *(n for n in names if n.startswith(('chim-town-', 'chim-rooms-'))))
         # the CHIM world leaves out the harvest placements and adds the town flora (payload parity)
         if name == 'chim':
             deps = (*deps, *(d for d in ('harvest', 'world-flora-assets', 'world-survey') if d in names))
@@ -474,11 +488,19 @@ def budget_command(command, jobs):
     return command
 
 
+def create_run(run, metadata):
+    """Make the new run folder (refused when it exists: one run per name) and write the files the plan prepared
+    for it before any stage (metadata '_run_files': {name: text}, e.g. world-manifest.json; never in a receipt)."""
+    run.mkdir(parents=True, exist_ok=False)
+    (run / 'logs').mkdir()
+    for name, text in sorted(metadata.pop('_run_files', {}).items()):
+        (run / name).write_text(text, encoding='utf-8', newline='\n')
+
+
 def execute_parallel(steps, run, metadata, root):
     dependencies = stage_dependencies(steps, plan_skipped(metadata))
     budget = int(metadata['compiler_jobs'])
-    run.mkdir(parents=True, exist_ok=False)
-    (run / 'logs').mkdir()
+    create_run(run, metadata)
     receipt = {**metadata, 'status': 'running', 'scheduler': 'bounded-dependencies-v1',
                'worker_budget': budget, 'steps': []}
     pending = list(enumerate(steps, 1))

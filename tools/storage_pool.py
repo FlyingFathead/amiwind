@@ -200,6 +200,8 @@ def _store(pool, source, digest):
             raise OSError(f'{source} changed while it was pooled')
         _read_only(temporary)
         os.replace(temporary, blob)
+        import cache_provenance
+        cache_provenance.object_stored(pool, digest, source)
     finally:
         temporary.unlink(missing_ok=True)
     return blob

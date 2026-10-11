@@ -112,9 +112,11 @@ exterior as region maps, as in v0.0.32 and earlier; still selectable and
 tested). Startup screen: a CHIM build shows "RPG engine powered by CHIM" under
 the logo, a legacy build the v0.0.32 lines. A CHIM town other than Seyda Neen is
 made from the game data and the CHIM world (stage `chim-town-<town>`): no legacy
-region maps are built for it; `--legacy-area TOWN` brings them back for
-debugging only (see
-[builder types](chim/build_guide/BUILDER_TYPES.md#chim-native-towns-experimental---chim-native-towns-on)).
+region maps are built for it (CHIM-native areas, the default since v0.0.36);
+`--legacy-area TOWN` is RETIRED, for historical regression tests only (refused in
+developer mode without `--override legacy-area`; see
+[builder types](chim/build_guide/BUILDER_TYPES.md#chim-native-towns-the-default---chim-native-towns-on)
+and [retired flags](EXPERIMENTAL_FLAGS.md#retired-flags)).
 A CHIM build ships no
 legacy exterior map of a CHIM area: the image step writes the town's CHIM frame
 maps, removes its legacy region maps and fails the build if any is still in the
@@ -132,6 +134,14 @@ Lava pools become Quake liquid by default (`--lava quake`, config key `lava`): a
 Morrowind's damage and a blood-red view tint, in interior rooms, region maps and CHIM chunks alike. `--lava static`
 keeps the earlier rule (rooms leave the pools out, exterior frames place them as solid models). See
 [Lava](LAVA.md).
+
+The world map file is written as v2 by default (`--world-map v2`, config key `world_map`): the terrain map plus
+the molten lava pools of the exterior cells, shown on the in-game map (M). `--world-map v1` writes the earlier
+map byte for byte. See [World map](WORLD_MAP_AND_JOURNAL.md#map-file-formats-v1-and-v2-lava-pools).
+
+World bounds are on by default (`--world-bounds on`): the sea near the edge of the open world carries the
+player along it and back in, instead of an invisible wall (an AmiWind extension). `--world-bounds off` writes
+nothing and leaves the game as before. See [World bounds](WORLD_BOUNDS.md).
 
 ## 1. Quickest setup and build
 
@@ -266,6 +276,11 @@ a version match to id's compiler. A temporary compile of AmiWind's own QuakeC
 checks version 6, system-variable CRC 5927, section bounds and supported opcodes
 before conversion. This check does not replace a runtime playtest.
 
+The SDK's own `vasmm68k_mot` (vasm 2.0f, Motorola syntax) assembles the boot check, the FPU
+support loader and, for the experimental `--engine-profile upstream`, upstream AmiQuake's 68k
+assembly ([engine profiles](ENGINE_PROFILES.md)); no separate assembler is needed. The engine
+receipt records its version and SHA-256.
+
 The complete native engine is included in `engine/aga/` inside this repository.
 No upstream engine archive download or patch application is needed. The builder
 stages these sources into a new separate build directory and records their hashes.
@@ -288,7 +303,9 @@ discovers managed tools. For an explicit, repeatable invocation:
 ```
 
 Remove `--check` and add `--name first-town` to perform the build. `--plan`
-prints the exact stage commands without running them. `--check` creates no retained
+prints the exact stage commands without running them. To keep a build's options in
+one file and repeat it later, write its recipe with `--save-recipe FILE` and build
+from it with `--recipe FILE` ([Build recipes](BUILD_RECIPES.md)). `--check` creates no retained
 build outputs; guided dependency installation is possible only after confirmation.
 It checks paths, tool versions, source presence, file sizes/SHA-256 and container
 structure. Referenced asset decoding and native performance require later stages. `ffmpeg`, `xdftool` and `rdbtool` are found on
@@ -517,8 +534,8 @@ town options stop the build before any work. Details: [TOWN_IMPORT.md](TOWN_IMPO
 
 ## Which Seyda Neen is in my build?
 
-- **CHIM builds (the default):** the Seyda Neen you play is the CHIM version, `maps/seyda-chim.bsp`
-  with its far layer `seyda-chim.far`, converted by the CHIM builder from your own Morrowind data files
+- **CHIM builds (the default):** the Seyda Neen you play is the CHIM version, `maps/seyda-chim.chim`
+  (a CHIM map, not a Quake `.bsp`: [file types](chim/WORLD_FORMAT.md#file-types)) with its far layer `seyda-chim.far`, converted by the CHIM builder from your own Morrowind data files
   (`Morrowind.esm` and the BSA archives). It is the only Seyda Neen in the image; the shipped v0.0.34
   image holds none of the 66 recorded v0.0.31 maps.
 - **The check reference:** to check that conversion, the build also converts Seyda Neen the legacy
@@ -645,7 +662,11 @@ or one option per group.
 Release builds: the image step's stair walk walks only the steps of flights
 (the rows that can stop the build) in release candidates and finals, and every
 step and ramp otherwise; `--stair-walk all` forces the full walk (nightly full
-reports), `--stair-walk flights` the short one. With `--allow-release-reuse`,
+reports), `--stair-walk flights` the short one. A map or CHIM frame whose collision is unchanged is not
+walked again: its stored result is reused (`--stair-walk-cache cached`, the default; a few are walked again on
+every build to check the cache, `--stair-walk-sample N`). Only a result checked by a build of the master builder
+that passed every gate is reused; the log names the run it comes from. `--stair-walk-cache full` walks everything
+again, for regression and beta-test runs only. With `--allow-release-reuse`,
 release builds also reuse the image step's per-map pass results, and each pass
 receipt counts its hits; the from-scratch reference build is then compared file
 by file with the release payload. Details: [BUILD_PROFILE.md](BUILD_PROFILE.md).

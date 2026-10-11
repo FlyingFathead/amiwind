@@ -665,6 +665,8 @@ void R_DrawEntitiesOnList (void)
 R_DrawViewModel
 =============
 */
+/* aw_view.c: third person hides the first-person hands, weapon and torch (as GLQuake's chase_active). */
+int (*aw_view_hide_hands)(void);
 void R_DrawViewModel (void)
 {
 // FIXME: remove and do real lighting
@@ -682,6 +684,9 @@ void R_DrawViewModel (void)
 		return;
 
 	if (cl.stats[STAT_HEALTH] <= 0)
+		return;
+
+	if (aw_view_hide_hands && aw_view_hide_hands ())
 		return;
 
 	currententity = &cl.viewent;

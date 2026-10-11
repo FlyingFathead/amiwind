@@ -21,8 +21,12 @@ MATH_FLAGS = -fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-co
 # NOTE: Using -O1 globally due to GCC optimizer bugs (culling, FP math)
 # NOTE: cvar.c contains workaround for AmigaOS sprintf lacking %f support
 WARN_FLAGS = -Wall -Wno-unused
-DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1
-# USE_ASM_SPANS=1: Use optimized 68k assembly for span drawing (d_scan_68k.s)
+# EXTRA_DEFINES: experimental engine switches, off by default (docs/EXPERIMENTAL_FLAGS.md), e.g.
+# make EXTRA_DEFINES=-DAW_EXP_WIDECOORD (24-bit coordinates, aw_coord.h)
+EXTRA_DEFINES ?=
+DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1 $(EXTRA_DEFINES)
+# USE_ASM_SPANS stays 0: the C span code is always compiled; the engine profile (ENGINE_ASM below)
+# links upstream's span assembly beside it.
 # USE_FAST_RECIPROCAL=1: Use fast 1/x approximation in Turbulent8 (saves ~15 cycles per division)
 # Note: Defining FALSE/TRUE as this GCC SDK doesn't provide them
 # Note: id68k is for SAS/C compiler, we use GCC so keep it undefined
@@ -34,7 +38,51 @@ VERSION_GENERATOR ?= $(if $(wildcard tools/project_version.py),tools/project_ver
 # CHIM's own version, beside VERSION (tools/project_version.py)
 CHIM_VERSION_FILE ?= $(wildcard $(dir $(VERSION_FILE))CHIM_VERSION)
 
-CFLAGS = $(ARCH_FLAGS) $(OPT_FLAGS) $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES)
+# Engine profile (docs/ENGINE_PROFILES.md; tools/build_aga.py engine --engine-profile c|upstream,
+# --engine-asm, --engine-opt). ENGINE_ASM names the upstream AmiQuake 68k assembly units linked
+# instead of the C paths (TerribleFire's AmiQuake GCC port, Stephen Leary, including NovaCoder's
+# original routines; revision 9c62d90):
+#   spans  d_scan_68k.s D_DrawSpans8 (the 68020 build: d_scan_68k_nofpu.s)
+#   turb   d_scan_68k.s D_DrawTurbulent8Span, the water/lava span loop (same files)
+#   maths  mathlib_68k.s AngleVectors (68040 build only)
+#   c2p    c2p8.s chunky-to-planar
+#   fixed  fixedpoint_asm.s (68020 build only: the no-FPU spans call it)
+# ENGINE_OPT: o1 = -O1 everywhere (as upstream's Makefile builds too); o2 = the selective -O2 experiment
+# upstream's README describes (everything at -O2 except mathlib.c and in_amiga.c at -O1; d_sprite.c
+# stays -O0 either way).
+# Empty ENGINE_ASM with ENGINE_OPT=o1 is the c profile: exactly the C build's commands and binary.
+ENGINE_ASM ?=
+ENGINE_OPT ?= o1
+ENGINE_ASM_UNITS = spans turb maths c2p fixed
+ifneq ($(filter-out $(ENGINE_ASM_UNITS),$(ENGINE_ASM)),)
+$(error ENGINE_ASM: unknown unit(s) $(filter-out $(ENGINE_ASM_UNITS),$(ENGINE_ASM)); known: $(ENGINE_ASM_UNITS))
+endif
+ifneq ($(filter-out o1 o2,$(ENGINE_OPT)),)
+$(error ENGINE_OPT must be o1 or o2, not $(ENGINE_OPT))
+endif
+ENGINE_DEFINES =
+ENGINE_ASM_SRCS =
+ifneq ($(filter spans turb,$(ENGINE_ASM)),)
+ENGINE_DEFINES += -DAW_ASM_DSCAN=1
+ENGINE_ASM_SRCS += $(if $(filter obj-nofpu,$(OBJDIR)),d_scan_68k_nofpu.s,d_scan_68k.s)
+endif
+ENGINE_DEFINES += $(if $(filter spans,$(ENGINE_ASM)),-DAW_ASM_SPANS=1) $(if $(filter turb,$(ENGINE_ASM)),-DAW_ASM_TURB=1)
+ifneq ($(filter maths,$(ENGINE_ASM)),)
+ENGINE_DEFINES += -DAW_ASM_MATHS=1
+ENGINE_ASM_SRCS += mathlib_68k.s
+endif
+ifneq ($(filter c2p,$(ENGINE_ASM)),)
+ENGINE_DEFINES += -DAW_ASM_C2P=1
+ENGINE_ASM_SRCS += c2p8.s
+endif
+ifneq ($(filter fixed,$(ENGINE_ASM)),)
+ENGINE_ASM_SRCS += $(if $(filter obj-nofpu,$(OBJDIR)),fixedpoint_asm.s)
+endif
+ifeq ($(ENGINE_OPT),o2)
+OPT_FLAGS = -O2 -fno-strict-aliasing
+endif
+
+CFLAGS = $(ARCH_FLAGS) $(OPT_FLAGS) $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(ENGINE_DEFINES) $(INCLUDES)
 
 # Linker flags
 LDFLAGS = $(ARCH_FLAGS) -s
@@ -58,10 +106,10 @@ OBJDIR = obj
 SRCS = \
 	amiga_stubs.c \
 	aw_debug.c aw_clock.c aw_wait.c \
-	aw_ui.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_lava_rules.c aw_lava.c \
-	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_gallery.c aw_stream.c \
-	aw_walk.c aw_world.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_hand_models.c aw_npc_lod.c \
-	aw_music.c aw_log.c \
+	aw_ui.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_lava_rules.c aw_lava.c \
+	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_mappath.c aw_gallery.c aw_stream.c \
+	aw_walk.c aw_world.c aw_bounds_rules.c aw_bounds.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_hand_models.c aw_npc_lod.c \
+	aw_music.c aw_aread.c aw_log.c \
 	aw_profile.c aw_render_ranges.c aw_fpu_status.c aw_photo.c aw_miniwind.c aw_quickchar.c aw_testbox.c \
 	aw_platform.c \
 	aw_fog.c aw_horizon.c \
@@ -153,9 +201,10 @@ CHIM_SRCS = \
 
 SRCS += $(CHIM_SRCS)
 
-# Release builds use GPL C spans and independent C2P; no extracted assembly.
+# The c profile links no assembly: GPL C spans and the independent C2P (aw_c2p.c). The upstream
+# profile adds the ENGINE_ASM units above.
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
-ALLOBJS = $(OBJS)
+ALLOBJS = $(OBJS) $(ENGINE_ASM_SRCS:%.s=$(OBJDIR)/%.o)
 
 # Default target: verified CPU class; nofpu is an explicit experiment
 .PHONY: all fpu nofpu
@@ -181,7 +230,7 @@ $(ALLOBJS): build/version/amiwind_version.h | $(OBJDIR)
 # FPU target (68040 with FPU)
 # Uses Quake III fast InvSqrt for math (2.3x faster than hardware sqrt on real 68040)
 fpu: ARCH_FLAGS = -m68040 -m68881
-fpu: DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1
+fpu: DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1 $(EXTRA_DEFINES)
 fpu: TARGET = build/AmiQuakeGCC
 fpu: OBJDIR = obj
 fpu: LDFLAGS = -m68040 -m68881 -s -Wl,-Map,build/AmiQuakeGCC.map
@@ -208,6 +257,16 @@ $(OBJDIR)/model.o: $(SRCDIR)/model_alias_stream.inc
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Upstream's assembly units, assembled exactly as upstream does (68040 for the C2P patch offsets).
+ENGINE_AS_FLAGS = -Fhunk -m68040 -phxass -quiet
+$(OBJDIR)/%.o: $(SRCDIR)/%.s
+	$(AS) $(ENGINE_AS_FLAGS) -I$(NDK_INC) -I$(NDK_INC)/lvo -o $@ $<
+
+# ENGINE_OPT=o2: upstream's two -O1 files (GCC's -O2 floating-point optimiser broke angles and mouse input)
+ifeq ($(ENGINE_OPT),o2)
+$(OBJDIR)/mathlib.o $(OBJDIR)/in_amiga.o: OPT_FLAGS = -O1 -fno-strict-aliasing
+endif
+
 # Special rule for net_amigaudp.c (needs additional include path)
 $(OBJDIR)/net_amigaudp.o: $(SRCDIR)/net_amigaudp.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -216,7 +275,7 @@ $(OBJDIR)/net_amigaudp.o: $(SRCDIR)/net_amigaudp.c
 
 # Special rule for d_sprite.c (disable optimization to prevent FPU precision issues)
 $(OBJDIR)/d_sprite.o: $(SRCDIR)/d_sprite.c
-	$(CC) $(ARCH_FLAGS) -O0 $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(INCLUDES) -c -o $@ $<
+	$(CC) $(ARCH_FLAGS) -O0 $(MATH_FLAGS) $(WARN_FLAGS) $(DEFINES) $(ENGINE_DEFINES) $(INCLUDES) -c -o $@ $<
 
 # Hardware benchmark for owners (docs/HARDWARE-BENCHMARK.md): asset-free,
 # 68020+ (the FPU loop runs only when an FPU is present).

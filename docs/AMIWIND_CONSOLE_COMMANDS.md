@@ -5,17 +5,29 @@ a command, for example `dbg headlamp on`. This page is generated from
 `config/debug-commands.txt`, the catalogue the game itself reads, by
 `tools/console_commands_doc.py`; do not edit it by hand.
 
+At start-up, on every map load and with the `version` command the console shows the
+game and CHIM versions, the AmiQuake version and where help is (on a map load the
+AmiQuake line ends with `SERVER (<game code CRC>)`):
+
+```text
+AmiWind v<version> / CHIM v<CHIM version>
+AmiQuake: VERSION 1.09
+Type: "dbg help" for help.
+```
+
 ## Audio
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
 | `dbg door sounds` | - | on/off (default on) |
+| `dbg music` | - | [on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again |
 | `dbg ost play` | - | 00..98 / original music filename stem (spaces as underscores) |
 
 ## Video
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
 | `dbg crosshair` | `dbg crosshairs` | [on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs) |
 | `dbg cull` | - | 0/1 or on/off (default 1) |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
@@ -24,6 +36,7 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode) |
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
 | `dbg render order` | - | 1 legacy / 2 mesh intersections (default) |
+| `dbg vanitycam` | `dbg vanitycamera` | same as vanitycamera |
 
 ## Playtesting
 
@@ -34,13 +47,14 @@ a command, for example `dbg headlamp on`. This page is generated from
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
-| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / bestattack on/off / loadout NAME/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on) |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / bestattack on/off / loadout NAME/off / calm] melee combat: no argument = status and costs; readout = a console line per swing; seed 0 = a new seed per fight; block hold = right button blocks (defaults: on, readout on, music on, block hold) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
+| `dbg quickchar` | - | [name race class birthsign review / all] the quick character screen over the current scene (default: all pages; the New Game screen of --skip-census builds) |
 | `dbg shroompicker` | - | [1..10/list] (default 1; preserves inventory and picked state) |
 | `dbg shroomtracker` | - | (picked mushrooms in this save; excludes empty plants) |
 | `dbg torchgallery` | `dbg torchtest` | [npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch |
@@ -50,15 +64,19 @@ a command, for example `dbg headlamp on`. This page is generated from
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved) |
+| `dbg map format` | - | 2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only) |
+| `dbg map lava` | - | 1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved) |
 | `dbg map tp` | `dbg tp map` | select a destination on the world map (alias) |
 | `dbg noclip` | - | - |
 | `dbg recover` | - | - |
 | `dbg reset location` | - | 0 |
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
-| `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / seydaneen / prisonship / balmora / vivec (Vivec Arena) / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / <map name>; no argument opens menu] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
+| `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |
 
 ## Sky / Lighting
 

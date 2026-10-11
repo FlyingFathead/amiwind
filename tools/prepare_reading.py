@@ -131,6 +131,8 @@ def prepare_paper_font(data_files, scene, bitmap_paper_ink="filled"):
 
 def prepare(data_files,scene,bitmap_paper_ink="filled"):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'reading conversion')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     font_report=prepare_paper_font(data_files,scene,bitmap_paper_ink)
     master=child_ci(data_files,'Morrowind.esm');assets=Assets(data_files,BSA(child_ci(data_files,'Morrowind.bsa')))
     dest=scene/'id1/reading';dest.mkdir(exist_ok=True)

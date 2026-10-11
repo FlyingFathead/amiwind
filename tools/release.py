@@ -92,6 +92,12 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-fix-{name}.png" for na
 # Builder profile: fixes and time savings since v0.0.33, drawn by tools/builder_savings_chart.py from
 # docs/performance/builder-savings.json.
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-builder-savings.png")
+# Build Timeline example (docs/BUILD_PROFILE.md), drawn by tools/build_profile.py timeline from one build run.
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.36-build-timeline.png")
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.36-progress-map.png")
+# Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
+# and on a CHIM world with the memory overlay.
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))
 # Project-authored text graphic; retain bounded UTF-8 source validation.
 DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-comparison.svg"}
 # Performance charts written by tools/perf_charts.py from measured numbers.
@@ -104,7 +110,13 @@ WORLD_TABLES = {"config/fog-locations.txt"}
 # (docs/chim/TEXTURE_EFFECTS.md); no game data.
 CHIM_EFFECTS_DIR = PurePosixPath("tools/chim/effects")
 # Exact project-authored C include, validated as bounded UTF-8 source.
-NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc"}
+NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc"} | {
+    # Upstream AmiQuake 68k assembly (vasm Motorola syntax), linked only by the upstream engine profile
+    # (docs/ENGINE_PROFILES.md); exact names, validated as bounded UTF-8 source like the C files.
+    "engine/aga/src/" + name for name in ("c2p8.s", "d_scan_68k.s", "d_scan_68k_nofpu.s", "fixedpoint_asm.s", "mathlib_68k.s")}
+# Vendored third-party C++ sources, unchanged, with their licence beside them (third_party/<name>/README.md lists
+# version and SHA-256 per file): meshoptimizer's simplifier (MIT), compiled on the build host by tools/meshopt.py.
+VENDORED_SOURCES = {"third_party/meshoptimizer/simplifier.cpp", "third_party/meshoptimizer/allocator.cpp"}
 
 
 def allowed_files(root):
@@ -118,10 +130,85 @@ def allowed_files(root):
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
         preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES or (p.suffix == ".chimfx" and p.parent == CHIM_EFFECTS_DIR)
-        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/header.js", "tests/test_cell_progress_legend.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
-        if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
+        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/header.js", "amiwind-toolkit/chim-reader.js", "amiwind-toolkit/monitor.html", "amiwind-toolkit/mesh-compare.html", "amiwind-toolkit/view-camera.js", "tests/test_mesh_compare.js", "tests/test_cell_progress_legend.js", "tests/test_cell_progress_page_run.js", "tests/test_toolkit_chim.js", "tests/test_toolkit_monitor.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and name not in VENDORED_SOURCES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)
+
+
+# Test sources: the gate stages only the files of tools/release-files.json, so a test missing from the list is
+# never run (TEST-GODMODE-UNLISTED-36, OPS-GATE-UNLISTED-TESTS-36).
+TEST_SOURCE_SUFFIXES = {".py", ".c", ".h", ".js", ".asm", ".qc"}
+# Test sources deliberately kept out of the public file list, with the reason: {path: reason}. Empty: every test
+# in the repository is public and runs in the gate. An entry needs a written reason.
+UNLISTED_TESTS_ALLOWED = {}
+
+
+def present_test_sources(root):
+    """Test sources under tests/ in the checkout: tracked and untracked (not ignored) files when it is a git
+    checkout, else every file on disk."""
+    root = Path(root)
+    if (root / ".git").exists():
+        listing = subprocess.check_output(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
+                                           "--exclude-standard", "--", "tests"]).decode("utf-8").split("\0")
+        names = {name for name in listing if name and (root / name).is_file()}
+    else:
+        names = {path.relative_to(root).as_posix() for path in (root / "tests").rglob("*")
+                 if path.is_file() and not any(p in IGNORED_PARTS for p in path.relative_to(root).parts)}
+    return sorted(name for name in names if PurePosixPath(name).suffix.lower() in TEST_SOURCE_SUFFIXES)
+
+
+def unlisted_test_files(root):
+    """Test sources in the checkout that tools/release-files.json does not list (and UNLISTED_TESTS_ALLOWED does
+    not excuse): the gate would never run them. Sorted paths; [] when every test is listed."""
+    root = Path(root)
+    listed = set(json.loads((root / "tools/release-files.json").read_text(encoding="utf-8")))
+    return [name for name in present_test_sources(root) if name not in listed and name not in UNLISTED_TESTS_ALLOWED]
+
+
+def check_test_listing(root):
+    """Raises ValueError naming every test source that is missing from the public file list."""
+    missing = unlisted_test_files(root)
+    if missing:
+        raise ValueError("Test files missing from tools/release-files.json (the gate stages only listed files, so "
+                         "these would never run): " + ", ".join(missing))
+
+
+def committed_executables(root):
+    """{path} of the files the git index of ROOT records as executable (mode 100755); None without git."""
+    try:
+        listing = subprocess.run(["git", "-C", str(root), "ls-files", "-s", "-z"], check=True,
+                                 capture_output=True).stdout.decode("utf-8", "surrogateescape")
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    found = set()
+    for entry in listing.split("\0"):
+        info, _, path = entry.partition("\t")
+        if path and info.split(" ")[0] == "100755":
+            found.add(path)
+    return found
+
+
+def listed_executables(root):
+    """The EXECUTABLES set of ROOT's own tools/release.py (read, not imported: the tree may be another one)."""
+    import ast
+    tree = ast.parse((Path(root) / "tools/release.py").read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "EXECUTABLES" for t in node.targets):
+            return set(ast.literal_eval(node.value))
+    raise ValueError("tools/release.py has no EXECUTABLES")
+
+
+def executable_mismatches(root, found=None):
+    """(executable but not listed, listed but not executable) of ROOT, or None without git (FOUND: the executable
+    paths, when already read). The source ZIP is
+    written with 0755 exactly for EXECUTABLES; a committed mode that differs breaks the kit's tree compare
+    (BUILD-EXECUTABLES-LIST-UNGATED-36)."""
+    found = committed_executables(root) if found is None else set(found)
+    if found is None:
+        return None
+    listed = listed_executables(root)
+    return sorted(found - listed), sorted(listed - found)
 
 
 def version(root):
@@ -261,6 +348,9 @@ def write_whitespace_baseline(root, revision):
 def inspect_source(root):
     if (root / 'engine/aga').exists():
         check_native_versions(root)
+    # The Toolkit's "Last updated with" line names this release when a Toolkit file changed (tools/toolkit_version.py).
+    import toolkit_version
+    toolkit_version.check(root)
     allowed = allowed_files(root)
     # A ZIP may include an image that git add silently ignores. Require the
     # repository's explicit per-media exception alongside the package allowlist.
@@ -388,12 +478,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--check", action="store_true", help="Inspect the source file list without creating a release")
+    parser.add_argument("--check-tests", type=Path, metavar="CHECKOUT",
+                        help="Fail when a test source of CHECKOUT is missing from its tools/release-files.json")
     parser.add_argument("--whitespace-baseline", metavar="RELEASE_TAG",
                         help="Write docs/WHITESPACE-BASELINE.json from a published release tag (e.g. v0.0.32)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
-        if args.whitespace_baseline:
+        if args.check_tests:
+            check_test_listing(args.check_tests)
+            print(json.dumps({"test_sources": len(present_test_sources(args.check_tests)), "status": "passed"},
+                             indent=2))
+        elif args.whitespace_baseline:
             print(json.dumps(write_whitespace_baseline(root, args.whitespace_baseline), indent=2))
         elif args.check:
             print(json.dumps({"source_files": len(inspect_source(root)), "status": "passed"}, indent=2))

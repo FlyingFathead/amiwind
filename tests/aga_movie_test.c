@@ -3,7 +3,7 @@
 #include "sound.h"
 #include "aw_miniwind.h"
 #include <assert.h>
-viddef_t vid;byte *draw_chars;int soundtime,paintedtime,sound_started,snd_blocked;keydest_t key_dest;
+viddef_t vid;byte *draw_chars;int soundtime,paintedtime,sound_started,snd_blocked;keydest_t key_dest;server_t sv;   /* aw_movie.c: a map started during the logo stays in play (SMOKE-PASSES-WITHOUT-MAP-36) */
 static int titles,music_samples,paused,begins,ends,flushes;static cvar_t *overlay;
 static void (*playvid_command)(void);
 static char *cmdargs[2];static int cmdargc;

@@ -1,42 +1,92 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""MiniWind test spots: config/miniwind-presets.json, one row per spot.
+"""MiniWind test spots: build recipes in config/recipes/miniwind/, one file per spot (NAME.json).
 
-tools/build.py --miniwind-preset NAME (and one generated alias per row,
---miniwind-NAME) is a MiniWind playtest build with the row's settings:
+tools/build.py --miniwind-preset NAME (and one generated alias per recipe, --miniwind-NAME) is a MiniWind
+playtest build from the recipe config/recipes/miniwind/NAME.json: the same recipe format and the same path as
+tools/build.py --recipe FILE (tools/build_recipe.py, docs/BUILD_RECIPES.md); options given on the command line
+win, and --exclude adds to the recipe's exclusions. A preset recipe sets:
 
-  name          the preset's name (lower case, digits, hyphens): the alias --miniwind-NAME
-  description   the startup screen's "Scene:" line (tools/miniwind.py check_description)
-  scope         the MiniWind scope (tools/miniwind.py SCOPES: full, exterior)
-  start         a --direct-to-game-map start point (tools/direct_start.py), or null for the
-                MiniWind town's arrival
-  exclude       quick-test exclusion groups (tools/build_exclusions.py)
-  unreferenced  --exclude-unreferenced groups ("all", a comma list, or null for none)
-  character     a --quick-character RACE,CLASS[,NAME], or null for the Hors preset
-  skip_census   true / false: --skip-census / --no-skip-census (the quick character screen on
-                arrival); null: the builder's default (on, unless a character is given)
+  miniwind                 true
+  miniwind_scope           the MiniWind scope (tools/miniwind.py SCOPES: full, exterior)
+  miniwind_description     the startup screen's "Scene:" line (tools/miniwind.py check_description)
+  direct_to_game_map       a --direct-to-game-map start point (tools/direct_start.py); left out: the MiniWind
+                           town's arrival
+  exclude                  quick-test exclusion groups (tools/build_exclusions.py), one comma list
+  exclude_unreferenced     --exclude-unreferenced groups ("all" or a comma list); left out: none
+  quick_character          a --quick-character RACE,CLASS[,NAME]; left out: the Hors preset
+  skip_census              true / false: --skip-census / --no-skip-census; left out: the builder's default
+  miniwind_boot            dbg console commands run once on arrival, separated by ";"
 
-`--miniwind-preset list` prints the table. A preset whose start is not in the
-build (the Vivec Arena interiors are not converted yet) stops the build before
-any stage with the start point's own message. Presets are -devN only, like
-every MiniWind build. Add a spot: add a row; tests/test_miniwind_presets.py
-checks every row parses.
+The row view of a recipe (row_of: name, description, scope, start, exclude, unreferenced, character,
+skip_census, boot_commands) is what build-state.json records as miniwind_preset, exactly as the earlier preset
+table (config/miniwind-presets.json, format 1) did; check_row checks it with the options' own parsers and
+apply_row is that table's method, kept (tests/test_build_recipe.py proves every preset recipe gives the options
+its table row gave). `--miniwind-preset list` prints the presets. A preset whose start is not in the build stops
+the build before any stage with the start point's own message (vivec-arena-pit starts inside the Pit, vai000,
+which the Arena's chim-rooms stage makes; BUILD-MINIWIND-ARENA-PIT-REFUSED-36). Presets are -devN only, like every MiniWind build. Add a spot: add a recipe file.
 """
 import json
 from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-TABLE = 'config/miniwind-presets.json'
+TABLE = 'config/recipes/miniwind'
 OPTION = '--miniwind-preset'
 KEYS = ('name', 'description', 'scope', 'start', 'exclude', 'unreferenced', 'character', 'skip_census',
         'boot_commands')
+# The recipe options a preset may set (row field -> recipe option).
+FIELDS = {'scope': 'miniwind_scope', 'description': 'miniwind_description', 'start': 'direct_to_game_map',
+          'exclude': 'exclude', 'unreferenced': 'exclude_unreferenced', 'character': 'quick_character',
+          'skip_census': 'skip_census', 'boot_commands': 'miniwind_boot'}
+
+
+def recipe_files(root=ROOT):
+    return sorted((Path(root) / TABLE).glob('*.json'))
+
+
+def row_of(document):
+    """The preset row of a preset recipe (the earlier table's fields)."""
+    options = document['options']
+    unknown = sorted(set(options) - set(FIELDS.values()) - {'miniwind'})
+    if options.get('miniwind') is not True or unknown:
+        raise ValueError('%s: preset %s: a preset recipe sets miniwind true and only %s%s'
+                         % (TABLE, document.get('name'), ', '.join(sorted(FIELDS.values())),
+                            ' (not ' + ', '.join(unknown) + ')' if unknown else ''))
+    exclude = [group for entry in options.get('exclude') or [] for group in str(entry).split(',') if group]
+    boot = options.get('miniwind_boot')
+    return {'name': document['name'], 'description': options.get('miniwind_description'),
+            'scope': options.get('miniwind_scope'), 'start': options.get('direct_to_game_map'),
+            'exclude': exclude, 'unreferenced': options.get('exclude_unreferenced'),
+            'character': options.get('quick_character'), 'skip_census': options.get('skip_census'),
+            'boot_commands': boot.split(';') if boot else []}
+
+
+def recipe_of(row):
+    """The preset recipe of a row of the earlier table (config/miniwind-presets.json, format 1)."""
+    options = {'miniwind': True, 'miniwind_scope': row['scope'], 'miniwind_description': row['description']}
+    if row['start'] is not None:
+        options['direct_to_game_map'] = row['start']
+    if row['exclude']:
+        options['exclude'] = [','.join(row['exclude'])]
+    for field in ('unreferenced', 'character', 'skip_census'):
+        if row[field] is not None:
+            options[FIELDS[field]] = row[field]
+    if row['boot_commands']:
+        options['miniwind_boot'] = ';'.join(row['boot_commands'])
+    return {'schema': 'build-recipe-1', 'name': row['name'],
+            'description': 'MiniWind preset --miniwind-%s: %s' % (row['name'], row['description']),
+            'options': options, 'inputs': [], 'written_with': None, 'checked_with': None, 'status': 'unverified'}
 
 
 def table(root=ROOT):
-    data = json.loads((Path(root) / TABLE).read_text(encoding='utf-8'))
-    if data.get('format') != 1:
-        raise ValueError(TABLE + ': unknown format')
-    return data['presets']
+    """Every preset as a row, by name (read only, without the option checks: see presets())."""
+    rows = []
+    for path in recipe_files(root):
+        document = json.loads(path.read_text(encoding='utf-8'))
+        if path.stem != document.get('name'):
+            raise ValueError('%s: the file name must be the recipe name (%s.json)' % (path, document.get('name')))
+        rows.append(row_of(document))
+    return rows
 
 
 def check_row(row, root=ROOT):
@@ -61,7 +111,6 @@ def check_row(row, root=ROOT):
         parse_groups(row['unreferenced'])
     if row['character'] is not None:
         direct_start.parse_character(row['character'])
-    import miniwind
     if not isinstance(row['boot_commands'], list):
         raise ValueError('%s: preset %r: boot_commands must be a list' % (TABLE, row['name']))
     miniwind.boot_line(row['boot_commands'])
@@ -71,7 +120,11 @@ def check_row(row, root=ROOT):
 
 
 def presets(root=ROOT):
-    rows = [check_row(row, root) for row in table(root)]
+    import build_recipe
+    rows = []
+    for path in recipe_files(root):
+        build_recipe.read(path)  # the recipe schema
+        rows.append(check_row(row_of(json.loads(path.read_text(encoding='utf-8'))), root))
     names = [row['name'] for row in rows]
     if len(set(names)) != len(names):
         raise ValueError(TABLE + ': preset names must be unique')
@@ -91,12 +144,12 @@ def alias(name):
 
 
 def add_options(parser, root=ROOT):
-    """--miniwind-preset NAME|list and one --miniwind-NAME per row (same destination)."""
+    """--miniwind-preset NAME|list and one --miniwind-NAME per recipe (same destination)."""
     rows = table(root)
     parser.add_argument(OPTION, dest='miniwind_preset', metavar='NAME',
-                        help='MiniWind test spot from ' + TABLE + ' (implies --miniwind): '
-                             + ', '.join(row['name'] for row in rows) + '; "list" prints the table. '
-                             'See docs/chim/build_guide/MINIWIND.md')
+                        help='MiniWind test spot, the recipe ' + TABLE + '/NAME.json (implies --miniwind): '
+                             + ', '.join(row['name'] for row in rows) + '; "list" prints them. '
+                             'See docs/chim/build_guide/MINIWIND.md and docs/BUILD_RECIPES.md')
     for row in rows:
         parser.add_argument(alias(row['name']), dest='miniwind_preset', action='store_const', const=row['name'],
                             help='Same as %s %s: %s' % (OPTION, row['name'], row['description']))
@@ -110,15 +163,31 @@ def listing(root=ROOT):
                      % (row['scope'], row['start'] or 'the MiniWind town', ', '.join(row['exclude']) or 'nothing',
                         row['unreferenced'] or 'none', row['character'] or 'Hors preset',
                         {True: 'on', False: 'off', None: 'default'}[row['skip_census']]))
+        lines.append('  recipe %s/%s.json' % (TABLE, row['name']))
     return '\n'.join(lines)
 
 
-def apply(args, root=ROOT):
-    """Fold the preset into the options (explicit options win where both are given). Returns the row."""
+def apply(args, argv=None, out=None):
+    """Fold the preset into the options through its recipe (tools/build_recipe.py; options given on ARGV win;
+    without ARGV, every option that differs from its default counts as given). Returns the row."""
+    import io
+    import build
+    import build_recipe
     name = getattr(args, 'miniwind_preset', None)
     if name is None:
         return None
-    row = find(name, root)
+    explicit = None
+    if argv is None:
+        parser = build.parser()
+        explicit = {dest: value for dest, value in vars(args).items()
+                    if dest in build_recipe.actions_by_dest(parser) and value != parser.get_default(dest)}
+    build_recipe.configure(build.parser, args, argv or [], None, out=out or io.StringIO(), explicit=explicit)
+    return args.miniwind_preset_record
+
+
+def apply_row(args, row):
+    """The earlier table's method (format 1 rows): fold ROW into the options, explicit options win. Kept for
+    format-1 rows and as the reference the preset recipes are tested against."""
     args.miniwind = True
     if getattr(args, 'miniwind_scope', None) is None:
         args.miniwind_scope = row['scope']

@@ -73,7 +73,7 @@ done:
 static int valid_town(const terrain_region_t *t){
     int k;
     for(k=0;k<3;k++)if(!isfinite(t->origin[k]) || fabs(t->origin[k])>1000000)return 0;
-    for(k=0;k<2;k++)if(!(t->core[k]>=-4000 && t->core[k+2]<=4000 && t->core[k]<t->core[k+2]))return 0;
+    for(k=0;k<2;k++)if(!(t->core[k]>=-AW_COORD_BOUND && t->core[k+2]<=AW_COORD_BOUND && t->core[k]<t->core[k+2]))return 0;
     return 1;
 }
 /* A table frame joins the world only when its arrival alias map exists. */
@@ -113,7 +113,7 @@ static int load_directory(void){
         for(k=0;k<4;k++){r->core[k]=number(row+20+k*4);r->cover[k]=number(row+36+k*4);}
         for(k=0;k<3;k++)if(!isfinite(r->origin[k]) || fabs(r->origin[k])>1000000)goto bad;
         for(k=0;k<2;k++)if(!(r->core[k]<r->core[k+2] && r->cover[k]<=r->core[k]-896 &&
-            r->cover[k+2]>=r->core[k+2]+896 && r->cover[k]>-4000 && r->cover[k+2]<4000))goto bad;
+            r->cover[k+2]>=r->core[k+2]+896 && r->cover[k]>-AW_COORD_BOUND && r->cover[k+2]<AW_COORD_BOUND))goto bad;
     }
     fclose(f);count=n;table_towns();
     Con_Printf("Vvardenfell: %ld terrain regions; %ld directory bytes.\n",(long)n,(long)(n*sizeof(*regions)));return 1;
@@ -157,6 +157,18 @@ int AW_SourceToWorld(const char *name,const float *world,float *local){
     for(k=0;k<3;k++)local[k]=world[k]*.25f-r->origin[k];
     return 1;
 }
+/* World bounds (aw_bounds.c): the map-unit centre of every open-world map's
+ * core, the lookup table of the cells the world holds. Returns the count (0:
+ * no directory), writing at most max x,y pairs. */
+int AW_WorldRegionCentres(float *xy,int max){
+    int i;
+    if(!load_directory())return 0;
+    for(i=0;i<count && i<max;i++){
+        xy[i*2]=regions[i].origin[0]+(regions[i].core[0]+regions[i].core[2])*.5f;
+        xy[i*2+1]=regions[i].origin[1]+(regions[i].core[1]+regions[i].core[3])*.5f;
+    }
+    return count;
+}
 int AW_WorldContains(const char *name,const float *local){
     terrain_region_t *r=source(name);
     return r && inside(local,r->cover,-24);
@@ -181,7 +193,7 @@ int AW_WorldDestination(const char *name,const float *local,char *target,float *
         if(inside(point,regions[i].core,0)){to=&regions[i];sprintf(target,"vf%04ld",(long)i);break;}
     }
     if(!to || !strcmp(name,target))return 0;
-    for(k=0;k<3;k++){arrival[k]=global[k]-to->origin[k];if(!(fabs(arrival[k])<4000))return 0;}
+    for(k=0;k<3;k++){arrival[k]=global[k]-to->origin[k];if(!(fabs(arrival[k])<AW_COORD_BOUND))return 0;}
     return target_map(target);
 }
 
@@ -202,7 +214,7 @@ int AW_WorldMapTarget(const float *world,char *target,float *arrival){
         if(inside(point,regions[i].core,0)){to=&regions[i];sprintf(target,"vf%04ld",(long)i);break;}
     }
     if(!to)return 0;
-    for(k=0;k<2;k++){arrival[k]=world[k]*.25f-to->origin[k];if(fabs(arrival[k])>=4000)return 0;}
+    for(k=0;k<2;k++){arrival[k]=world[k]*.25f-to->origin[k];if(fabs(arrival[k])>=AW_COORD_BOUND)return 0;}
     arrival[2]=0;
     return target_map(target);
 }

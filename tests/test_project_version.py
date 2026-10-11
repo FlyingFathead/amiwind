@@ -48,6 +48,24 @@ class ProjectVersion(unittest.TestCase):
             self.assertIn('AmiWind v0.0.17-dev1 preflight OK.', asm)
             self.assertIn('AmiWind v0.0.17-dev1 was not loaded', asm)
             self.assertIn('$VER: AmiWindCheck 0.0.17-dev1', asm)
+    def test_preflight_dividers_are_as_long_as_the_header(self):
+        import re
+        for version, chim in (('0.0.36-dev5', '0.1.0'), ('0.0.9', '0.2.10'), ('0.0.100-rc12', None)):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root/'VERSION').write_text(version + '\n')
+                if chim:
+                    (root/'CHIM_VERSION').write_text(chim + '\n')
+                generate_native(root/'VERSION', root/'g')
+                asm = (root/'g/amiwind_version.i').read_text()
+                header = re.search(r'dc\.b "(AmiWind [^"]* hardware preflight)"', asm).group(1)
+                rules = re.findall(r'dc\.b "(-+)"', asm)
+                self.assertEqual(len(rules), 3)  # banner top and bottom, separator
+                for rule in rules:
+                    self.assertEqual(len(rule), len(header))
+        boot = (ROOT/'engine/aga/boot/bootcheck.asm').read_text()
+        self.assertNotIn('dc.b "----', boot)  # no hard-coded divider left in the boot check
+
     def test_chim_version_file_is_the_one_source(self):
         import chim
         from project_version import chim_version, read_chim_version

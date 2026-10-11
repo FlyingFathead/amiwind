@@ -24,6 +24,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	QUAKE_GAME			// as opposed to utilities
 
 #define	VERSION				1.09
+// AmiWind: the version as text for the console lines, no float formatting (ENGINE-FPU-UNIMPL-31)
+#define	AW_STRINGIFY(x)		#x
+#define	AMIQUAKE_VERSION_LINE_OF(v)	"AmiQuake: VERSION " AW_STRINGIFY (v)
+// AmiWind: the console line under the version lines (owner, 11 October 2026)
+#define	AW_CONSOLE_HELP_LINE	"Type: \"dbg help\" for help."
 #define	GLQUAKE_VERSION		1.00
 #define	D3DQUAKE_VERSION	0.01
 #define	WINQUAKE_VERSION	0.996
@@ -579,6 +584,7 @@ int AW_CompanionSkipSave(edict_t *e);
 void AW_CompanionSaveSwap(int begin);
 int AW_CompanionCrosshair(int x,int y);
 int AW_CompanionButtons(int bits);
+extern int (*aw_combat_buttons)(int bits);
 int AW_CompanionPickMode(void);
 int AW_CompanionPickAim(void);
 /* Hooks set by AW_CompanionInit, defined beside their callers (NULL in
@@ -603,6 +609,7 @@ int AW_LavaPoolCount(void);
 void AW_MusicCombat(int on);
 void AW_MusicDeath(void);
 extern int (*aw_combat_enemy_bar)(float *fraction,float *alpha);
+extern int (*aw_combat_guard_marker)(void);
 extern void (*aw_combat_scene)(void);
 int AW_ArenaActive(void);
 void AW_ArenaEntities(void);
@@ -683,3 +690,14 @@ int AW_WorldUIDraw(void);
 /* Placement-specific render pool; no new network or collision entities. */
 void AW_RenderRangesNewMap(void);
 qboolean AW_RenderRangeView(entity_t *entity,int pass,model_t *view);
+
+/* THE "player dead" predicate (PLAYER-DEATH-LIMBO-35, docs/THIRD_PERSON.md "While dead"): the single-player
+ * player's health is gone. Every focus name, hint, prompt, crosshair, voice line, greeting and activation path
+ * asks it, and the input lock (aw_view.c AW_DeathLocked) is built on it: dead, nothing more is shown or done.
+ * The original: OpenMW Player::activate refuses a dead player, Actors greet only a living one; the third-person
+ * death camera shows no crosshair (camera.lua updateCrosshair). */
+static inline int AW_PlayerDead(void)
+{
+    return sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
+        svs.clients[0].edict->v.health<=0;
+}

@@ -26,7 +26,8 @@ class KnownStairFindingTests(unittest.TestCase):
 
     def test_every_listed_finding_is_a_tracker_entry(self):
         table = json.loads((ROOT / 'config/known-stair-findings.json').read_text(encoding='utf-8'))['findings']
-        ids = {e['id'] for e in json.loads((ROOT / 'docs/bugs/bugs.json').read_text(encoding='utf-8'))}
+        files = [ROOT / 'docs/bugs/bugs.json'] + sorted((ROOT / 'docs/bugs/archive').glob('*.json'))
+        ids = {e['id'] for f in files for e in json.loads(f.read_text(encoding='utf-8'))}
         self.assertLessEqual(set(table), ids)
 
     def test_accepted_failures_are_recorded_not_dropped(self):

@@ -184,6 +184,13 @@ AmiWind-launcher.json
 !docs/images/amiwind-v0.0.32-vivec-guard-sun.png
 !docs/images/amiwind-v0.0.32-vivec-sun-between-cantons.png
 !docs/images/amiwind-builder-savings.png
+!docs/images/amiwind-v0.0.36-build-timeline.png
+!/docs/images/amiwind-v0.0.36-progress-map.png
+# Toolkit screenshots (amiwind-toolkit/README.md, docs/AMIWIND_TOOLKIT.md), one exception per published image.
+!/docs/images/amiwind-v0.0.36-toolkit-world-chim-tracker.png
+!/docs/images/amiwind-v0.0.36-toolkit-inspector-chim-map.png
+!/docs/images/amiwind-v0.0.36-toolkit-inspector-chim-world-memory.png
+!/docs/images/amiwind-v0.0.36-toolkit-monitor.png
 
 # Owner-requested native v0.0.28-rc1 documentation captures.
 !/docs/images/amiwind-v0.0.28-rc1-sunrise.png

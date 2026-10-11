@@ -278,11 +278,12 @@ def check(data, name='map', table=None, rules=None, scenery=None, plants=0, id1=
 
 
 def audit_maps(maps_dir, skip=()):
-    """The report of every map in MAPS_DIR (*.bsp, less the file names in SKIP) against the engine's
-    tables, refusals listed."""
+    """The report of every map in MAPS_DIR (*.bsp and the CHIM frame maps *.chim: tools/map_files.py, less
+    the file names in SKIP) against the engine's tables, refusals listed."""
+    from map_files import map_files
     table, rules, towns = limits(), spawn_rules(), scenery_towns()
     rows, refused, unreadable, extras = {}, [], {}, {}
-    for path in sorted(Path(maps_dir).glob('*.bsp')):
+    for path in map_files(maps_dir):
         if path.name in skip:
             continue
         try:

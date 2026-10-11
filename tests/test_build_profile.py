@@ -141,18 +141,24 @@ class MeasuredStageTests(unittest.TestCase):
 
     def test_profiler_overhead_is_bounded(self):
         # A sampler at 20 Hz over a tree of eight processes; the build default is 1 Hz.
-        sleepers = [subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(3)']) for _ in range(8)]
-        root = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(3)'])
+        # TEST-PROFILE-OVERHEAD-SAMPLES-36: on a busy host 2 s gave only 6 samples; sample until there are more
+        # than 20 (at most 15 s), then end the sleepers.
+        sleepers = [subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)']) for _ in range(8)]
+        root = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
         try:
             sampler = build_profile.Sampler(0.05, time.monotonic())
             sampler.add('root', root.pid)
             for index, process in enumerate(sleepers):
                 sampler.add(f'sleeper{index}', process.pid)
             sampler.start()
+            end = time.monotonic() + 15
             time.sleep(2)
+            while sampler.samples <= 20 and time.monotonic() < end:
+                time.sleep(0.1)
             sampler.stop()
         finally:
             for process in (*sleepers, root):
+                process.kill()
                 process.wait()
         per_sample = sampler.cpu_seconds / max(1, sampler.samples)
         print(f'\n[profiler overhead] {sampler.samples} samples, {sampler.cpu_seconds * 1000:.1f} ms CPU, '
@@ -179,6 +185,61 @@ class MeasuredStageTests(unittest.TestCase):
             self.assertLess(wrapped - plain, 0.5)
             stats = json.loads((Path(temp) / 's.json').read_text())
             self.assertEqual(stats['returncode'], 0)
+
+
+# A stage that handles Ctrl-C itself and ends with 0 (as a test runner or a tool with its own cleanup may):
+# READY is written once the handler is in place; with KILL_GROUP it interrupts its own process group (Ctrl-C).
+POLITE_STAGE = """
+import os, signal, sys, time
+signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
+open(sys.argv[1], 'w').close()
+if sys.argv[2] == 'group':
+    os.killpg(0, signal.SIGINT)
+time.sleep(30)
+sys.exit(3)
+"""
+
+
+@unittest.skipUnless(os.name == 'posix', 'signals: POSIX stage wrapper')
+class StageInterruptTests(unittest.TestCase):
+    """BUILD-STAGE-INTERRUPT-ABSORBED-36: Ctrl-C cancels a stage, and the build with it; the wrapper never absorbs it."""
+
+    def wrapper(self, temp, how):
+        ready = Path(temp) / 'ready'
+        stats = Path(temp) / 'stage.json'
+        command = [sys.executable, str(ROOT / 'tools/build_profile.py'), '_stage', str(stats),
+                   str(Path(temp) / 'sections.jsonl'), '--', sys.executable, '-c', POLITE_STAGE, str(ready), how]
+        return command, ready, stats
+
+    def test_interrupt_to_the_wrapper_alone_reaches_the_stage_and_ends_the_wrapper(self):
+        import signal
+        with tempfile.TemporaryDirectory() as temp:
+            command, ready, stats = self.wrapper(temp, 'wait')
+            process = subprocess.Popen(command, start_new_session=True)
+            for _ in range(200):
+                if ready.exists():
+                    break
+                time.sleep(.05)
+            process.send_signal(signal.SIGINT)        # the wrapper only: the stage never saw it
+            self.assertEqual(process.wait(timeout=build_profile.STAGE_INTERRUPT_GRACE + 20), -signal.SIGINT)
+            record = json.loads(stats.read_text())
+            self.assertEqual((record['returncode'], record['interrupted']), (0, True))  # handed on, then it ended
+
+    def test_a_cancelled_stage_stops_the_whole_build(self):
+        # The stage interrupts its own group (wrapper and stage, as Ctrl-C in their terminal would) and ends with 0;
+        # before the repair the wrapper absorbed the interrupt, returned 0 and the next stage ran.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            after = root / 'second-ran'
+            steps = [('media', [sys.executable, '-c', POLITE_STAGE, str(root / 'ready'), 'group']),
+                     ('music', [sys.executable, '-c', 'import sys; open(sys.argv[1], "w").close()', str(after)])]
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(RuntimeError):
+                execute_parallel(steps, root / 'run', {'compiler_jobs': 1, 'profile': True}, root)
+            receipt = json.loads((root / 'run' / 'build-state.json').read_text())
+            media = next(step for step in receipt['steps'] if step['name'] == 'media')
+            self.assertEqual(media['status'], 'failed')
+            self.assertNotEqual(media['returncode'], 0)
+            self.assertFalse(after.exists())
 
 
 class OutputsUnchangedTests(unittest.TestCase):

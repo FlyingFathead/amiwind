@@ -378,13 +378,61 @@ int ChimModels_Step (unsigned id, long *budget)
 	return r;
 }
 
-/* A chunk's terrain: the brush image at the end of its chunk record. */
-int ChimModels_TerrainStep (int entry, long *budget)
+/* Where a chunk's terrain image is: the end of its chunk record (CHK0), or
+ * the TERR record its reference block names (0.7 CHK1), placed at the
+ * block's shift (kept in the entry for the graft). Returns 1, or -1 on bad
+ * data; pack and at may be NULL (bytes only). */
+int ChimModels_TerrainPlace (int entry, chim_pack_t **pack_out, long *at_out, long *bytes_out)
 {
 	chim_entry_t *e = &chim_frame.entries[entry];
 	chim_chunk_head_t head;
+	chim_terrain_ref_t ref;
 	chim_pack_t *pack;
-	byte raw[CHIM_CHUNK_HEAD_BYTES];
+	byte raw[CHIM_TERRAIN_REF_BYTES];
+	long at, bytes;
+	int k;
+
+	if (!(pack = Chim_File (e->file)) || !Chim_PackRead (pack, e->disk.offset, raw, CHIM_CHUNK_HEAD_BYTES) ||
+		!ChimFormat_ChunkHead (raw, &head))
+		return -1;
+	if (!head.ref)
+	{
+		at = (long)e->disk.offset + head.image_at;
+		bytes = (long)e->disk.render + e->disk.collision - head.image_at;
+		for (k=0 ; k<3 ; k++)
+			e->shift[k] = 0;
+	}
+	else
+	{
+		if (chim_world.minor < 7 || head.image_render != CHIM_TERRAIN_REF_BYTES || e->disk.collision ||
+			!Chim_PackRead (pack, (long)e->disk.offset + head.image_at, raw, CHIM_TERRAIN_REF_BYTES) ||
+			!ChimFormat_TerrainRef (raw, &ref) || ref.file >= (unsigned)chim_world.files ||
+			strcmp (chim_world.file[ref.file].kind, "SECT") || ref.offset < CHIM_HEADER_BYTES ||
+			ref.offset > chim_world.file[ref.file].bytes || ref.bytes > chim_world.file[ref.file].bytes - ref.offset)
+			return -1;
+		if (pack_out && !(pack = Chim_File ((int)ref.file)))
+			return -1;
+		at = (long)ref.offset;
+		bytes = (long)ref.bytes;
+		for (k=0 ; k<3 ; k++)
+			e->shift[k] = ref.shift[k];
+	}
+	if (bytes < (long)sizeof(dheader_t))
+		return -1;
+	if (pack_out)
+		*pack_out = pack;
+	if (at_out)
+		*at_out = at;
+	if (bytes_out)
+		*bytes_out = bytes;
+	return 1;
+}
+
+/* A chunk's terrain: its brush image (ChimModels_TerrainPlace). */
+int ChimModels_TerrainStep (int entry, long *budget)
+{
+	chim_entry_t *e = &chim_frame.entries[entry];
+	chim_pack_t *pack;
 	long at, bytes;
 	int r;
 
@@ -403,12 +451,7 @@ int ChimModels_TerrainStep (int entry, long *budget)
 		bad_kind = 0;
 		return -1;
 	}
-	if (!(pack = Chim_File (e->file)) || !Chim_PackRead (pack, e->disk.offset, raw, sizeof(raw)) ||
-		!ChimFormat_ChunkHead (raw, &head))
-		return -1;
-	at = (long)e->disk.offset + head.image_at;
-	bytes = (long)e->disk.render + e->disk.collision - head.image_at;
-	if (bytes < (long)sizeof(dheader_t))
+	if (ChimModels_TerrainPlace (entry, &pack, &at, &bytes) < 0)
 		return -1;
 	r = Begin (CHIM_KIND_TERRAIN, (unsigned)entry, &e->terrain, pack, at, bytes, budget);
 	if (r < 0)

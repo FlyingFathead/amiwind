@@ -1,5 +1,14 @@
 # WORLD-THIRD-PARTITION-32: The world image now needs a fourth partition (DW2); launchers were only used with three
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.32-dev1 at 2026-10-08 (time not recorded): WORLD-THIRD-PARTITION-32: the world image needs more partitions
+- Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: two disks and three world partitions; the target is one HDF
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -87,6 +96,7 @@ Family: Disk images, partitions and launchers (`disk-image-layout`). Classic FFS
 - [EMULATOR-TEMPLATES-WORLD-32](EMULATOR-TEMPLATES-WORLD-32.md): The static emulator templates list only the boot disk, not the world disk
 - [FFS-DIRECTORY-HASH-32](FFS-DIRECTORY-HASH-32.md): Thousands of files in one directory are slow to open on a real FFS disk
 - HDF-WRITER-01 (no report page): Private image refresh left file-owned blocks marked free
+- [IMAGE-ONE-HDF-TARGET-36](IMAGE-ONE-HDF-TARGET-36.md): The game ships on two drive images and three world partitions; the project target is the whole game on one HDF
 - [WORLD-HDF-OVER-2GIB-32](WORLD-HDF-OVER-2GIB-32.md): The world hard disk image is 32,768 bytes over 2 GiB
 
 <!-- END GENERATED CATEGORY -->

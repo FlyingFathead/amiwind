@@ -129,7 +129,8 @@ class SeydaPendingPreflightTests(unittest.TestCase):
                          sorted('maps/%s.bsp' % n for n in names + list(SPECIALS) + ['seyda']))
         source = inspect.getsource(prepare_seyda_regions.convert)
         for name in build_aga.SEYDA_SPECIAL_MAPS:                  # convert() writes the same special maps
-            self.assertIn("('%s'," % name, source)
+            self.assertIn(name, dict(prepare_seyda_regions.SPECIALS))
+        self.assertIn('specials=list(SPECIALS)', source)
         self.assertIn("outputs['seyda']", source)
 
     def test_image_step_wiring(self):
@@ -202,6 +203,15 @@ class SeydaReportPathTests(unittest.TestCase):
                 return [value] if isinstance(value, str) else []
             self.assertEqual([s for s in strings(neutral) if Path(s).is_absolute()], [])   # no absolute path left
             self.assertEqual(report['complete_source_preserved'], str(work / 'source-town.bsp'))  # caller's copy kept
+            # A stage folder beside the inputs (actor-contact reads intro-scene): the second pass names them relative
+            # to the run folder, so the stage's copy is the same in every run folder (BUILD-SEYDA-BOUNDED-RUN-PATHS-36).
+            stage_work = Path(temp) / 'actor-contact' / 'bounded-seyda'
+            staged = {'inputs': {'palette': str(Path(temp) / 'intro-scene/id1/gfx/palette.lmp'),
+                                 'candidate': str(stage_work / 'sn000/candidate.bsp')}}
+            twice = prepare_seyda_regions.neutral_paths(prepare_seyda_regions.neutral_paths(staged, stage_work.parent),
+                                                        temp)
+            self.assertEqual(twice['inputs'], {'palette': 'intro-scene/id1/gfx/palette.lmp',
+                                               'candidate': 'bounded-seyda/sn000/candidate.bsp'})
             # The payload check the image step runs: the absolute form is refused, the written form passes.
             boot = out / 'boot'
             (boot / 'id1').mkdir(parents=True)
@@ -214,7 +224,9 @@ class SeydaReportPathTests(unittest.TestCase):
 
     def test_convert_writes_the_neutral_report(self):
         source = inspect.getsource(prepare_seyda_regions.convert)
-        self.assertIn("json.dumps(neutral_paths(report,work.parent)", source)
+        self.assertIn("table=neutral_paths(report,work.parent)", source)
+        self.assertIn("table=neutral_paths(table,path_root)", source)      # BUILD-SEYDA-BOUNDED-RUN-PATHS-36
+        self.assertIn("json.dumps(table,indent=2)", source)
         self.assertIn("(work/'seyda-regions-full.json')", source)          # full paths stay in the build folder
 
 if __name__ == '__main__':

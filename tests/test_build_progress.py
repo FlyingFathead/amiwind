@@ -71,11 +71,13 @@ class ExpectedDurationTests(unittest.TestCase):
             defaults = (24, {'music': {'wall': 30, 'cpu': 30, 'jobs': 1}})
             expected = build_progress.expected_durations(['scene', 'image', 'music', 'town-new', 'engine'], 16, samples,
                                                          defaults, reused={'engine'})
-            self.assertEqual(expected['scene'], {'seconds': 110.0, 'cores': 1.0, 'source': 'history', 'samples': 3})
+            self.assertEqual(expected['scene'], {'seconds': 110.0, 'cores': 1.0, 'source': 'history', 'samples': 3,
+                                                 'basis': 'history (3 run(s))'})
             self.assertEqual(expected['image']['seconds'], 125.0)  # median 250 s on 8, perfectly parallel, now 16
             self.assertEqual(expected['music']['source'], 'default')
             self.assertEqual(expected['music']['seconds'], 30.0)
-            self.assertEqual(expected['town-new'], {'seconds': None, 'cores': None, 'source': 'none', 'samples': 0})
+            self.assertEqual(expected['town-new'], {'seconds': None, 'cores': None, 'source': 'none', 'samples': 0,
+                                                    'basis': 'no history'})
             self.assertEqual(expected['engine']['source'], 'reused')
 
     def test_shipped_default_table_covers_the_default_build(self):
@@ -452,3 +454,103 @@ class WorkerAllowanceTests(unittest.TestCase):
             state = json.loads((root / 'run' / 'build-state.json').read_text())
             entry = next(step for step in state['steps'] if step['name'] == 'media')
             self.assertEqual(entry['profile']['jobs_max'], 4)
+
+
+def chim_command(areas=('balmora', 'seyda', 'bcoast_x7y2'), cells=()):
+    command = ['python3', 'tools/chim_build.py']
+    for area in areas:
+        command += ['--area', area]
+    if cells:
+        command += ['--chim-regions-cells', ' '.join(cells)]
+    return command + ['--jobs', '12']
+
+
+class WorkMeasureTests(unittest.TestCase):
+    """BUILD-PROGRESS-ETA-BASIS-36: the chim stage of a 273-frame build was expected at 154 s from three-area
+    runs and ran 1 h 48 min; the progress said 27 %, about 22 minutes left."""
+    CELLS = [f'{x},{y}:l' for x in range(-5, 5) for y in range(27)]   # 270 region cells
+
+    def history(self, workspace, with_commands=True):
+        for name, wall in (('a', 150), ('b', 154), ('c', 160)):
+            write_profile(workspace / name, [('setup', 1, 1, 1), ('chim', wall, wall * 4, 8)])
+            if with_commands:
+                (workspace / name / 'build-state.json').write_text(json.dumps(
+                    {'steps': [{'name': 'chim', 'command': chim_command()}]}), encoding='utf-8')
+        current = workspace / 'now'
+        current.mkdir()
+        return build_progress.history_samples(current)[0]
+
+    def running(self, expected):
+        return build_progress.estimate(['setup', 'chim'], {'setup': [], 'chim': ['setup']},
+                                       {'setup': {'status': 'passed', 'elapsed': 1},
+                                        'chim': {'status': 'running', 'elapsed': 1320}}, expected, 8)
+
+    def test_frames_are_read_from_the_command(self):
+        self.assertEqual(build_progress.chim_frames(chim_command()), 3)
+        self.assertEqual(build_progress.chim_frames(chim_command(cells=self.CELLS)), 273)
+        self.assertEqual(build_progress.chim_frames(['x', '--area=balmora', '--chim-regions-cells=1,2:l 3,4:s']), 3)
+        self.assertEqual(build_progress.work_measure('chim', chim_command()), ('frames', 3))
+        self.assertIsNone(build_progress.work_measure('image', chim_command()))
+        self.assertIsNone(build_progress.work_measure('chim', None))
+
+    def test_history_is_scaled_by_the_frames_of_this_build(self):
+        with tempfile.TemporaryDirectory() as temp:
+            samples = self.history(Path(temp))
+        self.assertEqual([row['work'] for row in samples['chim']], [3, 3, 3])
+        expected = build_progress.expected_durations(['setup', 'chim'], 8, samples, work={'chim': ('frames', 273)})
+        self.assertAlmostEqual(expected['chim']['seconds'], 154 * 273 / 3, delta=0.1)
+        self.assertIn('scaled by frames: 273 here, 3', expected['chim']['basis'])
+        self.assertEqual(expected['setup']['basis'], 'history (3 run(s))')
+        same = build_progress.expected_durations(['chim'], 8, samples, work={'chim': ('frames', 4)})
+        self.assertAlmostEqual(same['chim']['seconds'], 154 * 4 / 3, delta=0.1)
+        self.assertTrue(same['chim']['basis'].startswith('history (3 run(s), 3 frames there'))
+        # 22 minutes into a stage now expected at about 3.9 hours: no "about 22 minutes left".
+        result = self.running(expected)
+        self.assertGreater(result['eta_seconds'], 3 * 3600)
+        self.assertFalse(result['eta_lower_bound'])
+
+    def test_no_comparable_history_is_said_not_guessed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            samples = self.history(Path(temp), with_commands=False)   # older runs: size unknown
+        self.assertEqual([row['work'] for row in samples['chim']], [None, None, None])
+        expected = build_progress.expected_durations(['setup', 'chim'], 8, samples, work={'chim': ('frames', 273)})
+        self.assertIsNone(expected['chim']['seconds'])
+        self.assertEqual(expected['chim']['source'], build_progress.NO_COMPARABLE)
+        self.assertIn('273 frames here', expected['chim']['basis'])
+        result = self.running(expected)
+        self.assertTrue(result['eta_lower_bound'])
+        self.assertIn('lower bound: no comparable history for chim', result['eta_basis'])
+        self.assertIn('chim', result['no_history'])
+        # Without a measure for this build the history is used as before.
+        plain = build_progress.expected_durations(['chim'], 8, samples)
+        self.assertEqual(plain['chim']['seconds'], 154.0)
+
+    def test_progress_record_and_status_show_the_basis(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            self.history(workspace)
+            run = workspace / 'now'
+            tracker = build_progress.Tracker(run, ['setup', 'chim'], {'chim': ['setup']}, {'compiler_jobs': 8},
+                                             interval=3600, commands={'chim': chim_command(cells=self.CELLS)})
+            try:
+                tracker.stage_started('chim', 2, 8)
+                record = json.loads((run / build_progress.PROGRESS_NAME).read_text(encoding='utf-8'))
+            finally:
+                tracker.close('cancelled')
+        row = next(row for row in record['stages'] if row['name'] == 'chim')
+        self.assertEqual(row['work'], 273)
+        self.assertIn('scaled by frames', row['expected_basis'])
+        self.assertAlmostEqual(row['expected_seconds'], 154 * 91, delta=1)
+        text = '\n'.join(build_progress.status_lines(record, now=time.time()))
+        self.assertIn('scaled by frames: 273 here', text)
+
+
+class TimelineExpectationTests(unittest.TestCase):
+    def test_the_build_timeline_shows_a_stage_expectation_that_was_off(self):
+        row = {'start': 0.0, 'end': 6480.0, 'expected': 154.0, 'expected_basis': 'history (3 run(s))'}
+        self.assertEqual(build_profile.expectation_text(row), 'expected 3 min (history (3 run(s)))')
+        self.assertEqual(build_profile.expectation_text(dict(row, end=200.0)), '')
+        self.assertEqual(build_profile.expectation_text({'start': 0.0, 'end': 10.0, 'expected': None,
+                                                         'expected_basis': 'no comparable history: 273 frames'}),
+                         'expected: no comparable history: 273 frames')
+        self.assertEqual(build_profile.expectation_text({'start': 0.0, 'end': 10.0}), '')

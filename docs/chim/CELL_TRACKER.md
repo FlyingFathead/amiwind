@@ -4,22 +4,25 @@
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
 
-**Done: 716 of 1,292 (55.4 %)**
+**Done: 1,021 of 1,292 (79.0 %)**
+
+Map cells 2,157: land and empty-sea cells 1,292 (done 1,021, 79.0 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
 - Cell complete, awaiting lighting: 96
-- Terrain complete, awaiting lighting: 108
-- Passed (something still deferred): 409
+- Terrain complete, awaiting lighting: 367
+- Passed (something still deferred): 455
 - Empty sea: 103
+- Open ocean (silver, not counted as done): 865
 
-**Eligible for v0.0.34: 716 of 1,292** (every done cell, lighting done or not; definition in the import policy).
+**Eligible for v0.0.36: 1,021 of 1,292** (every done cell, lighting done or not; definition in the import policy).
 
-Lighting: lit 0, partial 133, unlit 1,052, not measured 107 (cells; lit is required for both completion levels).
+Lighting: lit 0, partial 133, unlit 1,027, not measured 132 (cells; lit is required for both completion levels).
 
-Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 647 night lamps only, 2,279 not represented.
+Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 647 night lamps only, 2,207 not represented.
 
-Generated 2026-10-09 15:55 +0300. Tracker data generated 2026-10-09T12:55:00+00:00.
+Generated 2026-10-11 10:25 +0300. Tracker data generated 2026-10-11T07:15:06+00:00.
 
 ## Totals
 
@@ -28,12 +31,13 @@ Generated 2026-10-09 15:55 +0300. Tracker data generated 2026-10-09T12:55:00+00:
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
 | Cell complete, awaiting lighting | 96 | 7.4 % |
-| Terrain complete, awaiting lighting | 108 | 8.4 % |
-| Passed (something still deferred) | 409 | 31.7 % |
+| Terrain complete, awaiting lighting | 367 | 28.4 % |
+| Passed (something still deferred) | 455 | 35.2 % |
 | Empty sea | 103 | 8.0 % |
-| Hull policy pending | 546 | 42.3 % |
-| Failed | 26 | 2.0 % |
-| Not converted | 4 | 0.3 % |
+| Open sea | 865 | 67.0 % |
+| Hull policy pending | 219 | 17.0 % |
+| Failed | 23 | 1.8 % |
+| Not converted | 29 | 2.2 % |
 | Not started | 0 | 0.0 % |
 
 Definitions are in the import policy below.
@@ -42,37 +46,34 @@ Definitions are in the import policy below.
 
 Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results never change it).
 
-| Release | State | Cells | Complete | Awaiting lighting | Lit | Empty sea | Failing | Hull policy pending |
-| :-- | --: | --: | --: | --: | --: | --: | --: | --: |
-| v0.0.33 | shipped | 25 | 0 | 0 | 0 | 0 | 1 | 9 |
-| unassigned | - | 1,411 | 0 | 204 | 0 | 103 | 29 | 537 |
+No cells are assigned to a release yet.
 
 ## Per ring (ring 1 touches the sea)
 
-| Ring | Cells | Cell complete | Terrain complete | Cell complete, awaiting lighting | Terrain complete, awaiting lighting | Passed (something still deferred) | Empty sea | Hull policy pending | Failed | Not converted | Not started |
-| :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| 1 | 171 | 0 | 0 | 56 | 5 | 8 | 102 | 0 | 0 | 0 | 0 |
-| 2 | 160 | 0 | 0 | 38 | 9 | 111 | 1 | 1 | 0 | 0 | 0 |
-| 3 | 149 | 0 | 0 | 0 | 4 | 123 | 0 | 16 | 6 | 0 | 0 |
-| 4 | 138 | 0 | 0 | 1 | 21 | 97 | 0 | 10 | 8 | 1 | 0 |
-| 5 | 125 | 0 | 0 | 1 | 42 | 66 | 0 | 12 | 4 | 0 | 0 |
-| 6 | 114 | 0 | 0 | 0 | 7 | 4 | 0 | 102 | 0 | 1 | 0 |
-| 7 | 104 | 0 | 0 | 0 | 6 | 0 | 0 | 96 | 2 | 0 | 0 |
-| 8 | 94 | 0 | 0 | 0 | 8 | 0 | 0 | 85 | 0 | 1 | 0 |
-| 9 | 81 | 0 | 0 | 0 | 4 | 0 | 0 | 73 | 3 | 1 | 0 |
-| 10 | 66 | 0 | 0 | 0 | 2 | 0 | 0 | 62 | 2 | 0 | 0 |
-| 11 | 50 | 0 | 0 | 0 | 0 | 0 | 0 | 49 | 1 | 0 | 0 |
-| 12 | 33 | 0 | 0 | 0 | 0 | 0 | 0 | 33 | 0 | 0 | 0 |
-| 13 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 |
+| Ring | Cells | Cell complete | Terrain complete | Cell complete, awaiting lighting | Terrain complete, awaiting lighting | Passed (something still deferred) | Empty sea | Open sea | Hull policy pending | Failed | Not converted | Not started |
+| :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
+| 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
+| 1 | 171 | 0 | 0 | 56 | 5 | 8 | 102 | 0 | 0 | 0 | 0 | 0 |
+| 2 | 160 | 0 | 0 | 38 | 9 | 111 | 1 | 0 | 1 | 0 | 0 | 0 |
+| 3 | 149 | 0 | 0 | 0 | 6 | 125 | 0 | 0 | 11 | 7 | 0 | 0 |
+| 4 | 138 | 0 | 0 | 1 | 27 | 99 | 0 | 0 | 6 | 4 | 1 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 46 | 67 | 0 | 0 | 5 | 5 | 1 | 0 |
+| 6 | 114 | 0 | 0 | 0 | 33 | 8 | 0 | 0 | 71 | 1 | 1 | 0 |
+| 7 | 104 | 0 | 0 | 0 | 43 | 1 | 0 | 0 | 59 | 1 | 0 | 0 |
+| 8 | 94 | 0 | 0 | 0 | 52 | 0 | 0 | 0 | 39 | 0 | 3 | 0 |
+| 9 | 81 | 0 | 0 | 0 | 58 | 6 | 0 | 0 | 10 | 2 | 5 | 0 |
+| 10 | 66 | 0 | 0 | 0 | 38 | 10 | 0 | 0 | 8 | 1 | 9 | 0 |
+| 11 | 50 | 0 | 0 | 0 | 25 | 11 | 0 | 0 | 6 | 2 | 6 | 0 |
+| 12 | 33 | 0 | 0 | 0 | 21 | 8 | 0 | 0 | 2 | 0 | 2 | 0 |
+| 13 | 7 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
 
 ## Failures by mechanism class
 
 | Mechanism | Cells |
 | :-- | --: |
-| Stair walk | 10 |
-| Memory fit (zone ring / heap) | 13 |
-| Hull bevels / hull chain length | 21 |
-| Doors / interior links | 5 |
+| Stair walk | 11 |
+| Memory fit (zone ring / heap) | 12 |
+| Hull bevels / hull chain length | 12 |
 
 A cell can fail more than one mechanism. Hull policy pending cells are not failures; they have their own line.
 
@@ -80,23 +81,23 @@ A cell can fail more than one mechanism. Hull policy pending cells are not failu
 
 | Object type | Placed | Converted | Deferred | Skipped | Failed |
 | :-- | --: | --: | --: | --: | --: |
-| Statics | 106,813 | 106,791 | 0 | 22 | 0 |
-| Flora | 58,565 | in statics | - | - | - |
-| Lights | 2,926 | 643 | 4,566 | 0 | 0 |
-| Doors | 1,041 | 1,041 | 0 | 0 | 0 |
-| Containers | 22,193 | 22,193 | 0 | 0 | 0 |
-| Activators | 2,762 | 2,761 | 0 | 1 | 0 |
-| Items | 364 | 364 | 0 | 0 | 0 |
-| NPCs | 546 | 0 | 546 | 0 | 0 |
-| Creatures | 5,409 | 0 | 5,409 | 0 | 0 |
+| Statics | 103,593 | 103,571 | 0 | 22 | 0 |
+| Flora | 57,686 | in statics | - | - | - |
+| Lights | 2,854 | 643 | 4,422 | 0 | 0 |
+| Doors | 1,031 | 1,031 | 0 | 0 | 0 |
+| Containers | 22,007 | 22,007 | 0 | 0 | 0 |
+| Activators | 2,245 | 2,244 | 0 | 1 | 0 |
+| Items | 351 | 351 | 0 | 0 | 0 |
+| NPCs | 544 | 0 | 544 | 0 | 0 |
+| Creatures | 5,293 | 0 | 5,293 | 0 | 0 |
 | Markers | 15 | not drawn, not required | - | - | - |
 
 - Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (22)
-- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (2,283)
-- Lights, deferred: nonvisual source marker (2,283)
+- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (2,211)
+- Lights, deferred: nonvisual source marker (2,211)
 - Activators, skipped: not in the frame (outside the cell bounds or removed by a selection) (1)
-- NPCs, deferred: resident conversion (546)
-- Creatures, deferred: creature simulation pending (5,409)
+- NPCs, deferred: resident conversion (544)
+- Creatures, deferred: creature simulation pending (5,293)
 
 Counts are every placed reference in converted cells, from the conversion job. Door and light figures in the Toolkit contents panel (original census) and the door audit (links per cell) are different measures. Light emitters without a mesh stay under Lights: they cast light, so the lighting audit keeps a cell from both completion levels until it is lit.
 
@@ -112,6 +113,7 @@ Generated from the constants of the tracker code, so it cannot drift from what t
 - Terrain complete, awaiting lighting: everything terrain complete needs except the lighting audit (lit). Counts as done; becomes terrain complete once lit.
 - Passed: converted and every measured audit passed, but something placed is still deferred or skipped (owner-approved and playtested cells also count here).
 - Empty sea: terrain and water only, nothing placed. Counts as done.
+- Open sea: a map cell without terrain data (no LAND record), the water surface over the flat seabed at the default depth, stored once as one shared ocean chunk and referenced by every such cell. Shown in silver; the engine does not place the chunk yet, so it is not counted as done and never as land.
 - Hull policy pending: converted; the only problem is a standing-hull chain deeper than the limit below, waiting for one shared routing rule. Neither passed nor failed.
 - Failed: converted, but at least one audit failed or the conversion reported an error.
 - Not converted: the conversion was tried and could not finish the cell (for example an object placed across a cell edge). A failure-type state, never counted as done.
@@ -119,7 +121,7 @@ Generated from the constants of the tracker code, so it cannot drift from what t
 
 Done = cell complete + terrain complete + cell complete, awaiting lighting + terrain complete, awaiting lighting + passed + empty sea, each kept on its own line. Empty sea cells count as done: there is nothing to convert there but the terrain and the water.
 
-Eligible for v0.0.34 = every done cell: cell complete, terrain complete, cell complete, awaiting lighting, terrain complete, awaiting lighting, passed (owner-approved and playtested included) and empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to be done.
+Eligible for the next release = every done cell: cell complete, terrain complete, cell complete, awaiting lighting, terrain complete, awaiting lighting, passed (owner-approved and playtested included) and empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to be done.
 
 Status precedence, strongest first: cell complete > terrain complete > cell complete, awaiting lighting > terrain complete, awaiting lighting > passed > hull policy pending > failed > not converted > not started.
 

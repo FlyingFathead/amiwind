@@ -222,6 +222,9 @@ bootcheck_start:
         ; warning row, never a failure. Empty otherwise (amiwind_heap.i).
         lea     heap_note(pc),a0
         bsr     puts
+        ; The engine profile the binary was built with (--engine-profile; amiwind_engine.i).
+        lea     engine_note(pc),a0
+        bsr     puts
         ; UAE host policy is intentionally not guessed from guest state. The
         ; portable launcher validates the requested FS-UAE profile before launch.
         lea     host_speed_line(pc),a0
@@ -372,7 +375,7 @@ graphics_name:  dc.b "graphics.library",0
 credits:        dc.b "By FlyingFathead",10
                 dc.b "https://github.com/FlyingFathead/amiwind/",10
                 dc.b "Special thanks to: ChaosWhisperer",10,0
-separator:      dc.b "----------------------------------------------",10,0
+; separator: generated into amiwind_version.i (as long as the header line)
 exec_ok_format: dc.b "Exec API:             %ld.%ld (Kickstart 3.1+) [x] OK",10,0
 exec_fail_format: dc.b "Exec API:             %ld.%ld                    [!] FAIL",10,0
 cpu_040_line:   dc.b "CPU:                  68040                      [x] OK",10,0
@@ -402,6 +405,7 @@ need_os:        dc.b "FAIL: this AGA build needs Kickstart 3.1 or newer.",10,0
 need_aga:       dc.b "FAIL: this build needs the AGA chipset.",10,0
 need_chip:      dc.b "FAIL: select 2 MB Chip; keep 512 KiB free (256 KiB contiguous).",10,0
                 include "amiwind_heap.i"
+                include "amiwind_engine.i"
         even
 memory_flags:
         dc.l    MEMF_CHIP!MEMF_TOTAL,MEMF_CHIP,MEMF_CHIP!MEMF_LARGEST

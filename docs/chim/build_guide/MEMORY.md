@@ -51,7 +51,7 @@ others constantly, and one larger allocation than usual ends the game with an er
 
 ## What a CHIM map adds: the zone
 
-A CHIM map (`maps/<town>-chim.bsp`) is a small frame map; the world itself is streamed in chunks.
+A CHIM map (`maps/<town>-chim.chim`) is a small frame map; the world itself is streamed in chunks.
 When it starts, it takes one block from the heap, the **CHIM zone** (`chim_zone_kib`, default 6,864
 KiB), and gives it back at the next map change. Maps without a frame (the ship, interiors, the
 gallery) take no zone. The zone holds:

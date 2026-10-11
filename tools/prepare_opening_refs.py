@@ -5,11 +5,11 @@ import argparse
 import json
 from pathlib import Path
 import re
-import shutil
+
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.audit import records,subrecords,string,cell_data
-from mwad.paths import ensure_external,resolve_data_files,child_ci
+from mwad.paths import ensure_external,resolve_data_files,child_ci,replace_bytes,replace_copy
 from prepare_quake import CENTRE
 from prepare_scenery import export_refs
 from prepare_mesh_bsp import append_meshes
@@ -42,6 +42,8 @@ BARREL='chargen barrel fatigue'
 
 def prepare(data_files,scene):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'opening references')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     refs,wanted,disabled=opening_references(data_files)
     def point(ref):return [(ref['position'][i]-(CENTRE[i] if i<2 else 0))*.25 for i in range(3)]
     path=scene/'id1/maps/seyda.bsp';b=lumps(path.read_bytes());found=set();ent=b[0].rstrip(b'\0').decode('cp1252')
@@ -60,14 +62,15 @@ def prepare(data_files,scene):
         block=re.sub(r'\n"aw_ref" "[^"]*"','',block)
         block=re.sub(r'\n"aw_story_hidden" "[^"]*"','',block)
         return block[:-1]+extra+'}'
-    ent=re.sub(r'\{[^{}]*\}',bind,ent);b[0]=(ent+'\0').encode('cp1252');path.write_bytes(pack_lumps(b))
+    # replaced whole: the area stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
+    ent=re.sub(r'\{[^{}]*\}',bind,ent);b[0]=(ent+'\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
     barrel=next(r for r in wanted if r['id'].casefold()==BARREL)
     if barrel['number'] not in found:
         parts=scene/'opening-barrel-source';group='opening_barrel';barrel['scene_groups']=[group]
         export_refs(data_files,parts,[barrel],{group:{'references':[barrel['number']]}},[*CENTRE,0],4096,32,{'scope':'authored tutorial barrel'})
-        base=scene/'seyda-before-barrel.bsp';shutil.copyfile(path,base)
+        base=scene/'seyda-before-barrel.bsp';replace_copy(path,base)
         append_meshes(base,path,parts,scene/'id1/gfx/palette.lmp');found.add(barrel['number'])
-    shutil.copyfile(path,scene/'seyda.bsp')
+    replace_copy(path,scene/'seyda.bsp')
     result={'bound':sorted(found),'not_converted':[r['number'] for r in wanted if r['number'] not in found],
             'source_disable_ids':sorted(disabled)}
     (scene/'opening-refs.json').write_text(json.dumps(result,indent=2)+'\n')

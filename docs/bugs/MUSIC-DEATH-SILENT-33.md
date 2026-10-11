@@ -72,11 +72,13 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - AUDIO-LOAD-29 (no report page): OST crackles under heavy loading
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
 - [AUDIO-NEWGAME-30](AUDIO-NEWGAME-30.md): Music crackles when confirming New Game (WinUAE)
-- AW-20260928-02 (no report page): Dock/menu freeze and looping audio
+- [AW-20260928-02](AW-20260928-02.md): Dock/menu freeze and looping audio
 - AW-20260928-15 (no report page): Prison wave ambience masks dialogue
 - AW-20260929-03 (no report page): Music cuts during loading
 - AW-20260929-05 (no report page): Ship waves too quiet
+- [COMBAT-MUSIC-AIR-SWING-35](COMBAT-MUSIC-AIR-SWING-35.md): Swinging at the air starts the combat music; it should start only when the player attacks a valid combat target (an NPC or creature)
 - [COMBAT-VOICES-SILENT-33](COMBAT-VOICES-SILENT-33.md): Player pain grunts and hostile NPC taunts are not heard in fights
+- [ENGINE-MUSIC-NO-OFF-SWITCH-36](ENGINE-MUSIC-NO-OFF-SWITCH-36.md): The soundtrack has no off switch: music can only be disabled by deleting music/playlist.txt from the image
 - [ENGINE-SOUND-NAME-SYSERROR-35](ENGINE-SOUND-NAME-SYSERROR-35.md): A sound name of 64 characters or more, or more than 512 sounds in a session, stopped the program
 - [MUSIC-OPENING-CLIP-31](MUSIC-OPENING-CLIP-31.md): A clip of another track plays while the opening scene loads
 - [MUSIC-STARTUP-TRACK-31](MUSIC-STARTUP-TRACK-31.md): A random world track plays under the startup logo
@@ -84,5 +86,9 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
 - PUNCH-AUDIO-COVERAGE-29 (no report page): Original punch swing/hit sound coverage unverified
 - WIN-05 (no report page): Intermittent WinUAE background-music snapping
+
+Related bugs in other categories:
+
+- [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
 
 <!-- END GENERATED CATEGORY -->

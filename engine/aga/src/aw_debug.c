@@ -2,6 +2,7 @@
  * Local development console commands. No gameplay state/save format implied.
  */
 #include "quakedef.h"
+#include "aw_bounds.h"
 #include "aw_save.h"
 #include "aw_region.h"
 #include "aw_world.h"
@@ -13,6 +14,7 @@
 #include "aw_miniwind.h"
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
+#include "aw_view.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -209,12 +211,27 @@ static void savelogs_command(void)
     if(AW_LogLive())Con_Printf("Diagnostic logs are live and already in %s.\n",folder);
     else Con_Printf("Saved %d diagnostic log files to %s (%lu older lines dropped from the memory logs).\n",files,folder,dropped);
 }
+/* dbg god / dbg godmode: Quake's god cheat (Host_God_f, FL_GODMODE, the HUD GOD
+ * indicator) with the usual on/off, true/false or 1/0 words. Not saved. The
+ * state lives only in the player's edict; this asks Quake's own "god" to flip it. */
+static void godmode_command(void)
+{
+    char *text=Cmd_Argv(1);int on,now;
+    if(Cmd_Argc()>2 || (Cmd_Argc()==2 && Q_strcasecmp(text,"on") && Q_strcasecmp(text,"off") &&
+       Q_strcasecmp(text,"true") && Q_strcasecmp(text,"false") && strcmp(text,"1") && strcmp(text,"0"))){
+        Con_Printf("Usage: dbg godmode [on/off, true/false or 1/0]; no argument toggles (not saved).\n");return;}
+    if(!sv.active || !sv_player){Con_Printf("Godmode needs a running game.\n");return;}
+    now=((int)sv_player->v.flags & FL_GODMODE)!=0;
+    on=Cmd_Argc()==1?!now:(!Q_strcasecmp(text,"on") || !Q_strcasecmp(text,"true") || !strcmp(text,"1"));
+    if(on!=now)Cbuf_AddText("god\n");   /* Host_God_f prints "godmode ON/OFF" */
+    else Con_Printf("godmode %s\n",on?"ON":"OFF");
+}
 void AW_DebugInit(void) {
-    Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);
+    Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_GalleryInit();AW_WorldUIInit();
     AW_StreamInit();AW_PhotoInit();Chim_Init();
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
-    AW_InputDebugInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
+    AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_ViewInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_dimensions",dimensions);

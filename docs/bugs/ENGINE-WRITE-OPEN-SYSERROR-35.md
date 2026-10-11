@@ -72,6 +72,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - [ENGINE-MAP-NAME-OVERFLOW-35](ENGINE-MAP-NAME-OVERFLOW-35.md): map, changelevel, connect and load copied a name of any length into fixed buffers
 - [KEYS-AMIGA-EDIT-32](KEYS-AMIGA-EDIT-32.md): Amiga Del arrived as F11; FS-UAE sent Home/End as keypad ( and Help
 - MAP-VIEW-SWITCH-28 (no report page): Mouse cannot switch DEBUG / IN-GAME map views
+- [UI-MAP-CLICK-DRAGS-SCREEN-36](UI-MAP-CLICK-DRAGS-SCREEN-36.md): A click on the game screen with the Amiga qualifier (held, or latched by a crashed program) drags the game screen down and reveals the AmigaDOS screen behind it
 - VIEW-PITCH-CENTER-29 (no report page): Legacy automatic pitch centering during free-look
 
 <!-- END GENERATED CATEGORY -->

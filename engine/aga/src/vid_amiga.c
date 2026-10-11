@@ -327,7 +327,9 @@ void	VID_Init (unsigned char *palette)
         SA_Height,      height,
         SA_Depth,       8,
         SA_Font,        &topaz8,
-        /* SA_Draggable,FALSE, */
+        /* AmiWind: the game screen never moves (UI-MAP-CLICK-DRAGS-SCREEN-36: a click with an Amiga
+         * qualifier, or one latched by a crashed program, dragged it down over the AmigaDOS screen). */
+        SA_Draggable,   FALSE,
         /* SA_AutoScroll,FALSE, */
         /* SA_Exclusive,TRUE, */
         SA_Quiet,       TRUE,

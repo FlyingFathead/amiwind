@@ -4,7 +4,7 @@
 #include "../src/quakedef.h"
 #include "../src/aw_remote.h"
 #include <assert.h>
-client_static_t cls;client_state_t cl;server_t sv;refdef_t r_refdef;
+client_static_t cls;client_state_t cl;server_t sv;refdef_t r_refdef;keydest_t key_dest;
 double realtime,host_frametime=.02;int r_daylight=200;
 static char buffer[8192];static cvar_t *vars[4];static int nvars;
 void Cbuf_AddText(char *t){strcat(buffer,t);}
@@ -16,6 +16,7 @@ void AW_ClockDate(int *y,int *mo,int *d,int *h,int *mi){*y=427;*mo=8;*d=16;*h=1;
 int AW_LampLitCount(void){return 2;}
 int R_SkyExterior(void){return 1;}
 int AW_GuardTorchNight(void){return 1;}
+int aw_efrags_bad=3;   /* r_efrag.c: the efrag safety net's count (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
 static int held;int AW_DayNightFrozen(void){return held;}
 static int exists(const char *p){FILE *f=fopen(p,"rb");if(f)fclose(f);return f!=NULL;}
 int main(void){
@@ -30,7 +31,7 @@ int main(void){
     Cvar_Set("aw_remote","1");assert(AW_RemoteLogging());
     AW_RemotePoll();assert(!strcmp(buffer,"dbg time 0119\n") && !exists(cmd) && exists(state));
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
-    assert(strstr(text,"commands 1\n") && strstr(text,"time 01:19\n") && strstr(text,"lamps_lit 2\n") && strstr(text,"daylight 200\n") && strstr(text,"guard_night 1\n") && strstr(text,"end\n"));
+    assert(strstr(text,"commands 1\n") && strstr(text,"time 01:19\n") && strstr(text,"lamps_lit 2\n") && strstr(text,"daylight 200\n") && strstr(text,"guard_night 1\n") && strstr(text,"efrags_bad 3\n") && strstr(text,"screen game\n") && strstr(text,"world_leafs 0\n") && strstr(text,"end\n"));
     assert(strstr(text,"daynight on\n") && !strstr(text,"daynight off\n"));
     f=fopen(cmd,"w");fputs("aw_aim 113 -3\n",f);fclose(f);
     realtime=1.2;AW_RemotePoll();assert(exists(cmd)); /* within the period: not yet */

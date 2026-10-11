@@ -34,7 +34,7 @@ GENERATED = ('<!-- Generated whole by tools/chim_features.py render from docs/ch
 
 STATUSES = ['shipped', 'in-release', 'in-progress', 'planned', 'idea']
 STATUS_TITLES = {
-    'shipped': 'Shipped in CHIM {v}',
+    'shipped': 'Shipped',
     'in-release': 'In this release (CHIM {v})',
     'in-progress': 'In progress',
     'planned': 'Planned',
@@ -111,7 +111,8 @@ def anchors(path):
 
 
 def bug_ids(root=ROOT):
-    return {b['id'] for b in json.loads((root / 'docs' / 'bugs' / 'bugs.json').read_text(encoding='utf-8'))}
+    files = [root / 'docs' / 'bugs' / 'bugs.json'] + sorted((root / 'docs' / 'bugs' / 'archive').glob('*.json'))
+    return {b['id'] for f in files for b in json.loads(f.read_text(encoding='utf-8'))}
 
 
 def chim_version(root=ROOT):
@@ -314,8 +315,8 @@ def render(data):
     lines += ['']
     lines += ['Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free '
               'at the load peak, spends more time outside the 3D view and draws slightly more spans. '
-              'CHIM 0.1.0 is not published yet; the features marked "in this release" are in the '
-              'development line for AmiWind v0.0.33.', '']
+              'Each shipped feature names the CHIM version it came with; the features marked "in this '
+              'release" are in the development line of CHIM %s, not yet published.' % version, '']
     lines += ['## Features by status', '']
     lines += ['| Status | Meaning | Features |', '| --- | --- | --- |']
     for s in STATUSES:
@@ -340,7 +341,9 @@ def render(data):
         lines += ['### %s' % title, '']
         for f in group:
             lines += ['#### %s' % f['name'], '']
-            lines += ['**Status:** %s. **ID:** `%s`.' % (status_title(f['status'], version), f['id']), '']
+            shown = ('Shipped in CHIM %s' % f['version'] if f['status'] == 'shipped'
+                     else status_title(f['status'], version))
+            lines += ['**Status:** %s. **ID:** `%s`.' % (shown, f['id']), '']
             lines += [f['summary'], '']
             if f['gains']:
                 lines += ['**Measured gain:**', '']

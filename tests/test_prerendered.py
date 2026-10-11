@@ -132,7 +132,7 @@ class StoreBuildTests(unittest.TestCase):
     def build(self, name, store=True, stages='all', version='0.0.0-dev1', parallel=False, workspace='workspace',
               steps=None, expect_failure=False):
         run = self.root / workspace / 'build' / name
-        index = build_cache.SourceIndex(self.repository)
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)  # as tools/build.py
         meta = metadata()
         meta.update(compiler_jobs=2 if parallel else 1, runtime_version=version, python=sys.version,
                     source_sha256=source_record(self.repository))

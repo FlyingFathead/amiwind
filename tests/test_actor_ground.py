@@ -111,6 +111,23 @@ class GroundGateTests(unittest.TestCase):
                    for seed in ('1', '2', '3', '4')}
         self.assertEqual(len(outputs), 1)
 
+    def test_chim_frame_residents_are_judged_by_their_frame_fit(self):
+        # BUILD-ACTOR-GATE-CHIM-FRAMES-36: a CHIM-only build's residents are in its frame, fitted by the town stage
+        fit = lambda ref, status: dict(reference=ref, source_id='ordinator wander', status=status, mesh_contact='unchanged')
+        self.put('', 'torchtest')
+        r = audit(self.maps, chim_frames={'vivec_arena': [fit('1', 'supported'), fit('2', 'supported')]})
+        self.assertEqual((r['status'], r['chim_frame_actors'], r['summary']), ('passed', 2, {'grounded': 2}))
+        # a blocked or unsupported resident is unresolved, never passed as supported
+        for status in ('blocked', 'unsupported', 'unresolved-mesh-contact'):
+            r = audit(self.maps, chim_frames={'vivec_arena': [fit('1', 'supported'), fit('2', status)]})
+            self.assertEqual(r['status'], 'failed')
+            self.assertEqual([(e['reference'], e['map']) for e in r['errors']], [('2', 'vivec_arena-chim')])
+            self.assertIn(status, r['errors'][0]['error'])
+        # neither the maps nor the frames hold an actor: still refused
+        for frames in (None, {}, {'vivec_arena': []}):
+            r = audit(self.maps, chim_frames=frames)
+            self.assertEqual(r['errors'], [{'error': 'No actor placements found'}])
+
     def test_missing_owner_duplicate_and_bad_model_fail(self):
         self.put(actor()+actor());self.assertEqual(audit(self.maps)['status'],'failed')
         self.put(actor());(self.id1/'progs/test.mdl').write_bytes(b'bad')

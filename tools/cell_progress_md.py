@@ -32,6 +32,9 @@ STATUS_TEXT = collections.OrderedDict([
     ('audits_passed', 'Passed: converted and every measured audit passed, but something placed is still deferred or skipped '
                       '(owner-approved and playtested cells also count here).'),
     ('empty_sea', 'Empty sea: terrain and water only, nothing placed. Counts as done.'),
+    ('ocean', 'Open sea: a map cell without terrain data (no LAND record), the water surface over the flat seabed at the '
+              'default depth, stored once as one shared ocean chunk and referenced by every such cell. Shown in silver; the '
+              'engine does not place the chunk yet, so it is not counted as done and never as land.'),
     ('hull_policy_pending', 'Hull policy pending: converted; the only problem is a standing-hull chain deeper than the limit '
                             'below, waiting for one shared routing rule. Neither passed nor failed.'),
     ('converted_failing', 'Failed: converted, but at least one audit failed or the conversion reported an error.'),
@@ -85,7 +88,7 @@ def table(head, rows, right_from=1):
 
 
 def island_cells(doc, island):
-    return [c for c in doc['cells'].values() if c.get('island') == island and (c['land'] or c['chim']['bucket'] == 'empty_sea')]
+    return [c for c in doc['cells'].values() if c.get('island') == island and cp.on_map(c)]
 
 
 def classes(cells):
@@ -98,6 +101,7 @@ def classes(cells):
         ('terrain_complete_unlit', c['terrain_complete_unlit']),
         ('audits_passed', c['audits_passed'] + c['approved'] + c['playtested']),
         ('empty_sea', c['empty_sea']),
+        ('ocean', c['ocean']),
         ('hull_policy_pending', c['hull_policy_pending']),
         ('converted_failing', c['converted_failing'] + c['converted_unmeasured']),
         ('not_converted', c['not_converted']),
@@ -128,10 +132,10 @@ def policy_lines():
             'there is nothing to convert there but the terrain and the water.' % (
                 cp.COMPLETE_LABEL.lower(), cp.TERRAIN_COMPLETE_LABEL.lower(), cp.COMPLETE_UNLIT_LABEL.lower(),
                 cp.TERRAIN_COMPLETE_UNLIT_LABEL.lower()), '',
-            'Eligible for %s = every done cell: %s, %s, %s, %s, passed (owner-approved and playtested included) and '
+            'Eligible for the next release = every done cell: %s, %s, %s, %s, passed (owner-approved and playtested included) and '
             'empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to '
             'be done.' % (
-                cp.ELIGIBLE_RELEASE, cp.COMPLETE_LABEL.lower(), cp.TERRAIN_COMPLETE_LABEL.lower(),
+                cp.COMPLETE_LABEL.lower(), cp.TERRAIN_COMPLETE_LABEL.lower(),
                 cp.COMPLETE_UNLIT_LABEL.lower(), cp.TERRAIN_COMPLETE_UNLIT_LABEL.lower()), '',
             'Status precedence, strongest first: %s > %s > %s > %s > passed > hull policy pending > failed > not converted > '
             'not started.' % (cp.COMPLETE_LABEL.lower(), cp.TERRAIN_COMPLETE_LABEL.lower(), cp.COMPLETE_UNLIT_LABEL.lower(),
@@ -210,23 +214,28 @@ def render(doc, today=None):
     cl = classes(cells)
     done = sum(cl[k] for k in cp.COMPLETE_LEVELS) + cl['audits_passed'] + cl['empty_sea']
     eligible = sum(1 for c in cells if c['chim']['bucket'] in cp.ELIGIBLE)
+    map_total, total = total, total - cl['ocean']
+    land_total, land_done = total, done
     out = [HEADER, '', '# CHIM Cell Tracker', '',
            'Live status of the open world on CHIM, Vvardenfell (island %d). Generated page: do not edit by hand. '
            'Per-cell detail is in the Toolkit and its CSV export.' % MAIN_ISLAND, '',
            '**Done: %s of %s (%s)**' % (n(done), n(total), pct(done, total)), '',
+           'Map cells %s: land and empty-sea cells %s (done %s, %s) and open-ocean cells %s (shared ocean chunk made, not yet placed in the game: not counted as done).' % (
+               n(map_total), n(land_total), n(land_done), pct(land_done, land_total), n(cl['ocean'])), '',
            '- %s: %s' % (cp.COMPLETE_LABEL, n(cl['complete'])),
            '- %s: %s' % (cp.TERRAIN_COMPLETE_LABEL, n(cl['terrain_complete'])),
            '- %s: %s' % (cp.COMPLETE_UNLIT_LABEL, n(cl['complete_unlit'])),
            '- %s: %s' % (cp.TERRAIN_COMPLETE_UNLIT_LABEL, n(cl['terrain_complete_unlit'])),
            '- Passed (something still deferred): %s' % n(cl['audits_passed']),
-           '- Empty sea: %s' % n(cl['empty_sea']), '',
+           '- Empty sea: %s' % n(cl['empty_sea']),
+           '- Open ocean (silver, not counted as done): %s' % n(cl['ocean']), '',
            '**Eligible for %s: %s of %s** (every done cell, lighting done or not; definition in the import policy).' % (
-               cp.ELIGIBLE_RELEASE, n(eligible), n(total)), ''] + lighting_lines(cells) + [
+               doc.get('plan_next') or (doc.get('headline') or {}).get('eligible_release') or cp.ELIGIBLE_RELEASE, n(eligible), n(total)), ''] + lighting_lines(cells) + [
            '',
            'Generated %s. Tracker data generated %s.' % (today, doc.get('generated', 'unknown')), '',
            '## Totals', '']
     labels = {'complete': cp.COMPLETE_LABEL, 'terrain_complete': cp.TERRAIN_COMPLETE_LABEL,
-              'complete_unlit': cp.COMPLETE_UNLIT_LABEL, 'terrain_complete_unlit': cp.TERRAIN_COMPLETE_UNLIT_LABEL, 'audits_passed': 'Passed (something still deferred)', 'empty_sea': 'Empty sea',
+              'complete_unlit': cp.COMPLETE_UNLIT_LABEL, 'terrain_complete_unlit': cp.TERRAIN_COMPLETE_UNLIT_LABEL, 'audits_passed': 'Passed (something still deferred)', 'empty_sea': 'Empty sea', 'ocean': 'Open sea',
               'hull_policy_pending': 'Hull policy pending', 'converted_failing': 'Failed',
               'not_converted': 'Not converted', 'not_started': 'Not started'}
     out += table(['Status', 'Cells', 'Share'], [(labels[k], n(v), pct(v, total)) for k, v in cl.items()])

@@ -26,7 +26,15 @@ WARN = ['-Wall', '-Werror', '-Wno-unused-function', '-Wno-unused-variable', '-Wn
         '-Wno-pointer-to-int-cast', '-Wno-int-to-pointer-cast']
 
 
+# Engine files that build map paths through aw_mappath.c (AW_MapPath).
+MAP_PATH_USERS = ('aw_region.c', 'aw_section.c', 'aw_scene.c', 'aw_gallery.c', 'aw_arena.c', 'aw_wait.c',
+                  'sv_main.c', 'chim_world.c')
+
+
 def compile_and_run(test, fixture, sources, arguments_sets=((),), extra=(), cwd=None):
+    sources = [Path(p) for p in sources]
+    if any(p.name in MAP_PATH_USERS for p in sources) and not any(p.name == 'aw_mappath.c' for p in sources):
+        sources.append(SRC / 'aw_mappath.c')
     with tempfile.TemporaryDirectory(prefix='amiwind-chim-') as tmp:
         tmp = Path(tmp)
         from project_version import generate_native
@@ -217,7 +225,7 @@ def set_world_version(root, major, minor):
             path.write_bytes(bytes(data))
 
 
-def write_test_world(root, first=0, story=(), rows=False):
+def write_test_world(root, first=0, story=(), rows=False, refs=False):
     """first: the world's placement ids before this frame (an earlier frame); story: placement ids flagged
     story hidden (format 0.5)."""
     from chim_fixture import box_bsp, miptex, pack_order, placement, terrain_bsp, write_world
@@ -257,7 +265,7 @@ def write_test_world(root, first=0, story=(), rows=False):
     write_world(root, (0, 0), (LOW, LOW), GRAIN, NX, NX, chunks, models, textures, len(PLACEMENTS),
                 dict(draw_distance=200.0, hysteresis=32.0, prefetch_margin=64.0, collision_margin=48.0), sees, SECTOR,
                 {0: (0,), 1: (1,), 2: (2,)}, sees_placement=sees_placement,
-                lead=((5, 5), first) if first else None, rows=rows)
+                lead=((5, 5), first) if first else None, rows=rows, refs=refs)
     if rows:
         set_world_version(root, 0, 6)
     return sum(len(r) for r in reach.values())
@@ -289,7 +297,7 @@ def write_big_world(root):
                 {m: (m % 3,) for m in range(40)})
 
 
-def write_seam_world(root):
+def write_seam_world(root, refs=False):
     """A 4 x 4 chunk frame written by the CHIM builder (tests/test_chim_format.py's fixture) on
     ground that steps up in every other chunk column and row, so near most chunk borders the
     highest ground under the standing box is the neighbour's. Writes seam.txt (x y stand) for
@@ -309,7 +317,8 @@ def write_seam_world(root):
     def ground(x, y):
         return float(np.interp(x, vertex, steps) + 0.5 * np.interp(y, vertex, steps))
 
-    _, source = fixture(Path(root), heights_of=ground)
+    _, source = fixture(Path(root), heights_of=ground,
+                        settings={'grain': 256, 'sector_chunks': 2, **({'terrain_refs': 'on'} if refs else {})})
     rows, neighbour = [], 0
     for border in (-256, 0, 256):
         for along in (-470.3, -301.7, -130.9, 41.3, 207.7, 388.1):
@@ -342,7 +351,7 @@ class ChimWorldTests(unittest.TestCase):
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 
     def run_world(self, modes, with_data=True, env=None, big=False, seam=False, first=0, story=(), rows=False,
-                  far=False, extra=()):
+                  far=False, extra=(), refs=False):
         with tempfile.TemporaryDirectory(prefix='amiwind-chim-world-') as tmp:
             if far:
                 # The frame map's far terrain (tools/chim/far.py), frame 0 0 (centre 0 0): 9 x 7 samples.
@@ -352,11 +361,11 @@ class ChimWorldTests(unittest.TestCase):
                 (Path(tmp) / 'maps').mkdir()
                 (Path(tmp) / 'maps/chimtest.far').write_bytes(encode((0, 0), -4096, -3072, 1024, grid, 4))
             if seam:
-                self.assertGreater(write_seam_world(tmp), 20)
+                self.assertGreater(write_seam_world(tmp, refs), 20)
             elif big:
                 write_big_world(tmp)
             elif with_data:
-                self.assertGreater(write_test_world(tmp, first, story, rows), 0)
+                self.assertGreater(write_test_world(tmp, first, story, rows, refs), 0)
                 if rows:
                     self.assertTrue(list(Path(tmp).glob('chim/frames/*/*/r*/s*.ccs')))
             old = dict(os.environ)
@@ -471,7 +480,7 @@ class ChimWorldTests(unittest.TestCase):
         self.assertIn('budget ok', out)
         print([l for l in out.splitlines() if l.startswith('budget:')])
 
-    # World format 0.5 (M2 Seyda Neen): the engine reads 0.4 and 0.5, refuses others with a line.
+    # World format 0.5 (M2 Seyda Neen): the engine reads 0.4 to 0.7 (0.7: terrain references), refuses others with a line.
     def test_far_terrain_loads_with_the_frame_map_and_goes_with_it(self):
         # CHIM-FAR-TERRAIN-33: maps/<frame map>.far, low Hunk, fog hook; without it nothing is drawn.
         out = self.run_world(['far'], far=True)
@@ -499,6 +508,21 @@ class ChimWorldTests(unittest.TestCase):
         self.assertEqual(major, FORMAT_VERSION[0])
         self.assertLessEqual(oldest, FORMAT_VERSION[1])
         self.assertGreaterEqual(minor, FORMAT_VERSION[1])
+
+    def test_terrain_references_run_the_whole_ring(self):
+        # Format 0.7 (CHIM-REGION-MARGIN-STORAGE-36): every chunk's terrain is a TERR record in chunk-local
+        # units, the flat ones one record; the graft moves each copy to its chunk (CopyGraft Shift). The
+        # whole ring scenario (placements, collision, the pond's water, streaming, map change) holds.
+        out = self.run_world(['ring'], refs=True)[0]
+        self.assertIn('ring ok', out)
+
+    def test_terrain_references_stand_on_the_neighbours_ground(self):
+        # The builder's own terrain references (chim.build terrain_refs on): the standing hull moved by
+        # the graft stands exactly on the highest ground under the box at every chunk border, as the
+        # copies do (test_chunk_borders_stand_on_the_neighbours_ground).
+        out = self.run_world(['seam'], seam=True, refs=True)[0]
+        self.assertIn('seam ok', out)
+        self.assertIn(' 0 off the ground', out)
 
     def test_placement_ids_of_a_later_frame_of_a_world(self):
         # Ids run on across frames: this frame's ids start at 1,000 (an earlier frame in the index);

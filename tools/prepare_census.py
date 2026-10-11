@@ -36,6 +36,8 @@ def actor_names(master, identifiers):
 
 def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'census conversion')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     # Master-only reads (door catalogue, actor names) run beside the conversion.
     from build_parallel import Background
     from prepare_doors import door_sources

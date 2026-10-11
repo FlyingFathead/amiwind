@@ -20,6 +20,15 @@ void Con_ToggleConsole_f(void){key_dest=key_game;}
 int AW_CharacterActive(void){return 0;}int AW_ReaderActive(void){return 0;}int AW_IntroUse(void){return restricted;}
 int AW_StoryRestricted(void){return restricted;}double AW_SpeechRemaining(void){return speech;}
 static char subtitle[256];
+/* WAIT-DURING-COMBAT-36: the one fight check (aw_combat.c) and the refusal text written by the builder */
+static int in_combat,settings_text;
+int AW_PlayerInCombat(void){return in_combat;}
+int COM_FOpenFile(char *path,FILE **file){
+    *file=NULL;
+    if(strcmp(path,"view/settings.txt") || !settings_text)return -1;
+    *file=tmpfile();assert(*file);fputs("AWVS1\nfVanityDelay 30\nsNotifyMessage2 Test: enemies near.\n",*file);rewind(*file);
+    return 60;
+}
 void IN_AWClearButtons(void){}void AW_UISubtitle(const char *a,const char *b,double d){snprintf(subtitle,sizeof subtitle,"%s",b);}
 void Con_Printf(char *s,...){}void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_timescale"))scale=c;else if(!strcmp(c->name,"aw_daynightcycle"))cycle=c;else assert(0);}
 void Cmd_AddCommand(char *n,void(*f)(void)){if(!strcmp(n,"aw_wait"))open_wait=f;else if(!strcmp(n,"aw_quick_help"))help=f;else if(!strcmp(n,"aw_timeofday"))settime=f;else if(!strcmp(n,"aw_set_time"))setexact=f;else if(!strcmp(n,"aw_daycycle_gallery"))gallery=f;else if(!strcmp(n,"aw_nightgallery"))nightgallery=f;else if(!strcmp(n,"aw_24hrcycle"))hourcycle=f;else if(!strcmp(n,"aw_lightgallery"))lightgallery=f;else if(!strcmp(n,"aw_daynight_set"))daynight=f;}
@@ -178,6 +187,11 @@ int main(void){
     restricted=1;open_wait();assert(key_dest==key_game);restricted=0;
     speech=1;open_wait();assert(key_dest==key_game);speech=0;
     player.v.waterlevel=2;open_wait();assert(key_dest==key_game);player.v.waterlevel=0;
+    /* in a fight: refused with the game's own text (view/settings.txt), else an AmiWind line; calm: allowed */
+    in_combat=1;subtitle[0]=0;open_wait();assert(key_dest==key_game && strstr(subtitle,"Enemies are nearby"));
+    settings_text=1;subtitle[0]=0;open_wait();assert(key_dest==key_game && !strcmp(subtitle,"Test: enemies near."));
+    settings_text=0;in_combat=0;
+    open_wait();assert(key_dest==key_menu);in_combat=1;AW_WaitKey(K_ENTER);assert(key_dest==key_game);in_combat=0;
     open_wait();assert(key_dest==key_menu && AW_WaitDraw());saved=aw_state;
     AW_WaitTick();AW_WaitKey(K_RIGHTARROW);AW_WaitKey(K_ESCAPE);assert(key_dest==key_game && !memcmp(&saved,&aw_state,sizeof(saved)));
     open_wait();for(i=0;i<30;i++)AW_WaitKey(K_RIGHTARROW);AW_WaitKey(K_ENTER);date(427,8,17,9,1);

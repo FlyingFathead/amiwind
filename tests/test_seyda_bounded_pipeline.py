@@ -48,7 +48,7 @@ class SeydaBoundedPipelineTests(unittest.TestCase):
             palette=root/'id1/gfx/palette.lmp';palette.parent.mkdir();palette.write_bytes(bytes(768))
             calls=[]
             def builder(source_map,texture_bsp,source_bsp,palette_path,coverage,out_dir,
-                        ericw_bin,target_sizes,*,core=None,threads=1):
+                        ericw_bin,target_sizes,*,core=None,threads=1,path_root=None):
                 self.assertEqual(Path(source_bsp).read_bytes(),raw)
                 self.assertEqual(source.read_bytes(),raw) # Never overwrite mid-generation.
                 self.assertNotEqual(Path(source_bsp).parent,maps)

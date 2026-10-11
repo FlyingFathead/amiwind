@@ -49,6 +49,7 @@ typedef struct aw_efrag_page_s {
 } aw_efrag_page_t;
 static aw_efrag_page_t *aw_efrag_pages;
 int aw_efrags_capacity = MAX_EFRAGS;
+int aw_efrags_bad;		/* the safety net's count (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
 
 /* Quake drops an entity silently when cl_visedicts is full (MAX_VISEDICTS).
  * Count every drop (in total and since the frame's list was reset) and say so
@@ -109,6 +110,34 @@ static void R_GrowEfrags(void)
 }
 
 
+/* SAFETY NET (CHIM-FRAME-EDGE-EFRAG-CRASH-36): a bad leaf link used to end the game (Quake's
+ * Sys_Error in R_StoreEfrags) or, in R_RemoveEfrags, to walk low memory. The link is left out
+ * instead, counted (aw_efrags_bad, state.txt "efrags_bad": the engine smoke fails on it) and its
+ * entity named once on the console by kind; the paths that clear a linked entity's model remove
+ * its links first, so this should never run. */
+static entity_t *aw_efrag_bad_last;
+static const char *aw_efrag_bad_reason;
+const char *(*aw_efrag_describe)(const entity_t *ent, char *out, int size);
+static void BadEfrag (entity_t *ent, const char *reason)
+{
+	char what[160];
+	aw_efrags_bad++;
+	if (ent == aw_efrag_bad_last && reason == aw_efrag_bad_reason)
+		return;
+	aw_efrag_bad_last = ent;
+	aw_efrag_bad_reason = reason;
+	what[0] = 0;
+	if (!ent)
+		strcpy (what, "a leaf's efrag chain");
+	else if (ent >= cl_entities && ent < cl_entities + MAX_EDICTS)
+		sprintf (what, "entity %ld", (long)(ent - cl_entities));
+	else if (ent >= cl_static_entities && ent < cl_static_entities + MAX_STATIC_ENTITIES)
+		sprintf (what, "Quake static %ld", (long)(ent - cl_static_entities));
+	else if (!aw_efrag_describe || !aw_efrag_describe (ent, what, sizeof(what)))
+		sprintf (what, "entity at %p (model %.40s)", (void *)ent, ent->model ? ent->model->name : "none");
+	Con_Printf ("Efrag safety net: %s: %s (CHIM-FRAME-EDGE-EFRAG-CRASH-36)\n", what, reason);
+}
+
 /*
 ================
 R_RemoveEfrags
@@ -119,17 +148,34 @@ Call when removing an object from the world or moving it to another position
 void R_RemoveEfrags (entity_t *ent)
 {
 	efrag_t		*ef, *old, *walk, **prev;
+	int			steps;
 
 	ef = ent->efrag;
 
 	while (ef)
 	{
-		prev = &ef->leaf->efrags;
-		while (1)
+		/* SAFETY NET (CHIM-FRAME-EDGE-EFRAG-CRASH-36): a link without a leaf has nothing to
+		 * unlink; walking &NULL->efrags would read and write low Amiga memory (the CPU's
+		 * exception vectors) instead of failing. */
+		prev = ef->leaf ? &ef->leaf->efrags : NULL;
+		if (!prev)
+		{	/* a reset pool's link (already free): the rest of the chain is not this
+			 * entity's any more; pushing it on the free list again would loop the list */
+			BadEfrag (ent, "a link without a leaf (chain dropped)");
+			break;
+		}
+		steps = 0;
+		while (prev)
 		{
 			walk = *prev;
 			if (!walk)
 				break;
+			if (++steps > aw_efrags_capacity)
+			{	/* a looping leaf chain: cut it (safety net, as R_StoreEfrags) */
+				*prev = NULL;
+				BadEfrag (ent, "a looping leaf chain while unlinking (cut)");
+				break;
+			}
 			if (walk == ef)
 			{	// remove this fragment
 				*prev = ef->leafnext;
@@ -318,11 +364,27 @@ void R_StoreEfrags (efrag_t **ppefrag)
 	efrag_t		*pefrag;
 
 
+	int		walked = 0;
+
 	while ((pefrag = *ppefrag) != NULL)
 	{
+		/* SAFETY NET: a leaf chain longer than the whole efrag pool has a loop (a link
+		 * reused while still in a leaf): cut it here instead of spinning forever. */
+		if (++walked > aw_efrags_capacity)
+		{
+			BadEfrag (NULL, "a looping leaf chain (cut)");
+			*ppefrag = NULL;
+			break;
+		}
 		pent = pefrag->entity;
-		clmodel = pent->model;
+		clmodel = pent ? pent->model : NULL;
 
+		if (!clmodel)
+		{
+			BadEfrag (pent, "no model; left out");
+			ppefrag = &pefrag->leafnext;
+			continue;
+		}
 		switch (clmodel->type)
 		{
 		case mod_alias:
@@ -345,7 +407,9 @@ void R_StoreEfrags (efrag_t **ppefrag)
 			break;
 
 		default:
-			Sys_Error ("R_StoreEfrags: Bad entity type %d\n", clmodel->type);
+			BadEfrag (pent, "a bad model type; left out");
+			ppefrag = &pefrag->leafnext;
+			break;
 		}
 	}
 }

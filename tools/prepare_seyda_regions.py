@@ -23,6 +23,8 @@ DRAW_DISTANCE=540
 # Include the existing world enclosure; partial edge cores remain explicit.
 BOUNDS=((-2079,-2079),(2079,2079))
 COURTYARD=(-128,-384,512,256)
+# The special scenes after the regions: name and XY bounds (the intro docks' route, the Census courtyard).
+SPECIALS=(('intro_docks',(-240,-1100,1120,620)),('sncourt',COURTYARD))
 
 
 LAYOUT = Path(__file__).resolve().parents[1]/'config/seyda-bounded-regions.json'
@@ -79,9 +81,21 @@ def directory_text(entries):
 
 
 def select(raw, bounds, polygon=None):
-    data=lumps(raw);models=list(struct.iter_unpack('<9f7i',data[14]));kept=[]
+    data=lumps(raw)
+    return select_entities(entities(data[0]),list(struct.iter_unpack('<9f7i',data[14])),bounds,polygon)
+
+
+def special_polygon(name):
+    """The route polygon a special map's selection also applies (the intro docks), or None."""
+    return [(440+680*math.cos(i*math.pi/4),-240+860*math.sin(i*math.pi/4)) for i in range(8)] if name=='intro_docks' else None
+
+
+def select_entities(rows, models, bounds, polygon=None):
+    """select() on entity dicts and the map's model records: one rule for the legacy region maps and a
+    CHIM-native Seyda Neen's frame rows (tools/chim_town.py)."""
+    kept=[]
     low,high=bounds
-    for e in entities(data[0]):
+    for e in rows:
         if e.get('classname') not in ('func_wall','aw_static'):
             # Stable NPC identities remain available for restoration; the runtime
             # discards actors whose restored positions lie outside this region.
@@ -120,7 +134,7 @@ def _build_region(task):
     raw = original.read_bytes()
     result=build_candidate(Path(task['source_map']),original,original,Path(task['palette']),coverage,work/name,
                            Path(task['ericw_bin']),task['target_sizes'],core=core,threads=task['threads'],
-                           **vis_kwargs(task['vis_mode']))
+                           path_root=task.get('path_root'),**vis_kwargs(task['vis_mode']))
     output=Path(result['candidate_path'])
     if hashlib.sha256(output.read_bytes()).hexdigest()!=result['candidate_sha256']:
         raise ValueError('Bounded candidate receipt mismatch: '+name)
@@ -191,13 +205,19 @@ def convert(source, destination, *, source_map, palette, ericw_bin,
     from build_parallel import ordered_map
     from build_jobs import resolve_jobs
     from vis_options import map_threads
-    specials=[('intro_docks',(-240,-1100,1120,620)),('sncourt',COURTYARD)]
+    specials=list(SPECIALS)
     jobs=resolve_jobs(jobs if jobs is not None else threads)
     plan=[(entry['name'],entry['coverage'],entry['core']) for entry in entries]+[
           (name,[list(bounds[:2]),list(bounds[2:])],None) for name,bounds in specials]
     concurrent=max(1,min(jobs,len(plan)))
     vis_threads=map_threads(jobs,concurrent)
+    # The build records (each region's report.json, seyda-regions-full.json) name paths relative to the folder
+    # the work directory and the source scene share (the run folder), so a rerun in another run folder writes
+    # the same bytes (BUILD-SEYDA-BOUNDED-RUN-PATHS-36); the returned results keep full paths.
+    records=Path(os.path.commonpath([str(p.resolve()) for p in (work,source,source_map,palette)]))
+    path_root=str(records) if records.parent!=records else None
     common=dict(source_map=str(source_map),original=str(original),palette=str(palette),work=str(work),
+                path_root=path_root,
                 ericw_bin=str(ericw_bin),target_sizes=target_sizes,threads=vis_threads,vis_mode=vis_mode,
                 terrain_cull_config=terrain_cull_config,terrain_visual_cull=terrain_visual_cull,
                 terrain_cull_overlap=terrain_cull_overlap,canonical_land_source=canonical_land_source,
@@ -218,7 +238,7 @@ def convert(source, destination, *, source_map, palette, ericw_bin,
         coverage=[list(bounds[:2]),list(bounds[2:])]
         output,result=build(name,coverage)
         masked,mask_report=derive(output.read_bytes(),bounds)
-        polygon=[(440+680*math.cos(i*math.pi/4),-240+860*math.sin(i*math.pi/4)) for i in range(8)] if name=='intro_docks' else None
+        polygon=special_polygon(name)
         converted,selection=compact(masked,select(masked,coverage,polygon),prune_world=True)
         final=work/name/'special.bsp';final.write_bytes(converted)
         outputs[name]=final
@@ -244,10 +264,18 @@ def convert(source, destination, *, source_map, palette, ericw_bin,
     # The shipped table holds no build path (BUILD-SEYDA-REPORT-HOST-PATHS-35): paths under the folder the
     # work directory sits in are written relative to it (the recorded v0.0.31 table's names without its
     # host root, same schema and hashes); the full-path report stays in the build folder (work directory)
-    # and is returned to the caller.
-    (work/'seyda-regions-full.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # and is returned to the caller. The build-folder copy names run-folder paths relative to the run folder
+    # (path_root), so it is the same in every run folder (BUILD-SEYDA-BOUNDED-RUN-PATHS-36).
+    full=neutral_paths(report,path_root) if path_root else report
+    (work/'seyda-regions-full.json').write_text(json.dumps(full,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # Inputs outside work.parent (in another stage's folder: the actor-contact stage reads intro-scene) are then
+    # named relative to the run folder too, so the stage's copy is the same in every run folder; in the image
+    # step every path is under work.parent and the shipped table is unchanged (BUILD-SEYDA-BOUNDED-RUN-PATHS-36).
+    table=neutral_paths(report,work.parent)
+    if path_root:
+        table=neutral_paths(table,path_root)
     (destination.parent/'seyda-regions.json').write_text(
-        json.dumps(neutral_paths(report,work.parent),indent=2)+'\n',encoding='utf-8',newline='\n')
+        json.dumps(table,indent=2)+'\n',encoding='utf-8',newline='\n')
     return report
 
 

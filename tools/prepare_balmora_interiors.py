@@ -24,6 +24,8 @@ def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis
     written, so Balmora's doors say the area is unavailable."""
     data = resolve_data_files(data_files)
     scene = ensure_external(scene, 'Balmora interiors')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     # The hand timings every exterior carries (import_town copies them from seyda.bsp); Balmora on CHIM
     # has no legacy balmora.bsp (CHIM-LEGACY-CHAIN-33), so they come from where it got them.
     source = scene / 'id1/maps/balmora.bsp'

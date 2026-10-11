@@ -20,7 +20,7 @@ from PIL import Image
 from mwad.audit import BSA
 from mwad.interior import read_interior, select_geometry
 from mwad.npc import load_master, outfit, greeting_fixture, behavior_record, greeting_settings, first
-from mwad.paths import resolve_data_files, child_ci, ensure_external
+from mwad.paths import resolve_data_files, child_ci, ensure_external, replace_bytes, replace_copy
 from area_config import SCENES, inside
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
@@ -52,6 +52,8 @@ def interior_visual_profile(model, area=None):
                'hollow_collision':not ('rock' in model or 'boulder' in model)}
     if area == 'balmora' and profile['hollow_collision']:
         profile['exact_collision_bevels'] = True
+    # the stair-plate rules (mesh_geometry.collision_pieces: steep toes cut to vertical steps, STAIRS-VIVEC-ROOMS-JOINT-36)
+    profile['stair_plates'] = True
     return profile
 
 
@@ -318,6 +320,8 @@ def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='
     are placed and the door tables written as usual, so their doors say the area is
     unavailable."""
     data=resolve_data_files(data_files);scene=ensure_external(scene,'area conversion')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
     ext=lumps((scene/'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',ext))
@@ -339,7 +343,7 @@ def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='
                                   fallback=sizes.get if sizes else None)
                         if tasks else ()):
         slug=report['map'];rooms[slug]=cell;reports.append(report)
-        shutil.copyfile(scene/'area-work'/slug/'room.bsp',scene/'id1/maps'/f'{slug}.bsp')
+        replace_copy(scene/'area-work'/slug/'room.bsp',scene/'id1/maps'/f'{slug}.bsp')
         print('Interior ready:',slug,report['bytes'],'bytes',flush=True)
     return populate(data,scene,rooms,reports,ffmpeg,jobs)
 
@@ -370,10 +374,10 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
     for identifier,raw,voice,record in ordered_map(build_resident,tasks,max(1,min(resolve_jobs(jobs),len(tasks)))):
         stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
         record.update(model='progs/'+stem+'.mdl',voice='npc/'+stem+'.wav' if voice else '')
-        (scene/'id1'/record['model']).write_bytes(raw)
+        replace_bytes(scene/'id1'/record['model'],raw)
         publish_anim(scene/'id1',record)
         npc_items.publish(scene/'id1',record)
-        if voice:(scene/'id1/sound'/record['voice']).write_bytes(voice)
+        if voice:replace_bytes(scene/'id1/sound'/record['voice'],voice)
         behavior=behavior_record(kinds['NPC_'][identifier],SCALE)
         record['behavior']=behavior;record['settings']=greeting_settings(kinds,behavior,SCALE)
         models[identifier]=record
@@ -402,8 +406,9 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
                     'aw_hello_distance':settings['distance'],'aw_hello_reset':settings['reset_distance'],
                     'aw_greet_duration':settings['duration']}
             entities.append(entity(fields));placed.append({'map':slug,'reference':ref['number'],'id':ref['id'],'position':pos})
-        b[0]=('\n'.join(entities)+'\n\0').encode('cp1252');path.write_bytes(pack_lumps(b))
-        if slug=='seyda':shutil.copyfile(path,scene/'seyda.bsp')
+        # replaced whole: an earlier stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
+        b[0]=('\n'.join(entities)+'\n\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
+        if slug=='seyda':replace_copy(path,scene/'seyda.bsp')
     # Town interiors (import_town.py) write their own door banks.
     doors=prepare_doors(data,scene) if doors else None
     report={'rooms':reports,'cast':placed,'models':models,'doors':doors,'npc_lod':lod_report,

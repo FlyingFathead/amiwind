@@ -119,6 +119,7 @@ presets, not a season-dependent astronomical model.
 Sky rendering still uses the existing renderer. Sun disc, directional sunrise/
 sunset gradients, night sky, weather, NPC schedules, rest healing and fatigue
 recovery remain pending. This is waiting, not a claim of full Morrowind rest rules.
+The original's wait and rest rules, studied from its data and OpenMW's source: [WAIT_AND_REST.md](WAIT_AND_REST.md).
 
 **F1** opens AmiWind quick help with the logo and a paged console-font list of
 actual current bindings. Arrows/PageUp/PageDown change pages. Customized bindings

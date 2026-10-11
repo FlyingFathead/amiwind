@@ -67,7 +67,7 @@ int main(void) {
  VectorCopy(p.v.origin,saved);water_height=220;
  assert(!AW_MapPlace(&p,preferred) && !memcmp(saved,p.v.origin,sizeof saved));
  water_height=0;
- unavailable=0;preferred[0]=NAN;assert(!AW_MapPlace(&p,preferred));preferred[0]=4000;assert(!AW_MapPlace(&p,preferred));
+ unavailable=0;preferred[0]=NAN;assert(!AW_MapPlace(&p,preferred));preferred[0]=AW_COORD_BOUND;assert(!AW_MapPlace(&p,preferred));
  }
  puts("blocked spawn, ledge rejection, grounded recovery, actual water surface and no-solution preservation passed");return 0;
 }

@@ -54,7 +54,10 @@ static int NameFromLock(BPTR handle, char *path, unsigned long size) {
     if(mode==8)return 0; strcpy(path,"AmiWind:ERROR.TXT"); return 1;
 }
 static void UnLock(BPTR handle) {assert(handle==3);}
-static void Host_Shutdown(void) {assert(phase==1);phase=2;}
+/* ENGINE-CRASH-EXIT-KEYBOARD-36: the input.device handler leaves first, before any shutdown step. */
+static int guard_removed;
+static void AW_InputGuardShutdown(void) {assert(phase<=1 && !guard_removed);guard_removed=1;}
+static void Host_Shutdown(void) {assert(phase==1 && guard_removed==1);phase=2;}
 /* In-memory diagnostic logs are written after shutdown, before the heap goes. */
 static int log_flushes, log_closes;
 static int AW_LogFlushAll(void) {assert(phase==2);log_flushes++;return 0;}
@@ -76,7 +79,7 @@ int main(void) {
     char cause[200]; int i;
     for(i=0;i<150;i++)cause[i]=(char)('a'+i%26);cause[150]=0;
     for(mode=0;mode<10;mode++) {
-        phase=exit_status=close_count=read_count=0; log_flushes=log_closes=0; output[0]=0;
+        phase=exit_status=close_count=read_count=guard_removed=0; log_flushes=log_closes=0; output[0]=0;
         aw_heap_allocation=&phase; aw_heap_allocation_size=16;
         quakeparms.membase=aw_heap_allocation;
         if(!setjmp(terminated)) Sys_Error("fixture error: %s",cause);

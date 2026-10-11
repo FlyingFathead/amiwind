@@ -210,7 +210,8 @@ def audit(id1, jobs=None, maps=None, progress=print, bsp_dir=None):
     for i, part in enumerate(ordered_map(audit_map, tasks, resolve_jobs(jobs), cost=lambda t: Path(t[0]).stat().st_size)):
         rows.extend(part)
         if progress and (i % 50 == 0 or i == len(tasks) - 1):
-            progress('harvest pick audit %d/%d maps' % (i + 1, len(tasks)))
+            import progress_line
+            progress(progress_line.line('Harvest pick audit', None, None, (i + 1, len(tasks), 'maps')))
     report = summarise(rows)
     # Catalogues without a BSP map of their own are followed on a CHIM frame map (AW_HarvestFollow);
     # CHIM collision is not replayed here.

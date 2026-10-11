@@ -26,6 +26,9 @@ placeholder files in a scratch folder (tools/build_scratch.py) that is always re
 - actor-frames: every placed actor model has a declared frame layout (an animation kit layout <model>.anm,
   or the previous 8 idle / 21 town actor layouts), every layout fits its model (and its mover), and every
   carried-item tag table has one row per model frame (tools/actor_frames.py, ANIMKIT-ACTOR-ABI-SITES-35);
+- chim-native: each CHIM-native town (--chim-town output) takes its area from that output alone: no legacy-chain
+  file of the town staged, no installed file staged with other bytes or from two outputs, the town an area of
+  the CHIM world (chim_town.collisions, BUILD-IMAGE-CHIM-NATIVE-TOWN-36);
 - engine-map-limits: every staged map the image keeps fits the engine's per-map tables (edicts, model and
   sound precaches, static entities, the scenery catalogue; tools/map_engine_limits.py,
   BUILD-BUDGET-ENGINE-LIMITS-35). The image step checks the final map set again after the frame maps.
@@ -84,7 +87,8 @@ def check_chim_inputs(id1, chim_world, pending=None, chim_towns=()):
         if area in chim_towns:
             continue
         row = rows[area]
-        if (id1/'maps'/(map_name(row['name'])+'.bsp')).is_file():
+        from map_files import map_file
+        if map_file(id1/'maps', map_name(row['name'])).is_file():
             continue
         if (id1/row['regions']).is_file():
             names = [name for name, _ in region_table(id1/row['regions'])[1]]
@@ -94,12 +98,29 @@ def check_chim_inputs(id1, chim_world, pending=None, chim_towns=()):
             missing.append(row['regions'])
             continue
         missing += ['maps/%s.bsp' % name for name in names if not staged('maps/%s.bsp' % name)]
-    if 'seyda' in areas:
+    if 'seyda' in areas and 'seyda' not in chim_towns:   # a CHIM-native Seyda Neen's specials: from its output
+        from map_files import map_file
         missing += ['maps/%s.bsp' % name for name in SPECIALS
-                    if not (id1/'maps'/(map_name(name)+'.bsp')).is_file() and not staged('maps/%s.bsp' % name)]
+                    if not map_file(id1/'maps', map_name(name)).is_file() and not staged('maps/%s.bsp' % name)]
     if missing:
         raise ValueError('CHIM frame map inputs are not staged: ' + ', '.join(missing[:12]) +
                          (' and %d more' % (len(missing) - 12) if len(missing) > 12 else ''))
+
+
+def check_chim_native(id1, chim_world, town_dirs, installed=False):
+    """The CHIM-native towns' collision check (chim_town.collisions, BUILD-IMAGE-CHIM-NATIVE-TOWN-36): for
+    each --chim-town output, no legacy-chain file of its town is staged, no file it installs is staged with
+    other bytes or comes from two outputs, and the town is an area of the CHIM world. installed: the image step
+    already installed the outputs (OUT/chim-towns.json; its passes then rewrite models in place), so the staged
+    bytes are not compared. Returns the town count."""
+    from build_aga import chim_world_receipt
+    from chim_town import collisions
+    areas = chim_world_receipt(chim_world)[1] if chim_world else []
+    found = collisions(id1, town_dirs, areas, installed=installed)
+    if found:
+        raise ValueError('CHIM-native towns collide with the legacy chain or each other (%d): %s'
+                         % (len(found), '; '.join(found[:12]) + (' and %d more' % (len(found) - 12) if len(found) > 12 else '')))
+    return len(town_dirs)
 
 
 def planned_catalogues(id1, harvest, data_files):
@@ -134,11 +155,12 @@ def check_harvest(id1, added, removed, harvest=None, data_files=None):
         if (id1/'progs/harvest').is_dir():
             from mwad.paths import copy_tree
             copy_tree(id1/'progs/harvest', root/'progs/harvest')
-        for path in (id1/'maps').glob('*.bsp'):
+        from map_files import frame_ext, map_files
+        for path in map_files(id1/'maps'):
             if 'maps/' + path.name not in removed:
                 (root/'maps'/path.name).touch()
         for name in added:
-            (root/'maps'/(name+'.bsp')).touch()
+            (root/'maps'/(name+frame_ext())).touch()
         for name in planned:
             (root/('harvest-'+name+'.txt')).write_bytes(b'AWH1 0 0 0\n')
         return len(harvest_fingerprint_entries(root))
@@ -183,7 +205,14 @@ def check_disk_layout(boot, removed, music_files, chim_world):
         count = struct.unpack_from('<I', raw, 4)[0]
         if not 1 <= count <= 8192 or len(raw) != 64 + count*52:
             raise ValueError('Invalid region directory count')
-        paths = [id1/'maps'/f'vf{i:04d}.bsp' for i in range(count)]
+        from map_files import map_file
+        paths = [map_file(id1/'maps', f'vf{i:04d}') for i in range(count)]
+        # a CHIM region cell's map is its frame map, written later in the image step: no legacy map is made for it
+        # (docs/BUILD_MANIFEST.md step 2); any other missing map stays an error
+        if chim_world:
+            from chim.frame_map import region_map_names
+            owned = region_map_names(id1, chim_world)
+            paths = [p for p in paths if p.is_file() or p.stem not in owned]
         terrain = sum(p.stat().st_size for p in paths)
         _, batches = partition_batches(paths, sum(files.values()) - terrain)
         worlds = plan_partitions(batches)
@@ -242,7 +271,7 @@ def check_music(music):
 
 
 def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=None, report_path=None,
-        pending=None, chim_towns=()):
+        pending=None, chim_towns=(), chim_town_dirs=()):
     """Run every check over the staged payload OUT (OUT/boot). Prints one summary line; raises
     ValueError listing every error together. Returns the report. pending: files the image step still
     writes before its frame maps (check_chim_inputs)."""
@@ -268,6 +297,9 @@ def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=No
               ('actor-frames', lambda: check_actor_frames(id1, removed))]
     if chim_world:
         checks.append(('chim-inputs', lambda: check_chim_inputs(id1, chim_world, pending, set(chim_towns))))
+    if chim_town_dirs:
+        checks.append(('chim-native', lambda: check_chim_native(id1, chim_world, list(chim_town_dirs),
+                                                                 installed=(out/'chim-towns.json').is_file())))
     music_result = {}
     if music:
         def music_check():

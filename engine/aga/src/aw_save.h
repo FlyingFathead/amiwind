@@ -42,6 +42,7 @@ int AW_SaveWrite(int slot);
 int AW_SaveRead(uint32_t profile,int slot);
 int AW_SaveProfiles(uint32_t *ids,char names[][32],int capacity);
 int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity);
+int AW_SaveLatest(uint32_t profile,char *label,int capacity);
 uint32_t AW_SaveProfile(void);
 int AW_AutosaveCount(void);
 void AW_SetAutosaveCount(int count);

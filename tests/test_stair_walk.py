@@ -19,7 +19,7 @@ READY = importlib.util.find_spec('numpy') is not None
 from player_hull import pack_lumps, PROFILE, MINS, MAXS  # noqa: E402
 
 
-def build(fill=False, rise=4.):
+def build(fill=False, rise=4., fill_box=((-5, 0, 0), (40, 40, 30))):
     """BSP29 payload: world (empty), a visual-only placement (ref 100), collision boxes."""
     data = [bytearray() for _ in range(15)]
     verts, edges, surf, faces = [], [(0, 0)], [], []
@@ -51,7 +51,7 @@ def build(fill=False, rise=4.):
     boxes = [((-80, -20, -20), (90, 60, 0))]                       # floor slab
     boxes += [((10 * k, 0, 0), (70, 40, rise * (k + 1))) for k in range(4)]
     if fill:
-        boxes.append(((-5, 0, 0), (40, 40, 30)))                   # convex fill over the flight
+        boxes.append(fill_box)                                     # convex fill over the flight
     for i, (low, high) in enumerate(boxes):
         lo = [low[0] + MINS[0], low[1] + MINS[1], low[2] + MINS[2]]
         hi = [high[0] + MAXS[0], high[1] + MAXS[1], high[2] + MAXS[2]]

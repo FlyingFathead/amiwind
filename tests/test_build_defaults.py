@@ -36,7 +36,16 @@ SHIPPED_STAGES = {
     'harvest': 'harvestable mushrooms (harvest-*.txt, progs/harvest/*.mdl)',
     'interior': 'interiors', 'dialogue-lookup': 'voice lookup', 'intro': 'opening, chargen captions',
     'census': 'census map', 'npc-gallery': 'gallery/*.mdl (7,102 files)',
-    'area': 'area interiors', 'balmora': 'Balmora maps (bm*)', 'balmora-interiors': 'Balmora interiors',
+    'area': 'area interiors', 'balmora-interiors': 'Balmora interiors',
+    # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora prepared CHIM-native, no legacy region maps (bm*).
+    'chim-town-balmora': 'Balmora residents, frame entities, region table and door bank from the game data',
+    # all of Vivec in one CHIM frame, CHIM-native (owner decision 2026-10-11 09:55; replaces the Arena-only frame)
+    'chim-town-vivec_city': 'Vivec residents, frame entities, region table and door bank from the game data',
+    # v0.0.36-dev5: Seyda Neen CHIM-native (no legacy region maps; BUILD-LEGACY-TOWN-MAPS-SHIPPED-36)
+    'chim-town-seyda': 'Seyda Neen frame and opening-scene entities, activated objects and region table from the town',
+    # The Arena's listed rooms (the Pit, vai000; shipped in v0.0.35 through the legacy chain): their own CHIM-native stage
+    # (tools/chim_rooms.py, BUILD-MINIWIND-ARENA-PIT-REFUSED-36).
+    'chim-rooms-vivec_city': 'the 130 Vivec rooms (the Arena Pit vai000 among them), their residents and linked door banks',
     'door-audio': 'door-sounds.txt', 'character': 'character/*.awh', 'reading': 'reading/*',
     'opening-references': 'opening references', 'world-survey': 'world/regions.awr, map.awm',
     'world-ui': 'world/journal.awj, quests.awq', 'actor-contact': 'actor ground gate',
@@ -57,7 +66,6 @@ SHIPPED_IMAGE_OPTIONS = {
     '--world-flora': str(RUN / 'world-flora'),
     '--town-flora-source-index': str(RUN / 'scenery/scenery-index.json'),
     '--town-flora-scene-report': str(RUN / 'alias-scene/scene-report.json'),
-    '--balmora-cache': str(RUN / 'balmora-work'),
     '--gallery': str(RUN / 'npc-gallery'),
     '--hands': '3d',
     '--hand-catalog': str(RUN / 'hand-catalog'),
@@ -66,7 +74,6 @@ SHIPPED_IMAGE_OPTIONS = {
     '--local-skybox': 'false',
     '--canonical-land-source': str(RUN / 'world-survey/terrain-source.npz'),
     '--town-scenery': str(RUN / 'scenery'),
-    '--balmora-scenery': str(RUN / 'balmora-work/scenery'),
 }
 
 # Every builder option, classified against what a release ships. A new option
@@ -100,14 +107,29 @@ OPTIONS = {
     'model_hull': 'shipped default',
     # CHIM frame maps tag statics to stream with their chunks (the engine reads the tags); --no-... is the debug way out
     'chim_stream_statics': 'shipped default',
+    # CHIM frame maps as maps/<name>.chim (tools/map_files.py, default chim); --chim-frame-ext bsp keeps the earlier names
+    'chim_frame_ext': 'shipped default',
+    'chim_region_rows': 'shipped default',
     # Lava pools as Quake liquid (config/build-defaults.json, quake; docs/LAVA.md); --lava static keeps the earlier rule
     'lava': 'shipped default',
+    # In-game world map v2 with the lava pools (config/build-defaults.json, v2); --world-map v1 keeps the earlier map
+    'world_map': 'shipped default',
+    # World bounds (tools/world_bounds.py, docs/WORLD_BOUNDS.md): on by default, the image step gets --world-bounds;
+    # --world-bounds off writes nothing (the game as before; tests/test_world_bounds.py)
+    'world_bounds': 'shipped default',
+    # The player's view (tools/prepare_player_view.py, docs/THIRD_PERSON.md): the bodies and the quick retry are on
+    # by default (nothing added to the image step); off adds --no-player-body / --no-death-retry
+    'player_body': 'shipped default',
+    'death_retry': 'shipped default',
     # NPC heads (config/build-defaults.json auto = budget, the previous bake: NPC-HEAD-DECIMATION-33);
     # --npc-head-detail original is EXPERIMENTAL (docs/EXPERIMENTAL_FLAGS.md)
     'npc_head_detail': 'shipped default',
     # The game heap: the engine's 11 MiB unless --heap-mb / heap_mb asks otherwise (used as asked, warned above
     # the measured safe size; tests/test_heap_size.py).
     'heap_mb': 'shipped default',
+    # Engine profile (docs/ENGINE_PROFILES.md, tests/test_engine_profile.py): c is what ships and adds nothing to the
+    # engine command; upstream and the --engine-asm / --engine-opt overrides are EXPERIMENTAL.
+    'engine_profile': 'shipped default', 'engine_asm': 'opt-in, not shipped', 'engine_opt': 'opt-in, not shipped',
     # NPC model levels of detail (docs/NPC_MODEL_CACHE.md; tests/test_npc_lod.py): on, 3 levels, the face
     # LOD policy and the level-file disk budget; --npc-lod off is the earlier single model (kept).
     'npc_lod': 'shipped default', 'npc_lod_levels': 'shipped default', 'npc_face_lod': 'shipped default',
@@ -125,7 +147,19 @@ OPTIONS = {
     'miniwind_scope': 'opt-in, not shipped',
     'miniwind_town': 'opt-in, not shipped', 'miniwind_debug': 'opt-in, not shipped',
     'chim_detail_budget': 'opt-in, not shipped', 'chim_cut_models_over': 'opt-in, not shipped',
-    'chim_draw_distance': 'opt-in, not shipped',
+    # EXPERIMENTAL engine compile switches (docs/EXPERIMENTAL_FLAGS.md; widecoord: CHIM-FRAME-COORD-RANGE-33)
+    'engine_experiment': 'opt-in, not shipped',
+    # how the engine sends positions: wide by default since v0.0.36 (tools/coord_range.py)
+    'coord_range': 'shipped default',
+    'chim_draw_distance': 'opt-in, not shipped', 'chim_terrain_shoreline': 'shipped default',
+    # the compiled terrain hull and terrain references: defaults from v0.0.36 (owner decision 2026-10-11)
+    'chim_terrain_hull': 'shipped default', 'chim_terrain_refs': 'shipped default',
+    'chim_model_hull_patch': 'shipped default',
+    # how a CHIM model variant shares its vertices (base by default; placed = the earlier per-placement weld)
+    'chim_model_weld': 'shipped default',
+    # how CHIM meshes become faces (table by default: config/mesh-methods.json)
+    'chim_mesh_method': 'shipped default',
+    'stair_walk_cache': 'check', 'stair_walk_sample': 'check',
     # Entity tracker against the release baseline (BUILD-DRESSING-EXCLUDED-32).
     'no_entity_baseline': 'debug opt-out', 'accept_entity_loss': 'check',
     'skip_dressing': 'debug opt-out',
@@ -145,15 +179,19 @@ OPTIONS = {
     'rdbtool': 'tooling', 'gallery_cache': 'tooling', 'gallery_seed_run': 'tooling',
     'estimate_world': 'mode', 'estimate_sample': 'mode', 'jobs': 'tooling', 'serial_stages': 'tooling',
     # Build profile and development stage reuse (docs/BUILD_PROFILE.md): outputs unchanged.
-    'no_profile': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',
+    'no_profile': 'tooling', 'perf_guard': 'tooling', 'perf_guard_baselines': 'tooling', 'log_level': 'tooling', 'quiet': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',
     'accept_rebuild': 'tooling', 'any_run_name': 'tooling', 'source_commit': 'tooling',
     'developer_mode': 'tooling', 'working_version': 'tooling', 'accept_version_mismatch': 'tooling',
+    # Build recipes (tools/build_recipe.py, docs/BUILD_RECIPES.md): where the options come from and where they go.
+    'recipe': 'tooling', 'save_recipe': 'tooling', 'recipe_inputs': 'tooling',
     'rebuild_unit': 'tooling',
     'allow_release_reuse': 'check',
     'fingerprint_scope': 'tooling', 'no_unit_cache': 'debug opt-out', 'no_media_cache': 'debug opt-out',
     'prerendered': 'tooling', 'prerendered_stages': 'tooling', 'storage_pool': 'tooling', 'anim_kit': 'shipped default', 'miniwind_boot': 'mode',
-    # CHIM-native towns (CHIM-LEGACY-CHAIN-33): EXPERIMENTAL, off by default; --legacy-area: legacy/debugging only
-    'chim_native_towns': 'mode', 'legacy_areas': 'debug opt-out',
+    # CHIM-native towns (CHIM-LEGACY-CHAIN-33): on by default since v0.0.36 (CHIM-native areas); 'off' and --legacy-area
+    # are RETIRED since CHIM v0.1.0 (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36); --override lets one through.
+    'chim_native_towns': 'shipped default', 'chim_regions': 'opt-in, not shipped', 'chim_regions_status': 'opt-in, not shipped',
+    'legacy_areas': 'retired', 'override': 'tooling',
     # Night-lamp lightmaps (bm019 prototype, tools/lamp_lightmaps.py): EXPERIMENTAL, off by default
     'night_lamp_lightmaps': 'mode',
     # Modular NPCs (docs/MODULAR_NPCS.md): EXPERIMENTAL, whole by default
@@ -169,6 +207,12 @@ def steps(*extra):
     # one worker; pin it so the comparisons see only the options under test.
     with patch('build_jobs.auto_jobs', return_value=4):
         return build.commands(args, TOOLS, RUN)
+
+
+def legacy_steps(*extra):
+    """The legacy builder's plan: extra towns go through import_town (a CHIM-native plan imports only
+    towns on CHIM; the others never ship in a CHIM image, chim.frame_map.remove_towns_not_on_chim)."""
+    return steps('--builder', 'legacy', *extra)
 
 
 def option(command, flag):
@@ -210,11 +254,14 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
         self.assertEqual(set(default) - set(debug), {'world-flora-assets', 'world-flora'})
         for flag in ('--world-flora', '--town-flora-source-index', '--town-flora-scene-report'):
             self.assertNotIn(flag, debug['image'])
-        # The Balmora layout repair no longer depends on flora.
-        self.assertEqual(Path(option(debug['image'], '--balmora-cache')), RUN / 'balmora-work')
+        # The Balmora layout repair no longer depends on flora; a CHIM-native image has no Balmora region maps.
+        self.assertNotIn('--balmora-cache', debug['image'])
+        self.assertEqual(Path(option(debug['image'], '--chim-town')), RUN / 'chim-town-balmora')
 
     def test_opt_outs_are_debugging_only(self):
         for action in build.parser()._actions:
+            if OPTIONS.get(action.dest) == 'retired':
+                continue  # RetiredFlags below: help starts with RETIRED
             if action.dest.startswith('no_') or OPTIONS.get(action.dest) == 'debug opt-out':
                 with self.subTest(option=action.option_strings[0]):
                     self.assertFalse(action.default)
@@ -249,8 +296,13 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
         self.assertEqual(engine_args.cpu, '68040')
         self.assertTrue(engine_args.debug_luma)
         self.assertEqual(engine_args.hands, '3d')
+        # Engine profile c: the C paths at -O1 (docs/ENGINE_PROFILES.md); upstream stays experimental.
+        self.assertEqual(engine_args.engine_profile, 'c')
+        self.assertIsNone(engine_args.engine_asm)
+        self.assertIsNone(engine_args.engine_opt)
         engine = dict(steps())['engine']
-        for flag in ('--cpu', '--disallow-luma-controls', '--no-luma-controls', '--allow-compiler-warnings'):
+        for flag in ('--cpu', '--disallow-luma-controls', '--no-luma-controls', '--allow-compiler-warnings',
+                     '--engine-profile', '--engine-asm', '--engine-opt', '--check-profiles'):
             self.assertNotIn(flag, engine)
 
 
@@ -273,15 +325,23 @@ class WithdrawnTowns(unittest.TestCase):
     """v0.0.33 leaves the Vivec Arena out by owner decision (CHIM-ARENA-MEMORY-33): as data
     ("withdrawn" on its town row), not a deletion; --extra-town still builds it."""
 
-    def test_the_arena_is_withdrawn_and_still_buildable(self):
+    def test_the_arena_is_withdrawn_from_legacy_and_ships_on_chim(self):
+        # withdrawn from legacy images in v0.0.33 (CHIM-ARENA-MEMORY-33); from v0.0.36 a default CHIM area,
+        # CHIM-native (owner decision 2026-10-11, Vivec stage A): the CHIM plan converts it, the legacy plan does not
         from town_config import extra_towns, registry_row, shipped_extra_towns, withdrawn_towns
         self.assertEqual(shipped_extra_towns(), [])
         self.assertEqual(withdrawn_towns(), ['vivec_arena'])
         self.assertIn('CHIM-ARENA-MEMORY-33', registry_row('vivec_arena')['withdrawn'])
         self.assertEqual(registry_row('vivec_arena')['shipped_since'], 'v0.0.32')
         self.assertIn('vivec_arena', extra_towns())
+        self.assertNotIn('town-vivec_arena', dict(legacy_steps()))
+        self.assertIn('town-vivec_arena', dict(legacy_steps('--extra-town', 'vivec_arena')))
+        # CHIM-native areas: Vivec (one frame, vivec_city) is a default CHIM area; no legacy town import in a CHIM image;
+        # the Arena-only frame is a retired legacy area (tools/retired_flags.py vivec-districts)
+        self.assertIn('chim-town-vivec_city', dict(steps()))
+        self.assertNotIn('chim-town-vivec_arena', dict(steps()))
         self.assertNotIn('town-vivec_arena', dict(steps()))
-        self.assertIn('town-vivec_arena', dict(steps('--extra-town', 'vivec_arena')))
+        self.assertNotIn('town-vivec_arena', dict(steps('--extra-town', 'vivec_arena')))
         self.assertEqual({name for name in SHIPPED_STAGES if name.startswith('town-')}, set())
 
     def test_withdrawn_needs_a_reason(self):
@@ -326,7 +386,7 @@ class ShippedTowns(unittest.TestCase):
 
     def test_default_build_imports_every_shipped_town(self):
         from build_parallel import stage_dependencies
-        default = steps()
+        default = legacy_steps()
         names = [name for name, _ in default]
         self.assertEqual(names.index('town-vivec_arena'), names.index('balmora-interiors') + 1)
         command = dict(default)['town-vivec_arena']
@@ -338,13 +398,13 @@ class ShippedTowns(unittest.TestCase):
                          'vivec_arena (shipped by default)')
 
     def test_extra_town_of_a_shipped_town_is_a_no_op(self):
-        self.assertEqual(steps('--extra-town', 'vivec_arena'), steps())
+        self.assertEqual(legacy_steps('--extra-town', 'vivec_arena'), legacy_steps())
 
     def test_debug_opt_outs_remove_only_the_town(self):
-        default = dict(steps())
+        default = dict(legacy_steps())
         for extra in (('--no-extra-town', 'vivec_arena'), ('--only-core-towns',)):
             with self.subTest(option=extra[0]):
-                debug = dict(steps(*extra))
+                debug = dict(legacy_steps(*extra))
                 self.assertEqual(set(default) - set(debug), {'town-vivec_arena'})
                 self.assertEqual(set(debug) - set(default), set())
                 self.assertEqual(debug['image'], default['image'])
@@ -353,10 +413,10 @@ class ShippedTowns(unittest.TestCase):
         self.assertIn('left out for debugging: vivec_arena (--only-core-towns)', selection['status'])
 
     def test_towns_not_shipped_stay_opt_in(self):
-        names = [name for name, _ in steps('--extra-town', 'vivec_foreign')]
+        names = [name for name, _ in legacy_steps('--extra-town', 'vivec_foreign')]
         start = names.index('balmora-interiors') + 1
         self.assertEqual(names[start:start + 2], ['town-vivec_arena', 'town-vivec_foreign'])
-        self.assertNotIn('town-vivec_foreign', dict(steps()))
+        self.assertNotIn('town-vivec_foreign', dict(legacy_steps()))
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             build.parser().parse_args(['--no-extra-town', 'vivec_foreign'])  # only shipped towns can be left out
 

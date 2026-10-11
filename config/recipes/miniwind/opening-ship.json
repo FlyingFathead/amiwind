@@ -1,0 +1,20 @@
+{
+  "schema": "build-recipe-1",
+  "name": "opening-ship",
+  "description": "MiniWind preset --miniwind-opening-ship: Opening ship: lantern and ship lighting check",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Opening ship: lantern and ship lighting check",
+    "direct_to_game_map": "interior:Imperial Prison Ship",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs",
+    "skip_census": false
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

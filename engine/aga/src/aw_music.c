@@ -6,11 +6,29 @@
 #include "aw_format.h"
 #include "sound.h"
 #include "aw_log.h"
+#include "aw_aread.h"
 #define FRAMES 8192
 #define BYTES (FRAMES*2)
 #define HISTORY 128
 #define MUSIC_BLOCKS 4
-static FILE *music;
+/* The stream is read asynchronously (aw_aread.c, HANG-IDLE-DUSK-35): the main
+ * loop and the mixer only look for finished reads and never wait for one. */
+static aw_aread_t *music;
+static int header_wait;      /* the 16-byte header read is outstanding */
+static double read_started;  /* Sys_FloatTime() when the outstanding read was sent */
+static int read_polls;       /* looks at the outstanding read without a reply */
+static int stall_logged, stall_off, stall_told;
+static unsigned long stalls, recoveries, abandons, underruns;
+static int bad_headers;       /* consecutive streams with a bad header */
+static int death_id=-1;       /* death track, looked up once at start (no catalogue read in play) */
+/* A read is stalled when it has had no reply for MUSIC_STALL_SECONDS and at
+ * least MUSIC_STALL_POLLS looks (one long frame alone is not a stall). The
+ * buffered blocks play out, then the music is silent; after
+ * MUSIC_ABANDON_SECONDS the stream is abandoned and the next track opened. */
+#define MUSIC_STALL_SECONDS 2.0
+#define MUSIC_STALL_POLLS 8
+#define MUSIC_ABANDON_SECONDS 6.0
+#define MUSIC_ABANDON_POLLS 24
 static signed char blocks[MUSIC_BLOCKS][BYTES];
 static int active, at, valid[MUSIC_BLOCKS], loading, loaded;
 static unsigned long remaining, total, played, reads, bytes_read, errors, opens;
@@ -25,6 +43,12 @@ static int fade, previous_l, previous_r;
 /* music-events.csv: an in-memory diagnostic log unless aw_logs_live (aw_log.c). */
 static int events;
 static char opened_file[12]="none";
+/* dbg music on/off (ENGINE-MUSIC-NO-OFF-SWITCH-36): the background music switch,
+ * default on, not saved. Off closes the stream: an outstanding read is
+ * abandoned into its reader's own packet and buffer (aw_aread.c), and no new
+ * stream is opened and no read sent until it is on again. */
+static cvar_t music_switch={"aw_music","1"};
+static int muted;
 static unsigned long be32(byte *p) { return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3]; }
 static int random_bounded(int n) { rng=rng*1664525U+1013904223U;return (rng>>16)%n; }
 static void log_event(const char *why) {
@@ -33,22 +57,42 @@ static void log_event(const char *why) {
 }
 void AW_MusicSceneEvent(const char *why) {log_event(why);}
 static void close_music(void) {
-    if(music)fclose(music);
-    music=NULL;at=0;memset(valid,0,sizeof(valid));loaded=0;loading=-1;
+    /* An outstanding read is abandoned, never waited for: its reader closes
+     * when the late reply arrives (AW_AReadService). */
+    if(music)AW_AReadClose(music);
+    music=NULL;at=0;memset(valid,0,sizeof(valid));loaded=0;loading=-1;header_wait=0;stall_logged=0;
+}
+static void send_read(long length) {
+    if(!AW_AReadStart(music,length))return;
+    read_started=Sys_FloatTime();read_polls=0;
+}
+/* Check the header of the opened stream; 0 = not a valid MWA1 stream. */
+static int take_header(const unsigned char *h,long n) {
+    unsigned long count;
+    header_wait=0;
+    if(n!=16 || !h || memcmp(h,"MWA1",4) || h[6]!=32 || h[7]!=0 || (((int)h[4]<<8)|h[5])!=11015)return 0;
+    total=remaining=be32((byte *)h+8);count=be32((byte *)h+12);
+    if(!total || count!=(total+FRAMES-1)/FRAMES)return 0;
+    bad_headers=0;return 1;
 }
 static int open_track(int id,const char *reason) {
-    byte h[16];char path[MAX_OSPATH+64];unsigned long count;
+    char path[MAX_OSPATH+64];
     close_music();
+    if(muted)return 0;
     if(id<0 || id>98 || strlen(com_gamedir)+24>=sizeof(path)){errors++;return 0;}
     /* The selected Amiga sprintf reads %d as a word: it opened track00 for
      * every small 32-bit id. Build fixed-width digits without varargs. */
     strcpy(opened_file,"track00.mws");opened_file[5]='0'+id/10;opened_file[6]='0'+id%10;
     strcpy(path,com_gamedir);strcat(path,"/music/");strcat(path,opened_file);
-    music=fopen(path,"rb");
+    music=AW_AReadOpen(path);
     if(!music){errors++;return 0;}
-    if(fread(h,1,16,music)!=16 || memcmp(h,"MWA1",4) || h[6]!=32 || h[7]!=0 || (((int)h[4]<<8)|h[5])!=11015) {errors++;close_music();return 0;}
-    total=remaining=be32(h+8);count=be32(h+12);
-    if(!total || count!=(total+FRAMES-1)/FRAMES){errors++;close_music();return 0;}
+    /* The header comes back like every other read. When it is already there
+     * (host builds, a fast disk) it is checked here, else on a later frame. */
+    total=remaining=0;header_wait=1;send_read(16);
+    if(AW_AReadPoll(music)!=AW_AREAD_PENDING) {
+        const unsigned char *h;long n=AW_AReadTake(music,&h);
+        if(!take_header(h,n)){errors++;close_music();return 0;}
+    }
     current=id;played=0;opens++;active=0;
     if(opened_count<256)opened[opened_count++]=id;
     log_event(reason);
@@ -69,6 +113,7 @@ static int shuffled(void) {
 }
 static int advance(const char *reason) {
     int id,tries;
+    if(muted)return 0;   /* off is not a failure: the music stays available */
     if(title_playing){if(open_track(title_track,reason))return 1;available=0;return 0;}
     for(tries=0;tries<counts[mode];tries++) {
         if(cursor[mode]+1<length[mode])id=history[mode][++cursor[mode]];
@@ -81,43 +126,99 @@ static int advance(const char *reason) {
     }
     available=0;return 0;
 }
-/* One 4 KiB read per service call. No heap allocation and no decoder on Amiga. */
+/* One block read (16 KiB) outstanding at a time, sent and collected without
+ * waiting (aw_aread.c). No decoder on Amiga. */
 static double title_due=-1; /* AW_MusicTitleAfter: realtime when the title starts, -1 none */
 /* Opening hold (MUSIC-OPENING-CLIP-31): silent and flushed until the opening
  * track starts; Quake's CD-track resume on map load must not restart the
  * previous stream's buffered blocks. */
 static int held;
-static int refill(void) {
-    int target,take,i;
-    if(!music || !remaining)return 0;
+/* Stall handling: looked at only while a read is outstanding. */
+static void music_stalled(void) {
+    double age=Sys_FloatTime()-read_started;
+    read_polls++;
+    if(!stall_logged && age>=MUSIC_STALL_SECONDS && read_polls>=MUSIC_STALL_POLLS) {
+        stall_logged=1;stalls++;log_event("read-stalled");
+        if(!stall_told){stall_told=1;Con_Printf("music read stalled; the game goes on without music\n");}
+    }
+    if(age>=MUSIC_ABANDON_SECONDS && read_polls>=MUSIC_ABANDON_POLLS) {
+        /* Give the stream up; its reader keeps the request until the reply
+         * comes. The next track opens on a free reader, or the music stays
+         * off until an abandoned read returns (CDAudio_Update). */
+        abandons++;log_event("read-abandoned");close_music();
+        if(!advance("stall")){stall_off=1;available=0;log_event("stall-off");}
+    }
+}
+/* Take a finished read, store it, and send the next one. Never waits.
+ * Returns 1 when a reply was taken or a read sent (progress), 0 otherwise. */
+static int music_pump(void) {
+    int target,state,took=0;long n;const unsigned char *data;
+    if(!music)return 0;
+    state=AW_AReadPoll(music);
+    if(state==AW_AREAD_PENDING){music_stalled();return 0;}
+    if(state==AW_AREAD_DONE || state==AW_AREAD_FAILED) {
+        took=1;n=AW_AReadTake(music,&data);
+        if(stall_logged){stall_logged=0;recoveries++;log_event("read-recovered");}
+        if(header_wait) {
+            if(!take_header(data,n)) {
+                errors++;log_event("bad-header");close_music();
+                /* Bounded: a playlist of bad streams turns the music off. */
+                if(++bad_headers>counts[mode]+1 || !advance("bad-header"))available=0;
+                return 1;
+            }
+        } else {
+            if(n!=BYTES || loading<0){errors++;log_event("read-error");close_music();available=0;return 1;}
+            memcpy(blocks[loading],data,BYTES);
+            reads++;bytes_read+=BYTES;
+            valid[loading]=remaining>FRAMES?FRAMES:(int)remaining;remaining-=valid[loading];loading=-1;loaded=0;
+        }
+    }
+    if(!remaining || loading>=0)return took;
     /* Preserve stream order while filling the first empty slot ahead of play.
      * This queue belongs only to the OST; speech/SFX and DMA timing are unchanged. */
-    for(i=0;i<MUSIC_BLOCKS;i++){
-        target=(active+i)%MUSIC_BLOCKS;
-        if(!valid[target])break;
-    }
-    if(i==MUSIC_BLOCKS)return 0;
-    if(loading<0){loading=target;loaded=0;}
-    take=BYTES-loaded;if(take>4096)take=4096;
-    if(fread(blocks[loading]+loaded,1,take,music)!=(size_t)take){errors++;log_event("read-error");close_music();available=0;return 0;}
-    reads++;bytes_read+=take;loaded+=take;
-    if(loaded==BYTES){valid[loading]=remaining>FRAMES?FRAMES:(int)remaining;remaining-=valid[loading];loading=-1;loaded=0;}
+    for(target=0;target<MUSIC_BLOCKS;target++)if(!valid[(active+target)%MUSIC_BLOCKS])break;
+    if(target==MUSIC_BLOCKS)return took;
+    loading=(active+target)%MUSIC_BLOCKS;loaded=0;send_read(BYTES);
     return 1;
 }
+/* Follows aw_music: off closes the stream (a pending read is abandoned, never
+ * waited for); on starts the title or the current group again. */
+static void music_apply(void) {
+    int off=music_switch.value==0;
+    if(off==muted)return;
+    muted=off;
+    if(off){close_music();log_event("music-off");return;}
+    fade=128;previous_l=previous_r=0;
+    if(!available || held || !advance("music-on"))log_event("music-on");
+}
 void CDAudio_Update(void) {
+    music_apply();
+    /* Late replies of abandoned streams close their files here; when the
+     * last one is back after the music went off, the music comes back. */
+    if(!AW_AReadService() && stall_off) {
+        stall_off=0;available=1;log_event("stall-recovered");
+        /* advance() reopens the title track on the title screen. */
+        if(!held && !muted && !advance("stall-recovered"))available=0;
+    }
     if(title_due>=0 && realtime>=title_due)AW_MusicTitle();
-    if(available && !paused)refill();
+    if(available && !paused)music_pump();
 }
 void AW_MusicPaint(portable_samplepair_t *dst,int n) {
     int i,take,l,r,next,gain=(int)(bgmvolume.value*256);
-    if(!available || paused)return;
+    if(!available || paused || muted)return;
     while(n>0) {
         if(at>=valid[active]) {
             valid[active]=0;at=0;
             next=(active+1)%MUSIC_BLOCKS;
             if(valid[next] || loading==next)active=next;
-            else if(!remaining && loading<0){completions++;log_event("complete");if(!advance("eof"))return;}
-            if(!valid[active]) {sync_fills++;while(!valid[active] && refill()){}if(!valid[active])return;}
+            else if(!remaining && loading<0 && !header_wait){completions++;log_event("complete");if(!advance("eof"))return;}
+            if(!valid[active]) {
+                /* Take replies that are already there (bounded, never waiting);
+                 * with nothing ready the music is silent for this span. */
+                int k;sync_fills++;
+                for(k=0;k<MUSIC_BLOCKS+2 && !valid[active] && music_pump();k++){}
+                if(!valid[active]){underruns++;fade=128;previous_l=previous_r=0;return;}
+            }
         }
         take=valid[active]-at;if(take>n)take=n;
         for(i=0;i<take;i++) {
@@ -186,6 +287,7 @@ static int manual_preflight(int id) {
 static void music_play(void) {
     char query[96];const char *word;int arg,n=0,id,g,i,old_mode;
     if(Cmd_Argc()<2){Con_Printf("Usage: dbg ost play <00..98 or source_filename_stem>\n");return;}
+    if(muted){Con_Printf("Background music is off (dbg music on); music unchanged.\n");return;}
     for(arg=1;arg<Cmd_Argc();arg++) {
         if(arg>1){if(n>=95)break;query[n++]='_';}
         for(word=Cmd_Argv(arg);*word;word++) {
@@ -241,11 +343,11 @@ void AW_MusicCombat(int on) {
 /* The player died: the special death track once (music.lua playerDied),
  * then the current group's shuffle at its end. */
 void AW_MusicDeath(void) {
-    int g,id;
-    if(!available || held)return;
-    id=manual_lookup("mw_death",&g);
-    if(id<0 || !manual_preflight(id))return;
-    if(open_track(id,"death")){title_playing=0;paused=0;fade=128;}
+    if(!available || held || death_id<0)return;
+    /* No catalogue or preflight read here: the id was looked up at start and
+     * the header is checked by the stream itself (HANG-IDLE-DUSK-35). */
+    if(open_track(death_id,"death")){title_playing=0;paused=0;fade=128;}
+    else advance("death-fallback");
 }
 static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
@@ -255,13 +357,23 @@ static void music_previous(void) {
     open_track(history[mode][cursor[mode]],"previous");
 }
 static void music_mode(void) {if(title_playing)return;mode=!mode;if(available){manual_changes++;fade=128;advance("mode");}}
+/* dbg music [on/off, true/false or 1/0]: the switch (ENGINE-MUSIC-NO-OFF-SWITCH-36);
+ * no argument: the switch and the stream status. */
 static void music_status(void) {
-    unsigned long queued=0;int i;
+    unsigned long queued=0;int i;char *text=Cmd_Argv(1);
+    if(Cmd_Argc()>2 || (Cmd_Argc()==2 && Q_strcasecmp(text,"on") && Q_strcasecmp(text,"off") &&
+       Q_strcasecmp(text,"true") && Q_strcasecmp(text,"false") && strcmp(text,"1") && strcmp(text,"0"))){
+        Con_Printf("Usage: dbg music [on/off, true/false or 1/0]; no argument shows the status (not saved).\n");return;}
+    if(Cmd_Argc()==2)Cvar_SetValue("aw_music",(float)(!Q_strcasecmp(text,"on") || !Q_strcasecmp(text,"true") || !strcmp(text,"1")));
+    music_apply();
+    Con_Printf("Background music %s%s\n",muted?"off":"on",available || muted?"":" (no playable soundtrack)");
+    if(Cmd_Argc()==2)return;
     for(i=0;i<MUSIC_BLOCKS;i++)queued+=(unsigned long)valid[i];
     if(queued>=(unsigned long)at)queued-=(unsigned long)at;
     Con_Printf("OST group=%s track=%02ld played=%lu/%lu frames eof=%lu reads=%lu errors=%lu\n",title_playing?"title":mode?"battle":"explore",(long)current,played,total,completions,reads,errors);
     Con_Printf("OST read-ahead: %lu blocks / %lu bytes; queued %lu frames.\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks),queued);
     Con_Printf("OST combat switches: %lu\n",combat_switches);
+    Con_Printf("OST read stalls: %lu, recovered %lu, abandoned %lu, silent spans %lu\n",stalls,recoveries,abandons,underruns);
 }
 /* Deferred title start: lets the menu finish loading before the stream reads. */
 void AW_MusicTitleAfter(double seconds) {
@@ -274,6 +386,7 @@ void AW_MusicTitle(void) {
     /* Startup branding and its destination menu share the same title stream. */
     if(title_playing && music && current==title_track && !paused)return;
     title_playing=1;
+    if(muted){paused=0;return;}   /* dbg music on starts the title */
     if(title_track<0 || !open_track(title_track,"main-menu")){paused=1;return;}
     paused=0;fade=0;previous_l=previous_r=0;
 }
@@ -286,6 +399,7 @@ int AW_MusicStartTrack(int id) {
     for(i=0;i<counts[0];i++)if(groups[0][i]==id)break;
     if(i==counts[0])return 0;
     mode=0;title_playing=0;
+    if(muted)return 1;   /* dbg music on plays the exploration group */
     if(current==id && played==0 && music)log_event("early_game_demo_start_1");
     else if(!open_track(id,"early_game_demo_start_1")) {
         advance("demo-track-fallback");return 0;
@@ -307,6 +421,8 @@ void AW_MusicHold(void) {
 int CDAudio_IsPaused(void) {return paused!=0;}
 int CDAudio_Init(void) {
     FILE *f;char path[MAX_OSPATH+64];int g,n,i,j,id;
+    /* Registered first: dbg music answers even when the disk has no soundtrack. */
+    Cvar_RegisterVariable(&music_switch);Cmd_AddCommand("aw_music_status",music_status);
     sprintf(path,"%s/music/playlist.txt",com_gamedir);f=fopen(path,"r");if(!f)return -1;
     for(g=0;g<2;g++) {
         if(Q_fscanf(f,"%d",&n)!=1 || n<1 || n>99){fclose(f);return -1;}
@@ -322,11 +438,12 @@ int CDAudio_Init(void) {
     title_track=-1;title_playing=0;
     if(Q_fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
     fclose(f);available=1;paused=0;mode=0;loading=-1;
+    {int g;death_id=manual_lookup("mw_death",&g);}
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
     AW_LogHeader(AW_LOG_MUSIC_EVENTS,"time_ms,event,mode,track,file,played_frames,total_frames\n");events=1;
     Cmd_AddCommand("aw_music_play",music_play);
     Cmd_AddCommand("aw_music_next",music_next);Cmd_AddCommand("aw_music_previous",music_previous);
-    Cmd_AddCommand("aw_music_mode",music_mode);Cmd_AddCommand("aw_music_status",music_status);
+    Cmd_AddCommand("aw_music_mode",music_mode);
     /* With a title track, stay silent until the main menu starts it: the startup
      * logo is silent, and a random world track must not play under it
      * (MUSIC-STARTUP-TRACK-31). Old playlists without one start the world shuffle. */
@@ -334,9 +451,10 @@ int CDAudio_Init(void) {
     return advance("start")?0:-1;
 }
 void CDAudio_Shutdown(void) {
-    int i;log_event("shutdown");close_music();if(events){AW_LogStreamClose(AW_LOG_MUSIC_EVENTS);events=0;}
+    int i;log_event("shutdown");close_music();AW_AReadShutdown();if(events){AW_LogStreamClose(AW_LOG_MUSIC_EVENTS);events=0;}
     AW_LogBegin(AW_LOG_MUSIC_PROFILE);
     AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"read_slices=%lu\nbytes_read=%lu\nread_errors=%lu\ntrack_opens=%lu\nlast_track=%d\nnatural_completions=%lu\nmanual_changes=%lu\nsynchronous_fills=%lu\n",reads,bytes_read,errors,opens,current,completions,manual_changes,sync_fills);
+    AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"read_stalls=%lu\nread_recoveries=%lu\nread_abandons=%lu\nsilent_spans=%lu\n",stalls,recoveries,abandons,underruns);
     AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"buffer_blocks=%lu\nbuffer_bytes=%lu\n",(unsigned long)MUSIC_BLOCKS,(unsigned long)sizeof(blocks));
     AW_LogWrite(AW_LOG_MUSIC_PROFILE,"track_history=");
     for(i=0;i<opened_count;i++)AW_LogPrintf(AW_LOG_MUSIC_PROFILE,"%s%d",i?",":"",opened[i]);

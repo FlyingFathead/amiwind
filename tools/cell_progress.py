@@ -17,6 +17,7 @@ Inputs (all optional; anything missing is "not measured", never guessed):
   OUT/audits/*.json                    audit results from other tools (format aw-cell-audit-1), see `record`
   OUT/results/*.json                   per-cell conversion results (format aw-cell-result-1), see `result`
   OUT/owner-status.json                playtested / approved cells, see `owner`
+  OUT/plan.json                        the release plan (planned / in_build / shipped per cell), see `plan` and `ship`
 
 Outputs in OUT (a private folder: the data is derived from the owner's game files):
   cell-progress.json   the tracker data the Toolkit loads (format aw-cell-progress-1)
@@ -47,12 +48,13 @@ import cell_lava as LV  # noqa: E402
 import cell_progress_chim as CH  # noqa: E402
 import cell_progress_order as OR  # noqa: E402
 import cell_progress_release as RL  # noqa: E402
+import cell_progress_plan as PL  # noqa: E402
 
 FORMAT = 'aw-cell-progress-1'
 AUDIT_FORMAT = 'aw-cell-audit-1'
 CENSUS_FORMAT = 'aw-cell-census-1'
 OUT_FILES = {'progress': 'cell-progress.json', 'next': 'next.json', 'curve': 'mesh-curve.json', 'png': 'mesh-curve.png',
-             'history': 'history.jsonl', 'owner': 'owner-status.json', 'releases': RL.RELEASE_FILE, 'sources': 'sources.json'}
+             'history': 'history.jsonl', 'owner': 'owner-status.json', 'releases': RL.RELEASE_FILE, 'plan': PL.PLAN_FILE, 'sources': 'sources.json'}
 NEXT_LIMIT = 300
 
 # Audit mechanisms: id -> label. Order is the display order.
@@ -72,7 +74,12 @@ MECHANISMS = collections.OrderedDict([
 RESULTS = ('passed', 'failed', 'accepted', 'not_measured')   # accepted = failed but owner-accepted
 OWNER_STATES = ('playtested', 'approved')
 BUCKETS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'converted_failing', 'not_converted', 'converted_unmeasured', 'not_started',
-           'empty_sea', 'hull_policy_pending')
+           'empty_sea', 'hull_policy_pending', 'ocean')
+# Sea buckets shown on the map beside the land cells: empty sea (a LAND cell with nothing placed) and open sea (a cell
+# without LAND, a reference to the shared ocean chunk: chimport.py ocean, K-OCEAN). Empty sea counts as done. The open ocean
+# does NOT (TRACKER-OCEAN-COUNTED-DONE-36): the engine does not place the ocean chunk yet, so it has its own line and colour (silver).
+SEA_BUCKETS = ('empty_sea', 'ocean')
+DONE_SEA = ('empty_sea',)
 # SUCCESS = every bucket that counts as passed (complete cells included). Precedence of the statuses, strongest first:
 # complete > terrain_complete > complete_unlit > terrain_complete_unlit > approved > playtested > passed (audits_passed) >
 # hull policy pending > failed > not converted. The _unlit levels ("awaiting lighting", owner 2026-10-09): every criterion
@@ -84,10 +91,10 @@ COMPLETE_LEVELS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_co
 # Eligible for the next release (owner, 2026-10-09): every done status, lighting done or not = every passed status
 # (cell / terrain complete, awaiting lighting or not, owner states, passed) and empty sea (it passes as it is; the
 # open world needs the water around the coast).
-ELIGIBLE = SUCCESS + ('empty_sea',)
+ELIGIBLE = SUCCESS + DONE_SEA
 ELIGIBLE_RELEASE = 'v0.0.34'
 # The "eligible" selector of the release tool and the Toolkit preset: eligible statuses plus empty sea (done = usable).
-ELIGIBLE_SELECT = tuple(dict.fromkeys(tuple(ELIGIBLE) + ('empty_sea',)))
+ELIGIBLE_SELECT = tuple(dict.fromkeys(tuple(ELIGIBLE) + DONE_SEA))
 # Two completion levels (owner, 2026-10-09). Terrain complete: all audits pass and every placed object except actors is
 # converted (actors may still be deferred). Cell complete: terrain complete and every actor converted too.
 COMPLETE_LABEL = 'Cell complete'
@@ -305,6 +312,10 @@ def derive(rec):
         counts.setdefault(r, 0)
     rec['audit_counts'] = {r: counts[r] for r in RESULTS}
     chim = rec['chim']
+    if chim.get('ocean'):
+        # CHIMport open sea: a cell without LAND, one reference to the shared ocean chunk. Not done (the engine does not place the chunk yet): its own bucket.
+        chim['status'], chim['bucket'] = 'ocean', 'ocean'
+        return
     if chim.get('empty'):
         # CHIMport: terrain and water only, nothing placed. Its own status; never counted as passed or as converted.
         chim['status'], chim['bucket'] = 'empty_sea', 'empty_sea'
@@ -447,15 +458,27 @@ def promote_complete(cells):
                 rec['chim']['blockers'] = blockers(rec, actors=level not in ('terrain_complete', 'terrain_complete_unlit'))
 
 
+def on_map(c):
+    """A cell of an island's map: land, empty sea or open sea (ocean)."""
+    return bool(c['land']) or c['chim']['bucket'] in SEA_BUCKETS
+
+
 def island_headlines(cells):
-    """Per island (land cells plus empty sea): the same done/complete figures, so islands are never mixed in one percentage."""
+    """Per island: the same done/complete figures, so islands are never mixed in one percentage. Map cells = land,
+    empty sea and open sea (the island's rectangle once the ocean cells are in); land cells = land and empty sea, the
+    figures from before the open sea was converted (land_cells, land_done, land_percent). The open ocean is never done and
+    not in `cells` / `percent`: it is counted on its own line (`ocean`, `map_cells`)."""
     out = []
     for i in sorted({c.get('island') for c in cells.values() if c.get('island')}):
-        mine = [c for c in cells.values() if c.get('island') == i and (c['land'] or c['chim']['bucket'] == 'empty_sea')]
+        mine = [c for c in cells.values() if c.get('island') == i and on_map(c)]
         n = collections.Counter(c['chim']['bucket'] for c in mine)
-        done = sum(n[b] for b in SUCCESS) + n['empty_sea']
-        row = {'island': i, 'name': ISLAND_NAMES.get(i, 'island %d' % i), 'cells': len(mine), 'done': done,
-               'percent': round(100.0 * done / len(mine), 1) if mine else 0.0,
+        done = sum(n[b] for b in SUCCESS) + sum(n[b] for b in DONE_SEA)
+        land_cells = len(mine) - n['ocean']
+        land_done = done
+        row = {'island': i, 'name': ISLAND_NAMES.get(i, 'island %d' % i), 'cells': land_cells, 'done': done,
+               'percent': round(100.0 * done / land_cells, 1) if land_cells else 0.0,
+               'map_cells': len(mine), 'land_cells': land_cells, 'land_done': land_done,
+               'land_percent': round(100.0 * land_done / land_cells, 1) if land_cells else 0.0,
                'passed': sum(n[b] for b in SUCCESS), 'converted': sum(1 for c in mine if c['chim']['converted']),
                'eligible': done}
         row.update({b: n[b] for b in BUCKETS})
@@ -470,11 +493,15 @@ def headline(cells):
     passed = sum(n[b] for b in SUCCESS)
     out = {b: n[b] for b in BUCKETS}
     out['empty_sea'] = sum(1 for c in cells.values() if c['chim']['bucket'] == 'empty_sea')     # land or not
+    out['ocean'] = sum(1 for c in cells.values() if c['chim']['bucket'] == 'ocean')             # never land
     out['islands'] = island_headlines(cells)
     out['lighting'] = LT.headline([c['lighting'] for c in land if c.get('lighting')])
     out['lava'] = LV.headline([c['lava'] for c in cells.values() if c.get('lava')])
-    out['done'] = passed + out['empty_sea']      # cell complete + terrain complete + passed + empty sea (each has its own line)
-    out['eligible'] = passed + out['empty_sea']      # every done status, empty sea included (= done)
+    # cell complete + terrain complete + passed + empty sea (each has its own line); the open ocean is NOT done
+    out['done'] = passed + out['empty_sea']
+    out['eligible'] = out['done']      # every done status, empty sea included (= done)
+    sea_only = sum(1 for c in cells.values() if not c['land'] and c['chim']['bucket'] in SEA_BUCKETS)
+    out['map_cells'] = len(land) + sea_only      # land cells + sea cells without LAND (the map's cells)
     out['eligible_release'] = ELIGIBLE_RELEASE
     out.update({'land_cells': len(land), 'passed': passed,
                 'percent': round(100.0 * passed / len(land), 2) if land else 0.0,
@@ -616,7 +643,7 @@ def load_results(out):
     got = {}
     for d in docs:
         for k, v in d['cells'].items():
-            e = got.setdefault(k, {'stats': {}, 'audits': {}, 'errors': [], 'converted': None, 'empty': False, 'policy_pending': None, 'failed': False, 'provenance': None})
+            e = got.setdefault(k, {'stats': {}, 'audits': {}, 'errors': [], 'converted': None, 'empty': False, 'ocean': False, 'policy_pending': None, 'failed': False, 'provenance': None})
             deep_merge(e['stats'], v.get('stats') or {})
             for m, a in (v.get('audits') or {}).items():
                 e['audits'][m] = dict(a, build=a.get('build') or d.get('build'))      # numbers etc. ride along
@@ -633,6 +660,10 @@ def load_results(out):
                 e['not_converted'] = v['status'] == 'not_converted'
             if v.get('empty') is not None or v.get('status') is not None:
                 e['empty'] = bool(v.get('empty')) or v.get('status') == 'empty'
+            if v.get('ocean') is not None or v.get('status') is not None:
+                e['ocean'] = bool(v.get('ocean')) or v.get('status') == 'ocean'
+            if v.get('set'):
+                e['set'] = v['set']
             pv = dict(d.get('provenance') or {})
             pv.update(v.get('provenance') or {})
             if pv:
@@ -865,12 +896,17 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         # The game's own LAND records: exactly the cells that have ground. (The legacy table also holds cells with
         # flat converted terrain but no LAND record; they are sea and stay out of the land count.)
         land = set(census.get('land', []))
+        # The island set of a land cell comes from the masters' own LAND records, not from the map-metrics layer: a cell
+        # with terrain and sea but nothing placed has no metrics row and lost its set (TRACKER-SEA-CELL-SET-36).
+        land_set = {k: 'vvardenfell' for k in land}
+        land_set.update({k: 'bloodmoon' for k in census.get('land_bloodmoon', [])})
     else:
+        land_set = {}
         land = {k for k, c in prog_cells.items() if c.get('map') in ('terrain', 'full')}
         land |= {k for k, c in met_cells.items() if c.get('set') == 'bloodmoon'}
     keys = set(land) | set(met_cells) | set(cen_cells) | set(prog_cells)
     keys |= {k for d in digests for k, e in d['cells'].items() if e.get('converted')}
-    keys |= {k for k, r in results.items() if r.get('empty')}
+    keys |= {k for k, r in results.items() if r.get('empty') or r.get('ocean')}
     cells = {}
     for k in sorted(keys, key=lambda s: parse_cell(s)):
         x, y = parse_cell(k)
@@ -890,7 +926,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             cost['refs_total'] = contents['refs_total']
         cells[k] = {
             'x': x, 'y': y, 'name': d.get('name') or nm.get('name') or '', 'region': d.get('region') or nm.get('region') or '',
-            'set': (mc or {}).get('set') or '', 'land': k in land,
+            'set': land_set.get(k) or (mc or {}).get('set') or '', 'land': k in land,
             'contents': contents, 'legacy': legacy_of(pc), 'risk': risk, 'cost': cost,
             'chim': {'converted': False, 'builds': [], 'owner': None},
             'audits': {m: {'status': 'not_measured', 'detail': None, 'build': None} for m in MECHANISMS},
@@ -942,6 +978,20 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         ch = rec['chim']
         ch['result_generated'] = r.get('generated')
         rec['errors'] = r['errors']
+        if r.get('ocean'):
+            # open sea: a reference to the shared ocean chunk; its audits (the chunk's checks, the seam to LAND
+            # neighbours) are shown, the cell never counts as converted land
+            ch['ocean'] = True
+            ch['build'] = r.get('build')
+            rec['set'] = rec['set'] or r.get('set') or ''
+            ch['converted'] = False
+            for m, a in r['audits'].items():
+                if m in MECHANISMS and a.get('status') in RESULTS:
+                    rec['audits'][m] = {'status': a['status'], 'detail': a.get('detail'),
+                                        'build': a.get('build') or r.get('build')}
+                    if a.get('numbers') is not None:
+                        rec['audits'][m]['numbers'] = a['numbers']
+            continue
         if r.get('empty'):
             ch['empty'] = True
             ch['build'] = r.get('build')
@@ -1024,6 +1074,14 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
                             lambda c: (cells[ckey(*c)]['contents'] or {}).get('refs_total'))
     for rank, c in enumerate(ordered, 1):
         cells[ckey(*c)]['risk_rank'] = rank
+    # Open-sea cells belong to the island of the nearest island cell of their own master set (the conversion job names
+    # it: the base master's sea is Vvardenfell's map), else of any set (Chebyshev distance, then the lower island).
+    placed = [(parse_cell(k), r['island'], r.get('set')) for k, r in cells.items() if r.get('island')]
+    for k, rec in cells.items():
+        if rec['chim'].get('ocean') and not rec.get('island') and placed:
+            x, y = parse_cell(k)
+            mine = [p for p in placed if rec.get('set') and p[2] == rec['set']] or placed
+            rec['island'] = min(mine, key=lambda p: (max(abs(p[0][0] - x), abs(p[0][1] - y)), p[1]))[1]
     for rec in cells.values():
         rec.setdefault('ring', None)
         rec.setdefault('spiral_rank', None)
@@ -1091,6 +1149,11 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     rel_doc = RL.load(out)         # owner-set, never written by ingest
     RL.attach(cells, rel_doc)
     releases = RL.summary(cells, rel_doc)
+    plan_doc = PL.load(out)        # set by `plan` / `ship` only, never by ingest; separate from conversion status
+    PL.attach(cells, plan_doc)
+    plans = PL.summary(cells, plan_doc)
+    # The release the "eligible" figure is for: the upcoming plan release (data), the old constant only while there is no plan.
+    head['eligible_release'] = PL.next_release(plan_doc) or ELIGIBLE_RELEASE
     interiors, entrances = build_interiors(census, metrics, cells, (cells_detail or {}).get('pois'), bugs, our_maps(config_dir))
     for k, trees in entrances.items():
         if k in cells:
@@ -1113,7 +1176,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         'mesh_curve': {k: curve[k] for k in ('unique_meshes', 'cells_with_meshes', 'meshes_in_one_cell_only',
                                               'cells_without_new_mesh_spiral', 'cells_that_own_a_mesh',
                                               'meshes_without_store_once', 'takeaway')} if curve else None,
-        'releases': releases, 'area_cells': {a: sorted(ks) for a, ks in area_cells.items()},
+        'releases': releases, 'plans': plans, 'plan_next': PL.next_release(plan_doc), 'schema': 2,
+        'area_cells': {a: sorted(ks) for a, ks in area_cells.items()},
         'area_cover': {a: sorted(ks) for a, ks in area_cover.items()},
         'totals': totals, 'owner_ignored': sorted(ignored), 'result_ignored': sorted(result_ignored),
         'cells': cells, 'interiors': interiors,
@@ -1241,7 +1305,7 @@ def export_csv(doc):
     mech = [m['id'] for m in doc['mechanisms']]
     head = (['x', 'y', 'name', 'region', 'island', 'ring', 'spiral_rank', 'risk_rank', 'risk_score', 'land', 'chim_status',
              'chim_bucket', 'legacy_grade', 'legacy_placed_share', 'open_bugs', 'build', 'source_commit', 'chim_version',
-             'world_format', 'errors', 'lighting', 'lights_active', 'lights_meshless', 'lava', 'lava_pools']
+             'world_format', 'errors', 'lighting', 'lights_active', 'lights_meshless', 'lava', 'lava_pools', 'plan_release', 'plan_state', 'plan_since', 'plan_source']
             + ['audit.' + m for m in mech] + keys)
     import csv
     import io
@@ -1260,6 +1324,8 @@ def export_csv(doc):
         row += [lt.get('status'), lt.get('active'), lt.get('meshless')]
         lv = c.get('lava') or {}
         row += [lv.get('status'), lv.get('molten')]
+        pl = c.get('plan') or {}
+        row += [pl.get('release'), pl.get('state'), pl.get('since'), pl.get('source')]
         row += [c['audits'][m]['status'] for m in mech] + [f.get(k) for k in keys]
         w.writerow(['' if v is None else v for v in row])
     return buf.getvalue()
@@ -1307,6 +1373,24 @@ def main(argv=None):
     rel.add_argument('--shipped', action='store_true', help='mark the release (and these cells) as shipped')
     rel.add_argument('--who', default='owner')
     rel.add_argument('--now', help='timestamp to stamp (tests)')
+    pln = sub.add_parser('plan', help='plan cells for an upcoming release (own layer: never changes conversion status)')
+    pln.add_argument('--out', type=Path, required=True)
+    pln.add_argument('--release', required=True, help='release name, e.g. v0.0.36')
+    pln.add_argument('--cells', required=True, nargs='+',
+                     help='cell ids and selectors: "x,y", @FILE, area:NAME, build:RUN, plan:VERSION, state:STATE, unplanned, '
+                          'ring:N, status:BUCKET, eligible, all')
+    pln.add_argument('--state', default='planned', choices=PL.STATES)
+    pln.add_argument('--clear', action='store_true', help='remove the cells from this release plan')
+    pln.add_argument('--title', help='release title (stored once for the release)')
+    pln.add_argument('--set', action='append', default=[], metavar='KEY=VALUE', help='extra key on every cell record (kept, shown, exported)')
+    pln.add_argument('--source', help='who or what set it (default: --who)')
+    pln.add_argument('--who', default='owner')
+    pln.add_argument('--now', help='timestamp to stamp (tests)')
+    shp = sub.add_parser('ship', help='the release is published: its plan cells become shipped')
+    shp.add_argument('--out', type=Path, required=True)
+    shp.add_argument('--release', required=True)
+    shp.add_argument('--who', default='owner')
+    shp.add_argument('--now', help='timestamp to stamp (tests)')
     res = sub.add_parser('result', help='store per-cell results (stats, audits, errors) of the conversion job')
     res.add_argument('--out', type=Path, required=True)
     res.add_argument('--file', type=Path, required=True, help='an aw-cell-result-1 file (see FORMAT.md)')
@@ -1409,6 +1493,26 @@ def main(argv=None):
             return 2
         stamp = now_iso(a.now)
         print('recorded', RL.record(out, a.version, keys, a.who, stamp, a.shipped, a.clear, a.cells), '(%d cells)' % len(keys))
+    elif a.cmd == 'plan':
+        cur = read_json(out / OUT_FILES['progress'])
+        if not cur:
+            print('no tracker data in %s yet; run ingest' % out)
+            return 1
+        try:
+            keys = PL.resolve(cur['cells'], a.cells, ELIGIBLE_SELECT, cur.get('area_cover') or cur.get('area_cells'), PL.load(out))
+            extra = dict(s.partition('=')[::2] for s in a.set)
+            print('recorded', PL.record(out, a.release, keys, a.state, a.who, a.source, now_iso(a.now), a.clear, extra, a.title,
+                                        ' '.join(a.cells)), '(%d cells)' % len(keys))
+        except ValueError as e:
+            print('error: %s' % e)
+            return 2
+    elif a.cmd == 'ship':
+        try:
+            n = PL.ship(out, a.release, a.who, now_iso(a.now))
+        except ValueError as e:
+            print('error: %s' % e)
+            return 2
+        print('shipped %s: %d plan cells flipped to shipped' % (a.release, n))
     remembered = read_json(src_path) or {}
     if a.cmd == 'ingest':
         for k in SOURCE_KEYS + ('data_files', 'config_dir'):

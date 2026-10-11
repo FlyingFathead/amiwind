@@ -41,6 +41,29 @@ def main(argv=None):
                     help='Apply a named per-mesh visual triangle budget (config/chim-detail-budgets.json; default none)')
     ap.add_argument('--cut-models-over', type=float, default=None, metavar='UNITS',
                     help='Cut placements of models wider than UNITS by chunk (chim.cut; default 0: none)')
+    ap.add_argument('--terrain-shoreline', choices=('on', 'off'), default='on',
+                    help='Town frames: triangulate the shoreline tiles with the sampler of the legacy region maps '
+                         '(on, default; CHIM-STITCH-SHORELINE-36) or keep the plain tile grid (off)')
+    ap.add_argument('--terrain-hull', choices=('auto', 'routed', 'compiled'), default='auto',
+                    help='Standing hull of chunk terrain: auto (default: compiled by qbsp for irregular ground, '
+                         'routed chains for the regular grid), routed or compiled for every chunk')
+    ap.add_argument('--terrain-refs', choices=('off', 'on'), default='off',
+                    help='Terrain references (world format 0.7, EXPERIMENTAL): chunk terrain stored once per content '
+                         'in chunk-local units and placed at an offset by every chunk with it; off (default) keeps '
+                         'a copy in every chunk (format 0.5)')
+    ap.add_argument('--model-hull-patch', choices=('off', 'on'), default='on',
+                    help='Compiled model hulls whose compiler lost pieces under a walkable surface get those pieces '
+                         'added exactly (on, default), or stay as compiled with the check recorded (off: the '
+                         'previous method); CHIM-COMPILED-HULL-SHORT-36')
+    ap.add_argument('--mesh-method', choices=('table', 'converter', 'merge', 'meshopt+merge'), default='table',
+                    help='How meshes become faces (docs/chim/MESH_METHODS.md): table (default: config/mesh-methods.json, '
+                         'planar merge for every mesh, meshoptimizer + planar merge for the meshes it names), or one '
+                         'method for every mesh: converter (the method before v0.0.36-dev3), merge, meshopt+merge')
+    ap.add_argument('--model-weld', choices=('base', 'placed'), default='base',
+                    help='How a model variant shares its vertices: base (default: as its base, the prepared mesh '
+                         'unscaled, so every scale and tilt has the same vertices and edges; '
+                         'CHIM-STRIDER-SCALED-SEAMS-36) or placed (by the placed position, the method before '
+                         'v0.0.36-dev3)')
     ap.add_argument('--draw-distance', type=float, default=None, metavar='UNITS',
                     help='World setting draw_distance (default 540): the ring the world is built, culled and '
                          'heap-gated for; a closer view is a DEBUG ONLY MiniWind setting (tools/build.py)')
@@ -80,9 +103,46 @@ def main(argv=None):
     ap.add_argument('--no-far-terrain', action='store_true',
                     help='DEBUGGING ONLY: write no far terrain layer (the frame maps then draw no distant land '
                          'beyond the chunk ring; docs/chim/WORLD_FORMAT.md "Far terrain")')
+    ap.add_argument('--chim-regions-cells', metavar='CELLS',
+                    help='CHIM regions (docs/chim/CHIM_REGIONS.md): exterior cells on CHIM inside the legacy open '
+                         'world, one frame per cell, as tools/build.py resolves --chim-regions: "x,y:k ..." (k = s '
+                         'seabed, l land); none by default')
+    ap.add_argument('--chim-regions', action='append', default=[], metavar='SET',
+                    help='CHIM regions by name for a run of this tool alone: seabed, coast, sea-ring, a region name '
+                         'or @FILE (CSV x,y / aw-chim-cells-1 JSON / Toolkit World Map state); needs '
+                         '--chim-regions-status')
+    ap.add_argument('--chim-regions-status', type=Path, metavar='FILE',
+                    help='The CHIM progress tracker file --chim-regions is checked against (cell-progress.json)')
     add_jobs(ap)
     a = ap.parse_args(argv)
-    areas = list(dict.fromkeys(a.areas or ['balmora']))
+    # default Balmora, unless the world holds CHIM region frames only
+    areas = list(dict.fromkeys(a.areas or ([] if a.chim_regions or a.chim_regions_cells else ['balmora'])))
+    regions_table = None
+    if a.chim_regions or a.chim_regions_cells:
+        # CHIM region frames: the ownership table (chim.regions, its one writer), its frames registered as
+        # generated areas and built into this world beside the towns
+        from chim import regions as chim_regions
+        from town_config import register_generated
+        try:
+            if a.chim_regions_cells and a.chim_regions:
+                raise ValueError('give --chim-regions-cells or --chim-regions, not both')
+            if a.chim_regions_cells:
+                kinds = chim_regions.decode_cells(a.chim_regions_cells)
+                problems = ['cells %s: a legacy pocket enclosed by CHIM region cells'
+                            % ' '.join(map(chim_regions.cell_key, p)) for p in chim_regions.holes(kinds)]
+                regions_table = chim_regions.ownership(kinds, {'cells': 'resolved by tools/build.py'})
+            else:
+                if not a.chim_regions_status:
+                    raise ValueError('--chim-regions needs --chim-regions-status FILE')
+                regions_table, problems = chim_regions.plan(a.chim_regions, a.chim_regions_status, towns=areas)
+        except (OSError, ValueError) as exc:
+            ap.exit(1, 'Error: CHIM regions: %s\n' % exc)
+        if problems:
+            ap.exit(1, 'Error: CHIM regions preflight:\n  %s\n' % '\n  '.join(problems))
+        areas += register_generated([chim_regions.frame_settings(f, regions_table['terrain_margin'])
+                                     for f in regions_table['frames']])
+        print('CHIM regions: %(cells)d cells (%(seabed)d seabed, %(land)d land) in %(frames)d frames'
+              % regions_table['counts'], flush=True)
     if a.accept_known_stair_findings:
         from project_version import public_version, require_private_test_version
         from chim.known import known_stair_findings
@@ -106,14 +166,25 @@ def main(argv=None):
         try:
             build_areas(areas, a.data_files, a.out, a.palette, a.qbsp, a.jobs, dict({'grain': a.grain}, **({'cut_models_over': a.cut_models_over} if a.cut_models_over is not None else {}),
                      **({'detail_budget': a.detail_budget} if a.detail_budget else {}),
-                     **({'draw_distance': a.draw_distance} if a.draw_distance is not None else {})), not a.no_cache,
+                     **({'draw_distance': a.draw_distance} if a.draw_distance is not None else {}),
+                     **({'terrain_shoreline': a.terrain_shoreline} if a.terrain_shoreline != 'on' else {}),
+                     **({'terrain_hull': a.terrain_hull} if a.terrain_hull != 'auto' else {}),
+                     **({'terrain_refs': a.terrain_refs} if a.terrain_refs != 'off' else {}),
+                     **({'model_hull_patch': a.model_hull_patch} if a.model_hull_patch != 'on' else {}),
+                     **({'model_weld': a.model_weld} if a.model_weld != 'base' else {}),
+                     **({'mesh_method': a.mesh_method} if a.mesh_method != 'table' else {})), not a.no_cache,
                         set(a.rebuild_mesh), not a.no_mesh_occluders, a.unit_cache, a.harvest, a.flora,
                         a.legacy_run, [effect_path(e) for e in a.texture_effect], not a.no_far_terrain,
                         # the routed-hull heap fallback runs inside the shared builder (chim.build.build_areas)
                         hull_fallback_sdk=a.sdk if a.validate else None)
         except (OSError, ValueError) as exc:
             ap.exit(1, 'Error: %s\n' % exc)
-    build_world()
+    import build_profile      # phase timer: start/end lines with time and cores, never part of a stage key
+    with build_profile.phase('CHIM world conversion', '%d areas' % len(areas)):
+        build_world()
+    if regions_table is not None:
+        a.out.mkdir(parents=True, exist_ok=True)
+        (a.out / 'chim-regions.json').write_bytes(chim_regions.dumps(regions_table).encode('utf-8'))
     # The lighting type and what of it is implemented (docs/chim/LIGHTING_ROADMAP.md) go into the receipt.
     import json
     from chim.light_types import record as lighting_record
@@ -122,24 +193,89 @@ def main(argv=None):
         receipt = json.loads(receipt_path.read_bytes().decode('utf-8'))
         receipt['lighting'] = lighting_record(lighting_type)
         receipt_path.write_bytes((json.dumps(receipt, indent=1, sort_keys=True) + '\n').encode('utf-8'))
+    validated = None
     if a.validate:
-        from chim.validate import main as validate
-        if validate([str(a.out), '--json', str(a.out / 'chim-validate.json'), '--palette', str(a.palette)]) != 0:
+        # One validation per build (BUILD-CHIM-STATS-SERIAL-TAIL-36): the stats below reuse its world and
+        # measurements; the report and stdout are what `chim/validate.py OUT --json ... --palette ...` writes.
+        from build_jobs import resolve_jobs
+        from chim.validate import report_text, report_world
+        with build_profile.phase('CHIM validation', '%d frames' % len(areas)) as timer:
+            src_path = a.out / 'chim-source.json'
+            report, world, _ = report_world(a.out, json.loads(src_path.read_text(encoding='utf-8'))
+                                            if src_path.is_file() else None, a.palette.read_bytes(),
+                                            jobs=resolve_jobs(a.jobs))
+            text = report_text(report)
+            (a.out / 'chim-validate.json').write_bytes(text.encode('utf-8'))
+            sys.stdout.write(text)
+            timer.done('CHIM validation: %s (%d failures)' % ('passed' if report['ok'] else 'FAILED',
+                                                               report['failure_count']))
+        if not report['ok']:
             ap.exit(1, 'Error: the CHIM world fails validation (%s)\n' % (a.out / 'chim-validate.json'))
+        validated = (world, report['measured'])
+        if a.stats:
+            # Right after validation, while its world is in memory (the gates below never change the world).
+            write_stats(a, build_profile, validated)
+            validated = None
         import json
         fallback = json.loads((a.out / 'chim-receipt.json').read_text(encoding='utf-8')).get('hull_fallback')
         if fallback:
             print('CHIM hull fallback: chains kept for %s (a ring did not fit with their routed hulls)'
                   % ', '.join(fallback['kept_as_chain']), flush=True)
+        # Order (BUILD-CHIM-HEAP-GATE-LATE-36): the checks that take seconds per frame first (heap, zone walk), the
+        # stair walk (the slowest: about an hour for 270 frames) last, so a ring over the zone stops the stage at once.
+        # Every ring fits the engine's CHIM zone: strict, no exceptions (chim.heap).
+        from chim.heap import require_heap
+        heap_timer = build_profile.phase('CHIM heap gate', '%d frames' % len(areas)).__enter__()
+        try:
+            # frames in parallel; each frame's result kept by its content key beside the unit cache
+            # (CHIM-WORLD-AUDIT-SCALING-33)
+            heap = require_heap(a.out, a.sdk, jobs=resolve_jobs(a.jobs),
+                                cache_dir=(a.unit_cache / 'heap') if a.unit_cache and not a.no_cache else None)
+        except ValueError as exc:
+            heap_timer.__exit__(ValueError, exc, None)
+            ap.exit(1, 'Error: %s\n' % exc)
+        heap_timer.done('CHIM heap gate: %s %s' % (heap['status'], ', '.join(
+            '%s active ring peak %d, load ring peak %d (%d positions over), largest block %d, of %d bytes (gated: %s)'
+            % (f['frame'], f['peak_bytes'], f['load_ring']['peak_bytes'], f['load_ring']['positions_over_budget'],
+               f['largest_block_bytes'], f['budget_bytes'], f['gated_ring'])
+            for f in heap.get('frames', []))))
+        heap_timer.__exit__(None, None, None)
+        # The engine's own zone allocator over a walk through every frame: never a step without ground
+        # (CHIM-CHUNK-LOAD-FAIL-33, chim.zone_sim).
+        from chim.zone_sim import require_zone_walk
+        walk_timer = build_profile.phase('CHIM zone walk gate').__enter__()
+        try:
+            walk = require_zone_walk(a.out, a.sdk, jobs=resolve_jobs(a.jobs))
+        except ValueError as exc:
+            walk_timer.__exit__(ValueError, exc, None)
+            ap.exit(1, 'Error: %s\n' % exc)
+        walk_timer.done('CHIM zone walk gate: %s %s' % (walk['status'], ', '.join(
+            '%s: %d steps, %d loads without room, %d partial activations, %d+%d chunks released, %d model loads'
+            % (w['name'], w['steps'], w['zone_fail'], w['partial'], w['released_band'], w['released_ring'],
+               w['model_loads']) for w in walk.get('walks', []))))
+        walk_timer.__exit__(None, None, None)
         # Every flight of stairs walked on the frame's own collision (COLLISION-STAIR-SLOPE-32).
         from chim.collision import require_stairs
+        stair_timer = build_profile.phase('CHIM stair gate').__enter__()
         try:
             report = require_stairs(a.out, a.jobs, accepted=a.accept_known_stair_findings)
         except ValueError as exc:
+            stair_timer.__exit__(ValueError, exc, None)
             ap.exit(1, 'Error: %s\n' % exc)
-        print('CHIM stair gate: %s (%s steps and ramps tested, %d advisory, %d accepted known)'
-              % (report['status'], report.get('tested', 0), len(report.get('advisory_failures', [])),
-                 len(report.get('accepted_known_findings', []))), flush=True)
+        reuse = report.get('pass_cache') or {}
+        stair_timer.done('CHIM stair gate: %s (%s steps and ramps tested, %d advisory, %d accepted known; walk %s: '
+                         '%s frames reused, %s walked, %d walked again to check the cache)'
+                         % (report['status'], report.get('tested', 0), len(report.get('advisory_failures', [])),
+                            len(report.get('accepted_known_findings', [])), reuse.get('mode', 'cached'),
+                            reuse.get('reused', 0), reuse.get('walked', '?'), len(reuse.get('sampled', []))))
+        stair_timer.__exit__(None, None, None)
+        # the CHIM receipt records the walk's reuse (BUILD-CHIM-HEAP-GATE-LATE-36)
+        receipt_path = a.out / 'chim-receipt.json'
+        receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+        # (the candidate records this run stored are listed in chim-stairs.json, which the promotion reads)
+        receipt['stair_walk'] = dict({k: v for k, v in reuse.items() if k != 'stored'}, status=report['status'],
+                                     tested=report.get('tested', 0))
+        receipt_path.write_text(json.dumps(receipt, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
         if a.accept_known_stair_findings:
             # the receipt records the waiver (private test only)
             import json
@@ -150,34 +286,8 @@ def main(argv=None):
                 'failures': len(report.get('accepted_known_findings', [])),
                 'policy': 'private -devN test only (require_private_test_version)'}
             path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
-        # Every ring fits the engine's CHIM zone: strict, no exceptions (chim.heap).
-        from chim.heap import require_heap
-        try:
-            # frames in parallel; each frame's result kept by its content key beside the unit cache
-            # (CHIM-WORLD-AUDIT-SCALING-33)
-            heap = require_heap(a.out, a.sdk, jobs=a.jobs or 1,
-                                cache_dir=(a.unit_cache / 'heap') if a.unit_cache and not a.no_cache else None)
-        except ValueError as exc:
-            ap.exit(1, 'Error: %s\n' % exc)
-        print('CHIM heap gate: %s %s' % (heap['status'], ', '.join(
-            '%s active ring peak %d, load ring peak %d (%d positions over), largest block %d, of %d bytes (gated: %s)'
-            % (f['frame'], f['peak_bytes'], f['load_ring']['peak_bytes'], f['load_ring']['positions_over_budget'],
-               f['largest_block_bytes'], f['budget_bytes'], f['gated_ring'])
-            for f in heap.get('frames', []))), flush=True)
-        # The engine's own zone allocator over a walk through every frame: never a step without ground
-        # (CHIM-CHUNK-LOAD-FAIL-33, chim.zone_sim).
-        from chim.zone_sim import require_zone_walk
-        try:
-            walk = require_zone_walk(a.out, a.sdk)
-        except ValueError as exc:
-            ap.exit(1, 'Error: %s\n' % exc)
-        print('CHIM zone walk gate: %s %s' % (walk['status'], ', '.join(
-            '%s: %d steps, %d loads without room, %d partial activations, %d+%d chunks released, %d model loads'
-            % (w['name'], w['steps'], w['zone_fail'], w['partial'], w['released_band'], w['released_ring'],
-               w['model_loads']) for w in walk.get('walks', []))), flush=True)
-    if a.stats:
-        from chim.stats import main as stats
-        if stats([str(a.out)]) != 0:
+    if a.stats and not a.validate:
+        if write_stats(a, build_profile, None) != 0:
             return 1
     if a.cell_progress:
         # The tracker is no longer run from here: the builder runs tools/cell_progress_build.py as its own stage
@@ -185,6 +295,15 @@ def main(argv=None):
         print('CHIM cell progress: run `python3 tools/cell_progress_build.py --out %s --chim-world %s` '
               '(the builder does it in its cell-progress stage)' % (a.cell_progress, a.out), flush=True)
     return 0
+
+
+def write_stats(a, build_profile, validated):
+    """chim-stats.json (chim.stats), timed; with VALIDATED (world, measurements) of this build's validation the
+    world is not validated a second time."""
+    from chim.stats import main as stats
+    with build_profile.phase('CHIM stats', 'reusing this build\'s validation' if validated else 'validating the world'):
+        code = stats([str(a.out)], *(validated or (None, None)))
+    return code
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""docs/MINIWIND.md lists every MiniWind preset (config/miniwind-presets.json) with its option and scene."""
+"""docs/MINIWIND.md lists every MiniWind preset (the recipes in config/recipes/miniwind/) with its option and scene."""
 import json
 from pathlib import Path
 import unittest
@@ -16,7 +16,10 @@ class MiniWindPageTests(unittest.TestCase):
         page = read('docs/MINIWIND.md')
         start = page.index('<!-- presets start -->')
         self.table = page[start:page.index('<!-- presets end -->')]
-        self.presets = json.loads(read('config/miniwind-presets.json'))['presets']
+        self.presets = [json.loads(path.read_text(encoding='utf-8')) for path in
+                        sorted((ROOT / 'config/recipes/miniwind').glob('*.json'))]
+        for preset in self.presets:
+            preset['description'] = preset['options']['miniwind_description']
 
     def test_every_preset_is_listed_with_option_and_scene(self):
         for row in self.presets:

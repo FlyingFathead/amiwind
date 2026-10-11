@@ -31,7 +31,7 @@ class DebugTeleportNameTests(unittest.TestCase):
 
     def test_console_page_lists_vivec(self):
         page = (ROOT / 'docs' / 'AMIWIND_CONSOLE_COMMANDS.md').read_text(encoding='utf-8')
-        self.assertIn('vivec (Vivec Arena)', page)
+        self.assertIn('vivec (the whole city vivec_city, else the Vivec Arena)', page)
 
 
 if __name__ == '__main__':

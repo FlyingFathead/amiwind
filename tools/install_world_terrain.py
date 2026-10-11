@@ -52,6 +52,12 @@ def install(terrain, id1):
                                *row['coverage'][0], *row['coverage'][1])
         if packet[64+i*52:64+(i+1)*52] != expected:
             raise ValueError('Terrain row differs from runtime directory: '+name)
+        if row.get('chim_region'):
+            # a CHIM region cell: the directory row only, no map (docs/BUILD_MANIFEST.md step 2); a legacy map of the
+            # cell in the stage would be a second owner
+            if (id1/'maps'/(name+'.bsp')).exists():
+                raise ValueError('A legacy map of a CHIM region cell is staged: '+name)
+            continue
         source = terrain/name/'scene.bsp'
         if (not source.is_file() or source.is_symlink()
                 or digest(source) != row['converted']['sha256']
@@ -77,6 +83,7 @@ def install(terrain, id1):
             raise ValueError('Terrain read-back failed')
     (id1/'world/regions.awr').write_bytes(packet)
     return {'regions':len(rows),'replaced_maps':len(replacements),
+            'chim_region_maps_not_made':sorted(r['name'] for r in rows if r.get('chim_region')),
             'directory_sha256':hashlib.sha256(packet).hexdigest(),
             'terrain_receipt_sha256':digest(receipt_path),
             'target_validation':'pending'}

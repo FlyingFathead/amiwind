@@ -8,6 +8,8 @@
     chimport.py cell   --data-files DIR --palette PALETTE.lmp --cell X,Y --out CELLDIR [--unit-cache DIR] ...
     run, cell, world:  [--storage-pool auto|on|off] [--reuse-mode copy|hardlink|pool] [--storage-pool-dir DIR]
     plan, run:         [--region NAME]  (the cells of a region of plan.json; repeatable)
+    chimport.py ocean  --data-files DIR --palette PALETTE.lmp --out RUN [--rect X0,X1,Y0,Y1] [--margin N] [--dry-run]
+                       [--storage-pool ...] [--tracker DIR --tracker-tool tools/cell_progress.py]
     chimport.py status --out RUN
     chimport.py export --out RUN [--csv FILE] [--json FILE]
 
@@ -315,6 +317,8 @@ def _shared_put(self, kind, fp, value):
     tmp = path.with_name(path.name + '.%d.tmp' % os.getpid())
     tmp.write_bytes(pickle.dumps((fp, value), protocol=4))
     tmp.replace(path)
+    import cache_provenance
+    cache_provenance.sidecar_unit(path, kind, fp)
 
 
 @contextlib.contextmanager
@@ -354,7 +358,8 @@ def hull_figures(models):
     return rows
 
 
-ELIGIBLE = ('passed', 'empty')        # cells usable as release candidates (complete apart from lighting)
+MARKER_REASON = 'nonvisual source marker'   # import_town's reason for a record with a marker model
+ELIGIBLE = ('passed', 'empty', 'ocean')   # cells usable as release candidates (complete apart from lighting)
 KEPT_CHAIN_OUTCOME = 'kept_as_chain'   # hull audit outcome the CHIM Progress Tracker shows (counts as passed)
 LEGACY_CHAIN_DEPTH = 256      # the audit's own threshold until the shared rule is in the builder line
 
@@ -374,6 +379,20 @@ def kept_as_chain(receipt):
     """Meshes the builder's heap fallback kept as chains for memory (chim-receipt.json hull_fallback)."""
     fb = (receipt or {}).get('hull_fallback') or {}
     return sorted(fb.get('kept_chain') or []) if isinstance(fb, dict) else sorted(fb)
+
+
+ACCEPTED_CHAINS = ROOT / 'config' / 'hull-chain-accepted.json'
+
+
+def accepted_chains(path=ACCEPTED_CHAINS):
+    """{mesh stem: reason} of meshes the owner accepted as standing-hull chains (config/hull-chain-accepted.json):
+    models whose collision the router cannot split (COLLISION-ROUTE-NO-SPLIT-36); the hull audit passes them with
+    the kept-as-chain outcome, as the meshes the heap fallback keeps for memory. {} without the file."""
+    path = Path(path)
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding='utf-8'))
+    return {_mesh_stem(r['mesh']): r['reason'] for r in data.get('meshes', [])}
 
 
 def _mesh_stem(name):
@@ -473,17 +492,24 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
     else:
         kept = kept_as_chain(receipt)
         kept_stems = {_mesh_stem(k) for k in kept}
+        accepted = accepted_chains()     # owner-accepted chains (COLLISION-ROUTE-NO-SPLIT-36): kept as chain too
         over = [h for h in hulls if h.get('over', h['depth'] >= LEGACY_CHAIN_DEPTH)]
         # meshes the heap fallback kept as chains for memory: their own outcome, not a failure
+        owner = [h for h in over if _mesh_stem(h['name']) in accepted and _mesh_stem(h['name']) not in kept_stems]
         for_memory = [h for h in over if _mesh_stem(h['name']) in kept_stems]
-        deep = [h for h in over if h not in for_memory]
+        deep = [h for h in over if h not in for_memory and h not in owner]
+        owner_stems = sorted({_mesh_stem(h['name']) for h in owner})
         put('hull_bevels', 'failed' if deep else 'passed',
-            '%d models over the hull-chain limit (max depth %d)%s' % (
+            '%d models over the hull-chain limit (max depth %d)%s%s' % (
                 len(deep), max([h['depth'] for h in hulls] or [0]),
-                '; %d kept as chain for memory' % len(for_memory) if for_memory else ''),
+                '; %d kept as chain for memory' % len(for_memory) if for_memory else '',
+                '; kept as chain, owner-accepted: %s' % ', '.join(
+                    '%s (%s)' % (m, accepted[m]) for m in owner_stems) if owner_stems else ''),
             over_limit=len(deep), max_depth=max([h['depth'] for h in hulls] or [0]),
             kept_as_chain_for_memory=sorted({_mesh_stem(h['name']) for h in for_memory} | kept_stems),
+            kept_as_chain_owner_accepted=owner_stems,
             routed=len((receipt or {}).get('routed_hulls') or []))
+        for_memory = for_memory + owner
         if not deep and (for_memory or kept_stems):
             # the tracker's KEPT_CHAIN_OUTCOME: passed, with meshes the heap fallback kept as chains for memory
             a['hull_bevels']['outcome'] = KEPT_CHAIN_OUTCOME
@@ -493,9 +519,16 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
     put('actor_grounding', 'not_measured', '%d actors deferred to the actor pipeline' % actors, actors=actors)
     doors = records['by_type'].get('DOOR', {})
     if doors:
-        ok = doors['converted'] == doors['placed']
-        put('door_links', 'passed' if ok else 'failed', '%d of %d doors converted' % (doors['converted'], doors['placed']),
-            converted=doors['converted'], placed=doors['placed'])
+        # DOOR records with a marker model (PrisonMarker, DivineMarker, TempleMarker: Marker_*.nif) are destinations
+        # of the game's scripts, not doors anyone walks through; they stay deferred and are not missing door links
+        # (CHIMPORT-DOOR-MARKER-AUDIT-36).
+        deferred = doors.get('deferred')
+        markers = deferred.get(MARKER_REASON, 0) if isinstance(deferred, dict) else 0
+        walkable = doors['placed'] - markers
+        ok = doors['converted'] == walkable
+        put('door_links', 'passed' if ok else 'failed', '%d of %d doors converted%s' % (
+            doors['converted'], walkable, '; %d marker doors deferred' % markers if markers else ''),
+            converted=doors['converted'], placed=doors['placed'], markers=markers)
     else:
         put('door_links', 'not_measured', 'no doors in the cell')
     vis = (measured or {}).get('visibility') or {}
@@ -610,11 +643,14 @@ POLICY_PENDING = ('hull_bevels',)
 
 
 def cell_status(res):
-    """passed | empty | hull_pending | failed | not_converted. hull_pending = failing only POLICY_PENDING audits. empty = converted, nothing placed in the cell (terrain and water
-    only), no error and no failed audit: counted apart so empty sea cells do not inflate "passed"."""
+    """passed | empty | ocean | hull_pending | failed | not_converted. hull_pending = failing only POLICY_PENDING audits. empty = converted, nothing placed in the cell (terrain and water
+    only), no error and no failed audit: counted apart so empty sea cells do not inflate "passed". ocean = a cell
+    without LAND, written as a reference to the shared ocean chunk (`chimport.py ocean`), no error, no failed audit."""
     if not res.get('converted'):
         return 'not_converted'
     failed = {m for m, a in (res.get('audits') or {}).items() if a['status'] == 'failed'}
+    if res.get('ocean'):
+        return 'failed' if res.get('errors') or failed else OCEAN_STATUS
     if res.get('errors') or failed - set(POLICY_PENDING):
         return 'failed'
     if failed:
@@ -1186,11 +1222,21 @@ def load_state(run):
     return st or {'format': STATE_FORMAT, 'cells': {}, 'created': now_iso()}
 
 
+RETRY_RESULTS = ('failed', 'hull_pending', 'not_converted')   # recorded results --retry-failed runs again
+
+
 def pending_rows(rows, state, retry_failed=False):
+    """The rows still to run: never run, stopped, and with RETRY_FAILED also every cell whose last result is
+    not usable (RETRY_RESULTS). A cell that converted without an error is 'done' in state.json even when an
+    audit failed (memory fit, doors, hull chains), so the runner state alone never selects it again
+    (CHIMPORT-RETRY-AUDIT-FAILED-36): the recorded result decides."""
     out = []
     for r in rows:
-        s = state['cells'].get(ckey((r['x'], r['y'])), {}).get('status')
-        if s == 'done' or (s == 'failed' and not retry_failed):
+        entry = state['cells'].get(ckey((r['x'], r['y'])), {})
+        s = entry.get('status')
+        if s == 'done' and not (retry_failed and entry.get('result') in RETRY_RESULTS):
+            continue
+        if s == 'failed' and not retry_failed:
             continue
         out.append(r)
     return out
@@ -1480,6 +1526,320 @@ def _run(args, pool_origin):
     return 0
 
 
+# ------------------------------------------------------------------ the open sea: cells without LAND (K-OCEAN)
+
+OCEAN_PLAN_FORMAT = 'aw-chimport-ocean-plan-1'
+OCEAN_DIR = 'ocean'
+OCEAN_MARGIN = 2                # cells of open sea around the island rectangle (the horizon ring)
+OCEAN_NAMESPACE = 'chim-ocean'  # the shared ocean chunk's key in the storage pool's index
+OCEAN_STATUS = 'ocean'
+OCEAN_REF_NAME = 'ocean.json'
+
+
+def parse_rect(text):
+    """'X0,X1,Y0,Y1' (inclusive cell bounds) -> (x0, x1, y0, y1)."""
+    parts = [int(v) for v in re.split(r'[\s,;]+', (text or '').strip()) if v]
+    if len(parts) != 4 or parts[0] > parts[1] or parts[2] > parts[3]:
+        raise ValueError('--rect takes X0,X1,Y0,Y1 with X0 <= X1 and Y0 <= Y1')
+    return tuple(parts)
+
+
+def master_lands(data_files):
+    """(base, others): the base master's LAND heights {(x, y): rows} (Morrowind.esm, mwad.audit.load_esm) and the
+    cells that have a LAND record in any other master of the data folder (Tribunal, Bloodmoon: never open sea),
+    plus the base master's exterior cells {(x, y): {name, region, refs}}."""
+    from mwad.audit import load_esm
+    from mwad.esm import is_deleted, records, subrecords
+    from mwad.paths import child_ci, resolve_data_files
+    data = resolve_data_files(data_files)
+    esm = load_esm(child_ci(data, 'Morrowind.esm'))
+    base = {k: v['heights'] for k, v in esm['lands'].items()}
+    others = set()
+    for path in sorted(p for p in data.iterdir() if p.is_file() and p.suffix.casefold() == '.esm'
+                       and p.name.casefold() != 'morrowind.esm'):
+        for tag, flags, payload in records(path.read_bytes()):
+            if tag != 'LAND':
+                continue
+            subs = list(subrecords(payload))
+            s = dict(subs)
+            if len(s.get('INTV', b'')) == 8 and not is_deleted(flags, subs):
+                import struct
+                others.add(struct.unpack('<ii', s['INTV']))
+    cells = {k: {'name': c['name'], 'region': c['region'], 'refs': sum(1 for r in c['refs'] if not r.get('deleted'))}
+             for k, c in esm['cells'].items()}
+    return base, others, cells, esm['sha256']
+
+
+def plan_ocean(base_lands, other_lands=(), cells=None, rect=None, margin=OCEAN_MARGIN, planned=()):
+    """The open-sea cells: every cell of the island rectangle (default: the bounding box of the base master's
+    LAND cells) grown by MARGIN cells, without a LAND record in any master, without placed records and not in
+    the CHIMport plan. Rows carry the seam check against LAND neighbours (chim.ocean.seam_steps)."""
+    from chim.ocean import seam_steps
+    cells = cells or {}
+    if rect is None:
+        if not base_lands:
+            raise ValueError('No LAND cells: name the rectangle with --rect')
+        xs = [c[0] for c in base_lands]
+        ys = [c[1] for c in base_lands]
+        rect = (min(xs), max(xs), min(ys), max(ys))
+    x0, x1, y0, y1 = rect
+    if margin < 0:
+        raise ValueError('--margin must be 0 or more')
+    planned = set(planned)
+    skip = set(base_lands) | set(other_lands) | planned
+    rows, kept = [], collections.Counter()
+    grown = [(x, y) for y in range(y0 - margin, y1 + margin + 1) for x in range(x0 - margin, x1 + margin + 1)]
+    # The base master's own exterior cells without LAND beyond the grown rectangle are map cells too (named sea cells
+    # the legacy table drew with flat terrain, for example on Azura's Coast).
+    in_grown = set(grown)
+    beyond = sorted(c for c in cells if c not in in_grown)
+    for c in grown + beyond:
+        x, y = c
+        info = cells.get(c) or {}
+        if c in base_lands:
+            kept['land'] += 1
+            continue
+        if c in other_lands:
+            kept['other_master_land'] += 1
+            continue
+        if info.get('refs'):
+            kept['records_without_land'] += 1
+            continue
+        if c in skip:
+            kept['planned'] += 1
+            continue
+        inside = x0 <= x <= x1 and y0 <= y <= y1
+        where = 'rect' if inside else ('margin' if c in in_grown else 'record')
+        rows.append({'x': x, 'y': y, 'name': info.get('name') or '', 'region': info.get('region') or '',
+                     'land': False, 'margin': not inside, 'where': where, 'record': c in cells,
+                     'seam': seam_steps(c, base_lands)})
+    return {'format': OCEAN_PLAN_FORMAT, 'generated': now_iso(), 'rect': list(rect), 'margin': margin,
+            'rule': 'cells of the rectangle (+ margin) and every exterior cell record of the base master, without LAND '
+                    'in any master, without placed records, not in plan.json: open sea, one reference each to the shared '
+                    'ocean chunk',
+            'map_cells': (x1 - x0 + 1 + 2 * margin) * (y1 - y0 + 1 + 2 * margin),
+            'rect_cells': (x1 - x0 + 1) * (y1 - y0 + 1), 'left_out': dict(kept),
+            'cells': rows, 'counts': {'ocean': len(rows), 'inside_rect': sum(1 for r in rows if not r['margin']),
+                                      'margin': sum(1 for r in rows if r['where'] == 'margin'),
+                                      'beyond': sum(1 for r in rows if r['where'] == 'record'),
+                                      'seam_edges': sum(len(r['seam']['edges']) for r in rows),
+                                      'seam_over': sum(1 for r in rows if r['seam']['over'])}}
+
+
+def ocean_ground_textures(data_files, palette_bytes, near=None):
+    """{'g0', '*water': miptex} as the builder makes them (import_town.ground_assets: material 0 = the default land
+    texture, water from water00), through a one-material audit folder that is removed afterwards."""
+    from build_scratch import scratch_dir
+    from chim.build import wad_lumps
+    from import_town import ground_assets
+    from mwad.paths import resolve_data_files
+    with scratch_dir(prefix='ocean-', near=near, keep_on_failure=False) as tmp:
+        audit = Path(tmp)
+        (audit / 'materials.json').write_bytes(b'{"0": {"id": "default", "texture": null}}\n')
+        ground = wad_lumps(ground_assets(resolve_data_files(data_files), audit, palette_bytes))
+    if near is not None:
+        with contextlib.suppress(OSError):          # the run's own scratch root, when nothing else is in it
+            (Path(near) / '.scratch').rmdir()
+    return {k: v for k, v in ground.items() if k in ('g0', '*water')}
+
+
+def ocean_cell_result(row, ref, chunk_audits, chunk_info, ref_bytes):
+    """A CHIMport cell result (aw-chimport-cell-1) of an open-sea cell: the reference, the shared chunk's audits
+    and the cell's own seam check; status 'ocean'."""
+    from chim.ocean import SEAM_TOLERANCE
+    seam = row['seam']
+    audits = {m: {'status': 'not_measured', 'detail': 'open sea: nothing of this kind in the cell', 'numbers': {}}
+              for m in MECHANISMS}
+    audits.update(chunk_audits)
+    if seam['edges'] or seam['corners']:
+        audits['seam_tears'] = {
+            'status': 'failed' if seam['over'] else 'passed',
+            'detail': 'shared chunk tiles seamlessly; %d LAND edges, largest height step %.0f units (tolerance %d)%s'
+                      % (len(seam['edges']), seam['max_step'], SEAM_TOLERANCE,
+                         '; over it: ' + ', '.join(seam['over']) if seam['over'] else ''),
+            'numbers': {'land_edges': len(seam['edges']), 'max_step': seam['max_step'], 'over': len(seam['over'])}}
+    records = {'by_type': {}, 'totals': {'placed': 0, 'converted': 0, 'deferred': 0, 'failed': 0, 'skipped': 0}}
+    stats = {'records': records['totals'], 'meshes': {'unique_in_cell': 0, 'new': 0, 'reused': 0},
+             'faces': {'source_triangles': 0, 'stored': chunk_info.get('faces', 0) + chunk_info.get('water_faces', 0),
+                       'placed': None, 'terrain': None},
+             'textures': {'count': len(chunk_info.get('textures') or ()), 'bytes': chunk_info.get('texture_bytes')},
+             'disk': {'files': 1, 'chim_bytes': ref_bytes, 'chunks': 64, 'legacy_region_bytes': None,
+                      'shared_chunk_bytes': chunk_info.get('bytes')},
+             'collision': {'models': 0, 'clipnodes': chunk_info.get('clipnodes'), 'max_hull_depth': 0, 'over_limit': 0},
+             'memory': {}, 'vis': {}, 'ocean': {'chunk': ref['chunk']['sha256'], 'seam': seam}}
+    res = {'format': CELL_FORMAT, 'cell': [row['x'], row['y']], 'key': ckey((row['x'], row['y'])), 'converted': True,
+           'ocean': ref, 'errors': [], 'records': records, 'audits': audits, 'stats': stats, 'wall_s': 0.0,
+           'cpu_s': 0.0, 'started': now_iso(), 'finished': now_iso(), 'stages': {}, 'units': None,
+           'ring': None, 'order': None, 'name': row['name'], 'region': row['region'], 'land': False,
+           'margin': row['margin']}
+    res['status'] = cell_status(res)
+    return res
+
+
+def ocean_chunk_audits(failures, figures, info):
+    """Audit rows of the shared chunk, the same for every ocean cell that references it."""
+    from chim.heap import POOL_SLOTS, engine_memory
+    memory = engine_memory()
+    budget = (memory['zone_kib'] - POOL_SLOTS * memory['pool_kib']) * 1024
+    fmt = [f for f in failures if 'seam' not in f and 'cover' not in f]
+    seam = [f for f in failures if 'seam' in f]
+    cover = [f for f in failures if 'cover' in f]
+    resident = info['chunk_bytes'] + info['texture_bytes']
+    return {
+        'format_validation': {'status': 'failed' if fmt else 'passed', 'numbers': {'failures': len(fmt)},
+                              'detail': 'shared ocean chunk reads back (%d validator failures)' % len(fmt)},
+        'seam_tears': {'status': 'failed' if seam else 'passed', 'numbers': {'failures': len(seam),
+                                                                             'points': figures.get('hull_points', 0)},
+                       'detail': 'shared chunk standing hull at its edges and its copies\' (%d failures)' % len(seam)},
+        'far_terrain': {'status': 'failed' if cover else 'passed', 'numbers': {'failures': len(cover)},
+                        'detail': 'every tile covered by seabed and water faces (%d failures)' % len(cover)},
+        'memory_fit': {'status': 'passed' if resident <= budget else 'failed',
+                       'numbers': {'resident_bytes': resident, 'budget_bytes': budget},
+                       'detail': 'one shared chunk %d B + textures %d B resident for every ocean chunk in the ring '
+                                 '(zone budget %d B)' % (info['chunk_bytes'], info['texture_bytes'], budget)},
+        'hull_bevels': {'status': 'passed' if info['hull_chain_max'] < LEGACY_CHAIN_DEPTH else 'failed',
+                        'numbers': {'max_depth': info['hull_chain_max'], 'clipnodes': info['clipnodes']},
+                        'detail': 'seabed standing hull: longest chain %d' % info['hull_chain_max']},
+    }
+
+
+def ocean_chunk(run_dir, data_files, palette, pool=None, link=True):
+    """The shared ocean chunk of this run: (path in RUN/ocean, sha256, info, pool record). Looked up by its content
+    key in the storage pool (linked, never built again), else built, validated and stored once."""
+    import hashlib
+    from chim import ocean as O
+    odir = run_dir / OCEAN_DIR
+    odir.mkdir(parents=True, exist_ok=True)
+    pal = Path(palette).read_bytes()
+    ground = ocean_ground_textures(data_files, pal, run_dir)
+    task = O.ocean_task()
+    key = O.ocean_key(task, ground, pal)
+    record = {'key': key, 'chunk': 'computed', 'stored_bytes': 0, 'linked_bytes': 0, 'stored_files': 0,
+              'linked_files': 0, 'reused_bytes': 0, 'errors': []}
+    meta_path = odir / 'ocean-chunk.json'
+    index = None
+    if pool is not None:
+        import storage_pool
+        from file_cache import FileCache
+        index = FileCache(Path(pool), OCEAN_NAMESPACE, None, fallback=False)
+        meta = index.lookup(key)
+        info = ((meta or {}).get('facts') or {}).get('info')
+        if meta is not None and info:
+            target = odir / ('ocean-%s.cco' % meta['sha256'][:16])
+            try:
+                placed = storage_pool.place(Path(pool), meta['sha256'], target, link=link)
+            except OSError as exc:
+                placed = False
+                record['errors'].append(str(exc))
+            if placed:
+                write_json(meta_path, {'key': key, 'sha256': meta['sha256'], 'info': info})
+                record.update(chunk='reused', linked_bytes=target.stat().st_size, linked_files=1)
+                return target, meta['sha256'], info, record
+    data, info = O.build_ocean(ground, pal, task)        # one small unit: the pool keeps it, no run-local cache
+    failures, figures = O.validate_ocean(data)
+    info = dict(info, key=key, validation={'failures': failures, 'figures': figures})
+    digest = hashlib.sha256(data).hexdigest()
+    target = odir / ('ocean-%s.cco' % digest[:16])
+    tmp = target.with_name(target.name + '.%d.tmp' % os.getpid())
+    tmp.write_bytes(data)
+    tmp.replace(target)
+    write_json(meta_path, {'key': key, 'sha256': digest, 'info': info})
+    if pool is not None and not failures:
+        import storage_pool
+        try:
+            existed = storage_pool.object_path(Path(pool), digest).is_file()
+            if storage_pool.put(Path(pool), target, digest)[0] == 'skipped':
+                raise OSError('cannot be hard-linked with the pool')
+            index.point(key, digest, len(data), {'info': info})
+            record['linked_bytes' if existed else 'stored_bytes'] += len(data)
+            record['linked_files' if existed else 'stored_files'] += 1
+        except OSError as exc:
+            record['errors'].append(str(exc))
+    elif pool is None:
+        record.update(stored_bytes=len(data), stored_files=1)
+    return target, digest, info, record
+
+
+def ocean(args):
+    """chimport.py ocean: plan the open-sea cells, make (or link) the shared ocean chunk, write one reference and
+    one result per cell, and feed the tracker. One writer per run folder (run.lock)."""
+    run_dir = args.out
+    run_dir.mkdir(parents=True, exist_ok=True)
+    base, others, cells, esm_sha = master_lands(args.data_files)
+    plan = read_json(run_dir / 'plan.json') or {'cells': []}
+    planned = {(r['x'], r['y']) for r in plan['cells']}
+    doc = plan_ocean(base, others, cells, parse_rect(args.rect) if args.rect else None, args.margin, planned)
+    doc['esm_sha256'] = esm_sha
+    c = doc['counts']
+    print('chimport ocean: rectangle x %d..%d, y %d..%d + margin %d = %d map cells; %d open-sea cells (%d inside the '
+          'rectangle, %d in the margin, %d named cells beyond it); left out: %s; %d LAND edges, %d cells with a seam '
+          'step over the tolerance'
+          % (*doc['rect'], doc['margin'], doc['map_cells'], c['ocean'], c['inside_rect'], c['margin'], c['beyond'],
+             ', '.join('%s %d' % kv for kv in sorted(doc['left_out'].items())) or 'none', c['seam_edges'],
+             c['seam_over']), flush=True)
+    if args.dry_run:
+        return 0
+    pool, origin = pool_choice(args)
+    try:
+        lock = RunLock(run_dir).__enter__()
+    except RunLocked as exc:
+        print(exc, file=sys.stderr, flush=True)
+        return 3
+    try:
+        t0 = time.time()
+        link = True
+        if pool is not None:
+            import storage_pool
+            link = storage_pool.setting(pool, origin or 'option', run_dir,
+                                        log=lambda line: print(line, flush=True))['links'] and args.reuse_mode != 'copy'
+        path, digest, info, record = ocean_chunk(run_dir, args.data_files, args.palette, pool, link)
+        validation = info.get('validation') or {}
+        if validation.get('failures'):
+            print('chimport ocean: the shared chunk FAILS its checks: %s' % '; '.join(validation['failures'][:10]),
+                  file=sys.stderr, flush=True)
+            return 4
+        chunk_audits = ocean_chunk_audits(validation.get('failures') or [], validation.get('figures') or {}, info)
+        size = path.stat().st_size
+        print('chimport ocean: shared chunk %s (%d B, %s; %d faces, %d water faces, %d clipnodes)'
+              % (path.name, size, record['chunk'], info['faces'], info['water_faces'], info['clipnodes']), flush=True)
+        write_json(run_dir / OCEAN_DIR / 'plan.json', doc)
+        from chim.ocean import dumps, reference
+        written = 0
+        for row in doc['cells']:
+            cdir = run_dir / 'cells' / cell_dir((row['x'], row['y']))
+            ref = reference((row['x'], row['y']), digest, size, info)
+            text = dumps(ref).encode('utf-8')
+            cdir.mkdir(parents=True, exist_ok=True)
+            tmp = cdir / (OCEAN_REF_NAME + '.%d.tmp' % os.getpid())
+            tmp.write_bytes(text)
+            tmp.replace(cdir / OCEAN_REF_NAME)
+            res = ocean_cell_result(row, ref, chunk_audits, info, len(text))
+            res['pool'] = {'cell': 'reference', 'stored_bytes': len(text), 'stored_files': 1}
+            write_json(cdir / 'result.json', res)
+            record['stored_bytes'] += len(text)
+            record['stored_files'] += 1
+            written += 1
+        summary = {'format': 'aw-chimport-ocean-summary-1', 'finished': now_iso(), 'cells': written,
+                   'chunk': {'file': path.name, 'sha256': digest, 'bytes': size, 'key': info.get('key')},
+                   'pool': dict(record, dir=str(pool) if pool else None), 'wall_s': round(time.time() - t0, 2),
+                   'seam': {'edges': c['seam_edges'], 'cells_over': c['seam_over']}}
+        write_json(run_dir / OCEAN_DIR / 'summary.json', summary)
+        print('chimport ocean: %d cells written as references; storage pool: stored %d B (%d files), linked %d B (%d '
+              'files)' % (written, record['stored_bytes'], record['stored_files'], record['linked_bytes'],
+                          record['linked_files']), flush=True)
+    finally:
+        lock.__exit__(None, None, None)
+    if args.tracker and args.tracker_tool:
+        return feed_tracker(run_dir, args.tracker, args.tracker_tool, args.tracker_ingest)
+    return 0
+
+
+def ocean_rows(run_dir):
+    """The ocean plan's rows (RUN/ocean/plan.json), shaped like plan rows for the feed."""
+    doc = read_json(Path(run_dir) / OCEAN_DIR / 'plan.json') or {'cells': []}
+    return [dict(r, ring=None, order=None, refs=0, categories={}) for r in doc['cells']]
+
+
 # ------------------------------------------------------------------ export
 
 EXPORT_FIELDS = ['order', 'ring', 'x', 'y', 'name', 'region', 'land', 'converted', 'passed', 'status', 'eligible', 'errors', 'audits_failed',
@@ -1574,7 +1934,13 @@ def tracker_cell(res, plan_row):
             if m in audits and audits[m]['status'] == 'failed':
                 audits[m] = dict(audits[m], status='not_measured',
                                  detail='hull policy pending: ' + (audits[m]['detail'] or ''), policy_pending=True)
+    extra = {}
+    if cell_status(res) == OCEAN_STATUS:
+        # open sea (no LAND): a reference to the shared ocean chunk; its own tracker status, counted as done
+        # 'set': the master whose map the sea belongs to (the tracker gives the cell that island)
+        extra = {'ocean': True, 'margin': bool((plan_row or {}).get('margin')), 'set': 'vvardenfell'}
     return {'converted': bool(res['converted']), 'status': cell_status(res), 'empty': cell_status(res) == 'empty',
+            **extra,
             # usable now: passed (lighting aside, which the lighting audit judges) or empty sea
             'eligible': cell_status(res) in ELIGIBLE,
             'stats': stats, 'audits': audits,
@@ -1589,6 +1955,8 @@ def feed(run_dir, build=None, all_cells=False):
     path or None. The tracker's ingester stores it (cell_progress.py result --file) and is the only writer."""
     plan = read_json(run_dir / 'plan.json') or {'cells': []}
     rows = {ckey((r['x'], r['y'])): r for r in plan['cells']}
+    for r in ocean_rows(run_dir):          # open-sea cells (chimport.py ocean): references to the shared chunk
+        rows.setdefault(ckey((r['x'], r['y'])), r)
     fed_path = run_dir / 'tracker' / 'fed.json'
     fed = read_json(fed_path) or {}
     from chim import CHIM_VERSION, FORMAT_VERSION
@@ -1643,10 +2011,10 @@ def entry(a):
     only from this source tree, and the source VERSION equal to the working version when a record is found.
     `run` prints the block and passes the record on to its cells. Returns the refusal text or None."""
     import entry_check
-    refused = entry_check.guard_imports(ROOT, log=print if a.cmd == 'run' else None)
+    refused = entry_check.guard_imports(ROOT, log=print if a.cmd in ('run', 'ocean') else None)
     record = entry_check.check(ROOT, a.working_version, Path(a.out),
                                accept_mismatch=a.accept_version_mismatch or os.environ.get('AMIWIND_ACCEPT_VERSION_MISMATCH'))
-    if a.cmd == 'run':
+    if a.cmd in ('run', 'ocean'):
         print('\n'.join(entry_check.lines(record, 'chimport entry check')), flush=True)
         if record['working_version']['record']:
             os.environ[entry_check.ENV] = str(Path(record['working_version']['record']).resolve())
@@ -1703,7 +2071,8 @@ def main(argv=None):
         q.add_argument('--jobs', type=int, default=2, help='worker processes inside each cell (default 2)')
         q.add_argument('--rings', type=int, help='only rings 0..N-1')
         q.add_argument('--cells', help='only these cells: "x,y x,y ..."')
-        q.add_argument('--retry-failed', action='store_true', help='run failed cells again')
+        q.add_argument('--retry-failed', action='store_true', help='run failed cells again: runner failures and every cell whose last result is failed, '
+                       'hull_pending or not_converted (audit failures included)')
         q.add_argument('--timeout', type=int, default=3600, help='seconds per cell before it is stopped (default 3600)')
         q.add_argument('--dry-run', action='store_true', help='print what would run')
         q.add_argument('--world-every', type=int, default=1,
@@ -1750,6 +2119,20 @@ def main(argv=None):
     f.add_argument('--out', type=Path, required=True)
     f.add_argument('--build', help='build name in the tracker (default chimport-<run folder name>)')
     f.add_argument('--all', action='store_true', help='every finished cell, also those fed before')
+    o = sub.add_parser('ocean', help='open-sea cells (no LAND) of the island rectangle + a margin ring as references '
+                       'to ONE shared ocean chunk; fed to the tracker as status "ocean"')
+    o.add_argument('--data-files', type=Path, required=True)
+    o.add_argument('--palette', type=Path, required=True)
+    o.add_argument('--out', type=Path, required=True)
+    o.add_argument('--rect', help='island rectangle X0,X1,Y0,Y1 in cells, inclusive (default: the bounding box of the '
+                   'base master LAND cells)')
+    o.add_argument('--margin', type=int, default=OCEAN_MARGIN,
+                   help='cells of open sea around the rectangle for the horizon (default %d)' % OCEAN_MARGIN)
+    o.add_argument('--dry-run', action='store_true', help='print the plan and its seam figures only')
+    o.add_argument('--tracker', type=Path, help='CHIM Progress Tracker folder to feed afterwards')
+    o.add_argument('--tracker-tool', type=Path, help='the tracker ingester (tools/cell_progress.py)')
+    o.add_argument('--tracker-ingest', default='', help='extra arguments of the tracker ingest, one string')
+    add_pool_options(o)
     ft = sub.add_parser('feed-tracker', help='feed, then store the result with the tracker ingester and re-ingest')
     ft.add_argument('--out', type=Path, required=True)
     ft.add_argument('--tracker', type=Path, required=True)
@@ -1761,14 +2144,14 @@ def main(argv=None):
     e.add_argument('--out', type=Path, required=True)
     e.add_argument('--csv', type=Path)
     e.add_argument('--json', type=Path)
-    for q in (r, c, w):
+    for q in (r, c, w, o):
         q.add_argument('--working-version', type=Path, metavar='FILE',
                        help='working-version record for the entry check (default: AMIWIND_WORKING_VERSION, then '
                             'OUT/../WORKING_VERSION.json; tools/entry_check.py)')
         q.add_argument('--accept-version-mismatch', metavar='REASON',
                        help='convert although the source VERSION differs from the working version (say why)')
     a = ap.parse_args(argv)
-    if a.cmd in ('run', 'cell', 'world'):
+    if a.cmd in ('run', 'cell', 'world', 'ocean'):
         refused = entry(a)
         if refused:
             print(refused, file=sys.stderr)
@@ -1813,6 +2196,8 @@ def main(argv=None):
                           'validation_failures': (rep.get('validation') or {}).get('failure_count'),
                           'errors': [e['mechanism'] for e in rep['errors']]}))
         return 0
+    if a.cmd == 'ocean':
+        return ocean(a)
     if a.cmd == 'feed':
         path = feed(a.out, a.build, a.all)
         print(path or 'chimport feed: nothing new')

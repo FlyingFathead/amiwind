@@ -42,13 +42,31 @@ CHARACTER_OPTION = '--quick-character'
 CELL_UNITS = 8192          # one Morrowind exterior cell in global units
 LOCAL_SCALE = 0.25         # global units -> map units (the converter's scale)
 LIMIT = 2000000            # the engine's bound on a global coordinate (aw_world.c)
-AREA_ALIASES = {'seyda_neen': 'seyda', 'seydaneen': 'seyda', 'vivec': 'vivec_arena', 'arena': 'vivec_arena'}
+# vivec / arena: all of Vivec in one CHIM frame (the default since 2026-10-11; the Arena-only frame vivec_arena is a
+# retired legacy area, tools/retired_flags.py)
+AREA_ALIASES = {'seyda_neen': 'seyda', 'seydaneen': 'seyda', 'vivec': 'vivec_city', 'arena': 'vivec_city'}
 # The engine's buffers (aw_miniwind.h): one byte for the terminator.
 START_CHARS, CHARACTER_CHARS = 95, 127
 DEFAULT_CHARACTER = {'race': 'Nord', 'class': 'Barbarian', 'birth': 'Charioteer', 'female': False, 'name': 'Hors'}
 NAME_CHARS = 31
-NO_INTERIORS_NOTE = ('towns imported from config/towns.json (the Vivec Arena) have no converted interiors yet '
-                     '(IMPORT-TOWN-NO-INTERIORS-32)')
+# Kept for older callers: town-table rooms ARE converted by their town's stage (the Vivec Arena Pit since v0.0.35,
+# eecb4eb); only rooms listed with an "exclude" reason are not (BUILD-MINIWIND-ARENA-PIT-REFUSED-36).
+NO_INTERIORS_NOTE = ('a room the town table lists with an "exclude" reason is not converted yet; every other listed '
+                     'room is built by its town stage (config/towns.json towns, "interiors")')
+
+
+def interior_reason(cell, root=ROOT):
+    """Why an interior is not in a build, from what the repository knows about it: the town that converts it (the
+    build must hold that town: --miniwind-town TOWN or the town in the build), its exclusion reason, or unknown."""
+    from town_config import town_interiors
+    room = next((r for r in town_interiors(Path(root)) if r['cell'].casefold() == cell.casefold()), None)
+    if room is None:
+        return ('no converted room has this cell ID (the converted rooms: config/seyda_area.json, '
+                'config/balmora_interiors.json and the "interiors" of the config/towns.json towns)')
+    if room['exclude']:
+        return 'the town %s lists it but does not convert it yet: %s' % (room['town'], room['exclude'])
+    return ('it is converted with the town %s (map %s), which this build does not hold: build that town '
+            '(--miniwind-town %s, or a MiniWind build whose start is in it)' % (room['town'], room['map'], room['town']))
 
 
 class Start:
@@ -140,11 +158,24 @@ def parse(text, root=ROOT):
 # ------------------------------------------------------------------ what a build holds
 
 def scene_rows(root=ROOT):
+    """Every converted interior a build can hold: the Seyda Neen and Balmora scenes, and the rooms the town table
+    lists (config/towns.json towns' "interiors", converted by their town stage, e.g. the Vivec Arena Pit vai000);
+    a listed room with an "exclude" reason is not converted and is left out (BUILD-MINIWIND-ARENA-PIT-REFUSED-36)."""
     rows = []
     for name in ('seyda_area.json', 'balmora_interiors.json'):
         path = Path(root) / 'config' / name
         if path.is_file():
             rows += json.loads(path.read_text(encoding='utf-8')).get('scenes', [])
+    from town_config import room_takers, town_interiors
+    known = {(row.get('cell') or '').casefold() for row in rows}
+    takers = room_takers(Path(root))
+    for room in town_interiors(Path(root)):
+        if room['exclude'] is None and room['cell'].casefold() not in known:
+            # the area that holds the room: the town that takes its town's rooms (vivec_city takes the Vivec
+            # districts'), else its own town; 'district' keeps the listing town (a legacy district build)
+            rows.append({'map': room['map'], 'cell': room['cell'], 'interior': True,
+                         'area': takers.get(room['town'], room['town']), 'district': room['town'],
+                         'town_table': True})
     return rows
 
 
@@ -176,10 +207,15 @@ def build_scope(towns, world, interiors_excluded=False, miniwind_scope=None, roo
             if scene['map'] in START_MAPS:
                 interiors[scene['cell'].casefold()] = (scene['map'], area)
                 continue
+            if area not in towns and scene.get('district') in towns:
+                area = scene['district']        # a legacy district build (retired, --override vivec-districts)
             if opening or area not in towns or miniwind_scope == 'exterior':
                 continue
-        elif area not in towns or (interiors_excluded and not opening):
-            continue
+        else:
+            if area not in towns and scene.get('district') in towns:
+                area = scene['district']
+            if area not in towns or (interiors_excluded and not opening):
+                continue
         interiors[scene['cell'].casefold()] = (scene['map'], area)
     cells = {}
     for town in towns:
@@ -188,30 +224,123 @@ def build_scope(towns, world, interiors_excluded=False, miniwind_scope=None, roo
     return {'towns': list(towns), 'interiors': interiors, 'world': bool(world), 'cells': cells}
 
 
+def valid_starts(scope):
+    """What a build holds, as the starts it can take (for refusals): its areas, interiors and cells."""
+    parts = ['areas: ' + (', '.join(scope['towns']) or 'none')]
+    rooms = sorted(scope['interiors'])
+    parts.append('interiors: %d%s' % (len(rooms), ' (e.g. ' + ', '.join('"interior:%s"' % r for r in rooms[:3]) + ')'
+                                      if rooms else ''))
+    if scope['world']:
+        parts.append('cells and positions: the whole open world')
+    else:
+        cells = sorted(scope['cells'])
+        parts.append('cells: ' + ((' '.join('cell:%d,%d' % c for c in cells[:12]) + (' ...' if len(cells) > 12 else ''))
+                                  if cells else 'none') + ' (pos: inside them)')
+    return '; '.join(parts)
+
+
 def check(start, scope):
-    """The start point against what the build holds (before any stage runs); returns the start."""
+    """The start point against what the build holds (before any stage runs); returns the start. A start outside
+    the built content is refused, naming what the build holds (never a silent fallback: BUILD-MINIWIND-DIRECT-START-
+    TOWN-36)."""
+    holds = '. This build holds ' + valid_starts(scope)
     if start.kind == 'area':
         if start.town not in scope['towns']:
-            raise ValueError('%s %s: %s is not in this build (it holds %s)'
-                             % (OPTION, start.text, start.title, ', '.join(scope['towns']) or 'no town'))
+            raise ValueError('%s %s: %s is not in this build%s' % (OPTION, start.text, start.title, holds))
         return start
     if start.kind == 'interior':
         row = scope['interiors'].get(start.cell.casefold())
         if row is None:
-            held = sorted(scope['interiors'])
-            raise ValueError('%s "%s": the interior "%s" is not in this build. %s. This build holds %d interiors%s'
-                             % (OPTION, start.text, start.cell, NO_INTERIORS_NOTE[0].upper() + NO_INTERIORS_NOTE[1:],
-                                len(held), '' if not held else ' (the converted Seyda Neen and Balmora rooms; '
-                                'their cell IDs are in config/seyda_area.json and config/balmora_interiors.json)'))
+            raise ValueError('%s "%s": the interior "%s" is not in this build: %s%s'
+                             % (OPTION, start.text, start.cell, interior_reason(start.cell), holds))
         start.map, start.town = row
         return start
     cell = (int(start.gx // CELL_UNITS), int(start.gy // CELL_UNITS))
     if not scope['world'] and cell not in scope['cells']:
-        raise ValueError('%s %s: cell %d,%d is outside the area this build holds (cells %s)'
-                         % (OPTION, start.text, cell[0], cell[1],
-                            ', '.join('%d,%d' % c for c in sorted(scope['cells'])) or 'none'))
+        raise ValueError('%s %s: cell %d,%d is outside the area this build holds%s'
+                         % (OPTION, start.text, cell[0], cell[1], holds))
     start.cell_xy = list(cell)
     return start
+
+
+TOWN_INTERIORS_STAGE_BUG = 'BUILD-MINIWIND-ARENA-PIT-REFUSED-36'
+
+
+def require_built_interior(start, native_towns, root=ROOT):
+    """A room the town table lists is converted by its town's legacy import stage (town-<town>) or, for a CHIM-native
+    town, by its chim-rooms-<town> stage (tools/chim_rooms.py). NATIVE_TOWNS: the CHIM-native towns whose plan has no
+    such stage; a start in one of their rooms is refused before any stage (BUILD-MINIWIND-ARENA-PIT-REFUSED-36)."""
+    if start.kind != 'interior':
+        return start
+    from town_config import town_interiors
+    room = next((r for r in town_interiors(Path(root)) if r['cell'].casefold() == start.cell.casefold()), None)
+    if room is not None and (start.town or room['town']) in native_towns:
+        raise ValueError('%s "%s": the room %s (map %s) is made by no stage of this build: the legacy town stage '
+                         'town-%s does not run for a CHIM-native %s and the plan has no chim-rooms stage (%s)'
+                         % (OPTION, start.text, room['cell'], room['map'], room['town'], room['town'],
+                            TOWN_INTERIORS_STAGE_BUG))
+    return start
+
+
+def start_town(start, root=ROOT):
+    """The town a start point lies in, for a partial-area build to hold: an area start's town, an interior's
+    town (its scene row), a cell or position inside a town's grid; None when no town holds it."""
+    if start.kind == 'area':
+        return start.town
+    if start.kind == 'interior':
+        row = next((r for r in scene_rows(root) if (r.get('cell') or '').casefold() == start.cell.casefold()), None)
+        return row.get('area', 'seyda') if row else None
+    cell = (int(start.gx // CELL_UNITS), int(start.gy // CELL_UNITS))
+    for town in towns_table(root):
+        if cell in town_grid(town['id'], root):
+            return town['id']
+    return None
+
+
+def image_start_check(id1, start, report=None):
+    """Image step, before packing (seconds): the boot start of a partial-area build exists in the final payload
+    and stands on collision. START: {'map': the start map or town, 'arrival': [x, y, z] or None, 'source': ...}.
+    Raises ValueError; returns (and writes to REPORT) the record."""
+    from map_files import map_file, is_chim_frame
+    maps = Path(id1) / 'maps'
+    candidates = [start['map'], start['map'] + '-chim']
+    found = next((map_file(maps, name) for name in candidates if map_file(maps, name).is_file()), None)
+    record = dict(start, ok=False)
+    if found is None:
+        raise ValueError('start check: the start map %s is not in the image (looked for %s); the player would start '
+                         'outside the built content' % (start['map'], ', '.join('maps/' + n + '.{chim,bsp}'
+                                                                                for n in candidates)))
+    record['map_file'] = 'maps/' + found.name
+    if start.get('arrival') is not None and not is_chim_frame(found):
+        from arrival_spot import Collision, standing_spot
+        try:
+            spot = standing_spot(Collision(found.read_bytes()), tuple(start['arrival']))
+        except ValueError as error:
+            # The tool tracer's visit limit (audit_walkability.Scene.trace) stops on some routed-hull rooms whose
+            # clipnode tails are shared (the Vivec Arena Pit; COLLISION-TRACE-LIMIT-ROUTED-ROOM-36); the engine's own
+            # hull check has no such limit. The spot is then not refused, and the record says it was not traced.
+            record.update(ok=True, collision='not traced by the tool tracer (%s); COLLISION-TRACE-LIMIT-ROUTED-ROOM-36'
+                          % error)
+            print('WARNING: start check: %s %s not traced: %s (COLLISION-TRACE-LIMIT-ROUTED-ROOM-36)'
+                  % (start['map'], ' '.join(_number(v) for v in start['arrival']), error), flush=True)
+            if report is not None:
+                Path(report).write_text(json.dumps(record, indent=2) + chr(10), encoding='utf-8', newline=chr(10))
+            return record
+        if spot is None:
+            raise ValueError('start check: no standing spot near %s %s on the collision of %s (the arrival search of the engine '
+                             'search would find no floor)' % (start['map'], ' '.join(_number(v) for v in start['arrival']),
+                                                               record['map_file']))
+        record['standing_spot'] = list(spot)
+        record['collision'] = 'standing spot on the final map (arrival_spot.standing_spot, the search the engine uses)'
+    elif start.get('arrival') is not None:
+        record['collision'] = ('resolved on the region collision before the CHIM rewrite (the same collision as the '
+                               'CHIM chunks)')
+    else:
+        record['collision'] = 'the town arrival (arrival gate of the image step or the CHIM frame)'
+    record['ok'] = True
+    if report is not None:
+        Path(report).write_text(json.dumps(record, indent=2) + chr(10), encoding='utf-8', newline=chr(10))
+    return record
 
 
 def check_cell_exists(start, data_files):

@@ -11,6 +11,7 @@
 #include "aw_region.h"
 #include "aw_town.h"
 #include "aw_section.h"
+#include "aw_mappath.h"
 #include "aw_world.h"
 #include "chim/chim.h"
 #include "aw_character.h"
@@ -23,7 +24,10 @@
  * runs its frame map; 0 on a legacy map. */
 static int harvest_follow(edict_t *p,int arrival){return AW_HarvestFollow(AW_RegionAt,p->v.origin,arrival);}
 typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,maxs;float yaw;int bounds;unsigned reference;} aw_scene_link_t;
-static aw_scene_link_t links[128];static int count,loaded,pending;
+/* One door bank: the doors of one map (all of Vivec in one CHIM frame holds 157 load doors; tools/town_interiors.py
+ * BANK_ROWS follows this, IMPORT-DOORBANK-LIMIT-32). */
+#define AW_SCENE_LINKS 256
+static aw_scene_link_t links[AW_SCENE_LINKS];static int count,loaded,pending;
 static aw_scene_link_t next;
 static char links_map[16];
 static double door_ready;
@@ -187,7 +191,7 @@ static edict_t *npc_target(void) {
 }
 const char *AW_SceneTargetName(void) {
     edict_t *driver;
-    if(!target_names.value || key_dest!=key_game || pending || AW_CharacterActive() ||
+    if(!target_names.value || key_dest!=key_game || pending || AW_PlayerDead() || AW_CharacterActive() ||
        AW_ReaderActive() || AW_IntroPromptActive() ||
        (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
     driver=travel_target();if(driver)return pr_strings+driver->v.netname;
@@ -199,7 +203,9 @@ const char *AW_SceneWorldModel(const char *name) {
     if(region)return region;
     if(!strcmp(name,"seyda") && intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE){
-        if(COM_FOpenFile("maps/intro_docks.bsp",&f)>=0 && f){fclose(f);return "maps/intro_docks.bsp";}
+        static char docks[AW_MAP_PATH_SIZE];
+        AW_MapPath("intro_docks",docks,sizeof(docks));
+        if(COM_FOpenFile(docks,&f)>=0 && f){fclose(f);return docks;}
         if(f)fclose(f);
         Con_Printf("Intro docks variant missing; retaining full exterior.\n");
     }
@@ -207,7 +213,7 @@ const char *AW_SceneWorldModel(const char *name) {
 }
 int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_MapId(sv.name)>=0 && AW_TownFind(sv.name)<0 && AW_TerrainId(sv.name)<0));}
 /* ENGINE-SCENE-NAME-BOUND-35: map names go into 16-byte fields; copy bounded. */
-static void copy_name(char *out,size_t size,const char *in){strncpy(out,in,size-1);out[size-1]=0;}
+static void copy_name(char *out,size_t size,const char *in){Q_strcpy_bounded(out,in,size);}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
 static void read_links_for(const char *map) {
     FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
@@ -222,7 +228,7 @@ static void read_links_for(const char *map) {
         if(!fgets(line,sizeof(line),f)){fclose(f);return;}
         version=!strcmp(line,"AWD3\n")?3:!strcmp(line,"AWD2\n")?2:!strcmp(line,"AWD1\n")?1:0;
         if(!version){fclose(f);return;}
-        while(count<128 && fgets(line,sizeof(line),f)) {
+        while(count<AW_SCENE_LINKS && fgets(line,sizeof(line),f)) {
             memset(&r,0,sizeof(r));
             if(version==3)n=Q_sscanf(line,"%15s %15s %u %f %f %f %f %f %f %f %f %f %f %95[^\r\n]",r.source,r.target,&r.reference,
                 &r.mins[0],&r.mins[1],&r.mins[2],&r.maxs[0],&r.maxs[1],&r.maxs[2],
@@ -242,7 +248,7 @@ static void read_links_for(const char *map) {
     }
     if(AW_TownFlag(map,AW_TOWN_OWN_DOORS) || AW_MapId(map)>=AW_MAP_COUNT)return;
     if(COM_FOpenFile("scene-links.txt",&f)<0 || !f)return;
-    while(count<128 && fgets(line,sizeof(line),f)) {
+    while(count<AW_SCENE_LINKS && fgets(line,sizeof(line),f)) {
         memset(&r,0,sizeof(r));
         n=Q_sscanf(line,"%15s %15s %f %f %f %f %f %f %f %c",r.source,r.target,
             &r.point[0],&r.point[1],&r.point[2],&r.arrival[0],&r.arrival[1],&r.arrival[2],&r.yaw,&extra);
@@ -293,7 +299,7 @@ int AW_MapTeleportAt(const float *source_position,int use_height) {
     memset(&r,0,sizeof(r));
     if(!AW_WorldMapTarget(source_position,r.target,r.arrival))return 0;
     if(use_height){
-        if(!AW_SourceToWorld(r.target,source_position,local) || !(fabs(local[2])<4000))return 0;
+        if(!AW_SourceToWorld(r.target,source_position,local) || !(fabs(local[2])<AW_COORD_BOUND))return 0;
         r.arrival[2]=local[2];
     }
     r.yaw=p->v.v_angle[1];region_crossing=0;door_ready=0;door_close=0;
@@ -401,7 +407,9 @@ int AW_TravelDraw(void) {
     AW_UISmallEnd();return 1;
 }
 int AW_SceneUse(void) {
-    int i;float duration;char path[40];if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && AW_HarvestUse())return 1;i=aimed_door();if(i<0)return 0;
+    int i;float duration;char path[40];
+    if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
+    i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && AW_HarvestUse())return 1;i=aimed_door();if(i<0)return 0;
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){
@@ -428,7 +436,7 @@ static const char *npc_hint(void)
 void AW_SceneDraw(void) {
     int i,y,w,cw,npc=0;char line[80];edict_t *driver;const char *name=NULL,*action=NULL;extern int scr_copyeverything;
     if(!AW_UISpeakerAtRight() || target_style.value!=2)AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
-    if(key_dest!=key_game || pending || AW_IntroUse() || !sv.active ||
+    if(key_dest!=key_game || pending || AW_IntroUse() || AW_PlayerDead() || !sv.active ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
     driver=travel_target();
@@ -730,7 +738,10 @@ static void scene_command(void) {
     if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
        !Q_strcasecmp((char *)s,"town"))s="town";
     else if(!Q_strcasecmp((char *)s,"ship") || !Q_strcasecmp((char *)s,"prisonship"))s="ship";
-    /* Short name while the Arena is the only Vivec town (DEBUG-TP-TOWN-NAMES-32). */
+    /* Short names (DEBUG-TP-TOWN-NAMES-32): "vivec" is the whole city when this disk holds it
+     * (vivec_city, one CHIM frame), else the Arena canton; "arena" is the Arena canton. */
+    else if(!Q_strcasecmp((char *)s,"vivec") && AW_TownFind("vivec_city")>=0 &&
+            AW_SceneMapSize("vivec_city",NULL,0)>=124)s="vivec_city";
     else if((!Q_strcasecmp((char *)s,"vivec") || !Q_strcasecmp((char *)s,"arena")) &&
             AW_TownFind("vivec_arena")>=0)s="vivec_arena";
     else{
@@ -993,7 +1004,8 @@ static void demo_start(void) {
          * normal spawn path still checks the standing hull and nearby exits. */
         Cbuf_AddText("map seyda\n");
     } else {
-        if(COM_FOpenFile("maps/prison.bsp",&f)>=0 && f) {
+        char prison[AW_MAP_PATH_SIZE];
+        if(COM_FOpenFile(AW_MapPath("prison",prison,sizeof(prison)),&f)>=0 && f) {
             fclose(f);Cbuf_AddText("map prison\n");
         } else Cbuf_AddText("map seyda\n");
     }

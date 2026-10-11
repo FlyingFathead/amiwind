@@ -6,8 +6,11 @@ Lists every stage that was NOT reused with the recorded reason, and classifies i
 
 - EXPECTED: a real input change (the stage's own fingerprint changed: its code, data files, game inputs,
   tools, settings or a stage it depends on), a stage that never reuses by policy (engine, the image), a stage
-  that had not passed in the old run, an older fingerprint format, or a stage that follows an EXPECTED
-  rebuild of a stage before it;
+  that had not passed in the old run, an older fingerprint format, a stage that follows an EXPECTED
+  rebuild of a stage before it, or a stage the old run itself reused without some of its files (a later
+  stage replaced them there) that runs again because that later stage runs again
+  (BUILD-REUSE-REDUCED-RECORD-36; it takes the class of the stages that replaced the files,
+  BUILD-REUSE-AUDIT-WITHOUT-REASON-36);
 - UNEXPECTED: anything else (a record refused for an undeclared run-folder entry or an overlap, a missing or
   damaged old output, outputs of a rebuilt stage that differ although its inputs did not change, or a source
   change confined to files no stage output can depend on: the release file list, prose, tests). An unexpected
@@ -32,6 +35,35 @@ if str(Path(__file__).resolve().parent) not in sys.path:  # run as a script; nev
 NEVER_AN_INPUT = (re.compile(r'^tools/release-files\.json$'), re.compile(r'^docs/'), re.compile(r'\.md$'),
                   re.compile(r'^tests/'))
 POLICY = ('engine', 'image', 'dry-run-image')
+# build_cache.plan_reuse: '<old run> reused it without <path> (replaced there by <stages>), which this build runs
+# again' - the old run's record of this stage is short a file a later stage replaced; the stage runs again so that
+# it is never reused with that file missing (BUILD-REUSE-REDUCED-RECORD-36). It follows the stages named.
+REDUCED_RECORD = re.compile(r' reused it without (.+) \(replaced there by (.*)\), which this build runs again$')
+
+
+def followed_stages(reason):
+    """The stages a FOLLOWS rebuild depends on, from its recorded reason."""
+    reduced = REDUCED_RECORD.search(reason)
+    if reduced:
+        return [name for name in (part.strip() for part in reduced.group(2).split(','))
+                if re.fullmatch(r'[a-z0-9_-]+', name)]
+    return re.findall(r'by ([a-z0-9_-]+), which is rebuilt', reason) \
+        + re.findall(r'and ([a-z0-9_-]+) \(reused\)', reason)
+
+
+def resolve_follows(rows, classes):
+    """A FOLLOWS row takes the class of the rebuilds it follows: UNEXPECTED when a stage it names was rebuilt
+    UNEXPECTED (after that stage's own FOLLOWS is resolved), else EXPECTED (rebuilt for an expected reason, or
+    not rebuilt at all). CLASSES ({stage: class}) is updated."""
+    pending = [row for row in rows if row['class'] == 'FOLLOWS']
+    while pending:
+        ready = [row for row in pending if not any(classes.get(n) == 'FOLLOWS' and n != row['stage']
+                                                   for n in followed_stages(row['reason']))]
+        for row in ready or pending:  # only a cycle of FOLLOWS rows is never ready: none of them is unexpected yet
+            upstream = [classes.get(n) for n in followed_stages(row['reason']) if n != row['stage']]
+            row['class'] = 'UNEXPECTED' if 'UNEXPECTED' in upstream else 'EXPECTED'
+            classes[row['stage']] = row['class']
+        pending = [row for row in pending if row['class'] == 'FOLLOWS']
 
 
 def load(path):
@@ -104,8 +136,23 @@ def classify(name, reason, ctx):
         return 'UNEXPECTED', 'record refused', reason
     if reason.startswith(('reuse would depend on rebuilt stages', 'its output ')):
         return 'FOLLOWS', 'replaced outputs', reason
+    if REDUCED_RECORD.search(reason):
+        return 'FOLLOWS', 'reduced record', reason
     if reason.startswith('an earlier stage it depends on ran again and its outputs differ'):
         upstream = [s.strip() for s in reason.rsplit(':', 1)[1].split(',')]
+        if upstream and ctx.get('run') is not None and ctx.get('old_run') is not None:
+            # Compare again by content (SHA-256; modes without write bits): an upstream stage that really wrote
+            # different outputs after an expected rebuild is a reason to run; one whose outputs are identical
+            # never is (BUILD-REUSE-CUTOFF-MODE-36: read-only reused copies counted as different).
+            from build_cache import same_outputs
+            identical = [s for s in upstream if same_outputs(ctx['run'], ctx['old_run'], s)]
+            changed = [s for s in upstream if s not in identical and ctx['classes'].get(s, 'EXPECTED') == 'EXPECTED']
+            if changed:
+                note = f" (identical by content: {', '.join(identical)})" if identical else ''
+                return 'EXPECTED', 'upstream changed', reason + ' [changed by content: ' + ', '.join(changed) + note + ']'
+            if identical and len(identical) == len(upstream):
+                return ('UNEXPECTED', 'refused with identical outputs',
+                        reason + ' [identical by content: ' + ', '.join(identical) + ']')
         if upstream and all(ctx['causes'].get(s) == 'input change' for s in upstream):
             return 'EXPECTED', 'upstream changed', reason
         # Which upstream stage really wrote different outputs, or whose old record could not be compared.
@@ -142,12 +189,7 @@ def report(run):
         ctx['classes'][name], ctx['causes'][name] = verdict, cause
         rows.append({'stage': name, 'class': verdict, 'cause': cause, 'reason': not_reused[name], 'detail': detail})
     # A stage that only follows replaced outputs takes the class of the rebuild it follows.
-    for row in rows:
-        if row['class'] == 'FOLLOWS':
-            named = re.findall(r'by ([a-z0-9_-]+), which is rebuilt', row['reason']) \
-                or re.findall(r'and ([a-z0-9_-]+) \(reused\)', row['reason'])
-            upstream = [ctx['classes'].get(n) for n in named]
-            row['class'] = 'UNEXPECTED' if 'UNEXPECTED' in upstream else 'EXPECTED'
+    resolve_follows(rows, ctx['classes'])
     stages = len(order)
     really_reused = len([n for n in reused if not reused[n].get('refused')])
     unexpected = [row for row in rows if row['class'] == 'UNEXPECTED']
@@ -198,11 +240,7 @@ def preflight(order, reasons, details, old_details, old_sources, files, reused=(
         ctx['classes'][name], ctx['causes'][name] = verdict, cause
         rows.append({'stage': name, 'class': verdict, 'cause': cause, 'reason': reasons[name], 'detail': detail,
                      'diff_files': touching})
-    for row in rows:
-        if row['class'] == 'FOLLOWS':
-            named = re.findall(r'by ([a-z0-9_-]+), which is rebuilt', row['reason']) \
-                + re.findall(r'and ([a-z0-9_-]+) \(reused\)', row['reason'])
-            row['class'] = 'UNEXPECTED' if 'UNEXPECTED' in [ctx['classes'].get(n) for n in named] else 'EXPECTED'
+    resolve_follows(rows, ctx['classes'])
     taken = set(reused)
     return {'format': 'AmiWind reuse preflight 1', 'stages': len(order),
             'reused': sum(name in taken for name in order), 'rebuilt': len(rows),

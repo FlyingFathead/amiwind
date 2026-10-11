@@ -7,6 +7,8 @@
     "STAIRS-BALMORA-WESTSOUTH-32": {"refs": [384371], "model": "in_hlaalu_hall_stairsl"},
     "STAIRS-SEYDA-LIGHTHOUSE-32": {"refs": [114026, 129152], "model": "x/ex_common_lighthouse, in_common_lighthouse"},
     "STAIRS-SEYDA-WAREHOUSE-32": {"refs": [321953], "model": "in_common_tower_thatch"},
+    "STAIRS-EBONHEART-CHIM-36": {"refs": [113805, 124459, 124537], "model": "Ebonheart edge of the whole-city Vivec frame"},
+    "STAIRS-VIVEC-ROOMS-JOINT-36": {"refs": [180421, 181885, 187806, 187808, 187809, 187813], "model": "stair pieces of rooms vdi012, voi025, vri000"},
     "VIVEC-TEMPLE-STAIRS-33": {"refs": [428484, 428530, 484457, 484458], "model": "x/ex_v_palace_steps_01, x/ex_vivec_hfq_01, x/ex_vivec_hfq_04"}
   }
 }

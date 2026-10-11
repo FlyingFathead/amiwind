@@ -16,7 +16,10 @@ python3 tools/chim/stats.py OUT [--legacy-maps DIR --legacy-regions FILE] [--cam
 `OUT` is the builder output folder. With no `--camera`, the area's benchmark cameras
 are used: the `dbg tp` positions in
 [HARDWARE-BENCHMARK.md](../HARDWARE-BENCHMARK.md#frame-time-in-the-game). The tool
-refuses a world that fails validation.
+refuses a world that fails validation. Inside a build, chim_build validates the world once and
+hands the validated world and its measurements to the statistics, which add the benchmark cameras
+on top: the same file, without a second validation of the whole world
+([BUILD-CHIM-STATS-SERIAL-TAIL-36](../bugs/BUILD-CHIM-STATS-SERIAL-TAIL-36.md)).
 
 ## Schema `chim-stats 1`
 

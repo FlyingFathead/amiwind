@@ -23,7 +23,7 @@ import math
 import struct
 from pathlib import Path
 
-from chim import BUILDER, CHIM_VERSION, FORMAT_VERSION
+from chim import BUILDER, CHIM_VERSION, FORMAT_VERSION, REFS_FORMAT_VERSION
 from chim import format as F
 from chim.visibility import bits_to_row, compress_row
 
@@ -193,6 +193,27 @@ def chunk_visibility(world, terrain, by_chunk, variants, visibility, jobs=1, cac
     return {c: seen[c] & ring[c] for c in world.order}, pvl, stats
 
 
+def placed_tree(unit, cache):
+    """The tree a placement's leaves are counted on: the unit's own TerrainTree, or for a referenced unit
+    ('offset', format 0.7) the tree of its image as the engine places it (chim.format.translate_image, single
+    precision planes), so the builder, the validator and the engine count the same leaves."""
+    d = unit.get('offset')
+    if not d:
+        return unit['info']['tree']
+    key = id(unit)
+    if key not in cache:
+        import numpy as np
+        from chim.terrain import TerrainTree
+        lumps = F.read_brush_image(F.translate_image(F.brush_image(unit['lumps'])[0], d))
+        planes = list(struct.iter_unpack('<4fi', lumps[1]))
+        tree = TerrainTree()
+        tree.nodes = [(np.array(planes[n[0]][:3]), planes[n[0]][3], n[1], n[2])
+                      for n in struct.iter_unpack('<ihh6h2H', lumps[5])]
+        tree.leaves = [lf[0] for lf in struct.iter_unpack('<2i6h2H4B', lumps[10])]
+        cache[key] = tree
+    return cache[key]
+
+
 def resolved_image(lumps, texture_keys, texture_id_of):
     """A unit's brush image with its texture keys turned into global texture ids.
 
@@ -221,6 +242,19 @@ def write_if_changed(path, data):
     tmp.write_bytes(data)
     tmp.replace(path)
     return True
+
+
+SECTOR_GROUP = 64       # sector files per subdirectory of a frame too large for one FFS directory
+
+
+def sector_path(index, count):
+    """A sector file's path below its frame directory: beside frame.ccf while the frame's files fit one
+    classic FFS directory (every frame up to 8 x 8 sectors: the paths are unchanged), else in groups
+    of SECTOR_GROUP (g0/, g1/, ...), as a frame with a terrain-only margin needs (10 x 10 sectors for
+    bcoast_x7y2, CHIM-FAR-BAND-GAP-36). The engine opens every file by its index path."""
+    if count + 1 <= F.FFS_MAX_DIRECTORY_ENTRIES:
+        return F.sector_name(index)
+    return 'g%d/%s' % (index // SECTOR_GROUP, F.sector_name(index))
 
 
 CHIM_SUFFIXES = ('.cwi', '.ccf', '.ccs', '.ccp', '.cmp', '.ctp', '.tmp')
@@ -258,8 +292,14 @@ def build_world(out, frame, placements, variants, textures, terrain, settings=No
 
 
 def frame_box(frame):
-    """A frame's ground box in Morrowind units (x0, y0, x1, y1): centre + 4 x the frame-local box."""
-    c, (lx, ly), (sx, sy) = frame['centre'], frame['low'], frame['span']
+    """A frame's owned box in Morrowind units (x0, y0, x1, y1): centre + 4 x the frame-local box. The box
+    is the frame's ground, or, for a frame with a terrain-only margin, the box it owns ('owned': its bounds):
+    neighbouring frames may share margin terrain (each stores its own copy), never placements."""
+    c = frame['centre']
+    if frame.get('owned'):
+        (lx, ly), (hx, hy) = frame['owned']
+        return (c[0] + 4 * lx, c[1] + 4 * ly, c[0] + 4 * hx, c[1] + 4 * hy)
+    (lx, ly), (sx, sy) = frame['low'], frame['span']
     return (c[0] + 4 * lx, c[1] + 4 * ly, c[0] + 4 * (lx + sx), c[1] + 4 * (ly + sy))
 
 
@@ -300,7 +340,14 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     root = Path(out) / 'chim'
     texture_ids, texture_content, texture_records, texture_names = {}, {}, [], {}
     model_ids, model_content, model_records, aliases, model_names = {}, {}, [], [], {}
-    homed = {'textures': [], 'models': []}      # ids first met in the sector being assembled
+    homed = {'textures': [], 'models': [], 'terrain': []}     # ids first met in the sector being assembled
+    # Terrain references (format 0.7): a chunk terrain unit with an 'offset' is chunk-local; its image is stored
+    # once per content (a TERR record homed in the sector that first meets it) and placed by every chunk with it.
+    refs = any('offset' in t for spec in frames for t in spec['terrain'].values())
+    if refs and not all('offset' in t for spec in frames for t in spec['terrain'].values()):
+        raise ValueError('Terrain references are all or nothing in one world')
+    version = REFS_FORMAT_VERSION if refs else FORMAT_VERSION
+    terrain_content, terrain_records, terrain_at = {}, [], {}
 
     def texture_id_of(fi, key):
         if (fi, key) not in texture_ids:
@@ -368,6 +415,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             by_chunk[owner]['owned'].append(p)
             rows_in.append(p)
         base = pid
+        trees = {}
         for c in world.order:
             for p in sorted(by_chunk[c]['owned'], key=lambda q: q['ref']):
                 p['_pid'] = pid
@@ -377,7 +425,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
         owned_total = pid - base
         for p in rows_in:
             lo, hi = p['_box']
-            p['_leaves'] = sum(len(terrain[c]['info']['tree'].leaves_touched(lo, hi)) for c in p['_touched'])
+            p['_leaves'] = sum(len(placed_tree(terrain[c], trees).leaves_touched(lo, hi)) for c in p['_touched'])
         with section('visibility rows'):
             pvs, pvl, vis_stats = chunk_visibility(world, terrain, by_chunk, variants, spec.get('visibility'),
                                                    jobs, cache)
@@ -393,12 +441,23 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             chunk_rows, sector_rows, sector_blobs = [], [], []
             first_row = len(files) + 1                     # the frame file's row; its sectors follow
             for si, sector in enumerate(world.sectors):
-                homed['textures'], homed['models'] = [], []
-                records, chunk_meta = [], []
+                homed['textures'], homed['models'], homed['terrain'] = [], [], []
+                records, chunk_meta, ref_at = [], [], {}
                 for c in world.order[si * S * S:(si + 1) * S * S]:
                     info = terrain[c]['info']
                     image, image_render = resolved_image(terrain[c]['lumps'], terrain[c]['texture_keys'],
                                                          lambda k: texture_id_of(fi, k))
+                    if refs:
+                        shift = terrain[c]['offset']
+                        why = F.refuse_shift(image, shift)
+                        if why:
+                            raise ValueError('Chunk %s of frame %s: terrain cannot be referenced: %s' % (c, cell, why))
+                        digest = hashlib.sha256(image).hexdigest()
+                        if digest not in terrain_content:
+                            terrain_content[digest] = len(terrain_records)
+                            terrain_records.append((image, image_render))
+                            homed['terrain'].append(terrain_content[digest])
+                        ref_at[c] = (terrain_content[digest], shift)
                     rows = {}
                     for kind in ('owned', 'reach'):
                         rows[kind] = [F.placement(p['_pid'], p['ref'], model_id_of(fi, p['variant']), p['origin'],
@@ -412,22 +471,44 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     pbits = [False] * owned_total
                     for q in pvl[c]:
                         pbits[q - base] = True
-                    data, render, collision = F.chunk_record(rows['owned'], rows['reach'],
-                                                             compress_row(bits_to_row(bits)), image, image_render,
-                                                             info.get('leaves', 0), compress_row(bits_to_row(pbits)))
+                    if refs:
+                        # the reference block is written with its record's place once the sector is laid out
+                        tid, shift = ref_at[c]
+                        data, render, collision = F.chunk_record_ref(
+                            rows['owned'], rows['reach'], compress_row(bits_to_row(bits)),
+                            F.terrain_ref(tid, 0, 0, 0, 0, shift), info.get('leaves', 0),
+                            compress_row(bits_to_row(pbits)))
+                    else:
+                        data, render, collision = F.chunk_record(rows['owned'], rows['reach'],
+                                                                 compress_row(bits_to_row(bits)), image, image_render,
+                                                                 info.get('leaves', 0), compress_row(bits_to_row(pbits)))
                     records.append((b'CHNK', world.chunk_index[c], data))
                     chunk_meta.append((c, render, collision, len(rows['owned']), len(rows['reach']),
                                        int(math.floor(info['zmin'])), int(math.ceil(info['zmax']))))
                     terrain_info['%d,%d/%d,%d' % (cell[0], cell[1], c[0], c[1])] = \
                         {k: v for k, v in info.items() if k != 'tree'}
-                # Models and textures first needed in this sector live here, after its chunks.
+                # Terrain, models and textures first needed in this sector live here, after its chunks.
+                records += [(b'TERR', tid, terrain_records[tid][0]) for tid in homed['terrain']]
                 records += [(b'MODL', mid, model_records[mid][1]) for mid in homed['models']]
                 records += [(b'TEXR', tid, texture_records[tid][1]) for tid in homed['textures']]
-                blob = F.sector_file(records)
+                blob = F.sector_file(records, version)
                 if len(blob) > F.FFS_MAX_PACK:
                     raise ValueError('Sector file exceeds the 1 GiB file limit')
                 file_row = first_row + si
                 offsets = {(r['kind'], r['id']): r['offset'] for r in F.read_sector(blob)}
+                if refs:
+                    for tid in homed['terrain']:
+                        terrain_at[tid] = (file_row, offsets[(b'TERR', tid)])
+                    # every reference names its record's file row and offset (fixed size: the layout stays)
+                    for k, (kind, cid, data) in enumerate(records):
+                        if kind != b'CHNK':
+                            continue
+                        tid, shift = ref_at[world.order[cid]]
+                        at = len(data) - F.TERRAIN_REF.size
+                        image, image_render = terrain_records[tid]
+                        records[k] = (kind, cid, data[:at] + F.terrain_ref(
+                            tid, terrain_at[tid][0], terrain_at[tid][1], len(image), image_render, shift))
+                    blob = F.sector_file(records, version)
                 for c, render, collision, owned, reach, zmin, zmax in chunk_meta:
                     chunk_rows.append((c[0], c[1], si, offsets[(b'CHNK', world.chunk_index[c])], render, collision,
                                        owned, reach, zmin, zmax))
@@ -436,11 +517,11 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                 for tid in homed['textures']:
                     texture_at[tid] = (file_row, offsets[(b'TEXR', tid)])
                 sector_rows.append((sector[0], sector[1], len(blob), F.crc32(blob)))
-                sector_blobs.append(('%s/%s' % (fdir, F.sector_name(si)), blob, len(records)))
+                sector_blobs.append(('%s/%s' % (fdir, sector_path(si, len(world.sectors))), blob, len(records)))
             frame_rec = {'cell': cell, 'centre': world.frame['centre'], 'low': world.frame['low'],
                          'grain': world.settings['grain'], 'nx': world.nx, 'ny': world.ny, 'sector_chunks': S,
                          'owned_total': owned_total}
-            frame_blob = F.frame_file(frame_rec, chunk_rows, sector_rows)
+            frame_blob = F.frame_file(frame_rec, chunk_rows, sector_rows, version)
             written += [(fdir + '/frame.ccf', frame_blob)] + [(path, blob) for path, blob, _ in sector_blobs]
             files.append({'kind': b'FRAM', 'sector': 0, 'cell': cell, 'bytes': len(frame_blob),
                           'crc': F.crc32(frame_blob), 'entries': len(chunk_rows), 'path': fdir + '/frame.ccf'})
@@ -461,7 +542,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
         first = World(frames[order[0]]['frame'], settings)
         idx_settings = dict(first.settings, terrain_light=terrain_light, placements=pid, models=len(model_records),
                             textures=len(texture_records), frames=len(frames), sector_chunks=first.sector_chunks)
-        index = F.index_file(idx_settings, files, models_dir, textures_dir)
+        index = F.index_file(idx_settings, files, models_dir, textures_dir, version)
     with section('pack write'):
         # Written whole, one after another, in the order they are read: the index, then
         # per frame its frame file and its sector files in pack order (docs/chim/WORLD_FORMAT.md).
@@ -470,7 +551,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
 
     def plain(rec):
         return {k: list(v) if isinstance(v, tuple) else v for k, v in rec.items()}
-    receipt = {'builder': BUILDER, 'chim_version': CHIM_VERSION, 'world_format': '%d.%d' % FORMAT_VERSION,
+    receipt = {'builder': BUILDER, 'chim_version': CHIM_VERSION, 'world_format': '%d.%d' % version,
                'settings': idx_settings,
                'frame': plain(frame_recs[0]['frame']),
                'frames': [dict(r, frame=plain(r['frame'])) for r in frame_recs],
@@ -485,11 +566,23 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                'models': len(model_records), 'model_variants': len(model_ids), 'model_aliases': aliases,
                'textures': len(texture_records), 'texture_keys': len(texture_ids),
                'chunks': sum(r['chunks'] for r in frame_recs),
+               **({'terrain_refs': {'records': len(terrain_records),
+                                    'record_bytes': sum(len(i) for i, _ in terrain_records)}} if refs else {}),
                'visibility': vis_totals,
                'placements_over_16_leaves': over_total,
                'terrain': {'tiles': sum(i['tiles'] for i in terrain_info.values()),
                            'faces': sum(i['faces'] for i in terrain_info.values()),
-                           'water_faces': sum(i['water_faces'] for i in terrain_info.values())}}
+                           'water_faces': sum(i['water_faces'] for i in terrain_info.values()),
+                           # compiled standing hulls that failed the exactness check and kept the routed hull
+                           # (CHIM-COMPILED-HULL-SHORT-36): frame cell / chunk and the measured shortfall
+                           'compiled_hull_fallbacks': sorted(
+                               '%s %s' % (k, i['hull_check']['short']) for k, i in terrain_info.items()
+                               if (i.get('hull_check') or {}).get('fallback')),
+                           # compiled standing hulls the check patched with lost pieces (kept compiled)
+                           'compiled_hull_patched': sorted(
+                               '%s +%d nodes' % (k, i['hull_check'].get('patched_nodes', 0))
+                               for k, i in terrain_info.items()
+                               if (i.get('hull_check') or {}).get('patched_rounds'))}}
     return receipt
 
 

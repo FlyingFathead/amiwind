@@ -110,7 +110,7 @@ typedef struct {const char *name,*command,*planned_keys;} control_t;
 static const control_t controls[]={
     {"Forward","+forward"},{"Back","+back"},{"Strafe left","+moveleft"},{"Strafe right","+moveright"},
     {"Turn left","+left"},{"Turn right","+right"},{"Jump","+jump"},{"Run","+speed"},
-    {"Use","+aw_use"},{"Attack","+attack"},{"Hands","impulse 202"},{"Torch","aw_torch"},
+    {"Use","+aw_use"},{"Attack","+attack"},{"Block","+aw_alt"},{"Hands","impulse 202"},{"Torch","aw_torch"},
     {"Map","aw_worldmap"},{"Journal","aw_journal"},{"Wait","aw_wait"},
     {"Quick save","aw_quicksave"},{"Quick load","aw_quickload"},
     {"Inventory",NULL,"I"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
@@ -118,20 +118,26 @@ static const control_t controls[]={
 /* Then the combat options (docs/COMBAT.md; saved with the game config):
  * Combat style: AmiWind (aw_combat_miss 1, AmiWind extension: a failed roll shows
  * the defender's dodge or block) / Original Morrowind (0: the swish);
- * Dice rolls: On (aw_combat_dice 1, the original rolls) / Off (no dice, extension). */
+ * Dice rolls: On (aw_combat_dice 1, the original rolls) / Off (no dice, extension);
+ * Blocking: Hold to block (aw_combat_block 1, AmiWind extension: the block button raises the
+ * shield, the original formula decides each blow) / Automatic (0: the original). */
 #define CONTROL_STYLE CONTROL_ACTIONS
 #define CONTROL_DICE (CONTROL_ACTIONS+1)
-#define CONTROL_RESET (CONTROL_ACTIONS+2)
-#define CONTROL_ROWS (CONTROL_ACTIONS+4)
+#define CONTROL_BLOCK (CONTROL_ACTIONS+2)
+#define CONTROL_RESET (CONTROL_ACTIONS+3)
+#define CONTROL_ROWS (CONTROL_ACTIONS+5)
+#define CONTROL_COMBAT(row) ((row)==CONTROL_STYLE || (row)==CONTROL_DICE || (row)==CONTROL_BLOCK)
 static void combat_toggle(int row){
     if(row==CONTROL_STYLE)Cvar_SetValue("aw_combat_miss",Cvar_VariableValue("aw_combat_miss")?0:1);
     else if(row==CONTROL_DICE)Cvar_SetValue("aw_combat_dice",Cvar_VariableValue("aw_combat_dice")?0:1);
+    else if(row==CONTROL_BLOCK)Cvar_SetValue("aw_combat_block",Cvar_VariableValue("aw_combat_block")?0:1);
 }
 static void combat_line(int row,char *line){
     if(row==CONTROL_STYLE){
         strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat style: AmiWind":"Combat style: Original Morrowind");
         if(AW_UIWidth(line)>226)strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat: AmiWind":"Combat: Original Morrowind");
-    }else strcpy(line,Cvar_VariableValue("aw_combat_dice")?"Dice rolls: On":"Dice rolls: Off");
+    }else if(row==CONTROL_BLOCK)strcpy(line,Cvar_VariableValue("aw_combat_block")?"Blocking: Hold to block":"Blocking: Automatic");
+    else strcpy(line,Cvar_VariableValue("aw_combat_dice")?"Dice rolls: On":"Dice rolls: Off");
 }
 #define CONTROL_VISIBLE 6
 static int controls_options,controls_top,controls_capture;
@@ -341,10 +347,10 @@ void M_Keydown(int key){
         if(selection<controls_top)controls_top=selection;
         if(selection>=controls_top+CONTROL_VISIBLE)controls_top=selection-CONTROL_VISIBLE+1;
         if((key==K_BACKSPACE || key==K_DEL) && selection<CONTROL_ACTIONS)control_clear(selection);
-        if((key==K_LEFTARROW || key==K_RIGHTARROW) && (selection==CONTROL_STYLE || selection==CONTROL_DICE))combat_toggle(selection);
+        if((key==K_LEFTARROW || key==K_RIGHTARROW) && CONTROL_COMBAT(selection))combat_toggle(selection);
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection<CONTROL_ACTIONS){if(control_ready(selection)){controls_capture=1;mouse_visible=0;}}
-            else if(selection==CONTROL_STYLE || selection==CONTROL_DICE)combat_toggle(selection);
+            else if(CONTROL_COMBAT(selection))combat_toggle(selection);
             else if(selection==CONTROL_RESET)Cbuf_AddText("exec keymaps-default.cfg\n");
             else controls_back();
         }
@@ -526,7 +532,7 @@ void M_Draw(void){
     }else if(controls_options){
         for(i=controls_top;i<controls_top+CONTROL_VISIBLE && i<CONTROL_ROWS;i++){
             if(i<CONTROL_ACTIONS)control_line(i,line);
-            else if(i==CONTROL_STYLE || i==CONTROL_DICE)combat_line(i,line);
+            else if(CONTROL_COMBAT(i))combat_line(i,line);
             else strcpy(line,i==CONTROL_RESET?"Reset to defaults":"Back");
             label(44,54+(i-controls_top)*19,230,19,line,control_ready(i),selection==i);
         }

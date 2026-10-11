@@ -14,13 +14,14 @@ def area_problems(areas, root=None):
     """Messages for areas the CHIM builder cannot write; empty when all can be written."""
     from town_config import load_registry, load_settings
     problems = []
-    known = {t['id'] for t in load_registry(root)['towns']}
+    from town_config import generated_areas
+    known = {t['id'] for t in load_registry(root)['towns']} | set(generated_areas())
     if not areas:
         problems.append('No CHIM area given')
     boxes = {}
     for area in areas:
         if area not in known:
-            problems.append('Unknown CHIM area %s: not a town of config/towns.json' % area)
+            problems.append('Unknown CHIM area %s: not a town of config/towns.json nor a CHIM region frame' % area)
             continue
         if area == 'seyda':
             from chim.seyda import world_box
@@ -31,7 +32,20 @@ def area_problems(areas, root=None):
         except (KeyError, ValueError) as exc:
             problems.append('CHIM area %s has no town converter settings yet (%s)' % (area, exc))
             continue
-        # the frame's ground box in Morrowind units (chim.world.frame_box)
+        # the box the frame owns in Morrowind units (chim.world.frame_box): its bounds; terrain-only margins
+        # may overlap (each frame stores its own margin terrain, no placements: CHIM region frames side by side)
+        # a handoff frame's core must fit the build's coordinate range (CHIM-FRAME-COORD-RANGE-33): all of
+        # Vivec in one frame needs wide coordinates (coord_range; tools/build.py --coord-range)
+        from town_config import handoff_core, registry_row
+        try:
+            handoff_row = area in generated_areas() or registry_row(area, root).get('world_slot', -1) < 0
+        except ValueError:
+            handoff_row = False
+        if handoff_row:
+            from coord_range import core_problem
+            problem = core_problem(handoff_core(settings))
+            if problem:
+                problems.append('CHIM area %s: %s' % (area, problem))
         (lx, ly), (hx, hy) = settings['bounds']
         c = settings['centre']
         boxes[area] = (c[0] + 4 * lx, c[1] + 4 * ly, c[0] + 4 * hx, c[1] + 4 * hy)

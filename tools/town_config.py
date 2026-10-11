@@ -86,6 +86,7 @@ def validate_town(town, settings=None):
     for key in ('reference_margin',):
         if key in settings and not (isinstance(settings[key], (int, float)) and settings[key] >= 0):
             raise ValueError('Invalid ' + key)
+    terrain_margin(settings)
     if 'handoff_core' in settings:
         handoff_core(settings)
     interiors(settings)
@@ -109,25 +110,64 @@ def resident_exclusions(settings):
     return {key.casefold() for key in rows}
 
 
+def terrain_margin(settings):
+    """Terrain-only margin of a frame (frame-local units, default 0): the CHIM frame's ground reaches
+    this far past the bounds, with no placements of its own there (like the legacy region maps' 896-unit
+    overlap), so a handoff core on the bounds keeps ground in view up to the fog plane
+    (CHIM-FAR-BAND-GAP-36)."""
+    margin = settings.get('terrain_margin', 0)
+    step = settings.get('terrain_step', 128)
+    if type(margin) is not int or margin < 0 or margin % step:
+        raise ValueError('Town terrain_margin must be a whole number of terrain tiles (>= 0)')
+    return margin
+
+
+def frame_ground_bounds(settings):
+    """The CHIM frame's ground box: the bounds grown by the terrain-only margin ([[x0, y0], [x1, y1]])."""
+    low, high = settings['bounds']
+    m = terrain_margin(settings)
+    return [[v - m for v in low], [v + m for v in high]]
+
+
 def handoff_core(settings):
     """World handoff core of a table frame, in frame-local units.
 
-    Default: the bounds inset by HANDOFF_INSET (the Arena). An explicit
-    "handoff_core" is the area this frame owns when it neighbours other town
-    frames; it must keep the frame edge out of view (draw distance plus the
-    engine's 32-unit exit margin) from every point the player can stand in.
+    "inset" (the method before v0.0.36; the Arena selects it): the bounds inset by HANDOFF_INSET.
+    It leaves no ground between the frame edge and the fog plane from the handover lines
+    (CHIM-FAR-BAND-GAP-36), so a handoff row must select it by name (handoff_gap_problem).
+    Absent: the same inset (rows that are no handoff frames: Seyda Neen, Balmora).
+    An explicit [[x0, y0], [x1, y1]] is the area this frame owns (the cell box of a CHIMport block,
+    the canton of a Vivec frame); it must keep the frame edge (frame_ground_bounds) out of view (draw
+    distance plus the engine's 32-unit exit margin) from every point the player can stand in.
     """
     low, high = settings['bounds']
     core = settings.get('handoff_core')
-    if core is None:
+    if core is None or core == 'inset':
         return [[v + HANDOFF_INSET for v in low], [v - HANDOFF_INSET for v in high]]
     if (not isinstance(core, list) or len(core) != 2 or any(not isinstance(p, list) or len(p) != 2 for p in core)
             or not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for p in core for v in p)):
-        raise ValueError('Town handoff_core must be [[x0, y0], [x1, y1]]')
+        raise ValueError('Town handoff_core must be "inset" or [[x0, y0], [x1, y1]]')
     margin = settings['draw_distance'] + 32
+    low, high = frame_ground_bounds(settings)
     if not all(low[k] + margin <= core[0][k] < core[1][k] <= high[k] - margin for k in range(2)):
         raise ValueError('Town handoff_core must stay draw distance + 32 inside the frame bounds')
     return [list(core[0]), list(core[1])]
+
+
+def handoff_gap_problem(settings, draw_distance):
+    """The far band gate (CHIM-FAR-BAND-GAP-36) of a handoff row: None, or why its core lies closer
+    than draw distance + 32 to the frame's ground edge without selecting the inset method by name
+    ("handoff_core": "inset", the Arena). From such a core the player sees no ground between the frame
+    edge and the fog plane, where the far layer starts."""
+    core = handoff_core(settings)
+    low, high = frame_ground_bounds(settings)
+    need = draw_distance + 32
+    room = min(min(core[0][k] - low[k], high[k] - core[1][k]) for k in range(2))
+    if room >= need or settings.get('handoff_core') == 'inset':
+        return None
+    return ('handoff core %s is %g units from the frame edge, under draw distance + 32 = %d (no ground up to '
+            'the fog plane, CHIM-FAR-BAND-GAP-36): give the frame a terrain_margin and an explicit handoff_core, '
+            'or select "handoff_core": "inset"' % (core, room, need))
 
 
 def interior_map(settings, index):
@@ -162,6 +202,18 @@ def interiors(settings):
         cells.add(cell.casefold())
         out.append({'map': interior_map(settings, index), 'cell': cell, 'exclude': reason})
     return out
+
+
+def room_takers(root=None):
+    """{town id: the town that takes its rooms} for towns named by another town's "interiors_from" (all of Vivec in
+    one CHIM frame, vivec_city, takes the eight district rows' rooms: they keep their map names and save IDs, and a
+    build of the city holds them)."""
+    takers = {}
+    for row in load_registry(root)['towns']:
+        settings = json.loads((_root(root) / 'config' / row['config']).read_text(encoding='utf-8'))
+        for town in settings.get('interiors_from') or []:
+            takers.setdefault(town, row['id'])
+    return takers
 
 
 def town_interiors(root=None):
@@ -244,8 +296,31 @@ def registry_row(town_id, root=None):
     raise ValueError('Unknown town: ' + str(town_id))
 
 
+# Converter settings of areas made by a build, not listed in config/towns.json: the CHIM region frames
+# (tools/chim/regions.py, builder option --chim-regions). {area id: settings}; register_generated fills it.
+_GENERATED = {}
+
+
+def register_generated(settings_list):
+    """Make load_settings return these settings for their town ids (CHIM region frames); returns the ids."""
+    ids = []
+    for settings in settings_list:
+        town = settings['town']
+        validate_town(town, settings)
+        _GENERATED[town['id']] = settings
+        ids.append(town['id'])
+    return ids
+
+
+def generated_areas():
+    return dict(_GENERATED)
+
+
 def load_settings(town_id, root=None):
-    """The converter settings of one converted town (its config has a town block)."""
+    """The converter settings of one converted town (its config has a town block), or of a registered
+    generated area (register_generated)."""
+    if town_id in _GENERATED:
+        return _GENERATED[town_id]
     row = registry_row(town_id, root)
     settings = json.loads((_root(root) / 'config' / row['config']).read_text(encoding='utf-8'))
     town = settings.get('town')
@@ -256,11 +331,14 @@ def load_settings(town_id, root=None):
 
 
 def handoff(settings):
-    """World-directory handoff of a town frame: origin and inset ground core."""
+    """World-directory handoff of a town frame: origin and inset ground core. The core must lie inside the
+    wide coordinate bound (coord_range.WIDE_BOUND, the engine's AW_COORD_BOUND by default); a core past the
+    narrow bound needs a wide-coordinate build (chim.areas.area_problems refuses it with --coord-range narrow)."""
+    from coord_range import WIDE_BOUND
     if settings['scale'] != .25:
         raise ValueError('Town handoff requires the shared 0.25 world scale')
     core = handoff_core(settings)
-    if not all(-4000 < core[0][k] < core[1][k] < 4000 for k in range(2)):
+    if not all(-WIDE_BOUND < core[0][k] < core[1][k] < WIDE_BOUND for k in range(2)):
         raise ValueError('Town handoff exceeds the bounded local coordinate range')
     return [v * settings['scale'] for v in settings['centre']] + [0.], core
 
@@ -292,6 +370,10 @@ def runtime_towns(root=None):
                                    any(c in travel['npc'] for c in '"\\\r\n')):
             raise ValueError('Invalid town travel: ' + row['id'])
         origin, core = handoff(settings) if slot < 0 else ([0., 0., 0.], [[0, 0], [0, 0]])
+        if slot < 0:
+            problem = handoff_gap_problem(settings, distance)
+            if problem:
+                raise ValueError('Town %s: %s' % (row['id'], problem))
         key = (town['map'], town['map_prefix'], town['region_file'])
         if key[0] in names or key[1] in prefixes or key[2] in files:
             raise ValueError('Town map, prefix and region file must be unique')

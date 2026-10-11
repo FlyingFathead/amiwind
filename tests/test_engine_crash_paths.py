@@ -65,7 +65,7 @@ typedef int qboolean;
 #define true 1
 #define false 0
 #define MAX_QPATH 64
-#define SV_MAPNAME_MAX (MAX_QPATH - 10)
+#define SV_MAPNAME_MAX (MAX_QPATH - 11)
 static int printed;
 static void Con_Printf (const char *f, ...) { (void)f; printed++; }
 static int argc; static char *argv[8];
@@ -78,8 +78,8 @@ int main(void)
     char modelname[MAX_QPATH], mapstring[MAX_QPATH];
     memset(name, 'a', SV_MAPNAME_MAX); name[SV_MAPNAME_MAX] = 0;
     if (!SV_MapNameFits(name) || printed) return 1;
-    /* the longest accepted name fills maps/<name>.bsp exactly */
-    if (snprintf(modelname, sizeof modelname, "maps/%s.bsp", name) != MAX_QPATH - 1) return 2;
+    /* the longest accepted name fills maps/<name>.chim exactly */
+    if (snprintf(modelname, sizeof modelname, "maps/%s.chim", name) != MAX_QPATH - 1) return 2;
     name[SV_MAPNAME_MAX] = 'a'; name[SV_MAPNAME_MAX + 1] = 0;
     if (SV_MapNameFits(name) || printed != 1) return 3;
     if (SV_MapNameFits(NULL)) return 4;
@@ -153,7 +153,7 @@ class CrashPathsSource(unittest.TestCase):
         self.assertLess(first, body.index('SV_SendReconnect'))
         self.assertNotIn('strcpy (sv.name', body)
         self.assertNotIn('sprintf (sv.modelname', body)
-        self.assertIn('#define SV_MAPNAME_MAX (MAX_QPATH - 10)', text('server.h'))   # "maps/" ".bsp" NUL
+        self.assertIn('#define SV_MAPNAME_MAX (MAX_QPATH - 11)', text('server.h'))   # "maps/" ".chim" NUL
 
     def test_console_commands_copy_names_with_a_bound(self):
         host = strip_comments(text('host_cmd.c'))

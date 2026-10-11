@@ -179,18 +179,35 @@ def connected_components(v,f):
  for i,face in enumerate(f):out[find(ix[face[0]])].append(i)
  return list(out.values())
 
-def collision_parts(v,f,tolerance=2):
+HOLE_AREA=32.  # uncovered square units that make a flat collision piece authored plates (STAIRS-EBONHEART-CHIM-36)
+
+def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False):
+ """Convex proxies of a collision mesh: each connected component, split at its median while the convex hull
+ closes source surface deeper than tolerance. plates: a list to collect the positions of authored plates that
+ replace a piece (they need exact standing bevels); with it, a flat component whose hull covers more than
+ HOLE_AREA square units its triangles do not (a wall plate around an arch or a door: the hull fills the opening,
+ STAIRS-EBONHEART-CHIM-36) becomes the authored plates of its triangles, and with fill_plates (meshes with stairs)
+ a piece that still closes more than tolerance when it cannot be split further does too (three triangles over a
+ flight whose hull invents a 67-degree face, VIVEC-TEMPLE-STAIRS-33). Without plates: the convex proxies only."""
  results=[];tris=v[f[:,:3],:3]*.25
+ def as_plates(ids):
+  for piece in shell_collision_parts(v,f[np.array(ids,int)]):
+   plates.append(len(results));results.append(piece)
  def split(ids,depth):
   p=np.unique(np.round(tris[ids].reshape(-1,3)*16)/16,axis=0);offset=p.mean(axis=0)
   if len(p)<3:return
   _,sig,axes=np.linalg.svd(p-offset,full_matrices=False)
-  if sig[-1]<.15:
+  flat=sig[-1]<.15
+  if flat:
    normal=axes[-1];p=np.vstack((p-normal*.2,p+normal*.2))
   dirs=np.array([(x,y,z) for x in (-1,1) for y in (-1,1) for z in (-1,1)]+[(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)])
   choice=np.unique(np.argmax(p@dirs.T,axis=0));candidate=p[choice]
   if len(candidate)>=4 and np.linalg.matrix_rank(candidate-candidate[0])==3:p=candidate
   hull=ConvexHull(p)
+  if plates is not None and flat:
+   t=tris[ids];area=float(np.linalg.norm(np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]),axis=1).sum())/2
+   if hull.volume/.4-area>HOLE_AREA:
+    as_plates(ids);return
   # Interior source surface samples reveal concave recesses closed by this hull.
   samples=tris[ids].mean(axis=1)
   inside=-(samples@hull.equations[:,:3].T+hull.equations[:,3]).max(axis=1)
@@ -198,9 +215,23 @@ def collision_parts(v,f,tolerance=2):
   if error>tolerance and len(ids)>4 and depth<8:
    axis=np.argmax(np.ptp(samples,axis=0));order=np.argsort(samples[:,axis]);mid=len(order)//2
    split(np.array(ids)[order[:mid]],depth+1);split(np.array(ids)[order[mid:]],depth+1);return
+  if error>tolerance and fill_plates and plates is not None and len(ids)<=4 and _invents_steep_face(hull,tris[ids]):
+   as_plates(ids);return
   results.append((p,hull,ids,error))
  for ids in connected_components(v,f):split(ids,0)
  return results
+
+def _invents_steep_face(hull,t):
+ """True when the hull has an upward face too steep to stand on (but not a wall) that no source triangle lies
+ in: a slope the convex proxy made up, where a standing box stepping up comes down (the palace steps' 67-degree
+ faces). Authored slopes the hull only repeats are left to the convex proxy."""
+ from player_hull import WALKABLE_Z
+ n=np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]);a=np.linalg.norm(n,axis=1);ok=a>1e-9
+ n=n[ok]/a[ok][:,None];c=t[ok].mean(axis=1)
+ for e in np.unique(np.round(hull.equations,6),axis=0):
+  if not (RISER_NZ<=e[2]<WALKABLE_Z):continue
+  if not np.any((np.abs(n@e[:3])>.999)&(np.abs(c@e[:3]+e[3])<.3)):return True
+ return False
 
 def split_surface(poly,ax):
  uv=poly@ax[:,:3].T+ax[:,3]
@@ -225,6 +256,124 @@ def split_surface(poly,ax):
 
 def collision_pieces(v,f,profile,stairs=None):
  """Collision proxies of one mesh under its profile: (pieces, exact_bevels, note).
+
+ One implementation for the converter and the size estimates. The convex
+ approximation (collision_parts) may close authored space. A profile with
+ surface_collision_beyond (exterior architecture of converted towns,
+ town_regions.visual_profile) keeps each authored collision surface instead
+ when the deepest closed space exceeds that height, the engine's step height:
+ the player cannot step over such invented solid and residents standing in it
+ are buried (VIVEC-ARENA-ACTORS-32).
+ """
+ if not profile.get('stair_plates'):
+  # the stair-plate rules (plate_toes, plates for open flat pieces, fill plates) are opted into by the converters
+  # whose walkers need them: CHIM models (chim.build) and rooms (prepare_interior); legacy open-world maps keep
+  # the classic proxies and their clip-node budget (BUILD-FLORA-STAIR-PLATES-BUDGET-36)
+  return collision_pieces_classic(v,f,profile,stairs)
+ if profile.get('collision_none'):
+  return [],False,'explicit nonsolid source/category policy'
+ exact=bool(profile.get('exact_collision_bevels'))
+ mode=stair_mitigation_mode() if stairs is None else stairs
+ if profile.get('hollow_collision'):
+  # Authored surface plates of a mesh with stairs need exact standing bevels:
+  # a thin plate's approximate (axial) standing hull grows into the space
+  # above a turned or sloped neighbour, and a spiral stairwell closes
+  # (COLLISION-STAIR-SLOPE-32). Other meshes keep their profile's bevels
+  # (exact everywhere would exceed the clip-node budget of large rooms).
+  shell,toes=plate_toes(v,f,shell_collision_parts(v,f),mode)
+  cut=f'{toes} steep toes cut to vertical steps' if toes else None
+  if exact or mode=='off' or not len(stair_treads(v,f)):
+   if toes and not exact:
+    return shell,frozenset(_plate_positions(shell)),'stairs: '+cut
+   return shell,exact,('stairs: '+cut) if cut else None
+  return shell,True,'stairs: exact bevels on the authored plates of a mesh with stairs'+('; '+cut if cut else '')
+ limit=profile.get('surface_collision_beyond')
+ if limit is not None:
+  # measured on the plain convex proxies: the plates below would hide the deep fill this test is for (the Vivec
+  # palace stairs, ex_vivec_ps_01, close 9.05 units and keep all their authored surfaces)
+  fill=max((error for _,_,_,error in collision_parts(v,f,2)),default=0.)
+  if fill>limit:
+   shell,toes=plate_toes(v,f,shell_collision_parts(v,f),mode)
+   return shell,True,('authored collision surfaces: convex approximation closes '
+                      f'{fill:.2f} units > {limit} step height'+(f'; {toes} steep toes cut to vertical steps' if toes else ''))
+ plates=[]
+ # the fill test of the stair rule only on meshes with stairs (mode on): every other mesh keeps its convex proxies
+ pieces=collision_parts(v,f,2,plates=plates,fill_plates=mode!='off' and bool(len(stair_treads(v,f))))
+ own=[pieces[k] for k in plates]
+ notes=[f'authored plates where the convex proxy filled open space ({len(own)} plates)'] if own else []
+ stair_plates=frozenset()
+ if mode!='off':
+  pieces,stair_plates,stats=mitigate_stairs(v,f,pieces,mode)
+  if stats:
+   notes.insert(0,'stairs: '+'; '.join(f"{s['action']} (proxy {s['proxy_angle']:.1f} deg, {s['buried_depth']:.1f} over a tread)" for s in stats))
+ if exact:
+  return pieces,True,'; '.join(notes) or None
+ # by the ids list each plate carries: the stair rule rebuilds every piece's tuple (vertical_risers), not its ids
+ marked=frozenset(stair_plates)|frozenset(k for k,piece in enumerate(pieces) if any(piece[2] is q[2] for q in own))
+ return pieces,(marked or False),'; '.join(notes) or None
+
+def _plate_positions(pieces):
+ """Positions of the plates plate_toes made (marked by their ids being the TOE marker)."""
+ return [k for k,piece in enumerate(pieces) if getattr(piece[2],'toe',False)]
+
+class _Toe(list):
+ """ids of a toe plate cut to vertical (plate_toes): a list that says so, for the exact-bevel positions."""
+ toe=True
+
+def plate_toes(v,f,pieces,mode='on',tolerance=.25,touch=.75):
+ """Steep toes of authored ramps cut to vertical steps (STAIRS-VIVEC-ROOMS-JOINT-36). An authored plate (a
+ thin piece of shell_collision_parts) steeper than walkable but not vertical, at most a step tall, whose top
+ edge lies on a walkable authored surface (a ramp or a tread: within tolerance of its plane and inside it or
+ within touch of it in plan) is the lip at the foot of that surface: the Velothi stair pieces end each ramp with
+ a 50-degree lip 2.9 units tall, and a standing box stepping up onto the joint of two pieces came down on it.
+ Such a plate is replaced by a vertical plate through its top edge (as vertical_risers' plate branch), so the
+ box steps over it as over any riser. Returns (pieces, plates cut). Mode 'off': unchanged."""
+ from player_hull import WALKABLE_Z, STEP_HEIGHT
+ if mode=='off' or not pieces:return pieces,0
+ tris=v[f[:,:3],:3]*.25
+ n=np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0]);a=np.linalg.norm(n,axis=1)
+ ok=a>1e-6;nz=np.zeros(len(f));nz[ok]=n[ok,2]/a[ok]
+ walk=np.flatnonzero(ok&(nz>=WALKABLE_Z))
+ if not len(walk):return pieces,0
+ wt=tris[walk];wn=n[walk]/a[walk][:,None]
+ def on_walkable(p):
+  d=np.abs(((p-wt[:,0])*wn).sum(axis=1))
+  for k in np.flatnonzero(d<tolerance):
+   t=wt[k][:,:2]
+   if _segment_distance(p[:2],p[:2],t,np.roll(t,-1,axis=0)).min()<touch:return True
+   c=[(t[(i+1)%3][0]-t[i][0])*(p[1]-t[i][1])-(t[(i+1)%3][1]-t[i][1])*(p[0]-t[i][0]) for i in range(3)]
+   if min(c)>=0 or max(c)<=0:return True
+  return False
+ out=[];cut=0
+ for points,hull,ids,error in pieces:
+  eqs=hull.equations;new=None
+  planes=np.unique(np.round(eqs,6),axis=0)
+  for e in planes:
+   if not (RISER_NZ<=e[2]<WALKABLE_Z):continue
+   if np.ptp(points@e[:3])>.5:continue          # a thin plate along this face only
+   face=points[np.abs(points@e[:3]+e[3])<1e-4]
+   if len(face)<3:continue
+   top=face[:,2].max();lo=face[:,2].min()
+   if top-lo>STEP_HEIGHT+1e-3 or top-lo<.5:continue
+   edge=face[face[:,2]>top-.05]
+   if not on_walkable(edge.mean(axis=0)):continue
+   nv=np.array([e[0],e[1],0.]);nv/=np.linalg.norm(nv);h=np.array([-nv[1],nv[0]])
+   a2,b2=face[np.argmin(face[:,:2]@h)][:2],face[np.argmax(face[:,:2]@h)][:2]
+   dv=float((edge@nv).max())
+   a3=np.array([*a2,0.]);b3=np.array([*b2,0.]);a3+=nv*(dv-a3@nv);b3+=nv*(dv-b3@nv)
+   if np.linalg.norm(b3-a3)<1e-3:continue
+   newp=np.array([q+nv*o+np.array([0.,0.,z]) for q in (a3,b3) for o in (-.2,.2) for z in (lo,top)])
+   new=(newp,ConvexHull(newp),_Toe(ids),error);break
+  if new is None:out.append((points,hull,ids,error))
+  else:out.append(new);cut+=1
+ return out,cut
+
+def collision_pieces_classic(v,f,profile,stairs=None):
+ """The collision proxies before the stair-plate rules (collision_pieces without the profile's stair_plates:
+ every legacy open-world map, whose clip-node budget they would raise: vf0779 went from 32,614 to
+ 33,172 aggregate clipnodes, over 32,767, BUILD-FLORA-STAIR-PLATES-BUDGET-36). Unchanged method.
+
+ (pieces, exact_bevels, note).
 
  One implementation for the converter and the size estimates. The convex
  approximation (collision_parts) may close authored space. A profile with

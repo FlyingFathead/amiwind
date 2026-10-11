@@ -59,6 +59,8 @@ typedef struct {
     unsigned char dead,aware,moving,attacking;
     unsigned char staggered;            /* hit recovery: cannot block */
     unsigned char shield_class;         /* 0 light, 1 medium, 2 heavy (its block sound) */
+    unsigned char block_off;            /* not ready to block (OpenMW isReadyToBlock): the player not
+                                           holding the block button with aw_combat_block 1 (AmiWind extension) */
     float weapon_health,weapon_health_max,shield_health,shield_health_max;  /* condition; max 0 = unknown (full) */
 } aw_fighter_t;
 /* Two-handed weapon types (and hand to hand, which OpenMW's weapon table also marks
@@ -112,6 +114,7 @@ typedef struct {
     int won;
     int player_swings,player_hits,player_misses,npc_swings,npc_hits,npc_misses,npc_flees;
     float dealt_health,dealt_fatigue,taken_health,taken_fatigue;
+    unsigned long player_blocks,npc_blocks,guards;   /* blocked blows (the player's, the NPCs'), block button presses with a shield */
 } aw_combat_stats_t;
 
 /* aw_combat.c: the engine side. */
@@ -121,6 +124,11 @@ int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
 int AW_CombatLoadout(const char *loadout,aw_fighter_t *out,char *chosen);
 extern int (*aw_combat_input_locked)(void);
+/* The held block (AmiWind extension, aw_combat_block 1, docs/COMBAT.md "Blocking"): 1 while the player
+ * guards with a usable shield; the third-person body plays its block group meanwhile (aw_view.c). */
+int AW_CombatGuarding(void);
+/* The body's block clip after a blow was blocked: seconds left, 0 = none. */
+float AW_CombatBlockShown(void);
 extern const aw_fighter_t *aw_combat_player_preset;
 void AW_CombatInit(void);
 void AW_CombatPhysics(void);
@@ -128,6 +136,8 @@ int AW_CombatHurtPlayer(float damage,const char *cause);  /* world damage (lava)
 void AW_CombatSceneSpawn(void);
 int AW_CombatEnemyBar(float *fraction,float *alpha);
 int AW_CombatHostiles(void);
+/* Someone fights the player and the player is alive: the battle music and the wait refusal ask this one check. */
+int AW_PlayerInCombat(void);
 struct edict_s;
 int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *fighter,const char *layout);
 const aw_fighter_t *AW_CombatFighter(struct edict_s *e);
@@ -139,4 +149,9 @@ extern void (*aw_combat_result)(int won);
 extern void (*aw_combat_voice)(struct edict_s *e,int event);
 /* An engaged NPC's health in percent (its fighter sheet), or -1 when it is not fighting (aw_anim.c voices). */
 int AW_CombatHealthPercent(struct edict_s *e);
+/* The death scene (aw_view.c): the quick retry of a lost fight (an AmiWind extension) and whether the
+ * fight's own death music plays. */
+int AW_CombatRetryAvailable(void);
+int AW_CombatRetry(void);
+int AW_CombatDeathMusicPlayed(void);
 #endif

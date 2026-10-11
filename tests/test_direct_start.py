@@ -96,12 +96,24 @@ class Scope(unittest.TestCase):
         with self.assertRaises(ValueError):
             ds.check(ds.parse('interior:Balmora, Council Club'), no_rooms)
 
-    def test_the_vivec_arena_pit_is_refused_until_its_interiors_are_converted(self):
-        for scope in (FULL, MINI):
-            with self.subTest(scope=len(scope['towns'])), self.assertRaises(ValueError) as error:
-                ds.check(ds.parse('interior:Vivec, Arena Pit'), scope)
-            self.assertIn('IMPORT-TOWN-NO-INTERIORS-32', str(error.exception))
-            self.assertIn('Vivec, Arena Pit', str(error.exception))
+    def test_the_vivec_arena_pit_is_in_a_build_that_holds_the_arena(self):
+        # BUILD-MINIWIND-ARENA-PIT-REFUSED-36: the Pit is converted by the Arena's town stage (vai000, eecb4eb); a
+        # build without the Arena refuses it naming the town to build, never "not converted"
+        self.assertEqual(ds.check(ds.parse('interior:Vivec, Arena Pit'), FULL).map, 'vai000')  # a build with the Arena
+        with self.assertRaises(ValueError) as error:
+            ds.check(ds.parse('interior:Vivec, Arena Pit'), MINI)
+        self.assertIn('converted with the town vivec_arena (map vai000)', str(error.exception))
+        self.assertNotIn('IMPORT-TOWN-NO-INTERIORS-32', str(error.exception))
+        arena = ds.build_scope(['vivec_arena'], False, False, 'full')
+        start = ds.check(ds.parse('interior:Vivec, Arena Pit'), arena)
+        self.assertEqual((start.map, start.town), ('vai000', 'vivec_arena'))
+        with self.assertRaises(ValueError) as error:
+            ds.check(ds.parse('interior:Vivec, Arena Pit'), ds.build_scope(['vivec_arena'], False, False, 'exterior'))
+        self.assertIn('vivec_arena', str(error.exception))
+        # a room the town table excludes is refused with its own reason
+        with self.assertRaises(ValueError) as error:
+            ds.check(ds.parse('interior:Vivec, Guild of Mages'), ds.build_scope(['vivec_foreign'], False, False, 'full'))
+        self.assertIn('does not convert it yet: inline models', str(error.exception))
 
     def test_cells_and_positions_inside_the_held_area(self):
         self.assertEqual(ds.check(ds.parse('cell:-3,-2'), MINI).cell_xy, [-3, -2])
@@ -343,8 +355,8 @@ class Builder(unittest.TestCase):
 
     def test_bad_area_and_missing_interior_stop_before_any_work(self):
         for argv, reason in ((['--direct-to-game-map', 'atlantis'], 'unknown area'),
-                             (['--miniwind', '--direct-to-game-map', 'interior:Vivec, Arena Pit'],
-                              'IMPORT-TOWN-NO-INTERIORS-32'),
+                             (['--miniwind', '--miniwind-town', 'balmora', '--direct-to-game-map',
+                               'interior:Vivec, Arena Pit'], 'converted with the town vivec_arena'),
                              (['--quick-character', 'Nord,Barbarian'], 'needs --direct-to-game-map')):
             with self.subTest(argv=argv), patch.object(build, 'VERSION', DEV), \
                     patch.object(build, 'prerequisites') as setup, \
@@ -364,6 +376,151 @@ class Builder(unittest.TestCase):
                                '--exclude-unreferenced', 'voice'])
         self.assertEqual(args.closure_cells, ['interior:Balmora, Council Club'])
         self.assertEqual(args.unreferenced_groups, ['voice'])
+
+    def test_miniwind_start_in_its_own_town(self):
+        # BUILD-MINIWIND-DIRECT-START-TOWN-36: a MiniWind of another town starts in that town, and only there
+        args = self.configure(['--miniwind', '--miniwind-town', 'vivec_arena', '--direct-to-game-map', 'vivec_arena'])
+        self.assertEqual(args.direct_start.town, 'vivec_arena')
+        with self.assertRaises(ValueError) as error:
+            self.configure(['--miniwind', '--miniwind-town', 'vivec_arena', '--direct-to-game-map', 'balmora'])
+        self.assertIn('not in this build. This build holds areas: vivec_arena', str(error.exception))
+
+
+class StartFollowsContent(unittest.TestCase):
+    """Owner order 2026-10-11 ("if you're only going to build a certain area, make sure the player is then there";
+    BUILD-MINIWIND-DIRECT-START-TOWN-36): a partial-area build starts inside what it holds, derived when no start is
+    given, refused before any stage when the start lies outside, checked again on the final image."""
+
+    configure = Builder.configure
+
+    def preset(self, name, *more):
+        import io as _io
+        import build_recipe
+        argv = ['--miniwind-preset', name, *more]
+        args = build.parser().parse_args(argv)
+        build_recipe.configure(build.parser, args, argv, DEV, out=_io.StringIO())
+        args.data_files, args.sdk, args.workspace = Path('/owned'), Path('/sdk'), Path('/private/ws')
+        with patch.object(build, 'VERSION', DEV), contextlib.redirect_stdout(io.StringIO()):
+            build.configure_miniwind(args)
+            import build_exclusions
+            build_exclusions.resolve(args, DEV, area_build=True)
+            build.configure_direct_start(args)
+        return args
+
+    def test_every_preset_starts_inside_its_own_content(self):
+        import miniwind_presets
+        for row in miniwind_presets.presets():
+            with self.subTest(preset=row['name']):
+                args = self.preset(row['name'])
+                town = args.miniwind_town
+                record = args.start_record
+                self.assertEqual(record['town'] if record['kind'] != 'interior' else town, town)
+                if args.direct_start is not None:
+                    scope = ds.build_scope([town], False, False, args.miniwind_scope)
+                    ds.check(ds.parse(row['start']), scope)  # inside the built content
+                    self.assertIn('explicit', record['source'])
+                else:
+                    self.assertEqual((record['kind'], record['start']), ('area', town))
+                    self.assertIn('derived', record['source'])
+
+    def test_the_arena_pit_preset_starts_inside_the_pit(self):
+        # BUILD-MINIWIND-ARENA-PIT-REFUSED-36: the preset builds Vivec (its start picks the town: the whole city takes
+        # the Arena's rooms, owner decision 2026-10-11), the resolver finds the Pit (vai000, listed by
+        # config/vivec_arena.json) and the plan makes it in chim-rooms-vivec_city
+        args = self.preset('vivec-arena-pit')
+        self.assertEqual((args.miniwind_town, args.miniwind_scope), ('vivec_city', 'full'))
+        self.assertEqual((args.direct_start.kind, args.direct_start.map, args.direct_start.town),
+                         ('interior', 'vai000', 'vivec_city'))
+        self.assertIn('explicit', args.start_record['source'])
+        import build_font_options as options
+        args.builder_options = options.resolve_builder(args)
+        with patch('build_jobs.auto_jobs', return_value=4), contextlib.redirect_stdout(io.StringIO()):
+            steps = build.miniwind_commands(args, build.commands(args, TOOLS, RUN))
+        names = [name for name, _ in steps]
+        self.assertIn('chim-rooms-vivec_city', names)
+        self.assertLess(names.index('chim-town-vivec_city'), names.index('chim-rooms-vivec_city'))
+        image = dict(steps)['image']
+        self.assertEqual(image[image.index('--chim-rooms') + 1], str(RUN / 'chim-rooms-vivec_city'))
+        self.assertIn('Vivec interiors', args.miniwind_record['features'] if 'features' in args.miniwind_record
+                      else image[image.index('--miniwind-features') + 1])
+
+    def test_a_room_with_no_stage_is_refused_before_any_stage(self):
+        scope = ds.build_scope(['vivec_arena'], False, False, 'full')
+        start = ds.check(ds.parse('interior:Vivec, Arena Pit'), scope)
+        self.assertIs(ds.require_built_interior(start, []), start)
+        with self.assertRaisesRegex(ValueError, ds.TOWN_INTERIORS_STAGE_BUG):
+            ds.require_built_interior(start, ['vivec_arena'])
+        balmora = ds.check(ds.parse('interior:Balmora, Council Club'), ds.build_scope(['balmora'], False, False, 'full'))
+        self.assertIs(ds.require_built_interior(balmora, ['balmora']), balmora)  # Balmora's rooms: own stage
+
+    def test_the_exterior_scope_has_no_room_stage(self):
+        args = self.configure(['--miniwind', '--miniwind-town', 'vivec_arena', '--miniwind-scope', 'exterior'])
+        import build_font_options as options
+        args.builder_options = options.resolve_builder(args)
+        with patch('build_jobs.auto_jobs', return_value=4), contextlib.redirect_stdout(io.StringIO()):
+            steps = build.miniwind_commands(args, build.commands(args, TOOLS, RUN))
+        self.assertNotIn('chim-rooms-vivec_arena', [name for name, _ in steps])
+
+    def test_vivec_arena_starts_in_the_whole_city(self):
+        # the Arena preset starts at the Arena arrival of the whole-city frame (owner decision 2026-10-11 09:55)
+        args = self.preset('vivec-arena-chim')  # no --miniwind-town: the start picks the town
+        self.assertEqual(args.miniwind_town, 'vivec_city')
+        self.assertEqual(args.chim_areas, ['vivec_city'])
+        self.assertEqual((args.direct_start.kind, args.direct_start.town), ('area', 'vivec_city'))
+        self.assertIn('derived from the start vivec_city', args.miniwind_town_source)
+        # the short names lead to the whole city; the Arena-only frame stays reachable by its own name (legacy)
+        self.assertEqual(ds.parse('vivec').town, 'vivec_city')
+        self.assertEqual(ds.parse('arena').town, 'vivec_city')
+        self.assertEqual(ds.parse('vivec_arena').town, 'vivec_arena')
+
+    def test_the_whole_city_starts_in_its_frame(self):
+        args = self.preset('vivec-city-chim')  # all of Vivec in one CHIM frame (stage B)
+        self.assertEqual(args.miniwind_town, 'vivec_city')
+        self.assertEqual(args.chim_areas, ['vivec_city'])
+        self.assertEqual((args.direct_start.kind, args.direct_start.town), ('area', 'vivec_city'))
+
+    def test_a_start_outside_the_built_content_is_refused_before_any_stage(self):
+        for argv, text in ((['--miniwind', '--miniwind-town', 'vivec_arena', '--direct-to-game-map', 'cell:-3,-2'],
+                            'cell -3,-2 is outside the area this build holds'),
+                           (['--miniwind', '--miniwind-scope', 'exterior', '--direct-to-game-map',
+                             'interior:Balmora, Council Club'], 'is not in this build')):
+            with self.subTest(argv=argv), self.assertRaises(ValueError) as error:
+                self.configure(argv)
+            self.assertIn(text, str(error.exception))
+            self.assertIn('This build holds areas:', str(error.exception))
+
+    def test_no_start_means_the_towns_arrival(self):
+        args = self.configure(['--miniwind', '--miniwind-town', 'vivec_arena'])
+        self.assertEqual((args.start_record['kind'], args.start_record['start']), ('area', 'vivec_arena'))
+        args = self.configure([])
+        self.assertEqual(args.start_record['kind'], 'new-game')
+
+    def test_start_town_of_each_form(self):
+        self.assertEqual(ds.start_town(ds.parse('vivec_arena')), 'vivec_arena')
+        self.assertEqual(ds.start_town(ds.parse('interior:Balmora, Council Club')), 'balmora')
+        self.assertEqual(ds.start_town(ds.parse('cell:4,-11')), 'vivec_arena')
+        self.assertIsNone(ds.start_town(ds.parse('cell:20,20')))
+
+    def test_image_start_check(self):
+        import map_files
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            (id1 / 'maps').mkdir(parents=True)
+            with self.assertRaisesRegex(ValueError, 'start map vivec_arena is not in the image'):
+                ds.image_start_check(id1, {'map': 'vivec_arena', 'arrival': None, 'source': 'test'})
+            (id1 / 'maps' / 'vivec_arena-chim.chim').write_bytes(b'frame')
+            report = Path(tmp) / 'start-check.json'
+            record = ds.image_start_check(id1, {'map': 'vivec_arena', 'arrival': None, 'source': 'test'}, report)
+            self.assertEqual((record['ok'], record['map_file']), (True, 'maps/vivec_arena-chim.chim'))
+            self.assertTrue(json.loads(report.read_text(encoding='utf-8'))['ok'])
+            (id1 / 'maps' / 'room.bsp').write_bytes(b'room')
+            with patch.object(map_files, 'is_chim_frame', return_value=False),                     patch('arrival_spot.Collision'), patch('arrival_spot.standing_spot', return_value=None):
+                with self.assertRaisesRegex(ValueError, 'no standing spot'):
+                    ds.image_start_check(id1, {'map': 'room', 'arrival': [0, 0, 24], 'source': 'test'})
+            with patch.object(map_files, 'is_chim_frame', return_value=False), patch('arrival_spot.Collision'),                     patch('arrival_spot.standing_spot', side_effect=ValueError('Cyclic or excessive collision tree')):
+                record = ds.image_start_check(id1, {'map': 'room', 'arrival': [0, 0, 24], 'source': 'test'})
+            self.assertTrue(record['ok'])
+            self.assertIn('COLLISION-TRACE-LIMIT-ROUTED-ROOM-36', record['collision'])
 
 
 if __name__ == '__main__':

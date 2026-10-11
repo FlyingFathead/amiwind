@@ -54,19 +54,41 @@ static struct MsgPort *guard_port;
 static struct IOStdReq *guard_io;
 static struct Interrupt guard_handler;
 static int guard_open,guard_added;
+/* Amiga keys this handler saw held (raw 0x66/0x67): a latched Amiga qualifier without a
+ * held key (left by a crashed program) made Intuition move the mouse pointer with the
+ * cursor keys in the menu (ENGINE-CRASH-EXIT-KEYBOARD-36). */
+static volatile UWORD guard_amiga_held;
 struct InputEvent *AW_InputGuardEvents(struct InputEvent *events){
+    struct InputEvent *e;int key;
+    for(e=events;e;e=e->ie_NextEvent)
+        if(e->ie_Class==IECLASS_RAWKEY && ((key=e->ie_Code&0x7f)==0x66 || key==0x67)){
+            if(e->ie_Code&IECODE_UP_PREFIX)guard_amiga_held&=~(UWORD)(key==0x66?1:2);
+            else guard_amiga_held|=(UWORD)(key==0x66?1:2);
+        }
+    if(video_window && IntuitionBase->FirstScreen==video_window->WScreen &&
+       (video_window->Flags&WFLG_WINDOWACTIVE))
+        for(e=events;e;e=e->ie_NextEvent)
+            if(e->ie_Class==IECLASS_RAWKEY && ((e->ie_Code&0x7f)==0x37 || (e->ie_Code&0x7f)==0x36 || !guard_amiga_held))
+                e->ie_Qualifier&=~(IEQUALIFIER_LCOMMAND|IEQUALIFIER_RCOMMAND);
+    return events;
+}
+/* Mouse buttons and moves on the game screen never carry an Amiga qualifier to Intuition: with it
+ * (held, or latched by a crashed program) a click dragged the game screen or reached the AmigaDOS
+ * screen behind it (UI-MAP-CLICK-DRAGS-SCREEN-36). The game still gets every button and move (IDCMP);
+ * other screens and every key keep their qualifiers. */
+struct InputEvent *AW_InputGuardMouse(struct InputEvent *events){
     struct InputEvent *e;
     if(video_window && IntuitionBase->FirstScreen==video_window->WScreen &&
        (video_window->Flags&WFLG_WINDOWACTIVE))
         for(e=events;e;e=e->ie_NextEvent)
-            if(e->ie_Class==IECLASS_RAWKEY && ((e->ie_Code&0x7f)==0x37 || (e->ie_Code&0x7f)==0x36))
-                e->ie_Qualifier&=~(IEQUALIFIER_LCOMMAND|IEQUALIFIER_RCOMMAND);
+            if(e->ie_Class==IECLASS_RAWMOUSE)e->ie_Qualifier&=~(IEQUALIFIER_LCOMMAND|IEQUALIFIER_RCOMMAND);
     return events;
 }
-/* input.device supplies the event list in A0; the C compiler uses the stack. */
+/* input.device supplies the event list in A0; the C compiler uses the stack. Mouse first, then keys. */
 extern void AW_InputGuardEntry(void);
 __asm__(".text\n.globl _AW_InputGuardEntry\n_AW_InputGuardEntry:\n"
-        "move.l %a0,-(%sp)\njsr _AW_InputGuardEvents\naddq.l #4,%sp\nrts\n");
+        "move.l %a0,-(%sp)\njsr _AW_InputGuardMouse\naddq.l #4,%sp\n"
+        "move.l %d0,-(%sp)\njsr _AW_InputGuardEvents\naddq.l #4,%sp\nrts\n");
 void AW_InputGuardShutdown(void){
     if(guard_added){guard_io->io_Command=IND_REMHANDLER;guard_io->io_Data=&guard_handler;
         DoIO((struct IORequest *)guard_io);guard_added=0;}
@@ -74,8 +96,14 @@ void AW_InputGuardShutdown(void){
     if(guard_io){DeleteIORequest((struct IORequest *)guard_io);guard_io=NULL;}
     if(guard_port){DeleteMsgPort(guard_port);guard_port=NULL;}
 }
+/* Every exit route removes the handler (ENGINE-CRASH-EXIT-KEYBOARD-36): a handler left in
+ * input.device's chain after exit() runs from freed memory, latches the shift/caps state and
+ * eats M and N in the AmigaDOS shell. Sys_Error and Sys_Quit remove it first, before any
+ * shutdown step that could fail again; atexit covers every other exit(). */
+static int guard_atexit;
 void AW_InputGuardInit(void){
     if(guard_added)return;
+    if(!guard_atexit){atexit(AW_InputGuardShutdown);guard_atexit=1;}
     guard_port=CreateMsgPort();if(!guard_port)goto failed;
     guard_io=(struct IOStdReq *)CreateIORequest(guard_port,sizeof(*guard_io));if(!guard_io)goto failed;
     if(OpenDevice("input.device",0,(struct IORequest *)guard_io,0))goto failed;
@@ -293,6 +321,7 @@ static void Sys_Init(int heap_mb) {
 
 void Sys_Quit(void) {
 
+	AW_InputGuardShutdown();	/* first: ENGINE-CRASH-EXIT-KEYBOARD-36 */
 	Host_Shutdown();
 
 	if (quakeparms.membase) {
@@ -327,6 +356,9 @@ void Sys_Error (char *error, ...)
     va_start (argptr, error);
     vsnprintf (text, sizeof(text), error, argptr);
     va_end (argptr);
+    /* First, before anything that could fail again: the input handler leaves the
+     * input.device chain (ENGINE-CRASH-EXIT-KEYBOARD-36). */
+    AW_InputGuardShutdown();
 
     /* Capture allocator state before shutdown releases caches and heap. */
     AW_HeapAuditPhase(NULL,"fatal-exit");
@@ -430,6 +462,7 @@ void Sys_SendKeyEvents(void) {
         case IDCMP_INACTIVEWINDOW:
             AW_WorldUICancelDrag();IN_AWClearButtons();Key_ClearStates();break;
         case IDCMP_RAWKEY:
+            Key_AmigaQualifierKey(code);
             Key_AmigaQualifiers(qualifier);
             /* The complete qualifier mask preserves the other Shift/Alt key. */
             if((code&0x7f)>=0x60 && (code&0x7f)<=0x67)break;
@@ -586,10 +619,19 @@ static int AW_StackTooSmall(void)
     return 1;
 }
 
+#if AW_ASM_MATHS
+/* Engine profile: upstream's mathlib_68k.s AngleVectors calls mathieeedoubtrans.library,
+ * opened once here (docs/ENGINE_PROFILES.md). */
+extern void InitMathLib(void);
+#endif
+
 int main(int argc, char *argv[]) {
     static char *default_argv[] = {"AmiWind", NULL};
     if (AW_StackTooSmall())
         return RETURN_FAIL;
+#if AW_ASM_MATHS
+    InitMathLib();
+#endif
     AW_PlatformInit();
     PutStr("Loading AmiWind v");
     /* Referencing the tag keeps Amiga Version-command metadata in the executable. */

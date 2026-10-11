@@ -105,11 +105,18 @@ def spans(raw,rel):
     elif ext=='.awm':
         # AWM1 terrain pixels and its ocean fill index share the global palette.
         # Town identities/transforms are metadata, not palette references.
+        # AWM2 adds the LAVA section after the pixels (prepare_world_ui.lava_section): its colour is one
+        # palette index too; the pool outlines are world coordinates.
         magic,w,h,x0,y0,x1,y1,count,ocean=get('<4sHH4iII',0)
-        need(magic==b'AWM1' and 1<=w<=512 and 1<=h<=512 and count<=8,'Unsupported world map')
+        need(magic in (b'AWM1',b'AWM2') and 1<=w<=512 and 1<=h<=512 and count<=8,'Unsupported world map')
         need(-2000000<=x0<x1<=2000000 and -2000000<=y0<y1<=2000000,'Invalid world map bounds')
-        start=32+60*count
-        need(ocean<=255 and n==start+w*h,'Invalid world map pixel length/index')
+        start=32+60*count;end=start+w*h
+        if magic==b'AWM2':
+            need(n>=end+16 and raw[end:end+4]==b'LAVA','Missing world map lava section')
+            pools,points,lava=get('<III',end+4)
+            need(pools<=2048 and points<=16*pools and lava<=255 and n==end+16+24*pools+8*points,'Invalid world map lava section')
+        else:need(n==end,'Invalid world map pixel length/index')
+        need(ocean<=255,'Invalid world map pixel length/index')
         for i in range(count):
             at=32+60*i
             need(b'\0' in raw[at:at+16] and b'\0' in raw[at+16:at+48],'Invalid world map area name')
@@ -117,6 +124,7 @@ def spans(raw,rel):
             need(-2000000<=x<=2000000 and -2000000<=y<=2000000 and .0009765625<=scale<=100,'Invalid world map transform')
         add(28,1)  # Validated uint32 index: its other three bytes are zero.
         add(start,w*h)
+        if magic==b'AWM2':add(end+12,1)  # the lava colour index (uint32, other bytes zero)
     elif ext in ('.awi','.awu'):
         need(raw[:4]==(b'AWI1' if ext=='.awi' else b'AWU1'),'Unknown image version');w,h=get('<2H',4);need(n==8+w*h,'Image size mismatch');add(8,w*h)
     elif rel.lower()=='gfx/hand-models.awh':
@@ -193,7 +201,47 @@ def lookup(raw,old,new,rows,name):
     out[:,255]=255
     return out.tobytes()
 
-def convert(source,output,expected_palette=None,changed_only=False):
+SPECIAL=('gfx/palette.lmp','gfx/colormap.lmp','gfx/fog.lmp','world/conversion.json','gfx/ui-palette.json')
+
+def _scan(task):
+    """Pool worker: the preflight row of one staged file and its indexed-pixel counts (convert)."""
+    source,rel=task
+    raw=(Path(source)/rel).read_bytes()
+    try:parts,reason=spans(raw,rel)
+    except Exception as exc:raise ValueError(f'{rel} SHA256={sha(raw)}: {exc}') from exc
+    counts=np.zeros(256,dtype=np.int64)
+    for at,size in parts:counts+=np.bincount(np.frombuffer(raw[at:at+size],np.uint8),minlength=256)
+    return ({'path':rel,'input_sha256':sha(raw),'bytes':len(raw),'spans':parts,'classification':reason,
+             'pixels':int(counts.sum()),'remapped_pixels':int(sum(counts[i] for i in BANK))},counts.tolist())
+
+def _remap(task):
+    """Pool worker: write one ordinary file's bank-remapped copy (convert); returns (output SHA-256, written)."""
+    source,output,rel,input_sha,parts,changed_only=task
+    path=Path(source)/rel;raw=path.read_bytes();need(sha(raw)==input_sha,'Input changed after preflight')
+    dest=bytearray(raw);mapping=bank_mapping()
+    for at,size in parts:dest[at:at+size]=raw[at:at+size].translate(mapping)
+    written=not changed_only or dest!=raw
+    if written:
+        target=Path(output)/rel;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(dest)
+    need(sha(path.read_bytes())==input_sha,'Source mutation detected')
+    return sha(dest),written
+
+def _scan_batch(tasks):return [_scan(t) for t in tasks]
+def _remap_batch(tasks):return [_remap(t) for t in tasks]
+
+def _batches(items,sizes,limit=32<<20,count=256):
+    """Consecutive groups of work items of about LIMIT bytes or COUNT items: small files share one task, so the
+    pool's per-task cost does not exceed the work (the payload holds thousands of small files)."""
+    out,group,total=[],[],0
+    for item,size in zip(items,sizes):
+        if group and (total+size>limit or len(group)>=count):out.append(group);group,total=[],0
+        group.append(item);total+=size
+    if group:out.append(group)
+    return out
+
+def convert(source,output,expected_palette=None,changed_only=False,jobs=None):
+    """Every file scanned and remapped on the shared worker pool (files in path order; the palette, its lookups
+    and the receipts they bind are written here), byte-identical with any worker count."""
     source=Path(source).resolve();output=Path(output).resolve()
     need(source.is_dir() and not output.exists(),'Source required; output must not exist')
     need(source!=output and source not in output.parents and output not in source.parents,'Separate immutable input/output trees required')
@@ -203,15 +251,17 @@ def convert(source,output,expected_palette=None,changed_only=False):
     new=bytearray(banked_palette(palette));mapping=bank_mapping()
     rows=[];total=np.zeros(256,dtype=np.int64)
     # Complete preflight before creating output. Metadata-only manifest, no assets in workspace.
+    from build_parallel import ordered_map
+    from build_jobs import resolve_jobs
+    names=[]
     for path in sorted(source.rglob('*')):
         need(not path.is_symlink(),'Symlinks are not supported')
-        if not path.is_file():continue
-        rel=path.relative_to(source).as_posix();raw=path.read_bytes()
-        try:parts,reason=spans(raw,rel)
-        except Exception as exc:raise ValueError(f'{rel} SHA256={sha(raw)}: {exc}') from exc
-        counts=np.zeros(256,dtype=np.int64)
-        for at,size in parts:counts+=np.bincount(np.frombuffer(raw[at:at+size],np.uint8),minlength=256)
-        total+=counts;rows.append({'path':rel,'input_sha256':sha(raw),'bytes':len(raw),'spans':parts,'classification':reason,'pixels':int(counts.sum()),'remapped_pixels':int(sum(counts[i] for i in BANK))})
+        if path.is_file():names.append(path.relative_to(source).as_posix())
+    workers=max(1,min(resolve_jobs(jobs),len(names) or 1))
+    sizes=[(source/rel).stat().st_size for rel in names]
+    for batch in ordered_map(_scan_batch,_batches([(str(source),rel) for rel in names],sizes),workers):
+        for row,counts in batch:
+            total+=np.array(counts,dtype=np.int64);rows.append(row)
     # Validate the old world-map receipt before writing anything, then bind it
     # to the remapped map and palette. This never repairs an already-stale input.
     world_receipt=None
@@ -225,7 +275,14 @@ def convert(source,output,expected_palette=None,changed_only=False):
         world_receipt['palette_sha256']=sha(new)
         world_receipt['files']['map.awm']=sha(remapped)
     output.mkdir(parents=True)
+    ordinary=[row for row in rows if row['path'] not in SPECIAL]
+    results=[r for batch in ordered_map(_remap_batch,_batches([(str(source),str(output),row['path'],row['input_sha256'],
+                                                                   row['spans'],changed_only) for row in ordinary],
+                                                                 [row['bytes'] for row in ordinary]),workers) for r in batch]
+    for row,(output_sha,written) in zip(ordinary,results):
+        row['output_sha256']=output_sha;row['overlay_written']=written
     for row in rows:
+        if row['path'] not in SPECIAL:continue
         path=source/row['path'];raw=path.read_bytes();need(sha(raw)==row['input_sha256'],'Input changed after preflight')
         dest=bytearray(raw)
         for at,size in row['spans']:dest[at:at+size]=raw[at:at+size].translate(mapping)

@@ -274,3 +274,53 @@ class Release(unittest.TestCase):
             self.assertEqual(json.loads(raw), record)
             self.assertEqual(load_whitespace_baseline(root), record)
             self.assertEqual(result['inherited_files'], 1)
+
+
+class TestListing(unittest.TestCase):
+    """OPS-GATE-UNLISTED-TESTS-36: the gate stages only the files of tools/release-files.json, so a test source
+    missing from the list never runs (TEST-GODMODE-UNLISTED-36). The check names every such file."""
+
+    def test_unlisted_test_sources_are_named(self):
+        import release as module
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            fixture(root)
+            names = json.loads((root / "tools/release-files.json").read_text())
+            (root / "tests/native").mkdir(parents=True)
+            (root / "tests/__pycache__").mkdir()
+            for name in ("tests/test_listed.py", "tests/test_new.py", "tests/native/probe.c",
+                         "tests/__pycache__/test_new.py", "tests/fixture.txt"):
+                (root / name).write_text("x = 1\n")
+            (root / "tools/release-files.json").write_text(json.dumps(names + ["tests/test_listed.py"]))
+            self.assertEqual(module.unlisted_test_files(root), ["tests/native/probe.c", "tests/test_new.py"])
+            with self.assertRaisesRegex(ValueError, "tests/native/probe.c, tests/test_new.py"):
+                module.check_test_listing(root)
+            with mock.patch.dict(module.UNLISTED_TESTS_ALLOWED, {"tests/native/probe.c": "documented reason"}):
+                self.assertEqual(module.unlisted_test_files(root), ["tests/test_new.py"])
+
+    def test_git_checkout_counts_tracked_and_untracked_but_not_ignored_files(self):
+        import release as module
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            fixture(root)
+            (root / "tests").mkdir()
+            (root / ".gitignore").write_text("tests/ignored_*.py\n")
+            for name in ("tests/test_tracked.py", "tests/test_untracked.py", "tests/ignored_scratch.py"):
+                (root / name).write_text("x = 1\n")
+            (root / ".git").mkdir()
+            listing = b"tests/test_tracked.py\0tests/test_untracked.py\0tests/gone.py\0"
+            with mock.patch.object(module.subprocess, "check_output", return_value=listing) as git:
+                self.assertEqual(module.unlisted_test_files(root), ["tests/test_tracked.py", "tests/test_untracked.py"])
+            self.assertIn("--others", git.call_args[0][0])
+            self.assertIn("--exclude-standard", git.call_args[0][0])
+            if shutil.which("git"):  # the same with a real git checkout (the gate images may have no git)
+                shutil.rmtree(root / ".git")
+                subprocess.run(["git", "init", "-q", str(root)], check=True)
+                subprocess.run(["git", "-C", str(root), "add", "tests/test_tracked.py"], check=True)
+                self.assertEqual(module.unlisted_test_files(root), ["tests/test_tracked.py", "tests/test_untracked.py"])
+
+    def test_every_test_source_of_this_checkout_is_listed(self):
+        import release as module
+        root = Path(__file__).resolve().parents[1]
+        self.assertEqual(module.unlisted_test_files(root), [],
+                         "add these test files to tools/release-files.json: the gate stages only listed files")

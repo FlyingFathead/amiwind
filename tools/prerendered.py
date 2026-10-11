@@ -650,7 +650,8 @@ def action_import(store, run, source, stages='default', python_check=True, sourc
         for key in saved:
             del os.environ[key]
         os.environ.update(environment)
-        index = build_cache.SourceIndex(source, scope=(state.get('stage_cache') or {}).get('scope') or 'symbols')
+        index = build_cache.SourceIndex(source, scope=(state.get('stage_cache') or {}).get('scope') or 'symbols',
+                                        top_format=build_cache.STAGE_TOP_FORMAT)
         fingerprints, components, problems, _ = build_cache.fingerprint_steps(steps, run, state, index)
     finally:
         for key in [key for key in os.environ if key.startswith(build_cache.ENV_PREFIX)]:

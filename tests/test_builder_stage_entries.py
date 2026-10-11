@@ -108,7 +108,11 @@ class ActorContactStage(unittest.TestCase):
             (scene / 'id1/gfx/palette.lmp').write_bytes(bytes(768))
             (scene / 'seyda.bsp').write_bytes(b'town')
             (scene / 'seyda.map').write_text('{\n"classname" "worldspawn"\n}\n', newline='\n')
-            command = dict(builder_steps(run, data))['actor-contact']
+            # v0.0.36-dev5: the default Seyda Neen is CHIM-native and the stage cuts no region maps
+            # (--seyda-chim-native); the retired legacy chain (--legacy-area seyda) still converts them here
+            self.assertIn('--seyda-chim-native', [str(p) for p in dict(builder_steps(run, data))['actor-contact']])
+            command = dict(builder_steps(run, data, ['--legacy-area', 'seyda']))['actor-contact']
+            self.assertNotIn('--seyda-chim-native', [str(p) for p in command])
             self.assertEqual(Path(command[1]).name, 'check_scene_actors.py')
             # autospec: a call that no longer matches a signature fails here.
             with patch.object(prepare_seyda_regions, 'convert', autospec=True, return_value={}) as convert, \

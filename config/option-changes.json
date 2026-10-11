@@ -1,0 +1,632 @@
+{
+  "format": 1,
+  "about": "Builder options whose meaning or default changed, by AmiWind version (tools/build_recipe.py, docs/BUILD_RECIPES.md). A recipe from an older version is built with a warning that lists every change since its version. change: added (with its default \"to\"), default (from -> to), meaning, retired (tools/retired_flags.py) or removed. A null default means the builder decides (the build defaults file or the option's own rule). \"current\" is this builder's defaults: tests/test_build_recipe.py fails when they differ, so a changed default or a new option is recorded here first (python tools/build_recipe.py snapshot prints the block).",
+  "changes": [
+    {
+      "version": "0.0.21-dev8",
+      "option": "bitmap_paper_ink",
+      "flag": "--bitmap-paper-ink",
+      "change": "added",
+      "to": "filled",
+      "source": "config/build-defaults.json 751f0fa"
+    },
+    {
+      "version": "0.0.32-dev1",
+      "option": "builder",
+      "flag": "--builder",
+      "change": "added",
+      "to": "legacy",
+      "source": "config/build-defaults.json f80ada5"
+    },
+    {
+      "version": "0.0.32-dev1",
+      "option": "chim_areas",
+      "flag": "--chim-area",
+      "change": "added",
+      "to": [
+        "balmora"
+      ],
+      "source": "config/build-defaults.json f80ada5"
+    },
+    {
+      "version": "0.0.32-dev1",
+      "option": "follow_original_stair_rules",
+      "flag": "--follow-original-stair-rules",
+      "change": "added",
+      "to": true,
+      "source": "config/build-defaults.json cb302db"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "chim_texture_effects",
+      "flag": "--chim-texture-effect",
+      "change": "added",
+      "to": [],
+      "source": "config/build-defaults.json 49fa63b"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "model_hull",
+      "flag": "--model-hull",
+      "change": "added",
+      "to": "auto",
+      "source": "config/build-defaults.json c0258dd"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "chim_stream_statics",
+      "flag": "--chim-stream-statics",
+      "change": "added",
+      "to": false,
+      "source": "config/build-defaults.json 420884c"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "chim_stream_statics",
+      "flag": "--chim-stream-statics",
+      "change": "default",
+      "from": false,
+      "to": true,
+      "source": "config/build-defaults.json c04404f",
+      "note": "CHIM frame maps tag statics to stream with their chunks"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "builder",
+      "flag": "--builder",
+      "change": "default",
+      "from": "legacy",
+      "to": "chim",
+      "source": "config/build-defaults.json 8bc890d",
+      "note": "the first CHIM release: the CHIM world streamer by default"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "chim_areas",
+      "flag": "--chim-area",
+      "change": "default",
+      "from": [
+        "balmora"
+      ],
+      "to": [
+        "balmora",
+        "seyda"
+      ],
+      "source": "config/build-defaults.json 8bc890d"
+    },
+    {
+      "version": "0.0.33-dev1",
+      "option": "chim_native_towns",
+      "flag": "--chim-native-towns",
+      "change": "added",
+      "to": "off",
+      "source": "tools/build.py 04db1f3",
+      "note": "on: a CHIM town other than Seyda Neen built from the game data with no legacy chain"
+    },
+    {
+      "version": "0.0.33-rc1",
+      "option": "model_hull",
+      "flag": "--model-hull",
+      "change": "default",
+      "from": "auto",
+      "to": "chain",
+      "source": "config/build-defaults.json a18be05",
+      "note": "chain standing hulls (routed hulls pushed an open-world map past its clipnode budget)"
+    },
+    {
+      "version": "0.0.33-rc1",
+      "option": "lava",
+      "flag": "--lava",
+      "change": "added",
+      "to": "quake",
+      "source": "config/build-defaults.json 5fe4caf",
+      "note": "lava pools as a Quake liquid"
+    },
+    {
+      "version": "0.0.33-rc1",
+      "option": "chim_lighting_type",
+      "flag": "--chim-lighting-type",
+      "change": "added",
+      "to": "hybrid",
+      "source": "config/build-defaults.json 08f4602"
+    },
+    {
+      "version": "0.0.33-rc1",
+      "option": "stair_walk",
+      "flag": "--stair-walk",
+      "change": "added",
+      "to": "auto",
+      "source": "tools/build.py 865dbcf",
+      "note": "auto: every step and ramp in development builds, flight steps only in release builds"
+    },
+    {
+      "version": "0.0.35-dev1",
+      "option": "npc_head_detail",
+      "flag": "--npc-head-detail",
+      "change": "added",
+      "to": "auto",
+      "source": "config/build-defaults.json b618b1d",
+      "note": "auto = budget (the previous bake); original heads are experimental"
+    },
+    {
+      "version": "0.0.35-dev1",
+      "option": "npc_lod",
+      "flag": "--npc-lod",
+      "change": "added",
+      "to": "off",
+      "source": "config/build-defaults.json 6cf34d1"
+    },
+    {
+      "version": "0.0.35-dev1",
+      "option": "npc_lod_levels",
+      "flag": "--npc-lod-levels",
+      "change": "added",
+      "to": 3,
+      "source": "config/build-defaults.json 6cf34d1"
+    },
+    {
+      "version": "0.0.35-dev1",
+      "option": "npc_face_lod",
+      "flag": "--npc-face-lod",
+      "change": "added",
+      "to": "all",
+      "source": "config/build-defaults.json 6cf34d1"
+    },
+    {
+      "version": "0.0.35-dev1",
+      "option": "npc_lod_disk_mib",
+      "flag": "--npc-lod-disk-mib",
+      "change": "added",
+      "to": 96,
+      "source": "config/build-defaults.json 6cf34d1"
+    },
+    {
+      "version": "0.0.35-dev1",
+      "option": "anim_kit",
+      "flag": "--anim-kit",
+      "change": "added",
+      "to": "on",
+      "source": "tools/build.py fb08343",
+      "note": "on: residents get the react+full animation kit (--npc-anim react+full); off: the previous idle frames"
+    },
+    {
+      "version": "0.0.36-dev1",
+      "option": "world_map",
+      "flag": "--world-map",
+      "change": "added",
+      "to": "v2",
+      "source": "config/build-defaults.json d18e2ed",
+      "note": "the in-game world map with the lava pools (AWM2)"
+    },
+    {
+      "version": "0.0.36-dev1",
+      "option": "chim_terrain_shoreline",
+      "flag": "--chim-terrain-shoreline",
+      "change": "added",
+      "to": "on",
+      "source": "tools/build.py 666328f",
+      "note": "town frames triangulate the shoreline tiles as the legacy region maps do"
+    },
+    {
+      "version": "0.0.36-dev1",
+      "option": "chim_regions",
+      "flag": "--chim-regions",
+      "change": "added",
+      "to": [],
+      "source": "tools/build.py dfa6bc2",
+      "note": "EXPERIMENTAL: exterior cells on CHIM inside the legacy open world"
+    },
+    {
+      "version": "0.0.36-dev1",
+      "option": "chim_regions_status",
+      "flag": "--chim-regions-status",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py dfa6bc2"
+    },
+    {
+      "version": "0.0.36-dev2",
+      "option": "chim_native_towns",
+      "flag": "--chim-native-towns",
+      "change": "default",
+      "from": "off",
+      "to": "on",
+      "source": "tools/build.py c0a4d51",
+      "note": "CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36)"
+    },
+    {
+      "version": "0.0.36-dev2",
+      "option": "chim_native_towns",
+      "flag": "--chim-native-towns off",
+      "change": "retired",
+      "source": "tools/retired_flags.py c0a4d51",
+      "note": "the legacy town chains; refused in developer mode without --override chim-native-towns-off"
+    },
+    {
+      "version": "0.0.36-dev2",
+      "option": "legacy_areas",
+      "flag": "--legacy-area",
+      "change": "retired",
+      "source": "tools/retired_flags.py c0a4d51",
+      "note": "a CHIM town through the legacy region-map chain; refused in developer mode without --override legacy-area"
+    },
+    {
+      "version": "0.0.36-dev2",
+      "option": "chim_terrain_hull",
+      "flag": "--chim-terrain-hull",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py b491a0b",
+      "note": "null = auto: compiled hull for irregular ground, routed chains for the regular grid"
+    },
+    {
+      "version": "0.0.36-dev2",
+      "option": "chim_terrain_refs",
+      "flag": "--chim-terrain-refs",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py b491a0b",
+      "note": "EXPERIMENTAL terrain references (world format 0.7); null = off"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "seyda_recorded",
+      "flag": "--seyda-recorded",
+      "change": "retired",
+      "source": "tools/retired_flags.py ba8cc85",
+      "note": "the recorded v0.0.31 Seyda Neen maps; refused in developer mode without --override seyda-recorded"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "chim_frame_ext",
+      "flag": "--chim-frame-ext",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py f040b61",
+      "note": "CHIM frame maps as maps/<name>.chim (null = chim); bsp = the old method"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "chim_frame_ext",
+      "flag": "--chim-frame-ext",
+      "change": "default",
+      "from": null,
+      "to": "chim",
+      "source": "tools/build.py build recipes",
+      "note": "the default named: chim (CHIM's own map format), the same build; bsp = the old method, labelled"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "world_bounds",
+      "flag": "--world-bounds",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py 7d91e51",
+      "note": "null = on: the image step writes the world bounds"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "player_body",
+      "flag": "--player-body",
+      "change": "added",
+      "to": null,
+      "source": "tools/prepare_player_view.py 5d7f701",
+      "note": "null = on: the player body for the third-person view"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "death_retry",
+      "flag": "--death-retry",
+      "change": "added",
+      "to": null,
+      "source": "tools/prepare_player_view.py 5d7f701",
+      "note": "null = on: the quick retry after death"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "chim_model_hull_patch",
+      "flag": "--chim-model-hull-patch",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py 4dc2721",
+      "note": "null = off: compiled model hulls checked for exactness, lost pieces only recorded"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "chim_model_hull_patch",
+      "flag": "--chim-model-hull-patch",
+      "change": "default",
+      "from": null,
+      "to": "on",
+      "source": "tools/build.py 9bfb7cb",
+      "note": "the pieces a compiled model hull lost under a walkable surface are added back (CHIM-COMPILED-HULL-SHORT-36); off keeps the compiled hull as it is"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "chim_model_weld",
+      "flag": "--chim-model-weld",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py 86ae112",
+      "note": "null = base: a model variant shares its vertices with its base (every scale and tilt the same vertices and edges); placed = the earlier per-placement weld"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "stair_walk_cache",
+      "flag": "--stair-walk-cache",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py fc90d48",
+      "note": "null = cached: a map or frame is stair-walked once and its result reused while its collision (by SHA-256) is unchanged; full walks every map"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "stair_walk_sample",
+      "flag": "--stair-walk-sample",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py fc90d48",
+      "note": "null = 2: reused maps or frames walked again and compared on every build (0 = none, development builds only)"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "engine_experiment",
+      "flag": "--engine-experiment",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py 6c3a8a4",
+      "note": "EXPERIMENTAL engine compile switch, off by default: widecoord (AW_EXP_WIDECOORD)"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "log_level",
+      "flag": "--log-level",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py f015328",
+      "note": "null = normal (or AMIWIND_LOG_LEVEL): how much the stages print; logs only, outputs unchanged (quiet/normal/verbose)"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "quiet",
+      "flag": "--quiet",
+      "change": "added",
+      "to": false,
+      "source": "tools/build.py f015328",
+      "note": "false: same as --log-level quiet; logs only, outputs unchanged"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "chim_region_rows",
+      "flag": "--chim-region-rows",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py image-speed",
+      "note": "null: game-data (the region frame map's worldspawn and start from their sources, no legacy map read); legacy keeps the earlier copy from the legacy map"
+    },
+    {
+      "version": "0.0.36-dev4",
+      "option": "chim_areas",
+      "flag": "--chim-area",
+      "change": "default",
+      "from": [
+        "balmora",
+        "seyda"
+      ],
+      "to": [
+        "balmora",
+        "seyda",
+        "vivec_arena"
+      ],
+      "source": "config/build-defaults.json (owner decision 2026-10-11: Vivec stage A passed the owner playtest)",
+      "note": "the Vivec Arena is a default CHIM area, CHIM-native (chim-town-vivec_arena); legacy builds still leave it out (config/towns.json withdrawn, --extra-town vivec_arena builds it there)"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "engine_profile",
+      "flag": "--engine-profile",
+      "change": "added",
+      "to": "c",
+      "source": "tools/build.py c995f45",
+      "note": "c = the C paths at -O1 (engine binary unchanged); upstream = upstream AmiQuake's turbulent span and chunky-to-planar assembly, EXPERIMENTAL (docs/ENGINE_PROFILES.md)"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "engine_asm",
+      "flag": "--engine-asm",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py c995f45",
+      "note": "null = the profile's assembly units; a comma list of spans,turb,maths,c2p,fixed, none or all, EXPERIMENTAL"
+    },
+    {
+      "version": "0.0.36-dev3",
+      "option": "engine_opt",
+      "flag": "--engine-opt",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py c995f45",
+      "note": "null = the profile's optimisation (o1); o2 = the selective -O2 experiment, EXPERIMENTAL"
+    },
+    {
+      "version": "0.0.36-dev4",
+      "option": "coord_range",
+      "flag": "--coord-range",
+      "change": "added",
+      "to": "wide",
+      "source": "tools/build.py e48060e",
+      "note": "wide = 24-bit 1/256-unit coordinates (+/-32,000), the engine default since v0.0.36; narrow = Quake's 1/8-unit shorts, the method before (CHIM-FRAME-COORD-RANGE-33)"
+    },
+    {
+      "version": "0.0.36-dev4",
+      "option": "chim_mesh_method",
+      "flag": "--chim-mesh-method",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py mesh-methods",
+      "note": "null: table (config/mesh-methods.json: planar merge for every CHIM mesh, meshoptimizer + planar merge for the rows it names); converter keeps the earlier faces"
+    },
+    {
+      "version": "0.0.36-dev5",
+      "option": "chim_areas",
+      "flag": "--chim-area",
+      "change": "default",
+      "from": [
+        "balmora",
+        "seyda",
+        "vivec_arena"
+      ],
+      "to": [
+        "balmora",
+        "seyda",
+        "vivec_city"
+      ],
+      "source": "config/build-defaults.json (owner decision 2026-10-11 09:55 +0300: whole-city Vivec replaces the Arena-only area by default)",
+      "note": "all of Vivec in one CHIM frame with its 130 rooms; the district areas (vivec_arena ...) are retired (--override vivec-districts)"
+    },
+    {
+      "version": "0.0.36-dev5",
+      "option": "chim_terrain_hull",
+      "flag": "--chim-terrain-hull",
+      "change": "default",
+      "from": "auto",
+      "to": "compiled",
+      "source": "tools/build.py (owner decision 2026-10-11 10:11 +0300)",
+      "note": "compiled terrain hull for every chunk by default (owner decision 2026-10-11; a default build otherwise overruns Balmora's ring, CHIM-BALMORA-RING-GROWTH-36); auto and routed stay selectable"
+    },
+    {
+      "version": "0.0.36-dev5",
+      "option": "chim_terrain_refs",
+      "flag": "--chim-terrain-refs",
+      "change": "default",
+      "from": "off",
+      "to": "on",
+      "source": "tools/build.py (owner decision 2026-10-11 10:11 +0300)",
+      "note": "terrain references (world format 0.7) by default (owner decision 2026-10-11); off keeps a terrain copy per chunk (format 0.5)"
+    }
+  ],
+  "current": {
+    "options": {
+      "accept_entity_loss": null,
+      "accept_known_stair_findings": [],
+      "allow_data_differences": false,
+      "allow_known_actor_ground_findings": null,
+      "amiga_libs": null,
+      "amiga_libs_policy": "warn",
+      "anim_kit": "on",
+      "bitmap_paper_ink": null,
+      "build_config": null,
+      "builder": null,
+      "check_hashes": "core",
+      "chim_areas": null,
+      "chim_cut_models_over": null,
+      "chim_detail_budget": null,
+      "chim_draw_distance": null,
+      "chim_frame_ext": "chim",
+      "chim_lighting_type": null,
+      "chim_mesh_method": null,
+      "chim_model_hull_patch": "on",
+      "chim_model_weld": null,
+      "chim_native_towns": "on",
+      "chim_region_rows": null,
+      "chim_regions": [],
+      "chim_regions_status": null,
+      "chim_stream_statics": true,
+      "chim_terrain_hull": "compiled",
+      "chim_terrain_refs": "on",
+      "chim_terrain_shoreline": "on",
+      "chim_texture_effects": null,
+      "coord_range": "wide",
+      "death_retry": null,
+      "direct_to_game_map": null,
+      "engine_asm": null,
+      "engine_experiment": null,
+      "engine_opt": null,
+      "engine_profile": "c",
+      "exclude": null,
+      "exclude_unreferenced": null,
+      "extra_town": [],
+      "fallback_font": null,
+      "follow_original_stair_rules": true,
+      "game_data_policy": "warn",
+      "hands": "3d",
+      "heap_mb": null,
+      "hidden_surface_cull": "true",
+      "intro_captions": null,
+      "lava": null,
+      "legacy_areas": [],
+      "live_logs": false,
+      "local_skybox": "false",
+      "log_level": null,
+      "map_budget_policy": "strict",
+      "miniwind": false,
+      "miniwind_boot": null,
+      "miniwind_debug": false,
+      "miniwind_description": null,
+      "miniwind_scope": null,
+      "miniwind_town": null,
+      "model_hull": null,
+      "night_lamp_lightmaps": "off",
+      "no_cell_progress": false,
+      "no_entity_baseline": false,
+      "no_extra_town": [],
+      "no_harvest": false,
+      "no_media_cache": false,
+      "no_npc_gallery": false,
+      "no_tree_sprites": false,
+      "no_unit_cache": false,
+      "npc_anim": null,
+      "npc_face_lod": null,
+      "npc_face_lod_list": null,
+      "npc_head_detail": null,
+      "npc_lod": null,
+      "npc_lod_disk_mib": null,
+      "npc_lod_levels": null,
+      "npc_models": "whole",
+      "npc_parts_face_cap": 666,
+      "npc_parts_policy": "exact",
+      "npc_root_rule": "legacy",
+      "only_core_towns": false,
+      "player_body": null,
+      "quick_character": null,
+      "quiet": false,
+      "scenery_reduce": null,
+      "scenery_reduce_texels": null,
+      "seyda_recorded": null,
+      "shared_sky_source": null,
+      "skip_census": null,
+      "skip_dressing": false,
+      "stage": "aga",
+      "stair_walk": "auto",
+      "stair_walk_cache": null,
+      "stair_walk_sample": null,
+      "texinfo_snap": null,
+      "tree_sprites": false,
+      "vis_mode": "fast",
+      "with_video": false,
+      "world_bounds": null,
+      "world_map": null
+    },
+    "build_defaults": {
+      "bitmap_paper_ink": "filled",
+      "builder": "chim",
+      "chim_areas": [
+        "balmora",
+        "seyda",
+        "vivec_city"
+      ],
+      "chim_lighting_type": "hybrid",
+      "chim_stream_statics": true,
+      "chim_texture_effects": [],
+      "follow_original_stair_rules": true,
+      "lava": "quake",
+      "model_hull": "chain",
+      "npc_face_lod": "all",
+      "npc_head_detail": "auto",
+      "npc_lod": "off",
+      "npc_lod_disk_mib": 96,
+      "npc_lod_levels": 3,
+      "world_map": "v2"
+    }
+  }
+}

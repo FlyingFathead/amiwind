@@ -1,0 +1,137 @@
+# BUILD-MINIWIND-ARENA-PIT-REFUSED-36: Regression against v0.0.35: the Vivec Arena Pit is in no CHIM build (no CHIM-native stage made the Arena's rooms), and its start was refused as not converted
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 11 October 2026, in v0.0.36-dev3 |
+| Where | tools/direct_start.py (start resolver), tools/build.py chim_town_commands |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.36-dev3 (last seen) |
+| Severity | high: regression against v0.0.35 (which shipped vai000): the Arena Pit is in no CHIM build and the vivec-arena-pit preset was refused; no wrong payload |
+| Family | Content silently missing from a build (`build-content-missing`) |
+| CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
+| Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
+| From commit | source 714d6de, engine 714d6de, CHIM world 714d6de |
+| CHIM engine version | CHIM 0.1.0, engine 714d6de, world format 0.5 |
+| Build note | MiniWind vivec-arena-chim stage A try4 (61a1ea0) holds no vai000: its plan ran chim-town-vivec_arena, not town-vivec_arena |
+
+<!-- END GENERATED FACTS -->
+
+## Status: 11 October 2026
+
+Fixed in source: the new stage `chim-rooms-<town>` makes a CHIM-native town's listed rooms, the Arena Pit among them;
+the start resolver finds the room. A regression against v0.0.35, which shipped the Pit through the legacy town chain;
+it persists ARENA-PIT-NO-INTERIOR-33. Verification in a real MiniWind build of `vivec-arena-pit` is pending at the time
+of writing.
+
+## Symptom
+
+`--miniwind-vivec-arena-pit` (and any `--direct-to-game-map "interior:Vivec, Arena Pit"`) was refused before any stage
+with "Towns imported from config/towns.json (the Vivec Arena) have no converted interiors yet
+(IMPORT-TOWN-NO-INTERIORS-32)", although the Arena Pit has been converted since v0.0.35 and was played in a v0.0.35
+build.
+
+## Where
+
+- `tools/direct_start.py`: the start resolver read the converted rooms from `config/seyda_area.json` and
+  `config/balmora_interiors.json` only, and its refusal still said that town-table rooms are not converted.
+- `tools/build.py` `chim_town_commands`: a CHIM-native town (the default since v0.0.36) replaces its legacy stage
+  `town-<town>` by `chim-town-<town>`. The legacy stage was the only one that converts the town's listed rooms
+  (`tools/import_town.py` `convert_interiors`); `chim-town` makes none.
+
+## How it happened
+
+The Pit became the Arena's first listed room on v0.0.33-arena-interiors (a8f0568, routed hulls cceb661 and 1b53fbb) and
+reached the v0.0.35 line with the merge eecb4eb (owner decision D1): map `vai000`, built inside `town-vivec_arena`. The
+direct start was written before that, with the town-table rooms "not converted yet" and a fixed list of two scene files;
+nobody updated it when the rooms arrived. Then CHIM-native areas became the default (BUILD-LEGACY-CHAIN-DEFAULT-36), and
+the Arena's CHIM-native plan dropped `town-vivec_arena` and the room conversion with it. The Vivec stage A run
+2026_10_11_v0.0.36-dev3_miniwind-vivec-arena-chim-vivec-stage-a-try4_61a1ea0 holds no `vai000`: its plan ran
+`chim-town-vivec_arena` and no room stage.
+
+## Why it was not caught
+
+The refusal looked like a correct check ("not converted"), and the test of the Pit preset asserted the refusal. No test
+compared the resolver's room list with the town table, and no test checked that a CHIM-native town's listed rooms are
+made by some stage.
+
+## Reproduction
+
+`python3 tools/build.py --miniwind-vivec-arena-pit --check ...` on any commit before the fix: refused with the stale
+IMPORT-TOWN-NO-INTERIORS-32 message.
+
+## Repair
+
+- **The stage** `chim-rooms-<town>` (`tools/chim_rooms.py`), planned right after `chim-town-<town>` for every
+  CHIM-native town whose config lists rooms (Balmora keeps `balmora-interiors`; a town without listed rooms gets no
+  stage, so default plans are unchanged). It runs the legacy chain's own room code, `import_town.convert_interiors`:
+  every listed room that is not excluded, converted by `prepare_area.build_room_cached` (one hashed unit per room in the
+  interior-room unit cache; the routed hulls and exact standing bevels of interiors), with its residents and its room
+  door bank. No legacy region map is built. It works in its own folder (the run's palette in), never in the shared scene.
+- **The door banks, both ways:** each room's bank (`doors-<room>.txt`) leads into the other listed rooms and out to the
+  town by its map name, which the engine loads as the town's CHIM frame; the town's exterior bank is written with the
+  doors into the converted rooms linked (`import_town.door_bank_text` with the rooms).
+- **The image** installs the rooms (`--chim-rooms`, `chim_rooms.install`, every file checked by SHA-256 against the
+  stage's record; another file with other bytes is refused) before the `--chim-town` outputs, so `chim_town.install`
+  keeps the linked bank instead of its own unlinked one (the slot it already left for a "converted interiors stage").
+- **MiniWind** keeps the sandbox town's room stage in the full scope and leaves it out in the exterior scope; the boot
+  notice lists "<town> interiors".
+- **The start:** the resolver reads the rooms the town table lists (`direct_start.scene_rows`), refusals name the real
+  reason (`direct_start.interior_reason`), and a room whose town has no room stage in the plan is refused before any stage
+  (`direct_start.require_built_interior`).
+- The legacy chain stays selectable (`--chim-native-towns off`, retired: `--override chim-native-towns-off`); it makes the
+  same rooms inside `town-<town>`.
+
+## Verification
+
+`tests/test_chim_rooms.py`: the stage is planned after the town's chim-town stage for a CHIM-native town with rooms
+and for no other; the image gets `--chim-rooms`; install copies the rooms, accepts the same bytes again and refuses
+other or changed bytes; the rooms' linked town bank wins over chim-town's. `tests/test_direct_start.py`: the Pit
+preset starts inside the Pit (vai000) with `chim-rooms-vivec_arena` in its plan; the exterior scope has no room stage; a
+room with no stage is refused before any stage. Pending: a real MiniWind build of `vivec-arena-pit` through the master
+builder with the boot smoke.
+
+## Prevention
+
+The resolver takes its rooms from the town table itself, so a newly listed room is a valid start at once. The sweep on
+11 October 2026 found no other preset refused on stale data; every other town-table room of a CHIM-native town (the
+Vivec cantons' rooms, when those towns are CHIM areas) meets the same missing stage and is refused with this ID.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Content silently missing from a build (`build-content-missing`). Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. See [families](README.md#families).
+
+- [ARENA-PIT-NO-INTERIOR-33](ARENA-PIT-NO-INTERIOR-33.md): The Vivec Arena minigame fights on the test floor: the Arena Pit interior is not in v0.0.33 builds
+- [AUDIO-MISSING-SOURCES-32](AUDIO-MISSING-SOURCES-32.md): The image step reports missing sources for 7 voices and 2 effects
+- [BUILD-CHIM-ROOMS-IMAGE-RACE-36](BUILD-CHIM-ROOMS-IMAGE-RACE-36.md): The image step ran beside a CHIM town's room stage and read its record before it existed
+- [BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36](BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36.md): An area build of a CHIM town without exterior BSP maps ships no shared sky although its CHIM frame names it
+- [BUILD-DRESSING-EXCLUDED-32](BUILD-DRESSING-EXCLUDED-32.md): The repository builder drops lantern hooks and other dressing in Seyda Neen maps without a receipt
+- [BUILD-EXTRA-TOWN-OPTIN-32](BUILD-EXTRA-TOWN-OPTIN-32.md): A default build leaves out the Vivec Arena preview that v0.0.32 ships
+- [BUILD-FLORA-OPTIN-32](BUILD-FLORA-OPTIN-32.md): A from-scratch build without --tree-sprites leaves out the trees and grass every release ships
+- [BUILD-HANDS-NOT-BUILT-32](BUILD-HANDS-NOT-BUILT-32.md): Per-race first-person hands are not built by the builder
+- [BUILD-HARVEST-NATIVE-TOWN-ORDER-36](BUILD-HARVEST-NATIVE-TOWN-ORDER-36.md): The image step's harvest check refused a CHIM-native town's catalogues before its frame map was written
+- [BUILD-HARVEST-NOT-BUILT-32](BUILD-HARVEST-NOT-BUILT-32.md): Mushroom harvest data is not built by the builder
+- [BUILD-IMAGE-NATIVE-BALMORA-CACHE-36](BUILD-IMAGE-NATIVE-BALMORA-CACHE-36.md): The image step asked for the legacy Balmora cache when Balmora is CHIM-native
+- [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36](BUILD-LEGACY-TOWN-MAPS-SHIPPED-36.md): CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload)
+- [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
+- [BUILD-MINIWIND-DIRECT-START-TOWN-36](BUILD-MINIWIND-DIRECT-START-TOWN-36.md): A MiniWind build of another town refuses its own direct start: the start check assumed Balmora
+- [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-RUN-FOLDER-PRECREATED-36](BUILD-RUN-FOLDER-PRECREATED-36.md): Every real CHIM build is refused at its start: the plan writes the world map manifest into the run folder before the run makes it
+- [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
+- [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
+- [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
+- [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
+- [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
+
+Related bugs in other categories:
+
+- [IMPORT-TOWN-NO-INTERIORS-32](IMPORT-TOWN-NO-INTERIORS-32.md): The town importer converts no interiors; all Vivec Arena doors say "Interior unavailable"
+
+<!-- END GENERATED CATEGORY -->

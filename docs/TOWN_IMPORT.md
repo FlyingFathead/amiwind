@@ -64,7 +64,8 @@ to hard-wire for Balmora.
 | `town.visual_group` | Group key in the scenery index |
 | `town.arrival` | `{"travel_npc": id}`: that NPC's travel destination inside this frame; or `{"source_position": [x, y, z], "source_rotation_z": radians}`: an explicit original pose, converted like a travel destination |
 | `town.return` | `{"travel_npc": id, "config": file}`: return travel into another area; or `null` (the directory then records `0 0 0 0`) |
-| `handoff_core` | Optional: the frame-local rectangle this town owns in the world handoff. Default: `bounds` inset by 96. Must stay `draw_distance + 32` inside the bounds, so the frame edge is never in view from a point the player can stand in |
+| `handoff_core` | The frame-local rectangle this town owns in the world handoff, `[[x0, y0], [x1, y1]]`; it must stay `draw_distance + 32` inside the frame's ground box (`bounds` plus `terrain_margin`), so the frame edge is never in view from a point the player can stand in. `"inset"` selects `bounds` inset by 96 (the Arena): it leaves no ground between the frame edge and the fog plane, so a handoff row (`world_slot` -1) must name it; rows without the key (Seyda Neen, Balmora) keep the inset. The town table refuses a handoff row whose core is closer than draw distance + 32 to the frame edge without `"inset"` |
+| `terrain_margin` | Optional, default 0: a terrain-only margin (whole 128-unit tiles) the CHIM frame's ground reaches past `bounds`, with no placements of its own, like the legacy region maps' overlap; a CHIMport block inside the legacy world owns its cell box (`handoff_core` = `bounds`) and carries a margin of at least draw distance + 32 |
 | `interiors` | Optional: `[{"cell": original interior cell, "exclude": reason}]`, the rooms reached through the town's load doors. Append only: a room's position gives its map name `<prefix>i000` upwards and its save ID. `exclude` keeps the slot and leaves the room unconverted; its doors show it as unavailable |
 
 `config/towns.json` lists the runtime towns in stable save order (append,
@@ -74,7 +75,7 @@ never reorder) with the engine-only facts:
 | --- | --- |
 | `id`, `config` | Town id and its config file |
 | `town` | Inline town block for towns not converted by `import_town.py` (Seyda Neen) |
-| `world_slot` | 0/1: Seyda's and Balmora's handoff rows in `world/regions.awr`; -1: the handoff frame comes from the town config (`bounds` inset by 96) and is used once `maps/<map>.bsp` is installed |
+| `world_slot` | 0/1: Seyda's and Balmora's handoff rows in `world/regions.awr`; -1: the handoff frame comes from the town config (`handoff_core`) and is used once `maps/<map>.bsp` is installed |
 | `flags` | `seyda_scenes`, `legacy_payload`, `own_doors`, `scenery_catalogue`, `teleport_arrival`, `ground_place` (see `aw_town.h`) |
 | `travel` | `{"npc": display name, "target": map, "use_return_point": bool}` or `null` |
 | `shipped_since` | Optional `vX.Y.Z`, towns after Seyda and Balmora only: the release that first ships the town. Every default build imports it (`vivec_arena`: `v0.0.32`); the release feature `extra-towns` in `config/release-features.json` takes its files from this row. Not allowed on a blocked town |
@@ -105,6 +106,12 @@ places its residents, and writes the door banks (`tools/town_interiors.py`):
   point, in table order (the engine's own world-handoff rule);
 - a door into a room that is not listed, excluded or failed keeps target `-`:
   the engine shows "Interior unavailable" and never loads it.
+
+A CHIM-native town (the default for every CHIM area since v0.0.36) has no `import_town.py` stage: its listed
+rooms are made by the stage `chim-rooms-<town>` (`tools/chim_rooms.py`, after `chim-town-<town>`) with the same
+converter and the same banks: one hashed unit per room in the interior-room cache, the exits leading to the town's
+map name (its CHIM frame), and the town's exterior bank with the doors into the rooms linked, installed in place of
+chim-town's unlinked bank (BUILD-MINIWIND-ARENA-PIT-REFUSED-36). No legacy region map is built for it.
 
 A room also fails when its coordinates reach the +-4096 network range
 (INTERIOR-COORDS-31) or it needs more than 220 inline models

@@ -115,6 +115,9 @@ class PerFrameAuditTests(unittest.TestCase):
                 plain = lambda r: json.loads(json.dumps(r, default=lambda o: o.item()))
                 self.assertEqual(plain(per), plain(whole))
                 self.assertEqual(len(per['frames']), 2)
+                for f in per['frames']:
+                    # what fills the worst position adds up to the peak (CHIM-TOWN-HEAP-ROUTED-HULL-36)
+                    self.assertEqual(sum(f['peak_breakdown'].values()), f['peak_bytes'])
 
     def test_parallel_and_cached_runs_give_the_same_report(self):
         opts = self.options()
@@ -130,6 +133,47 @@ class PerFrameAuditTests(unittest.TestCase):
             other = heap.ring_peak(self.world, dict(SIZES, scenery=SIZES['scenery'] + 1000), cache_dir=cache, **opts)
             self.assertEqual(len(list(Path(cache).glob('*.json'))), 4)
             self.assertGreater(other['frames'][0]['peak_bytes'], serial['frames'][0]['peak_bytes'])
+
+    def test_a_big_frame_split_over_the_pool_gives_the_same_report(self):
+        # owner order 2026-10-11 10:08 (max parallelization): a big frame scans its positions in slices over the
+        # shared pool; with the threshold lowered here every frame of this small world is "big": same report
+        from unittest.mock import patch
+        opts = self.options()
+        serial = heap.ring_peak(self.world, SIZES, **opts)
+        plain = lambda r: json.loads(json.dumps(r, default=lambda o: o.item()))
+        with patch.object(heap, 'BIG_FRAME_POSITIONS', 1), patch.object(heap, 'SCAN_BATCH', 7):
+            split = heap.ring_peak(self.world, SIZES, jobs=3, **opts)
+            whole = heap.ring_peak(self.world, SIZES, jobs=1, **opts)
+        self.assertEqual(plain(split), plain(serial))
+        self.assertEqual(plain(whole), plain(serial))
+        # slices merged in order keep the first worst position (ties included)
+        task = None
+        with patch.object(heap, 'SCAN_BATCH', 7):
+            import numpy as np
+            calls = []
+            real = heap._scan
+
+            def scan(work):
+                calls.append(work[1:])
+                return real(work)
+            with patch.object(heap, '_scan', scan), patch.object(heap, 'BIG_FRAME_POSITIONS', 1), \
+                    patch('build_parallel.ordered_map', lambda f, items, *a, **k: (f(i) for i in items)):
+                task = plain(heap.ring_peak(self.world, SIZES, jobs=4, **opts))
+        self.assertGreater(len(calls), 2)
+        self.assertEqual(task, plain(serial))
+
+    def test_an_unwritable_cache_never_fails_the_gate(self):
+        # BUILD-CACHE-OWNER-FAILS-STAGE-34 (persisting, 2026-10-11): a read-only unit cache failed the whole-city
+        # Vivec heap gate after the world was built; the gate computes and goes on, with a warning
+        from unittest.mock import patch
+        opts = self.options()
+        serial = heap.ring_peak(self.world, SIZES, **opts)
+        with tempfile.TemporaryDirectory() as cache, \
+                patch.object(Path, 'write_text', side_effect=OSError(30, 'Read-only file system')), \
+                patch.object(Path, 'mkdir', side_effect=OSError(30, 'Read-only file system')), \
+                patch('sys.stdout'):
+            again = heap.ring_peak(self.world, SIZES, cache_dir=Path(cache) / 'heap', **opts)
+        self.assertEqual(json.loads(json.dumps(again)), json.loads(json.dumps(serial)))
 
     def test_a_frame_audit_does_not_grow_with_the_world(self):
         # the per-frame task holds only what the frame uses, however many models the world lists

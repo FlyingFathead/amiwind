@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools'), str(ROOT / 'tests')]
 import build
-from test_build_builder import plan
+from test_build_builder import RUN, plan
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/ (env_guard) when run as a file
 import env_guard  # noqa: E402
 
@@ -35,8 +35,8 @@ LEGACY_IMAGE_OPTIONS = (
     '--balmora-cache', '--balmora-scenery', '--canonical-land-source', '--data-files', '--engine', '--entity-baseline',
     '--gallery', '--hand-catalog', '--hands', '--harvest', '--hidden-surface-cull', '--jobs', '--light',
     '--local-skybox', '--map-budget-policy', '--media', '--music', '--out', '--qbsp', '--qcc', '--rdbtool', '--scene',
-    '--sdk', '--town-flora-scene-report', '--town-flora-source-index', '--town-scenery', '--vis', '--world-flora',
-    '--world-scenery', '--xdftool')
+    '--sdk', '--town-flora-scene-report', '--town-flora-source-index', '--town-scenery', '--vis', '--world-bounds',
+    '--world-flora', '--world-scenery', '--xdftool')   # --world-bounds: a game setting for every builder (default on)
 BOTH = ['--jobs', '4', '--builder', 'chim', '--chim-area', 'balmora', '--chim-area', 'seyda']
 
 
@@ -71,12 +71,19 @@ class ChimPlanTests(unittest.TestCase):
                       'harvest', 'world-flora-assets', 'chim', 'image'):
             self.assertIn(stage, names)
         rows = record(names, ['balmora', 'seyda'])['legacy_exterior_stages']
+        # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): no Balmora region-map chain.
         self.assertEqual([(r['stage'], r['area'], r['on_chim']) for r in rows], [
-            ('balmora', 'balmora', True),
             ('world-terrain', 'open world', False), ('world-scenery-assets', 'open world', False),
             ('world-scenery', 'open world', False), ('world-flora', 'open world', False)])
         for row in rows:
             self.assertTrue(row['makes'] and row['read_by'], row)
+        # The retired legacy chain stays selectable (DON'T DELETE ANY METHOD), for regression tests only.
+        for retired in (['--chim-native-towns', 'off'], ['--legacy-area', 'balmora']):
+            with self.subTest(retired=retired):
+                names = [name for name, _ in plan(BOTH + retired)]
+                rows = record(names, ['balmora', 'seyda'])['legacy_exterior_stages']
+                self.assertEqual(rows[0]['stage'], 'balmora')
+                self.assertNotIn('chim-town-balmora', names)
 
     def test_chim_stage_reads_shared_converter_outputs(self):
         command = [str(p) for p in dict(plan(BOTH))['chim']]
@@ -119,18 +126,32 @@ class SeydaInputTests(unittest.TestCase):
         args = build.parser().parse_args([])
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            self.assertEqual(build.chim_seyda_input(args), 'converted')
-        self.assertIn('converted from your data', out.getvalue())
+            self.assertEqual(build.chim_seyda_input(args), 'chim-native')
+        self.assertIn('CHIM-native from your data', out.getvalue())
         steps = plan(['--jobs', '4'])
         self.assertIn('chim', dict(steps))
         for name, command in steps:
             with self.subTest(step=name):
                 self.assertNotIn('--seyda-recorded', [str(p) for p in command])
-        # The converted Seyda Neen region maps are only the frame maps' reference: no terrain cull
-        # (BUILD-SEYDA-CULL-STABLE-32), in both steps that convert them.
+                self.assertNotIn('--seyda-terrain-cull', [str(p) for p in command])
+        # v0.0.36-dev5: Seyda Neen is CHIM-native; the actor-contact stage cuts no Seyda Neen region maps, the
+        # chim-town-seyda stage makes its frame rows after the CHIM world, the image takes them
+        self.assertIn('--seyda-chim-native', [str(p) for p in dict(steps)['actor-contact']])
+        order = [n for n, _ in steps]
+        self.assertGreater(order.index('chim-town-seyda'), order.index('chim'))
+        self.assertIn(str(RUN / 'chim-town-seyda'), [str(p) for p in dict(steps)['image']])
+
+    def test_retired_legacy_seyda_still_converts_its_region_maps(self):
+        # DON'T DELETE ANY METHOD: --legacy-area seyda (retired) keeps the region-map chain, without terrain cull
+        args = build.parser().parse_args(['--legacy-area', 'seyda'])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(build.chim_seyda_input(args), 'converted')
+        steps = plan(['--jobs', '4', '--legacy-area', 'seyda'])
+        self.assertNotIn('chim-town-seyda', dict(steps))
         for name in ('actor-contact', 'image'):
             command = [str(p) for p in dict(steps)[name]]
             self.assertEqual(command[command.index('--seyda-terrain-cull') + 1], 'off')
+            self.assertNotIn('--seyda-chim-native', command)
 
     def test_recorded_or_legacy_seyda_keeps_the_terrain_cull(self):
         for argv in (BOTH + ['--seyda-recorded', '/recorded'], ['--jobs', '4', '--builder', 'legacy'],
@@ -160,7 +181,9 @@ class SeydaInputTests(unittest.TestCase):
                                     (['--builder', 'chim', '--chim-area', 'seyda', '--dry-run'], False, None),
                                     (['--stage', 'terrain'], False, None),
                                     (['--builder', 'legacy'], False, None),
-                                    (['--builder', 'chim', '--chim-area', 'seyda'], False, 'converted'),
+                                    (['--builder', 'chim', '--chim-area', 'seyda'], False, 'chim-native'),
+                                    (['--builder', 'chim', '--chim-area', 'seyda', '--legacy-area', 'seyda'], False,
+                                     'converted'),
                                     (['--builder', 'chim', '--chim-area', 'seyda'], True, 'recorded')):
             with self.subTest(argv=argv, given=given):
                 args = build.parser().parse_args(argv)
@@ -291,7 +314,8 @@ class OptimizerRebindTests(unittest.TestCase):
                 (maps / (name + '.bsp')).write_bytes(name.encode())
             report = optimizer_receipt(maps, ['bm001.bsp', 'bm002.bsp', 'interior01.bsp'])
             # the CHIM image: frame map written, legacy maps removed; the old receipt no longer binds
-            (maps / 'balmora-chim.bsp').write_bytes(b'frame')
+            from chim_fixture import frame_header_bytes                 # a frame map: told by its key
+            (maps / 'balmora-chim.chim').write_bytes(frame_header_bytes())
             for name in ('bm001', 'bm002'):
                 (maps / (name + '.bsp')).unlink()
             with self.assertRaises(ValueError):
@@ -299,9 +323,9 @@ class OptimizerRebindTests(unittest.TestCase):
             path = Path(tmp) / 'optimize-world-maps.json'
             report = rebind_chim_maps(maps, report, path, ['maps/bm001.bsp', 'maps/bm002.bsp', 'balmora-regions.txt'])
             verify_optimized_maps(maps, report)
-            self.assertEqual([r['map'] for r in report['maps']], ['balmora-chim.bsp', 'interior01.bsp'])
+            self.assertEqual([r['map'] for r in report['maps']], ['balmora-chim.chim', 'interior01.bsp'])
             self.assertEqual(report['chim_rebind'], {'removed': ['bm001.bsp', 'bm002.bsp'],
-                                                     'added_frame_maps': ['balmora-chim.bsp']})
+                                                     'added_frame_maps': ['balmora-chim.chim']})
             self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['map_count'], 2)
 
     def test_anything_else_stops_the_image(self):

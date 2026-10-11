@@ -9,7 +9,10 @@
 #include "aw_maps.h"
 #include "aw_world.h"
 #include <stdint.h>
-#define MAP_MAX (512*512+32+8*60)
+/* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
+#define LAVA_POOLS_MAX 2048
+#define LAVA_POINTS 16
+#define MAP_MAX (512*512+32+8*60+16+LAVA_POOLS_MAX*(24+LAVA_POINTS*8))
 #define BOOK_PAGES 256
 #define BOOK_LINES 9
 #define BOOK_WIDTH 132
@@ -32,6 +35,11 @@ static float map_x,map_y,player_x,player_y,player_z,map_step;
 static int map_view_ready,teleport_mode,teleport_selected;
 static cvar_t aw_map_mode={"aw_map_mode","0",true}; /* 0=Debug, 1=In-Game */
 static cvar_t aw_map_debug_available={"aw_map_debug_available","1",true};
+/* v2 map layers: lava pools on by default; aw_map_format 1 draws a v2 file as v1. */
+static cvar_t aw_map_lava={"aw_map_lava","1",true};
+static cvar_t aw_map_format={"aw_map_format","2",true};
+static const byte *lava_pools,*lava_points;
+static int lava_count,lava_colour,lava_painted;
 static float teleport_point[3];
 static const char *teleport_message;
 static char teleport_region[64];
@@ -58,7 +66,7 @@ static void cursor(void){
     AW_UIFill(x+1,y+1,1,6,c);AW_UIFill(x+1,y+1,6,1,c);
 }
 static void close_panel(void){
-    free(map_data);map_data=map_pixels=NULL;free(book);book=NULL;
+    free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;free(book);book=NULL;
     if(modal && key_dest==key_menu)key_dest=key_game;
     modal=drag=marker_click=teleport_mode=teleport_selected=0;teleport_message=marker_message=NULL;IN_AWClearButtons();
 }
@@ -106,8 +114,32 @@ static int map_in_game(void){
     if(!map_debug_enabled() && aw_map_mode.value<1)Cvar_SetValue(aw_map_mode.name,1);
     return aw_map_mode.value>=1;
 }
+/* LAVA section: "LAVA", pools, points, colour; per pool <hhHH4i> cell, point count, 0,
+ * bounds; then <ii> points. Source units, the same transform as the AWM1 pixels. */
+static int lava_section(const byte *p,int size){
+    int pools,points,i,j,n,total=0;const byte *q,*pt;int32_t b[4],x,y;
+    lava_count=0;lava_pools=lava_points=NULL;
+    if(size<16 || memcmp(p,"LAVA",4))return 0;
+    pools=(int)u32(p+4);points=(int)u32(p+8);lava_colour=(int)u32(p+12);
+    if(pools<0 || pools>LAVA_POOLS_MAX || points<0 || points>pools*LAVA_POINTS || lava_colour<0 || lava_colour>255)return 0;
+    if(size!=16+pools*24+points*8)return 0;
+    pt=p+16+pools*24;
+    for(i=0;i<pools;i++){
+        q=p+16+i*24;n=q[4]|(q[5]<<8);
+        if(n<1 || n>LAVA_POINTS || q[6] || q[7] || total+n>points)return 0;
+        for(j=0;j<4;j++){b[j]=(int32_t)u32(q+8+j*4);if(b[j]<-2000000 || b[j]>2000000)return 0;}
+        if(b[2]<b[0] || b[3]<b[1])return 0;
+        for(j=0;j<n;j++){
+            x=(int32_t)u32(pt+(total+j)*8);y=(int32_t)u32(pt+(total+j)*8+4);
+            if(x<b[0] || x>b[2] || y<b[1] || y>b[3])return 0;
+        }
+        total+=n;
+    }
+    if(total!=points)return 0;
+    lava_pools=p+16;lava_points=pt;lava_count=pools;return 1;
+}
 static void open_map(void){
-    FILE *f=NULL;int size,i,off;byte *p;
+    FILE *f=NULL;int size,i,off,version;byte *p;
     if(!allowed())return;
     map_in_game();
     size=COM_FOpenFile("world/map.awm",&f);
@@ -115,10 +147,13 @@ static void open_map(void){
     map_data=(byte *)malloc(size);if(!map_data)goto bad;
     if(fread(map_data,1,size,f)!=(size_t)size)goto bad;
     fclose(f);f=NULL;p=map_data;
-    if(memcmp(p,"AWM1",4))goto bad;
+    if(!memcmp(p,"AWM1",4))version=1;else if(!memcmp(p,"AWM2",4))version=2;else goto bad;
+    lava_count=0;lava_pools=lava_points=NULL;
     map_w=p[4]+(p[5]<<8);map_h=p[6]+(p[7]<<8);area_count=(int)u32(p+24);
     if(map_w<1 || map_w>512 || map_h<1 || map_h>512 || area_count<0 || area_count>8)goto bad;
-    off=32+area_count*60;map_ocean=(int)u32(p+28);if(map_ocean<0 || map_ocean>255)goto bad;if(size!=off+map_w*map_h)goto bad;
+    off=32+area_count*60;map_ocean=(int)u32(p+28);if(map_ocean<0 || map_ocean>255)goto bad;
+    if(version==1?size!=off+map_w*map_h:
+       (size<off+map_w*map_h || !lava_section(map_data+off+map_w*map_h,size-off-map_w*map_h)))goto bad;
     for(i=0;i<4;i++){map_bounds[i]=(int32_t)u32(p+8+i*4);if(map_bounds[i]<-2000000 || map_bounds[i]>2000000)goto bad;}
     if(map_bounds[2]<=map_bounds[0] || map_bounds[3]<=map_bounds[1])goto bad;
     marker=0;
@@ -132,10 +167,12 @@ static void open_map(void){
     if(!map_view_ready){map_home();map_view_ready=1;}else map_fit();
     opened(1);
     if(marker)Con_Printf("World map position: %ld %ld %ld (%s).\n",(long)player_x,(long)player_y,(long)player_z,sv.name);
-    Con_Printf("World map: %ld bytes on demand; %s position.\n",(long)size,marker?"exterior":"no exterior");return;
+    Con_Printf("World map: %ld bytes on demand; %s position.\n",(long)size,marker?"exterior":"no exterior");
+    if(version==2)Con_Printf("World map v2: %d lava pools.\n",lava_count);
+    return;
  bad:
     if(f)fclose(f);
-    free(map_data);map_data=map_pixels=NULL;
+    free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;
     Con_Printf("World map missing, invalid, or not enough memory.\n");
 }
 /* M follows the current HUD preference; explicit teleport remains independent. */
@@ -332,7 +369,8 @@ static void open_journal(void){
     quest_titles();book->filter=-1;load_entry(aw_state.journal_count-1);opened(2);
     Con_Printf("Journal: %ld earned entries; reader %ld bytes.\n",(long)aw_state.journal_count,(long)sizeof(*book));
 }
-void AW_WorldUIInit(void){Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);}
+void AW_WorldUIInit(void){Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);
+    Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
     if(!modal || key_dest!=key_menu)return;
@@ -476,6 +514,49 @@ static void teleport_button_draw(int gold){
     AW_UIFill(TELEPORT_X+1,y+1,TELEPORT_W-2,TELEPORT_H-2,AW_UIColor(29,23,17));
     text(TELEPORT_X+(TELEPORT_W-8*AW_ConsoleCharWidth())/2,y+4,"TELEPORT",TELEPORT_X+TELEPORT_W-1);
 }
+/* v2 lava layer: each pool's outline (at most 16 points, inside the pool) is filled
+ * where a pixel centre lies inside it; a pool too small to cover a pixel centre marks
+ * the one pixel holding its centre. Rejected by its bounds first; drawn only while the
+ * map is open, straight into the frame like the terrain pixels. */
+static int lava_visible(void){return lava_count>0 && aw_map_lava.value!=0 && aw_map_format.value>=2;}
+static void lava_draw(float left,float top){
+    int i,j,n,k,r,r0,r1,c,c0,c1,painted,mx,my;const byte *q,*pt=lava_points;byte *dst;
+    float kx=map_w/((float)(map_bounds[2]-map_bounds[0])*map_step),ky=map_h/((float)(map_bounds[3]-map_bounds[1])*map_step);
+    float ox=4-left/map_step-map_bounds[0]*kx,oy=19-top/map_step+map_bounds[3]*ky;
+    float sx[LAVA_POINTS],sy[LAVA_POINTS],x0,x1,y0,y1,yc,xl,xr,xi,ax,ay,bx,by,cx,cy;
+    lava_painted=0;
+    for(i=0;i<lava_count;i++,pt+=n*8){
+        q=lava_pools+i*24;n=q[4]|(q[5]<<8);
+        x0=(int32_t)u32(q+8)*kx+ox;x1=(int32_t)u32(q+16)*kx+ox;
+        y0=oy-(int32_t)u32(q+20)*ky;y1=oy-(int32_t)u32(q+12)*ky;
+        if(x1<4 || x0>=316 || y1<19 || y0>=173)continue;
+        cx=cy=0;
+        for(j=0;j<n;j++){sx[j]=(int32_t)u32(pt+j*8)*kx+ox;sy[j]=oy-(int32_t)u32(pt+j*8+4)*ky;cx+=sx[j];cy+=sy[j];}
+        painted=0;
+        if(n>=3){
+            r0=(int)ceil(y0-.5f);r1=(int)floor(y1-.5f);if(r0<19)r0=19;if(r1>172)r1=172;
+            for(r=r0;r<=r1;r++){
+                yc=r+.5f;xl=1e9f;xr=-1e9f;
+                for(j=0,k=n-1;j<n;k=j++){
+                    ax=sx[k];ay=sy[k];bx=sx[j];by=sy[j];
+                    if((ay<=yc && yc<by) || (by<=yc && yc<ay)){
+                        xi=ax+(yc-ay)*(bx-ax)/(by-ay);if(xi<xl)xl=xi;if(xi>xr)xr=xi;
+                    }
+                }
+                if(xl>xr)continue;
+                c0=(int)ceil(xl-.5f);c1=(int)floor(xr-.5f);if(c0<4)c0=4;if(c1>315)c1=315;
+                if(c0>c1)continue;
+                dst=vid.buffer+r*vid.rowbytes;for(c=c0;c<=c1;c++)dst[c]=(byte)lava_colour;
+                painted+=c1-c0+1;
+            }
+        }
+        if(!painted){
+            mx=(int)floor(cx/n);my=(int)floor(cy/n);
+            if(mx>=4 && mx<316 && my>=19 && my<173){vid.buffer[my*vid.rowbytes+mx]=(byte)lava_colour;painted=1;}
+        }
+        lava_painted+=painted;
+    }
+}
 static void map_draw(void){
     int x,y,sx,sy,cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
     float left=map_x-156*map_step,top=map_y-77*map_step,px,py,angle,dx,dy;byte *dst;char line[96];
@@ -487,6 +568,7 @@ static void map_draw(void){
         sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+19)*vid.rowbytes+4;
         for(x=0;x<312;x++){sx=cols[x];dst[x]=(sx>=0 && sx<map_w && sy>=0 && sy<map_h)?map_pixels[sy*map_w+sx]:ocean;}
     }
+    if(lava_visible())lava_draw(left,top);
     if(grid && !in_game){
         for(i=map_bounds[0]/8192;i<=map_bounds[2]/8192;i++){
             px=(i*8192.0f-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);mx=4+(int)((px-left)/map_step);
@@ -496,6 +578,11 @@ static void map_draw(void){
             py=(map_bounds[3]-i*8192.0f)*map_h/(map_bounds[3]-map_bounds[1]);my=19+(int)((py-top)/map_step);
             if(my>=19 && my<173)for(x=4;x<316;x+=4)AW_UIFill(x,my,1,1,gold);
         }
+    }
+    if(lava_visible()){
+        /* Legend in the map's lower left corner, in both views. */
+        width=AW_ConsoleCharWidth();
+        AW_UIFill(5,161,15+4*width,11,AW_UIColor(15,20,23));AW_UIFill(7,163,7,7,lava_colour);text(16,163,"LAVA",17+4*width);
     }
     /* Settlement landmarks are shared by both views; only diagnostics differ. */
     for(i=0;i<area_count;i++){

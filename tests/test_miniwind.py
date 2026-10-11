@@ -57,9 +57,11 @@ def value(command, flag):
 
 
 EXPECTED_STAGES = ['setup', 'terrain', 'scenery', 'scene', 'bsp', 'npcs', 'hands', 'interior', 'dialogue-lookup',
-                   'intro', 'census', 'balmora', 'balmora-interiors', 'door-audio', 'character', 'reading',
+                   'intro', 'census', 'balmora-interiors', 'door-audio', 'character', 'reading',
                    'opening-references', 'seam-audit', 'media', 'music', 'engine', 'harvest', 'hand-catalog', 'chim',
-                   'cell-progress', 'image']  # seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33)
+                   'chim-town-balmora', 'cell-progress', 'image']  # seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33)
+# CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora's residents come from chim-town-balmora,
+# not the legacy chain stage 'balmora' (--legacy-area balmora, RETIRED).
 
 
 @env_guard.isolated  # build.main exports AMIWIND_* switches (TEST-ENV-LEAK-HULL-33)
@@ -152,8 +154,9 @@ class PlanTests(unittest.TestCase):
                 fewer, _ = plan(['--jobs', '4', '--miniwind', *extra])
                 self.assertNotIn(label, miniwind.features(names(fewer)))
                 self.assertNotIn(label, value(dict(fewer)['image'], '--miniwind-features'))
-        # every label names a stage of the MiniWind plan
-        self.assertTrue({stage for stage, _ in miniwind.FEATURES} <= set(names(steps)))
+        # every label names a stage of the MiniWind plan (chim-town-balmora carries the 'balmora' label)
+        self.assertTrue({stage for stage, _ in miniwind.FEATURES}
+                        <= {miniwind.FEATURE_ALIASES.get(n, n) for n in names(steps)})
 
     def test_normal_plans_are_unchanged(self):
         for argv in (['--jobs', '4'], ['--jobs', '4', '--builder', 'chim']):
@@ -168,7 +171,8 @@ class PlanTests(unittest.TestCase):
     def test_dependencies_follow_the_plan(self):
         steps, _ = plan(['--jobs', '4', '--miniwind'])
         deps = build_parallel.stage_dependencies(steps)
-        self.assertEqual(deps['balmora'], ('census',))
+        self.assertNotIn('balmora', deps)  # CHIM-native: no legacy Balmora chain stage
+        self.assertIn('chim', deps['chim-town-balmora'])
         self.assertIn('chim', deps['image'])
         self.assertFalse({'world-terrain', 'world-scenery', 'npc-gallery'} & set(deps['image']))
         # the image still waits for the whole scene chain (every stage before it, transitively)
@@ -185,7 +189,7 @@ class PlanTests(unittest.TestCase):
         # the normal plan keeps its full dependency check
         normal, _ = plan(['--jobs', '4'])
         normal_deps = build_parallel.stage_dependencies(normal)
-        self.assertEqual(normal_deps['balmora'], ('area',))
+        self.assertIn('chim', normal_deps['chim-town-balmora'])
         self.assertIn('world-terrain', normal_deps['image'])
 
     def test_receipt_and_summary_say_partial_area(self):
@@ -546,6 +550,24 @@ class ImageTests(unittest.TestCase):
                 build_aga.write_content_fingerprint(id1, partial=True)
         self.assertTrue(any(s['map'] == 'seyda' for s in SCENES))
 
+    def test_save_fingerprint_of_another_town_needs_no_balmora_table(self):
+        # BUILD-MINIWIND-BALMORA-ASSUMED-36: the Vivec Arena MiniWind failed its fingerprint on the missing
+        # balmora-regions.txt; only a Balmora MiniWind (or a full image) binds the Balmora region table
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            for name in ('maps', 'character', 'world'):
+                (id1 / name).mkdir(parents=True)
+            for name in ('progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj',
+                         'world/entries.dat', 'world/quests.awq', 'world/region-names.awn'):
+                (id1 / name).write_bytes(b'x')
+            for partial, needs in ((('full', 'vivec_arena'), False), (('full', 'balmora'), True), (True, True)):
+                try:
+                    build_aga.write_content_fingerprint(id1, partial=partial)
+                    message = ''
+                except (ValueError, OSError) as error:
+                    message = str(error)
+                self.assertEqual('balmora-regions.txt' in message, needs, (partial, message))
+
     def test_marking_and_image_options(self):
         self.assertEqual(miniwind.hdf_name(DEV), 'AmiWind-v0.0.33-dev1-MiniWind-PARTIAL-AREA.hdf')
         source = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
@@ -623,7 +645,7 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(set(names(normal)) - set(names(steps)), set(record['left_out']))
         self.assertTrue(all(record['left_out'].values()))
         # the CHIM world, harvest, hands, music, media, residents and the engine stay
-        for stage in ('chim', 'balmora', 'harvest', 'hand-catalog', 'hands', 'music', 'media', 'engine', 'census'):
+        for stage in ('chim', 'chim-town-balmora', 'harvest', 'hand-catalog', 'hands', 'music', 'media', 'engine', 'census'):
             self.assertIn(stage, names(steps))
 
     def test_exterior_features_and_label_are_generated(self):
@@ -650,8 +672,8 @@ class ScopeTests(unittest.TestCase):
     def test_exterior_dependencies_skip_the_left_out_stages(self):
         steps, _ = plan(['--jobs', '4', '--miniwind', '--miniwind-scope', 'exterior'])
         deps = build_parallel.stage_dependencies(steps)
-        self.assertEqual(deps['balmora'], ('census',))
-        self.assertEqual(deps['character'], ('balmora',))
+        self.assertNotIn('balmora', deps)  # CHIM-native: no legacy Balmora chain stage
+        self.assertEqual(deps['character'], ('census',))
         self.assertIn('chim', deps['image'])
 
         def before(stage, seen=None):
@@ -736,10 +758,12 @@ class ScopeTests(unittest.TestCase):
             removed = ['maps/balmora.bsp', 'maps/bm000.bsp']
             for name in removed:
                 (id1 / name).unlink()
-            (id1 / 'maps/balmora-chim.bsp').write_bytes(b'\x1d\0\0\0' + bytes(130))
+            # a frame map is bound by its "_chim_frame" key (tools/map_files.py), whatever its extension
+            from chim_fixture import frame_header_bytes
+            (id1 / 'maps/balmora-chim.chim').write_bytes(frame_header_bytes(pad=130))
             build_aga.write_content_fingerprint(id1, partial='exterior', removed=removed)
             first = (id1 / 'save-content.bin').read_bytes()
-            (id1 / 'maps/balmora-chim.bsp').write_bytes(b'\x1d\0\0\0' + bytes(131))
+            (id1 / 'maps/balmora-chim.chim').write_bytes(frame_header_bytes(pad=131))
             build_aga.write_content_fingerprint(id1, partial='exterior', removed=removed)
             self.assertNotEqual((id1 / 'save-content.bin').read_bytes(), first)
             with self.assertRaises(ValueError):
@@ -836,10 +860,13 @@ class TownSandboxTests(unittest.TestCase):
     def test_town_plan_runs_its_import_and_chim_area(self):
         steps, args = plan(self.TEMPLE)
         n = names(steps)
-        self.assertIn('town-vivec_temple', n)
+        # CHIM-native areas by default: the town's residents from chim-town-<town>, no legacy import
+        self.assertIn('chim-town-vivec_temple', n)
         self.assertNotIn('balmora', n)                  # another town's sandbox builds no Balmora (CHIM format line)
         self.assertNotIn('balmora-interiors', n)
-        self.assertEqual([x for x in n if x.startswith('town-')], ['town-vivec_temple'])
+        self.assertEqual([x for x in n if x.startswith('town-')], [])
+        legacy = names(plan([*self.TEMPLE, '--chim-native-towns', 'off'])[0])  # RETIRED, still selectable
+        self.assertEqual([x for x in legacy if x.startswith('town-')], ['town-vivec_temple'])
         self.assertEqual(value(dict(steps)['chim'], '--area'), 'vivec_temple')
         self.assertEqual(args.chim_areas, ['vivec_temple'])
         image = [str(p) for p in dict(steps)['image']]
@@ -848,13 +875,18 @@ class TownSandboxTests(unittest.TestCase):
         record = args.miniwind_record
         self.assertEqual((record['town'], record['chim_areas'], record['debug_only']), ('vivec_temple', ['vivec_temple'], False))
         self.assertIn('Vivec, Temple exterior (CHIM)', record['features'])
-        self.assertIn('Vivec, Temple residents and interiors', record['features'])
+        # CHIM-native: the residents from the game data; the legacy import (RETIRED) also brought its interiors
+        self.assertIn('Vivec, Temple residents', record['features'])
+        self.assertNotIn('Vivec, Temple residents and interiors', record['features'])
         self.assertNotIn('Balmora residents', record['features'])
         self.assertIn('Vivec, Temple only', record['partial_area'])
         self.assertTrue(all(record['left_out'].values()))
-        # the stage chain: the town follows Balmora's scene stage (its interiors are left out)
         deps = build_parallel.stage_dependencies(steps)
-        self.assertEqual(deps['town-vivec_temple'], ('census',))   # no Balmora in another town's sandbox
+        self.assertIn('chim', deps['chim-town-vivec_temple'])
+        # the retired legacy chain: the town follows Balmora's scene stage (its interiors are left out)
+        legacy, legacy_args = plan([*self.TEMPLE, '--chim-native-towns', 'off'])
+        self.assertIn('Vivec, Temple residents and interiors', legacy_args.miniwind_record['features'])
+        self.assertEqual(build_parallel.stage_dependencies(legacy)['town-vivec_temple'], ('census',))
 
     def test_balmora_names_and_commands_stay_unchanged(self):
         steps, args = plan(['--jobs', '4', '--miniwind'])
@@ -905,7 +937,6 @@ class TownSandboxTests(unittest.TestCase):
         for argv, message in (([*self.TEMPLE, '--chim-draw-distance', '448'], 'DEBUG ONLY'),
                               ([*self.TEMPLE, '--miniwind-debug', '--chim-draw-distance', '700'], '128..540'),
                               ([*self.TEMPLE, '--chim-area', 'balmora'], 'vivec_temple only'),
-                              (['--miniwind', '--miniwind-town', 'seyda'], 'must be one of'),
                               (['--miniwind', '--miniwind-town', 'nowhere'], 'must be one of')):
             with self.subTest(argv=argv), self.assertRaisesRegex(ValueError, message):
                 plan(argv)

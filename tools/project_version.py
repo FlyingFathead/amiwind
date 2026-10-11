@@ -146,21 +146,34 @@ def generate_native(version_file, out, heap_mb=None):
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
     (out/'amiwind_version.h').write_text('/* Generated from VERSION; do not edit. */\n'
         '#ifndef AMIWIND_VERSION_H\n#define AMIWIND_VERSION_H\n'
-        f'#define AMIWIND_VERSION "{value}"\n#endif\n')
+        f'#define AMIWIND_VERSION "{value}"\n'
+        # The console's first version line (owner, 11 October 2026): the boot check's title.
+        f'#define AMIWIND_TITLE "{title}"\n#endif\n')
     if chim:
         # CHIM's own version for the engine (engine/aga/src/chim/chim.h includes it).
         (out/'chim_version.h').write_text('/* Generated from CHIM_VERSION; do not edit. */\n'
             '#ifndef CHIM_VERSION_H\n#define CHIM_VERSION_H\n'
             f'#define CHIM_VERSION "{chim}"\n#endif\n')
+    header = f'{title} hardware preflight'
+    rule = '-' * len(header)  # every divider is exactly as long as the header line (generated, never hard-coded)
     (out/'amiwind_version.i').write_text('; Generated from VERSION and CHIM_VERSION; do not edit.\n'
-        f'banner: dc.b "----------------------------------------------",10\n'
-        f'        dc.b "{title} hardware preflight",10\n'
-        f'        dc.b "----------------------------------------------",10,0\n'
+        f'banner: dc.b "{rule}",10\n'
+        f'        dc.b "{header}",10\n'
+        f'        dc.b "{rule}",10,0\n'
+        f'separator:      dc.b "{rule}",10,0\n'
         f'passed: dc.b "AmiWind v{value} preflight OK.",10,0\n'
         f'stopped: dc.b "AmiWind v{value} was not loaded. Change settings and reboot.",10,0\n'
         f'version_tag: dc.b "$VER: AmiWindCheck {value}",0\n')
     generate_heap(out, heap_mb)
+    # The boot check's engine profile row: the c profile until tools/build_aga.py engine writes the
+    # build's own (engine_profile.write_boot_include; the same text as engine_profile.boot_line).
+    _write_if_changed(out/'amiwind_engine.i', DEFAULT_ENGINE_INCLUDE)
     return value
+
+
+# engine_profile.write_boot_include for the c profile (tests/test_engine_profile.py keeps them equal)
+DEFAULT_ENGINE_INCLUDE = ("; Generated from the engine profile (--engine-profile); do not edit.\n"
+                          'engine_note:    dc.b "Engine profile:       c: C paths, -O1             [i] INFO",10,0\n')
 
 
 def check_native_versions(root=ROOT):

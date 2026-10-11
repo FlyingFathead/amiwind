@@ -133,3 +133,13 @@ grass region instead failed the entity reserve, as recorded in the bug journal.
 An opt-in collision-packing comparison is implemented but not yet accepted.
 No new playable image or FPS improvement is claimed. Final map and sprite memory
 auditing, matching packaging and target lifecycle tests remain required.
+
+## Reserves fail fast (11 October 2026)
+
+The world flora stage reads every open-world map's scenery first (brush models against the 240 models + sprites
+reserve, clipnodes against 32,767; in parallel, no compile) and converts the maps already at 70 % or more of a
+reserve before all others, largest first. If one of those cannot be packed, the stage stops at once with the map
+and the reserve it passes (`conversion-status.json` lists them under `budget_first`), instead of failing after
+hundreds of maps. On the v0.0.36-dev5 coast build 31 of 2,201 maps go first, vf0779 among them (82 %); a collision
+change that pushes it over its clipnode reserve is now seen in the first minute of the stage
+(BUILD-FLORA-STAIR-PLATES-BUDGET-36).

@@ -79,6 +79,28 @@ def sprite_entity(ref, asset, origin, world_scale=.25):
     return '{\n' + '\n'.join('"' + k + '" "' + v + '"' for k, v in fields.items()) + '\n}'
 
 
+def bound_legacy_sprite(fields, bindings, available):
+    """The binding (install_town_flora.derive_bindings) that replaces the legacy sprite entity `fields`, or None;
+    available: {identity(source key): selected reference}. One rule for a region map's entity lump
+    (remove_legacy_sprites) and a CHIM-native town's entity rows (tools/chim_town.py)."""
+    if fields.get('classname') != 'aw_static':
+        return None
+    matches = []
+    for binding in bindings:
+        key = identity(binding['source_key'])
+        ref = available.get(key)
+        if ref is None or binding['source_model'].replace('\\', '/').casefold().removeprefix('meshes/') != ref['model']:
+            raise ValueError('Legacy sprite binding lacks an exact original source-model mapping')
+        if fields.get('model') != binding['model'] or 'origin' not in fields:
+            continue
+        point = list(map(float, fields['origin'].split()))
+        if len(point) == 3 and all(abs(point[k] - binding['origin'][k]) <= .001 for k in range(3)) and float(fields.get('aw_scale', 1)) == binding['scale']:
+            matches.append(binding)
+    if len(matches) > 1:
+        raise ValueError('Ambiguous legacy sprite source binding')
+    return matches[0] if matches else None
+
+
 def remove_legacy_sprites(raw, bindings, selected):
     """Bind old sprites by source key, source-model mapping AND model/pose/scale."""
     if not bindings:
@@ -88,24 +110,10 @@ def remove_legacy_sprites(raw, bindings, selected):
     data = lumps(raw)
     def replace(match):
         block = match.group(); fields = dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"', block))
-        if fields.get('classname') != 'aw_static':
+        binding = bound_legacy_sprite(fields, bindings, available)
+        if binding is None:
             return block
-        matches = []
-        for binding in bindings:
-            key = identity(binding['source_key'])
-            ref = available.get(key)
-            if ref is None or binding['source_model'].replace('\\', '/').casefold().removeprefix('meshes/') != ref['model']:
-                raise ValueError('Legacy sprite binding lacks an exact original source-model mapping')
-            if fields.get('model') != binding['model'] or 'origin' not in fields:
-                continue
-            point = list(map(float, fields['origin'].split()))
-            if len(point) == 3 and all(abs(point[k] - binding['origin'][k]) <= .001 for k in range(3)) and float(fields.get('aw_scale', 1)) == binding['scale']:
-                matches.append(binding)
-        if len(matches) > 1:
-            raise ValueError('Ambiguous legacy sprite source binding')
-        if not matches:
-            return block
-        binding = matches[0]; key = identity(binding['source_key'])
+        key = identity(binding['source_key'])
         if key in seen:
             raise ValueError('Duplicate legacy sprite representation')
         seen.add(key);removed.append(binding['source_key']);return ''
@@ -183,6 +191,69 @@ def aggregate_collision(index, refs, prepared, entry):
 # for the scene's own statics.
 RESERVES = {'models_plus_sprites': 240, 'entities': 550, 'static_entities': engine_limits()['max_static_entities'] - 32,
             'nodes': 32767, 'clipnodes': 32767, 'bytes': 4 * 1024 * 1024}
+
+
+# Fail fast (BUILD-FLORA-STAIR-PLATES-BUDGET-36): a map whose scenery already fills this share of a reserve
+# (models + sprites, clipnodes) is converted first, before every other map; if one of them cannot be packed, the
+# stage stops at once with the map and its numbers instead of failing hundreds of maps later.
+BUDGET_FIRST = 0.70
+
+
+def budget_share(scene):
+    """(share, base figures) of one scenery map (scene.bsp path): the larger of its brush models against the
+    models + sprites reserve and its clipnodes against the clipnode reserve. Read only, no compile."""
+    data = lumps(Path(scene).read_bytes())
+    models, clipnodes = len(data[14]) // 64, len(data[9]) // 8
+    share = max(models / RESERVES['models_plus_sprites'], clipnodes / RESERVES['clipnodes'])
+    return share, {'base_models': models, 'base_clipnodes': clipnodes}
+
+
+def _budget_task(task):
+    base, name = task
+    share, figures = budget_share(Path(base) / name / 'scene.bsp')
+    return name, share, figures
+
+
+def budget_order(base, entries, jobs=1, first=BUDGET_FIRST):
+    """(at-risk entries, the rest, {name: (share, figures)}): every map's budget share (in parallel), largest first;
+    at risk = share >= FIRST."""
+    shares = {name: (share, figures) for name, share, figures in
+              ordered_map(_budget_task, [(str(base), e['name']) for e in entries], max(1, jobs))}
+    ordered = sorted(entries, key=lambda e: (-shares[e['name']][0], e['name']))
+    risky = [e for e in ordered if shares[e['name']][0] >= first]
+    return risky, [e for e in ordered if shares[e['name']][0] < first], shares
+
+
+class FloraBudgetError(ValueError):
+    """A map converted first because its scenery is near a reserve could not be packed: the stage stops at once."""
+    def __init__(self, message, failures=(), converted=(), not_started=0):
+        super().__init__(message)
+        self.failures, self.converted, self.not_started = list(failures), list(converted), not_started
+
+
+def convert_budget_first(tasks, first, jobs, report=None, done=0, worker=None):
+    """Convert TASKS (sorted at-risk first): the first FIRST of them, in parallel, then the rest. A failure among the
+    first stops at once (FloraBudgetError with the failures and the number never started); failures among the rest
+    are returned as before. Returns (converted, failures)."""
+    worker = worker or convert_region_cached
+    converted, failures = [], []
+    for phase, part in enumerate((tasks[:first], tasks[first:])):
+        for result in ordered_map(worker, part, jobs):
+            (failures if result.get('conversion_status') == 'failed' else converted).append(result)
+            if report:
+                report(result, done + len(converted) + len(failures))
+        if phase == 0 and failures:
+            raise FloraBudgetError('Flora budget preflight failed before %d other maps: %s' % (
+                len(tasks) - first, ', '.join('%s %s' % (f['name'], _violations(f)) for f in failures)),
+                failures, converted, len(tasks) - first)
+    return converted, failures
+
+
+def _violations(failure):
+    """'(clipnodes 33172 > 32767; ...)' of a failed region, from its packing attempts or its error text."""
+    text = str(failure.get('error', ''))
+    found = re.findall(r"'metric': '(\w+)', 'actual': (\d+), 'limit': (\d+)", text)
+    return '(%s)' % '; '.join('%s %s > %s' % v for v in found) if found else '(%s)' % failure.get('error_type', 'failed')
 
 
 class FloraReserveError(ValueError):
@@ -298,14 +369,11 @@ def _overlay_region(source, out, flora, index, receipt, entry, palette, kwargs, 
     raise AssertionError('Adaptive collision selection exhausted unexpectedly')
 
 
-def _overlay_candidate(source, out, flora, index, receipt, entry, palette,
-                   retained_mesh_keys=(), legacy_sprite_bindings=(), aggregate_sprite_collision=False, admission_profile='world'):
-    """Reusable town/world consumer: source BSP + coverage + engine-world origin.
-
-    Existing Balmora meshes can be retained by exact source key. Seyda legacy
-    sprites require explicit source-model/path/pose/scale bindings for replacement.
-    """
-    from prepare_mesh_bsp import append_meshes, _prepare_model
+def overlay_selection(index, receipt, entry, retained_mesh_keys=(), legacy_sprite_bindings=()):
+    """The flora references one region's overlay takes (region_references plus the exact existing source
+    bindings outside its source bounds), with their original receipt fields. Returns (selected, original_refs,
+    bound_extras). One selection for a region map overlay (_overlay_candidate) and a CHIM-native town's flora
+    sprite rows (tools/chim_town.py)."""
     selected = region_references(index, entry)
     from prepare_tree_sprites import unique_reference_numbers
     unique_reference_numbers(receipt['placements'])
@@ -332,6 +400,31 @@ def _overlay_candidate(source, out, flora, index, receipt, entry, palette,
         ref.update({k: original_refs[ref['number']][k] for k in
                     ('source_key', 'renderer_policy', 'requires_interaction', 'model')})
         ref['source_collision'] = original_refs[ref['number']]['source_collision']
+    return selected, original_refs, bound_extras
+
+
+def sprite_rows(index, receipt, entry, retained_mesh_keys=(), legacy_sprite_bindings=()):
+    """The aw_flora entities (dicts, sprite_entity) a town region's overlay adds, by the overlay's own selection
+    (overlay_selection) and representation rule; returns (rows, selected)."""
+    selected, original_refs, _ = overlay_selection(index, receipt, entry, retained_mesh_keys, legacy_sprite_bindings)
+    retained = {identity(k) for k in retained_mesh_keys}
+    assets = {a['model']: a for a in receipt['assets']}
+    rows = [dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"', sprite_entity(original_refs[r['number']], assets[r['model']],
+                                                                       entry['origin'])))
+            for r in selected if identity(r['source_key']) not in retained and effective_representation(r) == 'sprite']
+    return rows, selected
+
+
+def _overlay_candidate(source, out, flora, index, receipt, entry, palette,
+                   retained_mesh_keys=(), legacy_sprite_bindings=(), aggregate_sprite_collision=False, admission_profile='world'):
+    """Reusable town/world consumer: source BSP + coverage + engine-world origin.
+
+    Existing Balmora meshes can be retained by exact source key. Seyda legacy
+    sprites require explicit source-model/path/pose/scale bindings for replacement.
+    """
+    from prepare_mesh_bsp import append_meshes, _prepare_model
+    selected, original_refs, bound_extras = overlay_selection(index, receipt, entry, retained_mesh_keys,
+                                                              legacy_sprite_bindings)
     raw = Path(source).read_bytes();base_hash = hashlib.sha256(raw).hexdigest()
     raw, removed = remove_legacy_sprites(raw, legacy_sprite_bindings, selected)
     local = Path(out).parent;local.mkdir(parents=True, exist_ok=True)
@@ -538,8 +631,15 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
         raise ValueError('Full flora overlay requires full base scenery and flora census')
     if directory['master_sha256'] != receipt['master_sha256'] or digest(palette) != receipt['palette_sha256'] or receipt['palette_sha256'] != base_receipt['palette_sha256']:
         raise ValueError('Flora source master/palette differs from retained world')
-    entries = directory['regions']
+    # CHIM region cells (docs/BUILD_MANIFEST.md step 2): no map was made for them, so none is made here; their
+    # flora is in the CHIM world.
+    chim_rows = [e for e in directory['regions'] if e.get('chim_region')]
+    chim_cells = {tuple(e['cell']) for e in chim_rows}
+    entries = [e for e in directory['regions'] if not e.get('chim_region')]
     expected_base = {r['name']: r for r in base_receipt['regions']}
+    for row in chim_rows:
+        if not expected_base.get(row['name'], {}).get('chim_region'):
+            raise ValueError('CHIM region cell map differs between terrain and scenery: ' + row['name'])
     for entry in entries:
         if entry['name'] not in expected_base or digest(base / entry['name'] / 'scene.bsp') != expected_base[entry['name']]['sha256']:
             raise ValueError('Retained scenery region mismatch')
@@ -592,10 +692,26 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
     owned={k:v for k,v in contract['hashes'].items() if k not in ('terrain_directory','base_receipt')}
     tasks=[(terrain,base,flora,palette,out,e,aggregate_sprite_collision,collision_packing,cache,
             {'entry':e,'base_sha256':expected_base[e['name']]['sha256'],'owned':owned}) for e in pending]
-    for result in ordered_map(convert_region_cached,tasks,resolve_jobs(jobs)):
-        if result.get('conversion_status')=='failed':failures.append(result)
-        else:results.append(result)
-        print('FLORA REGION',len(results)+len(failures),'/',len(entries),result['name'],result.get('conversion_status','complete'),flush=True)
+    # fail fast: the maps nearest a reserve first (in parallel, largest first); one of them failing stops the stage
+    risky,rest,shares=budget_order(base,pending,resolve_jobs(jobs))
+    print('FLORA BUDGET: %d of %d maps at or over %d %% of a reserve go first%s'%(len(risky),len(pending),
+          round(BUDGET_FIRST*100),(' (highest: %s %.0f %%)'%(risky[0]['name'],shares[risky[0]['name']][0]*100)) if risky else ''),flush=True)
+    rank={e['name']:i for i,e in enumerate(risky+rest)}
+    tasks.sort(key=lambda t:rank[t[5]['name']])
+    def report(result,done):
+        print('FLORA REGION',done,'/',len(entries),result['name'],result.get('conversion_status','complete'),flush=True)
+    try:
+        converted,failed=convert_budget_first(tasks,len(risky),resolve_jobs(jobs),report,len(results))
+    except FloraBudgetError as error:
+        status={'completed_regions':len(results)+len(error.converted),'failed_regions':len(error.failures),
+                'not_started':error.not_started,
+                'budget_first':[{'name':e['name'],'share':round(shares[e['name']][0],4),**shares[e['name']][1]} for e in risky],
+                'input_contract_sha256':contract['sha256'],'failures':error.failures}
+        (out/'conversion-status.json').write_text(json.dumps(status,indent=2)+'\n',encoding='utf-8',newline='\n')
+        raise FloraBudgetError(str(error)+' ('+str(out/'conversion-status.json')+')',error.failures,error.converted,
+                               error.not_started) from None
+    results+=converted;failures+=failed
+    results += [{'name': e['name'], 'chim_region': True, 'source_references': []} for e in chim_rows]
     results.sort(key=lambda r:r['name'])
     status={'completed_regions':len(results),'failed_regions':len(failures),'reused_regions':len(adoption['reused']),
             'input_contract_sha256':contract['sha256'],'failures':failures}
@@ -603,7 +719,9 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
     if failures:raise ValueError('Flora conversion incomplete; all completed receipts/failures preserved: '+str(out/'conversion-status.json'))
     covered = {identity(r['source_key']) for e in results for r in e['source_references']}
     expected = {identity(r['source_key']) for r in receipt['placements']}
-    if not only and covered != expected:raise ValueError('Full-world flora overlay omitted/invented source references')
+    in_chim = {identity(r['source_key']) for r in receipt['placements'] if tuple(r.get('cell') or ()) in chim_cells}
+    if not only and (covered - expected or (expected - covered) - in_chim):
+        raise ValueError('Full-world flora overlay omitted/invented source references')
     for asset in receipt['assets']:
         source = flora / asset['sprite_asset_name'];target = out / asset['sprite_asset_name']
         if digest(source) != asset['sha256']:raise ValueError('Flora shared sprite hash mismatch')
@@ -618,10 +736,26 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
               'deferred_references': receipt.get('deferred_references', []),
               'covered_unique_original_refs': len(covered),
               'region_copy_instances': sum(len(r['source_references']) for r in results),
-              'seconds': round(time.monotonic() - started, 3), 'regions': results,
+              'regions': results,
+              **({'chim_region_cells': sorted([list(c) for c in chim_cells])} if chim_cells else {}),
               'scope': 'Original flora placement overlay; retained LAND/rocks/mushrooms verified. Town consumers and stateful interactions have separate acceptance.'}
+    # The wall time goes to the log only: an output another stage reads carries no timing, so a rerun with the
+    # same inputs writes the same bytes (BUILD-FLORA-RECEIPT-SECONDS-36).
     (out / 'world-flora.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8', newline='\n')
+    print('World flora overlay: %.3f s' % (time.monotonic() - started), flush=True)
     return result
+
+
+def check_chim_cells(text, terrain):
+    """Refuse a run whose --chim-regions-cells differ from the cells the terrain stage left out (one owner per cell)."""
+    import json
+    from chim.regions import decode_cells
+    given = set(decode_cells(text)) if text else set()
+    receipt = json.loads((Path(terrain) / 'world-regions.json').read_text(encoding='utf-8'))
+    made = {tuple(r['cell']) for r in receipt['regions'] if r.get('chim_region')}
+    if given != made:
+        raise ValueError('CHIM region cells differ from the terrain stage (%d given, %d left out by terrain)'
+                         % (len(given), len(made)))
 
 
 def main():
@@ -633,7 +767,9 @@ def main():
     parser.add_argument('--adopt-legacy-resume-inputs',action='store_true',help='Explicit adoption of unchanged original invocation inputs when historical contract was not recorded; per-region validation remains mandatory')
     parser.add_argument('--collision-packing',choices=('per_instance','adaptive'),default='per_instance')
     parser.add_argument('--aggregate-sprite-collision', action='store_true', help='Opt-in collision union comparison; performance acceptance required')
+    parser.add_argument('--chim-regions-cells', metavar='CELLS', help='CHIM region cells ("x,y:k ...", tools/build.py): checked against the terrain stage\'s receipt, which made no map for them (docs/BUILD_MANIFEST.md)')
     parser.add_argument('--only', nargs='+');add_jobs(parser);args = parser.parse_args()
+    check_chim_cells(args.chim_regions_cells, args.terrain)
     result = prepare(args.terrain, args.base, args.flora, args.palette, args.out, args.jobs, args.only, args.aggregate_sprite_collision, args.collision_packing,args.resume_from,args.adopt_legacy_resume_inputs,args.resume_unchanged_regions)
     print('WORLD FLORA SOURCE COVERAGE', result['covered_unique_original_refs'], 'original refs; runtime acceptance pending')
 

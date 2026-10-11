@@ -1,5 +1,14 @@
 # MESH-LOD-TORN-MESHES-33: Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.33 at 2026-10-09 (time not recorded): found by the island-wide seam audit: 49 reduced meshes tear their seams
+- Reported with v0.0.36-dev3 at 2026-10-11 03:36 +0300: measured as visible holes: 39 of 150 open-world rocks at 64 triangles show the sky through on more than 5 of 100 pixels, worst 48 (terrain_ashland_rock_01)
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -18,12 +27,39 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 9 October 2026
 
 Open. Found by the seam audit written for [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md). The
 torn meshes are recorded as known findings in `config/seam-audit-known.json`; the builder's
 `seam-audit` stage fails on any other reduced mesh above the threshold, and on a listed mesh that tears
 more than recorded. No profile is changed by this entry.
+
+11 October 2026, measured as visible holes: the open-world scenery profile (64 triangles per rock, 160 per
+giant mushroom) reduces 150 of the 174 meshes the open-world scenery stage converts (rocks and giant
+mushrooms only; no building is converted by it). Rendered as the engine draws them (one side, 16 views
+around and below), 139 of the 150 show the sky through the model where the source is solid on more than
+1 % of the pixels, 39 on more than 5 %, the worst 48 % (`terrain_ashland_rock_01`). meshoptimizer with
+locked borders at the same ratio closes them (38 rocks: 14.4 % to 0.0 % on average) but keeps 4.6 times the
+triangles (2,409 to 11,154), because every open rim stays where it is: not a free repair for heap-limited
+open-world maps. Options for the owner: a triangle floor per rock, the CHIM mesh method `meshopt+merge` for
+rocks once the open world is on CHIM, or a rim-aware target.
 
 ## Symptom
 
@@ -106,6 +142,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [BALMORA-TEMPLE-GEOMETRY-29](BALMORA-TEMPLE-GEOMETRY-29.md): Balmora Temple lower rooms: missing walls and floors, collision holes
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls
+- [CHIM-STRIDER-SCALED-SEAMS-36](CHIM-STRIDER-SCALED-SEAMS-36.md): Seyda Neen's silt strider (scale 0.89 variant) still shows open seams; Balmora's (scale 1.0) is closed
 - [CONVERT-COLLISION-FALLBACK-32](CONVERT-COLLISION-FALLBACK-32.md): Five Balmora meshes fall back to a collision union in qbsp
 - [CONVERT-DEGENERATE-FACES-32](CONVERT-DEGENERATE-FACES-32.md): The converter writes degenerate faces (no area, slivers, repeated vertices)
 - [CONVERT-FACE-PLANE-32](CONVERT-FACE-PLANE-32.md): Converter takes a merged face's plane from its first three vertices
@@ -128,5 +165,9 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - SKY-GROUND-28 (no report page): Rebuilt LAND faces invisible; clouds scroll too fast
 - [TOOL-ALIAS-FRAMES-33](TOOL-ALIAS-FRAMES-33.md): The alias model writer refuses more than 32 frames
 - [TOOL-SIMPLIFY-MANIFOLD-32](TOOL-SIMPLIFY-MANIFOLD-32.md): Mesh reduction can return open or non-manifold meshes
+
+Related bugs in other categories:
+
+- [CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36](CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36.md): The seam-tear audit does not measure the CHIM detail budgets: the Vivec statues at 900 of 5,451 triangles are not checked for opened seams
 
 <!-- END GENERATED CATEGORY -->

@@ -237,8 +237,13 @@ class GuidedBuildTests(unittest.TestCase):
             self.assertNotIn('--seyda-recorded', plain[step])
             at = given[step].index('--seyda-recorded')
             self.assertEqual(str(given[step][at + 1]), str(Path('/rec')))
-        self.assertEqual({k: v for k, v in plain.items() if k not in ('actor-contact', 'image')},
-                         {k: v for k, v in given.items() if k not in ('actor-contact', 'image')})
+        # v0.0.36-dev5: the default Seyda Neen is CHIM-native (chim-town-seyda); the retired recorded maps take the
+        # legacy chain instead, so that stage leaves the plan
+        self.assertIn('chim-town-seyda', plain)
+        self.assertNotIn('chim-town-seyda', given)
+        skip = ('actor-contact', 'image', 'chim-town-seyda')
+        self.assertEqual({k: v for k, v in plain.items() if k not in skip},
+                         {k: v for k, v in given.items() if k not in skip})
 
 
 if __name__ == '__main__':

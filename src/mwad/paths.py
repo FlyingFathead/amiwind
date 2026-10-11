@@ -81,6 +81,58 @@ def copy_writable(source, target, *, follow_symlinks=True):
     return copied
 
 
+def replace_bytes(path, raw):
+    """Write a file whole by a temporary file renamed over it, never in place. A scene stage that rewrites a file
+    an earlier stage made (the area and opening-references stages rewrite maps/seyda.bsp) may find it a read-only
+    hard link into the shared storage pool when that earlier stage was reused (BUILD-POOL-READONLY-SCENE-WRITE-35,
+    like BUILD-POOL-READONLY-SCENE-WRITE-35): the rename replaces the link, the pooled object is never touched."""
+    path = Path(path)
+    temporary = path.with_name(path.name + '.replacing')
+    temporary.write_bytes(raw)
+    os.replace(temporary, path)
+
+
+def replace_copy(source, target):
+    """shutil.copyfile by replace_bytes's rule: the target is replaced whole, never opened for writing."""
+    import shutil
+    target = Path(target)
+    temporary = target.with_name(target.name + '.replacing')
+    shutil.copyfile(source, temporary)
+    os.replace(temporary, target)
+    return target
+
+
+def unshare_tree(root):
+    """Make every file of a scene tree that a stage rewrites in place its own writable file: each read-only file
+    (a hard link into the shared storage pool, left by a reused earlier stage) is replaced by a private writable
+    copy (temporary file + rename; the pooled object is never touched). Writable files are left as they are, so
+    only the first in-place stage after a reused one copies anything. The scene stages that edit their inherited
+    tree in place (census, area, Balmora interiors, door audio, character, reading, opening references, town
+    imports) call it first (BUILD-POOL-READONLY-SCENE-WRITE-35, persisting: an in-place stage after a reused one).
+    Returns (files, bytes) copied."""
+    import shutil
+    import stat
+    files = size = 0
+    for folder, _, names in os.walk(root):
+        for name in names:
+            path = Path(folder) / name
+            if path.is_symlink() or not path.is_file():
+                continue
+            mode = stat.S_IMODE(path.stat().st_mode)
+            if mode & stat.S_IWUSR:
+                continue
+            temporary = path.with_name(path.name + '.unsharing')
+            shutil.copyfile(path, temporary)
+            os.chmod(temporary, mode | stat.S_IWUSR)
+            os.replace(temporary, path)
+            files += 1
+            size += path.stat().st_size
+    if files:
+        print('Scene tree %s: %d read-only pooled file(s) (%d bytes) made private and writable before the in-place '
+              'stage' % (Path(root).name, files, size), flush=True)
+    return files, size
+
+
 def copy_tree(source, target, **options):
     """shutil.copytree whose copies are writable (copy_writable): how a stage copies a folder it inherits
     (the scene chain: bsp-scene -> npc-scene -> hands-scene ...) before it edits the copy in place."""

@@ -265,7 +265,51 @@ def _equipment(assets, appearance, layer, samples, mesh, palette):
     return equipment, emitters
 
 
-def prepare(data_files, id1, output_id1=None):
+GUARD_CACHE = 'guard-torch'
+
+
+def _guard_cache():
+    """The guard models' share of the image pass cache (tools/pass_cache.py), or None (cache off, or no input lock
+    naming the game data by SHA-256: then the inputs are not known exactly and nothing is reused)."""
+    from pass_cache import PassCache, game_data_digest
+    game = game_data_digest()
+    if game is None:
+        return None
+    return PassCache.open(GUARD_CACHE, {'game_data': game}, (__file__, '_convert_guard'))
+
+
+def _convert_guard(task):
+    """Pool worker: the held-torch body and torch companions of one guard model (prepare). Reads only.
+    Returns bytes and the receipt fields; with a cache, a result recorded for the same inputs (SHA-256 of the
+    base model, the palette, the appearance and the torch mesh name, the game data by the cache's options, the
+    worker's code by its key) is taken from it, byte for byte."""
+    data_files, id1, entry, appearance, mesh, palette, cache = task
+    original = (Path(id1) / entry['base_model']).read_bytes()
+    layout = actor_frames.layout_text(Path(id1) / entry['base_model'])
+    key = None
+    if cache is not None:
+        from pass_cache import input_digest
+        key = input_digest({'base': sha(original), 'layout': layout, 'palette': sha(palette), 'entry': entry,
+                            'appearance': json.loads(json.dumps(appearance, default=str)), 'mesh': mesh})
+        found = cache.load(key)
+        if found is not None and found[1] is not None and isinstance(found[0], dict):
+            row, blob = found
+            cut = row['body_bytes']
+            return dict(row, body=blob[:cut], equipment=blob[cut:], inputs=[tuple(i) for i in row['inputs']],
+                        reused=True)
+    assets = AuditedAssets(Path(data_files), BSA(child_ci(Path(data_files), 'Morrowind.bsa')))
+    skeleton = Skeleton(assets, appearance['skeleton'])
+    body, layer, samples, proof = _body(assets, appearance, skeleton, original, palette, layout)
+    equipment, emitters = _equipment(assets, appearance, layer, samples, mesh, palette)
+    row = json.loads(json.dumps({'proof': proof, 'emitters': emitters, 'layer': [layer.start, layer.stop],
+                                 'base_sha256': sha(original), 'inputs': list(assets.inputs.items()),
+                                 'body_bytes': len(body)}))
+    if cache is not None:
+        cache.store(key, row, body + equipment)
+    return dict(row, body=body, equipment=equipment, inputs=[tuple(i) for i in row['inputs']], reused=False)
+
+
+def prepare(data_files, id1, output_id1=None, jobs=None):
     data_files = ensure_external(data_files, 'owned guard data')
     id1 = ensure_external(id1, 'guard source stage')
     output = ensure_external(output_id1 or id1, 'guard companion output')
@@ -275,28 +319,41 @@ def prepare(data_files, id1, output_id1=None):
     entries = _guard_models(id1, kinds, lights, mesh)
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
     if len(palette) != 768: raise ValueError('Invalid guard palette')
-    assets = AuditedAssets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))
-    skeletons = {}; files = {}; rows = []
-    for entry in entries:
-        appearance = outfit(kinds, entry['source_id'])
-        rig = appearance['skeleton']
-        if rig not in skeletons: skeletons[rig] = Skeleton(assets, rig)
-        original = (id1 / entry['base_model']).read_bytes()
-        body, layer, samples, proof = _body(assets, appearance, skeletons[rig], original, palette,
-            actor_frames.layout_text(id1 / entry['base_model']))
-        equipment, emitters = _equipment(assets, appearance, layer, samples, mesh, palette)
-        body_path = 'progs/gt_b_'+sha(body)[:12]+'.mdl'
-        equipment_path = 'progs/gt_t_'+sha(equipment)[:12]+'.mdl'
-        files[body_path] = body; files[equipment_path] = equipment
-        rows.append({**entry, **proof, 'body_model': body_path, 'torch_model': equipment_path,
-            'base_sha256': sha(original), 'emitters': emitters,
-            'body_bytes': len(body), 'torch_bytes': len(equipment), 'source_class': appearance['class'],
-            'source_skeleton': rig, 'source_torch_key_seconds': [layer.start, layer.stop]})
-        print('Guard torch prepared:', entry['source_id'], entry['base_model'], flush=True)
+    # One guard model per worker of the shared pool, results in entry order (the image step's guard torches ran one
+    # by one on one core); each kept in the image pass cache by the SHA-256 of its inputs.
+    from build_parallel import ordered_map
+    from build_jobs import resolve_jobs
+    import build_profile
+    import progress_line
+    cache = _guard_cache()
+    tasks = [(str(data_files), str(id1), entry, outfit(kinds, entry['source_id']), mesh, palette, cache)
+             for entry in entries]
+    jobs = max(1, min(resolve_jobs(jobs), len(tasks) or 1))
+    files = {}; rows = []; inputs = {}; reused = 0
+    with build_profile.phase('Guard torches', detail='%d models, %d workers' % (len(tasks), jobs),
+                             total=len(tasks), unit='models') as timer:
+        for (_, _, entry, appearance, *_), result in zip(tasks, ordered_map(_convert_guard, tasks, jobs)):
+            body, equipment = result['body'], result['equipment']
+            body_path = 'progs/gt_b_'+sha(body)[:12]+'.mdl'
+            equipment_path = 'progs/gt_t_'+sha(equipment)[:12]+'.mdl'
+            files[body_path] = body; files[equipment_path] = equipment
+            for name, value in result['inputs']:
+                inputs.setdefault(name, value)
+            rows.append({**entry, **result['proof'], 'body_model': body_path, 'torch_model': equipment_path,
+                'base_sha256': result['base_sha256'], 'emitters': result['emitters'],
+                'body_bytes': len(body), 'torch_bytes': len(equipment), 'source_class': appearance['class'],
+                'source_skeleton': appearance['skeleton'], 'source_torch_key_seconds': result['layer']})
+            reused += result['reused']
+            timer.step(label=entry['base_model'])
+            print('Guard torch prepared:', entry['source_id'], entry['base_model'], flush=True)
+            build_profile.progress(progress_line.line('Guard torches', entry['base_model'],
+                                                      'reused' if result['reused'] else 'made',
+                                                      (timer.count, timer.total, 'models')))
+        timer.done('Guard torches: %d models (%d from the pass cache)' % (len(rows), reused))
     files['gfx/guard-torches.awg'] = registry(rows)
     report = {'format': 'AmiWind original guard torch companions 1', 'registry': 'gfx/guard-torches.awg',
         'source_classes': sorted(GUARD_CLASSES), 'source_mesh': mesh, 'source_torch_triangles': 238,
-        'source_master_sha256': sha(master.read_bytes()), 'source_assets': assets.inputs,
+        'source_master_sha256': sha(master.read_bytes()), 'source_assets': inputs,
         'palette_sha256': sha(palette), 'records': rows, 'record_count': len(rows),
         'unique_body_models': len({row['body_model'] for row in rows}),
         'unique_torch_models': len({row['torch_model'] for row in rows}),

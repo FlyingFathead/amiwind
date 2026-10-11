@@ -593,7 +593,12 @@ void MSG_WriteString (sizebuf_t *sb, char *s)
 
 void MSG_WriteCoord (sizebuf_t *sb, float f)
 {
+#if AW_COORD_BYTES == 3
+	/* 24 bits of 1/256 units (aw_coord.h, CHIM-FRAME-COORD-RANGE-33) */
+	AW_Coord24Encode (f, (unsigned char *)SZ_GetSpace (sb, 3));
+#else
 	MSG_WriteShort (sb, (int)(f*8));
+#endif
 }
 
 void MSG_WriteAngle (sizebuf_t *sb, float f)
@@ -726,7 +731,20 @@ char *MSG_ReadString (void)
 
 float MSG_ReadCoord (void)
 {
+#if AW_COORD_BYTES == 3
+	unsigned char b[3];
+	int	i, c;
+	for (i = 0; i < 3; i++)
+	{
+		c = MSG_ReadByte ();
+		if (c < 0)
+			return 0;	/* past the end: msg_badread is set */
+		b[i] = (unsigned char)c;
+	}
+	return AW_Coord24Decode (b);
+#else
 	return MSG_ReadShort() * (1.0/8);
+#endif
 }
 
 float MSG_ReadAngle (void)

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""MiniWind test spots (config/miniwind-presets.json, tools/miniwind_presets.py).
+"""MiniWind test spots (recipes in config/recipes/miniwind/, tools/miniwind_presets.py; tests/test_build_recipe.py
+checks the recipe path itself).
 
 Every preset parses with the options' own parsers, every preset has its
 --miniwind-NAME alias in --help, --miniwind-preset list prints the table, an
@@ -40,8 +41,11 @@ def run_main(argv, version=DEV):
 class Table(unittest.TestCase):
     def test_every_preset_parses(self):
         rows = mp.presets()
-        self.assertEqual([row['name'] for row in rows],
-                         ['balmora', 'balmora-exterior', 'vivec-arena-pit', 'opening-ship', 'animkit'])
+        self.assertEqual(sorted(row['name'] for row in rows),
+                         ['animkit', 'balmora', 'balmora-exterior', 'opening-ship', 'seyda-chim',
+                          'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim'])
+        seyda = mp.find('seyda-chim')            # v0.0.36-dev5: Seyda Neen CHIM-native, starts at its arrival
+        self.assertEqual(seyda['start'], 'seyda_neen')
         ship = mp.find('opening-ship')
         self.assertEqual(ship['start'], 'interior:Imperial Prison Ship')
         self.assertEqual(ship['description'], 'Opening ship: lantern and ship lighting check')
@@ -53,6 +57,14 @@ class Table(unittest.TestCase):
         self.assertIn('npc-gallery', pit['exclude'])
         self.assertEqual(pit['unreferenced'], 'voice,npcs')
         self.assertEqual(mp.find('balmora-exterior')['scope'], 'exterior')
+        # Vivec stage A's preset, now the whole city from the Arena arrival (owner decision 2026-10-11 09:55)
+        arena = mp.find('vivec-arena-chim')
+        self.assertEqual((arena['start'], arena['scope']), ('vivec_city', 'full'))
+        self.assertIn('npc-gallery', arena['exclude'])
+        # Vivec stage B: all of Vivec in one CHIM frame (vivec_city), from the same Arena arrival
+        city = mp.find('vivec-city-chim')
+        self.assertEqual((city['start'], city['scope']), ('vivec_city', 'full'))
+        self.assertIn('npc-gallery', city['exclude'])
 
     def test_bad_rows_are_refused(self):
         good = dict(mp.find('balmora'))
@@ -97,16 +109,17 @@ class Table(unittest.TestCase):
                 self.assertIn('release candidate or final', err)
                 setup.assert_not_called()
 
-    def test_the_arena_pit_waits_for_its_interiors(self):
-        code, out, err, setup = run_main(['--miniwind-vivec-arena-pit', '--check', '--tools-dir', '/nonexistent'])
-        self.assertEqual(code, 1)
-        self.assertIn('Vivec, Arena Pit', err)
-        self.assertIn('IMPORT-TOWN-NO-INTERIORS-32', err)
-        setup.assert_not_called()
+    def test_the_arena_pit_preset_passes_its_start_check(self):
+        # BUILD-MINIWIND-ARENA-PIT-REFUSED-36: the Pit (vai000) is made by chim-rooms-vivec_arena; the preset starts there
+        code, out, err, setup = run_main(['--miniwind-vivec-arena-pit', '--host-plan'])
+        self.assertEqual(code, 0, err)
+        self.assertIn('MiniWind town: vivec_city', out + err)
+        self.assertNotIn('IMPORT-TOWN-NO-INTERIORS-32', out + err)
 
     def test_preset_fills_the_options_and_explicit_options_win(self):
-        args = build.parser().parse_args(['--miniwind-vivec-arena-pit', '--miniwind-description', 'Mine'])
-        mp.apply(args)
+        argv = ['--miniwind-vivec-arena-pit', '--miniwind-description', 'Mine']
+        args = build.parser().parse_args(argv)
+        mp.apply(args, argv)
         self.assertTrue(args.miniwind)
         self.assertEqual(args.direct_to_game_map, 'interior:Vivec, Arena Pit')
         self.assertEqual(args.miniwind_description, 'Mine')
@@ -114,14 +127,14 @@ class Table(unittest.TestCase):
         self.assertEqual(args.exclude_unreferenced, 'voice,npcs')
         self.assertEqual(args.miniwind_preset_record['name'], 'vivec-arena-pit')
         args = build.parser().parse_args(['--miniwind-balmora'])
-        mp.apply(args)
+        mp.apply(args)  # without the command line: options that differ from their defaults count as given
         self.assertEqual((args.miniwind_scope, args.direct_to_game_map), ('full', None))
         self.assertEqual(args.miniwind_description, 'Balmora: exterior and interiors')
 
     def test_the_table_is_a_public_file(self):
         names = json.loads((ROOT / 'tools/release-files.json').read_text(encoding='utf-8'))
-        for path in (mp.TABLE, 'tools/miniwind_presets.py', 'tools/direct_start.py', 'tests/test_miniwind_presets.py',
-                     'tests/test_direct_start.py'):
+        for path in [p.relative_to(ROOT).as_posix() for p in mp.recipe_files()] + ['tools/miniwind_presets.py', 'tools/direct_start.py', 'tests/test_miniwind_presets.py',
+                     'tests/test_direct_start.py']:
             self.assertIn(path, names)
 
 

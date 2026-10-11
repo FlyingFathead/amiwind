@@ -10,7 +10,10 @@ tools/build.py runs it for every real image build, right after the previous-rele
   and finals stop, development builds warn);
 - the game data folder exists and holds the master file;
 - every town config's entity and model budget fits the engine's tables (tools/map_engine_limits.py
-  budget_room: a config may only tighten the engine's limits, BUILD-BUDGET-ENGINE-LIMITS-35).
+  budget_room: a config may only tighten the engine's limits, BUILD-BUDGET-ENGINE-LIMITS-35);
+- every NPC resident of every CHIM area of the build has a grounding classification in
+  config/actor_grounding.json (tools/actor_grounding_census.py area_problems; the chim-town stage stopped
+  40 minutes in on unlisted residents, CHIM-ACTOR-GROUNDING-POLICY-36).
 
 Every problem is listed at once, each with the command that fixes it. Run it alone with
 `python3 tools/build_preflight.py --workspace DIR [--data-files DIR]`.
@@ -101,6 +104,14 @@ def budget_problems(config_dir=None):
     except ValueError as exc:
         return [f'{exc}; fix: lower the budget in the named config']
     return []
+
+
+def grounding_problems(data_files, areas):
+    """[problem] for each CHIM area with an NPC resident the grounding policy does not classify."""
+    if data_files is None or not areas or data_problems(data_files):
+        return []
+    import actor_grounding_census
+    return actor_grounding_census.area_problems(data_files, areas)
 
 
 def run(workspace, data_files=None, uid=None, minimum_gib=None, space=True):

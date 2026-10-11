@@ -17,6 +17,8 @@ in one chain, the converters' earlier form), routed (every model) or balanced (t
 lava: how Morrowind's lava pools are converted (tools/lava.py, docs/LAVA.md): quake (default: Quake liquid brushes
 with a "*lava" warp texture, lava contents, embers and glow) or static (the earlier rule: interior rooms leave the pool
 activator out, exterior frames place the pool mesh as a solid model).
+world_map: the in-game world map file (tools/prepare_world_ui.py, docs/WORLD_MAP_AND_JOURNAL.md): v2 (default: AWM2,
+the terrain map plus the molten lava pools of the exterior cells) or v1 (AWM1: terrain and settlements only, kept selectable).
 npc_head_detail: humanoid heads in whole-model NPC bakes (tools/npc_geometry.py head_plan): original (the head
 keeps every original triangle, the body its silhouette, NPC-HEAD-DECIMATION-33), budget (the previous 480-triangle
 split that decimated heads) or auto (shipped default: budget; original heads are EXPERIMENTAL, off by default in v0.0.35 and
@@ -34,9 +36,20 @@ INK_MODES = ("filled", "original")
 BUILDERS = ("legacy", "chim")
 MODEL_HULLS = ("auto", "chain", "routed", "balanced", "compiled")
 LAVA_MODES = ("quake", "static")
+WORLD_MAPS = ("v1", "v2")
+WORLD_MAP_VARIABLE = "AMIWIND_WORLD_MAP"   # read by tools/prepare_world_ui.py (same name, test-checked)
+
+
+def export_world_map(value):
+    """Export the resolved world map format for the world-ui stage and the image step (stdlib only: the
+    builder's bootstrap imports no third-party module)."""
+    import os
+    if value not in WORLD_MAPS:
+        raise ValueError("world_map must be v1 or v2")
+    os.environ[WORLD_MAP_VARIABLE] = value
 NPC_HEAD_DETAILS = ("auto", "original", "budget")
 KNOWN_KEYS = {"bitmap_paper_ink", "follow_original_stair_rules", "builder", "chim_areas", "chim_texture_effects",
-              "heap_mb", "model_hull", "chim_stream_statics", "lava", "chim_lighting_type",
+              "heap_mb", "model_hull", "chim_stream_statics", "lava", "world_map", "chim_lighting_type",
               "storage_pool_dir", "npc_head_detail",
               # NPC model levels of detail: validated and resolved by tools/npc_lod.py.
               "npc_lod", "npc_lod_levels", "npc_face_lod", "npc_lod_disk_mib"}
@@ -57,6 +70,9 @@ def add_font_options(parser):
     parser.add_argument("--lava", choices=LAVA_MODES, default=None,
                         help="Lava pools: quake (default: Quake liquid with the warp, lava contents, damage and tint) "
                              "or static (the earlier rule: rooms leave the pool out, exterior frames place it as a model)")
+    parser.add_argument("--world-map", choices=WORLD_MAPS, default=None,
+                        help="In-game world map file: v2 (default: terrain map plus the molten lava pools) or v1 "
+                             "(the earlier map: terrain and settlements only)")
     parser.add_argument("--npc-head-detail", choices=NPC_HEAD_DETAILS, default=None,
                         help="Humanoid NPC heads in baked models: auto (default: budget, the previous bake), original (EXPERIMENTAL, original (head keeps "
                              "every original triangle, body and clothing keep their silhouette) or budget (the "
@@ -105,6 +121,8 @@ def _read(path):
         raise ValueError(f"Invalid model_hull in {path}: expected auto, chain, routed, balanced or compiled")
     if "lava" in values and values["lava"] not in LAVA_MODES:
         raise ValueError(f"Invalid lava in {path}: expected quake or static")
+    if "world_map" in values and values["world_map"] not in WORLD_MAPS:
+        raise ValueError(f"Invalid world_map in {path}: expected v1 or v2")
     if "npc_head_detail" in values and values["npc_head_detail"] not in NPC_HEAD_DETAILS:
         raise ValueError(f"Invalid npc_head_detail in {path}: expected auto, original or budget")
     if "follow_original_stair_rules" in values and not isinstance(values["follow_original_stair_rules"], bool):
@@ -150,6 +168,13 @@ def resolve_font_options(args):
         lava, lava_origin = values["lava"], "build config"
     if getattr(args, "lava", None) is not None:
         lava, lava_origin = args.lava, "CLI override"
+    if "world_map" not in defaults:
+        raise ValueError("Shipped build defaults must define world_map")
+    world_map, world_map_origin = defaults["world_map"], "shipped default"
+    if selected is not None and "world_map" in values:
+        world_map, world_map_origin = values["world_map"], "build config"
+    if getattr(args, "world_map", None) is not None:
+        world_map, world_map_origin = args.world_map, "CLI override"
     stream, stream_origin = bool(defaults.get("chim_stream_statics", False)), "shipped default"
     if selected is not None and "chim_stream_statics" in values:
         stream, stream_origin = values["chim_stream_statics"], "build config"
@@ -173,6 +198,7 @@ def resolve_font_options(args):
             "follow_original_stair_rules": stairs, "follow_original_stair_rules_selected_by": stairs_origin,
             "model_hull": hull, "model_hull_selected_by": hull_origin,
             "lava": lava, "lava_selected_by": lava_origin,
+            "world_map": world_map, "world_map_selected_by": world_map_origin,
             "chim_stream_statics": stream, "chim_stream_statics_selected_by": stream_origin,
             "npc_head_detail": heads, "npc_head_detail_selected_by": heads_origin,
             "npc_head_detail_setting": heads_setting}
@@ -214,11 +240,12 @@ def configured_storage_pool_dir(args):
 def add_builder_options(parser):
     parser.add_argument("--builder", choices=BUILDERS, default=None,
                         help="Exterior world pipeline: chim (default from v0.0.33, with the CHIM areas of "
-                             "config/build-defaults.json: Balmora and Seyda Neen; the CHIM world streamer: every "
+                             "config/build-defaults.json: Balmora, Seyda Neen and all of Vivec; the CHIM world streamer: every "
                              "asset stored once; docs/chim/WORLD_FORMAT.md) or legacy (overlapping region maps)")
+    from retired_flags import vivec_help as retired_vivec_help   # the retired Vivec district areas
     parser.add_argument("--chim-area", dest="chim_areas", action="append", default=None, metavar="TOWN",
                         help="With --builder chim: a town from config/towns.json the CHIM world holds "
-                             "(repeatable; default from the build config)")
+                             "(repeatable; default from the build config)" + ' ' + retired_vivec_help())
     parser.add_argument("--chim-texture-effect", dest="chim_texture_effects", action="append", default=None,
                         metavar="EFFECT",
                         help="With --builder chim: apply a CHIM texture effect (a .chimfx file or a shipped name such "

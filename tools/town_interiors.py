@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCALE = .25
 FEET = 16.875            # feet-to-origin lift of every converted arrival
 COORD_LIMIT = 4096       # MSG_WriteCoord: 1/8-unit shorts (INTERIOR-COORDS-31)
-BANK_ROWS = 128          # aw_scene.c read_links_for keeps at most 128 links
+BANK_ROWS = 256          # aw_scene.c AW_SCENE_LINKS: read_links_for keeps at most 256 links (was 128; whole-city Vivec: 157)
 MODEL_LIMIT = 220        # prepare_area.build_room's inline model budget
 
 
@@ -41,15 +41,29 @@ def arrival_yaw(rotation_z):
     return round((90 - math.degrees(rotation_z)) % 360, 5) % 360
 
 
-def frame_towns(root=None):
-    """Table frames with a world handoff, in table order: (map, title, settings, core)."""
+def listed_rooms(settings, root=None):
+    """The rooms a town's frame leads into: its own listed interiors, then those of the towns named by its
+    "interiors_from" (all of Vivec in one frame, vivec_city, takes the eight district rows' rooms with their
+    map names and save IDs, so a room is listed once in the town table)."""
+    from town_config import load_settings
+    rows = list(interiors(settings))
+    for town in settings.get('interiors_from') or []:
+        rows += interiors(load_settings(town, root))
+    return rows
+
+
+def frame_towns(root=None, prefer=()):
+    """Table frames with a world handoff, in table order: (map, title, settings, core). prefer: town ids tried
+    first (the towns this build holds: a room of the Vivec districts leads out into vivec_city when the build
+    holds the whole city, not into a district frame the disk does not have)."""
     out = []
     for row in load_registry(root)['towns'][len(FIXED_TOWNS):]:
         if row.get('world_slot', -1) >= 0 or row.get('town') is not None:
             continue
         settings = json.loads((Path(root or ROOT) / 'config' / row['config']).read_text(encoding='utf-8'))
         out.append((town_field(settings, 'map'), town_field(settings, 'title'), settings, handoff_core(settings)))
-    return out
+    first = [t for t in out if t[2].get('town', {}).get('id') in prefer]
+    return first + [t for t in out if t not in first]
 
 
 def exit_town(position, towns):
@@ -170,7 +184,7 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
     """Convert the town's listed rooms; returns {'rooms', 'cells', 'failed', 'excluded', 'reports'}."""
     from build_parallel import ordered_map
     from vis_options import map_threads
-    listed = interiors(settings)
+    listed = listed_rooms(settings)
     work = [room for room in listed if room['exclude'] is None]
     result = {'rooms': {}, 'cells': {}, 'reports': [], 'failed': {},
               'excluded': {room['map']: {'cell': room['cell'], 'reason': room['exclude']}
@@ -193,7 +207,9 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
                        [room['map'] for room in work], workers, fallback=sizes.get if sizes else None)
     for room, (status, value) in zip(work, rooms):
         if status != 'ok':
-            if not dry_run:
+            # "room_failures": "unavailable" (a town config setting; the whole-city Vivec frame): a room past an
+            # engine limit is listed as failed and its doors show it unavailable; the other rooms ship
+            if not dry_run and settings.get('room_failures') != 'unavailable':
                 raise ValueError(town_field(settings, 'title') + ' interior failed: ' + value)
             result['failed'][room['map']] = {'cell': room['cell'], 'error': value}
             print('Interior failed:', room['map'], value, flush=True)
@@ -221,7 +237,7 @@ def door_mesh_bounds(data, doors):
     return out
 
 
-def write_room_banks(data, scene, result, root=None):
+def write_room_banks(data, scene, result, root=None, prefer=()):
     """doors-<room>.txt for every converted room; returns the link receipt."""
     from mwad.interior import original_doors
     from mwad.paths import child_ci
@@ -230,7 +246,7 @@ def write_room_banks(data, scene, result, root=None):
     converted = {cell: True for cell in result['cells']}
     converted.update({room['cell'].casefold(): False for room in result['failed'].values()})
     rooms = available_rooms(root, converted)
-    towns = frame_towns(root)
+    towns = frame_towns(root, prefer)
     by_cell = {}
     for door in original_doors(child_ci(data, 'Morrowind.esm').read_bytes()):
         if door['source_interior']:

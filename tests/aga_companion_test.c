@@ -86,6 +86,7 @@ int main(void){
     palette[5*3]=250;                                   /* index 5: the reddest */
     sv.active=1;sv.edicts=edicts;sv.num_edicts=3;sv.models[1]=&model;model.numframes=21;sv.time=1;
     svs.maxclients=1;svs.clients=&client;client.edict=p;cls.state=ca_connected;key_dest=key_game;
+    p->v.health=100;   /* a living player: the dead see no pick target (AW_PlayerDead, PLAYER-DEATH-LIMBO-35) */
     p->v.origin[0]=300;p->v.origin[2]=16.625f;p->v.mins[2]=-16.625f;p->v.view_ofs[2]=13;
     npc->v.classname=1;npc->v.netname=8;npc->v.modelindex=1;npc->v.solid=SOLID_SLIDEBOX;npc->v.nextthink=2;npc->v.think=7;
     npc->v.mins[0]=-7.32f;npc->v.mins[1]=-7.12f;npc->v.maxs[0]=7.32f;npc->v.maxs[1]=7.12f;npc->v.maxs[2]=33.25f;
@@ -124,6 +125,8 @@ int main(void){
     assert(AW_CompanionPickAim()==1 && !AW_CompanionEdict(npc));   /* right button in pick mode: handled, nothing aimed at */
     assert(AW_CompanionButtons(1)==0 && !AW_CompanionEdict(npc));   /* swallowed, nothing to pick */
     AW_CompanionButtons(0);
+    /* dead: no target, no red crosshair, nothing picked (PLAYER-DEATH-LIMBO-35) */
+    p->v.health=0;target=npc;host_framecount++;assert(AW_CompanionCrosshair(10,10)==1 && fills==0);p->v.health=100;
     target=npc;host_framecount++;assert(AW_CompanionCrosshair(10,10)==2 && fills==2 && fill_colour==5);
     assert(AW_CompanionButtons(1|2)==2);                               /* attack swallowed, jump kept */
     assert(AW_CompanionEdict(npc) && npc->v.solid==SOLID_NOT && npc->v.nextthink==0);

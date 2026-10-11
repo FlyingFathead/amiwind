@@ -38,12 +38,13 @@ QUICK_SLUG = 'quick-playtest-no-NPC-gallery'
 SCOPE_LABEL = {'full': None, 'exterior': QUICK_LABEL}
 # The town the build holds, its CHIM area and where a new game starts: Balmora by
 # default; --miniwind-town picks another town table row (a sandbox of that town on
-# CHIM: its exterior frame, its residents and interiors). Seyda Neen needs the
-# recorded maps and is not a MiniWind town.
+# CHIM: its exterior frame, its residents and interiors). Seyda Neen is a MiniWind
+# town since v0.0.36-dev5: CHIM-native, no recorded or region maps (tools/chim_town.py).
+# NOT_TOWNS stays as the mechanism for a town that cannot be a sandbox (none today).
 TOWN = 'balmora'
 CHIM_AREAS = ('balmora',)
 TOWN_OPTION = '--miniwind-town'
-NOT_TOWNS = ('seyda',)
+NOT_TOWNS = ()
 # DEBUG ONLY builds (--miniwind-debug): a private debugging sandbox, not a playtest.
 # The notice, startup screen, marker, HDF and run names say so, and only such a build
 # may carry debugging settings a playtest never has (a stated closer view).
@@ -131,7 +132,7 @@ FEATURES = (
 
 
 def check_town(town, root=None):
-    """The --miniwind-town value, checked: a town table row (config/towns.json) other than Seyda Neen."""
+    """The --miniwind-town value, checked: a town table row (config/towns.json) not in NOT_TOWNS."""
     from town_config import runtime_towns
     names = [t['name'] for t in runtime_towns(root)]
     if town not in names or town in NOT_TOWNS:
@@ -164,14 +165,29 @@ def label(scope=DEFAULT_SCOPE):
     return SCOPE_LABEL[check_scope(scope)]
 
 
+# Stages OMITTED leaves out that a Seyda Neen sandbox (CHIM-native since v0.0.36-dev5) needs.
+SEYDA_STAGES = ('area', 'world-survey')
+
+
 def omitted(name, scope=DEFAULT_SCOPE, town=TOWN):
     """The reason a MiniWind plan leaves this stage out, or None when it runs. Another
     town than Balmora runs its own import (town-<town>); Balmora's scene stage still runs
     (the scene chain and the image's Balmora inputs), its interiors do not."""
     if name == 'town-' + town:
         return None
+    if name.startswith('chim-rooms-'):
+        # a CHIM-native town's listed rooms (tools/chim_rooms.py): the sandbox town's, in the full scope only
+        if name != 'chim-rooms-' + town:
+            return 'extra town (not %s)' % town
+        return 'interiors (exterior scope)' if check_scope(scope) == 'exterior' else None
     if name.startswith('town-'):
         return EXTRA_TOWN_REASON if town == TOWN else 'extra town (not %s)' % town
+    if name.startswith('chim-town-') and name != 'chim-town-' + town:
+        return 'another CHIM town (not %s): a MiniWind holds one town' % town
+    if town == 'seyda' and name in SEYDA_STAGES:
+        # a Seyda Neen sandbox: its rooms and residents (area) and the canonical land its CHIM frame's edge
+        # reads (world-survey, chim.seyda) run; the rest of the open world stays out
+        return None
     if town != TOWN and name in ('balmora', 'balmora-interiors'):
         # another town's sandbox holds no Balmora: its scene stage, interiors and their image inputs
         # (the layout repair, the night-window scenery) are left out with its maps
@@ -207,6 +223,7 @@ def features(stage_names, town=TOWN, scope=DEFAULT_SCOPE):
     title = town_title(town)
     table = [('chim', title + ' exterior (CHIM)'),
              ('chim-town-' + town, title + ' residents'),
+             ('chim-rooms-' + town, title + ' interiors'),
              ('town-' + town, title + (' residents' if check_scope(scope) == 'exterior' else ' residents and interiors')),
              *((s, l) for s, l in FEATURES if s not in ('chim', 'balmora-interiors', 'balmora', 'chim-town-balmora'))]
     return [label for stage, label in table if stage in set(stage_names)]
@@ -372,6 +389,11 @@ def kept_maps(root=None, scope=DEFAULT_SCOPE, town=TOWN, extra=()):
         return {town, *extra}, row['prefix']
     if town == TOWN:
         rooms = json.loads((root / 'config/balmora_interiors.json').read_text(encoding='utf-8'))['scenes']
+    elif row['id'] == 'seyda':
+        # Seyda Neen's rooms are scenes of its area (config/seyda_area.json): every interior except the
+        # prison ship and the Census office (a direct start keeps the ship: start_maps)
+        rooms = [s for s in json.loads((root / 'config/seyda_area.json').read_text(encoding='utf-8'))['scenes']
+                 if s.get('interior') and s['map'] not in ('prison', 'census')]
     else:
         rooms = [r for r in town_interiors(root) if r['town'] == row['id']]
     return {town, *extra, *(room['map'] for room in rooms)}, row['prefix']

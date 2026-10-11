@@ -10,5 +10,6 @@ int AW_MapTeleportAt(const float *,int);
 qboolean AW_MapPlaceBelow(edict_t *,const float *);
 qboolean AW_MapPlace(edict_t *,const float *);
 int AW_WorldContains(const char *,const float *);
+int AW_WorldRegionCentres(float *,int);
 const char *AW_RegionNameAt(const float *source_coordinates);
 #endif

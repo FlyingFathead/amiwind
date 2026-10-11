@@ -36,6 +36,7 @@ sfxcache_t *S_LoadSound(sfx_t *s){assert(0);return NULL;}
 void Con_Printf(char *fmt,...){}
 int AW_DebugOverlaysEnabled(void){return 0;}
 void Cmd_AddCommand(char *n,void (*fn)(void)){}
+void Cvar_RegisterVariable(cvar_t *v){v->value=1;}void Cvar_SetValue(char *n,float v){}
 int Cmd_Argc(void){return 0;}char *Cmd_Argv(int i){return "";}
 void Sys_Error(char *fmt,...){fprintf(stderr,"%s\n",fmt);abort();}
 void Sys_Printf(char *fmt,...){}

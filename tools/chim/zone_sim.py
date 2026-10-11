@@ -32,6 +32,7 @@ import ctypes
 import math
 import os
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -449,10 +450,53 @@ def lawnmower(frame, spacing=256.0, step=16.0, margin=128.0):
     return line(pts, step)
 
 
-def walk(lib_path, memory, world, sizes_tuple, routes, ends=None, release=1, partial=1, draw_distance=None):
-    """Run each route on a fresh zone; returns {route name: result}."""
+def _walk_route(task):
+    """Worker of walk(): one route on a fresh zone (the host library loaded in this process). With a cache
+    (pass_cache.PassCache) the route is a unit keyed by SHA-256 of exactly what it reads: the zone library's
+    bytes, the memory and ring settings, the frame, its chunks' block sizes, the sizes of the models and
+    textures, the positions and the methods; reused while the key is unchanged (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
+    (lib_path, memory, settings, frame, chunks, model_bytes, model_tex, tex_bytes, positions, ends, release, partial,
+     draw_distance, cache) = task
+    key = None
+    if cache is not None:
+        import hashlib
+        import json
+        h = hashlib.sha256(Path(lib_path).read_bytes())
+        h.update(json.dumps([memory, settings, frame, chunks, model_bytes, model_tex, tex_bytes, positions, ends,
+                             release, partial, draw_distance], sort_keys=True, default=str).encode())
+        key = h.hexdigest()
+        found = cache.load(key)
+        if found is not None:
+            return found[0]
+    w = Walker(lib_path, memory, settings, frame, chunks, model_bytes, model_tex, tex_bytes,
+               ends=ends, release=release, partial=partial, draw_distance=draw_distance)
+    for x, y in positions:
+        w.step(x, y)
+    result = w.result()
+    if key is not None:
+        import json
+        import cache_provenance
+        cache_provenance.name_unit(cache, key, lambda: 'route %s' % ((frame.get('path') or frame.get('name') or frame.get('cell')),), lambda: [('zone library', Path(lib_path).read_bytes()), ('memory', memory), ('ring settings', settings), ('frame', frame), ('chunks', chunks), ('model bytes', model_bytes), ('model textures', model_tex), ('texture bytes', tex_bytes), ('positions', positions), ('methods', [ends, release, partial, draw_distance])])
+        cache.store(key, result)
+        result = json.loads(json.dumps(result))       # the stored form: a reused route reads back the same
+    return result
+
+
+def walk(lib_path, memory, world, sizes_tuple, routes, ends=None, release=1, partial=1, draw_distance=None,
+         jobs=1, cache=None):
+    """Run each route on a fresh zone; returns {route name: result}. jobs: routes on the shared worker pool
+    (build_parallel.ordered_map, largest first); cache: a pass_cache.PassCache keeping each route's result."""
     model_bytes, model_tex, tex_bytes, frames = sizes_tuple
     settings = world['settings']
+    if (jobs and jobs > 1 and len(routes) > 1) or cache is not None:
+        tasks = [(str(lib_path), memory, settings, frames[k][1], frames[k][2], model_bytes, model_tex, tex_bytes,
+                  positions, ends, release, partial, draw_distance, cache) for _, k, positions in routes]
+        if jobs and jobs > 1 and len(routes) > 1:
+            from build_parallel import ordered_map
+            done = ordered_map(_walk_route, tasks, min(jobs, len(tasks)), cost=lambda t: len(t[8]) * len(t[4]))
+        else:
+            done = map(_walk_route, tasks)
+        return {name: r for (name, _, _), r in zip(routes, done)}
     results = {}
     for name, frame_index, positions in routes:
         _path, frame, chunks = frames[frame_index]
@@ -464,7 +508,7 @@ def walk(lib_path, memory, world, sizes_tuple, routes, ends=None, release=1, par
     return results
 
 
-def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, spacing=256.0, step=24.0):
+def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, spacing=256.0, step=24.0, jobs=1):
     """The build's CHIM zone walk gate: OUT/chim-zone-walk.json, and a ValueError when a walk over any
     frame leaves the player without ground (a chunk within the collision margin not active at the end
     of a step) or a chunk fails for bad data. Loads that found no room, chunks released for nearer
@@ -498,7 +542,13 @@ def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, 
             lib = build_library(tmp)
             routes = [('%s lawnmower' % path, k, lawnmower(frame, spacing, step))
                       for k, (path, frame, chunks) in enumerate(frames)]
-            results = walk(lib, memory, world, blocks, routes, release=1, partial=1)
+            from pass_cache import PassCache
+            cache = PassCache.open('chim-zone-walk', {'unit': 'frame route'}, __file__)
+            results = walk(lib, memory, world, blocks, routes, release=1, partial=1, jobs=jobs, cache=cache)
+            if cache is not None:
+                used = cache.summary()
+                print('CHIM zone walk units: %d reused, %d walked (frames, by SHA-256 of their inputs)'
+                      % (used['hits'], used['misses']), file=sys.stderr, flush=True)
         walks = []
         for name, r in results.items():
             r = dict(r, hole_need={str(k): v for k, v in r['hole_need'].items()},

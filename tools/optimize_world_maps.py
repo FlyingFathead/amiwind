@@ -61,6 +61,8 @@ def prepare_candidate(path, transaction, cache=None):
             return row
         row, final = _prepare(path, transaction, original)
         row = json.loads(json.dumps(row))  # the form a cached row has
+        import cache_provenance
+        cache_provenance.name_unit(cache, input_sha, lambda: path.name, lambda: [('map bytes', input_sha)])
         cache.store(input_sha, row, final if row['changed'] else None)
         return row
     return _prepare(path, transaction, original)[0]
@@ -150,7 +152,7 @@ def optimize_maps(maps, report_path, jobs=1):
         completed = 0
         # Development builds reuse results for unchanged map bytes (pass_cache.py).
         from pass_cache import PassCache
-        cache = PassCache.open('optimize-world-maps', {}, __file__)
+        cache = PassCache.open('optimize-world-maps', {}, (__file__, 'prepare_candidate'))  # the per-map worker's code only
         if cache is not None:
             report['pass_cache'] = {'sources_sha256': cache.sources}
         try:
@@ -214,46 +216,62 @@ def verify_optimized_maps(maps, report, require_committed=True, jobs=1):
     from build_parallel import hash_files
     if require_committed and report.get('status') != 'verified':
         raise ValueError('Optimizer receipt has not completed verification')
-    paths = sorted(Path(maps).glob('*.bsp'))
+    from map_files import map_files
+    paths = map_files(maps)         # x.bsp and the CHIM frame maps x.chim (tools/map_files.py)
     actual = dict(zip((p.name for p in paths), hash_files(paths, jobs)))
     expected = {r['map']: r['output_sha256'] for r in report['maps']}
     if actual != expected:
         raise ValueError('Final staged maps no longer match optimizer receipt')
 
 
-def rebind_chim_maps(maps, report, report_path, removed, jobs=1):
+def rebind_chim_maps(maps, report, report_path, removed, jobs=1, replaced=()):
     """A CHIM image changes the optimized map set once, after the optimizer: it writes the CHIM frame
-    maps (maps/*-chim.bsp, an empty world plus entities; not optimized) and removes the legacy
+    maps (an empty world plus entities, found by their "_chim_frame" key; not optimized) and removes the legacy
     exterior maps it does not ship (`removed`: id1-relative 'maps/x.bsp' rows). The receipt follows:
     removed rows leave, frame maps join unchanged (input = output), the change is recorded under
     'chim_rebind', and the later gates (final heap audit, verify_optimized_maps) bind to the result.
-    Any other new or missing map stops the image."""
+    `replaced`: map file names removed and written again as CHIM region frame maps (tools/chim/regions.py: the
+    frame map keeps the open-world map's name, as vfNNNN.chim or, with chim_frame_ext bsp, vfNNNN.bsp); they
+    leave as removed rows and join as frame maps. Any other new or missing map stops the image."""
     from build_parallel import hash_files
+    from map_files import is_chim_frame, map_files, map_stem
     maps = Path(maps)
     gone = sorted({Path(name).name for name in removed if name.startswith('maps/') and name.endswith('.bsp')})
-    present = {p.name for p in maps.glob('*.bsp')}
+    present = {p.name for p in map_files(maps)}
+    replaced = {map_stem(name) for name in replaced}
     rows = [r for r in report['maps'] if r['map'] not in gone]
     missing = sorted(r['map'] for r in rows if r['map'] not in present)
     if missing:
         raise ValueError('Optimized maps missing after the CHIM frame maps: ' + ', '.join(missing[:8]))
-    still = sorted(set(gone) & present)
+    gone_stems = {map_stem(name) for name in gone}
+    if replaced - gone_stems:
+        raise ValueError('Replaced maps not in the removed list: ' + ', '.join(sorted(replaced - gone_stems)[:8]))
+    present_stems = {map_stem(name): name for name in present}
+    absent = sorted(replaced - set(present_stems))
+    if absent:
+        raise ValueError('CHIM region frame maps missing: ' + ', '.join(absent[:8]))
+    still = sorted(name for name in set(gone) & present if map_stem(name) not in replaced)
+    # a region frame written under the legacy name (chim_frame_ext bsp) is the frame map, not the legacy map
+    still += sorted(name for name in set(gone) & present if map_stem(name) in replaced and not is_chim_frame(maps / name))
     if still:
         raise ValueError('Removed legacy maps still staged: ' + ', '.join(still[:8]))
     added = sorted(present - {r['map'] for r in rows})
-    other = [name for name in added if not name.endswith('-chim.bsp')]
+    other = [name for name in added if not is_chim_frame(maps / name)]
     if other:
         raise ValueError('Maps added after the optimizer that are not CHIM frame maps: ' + ', '.join(other[:8]))
     for name, value in zip(added, hash_files([maps / name for name in added], jobs)):
         size = (maps / name).stat().st_size
         rows.append({'map': name, 'input_sha256': value, 'output_sha256': value, 'input_bytes': size,
                      'output_bytes': size, 'file_bytes_saved': 0, 'changed': False,
-                     'not_optimized': 'CHIM frame map'})
+                     'not_optimized': 'CHIM region frame map' if map_stem(name) in replaced else 'CHIM frame map'})
     rows.sort(key=lambda r: r['map'])
     report['maps'] = rows
     report['committed_maps'] = [name for name in report.get('committed_maps', []) if name not in gone]
     report.update(map_count=len(rows), changed_maps=len(report['committed_maps']),
                   file_bytes_saved=sum(r['file_bytes_saved'] for r in rows),
-                  chim_rebind={'removed': gone, 'added_frame_maps': added})
+                  chim_rebind=dict({'removed': gone, 'added_frame_maps': added},
+                                   **({'replaced_by_region_frames': sorted(present_stems[n] for n in replaced)}
+                                      if replaced else {})))
     write_report(report_path, report)
     verify_optimized_maps(maps, report, jobs=jobs)
     return report

@@ -72,7 +72,10 @@ static void finish(const char *why){
     if(!branding)S_StopAllSounds(true);
     IN_AWClearButtons();
     /* After the logo: the main menu, or a partial-area build's quick start (aw_miniwind.c). */
-    if(branding==1)Cbuf_AddText((char *)AW_MiniwindAfterLogo());else AW_IntroBegin();
+    /* A map started while the logo played (from the console, or a test drive's remote command)
+     * stays in play: the title menu or a quick start would cover or replace it
+     * (SMOKE-PASSES-WITHOUT-MAP-36). */
+    if(branding==1){if(!sv.active)Cbuf_AddText((char *)AW_MiniwindAfterLogo());}else AW_IntroBegin();
     /* Con_Printf may refresh a disconnected client's screen. Select the
      * intro loading style before that refresh can request normal artwork. */
     Con_Printf("Intro movie: %s.\n",why);

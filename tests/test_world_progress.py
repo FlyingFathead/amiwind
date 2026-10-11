@@ -60,6 +60,27 @@ class ToolkitVersionTests(unittest.TestCase):
         self.assertLessEqual(tuple(int(n) for n in found.groups()), current)
 
 
+class PlacedLabelTests(unittest.TestCase):
+    # The World Map's cell texts: a cell with nothing placed in the original reads "0 / 0 (terrain only)" (or
+    # "(empty)" without terrain), never a bare 0 / 0 that looks like a failed conversion.
+    def test_cells_without_original_entities_say_what_they_hold(self):
+        import json, shutil, subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('node not installed')
+        root = Path(__file__).resolve().parents[1]
+        page = (root / 'amiwind-toolkit' / 'world-map.html').read_text(encoding='utf-8')
+        found = re.search(r'^function placedLabel\(.*?^}$', page, re.S | re.M)
+        self.assertTrue(found, 'world-map.html must define placedLabel')
+        cases = [[3, 5, True], [0, 0, True], [0, 0, False], [0, 4, False]]
+        script = found.group(0) + '\nconsole.log(JSON.stringify(%s.map(a => placedLabel(...a))));' % json.dumps(cases)
+        out = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout), ['3 / 5', '0 / 0 (terrain only)', '0 / 0 (empty)', '0 / 4'])
+        self.assertEqual(page.count('entities placed: ' + "' + placedLabel("), 1)
+        self.assertEqual(page.count("entities placed ' + placedLabel("), 1)
+
+
 class BuildTests(unittest.TestCase):
     def setUp(self):
         self.result = wp.build(ENTITIES, PLACES, {'cells': [[1, 0]]}, {(0, 0), (1, 0), (2, 0)})

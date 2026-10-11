@@ -1,0 +1,172 @@
+# SMOKE-PASSES-WITHOUT-MAP-36: The engine boot smoke passed while its first map ran under the title menu: a loaded server was taken for a played map
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 11 October 2026, in v0.0.36-dev5 |
+| Where | tools/engine_smoke.py PROBE; engine aw_movie.c (logo end), aw_remote.c (state file) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.36-dev5 (last seen) |
+| Severity | high: Hold level: the boot smoke is the ship check; 109 of 142 gate smokes proved only the second map in play |
+| Family | Gates, CI and tests (`tests-ci`) |
+| Playtest version | v0.0.36-dev5 |
+| From commit | source 6c29a23, engine 6c29a23, CHIM world 6c29a23 |
+| CHIM engine version | CHIM 0.1.0, engine 6c29a23, world format 0.7 |
+| Platform or emulator | FS-UAE, JIT (engine smoke) |
+
+<!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Status: 11 October 2026](#status-11-october-2026)
+- [Symptom](#symptom)
+- [Evidence](#evidence)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 11 October 2026
+
+Open; repaired in source (not yet gated). This is our own test tooling. It is hold level: the boot smoke is the check
+that nothing ships without.
+
+## Symptom
+
+`tools/engine_smoke.py --map seyda --start map` printed PASS while its screenshot after the first map ("map1") showed
+the title menu ("New game / Load game / Options / Exit game"), not Seyda Neen. Renderer counters from the same moment
+showed no world drawn.
+
+## Evidence
+
+Screenshots of the gate smokes since the boot smoke began (10 October 2026), each classified against a title-menu
+reference frame:
+
+| First map (Seyda Neen) | Second load (Balmora, dbg tp) | Gate smokes |
+| --- | --- | ---: |
+| title menu | in play | 109 |
+| in play | in play | 30 |
+| in play | no screenshot | 1 |
+| no screenshots | no screenshots | 2 |
+| Total | | 142 |
+
+The second load (a coordinate teleport into Balmora) closed the menu and ran in play in every smoke with screenshots.
+So those smokes did load and play a map, but not the first one they claimed.
+
+The engine's own console in a smoke run shows the order:
+1. the smoke loads Seyda Neen while the startup logo is still playing;
+2. the logo ends ("Intro movie: complete.");
+3. the logo's end opens the title menu over the running map.
+
+## Where
+
+- `tools/engine_smoke.py` (the emulator-side `PROBE` script): `loaded` waited only for the server's map name.
+- `engine/aga/src/aw_movie.c`: the end of the startup logo queued the title menu (or a MiniWind quick start) even
+  when a map was already running.
+- `engine/aga/src/aw_remote.c`: the state file had no line saying what the screen shows.
+
+## How it happened
+
+The smoke's map check read "server seyda" from the state file. That name is set once the server runs the map, with or
+without a client playing it. The smoke issued its map command as soon as the remote console answered, which is during
+the startup logo. When the logo ended, the engine opened the title menu over the loaded map. The music steps passed
+too, because the title menu plays music.
+
+## Why it was not caught
+
+- Nobody compared the "map1" screenshot with a game frame. Later steps were judged from state values that a map under
+  a menu also has (server name, game clock, music reads).
+- The second load always ran in play, which hid the first map's state.
+
+## Reproduction
+
+Always on images with a startup logo: `tools/engine_smoke.py --map seyda --start map` (no `--script`), then look at
+`shots/map1.png`.
+
+## Repair
+
+In source, not yet gated:
+- The state file now has `screen` (game, menu, console, message), `signon` and `world_leafs`.
+- The smoke requires every map step to be in play: screen game, signon 4 and a world with leaves, within 30 s. That
+  covers the first map, the second load, and the end of a scripted session. Otherwise it fails and names what the
+  screen showed. An engine without these lines fails.
+- A map started while the startup logo plays now stays in play: the logo's end opens the title menu (or a MiniWind's
+  quick start) only when no map is running.
+
+## Verification
+
+Same dev5 playtest image:
+- **Engine with the repair:** "in play: seyda (1435 leaves)" and "in play: the second load (balmora) (488 leaves)",
+  PASS (2 of 2 runs, plus one music-read failure under host load).
+- **The dev5 engine:** FAIL "seyda is not in play" (it has no screen lines).
+
+Tests:
+- `tests/test_engine_smoke.py` checks the in-play steps.
+- `tests/aga_remote_test.c` checks the new state lines.
+
+## Prevention
+
+- The in-play checks above are part of every engine smoke.
+- A smoke result without in-play lines for each map is not a pass.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. See [families](README.md#families).
+
+- [AW-RESULT-RECIPE-SAVED-36](AW-RESULT-RECIPE-SAVED-36.md): The master builder's result of a failed build from a requested recipe does not validate (recipe.saved left in)
+- [AW-RUN-NAME-LONG-REASON-36](AW-RUN-NAME-LONG-REASON-36.md): aw gate refuses a long --reason after leasing the gate number: the run name, used as the request id, passes 128 characters
+- [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
+- CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
+- [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
+- [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
+- [CI-HOSTDEPS-30](CI-HOSTDEPS-30.md): Host CI job fails: scenery export needs the NIF reader for non-NIF test data
+- [CI-NEW-BUILDER-RULES-35](CI-NEW-BUILDER-RULES-35.md): Hosted CI failed on v0.0.35: the previous-release check refused the one-commit checkout and the run-name rule refused the Docker check's run name
+- [CI-SKIPS-UNGUARDED-31](CI-SKIPS-UNGUARDED-31.md): Hosted CI does not fail on skipped tests; JavaScript test coverage unpinned
+- [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
+- [ENGINE-O2-STRNCPY-WARNINGS-36](ENGINE-O2-STRNCPY-WARNINGS-36.md): At -O2 the engine build printed four -Wstringop-truncation warnings for bounded strncpy copies
+- [ENGINE-STRICT-WARNINGS-36](ENGINE-STRICT-WARNINGS-36.md): The engine builds warning-free only under -Wall -Wno-unused; stricter flags show 482 warnings
+- [GATE-EMBERS-31](GATE-EMBERS-31.md): Ember commit broke native torch tests and a header format check
+- [GATE-HOSTPARITY-TEMP-RACE-33](GATE-HOSTPARITY-TEMP-RACE-33.md): Two gates running at once share the host-parity step's log file, so one gate can report the other's error
+- [GATE-NODE-MISSING-31](GATE-NODE-MISSING-31.md): The local gate never runs the inspector JavaScript tests (no Node.js in the Docker images)
+- [GATE-NUMPY-PATH-SCRATCH-33](GATE-NUMPY-PATH-SCRATCH-33.md): The gate's NumPy and Pillow import folder lived in a temporary per-session folder, so gates broke once it was removed
+- [GATE-PRIVACY-SCAN-33](GATE-PRIVACY-SCAN-33.md): The source preflight does not scan file contents for tool or model names and private path prefixes
+- [GATE-SHARED-SOURCE-32](GATE-SHARED-SOURCE-32.md): The local gate always tested the main checkout, in one shared folder
+- [GATE-SOURCE-RACE-33](GATE-SOURCE-RACE-33.md): The local gate copies the working tree after its clean check, so edits during the copy reach the tested source
+- [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so
+- LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
+- [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
+- [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
+- [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a busy host
+- [TEST-COST-ORDER-LOAD-33](TEST-COST-ORDER-LOAD-33.md): The scheduler cost-order test fails on a fully loaded host (start times compared within a fraction of a second)
+- [TEST-ENV-LEAK-HULL-33](TEST-ENV-LEAK-HULL-33.md): A sequential run of the suite fails the CHIM unit fingerprint test: an earlier in-process test leaves AMIWIND_MODEL_HULL set
+- [TEST-GODMODE-UNLISTED-36](TEST-GODMODE-UNLISTED-36.md): The dbg godmode test was never run by the gate (missing from the public file list) and its escape check failed
+- [TEST-NATIVE-STALE-IMPORT-33](TEST-NATIVE-STALE-IMPORT-33.md): Native engine tests run alone generate their version headers with the builder image's old tools copy
+- [TEST-NATIVE-TMPDIR-32](TEST-NATIVE-TMPDIR-32.md): A native test overflows a 64-byte name buffer when the temp path is long
+- [TEST-PARALLEL-ORDER-FLAKY-36](TEST-PARALLEL-ORDER-FLAKY-36.md): test_processes_keep_order_and_limit_nested_threads is timing-sensitive and fails now and then
+- [TEST-PARALLEL-ORDER-LOAD-33](TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded host (one worker process takes every item)
+- [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a busy host
+- TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode
+- TEST-PORTABILITY-01 (no report page): Pre-release test fixtures assumed host features and links
+- [TEST-PROFILE-OVERHEAD-SAMPLES-36](TEST-PROFILE-OVERHEAD-SAMPLES-36.md): The profiler overhead test sampled for a fixed 2 s and got too few samples on a busy host
+- [TEST-PROFILE-SECTION-CPU-32](TEST-PROFILE-SECTION-CPU-32.md): The build profile section test fails on a loaded host (CPU time read in clock ticks)
+- [TEST-PROFILE-STAGE-WALL-32](TEST-PROFILE-STAGE-WALL-32.md): The build profile stage test needs an idle host (wall time compared with CPU time)
+- [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a busy host
+- [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded host (timeline CPU above the stage's own CPU)
+- [TEST-WORKER-SYSPATH-32](TEST-WORKER-SYSPATH-32.md): Pool workers started from tests import tools/mwad.py instead of the mwad package
+- [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
+
+<!-- END GENERATED CATEGORY -->

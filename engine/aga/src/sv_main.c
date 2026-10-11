@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sv_main.c -- server main program
 
 #include "quakedef.h"
+#include "aw_mappath.h"
+#include "amiwind_version.h"
 
 server_t		sv;
 server_static_t	svs;
@@ -192,7 +194,9 @@ void SV_SendServerinfo (client_t *client)
     char			message[2048];
 
     MSG_WriteByte (&client->message, svc_print);
-    sprintf (message, "%c\nVERSION %4.2f SERVER (%ld CRC)", 2, VERSION, (long)pr_crc);
+    // AmiWind: the game and CHIM versions first, then the AmiQuake line and the help line
+    sprintf (message, "%c\n" AMIWIND_TITLE "\n" AMIQUAKE_VERSION_LINE_OF (VERSION) " SERVER (%ld CRC)\n"
+             AW_CONSOLE_HELP_LINE, 2, (long)pr_crc);
     MSG_WriteString (&client->message,message);
 
     MSG_WriteByte (&client->message, svc_serverinfo);
@@ -1146,11 +1150,13 @@ void SV_SpawnServer (char *server)
     sv.time = 1.0;
 
     COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);
-    COM_FormatPath (sv.modelname, sizeof(sv.modelname), "maps/%s.bsp", server);
+    /* The one map path resolver (aw_mappath.c): maps/<name>.chim for a CHIM
+     * frame map, else maps/<name>.bsp. */
+    AW_MapPath (server, sv.modelname, sizeof(sv.modelname));
     {
         const char *variant=AW_SceneWorldModel(server);
         if(variant && !COM_FormatPath(sv.modelname,sizeof(sv.modelname),"%s",variant))
-            COM_FormatPath (sv.modelname, sizeof(sv.modelname), "maps/%s.bsp", server);
+            AW_MapPath (server, sv.modelname, sizeof(sv.modelname));
     }
     AW_HeapAuditPhase(sv.modelname,"before-bsp");
     AW_StreamLoadBegin(sv.modelname);aw_world_start=Sys_FloatTime();
@@ -1158,6 +1164,9 @@ void SV_SpawnServer (char *server)
     aw_world_time=Sys_FloatTime()-aw_world_start;
     if (!sv.worldmodel)
     {
+        char why[160];
+        if (AW_MapChimOrphan (server, why, sizeof(why)))
+            Con_Printf ("Map %s unavailable: %s\n", server, why);
         Con_Printf ("Couldn't spawn server %s\n", sv.modelname);
         sv.active = false;
         SCR_EndLoadingPlaque();
@@ -1174,6 +1183,18 @@ void SV_SpawnServer (char *server)
         sv.active = false;
         SCR_EndLoadingPlaque();
         return;
+    }
+    /* A CHIM frame map is a BSP29 file but not a playable map without its
+     * CHIM world: refused loudly, as a missing map is, never loaded as a void. */
+    {
+        char why[160];
+        if (AW_MapRefused (sv.modelname, sv.worldmodel->entities, why, sizeof(why)))
+        {
+            Con_Printf ("Map %s unavailable: %s\n", sv.modelname, why);
+            sv.active = false;
+            SCR_EndLoadingPlaque();
+            return;
+        }
     }
     sv.models[1] = sv.worldmodel;
     AW_HeapAuditPhase(sv.modelname,"after-bsp");

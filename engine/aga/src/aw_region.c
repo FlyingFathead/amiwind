@@ -5,6 +5,7 @@
 #include "aw_section.h"
 #include "aw_maps.h"
 #include "aw_town.h"
+#include "aw_mappath.h"
 typedef struct {
     aw_region_t regions[AW_REGION_MAX];
     int count,loaded,current,requested,kind,requested_kind;
@@ -174,9 +175,9 @@ const char *AW_RegionWorldModel(const char *name,int intro)
     a=&areas[area];
     if(a->requested<0){a->requested=AW_RegionOwner(a->regions,a->count,a->arrival,-1,0);a->requested_kind=scenes(area)&&intro?1:0;}
     a->current=a->requested;a->kind=a->requested_kind;a->requested=-1;
-    if(a->kind==1)return "maps/intro_docks.bsp";
-    if(a->kind==2)return "maps/sncourt.bsp";
-    sprintf(model_path,"maps/%s.bsp",a->regions[a->current].name);
+    if(a->kind==1)return AW_MapPath("intro_docks",model_path,sizeof(model_path));
+    if(a->kind==2)return AW_MapPath("sncourt",model_path,sizeof(model_path));
+    AW_MapPath(a->regions[a->current].name,model_path,sizeof(model_path));
     Con_Printf("%s: legacy region map %s.\n",AW_Town(area)->title,model_path);return model_path;
 }
 int AW_RegionCrossing(const float *point,int intro)
@@ -197,7 +198,7 @@ const char *AW_RegionAhead(const float *point,const float *velocity,int intro,fl
     a=&areas[area];if(a->kind || a->current<0)return NULL;
     id=AW_RegionNextOwner(a->regions,a->count,point,velocity,a->current,a->hysteresis,seconds);
     if(id<0 || id==a->current)return NULL;
-    sprintf(next,"maps/%s.bsp",a->regions[id].name);return next;
+    return AW_MapPath(a->regions[id].name,next,sizeof(next));
 }
 int AW_RegionContains(const float *point)
 {
@@ -245,7 +246,7 @@ int AW_SceneMapSize(const char *name,char *path,int size)
     static char found[MAX_QPATH+24];FILE *f=NULL;int n=-1;const char *chim;
     found[0]=0;
     if(name && *name && strlen(name)<=40){
-        sprintf(found,"maps/%s.bsp",name);n=COM_FOpenFile(found,&f);
+        AW_MapPath(name,found,sizeof(found));n=COM_FOpenFile(found,&f);
         if(f)fclose(f);
         else if((chim=chim_map(name))!=NULL){
             strcpy(found,chim);f=NULL;n=COM_FOpenFile(found,&f);
@@ -267,8 +268,9 @@ int AW_TeleportDestinations(char *out,int size)
     for(i=-2;i<=AW_TOWN_COUNT;i++){
         if(i==-2)name=AW_SceneMapSize("seyda",NULL,0)>=124?"seydaneen":NULL;
         else if(i==-1)name=AW_SceneMapSize("prison",NULL,0)>=124?"prisonship":NULL;
-        else if(i==AW_TOWN_COUNT)   /* the short name while the Arena is the only Vivec town */
-            name=AW_TownFind("vivec_arena")>=0 && AW_SceneMapSize("vivec_arena",NULL,0)>=124?"vivec":NULL;
+        else if(i==AW_TOWN_COUNT)   /* the short name: the whole city (vivec_city) or the Arena canton */
+            name=(AW_TownFind("vivec_city")>=0 && AW_SceneMapSize("vivec_city",NULL,0)>=124) ||
+                 (AW_TownFind("vivec_arena")>=0 && AW_SceneMapSize("vivec_arena",NULL,0)>=124)?"vivec":NULL;
         else{
             t=AW_Town(i);
             name=t && (t->flags&AW_TOWN_TELEPORT) && strcmp(t->name,"seyda") &&
@@ -292,7 +294,7 @@ int AW_TownArrival(const char *name,int returning,float *point,float *yaw)
     id=AW_RegionOwner(a->regions,a->count,a->arrival,-1,0);
     if(returning){if(AW_SceneMapSize(t->travel_target,NULL,0)<0)return 0;}
     else if(!chim_map(name)){
-        sprintf(model_path,"maps/%s.bsp",a->regions[id].name);
+        AW_MapPath(a->regions[id].name,model_path,sizeof(model_path));
         if(COM_FOpenFile(model_path,&f)<0 || !f)return 0;
         fclose(f);
     }

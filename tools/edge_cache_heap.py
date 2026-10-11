@@ -59,7 +59,57 @@ def runtime_policy(source):
         model_slot_capacity=256,immutable_edge_bytes=4,
         note='Allocation/source policy. Renderer output, target ABI and native acceptance are separate gates.')
 
-def prefix(lumps):
+def prefix(lumps,method=None):
+    """The world edge-cache prefix: edges of every face the world model, a node or a leaf mark can draw.
+    method: 'vector' (default; numpy spans) or 'python' (the earlier per-face loop, kept selectable;
+    env AMIWIND_HEAP_AUDIT_METHOD). Both give the same result (tests/test_edge_cache_heap.py and every
+    map of the dev5 full build); the loop was a fifth of the world map heap audit's remaining time
+    (BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36). For a broken map both raise; when it has several faults the
+    one named first may differ."""
+    from sprite_heap import efrag_method
+    if efrag_method(method)=='python':
+        return prefix_python(lumps)
+    return prefix_vector(lumps)
+
+def prefix_vector(lumps):
+    import numpy as np
+    # struct.iter_unpack checks each lump's length up front (the same struct.error as the loop)
+    struct.iter_unpack('<HhihH4Bi',lumps['faces']);struct.iter_unpack('<i2h6h2H',lumps['nodes'])
+    struct.iter_unpack('<i',lumps['surfedges']);struct.iter_unpack('<H',lumps['marksurfaces'])
+    models=list(struct.iter_unpack('<9f7i',lumps['models']))
+    face_rows=np.frombuffer(lumps['faces'],dtype=np.dtype([('plane','<u2'),('side','<i2'),('first','<i4'),
+                                                           ('count','<i2'),('tex','<u2'),('styles','u1',(4,)),
+                                                           ('light','<i4')]))
+    node_rows=np.frombuffer(lumps['nodes'],dtype=np.dtype([('plane','<i4'),('children','<i2',(2,)),
+                                                           ('box','<i2',(6,)),('first','<u2'),('count','<u2')]))
+    sequence=np.frombuffer(lumps['surfedges'],dtype='<i4').astype(np.int64)
+    marks=np.frombuffer(lumps['marksurfaces'],dtype='<u2').astype(np.int64)
+    edges=len(lumps['edges'])//4
+    if not models:raise ValueError('Missing edge-cache world model')
+    face_count=len(face_rows)
+    first=np.concatenate(([models[0][14]],node_rows['first'].astype(np.int64),marks))
+    count=np.concatenate(([models[0][15]],node_rows['count'].astype(np.int64),np.ones(len(marks),dtype=np.int64)))
+    if ((first<0)|(count<0)|(first+count>face_count)).any():raise ValueError('Invalid edge-cache face span')
+    protected=_spans(np,first,count,face_count)
+    limit=1 if edges else 0
+    faces=np.flatnonzero(protected)
+    span_first=face_rows['first'][faces].astype(np.int64);span_count=face_rows['count'][faces].astype(np.int64)
+    if ((span_first<0)|(span_count<0)|(span_first+span_count>len(sequence))).any():
+        raise ValueError('Invalid edge-cache edge span')
+    used=np.abs(sequence[_spans(np,span_first,span_count,len(sequence))])
+    if used.size:
+        if (used>=edges).any():raise ValueError('Invalid edge-cache edge index')
+        limit=max(limit,int(used.max())+1)
+    return dict(prefix_edges=limit,protected_faces=int(faces.size),all_edges=edges)
+
+def _spans(np,first,count,length):
+    """Boolean mask of [first, first+count) over 0..length-1 (spans already checked to fit)."""
+    keep=count>0
+    change=np.zeros(length+1,dtype=np.int64)
+    np.add.at(change,first[keep],1);np.add.at(change,first[keep]+count[keep],-1)
+    return np.cumsum(change[:length])>0
+
+def prefix_python(lumps):
     faces=list(struct.iter_unpack('<HhihH4Bi',lumps['faces']))
     nodes=list(struct.iter_unpack('<i2h6h2H',lumps['nodes']))
     models=list(struct.iter_unpack('<9f7i',lumps['models']))

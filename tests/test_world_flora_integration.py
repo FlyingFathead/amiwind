@@ -270,14 +270,17 @@ class WorldFloraIntegrationTests(unittest.TestCase):
         self.assertIn('--world-flora',commands['image'])
         self.assertIn('--town-flora-source-index',commands['image'])
         self.assertIn('--town-flora-scene-report',commands['image'])
-        self.assertEqual(Path(commands['image'][commands['image'].index('--balmora-cache')+1]),Path('/private/run/balmora-work'))
+        # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora from chim-town, no layout cache.
+        self.assertEqual(Path(commands['image'][commands['image'].index('--chim-town')+1]),Path('/private/run/chim-town-balmora'))
+        self.assertNotIn('--balmora-cache',commands['image'])
         self.assertEqual(commands['world-flora'][commands['world-flora'].index('--collision-packing')+1],'adaptive')
         self.assertIn('world-scenery',deps['world-flora']);self.assertIn('world-flora',deps['image'])
         args.no_tree_sprites=True;commands=dict(build.commands(args,tools,Path('/private/run')))
         self.assertNotIn('world-flora',commands);self.assertNotIn('--world-flora',commands['image'])
         self.assertNotIn('--town-flora-source-index',commands['image'])
         self.assertNotIn('--town-flora-scene-report',commands['image'])
-        # The Balmora layout repair is not part of flora (BUILD-FLORA-OPTIN-32).
+        # The Balmora layout repair is not part of flora (BUILD-FLORA-OPTIN-32): the retired legacy chain keeps it.
+        args.chim_native_towns='off';commands=dict(build.commands(args,tools,Path('/private/run')))
         self.assertIn('--balmora-cache',commands['image'])
 
 

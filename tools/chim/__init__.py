@@ -20,4 +20,7 @@ def _chim_version():
 
 CHIM_VERSION = _chim_version()
 FORMAT_VERSION = (0, 5)
+# A world with terrain references (chunk terrain stored once, placed at offsets: build setting terrain_refs)
+# is written as 0.7; every other world stays 0.5 (docs/chim/WORLD_FORMAT.md "Terrain references").
+REFS_FORMAT_VERSION = (0, 7)
 BUILDER = 'chim'

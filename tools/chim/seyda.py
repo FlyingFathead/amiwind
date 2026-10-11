@@ -220,7 +220,10 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
     used = list(dict.fromkeys(r['model_index'] for r in selected))
     for mi in used:
         model = index['models'][mi]
-        profile = profiles.get(model['source'], {})
+        # the mesh's CHIM mesh method (config/mesh-methods.json), as every CHIM area applies it
+        from chim.build import apply_mesh_method
+        profile = profiles[model['source']] = apply_mesh_method(profiles.get(model['source'], {}), model['source'],
+                                                                settings_override)
         fp = mesh_fingerprint(model, profile, index['textures'])
         if model['source'] in rebuild_meshes:
             fp = fingerprint('mesh', fp, 'rebuild', time.time_ns())

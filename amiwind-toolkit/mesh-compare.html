@@ -1,0 +1,318 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AmiWind Toolkit · Mesh Compare</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#101923;color:#edf3fa;font:14px system-ui,sans-serif;display:flex;flex-direction:column}
+#bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;border-bottom:1px solid #345;background:#13202d}
+select,button,input[type=text],label.chk{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:5px;padding:6px 8px;font:inherit}
+button{cursor:pointer}
+label.chk{display:inline-flex;gap:6px;align-items:center}
+input[type=text]{width:min(100%,320px)}
+.muted{color:#9fb3c8;font-size:12px}
+#views{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 14px;min-height:0}
+@media (max-width:820px){html,body{height:auto}#views{flex:none;grid-template-columns:1fr;grid-auto-rows:auto}canvas{flex:none;height:60vh;min-height:260px}}
+.view{display:flex;flex-direction:column;min-height:0;min-width:0;background:#162433;border:1px solid #2c4256;border-radius:8px;overflow:hidden}
+.pick{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 8px;border-bottom:1px solid #2c4256}
+.pick b{color:#ffe28a;font-size:16px}
+.pick select{max-width:100%;min-width:0;flex:1 1 180px}
+.pick input[type=file]{max-width:100%;font-size:12px;color:#9fb3c8}
+canvas{flex:1;width:100%;min-height:200px;display:block;background:#0b121a;touch-action:none;outline:none}
+.counts{padding:6px 8px;border-top:1px solid #2c4256;font-size:13px;min-height:2.4em;overflow-wrap:anywhere}
+.counts .n{color:#ffe28a;font-weight:700}
+#export{display:none;gap:8px;align-items:center;flex-wrap:wrap;flex:0 1 auto}
+#message{color:#ffe28a}
+#help{padding:0 14px 8px}
+</style>
+</head>
+<body>
+<div id="bar">
+  <label class="chk"><input id="wire" type="checkbox"> Wireframe</label>
+  <button id="reset" type="button" title="Fit both meshes in view again">Reset view</button>
+  <label>Speed <input id="speed" type="range" min="0" max="1000" step="any" value="683.67"> <span id="speedvalue">×1.00</span></label>
+  <span id="export"><input id="meshname" type="text" placeholder="meshes/x/ex_hlaalu_b_01.nif" aria-label="Mesh name">
+    <button id="exportbtn" type="button">Export to the list</button></span>
+  <span id="message" role="status"></span>
+</div>
+<div id="views">
+  <div class="view"><div class="pick"><b>A</b><select id="listA" aria-label="A: mesh from the server"><option value="">(server list)</option></select>
+    <input id="fileA" type="file" accept=".obj" aria-label="A: open an .OBJ file"></div>
+    <canvas id="canvasA" tabindex="0" aria-label="View A"></canvas><div class="counts" id="countsA">Open an .OBJ file.</div></div>
+  <div class="view"><div class="pick"><b>B</b><select id="listB" aria-label="B: mesh from the server"><option value="">(server list)</option></select>
+    <input id="fileB" type="file" accept=".obj" aria-label="B: open an .OBJ file"></div>
+    <canvas id="canvasB" tabindex="0" aria-label="View B"></canvas><div class="counts" id="countsB">Open an .OBJ file.</div></div>
+</div>
+<div id="help" class="muted">Both views share one camera, as in the 3D Map Inspector: drag to orbit, middle-drag to move closer or farther,
+right-drag or Shift-drag to pan, wheel to zoom; W/S/A/D (or the arrow keys) fly, E/Q up and down, Shift 4x faster, Ctrl or Alt 4x slower.
+Back faces are drawn darker red. Files are read in your browser; nothing is uploaded.</div>
+<script src="view-camera.js"></script>
+<script>
+'use strict';
+// Mesh Compare: two Wavefront .OBJ files side by side (A | B) with one linked camera. The camera moves exactly like the
+// 3D Map Inspector's (view-camera.js, shared). OBJ files come from file pickers or, when tools/toolkit_serve.py runs with
+// --mesh-cache, from its read-only list (/mesh/list.json, /mesh/file/<name>), which tools/mesh_export.py fills.
+const $ = id => document.getElementById(id);
+function VC(){return (typeof window!=='undefined'&&window.AmiWindViewCamera)||(typeof AmiWindViewCamera!=='undefined'?AmiWindViewCamera:null);}
+const MAX_OBJ_BYTES = 64 * 1024 * 1024;
+
+// ---- OBJ: v x y z and f a b c ... (v, v/t, v/t/n, v//n; negative indices count back); everything else is skipped
+function parseOBJ(text){
+  const positions=[], faces=[];
+  let bad=0;
+  for(const raw of String(text).split('\n')){
+    const line=raw.trim();
+    if(line.startsWith('v ')){
+      const p=line.split(/\s+/).slice(1,4).map(Number);
+      if(p.length===3&&p.every(Number.isFinite))positions.push(p);else{positions.push([0,0,0]);bad++;}
+    }else if(line.startsWith('f ')){
+      const idx=line.split(/\s+/).slice(1).map(t=>{const k=parseInt(t.split('/')[0],10);return k<0?positions.length+k:k-1;});
+      if(idx.length>=3&&idx.every(k=>Number.isInteger(k)&&k>=0&&k<positions.length))faces.push(idx);else bad++;
+    }
+  }
+  const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];
+  for(const f of faces)for(const k of f)for(let i=0;i<3;i++){lo[i]=Math.min(lo[i],positions[k][i]);hi[i]=Math.max(hi[i],positions[k][i]);}
+  return {positions,faces,faceCount:faces.length,vertexCount:positions.length,bad,
+    triangles:faces.reduce((n,f)=>n+f.length-2,0),bounds:faces.length?[lo,hi]:null};
+}
+
+// flat-shaded triangles (a fan per polygon) and the polygon edges, each edge once
+function meshArrays(m){
+  const tri=[],nrm=[],edges=[],seen=new Set();
+  for(const f of m.faces){
+    const P=f.map(k=>m.positions[k]);
+    let n=[0,0,0];
+    for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];n=[n[0]+(a[1]-b[1])*(a[2]+b[2]),n[1]+(a[2]-b[2])*(a[0]+b[0]),n[2]+(a[0]-b[0])*(a[1]+b[1])];}
+    const l=Math.hypot(...n)||1;n=n.map(x=>x/l);
+    for(let i=1;i+1<P.length;i++)for(const q of [P[0],P[i],P[i+1]]){tri.push(...q);nrm.push(...n);}
+    for(let i=0;i<f.length;i++){const a=f[i],b=f[(i+1)%f.length],key=a<b?a+','+b:b+','+a;if(!seen.has(key)){seen.add(key);edges.push(...m.positions[a],...m.positions[b]);}}
+  }
+  return {tri:new Float32Array(tri),nrm:new Float32Array(nrm),edges:new Float32Array(edges)};
+}
+
+// ---- the linked camera (Quake axes: Z up), moved by the shared Inspector controls
+const cam={eye:[200,0,100],pivot:[0,0,0],yaw:Math.PI,pitch:0,focal:1.4};
+let moveBase=200;
+function aimCam(){const a=VC().aim(cam.eye,cam.pivot);cam.yaw=a.yaw;cam.pitch=a.pitch;}
+function unionBounds(){
+  const bs=views.map(v=>v.mesh&&v.mesh.bounds).filter(Boolean);
+  if(!bs.length)return null;
+  return [[0,1,2].map(i=>Math.min(...bs.map(b=>b[0][i]))),[0,1,2].map(i=>Math.max(...bs.map(b=>b[1][i])))];
+}
+function resetView(){
+  const b=unionBounds();cam.focal=1.4;
+  if(!b){cam.pivot=[0,0,0];cam.eye=[200,0,100];aimCam();moveBase=200;drawAll();return;}
+  const c=b[0].map((v,i)=>(v+b[1][i])/2),r=Math.max(1,Math.hypot(b[1][0]-b[0][0],b[1][1]-b[0][1],b[1][2]-b[0][2])/2);
+  const d=r*(cam.focal*1.05+.3),az=-2.3,el=.42;
+  cam.pivot=c;cam.eye=[c[0]+d*Math.cos(el)*Math.cos(az),c[1]+d*Math.cos(el)*Math.sin(az),c[2]+d*Math.sin(el)];
+  aimCam();moveBase=VC().baseSpeed(b[0],b[1]);drawAll();
+}
+function orbitBy(dx,dy){const o=VC().orbit(cam.eye,cam.pivot,dx,dy);cam.eye=o.eye;cam.yaw=o.yaw;cam.pitch=o.pitch;drawAll();}
+function dollyBy(dy){cam.eye=VC().dolly(cam.eye,cam.pivot,dy);aimCam();drawAll();}
+function panBy(dx,dy,height){
+  const dist=Math.hypot(...cam.eye.map((v,i)=>v-cam.pivot[i])),k=dist*2/(Math.max(1,height)*cam.focal);
+  const p=VC().pan(cam.eye,cam.pivot,VC().basis(cam.yaw,cam.pitch),dx,dy,k);cam.eye=p.eye;cam.pivot=p.pivot;drawAll();
+}
+function zoomBy(deltaY){cam.focal=VC().zoomFocal(cam.focal,deltaY);drawAll();}
+// WASD flying: eye and pivot move together (orbiting stays around the same point of the mesh)
+const keys=new Set();
+function flyStep(dt){
+  const b=VC().basis(cam.yaw,cam.pitch);let v=[0,0,0];
+  const add=(a,c,s)=>a.map((x,i)=>x+c[i]*s);
+  if(keys.has('w')||keys.has('arrowup'))v=add(v,b.f,1);
+  if(keys.has('s')||keys.has('arrowdown'))v=add(v,b.f,-1);
+  if(keys.has('d'))v=add(v,b.r,1);
+  if(keys.has('a'))v=add(v,b.r,-1);
+  if(keys.has('e'))v[2]+=1;
+  if(keys.has('q'))v[2]-=1;
+  if(keys.has('arrowleft'))orbitBy(-dt/.008,0);
+  if(keys.has('arrowright'))orbitBy(dt/.008,0);
+  if(!v.some(Boolean))return false;
+  const speed=VC().keySpeed(moveBase,VC().factorOf($('speed').value),{fast:keys.has('shift'),slow:keys.has('control')||keys.has('alt')});
+  cam.eye=add(cam.eye,v,speed*dt);cam.pivot=add(cam.pivot,v,speed*dt);drawAll();return true;
+}
+
+// ---- WebGL, one context per view (no library)
+const VS='attribute vec3 p;attribute vec3 n;uniform vec3 eye,right,up,forward;uniform float aspect,focal,nearPlane,farPlane;varying vec3 vn;varying float vz;'+
+  'void main(){vec3 q=p-eye;float z=dot(q,forward);vn=n;vz=z;gl_Position=vec4(dot(q,right)*focal/aspect,dot(q,up)*focal,((farPlane+nearPlane)*z-2.0*farPlane*nearPlane)/(farPlane-nearPlane),z);}';
+const FS='precision mediump float;uniform vec3 lightDir;uniform vec3 colour;uniform float lines;varying vec3 vn;varying float vz;'+
+  'void main(){if(lines>0.5){gl_FragColor=vec4(colour,1.0);return;}float l=.35+.65*abs(dot(normalize(vn),lightDir));'+
+  'gl_FragColor=gl_FrontFacing?vec4(colour*l,1.0):vec4(vec3(.55,.18,.16)*l,1.0);}';
+function setupGL(view){
+  let gl=null;
+  try{gl=view.canvas.getContext&&view.canvas.getContext('webgl',{antialias:true});}catch(e){gl=null;}
+  if(!gl)return false;
+  const sh=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);return s;};
+  const prog=gl.createProgram();gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){say('WebGL: '+gl.getProgramInfoLog(prog));return false;}
+  view.gl=gl;view.prog=prog;view.bufs={tri:gl.createBuffer(),nrm:gl.createBuffer(),edges:gl.createBuffer(),zero:gl.createBuffer()};
+  return true;
+}
+function upload(view){
+  const gl=view.gl;if(!gl||!view.arrays)return;
+  for(const k of ['tri','nrm','edges']){gl.bindBuffer(gl.ARRAY_BUFFER,view.bufs[k]);gl.bufferData(gl.ARRAY_BUFFER,view.arrays[k],gl.STATIC_DRAW);}
+  gl.bindBuffer(gl.ARRAY_BUFFER,view.bufs.zero);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(view.arrays.edges.length),gl.STATIC_DRAW);
+}
+function draw(view){
+  const gl=view.gl;if(!gl)return;
+  const c=view.canvas,dpr=(typeof window!=='undefined'&&window.devicePixelRatio)||1,w=Math.max(1,Math.round(c.clientWidth*dpr)),h=Math.max(1,Math.round(c.clientHeight*dpr));
+  if(c.width!==w||c.height!==h){c.width=w;c.height=h;}
+  gl.viewport(0,0,w,h);gl.clearColor(.043,.071,.102,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  if(!view.arrays)return;
+  const b=VC().basis(cam.yaw,cam.pitch),prog=view.prog,U=n=>gl.getUniformLocation(prog,n);
+  const span=unionBounds(),size=span?Math.hypot(...span[1].map((v,i)=>v-span[0][i])):1000,dist=Math.hypot(...cam.eye.map((v,i)=>v-cam.pivot[i]));
+  gl.useProgram(prog);gl.enable(gl.DEPTH_TEST);
+  gl.uniform3fv(U('eye'),cam.eye);gl.uniform3fv(U('right'),b.r);gl.uniform3fv(U('up'),b.u);gl.uniform3fv(U('forward'),b.f);gl.uniform3fv(U('lightDir'),b.f);
+  gl.uniform1f(U('aspect'),w/h);gl.uniform1f(U('focal'),cam.focal);
+  gl.uniform1f(U('nearPlane'),Math.max(.01,Math.min(1,(dist+size)/2e4)));gl.uniform1f(U('farPlane'),Math.max(100,(dist+size)*4));
+  const P=gl.getAttribLocation(prog,'p'),N=gl.getAttribLocation(prog,'n');
+  const bind=(buf,loc)=>{gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);};
+  bind(view.bufs.tri,P);bind(view.bufs.nrm,N);
+  gl.uniform1f(U('lines'),0);gl.uniform3fv(U('colour'),[.80,.78,.70]);
+  gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1,1);
+  gl.drawArrays(gl.TRIANGLES,0,view.arrays.tri.length/3);
+  gl.disable(gl.POLYGON_OFFSET_FILL);
+  if($('wire').checked&&view.arrays.edges.length){
+    bind(view.bufs.edges,P);bind(view.bufs.zero,N);
+    gl.uniform1f(U('lines'),1);gl.uniform3fv(U('colour'),[.2,.85,1]);
+    gl.drawArrays(gl.LINES,0,view.arrays.edges.length/3);
+  }
+}
+let pending=false;
+function drawAll(){
+  if(pending)return;pending=true;
+  const go=()=>{pending=false;for(const v of views)draw(v);};
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(go);else go();
+}
+
+// ---- the two views
+const views=['A','B'].map(k=>({key:k,canvas:$('canvas'+k),counts:$('counts'+k),list:$('list'+k),file:$('file'+k),mesh:null,arrays:null,gl:null}));
+function plural(n,w){return n.toLocaleString('en-US')+' '+w+(n===1?'':'s');}
+function showMesh(view,text,label){
+  const m=parseOBJ(text);
+  if(!m.faceCount){view.mesh=null;view.arrays=null;view.counts.textContent=label+': no faces read from this file.';drawAll();return m;}
+  view.mesh=m;view.arrays=meshArrays(m);upload(view);
+  view.counts.innerHTML='';
+  const name=document.createElement('div');name.textContent=label;
+  const n=document.createElement('div');
+  n.innerHTML='<span class="n">'+m.faceCount.toLocaleString('en-US')+'</span> faces · <span class="n">'+m.vertexCount.toLocaleString('en-US')+
+    '</span> vertices · '+plural(m.triangles,'triangle')+' drawn'+(m.bad?' · '+plural(m.bad,'line')+' skipped':'');
+  view.counts.append(name,n);
+  view.counts.dataset.faces=String(m.faceCount);view.counts.dataset.vertices=String(m.vertexCount);
+  resetView();
+  return m;
+}
+function say(t){$('message').textContent=t||'';}
+async function openServerFile(view,file,label){
+  try{
+    const r=await fetch('/mesh/file/'+encodeURIComponent(file));
+    if(!r.ok)throw Error('the server answered '+r.status);
+    showMesh(view,await r.text(),label);say('');
+  }catch(e){say('Could not read '+file+': '+e.message);}
+}
+let serverRows=[];
+function rowMethod(r){return r.method+(r.space&&r.method!=='original'?' ('+r.space+' profile)':'');}
+function fillLists(rows,keep){
+  serverRows=rows;
+  for(const v of views){
+    const was=keep?v.list.value:'';
+    v.list.replaceChildren();
+    const first=document.createElement('option');first.value='';first.textContent=rows.length?'(server list: '+rows.length+')':'(server list: empty)';v.list.append(first);
+    for(const r of rows){const o=document.createElement('option');o.value=r.file;o.textContent=r.source+' · '+rowMethod(r)+' · '+r.faces+' faces';v.list.append(o);}
+    v.list.value=was;
+  }
+}
+async function loadServer(){
+  if(!/^https?:$/.test((location&&location.protocol)||''))return;
+  try{
+    const cfg=await (await fetch('/mesh/config.json')).json();
+    if(!cfg||!cfg.ok||!cfg.cache){for(const v of views)v.list.style.display='none';return;}
+    const list=await (await fetch('/mesh/list.json')).json();
+    fillLists(list.ok?list.files:[],true);
+    if(cfg.export){$('export').style.display='inline-flex';$('exportbtn').dataset.methods=(cfg.methods||[]).join(',');}
+  }catch(e){for(const v of views)v.list.style.display='none';}
+}
+async function exportMesh(){
+  const name=$('meshname').value.trim().toLowerCase().replace(/\\/g,'/');
+  if(!/^meshes\/[a-z0-9_][a-z0-9_ .\/-]*\.nif$/.test(name)){say('Give a mesh name such as meshes/x/ex_hlaalu_b_01.nif');return;}
+  const methods=($('exportbtn').dataset.methods||'original,current').split(',').filter(m=>m);
+  say('Exporting '+name+' ('+methods.join(', ')+') ...');
+  try{
+    const r=await (await fetch('/mesh/export.json?mesh='+encodeURIComponent(name)+'&methods='+encodeURIComponent(methods.join(',')))).json();
+    if(!r.ok)throw Error(r.error||'export failed');
+    const list=await (await fetch('/mesh/list.json')).json();
+    fillLists(list.ok?list.files:[],true);
+    const files=r.record.files||[];
+    const a=files.find(f=>f.method==='original')||files[0],b=files.find(f=>f.method==='current')||files[1]||files[0];
+    const row=f=>serverRows.find(x=>x.file===f.file)||f;
+    if(a){views[0].list.value=a.file;await openServerFile(views[0],a.file,a.source+' · '+rowMethod(row(a)));}
+    if(b){views[1].list.value=b.file;await openServerFile(views[1],b.file,b.source+' · '+rowMethod(row(b)));}
+    say('Exported: '+files.map(f=>f.method+' '+f.faces+' faces').join(', '));
+  }catch(e){say('Export failed: '+e.message);}
+}
+
+// ---- input: the Inspector's mouse (left orbit, middle dolly, right or Shift+left pan, wheel zoom) and keys
+let dragButton=-1,dragShift=false;
+function pointerDown(e){dragButton=e.button;dragShift=e.shiftKey;if(e.target&&e.target.focus)e.target.focus();if(e.target&&e.target.setPointerCapture&&e.pointerId!==undefined)try{e.target.setPointerCapture(e.pointerId);}catch(err){}if(e.preventDefault&&e.button===1)e.preventDefault();}
+function pointerMove(e){
+  if(dragButton<0)return;
+  const dx=e.movementX||0,dy=e.movementY||0;
+  if(dragButton===1)dollyBy(dy);
+  else if(dragButton===2||(dragButton===0&&(dragShift||e.shiftKey)))panBy(dx,dy,(e.target&&e.target.clientHeight)||400);
+  else if(dragButton===0)orbitBy(dx,dy);
+}
+function pointerUp(){dragButton=-1;}
+const NAV={w:1,a:1,s:1,d:1,q:1,e:1,arrowup:1,arrowdown:1,arrowleft:1,arrowright:1,shift:1,control:1,alt:1};
+function keyDown(e){
+  if(e.metaKey){keys.clear();return;}
+  const k=String(e.key||'').toLowerCase();
+  if(e.target&&/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName||'')&&e.target.type!=='range'&&e.target.type!=='checkbox')return;
+  if(NAV[k]){keys.add(k);if(k.startsWith('arrow')&&e.preventDefault)e.preventDefault();}
+  if(e.shiftKey)keys.add('shift');else keys.delete('shift');
+  if(e.ctrlKey)keys.add('control');else keys.delete('control');
+  if(e.altKey)keys.add('alt');else keys.delete('alt');
+}
+function keyUp(e){keys.delete(String(e.key||'').toLowerCase());if(!e.shiftKey)keys.delete('shift');if(!e.ctrlKey)keys.delete('control');if(!e.altKey)keys.delete('alt');}
+let lastTick=0;
+function tick(t){
+  const dt=lastTick?Math.min(.1,(t-lastTick)/1000):0;lastTick=t;
+  if(dt)flyStep(dt);
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(tick);
+}
+
+for(const v of views){
+  setupGL(v);
+  v.canvas.addEventListener('pointerdown',pointerDown);
+  v.canvas.addEventListener('pointermove',pointerMove);
+  v.canvas.addEventListener('pointerup',pointerUp);
+  v.canvas.addEventListener('pointercancel',pointerUp);
+  v.canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  v.canvas.addEventListener('wheel',e=>{zoomBy(e.deltaY);e.preventDefault();},{passive:false});
+  v.file.addEventListener('change',()=>{
+    const f=v.file.files&&v.file.files[0];if(!f)return;
+    if(f.size>MAX_OBJ_BYTES){say(f.name+' is over 64 MiB');return;}
+    f.text().then(t=>{showMesh(v,t,f.name);v.list.value='';say('');});
+  });
+  v.list.addEventListener('change',()=>{const r=serverRows.find(x=>x.file===v.list.value);if(r)openServerFile(v,r.file,r.source+' · '+rowMethod(r));});
+}
+$('wire').addEventListener('change',drawAll);
+$('reset').addEventListener('click',resetView);
+$('exportbtn').addEventListener('click',exportMesh);
+$('meshname').addEventListener('keydown',e=>{if(e.key==='Enter')exportMesh();});
+$('speed').addEventListener('input',()=>{const f=VC().factorOf($('speed').value);$('speedvalue').textContent=VC().label(f);VC().saveFactor(f);});
+$('speed').value=VC().sliderOf(VC().loadFactor());$('speedvalue').textContent=VC().label(VC().loadFactor());
+document.addEventListener('keydown',keyDown);
+document.addEventListener('keyup',keyUp);
+if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',drawAll);window.addEventListener('blur',()=>keys.clear());}
+resetView();
+loadServer();
+if(typeof requestAnimationFrame==='function')requestAnimationFrame(tick);
+</script>
+<script src="header.js"></script>
+<script>AmiWindToolkitHeader.mount('Mesh Compare');</script>
+</body>
+</html>

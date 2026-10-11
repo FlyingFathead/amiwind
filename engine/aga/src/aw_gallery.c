@@ -6,6 +6,7 @@
 #include "aw_save.h"
 #include "aw_character.h"
 #include "aw_region.h"
+#include "aw_mappath.h"
 typedef struct {
     int number;char kind[8],model[2][24],id[96],name[96];float size[3];
 } gallery_entry_t;
@@ -261,7 +262,7 @@ static int capture_game(void) {
         }
         strcpy(back_map,sv.name);VectorCopy(p->v.origin,back_origin);
         /* The intro docks: the legacy map or their CHIM frame map. */
-        back_intro=!strcmp(sv.modelname,"maps/intro_docks.bsp") || !strcmp(sv.modelname,"maps/intro_docks-chim.bsp");
+        back_intro=AW_MapPathIs(sv.modelname,"intro_docks") || AW_MapPathIs(sv.modelname,"intro_docks-chim");
         VectorCopy(cl.viewangles,back_angles);back_move=p->v.movetype;session=1;body=0;
         back_health=p->v.health;goal=GetEdictFieldValue(p,"aw_hand_goal");back_hand_goal=goal?goal->_float:0;
         goal=GetEdictFieldValue(p,"aw_torch");back_torch=goal?goal->_float:0;
@@ -294,7 +295,7 @@ static void command(void) {
  * dbgmode arenapit); the empty gallery floor test is dbg combattest gallery
  * (or floor), with its idle/draw/lower/punch/center/help/exit actions. */
 static void combat_command(void){
-    edict_t *p;eval_t *v;FILE *f=NULL;int i,state=-1;
+    edict_t *p;eval_t *v;FILE *f=NULL;int i,state=-1;char path[AW_MAP_PATH_SIZE];
     const char *arg=Cmd_Argv(1);
     if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
     if(arena || (!combat && !session && (!*arg || (Q_strcasecmp((char *)arg,"gallery") && Q_strcasecmp((char *)arg,"floor") &&
@@ -334,7 +335,7 @@ static void combat_command(void){
         }
         combat_timing[i]=v->_float;
     }
-    if(COM_FOpenFile("maps/charplane.bsp",&f)<124 || !f){
+    if(COM_FOpenFile(AW_MapPath("charplane",path,sizeof(path)),&f)<124 || !f){
         if(f)fclose(f);
         if(AW_GalleryOmitted()){Con_Printf("Combat test uses the NPC gallery room. " NO_GALLERY_TEXT);return;}
         Con_Printf("Combat test floor missing; rebuild the gallery.\n");return;
@@ -345,7 +346,7 @@ static void combat_command(void){
 }
 static void torch_center(edict_t *p){combat_center(p);p->v.origin[0]=64;VectorCopy(p->v.origin,p->v.oldorigin);SV_LinkEdict(p,false);}
 static void torch_command(void){
-    edict_t *p;eval_t *v;FILE *f=NULL;int i,n=0,want_actor=0;char search[96];
+    edict_t *p;eval_t *v;FILE *f=NULL;int i,n=0,want_actor=0;char search[96],path[AW_MAP_PATH_SIZE];
     gallery_entry_t previous=current;
     const char *arg=Cmd_Argv(1);
     if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
@@ -384,7 +385,7 @@ static void torch_command(void){
         }
         combat_timing[i]=v->_float;
     }
-    if(COM_FOpenFile("maps/torchtest.bsp",&f)<124 || !f){
+    if(COM_FOpenFile(AW_MapPath("torchtest",path,sizeof(path)),&f)<124 || !f){
         if(f)fclose(f);
         Con_Printf("Dark torch test room missing; rebuild the image.\n");return;
     }

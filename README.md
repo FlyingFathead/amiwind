@@ -29,6 +29,14 @@ what the public package contains. In-game screenshots of every version:
 
 More in the [gallery](docs/GALLERY.md).
 
+**In development, v0.0.36, running on CHIM Engine v0.2.0:** CHIM starts replacing the legacy open world from the coast inward (CHIM cells for the converted coast and seabed, shared terrain stored once), CHIM-native towns by default, lava pools on the world map, `dbg godmode`, builds by request through the build server, and the idle freeze with looping music traced to a blocked music read. Draft notes: [docs/RELEASE-v0.0.36.md](docs/RELEASE-v0.0.36.md).
+
+### CHIM progress map
+
+![CHIM progress map of Vvardenfell, 2026-10-11: green cells are done, gold rings are planned for v0.0.36](docs/images/amiwind-v0.0.36-progress-map.png)
+
+Each square is one map cell, north up (2026-10-11, v0.0.36 development line). **Green:** converted to CHIM with every measured check passed, or open coast with nothing to place. **Violet:** converted, hull policy still pending. **Red:** failing a check, or not converted yet. **Dark grey:** not started (Solstheim). **Silver:** open ocean. **Gold rings:** planned for v0.0.36 (367 cells: the whole coastline ring, all of Vivec, Seyda Neen and Balmora). Done: 1,021 of 1,292 Vvardenfell land cells (79.0 %). The map is drawn by `tools/cell_progress_map.py` from the progress tracker data. What every colour means: [the CHIM progress map](docs/chim/CHIM_PROGRESS_MAP.md).
+
 **What's new in v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](docs/RELEASE-v0.0.35.md).
 
 ## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore
@@ -108,6 +116,7 @@ Read more:
 
 - [Release notes](docs/RELEASE-v0.0.33.md), with what is known in this build
 - [CHIM engine](docs/chim/README.md)
+- [CHIM file format](docs/CHIM_FILE_FORMAT.md): what CHIM stores and why, its files (`.chim` maps and the CHIM world), versions and roadmap
 - [CHIM features](docs/chim/FEATURES.md): what is done, measured or still to do
 - [Disk space](docs/chim/DISK_SPACE.md): Amiga disk limits and what CHIM saves
 - [CHIM build guide](docs/chim/build_guide/README.md)
@@ -684,7 +693,9 @@ with intermittent worker and cancellation failures recorded in the
 The [Docker build helper](docs/DOCKER_BUILD.md) takes your own Morrowind
 installation as private runtime input. Images contain source and tools; game
 data, converted assets and ROMs stay outside image layers and public releases.
-The [v0.0.27 release notes](docs/RELEASE-v0.0.27.md) record the published
+While it runs, the Toolkit's [Monitor](docs/DOCKER_BUILD.md#watch-a-build-in-the-monitor) follows it
+in a browser: `python tools/toolkit_serve.py --monitor-docker amiwind-docker-builds --open`.
+The [v0.0.27 release notes](docs/RELEASE-v0.0.27.md) record the first Docker-built
 baseline's build and CI evidence. Earlier full-conversion and game-entry results remain in the dated
 [Windows](docs/VALIDATION-WINDOWS-2026-10-02.md) and
 [Docker](docs/VALIDATION-DOCKER-2026-10-02.md) records and
@@ -804,6 +815,12 @@ then point the command at your own **A1200 Kickstart 3.1 ROM**:
   --kickstart-file "/path/to/your/kickstart-3.1-a1200.rom"
 ```
 
+Every finished build also writes, beside the HDF, `AmiWind-FS-UAE-launcher.py`
+(run it: it asks for your ROM once and starts FS-UAE), `AmiWind-v<version>-FS-UAE.fs-uae`
+and `AmiWind-v<version>-WinUAE.uae`. Without `--kickstart-file` the two configs carry a
+placeholder ROM setting to fill in; see [WinUAE setup](docs/WINUAE.md) and the
+[FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).
+
 Replace the example ROM path with your actual file or a directory containing ROMs. The builder checks FS-UAE
 and the ROM before setup, fills both ROM and HDF paths in the
 [documented preset](docs/FS-UAE-PLAYTESTING.md), and launches the finished image.
@@ -844,7 +861,9 @@ guide to install the required tools and build the playable HDF.
 ETA; afterwards `./build.sh profile report|compare|optimize out/build/NAME`
 shows where the time went and what to parallelize next. Development rebuilds can
 reuse unchanged stages with `--reuse-from`. See
-[performance options](docs/BUILD_PROFILE.md#performance-options).
+[performance options](docs/BUILD_PROFILE.md#performance-options). The numbers of
+every build and gate can be kept in one database for comparisons across runs:
+[perf database](docs/PERF_DATABASE.md).
 
 A normal build includes everything the release ships; no extra option is
 needed. From v0.0.33 the default builder is CHIM, with Balmora and Seyda Neen on

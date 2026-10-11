@@ -9,6 +9,7 @@ rematch. Development builds only; nothing here changes saved games.
 
 - [Playing the Vivec Arena (testing guide)](#playing-the-vivec-arena-testing-guide)
 - [How combat works](#how-combat-works)
+- [Blocking](#blocking)
 - [Cost on a 68040](#cost-on-a-68040)
 - [Known limits](#known-limits)
 
@@ -144,7 +145,9 @@ your own master file when the image is built.
   the shield by it (at 0 the shield is gone), costs the blocker
   fFatigueBlockBase + weapon weight x swing x fWeaponFatigueBlockMult fatigue,
   plays the shield's light, medium or heavy armour hit sound and the original
-  block animation. Reference: `combat.cpp` blockMeleeAttack.
+  block animation. Reference: `combat.cpp` blockMeleeAttack. "Not moving
+  forward" is the forward key, as in the original (sideways or backwards still
+  counts as standing).
 - Critical strike x fCombatCriticalStrikeMult on a resident that was not yet
   fighting; x fCombatKODamageMult on a knocked-down victim.
 - Every damaging hit staggers the victim briefly (no block meanwhile).
@@ -167,6 +170,37 @@ your own master file when the image is built.
   swings.
 - Rolls come from one seeded generator per fight (xorshift, 4 bytes), so a
   seed replays a fight swing for swing when both fighters act the same.
+
+## Blocking
+
+The original game has no block button: blocking is automatic whenever a shield
+is equipped (the rule above). AmiWind adds a held block, an AmiWind extension
+and the default (owner decision, 11 October 2026):
+
+- Blocking: Hold to block (default, `aw_combat_block 1`). Hold the right mouse
+  button (the Block action in Options > Controls) to raise your shield. You
+  block only while it is held, and each blow is still decided by the original
+  formula and settings above (Block skill, Agility, Luck, swing, fatigue,
+  facing, 10 to 50 % chance): the button decides when you block, your skill
+  decides whether the block holds. While you guard you cannot swing: let go to
+  attack. "Guard" shows under the crosshair. Without a shield (or with a
+  two-handed weapon or fists) there is nothing to raise and the console says
+  so. In third person your body raises the shield (the original block
+  animation: it rises to the block's hit key and stays up while you hold, and
+  plays out after a blocked blow). In first person a block gives the shield's
+  sound and a kick of the view; a first-person shield model is a later step.
+- Blocking: Automatic (`aw_combat_block 0`): the original rule, the shield
+  blocks by itself and the button does nothing.
+
+NPCs always block the original way (automatic, by their skill), with the
+block animation of the animation kit and their shield's sound; only fighters
+with a shield and a one-handed weapon can block, which is why most residents
+never do. Your character from the character creation carries no shield yet;
+the arena loadouts with a shield (for example `dbg combat loadout
+sword_shield`) can block. Console: `dbg combat block hold|auto`; `dbg combat`
+reports the mode and the blocks of the fight (yours and the NPCs').
+References: UESP Block (automatic blocking), OpenMW `combat.cpp`
+blockMeleeAttack and `character.cpp` (isReadyToBlock, the block hit state).
 
 Two switches, both in Options > Controls and saved with the game settings:
 

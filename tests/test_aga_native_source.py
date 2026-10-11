@@ -28,6 +28,10 @@ def tree_project_version():
     return module
 
 
+# Engine files that build map paths through aw_mappath.c (AW_MapPath).
+MAP_PATH_USERS = ('aw_region.c', 'aw_section.c', 'aw_scene.c', 'aw_gallery.c', 'aw_arena.c', 'aw_wait.c',
+                  'sv_main.c', 'chim_world.c')
+
 class VersionHeaderSourceTests(unittest.TestCase):
     def test_version_headers_come_from_this_tree(self):
         module = tree_project_version()
@@ -620,6 +624,9 @@ class NativeSourceTests(unittest.TestCase):
             sources = [*sources, tree/"src/aw_section.c"]
         if any(p.name == "aw_scene.c" for p in sources):
             sources = [*sources, tree/"src/aw_world.c"]
+        # The one map path resolver (aw_mappath.c) every map-path builder asks.
+        if any(p.name in MAP_PATH_USERS for p in sources) and not any(p.name == "aw_mappath.c" for p in sources):
+            sources = [*sources, tree/"src/aw_mappath.c"]
         # Partial-area builds (aw_miniwind.c): the scene, logo and New Game paths ask it.
         if any(p.name in ("aw_scene.c", "aw_movie.c", "aw_intro.c") for p in sources) and \
                 not any(p.name == "aw_miniwind.c" for p in sources):
@@ -640,6 +647,9 @@ class NativeSourceTests(unittest.TestCase):
                 and not includes_aw_log(ROOT/"tests"/fixture)):
             # In-memory diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33); live when unbound.
             sources = [*sources, tree/"src/aw_log.c"]
+        # The music stream reads through the asynchronous reader (HANG-IDLE-DUSK-35).
+        if any(p.name == "aw_music.c" for p in sources) and not any(p.name == "aw_aread.c" for p in sources):
+            sources = [*sources, tree/"src/aw_aread.c"]
         # Weak stand-ins for the quick character screen, the test channels and the notice
         # (tests/aga_hook_stubs.c): fixtures that link the real modules keep them.
         sources = [*sources, ROOT/"tests/aga_hook_stubs.c"]

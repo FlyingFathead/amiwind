@@ -56,6 +56,10 @@ Pending.
 
 Benchmark sessions have a time limit and report a stalled session instead of waiting.
 
+## Related freezes
+
+10 October 2026: possible link to [HANG-IDLE-DUSK-35](HANG-IDLE-DUSK-35.md) (full analysis and repair: a music stream read that never returns while the main loop waits for it): there a disk read reply is lost below the game (file system handler, hard file device or the emulator host disk thread), and this session hung with a hard file on host storage. Not confirmed.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -68,5 +72,10 @@ Family: Emulator measurement method (`benchmark-method`). Emulator numbers are r
 - [BENCH-HOST-STORAGE-32](BENCH-HOST-STORAGE-32.md): Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS
 - [BENCH-JIT-PROFILE-32](BENCH-JIT-PROFILE-32.md): Every frame-rate and load-time figure was measured with the emulator at host speed
 - [BENCH-SESSION-DRIFT-32](BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions
+- [EMU-JIT-FAULT-ADDRESS-36](EMU-JIT-FAULT-ADDRESS-36.md): FS-UAE JIT reports fault addresses during the Vivec stage A boot smoke
+
+Related bugs in other categories:
+
+- [HANG-IDLE-DUSK-35](HANG-IDLE-DUSK-35.md): The game freezes with the music looping after the player is left idle for a few minutes outdoors, seen around sundown
 
 <!-- END GENERATED CATEGORY -->

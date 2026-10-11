@@ -20,6 +20,27 @@ from player_hull import lumps, pack_lumps
 BOUNDS = (-240.0, -1100.0, 1120.0, 620.0)
 
 
+def keep_entity(fields, models, bounds=BOUNDS):
+    """True when a special map keeps this entity (derive): scenery and actors only where their box (origin
+    +-96, a brush model's radius) meets the XY bounds; everything else always. models: the map's model
+    records (struct '<9f7i'). One rule for the legacy special maps and a CHIM-native Seyda Neen's special
+    frame maps (tools/chim_town.py)."""
+    xmin, ymin, xmax, ymax = bounds
+    kind = fields.get('classname', '')
+    origin = [float(v) for v in fields.get('origin', '0 0 0').split()]
+    if len(origin) != 3:
+        raise ValueError('Bad entity origin')
+    low = [v-96 for v in origin]; high = [v+96 for v in origin]
+    model = fields.get('model', '')
+    if model.startswith('*'):
+        m = models[int(model[1:])]
+        # Radius conservatively covers rotated brush bounds.
+        radius = math.sqrt(sum(max(abs(m[i]), abs(m[i+3]))**2 for i in range(3)))
+        low = [v-radius for v in origin]; high = [v+radius for v in origin]
+    inside = low[0] <= xmax and high[0] >= xmin and low[1] <= ymax and high[1] >= ymin
+    return inside or kind not in ('func_wall', 'aw_static', 'aw_npc')
+
+
 def derive(raw, bounds=BOUNDS):
     if len(bounds) != 4 or not all(math.isfinite(v) for v in bounds):
         raise ValueError('Expected finite XY bounds')
@@ -35,21 +56,10 @@ def derive(raw, bounds=BOUNDS):
         return low[0] <= xmax and high[0] >= xmin and low[1] <= ymax and high[1] >= ymin
     for block in entities:
         fields = dict(re.findall(r'"([^"\n]*)"\s+"([^"\n]*)"', block))
-        kind = fields.get('classname', '')
-        origin = [float(v) for v in fields.get('origin', '0 0 0').split()]
-        if len(origin) != 3:
-            raise ValueError('Bad entity origin')
-        low = [v-96 for v in origin]; high = [v+96 for v in origin]
-        model = fields.get('model', '')
-        if model.startswith('*'):
-            m = models[int(model[1:])]
-            # Radius conservatively covers rotated brush bounds.
-            radius = math.sqrt(sum(max(abs(m[i]), abs(m[i+3]))**2 for i in range(3)))
-            low = [v-radius for v in origin]; high = [v+radius for v in origin]
-        if kind in ('func_wall', 'aw_static', 'aw_npc') and not intersects(low, high):
-            counts['actors_removed' if kind == 'aw_npc' else 'scenery_removed'] += 1
-        else:
+        if keep_entity(fields, models, bounds):
             kept.append(block)
+        else:
+            counts['actors_removed' if fields.get('classname', '') == 'aw_npc' else 'scenery_removed'] += 1
     data[0] = ('\n'.join(kept)+'\n\0').encode('ascii')
     vertices = list(struct.iter_unpack('<3f', data[3]))
     edges = list(struct.iter_unpack('<HH', data[12]))

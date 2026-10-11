@@ -276,8 +276,12 @@ def dumps(stats):
     return json.dumps(stats, indent=1, sort_keys=True) + '\n'
 
 
-def main(argv=None):
-    from chim.validate import measure, validate
+def main(argv=None, world=None, measured=None):
+    """WORLD and MEASURED: a world chim.validate.report_world validated in this process and its measurements
+    (chim_build passes them): the stats then reuse them instead of validating and measuring the world a second
+    time; the benchmark cameras are measured on top (chim.validate.camera_report), as measure() would.
+    Without them the world is validated here (`stats.py OUT`)."""
+    from chim.validate import camera_report, measure, validate
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('out', type=Path, help='builder output folder (holds chim/, chim-receipt.json)')
     ap.add_argument('--source', type=Path, help='source manifest (default OUT/chim-source.json if present)')
@@ -296,14 +300,26 @@ def main(argv=None):
     from chim.build import TIMING_FILE
     if (a.out / TIMING_FILE).is_file():
         receipt = dict(receipt, **json.loads((a.out / TIMING_FILE).read_text(encoding='utf-8')))
-    fails, world = validate(a.out, source)
-    if fails:
-        sys.stderr.write('CHIM world fails validation (%d); no stats written:\n  %s\n' % (len(fails), '\n  '.join(fails[:20])))
-        return 1
+    reused = world is not None and measured is not None and not (a.legacy_maps or a.legacy_regions)
+    if not reused:
+        import build_profile
+        with build_profile.phase('CHIM stats: validation') as timer:
+            fails, world = validate(a.out, source)
+            timer.done('CHIM stats: validation %s' % ('FAILED (%d)' % len(fails) if fails else 'passed'))
+        if fails:
+            sys.stderr.write('CHIM world fails validation (%d); no stats written:\n  %s\n'
+                             % (len(fails), '\n  '.join(fails[:20])))
+            return 1
     area_list = receipt.get('areas') or ([receipt['town']] if receipt.get('town') else [])
     cameras = [(n, float(x), float(y)) for n, x, y in a.camera] if a.camera is not None \
         else [(n, float(x), float(y)) for area in area_list for n, x, y in BENCHMARK_CAMERAS.get(area, [])]
-    measured = measure(world, source, a.legacy_maps, a.legacy_regions, None, cameras)
+    if reused:
+        # the same figures measure() gives: its result plus the cameras' report (validate.measure)
+        measured = dict(measured)
+        if cameras:
+            measured['cameras'] = camera_report(world, cameras)
+    else:
+        measured = measure(world, source, a.legacy_maps, a.legacy_regions, None, cameras)
     measured.get('walk', {}).pop('_replay', None)
     legacy = legacy_summary(a.legacy_maps, a.legacy_regions) if a.legacy_maps and a.legacy_regions else None
     stats = chim_stats(world, measured, receipt, area_list or None, legacy, cameras, source=source)

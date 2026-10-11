@@ -20,6 +20,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import struct
 import time
 from pathlib import Path
@@ -53,6 +54,33 @@ def wad_lumps(wad):
 # measured on Balmora and Seyda Neen (their rings have little headroom); an area turns it on with its
 # settings (cut_models_over, e.g. 512: district-size bodies such as the Vivec cantons).
 CUT_MODELS_OVER = 0.0
+# Meshes the large-model cut keeps whole even when they are wider than cut_models_over: variant name prefixes
+# (the mesh path without 'meshes/'). Owner decision 2026-10-10 (Vivec M3): flora stays whole until tiling it is
+# measured (24 wide trees and 31 parasols around Vivec). An area may set its own list (cut_keep_whole).
+CUT_KEEP_WHOLE = ('f/flora_',)
+# Area config keys of the cut (config/<town>.json): the area's own value unless the build names one for every
+# area (chim_build --cut-models-over).
+# detail_budget: a named per-mesh triangle budget (config/chim-detail-budgets.json) as an area setting, so one area
+# (all of Vivec in one frame: 'vivec-deep') takes it and the others stay whole; the build-wide --detail-budget wins
+AREA_CUT_KEYS = ('cut_models_over', 'cut_mode', 'cut_keep_whole', 'detail_budget')
+
+
+def cut_candidate(variant, cut_over, keep_whole=CUT_KEEP_WHOLE):
+    """True when the large-model cut stores this variant in pieces: wider than cut_over (local units) and not
+    named by keep_whole."""
+    if cut_over <= 0 or max(variant['hi'][0] - variant['lo'][0], variant['hi'][1] - variant['lo'][1]) <= cut_over:
+        return False
+    return not str(variant.get('name', '')).lower().startswith(tuple(p.lower() for p in keep_whole))
+
+
+def area_cut_settings(area_settings, settings_override):
+    """The frame settings of one area: the build-wide settings with the area's own cut keys added where the
+    build does not set them."""
+    out = dict(settings_override or {})
+    for key in AREA_CUT_KEYS:
+        if key in (area_settings or {}) and key not in out:
+            out[key] = area_settings[key]
+    return out
 # Worker count, unit cache hits and wall time of a CHIM build (a diagnostic, build_cache.DIAGNOSTIC_NAMES).
 TIMING_FILE = 'chim-timing.json'
 
@@ -154,7 +182,7 @@ def build_frame(out, **kw):
 def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_fps, texture_records,
                 archive, palette, heights, materials, step, floor, ceiling, ground_textures,
                 qbsp=None, collision_cache=None, jobs=1, cache=None, timer=None, settings=None,
-                mesh_occluders=True, ground=None, liquids=None):
+                mesh_occluders=True, ground=None, liquids=None, height_at=None):
     """Units of one frame from prepared inputs (shared by the area build and the tests): the frame
     input of chim.world.build_frames, plus 'fallbacks' (meshes whose collision union fell back).
 
@@ -167,8 +195,11 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     the frame's tiles, the converter's own triangles, instead of heights and materials;
     liquids: lava prisms in frame-local units (tools/lava.py, docs/LAVA.md), carved into the chunks
     they reach (chim.terrain.chunk_terrain); a chunk without one keeps its task, so its unit is reused.
+    height_at (terrain references): the ground height at any frame-local corner, also one tile past the
+    frame, so a chunk at the frame's edge gets the whole ring of its standing hull and the same content as
+    the same ground inside a neighbouring frame.
     Returns the receipt."""
-    from chim.models import texture_unit, variant_unit, yaw_degrees
+    from chim.models import texture_unit, variant_ref, variant_unit, yaw_degrees
     timer = timer or Timer()
     cache = cache or UnitCache()
     firsts = {}
@@ -192,22 +223,34 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                     'texture_shas': texture_shas,
                     'exact': exact, 'hollow': bool(profile.get('hollow_collision')),
                     'qbsp': str(qbsp) if qbsp else None,
-                    'collision_cache': str(collision_cache) if collision_cache else None}
+                    'collision_cache': str(collision_cache) if collision_cache else None,
+                    'hull_patch': model_hull_patch_on(settings), 'weld': model_weld_mode(settings)}
             # the hull mode changes the model's collision bytes (routed_hull): part of its identity
             from mesh_geometry_env import model_hull_mode
             from routed_hull import chain_depth_limit, keep_chain_set, mesh_stem
             # the heap fallback's keep-chain list (chim_build): this mesh's hull stays the chain
             task['keep_chain'] = mesh_stem(model['source']) in keep_chain_set()
+            # with model_hull_patch on (the default), a model whose standing hull may be compiled (exact, or the
+            # compiled model hull mode) gets the lost pieces patched in (CHIM-COMPILED-HULL-SHORT-36): other bytes,
+            # another key. Off, the compiled bytes are unchanged and so is the key; the check is recorded when built.
+            checked = (('hull-check-1', 'patch') if task['hull_patch'] and qbsp_hash
+                       and (exact or model_hull_mode() == 'compiled') else None)
             fp = fingerprint('variant', mesh_fps[mi], list(k), size, exact, task['hollow'], qbsp_hash, model_hull_mode(), chain_depth_limit(),
                              task['keep_chain'], 'hull-form-v1',
                              model.get('flames'), canonical_materials(model['materials'], texture_records),
-                             ref['scale'], ref['rotation_radians'],
+                             ref['scale'], (variant_ref(ref) if task['weld'] == 'base' else ref)['rotation_radians'],
                              ref.get('_flatten_shift', 0), ref.get('_visual_offset', [0, 0, 0]))
+            if checked:
+                fp = fingerprint('variant', fp, *checked)
+            if task['weld'] == 'base':
+                # vertices shared as in the base (chim.models.base_frame, CHIM-STRIDER-SCALED-SEAMS-36): other bytes
+                # than the placed-position sharing for most scaled and tilted variants, so another key
+                fp = fingerprint('variant', fp, 'weld-base-1')
             items.append((fp, task))
         results = run_units('variant', items, variant_unit, jobs, cache)
         variant_fps = {k: fp for k, (fp, _) in zip(order, items)}
         variant_tasks = {k: task for k, (_, task) in zip(order, items)}
-    variants, names, fallbacks, routed = {}, set(), [], []
+    variants, names, fallbacks, routed, checks = {}, set(), [], [], []
     for k, res in zip(order, results):
         model = models[firsts[k]['model_index']]
         name = variant_name(model, k)
@@ -220,6 +263,8 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             fallbacks.append(model['source'])
         if res.get('hull_form') == 'routed':
             routed.append(name)
+        if res.get('hull_check'):
+            checks.append(dict(res['hull_check'], model=name))
         variants[k] = dict(res, name=name)
     with timer.section('textures'):
         tasks = {}
@@ -266,6 +311,8 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             raise ValueError('Chunk grain must be a whole number of terrain tiles')
         chunks = [(cx, cy) for cx in range(nx) for cy in range(ny)]
         items = []
+        refs = terrain_refs_on(settings)
+        outer_ring = []                 # chunks whose standing hull ring reaches past the frame (height_at)
         tiles_x, tiles_y = nx * per, ny * per
         for cx, cy in chunks:
             # The collision box: the chunk and one ring of tiles around it inside the frame
@@ -274,7 +321,25 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             i1, j1 = min(tiles_x, (cx + 1) * per + 1), min(tiles_y, (cy + 1) * per + 1)
             box = (low[0] + cx * g, low[1] + cy * g, low[0] + (cx + 1) * g, low[1] + (cy + 1) * g)
             cbox = (low[0] + i0 * step, low[1] + j0 * step, low[0] + i1 * step, low[1] + j1 * step)
-            if ground is None:
+            # A frame with both a corner grid and irregular ground (a town frame with shoreline tiles,
+            # CHIM-STITCH-SHORELINE-36) takes the triangles only in the chunks whose collision box
+            # holds a refined tile; every other chunk keeps its grid task, so its unit is reused.
+            # (a ground without a .refined set is irregular everywhere, as Seyda Neen's)
+            refined = getattr(ground, 'refined', None)
+            irregular = ground is not None and (heights is None or refined is None or any(
+                (i, j) in refined for j in range(j0, j1) for i in range(i0, i1)))
+            if not irregular and refs and height_at is not None and (i0, j0, i1, j1) != (
+                    cx * per - 1, cy * per - 1, (cx + 1) * per + 1, (cy + 1) * per + 1):
+                # a chunk at the frame's edge: its whole ring from the sampler, as inside any other frame
+                i0, j0, i1, j1 = cx * per - 1, cy * per - 1, (cx + 1) * per + 1, (cy + 1) * per + 1
+                outer_ring.append([cx, cy])
+                cbox = (low[0] + i0 * step, low[1] + j0 * step, low[0] + i1 * step, low[1] + j1 * step)
+                hs = [[height_at(low[0] + i * step, low[1] + j * step) for i in range(i0, i1 + 1)]
+                      for j in range(j0, j1 + 1)]
+                ms = [row[cx * per:(cx + 1) * per] for row in materials[cy * per:(cy + 1) * per]]
+                task = {'box': box, 'step': step, 'heights': hs, 'materials': ms, 'floor': floor,
+                        'ceiling': ceiling, 'water': WATER_LEVEL, 'light': TERRAIN_LIGHT, 'collision_box': cbox}
+            elif not irregular:
                 hs = [row[i0:i1 + 1] for row in heights[j0:j1 + 1]]
                 ms = [row[cx * per:(cx + 1) * per] for row in materials[cy * per:(cy + 1) * per]]
                 task = {'box': box, 'step': step, 'heights': hs, 'materials': ms, 'floor': floor,
@@ -290,22 +355,33 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             reach = [l for l in (liquids or ()) if lava_box_reaches(l, cbox)]
             if reach:
                 task = dict(task, liquids=reach)
+            if refs:
+                # terrain references (format 0.7, docs/chim/WORLD_FORMAT.md "Terrain references"): the chunk's
+                # terrain in chunk-local units (its low corner at 0, 0), so the same ground anywhere is the same
+                # unit and the same stored record; the frame places it at its offset (the engine translates it
+                # when it grafts the chunk, chim_graft.c)
+                task = local_terrain_task(task, box[0], box[1])
             # Irregular ground (many small prisms per chunk) gets the standing hull compiled by qbsp
             # (CHIM-SEYDA-MEMORY-33); a regular grid keeps the routed chains (format 0.4), which hold
             # it compactly and walk it exactly. Either is selectable (terrain_hull). The fingerprint
             # holds the compiler's bytes, not its path or the cache folder.
-            hull = (settings or {}).get('terrain_hull') or ('compiled' if qbsp and ground is not None else 'routed')
-            fp = fingerprint('terrain', task, hull, qbsp_hash if hull == 'compiled' else None)
+            hull = (settings or {}).get('terrain_hull') or ('compiled' if qbsp and irregular else 'routed')
+            # 'hull-check-2': a compiled hull is checked against the exact union of its pieces, lost pieces patched in,
+            # else the unit falls back to the routed hull (CHIM-COMPILED-HULL-SHORT-36); older units are not reused
+            fp = fingerprint('terrain', task, hull, *((qbsp_hash, 'hull-check-2') if hull == 'compiled' else (None,)))
             if hull != 'routed':
                 task = dict(task, hull=hull, qbsp=str(qbsp), collision_cache=str(collision_cache))
             items.append((fp, task))
         terrain = dict(zip(chunks, run_units('terrain', items, terrain_unit, jobs, cache)))
+        if refs:
+            terrain = {c: dict(t, offset=(low[0] + c[0] * g, low[1] + c[1] * g, 0.0)) for c, t in terrain.items()}
     # Large-model cut (chim.cut): a placement whose model is wider than cut_models_over (default: one
     # chunk) is stored as one model per chunk it covers, so only its pieces in the ring are resident
     # (CHIM-ARENA-MEMORY-33). 512 (two chunks) cuts district-size bodies (Vivec cantons about 1,750 units,
     # the Ministry of Truth about 915) and keeps house-size models whole; 0 keeps every model whole.
     cut_over = float((settings or {}).get('cut_models_over', CUT_MODELS_OVER))
     cut_mode = (settings or {}).get('cut_mode', 'tiles')
+    keep_whole = tuple((settings or {}).get('cut_keep_whole', CUT_KEEP_WHOLE))
     cuts, tiled = {}, {}
     if cut_over > 0 and cut_mode == 'tiles':
         # the model is cut once in its own frame; every placement of it places the shared tiles
@@ -313,15 +389,13 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
         with timer.section('large-model cut'):
             items = []
             for k in order:
-                v = variants[k]
-                if max(v['hi'][0] - v['lo'][0], v['hi'][1] - v['lo'][1]) <= cut_over:
+                if not cut_candidate(variants[k], cut_over, keep_whole):
                     continue
                 task = dict(variant_tasks[k], grain=g)
                 task.pop('qbsp', None)
                 task.pop('collision_cache', None)
                 items.append((fingerprint('tiles', variant_fps[k], g), task))
-            keys = [k for k in order if max(variants[k]['hi'][0] - variants[k]['lo'][0],
-                                            variants[k]['hi'][1] - variants[k]['lo'][1]) > cut_over]
+            keys = [k for k in order if cut_candidate(variants[k], cut_over, keep_whole)]
             for k, tiles in zip(keys, run_units('tiles', items, tile_unit, jobs, cache)):
                 tiled[k] = tiles
                 for t in tiles:
@@ -333,8 +407,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             items = []
             for ref in references:
                 k = variant_key(ref)
-                v = variants[k]
-                if max(v['hi'][0] - v['lo'][0], v['hi'][1] - v['lo'][1]) <= cut_over:
+                if not cut_candidate(variants[k], cut_over, keep_whole):
                     continue
                 origin = [float(x) for x in (np.array(ref['position']) - np.array([*centre, 0])) * 0.25]
                 task = dict(variant_tasks[k], ref=ref, origin=origin, yaw=yaw_degrees(ref), low=list(low),
@@ -385,12 +458,73 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     variants = {k: v for k, v in variants.items() if k in used}     # a model only its cut placements used
     return {'frame': frame, 'placements': placements, 'variants': variants, 'textures': textures,
             'terrain': terrain, 'fallbacks': sorted(set(fallbacks)), 'routed_hulls': sorted(set(routed)),
+            'outer_ring_chunks': outer_ring, 'hull_checks': checks,
             'visibility': ({'heights': heights, 'step': step, 'low': tuple(low), 'mesh_occluders': mesh_occluders}
                            if ground is None else
                            {'triangles': [(t, m) for j in range(ground.size[1]) for i in range(ground.size[0])
                                           for t, m in ground.tile_list(i, j)],
                             'step': step, 'low': tuple(low), 'size': ground.size,
                             'mesh_occluders': mesh_occluders})}
+
+
+TERRAIN_REFS = ('off', 'on')
+
+
+def apply_mesh_method(profile, source, settings):
+    """A CHIM area profile with the mesh's method keys (tools/mesh_methods.py): planar merge, or meshoptimizer +
+    planar merge, or the converter's own steps. Flattened window meshes keep the converter's steps."""
+    from mesh_methods import apply
+    if profile.get('flatten'):
+        return profile
+    return apply(profile, source, settings)
+MODEL_HULL_PATCH = ('off', 'on')
+
+
+def model_hull_patch_on(settings):
+    """Patch the pieces a compiled model hull lost (build setting model_hull_patch, 'on' by default since the
+    compiled terrain hull left Balmora's ring room for it; 'off' keeps the hull as compiled, the previous method;
+    collision_bsp.patch_holes, CHIM-COMPILED-HULL-SHORT-36)."""
+    mode = (settings or {}).get('model_hull_patch', 'on')
+    if mode not in MODEL_HULL_PATCH:
+        raise ValueError('Unknown model hull patch mode: %s' % mode)
+    return mode == 'on'
+
+
+def model_weld_mode(settings):
+    """How a model variant shares its vertices (build setting 'model_weld'): 'base' (default: as in its base,
+    the prepared mesh's own frame, so every scale and tilt has the base's vertices and edges;
+    CHIM-STRIDER-SCALED-SEAMS-36) or 'placed' (by the placed position rounded to 1e-5, the method before
+    v0.0.36-dev3)."""
+    from chim.models import MODEL_WELD
+    mode = (settings or {}).get('model_weld', 'base')
+    if mode not in MODEL_WELD:
+        raise ValueError('Unknown model weld mode: %s' % mode)
+    return mode
+
+
+def terrain_refs_on(settings):
+    """Terrain references (format 0.7): the build setting 'terrain_refs' ('off' by default, 'on')."""
+    mode = (settings or {}).get('terrain_refs', 'off')
+    if mode not in TERRAIN_REFS:
+        raise ValueError('Unknown terrain references mode: %s' % mode)
+    return mode == 'on'
+
+
+def local_terrain_task(task, ox, oy):
+    """A chunk terrain task moved by (-ox, -oy): box, collision box, tile triangles and lava prisms in
+    chunk-local units. Heights and materials are tables (no positions); z is not moved."""
+    def box(b):
+        return (b[0] - ox, b[1] - oy, b[2] - ox, b[3] - oy)
+    out = dict(task, box=box(task['box']))
+    if task.get('collision_box') is not None:
+        out['collision_box'] = box(task['collision_box'])
+    if task.get('triangles') is not None:
+        out['triangles'] = [[tx - ox, ty - oy, [[r[0] - ox, r[1] - oy, r[2], r[3] - ox, r[4] - oy, r[5],
+                                                  r[6] - ox, r[7] - oy, r[8], r[9]] for r in rows]]
+                            for tx, ty, rows in task['triangles']]
+    if task.get('liquids'):
+        out['liquids'] = [dict(l, hull=[[x - ox, y - oy] for x, y in l['hull']]) for l in task['liquids']]
+    return out
 
 
 def lava_box_reaches(liquid, box):
@@ -638,7 +772,24 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     pal_bytes = Path(palette).read_bytes()
     harvest_set = harvest_numbers(harvest, data) if harvest else set()
     specs, sections, parity, meshes = [], [], {}, 0
+    # CHIM region frames (one cell each, registered generated areas) are prepared side by side, one area per
+    # worker: each area's own steps (its source catalogue, terrain audits, ground samples) are serial, so one
+    # area at a time kept most cores idle for the first 35 to 45 minutes of a 270-frame stage
+    # (BUILD-CHIM-STAGE-IDLE-START-36). Towns keep the whole job budget, one after another. Same results.
+    from town_config import generated_areas
+    generated = generated_areas()
+    regional = [t for t in areas if t in generated]
+    prepared = {}
+    if len(regional) > 1 and jobs > 1:
+        prepared = prepare_areas_parallel(regional, generated, data, out, pal_bytes, qbsp, jobs, cache, timer,
+                                          settings_override, rebuild_meshes, mesh_occluders, harvest_set, flora)
     for town in areas:
+        if town in prepared:
+            spec, section, parity[town], count = prepared.pop(town)
+            specs.append(spec)
+            sections.append(section)
+            meshes += count
+            continue
         if town == 'seyda':
             from chim import seyda
             spec, section, parity[town], count = seyda.prepare_area(
@@ -648,6 +799,13 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
             spec, section, parity[town], count = prepare_area(
                 town, data, out / 'work' / town, pal_bytes, qbsp, jobs, cache, timer, settings_override,
                 rebuild_meshes, mesh_occluders, harvest_set, flora)
+        # fail fast (BUILD-CHIM-VALIDATE-LATE-36): this frame's terrain geometry is checked now, not after
+        # every other frame is built; the whole-world validation still runs at the end (chim_build --validate)
+        with timer.section('early frame checks'):
+            from chim.validate import early_frame_failures
+            early = early_frame_failures(spec, section, town, jobs)
+        if early:
+            raise ValueError('CHIM frame checks failed (%d): %s' % (len(early), '; '.join(early[:5])))
         specs.append(spec)
         sections.append(section)
         meshes += count
@@ -660,6 +818,15 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     receipt['collision_union_fallbacks'] = sorted({m for s in specs for m in s['fallbacks']})
     # models whose standing hull is routed (routed_hull): the heap fallback's candidates (chim_build)
     receipt['routed_hulls'] = sorted({m for s in specs for m in s.get('routed_hulls', [])})
+    # compiled model hulls checked against their pieces (CHIM-COMPILED-HULL-SHORT-36): every one the compiler
+    # left short or floating, and every one patched (build setting model_hull_patch)
+    found = {c['model']: c for s in specs for c in s.get('hull_checks', [])}
+    receipt['compiled_model_hulls'] = {
+        'checked': len(found), 'patch': model_hull_patch_on(settings_override),
+        'inexact': sorted('%s short %s over %s' % (n, c['short'], c['over']) for n, c in found.items()
+                          if c['short'] > 0 or c['over'] > 0),
+        'patched': sorted('%s +%d nodes' % (n, c.get('patched_nodes', 0)) for n, c in found.items()
+                          if c.get('patched_rounds'))}
     # The frames' far terrain (chim.far): resident distant land, a sidecar of each frame map.
     with timer.section('far terrain'):
         from chim.far import write_layers
@@ -682,6 +849,20 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
                                      'textures': sorted({t for rec in applied for r in rec if r['name'] == e['name']
                                                          for t in r['textures']})} for e in effects],
                    )
+    # Areas whose own config sets the large-model cut (AREA_CUT_KEYS), recorded only when one does, so other
+    # receipts stay byte-identical; the build-wide --cut-models-over wins and is in receipt['settings']
+    from town_config import load_settings as _area_settings
+    area_cut = {}
+    for a in areas:
+        try:
+            own = _area_settings(a)
+        except (KeyError, ValueError, OSError):
+            continue
+        keys = {k: own[k] for k in AREA_CUT_KEYS if k in own}
+        if keys:
+            area_cut[a] = dict(keys, applied=area_cut_settings(own, settings_override).get('cut_models_over'))
+    if area_cut:
+        receipt['area_cut'] = area_cut
     write_json(out / 'chim-receipt.json', receipt)
     # Worker count, unit cache hits and wall time: a diagnostic beside the receipt, so the receipt is
     # byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33); chim/stats.py reads it for its build figures.
@@ -708,6 +889,120 @@ def detail_budget(name):
     return {k.replace(chr(92), '/').lower(): int(v) for k, v in data['budgets'][name].items()}
 
 
+SHORELINE_MODES = ('on', 'off')   # chim_build.py --terrain-shoreline (CHIM-STITCH-SHORELINE-36)
+
+
+def shoreline_ground(sample, materials, low, high, step):
+    """The frame's ground as the legacy region maps triangulate it: every tile through
+    prepare_world_regions.terrain_triangles (the shared sampler; Seyda Neen's frame uses it too), over
+    sample(x, y) -> (height, material) in frame-local units. A tile where land and water flip between
+    the 32-unit samples gets them inserted (shoreline refinement); every other tile is its two plain
+    triangles 0-1-2, 0-2-3, exactly the corner grid. Each triangle takes its tile's material
+    (materials: rows by y, one per tile, as the plain grid). Returns a chim.ground.TriangleGround
+    with .refined = {(i, j)} of the refined tiles."""
+    from chim.ground import TriangleGround
+    from prepare_world_regions import STEP, Terrain, terrain_triangles
+    if step != STEP:
+        raise ValueError('The shoreline refinement needs %d-unit terrain tiles' % STEP)
+
+    class _Sampler(Terrain):
+        def __init__(self):            # no survey packet: the frame's own sampler
+            pass
+
+        def sample(self, x, y):
+            return sample(x, y)
+
+    terrain = _Sampler()
+    tris, refined = [], set()
+    for j, y in enumerate(range(int(low[1]), int(high[1]), step)):
+        for i, x in enumerate(range(int(low[0]), int(high[0]), step)):
+            if terrain.shoreline_detail(x, y):
+                refined.add((i, j))
+            m = int(materials[j][i])
+            tris.extend(([list(p) for p in tri], m) for tri in terrain_triangles(terrain, x, y))
+    size = ((int(high[0]) - int(low[0])) // step, (int(high[1]) - int(low[1])) // step)
+    ground = TriangleGround(tris, step, low, size)
+    ground.refined = refined
+    return ground
+
+
+def margin_grids(data, work, settings, low, high):
+    """Terrain grids {cell: grid} of every source cell under the frame ground box (low, high in
+    frame-local units), from a terrain audit of a square wide enough to hold it (work/audit-margin-rN,
+    reused when present) and that audit's folder (its materials.json names every ground material).
+    Cells without LAND are flat default land (-512 units: the legacy region maps' ocean floor,
+    prepare_world_regions.Terrain.sample). Only the terrain is used."""
+    from mwad.audit import audit
+    sx, sy = settings['source_cell']
+    c, s = settings['centre'], settings['scale']
+    eps = 1e-6
+    cells = [(math.floor((c[0] + x / s) / 8192), math.floor((c[1] + y / s) / 8192))
+             for x in (low[0], high[0] - eps) for y in (low[1], high[1] - eps)]
+    radius = max(max(abs(cx - sx), abs(cy - sy)) for cx, cy in cells)
+    out = work / ('audit-margin-r%d' % radius)
+    if not (out / 'terrain-source.json').is_file():
+        if out.exists():
+            shutil.rmtree(out)
+        audit(data, out, (sx, sy), radius, 2, missing_land='flat')
+    return {tuple(g['cell']): g for g in json.loads((out / 'terrain-source.json').read_text())}, out
+
+
+def _area_cache(cache):
+    """A worker's copy of the unit cache: the same folder and pool, its own counts (merged back by the caller)."""
+    import copy
+    clone = copy.copy(cache)
+    clone.stats = {}
+    if hasattr(clone, 'pool_stats'):
+        clone.pool_stats = {k: 0 for k in clone.pool_stats}
+        clone._keys = {}
+    return clone
+
+
+def _prepare_area_task(task):
+    """Worker of prepare_areas_parallel: one generated area prepared with one job, its early frame checks and
+    its timing and unit counts."""
+    (town, settings, data, work, pal_bytes, qbsp, cache, settings_override, rebuild_meshes, mesh_occluders,
+     harvest_set, flora) = task
+    from town_config import register_generated
+    from chim.validate import early_frame_failures
+    register_generated([settings])
+    timer = Timer()
+    spec, section, parity, count = prepare_area(town, data, work, pal_bytes, qbsp, 1, cache, timer,
+                                                settings_override, rebuild_meshes, mesh_occluders, harvest_set,
+                                                flora)
+    with timer.section('early frame checks'):
+        early = early_frame_failures(spec, section, town, 1)
+    return (spec, section, parity, count), early, timer.sections, cache.stats, getattr(cache, 'pool_stats', None)
+
+
+def prepare_areas_parallel(towns, generated, data, out, pal_bytes, qbsp, jobs, cache, timer, settings_override,
+                           rebuild_meshes, mesh_occluders, harvest_set, flora):
+    """{town: prepare_area result} of generated areas (CHIM region frames), one area per worker
+    (BUILD-CHIM-STAGE-IDLE-START-36). The first frame whose early checks fail stops the stage, named; unit
+    counts and timings are merged into the caller's cache and timer."""
+    from build_parallel import ordered_map
+    tasks = [(t, generated[t], data, out / 'work' / t, pal_bytes, qbsp, _area_cache(cache), settings_override,
+              rebuild_meshes, mesh_occluders, harvest_set, flora) for t in towns]
+    results = {}
+    with timer.section('region frames (side by side)'):
+        for town, (result, early, sections, stats, pool_stats) in zip(
+                towns, ordered_map(_prepare_area_task, tasks, max(1, min(jobs, len(tasks))))):
+            if early:
+                raise ValueError('CHIM frame checks failed (%d): %s' % (len(early), '; '.join(early[:5])))
+            results[town] = result
+            timer.sections.extend(dict(s, section='%s (%s)' % (s['section'], town)) for s in sections)
+            for kind, counts in stats.items():
+                mine = cache.stats.setdefault(kind, {})
+                for k, v in counts.items():
+                    mine[k] = mine.get(k, 0) + v
+            if pool_stats and hasattr(cache, 'pool_stats'):
+                for k, v in pool_stats.items():
+                    cache.pool_stats[k] = cache.pool_stats.get(k, 0) + v
+            import progress_line
+            progress_line.emit('CHIM region frames', town, 'prepared', (len(results), len(towns), 'frames'))
+    return results
+
+
 def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings_override, rebuild_meshes,
                  mesh_occluders, harvest_set, flora):
     """One area's frame input, source section, parity record and mesh count (build_areas)."""
@@ -726,9 +1021,12 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     flatten = load_profiles(scene_kind='exterior')
     profiles, items = {}, []
     archive = work / 'scenery/scenery.mwpak'
-    budget = detail_budget((settings_override or {}).get('detail_budget'))
+    budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
     for mi, model in enumerate(index['models']):
         profile = town_model_profile(group[model['source']], model['source'], model['triangles'])
+        # CHIM models take the stair-plate rules (mesh_geometry.collision_pieces; legacy open-world maps do not,
+        # BUILD-FLORA-STAIR-PLATES-BUDGET-36)
+        profile['stair_plates'] = True
         if model['source'] in flatten:
             profile['flatten'] = flatten[model['source']]
         target = budget.get(model['source'].replace(chr(92), '/').lower())
@@ -738,6 +1036,8 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
             # measured: 1,521 polygons for a 1,200 target on ex_v_vivecstatue_02)
             profile = dict(profile, ratio=target / model['triangles'], visual_triangle_target=target,
                            lod_preserve_border=True)
+        # the mesh's CHIM mesh method (config/mesh-methods.json; build setting mesh_method)
+        profile = apply_mesh_method(profile, model['source'], settings_override)
         profiles[model['source']] = profile
         fp = mesh_fingerprint(model, profile, index['textures'])
         if model['source'] in rebuild_meshes:
@@ -770,31 +1070,71 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     with timer.section('ground samples'):
         grids = {tuple(g['cell']): g for g in json.loads((work / 'audit/terrain-source.json').read_text())}
         from import_town import lava_pools
+        from town_config import frame_ground_bounds
         pools = lava_pools(work, data, json.loads((work / 'source-catalogue.json').read_text())['references'])
-        ground = wad_lumps(ground_assets(data, work / 'audit', pal_bytes, pools))
-        ground = {k: v for k, v in ground.items() if k.startswith('g') or k in ('*water', '*lava')}
         step = settings['terrain_step']
-        low, high = settings['bounds']
+        # the frame's ground: the bounds plus the terrain-only margin (CHIM-FAR-BAND-GAP-36), whose
+        # cells (and their ground materials) come from a wider terrain audit (no placements are taken from it)
+        low, high = frame_ground_bounds(settings)
+        audit_dir = work / 'audit'
+        if [low, high] != [list(v) for v in settings['bounds']]:
+            wide, audit_dir = margin_grids(data, work, settings, low, high)
+            grids = {**wide, **grids}
+        ground = wad_lumps(ground_assets(data, audit_dir, pal_bytes, pools))
+        ground = {k: v for k, v in ground.items() if k.startswith('g') or k in ('*water', '*lava')}
         xs = range(low[0], high[0] + 1, step)
         ys = range(low[1], high[1] + 1, step)
         heights = [[terrain_at(grids, settings, x, y)[0] for x in xs] for y in ys]
         materials = [[terrain_material(grids, settings, x + step / 2, y + step / 2) for x in xs[:-1]] for y in ys[:-1]]
+        # The shoreline refinement of the legacy region maps (prepare_world_regions.terrain_triangles,
+        # the same sampler Seyda Neen's frame uses): the tiles where land and water flip get the
+        # original 32-unit samples, so the CHIM ground meets the legacy ground (CHIM-STITCH-SHORELINE-36).
+        # 'off' keeps the plain tile grid (the method before v0.0.36).
+        mode = (settings_override or {}).get('terrain_shoreline', 'on')
+        if mode not in SHORELINE_MODES:
+            raise ValueError('Unknown terrain shoreline mode: %s' % mode)
+        tri_ground = (shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high, step)
+                      if mode == 'on' else None)
+        if tri_ground is not None and not tri_ground.refined:
+            tri_ground = None          # no shoreline tile: the plain grid is the same ground (frame unchanged)
+        height_at = None
+        if terrain_refs_on(settings_override):
+            # terrain references: heights one tile past the ground too (the ring of an edge chunk's hull)
+            wide = margin_grids(data, work, settings, [low[0] - step, low[1] - step], [high[0] + step, high[1] + step])[0]
+            wide = {**wide, **grids}
+
+            def height_at(x, y):
+                return terrain_at(wide, settings, x, y)[0]
     frame = {'cell': tuple(settings['source_cell']), 'centre': tuple(float(v) for v in centre),
              'low': (float(low[0]), float(low[1])), 'span': (high[0] - low[0], high[1] - low[1])}
+    if [low, high] != [list(v) for v in settings['bounds']]:
+        # the box the frame owns (its placements): frames may share terrain-only margins, never this box
+        # (chim.world.frame_box; adjacent CHIM region frames, docs/chim/CHIM_REGIONS.md)
+        (olx, oly), (ohx, ohy) = settings['bounds']
+        frame['owned'] = ((float(olx), float(oly)), (float(ohx), float(ohy)))
     spec = frame_input(frame=frame, centre=centre, models=models, references=selected,
                        prepared=prepared, profiles=profiles, mesh_fps=mesh_fps, texture_records=textures,
                        archive=archive, palette=pal_bytes, heights=heights, materials=materials, step=step,
                        floor=TERRAIN_FLOOR, ceiling=TERRAIN_CEILING, ground_textures=ground, qbsp=qbsp,
                        collision_cache=work / 'collision-cache', jobs=jobs, cache=cache, timer=timer,
-                       settings=settings_override, mesh_occluders=mesh_occluders,
-                       liquids=frame_liquids(pools, centre))
+                       settings=area_cut_settings(settings, settings_override), mesh_occluders=mesh_occluders,
+                       liquids=frame_liquids(pools, centre), ground=tri_ground, height_at=height_at)
     doors = [[(r['position'][0] - centre[0]) * SCALE, (r['position'][1] - centre[1]) * SCALE]
              for r in selected if r.get('type') == 'DOOR' and r.get('destination')]
     section = {'town': town, 'cell': list(frame['cell']),
                'placements': [{'ref': r['number'], 'cell': list(r.get('cell') or [])} for r in selected],
                'doors': doors, 'terrain_step': step, 'terrain_low': [low[0], low[1]],
                'terrain_tiles': (len(xs) - 1) * (len(ys) - 1), 'water_level': WATER_LEVEL,
-               'terrain_heights': heights,
+               'terrain_heights': heights, 'terrain_shoreline': mode,
+               **({'terrain_size': list(tri_ground.size), 'terrain_triangles': tri_ground.rows(),
+                   'terrain_refined_tiles': len(tri_ground.refined)} if tri_ground is not None else {}),
                # lava pools carved into the chunks as Quake liquid (docs/LAVA.md), by source cell
                'lava': lava_section(pools)}
+    if spec.get('outer_ring_chunks'):
+        # terrain references: the heights one tile past the ground that the edge chunks' hull rings hold, so
+        # the validator checks those rings (chim.validate.hull_seams) instead of stopping at the frame edge
+        section['terrain_outer'] = {
+            'low': [low[0] - step, low[1] - step], 'chunks': spec['outer_ring_chunks'],
+            'heights': [[height_at(x, y) for x in range(low[0] - step, high[0] + step + 1, step)]
+                        for y in range(low[1] - step, high[1] + step + 1, step)]}
     return spec, section, parity, len(prepared)

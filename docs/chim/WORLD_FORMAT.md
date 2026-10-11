@@ -1,14 +1,19 @@
-# CHIM world format 0.5
+# CHIM world format
 
 CHIM is the world streamer that replaces today's overlapping region maps (the
 legacy builder). This page specifies the files the CHIM builder writes and the
 engine will read: every shared model, texture and terrain face stored once,
 every placement stored once and pointing at a shared model, in small sector
-files that a classic Amiga FFS disk reads whole, front to back.
+files that a classic Amiga FFS disk reads whole, front to back. The builder
+writes world format 0.5, or 0.7 when terrain references are on; the engine
+reads 0.4 to 0.7 ("Version rules" below). A short overview for newcomers, with
+the roadmap of the format: [CHIM file format](../CHIM_FILE_FORMAT.md).
 
 <!-- contents start -->
 ## Contents
 
+- [File types](#file-types)
+- [Summary](#summary)
 - [Principles](#principles)
 - [Quake mechanisms reused](#quake-mechanisms-reused)
 - [Disk layout](#disk-layout)
@@ -22,6 +27,7 @@ files that a classic Amiga FFS disk reads whole, front to back.
 - [Chunk records](#chunk-records)
   - [Placement record (48 bytes, big-endian)](#placement-record-48-bytes-big-endian)
   - [Terrain image (a world subtree)](#terrain-image-a-world-subtree)
+- [Terrain references (0.7, experimental)](#terrain-references-07-experimental)
 - [Collision reference and the stair rule](#collision-reference-and-the-stair-rule)
 - [Visibility and culling](#visibility-and-culling)
 - [Ids and order](#ids-and-order)
@@ -33,8 +39,10 @@ files that a classic Amiga FFS disk reads whole, front to back.
   - [The frame-map heap (image step)](#the-frame-map-heap-image-step)
 - [How the engine loads it (staged plan step 3)](#how-the-engine-loads-it-staged-plan-step-3)
 - [Activation: the frame map](#activation-the-frame-map)
+  - [Frame maps are .chim files](#frame-maps-are-chim-files)
   - [Walkable area of the special maps](#walkable-area-of-the-special-maps)
 - [Far terrain sidecar](#far-terrain-sidecar)
+- [Shared ocean chunk](#shared-ocean-chunk)
 - [Validation](#validation)
 - [Statistics](#statistics)
 - [The builder: fast and incremental](#the-builder-fast-and-incremental)
@@ -48,10 +56,41 @@ files that a classic Amiga FFS disk reads whole, front to back.
 
 <!-- contents end -->
 
+## File types
+
+**We use `.chim` as the format for CHIM maps to avoid confusion: the format is no longer
+directly compatible with the Quake `.bsp` format.**
+
+Three kinds of files make up an area on CHIM. `.bsp` is a regular Quake map; `.chim`
+is a CHIM map, the CHIM version of the Quake map format (the modified BSP format);
+the CHIM world files are CHIM's own binary format. The builder, the tools and the
+Toolkit tell a CHIM map by its `"_chim_frame"` key, never by its file name
+(`tools/map_files.py`), and read it with a CHIM reader, never as a Quake map.
+
+| File | Name | Format | What it holds |
+| --- | --- | --- | --- |
+| Quake map | `maps/<name>.bsp` | Regular Quake BSP29 map (little-endian), compiled by qbsp, vis and light | The legacy open world (region maps such as `maps/vfNNNN.bsp`) and every interior. An interior cut into sub-cell sections is one BSP29 map per section, joined by `interior-sections.txt` (`AWIS1`: each section's box and the portals where two sections meet). |
+| CHIM map | `maps/<town>-chim.chim`, `maps/intro_docks-chim.chim`, `maps/vfNNNN.chim` (a cell on CHIM inside the legacy open world, in place of `vfNNNN.bsp`) | CHIM's own map format, the modified BSP format. Today it is laid out like a BSP29 file (the version word 29 and 15 lumps, in the CHIM brush image's lump order with the clipnodes last), but it is not a playable Quake map and is only valid with its CHIM world. Planned: its own header and loader ([.chim map format](CHIM_MAP_FORMAT.md)). | An empty shell: a world with no faces (one node, two empty leaves, an empty standing hull, no visibility), the map's entities (characters, doors, the start, streamed statics with `"_chim_chunk"` and `"_chim_box"`), collision-only clip models (the frame's boundary walls) and the worldspawn keys `"_chim_frame" "CX CY"` (the frame it belongs to), `"_chim_hunk_rest"` and `"_chim_streamed_statics"`. Builds before v0.0.36 named it `.bsp`; `--chim-frame-ext bsp` still does ("Frame maps are .chim files" below). |
+| CHIM index | `chim/world.cwi` | CHIM world, big-endian, kind `INDX` | Settings, the file table (every frame and sector file with its size and CRC-32), the model directory, the model name order, the texture directory and the names ("Index" below). |
+| CHIM frame file | `chim/frames/x-03/y-02/frame.ccf` (one per frame of 3 x 3 cells) | CHIM world, kind `FRAM` | The frame block (centre cell, origin, chunk grid), the chunk directory in pack order and the sector table ("Frame file"). |
+| CHIM sector file | `chim/frames/x-03/y-02/s00.ccs` ... `s63.ccs` | CHIM world, kind `SECT` | The records of 3 x 3 chunks, read whole: chunk records (`CHNK`: 48-byte placement records, the visibility rows and the chunk's ground as a small world subtree, or in 0.7 a 32-byte terrain reference), terrain records (`TERR`, 0.7: chunk ground stored once in chunk-local units), shared models (`MODL`: brush images in BSP29 lumps, little-endian) and textures (`TEXR`: Quake miptex), each stored once in the sector that first needs it ("Sector file" and the record sections). |
+| Far terrain | `maps/<frame map>.far` (builder output `far/<cx>_<cy>.far`) | Its own format (`CHFL`, version 2, big-endian), beside the frame map like a Quake `.lit`; not part of the CHIM world | The land outline beyond the chunk ring, drawn past the fog ("Far terrain sidecar"). |
+| Shared ocean chunk | one content-keyed file, kind `OCEN` | CHIM structures; no index lists it | One chunk of water over a flat seabed that every sea cell will reference; the engine does not read it yet ("Shared ocean chunk"). |
+| Texture effect | `tools/chim/effects/<name>.chimfx` | Text, a builder input | Changes chosen textures on purpose; the receipt lists what it changed. The world holds only the changed textures ([texture effects](TEXTURE_EFFECTS.md)). |
+| Builder reports | `chim-heap.json`, `chim-receipt.json`, `chim-validate.json`, `chim-source.json`, `chim-stairs.json`, `chim-regions.json`, `chim-timing.json` next to `chim/`; the image step adds `chim-frame-heap.json` | JSON | The heap gate per frame (peak, budget, headroom, positions over budget, the load ring), the receipt (versions, settings, texture effects), validation, the source manifest, the stair gate, the region ownership table (`aw-chim-ownership-1`) and stage timings. |
+
+Not in the format yet: the walkable graph for characters (designed as a `NAVG` sector record,
+[CHIM NPC pathfinding](CHIM_NPC_PATHFINDING.md)) and whole-rotation placement records (planned
+below). The Toolkit's 3D Map Inspector opens all three kinds: a `.bsp`, a `.chim` (its entities as
+markers, with the frame it names) and a CHIM world folder, with the heap gate's memory overlay
+([3D Map Inspector](../POLYCOUNT_INSPECTOR.md#chim-maps-and-chim-worlds)).
+
+## Summary
+
 | | |
 | --- | --- |
-| World format | 0.5 (major 0 = not yet read by any released engine); 0.4 had regular terrain grids only and no story-hidden placements, 0.3 chunk standing hulls without the neighbouring ground, 0.2 no placement lists, 0.1 one model pack, one texture pack and one chunk pack per frame |
-| CHIM version | 0.1.0, first shipped with AmiWind v0.0.33; its own number, kept in the `CHIM_VERSION` file at the repository root, the one source: `tools/project_version.py` (`chim_version()`) and the builder receipts read it, and `generate_native` writes `chim_version.h` (`#define CHIM_VERSION`; the engine's `chim/chim.h` includes it) and the boot check's "AmiWind vX / CHIM vY" |
+| World format | Written: 0.5, or 0.7 with terrain references (`--chim-terrain-refs on`, opt-in). The engine reads 0.4 to 0.7 (`chim/chim_format.h`). History: 0.7 terrain references; 0.6 one folder per sector row for frames of more than 64 sectors (read by the engine, not yet written by the builder); 0.5 story-hidden placements and irregular ground; 0.4 regular terrain grids only and no story-hidden placements; 0.3 chunk standing hulls without the neighbouring ground; 0.2 no placement lists; 0.1 one model pack, one texture pack and one chunk pack per frame. Major 0 = still in development. |
+| CHIM version | 0.2.0 with AmiWind v0.0.36 (0.1.0 first shipped with AmiWind v0.0.33); its own number, kept in the `CHIM_VERSION` file at the repository root, the one source: `tools/project_version.py` (`chim_version()`) and the builder receipts read it, and `generate_native` writes `chim_version.h` (`#define CHIM_VERSION`; the engine's `chim/chim.h` includes it) and the boot check's "AmiWind vX / CHIM vY" |
 | Builder | `tools/chim_build.py` (package `tools/chim/`), receipts say `builder: "chim"` |
 | Validator | `tools/chim/validate.py` |
 | Scope of 0.5 | town exterior frames (Balmora, the Vivec Arena, Seyda Neen with the intro docks): terrain (regular or irregular), water, every placed static object with a mesh |
@@ -432,6 +471,56 @@ world BSP, for the chunk's tiles:
   neighbour's included, is solid in the chunk's standing hull, and a box
   0.25 units above that height is empty.
 
+## Terrain references (0.7, experimental)
+
+A world built with terrain references (`tools/chim_build.py --terrain-refs on`, `tools/build.py
+--chim-terrain-refs on`; off by default) stores every chunk's terrain once per content and lets each
+chunk name it, as models and textures are stored once and named by placements. Neighbouring CHIM region
+frames ([CHIM_REGIONS.md](CHIM_REGIONS.md)) overlap by their terrain margins; with references the
+overlap is stored once, and flat sea floor anywhere is one record. Such a world is written as format
+0.7; every other world stays 0.5, byte for byte. An engine older than 0.7 refuses a 0.7 world by its
+minor version, with its usual message.
+
+- The terrain image of a chunk is built in **chunk-local** units: the chunk's low corner at 0, 0 (the
+  same tree, faces, texture vectors and standing hull, moved). It is a sector record of kind `TERR`
+  (id = the terrain record's number in the world, 0..n-1 in pack order), stored in the sector that first
+  meets it (records in the order `CHNK`, `TERR`, `MODL`, `TEXR`). Two chunks with the same ground have
+  byte-identical records, whatever frame or position they are in.
+- A chunk whose terrain is a reference has the magic `CHK1` and, where the terrain image would be, a
+  reference block (32 bytes, big-endian): u32 terrain id, u16 file row of the record's sector file,
+  u16 reserved (0), u32 offset of the record in that file, u32 record bytes, u32 render bytes, f32 shift
+  x, y, z in local units. Its directory entry counts the head, rows and block as render bytes and 0
+  collision bytes.
+- The engine loads the record named by the block and, when it grafts the chunk into the frame world,
+  moves its copy by the shift: plane distances (`dist += normal . shift`), vertexes, node and leaf
+  bounds, each lit face's texture minimums (`+ texture axis . shift`), and the chunk's box. The builder
+  only makes references whose shift is whole units and moves every texture axis by a multiple of 16
+  texels, so the moved texture minimums equal the ones measured on moved vertexes (water and sky faces
+  keep their fixed values). Everything else (texinfo, faces, edges, lightmaps, clipnodes) does not
+  depend on the position.
+- Each chunk keeps its own decoded copy in the zone, as before: memory and the heap gate are unchanged
+  by references (sharing one decoded record between chunks is a later step). A record homed in another
+  frame's sector file costs one more file seek when it loads.
+- An edge chunk of a frame gets the whole ring of its standing hull from the ground one tile past the
+  frame (the same content as the same chunk inside a neighbouring frame); the source manifest carries
+  those heights (`terrain_outer`), and the validator checks the hull against them.
+- Tools read a referenced chunk as the engine places it (`chim.validate.load_world` moves the record by
+  the shift: `chim.format.translate_image`), so every gate (validation, stairs, heap, zone walk, border
+  audit) runs on the world in frame coordinates. The validator also checks that every reference points at
+  a `TERR` record of the stated size and every `TERR` record is referenced.
+
+Measured on scratch worlds of CHIM region frames (one cell each, 896-unit terrain margin;
+CHIM-REGION-MARGIN-STORAGE-36), against the open-world maps they replace:
+
+| Cells | Open-world maps | Copies, routed hull | Copies, compiled hull | References, compiled hull |
+| --- | ---: | ---: | ---: | ---: |
+| 7 (3 coast, 4 sea floor) | 2,105,504 | 9,012,728 | 4,908,676 | 1,912,960 |
+| 6 (coast) | 2,768,088 | 10,024,380 | 5,089,260 | 2,586,432 |
+
+The compiled standing hull (`--terrain-hull compiled`: qbsp's exact union of the same pieces, the hull
+Seyda Neen's irregular ground already uses) takes about half the bytes; references take the margins
+shared between neighbours and every repeated chunk. File counts do not change.
+
 ## Collision reference and the stair rule
 
 Reference behaviour (Morrowind, as OpenMW 0.51 reimplements it): collision is
@@ -651,7 +740,7 @@ What was built (8 October 2026), against the plan above:
     frame map carries as an ordinary Quake static entity. Sprite records in the chunks are
     deferred until a frame holds more statics than the engine's static-entity limit (owner
     decision, 8 October 2026). Seyda Neen's region maps hold 229 such statics.
-- Frame maps: `maps/seyda-chim.bsp` (the town) and `maps/intro_docks-chim.bsp`, both naming the
+- Frame maps: `maps/seyda-chim.chim` (the town) and `maps/intro_docks-chim.chim`, both naming the
   same frame. The docks map is checked one way: its statics must be in the frame, and the frame
   holds the rest of the town as well. It copies the docks' own entities and turns the route
   boundary of the legacy docks map into four clip walls: `func_wall` brush models with a
@@ -756,7 +845,7 @@ the legacy preview at the A/B poses.
 
 *Stage B: all of Vivec, as one frame.*
 
-- The union of the nine Vivec district frames, in Morrowind units, is x 12,800..52,736 and
+- The union of the eight Vivec district frames, in Morrowind units, is x 12,800..52,736 and
   y -113,664..-70,144. That is 39 x 43 chunks, rounded to 13 x 15 sectors: 195 sector files.
 - Stage A's Arena frame lies inside it, so stage B replaces stage A's frame; the Arena area stays
   selectable.
@@ -806,7 +895,7 @@ the legacy preview at the A/B poses.
        and the rest in the north), a wider coordinate protocol (an engine-wide change), or M4 frames
        that span;
     3. one `vivec` area merging the eight districts' sources by reference number, and one `vivec` town
-       row with `vivec-chim.bsp`, the districts' doors and arrivals and `dbg tp` names by district; the
+       row with `vivec-chim.chim`, the districts' doors and arrivals and `dbg tp` names by district; the
        eight district rows and their legacy maps stay selectable;
     4. 1,677 chunks, within the engine's 4,096.
   - Memory is the same either way: the ring is centred on the player, so the Temple district's peak is
@@ -835,7 +924,7 @@ the legacy preview at the A/B poses.
 3. The memory policy stated through `tools/engine_limits.py`: which ring stays locked, and the
    allocation rule after the chunk-load repair, so the builder's gate follows it.
 4. The renderer counters at the stage A poses, legacy preview against CHIM, for the table.
-5. Names: `vivec_arena-chim.bsp` (stage A) and, in stage B, the Vivec frame map's name for the
+5. Names: `vivec_arena-chim.chim` (stage A) and, in stage B, the Vivec frame map's name for the
    district scenes (`dbg tp` names from the town table, VIVEC-ARENA-TP-ARRIVAL-32).
 
 **M4, the open world, on a fixed grid of frames.** The open world needs a different frame model:
@@ -908,6 +997,12 @@ piece, not a whole canton body.
 - A hollow shell's occluder (its closed render mesh's solid columns, CHIM-PVS-HOLLOW-33) is carried whole
   by the first piece.
 - Vis: pieces are chunk-sized, so each touches few leaves (under MAX_ENT_LEAFS) and is culled on its own.
+- Where it is set: the area's own config (`cut_models_over`, `cut_mode`, `cut_keep_whole`), which the
+  builder records per area in the receipt (`area_cut`); `chim_build --cut-models-over` sets one value for
+  every area and wins. The Vivec Arena sets 512 (M3 stage A); Balmora and Seyda Neen set nothing and keep
+  every model whole.
+- Flora stays whole (`cut_keep_whole`, default the `f/flora_` meshes; owner decision 10 October 2026): around
+  Vivec 24 wide trees and 31 parasols are wider than 512 units, and tiling them is not measured yet.
 
 Measured on the Vivec Arena frame (9 October 2026, `--cut-models-over 512`, tiles): active ring 6,492,688
 to 5,337,232 bytes (it now fits the 6,242,304-byte chunk room), largest block 2,514,432 to 450,704
@@ -989,13 +1084,39 @@ and is filled only as far as free room allows.
 ## Activation: the frame map
 
 With `tools/build.py --builder chim`, the image step writes one frame map per
-area the world holds: `maps/<town>-chim.bsp`, where `<town>` is the town's map
+area the world holds: `maps/<town>-chim.chim`, where `<town>` is the town's map
 name in `config/towns.json` (`tools/chim/frame_map.py`). When CHIM is on, the
 engine loads this map instead of the town's region maps. `chim_towns 0` in the
 engine loads the region maps instead, for A/B comparisons. The region maps,
 door links, sky, fog and the `dbg tp` names keep the town name. The legacy
 region maps stay as they are and remain selectable. A legacy build writes no
 frame map.
+
+### Frame maps are .chim files
+
+A frame map is a BSP29 file, but it is not a playable map without its CHIM world:
+it holds an empty world, the map's entities, collision-only boxes and the
+`"_chim_frame"` key; all its geometry is in `id1/chim/`. So it uses the `.chim`
+extension: `maps/<town>-chim.chim`, `maps/intro_docks-chim.chim`, and for a CHIM
+region frame `maps/vfNNNN.chim` in place of `maps/vfNNNN.bsp`
+([CHIM_REGIONS.md](CHIM_REGIONS.md)). The bytes are the same BSP29 file; Quake's
+model loader picks the loader from the file header, not the extension.
+
+- The engine finds every map through one resolver (`aw_mappath.c`, `AW_MapPath`):
+  `maps/<name>.chim` when the image has a CHIM world (`chim/world.cwi`) and that
+  file exists, else `maps/<name>.bsp`. Map names, saves, the region directory,
+  door links and the HUD keep using the name without an extension.
+- A frame map that cannot run is refused with a console message instead of
+  loading as an empty map: a map with `"_chim_frame"` in an image without a CHIM
+  world, a `.chim` file without the key, or a frame whose CHIM world cannot be
+  read or has no pack for it.
+- The builder's tools tell a frame map by its `"_chim_frame"` key and, for
+  region frames, the build's ownership table (`aw-chim-ownership-1`), never by
+  its file name (`tools/map_files.py`).
+- `tools/build.py --chim-frame-ext bsp` writes frame maps as `.bsp` files, as
+  builds before v0.0.36 did; the engine reads both. `tools/chim/frame_ext_migrate.py`
+  renames frame maps of earlier builds in a workspace to `.chim` (a hard link
+  under the new name: nothing is copied or rebuilt; dry run by default).
 
 - Worldspawn: the town's worldspawn, identical in every region map, plus the
   key `"_chim_frame" "CX CY"`: two decimal integers, the cell of the frame's
@@ -1149,6 +1270,59 @@ samples, 1,719 stamps, 23,476 bytes). Local position of sample (i, j):
 `((x0 + i x step) - frame origin x) x scale`, likewise for y, as every CHIM
 position.
 
+## Shared ocean chunk
+
+Most of the map has no LAND record: the sea around the island and between its
+parts. OpenMW gives such a cell a flat heightfield at -2048 units
+(`ESM::Land::DEFAULT_HEIGHT`) and creates it with water at the sea level; the
+legacy region maps sample the same depth (-512 local units) under a water
+brush at 0. Every such cell is the same, so the CHIM builder makes it once:
+one chunk of water over a flat seabed (`tools/chim/ocean.py`), made by the
+same chunk terrain code as every other chunk (ground plane, water plane and
+leaves, the standing hull of the chunk and its ring of tiles), but in
+chunk-local coordinates, its low corner at 0, 0. Being flat it tiles the
+plane: chunk (i, j) of an ocean cell is this chunk moved by i and j chunk
+widths.
+
+The chunk is its own file, kind `OCEN`. No index lists it and no frame names
+it, so a format 0.5 world reader never meets one; given one, the 0.5 readers
+refuse it (unknown kind). Layout, big-endian as every CHIM structure:
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 0 | 32 bytes | common header, kind `OCEN`, major 0, minor 5; count = 1 + textures |
+| 32 | f32 | water level, local units (0) |
+| 36 | f32 | seabed, local units (-512) |
+| 40 | f32 | seabed, Morrowind units (-2048) |
+| 44 | f32 | local units per Morrowind unit (0.25) |
+| 48 | u16, u16 | chunk grain (256) and terrain step (128), local units |
+| 52 | u16, u16 | textures, reserved |
+| 56 | u32, u32 | the chunk record's render and collision bytes |
+| 64 | u32, u32 | CRC-32 of the chunk record; CRC-32 of the texture records (in file order, unpadded) |
+| 72 | 16-byte rows | record directory, as in a sector file: `CHNK` 0, then `TEXR` 0..n-1 |
+| then | records | 4-byte aligned: one chunk record (no placements, no PVS row: Quake's "no visibility data", everything visible), then the miptexes |
+
+The terrain image's lump 2 holds the file's own texture ids (0..n-1): the
+seabed's default land texture (`g0`) and `*water`, moved off the sky bank as
+every CHIM texture. The file is stored once (a content-keyed unit; with the
+storage pool, one pooled object) and every ocean cell is a reference to it
+(`aw-chim-ocean-ref-1`: the cell, its centre, the chunk's SHA-256 and size,
+the tiling: 8 x 8 chunks from local -1024, -1024). Measured on the base
+master (10 October 2026): 10,528 bytes, 4 ground faces, 8 water faces, 146
+clipnodes, standing-hull chains at most 8 deep; 867 cells reference it.
+
+The engine does not read `OCEN` files yet: the open-world frames
+([OPEN_WORLD_FRAMES.md](OPEN_WORLD_FRAMES.md)) will place it for the sea
+cells. Until then the far terrain layer draws the sea as flat water at the
+water level where a frame's margin has no LAND (`tools/chim/far.py`).
+
+`chim.ocean.validate_ocean` checks a chunk file: it reads back (CRCs, record
+tiling), the brush and world-tree rules every chunk passes, solid under the
+seabed, water up to the water level and air above it, the standing hull
+solid just under and empty just over the seabed at the chunk's edges and
+beyond them (seamless when copies lie side by side), and seabed and water
+faces (up and down) each covering the chunk once.
+
 ## Validation
 
 `tools/chim/validate.py OUT` proves, from the files alone plus the builder's
@@ -1252,7 +1426,7 @@ Seyda Neen's frame maps are checked against the Seyda Neen region maps the
 builder converts from your data (without the terrain visual cull: these maps
 never ship, `--seyda-terrain-cull off`). From v0.0.35 the recorded v0.0.31 Seyda Neen
 maps (`--seyda-recorded DIR`) are optional and NOT RECOMMENDED since v0.0.31 (legacy: the shipped
-image holds only `seyda-chim.bsp` and its far layer for Seyda Neen); given, they are the reference
+image holds only `seyda-chim.chim` and its far layer for Seyda Neen); given, they are the reference
 instead (v0.0.33 stopped a CHIM build with Seyda Neen without them).
 
 See [Which Seyda Neen is in my build?](../LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.

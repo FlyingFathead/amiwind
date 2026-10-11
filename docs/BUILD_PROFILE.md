@@ -17,12 +17,20 @@ releases).
 - [Performance options](#performance-options)
 - [Reading a profile](#reading-a-profile)
 - [Optimizer](#optimizer)
+- [Perf guard](#perf-guard)
+- [Perf database](#perf-database)
+  - [Many builds: the stage ledger](#many-builds-the-stage-ledger)
+- [Unit reuse audit](#unit-reuse-audit)
+- [Build Timeline](#build-timeline)
 - [Live progress and ETA](#live-progress-and-eta)
 - [Sections](#sections)
+- [Phases and the heartbeat](#phases-and-the-heartbeat)
+- [Image step sub-phases (v0.0.36-dev3, 270 CHIM region cells)](#image-step-sub-phases-v0036-dev3-270-chim-region-cells)
 - [How it is measured](#how-it-is-measured)
 - [Stage reuse for development builds](#stage-reuse-for-development-builds)
   - [Reuse audit](#reuse-audit)
   - [Caches of another workspace](#caches-of-another-workspace)
+  - [Cache provenance](#cache-provenance)
 - [Build speed in CHIM](#build-speed-in-chim)
 - [Payload preflight](#payload-preflight)
 - [Measured release builds (v0.0.33 -> v0.0.34)](#measured-release-builds-v0033---v0034)
@@ -44,6 +52,9 @@ optimizing; reuse only what is provably unchanged.
 | `profile/sections/NN-stage.jsonl` | One line per timed section call |
 | `profile/manifests/STAGE.json` | Files the stage created, changed or deleted in the run folder, with SHA-256 |
 | `profile/fingerprints.json` | What each stage fingerprint is made of (for `explain`) |
+
+Run folders are deleted when a run is retired; the [perf database](PERF_DATABASE.md) keeps their
+numbers (see [Perf database](#perf-database)).
 
 The build summary footer shows the short form:
 
@@ -72,8 +83,14 @@ the time goes. None of these changes what a build produces.
 | `python tools/build.py profile report RUN` | The stage table, critical path, idle cores and suggestions of a finished build (`--html` for charts) |
 | `python tools/build.py profile compare RUN OLDER_RUN` | Per-stage wall time against an older run; slower stages are regressions (`--fail-on-regression` exits 3) |
 | `python tools/build.py profile optimize RUN [RUN ...]` | What to parallelize next, ranked: see [Optimizer](#optimizer) |
+| `python tools/build.py profile timeline RUN [RUN ...] --png OUT.png` | Build Timeline: one picture of where the wall time went over one or more runs (stages, gates, CPU in use). See [Build Timeline](#build-timeline) |
 | `--only-core-towns`, `--no-extra-town TOWN` | Debugging only: a smaller build without the shipped extra towns; the image does not match a release. See [LINUX_BUILD.md](LINUX_BUILD.md#shipped-towns-default) |
+| `--log-level quiet\|normal\|verbose`, `--quiet` | How much the stages print (default `normal`, or `AMIWIND_LOG_LEVEL`). `quiet` drops only per-unit progress lines; phase start and end lines with their time and cores, the heartbeat, warnings and errors always print. Recorded in the receipt (`log_level`); outputs and stage keys are the same. See [Phases and the heartbeat](#phases-and-the-heartbeat) |
 | `--no-profile` | Debugging only: no profile, no progress file, no output manifests (a later `--reuse-from` cannot use the run) |
+| `AMIWIND_HASH_METHOD=process` | Debugging only: payload SHA-256 checks in one spawned-process task per file (the earlier method) instead of threads of the stage in size batches (default since v0.0.36; same digests). Each hashing call is the profile section `parallel hash: sha256` with its file count and bytes |
+| `AMIWIND_HEAP_AUDIT_METHOD=python` | Debugging only: the world map heap audit's earlier per-entity leaf-link walk and edge-cache prefix loop instead of the float32 array methods (default since v0.0.36; the same report) |
+| `--perf-guard fail\|warn\|off`, `--perf-guard-baselines FILE` | The perf guard at the end of every build: a section that ran in parallel before and now runs serial, or slower for the same work, fails the build (exit 3). See [Perf guard](#perf-guard) |
+| `python tools/perf_guard.py check\|show\|seed ...` | Judge a finished run, show its verdict, or add finished runs to a baselines ledger. See [Perf guard](#perf-guard) |
 
 `./build.sh status ...` and `./build.sh profile ...` are the same commands.
 `--vis full` is not a speed option: it runs the slower full vis pass (see
@@ -162,12 +179,187 @@ ranked with the critical path first and then by the wall time they could save
 | `tail` | A stage ran on two or more cores, then spent more than 30 s (and 10 % of its time) at the end on about one core | One large item finished last: submit the largest items first, split it, or let the next stage start on the finished part |
 | `serial-critical` | A one-core stage of more than 60 s on the critical path | A parallel inner loop shortens the whole build directly |
 | `slot-wait` | The build took more than 1.25 times its longest dependency chain | Stages waited for job slots: give stages off the critical path fewer workers |
+| `underused-phase` | A phase or outermost section ran more than 30 s on fewer than half of the workers its stage held (`build_profile.underused`; also `[underused]` lines in the build summary and `stages[].underused` live in `build-progress.json`) | Run its independent items on the shared worker pool, cache its result by the SHA-256 of its inputs, or give the workers back ([BUILD-UNDERUSE-GATE-36](bugs/BUILD-UNDERUSE-GATE-36.md)) |
 
 With several runs each row says in how many of them the item appeared, so a
 one-off (a busy host, a cold disk cache) stands apart from a stage that is
 always slow. Items measured while other work loaded the machine say so: measure
 them again on a quiet host before acting. Every speed-up must keep the outputs
 byte for byte (check it against `--jobs 1`).
+
+## Perf guard
+
+Parallelization never regresses. The builder runs the perf guard (`tools/perf_guard.py`) after
+every build whose stages passed, and the master builder puts its verdict into the build result
+(`perf_guard`; step `perf-guard`) and `aw status`. It reads the run's `build-profile.json` and
+judges every stage section, phase and parallel map of a stage that was not reused and that ran
+for at least 30 s, against earlier runs of the SAME work only:
+
+| Baseline tier | Same work means | Compared |
+| --- | --- | --- |
+| exact | the stage's input fingerprint and the unit count are the same | cores and time |
+| units | the same unit count (a parallel map's items, a phase's unit total) | cores and time |
+| saturating | both runs had at least as many independent units as cores, so both could fill every core | cores only (as a share of the cores the run could use), never time |
+
+Anything else (another stage, another section, a run with fewer units than cores) is different
+work and is never compared. The cores baseline is the best share of usable cores any run of the
+same work reached (parallelism never falls back from what it achieved); the time baseline is the
+median of the exact, else same-units, runs.
+
+| Verdict | When | Fails the build |
+| --- | --- | --- |
+| `FAIL` | parallel -> serial (the baseline used 2+ cores, now under 1.5); or under half of the baseline's share of usable cores (and fewer cores); or more than 25 % and 30 s slower with the same units | yes |
+| `FIX-NOW` | no baseline needed: over 1 min with independent units (items, a phase total, or a section `config/perf-guard.json` declares per-unit) on under a quarter of the cores it could use (min(cores held, units)) | yes |
+| `WAIVED` | a FAIL or FIX-NOW covered by a waiver in `config/perf-guard.json` (bug ID, owning job, expiry date) | no; shown in the table, the result and `aw status` |
+| `BUSY HOST` | other work loaded the machine (the profiler's `host_busy`) in this run or the only baseline: time is never compared; cores only when the section still had at least the baseline's cores free, or left most of its free cores idle (the reasons say which) | no |
+| `ok`, `no baseline` | | no |
+
+Cores are compared only where at least 4 cores were usable (with two or three units one long unit
+sets the cores, not the code). A waiver ends at its date, or as soon as the bug register marks its
+bug fixed; a waiver lives at most 14 days (test-enforced) and must name a registered bug.
+
+Output: one table per build (stage, section, units, cores used / usable (held), time, baseline,
+verdict) ending with a TOTALS row, printed at the end of the build and written to `perf-guard.txt`
+and `perf-guard.json` in the run folder. A failed guard ends `tools/build.py` with exit 3: every
+stage passed and its outputs stay valid and reusable, but the build result is failed until the
+section is fixed or waived. `--perf-guard warn` only prints; `--perf-guard off` is for debugging
+only. Dry runs and `--no-profile` builds are not judged.
+
+Baselines: a JSON-lines ledger, by default `<workspace>/cache/perf-guard/baselines.jsonl` (the
+build pool's shared cache; `AMIWIND_PERF_GUARD_BASELINES` or `--perf-guard-baselines` override it).
+A build whose guard passed adds its sections (busy-host ones marked); a profile is added once, by
+its SHA-256. Seed or extend it from finished runs:
+
+```text
+python tools/perf_guard.py seed RUN [RUN ...] --baselines FILE
+python tools/perf_guard.py check RUN [--baselines FILE] [--record] [--json]
+python tools/perf_guard.py show RUN [--json]
+```
+
+The guard only reads the profile and the ledger; it never changes a build output. It sits beside
+the [Optimizer](#optimizer) (what to parallelize next) and the underused-phase list: those list,
+the guard fails.
+
+## Perf database
+
+`tools/perf_db.py` reads these files (and the gate results, the reuse audits and the CPU samples)
+into one SQLite database whose rows are never changed again, each file recorded with its SHA-256,
+so a number can be compared across every run that has it, including runs whose folders are gone:
+
+```text
+python3 tools/perf_db.py --db perf.db ingest out/build
+python3 tools/perf_db.py --db perf.db compare --metric heap.peak --frame frames/x-03/y-02
+python3 tools/perf_db.py --db perf.db stage-history --stage chim
+```
+
+Tables, commands, the container recipe and the deterministic rebuild: [PERF_DATABASE.md](PERF_DATABASE.md).
+
+### Many builds: the stage ledger
+
+```text
+python tools/build.py profile optimize --ledger LEDGER.jsonl [RUN ...]
+```
+
+With a stage ledger (one JSON object per stage and build: `stage`, `build`, `wall_s`, `cores_avg`, `jobs_max`,
+`status`; the perf database writes one), `optimize` also prints, per stage, how many builds it ran in, its median
+and longest wall time, its median cores, its slowest build and how often (and how long in total) it ran over 30 s
+on fewer than half of its workers. The list is sorted by that underused time, so the stage that wastes the most
+cores over many builds comes first.
+
+## Unit reuse audit
+
+```text
+python tools/build.py profile reuse RUN --cache CACHE_DIR [--cache ...] [--json] [--fail-on-recompute]
+```
+
+Every unit cache (world terrain, image passes, CHIM units, stair-walk records, ...) keeps a provenance record per
+entry (schema `aw-cache-provenance-1`: the entry's key, its input manifest, the run that made it) and a reuse log
+(`.provenance/reuse.jsonl`). The audit reads them for one run and lists, per cache:
+
+- **computed** and **reused** units of that run;
+- for each computed unit the inputs whose SHA-256 changed against the newest earlier entry of the same unit
+  (the `unit` name in its input manifest), or `parameters`; a unit with no earlier entry is `new unit`; one with
+  no unit name is `unexplained`;
+- **RECOMPUTED WITH AN UNCHANGED KEY**: a unit computed although an earlier entry, or an earlier reuse by another
+  run, already had its key. That is a reuse bug; `--fail-on-recompute` exits 3 so a gate or the release flow
+  stops on it;
+- **unkeyed stages**: stages that ran in the run with no unit cache of their own (`build_profile.STAGE_CACHES`);
+  they are reused or rebuilt only as a whole stage, and each is a work item under the hash-everything rule.
+
+The benchmark `tests/test_unit_reuse_audit.py` (`NoChangeRebuildBenchmark`) checks the other side: a rebuild with no
+change computes 0 units, and a changed input recomputes exactly its unit.
+
+## Build Timeline
+
+Part of the AmiWind Builder Profiler: one PNG that answers "where did the wall
+time go" over one build or a whole evening of builds, resumes and gates.
+
+```text
+python tools/build.py profile timeline RUN [RUN ...] --png OUT.png
+    [--labels NAME ...] [--title TEXT] [--start "YYYY-MM-DD HH:MM"] [--end ...]
+    [--utc-offset +HH:MM] [--samples CPU.jsonl] [--gates GATES.jsonl]
+    [--events JOBS.jsonl] [--commits REPO[:BRANCH]] [--host-cpus N] [--json OUT.json]
+```
+
+![Build Timeline of one v0.0.36-dev3 build](images/amiwind-v0.0.36-build-timeline.png)
+
+The title reads "TITLE: where the wall time went" (default: the run name, or
+the version of the runs). From top to bottom:
+
+- **Lanes** for commits (`--commits`), gates (`--gates`) and any other timed
+  jobs (`--events`, one lane per `lane` value): green outline passed, red
+  failed, grey still running.
+- **One block per run**, in start order: a bar for the whole run (light part:
+  the checks before the first stage), the reused stages and the stages too
+  short to read at the chart's scale as ticks on their own rows, then every
+  other stage as a bar labelled with its wall time and average cores (CPU /
+  wall). The shade is the share of the build's job budget it used (light: few
+  cores, dark: all); red = failed, hatched = still running, black outline =
+  critical path. A stage whose live expectation (from `build-progress.json`)
+  was off by more than 2x, or had no comparable history, says so in its label
+  with the basis (`expected 3 min (history (3 run(s)))`); a run that is still
+  going shows its last ETA and its basis after the run name.
+- **CPU cores in use**, stacked by job in 30 s means (`--step`), with the
+  machine's CPU threads dashed and the whole machine as a black line. The
+  legend gives each series' core-minutes inside the window.
+
+Inputs. Only what every build writes is read: a finished run's
+`build-profile.json` (stages, the one-second CPU timeline, `/proc/stat`
+machine load, critical path); for a run that is still going (or ran with
+`--no-profile`), `build-state.json` (each stage's start and duration),
+`build-progress.json` (the clock origin and the last update: a running stage
+ends there) and `build-summary.json`. The chart can be drawn while a build
+runs. Everything else is optional and passed in:
+
+| Option | One JSON object per line |
+| --- | --- |
+| `--samples` | `{"t": TIME, "name": "...", "cores": 3.2}`; optional `"group"` (the series to stack it in); the name `HOST` is the whole machine (`"cores"`, or `"cpu_pct"`: percent of all its CPUs). A sample whose name contains a drawn run's folder name joins that run's series (a build container named after its run); the run's own profiler timeline fills the time no sample covers. More than eight series: the smallest fold into "other". |
+| `--gates`, `--events` | `{"name": "...", "start": TIME, "end": TIME or null, "result": "passed" \| "failed" \| "running"}`; optional `"lane"` and `"label"`. `end: null` = still running (drawn to the end of the data). |
+
+TIME is epoch seconds or ISO 8601. Times with an offset (`Z`, `+00:00`, `+0300`)
+are exact; the build records are written in the container's clock (UTC) and
+are converted. Times without an offset are read in the `--utc-offset` zone,
+which is also the zone the chart is drawn in (default: the zone of the machine
+running the command; inside a container that is usually UTC, so pass the host's
+offset). Unreadable lines are skipped.
+
+How the CPU area is computed: each sample stands for the time since the
+previous sample of the same series (the profiler measures CPU over the real gap
+and divides by it); a gap over three times the usual one (a paused sampler)
+counts only the usual interval, so a late sample never spreads its rate over
+time it did not see; the 30 s means are time-weighted, so the area under a
+series equals the CPU it measured
+([TEST-PROFILE-TIMELINE-SUM-33](bugs/TEST-PROFILE-TIMELINE-SUM-33.md),
+[TEST-PROFILE-TIMELINE-BOUND-33](bugs/TEST-PROFILE-TIMELINE-BOUND-33.md):
+rates rounded to three decimals over jittered intervals stay within 0.2
+core-seconds; `tests/test_build_timeline.py` pins both). Container samples
+are snapshots, so where several jobs overlap the stack can pass the
+whole-machine line; the gap under that line is load no series covers.
+
+Drawing needs Pillow (in the builder Docker image); `--json OUT.json` writes
+the chart data without it. Fonts: DejaVu Sans when installed, else Pillow's own
+font. The same inputs give a byte-identical PNG with the same Pillow and fonts
+(no time stamps or metadata in the file).
 
 ## Live progress and ETA
 
@@ -208,6 +400,21 @@ What the file holds and how it is worked out:
   build on a 24-thread host) is used the same way. A stage in neither says
   "no history" and weighs the median of the known stages. A stage reused with
   `--reuse-from` weighs 5 s.
+- **Stage size**: a stage whose amount of work can be read from its command
+  line is compared only with earlier runs of a known size. Today that is the
+  chim stage: its frames (one per `--area`, one per `--chim-regions-cells`
+  cell). The history is scaled linearly by frames here / frames there (and
+  named so when the sizes differ by more than 2x); earlier runs whose size is
+  unknown do not count, and with none left the stage says `no comparable
+  history`, weighs the median like a stage without history, and the ETA says
+  `lower bound: no comparable history for chim` (`eta_lower_bound: true`)
+  instead of a confident number. Every stage row carries `expected_basis`
+  (`history (3 run(s))`, `history scaled by frames: 273 here, 3 in 3 earlier
+  run(s)`, `default table`, `no history`, ...) and, with a size, `work` and
+  `work_unit`. Origin: a 273-frame build's chim stage was expected at 154 s
+  from three-area runs and ran 1 h 48 min, while the progress showed 27 % and
+  about 22 minutes left
+  ([BUILD-PROGRESS-ETA-BASIS-36](bugs/BUILD-PROGRESS-ETA-BASIS-36.md)).
 - **Percent**: finished stages count their whole expected duration, a running
   stage its elapsed share (at most 95 % until it ends), pending stages nothing;
   the sum over all expected durations. Weighting by duration keeps a dozen
@@ -253,6 +460,12 @@ waited for, so `cores` above 1 means its worker pool or map tools ran in
 parallel. Without the builder the call costs two attribute reads and writes
 nothing. For standalone commands set `AMIWIND_PROFILE_SECTIONS=FILE.jsonl`.
 
+In `build-profile.json` each stage row lists its sections in one schema, the one
+the Build Timeline and the Toolkit Monitor draw: `name`, `start` and `end`
+(seconds after the first stage started; for a repeated section its first start
+and last end), `cpu` (seconds, the section and its children), optional `detail`,
+plus `calls`, `wall`, `cores_avg` and `phase` (a `build_profile.phase`).
+
 The builder also times functions without touching their code:
 `build_profile.instrument(stage)` wraps the functions listed for that stage in
 `INSTRUMENT` (the image step's world, flora, sky, optimizer, heap and volume
@@ -261,6 +474,118 @@ passes; the world terrain and scenery loops; Census; the asset census), every
 and every `subprocess.run` (as "exec qbsp", "exec vis", "exec make" ...). A
 test fails when a listed function no longer exists, and a missing target is
 reported in the profile, never silently dropped.
+
+## Phases and the heartbeat
+
+No part of a build runs silently. A stage marks its long steps with
+`build_profile.phase`; the builder process watches every running stage for
+silence.
+
+```python
+import build_profile
+
+with build_profile.phase('CHIM stats', '273 frames', total=273, unit='frames') as timer:
+    for frame in frames:
+        ...
+        timer.step(label=frame, line=True)     # counter (+ a progress line)
+    timer.done('CHIM stats: 2768 models')
+```
+
+prints, in the stage's log:
+
+```text
+CHIM stats: started, 273 frames
+[1/273 frames] CHIM stats: frames/x-11/y-01/frame.ccf
+...
+CHIM stats: 2768 models - took 38.0s, 23.1 cores
+```
+
+- **Start and end lines**: every phase prints when it starts and when it ends,
+  with its wall time and its cores: the CPU of the stage process and every
+  process under it (live worker pools included) divided by the wall time. A
+  phase that raises ends with `NAME: FAILED (ValueError) - took ...`.
+- **Records**: each phase is a line in the stage's sections file
+  (`profile/sections/NN-stage.jsonl`, the same file as the sections above:
+  `report` lists it) with its start and end as epoch times, wall, CPU, cores and
+  its counter. The Build Timeline draws the phases as a strip under the stage's
+  bar, also while the stage runs.
+- **Without code changes**: functions in `build_profile.PHASES` are timed as
+  phases by `instrument()` (the image step's world, sky, cull, optimizer, heap,
+  pack, finalize and check passes; world terrain; actor contact). The chim stage
+  times its world conversion, validation, statistics, heap gate, zone walk and
+  stair gate itself.
+- **Heartbeat**: the builder (the parent process, so a stage whose child prints
+  nothing at all is covered too) checks every running stage's log. After 30
+  seconds without output (`AMIWIND_HEARTBEAT_SECONDS`, `off` disables it) it
+  prints, and repeats after every further 30 silent seconds (every phase line and
+  heartbeat starts with the time since the build started, `[+1h02m]`):
+
+  ```text
+  [heartbeat] chim: [112/273 frames] CHIM stats: frames/x-03/y-02/frame.ccf: still working, 4m10s, 1.0 cores (no output for 30.0s)
+  ```
+
+  naming the stage, its current phase and counter (from the phase timer;
+  `(no phase recorded)` when the stage has none), how long that phase has run,
+  and the cores the stage's process tree uses (the profiler's sampler). The
+  last heartbeat and the current phase are also in `build-progress.json`
+  (`stages[].phase`, `stages[].heartbeat`) and in `build.py status`.
+- **Log level**: `--log-level quiet` (or `--quiet`) drops only the per-unit
+  progress lines (`build_profile.progress`, `timer.step(line=True)`); start and
+  end lines, heartbeats, warnings and errors always print. `verbose` is
+  reserved for more detail.
+
+The phase timer, the heartbeat and the log level only write logs and records
+next to the run: `tools/build_profile.py` is outside every stage key
+(`build_cache.INSTRUMENTATION_MODULES`) and `AMIWIND_LOG_LEVEL` and
+`AMIWIND_HEARTBEAT_SECONDS` are ignored environment variables, so changing them
+never rebuilds a stage; `tests/test_build_phases.py` checks that a stage's
+output has the same SHA-256 with the heartbeat on or off and at every log
+level. Origin: the chim stage of a 273-frame build ran its stair gate for about
+44 minutes, and its statistics for almost 8 more, with nothing to show the time
+([BUILD-PROFILE-SECTIONS-MISSING-36](bugs/BUILD-PROFILE-SECTIONS-MISSING-36.md)).
+
+## Image step sub-phases (v0.0.36-dev3, 270 CHIM region cells)
+
+Measured on the v0.0.36-dev3 full build (image step 1 h 22 min wall, 6.2 cores average on a 24-core budget):
+`build_profile.py report` and `optimize` for the step and its sections, the end time of each sub-phase's output
+file for the parts the profiler did not time yet, the builder's 30 s container CPU samples for the cores. "Reused by
+hash" says whether the sub-phase's per-unit result is kept by the SHA-256 of its inputs. After = this change
+(estimated until the next build measures it).
+
+| Sub-phase | What it does | Wall | Cores | Serial or parallel | Reused by hash | After |
+| --- | --- | --- | --- | --- | --- | --- |
+| Scene copy, terrain, scenery, flora install | stage the converted world | 8 s | 4-10 | parallel copies | stage reuse | unchanged |
+| Payload preflight, UI, torch, gallery staging | read-only checks, small conversions | 30 s | ~2 | serial | no | unchanged |
+| Combat data, player view | NPC sheets, Arena fighters, player bodies | 42 s | ~20 | parallel | no | unchanged |
+| Seyda Neen legacy region maps | convert the town into 65 region maps | 47 s | 19.6 | parallel | no | dead weight (see below) |
+| Seyda Neen town flora | flora into the 65 legacy maps | 15 s | 1 | serial | no | dead weight |
+| Harvest removal, QuakeC, actor annotate/bake | per-map passes | 19 s | 1-8 | mixed | no | unchanged |
+| Payload preflight (again), sky assets | sky conversion and palette | 53 s | 1 | serial | no | to do |
+| Guard torches | six guard models | 32 s | 1 | serial | no | to do |
+| Exterior sky, hidden-surface cull, hand stamps, cell numbers | per-map passes | 21 s | 7 | parallel | pass cache | unchanged |
+| World map optimizer | geometry/light/PVS sharing, 2,658 maps | 5 min 22 s | 21.7 | parallel | pass cache: 13 reused, 2,645 made | key fix to do |
+| Harvest, actor contact, entity tracker, progress, arrivals | gates | 52 s | 1-20 | mixed | no | unchanged |
+| Night lighting | lamp, glass and fog tables | 13 s | 1 | serial | no | unchanged |
+| CHIM town frame maps (Balmora, Seyda Neen, Bitter Coast) | frame maps of the CHIM areas | 33 s | 1 | serial, world read 2x per map | no | world read once |
+| CHIM region frame maps (270) | replace each region map by its frame map | about 23 min | 1 | serial, world read per map (about 5 s) | no | world read once, shared pool, pass cache |
+| Frame-map heap, engine limits, stair walk, heap audit | gates on the final maps | in finalize 37 min 35 s | 5.9 | mixed | stair walk records | to measure |
+| Fingerprints, audio and music, volumes, drives | payload and disk images | in finalize | ~1.8 during audio | audio serial | no | to do (BUILD-IMAGE-AUDIO-SERIAL-36) |
+
+The region frame maps were the single largest idle stretch: `build_profile.py optimize` lists the image step at
+1.2 of 24 cores for 24 min 49 s on the critical path (saves up to 23 min 35 s). Each region frame map read and
+checked the whole 190 MB CHIM world again (`chim.validate.load_world`) for its placements; the image now reads it
+once (`chim.frame_map.load`), makes the frame maps on the shared worker pool in table order (byte-identical with
+one worker or many) and keeps each one in the image pass cache under the SHA-256 of its inputs (legacy map,
+frame row, placement references, frame bounds and chunk grid, model files, activated-object header), so an
+unchanged map is not made again (BUILD-IMAGE-CHIM-MAPS-SERIAL-36). Every part prints its start, counters and
+"took X, N cores" (build_profile.phase, progress lines).
+
+Dead weight in the same run (BUILD-LEGACY-TOWN-MAPS-SHIPPED-36): the image step converted 65 Seyda Neen region
+maps and staged 270 open-world maps of CHIM region cells, ran every per-map pass on them and removed them before
+packing (435,379,983 bytes in `chim-removed-legacy.json`); none of them shipped. The 42 `bm*` maps in the image
+are Balmora interiors, not legacy region maps. The Seyda Neen frame map and its two special maps, and each region
+frame map's point entities, are still made from those legacy maps; moving those sources to the game data is the
+first part of the world map manifest (docs/BUILD_MANIFEST.md).
 
 ## How it is measured
 
@@ -458,7 +783,9 @@ python tools/build.py --reuse-report RUN [--json FILE]
 
 Read only. Lists every stage a `--reuse-from` run did not reuse, with the
 recorded reason, as EXPECTED (a real input change, a stage that never reuses,
-the image step, a stage that follows an expected rebuild) or UNEXPECTED (a key
+the image step, a stage that follows an expected rebuild, a stage the reuse
+source had itself reused without a file a later stage replaced there and that
+runs again because that later stage runs again) or UNEXPECTED (a key
 that changed only with files no output depends on, such as the release file
 list; a refused old record; outputs of a rebuilt stage that differ although its
 inputs did not, with the files that differ). Exit status 1 when anything is
@@ -478,6 +805,54 @@ and only the steps of flights in release candidates and finals (`flights`: the
 nightly full report builds with `--stair-walk all`. A flight row is the same in
 both walks; the release receipt says that ramps and single steps were not walked
 (`scope`). Measured costs: [performance/BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md).
+
+The stair walk is a check of the collision, not a step every build must repeat. Every legacy map and every
+CHIM frame is walked once; its rows are kept by the SHA-256 of what the walk reads (the map's bytes, or the
+frame's terrain, placements and placed models) together with the walk's own code and the stair rule, and reused
+while that is unchanged (`--stair-walk-cache cached`, the default). The scope above says WHAT is walked: with the
+cache, `all` never means walking an unchanged map or frame again. On every build a few reused ones (two by
+default, `--stair-walk-sample N`, seeded and named in the log) are walked again and compared with their stored rows;
+a difference stops the build, because it means the key missed one of the walk's inputs. `--stair-walk-cache full`
+walks every map and frame again: for regression and beta-test runs, such as the from-scratch reference build
+before a release or a nightly check, not for everyday builds.
+
+Each stored walk is a record (`tools/stair_records.py`): its key, the rows and their counts by result, the walk's
+code version, the AmiWind version, the source commit, the run name, the master builder request and the host time,
+with the SHA-256 of the record itself. A record is only a candidate until the run that wrote it has passed every
+gate as a build of the master builder (`tools/aw.py`): the master builder then marks the run's records as checked
+(`stair_records.py promote --run RUN`), and only a checked record is ever reused. A record of a failed, dry or local
+run, a damaged record, or one written again since its check, is walked again. The build log and the stair report
+name every map and frame as "walked" or "reused from RUN (VERSION, COMMIT, TIME)", and the master builder's result
+counts the records it marked and how many maps and frames the build reused and walked. The CHIM stage prints one line per frame as its walk
+finishes, and runs its heap gate and zone walk (seconds) before the stair walk (BUILD-CHIM-HEAP-GATE-LATE-36,
+BUILD-CHIM-STAIR-WALK-UNCACHED-36). The receipts record the mode and how many maps or frames were reused, walked
+and walked again.
+
+A CHIM frame's key (key form `chim-stair-key-2`, `chim.collision.frame_stair_parts`) holds exactly what its walk
+reads: the frame's path, the stair tile and the frame grid (grain, low corner, size); per chunk its place and the
+lumps of its terrain image the walk reads (planes, vertexes, nodes, texinfo, faces, clipnodes, leafs, edges,
+surfedges, models); per chunk its owned placements in order (reference, origin, yaw, box and the same lumps of the
+placed model's image, by content). It never holds the world's texture table entries (the textures lump), the
+world's model numbers, placement ids, reach records or lighting, which change in every frame when a frame is
+added anywhere in the world (the coast2 build walked all 330 frames again for that reason, although 220 of the
+237 frames it shared with dev5 had byte-identical collision). The walker's code in the key is the frame worker
+(`stair_task`) and what it reaches; the known-findings table is not in it. A walked frame says why in its line
+and in the report: `walked: no earlier walk of this frame in the pool`, `walked: inputs changed: 2 of 41 (chunk
+0,1 terrain, chunk 0,1 placements)`, `walked: walker code changed (...)`, or `walked: its stored walk has no check
+mark of a passed master build`; one summary line counts the reasons. The pool keeps, per frame, the key and the
+inputs of its last stored walk (`stair-walk-frames/`, bookkeeping only).
+
+The walk itself is scheduled as units: the count step (one read per frame, in parallel) gives the steps and
+ramps of every 1024-unit core; cores without any are skipped (they walk nothing), the others are cut in core
+order into runs of about total / (4 x workers) steps, and the runs go to the full worker count largest first,
+results taken as they finish. A worker reads a frame once per unit instead of once per core, and one large frame
+no longer tails the gate. The rows are the per-core walk's, byte for byte (tests/test_chim_stair_key.py).
+
+Counted progress lines put the counters first (`tools/progress_line.py`): `[done/total work | done/total
+containers] stage: unit: result`, the real work units first. The stair walks count their steps and ramps before
+they start (polygons only, in parallel; a reused map or frame counts its recorded rows), so a line reads
+`[12034/15415 stairs | 246/273 frames] CHIM stair gate: frames/x+21/y-08: 51 steps and ramps, 0 failed (walked)`,
+with `(reused from RUN (VERSION, COMMIT, TIME))` or `(walked again: sample, matches its record)` for the others.
 
 Scene stages that change an earlier stage's folder in place limit reuse: when
 such a stage is rebuilt, the earlier stages whose files it replaced are rebuilt
@@ -569,6 +944,41 @@ this build's own cache; nothing is written to the other workspace
 fingerprint; BUILD-CACHE-PER-WORKSPACE-33). The whole-builder profile with
 measured stage and section costs, failure costs and open items:
 [performance/BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md).
+
+### Cache provenance
+
+Every cache entry also records where it came from (`tools/cache_provenance.py`, one record format
+`aw-cache-provenance-1` for every cache; CACHE-NO-PROVENANCE-36): the cache and key, the input manifest (each
+input's name, SHA-256 and size, and the parameters, so a changed key can be explained), the output SHA-256 (never
+empty) and its kind, the host time with offset, the AmiWind version, commit, run, master builder request and job,
+the SHA-256 of the build's tools, the CHIM version and world format, a retention block and how each field was found
+(exact, estimated, inferred or N/A).
+
+Every pass names the unit it stores (the map, CHIM frame, region frame, route, head or model group) and the
+inputs its key was made from one by one (`cache_provenance.name_unit`), together with the pass's own sources
+and options, so the reuse audit can say which input of a recomputed unit changed.
+
+| Cache | Where the record is |
+| --- | --- |
+| stage records (`profile/manifests/STAGE.json`) | `provenance` field (output = the unit tree's stage hash) |
+| image passes, stage units, stair-walk records | `provenance` field of the entry's JSON |
+| asset pool keys | `provenance` field, or `KEY.meta.json` beside a key written by `point` |
+| asset pool objects | `.provenance/objects.jsonl` (named by SHA-256; who stored them, when) |
+| CHIM unit cache | `KEY.meta.json` beside each pickle (the pickle's bytes unchanged) |
+| world terrain cache | `provenance` field of the entry's `conversion.json` |
+| entries written before 11 October 2026 | `.provenance/backfill.jsonl` of the cache |
+
+Each cache also keeps `.provenance/reuse.jsonl` (one appended line per reuse: reuse count and last reuse per key)
+and `.provenance/pins.jsonl` (entries pinned for the garbage collector: `cache_provenance.py pin`).
+
+Rules: provenance never changes a stage, unit or pass key (the writers' provenance statements are left out of
+every key computation, and the module reads only the environment); a missing, estimated or N/A field is never a
+reason to rebuild; a reused entry whose output no longer has its recorded SHA-256 is a miss, built again, and never
+fails the build. Commands:
+
+    python tools/cache_provenance.py summary CACHE...          # entries, bytes, with/without provenance, ages, versions
+    python tools/cache_provenance.py show KEY|PATH [--cache CACHE]
+    python tools/cache_provenance.py backfill CACHE... --builds WORKSPACE/build [--trials TRIALS.jsonl] --dry-run
 
 ## Build speed in CHIM
 

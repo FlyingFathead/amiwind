@@ -12,6 +12,8 @@
 #define CHIM_OPEN_FILES		4		/* sector files kept open at once (the host tests may set fewer) */
 #endif
 #define CHIM_MAX_CHUNKS		4096
+/* Rows of the world file table (chim_asset_t.file is 16 bits); a 270-region coast world has 7,236 (CHIM-DEV3-MAPLOAD-CRASH-36). */
+#define CHIM_MAX_FILES		65535
 #define CHIM_MAX_RECORDS	8192		/* placement records in one chunk */
 #define CHIM_MIN_BUFFER		(AW_BRUSH_SLICE_BYTES)
 #define CHIM_MIN_ZONE		(128*1024)	/* below this a CHIM map does not start */
@@ -87,6 +89,8 @@ typedef struct
 	float		low[2], high[2];	/* chunk square in the frame */
 	chim_user_t	chunk;				/* chim_chunk_t catalogue */
 	chim_user_t	terrain;			/* chim_model_t terrain */
+	float		shift[3];			/* 0.7: where its (chunk-local) terrain is placed; 0 for CHK0 */
+	long		terrain_bytes;		/* its terrain image's bytes once the head was read, else 0 */
 	int			state, ready;
 	int			partial;			/* active without some models (CHIM-CHUNK-LOAD-FAIL-33) */
 	int			grafted;			/* its terrain is in the frame world */
@@ -154,6 +158,7 @@ void ChimModels_Init (void);
 chim_model_t *ChimModels_Find (unsigned id);
 int ChimModels_Step (unsigned id, long *budget);
 int ChimModels_TerrainStep (int entry, long *budget);
+int ChimModels_TerrainPlace (int entry, chim_pack_t **pack, long *at, long *bytes);
 int ChimModels_Busy (void);
 chim_model_t *ChimModels_Terrain (int entry);
 void ChimModels_Abort (void);
@@ -180,6 +185,7 @@ int ChimChunks_Frozen (edict_t *ent);
 int ChimChunks_FrozenLast (void);
 void ChimChunks_Prime (const vec3_t origin, long budget);
 int ChimChunks_Forget (entity_t *ent);
+const char *ChimChunks_Describe (const entity_t *ent, char *out, int size);
 extern int (*chim_story_hidden)(void);	/* 1: placements flagged story hidden stay out */
 void ChimChunks_Streaming (int *margin, unsigned long *urgent_loads, int *ahead);
 float ChimChunks_ActiveRadius (void);
@@ -202,6 +208,7 @@ int ChimStatics_Activate (int index);
 void ChimStatics_Deactivate (int index);
 int ChimStatics_Link (int (*add)(entity_t *ent, const vec3_t mins, const vec3_t maxs), int (*linkable)(int index));
 int ChimStatics_Forget (entity_t *ent);
+const char *ChimStatics_Describe (const entity_t *ent, char *out, int size);
 void ChimStatics_ReleaseEfrags (void);
 void ChimStatics_PoolReset (void);
 void ChimStatics_Report (void);

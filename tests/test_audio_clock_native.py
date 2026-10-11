@@ -30,6 +30,7 @@ class AudioClockTests(unittest.TestCase):
                     ('scheduler', SOURCE/'snd_dma.c', ['-DAMIGA']),
                     ('mixer', SOURCE/'snd_mix.c', []),
                     ('music', SOURCE/'aw_music.c', []),
+                    ('aread', SOURCE/'aw_aread.c', []),
                     ('format', SOURCE/'aw_format.c', [])):
                 obj = directory/(name+'.o')
                 self.checked(['cc', *FLAGS, *defines, '-I'+str(SOURCE), '-c', str(source), '-o', str(obj)])

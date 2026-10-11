@@ -335,17 +335,22 @@ class ParallelBuildTests(unittest.TestCase):
         watch = '\n'.join([
             'import json, os, sys, time',
             'from pathlib import Path',
-            'seen = []; end = time.time() + {}',
+            'seen = []; end = time.time() + {}; stop = {}',
             'while time.time() < end:',
             '    v = int(Path(os.environ["AMIWIND_BUILD_JOBS_FILE"]).read_text())',
             '    seen.append(v) if not seen or seen[-1] != v else None',
+            '    if v == stop: break',
             '    time.sleep(.02)',
             'Path({!r}).write_text(json.dumps(seen))'])
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            steps = [('engine', [sys.executable, '-c', watch.format(2.5, str(root / 'engine.json')), '--jobs', '1']),
+            # TEST-PARALLEL-SHARE-TIMING-36: terrain watches until it sees the freed budget (at most 20 s), not a
+            # fixed 4 s that a busy host can outlast.
+            engine_watch = watch.format(2.5, None, str(root / 'engine.json'))
+            terrain_watch = watch.format(20.0, 8, str(root / 'terrain.json'))
+            steps = [('engine', [sys.executable, '-c', engine_watch, '--jobs', '1']),
                      ('setup', [sys.executable, '-c', 'import time; time.sleep(.4)']),
-                     ('terrain', [sys.executable, '-c', watch.format(4.0, str(root / 'terrain.json')), '--jobs', '1'])]
+                     ('terrain', [sys.executable, '-c', terrain_watch, '--jobs', '1'])]
             with contextlib.redirect_stdout(io.StringIO()):
                 execute_parallel(steps, root / 'run', {'compiler_jobs': 8}, root)
             state = json.loads((root / 'run/build-state.json').read_text())

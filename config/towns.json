@@ -141,6 +141,30 @@
       ],
       "travel": null,
       "blocked": "exterior regions over the loader heap budget (VIVEC-HEAP-31): 6 of 25 regions, up to +2,534,244 B; not convertible within the 64-region cap at draw distance 540"
+    },
+    {
+      "id": "bcoast_x7y2",
+      "config": "bcoast_x7y2.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
+    },
+    {
+      "id": "vivec_city",
+      "config": "vivec_city.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
     }
   ]
 }

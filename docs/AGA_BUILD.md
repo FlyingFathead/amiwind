@@ -161,7 +161,9 @@ engine` fails if the compiler prints any warning. This covers the 68040 and
 Do not add `-Wno-*` flags to hide a new warning; fix the cause.
 
 The SDK vasm assembles the independent 68000 boot checker and the FPU support
-library loader `AmiWindFPU`; the renderer uses no extracted assembly. An optional
+library loader `AmiWindFPU`, and, for the experimental `upstream` engine profile only,
+upstream AmiQuake's 68k assembly ([engine profiles](ENGINE_PROFILES.md)); the default `c`
+profile links no assembly. An optional
 `--bootcheck` image argument selects the checker's binary; otherwise the builder
 expects `AmiWindCheck` (and `AmiWindFPU`) beside the engine.
 
@@ -170,8 +172,8 @@ from your Workbench or accelerator installation into `LIBS:` on the boot disk;
 the startup sequence then opens it before the boot check. See
 [FPU support library](FPU_SUPPORT_LIBRARY.md).
 
-The runtime uses GPL C span drawing and an independent C2P routine. Assembly
-identified upstream as extracted from a binary is excluded. Build outputs and
+The default runtime (`--engine-profile c`) uses GPL C span drawing and an
+independent C2P routine; upstream's assembly is linked only by `--engine-profile upstream`. Build outputs and
 all game-derived results stay external. The image builder validates all music
 streams and reads every payload back from the finished RDB image before success.
 No ROM or Workbench disk files are copied by this builder, except the FPU

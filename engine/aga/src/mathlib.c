@@ -510,6 +510,8 @@ if (sides == 0)
 #endif
 
 
+#if !AW_ASM_MATHS
+/* The engine profile's maths unit links upstream's mathlib_68k.s AngleVectors instead (docs/ENGINE_PROFILES.md). */
 void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
 {
 	float		sr, sp, sy, cr, cp, cy;
@@ -529,6 +531,7 @@ void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
 	up[1] = cr*sp*sy - sr*cy;
 	up[2] = cr*cp;
 }
+#endif
 
 int VectorCompare (vec3_t v1, vec3_t v2)
 {

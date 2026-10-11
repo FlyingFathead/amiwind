@@ -13,11 +13,20 @@ class Tests(unittest.TestCase):
     def test_map_palette_spans_preserve_town_metadata_and_reject_malformed(self):
         raw=self.world_map()
         self.assertEqual(spans(raw,'world/map.awm')[0],[(28,1),(92,8)])
-        for at,fmt,value in [(0,'4s',b'AWM2'),(4,'H',513),(24,'I',9),(28,'I',256),(88,'f',float('nan'))]:
+        for at,fmt,value in [(0,'4s',b'AWM3'),(4,'H',513),(24,'I',9),(28,'I',256),(88,'f',float('nan'))]:
             broken=bytearray(raw);struct.pack_into('<'+fmt,broken,at,value)
             with self.subTest(at=at),self.assertRaises(ValueError):spans(broken,'world/map.awm')
         for broken in (raw[:31],raw[:-1],raw+b'!'):
             with self.assertRaises(ValueError):spans(broken,'world/map.awm')
+
+    def test_awm2_lava_colour_is_a_palette_span_and_section_is_checked(self):
+        from prepare_world_ui import lava_section
+        rows=[{'cell':[1,2],'points':[[0,0],[10,0],[10,10]],'bounds':[0,0,10,10]}]
+        raw=b'AWM2'+self.world_map()[4:]+lava_section(rows,201)
+        self.assertEqual(spans(raw,'world/map.awm')[0],[(28,1),(92,8),(112,1)])
+        for broken in (raw[:-1],raw+b'!',raw[:100]+b'LAVX'+raw[104:]):
+            with self.subTest(size=len(broken)),self.assertRaises(ValueError):spans(broken,'world/map.awm')
+        self.assertRaises(ValueError,spans,b'AWM1'+raw[4:],'world/map.awm')
 
     def test_world_map_overlay_rebinds_receipt_and_preserves_landmarks(self):
         from prepare_world_ui import validate, WORLD_UI_FILES
@@ -123,5 +132,26 @@ class Tests(unittest.TestCase):
             (src/'unknown.bin').write_bytes(bytes(8))
             with self.assertRaises(ValueError):convert(src,root/'rejected')
             self.assertFalse((root/'rejected').exists())
+
+    def test_overlay_is_the_same_with_any_worker_count(self):
+        # Every file scanned and remapped on the shared worker pool: same output tree and receipt with 1 and 3 workers.
+        results=[]
+        for jobs in (1,3):
+            with tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);src=root/'source';(src/'gfx').mkdir(parents=True)
+                pal=bytearray(bytes([v for i in range(256) for v in (i,i,i)]))
+                for i,(target,_) in BANK.items():pal[i*3:i*3+3]=pal[target*3:target*3+3]
+                (src/'gfx/palette.lmp').write_bytes(bytes(pal))
+                for name,rows in [('colormap.lmp',64),('fog.lmp',16)]:
+                    (src/'gfx'/name).write_bytes(bytes(range(256))*rows)
+                for n in range(9):
+                    (src/('part%d'%n)).mkdir()
+                    (src/('part%d/loading.lmp'%n)).write_bytes(struct.pack('<2i',2,2)+bytes([222,255,101+n,95]))
+                report=convert(src,root/'output',jobs=jobs)
+                tree={p.relative_to(root/'output').as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
+                      for p in sorted((root/'output').rglob('*')) if p.is_file() and p.name!='sky-palette-overlay-receipt.json'}
+                report.pop('time');report.pop('source');report.pop('output')
+                results.append((tree,json.dumps(report,sort_keys=True)))
+        self.assertEqual(results[0],results[1])
 
 if __name__=='__main__':unittest.main()

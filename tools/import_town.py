@@ -447,6 +447,8 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
     if blocked and not dry_run:
         raise ValueError(title + ' is blocked in config/towns.json: ' + blocked + ' (measure it with --dry-run)')
     data = resolve_data_files(data_files); scene = ensure_external(scene, title + ' scene')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     out = ensure_external(out, title + ' work'); jobs = resolve_jobs(jobs)
     if not out.exists():
         out.mkdir(parents=True)
@@ -687,7 +689,9 @@ def convert_interiors(data, scene, settings, qbsp, vis, light, ffmpeg, jobs, vis
             if not dry_run:
                 raise
             result['failed']['residents'] = {'cell': '', 'error': 'residents: %s' % error}
-        result['receipt'] = town_interiors.write_room_banks(data, scene, result)
+        # a town that takes other towns' rooms (interiors_from: all of Vivec in one frame) is where they lead out
+        prefer = (town_field(settings, 'id'),) if settings.get('interiors_from') else ()
+        result['receipt'] = town_interiors.write_room_banks(data, scene, result, prefer=prefer)
         reports = {r['map']: r for r in result['reports']}
         for row in result['receipt']:
             report = reports[row['map']]

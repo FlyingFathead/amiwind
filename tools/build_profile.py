@@ -17,8 +17,9 @@ the build summary. Read and compare runs with:
     python tools/build_profile.py report RUN [--compare OLDER_RUN] [--html OUT.html]
     python tools/build_profile.py compare RUN OLDER_RUN [--fail-on-regression]
     python tools/build_profile.py optimize RUN [RUN ...]
+    python tools/build_profile.py timeline RUN [RUN ...] --png OUT.png [--samples JSONL] [--gates JSONL]
 
-(the same as `python tools/build.py profile report|compare|optimize ...`).
+(the same as `python tools/build.py profile report|compare|optimize|timeline ...`).
 Live progress and ETA while a build runs: tools/build_progress.py
 (`python tools/build.py status RUN`).
 
@@ -33,6 +34,7 @@ from contextlib import contextmanager
 import functools
 import html as html_escape
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -312,6 +314,263 @@ class section:
         return timed
 
 
+# --------------------------------------------------------------------------
+# Phases: named, always-timed parts of a stage that say when they start and end
+# (BUILD-PROFILE-SECTIONS-MISSING-36). This module is left out of every stage key
+# (build_cache.INSTRUMENTATION_MODULES): changing the wording here never rebuilds a stage.
+
+LOG_LEVEL_ENV = 'AMIWIND_LOG_LEVEL'      # quiet | normal | verbose (build.py --log-level, --quiet)
+LOG_LEVELS = ('quiet', 'normal', 'verbose')
+NOW_SUFFIX = '.now'                      # the stage's current phase, for the builder's heartbeat
+
+
+def log_level():
+    value = os.environ.get(LOG_LEVEL_ENV, 'normal').strip().lower()
+    return value if value in LOG_LEVELS else 'normal'
+
+
+BUILD_EPOCH_ENV = 'AMIWIND_BUILD_EPOCH'   # override of the build's start (epoch seconds) for the prefix
+EPOCH_FILE = 'build-epoch.txt'            # RUN/profile/build-epoch.txt: written by the builder's profiling session
+_PROCESS_START = time.time()
+_EPOCH = []
+
+
+def build_epoch():
+    """The build's start: AMIWIND_BUILD_EPOCH, else RUN/profile/build-epoch.txt (found from the stage's sections
+    file), else this process's start."""
+    value = os.environ.get(BUILD_EPOCH_ENV)
+    if value:
+        try:
+            return float(value)
+        except ValueError:
+            pass
+    if not _EPOCH:
+        found = _PROCESS_START
+        path = _section_file()
+        if path:
+            try:
+                found = float((Path(path).parent.parent / EPOCH_FILE).read_text(encoding='utf-8').strip())
+            except (OSError, ValueError):
+                pass
+        _EPOCH.append(found)
+    return _EPOCH[0]
+
+
+def stamp(now=None):
+    """'[+1h02m] ' - the time since the build started (build_epoch), else since this
+    process started: the prefix of every phase line and heartbeat, so a log tells when each step ran."""
+    origin = build_epoch()
+    return '[+%s] ' % _seconds(max(0.0, (time.time() if now is None else now) - origin))
+
+
+def took_text(wall, cpu=None):
+    """'took 41m12s, 21.4 cores' (cores = CPU of the process and everything under it / wall)."""
+    text = 'took ' + _seconds(wall)
+    if cpu is not None and wall and wall > 0:
+        text += f', {cpu / wall:.1f} cores'
+    return text
+
+
+def counter_text(done, total=None, unit=None):
+    """'112/273 frames': the counter of the builder's progress lines (tools/progress_line.py, one form for all)."""
+    if total is None:
+        return str(done) + (' ' + unit if unit else '')
+    from progress_line import counter_text as one_form
+    return one_form((done, total, unit) if unit else (done, total))
+
+
+def progress(text, stream=None):
+    """A per-unit progress line ('[112/273 frames] CHIM stats: x-03/y-02'): printed unless the log level is
+    quiet. Start/end lines, heartbeats, warnings and errors are never quieted."""
+    if log_level() != 'quiet':
+        print(text, file=stream, flush=True)
+
+
+def _tree_cpu():
+    """CPU seconds of this process and every process under it (live children included), else own + reaped."""
+    if linux_proc():
+        try:
+            return tree_usage(os.getpid())[0]
+        except Exception:  # noqa: BLE001
+            pass
+    times = os.times()
+    return times.user + times.system + times.children_user + times.children_system
+
+
+def _write_now(state):
+    path = _section_file()
+    if not path:
+        return
+    try:
+        temporary = path + NOW_SUFFIX + '.tmp'
+        with open(temporary, 'w', encoding='utf-8', newline='\n') as stream:
+            stream.write(json.dumps(state, sort_keys=True))
+        os.replace(temporary, path + NOW_SUFFIX)
+    except OSError:
+        pass  # Profiling must never fail a build.
+
+
+def read_now(sections_path):
+    """The current phase of a stage ({name, started_at, done, total, unit}) or None."""
+    try:
+        return json.loads(Path(str(sections_path) + NOW_SUFFIX).read_text(encoding='utf-8')) or None
+    except (OSError, ValueError):
+        return None
+
+
+_phases = []    # open phases of this process, innermost last
+
+
+class phase:
+    """A named part of a stage, always timed and never silent:
+
+        with build_profile.phase('CHIM stats', detail='273 frames', total=273, unit='frames') as timer:
+            for ...:
+                timer.step(label=frame)            # counter for the heartbeat (+ a progress line with line=True)
+            timer.done('CHIM stats: 2768 models')  # the summary; '- took 41m12s, 21.4 cores' is appended
+
+    prints 'NAME: started[, detail]' on entry and the summary (or 'NAME: done' / 'NAME: FAILED (Error)') with
+    its time and cores on exit, records the phase in the stage's sections file (wall, CPU of the whole process
+    tree, cores, epoch start and end; `build_profile.py report` and the Build Timeline read it) and keeps the
+    stage's current phase and counter where the builder's heartbeat reads it. Output files are never touched."""
+
+    def __init__(self, name, detail=None, total=None, unit=None, stream=None):
+        self.name, self.detail, self.total, self.unit = str(name), detail, total, unit
+        self.stream = stream
+        self.count, self.label, self.summary = 0, None, None
+        self._written = 0.0
+
+    def _state(self):
+        return {'name': self.name, 'started_at': round(self.at, 3), 'done': self.count, 'total': self.total,
+                'unit': self.unit, 'label': self.label, 'pid': os.getpid()}
+
+    def __enter__(self):
+        self.start = time.monotonic()
+        self.at = time.time()
+        self.cpu0 = _tree_cpu()
+        self.depth = len(_phases)
+        _phases.append(self)
+        print(stamp() + f'{self.name}: started' + (f', {self.detail}' if self.detail else ''), file=self.stream,
+              flush=True)
+        _write_section({'name': self.name, 'event': 'start', 'phase': True, 'pid': os.getpid(), 'depth': self.depth,
+                        'start': round(self.start, 4), 'at': round(self.at, 3), 'detail': self.detail})
+        _write_now(self._state())
+        return self
+
+    def step(self, count=None, label=None, line=False):
+        """Advance the counter (by one, or to COUNT); line=True also prints a progress line."""
+        self.count = self.count + 1 if count is None else count
+        self.label = label
+        if line:
+            from progress_line import line as progress_text
+            counter = (self.count, self.total, self.unit) if self.total is not None else (self.count, '?', self.unit)
+            progress(progress_text(self.name, label, None, counter), self.stream)
+        now = time.monotonic()
+        if now - self._written >= 1.0 or (self.total is not None and self.count >= self.total):
+            self._written = now
+            _write_now(self._state())
+
+    def done(self, summary):
+        self.summary = str(summary)
+
+    def elapsed(self):
+        return time.monotonic() - self.start
+
+    def __exit__(self, kind, value, traceback):
+        wall = time.monotonic() - self.start
+        cpu = max(0.0, _tree_cpu() - self.cpu0)
+        if kind is not None and not (kind is SystemExit and not getattr(value, 'code', 1)):
+            text = f'{self.name}: FAILED ({kind.__name__})'
+        else:
+            text = self.summary or f'{self.name}: done'
+        print(stamp() + f'{text} - {took_text(wall, cpu)}', file=self.stream, flush=True)
+        record = {'name': self.name, 'phase': True, 'pid': os.getpid(), 'depth': self.depth, 'detail': self.detail,
+                  'start': round(self.start, 4), 'at': round(self.at, 3), 'end_at': round(time.time(), 3),
+                  'wall': round(wall, 4), 'cpu_self': round(cpu, 3), 'cpu_children': 0.0,
+                  'cores': round(cpu / wall, 2) if wall > 0 else None}
+        if self.total is not None:
+            record.update(done=self.count, total=self.total)
+        if kind is not None:
+            record['error'] = kind.__name__
+        _write_section(record)
+        if _phases and _phases[-1] is self:
+            _phases.pop()
+        if _phases:
+            _write_now(_phases[-1]._state())
+        else:
+            path = _section_file()
+            if path:
+                try:
+                    os.remove(path + NOW_SUFFIX)
+                except OSError:
+                    pass
+        return False
+
+    def __call__(self, function):
+        name, detail = self.name, self.detail
+
+        @functools.wraps(function)
+        def timed(*args, **kwargs):
+            with phase(name, detail):
+                return function(*args, **kwargs)
+        timed.__amiwind_section__ = name
+        return timed
+
+
+# Functions instrument() times as phases (start/end lines with time and cores) instead of quiet sections:
+# the long, once-per-stage steps. (table stage, target) -> label; every target is also in INSTRUMENT.
+PHASES = {
+    ('build_aga image', 'install_world_scenery'): 'Image: world scenery',
+    ('build_aga image', 'install_world_terrain:install'): 'Image: world terrain',
+    ('build_aga image', 'install_world_flora:install'): 'Image: world flora',
+    ('build_aga image', 'exterior_sky_build:configure_staged_maps'): 'Image: exterior sky',
+    ('build_aga image', 'hidden_surface_build:cull_staged_maps'): 'Image: hidden surface cull',
+    ('build_aga image', 'optimize_world_maps:optimize_maps'): 'Image: world map optimizer',
+    ('build_aga image', 'optimize_world_maps:verify_optimized_maps'): 'Image: optimizer check',
+    ('build_aga image', 'actor_grounding:annotate'): 'Image: actor annotate',
+    ('build_aga image', 'actor_grounding:bake_ground'): 'Image: actor ground bake',
+    ('build_aga image', 'audit_world_map_heap_with_receipt'): 'Image: world map heap audit',
+    ('build_aga image', 'world_volumes:pack'): 'Image: pack volumes',
+    ('build_aga image', 'finalize_image'): 'Image: finalize',
+    ('build_aga image', 'check_image'): 'Image: check',
+    ('build_aga image', 'payload_preflight'): 'Image: payload preflight',
+    ('build_aga image', 'prepare_torch:prepare'): 'Image: torch',
+    ('build_aga image', 'prepare_combat:prepare'): 'Image: combat data',
+    ('build_aga image', 'prepare_player_view:prepare'): 'Image: player view',
+    ('build_aga image', 'prepare_seyda_regions:convert_builder_scene'): 'Image: Seyda Neen legacy region maps',
+    ('build_aga image', 'install_town_flora:install'): 'Image: town flora',
+    ('build_aga image', 'prepare_shared_sky_assets:prepare_staged_sky'): 'Image: sky assets',
+    ('build_aga image', 'prepare_guard_torches:prepare'): 'Image: guard torches',
+    ('build_aga image', 'hand_metadata:stamp_staged_hands'): 'Image: hand metadata',
+    ('build_aga image', 'cell_numbers:stamp_staged_cells'): 'Image: interior cell numbers',
+    ('build_aga image', 'harvest_build:image_step'): 'Image: harvest',
+    ('build_aga image', 'check_actor_ground:require'): 'Image: actor ground check',
+    ('build_aga image', 'entity_tracker:build_gate'): 'Image: entity tracker',
+    ('build_aga image', 'world_progress:build_step'): 'Image: world progress',
+    ('build_aga image', 'stage_direct_start'): 'Image: direct start',
+    ('build_aga image', 'night_lighting:stage'): 'Image: night lighting',
+    ('build_aga image', 'chim.heap:require_frame_map_heap'): 'Image: CHIM frame-map heap',
+    ('build_aga image', 'optimize_world_maps:rebind_chim_maps'): 'Image: optimizer rebind',
+    ('build_aga image', 'map_engine_limits:check_maps'): 'Image: engine map limits',
+    ('build_aga image', 'stair_walk:require'): 'Image: stair walk',
+    ('build_aga image', 'write_content_fingerprint'): 'Image: content fingerprint',
+    ('build_aga image', 'prepare_media_assets:stage_catalogue'): 'Image: media catalogue',
+    ('build_aga image', 'add_chim_volume'): 'Image: CHIM world volume',
+    ('build_aga image', 'world_volumes:write_boot_partition'): 'Image: boot partition',
+    ('build_aga image', 'world_volumes:assemble_drives'): 'Image: drives',
+    ('build_aga image', 'arrival_spot:require'): 'Image: arrival check',
+    ('build_aga image', 'chim_frame_maps'): 'Image: CHIM frame maps',
+    ('build_aga image', 'chim.frame_map:remove_legacy_areas'): 'Image: remove legacy areas',
+    ('world-terrain', 'plan'): 'World terrain: plan',
+    ('world-terrain', 'terrain_wad'): 'World terrain: texture WAD',
+    ('world-terrain', 'region_directory'): 'World terrain: region directory',
+    ('actor-contact', 'convert_builder_scene'): 'Actor contact: convert scene',
+    ('actor-contact', 'annotate'): 'Actor contact: annotate',
+    ('actor-contact', 'bake_ground'): 'Actor contact: bake ground',
+    ('actor-contact', 'require'): 'Actor contact: check',
+}
+
+
 def _timed_map(original, label):
     @functools.wraps(original)
     def timed(function, items, *args, **kwargs):
@@ -357,6 +616,16 @@ INSTRUMENT = {
         'optimize_world_maps:verify_optimized_maps', 'check_actor_ground:require',
         'check_world_map_heap:audit_world_maps', 'entity_tracker:build_gate', 'night_lighting:stage',
         'world_volumes:pack', 'world_volumes:verify_combined',
+        # every image sub-phase between the passes is a timed phase (BUILD-SILENT-PHASES-36)
+        'payload_preflight', 'prepare_torch:prepare', 'prepare_combat:prepare', 'prepare_player_view:prepare',
+        'prepare_shared_sky_assets:prepare_staged_sky', 'prepare_guard_torches:prepare',
+        'hand_metadata:stamp_staged_hands', 'cell_numbers:stamp_staged_cells', 'harvest_build:image_step',
+        'world_progress:build_step', 'stage_direct_start', 'chim.heap:require_frame_map_heap',
+        'optimize_world_maps:rebind_chim_maps', 'map_engine_limits:check_maps', 'stair_walk:require',
+        'prepare_media_assets:stage_catalogue', 'add_chim_volume', 'world_volumes:write_boot_partition',
+        'world_volumes:assemble_drives',
+        # from the build-timeline line: finalize_image between the optimizer and the final checks
+        'arrival_spot:require', 'chim_frame_maps', 'chim.frame_map:remove_legacy_areas',
         'build_parallel:ordered_map', 'build_parallel:completed_map'),
     'build_aga census': (
         'asset_census:scan_meshes', 'asset_census:collect_placements', 'asset_census:variant_table',
@@ -427,7 +696,10 @@ def instrument(stage, namespace=None):
         if getattr(original, '__amiwind_section__', None):
             continue
         label = target.split(':')[-1]
-        timed = _timed_map(original, 'parallel map') if label in MAP_FUNCTIONS else section(label)(original)
+        if (stage, target) in PHASES:
+            timed = phase(PHASES[(stage, target)])(original)
+        else:
+            timed = _timed_map(original, 'parallel map') if label in MAP_FUNCTIONS else section(label)(original)
         if isinstance(holder, dict):
             holder[attribute] = timed
         else:
@@ -453,9 +725,15 @@ def read_sections(path):
             record = json.loads(line)
         except ValueError:
             continue
+        if record.get('event') == 'start':
+            continue          # a phase's start line (the heartbeat and a running stage's chart read those)
         row = rows.setdefault(record['name'], {'name': record['name'], 'calls': 0, 'wall': 0.0, 'max_wall': 0.0,
                                                'cpu_self': 0.0, 'cpu_children': 0.0, 'min_depth': 99,
                                                'first_start': record.get('start', 0)})
+        if record.get('phase'):
+            row['phase'] = True
+            if record.get('at') is not None:
+                row['first_at'] = min(row.get('first_at', record['at']), record['at'])
         row['calls'] += 1
         row['wall'] += record.get('wall', 0)
         row['max_wall'] = max(row['max_wall'], record.get('wall', 0))
@@ -463,8 +741,13 @@ def read_sections(path):
         row['cpu_children'] += record.get('cpu_children', 0)
         row['min_depth'] = min(row['min_depth'], record.get('depth', 0))
         row['first_start'] = min(row['first_start'], record.get('start', 0))
+        row['last_end'] = max(row.get('last_end', 0.0), record.get('start', 0) + record.get('wall', 0))
+        if record.get('detail') and not row.get('detail'):
+            row['detail'] = record['detail']
         if 'items' in record:
             row['items'] = row.get('items', 0) + record['items']
+        if record.get('phase') and record.get('total') is not None:
+            row['units'] = row.get('units', 0) + record['total']   # a phase's unit total (the perf guard reads it)
         if record.get('missing'):
             row['missing'] = True
         if record.get('error'):
@@ -498,6 +781,18 @@ def trace_environment(stats_path, environment):
             'PYTHONPATH': str(hook) + (os.pathsep + existing if existing else '')}
 
 
+def _signal_child(child, sig):
+    """Send SIG to the stage (None: kill it); a stage that already ended is no error."""
+    try:
+        child.kill() if sig is None else child.send_signal(sig)
+    except OSError:
+        pass
+
+
+# Seconds a stage gets to end by itself after Ctrl-C before the wrapper hands the interrupt on to it.
+STAGE_INTERRUPT_GRACE = 5
+
+
 def stage_main(argv):
     if len(argv) < 4 or argv[2] != '--':
         print('usage: build_profile.py _stage STATS SECTIONS -- command...', file=sys.stderr)
@@ -518,13 +813,30 @@ def stage_main(argv):
         print(f'Cannot start stage command {command[:1]}: {exc}', file=sys.stderr, flush=True)
         child, code = None, 127
         record['command_started'] = False
+    interrupts = 0
     if child is not None:
         while True:
             try:
                 code = child.wait()
                 break
             except KeyboardInterrupt:
-                continue  # The stage got the same interrupt; record how it ends.
+                # Ctrl-C cancels the stage, never only this wrapper (BUILD-STAGE-INTERRUPT-ABSORBED-36): a stage
+                # in the same terminal group got the interrupt too and ends on its own; one that did not (another
+                # group, or the interrupt was sent to this wrapper alone) gets it now; a second one stops it hard.
+                # How it ends is recorded below, then the wrapper ends by the interrupt whatever the stage returned.
+                interrupts += 1
+                if interrupts == 1:
+                    try:
+                        code = child.wait(timeout=STAGE_INTERRUPT_GRACE)
+                        break
+                    except subprocess.TimeoutExpired:
+                        _signal_child(child, signal.SIGINT)
+                        continue
+                    except KeyboardInterrupt:
+                        interrupts += 1
+                _signal_child(child, None)
+    if interrupts:
+        record['interrupted'] = True
     wall = time.monotonic() - start
     after = _rusage_children()
     record.update(wall=round(wall, 4), returncode=code, pid=child.pid if child else None)
@@ -562,6 +874,9 @@ def stage_main(argv):
         temporary.replace(stats_path)
     except OSError:
         pass
+    if interrupts and not (code is not None and code < 0):
+        # The stage handled the interrupt (and may even have returned 0): the caller still sees a cancel.
+        code = -signal.SIGINT if os.name == 'posix' else 130
     if code is not None and code < 0 and os.name == 'posix':
         # Die of the same signal so the builder sees exactly what the stage did.
         signal.signal(-code, signal.SIG_DFL)
@@ -661,6 +976,104 @@ class Sampler(threading.Thread):
 # --------------------------------------------------------------------------
 # Session (the builder's hooks; tools/build.py and tools/build_parallel.py)
 
+# --------------------------------------------------------------------------
+# Heartbeat (in the builder): no stage runs silently
+
+HEARTBEAT_ENV = 'AMIWIND_HEARTBEAT_SECONDS'
+DEFAULT_HEARTBEAT = 30.0
+
+
+def heartbeat_seconds():
+    """Seconds of silence before a heartbeat line; 0 = off (AMIWIND_HEARTBEAT_SECONDS)."""
+    value = os.environ.get(HEARTBEAT_ENV, '').strip().lower()
+    if value in ('0', 'off', 'no', 'false'):
+        return 0.0
+    try:
+        return max(0.05, float(value)) if value else DEFAULT_HEARTBEAT
+    except ValueError:
+        return DEFAULT_HEARTBEAT
+
+
+class Heartbeat(threading.Thread):
+    """Watches every running stage's log from the builder process. When a stage has written nothing for the
+    heartbeat time, prints one line naming the stage, its current phase and counter (from the stage's own
+    phase timer, build_profile.phase), how long that phase (else the stage) has run and the cores the stage's
+    process tree uses (the profiler's sampler), and again after every further heartbeat time of silence. It
+    covers a stage whose child writes nothing at all; the stage's own output is never touched."""
+
+    def __init__(self, session, silence, stream=None):
+        super().__init__(name='build-heartbeat', daemon=True)
+        self.session, self.silence, self.stream = session, silence, stream
+        self.tick = max(0.02, min(5.0, silence / 4))
+        self.stop_event = threading.Event()
+        self.seen = {}        # stage -> (log size, time it last changed, time of the last heartbeat)
+        self.state = {}       # stage -> the last heartbeat (for build-progress.json)
+        self.lines = 0
+
+    def run(self):
+        while not self.stop_event.wait(self.tick):
+            try:
+                self.check()
+            except Exception:  # noqa: BLE001 - a heartbeat must never stop a build
+                pass
+
+    def cores(self, name):
+        sampler = self.session.sampler
+        if sampler is None:
+            return None
+        with sampler.lock:
+            rows = list(sampler.stages.get(name) or ())
+        return rows[-1][1] if rows else None
+
+    def check(self, now=None):
+        now = time.monotonic() if now is None else now
+        running = {name: stage for name, stage in list(self.session.stages.items()) if stage['status'] == 'running'}
+        for name in list(self.seen):
+            if name not in running:
+                self.seen.pop(name)
+                self.state.pop(name, None)
+        for name, stage in running.items():
+            log = self.session.run / 'logs' / f"{stage['number']:02}-{name}.log"
+            try:
+                size = log.stat().st_size
+            except OSError:
+                size = -1
+            last_size, changed, beat = self.seen.get(name, (None, now, None))
+            if size != last_size:
+                changed, beat = now, None
+                self.state.pop(name, None)
+            self.seen[name] = (size, changed, beat)
+            silent = now - changed
+            if silent < self.silence or (beat is not None and now - beat < self.silence):
+                continue
+            text = self.line(name, stage, silent)
+            print(text, file=self.stream, flush=True)
+            self.lines += 1
+            self.seen[name] = (size, changed, now)
+            self.state[name] = {'text': text, 'silent_seconds': round(silent, 1), 'at': round(time.time(), 3)}
+
+    def line(self, name, stage, silent):
+        current = read_now(stage['sections'])
+        cores = self.cores(name)
+        if current:
+            where = current.get('name') or name
+            if current.get('done') or current.get('total'):
+                where = f"[{counter_text(current.get('done') or 0, current.get('total'), current.get('unit'))}] {where}"
+            if current.get('label'):
+                where += f": {current['label']}"
+            elapsed = time.time() - float(current.get('started_at') or time.time())
+        else:
+            where = '(no phase recorded)'
+            elapsed = time.monotonic() - self.session.start - stage['start']
+        return (stamp() + f"[heartbeat] {name}: {where}: still working, {_seconds(elapsed)}"
+                + (f", {cores:.1f} cores" if cores is not None else '') + f" (no output for {_seconds(silent)})")
+
+    def stop(self):
+        self.stop_event.set()
+        if self.is_alive():
+            self.join(timeout=5)
+
+
 class NullSession:
     enabled = False
 
@@ -698,6 +1111,10 @@ class Session:
         self.dependencies = {name: list(deps) for name, deps in dependencies.items()}
         self.start = time.monotonic()
         self.started_at = time.strftime('%Y-%m-%dT%H:%M:%S%z')
+        try:   # the build's start for the stages' elapsed-time prefix (build_profile.stamp)
+            (self.folder / EPOCH_FILE).write_text('%.3f' % time.time(), encoding='utf-8', newline=chr(10))
+        except OSError:
+            pass
         self.stages = {}
         self.wrap = linux_proc() or os.name == 'posix'
         if interval is None:
@@ -718,10 +1135,17 @@ class Session:
         try:
             import build_progress
             self.progress = build_progress.start(self.run, self.order, self.dependencies, metadata,
-                                                 self.sampler, self.start)
+                                                 self.sampler, self.start,
+                                                 commands={name: command for name, command in steps})
         except Exception as exc:  # noqa: BLE001 - progress must never fail a build
             print(f'[warning] Live build progress disabled: {exc}', flush=True)
             self.progress = None
+        silence = heartbeat_seconds()
+        self.heartbeat = Heartbeat(self, silence) if silence else None
+        if self.heartbeat is not None:
+            self.heartbeat.start()
+        if self.progress is not None:
+            self.progress.heartbeat = self.heartbeat
         self.closed = False
 
     def _paths(self, number, name):
@@ -803,6 +1227,8 @@ class Session:
         self.closed = True
         if self.progress is not None:
             self.progress.close(receipt.get('status'))
+        if self.heartbeat is not None:
+            self.heartbeat.stop()
         if self.sampler:
             self.sampler.stop()
         try:
@@ -849,7 +1275,12 @@ class Session:
                 row['manifest_seconds'] = stage['manifest_seconds']
             sections = read_sections(stage['sections'])
             for item in sections:
+                # The sections schema the Build Timeline and the Toolkit Monitor read: name, start, end
+                # (seconds after the first stage started), cpu (seconds), optional detail; plus calls, wall,
+                # cores_avg, phase.
                 item['start'] = round(item.pop('first_start') - self.start, 3)
+                item['end'] = round(item.pop('last_end') - self.start, 3)
+                item['cpu'] = round(item['cpu_self'] + item['cpu_children'], 3)
             if sections:
                 row['sections'] = sections
             reuse = (receipt.get('stage_cache') or {}).get('reused', {}).get(name)
@@ -1103,6 +1534,35 @@ def suggestions(profile, critical, warnings):
     return lines
 
 
+UNDERUSE_SHARE = 0.5      # a stage or phase under half of the workers its stage held ...
+UNDERUSE_SECONDS = 30.0   # ... for longer than this: a fix item (BUILD-UNDERUSE-GATE-36)
+
+
+def underused(profile, share=UNDERUSE_SHARE, seconds=UNDERUSE_SECONDS):
+    """Every stage, and every phase or outermost section inside one, that ran longer than SECONDS on fewer than
+    SHARE of the workers its stage held (time-weighted mean of the scheduler's allowance): [{stage, phase,
+    wall, cores, jobs, why}]. 'why' is what the numbers say (one core: a serial loop or a single process;
+    else part of the pool idle), never a guess at the code."""
+    found = []
+    for row in profile.get('stages', []):
+        if row.get('reused'):
+            continue
+        held = row.get('jobs_mean') or row.get('jobs_max') or row.get('jobs') or 1
+        limit = share * held
+        candidates = [(None, row.get('wall') or 0, row.get('cores_avg'))]
+        candidates += [(item['name'], item.get('wall') or 0, item.get('cores_avg'))
+                       for item in row.get('sections', []) if not item.get('missing')
+                       and (item.get('phase') or item.get('min_depth', 0) == 0)
+                       and not str(item['name']).startswith('exec ')]
+        for name, wall, cores in candidates:
+            if wall > seconds and cores is not None and held > 1 and cores < limit:
+                why = ('about one core: a serial loop or a single process' if cores < 1.5
+                       else 'under half of the pool busy: a small pool, waits or a long last item')
+                found.append({'stage': row['name'], 'phase': name, 'wall': round(wall, 1), 'cores': round(cores, 2),
+                              'jobs': round(held, 1), 'why': why})
+    return sorted(found, key=lambda item: (-item['wall'], item['stage'], item['phase'] or ''))
+
+
 def analyse(profile, top=10):
     stages = profile.get('stages', [])
     critical = critical_path(stages)
@@ -1132,7 +1592,8 @@ def analyse(profile, top=10):
         if load and load['host_busy']:
             host.append({'stage': row['name'], 'other_percent': load['other_percent'],
                          'busy_percent': load['busy_percent'], 'cpus': load['cpus']})
-    result = {'critical_path': critical, 'idle_warnings': warnings, 'slowest_stages': slowest,
+    result = {'critical_path': critical, 'idle_warnings': warnings, 'underused': underused(profile),
+              'slowest_stages': slowest,
               'slowest_sections': sections, 'instrumentation_missing': missing, 'host_busy': host}
     result['suggestions'] = suggestions(profile, critical, warnings)
     return result
@@ -1231,6 +1692,10 @@ def _suggestion(item):
                 f"{item.get('cores')} core(s): one large item finished last. Submit the largest items first "
                 '(completed_map over a size-sorted list), split the largest item, or let the next stage start on '
                 f'the finished part.{where}')
+    elif item['kind'] == 'underused-phase':
+        text = (f"{stage} ran {seconds} on {item.get('cores')} of the {item.get('jobs')} workers its stage held "
+                f"({item.get('why')}). Run its independent items on the shared worker pool, cache its result by the "
+                'SHA-256 of its inputs, or give the workers back to the scheduler while it runs.')
     elif item['kind'] == 'serial-critical':
         held = item.get('jobs_max') or 1
         budget = ('takes no --jobs budget' if held <= 1 else
@@ -1283,6 +1748,13 @@ def optimize(profile, share=IDLE_SHARE, minimum=IDLE_SECONDS):
                 and row.get('cores_avg') is not None and row['cores_avg'] < TAIL_CORES):
             items.append(dict(common, kind='serial-critical', seconds=row['wall'], cores=row['cores_avg'],
                               potential_seconds=None))
+    for item in (analysis.get('underused') or underused(profile)):
+        if item['phase'] is None:
+            continue           # whole stages: the idle / tail / serial items above
+        items.append({'run': run, 'stage': f"{item['stage']}: {item['phase']}", 'kind': 'underused-phase',
+                      'seconds': item['wall'], 'cores': item['cores'], 'jobs': item['jobs'], 'wall': item['wall'],
+                      'critical': item['stage'] in on_path, 'host_busy': False, 'why': item['why'],
+                      'potential_seconds': round(item['wall'] * max(0.0, 1 - item['cores'] / item['jobs']), 1)})
     wall, ideal = profile.get('wall_seconds') or 0, critical['ideal_seconds']
     if wall and ideal and wall > 1.25 * ideal:
         items.append({'run': run, 'stage': '(whole build)', 'kind': 'slot-wait', 'seconds': round(wall - ideal, 1),
@@ -1314,6 +1786,44 @@ def optimize_runs(profiles, share=IDLE_SHARE, minimum=IDLE_SECONDS):
                      'suggestion': worst['suggestion']})
     rows.sort(key=lambda row: (not row['critical'], -(row['potential_seconds'] or row['worst_seconds'] or 0)))
     return rows
+
+
+def ledger_stats(rows, share=UNDERUSE_SHARE, seconds=UNDERUSE_SECONDS):
+    """Per-stage statistics over many builds from a stage ledger (one JSON object per stage and build, the
+    fields the profile's stage rows have: stage, build, wall_s, cpu_s, cores_avg, jobs_max, status): runs,
+    median and max wall, median cores, the slowest build, and how many runs were underused (over SECONDS on
+    fewer than SHARE of the workers held). Sorted by underused wall time, then median wall."""
+    import statistics
+    by = {}
+    for row in rows:
+        wall = row.get('wall_s', row.get('wall'))
+        if row.get('stage') is None or wall is None or row.get('status') not in (None, 'passed', 'failed'):
+            continue
+        by.setdefault(row['stage'], []).append(row)
+    table = []
+    for stage, items in by.items():
+        walls = [float(r.get('wall_s', r.get('wall'))) for r in items]
+        cores = [float(r['cores_avg']) for r in items if r.get('cores_avg') is not None]
+        under = [r for r in items if float(r.get('wall_s', r.get('wall'))) > seconds and r.get('cores_avg') is not None
+                 and (r.get('jobs_max') or r.get('jobs') or 1) > 1
+                 and float(r['cores_avg']) < share * float(r.get('jobs_max') or r.get('jobs') or 1)]
+        slowest = max(items, key=lambda r: float(r.get('wall_s', r.get('wall'))))
+        table.append({'stage': stage, 'runs': len(items), 'median_wall': round(statistics.median(walls), 1),
+                      'max_wall': round(max(walls), 1), 'median_cores': round(statistics.median(cores), 2) if cores else None,
+                      'slowest_build': slowest.get('build'), 'underused_runs': len(under),
+                      'underused_seconds': round(sum(float(r.get('wall_s', r.get('wall'))) for r in under), 1)})
+    table.sort(key=lambda r: (-r['underused_seconds'], -r['median_wall'], r['stage']))
+    return table
+
+
+def ledger_lines(table, top=40):
+    lines = [f"{'stage':<26}{'runs':>5}{'median':>9}{'max':>9}{'cores':>7}{'underused':>12}  slowest build"]
+    for row in table[:top]:
+        under = f"{row['underused_runs']}x {_seconds(row['underused_seconds'])}" if row['underused_runs'] else '-'
+        lines.append(f"{row['stage'][:25]:<26}{row['runs']:>5}{_seconds(row['median_wall']):>9}"
+                     f"{_seconds(row['max_wall']):>9}{(str(row['median_cores']) if row['median_cores'] is not None else '-'):>7}"
+                     f"{under:>12}  {row['slowest_build']}")
+    return lines
 
 
 def optimize_lines(rows, runs):
@@ -1392,6 +1902,9 @@ def summary_lines(profile, top=5):
         lines.append(f"  {mark}{row['name']:<25}{_seconds(row['wall']):>9}"
                      f"{(str(row.get('cores_avg')) if row.get('cores_avg') is not None else '-'):>7}"
                      f"{jobs_text(row):>6}{_bytes(rss):>11}{reused}")
+    for item in (analysis.get('underused') or [])[:12]:
+        lines.append(f"  [underused] {item['stage']}" + (f": {item['phase']}" if item['phase'] else '')
+                     + f": {_seconds(item['wall'])} at {item['cores']} of {item['jobs']} cores ({item['why']})")
     for warning in analysis['idle_warnings']:
         lines.append(f"  [idle] {warning['stage']}: {warning['cores_while_idle']} of {warning['jobs']} cores "
                      f"for {_seconds(warning['seconds'])}"
@@ -1424,6 +1937,7 @@ def summary_record(run):
             'critical_path_seconds': analysis['critical_path']['ideal_seconds'],
             'idle_warnings': [w['stage'] for w in analysis['idle_warnings']],
             'host_busy': [w['stage'] for w in analysis.get('host_busy', [])],
+            'underused': analysis.get('underused') or underused(profile),
             'reused': [row['name'] for row in profile['stages'] if row.get('reused')],
             'overhead': profile.get('overhead')}
 
@@ -1596,6 +2110,987 @@ if (window.Chart) {{
 """
 
 
+# --------------------------------------------------------------------------
+# Build Timeline: one PNG of where the wall time went (stage bars per run, gates and
+# other lanes, CPU cores in use stacked by job). docs/BUILD_PROFILE.md "Build Timeline".
+
+TIMELINE_SCHEMA = 'amiwind-build-timeline-v1'
+TIMELINE_STEP = 30.0          # CPU chart bucket, seconds
+TIMELINE_SERIES = 8           # stacked series drawn; the rest fold into "other"
+TIMELINE_SHORT_PX = 8         # a stage bar narrower than this is a tick on the run's "short" row
+TIMELINE_FONTS = ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/TTF/DejaVuSans.ttf')
+TIMELINE_BOLD = ('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf')
+# Light chart surface, ink, categorical slots in fixed order and a one-hue (blue) ramp, as the
+# other charts in docs/images; status colours only with a text label beside them.
+TL_SURFACE, TL_PANEL, TL_GRID, TL_AXIS = '#fcfcfb', '#f3f2ee', '#e1e0d9', '#c3c2b7'
+TL_INK, TL_SECONDARY, TL_MUTED = '#0b0b0b', '#52514e', '#898781'
+TL_SERIES = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948')
+TL_OTHER = '#a8a69e'
+TL_RAMP = ('#b7d3f6', '#9ec5f4', '#86b6ef', '#6da7ec', '#5598e7', '#3987e5', '#2a78d6', '#256abf',
+           '#1c5cab', '#184f95', '#104281')
+TL_GOOD, TL_CRITICAL, TL_RUNNING = '#0ca30c', '#d03b3b', '#898781'
+
+
+def parse_utc_offset(text):
+    """'+03:00', '-0500', '+3', 'UTC' or 'Z' -> seconds east of UTC; 'local' or None -> this machine's zone."""
+    if text is None or str(text).strip().lower() == 'local':
+        return local_utc_offset()
+    value = str(text).strip()
+    if value.upper() in ('UTC', 'Z', 'GMT'):
+        return 0
+    sign = -1 if value.startswith('-') else 1
+    digits = value.lstrip('+-').replace(':', '')
+    if not digits.isdigit() or len(digits) not in (1, 2, 4):
+        raise ValueError(f'Not a UTC offset: {text!r} (use +HH:MM)')
+    hours, minutes = (int(digits[:-2] or 0), int(digits[-2:])) if len(digits) == 4 else (int(digits), 0)
+    if hours > 14 or minutes > 59:
+        raise ValueError(f'Not a UTC offset: {text!r}')
+    return sign * (hours * 3600 + minutes * 60)
+
+
+def local_utc_offset(epoch=None):
+    """The UTC offset of this machine's clock at EPOCH (a container usually runs in UTC)."""
+    stamp = time.localtime(time.time() if epoch is None else epoch)
+    return int(stamp.tm_gmtoff) if getattr(stamp, 'tm_gmtoff', None) is not None else -time.timezone
+
+
+def to_epoch(value, offset=0):
+    """Epoch seconds from a number or an ISO 8601 time. A time with an offset (or Z) is exact;
+    a time without one is read in the zone OFFSET (seconds east of UTC), never in this machine's
+    zone by accident. Returns None for None or ''."""
+    from datetime import datetime, timedelta, timezone
+    if value is None or value == '':
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(' ', 'T', 1)
+    if text.endswith('Z') or text.endswith('z'):
+        text = text[:-1] + '+00:00'
+    if len(text) >= 5 and text[-5] in '+-' and text[-4:].isdigit() and 'T' in text:
+        text = text[:-2] + ':' + text[-2:]   # +0300 -> +03:00 (time.strftime('%z'))
+    stamp = datetime.fromisoformat(text)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone(timedelta(seconds=offset)))
+    return stamp.timestamp()
+
+
+def clock_text(epoch, offset, pattern='%H:%M'):
+    from datetime import datetime, timedelta, timezone
+    return datetime.fromtimestamp(epoch, timezone(timedelta(seconds=offset))).strftime(pattern)
+
+
+def _read_json(path):
+    try:
+        return json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+
+
+def timeline_run(path, label=None):
+    """One build run as the Build Timeline draws it, from the files every build writes.
+
+    A finished run: build-profile.json (stage times, CPU, the sampled CPU timeline, critical
+    path). A run still going or without a profile: build-state.json (each stage's start and
+    duration on the scheduler clock, reuse, CPU) and build-progress.json (the clock origin and
+    the last update, which is where a running stage ends on the chart); build-summary.json gives
+    the end of a finished run without a profile. All times are epoch seconds."""
+    folder = Path(path)
+    if folder.is_file():
+        folder = folder.parent
+    state = _read_json(folder / 'build-state.json') or {}
+    progress = _read_json(folder / 'build-progress.json') or {}
+    summary = _read_json(folder / 'build-summary.json') or {}
+    received = to_epoch(state.get('build_started_at') or summary.get('started_at'))
+    run = {'name': folder.name, 'label': label or folder.name, 'started': received, 'stages': [],
+           'cores': [], 'host': [], 'interval': None, 'critical_path': [], 'running': False}
+    profile = None
+    if (folder / PROFILE_NAME).is_file():
+        try:
+            profile = load(folder)
+        except (OSError, ValueError):
+            profile = None
+    if profile is not None:
+        origin = to_epoch(profile.get('started_at'))
+        run.update(source='build-profile.json', origin=origin, end=origin + (profile.get('wall_seconds') or 0),
+                   status=profile.get('status'), version=profile.get('version'), budget=profile.get('budget'),
+                   host_cpus=profile.get('host_cpus'),
+                   critical_path=list(((profile.get('analysis') or {}).get('critical_path') or {}).get('path') or []))
+        for row in profile.get('stages', []):
+            run['stages'].append({'name': row['name'], 'start': origin + row['start'], 'end': origin + row['end'],
+                                  'status': row.get('status'), 'cpu': row.get('cpu'),
+                                  'jobs': row.get('jobs_max') or row.get('jobs'), 'reused': bool(row.get('reused')),
+                                  'running': False})
+        timeline = profile.get('timeline') or {}
+        times = timeline.get('t') or []
+        own = timeline.get('cgroup_cores') or timeline.get('cores') or []
+        busy = timeline.get('host_busy') or []
+        cpus = timeline.get('host_cpus') or profile.get('host_cpus') or 1
+        run['interval'] = timeline.get('interval') or DEFAULT_INTERVAL
+        run['cores'] = [[origin + at, own[i]] for i, at in enumerate(times) if i < len(own) and own[i] is not None]
+        run['host'] = [[origin + at, busy[i] * cpus] for i, at in enumerate(times) if i < len(busy) and busy[i] is not None]
+    else:
+        origin = to_epoch(progress.get('started_at')) or received
+        if origin is None:
+            raise ValueError(f'{folder}: no build-profile.json, build-progress.json or build-state.json start time')
+        updated = progress.get('updated_epoch')
+        finished = to_epoch(summary.get('finished_at'))
+        status = summary.get('status') or progress.get('status') or state.get('status')
+        running = status == 'running'
+        last = finished or (float(updated) if updated is not None else None)
+        elapsed = {row['name']: row.get('elapsed_seconds') for row in progress.get('stages', [])}
+        ends = []
+        for step in state.get('steps', []):
+            if step.get('started_seconds') is None:
+                continue
+            start = origin + float(step['started_seconds'])
+            seconds = step.get('elapsed_seconds')
+            if seconds is None:
+                seconds = elapsed.get(step['name'])
+            is_running = step.get('status') == 'running'
+            if seconds is not None:
+                end = start + float(seconds)
+            else:
+                end = max(start, last if last is not None else start)
+            ends.append(end)
+            run['stages'].append({'name': step['name'], 'start': start, 'end': end, 'status': step.get('status'),
+                                  'cpu': (step.get('profile') or {}).get('cpu_seconds'),
+                                  'jobs': step.get('jobs'), 'reused': 'reused' in step, 'running': is_running})
+        run.update(source='build-state.json + build-progress.json' if progress else 'build-state.json',
+                   origin=origin, end=max([last] if last is not None else ends or [origin]), status=status,
+                   version=state.get('runtime_version') or summary.get('version'),
+                   budget=progress.get('budget') or state.get('worker_budget') or state.get('compiler_jobs'),
+                   host_cpus=(progress.get('host') or {}).get('cpus'), running=running,
+                   pending=[row['name'] for row in progress.get('stages', []) if row.get('status') == 'pending'])
+    # Phases inside each stage (build_profile.phase records in profile/sections/NN-stage.jsonl).
+    for row in run['stages']:
+        phases = stage_phases(folder, row['name'], run['end'])
+        if phases:
+            row['phases'] = phases
+    # What the live progress expected of each stage, and on what basis (BUILD-PROGRESS-ETA-BASIS-36).
+    expected = {row['name']: row for row in progress.get('stages', []) if row.get('name')}
+    for row in run['stages']:
+        entry = expected.get(row['name']) or {}
+        if entry.get('expected_source') not in (None, 'reused'):
+            row['expected'] = entry.get('expected_seconds')
+            row['expected_basis'] = entry.get('expected_basis') or entry.get('expected_source')
+    if run.get('running') and progress.get('eta_seconds') is not None:
+        run['eta'] = {'seconds': progress['eta_seconds'], 'basis': progress.get('eta_basis'),
+                      'lower_bound': bool(progress.get('eta_lower_bound'))}
+    run['stages'].sort(key=lambda row: (row['start'], row['name']))
+    return run
+
+
+def stage_phases(folder, name, end):
+    """[{name, start, end, cores, running}] of a stage's outermost phases from its sections file (epoch times);
+    a phase that started and has not ended runs to END (the run's last update)."""
+    paths = sorted((Path(folder) / 'profile' / 'sections').glob(f'*-{name}.jsonl'))
+    paths = [path for path in paths if path.name.split('-', 1)[1] == f'{name}.jsonl']
+    if not paths:
+        return []
+    found, open_phases = [], {}
+    try:
+        lines = paths[0].read_text(encoding='utf-8', errors='replace').splitlines()
+    except OSError:
+        return []
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not record.get('phase') or record.get('depth', 0) != 0 or record.get('at') is None:
+            continue
+        key = (record.get('pid'), record['name'], record['at'])
+        if record.get('event') == 'start':
+            open_phases[key] = record
+            continue
+        open_phases.pop(key, None)
+        found.append({'name': record['name'], 'start': float(record['at']),
+                      'end': float(record.get('end_at') or record['at'] + record.get('wall', 0)),
+                      'cores': record.get('cores'), 'running': False, 'error': record.get('error')})
+    for record in open_phases.values():
+        found.append({'name': record['name'], 'start': float(record['at']), 'end': max(float(record['at']), end),
+                      'cores': None, 'running': True, 'error': None})
+    return sorted(found, key=lambda item: (item['start'], item['name']))
+
+
+def expectation_text(row):
+    """'expected 3 min (basis)' when the live progress's expectation was off by more than 2x, or had
+    no comparable history; '' otherwise."""
+    basis = row.get('expected_basis')
+    if not basis:
+        return ''
+    took = row['end'] - row['start']
+    if row.get('expected') is None:
+        return 'expected: ' + basis
+    expected = float(row['expected'])
+    if expected <= 0 or 0.5 <= took / expected <= 2.0:
+        return ''
+    return f"expected {_minutes(expected)} ({basis})"
+
+
+def read_cpu_samples(path, offset=0, cpus=None):
+    """CPU samples, one JSON object per line: {"t": time, "name": job, "cores": float}
+    (optional "group": the series to stack it in). The name HOST is the whole machine: "cores",
+    or "cpu_pct" = percent of all of its CPUs (CPUS). t = epoch seconds or ISO 8601;
+    without an offset in the zone OFFSET. Unreadable lines are skipped.
+    Returns {name: [[epoch, cores, group], ...]} sorted by time."""
+    found = {}
+    for line in Path(path).read_text(encoding='utf-8', errors='replace').splitlines():
+        try:
+            item = json.loads(line)
+            name = str(item['name'])
+            at = to_epoch(item['t'], offset)
+        except (ValueError, KeyError, TypeError):
+            continue
+        cores = item.get('cores')
+        if cores is None and item.get('cpu_pct') is not None:
+            cores = float(item['cpu_pct']) / 100.0 * ((cpus or host_cpus()) if name == 'HOST' else 1)
+        if cores is None or at is None:
+            continue
+        found.setdefault(name, []).append([at, float(cores), item.get('group')])
+    for rows in found.values():
+        rows.sort(key=lambda row: row[0])
+    return found
+
+
+def read_lane_events(path, offset=0, lane='gates'):
+    """Lane events (gates, kits, any timed job), one JSON object per line:
+    {"name": "1615", "start": time, "end": time or null (still running),
+     "result": "passed" | "failed" | "running", "lane": optional lane name, "label": optional text}."""
+    events = []
+    for line in Path(path).read_text(encoding='utf-8', errors='replace').splitlines():
+        if not line.strip():
+            continue
+        try:
+            item = json.loads(line)
+            start = to_epoch(item['start'], offset)
+            end = to_epoch(item.get('end'), offset)
+        except (ValueError, KeyError, TypeError):
+            continue
+        if start is None:
+            continue
+        result = str(item.get('result') or ('running' if end is None else 'passed'))
+        events.append({'lane': str(item.get('lane') or lane), 'name': str(item.get('name', '')),
+                       'start': start, 'end': end, 'result': result, 'label': item.get('label')})
+    return events
+
+
+def read_commits(spec, start, end):
+    """[{'t', 'sha', 'merge'}] of REPO[:BRANCH] between START and END (commit time, epoch)."""
+    repo, branch = str(spec), ''
+    head, sep, tail = repo.rpartition(':')
+    if sep and len(head) > 1 and Path(head).is_dir():   # REPO:BRANCH (a drive letter alone is no split)
+        repo, branch = head, tail
+    command = ['git', '-C', repo, 'log', '--format=%H %ct %P', f'--since=@{int(start) - 1}', f'--until=@{int(end) + 1}']
+    if branch:
+        command.insert(4, branch)
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError(f'git log failed for {spec}: {result.stderr.strip()[:200]}')
+    commits = []
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and start <= int(parts[1]) <= end:
+            commits.append({'t': float(parts[1]), 'sha': parts[0][:7], 'merge': len(parts) > 3})
+    return sorted(commits, key=lambda row: (row['t'], row['sha']))
+
+
+def sample_intervals(points, nominal=None, cap=3.0):
+    """[(start, end, cores)] for timeline points [(t, cores), ...]: each value covers the time
+    since the previous point (how the profiler's sampler measures it: CPU used over the real gap,
+    divided by that gap). The first point covers NOMINAL seconds before it (default: the median
+    gap); a gap longer than CAP x NOMINAL (a sampler pause) is cut to NOMINAL, so a late sample
+    never spreads its rate over time it did not see (TEST-PROFILE-TIMELINE-SUM-33)."""
+    points = sorted((float(at), float(value)) for at, value in points)
+    if not points:
+        return []
+    gaps = sorted(b[0] - a[0] for a, b in zip(points, points[1:]) if b[0] > a[0])
+    if nominal is None:
+        nominal = gaps[len(gaps) // 2] if gaps else TIMELINE_STEP
+    nominal = max(float(nominal), 1e-6)
+    intervals, previous = [], None
+    for at, value in points:
+        start = at - nominal if previous is None or at - previous > cap * nominal else previous
+        if at > start:
+            intervals.append((start, at, value))
+        previous = at
+    return intervals
+
+
+def core_seconds(intervals):
+    """CPU seconds under a set of intervals (cores x seconds)."""
+    return sum((end - start) * value for start, end, value in intervals)
+
+
+def bucket_series(intervals, start, step, count):
+    """Time-weighted mean cores per bucket [start + i*step, start + (i+1)*step): each interval adds
+    cores x overlap / step to every bucket it overlaps, so the buckets keep exactly the area of the
+    intervals inside the window, never more (TEST-PROFILE-TIMELINE-SUM-33). Also returns the
+    covered seconds per bucket (0 = no data there)."""
+    values, covered = [0.0] * count, [0.0] * count
+    end_all = start + step * count
+    for a, b, cores in intervals:
+        a, b = max(a, start), min(b, end_all)
+        if b <= a:
+            continue
+        first, last = int((a - start) // step), min(count - 1, int((b - start) // step))
+        for index in range(first, last + 1):
+            lo, hi = start + index * step, start + (index + 1) * step
+            overlap = min(b, hi) - max(a, lo)
+            if overlap > 0:
+                values[index] += cores * overlap / step
+                covered[index] += overlap
+    return values, covered
+
+
+def timeline_data(runs, start=None, end=None, samples=None, events=(), commits=(), cpus=None, step=TIMELINE_STEP,
+                  title=None, offset=0, top=TIMELINE_SERIES):
+    """Everything the chart draws, as plain data (`timeline --json` writes it)."""
+    spans = [(run['started'] or run['origin'], run['end']) for run in runs]
+    spans += [(item['start'], item['end'] or item['start']) for item in events]
+    first = min([a for a, _ in spans if a is not None] or [0.0])
+    last = max([b for _, b in spans if b is not None] or [first + 60.0])
+    if start is None or end is None:
+        pad = max(60.0, 0.02 * (last - first))
+        start = first - pad if start is None else start
+        end = last + pad if end is None else end
+    if end <= start:
+        raise ValueError('The time window is empty (end before start)')
+    cpus = cpus or max([run.get('host_cpus') or 0 for run in runs] + [0]) or host_cpus()
+    data_end = max([run['end'] for run in runs] + [item['end'] or item['start'] for item in events]
+                   + [rows[-1][0] for rows in (samples or {}).values() if rows] + [start])
+    for item in events:
+        if item['end'] is None:   # still running: drawn to the end of the data
+            item['end'] = max(item['start'], min(data_end, end))
+    count = max(1, int(math.ceil((end - start) / step)))
+    # CPU series: samples grouped (explicit group, else the run whose folder name the sample name
+    # contains, else the name), then each run's own profiler timeline where no sample covers it.
+    series, order = {}, []
+
+    def add(name, values, covered, first_seen):
+        if name not in series:
+            series[name] = {'name': name, 'values': [0.0] * count, 'covered': [0.0] * count, 'first': first_seen}
+            order.append(name)
+        entry = series[name]
+        entry['values'] = [a + b for a, b in zip(entry['values'], values)]
+        entry['covered'] = [max(a, b) for a, b in zip(entry['covered'], covered)]
+        entry['first'] = min(entry['first'], first_seen)
+
+    host_line, host_source = None, None
+    for name in sorted(samples or {}):
+        rows = samples[name]
+        if not rows:
+            continue
+        intervals = sample_intervals([(at, cores) for at, cores, _ in rows])
+        values, covered = bucket_series(intervals, start, step, count)
+        if name == 'HOST':
+            host_line, host_source = [v if c > 0 else None for v, c in zip(values, covered)], 'samples'
+            continue
+        group = rows[0][2] or next((run['label'] for run in runs if run['name'] in name), name)
+        add(group, values, covered, rows[0][0])
+    sampled = {name for name in series}
+    host_profile = [0.0] * count
+    host_covered = [0.0] * count
+    for run in runs:
+        if run['cores']:
+            values, covered = bucket_series(sample_intervals(run['cores'], run['interval']), start, step, count)
+            if run['label'] in sampled:
+                entry = series[run['label']]
+                entry['values'] = [have if have_cov > 0 else value for have, have_cov, value in
+                                   zip(entry['values'], entry['covered'], values)]
+                entry['covered'] = [max(a, b) for a, b in zip(entry['covered'], covered)]
+            elif any(covered):
+                add(run['label'], values, covered, run['cores'][0][0])
+        if run['host']:
+            values, covered = bucket_series(sample_intervals(run['host'], run['interval']), start, step, count)
+            host_profile = [a + b if c > 0 else a for a, b, c in zip(host_profile, values, covered)]
+            host_covered = [max(a, b) for a, b in zip(host_covered, covered)]
+    if host_line is None and any(host_covered):
+        host_line = [v if c > 0 else None for v, c in zip(host_profile, host_covered)]
+        host_source = 'build profiler (/proc/stat)'
+    ordered = sorted(order, key=lambda name: (series[name]['first'], name))
+    totals = {name: sum(series[name]['values']) * step for name in ordered}
+    if len(ordered) > top:
+        keep = set(sorted(ordered, key=lambda name: (-totals[name], name))[:top - 1])
+        other = {'name': 'other', 'values': [0.0] * count, 'covered': [0.0] * count, 'first': 0.0}
+        for name in ordered:
+            if name not in keep:
+                other['values'] = [a + b for a, b in zip(other['values'], series[name]['values'])]
+        ordered = [name for name in ordered if name in keep]
+        series['other'] = other
+        totals['other'] = sum(other['values']) * step
+        ordered.append('other')
+    return {'schema': TIMELINE_SCHEMA, 'title': title, 'window': [start, end], 'data_end': data_end,
+            'sampled': bool(sampled),
+            'utc_offset': offset, 'step': step, 'host_cpus': cpus, 'runs': runs, 'events': list(events),
+            'commits': list(commits),
+            'series': [{'name': name, 'values': [round(v, 4) for v in series[name]['values']],
+                        'core_seconds': round(totals[name], 1)} for name in ordered],
+            'host': {'values': None if host_line is None else [None if v is None else round(v, 4) for v in host_line],
+                     'source': host_source}}
+
+
+def _timeline_font(size, bold=False):
+    from PIL import ImageFont
+    for path in (TIMELINE_BOLD if bold else TIMELINE_FONTS):
+        if Path(path).is_file():
+            return ImageFont.truetype(path, size)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:   # Pillow < 10.1: one small bitmap font
+        return ImageFont.load_default()
+
+
+def _rgb(colour):
+    return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def _dark(colour):
+    red, green, blue = _rgb(colour)
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue < 140
+
+
+def _pack(items, gap=6):
+    """Rows of items {'x0', 'x1'} so that no two in a row overlap (first row that is free)."""
+    rows = []
+    for item in sorted(items, key=lambda row: (row['x0'], row['key'])):
+        for row in rows:
+            if row[-1]['x1'] + gap <= item['x0']:
+                row.append(item)
+                break
+        else:
+            rows.append([item])
+    return rows
+
+
+def _minutes(seconds):
+    if seconds < 90:
+        return f'{seconds:.0f} s'
+    if seconds < 5400:
+        return f'{seconds / 60:.0f} min'
+    return f'{seconds / 3600:.1f} h'
+
+
+def render_timeline(data):
+    """The Build Timeline as PNG bytes. Same data -> byte-identical PNG (no time stamps, no
+    metadata; fonts and Pillow version are the only other inputs)."""
+    from PIL import Image, ImageDraw
+    import io
+    offset = data['utc_offset']
+    start, end = data['window']
+    width = 2000
+    left, right = 340, width - 40
+    fonts = {key: _timeline_font(size, bold) for key, (size, bold) in {
+        'title': (40, True), 'sub': (18, False), 'lane': (20, True), 'lanesub': (15, False),
+        'bar': (13, False), 'small': (12, False), 'axis': (15, False), 'legend': (15, False)}.items()}
+
+    def x_of(at):
+        return left + (min(max(at, start), end) - start) * (right - left) / (end - start)
+
+    image = Image.new('RGB', (width, 6000), _rgb(TL_SURFACE))
+    draw = ImageDraw.Draw(image)
+    runs, events, commits = data['runs'], data['events'], data['commits']
+    title = data.get('title') or (runs[0]['label'] if len(runs) == 1 else
+                                  (runs[0].get('version') and f"v{runs[0]['version']} builds") or 'Builds')
+    draw.text((30, 20), f'{title}: where the wall time went', font=fonts['title'], fill=TL_INK)
+    zone = f'UTC{offset // 3600:+03d}:{abs(offset) % 3600 // 60:02d}'
+    host_source = (data['host'] or {}).get('source')
+    lines = [f'Build Timeline. Host local time ({zone}); times in the build records (UTC) converted. '
+             f'Window {clock_text(start, offset)} - {clock_text(end, offset)} '
+             f'({clock_text(start, offset, "%Y-%m-%d")}), data to {clock_text(data["data_end"], offset)}.',
+             'Stages from each run\'s build-profile.json, or build-state.json + build-progress.json while it runs; '
+             'CPU from ' + ('the CPU samples and ' if data.get('sampled') else '')
+             + 'the build profiler' + (f'; whole-machine line from {host_source}' if host_source else '') + '.']
+    for index, line in enumerate(lines):
+        draw.text((30, 76 + 24 * index), line, font=fonts['sub'], fill=TL_SECONDARY)
+    y = 160
+    top = y + 26
+
+    def panel(y0, height, name, sub=None):
+        draw.rectangle((left, y0, right, y0 + height), fill=TL_PANEL)
+        middle = y0 + min(height, 60) / 2
+        draw.text((30, middle - (20 if sub else 12)), name, font=fonts['lane'], fill=TL_INK)
+        if sub:
+            draw.text((30, middle + 4), sub, font=fonts['lanesub'], fill=TL_SECONDARY)
+
+    def bar(a, b, y0, height, fill, outline=None, width_=1):
+        xa, xb = x_of(a), max(x_of(b), x_of(a) + 2)
+        draw.rectangle((xa, y0, xb, y0 + height), fill=fill, outline=outline, width=width_)
+        return xa, xb
+
+    y = top
+    if commits:
+        height = 40
+        panel(y, height, f'commits ({len(commits)})', 'short tick = merge')
+        for commit in commits:
+            x = x_of(commit['t'])
+            draw.line((x, y + (height / 2 if commit['merge'] else 6), x, y + height - 6), fill=TL_SERIES[0], width=2)
+        y += height + 10
+
+    lanes = []
+    for item in events:
+        if item['lane'] not in lanes:
+            lanes.append(item['lane'])
+    for lane in lanes:
+        items = [item for item in events if item['lane'] == lane and item['end'] >= start and item['start'] <= end]
+        boxes = []
+        for item in items:
+            text = str(item.get('label') or item['name'])
+            x0, x1 = x_of(item['start']), max(x_of(item['end']), x_of(item['start']) + 2)
+            label_w = draw.textlength(text, font=fonts['small']) + 6
+            inside = x1 - x0 >= label_w
+            boxes.append({'key': (item['start'], item['name']), 'x0': x0, 'x1': x1 if inside else x1 + label_w,
+                          'item': item, 'text': text, 'bar1': x1, 'inside': inside})
+        rows = _pack(boxes)
+        row_h = 22
+        height = max(1, len(rows)) * row_h + 8
+        failed = sum(1 for item in items if item['result'] == 'failed')
+        panel(y, height, f'{lane} ({len(items)})', f'{failed} failed; green passed, red failed, grey running')
+        for number, row in enumerate(rows):
+            yy = y + 5 + number * row_h
+            for box in row:
+                item = box['item']
+                colour = {'passed': TL_GOOD, 'failed': TL_CRITICAL}.get(item['result'], TL_RUNNING)
+                draw.rectangle((box['x0'], yy, box['bar1'], yy + row_h - 6), fill=TL_SURFACE, outline=colour, width=2)
+                text_x = box['x0'] + 3 if box['inside'] else box['bar1'] + 3
+                draw.text((text_x, yy + 1), box['text'], font=fonts['small'], fill=TL_INK)
+        y += height + 10
+
+    short_seen = []
+    for run in runs:
+        stages = [row for row in run['stages'] if row['end'] >= start and row['start'] <= end]
+        reused = [row for row in stages if row['reused']]
+        ran = [row for row in stages if not row['reused']]
+        budget = run.get('budget') or data['host_cpus']
+        critical = set(run.get('critical_path') or [])
+        boxes, short = [], []
+        for row in ran:
+            cores = (row['cpu'] or 0) / max(row['end'] - row['start'], 1e-6) if row.get('cpu') is not None else None
+            x0, x1 = x_of(row['start']), max(x_of(row['end']), x_of(row['start']) + 2)
+            if x1 - x0 < TIMELINE_SHORT_PX and not row['running']:
+                short.append(row)   # too short to read at this scale: a tick on the "short" row
+                continue
+            parts = [row['name'], _minutes(row['end'] - row['start'])]
+            if cores is not None and not row['running']:
+                parts.append(f'{cores:.1f} cores')
+            if row['running']:
+                parts.append('running')
+            elif row['status'] not in ('passed', None):
+                parts.append(str(row['status']).upper())
+            note = expectation_text(row)
+            if note:
+                parts.append(note)
+            text = ', '.join(parts)
+            label_w = draw.textlength(text, font=fonts['bar']) + 8
+            boxes.append({'key': (row['start'], row['name']), 'x0': x0, 'x1': x1 if x1 - x0 >= label_w else x1 + label_w,
+                          'bar1': x1, 'inside': x1 - x0 >= label_w, 'row': row, 'text': text, 'cores': cores})
+        short_seen += short
+        # A stage with phases gets its own row and a strip of its phases under its bar.
+        rows = _pack([box for box in boxes if not box['row'].get('phases')])
+        rows += [[box] for box in sorted((box for box in boxes if box['row'].get('phases')), key=lambda b: b['key'])]
+        rows.sort(key=lambda row: (row[0]['key']))
+        row_h = 22
+        heights = [row_h * (2 if row[0]['row'].get('phases') else 1) for row in rows]
+        head = 92
+        height = head + sum(heights) + 4
+        draw.rectangle((left, y, right, y + height), fill=TL_PANEL)
+        draw.text((30, y + 6), run['label'] if len(run['label']) <= 24 else run['label'][:22] + '..',
+                  font=fonts['lane'], fill=TL_INK)
+        failed = [row['name'] for row in stages if row['status'] not in ('passed', 'running', None)]
+        status = 'running' if run.get('running') else str(run.get('status'))
+        wall = run['end'] - (run['started'] or run['origin'])
+        info = [f'{len(stages)} stages: {len(ran)} ran, {len(reused)} reused',
+                f'{status}, {_minutes(wall)}, budget {budget}']
+        if failed:
+            info.append('failed: ' + ', '.join(failed)[:36])
+        elif run.get('pending'):
+            info.append(f"{len(run['pending'])} stages still to run")
+        for index, line in enumerate(info):
+            draw.text((30, y + 32 + 17 * index), line, font=fonts['lanesub'], fill=TL_SECONDARY)
+        # Whole run: from the receipt's start (preflight, checks) to the end of the data; its folder name below.
+        if run['started'] is not None and run['started'] < run['origin']:
+            bar(run['started'], run['origin'], y + 6, 10, TL_AXIS)
+        bar(run['origin'], run['end'], y + 6, 10, TL_SECONDARY)
+        name = run['name'] if len(run['name']) < 120 else run['name'][:118] + '..'
+        if run.get('eta'):
+            eta = run['eta']
+            name += (f" | ETA {'at least ' if eta['lower_bound'] else ''}{_minutes(eta['seconds'])} at the last "
+                     f"update ({eta['basis']})")
+        name_x = min(max(left + 6, x_of(run['started'] or run['origin'])),
+                     right - 6 - draw.textlength(name, font=fonts['small']))
+        draw.text((max(left + 6, name_x), y + 19), name, font=fonts['small'], fill=TL_SECONDARY)
+        # Reused stages and stages too short to label: ticks on one row each, counted on the left.
+        for offset_y, title_text, items, colour in ((38, f'reused ({len(reused)})', reused, TL_AXIS),
+                                                    (60, f'short ({len(short)})', short, TL_RAMP[6])):
+            draw.text((left - 8 - draw.textlength(title_text, font=fonts['small']), y + offset_y),
+                      title_text, font=fonts['small'], fill=TL_SECONDARY)
+            for row in items:
+                bad = row['status'] not in ('passed', None)
+                bar(row['start'], row['end'], y + offset_y + 1, 14, TL_CRITICAL if bad else colour)
+                if bad:
+                    draw.text((x_of(row['end']) + 5, y + offset_y), f"{row['name']} {str(row['status']).upper()}",
+                              font=fonts['small'], fill=TL_INK)
+        yy = y + head
+        if rows:
+            draw.text((left - 8 - draw.textlength('ran', font=fonts['small']), yy + 2), 'ran', font=fonts['small'],
+                      fill=TL_SECONDARY)
+        for number, row in enumerate(rows):
+            ry = yy + sum(heights[:number])
+            for box in row:
+                stage = box['row']
+                for item in stage.get('phases') or ():   # the strip under the bar
+                    pa, pb = x_of(item['start']), max(x_of(item['end']), x_of(item['start']) + 2)
+                    share = min(1.0, (item['cores'] or 0) / float(budget or 1))
+                    shade = TL_CRITICAL if item.get('error') else TL_RAMP[min(len(TL_RAMP) - 1,
+                                                                              int(share * (len(TL_RAMP) - 1) + 0.5))]
+                    draw.rectangle((pa, ry + row_h, pb, ry + 2 * row_h - 6), fill=shade, outline=TL_SURFACE)
+                    label = item['name'][len('CHIM '):] if item['name'].startswith('CHIM ') else item['name']
+                    label += ' ' + _minutes(item['end'] - item['start'])
+                    if item['cores'] is not None:
+                        label += f", {item['cores']:.1f} c"
+                    elif item['running']:
+                        label += ', running'
+                    if draw.textlength(label, font=fonts['small']) + 6 <= pb - pa:
+                        draw.text((pa + 3, ry + row_h + 2), label, font=fonts['small'],
+                                  fill='#ffffff' if _dark(shade) else TL_INK)
+                if stage['running']:
+                    fill = TL_RAMP[3]
+                elif stage['status'] not in ('passed', None):
+                    fill = TL_CRITICAL
+                elif box['cores'] is None:
+                    fill = TL_AXIS
+                else:
+                    share = min(1.0, max(0.0, box['cores'] / float(budget or 1)))
+                    fill = TL_RAMP[min(len(TL_RAMP) - 1, int(share * (len(TL_RAMP) - 1) + 0.5))]
+                outline = TL_INK if stage['name'] in critical else None
+                xa, xb = box['x0'], box['bar1']
+                draw.rectangle((xa, ry, xb, ry + row_h - 5), fill=fill, outline=outline, width=2 if outline else 1)
+                if stage['running']:   # open end: diagonal hatching, the bar keeps growing
+                    for hx in range(int(xa) - (row_h - 5), int(xb), 8):
+                        draw.line((max(xa, hx), ry + row_h - 5 - max(0, xa - hx), min(xb, hx + row_h - 5),
+                                   ry + max(0, hx + row_h - 5 - xb)), fill=TL_SURFACE, width=1)
+                if box['inside']:
+                    draw.text((xa + 4, ry + 2), box['text'], font=fonts['bar'],
+                              fill='#ffffff' if _dark(fill) else TL_INK)
+                else:
+                    draw.text((xb + 4, ry + 2), box['text'], font=fonts['bar'], fill=TL_INK)
+        y += height + 10
+    lanes_bottom = y
+
+    # CPU cores in use, stacked by series; whole-machine line; the machine's CPU count dashed.
+    series = data['series']
+    step = data['step']
+    count = len(series[0]['values']) if series else max(1, int(math.ceil((end - start) / step)))
+    stack_top = [0.0] * count
+    for entry in series:
+        stack_top = [a + b for a, b in zip(stack_top, entry['values'])]
+    host = (data['host'] or {}).get('values')
+    peak = max([data['host_cpus']] + stack_top + [v for v in (host or []) if v is not None])
+    scale = 4 if peak <= 32 else 8 if peak <= 64 else 16
+    y_max = scale * math.ceil(peak * 1.08 / scale)
+    chart_h = 380
+    c0, c1 = y + 10, y + 10 + chart_h
+    draw.rectangle((left, c0, right, c1), fill=TL_PANEL)
+    draw.text((30, c0 + 4), 'CPU cores in use', font=fonts['lane'], fill=TL_INK)
+    draw.text((30, c0 + 32), f'stacked by job, {step:.0f} s means\n(time-weighted)', font=fonts['lanesub'],
+              fill=TL_SECONDARY)
+
+    def y_of(cores):
+        return c1 - min(cores, y_max) * chart_h / y_max
+
+    for tick in range(0, int(y_max) + 1, scale):
+        draw.line((left, y_of(tick), right, y_of(tick)), fill=TL_GRID)
+        label = str(tick)
+        draw.text((left - 8 - draw.textlength(label, font=fonts['axis']), y_of(tick) - 9), label,
+                  font=fonts['axis'], fill=TL_MUTED)
+    colours = {}
+    slot = 0
+    for entry in series:
+        if entry['name'] == 'other':
+            colours['other'] = TL_OTHER
+        else:
+            colours[entry['name']] = TL_SERIES[slot % len(TL_SERIES)]
+            slot += 1
+    base = [0.0] * count
+    for entry in series:
+        for index, value in enumerate(entry['values']):
+            if value <= 0:
+                continue
+            a = start + index * step
+            xa, xb = x_of(a), x_of(min(end, a + step))
+            if xb <= xa:
+                continue
+            draw.rectangle((xa, y_of(base[index] + value), xb, y_of(base[index])), fill=colours[entry['name']])
+        base = [a + b for a, b in zip(base, entry['values'])]
+    for xx in range(left, right, 16):
+        draw.line((xx, y_of(data['host_cpus']), min(right, xx + 8), y_of(data['host_cpus'])), fill=TL_SECONDARY, width=2)
+    draw.text((left + 6, y_of(data['host_cpus']) - 18), f"{data['host_cpus']} CPU threads", font=fonts['small'],
+              fill=TL_SECONDARY)
+    if host:
+        points = []
+        for index, value in enumerate(host):
+            if value is None:
+                if len(points) > 1:
+                    draw.line(points, fill=TL_INK, width=2)
+                points = []
+                continue
+            points.append((x_of(start + (index + 0.5) * step), y_of(value)))
+        if len(points) > 1:
+            draw.line(points, fill=TL_INK, width=2)
+
+    # Time axis over every lane and the chart.
+    span = end - start
+    tick = next((value for value in (300, 600, 900, 1800, 3600, 7200, 14400, 43200, 86400) if span / value <= 14), 86400)
+    at = (math.floor((start + offset) / tick) + 1) * tick - offset
+    while at < end:
+        x = x_of(at)
+        draw.line((x, top, x, lanes_bottom - 10), fill=TL_GRID, width=1)
+        draw.line((x, c0, x, c1), fill=TL_GRID, width=1)
+        label = clock_text(at, offset)
+        draw.text((x - draw.textlength(label, font=fonts['axis']) / 2, top - 22), label, font=fonts['axis'],
+                  fill=TL_MUTED)
+        draw.text((x - draw.textlength(label, font=fonts['axis']) / 2, c1 + 4), label, font=fonts['axis'],
+                  fill=TL_MUTED)
+        at += tick
+
+    # Legend: CPU series with core-minutes, lines, stage colours.
+    y = c1 + 34
+    x = left
+    entries = [(colours[entry['name']], f"{entry['name']} ({entry['core_seconds'] / 60:.0f} core-min)")
+               for entry in series]
+    if host:
+        entries.append((TL_INK, 'whole machine'))
+    for colour, text in entries:
+        w = 30 + draw.textlength(text, font=fonts['legend'])
+        if x + w > right:
+            x, y = left, y + 24
+        draw.rectangle((x, y + 3, x + 16, y + 19), fill=colour)
+        draw.text((x + 22, y), text, font=fonts['legend'], fill=TL_INK)
+        x += w + 24
+    y += 30
+    x = left
+    every = [row for run in runs for row in run['stages'] if row['end'] >= start and row['start'] <= end]
+    shown = {'running': any(row['running'] for row in every),
+             'failed': any(row['status'] not in ('passed', 'running', None) for row in every),
+             'reused': any(row['reused'] for row in every), 'short': bool(short_seen),
+             'critical': any(run.get('critical_path') for run in runs),
+             'phases': any(row.get('phases') for row in every)}
+    for colour, text, outline, kind in ((TL_RAMP[1], 'stage, few cores of its budget', None, None),
+                                        (TL_RAMP[-2], 'stage, all cores of its budget', None, None),
+                                        (TL_PANEL, 'critical path (outline)', TL_INK, 'critical'),
+                                        (TL_RAMP[3], 'running (hatched)', None, 'running'),
+                                        (TL_CRITICAL, 'failed', None, 'failed'), (TL_AXIS, 'reused', None, 'reused'),
+                                        (TL_RAMP[6], 'short (too short to label)', None, 'short'),
+                                        (TL_RAMP[4], 'phases inside a stage (strip under its bar)', None, 'phases')):
+        if kind and not shown[kind]:
+            continue
+        w = 30 + draw.textlength(text, font=fonts['legend'])
+        if x + w > right:
+            x, y = left, y + 24
+        draw.rectangle((x, y + 3, x + 16, y + 19), fill=colour, outline=outline, width=2 if outline else 1)
+        draw.text((x + 22, y), text, font=fonts['legend'], fill=TL_INK)
+        x += w + 24
+    y += 30
+    for line in ('Core-minutes count only the window. A stage label gives its wall time and its average cores '
+                 '(CPU / wall); the run bar at the top of each run starts at the build receipt (light: checks before '
+                 'the first stage).',
+                 'Sampled CPU is a snapshot per sample interval, so where jobs overlap the stack can pass the '
+                 'whole-machine line; the gap below that line is load no series covers.'):
+        draw.text((left, y), line, font=fonts['small'], fill=TL_SECONDARY)
+        y += 18
+    image = image.crop((0, 0, width, y + 20))
+    out = io.BytesIO()
+    image.save(out, format='PNG')
+    return out.getvalue()
+
+
+def timeline_main(args):
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        if not args.json:
+            raise ValueError('The Build Timeline needs Pillow (python -m pip install Pillow; the builder Docker '
+                             'image has it). --json writes the chart data without it.')
+    offset = parse_utc_offset(args.utc_offset)
+    if args.labels and len(args.labels) != len(args.runs):
+        raise ValueError(f'--labels: {len(args.labels)} labels for {len(args.runs)} runs')
+    runs = [timeline_run(path, args.labels[i] if args.labels else None) for i, path in enumerate(args.runs)]
+    runs.sort(key=lambda run: (run['started'] or run['origin'], run['name']))
+    cpus = args.host_cpus
+    samples = read_cpu_samples(args.samples, offset, cpus or max([r.get('host_cpus') or 0 for r in runs] + [0]) or None) \
+        if args.samples else {}
+    events = []
+    for path in args.gates or []:
+        events += read_lane_events(path, offset, 'gates')
+    for path in args.events or []:
+        events += read_lane_events(path, offset, 'events')
+    start, end = to_epoch(args.start, offset), to_epoch(args.end, offset)
+    if start is not None:
+        samples = {name: [row for row in rows if row[0] >= start - 600] for name, rows in samples.items()}
+    if end is not None:
+        samples = {name: [row for row in rows if row[0] <= end + 600] for name, rows in samples.items()}
+    data = timeline_data(runs, start, end, samples, events, cpus=cpus, step=args.step, title=args.title,
+                         offset=offset)
+    if args.commits:
+        data['commits'] = read_commits(args.commits, data['window'][0], data['window'][1])
+    if args.json:
+        args.json.write_text(json.dumps(data, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+        print(f'Chart data: {args.json}')
+    if args.png:
+        png = render_timeline(data)
+        args.png.write_bytes(png)
+        import hashlib
+        print(f'Build Timeline: {args.png} ({len(png)} bytes, sha256 {hashlib.sha256(png).hexdigest()})')
+    return 0
+
+
+# --------------------------------------------------------------------------
+# Unit reuse audit (HASH EVERYTHING): per stage, the units a run computed and reused, the input whose hash
+# changed for each computed unit, and loud failures for a unit computed again with an unchanged key.
+# Reads the cache provenance records (schema aw-cache-provenance-1, tools/cache_provenance.py): a "provenance"
+# field in a JSON cache entry or a <entry>.meta.json sidecar, and <cache>/.provenance/reuse.jsonl.
+
+PROVENANCE_SCHEMA = 'aw-cache-provenance-1'
+# Which stage writes which cache (the folder name under the shared cache root). A stage that ran without any of
+# its caches being touched, or that has none here, is "unkeyed": it is reused or rebuilt only as a whole stage.
+STAGE_CACHES = {
+    'world-terrain': ('world-terrain-v1',),
+    'world-scenery': ('image-passes/world-scenery-region',),
+    'world-flora': ('image-passes/world-flora-region',),
+    'chim': ('chim-units', 'image-passes/stair-walk', 'chim-units/heap', 'image-passes/chim-validate',
+             'image-passes/chim-zone-walk'),
+    'character': ('image-passes/character-head',),
+    'image': ('image-passes/hidden-surface-cull', 'image-passes/optimize-world-maps', 'image-passes/exterior-sky',
+              'image-passes/stair-walk', 'image-passes/interior-room', 'image-passes/town-region',
+              'image-passes/character-head'),
+    'balmora': ('image-passes/town-region',),
+    'balmora-interiors': ('image-passes/interior-room',),
+}
+
+
+def _provenance_records(cache_root):
+    """(records, reuse lines) of one cache folder: every provenance record found (entry JSON field, sidecar, or
+    backfill log) and every reuse line."""
+    root = Path(cache_root)
+    records, reuses = [], []
+    if not root.is_dir():
+        return records, reuses
+    for path in sorted(root.rglob('*.json')):
+        if '.provenance' in path.parts:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        record = data if path.name.endswith('.meta.json') else (data.get('provenance') if isinstance(data, dict) else None)
+        if isinstance(record, dict) and record.get('schema') == PROVENANCE_SCHEMA:
+            records.append(dict(record, _path=str(path.relative_to(root))))
+    folder = root / '.provenance'
+    for name, target in (('backfill.jsonl', records), ('reuse.jsonl', reuses)):
+        try:
+            lines = (folder / name).read_text(encoding='utf-8').splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                target.append(row)
+    return records, reuses
+
+
+def _unit_of(record):
+    manifest = record.get('input_manifest') or {}
+    return record.get('unit') or manifest.get('unit')
+
+
+def changed_inputs(new, old):
+    """Names of the inputs whose SHA-256 differs between two input manifests (added and removed inputs too),
+    plus 'parameters' when those differ."""
+    a = {row.get('name'): row.get('sha256') for row in ((new or {}).get('inputs') or [])}
+    b = {row.get('name'): row.get('sha256') for row in ((old or {}).get('inputs') or [])}
+    changed = sorted(str(name) for name in set(a) | set(b) if a.get(name) != b.get(name))
+    if (new or {}).get('parameters') != (old or {}).get('parameters'):
+        changed.append('parameters')
+    return changed
+
+
+def unit_reuse(run, cache_roots, stages=None):
+    """The unit reuse audit of RUN (its folder name or path) over CACHE_ROOTS (cache folders).
+
+    Returns {'run', 'caches': {cache: {'computed', 'reused', 'units': [...]}}, 'failures': [...],
+    'unexplained': [...], 'unkeyed': [...]}. A computed unit lists the inputs whose hash changed against the
+    newest earlier entry of the same unit; a computed unit whose key an earlier entry (or an earlier computation
+    in this run) already had is a FAILURE: it should have been reused. A computed unit without a unit name or
+    without an earlier entry is listed as new (no earlier entry) or unexplained (no unit name to compare)."""
+    name = Path(str(run)).name
+    report = {'run': name, 'caches': {}, 'failures': [], 'unexplained': [], 'unkeyed': []}
+    touched = set()
+    for root in cache_roots:
+        root = Path(root)
+        records, reuses = _provenance_records(root)
+        if not records and not reuses:
+            continue
+        label = root.name
+        mine = [r for r in records if r.get('run') == name]
+        reused = [r for r in reuses if r.get('run') == name]
+        before = sorted((r for r in records if r.get('run') != name), key=lambda r: str(r.get('created_at')))
+        # Keys that existed before a unit was computed: earlier entries, and keys other runs reused earlier (an
+        # overwritten entry leaves only the new record, but its reuse lines remain).
+        known = [(str(r.get('created_at')), r.get('key')) for r in before if r.get('key')]
+        known += [(str(r.get('at')), r.get('key')) for r in reuses if r.get('run') != name and r.get('key')]
+        computed_here = set()
+        units = []
+        for record in sorted(mine, key=lambda r: (str(r.get('created_at')), str(r.get('key')))):
+            unit, key = _unit_of(record), record.get('key')
+            when = str(record.get('created_at'))
+            seen_keys = {k for at, k in known if at < when} | computed_here
+            row = {'unit': unit, 'key': key, 'entry': record.get('_path')}
+            if key in seen_keys:
+                row['status'] = 'FAILURE: computed again with an unchanged key'
+                report['failures'].append(dict(row, cache=label))
+            elif unit is None:
+                row['status'] = 'unexplained: no unit name in the input manifest'
+                report['unexplained'].append(dict(row, cache=label))
+            else:
+                earlier = [r for r in before if _unit_of(r) == unit]
+                if earlier:
+                    row['status'] = 'changed'
+                    row['changed_inputs'] = changed_inputs(record.get('input_manifest'), earlier[-1].get('input_manifest'))
+                else:
+                    row['status'] = 'new unit'
+            computed_here.add(key)
+            units.append(row)
+        report['caches'][label] = {'computed': len(mine), 'reused': len(reused), 'units': units}
+        if mine or reused:
+            touched.add(label)
+    for stage in stages or ():
+        caches = {Path(c).name for c in STAGE_CACHES.get(stage, ())}
+        if not caches or not caches & touched:
+            report['unkeyed'].append(stage)
+    return report
+
+
+def unit_reuse_lines(report, top=20):
+    lines = [f"Unit reuse audit: {report['run']}"]
+    for cache, row in sorted(report['caches'].items()):
+        changed = [u for u in row['units'] if u['status'] == 'changed']
+        lines.append(f"  {cache}: {row['computed']} computed, {row['reused']} reused"
+                     + (f" ({len(changed)} with a changed input)" if changed else ''))
+        for unit in changed[:top]:
+            lines.append(f"    {unit['unit']}: {', '.join(unit['changed_inputs']) or 'no input named'}")
+    for unit in report['failures']:
+        lines.append(f"  RECOMPUTED WITH AN UNCHANGED KEY: {unit['cache']} {unit['unit'] or unit['entry']} "
+                     f"(key {str(unit['key'])[:16]}) - a reuse bug")
+    if report['unexplained']:
+        lines.append(f"  unexplained (no unit name to compare): {len(report['unexplained'])}")
+    if report['unkeyed']:
+        lines.append('  unkeyed stages (reused or rebuilt only as a whole): ' + ', '.join(report['unkeyed']))
+    return lines
+
+
 def main(argv=None, prog=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ['_stage']:
@@ -1616,18 +3111,72 @@ def main(argv=None, prog=None):
     versus.add_argument('--json', action='store_true', help='Print the comparison as JSON')
     tune = sub.add_parser('optimize', help='Idle-core stages, single-core tails, serial critical stages and slot '
                                            'waits of one or more runs, with suggestions')
-    tune.add_argument('runs', type=Path, nargs='+', metavar='run', help='Build run folders or build-profile.json files')
+    tune.add_argument('runs', type=Path, nargs='*', metavar='run', help='Build run folders or build-profile.json files')
     tune.add_argument('--share', type=float, default=IDLE_SHARE, help='Idle below this share of the jobs (default 0.5)')
     tune.add_argument('--seconds', type=float, default=IDLE_SECONDS, help='... for longer than this (default 60)')
     tune.add_argument('--json', action='store_true', help='Print the items as JSON')
+    tune.add_argument('--ledger', type=Path, metavar='JSONL',
+                      help='Also (or only) per-stage statistics over many builds from a stage ledger: one JSON object '
+                           'per stage and build (stage, build, wall_s, cores_avg, jobs_max, status)')
+    chart = sub.add_parser('timeline', help='Build Timeline: a PNG of where the wall time went (stages of one or '
+                                            'more runs, gates and other lanes, CPU cores stacked by job)')
+    chart.add_argument('runs', type=Path, nargs='+', metavar='run', help='Build run folders (finished or running)')
+    chart.add_argument('--png', type=Path, metavar='OUT', help='Write the chart here')
+    chart.add_argument('--json', type=Path, metavar='OUT', help='Write the chart data here (works without Pillow)')
+    chart.add_argument('--start', help='Window start, host local time (YYYY-MM-DD HH:MM) or ISO 8601 with offset')
+    chart.add_argument('--end', help='Window end (default: the end of the data)')
+    chart.add_argument('--utc-offset', default='local',
+                       help='The zone to draw in and to read times without an offset (+HH:MM; default: this '
+                            "machine's zone, which inside a container is usually UTC)")
+    chart.add_argument('--samples', type=Path, metavar='JSONL', help='CPU samples: {"t", "name", "cores"} per line '
+                       '(name HOST = the whole machine, "cores" or "cpu_pct")')
+    chart.add_argument('--gates', type=Path, action='append', metavar='JSONL',
+                       help='Gate runs: {"name", "start", "end", "result"} per line (repeatable)')
+    chart.add_argument('--events', type=Path, action='append', metavar='JSONL',
+                       help='Other timed jobs, same fields plus "lane" (repeatable)')
+    chart.add_argument('--commits', metavar='REPO[:BRANCH]', help='Commit ticks from git log')
+    chart.add_argument('--labels', nargs='+', help='Short names for the runs, in the order given')
+    chart.add_argument('--title', help='Title before ": where the wall time went"')
+    chart.add_argument('--host-cpus', type=int, help='CPU threads of the machine (default: from the profiles)')
+    chart.add_argument('--step', type=float, default=TIMELINE_STEP, help='CPU chart bucket in seconds (default 30)')
+    audit = sub.add_parser('reuse', help='Unit reuse audit: per cache the units a run computed and reused, the input '
+                                         'whose hash changed, and units computed again with an unchanged key')
+    audit.add_argument('run', type=Path, help='Build run folder (or its name)')
+    audit.add_argument('--cache', type=Path, action='append', required=True, metavar='DIR',
+                       help='A cache folder with provenance records (repeatable)')
+    audit.add_argument('--json', action='store_true')
+    audit.add_argument('--fail-on-recompute', action='store_true',
+                       help='Exit 3 when a unit was computed again with an unchanged key')
     args = parser.parse_args(argv)
     try:
+        if args.action == 'reuse':
+            stages = None
+            state = _read_json(Path(args.run) / 'build-state.json')
+            if state:
+                stages = [step['name'] for step in state.get('steps', []) if 'reused' not in step]
+            report = unit_reuse(args.run, args.cache, stages)
+            print(json.dumps(report, indent=1) if args.json else chr(10).join(unit_reuse_lines(report)))
+            return 3 if args.fail_on_recompute and report['failures'] else 0
+        if args.action == 'timeline':
+            if not args.png and not args.json:
+                parser.error('timeline: give --png OUT.png and/or --json OUT.json')
+            return timeline_main(args)
         if args.action == 'compare':
             comparison = compare(load(args.run), load(args.older))
             comparison['old_run'] = str(args.older)
             print(json.dumps(comparison, indent=2) if args.json else '\n'.join(compare_lines(comparison)))
             return 3 if args.fail_on_regression and comparison['regressions'] else 0
         if args.action == 'optimize':
+            if args.ledger:
+                rows = [json.loads(line) for line in args.ledger.read_text(encoding='utf-8').splitlines() if line.strip()]
+                table = ledger_stats(rows, args.share, max(UNDERUSE_SECONDS, 0.0))
+                print(json.dumps({'ledger': table}, indent=2) if args.json and not args.runs
+                      else chr(10).join(ledger_lines(table)))
+                if not args.runs:
+                    return 0
+                print()
+            if not args.runs:
+                parser.error('optimize: give run folders and/or --ledger FILE')
             profiles = [load(path) for path in args.runs]
             rows = optimize_runs(profiles, args.share, args.seconds)
             names = [Path(str(profile.get('run') or path)).name for profile, path in zip(profiles, args.runs)]

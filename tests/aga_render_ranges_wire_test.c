@@ -41,7 +41,7 @@ static void wire(entity_t *entity,const float *angles){
     for(k=0;k<3;k++){MSG_WriteCoord(&net_message,source_origin[k]);MSG_WriteAngle(&net_message,angles[k]);}
     memset(entity,0,sizeof *entity);entity->model=&original;MSG_BeginReading();
     for(k=0;k<3;k++){entity->origin[k]=MSG_ReadCoord();entity->angles[k]=MSG_ReadAngle();}
-    assert(!msg_badread && msg_readcount==9);
+    assert(!msg_badread && msg_readcount==3*(AW_COORD_BYTES+1));
 }
 static void check(const float *angles,int expected){
     entity_t entity;model_t view,saved;int k,wrap;wire(&entity,angles);saved=original;

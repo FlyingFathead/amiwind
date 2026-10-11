@@ -12,6 +12,11 @@ Expected durations come from the build-profile.json files of earlier runs in
 the same workspace (sibling run folders; median per stage, scaled to this
 build's --jobs where the stage scales), else from the shipped table
 config/build-stage-durations.json. A stage with neither says "no history".
+A stage whose size can be read from its command line (WORK_MEASURES: the chim
+stage counts its frames) takes only history runs with a known size, scaled to
+this build's size; with none it says "no comparable history" and the ETA is a
+lower bound (BUILD-PROGRESS-ETA-BASIS-36). Every expected duration carries its
+basis (expected_basis) in the progress record.
 
     python tools/build.py status RUN [--json]
 
@@ -48,6 +53,46 @@ IDLE_SECONDS = 60.0        # ... for longer than this
 CORES_WINDOW = 10.0        # "cores now" = mean over the last this many seconds
 DONE = ('passed',)
 STOPPED = ('failed', 'cancelled')
+COMPARABLE_RATIO = 2.0     # history of a run within this size ratio counts as the same size
+NO_COMPARABLE = 'no comparable history'
+
+
+# --------------------------------------------------------------------------
+# Work measures: how much a stage does in this build, read from its command line, so that history
+# from a run of another size is scaled instead of used as is (BUILD-PROGRESS-ETA-BASIS-36: the
+# chim stage was expected at 154 s from three-area runs and ran 1 h 48 min on 273 frames).
+
+def _option_values(command, option):
+    args = [str(arg) for arg in command or ()]
+    values = []
+    for index, arg in enumerate(args):
+        if arg == option and index + 1 < len(args):
+            values.append(args[index + 1])
+        elif arg.startswith(option + '='):
+            values.append(arg.split('=', 1)[1])
+    return values
+
+
+def chim_frames(command):
+    """Frames the chim stage builds: one per --area, one per --chim-regions-cells cell."""
+    count = len(_option_values(command, '--area'))
+    count += sum(len(value.split()) for value in _option_values(command, '--chim-regions-cells'))
+    return count or None
+
+
+WORK_MEASURES = {'chim': ('frames', chim_frames)}
+
+
+def work_measure(name, command):
+    """(unit, amount) of stage NAME from its command, or None when the stage has no measure."""
+    entry = WORK_MEASURES.get(name)
+    if entry is None or not command:
+        return None
+    try:
+        amount = entry[1](command)
+    except Exception:  # noqa: BLE001 - a measure never stops progress
+        return None
+    return (entry[0], amount) if amount else None
 
 
 # --------------------------------------------------------------------------
@@ -99,16 +144,31 @@ def history_samples(run, limit=HISTORY_RUNS):
             continue
         budget = profile.get('budget')
         found = False
+        commands = None
         for row in profile.get('stages', []):
             if row.get('status') != 'passed' or row.get('reused') or not row.get('wall'):
                 continue
-            samples.setdefault(row['name'], []).append({'wall': row['wall'], 'cpu': row.get('cpu'),
-                                                         'jobs': row.get('jobs_max') or row.get('jobs'), 'budget': budget,
-                                                         'run': folder.name})
+            sample = {'wall': row['wall'], 'cpu': row.get('cpu'), 'jobs': row.get('jobs_max') or row.get('jobs'),
+                      'budget': budget, 'run': folder.name}
+            if row['name'] in WORK_MEASURES:
+                if commands is None:
+                    commands = run_commands(folder)
+                measure = work_measure(row['name'], commands.get(row['name']))
+                sample['work'] = measure[1] if measure else None
+            samples.setdefault(row['name'], []).append(sample)
             found = True
         if found:
             used.append(folder.name)
     return samples, used
+
+
+def run_commands(folder):
+    """{stage: command} recorded in a run's build-state.json ({} when unreadable)."""
+    try:
+        state = json.loads((Path(folder) / 'build-state.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+    return {step['name']: step.get('command') for step in state.get('steps', []) if step.get('name')}
 
 
 def load_defaults(path=DEFAULTS):
@@ -120,31 +180,60 @@ def load_defaults(path=DEFAULTS):
         return None, {}
 
 
-def expected_durations(names, budget, samples=None, defaults=(None, {}), reused=()):
-    """{stage: {'seconds', 'cores', 'source', 'samples'}}; seconds None = no history."""
+def expected_durations(names, budget, samples=None, defaults=(None, {}), reused=(), work=None):
+    """{stage: {'seconds', 'cores', 'source', 'samples', 'basis'}}; seconds None = no (comparable) history.
+
+    WORK: {stage: (unit, amount)} of this build (work_measure). A stage with a measure uses only the
+    history runs of a known size, each scaled by amount here / amount then (linear); with none it is
+    'no comparable history' (the default table has no sizes either)."""
     samples = samples or {}
+    work = work or {}
     default_budget, default_stages = defaults
     result = {}
     for name in names:
         if name in reused:
-            result[name] = {'seconds': REUSED_SECONDS, 'cores': 1.0, 'source': 'reused', 'samples': 0}
+            result[name] = {'seconds': REUSED_SECONDS, 'cores': 1.0, 'source': 'reused', 'samples': 0,
+                            'basis': 'reused'}
             continue
         rows = samples.get(name)
+        measure = work.get(name)
+        if measure:
+            unit, amount = measure
+            sized = [r for r in rows or () if r.get('work')]
+            if not sized:
+                result[name] = {'seconds': None, 'cores': None, 'source': NO_COMPARABLE, 'samples': 0,
+                                'work': amount, 'work_unit': unit,
+                                'basis': f'{NO_COMPARABLE}: {amount} {unit} here, '
+                                         f'{len(rows or ())} earlier run(s) of unknown size'}
+                continue
+            seconds = statistics.median(scaled_seconds(r['wall'], r.get('cpu'), r.get('jobs'), r.get('budget'), budget)
+                                        * amount / r['work'] for r in sized)
+            then = statistics.median(r['work'] for r in sized)
+            cores = [r['cpu'] / r['wall'] for r in sized if r.get('cpu') is not None and r['wall']]
+            ratio = amount / then
+            if 1 / COMPARABLE_RATIO <= ratio <= COMPARABLE_RATIO:
+                basis = f'history ({len(sized)} run(s), {then:g} {unit} there, {amount} here)'
+            else:
+                basis = f'history scaled by {unit}: {amount} here, {then:g} in {len(sized)} earlier run(s)'
+            result[name] = {'seconds': round(seconds, 1), 'cores': round(statistics.median(cores), 2) if cores else None,
+                            'source': 'history', 'samples': len(sized), 'work': amount, 'work_unit': unit,
+                            'basis': basis}
+            continue
         if rows:
             seconds = statistics.median(scaled_seconds(r['wall'], r.get('cpu'), r.get('jobs'), r.get('budget'), budget)
                                         for r in rows)
             cores = [r['cpu'] / r['wall'] for r in rows if r.get('cpu') is not None and r['wall']]
             result[name] = {'seconds': round(seconds, 1), 'cores': round(statistics.median(cores), 2) if cores else None,
-                            'source': 'history', 'samples': len(rows)}
+                            'source': 'history', 'samples': len(rows), 'basis': f'history ({len(rows)} run(s))'}
             continue
         row = default_stages.get(name)
         if row and row.get('wall'):
             seconds = scaled_seconds(row['wall'], row.get('cpu'), row.get('jobs'), default_budget, budget)
             result[name] = {'seconds': round(seconds, 1),
                             'cores': round(row['cpu'] / row['wall'], 2) if row.get('cpu') is not None else None,
-                            'source': 'default', 'samples': 0}
+                            'source': 'default', 'samples': 0, 'basis': 'default table'}
             continue
-        result[name] = {'seconds': None, 'cores': None, 'source': 'none', 'samples': 0}
+        result[name] = {'seconds': None, 'cores': None, 'source': 'none', 'samples': 0, 'basis': 'no history'}
     return result
 
 
@@ -232,8 +321,13 @@ def estimate(order, dependencies, stages, expected, budget):
         eta, basis = (0.0 if finished else None), None
     else:
         eta, basis = (chain, 'critical path') if chain >= work else (work, 'CPU budget')
-    unknown = [name for name in order if (expected.get(name) or {}).get('source', 'none') == 'none']
+    unknown = [name for name in order if (expected.get(name) or {}).get('source', 'none') in ('none', NO_COMPARABLE)]
+    incomparable = [name for name in order if (expected.get(name) or {}).get('source') == NO_COMPARABLE
+                    and status[name] not in DONE and status[name] not in STOPPED]
+    if basis and incomparable:   # not a confident number: say what it leaves out
+        basis += ', lower bound: ' + NO_COMPARABLE + ' for ' + ', '.join(incomparable)
     return {'percent': percent, 'eta_seconds': None if eta is None else round(eta, 1), 'eta_basis': basis,
+            'eta_lower_bound': bool(incomparable),
             'critical_path': path, 'critical_path_seconds': round(chain, 1), 'work_seconds': round(work, 1),
             'overrun': overrun, 'no_history': unknown, 'fallback_seconds': round(fallback, 1),
             'remaining': {name: round(value, 1) for name, value in remaining.items()}}
@@ -250,7 +344,7 @@ def _now_iso(epoch=None):
 class Tracker:
     """Writes RUN/build-progress.json; every method is cheap and never raises into the build."""
 
-    def __init__(self, run, order, dependencies, metadata, sampler=None, origin=None, interval=None):
+    def __init__(self, run, order, dependencies, metadata, sampler=None, origin=None, interval=None, commands=None):
         self.run = Path(run)
         self.order = list(order)
         self.dependencies = {name: list(deps) for name, deps in (dependencies or {}).items()}
@@ -261,7 +355,12 @@ class Tracker:
         reused = set(((metadata.get('stage_cache') or {}).get('reused') or {}).keys())
         samples, self.history_runs = history_samples(self.run)
         defaults = load_defaults()
-        self.expected = expected_durations(self.order, self.budget, samples, defaults, reused)
+        work = {}
+        for name in self.order:
+            measure = work_measure(name, (commands or {}).get(name))
+            if measure:
+                work[name] = measure
+        self.expected = expected_durations(self.order, self.budget, samples, defaults, reused, work)
         self.defaults_used = any(entry['source'] == 'default' for entry in self.expected.values())
         self.stages = {}
         self.status = 'running'
@@ -309,6 +408,21 @@ class Tracker:
                                  end=time.monotonic() - self.origin)
         self.write()
 
+    def _phase_now(self, name, stage, row):
+        """The running stage's current phase (its phase timer) and the builder's last heartbeat for it."""
+        try:
+            from build_profile import read_now
+            current = read_now(self.run / 'profile' / 'sections' / f"{stage['number']:02}-{name}.jsonl")
+        except Exception:  # noqa: BLE001
+            current = None
+        if current:
+            row['phase'] = {key: current.get(key) for key in ('name', 'done', 'total', 'unit', 'label')}
+            row['phase']['elapsed_seconds'] = round(max(0.0, time.time() - float(current.get('started_at') or 0)), 1)
+        beat = getattr(self, 'heartbeat', None)
+        state = (beat.state.get(name) if beat is not None else None)
+        if state:
+            row['heartbeat'] = dict(state)
+
     def _jobs_now(self, name, stage):
         """The stage's current worker allowance (the parallel scheduler rebalances it), else its start value."""
         try:
@@ -346,18 +460,27 @@ class Tracker:
             stage = stages.get(name)
             entry = self.expected.get(name, {})
             row = {'name': name, 'status': stage['status'] if stage else 'pending',
-                   'expected_seconds': entry.get('seconds'), 'expected_source': entry.get('source')}
+                   'expected_seconds': entry.get('seconds'), 'expected_source': entry.get('source'),
+                   'expected_basis': entry.get('basis')}
+            if entry.get('work'):
+                row.update(work=entry['work'], work_unit=entry.get('work_unit'))
             if stage:
                 end = stage.get('end', now)
                 elapsed = max(0.0, end - stage['start'])
                 row.update(elapsed_seconds=round(elapsed, 1), jobs=stage.get('jobs'))
                 states[name] = {'status': row['status'], 'elapsed': elapsed}
                 if row['status'] == 'running':
+                    self._phase_now(name, stage, row)
                     jobs = self._jobs_now(name, stage) or 1
                     row['jobs'] = jobs
                     points = per_stage.get(name, [])
                     recent = [cores for t, cores in points if t >= now - CORES_WINDOW]
                     row['cores_now'] = round(sum(recent) / len(recent), 2) if recent else None
+                    # live form of the profiler's fix-item rule (build_profile.underused): a phase over 30 s
+                    # on fewer than half of the stage's workers
+                    if (row.get('phase') and (row['phase'].get('elapsed_seconds') or 0) > 30
+                            and row['cores_now'] is not None and row['cores_now'] < 0.5 * jobs):
+                        row['underused'] = True
                     if points:
                         idle = trailing_idle(points, IDLE_SHARE * jobs, interval)
                         row['idle_seconds'] = idle
@@ -417,10 +540,11 @@ class Tracker:
             pass
 
 
-def start(run, order, dependencies, metadata, sampler=None, origin=None):
-    """The builder's progress tracker, or None when it cannot start."""
+def start(run, order, dependencies, metadata, sampler=None, origin=None, commands=None):
+    """The builder's progress tracker, or None when it cannot start. COMMANDS: {stage: command line},
+    read for the work measures."""
     try:
-        return Tracker(run, order, dependencies, metadata, sampler, origin)
+        return Tracker(run, order, dependencies, metadata, sampler, origin, commands=commands)
     except Exception as exc:  # noqa: BLE001
         print(f'[warning] Live build progress disabled: {exc}', flush=True)
         return None
@@ -500,10 +624,25 @@ def status_lines(progress, now=None):
             note = []
             if row.get('expected_source') == 'none':
                 note.append('no history')
+            elif row.get('expected_source') == NO_COMPARABLE:
+                note.append(row.get('expected_basis') or NO_COMPARABLE)
+            elif 'scaled' in (row.get('expected_basis') or ''):
+                note.append(row['expected_basis'])
             elif row.get('expected_source') == 'default':
                 note.append('default table')
             if row.get('overrun'):
                 note.append('OVERRUN')
+            current = row.get('phase')
+            if current:
+                where = current.get('name') or ''
+                if current.get('total'):
+                    where = '[%s/%s%s] %s' % (current.get('done') or 0, current['total'],
+                                              ' ' + current['unit'] if current.get('unit') else '', where)
+                note.append('%s %s' % (where, duration(current.get('elapsed_seconds'))))
+            if row.get('heartbeat'):
+                note.append('silent %s' % duration(row['heartbeat'].get('silent_seconds')))
+            if row.get('underused'):
+                note.append('UNDERUSED (under half of its workers)')
             if (row.get('idle_seconds') or 0) > IDLE_SECONDS:
                 note.append(f"idle {duration(row['idle_seconds'])}")
             cores = row.get('cores_now')

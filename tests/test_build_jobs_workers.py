@@ -220,7 +220,8 @@ class ImagePoolTests(unittest.TestCase):
             for index in range(6):
                 (maps / f'm{index}.bsp').write_bytes(fixture())
             cull_staged_maps(maps, base / 'proof', {'m0', 'm1'}, processor=parallel_fixture_processor, jobs=self.JOBS)
-        self.assertEqual(sizes, [self.JOBS] * 4)  # the cull, then three hash checks
+        # the cull; its three hash checks hash on threads (parallel_hash, BUILD-IMAGE-HASH-UNDERUSED-36)
+        self.assertEqual(sizes, [self.JOBS])
 
     def test_optimizer_uses_pool_for_preparation_and_hashing(self):
         from optimize_world_maps import optimize_maps, verify_optimized_maps
@@ -232,7 +233,8 @@ class ImagePoolTests(unittest.TestCase):
                 (maps / f'm{index}.bsp').write_bytes(repeated_geometry())
             report = optimize_maps(maps, Path(temp) / 'receipt.json', jobs=self.JOBS)
             verify_optimized_maps(maps, report, jobs=self.JOBS)
-        self.assertGreaterEqual(len(sizes), 3)
+        # preparation in processes; the hash checks on threads (parallel_hash, BUILD-IMAGE-HASH-UNDERUSED-36)
+        self.assertGreaterEqual(len(sizes), 1)
         self.assertEqual(set(sizes), {self.JOBS})
 
     def test_hand_metadata_uses_pool(self):
@@ -272,7 +274,9 @@ class ImagePoolTests(unittest.TestCase):
             for index in range(40):
                 path = Path(temp) / f'{index}.bin'; path.write_bytes(bytes([index]))
                 paths.append(path)
-            digests = build_parallel.hash_files(paths, 32)
+            # the process method (AMIWIND_HASH_METHOD=process); the thread default: test_parallel_hash.py
+            with patch.dict(os.environ, {'AMIWIND_HASH_METHOD': 'process'}):
+                digests = build_parallel.hash_files(paths, 32)
         self.assertEqual(sizes, [32])
         self.assertEqual(digests, [hashlib.sha256(bytes([i])).hexdigest() for i in range(40)])
 

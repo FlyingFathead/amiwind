@@ -51,6 +51,26 @@ class ModelHullTests(unittest.TestCase):
         root = struct.unpack_from('<9f7i', lumps[14])[10]
         return lumps, root
 
+    def test_a_model_without_collision_has_an_empty_point_hull_node(self):
+        # CHIM-EMPTY-POINT-HULL-36: a render-only tile of a cut model had no point-hull node; its leaf root
+        # (-2) reads as SOLID contents where the engine takes headnode[0] as hull 0's first clipnode, and an
+        # empty node lump is refused on load (model.c Mod_LoadNodes)
+        for hull in ('chain', 'routed', 'auto'):
+            lumps = [bytes(x) for x in model_image_lumps([], [], (0., 0., 0.), (64., 64., 64.), lambda m: 0, False,
+                                                         None, b'', hull)[0]]
+            nodes = list(struct.iter_unpack('<i2h6h2H', lumps[5]))
+            leaves = [r[0] for r in struct.iter_unpack('<ii6h2H4B', lumps[10])]
+            root = struct.unpack_from('<9f7i', lumps[14])[9]
+            self.assertGreaterEqual(len(nodes), 1, hull)
+            self.assertGreaterEqual(root, 0, hull)
+            for p in ((1., 2., 3.), (-50., 10., -9.), (30., 30., 100.)):
+                num = root
+                while num >= 0:
+                    pi, front, back = nodes[num][:3]
+                    n0, n1, n2, dist = struct.unpack_from('<4f', lumps[1], 20 * pi)
+                    num = front if n0 * p[0] + n1 * p[1] + n2 * p[2] - dist >= 0 else back
+                self.assertEqual(leaves[-num - 1], -1, (hull, p))   # CONTENTS_EMPTY
+
     def test_routed_hull_classifies_like_the_chain_with_fewer_visits(self):
         chain, croot = self.build('chain')
         routed, rroot = self.build('routed')

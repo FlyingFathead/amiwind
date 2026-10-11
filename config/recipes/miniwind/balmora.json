@@ -1,0 +1,15 @@
+{
+  "schema": "build-recipe-1",
+  "name": "balmora",
+  "description": "MiniWind preset --miniwind-balmora: Balmora: exterior and interiors",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "full",
+    "miniwind_description": "Balmora: exterior and interiors",
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

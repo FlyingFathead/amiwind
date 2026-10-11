@@ -4,6 +4,7 @@
 #include "quakedef.h"
 #include "aw_maps.h"
 #include "aw_section.h"
+#include "aw_mappath.h"
 static aw_section_directory_t directory;
 static int loaded,valid;
 static char ahead[40];
@@ -96,6 +97,6 @@ const char *AW_SectionAhead(const char *name,const float *point,const float *vel
     if(!(seconds>0 && seconds<=5))return NULL;
     for(k=0;k<3;k++){if(!isfinite(velocity[k]) || !isfinite(point[k]))return NULL;next[k]=point[k]+velocity[k]*seconds;}
     if(!AW_SectionDestination(name,next,namebuf))return NULL;
-    sprintf(ahead,"maps/%s.bsp",namebuf);return ahead;
+    return AW_MapPath(namebuf,ahead,sizeof(ahead));
 }
 unsigned AW_SectionStaticBytes(void){return sizeof(directory)+sizeof(loaded)+sizeof(valid)+sizeof(ahead);}

@@ -73,7 +73,7 @@ static void command(void) {
 
 #if !AW_ANIMKIT
 static void compiled_out(void) {Con_Printf("dbg animkit: this engine was built without the animation kit (AW_ANIMKIT=0).\n");}
-void AW_AnimKitInit(void) {Cmd_AddCommand("aw_animkit",compiled_out);aw_anim_kit_enabled=0;}
+void AW_AnimKitInit(void) {Cmd_AddCommand("aw_animkit_cmd",compiled_out);aw_anim_kit_enabled=0;}
 void AW_AnimKitTick(void) {}
 #else
 /* After the server frame: the forced group wins over every other driver of the target's frame. */
@@ -89,7 +89,7 @@ void AW_AnimKitTick(void) {
 
 void AW_AnimKitInit(void) {
     Cvar_RegisterVariable(&animkit);
-    Cmd_AddCommand("aw_animkit",command);
+    Cmd_AddCommand("aw_animkit_cmd",command);   /* not "aw_animkit": its cvar would shadow it (CONSOLE-COMMAND-SHADOWED-BY-CVAR-36) */
     sync();
 }
 #endif

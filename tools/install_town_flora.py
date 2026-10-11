@@ -45,6 +45,11 @@ def derive_bindings(raw, source_index, scene_report, receipt, flora_index, entry
     source scale within .02 of1. Reconstruct that exact old representation;
     new placements still use the complete original transforms.
     """
+    return derive_bindings_fields(entity_fields(raw), source_index, scene_report, receipt, flora_index, entry)
+
+
+def derive_bindings_fields(rows, source_index, scene_report, receipt, flora_index, entry):
+    """derive_bindings on entity dicts (a region map's entities, or a CHIM-native town's entity rows)."""
     unique_reference_numbers(source_index['references'])
     unique_reference_numbers(receipt['placements'])
     originals={r['number']:r for r in receipt['placements']}
@@ -60,7 +65,7 @@ def derive_bindings(raw, source_index, scene_report, receipt, flora_index, entry
                 raise ValueError('Legacy sprite source model hash lacks an exact base-model match')
             candidates[f'progs/m{mi:03}.spr']=(mi,name)
     seen=set();retained=[];bindings=[]
-    for fields in entity_fields(raw):
+    for fields in rows:
         path=fields.get('model','')
         if path.startswith('*') and 'aw_ref' in fields:
             number=int(fields['aw_ref'])

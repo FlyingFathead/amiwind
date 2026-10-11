@@ -120,7 +120,7 @@ static qboolean map_place(edict_t *p,const float *xy,float ceiling)
     vec3_t top,bottom,point;
     aw_map_place_failure="outside the map";
     if(!p || !sv.worldmodel || !isfinite(xy[0]) || !isfinite(xy[1]) || !isfinite(ceiling) ||
-       fabs(xy[0])>=4000 || fabs(xy[1])>=4000)return false;
+       fabs(xy[0])>=AW_COORD_BOUND || fabs(xy[1])>=AW_COORD_BOUND)return false;
     top[0]=bottom[0]=xy[0];top[1]=bottom[1]=xy[1];
     top[2]=sv.worldmodel->maxs[2]-p->v.maxs[2]-4;
     if(ceiling<top[2])top[2]=ceiling;
@@ -149,5 +149,5 @@ qboolean AW_MapPlace(edict_t *p,const float *xy)
  * upper floor is kept instead of the highest surface. Checked as AW_MapPlace. */
 qboolean AW_MapPlaceBelow(edict_t *p,const float *point)
 {
-    return point && isfinite(point[2]) && fabs(point[2])<4000 && map_place(p,point,point[2]);
+    return point && isfinite(point[2]) && fabs(point[2])<AW_COORD_BOUND && map_place(p,point,point[2]);
 }

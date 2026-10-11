@@ -26,6 +26,9 @@ Build options (the build a bug was found in, docs/bugs/README.md "Found in build
   --build-name N --source-commit C --engine-commit C --world-commit C|none
   --chim-version V|none --chim-format F|none --unknown-reason TEXT --build-note TEXT
                                 set or override single values ("unknown" needs a reason)
+  bug_register.py report ID --version V --at "YYYY-MM-DD HH:MM +ZZZZ" [--note TEXT]
+                                add a report line (found or reported again); two or more make the bug
+                                PERSISTING (heading on its page, own section in the register and tracker)
   bug_register.py backfill FILE [--overwrite] [--pages]
                                 merge facts from a JSON list of records (same keys as
                                 bugs.json) into the register: fills missing facts only
@@ -47,6 +50,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'docs' / 'bugs' / 'bugs.json'
+ARCHIVE = ROOT / 'docs' / 'bugs' / 'archive' / 'bugs-v0.0.29-v0.0.33.json'
+ARCHIVE_UP_TO = 33   # fixed or closed bugs first found in v0.0.33 or earlier rotate into the frozen archive
 FAMILIES = ROOT / 'docs' / 'bugs' / 'families.json'
 REGISTER = ROOT / 'docs' / 'BUGS.md'
 README = ROOT / 'docs' / 'bugs' / 'README.md'
@@ -59,6 +64,11 @@ CAT_BEGIN = '<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run t
 CAT_END = '<!-- END GENERATED CATEGORY -->'
 FAM_BEGIN = '<!-- BEGIN GENERATED FAMILIES: edit docs/bugs/families.json and bugs.json, then run tools/bug_register.py render -->'
 FAM_END = '<!-- END GENERATED FAMILIES -->'
+PERS_BEGIN = '<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->'
+PERS_END = '<!-- END GENERATED PERSISTING -->'
+REPORT_VERSION_RE = re.compile(r'^v\d+\.\d+\.\d+(?:-[a-z]+\d*)?$')
+REPORT_AT_RE = re.compile(r'^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2} [+-]\d{4})?$')
+PERSISTING_MIN = 2
 CHIM_TRACKER = ROOT / 'docs' / 'bugs' / 'CHIM_TRACKER.md'
 JOURNAL = ROOT / 'docs' / 'BUG_JOURNAL.md'
 CHIM_VERSION_FILE = ROOT / 'CHIM_VERSION'
@@ -71,7 +81,15 @@ FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
 # Facts every bug found from v0.0.30 on must carry (owner requirement, 9 October 2026).
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
-OPTIONAL = ('tags', 'chim', 'build')
+OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason')
+# Platform or emulator a bug was seen on (owner requirement, 11 October 2026): "platform" in bugs.json, e.g.
+# "FS-UAE 3.1.66, JIT, A1200 68040 preset", "WinUAE 6.0.1", "A1200 + 68060 accelerator". Required for the owner's
+# game-side reports on numbered builds from v0.0.36 on; "unknown" or "not in game" only with platform_reason.
+PLATFORM_FROM_SERIES = 36
+PLATFORM_UNKNOWN = ('unknown', 'not in game')
+# Families whose bugs live in the builder or tooling, not in the running game: no platform needed.
+PLATFORM_EXEMPT_FAMILIES = ('build-speed', 'build-cache-reuse', 'build-content-missing', 'builder-from-scratch',
+                            'tracker-tooling', 'tests-ci', 'disk-image-layout')
 # CHIM Engine tracker (docs/bugs/CHIM_TRACKER.md): a bug is a CHIM bug when its "chim" field names
 # its part. Required for every CHIM- ID and every bug of the chim-streamer family; any other bug
 # opts in when its cause or repair is in the CHIM engine, world format, builder stage or streaming.
@@ -113,16 +131,54 @@ MONTHS = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'Augus
 ORDER = {'open': 0, 'fixed': 1, 'closed': 2}
 
 
-def load(path=DATA):
-    return json.loads(path.read_text(encoding='utf-8'))
+def found_series(b):
+    """The version series a bug was first found in: found_in (v0.0.N...), else the ID suffix; None if unknown."""
+    m = re.match(r'v0\.0\.(\d+)', str(b.get('found_in') or ''))
+    if m:
+        return int(m.group(1))
+    return series(b['id'])
+
+
+def archivable(b):
+    """Rotation rule: fixed or closed, first found in v0.0.33 or earlier, and not persisting."""
+    n = found_series(b)
+    return b.get('state') in ('fixed', 'closed') and n is not None and n <= ARCHIVE_UP_TO \
+        and len(b.get('reports') or []) < PERSISTING_MIN
+
+
+def load(path=DATA, archive=ARCHIVE):
+    """The register: bugs.json plus, for the default path, the frozen archive (same schema)."""
+    bugs = json.loads(path.read_text(encoding='utf-8'))
+    if path == DATA and archive.is_file():
+        bugs = bugs + json.loads(archive.read_text(encoding='utf-8'))
+    return bugs
+
+
+def split(bugs):
+    """(live, archived) in the order given."""
+    return [b for b in bugs if not archivable(b)], [b for b in bugs if archivable(b)]
+
+
+def archive_text(old):
+    return json.dumps(old, indent=2, ensure_ascii=False) + '\n'
+
+
+def live_text(live):
+    return json.dumps(live, indent=2, ensure_ascii=False) + '\n'
 
 
 def load_families(path=FAMILIES):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def save(bugs, path=DATA):
-    path.write_text(json.dumps(bugs, indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
+def save(bugs, path=DATA, archive=ARCHIVE):
+    """Write bugs.json and, for the default path, the archive of rotated bugs."""
+    if path == DATA:
+        bugs, old = split(bugs)
+        if old or archive.is_file():
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            archive.write_text(archive_text(old), encoding='utf-8', newline='\n')
+    path.write_text(live_text(bugs), encoding='utf-8', newline='\n')
 
 
 def series(bug_id):
@@ -264,6 +320,33 @@ def validate_build(b, where):
     return errors
 
 
+def needs_platform(b):
+    """The owner's game-side reports on numbered builds from v0.0.36 on name their platform or emulator."""
+    m = re.match(r'v0\.0\.(\d+)-?(dev|rc)?\d*$', str(b.get('found_in') or ''))
+    return (b.get('reported_by') == 'owner' and bool(m) and BUILD_RE.match(b['found_in']) is not None
+            and int(m.group(1)) >= PLATFORM_FROM_SERIES and b.get('family') not in PLATFORM_EXEMPT_FAMILIES)
+
+
+def validate_platform(b, where):
+    errors = []
+    v = b.get('platform')
+    if v is None:
+        if 'platform_reason' in b:
+            errors.append('%s: platform_reason without a platform' % where)
+        if needs_platform(b):
+            errors.append('%s: missing platform (the platform or emulator the owner saw it on, e.g. "FS-UAE 3.1.66, '
+                          'JIT"; "unknown" or "not in game" with platform_reason)' % where)
+        return errors
+    if not _line_ok(v, 120):
+        errors.append('%s: platform must be one line of at most 120 characters' % where)
+    elif v in PLATFORM_UNKNOWN:
+        if not _line_ok(b.get('platform_reason'), 200):
+            errors.append('%s: platform "%s" needs platform_reason (one line, at most 200 characters)' % (where, v))
+    elif 'platform_reason' in b:
+        errors.append('%s: platform_reason is only for "unknown" or "not in game"' % where)
+    return errors
+
+
 def validate_chim(b, where):
     if 'chim' not in b:
         if must_be_chim(b):
@@ -401,6 +484,19 @@ def validate(bugs, families=None):
                 where, sorted(FIELDS), list(FACTS), list(OPTIONAL)))
             continue
         by_id[b['id']] = b
+        reports = b.get('reports')
+        if reports is not None:
+            if not isinstance(reports, list) or not reports:
+                errors.append('%s: reports must be a non-empty list' % where)
+            else:
+                for r in reports:
+                    if not isinstance(r, dict) or set(r) - {'version', 'at', 'note'} or not {'version', 'at'} <= set(r)                             or not REPORT_VERSION_RE.match(str(r.get('version')))                             or not REPORT_AT_RE.match(str(r.get('at')))                             or ('note' in r and not _line_ok(r['note'], 200)):
+                        errors.append('%s: each report needs version (vX.Y.Z[-devN]) and at (YYYY-MM-DD HH:MM +ZZZZ, '
+                                      'or a date alone), optional one-line note' % where)
+                        break
+                ats = [str(r.get('at')) for r in reports if isinstance(r, dict)]
+                if ats != sorted(ats):
+                    errors.append('%s: reports must be in time order' % where)
         tags = b.get('tags', [])
         if not isinstance(tags, list) or not tags and 'tags' in b or len(set(tags)) != len(tags) \
                 or any(t not in TAGS for t in tags) or tags != sorted(tags):
@@ -438,6 +534,7 @@ def validate(bugs, families=None):
         errors += validate_facts(b, ids, families, where)
         errors += validate_chim(b, where)
         errors += validate_build(b, where)
+        errors += validate_platform(b, where)
     for b in by_id.values():
         for r in b.get('related') or []:
             other = by_id.get(r)
@@ -450,6 +547,47 @@ def validate(bugs, families=None):
                 errors.append('%s: related %s is in the same family %s; the family already links them, '
                               'so list only bugs from other families' % (b['id'], r, b['family']))
     return errors
+
+
+def report_lines(b):
+    """One "Reported with <version> at <time>" line per report; a date alone is written as such."""
+    out = []
+    for r in b.get('reports') or []:
+        at = r['at'] if ' ' in r['at'] else '%s (time not recorded)' % r['at']
+        note = ': %s' % r['note'] if r.get('note') else ''
+        out.append('Reported with %s at %s%s' % (r['version'], at, note))
+    return out
+
+
+def is_persisting(b):
+    return len(b.get('reports') or []) >= PERSISTING_MIN
+
+
+def persisting(bugs):
+    """Persisting bugs, most reports first."""
+    return sorted((b for b in bugs if is_persisting(b)), key=lambda b: (-len(b['reports']), b['id']))
+
+
+def persisting_heading(b):
+    return 'PERSISTING: reported %d times; something has to be done' % len(b['reports'])
+
+
+def persisting_block(b):
+    out = [PERS_BEGIN, '', '## ' + persisting_heading(b), '']
+    out += ['- ' + x for x in report_lines(b)]
+    return chr(10).join(out + ['', PERS_END])
+
+
+def persisting_section(bugs, with_state=True):
+    """The "Persisting, not resolved" list for the register and the CHIM tracker."""
+    items = persisting(bugs)
+    if not items:
+        return []
+    out = ['### Persisting, not resolved', '',
+           'Bugs reported two or more times. Most reports first. Each has its report lines on its page.', '']
+    for b in items:
+        out.append('- %s: %s (reported %d times, %s)' % (link(b), b['title'], len(b['reports']), b['state']))
+    return out + ['']
 
 
 def link(b, prefix=''):
@@ -491,6 +629,9 @@ def facts_table(b, by_id, families):
     if is_chim(b):
         rows.append(('CHIM', '%s ([CHIM Engine tracker](CHIM_TRACKER.md))' % dict(CHIM_PARTS)[b['chim']]))
     rows += build_rows(b)
+    if b.get('platform'):
+        rows.append(('Platform or emulator', b['platform'] + (' (%s)' % b['platform_reason']
+                                                               if b.get('platform_reason') else '')))
     out = [FACTS_BEGIN, '', '| Fact | Value |', '| --- | --- |']
     out += ['| %s | %s |' % (k, v) for k, v in rows]
     return '\n'.join(out + ['', FACTS_END])
@@ -633,6 +774,9 @@ def chim_tracker(bugs, journal_text, version, pages=None):
         part = [b for b in chim if b['chim'] == key]
         out.append('| [%s](#%s) | %d | %d | %d |' % (title, doc_toc.slug(title),
                                                    *(sum(1 for b in part if b['state'] == s) for s in STATES)))
+    pers = persisting_section(chim)
+    if pers:
+        out += [''] + pers[:-1]
     out += ['', '## Latest changes', '',
             'Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM bug.', '']
     changes = journal_changes(bugs, journal_text)
@@ -702,6 +846,7 @@ def rendered_page(text, b, bugs, by_id, families):
     lines = text.rstrip('\n').split('\n')
     lines, _ = _strip_block(lines, FACTS_BEGIN, FACTS_END)
     lines, _ = _strip_block(lines, CAT_BEGIN, CAT_END)
+    lines, _ = _strip_block(lines, PERS_BEGIN, PERS_END)
     hand = _hand_fact_table(lines)
     if hand:
         lines = lines[:hand[0]] + lines[hand[1]:]
@@ -711,6 +856,8 @@ def rendered_page(text, b, bugs, by_id, families):
     while body and not body[0].strip():
         body.pop(0)
     out = [lines[0]]
+    if is_persisting(b):
+        out += ['', persisting_block(b)]
     if has_facts(b):
         out += ['', facts_table(b, by_id, families)]
     out += [''] + body if body else []
@@ -720,7 +867,10 @@ def rendered_page(text, b, bugs, by_id, families):
 
 
 def table(bugs):
-    out = ['| ID | Issue | Severity | Found in | State | Fixed in | Owner accepted | Status |',
+    out = persisting_section(bugs)
+    if out:
+        out += ['### All bugs', '']
+    out += ['| ID | Issue | Severity | Found in | State | Fixed in | Owner accepted | Status |',
            '| --- | --- | --- | --- | --- | --- | --- | --- |']
     for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])):
         out.append('| %s | %s | %s | %s | %s | %s | %s | %s |' % (
@@ -1007,6 +1157,10 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='cmd', required=True)
     sub.add_parser('render'); sub.add_parser('check')
+    rp = sub.add_parser('report', help='add a report line: the bug was found or reported again')
+    rp.add_argument('id'); rp.add_argument('--version', required=True)
+    rp.add_argument('--at', required=True, help='YYYY-MM-DD HH:MM +ZZZZ (host clock), or a date alone')
+    rp.add_argument('--note')
     bf = sub.add_parser('backfill'); bf.add_argument('file'); bf.add_argument('--overwrite', action='store_true')
     bf.add_argument('--pages', action='store_true', help='also read hand-written fact tables on report pages')
 
@@ -1026,6 +1180,9 @@ def main(argv=None):
             x.add_argument(opt)
         x.add_argument('--unknown-reason')
         x.add_argument('--build-note')
+        x.add_argument('--platform', help='platform or emulator it was seen on, e.g. "FS-UAE 3.1.66, JIT, A1200 '
+                                          '68040 preset"; "unknown" or "not in game" with --platform-reason')
+        x.add_argument('--platform-reason')
     a = sub.add_parser('add'); a.add_argument('id'); a.add_argument('--title', required=True)
     a.add_argument('--found', required=True); a.add_argument('--status')
     a.add_argument('--tag', action='append', choices=TAGS, default=[])
@@ -1060,6 +1217,12 @@ def main(argv=None):
                     by_id[r]['related'] = sorted(set(by_id[r].get('related') or []) | {b['id']})
         if args.chim:
             b['chim'] = args.chim
+        if args.platform is not None:
+            b['platform'] = args.platform
+            if args.platform not in PLATFORM_UNKNOWN:
+                b.pop('platform_reason', None)
+        if args.platform_reason is not None:
+            b['platform_reason'] = args.platform_reason
         apply_build(b)
 
     def apply_build(b):
@@ -1122,6 +1285,16 @@ def main(argv=None):
         page = 'bugs/%s.md' % b['id']
         if (REGISTER.parent / page).is_file():
             b['report'] = page
+    elif args.cmd == 'report':
+        b = by_id.get(args.id)
+        if b is None:
+            raise SystemExit('unknown ID: ' + args.id)
+        entry = {'version': args.version, 'at': args.at}
+        if args.note:
+            entry['note'] = args.note
+        if entry in (b.get('reports') or []):
+            raise SystemExit('report already recorded')
+        b['reports'] = sorted((b.get('reports') or []) + [entry], key=lambda r: r['at'])
     elif args.cmd == 'backfill':
         records = json.loads(Path(args.file).read_text(encoding='utf-8'))
         print('backfill: %d values written' % backfill(bugs, records, args.overwrite, args.pages))
@@ -1138,15 +1311,20 @@ def main(argv=None):
         print('\n'.join(errors), file=sys.stderr)
         return 1
     new = outputs(bugs, families)
+    live, old = split(bugs)
+    rotation = {DATA: live_text(live), ARCHIVE: archive_text(old)}
     if args.cmd == 'check':
         stale = [p.relative_to(ROOT).as_posix() for p, t in new.items()
                  if not p.is_file() or p.read_text(encoding='utf-8') != t]
+        stale += [p.relative_to(ROOT).as_posix() for p, t in rotation.items()
+                  if not p.is_file() or p.read_text(encoding='utf-8') != t]
         if stale:
             print('stale generated files (run tools/bug_register.py render): ' + ', '.join(stale), file=sys.stderr)
             return 1
-        print('bug register ok: %d bugs, %d with report pages' % (len(bugs), sum(1 for b in bugs if b['report'])))
+        print('bug register ok: %d bugs (%d live, %d archived), %d with report pages' % (
+            len(bugs), len(live), len(old), sum(1 for b in bugs if b['report'])))
         return 0
-    if args.cmd in ('add', 'set', 'backfill'):
+    if args.cmd in ('add', 'set', 'backfill', 'report', 'render'):
         save(bugs)
     changed = 0
     for path, text in new.items():

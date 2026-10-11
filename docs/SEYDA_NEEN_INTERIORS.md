@@ -45,7 +45,7 @@ All sixteen scenes loaded in a native emulator pass. Actual Tradehouse front-doo
 entry and exit passed. The raw source-door audit has 43 links; it is not a claim
 that all 43 arrivals, staircases and floors are completely tested. The runtime
 uses a floor/clearance search on arrival. Inspect difficult edges and report the
-map, `dbg position` coordinates and facing. The previously repaired Census room/floor is retained; its separate captain-wing
+map, `dbg pos` coordinates and facing. The previously repaired Census room/floor is retained; its separate captain-wing
 out-of-bounds report remains open. Successful loading is not a whole-floor test.
 
 The dated [work plan](PLAN-2026-09-29.md) prioritizes complete local voice behaviour

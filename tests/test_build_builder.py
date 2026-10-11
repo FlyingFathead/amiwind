@@ -24,13 +24,14 @@ def resolve(argv):
 
 class BuilderOptionTests(unittest.TestCase):
     def test_shipped_default_is_chim_with_balmora_and_seyda(self):
-        # v0.0.33, owner decision: the first CHIM release ships Balmora and Seyda Neen on CHIM.
+        # v0.0.33, owner decision: the first CHIM release ships Balmora and Seyda Neen on CHIM; v0.0.36 (owner decision
+        # 2026-10-11, Vivec stage A): the Vivec Arena joins them.
         shipped = json.loads((ROOT / 'config/build-defaults.json').read_text(encoding='utf-8'))
-        self.assertEqual((shipped['builder'], shipped['chim_areas']), ('chim', ['balmora', 'seyda']))
+        self.assertEqual((shipped['builder'], shipped['chim_areas']), ('chim', ['balmora', 'seyda', 'vivec_city']))
         record = resolve([])
         self.assertEqual((record['builder'], record['selected_by']), ('chim', 'shipped default'))
         self.assertEqual((record['chim_version'], record['world_format'], record['chim_areas']),
-                         (chim.CHIM_VERSION, '%d.%d' % chim.FORMAT_VERSION, ['balmora', 'seyda']))
+                         (chim.CHIM_VERSION, '%d.%d' % chim.FORMAT_VERSION, ['balmora', 'seyda', 'vivec_city']))
 
     def test_legacy_stays_selectable_without_chim_fields(self):
         record = resolve(['--builder', 'legacy'])
@@ -42,7 +43,7 @@ class BuilderOptionTests(unittest.TestCase):
         self.assertEqual((record['builder'], record['selected_by']), ('chim', 'CLI override'))
         self.assertEqual(record['chim_version'], chim.CHIM_VERSION)
         self.assertEqual(record['world_format'], '%d.%d' % chim.FORMAT_VERSION)
-        self.assertEqual(record['chim_areas'], ['balmora', 'seyda'])
+        self.assertEqual(record['chim_areas'], ['balmora', 'seyda', 'vivec_city'])
 
     def test_chim_version_is_semver_not_a_builder_number(self):
         parts = chim.CHIM_VERSION.split('.')
@@ -189,7 +190,10 @@ class ChimStageTests(unittest.TestCase):
         steps = plan(['--jobs', '4', '--builder', 'chim'])
         names = [name for name, _ in steps]
         legacy = [name for name, _ in plan(['--jobs', '4', '--builder', 'legacy'])]
-        self.assertEqual([n for n in names if n not in ('chim', 'cell-progress')], legacy)
+        # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora's legacy chain stage is replaced.
+        self.assertEqual([n for n in names if n not in ('chim', 'cell-progress', 'chim-town-balmora', 'chim-town-seyda',
+                                                        'chim-town-vivec_city', 'chim-rooms-vivec_city')],
+                         [n for n in legacy if n != 'balmora'])
         self.assertLess(names.index('census'), names.index('chim'))
         self.assertLess(names.index('chim'), names.index('image'))
         command = [str(part) for part in dict(steps)['chim']]
@@ -216,7 +220,10 @@ class ChimStageTests(unittest.TestCase):
         self.assertEqual(tracker[tracker.index('--chim-world') + 1], str(RUN / 'chim-world'))
         self.assertIn('--never-fail', tracker)
         names = [name for name, _ in plan(['--jobs', '4', '--builder', 'chim'])]
-        self.assertEqual(names[names.index('chim') + 1], 'cell-progress')
+        # the Arena's rooms after its chim-town stage (tools/chim_rooms.py, BUILD-MINIWIND-ARENA-PIT-REFUSED-36)
+        self.assertEqual(names[names.index('chim') + 1:names.index('chim') + 6],
+                         ['chim-town-balmora', 'chim-town-seyda', 'chim-town-vivec_city', 'chim-rooms-vivec_city',
+                          'cell-progress'])
         self.assertNotIn('cell-progress', dict(plan(['--jobs', '4', '--builder', 'chim', '--no-cell-progress'])))
         self.assertNotIn('cell-progress', dict(plan(['--jobs', '4', '--builder', 'legacy'])))
 

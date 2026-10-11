@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sv_phys.c
 
 #include "quakedef.h"
+#include "aw_bounds.h"
 #include "chim/chim.h"
 
 /*
@@ -1060,8 +1061,16 @@ SV_Physics_Client
 Player character actions
 ================
 */
+/* World bounds (aw_bounds.c, docs/WORLD_BOUNDS.md): the drift near the edge of
+ * the open world, added for the move and taken off after it as Quake's
+ * basevelocity is. NULL or 0: no drift. */
+int (*aw_bounds_player)(edict_t *,vec3_t);
+
 void SV_Physics_Client (edict_t	*ent, int num)
 {
+	vec3_t	drift;
+	int		bounded;
+
 	if ( ! svs.clients[num-1].active )
 		return;		// unconnected slot
 
@@ -1090,7 +1099,10 @@ void SV_Physics_Client (edict_t	*ent, int num)
 	case MOVETYPE_WALK:
 		if (!SV_RunThink (ent))
 			return;
+		bounded = aw_bounds_player && aw_bounds_player (ent, drift);
 		AW_WalkPlayer(ent);
+		if (bounded)
+			VectorSubtract (ent->v.velocity, drift, ent->v.velocity);
 
 		break;
 
@@ -1102,7 +1114,10 @@ void SV_Physics_Client (edict_t	*ent, int num)
 	case MOVETYPE_FLY:
 		if (!SV_RunThink (ent))
 			return;
+		bounded = aw_bounds_player && aw_bounds_player (ent, drift);
 		SV_FlyMove (ent, host_frametime, NULL);
+		if (bounded)
+			VectorSubtract (ent->v.velocity, drift, ent->v.velocity);
 		break;
 
 	case MOVETYPE_NOCLIP:

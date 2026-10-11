@@ -238,6 +238,8 @@ def _head_cached(task):
     if found is not None and found[1] is not None:
         return found[1]
     raw = _head((data_files, part, palette))
+    import cache_provenance
+    cache_provenance.name_unit(cache, key, lambda: cache_provenance.head_name(part), lambda: [('part', part), ('palette', palette)])
     cache.store(key, {'bytes': len(raw)}, raw)
     return raw
 
@@ -252,6 +254,8 @@ def head_cache():
 def prepare(data_files, scene, previews=True, jobs=None):
     from npc_geometry import Assets, Skeleton
     data_files = resolve_data_files(data_files); scene = ensure_external(scene, 'character conversion')
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     master = child_ci(data_files, 'Morrowind.esm')
     dest = scene/'id1/character'; dest.mkdir(exist_ok=True)
     assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))

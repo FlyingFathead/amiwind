@@ -28,7 +28,7 @@ def load(out):
 
 
 def usable(rec):
-    return rec.get('island') is not None and (rec['land'] or rec['chim']['bucket'] == 'empty_sea')
+    return rec.get('island') is not None and (rec['land'] or rec['chim']['bucket'] in ('empty_sea', 'ocean'))
 
 
 def resolve(cells, specs, eligible, area_cells=None):
@@ -103,6 +103,7 @@ def summary(cells, doc):
         rows.append({'release': name, 'shipped': bool(name and doc['releases'][name].get('shipped')), 'approved': len(mine),
                      'complete': sum(x in COMPLETE_DONE for x in b), 'awaiting_lighting': sum(x in AWAITING for x in b),
                      'lit': sum(1 for r in mine if (r.get('lighting') or {}).get('status') == 'lit'),
-                     'empty_sea': sum(x == 'empty_sea' for x in b), 'failing': sum(x in FAILING for x in b),
+                     'empty_sea': sum(x == 'empty_sea' for x in b), 'ocean': sum(x == 'ocean' for x in b),
+                     'failing': sum(x in FAILING for x in b),
                      'hull_policy_pending': sum(x == 'hull_policy_pending' for x in b)})
     return rows

@@ -138,7 +138,7 @@ def candidates(polys, core=None):
                 continue
             if RISE_MIN < rise <= STEP_HEIGHT + 1e-3 and width <= 2 * CLEARANCE:
                 strips.append(dict(kind='step', ref=ref, point=low, high=high, direction=d, rise=round(rise, 3),
-                                   top=high[2], reach=round(width + TREAD_MIN, 3), slope=slope))
+                                   top=high[2], reach=round(width + TREAD_MIN, 3), slope=slope, span=span))
             elif n[2] >= WALKABLE_Z and n[3] >= RAMP_MIN_AREA and width >= TREAD_MIN:
                 ramps.append(dict(kind='ramp', ref=ref, point=low, high=high, direction=d,
                                   reach=round(width, 3), slope=slope))
@@ -197,7 +197,7 @@ def candidates(polys, core=None):
                         continue
                     if inside(point):
                         steps.append(dict(kind='step', ref=ref, point=point, direction=(nx, ny), reach=round(reach_up, 3),
-                                          rise=round(rise, 3), top=items[high][0]))
+                                          rise=round(rise, 3), top=items[high][0], span=hi - lo))
     stairs = steps + strips
     flights(stairs)
     return stairs + ramps
@@ -617,6 +617,33 @@ def test(s, item, room=None):
     return dict(row, result='passed')
 
 
+LINE_STEP = 4.0   # spacing of the other lines up a flight step (other_lines)
+
+
+def other_lines(s, item, room, span):
+    """A flight step whose line through the riser's middle fails, walked along the other lines across the
+    riser's width (STAIRS-HFQ in VIVEC-TEMPLE-STAIRS-33): the authored collision of a staircase may close part of
+    its visible width (Morrowind collides with the same surfaces), and the player climbs where it is open. Lines
+    every LINE_STEP units, nearest the middle first, the standing box within the riser; the first line walked up
+    and down passes the step, recorded as 'line' (its sideways offset). None when no line passes: the failure
+    stands as walked through the middle."""
+    d = item['direction']
+    x, y, z = item['point']
+    half = span / 2. - max(MAXS[0], MAXS[1]) - .5
+    offsets = []
+    k = 1
+    while k * LINE_STEP <= half:
+        offsets += [k * LINE_STEP, -k * LINE_STEP]
+        k += 1
+    for side in offsets:
+        if abs(side) <= max(SIDE_SHIFTS):
+            continue   # test() tried these
+        row = test(s, dict(item, point=(x - d[1] * side, y + d[0] * side, z)), room)
+        if row['result'] == 'passed':
+            return dict(row, point=[round(v, 3) for v in item['point']], line=round(side, 3))
+    return None
+
+
 def _visual_block(room, result, d):
     """A blocked straight walk whose next box (raised by a step) also meets the
     visible geometry: the path leaves the stair, the collision is not at fault.
@@ -677,6 +704,7 @@ def _check_items(items, polys, scene, contents=None, proxy=None):
     rows = []
     for item in items:
         x, y, z = item['point']; d = item['direction']
+        span = item.pop('span', None)  # the riser's width (other_lines); not part of the row
         if contents is not None and contents((x, y, z + 1)) != -1:
             continue  # under water (swimming) or inside the world
         top = item.get('top', z)
@@ -713,6 +741,8 @@ def _check_items(items, polys, scene, contents=None, proxy=None):
             continue
         try:
             row = test(scene, item, room)
+            if row['result'] == 'failed' and item['kind'] == 'step' and item.get('flight') and span:
+                row = other_lines(scene, item, room, span) or row
         except ValueError as exc:  # the offline trace's own cycle/size guard
             row = dict(item, point=[round(v, 3) for v in item['point']], result='untestable',
                        detail=dict(status='trace limit', error=str(exc)))
@@ -749,26 +779,102 @@ def check_map(task):
     return Path(path).stem, rows
 
 
+WALK_CACHE_ENV = 'AMIWIND_STAIR_WALK_CACHE'     # cached (default) | full: walk everything again
+WALK_SAMPLE_ENV = 'AMIWIND_STAIR_WALK_SAMPLE'   # reused maps/frames walked again per run to check the cache
+WALK_CACHE_MODES = ('cached', 'full')
+WALK_SAMPLE_DEFAULT = 2
+
+
+def walk_cache_mode():
+    """The stair walk's reuse (tools/build.py --stair-walk): 'cached' reuses a map's or frame's rows while
+    what the walk reads is unchanged (pass_cache, SHA-256 of the content); 'full' walks every one (the
+    from-scratch reference build). Results are the same either way (BUILD-CHIM-HEAP-GATE-LATE-36)."""
+    mode = os.environ.get(WALK_CACHE_ENV, 'cached') or 'cached'
+    if mode not in WALK_CACHE_MODES:
+        raise ValueError('%s must be one of %s, not %r' % (WALK_CACHE_ENV, ', '.join(WALK_CACHE_MODES), mode))
+    return mode
+
+
+def walk_sample():
+    """How many reused maps or frames every run walks again and compares (--stair-walk-sample, default 2)."""
+    value = os.environ.get(WALK_SAMPLE_ENV, '')
+    try:
+        return WALK_SAMPLE_DEFAULT if value == '' else max(0, int(value))
+    except ValueError:
+        raise ValueError('%s must be a whole number, not %r' % (WALK_SAMPLE_ENV, value))
+
+
+def pick_sample(keys, count, seed):
+    """A seeded, logged choice of COUNT of the reused keys (the same run, the same sample)."""
+    import random
+    keys = sorted(keys)
+    return sorted(random.Random(seed).sample(keys, min(count, len(keys))))
+
+
+def rows_digest(rows):
+    """SHA-256 of rows in a canonical form: a reused result and a walk again must be equal."""
+    import hashlib
+    return hashlib.sha256(json.dumps(rows, sort_keys=True, default=str).encode()).hexdigest()
+
+
 def check_map_cached(task):
-    """Worker: check_map, or the rows recorded for the same map bytes, core,
-    models and stair rule (pass_cache.py, development builds only;
-    BUILD-IMAGE-NOT-INCREMENTAL-33)."""
+    """Worker: check_map, or the record of the same map bytes, core, models and stair rule (pass_cache.py;
+    BUILD-IMAGE-NOT-INCREMENTAL-33), reused only when a passed build of the master builder checked it
+    (stair_records.py). Returns (map name, rows, how: 'walked' or 'reused from ...', stored record or None)."""
     path, core, models, cache = task[:4]
     scope = task[4] if len(task) > 4 else 'all'
+    again = task[5] if len(task) > 5 else False     # a sampled reused map: walk it and compare
     if cache is None:
-        return check_map((path, core, models, scope))
+        return (*check_map((path, core, models, scope)), 'walked', None)
     import hashlib, json
+    import stair_records
     raw = Path(path).read_bytes()
     key = hashlib.sha256(raw).hexdigest() + ':' + json.dumps(core)
-    found = cache.load(key)
+    record, mark = stair_records.lookup(cache, key)
     name = Path(path).stem
-    if found is not None:
+    if record is not None and mark is not None:
         # Same keys in the same order; only the map name is this map's (aliases share bytes).
-        return name, [{k: (name if k == 'map' else v) for k, v in row.items()} for row in found[0]['rows']]
+        stored = [{k: (name if k == 'map' else v) for k, v in row.items()} for row in record['rows']]
+        if not again:
+            return name, stored, stair_records.provenance(mark), None
+        _, rows = check_map((path, core, models, scope))
+        if rows_digest(json.loads(json.dumps(rows))) != rows_digest(stored):
+            raise ValueError('Stair walk cache: %s walked again differs from its stored rows: the key does not '
+                             'cover everything the walk reads' % name)
+        return name, stored, 'walked again: ' + stair_records.provenance(mark), None
     name, rows = check_map((path, core, models, scope))
-    rows = json.loads(json.dumps(rows))  # the form cached rows have
-    cache.store(key, {'rows': rows})
-    return name, rows
+    rows = json.loads(json.dumps(rows))  # the form stored rows have
+    import cache_provenance
+    cache_provenance.name_unit(cache, key, lambda: name, lambda: [('map bytes', raw), ('core', core)])
+    return name, rows, 'walked', stair_records.store(cache, key, rows)
+
+
+# Maps of the payload that are not converted game maps: no standing hull, nothing to walk (named, logged, never silent).
+NOT_WALKED = {'charplane': 'NPC gallery room (plain compile, no converted standing hull)'}
+
+
+def hull_preflight(tasks):
+    """Fail fast, before any walk: every map must declare the converted standing hull. Names every map that does not
+    (path, SHA-256), all at once (BUILD-STAIR-WALK-UNNAMED-MAP-36)."""
+    import hashlib
+    import re as _re
+    from player_hull import lumps, PROFILE
+    bad = []
+    for task in tasks:
+        path = Path(task[0])
+        try:
+            raw = path.read_bytes()
+            first = _re.search(r'\{[^{}]*\}', lumps(raw)[0].decode('cp1252'))
+            hull = dict(_re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"', first.group(0))).get('aw_hull') if first else None
+        except Exception as error:      # unreadable map: named like the rest
+            bad.append('%s: unreadable (%s)' % (path, error)); continue
+        if hull != PROFILE:
+            bad.append('%s (sha256 %s): aw_hull %r, expected %r'
+                       % (path, hashlib.sha256(raw).hexdigest(), hull, PROFILE))
+    print('Stair walk preflight: %d maps checked for the standing hull, %d without' % (len(tasks), len(bad)), flush=True)
+    if bad:
+        raise ValueError('Stair walk preflight: %d map(s) do not declare the converted humanoid standing hull:\n  %s'
+                         % (len(bad), '\n  '.join(bad)))
 
 
 def map_tasks(id1, models=None, only=None):
@@ -777,6 +883,7 @@ def map_tasks(id1, models=None, only=None):
     alias maps (copies of a region under the town's name) are skipped."""
     from town_config import runtime_towns
     from arrival_spot import read_directory
+    from map_files import map_file, map_files
     id1 = Path(id1); tasks = []; seen = set()
     aliases = {t['name'] for t in runtime_towns()}
     for town in runtime_towns():
@@ -785,11 +892,14 @@ def map_tasks(id1, models=None, only=None):
             continue
         for row in read_directory(directory)['regions']:
             seen.add(row['name'])
-            path = id1 / 'maps' / (row['name'] + '.bsp')
+            path = map_file(id1 / 'maps', row['name'])
             if path.is_file() and (not only or row['name'] in only):
                 tasks.append((str(path), row['core'], models or {}))
-    for path in sorted((id1 / 'maps').glob('*.bsp')):
+    for path in map_files(id1 / 'maps'):        # x.bsp and the CHIM frame maps x.chim
         if path.stem in seen or path.stem in aliases or (only and path.stem not in only):
+            continue
+        if path.stem in NOT_WALKED:
+            print('Stair walk: skipped %s: %s' % (path.name, NOT_WALKED[path.stem]), flush=True)
             continue
         tasks.append((str(path), None, models or {}))
     return tasks
@@ -809,6 +919,15 @@ def family(name):
     return head if head in ('sn', 'bm', 'va', 'vf') else 'interiors and other maps'
 
 
+def walk_key_sources():
+    """The code a stored legacy-map walk is keyed by (BUILD-STAIR-KEY-BOOKKEEPING-36): the per-map worker
+    check_map and the unit worker of the parallel walk (tools/stair_parallel.py walk_unit), with everything they
+    reach (pass_cache.source_digest of (module, function)); never the orchestration, the progress counter or the
+    records (stair_progress.py, stair_records.py), whose edits cannot change a row."""
+    here = Path(__file__).resolve()
+    return ((str(here), 'check_map'), (str(here.with_name('stair_parallel.py')), 'walk_unit'))
+
+
 def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     """The gate over a payload; exempt: maps whose blocking failures are
     reported but do not fail it (a recorded, owner-approved stage); scope: 'all'
@@ -822,20 +941,39 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     if scope not in SCOPES:
         raise ValueError('Stair walk scope must be one of %s, not %r' % (', '.join(SCOPES), scope))
     tasks = map_tasks(id1, models, only)
+    hull_preflight(tasks)
     # Development builds (and release builds with --allow-release-reuse) reuse rows for
     # unchanged map bytes (pass_cache.py).
     options = {'stair_mode': stair_mode(), 'models': hashlib.sha256(
         json.dumps(models or {}, sort_keys=True).encode()).hexdigest()}
     if scope != 'all':
         options['scope'] = scope
-    cache = PassCache.open('stair-walk', options, __file__)
-    rows = []
+    cache = PassCache.open('stair-walk', options, *walk_key_sources()) if walk_cache_mode() == 'cached' else None
+    # every run walks a seeded sample of the maps again and compares with their stored rows
+    sample = set(pick_sample([t[0] for t in tasks], walk_sample(), 'legacy:%d' % len(tasks))) if cache else set()
+    rows, how, stored = [], {}, []
+    import progress_line
+    work = [(*task, cache, scope, task[0] in sample) for task in tasks]
+    workers = max(1, min(jobs, len(tasks) or 1))
+    # The progress counter counts the real work first: the steps and ramps each walked map checks, the recorded
+    # rows of each reused map (counted in parallel, polygons only); then the maps.
+    import stair_progress
+    counted = list(ordered_map(stair_progress.count_map, work, workers, cost=_map_cost))
+    stairs_total, stairs_done = sum(counted), 0
+    print('Stair walk: %d steps and ramps to check or reuse in %d maps' % (stairs_total, len(tasks)), flush=True)
     try:
         # Largest maps first (their walks take longest; a big map dispatched last left most
         # workers idle at the end of the pass); rows still come back in map order.
-        for name, found in ordered_map(check_map_cached, [(*task, cache, scope) for task in tasks],
-                                       max(1, min(jobs, len(tasks) or 1)), cost=_map_cost):
+        for number, (name, found, origin, record) in enumerate(ordered_map(
+                check_map_cached, work, workers, cost=_map_cost), 1):
             rows.extend(found)
+            how[name] = origin
+            if record:
+                stored.append(record)
+            stairs_done += counted[number - 1]
+            progress_line.emit('Stair walk', name, '%d steps and ramps, %d failed (%s)' % (
+                len(found), sum(1 for r in found if r['result'] == 'failed'), origin),
+                (stairs_done, stairs_total, 'stairs'), (number, len(tasks), 'maps'))
     finally:
         cached = cache.summary() if cache is not None else None
     exempt = set(exempt)
@@ -857,8 +995,19 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
         report['scope'] = ('flight steps only (release build): ramps and single steps are not walked; '
                            'their advisory findings come from a full walk (development or nightly build)')
     if cached is not None:
+        # bookkeeping only (the rows are the same with or without the cache): the maps walked again to check it,
+        # how each map was taken (reused from which run, or walked) and the candidate records this run stored
+        # (stair_records.promote marks them when the run passes as a master build)
+        cached['walked_again'] = sorted(Path(p).stem for p in sample)
+        cached['maps'] = how
+        cached['stored'] = stored
         report['pass_cache'] = cached
-        print('Stair walk pass cache: %d maps reused, %d walked.' % (cached['hits'], cached['misses']), flush=True)
+        reused = sum(1 for v in how.values() if v.startswith('reused'))
+        print('Stair walk records: %d maps reused (checked by a passed master build), %d walked, %d walked again '
+              'to check the cache.' % (reused, len(how) - reused, sum(1 for v in how.values()
+                                                                       if v.startswith('walked again'))), flush=True)
+    else:
+        print('Stair walk: every map walked (--stair-walk full)', flush=True)
     return report
 
 

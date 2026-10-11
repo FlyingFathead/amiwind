@@ -53,8 +53,10 @@ Every field is optional; a field that is absent is left as it was.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `converted` | boolean | `true`: counts as converted. `false`: tried and not converted |
-| `status` | string | The run's own verdict: `passed`, `failed`, `not_converted`, `hull_pending` (alias `policy_pending`) or `empty` |
+| `status` | string | The run's own verdict: `passed`, `failed`, `not_converted`, `hull_pending` (alias `policy_pending`), `empty` or `ocean` |
 | `empty` | boolean | The cell holds only terrain and water; nothing was placed. Shown as empty sea, never counted as passed |
+| `ocean` | boolean | Open sea: the cell has no LAND record and is a reference to the shared ocean chunk. Shown as open ocean (silver), not counted as done while the engine does not place the chunk, never as land |
+| `set` | string | Open sea only: the master set whose map the cell belongs to (`vvardenfell`); the tracker gives the cell the island of the nearest land cell of that set |
 | `policy_pending` | boolean | The only open problem is hull-chain depth, waiting for one shared rule. Neither passed nor failed |
 | `errors` | array | Replaces the cell's error list; `[]` clears it. Each entry is a string or `{"stage", "mechanism", "message"}` |
 | `audits` | object | Audit id to an audit result (below) |

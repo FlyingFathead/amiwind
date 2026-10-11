@@ -134,7 +134,8 @@ class ReleaseFeatures(unittest.TestCase):
         for feature in self.features:
             for flag in feature.get('image_options', []):
                 with self.subTest(feature=feature['id'], flag=flag):
-                    self.assertEqual(image.count(flag), 1)
+                    # --chim-town: one per CHIM-native town (Balmora, Seyda Neen since v0.0.36-dev5, the Vivec Arena)
+                    self.assertEqual(image.count(flag), 3 if flag == '--chim-town' else 1)
 
     def test_per_race_hands_are_a_default_step(self):
         steps = dict(default_steps())
@@ -204,7 +205,9 @@ class ReleaseFeatures(unittest.TestCase):
         feature = next(f for f in self.features if f['id'] == 'extra-towns')
         self.assertNotIn('town-vivec_arena', feature['steps'])
         self.assertNotIn('town-vivec_arena', dict(default_steps()))
-        self.assertIn('town-vivec_arena', dict(default_steps('--extra-town', 'vivec_arena')))
+        # A town not on CHIM is imported only by the legacy builder (CHIM-native areas leave it out).
+        self.assertIn('town-vivec_arena', dict(default_steps('--builder', 'legacy', '--extra-town', 'vivec_arena')))
+        self.assertNotIn('town-vivec_arena', dict(default_steps('--extra-town', 'vivec_arena')))
         self.assertTrue(feature['withdrawn_only'])
         arena = ['id1/maps/va%03d.bsp' % i for i in range(16)] + [
             'id1/maps/vivec_arena.bsp', 'id1/scene-doors-vivec_arena.txt', 'id1/vivec_arena-regions.txt']

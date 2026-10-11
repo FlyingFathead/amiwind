@@ -61,6 +61,7 @@ Import report lists unreachable rooms.
 Family: Town and interior import (`town-import`). The town importer converts every town and interior within engine limits; doors lead somewhere. See [families](README.md#families).
 
 - AW-20260928-08 (no report page): Census wall/hanging texture quality or mapping
+- [IMPORT-DOORBANK-CITY-36](IMPORT-DOORBANK-CITY-36.md): The whole-city Vivec frame holds 157 load doors, over the engine's 128-row door bank
 - [IMPORT-TEST-CELLS-31](IMPORT-TEST-CELLS-31.md): Development test cells would be imported with the world
 - [IMPORT-TOWN-NO-INTERIORS-32](IMPORT-TOWN-NO-INTERIORS-32.md): The town importer converts no interiors; all Vivec Arena doors say "Interior unavailable"
 - TOWN-ARRIVAL-002 (no report page): Town flora fallback picked the wrong Balmora region

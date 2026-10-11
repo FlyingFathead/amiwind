@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-The CHIM Progress Tracker is how AmiWind keeps count of the open world on CHIM: for every exterior cell of the island, whether it is converted, what each audit found, how it is lit, what it still lacks and which release it is approved for. This page is the hand-written guide. The live figures are on the generated [CHIM cell tracker](CELL_TRACKER.md), the conversion itself is described in [CHIMport](CHIMPORT.md) (how the conversion works), and the file format the conversion hands to the tracker is the [cell result format](CELL_RESULT_FORMAT.md).
+The CHIM Progress Tracker is how AmiWind keeps count of the open world on CHIM: for every exterior cell of the island, whether it is converted, what each audit found, how it is lit, what it still lacks and which release it is approved for. This page is the hand-written guide. The live figures are on the generated [CHIM cell tracker](CELL_TRACKER.md), the conversion itself is described in [CHIMport](CHIMPORT.md) (how the conversion works), and the file format the conversion hands to the tracker is the [cell result format](CELL_RESULT_FORMAT.md). What each colour of the map means, and the problems usually behind it, is on [the CHIM progress map](CHIM_PROGRESS_MAP.md).
 
 ## Why it exists
 
@@ -29,6 +29,7 @@ A cell has exactly one status. Strongest first:
 | Owner-approved, Playtested | gold, teal | Set by the owner for a converted cell that passes |
 | Passed | green | Converted and every measured audit passed, but something placed is still deferred or skipped |
 | Empty sea | blue | Terrain and water only, nothing placed; counts as done |
+| Open ocean | silver | No LAND record: a reference to the one shared ocean chunk (`chimport.py ocean`). The chunk is made but the engine does not place it yet, so it is not counted as done; never as land |
 | Hull policy pending | purple | The only open problem is a standing-hull chain deeper than the limit, waiting for one shared rule; neither passed nor failed |
 | Converted, failing audits | red | At least one audit failed or the conversion reported an error |
 | Not converted | magenta | The conversion was tried and could not finish the cell; a failure-type state, never counted as done |
@@ -37,7 +38,7 @@ A cell has exactly one status. Strongest first:
 
 Precedence: cell complete, terrain complete, the two awaiting-lighting levels, owner-approved, playtested, passed, hull policy pending, failed, not converted, not started. Nonvisual markers (door, travel, north and editor markers) are not drawn and not required, so they never block a level; light emitters without a mesh do cast light, so they stay under Lights and the lighting audit judges them.
 
-**Done** = cell complete + terrain complete + the two awaiting-lighting levels + passed + empty sea, each on its own line. The generated page repeats the exact definitions in its import policy section, built from the code's own constants.
+**Done** = cell complete + terrain complete + the two awaiting-lighting levels + passed + empty sea, each on its own line. The open ocean is **not** done: it is drawn silver, has its own legend row and its own totals row, and is counted apart (`ocean`, `map_cells`) until the engine places the chunk. An island's figures count its land and empty-sea cells and keep the land-only figures beside them (land cells, land done, land percent); the headline's percent stays passed of land cells. The generated page repeats the exact definitions in its import policy section, built from the code's own constants.
 
 ## Audits
 
@@ -53,7 +54,7 @@ A cell is only complete when it is lit like Morrowind. `tools/cell_lighting.py` 
 
 ## Eligible for a release
 
-"Eligible for vX" is the set of cells usable now for the next release, lighting done or not: every passed status (the completion levels, awaiting lighting included, owner states and passed) plus empty sea. The generated page prints the figure; the Toolkit has a "Show: eligible" filter and a legend preset.
+"Eligible for vX" is the set of cells usable now for the next release, lighting done or not: every passed status (the completion levels, awaiting lighting included, owner states and passed) plus empty and open sea. The generated page prints the figure; the Toolkit has a "Show: eligible" filter and a legend preset.
 
 ## The release field and the version tracker
 
@@ -71,6 +72,32 @@ python3 tools/cell_progress.py release --out DIR --version v0.0.34 --cells "0,0"
 ```
 
 Selectors: a cell ID `x,y`, `ring:N`, `status:BUCKET`, `eligible`, `unassigned`, `release:VERSION`, `shipped-towns` and `all`. The map has a version pull-down (all versions, each release, unassigned, assigned to any) with a one-line summary per version (approved cells, how many are complete or awaiting lighting, how many are lit, how many still fail), the cell panel shows the cell's release, and the generated page has a per-release table.
+
+## The release plan: gold for the next release
+
+Besides the owner's approval (above), every cell can be **planned** for an upcoming release. The plan is a layer of its own: it is stored in `plan.json` next to the tracker data (format `aw-cell-plan-1`, schema 1), written only by `cell_progress.py plan` and `cell_progress.py ship`, and it never changes a cell's conversion or audit status. Conversion results and ingest do not touch it, and a re-ingest keeps it.
+
+Each planned cell carries one open record in the tracker data (`cell.plan`):
+
+```json
+{"release": "v0.0.36", "state": "planned", "since": "2026-10-11T09:07:18+03:00", "source": "who or what set it", "tier": "next"}
+```
+
+- `state` is `planned`, `in_build` or `shipped`. `tier` is computed: `next` for the upcoming release, `later` for a planned release after it, `shipped` once it is published.
+- The record is open. Any other key (for example `--set scope=coast`) is kept, shown in the cell panel and exported; a key written by a newer tool survives a re-plan. A `plan.json` with a newer schema than the tool knows is never overwritten.
+- **The upcoming release is data, not code.** It is the lowest-numbered plan release that has not shipped. Several releases may be planned at once; the next one is gold, later ones are drawn in a paler gold.
+- When a release is published, one command flips all its plan cells to `shipped`; the next planned release takes the gold with no code change.
+
+```bash
+python3 tools/cell_progress.py plan --out DIR --release v0.0.36 --cells @LISTFILE --set scope=coast --source "run X"
+python3 tools/cell_progress.py plan --out DIR --release v0.0.36 --cells "area:NAME build:RUN 4,-11" --state in_build
+python3 tools/cell_progress.py plan --out DIR --release v0.0.36 --cells "0,0" --clear      # take a cell back out
+python3 tools/cell_progress.py ship --out DIR --release v0.0.36                              # published: planned -> shipped
+```
+
+Selectors: a cell ID `x,y`, `@FILE` (cell IDs separated by whitespace), `build:RUN`, `plan:VERSION`, `state:STATE`, `unplanned`, `ring:N`, `status:BUCKET`, `eligible` and `all`. The CSV export carries `plan_release`, `plan_state`, `plan_since` and `plan_source`. The tracker data carries `schema` 2, `plan_next` (the upcoming release, or none) and `plans` (one row per plan release: planned cells and how they stand, from which the Toolkit prints the per-release table with a TOTALS row).
+
+In the Toolkit, nothing about the plan shows while no plan exists. With a plan: the **Release plan** colouring fills the planned cells gold (the gold of the Toolkit header) and keeps every other cell in its status colour; in every other colouring the next release's cells get a gold outline; the legend has a row "Planned for vX (next release)" generated from the data, the **Preset** pull-down gets "Planned for vX (gold)", the version pull-down can filter by plan release, the cell panel and tooltip print the plan record, and a table under the legend lists each plan release with its planned cells, how many are complete, awaiting lighting, failing, hull-pending or not started, and a TOTALS row. Shipped cells keep their status colours.
 
 ## Legend checkboxes and presets
 

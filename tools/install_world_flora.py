@@ -52,6 +52,14 @@ def install(overlay, id1, scenery_acceptance, jobs=1):
         raise ValueError('Flora overlay does not cover every installed region in order')
     replacements = []
     originals = set()
+    # CHIM region cells (docs/BUILD_MANIFEST.md step 2): no map was made for them in any stage
+    chim = {row['name'] for row in rows if row.get('chim_region')}
+    if chim != set(scenery_acceptance.get('chim_region_maps_not_made') or ()):
+        raise ValueError('CHIM region cells differ between the scenery and flora overlays')
+    for name in sorted(chim):
+        if (id1 / 'maps' / (name + '.bsp')).exists() or (overlay / name / 'scene.bsp').exists():
+            raise ValueError('A legacy map of a CHIM region cell is staged: ' + name)
+    rows = [row for row in rows if row['name'] not in chim]
     names = [row['name'] for row in rows]
     installed = hash_existing([id1 / 'maps' / (name + '.bsp') for name in names], jobs)
     overlays = hash_existing([overlay / name / 'scene.bsp' for name in names], jobs)

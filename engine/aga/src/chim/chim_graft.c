@@ -263,13 +263,55 @@ static int ClipIndex (short child)
 	return child < -15 ? (unsigned short)child : child;
 }
 
+/* Move the copy of a referenced (chunk-local, format 0.7) terrain by its
+ * entry's shift: plane distances (normal . shift, in double so the result
+ * matches the builder's single rounding), vertexes, node and leaf bounds,
+ * and each lit surface's texture minimums (the builder keeps every texture
+ * axis . shift a multiple of 16, so this equals CalcSurfaceExtents on the
+ * moved vertexes; tiled water and sky keep their fixed -8192). Texinfo,
+ * extents, lightmaps, edges and clipnodes do not depend on the position. */
+static void Shift (chim_pool_t *p, chim_graft_t *g, const float *d)
+{
+	model_t *m = &g->terrain->model;
+	const int *b = g->base;
+	short sd[3];
+	int i, k;
+
+	for (k=0 ; k<3 ; k++)
+		sd[k] = (short)d[k];
+	for (i=0 ; i<m->numplanes ; i++)
+	{
+		mplane_t *pl = &p->planes[b[CA_PLANE]+i];
+		pl->dist = (float)((double)pl->dist + (double)pl->normal[0]*d[0] + (double)pl->normal[1]*d[1] +
+			(double)pl->normal[2]*d[2]);
+	}
+	for (i=0 ; i<m->numvertexes ; i++)
+		VectorAdd (p->verts[b[CA_VERT]+i].position, d, p->verts[b[CA_VERT]+i].position);
+	for (i=0 ; i<m->numsurfaces ; i++)
+	{
+		msurface_t *s = &p->surfs[b[CA_SURF]+i];
+		if (s->flags & SURF_DRAWTILED)
+			continue;
+		for (k=0 ; k<2 ; k++)
+			s->texturemins[k] = (short)(s->texturemins[k] + (int)DotProduct (s->texinfo->vecs[k], d));
+	}
+	for (i=1 ; i<g->terrain->leafs ; i++)
+		for (k=0 ; k<6 ; k++)
+			p->leafs[b[CA_LEAF]+i-1].minmaxs[k] = (short)(p->leafs[b[CA_LEAF]+i-1].minmaxs[k] + sd[k % 3]);
+	for (i=0 ; i<m->numnodes ; i++)
+		for (k=0 ; k<6 ; k++)
+			p->nodes[b[CA_NODE]+i].minmaxs[k] = (short)(p->nodes[b[CA_NODE]+i].minmaxs[k] + sd[k % 3]);
+}
+
 /* Copy one chunk's terrain template into the pool at the graft's ranges,
- * relocating every index and pointer; sets the graft's hull-1 root. */
+ * relocating every index and pointer (and moving a referenced terrain to
+ * its place: Shift); sets the graft's hull-1 root. */
 static void CopyGraft (chim_pool_t *p, chim_graft_t *g)
 {
 	chim_model_t *cm = g->terrain;
 	model_t *m = &cm->model;
 	const int *b = g->base;
+	const float *d = chim_frame.entries[g->entry].shift;
 	int i, j, k, c;
 
 	memcpy (p->planes + b[CA_PLANE], m->planes, m->numplanes*sizeof(mplane_t));
@@ -336,6 +378,8 @@ static void CopyGraft (chim_pool_t *p, chim_graft_t *g)
 	}
 	c = m->hulls[1].firstclipnode;
 	g->clip = c >= 0 ? c + b[CA_CLIP] : c;
+	if (d[0] || d[1] || d[2])
+		Shift (p, g, d);
 }
 
 /* Hull 0 as Mod_MakeHull0 builds it, for nodes [first, first+count). */

@@ -119,7 +119,9 @@ class FeatureTrackerChecksTests(unittest.TestCase):
         self.has(self.problems(lambda d: d['features'][0].update(status='done')), 'status must be one of')
 
     def test_in_release_needs_the_current_version(self):
-        self.has(self.problems(lambda d: d['features'][0].update(version='0.0.1')), 'current CHIM version')
+        # CHIM 0.2.0: the first features are shipped (0.1.0); an in-release feature carries the current version
+        self.has(self.problems(lambda d: d['features'][0].update(status='in-release', version='0.0.1')),
+                 'current CHIM version')
         self.has(self.problems(lambda d: d['features'][0].update(version=None)), 'needs a version')
 
     def test_planned_has_no_version_and_no_headline(self):

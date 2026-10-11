@@ -938,7 +938,9 @@ void Host_Init (quakeparms_t *parms)
     // of one source are byte-identical (ENGINE-BUILD-REPRO-31); the heap in
     // whole KiB, because float formatting runs the C library's dtoa, which
     // executes 68040-unimplemented FPU instructions (ENGINE-FPU-UNIMPL-31)
-    Con_Printf ("Exe: AmiWind v" AMIWIND_VERSION "\n");
+    Con_Printf (AMIWIND_TITLE "\n");
+    Con_Printf (AMIQUAKE_VERSION_LINE_OF (VERSION) "\n");
+    Con_Printf (AW_CONSOLE_HELP_LINE "\n");
     Con_Printf ("%ld KiB heap\n", (long)(parms->memsize / 1024));
 
     R_InitTextures ();		// needed even for dedicated servers

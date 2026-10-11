@@ -62,7 +62,7 @@ and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
 | E | `+aw_use` | Use / interact; up in noclip |
 | Q | `+movedown` | Down in noclip |
 | Mouse 1 | `+attack` | Attack |
-| Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Context action: picks a companion in pick mode (`dbg companion pick`); in a fight it is kept for a block button (not built yet; the original blocks automatically). Older saved key files get it if `MOUSE3` is unbound. |
+| Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Block: hold to raise your shield (`aw_combat_block 1`, an AmiWind extension and the default; the original blocks automatically, docs/COMBAT.md "Blocking"). In pick mode (`dbg companion pick`) it picks a companion, like the left button. Older saved key files get it if `MOUSE3` is unbound. |
 | F | `impulse 202` | Draw / lower hands |
 | V | `aw_torch` | Toggle the placeholder torch while hands are raised |
 | M | `aw_worldmap` | Open world map, including debug/noclip |

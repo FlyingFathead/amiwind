@@ -1,0 +1,47 @@
+{
+  "schema": "build-recipe-1",
+  "name": "full-coast-dev",
+  "description": "The v0.0.36-dev3 full build: Balmora, Seyda Neen and the Bitter Coast test town on CHIM, the finished coastal cells as CHIM region frames with routed terrain hulls and terrain references, no NPC gallery, live diagnostic logs. The two input files come from a CHIMport run (see each input's \"how\"); point the recipe at your own with --recipe-input ROLE=PATH (the SHA-256 must match, or save a new recipe from your build).",
+  "options": {
+    "chim_areas": [
+      "balmora",
+      "seyda",
+      "bcoast_x7y2",
+      "vivec_city"
+    ],
+    "extra_town": [
+      "bcoast_x7y2"
+    ],
+    "no_npc_gallery": true,
+    "chim_regions": [
+      "@chim-regions-cells.csv"
+    ],
+    "chim_regions_status": "cell-progress.json",
+    "chim_terrain_hull": "routed",
+    "chim_terrain_refs": "on",
+    "chim_native_towns": "on",
+    "chim_frame_ext": "chim",
+    "live_logs": true
+  },
+  "inputs": [
+    {
+      "option": "chim_regions",
+      "role": "chim-regions-cells",
+      "path": "chim-regions-cells.csv",
+      "sha256": "33ae73f0a12832ab59e196a6e9dbcf99391f36c9ae652f7f0f75267fd8fb9c82",
+      "kind": "file",
+      "how": "The 270 finished coastal cells (columns x,y): select them on the Toolkit World Map and use Export CSV, or write python3 tools/cell_progress.py export --out TRACKER --csv FILE and keep the finished coastal rows; python3 tools/chim/regions.py @FILE --status cell-progress.json checks the selection"
+    },
+    {
+      "option": "chim_regions_status",
+      "role": "chim-regions-status",
+      "path": "cell-progress.json",
+      "sha256": "0baeabf3ef88474f324db7268def10e93d7c085be2477c190237ffd1fbd0acbc",
+      "kind": "file",
+      "how": "The CHIM progress tracker file of the same CHIMport run: TRACKER/cell-progress.json, written by python3 tools/cell_progress.py ingest (docs/chim/PROGRESS_TRACKER.md)"
+    }
+  ],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

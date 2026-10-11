@@ -26,7 +26,9 @@ recorded with the reason, and the run moves on.
 - [Figures per cell](#figures-per-cell)
 - [Store once across the run](#store-once-across-the-run)
 - [The shared storage pool](#the-shared-storage-pool)
+- [Open sea: one shared ocean chunk](#open-sea-one-shared-ocean-chunk)
 - [Running CHIMport yourself](#running-chimport-yourself)
+- [Release plan of the cells](#release-plan-of-the-cells)
 - [Feeding the CHIM Progress Tracker](#feeding-the-chim-progress-tracker)
 
 <!-- contents end -->
@@ -350,6 +352,54 @@ One `run` writes a run folder's `state.json` at a time: a second `run` on the
 same folder refuses (`RUN/run.lock`). Use `--workers` for more cells at once,
 or one run folder per worker sharing the pool.
 
+## Open sea: one shared ocean chunk
+
+`chimport.py ocean` covers the map cells that have no LAND record, so the
+whole map, the open sea included, becomes one CHIM world. The cells: every
+cell of the island rectangle (default: the bounding box of the base master's
+LAND cells; `--rect X0,X1,Y0,Y1`) grown by a margin ring for the horizon
+(`--margin`, default 2), plus every exterior cell record of the base master
+beyond it, without LAND in any master of the data folder (another master's
+land, such as Solstheim's, is never sea), without placed records and not in
+`plan.json`. Sea cells with LAND (seabed) stay ordinary CHIMport cells
+(empty sea).
+
+Every such cell is the same water over the same flat seabed at -2048 units
+(OpenMW's default for a cell without LAND), so it is ONE chunk, stored once
+([WORLD_FORMAT.md](WORLD_FORMAT.md#shared-ocean-chunk)), and each cell is a
+small reference to it: `cells/<cell>/ocean.json` and a cell result with
+status `ocean`. With the storage pool (`--storage-pool on --reuse-mode pool
+--storage-pool-dir DIR`) the chunk is looked up by its content key and
+linked; only the references are new.
+
+The edge of the world moves with it: world bounds (the sea current along the edge of the open world,
+[WORLD_BOUNDS.md](../WORLD_BOUNDS.md)) take their cells from the open-world directory, so once the game
+places the ocean chunk the current starts at the new edge without another change.
+
+The shared chunk's own checks (read-back, contents, seamless standing hull,
+coverage, memory, hull chains) are the audits of every ocean cell. Each cell
+adds its seam check: on every edge where a LAND neighbour meets it, the
+height step between the neighbour's edge vertices and the default floor
+(passes within 8 units, one LAND height step; corners from diagonal LAND
+neighbours too). A step over it fails the cell's seam audit and the cell is
+`failed`, never hidden.
+
+Measured on the base master (10 October 2026): rectangle x -18..23, y
+-16..27, margin 2: 2,208 cells; 867 open-sea cells (531 in the rectangle,
+334 in the margin, 2 named cells beyond it); left out: 1,292 LAND cells and
+51 cells with LAND in another master. 173 LAND edges meet the open sea; the
+largest height step is 0 (every coastal and seabed edge facing the open sea
+lies exactly at -2048). The chunk is 10,528 bytes, stored once; the 867
+references are 339,720 bytes.
+
+```sh
+python3 tools/chimport.py ocean --data-files DATA --palette PALETTE --out RUN [--rect X0,X1,Y0,Y1] [--margin 2] \
+        [--dry-run] [--storage-pool on --reuse-mode pool --storage-pool-dir DIR] \
+        [--tracker DIR --tracker-tool tools/cell_progress.py]
+```
+
+`--dry-run` prints the plan and its seam figures and writes nothing. The run holds `RUN/run.lock` like `run`.
+
 ## Running CHIMport yourself
 
 ```sh
@@ -366,7 +416,9 @@ python3 tools/chimport.py status --out RUN
   (repeatable; "Bitter Coast" finds "Bitter Coast Region");
 - `--storage-pool on --reuse-mode pool --storage-pool-dir DIR` the shared
   storage pool (above);
-- `--retry-failed` runs failed cells again; `--timeout S` stops a cell after S
+- `--retry-failed` runs failed cells again: cells the runner lost and every cell
+  whose last result is failed, hull policy pending or not converted (a cell that
+  converted but failed an audit counts); `--timeout S` stops a cell after S
   seconds (default 3600);
 - `--dry-run` prints what would run;
 - create `RUN/STOP` to stop starting new cells (running cells finish);
@@ -394,11 +446,15 @@ PALETTE is the game palette of a build (`id1/gfx/palette.lmp`). Run it in the
 builder container, as every other build step. Everything in the run folder is
 derived from your own game files and stays private.
 
+## Release plan of the cells
+
+CHIMport converts cells; which of them a release will contain is a separate, planned layer of the tracker (`cell_progress.py plan`, see "The release plan" in `docs/chim/PROGRESS_TRACKER.md`). The Toolkit shows the cells planned for the next release in gold, with a count per planned release and a totals row, and the plan never changes a cell's conversion status. A cell that CHIMport converts later than the plan is made stays in the plan with its own status, so the gap between planned and finished is always visible; when the release is published, `cell_progress.py ship` marks its cells shipped and the following planned release becomes the gold one.
+
 ## Feeding the CHIM Progress Tracker
 
 The tracker system end to end is described in `docs/chim/PROGRESS_TRACKER.md`, and the result file format
 CHIMport writes for it (`aw-cell-result-1`) in `docs/chim/CELL_RESULT_FORMAT.md`. Each fed cell carries
-its status (passed, empty, hull_pending, failed, not_converted), whether it is eligible, its audits with
+its status (passed, empty, ocean, hull_pending, failed, not_converted), whether it is eligible, its audits with
 their numbers and outcomes, its errors and its figures.
 
 With `--tracker DIR --tracker-tool cell_progress.py [--tracker-ingest ARGS]` the run feeds the tracker

@@ -1,0 +1,17 @@
+{
+  "schema": "build-recipe-1",
+  "name": "animkit",
+  "description": "MiniWind preset --miniwind-animkit: Animation kit: walk and run with a companion and hostiles",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Animation kit: walk and run with a companion and hostiles",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg companion test;dbg combat on"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

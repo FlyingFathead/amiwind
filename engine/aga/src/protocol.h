@@ -19,7 +19,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // protocol.h -- communications protocols
 
-#define	PROTOCOL_VERSION	15
+#include "aw_coord.h"
+
+// AW_COORD_PROTOCOL: 1015 with wide coordinates (the default), 15 with AW_COORD_NARROW (aw_coord.h)
+#define	PROTOCOL_VERSION	AW_COORD_PROTOCOL
 
 // if the high bit of the servercmd is set, the low bits are fast update flags:
 #define	U_MOREBITS	(1<<0)

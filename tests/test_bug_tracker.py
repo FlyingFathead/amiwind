@@ -229,7 +229,10 @@ class BugTrackerTest(unittest.TestCase):
                 continue
             text = (DOCS / b['report']).read_text(encoding='utf-8')
             lines = text.split('\n')
-            self.assertEqual(lines[2], bug_register.FACTS_BEGIN, '%s: fact table must sit under the title' % b['id'])
+            under = lines[2:]
+            if under[0] == bug_register.PERS_BEGIN:  # a persisting bug carries its report lines first
+                under = under[under.index(bug_register.PERS_END) + 2:]
+            self.assertEqual(under[0], bug_register.FACTS_BEGIN, '%s: fact table must sit under the title' % b['id'])
             rows = bug_register.parse_fact_table(text)
             build = b.get('build') or {}
             expected = ['Fact', 'Reported by', 'First noticed', 'Where', 'Reproduction', 'Duplicate of', 'Persists in',
@@ -238,6 +241,7 @@ class BugTrackerTest(unittest.TestCase):
                 expected += ['Playtest version', 'From commit', 'CHIM engine version']
                 expected += ['Unknown because'] if build.get('unknown_reason') else []
                 expected += ['Build note'] if build.get('note') else []
+            expected += ['Platform or emulator'] if b.get('platform') else []
             self.assertEqual(list(rows), expected, b['id'])
             self.assertTrue(rows['Severity'].startswith(b['severity'] + ':'), b['id'])
             self.assertEqual(text.count(bug_register.CAT_HEADING), 1, b['id'])
@@ -322,11 +326,47 @@ class BugTrackerTest(unittest.TestCase):
         sys.path.insert(0, str(ROOT / 'tools'))
         import release
         self.assertEqual(release.TEXT_LIMIT, 262144)
-        files = [REGISTER, JOURNAL, *sorted((DOCS / 'bugs').iterdir())]
+        files = [REGISTER, JOURNAL, *sorted(p for p in (DOCS / 'bugs').iterdir() if p.is_file()),
+                 *sorted((DOCS / 'bugs' / 'archive').glob('*.json'))]
         files += sorted(DOCS.glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
+        # 2026-10-11 coordinator: temporary until the second archive rotation (TRACKER-REGISTER-SIZE-36);
+        # bugs.json warns at 85 %, every other file at 75 %; the hard 1 MiB limit is unchanged.
+        def share(p):
+            return 0.85 if p.name == 'bugs.json' else 0.75
         big = ['%s %d of %d' % (p.name, p.stat().st_size, release.text_limit(p.relative_to(ROOT).as_posix()))
-               for p in files if p.stat().st_size > 0.75 * release.text_limit(p.relative_to(ROOT).as_posix())]
+               for p in files if p.stat().st_size > share(p) * release.text_limit(p.relative_to(ROOT).as_posix())]
         self.assertEqual(big, [], 'tracker files near the release text limit (tools/release.py)')
+
+    def test_old_fixed_bugs_rotate_into_the_frozen_archive(self):
+        live = json.loads(bug_register.DATA.read_text(encoding='utf-8'))
+        old = json.loads(bug_register.ARCHIVE.read_text(encoding='utf-8'))
+        self.assertTrue(old, 'the archive is empty')
+        live_ids, old_ids = {b['id'] for b in live}, {b['id'] for b in old}
+        self.assertEqual(live_ids & old_ids, set(), 'an ID is in both bugs.json and the archive')
+        self.assertEqual([b['id'] for b in bug_register.load()], [b['id'] for b in live] + [b['id'] for b in old])
+        self.assertEqual([b['id'] for b in old if not bug_register.archivable(b)], [],
+                         'the archive holds a bug that is open, persisting or newer than v0.0.33')
+        self.assertEqual([b['id'] for b in live if bug_register.archivable(b)], [],
+                         'bugs.json holds a fixed bug first found in v0.0.33 or earlier: run bug_register.py render')
+        for b in old:
+            self.assertIn(b['state'], ('fixed', 'closed'))
+            self.assertLessEqual(bug_register.found_series(b), 33)
+            self.assertTrue(b['report'] is None or (DOCS / b['report']).is_file(), b['id'])
+        self.assertIn('docs/bugs/archive/bugs-v0.0.29-v0.0.33.json',
+                      json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8')))
+
+    def test_rotation_rule(self):
+        base = dict(id='BUILD-ROT-33', state='fixed', found_in='v0.0.33-rc1')
+        self.assertTrue(bug_register.archivable(base))
+        self.assertTrue(bug_register.archivable(dict(base, state='closed')))
+        self.assertFalse(bug_register.archivable(dict(base, state='open')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.34')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
+        two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
+        self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-34', found_in='v0.0.34')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-34'])
+        self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_whitespace_baselines_get_the_named_limit(self):
         # RELEASE-PATCH-SIZE-33: docs/PATCH-v<version>.json lists every file of the published base
@@ -370,6 +410,41 @@ class BugTrackerTest(unittest.TestCase):
         outputs = bug_register.outputs(bugs, bug_register.load_families())
         self.assertIn('docs/bugs/CHIM_TRACKER.md', [p.relative_to(ROOT).as_posix() for p in outputs],
                       'render does not write the CHIM tracker with the register')
+
+    def test_reports_are_valid_and_persisting_bugs_are_listed(self):
+        bugs = bug_register.load()
+        self.assertEqual([e for e in bug_register.validate(bugs) if 'report' in e and 'needs version' in e], [])
+        base = bug(id='BUILD-REPORT-TEST-36')
+        for bad in ([{'version': 'dev3', 'at': '2026-10-11 00:43 +0300'}],
+                    [{'version': 'v0.0.36-dev3', 'at': '11 October 2026'}],
+                    [{'version': 'v0.0.36-dev3', 'at': '2026-10-11 00:43'}],
+                    [{'version': 'v0.0.36-dev3', 'at': '2026-10-11'}, {'version': 'v0.0.32', 'at': '2026-10-08'}]):
+            self.assertTrue(bug_register.validate([dict(base, reports=bad)]), 'bad reports passed: %r' % bad)
+        ok = [{'version': 'v0.0.32', 'at': '2026-10-08'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11 00:43 +0300'}]
+        self.assertEqual(bug_register.validate([dict(base, reports=ok)]), [])
+        lines = bug_register.report_lines(dict(base, reports=ok))
+        self.assertEqual(lines[0], 'Reported with v0.0.32 at 2026-10-08 (time not recorded)')
+        self.assertEqual(lines[1], 'Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300')
+        text = REGISTER.read_text(encoding='utf-8')
+        self.assertIn('### Persisting, not resolved', text)
+        section = text.split('### Persisting, not resolved')[1].split('### All bugs')[0]
+        counts = [len(b['reports']) for b in bug_register.persisting(bugs)]
+        self.assertEqual(counts, sorted(counts, reverse=True))
+        for b in bugs:
+            if len(b.get('reports') or []) >= 2:
+                self.assertIn('[%s](' % b['id'], section, '%s has 2+ reports but is not in the persisting section' % b['id'])
+                if b['report']:
+                    page = (DOCS / b['report']).read_text(encoding='utf-8')
+                    self.assertIn('PERSISTING: reported %d times; something has to be done' % len(b['reports']), page)
+                    for line in bug_register.report_lines(b):
+                        self.assertIn(line, page)
+            else:
+                self.assertNotIn('[%s](' % b['id'], section)
+        tracker = (DOCS / 'bugs' / 'CHIM_TRACKER.md').read_text(encoding='utf-8')
+        for b in bugs:
+            if 'chim' in b and len(b.get('reports') or []) >= 2:
+                self.assertIn('Persisting, not resolved', tracker)
+                self.assertIn('[%s](' % b['id'], tracker.split('## Latest changes')[0])
 
     def test_chim_ids_must_carry_their_part(self):
         chim = bug(id='CHIM-TEST-33', family='chim-streamer', build=dict(CHIM_BUILD))
@@ -436,6 +511,27 @@ class BugTrackerTest(unittest.TestCase):
         for b in bad:
             self.assertTrue(bug_register.validate([dict(bare, build=b)]), b)
         self.assertEqual([b['id'] for b in bug_register.load() if bug_register.needs_build(b) and 'build' not in b], [])
+
+    def test_owner_game_reports_name_their_platform(self):
+        dev = dict(LEGACY_BUILD, name='v0.0.36-dev5')
+        bare = bug(id='TEST-PLAT-36', found_in='v0.0.36-dev5', persists_in=['v0.0.36-dev5'], reported_by='owner',
+                   family='actors-npc', build=dev)
+        self.assertTrue(any('missing platform' in e for e in bug_register.validate([bare])), 'owner report, no platform')
+        self.assertEqual(bug_register.validate([dict(bare, platform='FS-UAE 3.1.66, JIT')]), [])
+        self.assertEqual(bug_register.validate([dict(bare, reported_by='developer')]), [], 'only the owner reports')
+        self.assertEqual(bug_register.validate([dict(bare, family='build-speed')]), [], 'builder families are exempt')
+        self.assertEqual(bug_register.validate([dict(bare, id='TEST-PLAT-35', found_in='v0.0.35-dev2',
+                                                     persists_in=['v0.0.35-dev2'], build=dict(dev, name='v0.0.35-dev2'))]),
+                         [], 'from v0.0.36 on')
+        for v in ('unknown', 'not in game'):
+            self.assertTrue(bug_register.validate([dict(bare, platform=v)]), v + ' without a reason')
+            self.assertEqual(bug_register.validate([dict(bare, platform=v, platform_reason='not recorded')]), [])
+        self.assertTrue(bug_register.validate([dict(bare, platform='FS-UAE', platform_reason='x')]), 'reason only for unknown')
+        self.assertTrue(bug_register.validate([dict(bare, platform='a' + chr(10) + 'b')]), 'one line')
+        self.assertTrue(bug_register.validate([dict(bare, platform='x' * 121)]), 'at most 120 characters')
+        table = bug_register.facts_table(dict(bare, platform='FS-UAE 3.1.66, JIT'), {}, {})
+        self.assertIn('| Platform or emulator | FS-UAE 3.1.66, JIT |', table)
+        self.assertEqual([b['id'] for b in bug_register.load() if bug_register.needs_platform(b) and not b.get('platform')], [])
 
     def test_build_record_comes_from_the_receipt(self):
         preview = {'version': '0.0.32', 'source_commit': '0f467e4b907e28930e323b31a9db2fcfc17c1c47',

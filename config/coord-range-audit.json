@@ -1,0 +1,390 @@
+{
+ "format": 1,
+ "about": "Every 4000 / 4096 / 4095 in the engine and the builder's frame checks, classified against the coordinate range (CHIM-FRAME-COORD-RANGE-33, engine/aga/src/aw_coord.h): bound = follows the coordinate bound (AW_COORD_BOUND; tools/coord_range.py in the builder: wide by default since v0.0.36, narrow with --coord-range narrow); kept = about positions or distances but deliberately unchanged (why in note); unrelated = not a position. tests/test_coord_range_audit.py fails on any new occurrence that is not listed.",
+ "entries": [
+  {
+   "file": "engine/aga/src/aw_coord.h",
+   "contains": "AW_COORD_BOUND 4000",
+   "class": "bound",
+   "note": "the narrow bound itself (AW_COORD_NARROW, --coord-range narrow); wide (32000) is the default since v0.0.36"
+  },
+  {
+   "file": "engine/aga/src/aw_excluded.c",
+   "contains": "if(n<5 || n>4096 || !fget",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "limit_reason=\"Quake's coordinate range\"",
+   "class": "kept",
+   "note": "view distance cap: a distance, not a position; raising it is its own measured change (fog tables, far clip)"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "if(value>4096)value=4096;",
+   "class": "kept",
+   "note": "view distance cap (same)"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "if(value>4096)goto invalid;",
+   "class": "kept",
+   "note": "view distance cap (same)"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "if(distance>4096)distance=4096;",
+   "class": "kept",
+   "note": "view distance cap (same)"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "AW_Interior()?4096",
+   "class": "kept",
+   "note": "interior view distance"
+  },
+  {
+   "file": "engine/aga/src/aw_gallery.c",
+   "contains": "size[i]>=0 && e->size[i]<4096))return",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_harvest_runtime.c",
+   "contains": "char message[4096],line[96",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_head.c",
+   "contains": "take=size-offset;if(take>4096)take=409",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_horizon.c",
+   "contains": "distance<=4096",
+   "class": "kept",
+   "note": "horizon distance range"
+  },
+  {
+   "file": "engine/aga/src/aw_lava.c",
+   "contains": ") && radius>0 && radius<=4096){",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_log.c",
+   "contains": "e[1024], awlog_b_history[4096];",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "R_BASE (AW_TOWN_MAP_BASE+4096)",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "heck[AW_TOWN_EXTRA_COUNT<4096?1:-1];",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_movie.c",
+   "contains": "_PIXELS];signed char pcm[4096];} movie",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_movie.c",
+   "contains": "if(!f || size<6 || size>4096){if(f)fc",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_movie.c",
+   "contains": "es-position;if(pcm_count>4096)pcm_coun",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_npcpath.c",
+   "contains": "clamp(self[0]-s->x,4096)",
+   "class": "kept",
+   "note": "path step delta clamp (a difference within one frame); revisit if NPC paths cross a wide frame in one step"
+  },
+  {
+   "file": "engine/aga/src/aw_remote.c",
+   "contains": "#define REMOTE_CMD_MAX 4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_scene.c",
+   "contains": "if(!f || size<8 || size>4096){if(f)fc",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_spawn.c",
+   "contains": "map_place(p,xy,4000)",
+   "class": "kept",
+   "note": "trace start height for placing on the map (z), not an x/y bound"
+  },
+  {
+   "file": "engine/aga/src/aw_state.h",
+   "contains": "#define AW_HARVEST_SLOTS 4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_ui.c",
+   "contains": "static char subtitle[4096],speaker",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_walk.c",
+   "contains": "world_below(e,4096)",
+   "class": "kept",
+   "note": "downward trace depth"
+  },
+  {
+   "file": "engine/aga/src/bspfile.h",
+   "contains": "#define\tMAX_MAP_BRUSHES\t\t4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/bspfile.h",
+   "contains": "#define\tMAX_MAP_TEXINFO\t\t4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chase.c",
+   "contains": "VectorMA (r_refdef.vieworg, 4096",
+   "class": "kept",
+   "note": "chase camera trace length"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_format.c",
+   "contains": ">= 0 && s->hysteresis < 4096 &&",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_format.c",
+   "contains": "&& s->collision_margin < 4096 &&",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_format.c",
+   "contains": "&& s->prefetch_margin < 4096 &&",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_format.c",
+   "contains": "ain >= 32 && s->grain <= 4096 && !(s->",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_format.c",
+   "contains": "ain >= 32 && f->grain <= 4096 && f->nx",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_graft.c",
+   "contains": "l->minmaxs[2] = -4096;",
+   "class": "kept",
+   "note": "grafted leaf z bounds (shorts); x and y are clamped to the short range"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_graft.c",
+   "contains": "l->minmaxs[5] = 4095;",
+   "class": "kept",
+   "note": "grafted leaf z bounds (same)"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_local.h",
+   "contains": "#define CHIM_MAX_CHUNKS\t\t4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/chim/chim_local.h",
+   "contains": "efine CHIM_EFRAG_RESERVE\t4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/common.c",
+   "contains": "char    buf[4096];",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/common.c",
+   "contains": "limit=aw_loading_music?4096:16384;",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/console.c",
+   "contains": "#define\tMAXPRINTMSG\t4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/d_sky.c",
+   "contains": "4096*vpn[0]",
+   "class": "unrelated",
+   "note": "sky direction scale"
+  },
+  {
+   "file": "engine/aga/src/d_sky.c",
+   "contains": "4096*vpn[1]",
+   "class": "unrelated",
+   "note": "sky direction scale"
+  },
+  {
+   "file": "engine/aga/src/d_sky.c",
+   "contains": "4096*vpn[2]",
+   "class": "unrelated",
+   "note": "sky direction scale"
+  },
+  {
+   "file": "engine/aga/src/model.c",
+   "contains": "limit=aw_loading_music?4096:16384;",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/model.c",
+   "contains": "( (unsigned)mt->width > 4096 || (unsi",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/quakedef.h",
+   "contains": "IT_AXE                  4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/quakedef.h",
+   "contains": "RIT_LAVA_NAILGUN        4096",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/r_light.c",
+   "contains": "|| light_grid_dims[i] > 4096 || !isfi",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/r_sky.c",
+   "contains": "* and 4096-byte fog",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/r_sky.c",
+   "contains": "static byte sky_rgb[4096],sky_tin",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/r_sky.c",
+   "contains": "for(i=0;i<4096;i++){",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/server.h",
+   "contains": "define\tFL_JUMPRELEASED\t\t\t4096\t// for j",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/snd_dma.c",
+   "contains": "mbuffer = {\"bgmbuffer\", \"4096\"};",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "engine/aga/src/sys_amiga.c",
+   "contains": "&& *p <= '9' && value < 4096; p++)",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "tools/town_config.py",
+   "contains": "100 <= distance <= 4096",
+   "class": "kept",
+   "note": "draw distance range"
+  },
+  {
+   "file": "tools/chim/collision.py",
+   "contains": "guard > 4096",
+   "class": "unrelated",
+   "note": "loop guard"
+  },
+  {
+   "file": "tools/chim/collision.py",
+   "contains": "top=4096.0",
+   "class": "kept",
+   "note": "standing trace start height (z)"
+  },
+  {
+   "file": "tools/chim/collision.py",
+   "contains": "(x, y, -4096.0)",
+   "class": "kept",
+   "note": "standing trace end height (z)"
+  },
+  {
+   "file": "tools/chim/collision.py",
+   "contains": "(-4096.0 - top)",
+   "class": "kept",
+   "note": "standing trace end height (z)"
+  },
+  {
+   "file": "tools/chim/regions.py",
+   "contains": "CELL_UNITS + 4096.0",
+   "class": "unrelated",
+   "note": "half a cell (Morrowind units)"
+  },
+  {
+   "file": "tools/chim/seyda.py",
+   "contains": "[*CENTRE, 0], 4096, 32, {'s",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "tools/chim/zone_sim.py",
+   "contains": "for _guard in range(4 * 4096):",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "tools/chim/format.py",
+   "contains": "Was 4096 in the engine while this writer had no limit",
+   "class": "unrelated",
+   "note": "the CHIM world index file-row limit (CHIM-WORLD-INDEX-FILE-LIMIT-36), a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_town_table.h",
+   "contains": "{-4096,-4608,4096,4608}",
+   "class": "kept",
+   "note": "generated core box of the whole-city Vivec frame (vivec_city): frame-local core, inside the wide bound (tools/town_table.py FRAME_BOUND = coord_range.WIDE_BOUND); a narrow engine drops the row and the builder refuses the area with --coord-range narrow"
+  }
+ ]
+}

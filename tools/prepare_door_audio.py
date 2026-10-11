@@ -38,6 +38,8 @@ def catalogue(raw, wanted):
 
 def prepare(data,scene,ffmpeg='ffmpeg'):
     data=resolve_data_files(data);scene=ensure_external(scene,'door audio');wanted={172860}
+    from mwad.paths import unshare_tree
+    unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     for p in (scene/'id1').glob('scene-doors*.txt'):
         lines=p.read_text(encoding='cp1252').splitlines()
         if not lines or lines[0]!='AWD3':raise ValueError('Door audio needs placed-reference AWD3 links')

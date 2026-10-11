@@ -20,8 +20,8 @@ static char footer[80];static int footer_left,footer_right;
 static const char *region_override;
 static int cyan_pixels,cyan_left,cyan_right,cyan_top,cyan_bottom,button_x,button_y;
 /* Model the registered values used by the real panel; do not bypass mode logic. */
-static cvar_t *map_vars[2];static int map_var_count,debug_overlays=1;
-void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<2);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+static cvar_t *map_vars[4];static int map_var_count,debug_overlays=1;
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<4);v->value=atof(v->string);map_vars[map_var_count++]=v;}
 void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
 int AW_DebugOverlaysEnabled(void){return debug_overlays;}
 int Cmd_Argc(void){return 1;}
@@ -66,6 +66,11 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){
 }
 const char *AW_UILine(const char *p,int width,char *out,int capacity){int n=0;while(*p && n<width/6 && n<capacity-1)out[n++]=*p++;out[n]=0;return p;}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
+/* v2 fixture: 0 = AWM1; 2 = AWM2 with a 4x4-texel square pool and a sub-pixel triangle;
+ * 3 = AWM2 with a broken section (point outside its bounds). Terrain avoids the lava index. */
+static int map_version;
+#define LAVA_INDEX 201
+static void half(FILE *f,int n){fputc(n&255,f);fputc((n>>8)&255,f);}
 static void fixed(FILE *f,const char *s,int n){int i;for(i=0;i<n;i++)fputc(i<(int)strlen(s)?s[i]:0,f);}
 static const char body[]="Welcome %PCName. An earned event.\0Another earned event.";
 int COM_FOpenFile(char *name,FILE **out){
@@ -73,10 +78,18 @@ int COM_FOpenFile(char *name,FILE **out){
     opens++;if(missing){*out=NULL;return -1;}f=tmpfile();assert(f);*out=f;
     for(i=0;i<base;i++)fputc(0,f); /* Exercise packed-member-relative seeks. */
     if(!strcmp(name,"world/map.awm")){
-        fputs(corrupt?"BAD!":"AWM1",f);fputc(32,f);fputc(0,f);fputc(32,f);fputc(0,f);
+        fputs(corrupt?"BAD!":map_version?"AWM2":"AWM1",f);fputc(32,f);fputc(0,f);fputc(32,f);fputc(0,f);
         word(f,(unsigned)-8192);word(f,(unsigned)-8192);word(f,8192);word(f,8192);word(f,1);word(f,5);
         fixed(f,"balmora",16);fixed(f,"Balmora",32);word(f,0);word(f,0);value=.25;memcpy(&bits,&value,4);word(f,bits);
-        for(i=0;i<1024;i++)fputc(i&255,f);
+        for(i=0;i<1024;i++)fputc(map_version?i%200:i&255,f);
+        if(map_version){
+            static const int square[8]={1024,1024,3072,1024,3072,3072,1024,3072},tri[6]={-4000,-4000,-3995,-4000,-4000,-3995};
+            fputs("LAVA",f);word(f,2);word(f,7);word(f,LAVA_INDEX);
+            half(f,0);half(f,0);half(f,4);half(f,0);word(f,1024);word(f,1024);word(f,3072);word(f,map_version==3?3000:3072);
+            half(f,-1);half(f,-1);half(f,3);half(f,0);word(f,(unsigned)-4000);word(f,(unsigned)-4000);word(f,(unsigned)-3995);word(f,(unsigned)-3995);
+            for(i=0;i<8;i++)word(f,(unsigned)square[i]);
+            for(i=0;i<6;i++)word(f,(unsigned)tri[i]);
+        }
     }else if(!strcmp(name,"world/quests.awq")){fputs("AWQ1",f);word(f,1);fixed(f,"quest",64);fixed(f,title,96);
     }else if(!strcmp(name,"world/journal.awj")){
         fputs("AWJ1",f);word(f,2);
@@ -169,6 +182,34 @@ static void drag_test_cancel(void)
     drag_test_require(!AW_WorldUIKey(K_F10,1) && !AW_WorldUIActive(),"F10 route regressed");
 }
 
+/* v2 lava layer: painted pixels are exactly the pool's covered pixel centres plus one
+ * dot for the sub-pixel pool, in both views; the setting hides it; aw_map_format 1 draws
+ * the v2 file as v1; v1 files and broken sections behave as before. */
+static byte lava_before[320*200];
+static int lava_diff(int *left,int *right,int *top,int *bottom,int *dot){
+    int i,n=0;*left=*top=1000;*right=*bottom=-1;*dot=0;
+    for(i=0;i<320*200;i++)if(pixels[i]!=lava_before[i]){
+        int x=i%320,y=i/320;assert(pixels[i]==LAVA_INDEX && x>=4 && x<316 && y>=19 && y<173);
+        if(x==123 && y==132){*dot=1;continue;}
+        n++;if(x<*left)*left=x;if(x>*right)*right=x;if(y<*top)*top=y;if(y>*bottom)*bottom=y;
+    }
+    return n;
+}
+static void lava_layer_test(void){
+    int l,r,t,b,dot,mode;
+    for(mode=0;mode<2;mode++){
+        map_version=2;Cvar_SetValue("aw_map_mode",mode);Cvar_SetValue("aw_map_lava",0);
+        map_command();assert(AW_WorldUIActive());AW_WorldUIKey(K_HOME,1);
+        draw();assert(!strstr(drawn,"LAVA"));memcpy(lava_before,pixels,sizeof pixels);
+        Cvar_SetValue("aw_map_lava",1);draw();assert(strstr(drawn,"LAVA"));
+        /* Square 1024..3072 at 512 units a texel: screen x 169.4-188.1, y 67.9-86.6. */
+        assert(lava_diff(&l,&r,&t,&b,&dot)==19*19 && l==169 && r==187 && t==68 && b==86 && dot);
+        Cvar_SetValue("aw_map_format",1);draw();assert(!strstr(drawn,"LAVA") && !memcmp(pixels,lava_before,sizeof pixels));
+        Cvar_SetValue("aw_map_format",2);AW_WorldUIKey('m',1);
+    }
+    map_version=3;map_command();assert(!AW_WorldUIActive());
+    map_version=0;map_command();assert(AW_WorldUIActive());draw();assert(!strstr(drawn,"LAVA"));AW_WorldUIKey('m',1);
+}
 static void map_click(int button){AW_WorldUIKey(button,1);AW_WorldUIKey(button,0);}
 static int32_t marked(const char *suffix){char id[64];sprintf(id,"amiwind:map:marker:%s",suffix);return AW_StateGet(&aw_state,AW_GLOBAL,id);}
 static void marker_save_roundtrip(void)
@@ -379,5 +420,7 @@ int main(void){
     drag_test_normal();drag_test_selection();drag_test_boundaries();drag_test_cancel();
     if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
     custom_marker_test();normal_debug_teleport_test();
+    if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
+    lava_layer_test();
     return 0;
 }

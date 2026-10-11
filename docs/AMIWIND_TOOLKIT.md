@@ -7,7 +7,7 @@
 
 - [Starting it](#starting-it)
 - [Your data](#your-data)
-- [The three tabs](#the-three-tabs)
+- [The tabs](#the-tabs)
   - [World](#world)
   - [Local](#local)
   - [3D Inspector](#3d-inspector)
@@ -19,6 +19,8 @@
   - [Showing it](#showing-it)
   - [One Toolkit, your data loaded locally](#one-toolkit-your-data-loaded-locally)
   - [Track your own build](#track-your-own-build)
+- [Monitor](#monitor)
+- [Mesh Compare](#mesh-compare)
 - [Using it for development](#using-it-for-development)
 - [Other parts](#other-parts)
 
@@ -75,13 +77,16 @@ by itself, so each one has to be chosen.
    `island.png` is the topographic view, `island-world.png` the look of the
    game's own World map, and `island-cells.json` the Local level: each cell's
    terrain, its original placements, and the place and region names.
-3. **Maps folder (local).** A build's `id1/maps`, for the 3D Inspector.
+3. **Maps folder (local).** A build's `id1/maps`, for the 3D Inspector: Quake maps (`.bsp`) and
+   CHIM maps (`.chim`); where a map has both, the `.chim` is used, as the engine does.
 
-## The three tabs
+## The tabs
 
 ### World
 
 ![World view: the whole island on the topomap, with Balmora and Seyda Neen outlined as full town maps and named places and interior entrances shown](images/amiwind-v0.0.31-toolkit-world.png)
+
+![World view in v0.0.36 with the CHIM progress tracker: each cell coloured by its conversion status, the headline and the legend](images/amiwind-v0.0.36-toolkit-world-chim-tracker.png)
 
 Vvardenfell's exterior cells, one square per cell, north up.
 
@@ -123,7 +128,21 @@ wireframe or solid display, optional textures with your own palette, polygon
 heatmap, collision preview, a compass and orientation gizmo, face selection and
 markup for planning, and session export. Until a map is loaded it says so under
 the crosshair. Open a map with **Show in 3D** in Local, or with **Open BSP /
-JSON** in the inspector itself. The inspector also works on its own:
+CHIM / JSON** in the inspector itself. A Quake map (`.bsp`) shows its polygons;
+a CHIM map (`.chim`) shows its entities and names the CHIM frame that holds its
+geometry; **Open CHIM world** shows a frame of a build's CHIM world with the
+memory each player position needs
+([CHIM maps and CHIM worlds](POLYCOUNT_INSPECTOR.md#chim-maps-and-chim-worlds)).
+
+![3D Inspector on a CHIM map (.chim): its entities as markers and the CHIM frame that holds its geometry](images/amiwind-v0.0.36-toolkit-inspector-chim-map.png)
+
+![3D Inspector on a CHIM world: a Balmora frame from above with the memory overlay and the worst position's ring](images/amiwind-v0.0.36-toolkit-inspector-chim-world-memory.png)
+
+Fly with WASD (E/Q up and down); the **Speed** slider (0.05x to 4x, scaled to the
+size of the loaded map) sets the pace, Shift flies 4x faster and Ctrl or Alt 4x
+slower.
+
+The inspector also works on its own:
 [`amiwind-toolkit/map-inspector.html`](../amiwind-toolkit/map-inspector.html),
 [details](POLYCOUNT_INSPECTOR.md).
 
@@ -454,6 +473,126 @@ the same on Linux, macOS and Windows hosts.
 `tests/test_cell_progress.py` and `tests/test_live_tracker.py` check the schema, the orders, the audit and "not measured"
 handling, idempotence, results, the interiors tree, the serving, the legend filter, the release field, the reference file,
 the build-side ingest and the live tracker's prompt, files and server lifecycle, on synthetic data only.
+
+## Monitor
+
+![Monitor: a running build's progress, its stages, the live log of the running stage and the live stage timeline under it](images/amiwind-v0.0.36-toolkit-monitor.png)
+
+The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs, in any browser, phones included:
+
+- **Progress:** status, percent done, stages passed, running, pending and failed, elapsed time, the ETA with its basis
+  (critical path or history) and the cores in use now, from the run's `build-progress.json`;
+- **Activity:** what the running stage is doing even when its log is silent, from its read/write trace
+  (`profile/reads/NN-stage.txt`: files written, files read, code entered): the files written and read and the code
+  entries of the last 10 seconds, the code it is in now, the last entries, how long ago the trace and the log last
+  grew (more than a minute is marked) and the cores in use;
+- **Stages:** each stage's elapsed time against its expected time;
+- **Log:** the live log, read in byte ranges as it grows: the running stage's log by default (it follows the stage
+  that is running), any other stage log (for example the CHIM stage's per-frame stair gate lines) or a master
+  builder's console log; **Pause** stops reading, scrolling up keeps your place;
+- **Stage timeline** (under the log): one time axis from the build's start, each stage a bar from its start to its
+  end (reused stages as thin marks, the running stage growing to a "now" line, failed stages red), stages that ran
+  at the same time on rows of their own so the parallelism shows; hover or tap a bar for its start, end, duration
+  and jobs. Live from the run's `build-state.json`; for a finished run with a `build-profile.json` it also draws the
+  cores over time ([Build Timeline](BUILD_PROFILE.md)). Under each stage bar are its **sections**: the profiler's
+  section timer where the stage has one, and sections derived from the stage's trace, named by the files they wrote
+  (for example `vf*.chim x30`) and then by the code they entered, timed by the modification times of those files
+  (marked "derived from trace (approximate)"; module loads and pool start-up are never used as names). Sections under 4
+  cores for over a minute are hatched red with their names shown. The **cores line** turns red, with a faint red fill,
+  wherever the build stays under 2.5 cores for 30 s or more (both values can be changed above the chart); the live
+  "Cores now" readout turns red the same way. Hover shows a cursor across every row with the time, the cores, the stage
+  and sections running then; click or tap a red stretch to select it (highlighted, with a list of what ran in it),
+  arrows step to the next or previous stretch, Esc clears. Wheel zooms the time axis, drag pans, **Reset zoom** shows
+  the whole run, and **Fullscreen** fills the screen (a maximised panel where the browser has no fullscreen);
+- **Recent builds and gates:** the newest master builder results, when the server is given them.
+- **Build run:** the run list is read again every 15 seconds and with **Refresh**, keeping your choice; runs that
+  appeared after the page opened are marked "new", and **follow latest** switches to the newest running build.
+
+Start it with the Toolkit server:
+
+```bash
+python3 tools/toolkit_serve.py --builds BUILDS_DIR [--results DIR] [--console-logs DIR] --open
+```
+
+`BUILDS_DIR` is the folder holding your build runs. **Docker builds** (`tools/run_docker.py`,
+[Docker builder](DOCKER_BUILD.md#watch-a-build-in-the-monitor)) keep their runs in a Docker volume; read them
+with one option:
+
+```bash
+python3 tools/toolkit_serve.py --monitor-docker amiwind-docker-builds --open
+```
+
+`--monitor-docker VOLUME[:PATH]` (default PATH `build`) starts one throwaway reader container (image
+`amiwind-builder:local`, or `--monitor-image IMAGE`) with the volume and the reader mounted read-only, a read-only
+root, no network, no capabilities, an unprivileged user and half a core; it is removed when the server stops.
+For any other place, `--builds-command CMD` takes a command of your own that runs
+`tools/monitor_read.py --root builds=DIR --serve` there.
+
+**From a phone.** The server listens on 127.0.0.1 (this machine only) unless you start it with `--bind ADDRESS`,
+for example this machine's LAN address; then anyone on that network can read what it serves (the Toolkit, your data,
+your build logs), so only do it on a network you trust. It prints a warning when it does, and refuses an every-interface address: it always listens on the one address you name.
+
+Read-only by construction:
+
+- the `/monitor/` endpoints answer GET only; nothing runs a command, starts, stops or writes anything;
+- every request names a run and a log (or a stage trace) by a strict name pattern, checked by the server and again by the reader, and
+  must resolve inside the builds folder (no `..`, no path separators, no symbolic links); logs are read in capped byte
+  ranges; `build-state.json` is summarised (stage names, status, times), never sent whole;
+- with `--monitor-docker` or `--builds-command` the command is fixed when the server starts; a page's request
+  reaches it only as a JSON document on its input (`tools/monitor_read.py` refuses any request it does not know),
+  never as part of a command;
+- the server is bound to this machine (127.0.0.1) unless you choose `--bind`, as for the rest of the Toolkit.
+
+`tests/test_toolkit_monitor.py` checks the reader, the endpoints, traversal and bad input being refused, log offsets,
+the fixed command and the page on a sample run folder.
+
+## Mesh Compare
+
+The **Mesh Compare** tab (`amiwind-toolkit/mesh-compare.html`) shows two Wavefront `.OBJ` files side by side,
+**A** on the left and **B** on the right, for example a Morrowind mesh as the game has it and the same mesh as the
+converter makes it:
+
+- open each one with its file picker (the file is read in your browser), or pick it from the server's list;
+- both views share one camera and move like the [3D Inspector](#3d-inspector): drag to orbit, middle-drag to move
+  closer or farther, right-drag or Shift-drag to pan, the wheel to zoom, WASD and E/Q to fly with the same **Speed**
+  slider (Shift 4x faster, Ctrl or Alt 4x slower);
+- **Wireframe** draws each polygon's edges over the solid faces, **Reset view** fits both meshes again;
+- under each view: its faces and vertices (and the triangles drawn). Back faces are drawn darker red, so a face that
+  points the wrong way or a hole shows at once.
+
+The OBJ files come from `tools/mesh_export.py`, which runs the builder's own mesh path, never a second
+implementation:
+
+```bash
+python3 tools/mesh_export.py meshes/x/ex_hlaalu_b_01.nif --data-files "DATA_FILES" --methods original,current --out DIR
+```
+
+- `original`: the NIF's triangles as the converter reads them;
+- `current`: the converter as shipped: the mesh's reduction profile (the town, scenery group, open world or interior
+  path that reduces it; `--space` picks one) and the converter's face list;
+- `merge`, `meshopt+merge`: the candidate mesh methods, when the checkout has them (`tools/mesh_methods.py`).
+
+Coordinates are Quake units (Morrowind units x 0.25) and every face is counter-clockwise seen from its front. The
+output is deterministic: the same mesh and code give byte-identical files, and `NAME.export.json` records each
+file's faces, vertices and SHA-256 and the profile used. The `.mtl` file names materials and texture file names
+only. The OBJ files are made from your own game files: keep them to yourself.
+
+With the Toolkit server, the page lists the exports of a folder and can make new ones:
+
+```bash
+python3 tools/toolkit_serve.py --mesh-cache DIR [--mesh-data-files "DATA_FILES" [--mesh-docker IMAGE]] --open
+```
+
+`--mesh-cache DIR` serves the exports in `DIR` (`/mesh/list.json`, `/mesh/file/NAME.obj`, GET only, plain file
+names inside `DIR` only). With `--mesh-data-files`, typing a mesh name (`meshes/.../NAME.nif`) and **Export to the
+list** runs `tools/mesh_export.py` into `DIR` (in the server's Python, which then needs numpy, or with
+`--mesh-docker IMAGE` in a throwaway container of an image you already have: no network, read-only root, Data Files
+and repository mounted read-only); a mesh already exported is answered from `DIR`. Mesh names and methods are checked
+against fixed patterns before anything runs. `tests/test_mesh_compare.py` checks the export's determinism, the
+endpoints refusing anything outside `DIR` and the page on a synthetic cube.
+
+Later (not yet in the page): a deviation heat map between A and B, saved camera presets, an overlay of both meshes in
+one view and a statistics table.
 
 ## Using it for development
 

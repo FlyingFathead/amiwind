@@ -34,6 +34,7 @@ function makePage(files, search) {
   }
   const win = {addEventListener() {}, devicePixelRatio: 1, postMessage() {}};
   win.parent = win;
+  win.ChimLegend = require(path.resolve(__dirname, '..', 'amiwind-toolkit', 'chim-legend.js'));   // the page's pure map layout
   const context = vm.createContext({
     console, setTimeout: f => 0, URLSearchParams, File: class {}, Image: class {},
     location: {search: search || '', pathname: '/amiwind-toolkit/world-map.html'},

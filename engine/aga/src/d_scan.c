@@ -57,6 +57,18 @@ int				r_turb_spancount;
 
 void D_DrawTurbulent8Span (void);
 
+#if AW_ASM_DSCAN
+/* Engine profile (docs/ENGINE_PROFILES.md): upstream AmiQuake's d_scan_68k.s is linked and defines
+ * D_DrawSpans8 and D_DrawTurbulent8Span; the C versions below keep their code under _C names and
+ * AW_ASM_SPANS / AW_ASM_TURB choose which one runs. Without the assembly this block is empty. */
+void D_DrawTurbulent8Span_C (void);
+#if AW_ASM_TURB
+#define AW_TURB_SPAN D_DrawTurbulent8Span
+#else
+#define AW_TURB_SPAN D_DrawTurbulent8Span_C
+#endif
+#endif
+
 #ifdef USE_FAST_RECIPROCAL
 /*
 =============
@@ -143,7 +155,11 @@ void D_WarpScreen (void)
 D_DrawTurbulent8Span
 =============
 */
+#if AW_ASM_DSCAN
+void D_DrawTurbulent8Span_C (void)
+#else
 void D_DrawTurbulent8Span (void)
+#endif
 {
 	int		sturb, tturb;
 
@@ -295,7 +311,11 @@ void Turbulent8 (espan_t *pspan)
 			r_turb_s = r_turb_s & ((CYCLE<<16)-1);
 			r_turb_t = r_turb_t & ((CYCLE<<16)-1);
 
+#if AW_ASM_DSCAN
+			AW_TURB_SPAN ();
+#else
 			D_DrawTurbulent8Span ();
+#endif
 
 			r_turb_s = snext;
 			r_turb_t = tnext;
@@ -317,7 +337,11 @@ void Turbulent8 (espan_t *pspan)
 D_DrawSpans8
 =============
 */
+#if AW_ASM_DSCAN
+void D_DrawSpans8_C (espan_t *pspan)
+#else
 void D_DrawSpans8 (espan_t *pspan)
+#endif
 {
 	int				count, spancount, copy_of_cachewidth;
 	unsigned char	*pbase, *pdest;

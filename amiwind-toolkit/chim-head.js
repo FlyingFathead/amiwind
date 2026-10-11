@@ -19,6 +19,7 @@
     ['converted_unmeasured', 'converted, nothing measured', '#6ea4df'],
     ['not_started', 'not started', '#8a9bad'],
     ['empty_sea', 'empty sea', '#2f7fa6'],
+    ['ocean', 'open ocean, not counted as done (shared ocean chunk made, not yet placed)', '#c0c6cc'],
     ['hull_policy_pending', 'hull policy pending', '#b07ae0'],
   ];
   function spark(history) {

@@ -431,15 +431,23 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
     if failures:
         raise ValueError('Harvest geometry gate failed (baked mushroom where a harvestable one is placed) on '
                          f'{len(failures)} map(s): ' + '; '.join(f'{n}: {e}' for n, e in sorted(failures.items())))
-    # Stage every candidate, then admit by the heap check; failures are removed.
+    # Stage every candidate, then admit by the heap check; failures are removed. A CHIM town's catalogues
+    # take no part in the per-map heap check and are written after it: their frame map is written later in
+    # the image step, so a catalogue staged before the check would have no map yet
+    # (BUILD-HARVEST-NATIVE-TOWN-ORDER-36); every later check runs once the frame maps are there.
     for name, item in candidates.items():
-        (id1 / ('harvest-' + name + '.txt')).write_bytes(item['raw'])
+        if name not in chim:
+            (id1 / ('harvest-' + name + '.txt')).write_bytes(item['raw'])
         for path in item['models']:
             target = id1 / path
             if not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source / 'payload' / path, target)
-    heap = heap_admission(id1, [n for n in candidates if n not in chim], sizes, jobs)
+    per_map = [n for n in candidates if n not in chim]
+    heap = heap_admission(id1, per_map, sizes, jobs) if per_map else {}
+    for name in candidates:
+        if name in chim:
+            (id1 / ('harvest-' + name + '.txt')).write_bytes(candidates[name]['raw'])
     heap.update({n: dict(gate='pass', estimated_clearance_bytes=None, estimated_total_bytes=None, harvest=None,
                          rule='CHIM frame: no per-map heap check') for n in candidates if n in chim})
     admitted = sorted(n for n in candidates if heap[n]['gate'] == 'pass')

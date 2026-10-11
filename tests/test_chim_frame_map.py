@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""The CHIM frame map (maps/<town>-chim.bsp): content, accounting, refusals, legacy untouched."""
+"""The CHIM frame map (maps/<town>-chim.chim): content, accounting, refusals, legacy untouched."""
 import ast
 import hashlib
 import json
@@ -111,9 +111,9 @@ class FrameMapTests(unittest.TestCase):
             before = maps_digest(id1)
             record = M.build(id1, 'balmora', self.world)
             after = maps_digest(id1)
-            self.assertEqual(set(after) - set(before), {'balmora-chim.bsp'})
+            self.assertEqual(set(after) - set(before), {'balmora-chim.chim'})
             self.assertEqual({k: v for k, v in after.items() if k in before}, before)   # region maps untouched
-            data = (id1 / 'maps/balmora-chim.bsp').read_bytes()
+            data = (id1 / 'maps/balmora-chim.chim').read_bytes()
         rows = M.entities(data)
         self.assertEqual([r['classname'] for r in rows], ['worldspawn', 'info_player_start', 'aw_npc'])
         self.assertEqual(rows[0][M.FRAME_KEY], '0 0')
@@ -221,8 +221,8 @@ class FrameMapTests(unittest.TestCase):
             out = Path(tmp) / 'out'
             out.mkdir()
             _, record = build_aga.add_chim_volume(world, id1, out, 0, shutil.which('xdftool'), mib=8)
-            self.assertEqual([m['map'] for m in record['frame_maps']], ['maps/balmora-chim.bsp'])
-            self.assertTrue((id1 / 'maps/balmora-chim.bsp').is_file())
+            self.assertEqual([m['map'] for m in record['frame_maps']], ['maps/balmora-chim.chim'])
+            self.assertTrue((id1 / 'maps/balmora-chim.chim').is_file())
 
 
 
@@ -266,7 +266,7 @@ class StreamedStaticsTests(unittest.TestCase):
             (cls.id1 / cls.SHARED).write_bytes(sprite(20.0))
             (cls.id1 / cls.LAMP).write_bytes(sprite(12.5, 16))
             cls.record = M.build(cls.id1, 'balmora', cls.world)
-            cls.data = (cls.id1 / 'maps/balmora-chim.bsp').read_bytes()
+            cls.data = (cls.id1 / 'maps/balmora-chim.chim').read_bytes()
         cls.rows = M.entities(cls.data)
 
     @classmethod
@@ -337,10 +337,10 @@ class StreamedStaticsTests(unittest.TestCase):
         with patch('harvest_build.town_origin', return_value=list(ORIGIN)), \
                 patch('town_config.load_settings', return_value={'source_cell': [0, 0]}), \
                 patch.dict('os.environ', {M.STREAM_VARIABLE: '0'}):
-            (self.id1 / 'maps/balmora-chim.bsp').unlink()
+            (self.id1 / 'maps/balmora-chim.chim').unlink()
             record = M.build(self.id1, 'balmora', self.world)
-            rows = M.entities((self.id1 / 'maps/balmora-chim.bsp').read_bytes())
-        (self.id1 / 'maps/balmora-chim.bsp').write_bytes(self.data)            # the tagged map for the others
+            rows = M.entities((self.id1 / 'maps/balmora-chim.chim').read_bytes())
+        (self.id1 / 'maps/balmora-chim.chim').write_bytes(self.data)            # the tagged map for the others
         self.assertFalse([e for e in rows if M.CHUNK_KEY in e or M.BOX_KEY in e])
         self.assertNotIn(M.COUNT_KEY, rows[0])
         sprites = sum((self.id1 / m).stat().st_size + M.SPRITE_HUNK_OVERHEAD for m in (self.SHARED, self.LAMP))
@@ -368,9 +368,9 @@ class StreamedStaticsTests(unittest.TestCase):
         with patch('harvest_build.town_origin', return_value=list(ORIGIN)), \
                 patch('town_config.load_settings', return_value={'source_cell': [0, 0]}), \
                 patch.dict('os.environ', {M.STREAM_VARIABLE: '1'}):
-            (self.id1 / 'maps/balmora-chim.bsp').unlink()
+            (self.id1 / 'maps/balmora-chim.chim').unlink()
             M.build(self.id1, 'balmora', self.world)
-        self.assertEqual((self.id1 / 'maps/balmora-chim.bsp').read_bytes(), self.data)
+        self.assertEqual((self.id1 / 'maps/balmora-chim.chim').read_bytes(), self.data)
 
 
 class DocksFrameMapTests(unittest.TestCase):
@@ -413,12 +413,12 @@ class DocksFrameMapTests(unittest.TestCase):
         id1 = self.docks([11])
         with self.assertRaisesRegex(ValueError, 'a hole'):
             self.build(id1, walk=(['intro_docks: 3 places next to a hole in the CHIM collision'], {}))
-        self.assertFalse((id1 / 'maps' / 'intro_docks-chim.bsp').exists())
+        self.assertFalse((id1 / 'maps' / 'intro_docks-chim.chim').exists())
 
     def test_docks_map_keeps_a_subset_of_the_frame_and_its_own_entities(self):
         id1 = self.docks([11, 12])                       # two of the frame's six statics
         record = self.build(id1)
-        data = (id1 / 'maps' / 'intro_docks-chim.bsp').read_bytes()
+        data = (id1 / 'maps' / 'intro_docks-chim.chim').read_bytes()
         rows = M.entities(data)
         classes = [e['classname'] for e in rows]
         self.assertEqual(rows[0][M.FRAME_KEY], '0 0')
@@ -435,7 +435,7 @@ class DocksFrameMapTests(unittest.TestCase):
         from prepare_intro_docks import BOUNDS
         id1 = self.docks([11])
         self.build(id1)
-        lumps = F.read_brush_image((id1 / 'maps' / 'intro_docks-chim.bsp').read_bytes())
+        lumps = F.read_brush_image((id1 / 'maps' / 'intro_docks-chim.chim').read_bytes())
         models = list(struct.iter_unpack('<9f7i', lumps[14]))
         x0, y0, x1, y1 = BOUNDS
         inside = ((x0 + x1) / 2, (y0 + y1) / 2, 0.0)
@@ -575,7 +575,8 @@ class SeydaImageTests(unittest.TestCase):
                 (world / name).write_text('{"ok": true, "source_checked": true}')
             (world / 'chim-receipt.json').write_text(json.dumps({'builder': 'chim', 'areas': ['balmora', 'seyda']}))
             calls = []
-            with patch('chim.frame_map.build', side_effect=lambda id1, area, w: calls.append(area) or {'map': area}),                     patch('chim.frame_map.build_docks', side_effect=lambda id1, w, name: calls.append(name) or {'map': name}),                     patch('chim.disk.pack_partition', side_effect=RuntimeError('stop after the frame maps')):
+            # the world is read once for every frame map (chim.frame_map.load, BUILD-IMAGE-CHIM-MAPS-SERIAL-36)
+            with patch('chim.frame_map.load', return_value={'frames': [], 'models': []}),                     patch('chim.frame_map.build', side_effect=lambda id1, area, w, world=None: calls.append(area) or {'map': area}),                     patch('chim.frame_map.build_docks', side_effect=lambda id1, w, name, world=None: calls.append(name) or {'map': name}),                     patch('chim.disk.pack_partition', side_effect=RuntimeError('stop after the frame maps')):
                 with self.assertRaisesRegex(RuntimeError, 'stop after'):
                     build_aga.add_chim_volume(world, Path(tmp) / 'id1', Path(tmp), 0, 'xdftool')
             self.assertEqual(calls, ['balmora', 'seyda', 'intro_docks', 'sncourt'])
@@ -638,7 +639,7 @@ class ParityOnFrameTests(unittest.TestCase):
                 self.assertEqual((contact['grounded'], contact['refitted']), (1, 1))
                 row = next(r for r in contact['rows'] if r['status'] == 'refitted')
                 self.assertLessEqual(abs(row['refit_dz']), M.REFIT_LIMIT)
-                npc = next(e for e in M.entities((id1 / 'maps/balmora-chim.bsp').read_bytes())
+                npc = next(e for e in M.entities((id1 / 'maps/balmora-chim.chim').read_bytes())
                            if e.get('classname') == 'aw_npc')
                 x, y, z = map(float, npc['origin'].split())
                 self.assertEqual((x, y), (10.0, 20.0))
@@ -665,7 +666,7 @@ class ParityOnFrameTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, patch.object(M, 'closed_edge', return_value=True):
             id1 = town(Path(tmp), self.refs)
             record = M.build(id1, 'balmora', self.world)
-            data = (id1 / 'maps/balmora-chim.bsp').read_bytes()
+            data = (id1 / 'maps/balmora-chim.chim').read_bytes()
         self.assertTrue(record['closed_edge'])
         rows = M.entities(data)
         self.assertEqual(rows[0][M.EDGE_KEY], 'closed')
@@ -732,7 +733,7 @@ class ActivatedObjectTests(unittest.TestCase):
                 patch('harvest_build.town_origin', return_value=ORIGIN), \
                 patch('chim.frame_map.walk_check', return_value=([], {})):
             record = M.build_docks(root, self.world)
-        data = (root / 'maps' / (M.DOCKS + '-chim.bsp')).read_bytes()
+        data = (root / 'maps' / (M.DOCKS + '-chim.chim')).read_bytes()
         kept = [e for e in M.entities(data) if e.get('aw_ref') == '11']
         self.assertEqual(len(kept), 1)
         self.assertEqual(kept[0]['classname'], 'func_wall')

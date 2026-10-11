@@ -5,6 +5,7 @@
 
 - [Open map reports - 4 October 2026](#open-map-reports---4-october-2026)
 - [M: Vvardenfell overview](#m-vvardenfell-overview)
+- [Map file formats: v1 and v2 (lava pools)](#map-file-formats-v1-and-v2-lava-pools)
 - [Region name and debug teleport](#region-name-and-debug-teleport)
 - [J: earned journal entries in two facing pages](#j-earned-journal-entries-in-two-facing-pages)
 - [Persistence and validation](#persistence-and-validation)
@@ -61,6 +62,58 @@ allocated/read only when opened and freed on close. Map pixels stay in memory wh
 record on first use or a changed exterior cell and caches that result. Ocean beyond the image has the same colour as the map's
 water; panning has a bounded ocean margin. The separate
 [terrain pass](WORLD_TERRAIN.md) supplies playable regions and their origins.
+
+## Map file formats: v1 and v2 (lava pools)
+
+The builder writes `id1/world/map.awm` from your own game data at build time (nothing of it is in this
+repository). Builder option `--world-map v1|v2` (config key `world_map`; recorded in the build receipt's
+build settings and in `id1/world/conversion.json`) chooses the format; the default is **v2**.
+
+- **v1 (`AWM1`):** the terrain overview above: header (size, source bounds, settlement count, ocean colour),
+  60-byte settlement rows, then the palette pixels. `--world-map v1` writes it byte for byte as before.
+- **v2 (`AWM2`):** the same bytes under the `AWM2` tag, followed by one `LAVA` section: the tag, the pool
+  count, the outline point count and the lava colour (a palette index), then one 24-byte row per pool (its
+  exterior cell, point count and bounds) and the outline points in original Morrowind world units, the same
+  coordinates as the map's bounds. All little-endian.
+
+The pools are the molten lava pools of the exterior cells found by the lava census rules
+([Lava](LAVA.md#on-the-world-map)). The layer draws the **visible** lava (WORLDMAP-LAVA-MISMATCH-36): a pool is a
+flat tile laid into the land, and where the land rises above its surface the lava is buried and the player sees
+ground. The builder reads the land heights of the master (LAND records, bilinear between the 128-unit vertices)
+and covers each pool with axis-aligned rectangles, one row per rectangle, on a 64-unit grid (finer for small pools
+and ovals; 128 or 256 only when the rows would exceed the 2,048-row limit). A grid square is lava when at least
+half of its sample points lie on land below the pool surface and its corners lie in the pool's footprint; a pool
+the land buries completely has no row. The rows are rounded to whole units. Measured on the Game of the Year
+masters: 349 pools in 27 cells (Molag Amur, Sheogorad, one at Red Mountain), 27 of them buried completely, 1,713
+rectangles, 95,900 bytes of LAVA section (the earlier whole-outline layer, 1,412 points, was 19,688 bytes and
+painted 54 % of the pool footprints over ground). The lava colour is the palette entry nearest a lava
+orange that no terrain pixel and no ocean fill uses and that the sky palette step neither remaps nor remaps
+onto, so on the map that colour means lava and nothing else (lava-named rock and ground textures are not
+lava and are not painted). The earlier whole-footprint method stays in `lava_layer(pools)` without land.
+
+The build checks the layer before it writes the file: every row belongs to a census pool in its cell and lies
+inside that pool's footprint (within one unit), and `tools/lava_map.py` `audit` samples every pool at 16 units
+against the land: a pool that paints more than 12 % of its footprint on buried land, leaves more than 20 % of it
+visible and unpainted, or paints a point where the land is more than 96 units above the surface stops the step
+with the cell named. On the real masters the layer paints 0.8 % of the footprints on buried land and leaves 0.7 %
+unpainted, with the land at most 83 units above the surface under any painted sample. The receipt records pools,
+covered, buried, rectangles and the audit areas. `python3 tools/lava_map.py --data-files DIR` prints the audit per
+cell and a TOTALS row.
+
+In the game both views (Debug and In-Game) draw the pools by default, with a "LAVA" legend in the map's
+lower left corner. A pool's outline is filled where a screen pixel's centre lies inside it; a pool smaller
+than a pixel marks the one pixel that holds its centre. The settings:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `aw_map_lava` (`dbg map lava`) | 1 | 0 hides the lava layer |
+| `aw_map_format` (`dbg map format`) | 2 | 1 draws a v2 map as the v1 map (terrain and settlements only) |
+
+A v1 file still loads and draws as before. The pools are read with the map when it opens and freed when it
+closes; nothing is drawn or held while the map is closed. Cost while open: each pool is rejected by its
+bounds before its outline is used; on the host the map draw took about 4 microseconds more per frame at the
+whole-island view (349 pools, about 350 lava pixels) and no measurable extra when zoomed in. Not yet measured
+on 68040 hardware.
 
 ## Region name and debug teleport
 
@@ -195,6 +248,10 @@ POIs or lava. Expose missing/unresolved survey coverage. Ash/blight regions and
 transition boundaries also require original CELL/REGN/script evidence, not a
 guessed distance from Red Mountain. These are planned studies; see
 [v0.0.29 work list](PLAN-v0.0.29.md#weather-storms-and-lava-study).
+
+v0.0.36: the lava part is done as the v2 map's lava layer
+([Map file formats](#map-file-formats-v1-and-v2-lava-pools)): it is built from the source-authored pool
+placements, never from palette colours, and the build checks its coverage. Weather regions remain a study.
 
 
 ## v0.0.29 click marker and debug-HUD destination selection

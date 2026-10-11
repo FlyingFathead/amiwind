@@ -19,6 +19,7 @@ int host_framecount;double host_frametime=.02;char *pr_strings;dprograms_t *prog
 unsigned long aw_sv_move_calls;aw_character_t aw_character;
 /* the hooks live beside their callers (aw_ui.c, aw_scene.c) */
 int (*aw_combat_enemy_bar)(float *,float *);void (*aw_combat_scene)(void);int (*aw_combat_input_locked)(void);
+int (*aw_combat_buttons)(int);int (*aw_combat_guard_marker)(void);   /* cl_input.c, aw_ui.c */
 /* aw_items.c (carried weapon/shield entities; its own fixture aga_items_test.c): counted here. */
 #include "aw_items.h"
 static int items_shown,items_hidden;
@@ -177,11 +178,11 @@ int main(void){
 
     /* engage from 300 units: it runs in, then swings */
     assert(AW_CombatActorLoad("mevil molor",&f));
-    run("aw_combat seed 777");
+    run("aw_combat_cmd seed 777");
     assert(AW_CombatEngage(npc,&f,"idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 knock:21:4:0.6667 death:25:6:0.3333"));
     assert(items_shown==1);                       /* engage draws the carried items */
     assert(AW_CombatHostiles()==1 && npc->v.nextthink==0 && AW_CombatSeedUsed()==777);
-    tick(1);assert(music_on==1);                                     /* battle music at once */
+    tick(1);assert(music_on==1 && AW_PlayerInCombat());              /* battle music at once: in a fight */
     tick(10);assert(steps>0 && npc->v.frame>=4 && npc->v.frame<10);  /* run frames */
     for(i=0;i<400 && AW_CombatStats()->npc_swings==0;i++)tick(1);
     assert(AW_CombatStats()->npc_swings==1);
@@ -212,7 +213,7 @@ int main(void){
     }
     assert(results[1]==1 && sheet->dead && npc->v.solid==SOLID_NOT);
     assert(voices[AW_VOICE_START]==1 && voices[AW_VOICE_SWING]>=1 && voices[AW_VOICE_DEATH]==1);
-    assert(AW_CombatHostiles()==0);
+    assert(AW_CombatHostiles()==0 && !AW_PlayerInCombat());          /* the fight is over: calm */
     tick(2);assert(music_off==1);
     assert(npc->v.frame>=25 && npc->v.frame<31);                      /* death frames */
 
@@ -246,7 +247,19 @@ int main(void){
         assert(AW_CombatEngage(npc,&killer,NULL));                   /* the model's own frames */
         for(i=0;i<600 && !results[0];i++)tick(1);
         assert(results[0]==1 && music_death==1);
+        assert(AW_CombatHostiles()==1 && !AW_PlayerInCombat());          /* dead: no longer "in a fight" */
         tick(5);assert(music_death==1);
+        /* the quick retry (aw_view.c "Retry fight", an AmiWind extension): everyone back where and as the
+         * fight began, the opponent still hostile; dying again plays the death track again */
+        assert(AW_CombatRetryAvailable() && AW_CombatDeathMusicPlayed() && p->v.health<=0);
+        {float start_x=p->v.origin[0]-20;npc->v.origin[0]+=7;p->v.origin[1]+=3;
+         assert(AW_CombatRetry());
+         assert(p->v.health==.5f && !AW_CombatRetryAvailable() && !AW_CombatDeathMusicPlayed() && AW_CombatHostiles()==1);
+         assert(npc->v.origin[0]==start_x && p->v.origin[1]==npc->v.origin[1] && AW_CombatPlayer() && !AW_CombatPlayer()->dead);}
+        assert(!AW_CombatRetry());                                   /* only after a death */
+        for(i=0;i<600 && results[0]<2;i++)tick(1);
+        assert(results[0]==2 && music_death==2 && AW_CombatRetryAvailable());
+        AW_CombatClear();assert(!AW_CombatRetryAvailable());
     }
 
     /* outside fights the player's fatigue returns: 2.5 + 0.02 x 50 = 3.5 per second */
@@ -254,10 +267,49 @@ int main(void){
     aw_character.current[2]=100;tick(50);
     assert(aw_character.current[2]>103 && aw_character.current[2]<104);
 
+    /* Blocking (COMBAT-BLOCKING-36). aw_combat_block 1 (default, AmiWind extension): the player blocks
+     * only while the block button (+aw_alt, the right mouse button) is held, and every blow is still
+     * decided by the original formula; no swing while guarding. 0: the original automatic block. */
+    {
+        aw_fighter_t shieldp,brute;char used[24];unsigned long held_blocks,free_blocks,auto_blocks;
+        assert(aw_combat_buttons && aw_combat_guard_marker==AW_CombatGuarding);
+        AW_CombatClear();aw_combat_scene();
+        run("+aw_alt");assert(!AW_CombatGuarding() && aw_combat_buttons(1)==1);   /* the character: no shield */
+        run("-aw_alt");
+        assert(AW_CombatLoadout("sword_shield",&shieldp,used) && shieldp.shield);
+        aw_combat_player_preset=&shieldp;
+        run("+aw_alt");assert(AW_CombatGuarding() && aw_combat_guard_marker() && aw_combat_buttons(3)==2);  /* attack masked */
+        run("-aw_alt");assert(!AW_CombatGuarding() && aw_combat_buttons(3)==3);
+        assert(AW_CombatActorLoad("mevil molor",&brute));
+        brute.skills[AW_SK_BLUNT]=100;brute.health=brute.health_max=100000;
+        p->v.health=100000;p->v.angles[1]=180;                  /* facing the attacker on -X */
+        npc->v.solid=SOLID_BBOX;npc->v.origin[0]=p->v.origin[0]-20;npc->v.origin[1]=p->v.origin[1];
+        run("aw_combat_cmd seed 4242");
+        /* held: blocks happen */
+        assert(AW_CombatEngage(npc,&brute,NULL));run("+aw_alt");
+        for(i=0;i<20000 && AW_CombatStats()->npc_swings<40;i++)tick(1);
+        held_blocks=AW_CombatStats()->player_blocks;assert(AW_CombatStats()->npc_swings>=40 && held_blocks>0);
+        assert(AW_CombatStats()->guards==1);
+        /* not held: no block at all under the held-block rule */
+        run("-aw_alt");AW_CombatClear();p->v.health=100000;
+        assert(AW_CombatEngage(npc,&brute,NULL));
+        for(i=0;i<20000 && AW_CombatStats()->npc_swings<40;i++)tick(1);
+        free_blocks=AW_CombatStats()->player_blocks;assert(AW_CombatStats()->npc_swings>=40 && free_blocks==0);
+        /* the original automatic block: blocks without the button */
+        run("aw_combat_cmd block auto");AW_CombatClear();p->v.health=100000;
+        assert(AW_CombatEngage(npc,&brute,NULL));
+        for(i=0;i<20000 && AW_CombatStats()->npc_swings<40;i++)tick(1);
+        auto_blocks=AW_CombatStats()->player_blocks;assert(auto_blocks>0);
+        run("+aw_alt");assert(!AW_CombatGuarding() && aw_combat_buttons(1)==1);    /* automatic: no guard, attack free */
+        run("-aw_alt");run("aw_combat_cmd block hold");
+        AW_CombatClear();aw_combat_player_preset=NULL;p->v.health=60;p->v.angles[1]=0;
+        printf("blocking ok: held %lu, not held %lu, automatic %lu of 40 blows\n",held_blocks,free_blocks,auto_blocks);
+    }
+
     /* commands and cost */
-    run("aw_combat");run("aw_combat readout off");run("aw_combat calm");run("aw_combat off");
+    run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));
-    run("aw_combat on");
+    run("aw_combat_cmd on");
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
     AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;

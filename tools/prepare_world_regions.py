@@ -5,6 +5,7 @@
 The original survey remains immutable. Scenery residency estimates select the
 partition even though this first pass adds only terrain/water outside the towns.
 """
+from coord_range import bound as coord_bound
 import argparse
 import hashlib
 import io
@@ -60,7 +61,8 @@ def town_handoffs(report, root=None):
         for k in range(2):
             covered_lo = min(r['core'][0][k] for r in area['regions']) * SCALE - config['centre'][k] * SCALE
             covered_hi = max(r['core'][1][k] for r in area['regions']) * SCALE - config['centre'][k] * SCALE
-            if not (-4000 < covered_lo <= bounds[0][k] < lo[k] < hi[k] < bounds[1][k] <= covered_hi < 4000):
+            # the build's coordinate bound (coord_range: 4,000 narrow, 32,000 wide; engine aw_world.c)
+            if not (-coord_bound() < covered_lo <= bounds[0][k] < lo[k] < hi[k] < bounds[1][k] <= covered_hi < coord_bound()):
                 raise ValueError('Town handoff is outside converted ground/regions: ' + name)
         towns.append(dict(name=name, origin=[v * SCALE for v in config['centre']] + [0],
                           core=[lo, hi], ground_bounds=bounds, exit_margin=32))
@@ -317,7 +319,7 @@ def map_text(entry, terrain):
     oz = round((zmin+zmax)/256)*128
     entry['origin'][2] = oz
     bottom = zmin-oz-64; top = max(zmax,0)-oz+256
-    if max(abs(bottom-32), abs(top+32), abs(-oz)) >= 4000:
+    if max(abs(bottom-32), abs(top+32), abs(-oz)) >= coord_bound():   # the build's coordinate bound (coord_range)
         raise ValueError('Local coordinate budget requires a finer region: '+entry['name'])
     brushes = []
     for source_tri in triangles:
@@ -386,6 +388,8 @@ def unit_cache_lookup(cache, unit, root, entry, key):
         return None
     result = dict(entry, converted=record['converted'], input_sha256=key, storage=record['storage'])
     (root / 'conversion.json').write_text(json.dumps(result, indent=2) + '\n')
+    import cache_provenance
+    cache_provenance.reused(cache, 'world-terrain', unit)
     return result
 
 
@@ -403,12 +407,75 @@ def unit_cache_store(cache, unit, root, result):
                 shutil.copyfile(root / name, temporary / name)
         record = {'format': UNIT_CACHE_FORMAT, 'unit': unit, 'converted': result['converted'],
                   'storage': result['storage']}
+        import cache_provenance
+        cache_provenance.attach_terrain(record, temporary, unit, result)
         (temporary / 'conversion.json').write_text(json.dumps(record, indent=2) + '\n')
         os.rename(temporary, folder)
     except OSError as exc:
         shutil.rmtree(temporary, ignore_errors=True)
         if not folder.exists():
             print(f"[warning] world terrain cache: {result.get('name')} not stored: {exc}", flush=True)
+
+
+def chim_region(entry, cells):
+    """True for an open-world map of a CHIM region cell (docs/BUILD_MANIFEST.md step 2): its cell is one of CELLS.
+    Every map of a divided cell (2 x 2 or 4 x 4 maps) counts: the cell's one CHIM frame owns all of it
+    (merge_chim_rows, CHIM-REGION-DIVIDED-CELLS-36)."""
+    return bool(cells) and tuple(entry.get('cell') or ()) in cells
+
+
+CELL_SIZE = 2048            # map units per exterior cell (the survey's cell grid; every map core lies in one cell)
+
+
+def merge_chim_rows(rows):
+    """The directory rows of ONE CHIM region cell (its maps' chim_region_row results, any order) made into one
+    owner: the cell's first map (lowest index) gets the whole cell as its core (origin the cell centre, coverage
+    core +- OVERLAP, origin z its own), and every other map of the cell becomes an alias of it with the same
+    origin, core and coverage. The engine takes the FIRST directory row whose core holds a point
+    (aw_world.c AW_WorldDestination, AW_WorldMapTarget), so every point of the cell resolves to the first map's
+    name, where the image installs the cell's CHIM frame map; the alias rows keep the runtime's sequential names
+    (vf0000 ...) and are never a destination. A one-map cell is returned unchanged (its core is already the cell).
+    Returns the rows in index order."""
+    rows = sorted(rows, key=lambda r: int(r['name'][2:]))
+    cells = {tuple(r['cell']) for r in rows}
+    if len(cells) != 1:
+        raise ValueError('CHIM region rows of more than one cell: %s' % sorted(cells))
+    (cx, cy), = cells
+    half = CELL_SIZE // 2
+    origin = [cx * CELL_SIZE + half, cy * CELL_SIZE + half]
+    core = [[-half, -half], [half, half]]
+    covered = sum((r['core'][1][0] - r['core'][0][0]) * (r['core'][1][1] - r['core'][0][1]) for r in rows)
+    for r in rows:
+        lo = [r['origin'][k] + r['core'][0][k] for k in range(2)]
+        hi = [r['origin'][k] + r['core'][1][k] for k in range(2)]
+        if any(lo[k] < origin[k] - half or hi[k] > origin[k] + half for k in range(2)):
+            raise ValueError('Map %s of CHIM region cell %d,%d reaches past its cell' % (r['name'], cx, cy))
+    if covered != CELL_SIZE * CELL_SIZE:
+        raise ValueError('The maps of CHIM region cell %d,%d do not tile the cell (%d of %d square units)'
+                         % (cx, cy, covered, CELL_SIZE * CELL_SIZE))
+    if len(rows) == 1:
+        return rows
+    first = rows[0]
+    owner = dict(first, origin=origin + [first['origin'][2]], core=core,
+                 coverage=[[-half - OVERLAP, -half - OVERLAP], [half + OVERLAP, half + OVERLAP]],
+                 chim_region_maps=[r['name'] for r in rows])
+    out = [owner]
+    for r in rows[1:]:
+        out.append(dict(r, origin=list(owner['origin']), core=owner['core'], coverage=owner['coverage'],
+                        chim_region_alias=first['name']))
+    return out
+
+
+def chim_region_row(task):
+    """Worker: the directory row of a CHIM region cell's map without the map: map_text sets the row's origin z from
+    the terrain exactly as for a compiled map (the directory keeps the row: the engine finds the cell's CHIM frame
+    map under its name), but nothing is compiled or written."""
+    global _terrain
+    survey, out, entry = task[:3]
+    if _terrain is None:
+        _terrain = Terrain(survey)
+    map_text(entry, _terrain)
+    return dict(entry, converted=None, chim_region=True)
 
 
 def compile_region(task):
@@ -466,7 +533,7 @@ def compile_region(task):
     return result
 
 
-def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None):
+def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None):
     survey=survey.resolve();out=ensure_external(out,'world terrain').resolve();out.mkdir(parents=True,exist_ok=True)
     scene=ensure_external(scene,'private scene').resolve();bindir=bindir.resolve()
     report, entries=plan(survey)
@@ -491,12 +558,36 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     cells={tuple(c['cell']):c for c in report['cells']}
     triangles={e['name']:1+(cells.get(tuple(e['cell']),{}).get('spatial_source_triangles',0) or 0)/e.get('divisions',1)**2
                for e in entries}
-    for result in costed_map('world-terrain-regions',compile_region,[(survey,out,e,bindir,threads,vis_mode,*extra) for e in entries],
-                             [e['name'] for e in entries],jobs,fallback=triangles.get):
+    # CHIM region cells (--chim-regions-cells): no map is made for them, only their directory row
+    # (docs/BUILD_MANIFEST.md step 2: a cell has one owner, its CHIM frame).
+    cells=set(chim_cells or ())
+    skipped={e['name'] for e in entries if chim_region(e,cells)}
+    found={tuple(e['cell']) for e in entries if e['name'] in skipped}
+    if cells and found!=cells:
+        raise ValueError('CHIM region cells without an open-world map: %s'
+                         %' '.join('%d,%d'%c for c in sorted(cells-found)))
+    compiled=[e for e in entries if e['name'] not in skipped]
+    rows={}
+    for result in costed_map('world-terrain-regions',compile_region,[(survey,out,e,bindir,threads,vis_mode,*extra) for e in compiled],
+                             [e['name'] for e in compiled],jobs,fallback=triangles.get):
         action=result.pop('_unit_cache',None)
         if action:counts[action]+=1
-        results.append(result)
+        rows[result['name']]=result
         print(result['name'],result['converted'],flush=True)
+    from build_parallel import ordered_map
+    by_cell={}
+    for result in ordered_map(chim_region_row,[(survey,out,e) for e in entries if e['name'] in skipped],jobs):
+        by_cell.setdefault(tuple(result['cell']),[]).append(result)
+    divided=0
+    for cell in sorted(by_cell):
+        divided+=len(by_cell[cell])>1
+        for result in merge_chim_rows(by_cell[cell]):
+            rows[result['name']]=result
+    if skipped:
+        print('World terrain: %d maps of %d CHIM region cells not made (their CHIM frames own the cells; %d divided '
+              'cells: one directory row owns each, the other rows are its aliases)'%(len(skipped),len(by_cell),divided),
+              flush=True)
+    results=[rows[e['name']] for e in entries]
     if cache:
         print(f"World terrain cache: {counts['hit']} maps reused (verified), {counts['miss']} converted.",flush=True)
         (out/'world-terrain-cache.json').write_text(json.dumps(dict(format=UNIT_CACHE_FORMAT,**counts),indent=2)+'\n')
@@ -505,10 +596,14 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
         scale=SCALE,sample_stride=4,overlap=OVERLAP,draw_distance=540,
         scope='Terrain and water; existing town geometry remains separate. Other scenery and actors are not converted.',
         diagnostic_subset=bool(only),regions=results)
+    if skipped:
+        receipt['chim_region_cells']=sorted([list(c) for c in cells])
     if not only:
         receipt['town_handoffs'] = town_handoffs(report)
         packet = region_directory(report, results)
         for e in results:
+            if e.get('chim_region'):
+                continue
             shutil.copyfile(out/e['name']/'scene.bsp',scene/'id1/maps'/f"{e['name']}.bsp")
         (scene/'id1/world').mkdir(parents=True,exist_ok=True)
         (scene/'id1/world/regions.awr').write_bytes(packet)
@@ -524,6 +619,13 @@ if __name__=='__main__':
                    'keyed by each map\'s text, the texture WAD, this converter\'s code, the map tools and Python')
     from scenery_reduce import add_options, apply_options
     add_options(p)
+    p.add_argument('--chim-regions-cells',metavar='CELLS',
+                   help='CHIM region cells ("x,y:k ...", tools/build.py): their open-world maps are not made, only '
+                        'their directory rows (docs/BUILD_MANIFEST.md)')
     add_jobs(p);add_vis_option(p);a=p.parse_args();apply_options(a)
     import build_profile;build_profile.instrument('world-terrain')
-    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache)
+    cells=None
+    if a.chim_regions_cells:
+        from chim.regions import decode_cells
+        cells=set(decode_cells(a.chim_regions_cells))
+    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache,cells)

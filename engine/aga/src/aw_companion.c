@@ -414,7 +414,7 @@ void AW_CompanionSceneSpawn(edict_t *p) {
 /* ---- dbg pickcompanion: red crosshair on a pickable NPC, attack picks ---- */
 static edict_t *pick_target(void) {
     edict_t *p=player();
-    if(!pick.on || !p || key_dest!=key_game)return NULL;
+    if(!pick.on || !p || key_dest!=key_game || AW_PlayerDead())return NULL;   /* dead: no target */
     if(pick.frame!=host_framecount){
         pick.frame=host_framecount;pick.target=AW_NPCTargetReach(p,cl.viewangles,PICK_REACH);
         if(pick.target && pick.target==c.e)pick.target=NULL;

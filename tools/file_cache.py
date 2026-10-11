@@ -103,6 +103,8 @@ class FileCache:
             self.counts[name] += 1
 
     def key(self, source_sha256, settings):
+        import cache_provenance
+        cache_provenance.remember_key(self, source_sha256, settings)
         return digest_json({'schema': SCHEMA, 'source_sha256': source_sha256, 'settings': settings,
                             'identity': self.identity})
 
@@ -124,6 +126,8 @@ class FileCache:
                 with self._lock:
                     self.fallback_hits += 1
                 self.store(key, target, facts)
+        import cache_provenance
+        cache_provenance.reused(self.pool, 'keys/' + self.root.relative_to(self.pool / 'keys').as_posix(), key, facts is not None)
         return facts
 
     def _fetch(self, key, target):
@@ -183,6 +187,8 @@ class FileCache:
             temporary.write_bytes((json.dumps({'schema': SCHEMA, 'key': key, 'sha256': digest, 'bytes': size,
                                                'facts': facts or {}}) + chr(10)).encode('utf-8'))
             os.replace(temporary, key_path)
+            import cache_provenance
+            cache_provenance.sidecar_key(key_path, key, digest, size, self.root, *cache_provenance.recalled(self, key))
         except OSError as error:
             temporary.unlink(missing_ok=True)
             print(f'[warning] Asset pool key not written ({error}); the build continues.', flush=True)
@@ -213,6 +219,8 @@ class FileCache:
                 os.replace(temporaries[-1], blob)
             meta = {'schema': SCHEMA, 'key': key, 'sha256': digest, 'bytes': Path(path).stat().st_size,
                     'facts': facts or {}}
+            import cache_provenance
+            cache_provenance.attach_key(meta, self.root, *cache_provenance.recalled(self, key))
             key_path.parent.mkdir(parents=True, exist_ok=True)
             temporaries.append(str(key_path) + suffix)
             # FACTS keep their order: a converter may write them back as its own receipt.

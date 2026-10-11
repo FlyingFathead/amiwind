@@ -3,6 +3,8 @@
 <!-- contents start -->
 ## Contents
 
+- [Music on and off, and the packet fix: 11 October 2026](#music-on-and-off-and-the-packet-fix-11-october-2026)
+- [Music reads never stop the game: 10 October 2026](#music-reads-never-stop-the-game-10-october-2026)
 - [Host CPU load: 9 October 2026](#host-cpu-load-9-october-2026)
 - [Start-up and opening music: 7 October 2026](#start-up-and-opening-music-7-october-2026)
 - [Loading-audio candidate evidence: 6 October 2026](#loading-audio-candidate-evidence-6-october-2026)
@@ -19,6 +21,42 @@
 - [RC1 Audio options candidate](#rc1-audio-options-candidate)
 
 <!-- contents end -->
+
+## Music on and off, and the packet fix: 11 October 2026
+
+- **`dbg music on|off`** (also `true`/`false`, `1`/`0`; no argument shows the switch and the stream status): the
+  background music switch, default on, not saved. Off closes the stream at once; a read still on its way is left to
+  finish into its own buffer and packet and is closed when its reply comes; nothing is opened or read until the music
+  is on again, which starts the title or the current group. The console variable is `aw_music`
+  ([ENGINE-MUSIC-NO-OFF-SWITCH-36](bugs/ENGINE-MUSIC-NO-OFF-SWITCH-36.md); a switch in the audio settings menu comes
+  later, see the roadmap).
+- [CHIM-DEV3-MAPLOAD-CRASH-36](bugs/CHIM-DEV3-MAPLOAD-CRASH-36.md): the asynchronous reader below used the pointer
+  `AllocDosObject(DOS_STDPKT)` returns as a StandardPacket, but it is the DosPacket part. Every music read wrote its
+  packet 20 bytes off and sent a broken message to the file system. On the v0.0.36-dev3 image the emulator died a few
+  seconds after a map load. Fixed: the reader sends the DosPacket it was given; everything else below is unchanged.
+
+## Music reads never stop the game: 10 October 2026
+
+[HANG-IDLE-DUSK-35](bugs/HANG-IDLE-DUSK-35.md): a soak run caught the game waiting forever in one music read
+whose reply never came, with the audio hardware repeating its last buffer. The music stream now reads
+asynchronously (`engine/aga/src/aw_aread.c`):
+
+- each read is one `ACTION_READ` packet sent with `SendPkt()` to the file's handler, with the reader's own reply
+  port, and collected with `GetMsg()` on a later frame; nothing waits for a reply (the packet-level pattern of
+  asyncio.library; the opening demo's v0.0.5 scheduler below used the same packets but waited at track changes);
+- one whole 16 KiB block (8,192 stereo frames) is read per request, up from 4 KiB slices; the four-block queue
+  (64 KiB, about 3 seconds) is unchanged;
+- the mixer no longer fills an empty block synchronously; it takes replies already there and otherwise plays
+  silence for that span;
+- a read without a reply for 2 seconds is logged once (`read-stalled` in the music event log, one console line per
+  session); a late reply resumes the stream; after 6 seconds the stream is abandoned and the next track opened;
+  an abandoned reader closes its file only when its reply arrives; with every reader waiting the music is off
+  until they return;
+- `aw_music_status` prints the stall, recovery, abandon and silent-span counts; `music-profile.txt` records them
+  (`read_stalls`, `read_recoveries`, `read_abandons`, `silent_spans`).
+
+Opening the track file is still a normal DOS call (once per track). The other file calls the game makes during
+play are listed in [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md).
 
 ## Host CPU load: 9 October 2026
 

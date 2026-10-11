@@ -1,0 +1,41 @@
+{
+ "format": "amiwind-mesh-methods-1",
+ "note": "CHIM mesh methods (tools/mesh_methods.py, docs/chim/MESH_METHODS.md): the default for every mesh and the meshes that get another method, each with the measurement that chose it.",
+ "default": "merge",
+ "rule": {
+  "method": "meshopt+merge",
+  "text": "hard-surface mesh (meshes/x, d, o, i, l, not flora_ or terrain_) that the profile reduces (ratio below 1), with at least min_faces faces by the converter, and meshopt+merge gives fewer faces, no more torn seam or rim and no larger shape error (Hausdorff, sampled both ways) than the converter",
+  "min_faces": 200,
+  "hausdorff_slack": 0.0
+ },
+ "meshes": {
+  "meshes/x/ex_de_ship.nif": {
+   "method": "meshopt+merge",
+   "measured": {
+    "what": "the arrival ship (profile arrival_ship, ratio 0.2, texture 32), owner's data, v0.0.36-dev3 world (2026-10-11)",
+    "converter": {
+     "faces": 4046,
+     "triangles": 1954,
+     "seam_torn": 0.02176,
+     "rim_torn": 0.01383,
+     "hausdorff": 204.362,
+     "mean_error": 4.9495
+    },
+    "meshopt+merge": {
+     "faces": 3690,
+     "triangles": 3142,
+     "seam_torn": 0.0,
+     "rim_torn": 0.0,
+     "hausdorff": 29.767,
+     "mean_error": 0.9034
+    }
+   }
+  }
+ },
+ "sweep": {
+  "date": "2026-10-11",
+  "meshes_measured": 102,
+  "chosen": 1,
+  "note": "every mesh a CHIM area of the v0.0.36-dev3 world reduces (ratio below 1): 102 meshes, one of them hard-surface (the arrival ship), chosen; the others are flora, rocks and the silt strider (creature folder). Vivec shells are not reduced (ratio 1): planar merge only"
+ }
+}

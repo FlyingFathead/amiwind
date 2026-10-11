@@ -26,7 +26,7 @@ RUN = Path('/private/run')
 
 
 def plan(argv, native='on'):
-    # CHIM-native towns are EXPERIMENTAL in v0.0.35 (--chim-native-towns, off by default): these plans opt in.
+    # CHIM-native towns are the default since v0.0.36; native='off' is the RETIRED legacy chain.
     args = build.parser().parse_args(list(argv) + ['--chim-native-towns', native])
     args.data_files, args.sdk, args.workspace = Path('/owned'), Path('/sdk'), Path('/private/ws')
     args.builder_options = options.resolve_builder(args)
@@ -75,17 +75,31 @@ class DefaultPlanTests(unittest.TestCase):
                 self.assertNotIn('chim-town-balmora', names(steps))
                 image = [str(p) for p in dict(steps)['image']]
                 self.assertEqual(value(image, '--balmora-cache'), str(RUN / 'balmora-work'))
-                self.assertNotIn('--chim-town', image)
+                # Balmora's legacy chain: no Balmora CHIM town; Vivec (one frame) stays a CHIM area unless legacy
+                towns = [image[i + 1] for i, a in enumerate(image) if a == '--chim-town']
+                self.assertEqual(towns, [] if '--builder' in argv else [str(RUN / 'chim-town-seyda'),
+                                                                   str(RUN / 'chim-town-vivec_city')])
                 self.assertEqual(build_parallel.stage_dependencies(steps)['balmora-interiors'], ('balmora',))
         help_text = next(a.help for a in build.parser()._actions if a.dest == 'legacy_areas')
-        self.assertTrue(help_text.startswith('DEBUGGING ONLY'))
+        self.assertTrue(help_text.startswith('RETIRED - DO NOT USE'))  # BUILD-LEGACY-CHAIN-DEFAULT-36
 
-    def test_seyda_keeps_its_recorded_legacy_stage(self):
+    def test_seyda_is_chim_native(self):
+        # v0.0.36-dev5 (owner order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36): no legacy Seyda Neen chain
         args = build.parser().parse_args(['--builder', 'chim', '--chim-area', 'seyda', '--chim-area', 'balmora',
                                           '--chim-native-towns', 'on'])
-        self.assertEqual(build.chim_native_towns(args), ['balmora'])
+        self.assertEqual(build.chim_native_towns(args), ['seyda', 'balmora'])
         args = build.parser().parse_args(['--builder', 'chim', '--chim-area', 'seyda', '--chim-area', 'balmora'])
-        self.assertEqual(build.chim_native_towns(args), [])          # off by default: the legacy chains
+        self.assertEqual(build.chim_native_towns(args), ['seyda', 'balmora'])  # on by default (CHIM-native areas)
+        # the legacy chain stays selectable, only through retired flags
+        args = build.parser().parse_args(['--builder', 'chim', '--chim-area', 'seyda', '--chim-area', 'balmora',
+                                          '--legacy-area', 'seyda'])
+        self.assertEqual(build.chim_native_towns(args), ['balmora'])
+        args = build.parser().parse_args(['--builder', 'chim', '--chim-area', 'seyda', '--chim-area', 'balmora',
+                                          '--seyda-recorded', '/recorded'])
+        self.assertEqual(build.chim_native_towns(args), ['balmora'])
+        args = build.parser().parse_args(['--builder', 'chim', '--chim-area', 'seyda', '--chim-area', 'balmora',
+                                          '--chim-native-towns', 'off'])
+        self.assertEqual(build.chim_native_towns(args), [])          # RETIRED: the legacy chains
 
     def test_default_build_keeps_the_legacy_balmora_chain(self):
         steps = plan(['--jobs', '4'], native='off')
@@ -200,6 +214,17 @@ class ImageTests(unittest.TestCase):
             chim_town.install(town, id1)
             self.assertEqual(build_aga.never_built_maps(id1, ['balmora']), ['maps/balmora.bsp', 'maps/bm000.bsp'])
             self.assertEqual(build_aga.never_built_maps(id1, []), [])
+
+    def test_a_native_balmora_flora_image_needs_no_legacy_balmora_cache(self):
+        # BUILD-IMAGE-NATIVE-BALMORA-CACHE-36: the dev2 image refused a CHIM-native Balmora for a missing cache
+        import build_aga
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            town = Path(tmp) / 'chim-town-balmora'
+            town.mkdir()
+            (town / 'entities.json').write_text(json.dumps({'town': 'balmora', 'rows': []}), encoding='utf-8')
+            self.assertNotIn('balmora_cache', build_aga.flora_image_inputs(SimpleNamespace(chim_town=[town])))
+        self.assertIn('balmora_cache', build_aga.flora_image_inputs(SimpleNamespace(chim_town=[])))
 
     def test_harvest_plans_a_chim_towns_regions_without_maps(self):
         import harvest_build

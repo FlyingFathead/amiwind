@@ -33,11 +33,20 @@ void AW_ControlsMigrate(void);
 #define RAW_RETURN 0x44
 #define RAW_KEYPAD_8 0x3e
 #define RAW_KEYPAD_2 0x1e
+/* The qualifier keys a real keyboard holds for this qualifier mask: their raw down/up events
+ * (Sys_SendKeyEvents passes every raw code to Key_AmigaQualifierKey first). Caps Lock is a
+ * toggle: its key event is seen once when the mask has it. */
+static void held(unsigned qualifier){
+ static const unsigned bit[6]={1,2,4,8,16,32};int i;
+ for(i=0;i<6;i++)if(i!=2)Key_AmigaQualifierKey(0x60+i+((qualifier&bit[i])?0:0x80));
+ if(qualifier&4)Key_AmigaQualifierKey(0x62);
+}
 /* One raw key press and release, routed as Sys_SendKeyEvents routes IDCMP_RAWKEY. */
 static void raw(int code,unsigned qualifier){
  int up;
  for(up=0;up<2;up++){
   int c=code|(up?0x80:0);
+  held(qualifier);
   Key_AmigaQualifiers(qualifier);
   if((c&0x7f)>=0x60 && (c&0x7f)<=0x67)continue;
   if(Key_AmigaRaw(c))Key_Event(Key_AmigaRaw(c),(c&0x80)==0);
@@ -46,6 +55,7 @@ static void raw(int code,unsigned qualifier){
 /* One raw key event (press or release) as Sys_SendKeyEvents routes it. */
 static void raw_event(int code,int down,unsigned qualifier){
  int c=code|(down?0:0x80);
+ held(qualifier);
  Key_AmigaQualifiers(qualifier);
  if(Key_AmigaRaw(c))Key_Event(Key_AmigaRaw(c),(c&0x80)==0);
 }
@@ -80,6 +90,7 @@ static const char *saved(void){
 }
 static void history_section(void);
 static void terminal_section(void);
+static void latched_section(void);
 int main(void){
  Key_Init();AW_ControlsMigrate(); /* the arrows carry +forward/+back in the game */
  remove("console-history.txt");
@@ -94,7 +105,27 @@ int main(void){
  assert(!*saved()); /* classic mode never writes the history file */
  set_mode("1");reset_console();history_section();
  terminal_section();
+ latched_section();
  return 0;
+}
+/* ENGINE-CRASH-EXIT-KEYBOARD-36: a Shift qualifier latched in the input stream before
+ * the game started (no Shift key went down in this run) does not shift the typing; a real Shift
+ * key does, and its release ends it even when the stale bit stays. */
+static void latched_section(void){
+ int i,c;
+ Key_ClearStates();set_mode("1");reset_console();
+ for(i=0;"aw 1234"[i];i++){        /* a stale Shift bit, no Shift key pressed in this run */
+  c=raw_for("aw 1234"[i]);
+  Key_AmigaQualifiers(1);if(Key_AmigaRaw(c))Key_Event(Key_AmigaRaw(c),1);
+  Key_AmigaQualifiers(1);if(Key_AmigaRaw(c|0x80))Key_Event(Key_AmigaRaw(c|0x80),0);
+ }
+ expect("]aw 1234");
+ Key_AmigaQualifierKey(0x60);                /* the real left Shift goes down */
+ c=raw_for('1');Key_AmigaQualifiers(1);Key_Event(Key_AmigaRaw(c),1);Key_Event(Key_AmigaRaw(c),0);
+ Key_AmigaQualifierKey(0x60|0x80);           /* and up; the stale bit stays in the stream */
+ c=raw_for('2');Key_AmigaQualifiers(1);Key_Event(Key_AmigaRaw(c),1);Key_Event(Key_AmigaRaw(c),0);
+ expect("]aw 1234!2");
+ Key_ClearStates();
 }
 static void history_section(void){
  assert(Key_AmigaRaw(RAW_UP)==K_UPARROW && Key_AmigaRaw(RAW_DOWN)==K_DOWNARROW);

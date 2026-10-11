@@ -49,6 +49,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import copy_tree, ensure_external
@@ -60,6 +61,7 @@ from project_version import VERSION, check_native_versions, require_private_test
 from build_jobs import add_jobs, resolve_jobs
 from build_host import executable_path, make_python_assignment
 from vis_options import add_vis_option
+import engine_profile
 import fpu_support
 import known_inputs
 from fpu_support import LOADER as FPU_LOADER
@@ -77,6 +79,7 @@ HEAP_LOADER_SOURCE_PATHS = (
     'src/aw_harvest.c', 'src/aw_harvest.h', 'src/aw_harvest_runtime.c', 'src/aw_harvest_runtime.h',
     'src/aw_harvest_proxy.c', 'src/aw_harvest_proxy.h',
     'src/aw_section.c', 'src/aw_section.h', 'src/aw_maps.h', 'src/aw_region.c',
+    'src/aw_mappath.c', 'src/aw_mappath.h',
     'src/aw_town.h', 'src/aw_town_table.h',
     'src/aw_scenery.c', 'src/pr_edict.c', 'src/aw_scene.c', 'src/aw_spawn.c', 'src/aw_console.c',
     'src/render.h', 'src/r_sprite.c', 'src/r_efrag.c', 'src/r_main.c',
@@ -491,15 +494,26 @@ def engine(args):
     heap['selected_by']='--heap-mb' if getattr(args,'heap_mb',None) is not None else 'engine default'
     if heap['heap_warning']:
         print('='*72+'\nWARNING: '+heap['heap_warning']+'\n'+'='*72,flush=True)
-    output=run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),make_python_assignment(),
-                *([f'HEAP_MB={heap["heap_mb"]}'] if getattr(args,'heap_mb',None) is not None else []),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0')+(' -DAMIWIND_DEBUG_LUMA=1' if debug_luma else ''),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env,capture=True)
-    warnings=[line for line in str(output or '').splitlines() if ': warning: ' in line]
-    if warnings and not getattr(args,'allow_compiler_warnings',False):
-        raise SystemExit(f'Engine build produced {len(warnings)} compiler warning(s); it must be warning-free. '
-                         'Fix them, or pass --allow-compiler-warnings for a local experiment only.')
-    binary=tree/('build/AmiQuakeGCC-NoFPU' if args.cpu=='68020' else 'build/AmiQuakeGCC')
-    check_binary(binary.read_bytes())
-    fpu_check=check_engine_fpu(binary,tree/'build/AmiQuakeGCC.map',args.sdk,out) if args.cpu=='68040' else None
+    # Experimental engine switches (docs/EXPERIMENTAL_FLAGS.md), off by default: only an asked one changes the
+    # make command line (EXTRA_DEFINES), so the default engine command and binary stay the same.
+    experiments=sorted(set(getattr(args,'engine_experiment',None) or []))
+    # The coordinate range (tools/coord_range.py): wide is the engine source's default, narrow adds its define.
+    import coord_range
+    coords=coord_range.current(getattr(args,'coord_range',None) or coord_range.DEFAULT)
+    if coords=='narrow' and 'widecoord' in experiments:
+        raise SystemExit('--coord-range narrow conflicts with --engine-experiment widecoord')
+    defines=' '.join([ENGINE_EXPERIMENTS[name] for name in experiments]+
+                     ([coord_range.RANGES[coords]['define']] if coord_range.RANGES[coords]['define'] else []))
+    if experiments:
+        print('EXPERIMENTAL engine switches: '+', '.join(experiments)+' ('+defines+')',flush=True)
+    print(f"Coordinate range: {coords} (bound {coord_range.RANGES[coords]['bound']}, "
+          f"{coord_range.RANGES[coords]['bytes']} bytes per coordinate, protocol {coord_range.RANGES[coords]['protocol']})",flush=True)
+    # The engine profile (docs/ENGINE_PROFILES.md): c = the C paths at -O1, the make command unchanged.
+    profile=engine_profile.from_args(args,args.cpu)
+    print('Engine profile: '+engine_profile.short(profile),flush=True)
+    binary,fpu_check=compile_engine(args,tree,env,jobs,heap,debug_luma,profile,out)
+    profile_checks=(check_other_profiles(args,out,env,jobs,heap,debug_luma,profile,digest(binary))
+                    if getattr(args,'check_profiles',False) else None)
     # Asset-free hardware benchmark for owners (engine/aga/bench, docs/HARDWARE-BENCHMARK.md).
     bench_output=run(['make','-B','bench','CC=m68k-amigaos-gcc'+CC_FLAGS,'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include')],tree,env,capture=True)
     bench_warnings=[line for line in str(bench_output or '').splitlines() if ': warning: ' in line]
@@ -511,6 +525,7 @@ def engine(args):
     checker=tree/'build/AmiWindCheck'
     vasm=executable_path(args.vasm.resolve() if args.vasm else args.sdk.resolve()/'bin/vasmm68k_mot')
     ndk=args.sdk.resolve()/'m68k-amigaos/ndk-include'
+    engine_profile.write_boot_include(tree/'build/version',profile)
     run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',ndk,'-I',tree/'build/version','-I',tree/'boot','-o',checker,tree/'boot/bootcheck.asm'])
     check_binary(checker.read_bytes())
     # AmiWindFPU opens the user's own FPU support library at boot (--amiga-libs).
@@ -518,10 +533,90 @@ def engine(args):
     run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',ndk,'-I',tree/'boot','-o',loader,tree/'boot/fpulib.asm'])
     check_binary(loader.read_bytes())
     (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'debug_luma':debug_luma,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker),'fpu_loader_sha256':digest(loader),'hardware_benchmark_sha256':digest(out/'awbench'),'fpu_unimplemented_check':fpu_check,
+        'engine_profile':profile,'engine_profile_checks':profile_checks,'assembler':assembler_identity(vasm),
         'heap_mb':heap['heap_mb'],'heap_mb_selected_by':heap['selected_by'],'heap_default_mb':heap['heap_default_mb'],
-        'heap_safe_mb':heap['heap_safe_mb'],'heap_warning':heap['heap_warning']},indent=2)+'\n', newline='\n')
+        'heap_safe_mb':heap['heap_safe_mb'],'heap_warning':heap['heap_warning'],
+        'coord_range':coords,'protocol':coord_range.RANGES[coords]['protocol'],
+        **({'engine_experiments':experiments} if experiments else {})},indent=2)+'\n', newline='\n')
     print(binary)
     write_world_coverage(out,'engine',getattr(args,'world_coverage',None))
+
+def assembler_identity(vasm):
+    """The SDK's vasmm68k_mot (boot check, FPU loader and the upstream profile's assembly): its banner
+    lines and SHA-256 for the engine receipt."""
+    try:
+        result=subprocess.run([str(vasm),'-v'],capture_output=True,text=True,errors='replace',timeout=30)
+    except OSError as exc:
+        return {'name':Path(vasm).name,'version':None,'sha256':None,'error':str(exc)}
+    banner=[line.strip() for line in (result.stdout+result.stderr).splitlines() if line.strip().startswith('vasm')]
+    return {'name':Path(vasm).name,'version':banner,'sha256':digest(vasm) if Path(vasm).is_file() else None}
+
+def engine_experiment_variables(args):
+    """make EXTRA_DEFINES for the asked --engine-experiment switches and the coordinate range (tools/coord_range.py:
+    wide is the engine source's default, narrow adds -DAW_COORD_NARROW); none: the make command is unchanged."""
+    import coord_range
+    experiments=sorted(set(getattr(args,'engine_experiment',None) or []))
+    narrow=coord_range.RANGES[coord_range.current(getattr(args,'coord_range',None) or coord_range.DEFAULT)]['define']
+    defines=[ENGINE_EXPERIMENTS[name] for name in experiments]+([narrow] if narrow else [])
+    return [f'EXTRA_DEFINES={" ".join(defines)}'] if defines else []
+
+def _frame_heap_cache():
+    """The image pass cache's folder for the CHIM frame-map heap reports (tools/pass_cache.py), or None when off."""
+    from pass_cache import folder
+    root = folder()
+    return root / 'chim-frame-heap' if root else None
+
+def compile_engine(args,tree,env,jobs,heap,debug_luma,profile,out,variables=None):
+    """make the engine in TREE for the engine PROFILE: warning-free (compiler and assembler), binary
+    structure, link map (exactly the selected assembly objects) and, for the 68040, the FPU check.
+    VARIABLES replaces the profile's make variables (the c-explicit check)."""
+    output=run(['make','-B','--output-sync=target',f'-j{jobs}',('nofpu' if args.cpu=='68020' else 'fpu'),make_python_assignment(),
+                *([f'HEAP_MB={heap["heap_mb"]}'] if getattr(args,'heap_mb',None) is not None else []),'CC=m68k-amigaos-gcc'+CC_FLAGS+' -DAMIWIND_SPRITE_HANDS='+('1' if args.hands=='sprites' else '0')+(' -DAMIWIND_DEBUG_LUMA=1' if debug_luma else ''),'NDK_INC='+str(args.sdk.resolve()/'m68k-amigaos/ndk-include'),
+                *(engine_profile.make_variables(profile) if variables is None else variables),
+                *engine_experiment_variables(args)],tree,env,capture=True)
+    # vasm reports "warning NNN in line ..." (the upstream assembly units): counted like compiler warnings.
+    warnings=[line for line in str(output or '').splitlines() if ': warning: ' in line or re.match(r'\s*warning \d+',line)]
+    if warnings and not getattr(args,'allow_compiler_warnings',False):
+        raise SystemExit(f'Engine build ({engine_profile.short(profile)}) produced {len(warnings)} compiler warning(s); it must be warning-free. '
+                         'Fix them, or pass --allow-compiler-warnings for a local experiment only.')
+    binary=tree/('build/AmiQuakeGCC-NoFPU' if args.cpu=='68020' else 'build/AmiQuakeGCC')
+    check_binary(binary.read_bytes())
+    link_map=tree/'build/AmiQuakeGCC.map'
+    if args.cpu=='68040' and link_map.is_file():  # a missing map fails check_engine_fpu below
+        problems=engine_profile.check_link_map(link_map.read_text(encoding='utf-8',errors='replace'),profile)
+        if problems:raise SystemExit('Engine link map does not match the engine profile: '+'; '.join(problems))
+    fpu_check=check_engine_fpu(binary,tree/'build/AmiQuakeGCC.map',args.sdk,out) if args.cpu=='68040' else None
+    return binary,fpu_check
+
+def check_other_profiles(args,out,env,jobs,heap,debug_luma,profile,binary_sha256):
+    """--check-profiles (the gate's engine step): build every other engine profile and the -O2 experiment
+    from the same source, each warning-free, link-map- and FPU-checked, so no path rots unnoticed. For a c build
+    also c once more with its make variables spelled out (ENGINE_ASM empty, ENGINE_OPT=o1): it must
+    give the same binary SHA-256 as the plain c build (the profile machinery adds nothing to c)."""
+    variants=[(name,engine_profile.resolve(name,cpu=args.cpu),None) for name in engine_profile.PROFILES if name!=profile['label']]
+    # and the -O2 experiment (upstream's assembly with every C file at -O2 except mathlib.c and in_amiga.c), so
+    # an -O2-only warning or FPU instruction is found by the gate too
+    variants.append(('upstream-o2',engine_profile.resolve('upstream',None,'o2',cpu=args.cpu),None))
+    if engine_profile.is_default(profile):
+        variants.append(('c-explicit',profile,['ENGINE_ASM=','ENGINE_OPT=o1']))
+    results=[]
+    for name,record,variables in variants:
+        sub=out/('profile-check-'+name);sub.mkdir()
+        tree,_=stage_runtime(sub)
+        tick=time.monotonic()
+        binary,fpu_check=compile_engine(args,tree,env,jobs,heap,debug_luma,record,sub,variables)
+        sha=digest(binary)
+        row={'variant':name,'profile':engine_profile.short(record),'binary_sha256':sha,
+             'seconds':round(time.monotonic()-tick,1),'warnings':0,'fpu_unimplemented_check':fpu_check}
+        if name=='c-explicit':
+            row['same_as_default_build']=sha==binary_sha256
+            if sha!=binary_sha256:
+                raise SystemExit('Engine profile c with ENGINE_ASM= ENGINE_OPT=o1 spelled out built a different binary '
+                                 f'({sha}) than the plain c build ({binary_sha256}): the profile machinery changes the c build')
+        print(f'Engine profile check {name}: {row["profile"]} SHA-256 {sha} ({row["seconds"]} s)',flush=True)
+        results.append(row)
+        shutil.rmtree(sub/RUNTIME_BUILD_DIR,ignore_errors=True)
+    return results
 
 def install_world_scenery(overlay, id1, jobs=1):
     """Validate a complete full-world overlay, then replace its terrain BSPs.
@@ -557,9 +652,15 @@ def install_world_scenery(overlay, id1, jobs=1):
         raise ValueError('World scenery overlay palette differs from the boot scene')
     unique_references = set()
     replacements = []
-    retained = hash_existing([id1 / 'maps' / f'{name}.bsp' for name in expected_names], jobs)
-    overlays = hash_existing([overlay / name / 'scene.bsp' for name in expected_names], jobs)
-    for region, source_sha, baked_sha in zip(regions, retained, overlays):
+    # CHIM region cells (docs/BUILD_MANIFEST.md step 2): no map was made for them; their rows carry no map
+    chim = [r['name'] for r in regions if r.get('chim_region')]
+    for name in chim:
+        if (id1 / 'maps' / f'{name}.bsp').exists() or (overlay / name / 'scene.bsp').exists():
+            raise ValueError('A legacy map of a CHIM region cell is staged: ' + name)
+    made = [name for name in expected_names if name not in set(chim)]
+    retained = hash_existing([id1 / 'maps' / f'{name}.bsp' for name in made], jobs)
+    overlays = hash_existing([overlay / name / 'scene.bsp' for name in made], jobs)
+    for region, source_sha, baked_sha in zip([r for r in regions if not r.get('chim_region')], retained, overlays):
         name = region['name']
         if not re.fullmatch(r'vf\d{4}', name):
             raise ValueError('Invalid world scenery region name')
@@ -597,6 +698,7 @@ def install_world_scenery(overlay, id1, jobs=1):
         raise ValueError('World scenery coverage total differs from region references')
     copy_files(replacements, jobs)
     result = {'status': 'passed', 'format': receipt['format'], 'regions': count,
+              'chim_region_maps_not_made': chim,
               'covered_source_references': len(unique_references),
               'palette_sha256': receipt['palette_sha256'],
               'terrain_directory_sha256': receipt.get('terrain_directory_sha256'),
@@ -633,17 +735,18 @@ def town_region_map_names(directory, prefix):
     return names
 
 def retire_chim_special_catalogues(id1):
-    """Harvest catalogues of special maps that run on CHIM in this image (maps/<name>-chim.bsp present,
-    maps/<name>.bsp absent, <name> not a region of a CHIM town): the engine names a map's catalogue after
+    """Harvest catalogues of special maps that run on CHIM in this image (the frame map maps/<name>-chim.chim
+    or .bsp present, maps/<name>.bsp absent, <name> not a region of a CHIM town): the engine names a map's catalogue after
     the loaded map (harvest-<map>.txt), so the legacy catalogue would never load; it is left out of the
     image and the save fingerprint, and listed (CHIM-HARVEST-SPECIALS-33)."""
+    from map_files import map_file
     root=Path(id1);regions=set()
     for table in sorted(root.glob('*-regions.txt')):
         regions.update(line.split()[0] for line in table.read_text(encoding='ascii').splitlines()[1:] if line.split())
     retired=[]
     for path in sorted(root.glob('harvest-*.txt')):
         name=path.name[len('harvest-'):-len('.txt')]
-        if ((root/'maps'/(name+'-chim.bsp')).is_file() and not (root/'maps'/(name+'.bsp')).is_file()
+        if (map_file(root/'maps',name+'-chim').is_file() and not (root/'maps'/(name+'.bsp')).is_file()
                 and name not in regions):
             path.unlink();retired.append(path.name)
     return retired
@@ -666,20 +769,21 @@ def harvest_fingerprint_entries(id1, *, plant_capacity=None, removed=()):
         plant_capacity=int(bound[1])
     if type(plant_capacity) is not int or not 1<=plant_capacity<=4096:
         raise ValueError('Invalid runtime harvest placement bound')
-    # Regions of towns that run on CHIM (maps/<town>-chim.bsp present): their region maps are gone from a
+    # Regions of towns that run on CHIM (maps/<town>-chim.chim or .bsp present): their region maps are gone from a
     # pure CHIM image, their catalogues stay and the engine loads them per region (CHIM-HARVEST-REMOVED-MAPS-33).
+    from map_files import map_file
     chim_regions=set()
     for table in sorted(root.glob('*-regions.txt')):
         town=table.name[:-len('-regions.txt')]
-        if (root/'maps'/(town+'-chim.bsp')).is_file():
+        if map_file(root/'maps',town+'-chim').is_file():
             chim_regions.update(line.split()[0] for line in table.read_text(encoding='ascii').splitlines()[1:] if line.split())
     for path in sorted(root.glob('harvest-*.txt'),key=lambda item:item.name):
         match=re.fullmatch(r'harvest-([a-z0-9_]{1,24})\.txt',path.name)
         if not match or path.is_symlink() or not path.is_file():
             raise ValueError('Invalid harvest catalogue path: '+path.name)
-        if (not (root/'maps'/(match[1]+'.bsp')).is_file() and 'maps/'+match[1]+'.bsp' not in removed
+        if (not map_file(root/'maps',match[1]).is_file() and 'maps/'+match[1]+'.bsp' not in removed
                 and match[1] not in chim_regions):
-            if (root/'maps'/(match[1]+'-chim.bsp')).is_file():
+            if map_file(root/'maps',match[1]+'-chim').is_file():
                 # A special map on CHIM: the engine never loads this catalogue; every caller skips it and the
                 # save fingerprint step leaves it out of the image (CHIM-HARVEST-SPECIALS-33).
                 continue
@@ -740,7 +844,8 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
     True or 'full' is the full MiniWind scope; 'exterior' leaves the Balmora
     interiors out as well.
     removed: legacy town maps a pure CHIM image left out (id1-relative 'maps/x.bsp'); they are not
-    required, and the CHIM frame maps (maps/*-chim.bsp) are bound instead.
+    required, and the CHIM frame maps of towns and special maps are bound instead (found by their
+    "_chim_frame" key, tools/map_files.py; region frames are bound with the open-world maps).
     excluded: quick-test groups; with 'interiors' the room maps the build left out
     (every interior except the prison ship and the Census office) are not required.
     kept_extra: maps a MiniWind image keeps for its direct start (tools/miniwind.py start_maps)."""
@@ -748,14 +853,19 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
     fingerprint=hashlib.sha256()
     from area_config import SCENES
     seyda=Path(id1)/'seyda-regions.txt'
-    town_maps=(town_region_map_names(seyda,'sn') if seyda.is_file() or not partial else [])+town_region_map_names(Path(id1)/'balmora-regions.txt','bm')
-    scenes=[s for s in SCENES if not ('interiors' in excluded and s.get('interior') is True
-            and s['map'] not in ('prison','census') and not (Path(id1)/'maps'/(s['map']+'.bsp')).is_file())]
-    names=[*(f"maps/{s['map']}.bsp" for s in scenes), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', 'balmora-regions.txt', *town_maps, 'progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj', 'world/entries.dat', 'world/quests.awq', 'world/region-names.awn']
+    balmora=Path(id1)/'balmora-regions.txt'
     if partial:
         import miniwind
         scope,town=(partial if isinstance(partial,tuple) else
                     (miniwind.DEFAULT_SCOPE if partial is True else partial,miniwind.TOWN))
+    # a MiniWind of another town (--miniwind-town) holds no Balmora region table (BUILD-MINIWIND-BALMORA-ASSUMED-36)
+    with_balmora=not partial or town=='balmora' or balmora.is_file()
+    town_maps=((town_region_map_names(seyda,'sn') if seyda.is_file() or not partial else [])
+               +(town_region_map_names(balmora,'bm') if with_balmora else []))
+    scenes=[s for s in SCENES if not ('interiors' in excluded and s.get('interior') is True
+            and s['map'] not in ('prison','census') and not (Path(id1)/'maps'/(s['map']+'.bsp')).is_file())]
+    names=[*(f"maps/{s['map']}.bsp" for s in scenes), 'maps/intro_docks.bsp', 'maps/sncourt.bsp', 'seyda-regions.txt', *(['balmora-regions.txt'] if with_balmora else []), *town_maps, 'progs.dat', 'character/catalog.awc', 'world/map.awm', 'world/journal.awj', 'world/entries.dat', 'world/quests.awq', 'world/region-names.awn']
+    if partial:
         kept,prefix=miniwind.kept_maps(scope=scope,town=town,extra=kept_extra)
         names=[name for name in names if name!='seyda-regions.txt' and
                not (name.startswith('maps/') and not miniwind.keep_map(name[5:-4],kept,prefix))]
@@ -766,7 +876,9 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
     if removed:
         removed=set(removed)
         names=[name for name in names if name not in removed]
-        names+=sorted('maps/'+p.name for p in (Path(id1)/'maps').glob('*-chim.bsp'))
+        from map_files import is_chim_frame, map_files
+        names+=['maps/'+p.name for p in map_files(Path(id1)/'maps')
+                if not re.fullmatch(r'vf[0-9]{4}', p.stem) and is_chim_frame(p)]
     for name in names:
         if not (Path(id1)/name).is_file():raise ValueError('Required character-creation asset missing: '+name)
     for name,value in zip(names,hash_files([Path(id1)/name for name in names],jobs)):
@@ -777,7 +889,12 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
         raw=directory.read_bytes()
         if raw[:4]!=b'AWR2' or len(raw)!=64+struct.unpack_from('<I',raw,4)[0]*52:
             raise ValueError('Invalid world region directory')
-        world=[f'maps/vf{index:04d}.bsp' for index in range(struct.unpack_from('<I',raw,4)[0])]
+        from map_files import map_rel
+        from chim.frame_map import alias_rows
+        # a divided CHIM region cell's alias rows have no map (the directory bytes above bind them)
+        aliases=alias_rows(raw)
+        world=[map_rel(id1,f'vf{index:04d}') for index in range(struct.unpack_from('<I',raw,4)[0])
+               if f'vf{index:04d}' not in aliases or (Path(id1)/map_rel(id1,f'vf{index:04d}')).is_file()]
         for name,value in zip(world,hash_files([Path(id1)/name for name in world],jobs)):
             fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(value))
     from prepare_guard_torches import fingerprint_entries
@@ -858,6 +975,15 @@ def chim_native_towns(args):
     return towns
 
 
+def flora_image_inputs(args):
+    """The inputs a complete flora image needs. A CHIM-native Balmora holds its town flora in the CHIM world, so
+    the legacy Balmora cache is not one of them (BUILD-IMAGE-NATIVE-BALMORA-CACHE-36)."""
+    fields=['town_flora_source_index','town_flora_scene_report']
+    if 'balmora' not in chim_native_towns(args):
+        fields.append('balmora_cache')
+    return fields
+
+
 def chim_town_rows(args):
     """{town: frame-map entity rows} of the --chim-town outputs, with the shared exterior sky keys the
     sky pass gives every exterior map's worldspawn (exterior_sky_build.transform)."""
@@ -872,6 +998,45 @@ def chim_town_rows(args):
     return rows
 
 
+def chim_town_specials(args):
+    """({special map: frame-map entity rows}, {town or special map: activated object rows}) of the --chim-town
+    outputs: a CHIM-native Seyda Neen's special frame maps (the intro docks, the Census courtyard) and the objects
+    the engine activates as edicts, both made from the game data (tools/chim_town.py prepare_seyda); the specials'
+    worldspawns get the shared exterior sky keys as the towns' (chim_town_rows)."""
+    from exterior_sky_build import SHARED_SKY_PATH
+    rows, activated = {}, {}
+    for path in getattr(args,'chim_town',None) or []:
+        record=json.loads((Path(path)/'entities.json').read_text(encoding='utf-8'))
+        if record.get('activated') is not None:
+            activated[record['town']]=record['activated']
+        for name, special in (record.get('specials') or {}).items():
+            special_rows=[dict(e) for e in special['rows']]
+            special_rows[0]['_aw_sky_mode']='exterior'
+            special_rows[0]['_aw_sky_asset']=SHARED_SKY_PATH
+            rows[name]=special_rows
+            activated[name]=special['activated']
+    return rows, activated
+
+
+def town_source_cell(town):
+    """The game cell of a town's CHIM frame: its converter settings' source_cell, Seyda Neen's from chim.seyda."""
+    if town == 'seyda':
+        from chim.seyda import source_cell
+        return tuple(source_cell())
+    from town_config import load_settings
+    return tuple(load_settings(town)['source_cell'])
+
+
+def chim_town_grounding(args):
+    """{town: the town stage's actor fit results on its CHIM frame} (entities.json 'grounding') of the
+    --chim-town outputs, for the actor placement gate (BUILD-ACTOR-GATE-CHIM-FRAMES-36)."""
+    out={}
+    for path in getattr(args,'chim_town',None) or []:
+        record=json.loads((Path(path)/'entities.json').read_text(encoding='utf-8'))
+        out[record['town']]=list(record.get('grounding') or [])
+    return out
+
+
 def chim_town_placements(args, id1):
     """{'<town>-chim': reference numbers} for each --chim-town town: its CHIM world placements, its frame
     actors and its region harvest catalogues (the entity tracker counts them as the legacy region maps
@@ -880,11 +1045,11 @@ def chim_town_placements(args, id1):
         return {}
     from chim.frame_map import chim_placements
     from entity_tracker import harvest_refs
-    from town_config import load_settings, runtime_towns
+    from town_config import runtime_towns
     out={}
     for town, rows in chim_town_rows(args).items():
         refs={int(e['aw_ref']) for e in rows if str(e.get('aw_ref','')).isdigit()}
-        refs|=set(chim_placements(args.chim_world, tuple(load_settings(town)['source_cell'])))
+        refs|=set(chim_placements(args.chim_world, town_source_cell(town)))
         row=next(t for t in runtime_towns() if t['id']==town)
         for name in town_region_map_names(Path(id1)/row['regions'], row['prefix']):
             catalogue=Path(id1)/('harvest-'+Path(name).stem+'.txt')
@@ -894,13 +1059,32 @@ def chim_town_placements(args, id1):
     return out
 
 
+def chim_region_placements(args, id1):
+    """{'vfNNNN': reference numbers} of each CHIM region cell whose legacy map no stage made (docs/BUILD_MANIFEST.md
+    step 2): the CHIM world's placements of its frame, which the entity tracker counts as the cell's map would have."""
+    if not getattr(args, 'chim_world', None):
+        return {}
+    from chim.frame_map import chim_placements, load, region_map_names
+    # one name per cell (a divided cell's alias rows are not counted again: CHIM-REGION-DIVIDED-CELLS-36)
+    owned = {name: cell for name, cell in region_map_names(id1, args.chim_world, primary_only=True).items()
+             if not (Path(id1)/'maps'/(name+'.bsp')).is_file()}
+    if not owned:
+        return {}
+    world = load(args.chim_world)
+    return {name: set(chim_placements(args.chim_world, cell, world=world)) for name, cell in sorted(owned.items())}
+
+
 def never_built_maps(id1, towns):
-    """id1-relative legacy exterior maps of CHIM towns built without them (their region tables name them)."""
+    """id1-relative legacy exterior maps of CHIM towns built without them (their region tables name them;
+    Seyda Neen's special scenes too: the intro docks and the Census courtyard)."""
     from town_config import runtime_towns
+    from chim.frame_map import SPECIALS
     names=[]
     for town in runtime_towns():
         if town['id'] in towns:
             names.append('maps/'+town['name']+'.bsp')
+            if town['id']=='seyda':
+                names+=['maps/'+name+'.bsp' for name in SPECIALS]
             table=Path(id1)/town['regions']
             if table.is_file():
                 names+=town_region_map_names(table,town['prefix'])
@@ -924,29 +1108,130 @@ def chim_world_receipt(chim_world):
     if receipt.get('builder') != 'chim':
         raise ValueError('CHIM world receipt does not name the chim builder')
     areas = receipt.get('areas') or ([receipt['town']] if receipt.get('town') else [])
+    # CHIM region frames (tools/chim/regions.py, --chim-regions) are no towns: chim_region_frames lists them
+    regions = chim_region_table(chim_world)
+    if regions:
+        ids = {f['id'] for f in regions['frames']}
+        areas = [a for a in areas if a not in ids]
     return receipt, areas
 
 
-def chim_frame_maps(chim_world, id1, town_rows=None):
-    """Check a CHIM world's receipts and write its frame maps into id1: maps/<town>-chim.bsp for each
-    area (the engine loads it instead of the town's region maps when CHIM is on), and for Seyda Neen
-    its special maps (format 0.5). Each is checked against the town's final legacy maps, which must
-    still be in id1. Returns {'areas', 'receipt', 'frame_maps'}."""
+def chim_region_table(chim_world):
+    """The CHIM world's ownership table of CHIM region frames (chim-regions.json, tools/chim/regions.py), or None."""
+    from chim.regions import TABLE_FILE, read_table
+    return read_table(Path(chim_world)/TABLE_FILE) if chim_world else None
+
+
+def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, special_rows=None, activated=None):
+    """Check a CHIM world's receipts and write its frame maps into id1: maps/<town>-chim.chim for each
+    area (.bsp with chim_frame_ext bsp; tools/map_files.py; the engine loads it instead of the town's
+    region maps when CHIM is on), and for Seyda Neen its special maps (format 0.5). Each is checked against the town's final legacy maps, which must
+    still be in id1. The CHIM world is read and checked once for all of them (chim.frame_map.load); the
+    region frame maps are made on the shared worker pool (jobs) and taken from the image pass cache when
+    unchanged (BUILD-IMAGE-CHIM-MAPS-SERIAL-36). Every part is a timed phase (build_profile.phase).
+    hand_fields: the open-world maps' hand fields (hand_metadata), for region frame maps made from the game data
+    (chim.frame_map region_rows_mode, docs/BUILD_MANIFEST.md step 2); without them the legacy method is used.
+    special_rows / activated: a CHIM-native Seyda Neen's special frame rows and the activated objects of its maps
+    (chim_town_specials): those frame maps take them instead of legacy maps.
+    Returns {'areas', 'receipt', 'frame_maps', 'region_maps', 'region_cache'}."""
+    import build_profile
+    import progress_line
     chim_world = Path(chim_world)
     receipt, areas = chim_world_receipt(chim_world)
     # Written before the partition, so a refused entity stops the image here.
-    from chim.frame_map import SPECIALS, build as build_frame_map, build_docks
+    from chim.frame_map import SPECIALS, build as build_frame_map, build_docks, load as load_chim_world
+    with build_profile.phase('Image: CHIM world read', detail=str(chim_world.name)) as timer:
+        world = load_chim_world(chim_world)
+        timer.done('Image: CHIM world read: %d frames, %d models' % (len(world['frames']), len(world['models'])))
     town_rows = town_rows or {}
-    frame_maps = [build_frame_map(id1, area, chim_world, **({'entity_rows': town_rows[area]} if area in town_rows else {}))
-                  for area in areas]
-    # Seyda Neen's special maps (the intro docks, the Census courtyard) become further frame maps of
-    # its frame (format 0.5): maps/intro_docks-chim.bsp, maps/sncourt-chim.bsp.
-    if 'seyda' in areas:
-        frame_maps += [build_docks(id1, chim_world, name=name) for name in SPECIALS]
+    special_rows, activated = special_rows or {}, activated or {}
+    specials = list(SPECIALS) if 'seyda' in areas else []
+    with build_profile.phase('Image: CHIM town frame maps', detail=', '.join(list(areas) + specials),
+                             total=len(areas) + len(specials), unit='maps') as timer:
+        frame_maps = []
+        for area in areas:
+            frame_maps.append(build_frame_map(id1, area, chim_world, world=world,
+                                              **({'entity_rows': town_rows[area], 'activated_rows': activated.get(area)}
+                                                 if area in town_rows else {})))
+            timer.step(label=area)
+            build_profile.progress(progress_line.line('Image: CHIM town frame maps', area, frame_maps[-1]['map'][5:],
+                                                      (timer.count, timer.total, 'maps')))
+        # Seyda Neen's special maps (the intro docks, the Census courtyard) become further frame maps of
+        # its frame (format 0.5): maps/intro_docks-chim.chim, maps/sncourt-chim.chim.
+        for name in specials:
+            frame_maps.append(build_docks(id1, chim_world, name=name, world=world,
+                                          **({'entity_rows': special_rows[name], 'activated_rows': activated.get(name)}
+                                             if name in special_rows else {})))
+            timer.step(label=name)
+            build_profile.progress(progress_line.line('Image: CHIM town frame maps', name, frame_maps[-1]['map'][5:],
+                                                      (timer.count, timer.total, 'maps')))
+        timer.done('Image: CHIM town frame maps: %d written' % len(frame_maps))
+    # CHIM region frames (EXPERIMENTAL, --chim-regions): each cell's open-world map is replaced in place by
+    # its frame map (chim.frame_map.build_regions; the legacy file is recorded in 'replaced').
+    region_maps, region_cache = [], None
+    table = chim_region_table(chim_world)
+    if table:
+        from chim.frame_map import build_regions, region_cache as open_region_cache, region_rows_mode
+        cache = open_region_cache()
+        rows = region_rows_mode() if hand_fields is not None else 'legacy'
+        workers = max(1, min(resolve_jobs(jobs), len(table['frames'])))
+        with build_profile.phase('Image: CHIM region frame maps', detail='%d frames, %d workers, pass cache %s, rows '
+                                 'from %s' % (len(table['frames']), workers, 'on' if cache is not None else 'off', rows),
+                                 total=len(table['frames']), unit='maps') as timer:
+            def progress(record, reused):
+                timer.step(label=record['map'][5:])
+                build_profile.progress(progress_line.line('Image: CHIM region frame maps', record['map'][5:],
+                                                          'reused' if reused else 'made',
+                                                          (timer.count, timer.total, 'maps')))
+            region_maps, reused = build_regions(id1, table['frames'], chim_world, world=world, jobs=workers,
+                                                cache=cache, progress=progress, rows=rows, hand_fields=hand_fields)
+            region_cache = dict(cache.summary() if cache is not None else {'status': 'off'}, reused=reused,
+                                made=len(region_maps) - reused, rows=rows)
+            timer.done('Image: CHIM region frame maps: %d written (%d from the pass cache, %d made)'
+                       % (len(region_maps), reused, len(region_maps) - reused))
+        frame_maps += region_maps
     # Each frame map's far terrain (chim.far): maps/<frame map>.far beside it, like a Quake .lit file.
-    for record in frame_maps:
-        record['far_terrain'] = chim_far_sidecar(chim_world, id1, record)
-    return {'areas': areas, 'receipt': receipt, 'frame_maps': frame_maps}
+    with build_profile.phase('Image: CHIM far terrain', total=len(frame_maps), unit='maps') as timer:
+        for record in frame_maps:
+            record['far_terrain'] = chim_far_sidecar(chim_world, id1, record)
+            timer.step()
+        timer.done('Image: CHIM far terrain: %d sidecars' % sum(1 for r in frame_maps if r['far_terrain']))
+    return {'areas': areas, 'receipt': receipt, 'frame_maps': frame_maps, 'region_maps': region_maps,
+            'region_cache': region_cache}
+
+
+def legacy_maps_summary(id1, removed_legacy):
+    """Legacy maps of CHIM cells in an image: the map files the CHIM step removed (built, never shipped), those
+    still in the payload as legacy maps (must be none: a CHIM frame map written under the legacy name, chim_frame_ext
+    bsp, is a frame map), and the payload's maps by kind (CHIM frame maps, far terrain, open-world legacy maps,
+    interiors and other maps)."""
+    from map_files import is_chim_frame, is_map_name, map_stem
+    maps = Path(id1)/'maps'
+    removed = [row for row in removed_legacy or [] if row['file'].startswith('maps/')]
+    shipped = sorted(row['file'] for row in removed
+                     if (Path(id1)/row['file']).is_file() and not is_chim_frame(Path(id1)/row['file']))
+    kinds = {}
+    for path in sorted(maps.iterdir()) if maps.is_dir() else []:
+        if not path.is_file():
+            continue
+        if path.suffix == '.far':
+            kind = 'far terrain'
+        elif not is_map_name(path.name):
+            kind = 'other files'
+        elif is_chim_frame(path):                       # by its key, whatever its extension (tools/map_files.py)
+            kind = 'CHIM frame maps'
+        elif re.fullmatch(r'vf[0-9]{4}', map_stem(path.name)):
+            kind = 'open-world legacy maps'
+        else:
+            kind = 'interiors and other maps'
+        row = kinds.setdefault(kind, {'files': 0, 'bytes': 0})
+        row['files'] += 1
+        row['bytes'] += path.stat().st_size
+    removed_bytes = sum(row['bytes'] for row in removed)
+    line = ('legacy maps of CHIM cells: %d built / %d shipped (%d bytes kept out of the image)'
+            % (len(removed), len(shipped), removed_bytes))
+    return {'built': len(removed), 'shipped': shipped, 'removed_bytes': removed_bytes,
+            'payload_by_kind': dict(sorted(kinds.items())), 'line': line}
 
 
 def chim_far_sidecar(chim_world, id1, record):
@@ -976,6 +1261,7 @@ def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None)
     frames: chim_frame_maps' result when the image wrote the frame maps earlier (pure CHIM); else
     they are written here. Returns (the volume entry for the hardfile, the build.json record)."""
     from chim.disk import IMAGE_BASE, pack_partition
+    from map_files import frame_ext
     chim_world = Path(chim_world)
     if frames is None:
         frames = chim_frame_maps(chim_world, id1)
@@ -998,7 +1284,8 @@ def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None)
               'files': len(packed['files']), 'payload_bytes': sum(f['bytes'] for f in packed['files']),
               'partition_mib': packed['mib'], 'layout_gate': packed['layout'],
               'receipt_sha256': digest(receipt_path), 'validate_sha256': digest(validate_path),
-              'stats_sha256': digest(stats_path), 'frame_maps': frame_maps}
+              'stats_sha256': digest(stats_path), 'frame_maps': frame_maps,
+              'frame_map_extension': frame_ext(), 'region_frame_cache': frames.get('region_cache')}
     return entry, record
 
 
@@ -1101,6 +1388,28 @@ def stage_skip_census(args, id1):
     return {'on': True, 'config': 'id1/default-game.cfg', 'line': 'aw_skip_census 1'}
 
 
+def stage_world_bounds(args, id1):
+    """--world-bounds (the builder's default, tools/world_bounds.py): aw_world_bounds 1 at the end of the
+    game's default settings (default-game.cfg): the sea near the edge of the open world carries the player
+    along it and back in (docs/WORLD_BOUNDS.md). Off: nothing is written (the game as before). Returns the
+    record, or None when off."""
+    if not getattr(args, 'world_bounds', False):
+        return None
+    path = Path(id1) / 'default-game.cfg'
+    raw = path.read_bytes()
+    if not raw.endswith(b'\n'):
+        raw += b'\n'
+    raw += WORLD_BOUNDS_LINES
+    path.write_bytes(raw)
+    print('World bounds: on (aw_world_bounds 1; --world-bounds off leaves it out)', flush=True)
+    return {'on': True, 'config': 'id1/default-game.cfg', 'line': 'aw_world_bounds 1'}
+
+
+WORLD_BOUNDS_LINES = (b'// World bounds (builder default, --world-bounds on|off): the sea near the edge of the open\n'
+                      b'// world carries you along it and back in (an AmiWind extension; dbg worldbounds).\n'
+                      b'aw_world_bounds 1\n')
+
+
 SKIP_CENSUS_LINES = (b'// --skip-census (quick test build): New Game makes the character on the quick character\n'
                      b'// screen and goes straight to the scene, without the ship and the census office.\n'
                      b'aw_skip_census 1\n')
@@ -1125,7 +1434,7 @@ def stage_direct_start(args, boot, out, mini, excluded):
             start.map = scenes.get(start.cell.casefold())
             if start.map is None:
                 raise ValueError('%s "%s": the interior "%s" is not in this build. %s.'
-                                 % (direct_start.OPTION, start.text, start.cell, direct_start.NO_INTERIORS_NOTE))
+                                 % (direct_start.OPTION, start.text, start.cell, direct_start.interior_reason(start.cell)))
         if start.kind == 'area' and start.town not in {t['name'] for t in towns if (id1/t['regions']).is_file()}:
             raise ValueError('%s %s: %s is not in this image' % (direct_start.OPTION, start.text, start.title))
         if start.kind == 'area' and not any(t['name'] == start.town and 'teleport_arrival' in t['flags'] for t in towns):
@@ -1159,6 +1468,25 @@ def stage_direct_start(args, boot, out, mini, excluded):
     print('Direct start: ' + (record['summary'] or 'MiniWind town') + (' -> ' + line if line else '')
           + '; character ' + record['character']['race'] + ' ' + record['character']['class'] + ' ' + record['character']['name'],
           flush=True)
+    return record
+
+
+def image_start(args, boot, out, direct_start_record):
+    """The start check of a partial-area build (MiniWind, direct start) on the final payload (tools/direct_start.py
+    image_start_check); None for a full build (the new game)."""
+    import direct_start, miniwind
+    resolved = (direct_start_record or {}).get('resolved')
+    if resolved:
+        start = {'map': resolved.get('map') or resolved.get('town'), 'arrival': resolved.get('arrival'),
+                 'source': 'direct start ' + ((direct_start_record.get('start') or {}).get('text') or '') + ' ('
+                           + str(resolved.get('from') or 'town arrival') + ')'}
+    elif getattr(args, 'miniwind', False):
+        start = {'map': getattr(args, 'miniwind_town', None) or miniwind.TOWN, 'arrival': None,
+                 'source': "the MiniWind town's arrival point (no explicit start)"}
+    else:
+        return None
+    record = direct_start.image_start_check(Path(boot)/'id1', start, report=Path(out)/'start-check.json')
+    print('Start check: %s (%s): %s' % (record['map'], record['map_file'], record['source']), flush=True)
     return record
 
 
@@ -1217,7 +1545,7 @@ def image(args):
         args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.resolve()
         load_approved_report(args.allow_known_actor_ground_findings)
     if getattr(args, 'world_flora', None):
-        for field in ('town_flora_source_index', 'town_flora_scene_report', 'balmora_cache'):
+        for field in flora_image_inputs(args):
             value = getattr(args, field, None)
             if not value or not Path(value).exists():
                 raise ValueError('Complete flora image requires --' + field.replace('_', '-'))
@@ -1238,6 +1566,13 @@ def image(args):
     scene=ensure_external(args.scene,'AGA scene');out=new_output(args.out)
     if 'music' not in excluded:ensure_external(args.music,'converted music')
     boot=out/'boot';copy_tree(scene/'id1',boot/'id1');(boot/'S').mkdir()
+    seyda_native='seyda' in chim_native_towns(args)
+    if seyda_native and (boot/'id1/maps/seyda.bsp').is_file():
+        # The scene's complete converted town is the chim-town-seyda stage's source, no map of the game: a
+        # CHIM-native Seyda Neen stages no legacy map at all (BUILD-LEGACY-TOWN-MAPS-SHIPPED-36).
+        (boot/'id1/maps/seyda.bsp').unlink()
+        print('Seyda Neen is CHIM-native: no Seyda Neen legacy map is staged or cut (frame maps from the '
+              'chim-town-seyda stage)',flush=True)
     if mini:
         # Balmora only: every other area's maps leave before any pass runs.
         import miniwind
@@ -1276,6 +1611,10 @@ def image(args):
                                   live_logs=getattr(args,'live_logs',False))
     skip_census_record=stage_skip_census(args, boot/'id1')
     args.image_skip_census_record=skip_census_record  # finalize_image writes it into build.json
+    args.image_world_bounds_record=stage_world_bounds(args, boot/'id1')  # build.json, only when on
+    # --death-retry off (tools/prepare_player_view.py): aw_death_retry 0 in the game defaults.
+    from prepare_player_view import stage_death_retry
+    args.image_death_retry_record=stage_death_retry(getattr(args,'no_death_retry',False), boot/'id1')
     (out/'diagnostic-logs.json').write_text(json.dumps(logs_record,indent=2)+'\n', encoding='utf-8', newline='\n')
     if logs_record['diagnostic_logs']=='live':
         print('[diagnostics] --live-logs: this image writes its diagnostic logs as they happen (benchmark/diagnostic image)',flush=True)
@@ -1315,6 +1654,12 @@ def image(args):
     print('Converting combat data (settings, NPC sheets, sounds, Arena fighters)...',flush=True)
     combat_report=prepare_combat(args.data_files,boot/'id1',jobs=jobs)
     (out/'combat-data.json').write_text(json.dumps(combat_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # The player's view (docs/THIRD_PERSON.md): the camera and death-scene game settings, and the player's
+    # body per playable race and sex for third person (--player-body on|off, tools/prepare_player_view.py).
+    from prepare_player_view import prepare as prepare_player_view
+    print('Converting the player view data (camera settings, player bodies)...',flush=True)
+    view_report=prepare_player_view(args.data_files,boot/'id1',jobs=jobs,bodies=not getattr(args,'no_player_body',False))
+    (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
     if args.data_files:prepare_world_ui(args.data_files,None,boot)
     validate_world_ui(boot/'id1')
@@ -1370,10 +1715,10 @@ def image(args):
         from player_hull import PROFILE
         if ready.get('standing_hull_profile')!=PROFILE:raise ValueError('Rebuild the scene: standing collision hull does not match this runtime')
         if not ready.get('hands'):raise ValueError('Prepare first-person hands before building this runtime')
-        if not mini:shutil.copyfile(scene/'seyda.bsp',out/'seyda.bsp')
+        if not mini and not seyda_native:shutil.copyfile(scene/'seyda.bsp',out/'seyda.bsp')
     else:
         raise ValueError('Prepare the matching mesh scene before building this runtime image')
-    if not mini:
+    if not mini and not seyda_native:
         shutil.copyfile(out/'seyda.bsp',boot/'id1/maps/seyda.bsp')
         from prepare_seyda_regions import convert_builder_scene
         convert_builder_scene(boot/'id1/maps', scene_map=out/'seyda.map',
@@ -1387,6 +1732,13 @@ def image(args):
     frozen=recorded_stage.frozen_maps(out/'bounded-seyda')
     native=chim_native_towns(args)
     if native:
+        # A CHIM-native town's listed rooms first (tools/chim_rooms.py): their door bank links the doors into the rooms,
+        # and chim_town.install keeps it instead of its own unlinked bank (BUILD-MINIWIND-ARENA-PIT-REFUSED-36).
+        from chim_rooms import install as install_chim_rooms
+        rooms=[install_chim_rooms(path,boot/'id1') for path in (getattr(args,'chim_rooms',None) or [])]
+        if rooms:
+            (out/'chim-rooms.json').write_text(json.dumps(rooms,indent=2)+'\n',encoding='utf-8',newline='\n')
+            print('CHIM town rooms: '+'; '.join(r['town']+' '+', '.join(r['rooms']) for r in rooms),flush=True)
         from chim_town import install as install_chim_town
         installed=[install_chim_town(path,boot/'id1') for path in args.chim_town]
         (out/'chim-towns.json').write_text(json.dumps(installed,indent=2)+'\n',encoding='utf-8',newline='\n')
@@ -1404,11 +1756,16 @@ def image(args):
         from prepare_quake import CENTRE
         town_palette = args.scene/'id1/gfx/palette.lmp'
         seyda_origin = [CENTRE[0]*.25, CENTRE[1]*.25, 0.]
-        actual = json.loads((boot/'id1/seyda-regions.json').read_text(encoding='utf-8'))
-        seyda_entries = [{**entry, 'origin':seyda_origin} for entry in actual['regions']]
-        if frozen:
-            towns = {'seyda':recorded_stage.keep_town_flora(boot, flora, [e['name']+'.bsp' for e in seyda_entries])}
+        if 'seyda' in native:
+            # The CHIM world holds Seyda Neen's town flora meshes and solid sprites' collision (chim.seyda), the
+            # chim-town-seyda stage its flora sprites (the same rule, chim_town.seyda_flora); no legacy maps.
+            towns = {'seyda': {'status': 'in the CHIM world and the chim-town-seyda frame rows (no legacy region maps)'}}
+        elif frozen:
+            actual = json.loads((boot/'id1/seyda-regions.json').read_text(encoding='utf-8'))
+            towns = {'seyda':recorded_stage.keep_town_flora(boot, flora, [e['name']+'.bsp' for e in actual['regions']])}
         else:
+            actual = json.loads((boot/'id1/seyda-regions.json').read_text(encoding='utf-8'))
+            seyda_entries = [{**entry, 'origin':seyda_origin} for entry in actual['regions']]
             towns = {'seyda':install_town_flora(boot, flora, town_palette,
                 entries=seyda_entries, town_source_index=args.town_flora_source_index,
                 town_scene_report=args.town_flora_scene_report, work_dir=out/'town-flora-seyda')}
@@ -1496,8 +1853,10 @@ def miniwind_receipt(args, out, boot):
             'interiors_missing': prune['interiors_missing']}
 
 
-def staged_exterior_map_names(id1):
-    """Explicit runtime directories identify exterior cells; sky is not a classifier."""
+def staged_exterior_map_names(id1, chim_world=None):
+    """Explicit runtime directories identify exterior cells; sky is not a classifier. chim_world: the build's CHIM
+    world; the open-world maps its region frames own have no legacy map (docs/BUILD_MANIFEST.md step 2) and are left
+    out until their frame maps exist; any other missing map stays listed (and fails the passes)."""
     id1 = Path(id1)
     from town_config import runtime_towns
     towns = runtime_towns()
@@ -1517,7 +1876,12 @@ def staged_exterior_map_names(id1):
         count = struct.unpack_from('<I', raw, 4)[0]
         if len(raw) != 64 + count * 52:
             raise ValueError('World region count mismatch for hidden-surface pass')
-        names.update(f'vf{index:04d}' for index in range(count))
+        owned = {}
+        if chim_world:
+            from chim.frame_map import region_map_names
+            owned = region_map_names(id1, chim_world)
+        names.update(name for name in (f'vf{index:04d}' for index in range(count))
+                     if name not in owned or (id1 / 'maps' / (name + '.bsp')).is_file())
     return names
 
 
@@ -1577,6 +1941,8 @@ def seyda_pending(args, scene):
     set, after the same pin check the install makes (BUILD-SEYDA-CONVERTED-NOT-STAGED-35)."""
     if getattr(args, 'miniwind', False):
         return None
+    if 'seyda' in chim_native_towns(args):
+        return None   # CHIM-native: the image step writes no Seyda Neen map (chim-town-seyda gives the region table)
     recorded = getattr(args, 'seyda_recorded', None)
     if recorded is not None:
         # The same pin check install() makes (tools/recorded_stage.py), then its shipped set.
@@ -1609,7 +1975,7 @@ def payload_preflight(args, out, excluded, jobs, pending=None):
                          music=None if 'music' in excluded else getattr(args, 'music', None), jobs=jobs,
                          harvest=getattr(args, 'harvest', None), data_files=getattr(args, 'data_files', None),
                          report_path=None if getattr(args, 'payload_preflight_only', False) else out/'payload-preflight.json',
-                         chim_towns=chim_native_towns(args))
+                         chim_towns=chim_native_towns(args), chim_town_dirs=getattr(args, 'chim_town', None) or ())
 
 def finalize_image(args):
     """Finalize an already prepared private image stage through every normal gate.
@@ -1682,25 +2048,28 @@ def finalize_image(args):
     from exterior_sky_build import configure_staged_maps
     exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
     exterior_sky = configure_staged_maps(boot / 'id1',
-        exterior_maps=staged_exterior_map_names(boot / 'id1'),
+        exterior_maps=staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None)),
         interior_maps=staged_interior_map_names(boot / 'id1'),
         local_skybox=getattr(args, 'local_skybox', 'false'),
         shared_sky_source=sky_asset_preparation['shared_sky_source'],
-        work_dir=exterior_sky_path.parent, jobs=jobs)
+        work_dir=exterior_sky_path.parent, jobs=jobs,
+        # the CHIM frame maps (written later) name the shared sky too (CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36)
+        frame_exterior=bool(getattr(args, 'chim_world', None)))
     from recorded_stage import check as check_recorded
     check_recorded(boot/'id1', out/'bounded-seyda', 'sky asset preparation and exterior sky', jobs=jobs)
     if excluded:
         # Quick test build: the shared assets maps and the engine find by name (the sky,
         # palette, fonts, menus) are kept by every exclusion (build_exclusions.ALWAYS_INCLUDED).
         from build_exclusions import check_always_included, worldspawn_sky_keys
-        always_included=check_always_included(boot/'id1', exterior=bool(staged_exterior_map_names(boot/'id1')),
+        always_included=check_always_included(boot/'id1', exterior=bool(staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None)))
+                                              or bool(getattr(args, 'chim_world', None)),
                                               maps=worldspawn_sky_keys(boot/'id1/maps'))
         (out/'always-included.json').write_text(json.dumps(always_included,indent=2)+'\n',encoding='utf-8',newline='\n')
     # Run after all meshes/overlays, before compaction, contact/heap and fingerprints.
     from hidden_surface_build import cull_staged_maps, enabled_value
     hidden_surface_path = out / 'hidden-surface-cull' / 'hidden-surfaces.json'
     hidden_surfaces = cull_staged_maps(boot / 'id1/maps', hidden_surface_path.parent,
-        staged_exterior_map_names(boot / 'id1'),
+        staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None)),
         enabled=enabled_value(getattr(args, 'hidden_surface_cull', 'true')),
         jobs=jobs)
     check_recorded(boot/'id1', out/'bounded-seyda', 'hidden-surface cull', jobs=jobs)
@@ -1709,7 +2078,7 @@ def finalize_image(args):
     from hand_metadata import stamp_staged_hands
     hand_source = json.loads((Path(args.scene)/'scene-ready.json').read_text())['hands']
     hand_metadata = stamp_staged_hands(boot/'id1', hand_source,
-        staged_exterior_map_names(boot/'id1') | staged_interior_map_names(boot/'id1'), jobs=jobs)
+        staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None)) | staged_interior_map_names(boot/'id1'), jobs=jobs)
     (out/'hand-metadata.json').write_text(json.dumps(hand_metadata,indent=2)+'\n', newline='\n')
     check_recorded(boot/'id1', out/'bounded-seyda', 'first-person hand metadata', jobs=jobs)
     # Stable interior cell numbers + full cell IDs for the debug HUD and `dbg cell`;
@@ -1731,9 +2100,10 @@ def finalize_image(args):
     # Placement correction is not its own proof: independently read the final
     # BSP/MDL payload, and stop before fingerprinting or HDF creation on failure.
     from check_actor_ground import require as require_actor_ground
+    # residents of CHIM-native town frames: their town stage's fit on the frame collision, judged by the same gate
     actor_report = require_actor_ground(boot/'id1/maps', out/'actor-initial-contact.json',
                                        getattr(args, 'allow_known_actor_ground_findings', None),
-                                       findings_only=True, jobs=jobs)
+                                       findings_only=True, jobs=jobs, chim_frames=chim_town_grounding(args))
     actor_acceptance = actor_report['acceptance']
     (out/'actor-ground-acceptance.json').write_text(json.dumps(actor_acceptance, indent=2)+'\n', newline='\n')
     # Count original versus placed entities on the final maps; an unexplained
@@ -1743,7 +2113,8 @@ def finalize_image(args):
     from prepare_mesh_bsp import DRESSING_EXCLUDED
     entity_tracker = entity_gate(out, boot/'id1/maps', child_ci(args.data_files,'Morrowind.esm'),
         getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None), jobs=jobs,
-        dressing_terms=DRESSING_EXCLUDED, extra_maps=chim_town_placements(args, boot/'id1'))
+        dressing_terms=DRESSING_EXCLUDED, extra_maps={**chim_town_placements(args, boot/'id1'),
+                                                     **chim_region_placements(args, boot/'id1')})
     # World progress map data: topomap coverage plus entity and POI layers.
     from world_progress import build_step as world_progress_step
     if getattr(args, 'miniwind', False):
@@ -1768,7 +2139,7 @@ def finalize_image(args):
     # removes the CHIM towns' legacy maps below).
     from night_lighting import stage as stage_night_lighting, image_sources
     night_lighting = stage_night_lighting(boot/'id1', master=child_ci(args.data_files,'Morrowind.esm'),
-        maps=staged_exterior_map_names(boot/'id1'), sources=image_sources(args),
+        maps=staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None)), sources=image_sources(args),
         palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting',
         lighting_type=getattr(args, 'chim_lighting_type', None))
     # Pure CHIM (--builder chim): each CHIM town's frame maps are written and checked against its
@@ -1777,20 +2148,35 @@ def finalize_image(args):
     # see only what ships, and the CHIM world carries its own (tools/chim_build.py).
     chim_frames, removed_legacy, not_on_chim = None, [], []
     if getattr(args, 'chim_world', None):
-        chim_frames = chim_frame_maps(args.chim_world, boot/'id1', town_rows=chim_town_rows(args))
+        special_rows, activated_rows = chim_town_specials(args)
+        chim_frames = chim_frame_maps(args.chim_world, boot/'id1', town_rows=chim_town_rows(args), jobs=jobs,
+                                      special_rows=special_rows, activated=activated_rows,
+                                      hand_fields=hand_metadata['worldspawn_fields'])
         from chim.frame_map import remove_legacy_areas, remove_towns_not_on_chim
         removed_legacy = remove_legacy_areas(boot/'id1', chim_frames['areas'], 'the town runs on CHIM')
         # Extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image whole: exterior maps, region and
         # door tables, harvest catalogues; the engine then finds no such destination (CHIM-LEGACY-CHAIN-33).
         not_on_chim = [town['id'] for town in staged_extra_towns(boot/'id1') if town['id'] not in chim_frames['areas']]
         removed_legacy += remove_towns_not_on_chim(boot/'id1', not_on_chim)
+        # CHIM region frames (EXPERIMENTAL): the open-world maps replaced in place (and their harvest catalogues)
+        region_replaced = [row for record in chim_frames['region_maps'] for row in record['replaced']]
+        removed_legacy += region_replaced
+        if chim_frames['region_maps']:
+            print('[chim] CHIM region frames: %d open-world maps replaced in place by CHIM frame maps (%d legacy '
+                  'bytes out, %d frame-map bytes in)' % (len(chim_frames['region_maps']),
+                  sum(r['bytes'] for r in region_replaced if r['file'].startswith('maps/')),
+                  sum(r['bytes'] for r in chim_frames['region_maps'])), flush=True)
         (out/'chim-removed-legacy.json').write_text(json.dumps(removed_legacy, indent=2)+'\n', encoding='utf-8',
                                                    newline='\n')
         # Each frame map's whole-map heap (CHIM-SEYDA-MEMORY-33): the zone the engine can take beside
         # the frame map's own Hunk, its rings with the streamed statics' models, on this build's heap.
         from chim.heap import require_frame_map_heap
         frame_heap = require_frame_map_heap(args.chim_world, boot/'id1', args.sdk, heap_mb=engine_record.get('heap_mb'),
-                                            report_path=out/'chim-frame-heap.json')
+                                            report_path=out/'chim-frame-heap.json',
+                                            extra_maps=[r['map'][5:] for r in chim_frames['region_maps']],
+                                            # all frames over the shared pool, unchanged frames from the image pass
+                                            # cache by their SHA-256 content key (owner order 2026-10-11 10:08)
+                                            jobs=resolve_jobs(args.jobs), cache_dir=_frame_heap_cache())
         for name, m in sorted(frame_heap.get('maps', {}).items()):
             print(f"[chim] frame-map heap {name}: zone {m['zone_bytes']} B (after the map {m['after_zone_bytes']} B), "
                   f"active ring {m['peak_bytes']} / load ring {m['load_ring']['peak_bytes']} of {m['budget_bytes']} B, "
@@ -1798,7 +2184,8 @@ def finalize_image(args):
         # The optimizer receipt follows the new map set (frame maps in, removed maps out) before the gates.
         from optimize_world_maps import rebind_chim_maps
         optimization = rebind_chim_maps(boot/'id1/maps', optimization, optimization_path,
-                                        [row['file'] for row in removed_legacy], jobs=jobs)
+                                        [row['file'] for row in removed_legacy], jobs=jobs,
+                                        replaced=[r['map'][5:] for r in chim_frames['region_maps'] if r['replaced']])
     # Every map that ships fits the engine's per-map tables: edicts, model and sound precaches, static
     # entities, the scenery catalogue (tools/map_engine_limits.py, BUILD-BUDGET-ENGINE-LIMITS-35); a map
     # over one stops the game at load ("no free edicts", precache overflow), so it never ships.
@@ -1812,7 +2199,7 @@ def finalize_image(args):
     # The recorded Seyda Neen stage (BUILD-SEYDA-REGEN-30) is reported, not gated.
     from mesh_geometry_env import stair_rules_enabled
     if stair_rules_enabled():
-        from stair_walk import require as require_stairs
+        from stair_parallel import require as require_stairs   # every core (BUILD-IMAGE-STAIR-WALK-SERIAL-36)
         from recorded_stage import frozen_maps
         from chim.known import known_stair_findings
         # Private -devN tests only (image_waivers above): known findings accepted by tracker ID.
@@ -1846,6 +2233,9 @@ def finalize_image(args):
           f"minimum clearance {world_heap['minimum_estimated_clearance_bytes']} bytes after unchanged baseline "
           f"and safety reserves. Policy={budget_decision['policy']}; runtime validation pending.",flush=True)
     verify_optimized_maps(boot/'id1/maps', optimization, jobs=jobs)
+    # The player starts inside what a partial-area build holds (owner order 2026-10-11; BUILD-MINIWIND-DIRECT-START-
+    # TOWN-36): the boot start's map is in the final payload and its spot stands on collision, in seconds, before packing.
+    start_check=image_start(args, boot, out, direct_start_record)
     # Every map write is above: the recorded maps ship exactly as recorded.
     removed_files = [row['file'] for row in removed_legacy]
     recorded_stage = check_recorded(boot/'id1', out/'bounded-seyda', 'final image payload', jobs=jobs,
@@ -1881,7 +2271,7 @@ def finalize_image(args):
     intro_receipt_path = Path(args.scene)/'intro-conversion.json'
     intro_receipt = json.loads(intro_receipt_path.read_text()).get('movie') if intro_receipt_path.is_file() else None
     media_coverage = stage_catalogue(args.media, boot/'id1', manifest, intro_receipt,
-                                     excluded=['music'] if 'music' in excluded else [])
+                                     excluded=['music'] if 'music' in excluded else [], jobs=jobs)
     media_coverage_path = out/'media-coverage.json'
     media_coverage_path.write_text(json.dumps(media_coverage,indent=2)+'\n',encoding='utf-8',newline='\n')
     # Missing original inputs remain warnings, but every available source must
@@ -1898,6 +2288,15 @@ def finalize_image(args):
         from chim.frame_map import require_no_legacy_areas
         legacy_check = require_no_legacy_areas(boot/'id1', chim_frames['areas'], 'final image payload',
                                                not_on_chim=not_on_chim)
+    # Legacy maps of CHIM cells (docs/BUILD_MANIFEST.md): how many this build still made, how many ship (must be
+    # 0) and the payload's maps by kind, printed and recorded (BUILD-LEGACY-TOWN-MAPS-SHIPPED-36).
+    legacy_summary = legacy_maps_summary(boot/'id1', removed_legacy)
+    (out/'legacy-maps-of-chim-cells.json').write_text(json.dumps(legacy_summary,indent=2)+'\n',encoding='utf-8',newline='\n')
+    print(legacy_summary['line'], flush=True)
+    print('Payload maps by kind: ' + ', '.join('%s %d (%d bytes)' % (kind, row['files'], row['bytes'])
+                                               for kind, row in legacy_summary['payload_by_kind'].items()), flush=True)
+    if legacy_summary['shipped']:
+        raise ValueError('Legacy maps of CHIM cells in the payload: ' + ', '.join(legacy_summary['shipped'][:8]))
     from world_volumes import pack as pack_world_volumes
     world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool,jobs=jobs)
     chim_world={'status':'not_requested'}
@@ -1990,18 +2389,34 @@ def finalize_image(args):
             if not getattr(args, 'miniwind', False) else miniwind_start(getattr(args, 'miniwind_town', None)),
         'hdf_bytes':hdf.stat().st_size,'hdf_sha256':digest(hdf),
         'binary_sha256':digest(boot/'AmiWind'),'bootcheck_sha256':digest(checker),
+        'engine_profile':engine_record.get('engine_profile') or {'label':'c','note':'engine receipt predates engine profiles'},
         'fpu_support':fpu_receipt,
         'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,
         'media_coverage':{'report':media_coverage_path.name,'sha256':digest(media_coverage_path),
             'categories':media_coverage['categories'],'excluded':media_coverage.get('excluded',[]),
             'payload_readback':'passed'},
         'direct_start':direct_start_record,
+        'start':start_check,
         'skip_census':getattr(args,'image_skip_census_record',None),
         'excluded_content':(json.loads((out/'excluded-content.json').read_text(encoding='utf-8'))
             if (out/'excluded-content.json').is_file() else stage_excluded_content(boot, excluded)),
         'music_tracks':len(manifest['tracks']),'music_catalogue':music_catalogue,'heap_reservation_bytes':world_heap['heap_budget_bytes'],
         'tested_minimum':False,'filesystem':'DOS1 FFS partitions in legacy-safe RDB HDF drives',
         'legacy_root_check':root_check}
+    if getattr(args, 'retired_flags_used', None):
+        # A flag retired since CHIM v0.1.0 (tools/retired_flags.py): the image receipt says so loudly.
+        build_json['retired_flags_used'] = {'flags': args.retired_flags_used,
+            'warning': 'WARNING: DO NOT USE EXCEPT FOR ANTIQUATED REGRESSION PURPOSES (retired since CHIM v0.1.0)'}
+        print('RETIRED FLAGS USED: ' + args.retired_flags_used, flush=True)
+    if getattr(args, 'image_world_bounds_record', None):
+        build_json['world_bounds'] = args.image_world_bounds_record
+    recipe_record = os.environ.get('AMIWIND_BUILD_RECIPE')
+    if recipe_record:
+        # The build's recipe (tools/build_recipe.py ENV, set by tools/build.py; never part of a stage key): a reused
+        # image step keeps the record of the run that made it (its "run" names that run).
+        build_json['build_recipe'] = json.loads(recipe_record)
+    build_json['player_view'] = {'player_body': not getattr(args, 'no_player_body', False),
+                                 'death_retry': not getattr(args, 'no_death_retry', False)}
     if getattr(args, 'miniwind', False):
         build_json['build_type'] = miniwind_receipt(args, out, boot)
     (out/'build.json').write_text(json.dumps(build_json,indent=2)+'\n', newline='\n')
@@ -2024,11 +2439,21 @@ def finalize_image(args):
     (out/'build.json').write_text(json.dumps(build_record,indent=2)+'\n',encoding='utf-8',newline='\n')
     write_world_coverage(out,'image',getattr(args,'world_coverage',None))
 
+# Experimental engine compile switches by name -> the define (engine/aga/Makefile EXTRA_DEFINES).
+# widecoord: positions as 24 bits of 1/256 units, +/-32,768 (engine/aga/src/aw_coord.h, CHIM-FRAME-COORD-RANGE-33).
+ENGINE_EXPERIMENTS={'widecoord':'-DAW_EXP_WIDECOORD'}
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     e=sub.add_parser('engine');e.add_argument('--cpu',choices=['68020','68040'],default='68040');e.add_argument('--archive',type=Path,help='Optional legacy provenance check; source is always engine/aga in this repository');e.add_argument('--out',type=Path,required=True);e.add_argument('--sdk',type=Path,required=True);e.add_argument('--vasm',type=Path,help='68000 preflight assembler; defaults to the SDK vasm')
     add_jobs(e)
     e.add_argument('--allow-compiler-warnings',action='store_true',help='Local experiments only: do not fail the build on compiler warnings')
+    engine_profile.add_options(e)
+    e.add_argument('--check-profiles',action='store_true',help='Gate check: also build every other engine profile (and c with its make variables spelled out) from the same source, each warning-free, link-map- and FPU-checked; recorded in engine-build.json')
+    e.add_argument('--engine-experiment',action='append',choices=sorted(ENGINE_EXPERIMENTS),metavar='NAME',
+                   help='EXPERIMENTAL engine compile switch, off by default (docs/EXPERIMENTAL_FLAGS.md): '
+                        +', '.join('%s (%s)'%(k,v) for k,v in sorted(ENGINE_EXPERIMENTS.items())))
+    e.add_argument('--coord-range',choices=('wide','narrow'),help="How the engine sends positions (tools/coord_range.py): wide (default, 24 bits of 1/256 units) or narrow (Quake's 1/8-unit shorts, -DAW_COORD_NARROW)")
     e.add_argument('--heap-mb',type=int,metavar='N',help="Game heap (Quake's Hunk) in MiB, exactly as asked (default: the engine source's AMIWIND_HEAP_MB); above the measured safe size one warning, recorded in engine-build.json and printed by the boot check")
     luma=e.add_mutually_exclusive_group()
     luma.add_argument('--disallow-luma-controls','--no-luma-controls',dest='debug_luma',action='store_false',help='Compile out brightness settings, scaling and menu; retain explanatory console messages')
@@ -2073,10 +2498,16 @@ def main():
     i.add_argument('--chim-lighting-type',default=None,help='With --chim-world: the CHIM lighting type (tools/chim/light_types.py); it selects the night lamp table classes (none: empty, lamps: the warm lamp classes, hybrid: every class that adds light); default: the legacy lamp table')
     i.add_argument('--town-flora-source-index',type=Path,help='Exact original Seyda scenery reference bindings for flora installation')
     i.add_argument('--town-flora-scene-report',type=Path,help='Original alias conversion model mapping; required with --world-flora')
+    i.add_argument('--chim-rooms',dest='chim_rooms',type=Path,action='append',default=[],
+                   help='The listed rooms of a CHIM-native town (tools/chim_rooms.py output), repeatable: their maps, '
+                        'residents and room door banks, and the town door bank with the doors into them, installed '
+                        'before the --chim-town outputs (BUILD-MINIWIND-ARENA-PIT-REFUSED-36)')
     i.add_argument('--chim-town',dest='chim_town',type=Path,action='append',default=[],
                    help='A CHIM town made from the game data (tools/chim_town.py output), repeatable: its residents, '
                         'region table and door bank are installed and its CHIM frame map takes its entities; the '
                         'town has no legacy region maps (CHIM-LEGACY-CHAIN-33)')
+    i.add_argument('--retired-flags-used',metavar='TEXT',help='Set by tools/build.py when the build uses a flag retired '
+                   'since CHIM v0.1.0 (tools/retired_flags.py): recorded in build.json retired_flags_used and printed loudly')
     i.add_argument('--night-lamp-lightmaps',action='store_true',help='EXPERIMENTAL (off by default): bake night-lamp '
                    'lightmaps (lightstyle 32) into the rebuilt Balmora cores (tools/lamp_lightmaps.py, prototype)')
     i.add_argument('--balmora-cache',type=Path,help='Complete owned Balmora preparation cache for measured layout repair before final actor/heap audits')
@@ -2104,6 +2535,13 @@ def main():
     i.add_argument('--skip-census',action='store_true',
                    help='Quick test builds (-devN only): New Game makes the character on the quick character '
                         'screen, without the ship and the census (aw_skip_census 1 in default-game.cfg)')
+    i.add_argument('--world-bounds',action='store_true',
+                   help='The sea near the edge of the open world carries the player along it and back in '
+                        '(aw_world_bounds 1 in default-game.cfg; tools/world_bounds.py, docs/WORLD_BOUNDS.md)')
+    i.add_argument('--no-player-body',action='store_true',
+                   help="No player body for the third-person view (tools/prepare_player_view.py; build.py --player-body off)")
+    i.add_argument('--no-death-retry',action='store_true',
+                   help='No quick retry after a lost fight (aw_death_retry 0 in default-game.cfg; build.py --death-retry off)')
     i.add_argument('--exclude',metavar='GROUP[,GROUP...]',
                    help='DEBUGGING ONLY (quick test builds, -devN only): content groups the builder left out '
                         '(tools/build_exclusions.py); written to id1/excluded-content.txt for the game')

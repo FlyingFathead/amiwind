@@ -514,6 +514,7 @@ void AW_UIEnemyBar(float fraction,float alpha) {
     }
 }
 int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
+int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
     int i,y=vid.height-26;
@@ -530,6 +531,8 @@ void AW_UIHud(void) {
         current[0]=svs.clients[0].edict->v.health;
     for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
     {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
+    /* The guard marker (COMBAT-BLOCKING-36): first person shows no shield yet, so a word under the crosshair. */
+    if(aw_combat_guard_marker && aw_combat_guard_marker())AW_UIText(r_refdef.vrect.x+(r_refdef.vrect.width-AW_UIWidth("Guard"))/2,r_refdef.vrect.y+r_refdef.vrect.height/2+12,"Guard",-1);
     scr_copyeverything=1;
 }
 /* Names are bounded text over the world, with no panel/background fill. */

@@ -1,0 +1,106 @@
+# WAIT-DURING-COMBAT-36: Waiting is allowed in the middle of a fight
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 10 October 2026, in v0.0.36-dev3 |
+| Where | engine/aga/src/aw_wait.c allowed(), the wait key |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.36-dev3 (last seen) |
+| Severity | low: The player can wait out a fight; the original refuses with enemies nearby |
+| Family | Game logic (QuakeC) and saves (`game-logic`) |
+| Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
+| From commit | source and engine 9176a77 |
+| CHIM engine version | none: legacy engine |
+| Platform or emulator | unknown (reported before the platform field existed; the emulator was not recorded) |
+
+<!-- END GENERATED FACTS -->
+
+## Status: 10 October 2026
+
+Repaired in source on the v0.0.36 development line (gated); the in-game check is pending.
+
+## Symptom
+
+The wait key (T) opened the wait window and passed hours while an NPC was fighting the player. The original never
+lets the player rest or wait with enemies nearby.
+
+## Where
+
+engine/aga/src/aw_wait.c: the wait key's checks (`allowed()`) had no fight check.
+
+## How it happened
+
+The wait window came before melee combat. When combat arrived it got its own "is someone fighting the player?"
+test for the battle music, but nothing else asked it.
+
+## Why it was not caught
+
+The wait tests covered the intro, speech, water and the clock, not a fight.
+
+## Reproduction
+
+Always: start a fight (`dbg combat on`, attack an NPC) and press T.
+
+## Repair
+
+One "are we in a fight?" check, `AW_PlayerInCombat()` in engine/aga/src/aw_combat.c: someone fights the player and
+the player is alive. It is exactly the battle music's condition, and the music now asks it. The wait key asks the
+same check and refuses with the game's own text (the game setting `sNotifyMessage2`, written to
+`id1/view/settings.txt` by the builder and read from disk only when the refusal is shown; an AmiWind line when an
+older image has none); a wait window already open closes instead of waiting.
+
+Not yet: the original's rest test is wider. OpenMW refuses rest and wait when any actor within 7168 units would
+attack the player (`World::canRest`, `Player::enemiesNearby`, the aggression test), not only when someone is already
+fighting; see [WAIT_AND_REST.md](../WAIT_AND_REST.md). That comes with the wait and rest work; until then a hostile
+that has not engaged yet does not stop waiting.
+
+## Verification
+
+tests/aga_wait_test.c: in a fight the wait key is refused with the game's text (and the fallback line without it),
+an open wait window closes, a calm player can wait. tests/aga_combat_test.c: the battle music and
+`AW_PlayerInCombat()` agree when the fight starts, ends and when the player dies. tests/test_third_person.py pins
+that the music and the wait key ask the same check.
+
+## Prevention
+
+A rule that the original applies in several places is one shared check that every place asks, with a test that
+pins the callers.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
+
+- AW-20260928-10 (no report page): Interior door animation and sound missing
+- AW-20260928-12 (no report page): Downstairs interior doors cannot open
+- AW-20260928-19 (no report page): Courtyard barrel incorrectly says empty
+- AW25-06 (no report page): Quicksave shown as empty; save ordering confusing
+- [CENSUS-DOOR-STUCK-29](CENSUS-DOOR-STUCK-29.md): Player stuck after opening Census Office hall door
+- [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
+- CLOCK-01 (no report page): Automatic clock dropped fractional milliseconds each frame
+- [COMBAT-BLOCKING-36](COMBAT-BLOCKING-36.md): Requested: blocking in combat - NPCs block by their Block skill with a block animation, the player blocks with the right mouse button
+- [COMBAT-FIST-BLOCK-33](COMBAT-FIST-BLOCK-33.md): A fighter with a shield blocks while fighting with fists
+- [COMBAT-HIT-RECOVERY-33](COMBAT-HIT-RECOVERY-33.md): Fatigue hits did not stagger, and knockdowns lasted half a second too long
+- [COMBAT-NO-CONDITION-33](COMBAT-NO-CONDITION-33.md): Weapon and shield condition were ignored in combat
+- [COMBAT-NOT-SAVED-33](COMBAT-NOT-SAVED-33.md): Combat state and NPC deaths are not saved
+- [COMBAT-PLAYER-ATTACK-TYPE-33](COMBAT-PLAYER-ATTACK-TYPE-33.md): The player's attack type and swing strength were random
+- [COMBAT-PLAYER-DEATH-FALL-33](COMBAT-PLAYER-DEATH-FALL-33.md): The player does not collapse on death
+- [COMBAT-PLAYER-KNOCKDOWN-33](COMBAT-PLAYER-KNOCKDOWN-33.md): The player's knockdown and knockout exist only in the combat rules
+- [COMBAT-SETUP-DICE-BLOCK-33](COMBAT-SETUP-DICE-BLOCK-33.md): The Arena setup offers no dice/style choice before a fight, and there is no block button
+- [DEBUG-MAP-SAVE-VALIDATION-32](DEBUG-MAP-SAVE-VALIDATION-32.md): After a debug map load of an open-world map the autosave fails validation; two of three also report Interior spawn blocked
+- [ENGINE-ANGLEMOD-RANGE-35](ENGINE-ANGLEMOD-RANGE-35.md): anglemod returned 360 for -360 and passed NaN and out-of-range values on
+- [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
+- [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
+- [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
+- [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
+- RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
+- SAVE-EQUIPMENT-29 (no report page): Quickload returns with hands and torch put away
+- [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
+- [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
+
+<!-- END GENERATED CATEGORY -->

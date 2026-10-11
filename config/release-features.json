@@ -134,8 +134,8 @@
    "id": "balmora",
    "replaced_by_chim": true,
    "description": "Balmora exterior maps and region table",
-   "steps": ["balmora", "image"],
-   "image_options": ["--balmora-cache"],
+   "steps": ["chim-town-balmora", "image"],
+   "image_options": ["--chim-town"],
    "patterns": ["id1/maps/balmora.bsp", "id1/maps/bm[0-9][0-9][0-9].bsp", "id1/balmora-regions.txt"]
   },
   {

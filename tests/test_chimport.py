@@ -3,6 +3,7 @@
 a failing or crashing cell never stops the run, the stop file, the per-cell result and tracker schemas, the
 one-cell frame settings, and flat default land for cells without a LAND record (src/mwad/audit.py)."""
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -39,12 +40,15 @@ if x == 1 and y == 1:
 mech = ('format_validation', 'sky_bank_texels', 'seam_tears', 'far_terrain', 'stair_walk', 'memory_fit',
         'hull_bevels', 'hidden_faces', 'sprite_shape', 'actor_grounding', 'door_links', 'vis')
 ok = not (x == 2 and y == 0)
+import os
+audit_fail = os.environ.get('AW_FAKE_AUDIT_FAIL') == cell   # converted, no error, one audit failed
 res = {'format': 'aw-chimport-cell-1', 'cell': [x, y], 'key': cell, 'converted': ok, 'started': 't', 'finished': 'f',
        'errors': [] if ok else [{'stage': 'build', 'mechanism': 'missing-terrain', 'message': 'x'}],
        'records': {'by_type': {'STAT': {'placed': 2, 'converted': 2 if ok else 0, 'deferred': {}, 'failed': 0,
                                         'skipped': {}}},
                    'totals': {'placed': 2, 'converted': 2 if ok else 0, 'deferred': 0, 'failed': 0, 'skipped': 0}},
-       'audits': {m: {'status': 'passed' if ok else 'not_measured', 'detail': '', 'numbers': {}} for m in mech},
+       'audits': {m: {'status': ('failed' if audit_fail and m == 'memory_fit' else 'passed') if ok else 'not_measured',
+                      'detail': '', 'numbers': {}} for m in mech},
        'stats': {'meshes': {'new': 1, 'reused': 1, 'unique_in_cell': 2}, 'disk': {'chim_bytes': 10, 'chunks': 64},
                  'faces': {'source_triangles': 5, 'placed': 9, 'terrain': 4, 'stored': 7}},
        'wall_s': 0.1, 'cpu_s': 0.1}
@@ -136,6 +140,33 @@ class CellSettings(unittest.TestCase):
         res = {'converted': True, 'errors': [], 'audits': a, 'stats': {},
                'records': {'by_type': {}, 'totals': {'placed': 1, 'converted': 1, 'deferred': 0, 'failed': 0, 'skipped': 0}}}
         self.assertEqual(C.tracker_cell(res, {})['audits']['hull_bevels']['outcome'], 'kept_as_chain')
+
+    def test_owner_accepted_chains_pass_with_their_reason(self):
+        # COLLISION-ROUTE-NO-SPLIT-36: the kelp of -9,-4 (owner decision 2026-10-11) closes the coast ring
+        accepted = C.accepted_chains()
+        self.assertIn('flora_kelp_03', accepted)
+        self.assertIn('owner decision', accepted['flora_kelp_03'])
+        hulls = [{'name': 'f/flora_kelp_03@s1', 'clipnodes': 305, 'depth': 305, 'over': True},
+                 {'name': 'f/flora_kelp_04@s1', 'clipnodes': 304, 'depth': 304, 'over': True}]
+        rec = {'by_type': {}, 'totals': {}}
+        h = C.audits_of(None, None, None, hulls, None, rec, None)['hull_bevels']
+        self.assertEqual((h['status'], h['outcome']), ('passed', 'kept_as_chain'))
+        self.assertEqual(h['numbers']['kept_as_chain_owner_accepted'], ['flora_kelp_03', 'flora_kelp_04'])
+        self.assertIn('owner-accepted', h['detail'])
+        with patch.object(C, 'accepted_chains', lambda: {}):      # without the list: the audit fails, as before
+            self.assertEqual(C.audits_of(None, None, None, hulls, None, rec, None)['hull_bevels']['status'], 'failed')
+
+    def test_door_audit_leaves_out_marker_doors(self):
+        # CHIMPORT-DOOR-MARKER-AUDIT-36: Seyda Neen's PrisonMarker is a DOOR record with a marker model
+        rec = {'by_type': {'DOOR': {'placed': 21, 'converted': 20, 'deferred': {'nonvisual source marker': 1},
+                                    'failed': 0, 'skipped': {}}}, 'totals': {}}
+        d = C.audits_of(None, None, None, None, None, rec, None)['door_links']
+        self.assertEqual(d['status'], 'passed')
+        self.assertEqual(d['numbers']['markers'], 1)
+        rec['by_type']['DOOR'].update(converted=19)
+        self.assertEqual(C.audits_of(None, None, None, None, None, rec, None)['door_links']['status'], 'failed')
+        rec['by_type']['DOOR'].update(converted=20, deferred={'other reason': 1})
+        self.assertEqual(C.audits_of(None, None, None, None, None, rec, None)['door_links']['status'], 'failed')
 
     def test_hull_rule_uses_the_shared_check_when_the_builder_has_it(self):
         import hull_chain_audit
@@ -246,6 +277,27 @@ class Run(unittest.TestCase):
         state = C.read_json(self.run_dir / 'state.json')
         self.assertEqual(state['cells']['1,1']['attempts'], 2)
         self.assertEqual(state['cells']['0,0']['attempts'], 1)
+
+    def test_retry_runs_converted_cells_whose_audits_failed(self):
+        # CHIMPORT-RETRY-AUDIT-FAILED-36: such a cell is 'done' in state.json; only its result says it failed
+        with patch.dict(os.environ, {'AW_FAKE_AUDIT_FAIL': '0,2'}):
+            self.go(cells='0,0 0,2')
+        state = C.read_json(self.run_dir / 'state.json')
+        self.assertEqual(state['cells']['0,2']['status'], 'done')
+        self.assertEqual(state['cells']['0,2']['result'], 'failed')
+        self.go(cells='0,0 0,2')
+        self.assertEqual(C.read_json(self.run_dir / 'state.json')['cells']['0,2']['attempts'], 1)
+        self.go(cells='0,0 0,2', retry_failed=True)
+        state = C.read_json(self.run_dir / 'state.json')
+        self.assertEqual(state['cells']['0,2']['attempts'], 2)
+        self.assertEqual(state['cells']['0,2']['result'], 'passed')
+        self.assertEqual(state['cells']['0,0']['attempts'], 1)       # a passed cell is never rerun
+        rows = [{'x': 0, 'y': 0}, {'x': 0, 'y': 2}]
+        for result in C.RETRY_RESULTS:
+            fake = {'cells': {'0,0': {'status': 'done', 'result': 'passed'},
+                              '0,2': {'status': 'done', 'result': result}}}
+            self.assertEqual(C.pending_rows(rows, fake, True), rows[1:])
+            self.assertEqual(C.pending_rows(rows, fake, False), [])
 
     def test_stop_file_starts_nothing_new(self):
         (self.run_dir / 'STOP').write_text('')

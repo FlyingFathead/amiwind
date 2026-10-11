@@ -64,6 +64,12 @@ static int you_valid,battle,dead_music;
 static aw_combat_rng_t rng;
 static unsigned long seed_used,encounters;
 static float punch_started=-1;static int punch_struck;
+/* The quick retry of a lost fight (an AmiWind extension, aw_view.c, aw_death_retry): where
+ * everyone stood and how they were when the fight began. */
+static struct {
+    int valid;vec3_t origin,angles;aw_fighter_t you;
+    struct {edict_t *e;vec3_t origin,angles;aw_fighter_t f;float health;} npc[SLOTS];
+} retry;
 static edict_t *enemy;static float enemy_until;
 static aw_combat_stats_t totals;
 static struct {unsigned long thinks,swings,traces;double seconds,max;} cost;
@@ -83,6 +89,14 @@ static cvar_t chase_speed={"aw_combat_speed","200"};
 static cvar_t miss_cvar={"aw_combat_miss","1",true};
 static cvar_t dice_cvar={"aw_combat_dice","1",true};
 static cvar_t best_cvar={"aw_combat_best_attack","0",true};
+/* Blocking (Controls > Blocking; docs/COMBAT.md "Blocking"): aw_combat_block 1 = hold to block
+ * (AmiWind extension, the default by owner decision 2026-10-11: the player blocks only while the
+ * block button, the right mouse button, is held; each blow is still decided by the original
+ * formula and settings), 0 = Original Morrowind (automatic: a shield blocks by skill, no button;
+ * UESP Block, OpenMW has no block input). NPCs always block the original way. */
+static cvar_t block_cvar={"aw_combat_block","1",true};
+static int guard_key;                /* +aw_alt held outside pick mode */
+static float block_shown_until;      /* the body's block clip after a blocked blow */
 static float knock_seconds=2.667f,block_seconds=1.333f,block_hit=.25f;   /* settings.txt "anim" lines (base_anim clips) */
 /* The player's dodge slide, knockdown view and swing hold. */
 static struct {
@@ -387,6 +401,12 @@ int AW_CombatHealthPercent(edict_t *e) {
     if(!s || !(s->f.health_max>0))return -1;
     return s->f.health<=0?0:(int)(s->f.health*100/s->f.health_max);
 }
+/* THE "are we in a fight?" check (WAIT-DURING-COMBAT-36): someone fights the player and the player is alive.
+ * The battle music plays exactly while it holds (OpenMW music.lua: the battle playlist while an actor has combat
+ * targets), and waiting is refused while it holds (aw_wait.c; OpenMW World::canRest Rest_EnemiesAreNearby). The
+ * original's rest test is wider (any aggressive actor within 7168 units, docs/WAIT_AND_REST.md); it comes with the
+ * wait/rest work. */
+int AW_PlayerInCombat(void) {return AW_CombatHostiles()>0 && !you.dead;}
 int AW_CombatHostiles(void) {
     int i,n=0;
     for(i=0;i<SLOTS;i++)if(slots[i].e && !slots[i].e->free && !slots[i].f.dead)n++;
@@ -399,6 +419,10 @@ static void begin_encounter(void) {
     AW_CombatSeed(&rng,seed);seed_used=seed;encounters++;
     memset(&totals,0,sizeof(totals));totals.seed=seed;totals.started=sv.time;
     AW_CombatPlayerSheet(&you);you_valid=1;punch_started=-1;dead_music=0;
+    memset(&retry,0,sizeof(retry));
+    {edict_t *p=player();
+     if(p){retry.valid=1;VectorCopy(p->v.origin,retry.origin);VectorCopy(p->v.v_angle,retry.angles);retry.angles[0]=retry.angles[2]=0;
+           retry.you=you;retry.you.health=p->v.health>0?p->v.health:you.health;}}
 }
 /* Make an NPC hostile to the player. fighter: its sheet; layout: frame
  * groups (fighters.txt) or NULL for the model's own frames. */
@@ -415,12 +439,47 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     AW_PathReset(&s->path,(int)floor(e->v.origin[0]),(int)floor(e->v.origin[1]));
     s->next_think=s->last_think=(float)sv.time;s->cooldown=.5f;
     set_state(s,S_CHASE,G_IDLE);
+    if(retry.valid && retry.npc[s-slots].e!=e){
+        retry.npc[s-slots].e=e;VectorCopy(e->v.origin,retry.npc[s-slots].origin);VectorCopy(e->v.angles,retry.npc[s-slots].angles);
+        retry.npc[s-slots].f=s->f;retry.npc[s-slots].health=e->v.health;
+    }
     AW_ItemsShow(e,s->item);    /* a resident draws its weapon and shield (NPC-WEAPON-MESH-33) */
     if(readout.value)Con_Printf("Combat: %s (level %ld) attacks; seed %lu\n",s->f.name,(long)s->f.level,seed_used);
     voice(e,AW_VOICE_START);
     return 1;
 }
-void AW_CombatClear(void) {int i;for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;}
+void AW_CombatClear(void) {int i;for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;retry.valid=0;}
+/* The player died in the current fight and its start is known (aw_view.c offers "Retry fight"). */
+int AW_CombatRetryAvailable(void) {return retry.valid && you_valid && you.dead && player()!=NULL;}
+/* The death music is combat's (the death in a fight): aw_view.c does not play it again. */
+int AW_CombatDeathMusicPlayed(void) {return music.value && you_valid && you.dead;}
+/* Retry: everyone back where the fight began, at the health and fatigue they had then; the
+ * opponents still hostile. An AmiWind extension (the original offers only the last save). */
+int AW_CombatRetry(void) {
+    edict_t *p=player();int i;
+    if(!p || !AW_CombatRetryAvailable())return 0;
+    if(pv.view_saved)p->v.view_ofs[2]=pv.view_base;
+    memset(&pv,0,sizeof(pv));
+    VectorCopy(retry.origin,p->v.origin);VectorCopy(vec3_origin,p->v.velocity);
+    VectorCopy(retry.angles,p->v.angles);VectorCopy(retry.angles,p->v.v_angle);p->v.fixangle=1;
+    if(p->v.movetype==MOVETYPE_NONE)p->v.movetype=MOVETYPE_WALK;
+    you=retry.you;you.dead=you.knocked=0;you.staggered=0;you_store(p);
+    SV_LinkEdict(p,true);
+    for(i=0;i<SLOTS;i++){
+        slot_t *s=&slots[i];
+        if(!s->e || s->e->free || retry.npc[i].e!=s->e)continue;
+        s->f=retry.npc[i].f;s->f.aware=1;s->e->v.health=retry.npc[i].health;
+        VectorCopy(retry.npc[i].origin,s->e->v.origin);VectorCopy(retry.npc[i].angles,s->e->v.angles);
+        if(s->state==S_DEAD)s->e->v.solid=SOLID_SLIDEBOX;
+        set_state(s,S_CHASE,G_IDLE);s->cooldown=1;s->struck=0;
+        AW_PathReset(&s->path,(int)floor(s->e->v.origin[0]),(int)floor(s->e->v.origin[1]));
+        SV_LinkEdict(s->e,false);
+    }
+    punch_started=-1;dead_music=0;battle=0;enemy=NULL;
+    totals.won=0;totals.ended=0;
+    if(readout.value)Con_Printf("Combat: the fight restarts (retry, seed %lu)\n",seed_used);
+    return 1;
+}
 const aw_combat_stats_t *AW_CombatStats(void) {return &totals;}
 unsigned long AW_CombatSeedUsed(void) {return seed_used;}
 const aw_fighter_t *AW_CombatPlayer(void) {return you_valid?&you:NULL;}
@@ -488,10 +547,16 @@ static void npc_strike(slot_t *s,edict_t *p) {
         return;
     }
     you.staggered=0;
+    you.block_off=(unsigned char)(block_cvar.value && !AW_CombatGuarding());
+    /* fBlockStillBonus while not moving forward (combat.cpp: movement mPosition[1] <= 0) */
     AW_CombatSwing(&aw_combat_settings,&s->f,&you,s->attack,s->strength,bearing(p,s->e,0),
-        !(p->v.velocity[0] || p->v.velocity[1]),&rng,&out);
+        svs.clients[0].cmd.forwardmove<=0,&rng,&out);
+    you.block_off=0;
     totals.npc_swings++;cost.swings++;
-    if(out.outcome==AW_HIT_BLOCKED){totals.npc_misses++;shield_sound(&you);p->v.punchangle[0]=-4;p->v.punchangle[2]=3;}
+    if(out.outcome==AW_HIT_BLOCKED){
+        totals.npc_misses++;totals.player_blocks++;shield_sound(&you);p->v.punchangle[0]=-4;p->v.punchangle[2]=3;
+        block_shown_until=(float)sv.time+block_seconds*(1-block_hit);
+    }
     else if(out.outcome==AW_HIT_MISS){totals.npc_misses++;sound(SND_SWISH);player_react_miss(p,&out);}
     else{
         totals.npc_hits++;
@@ -588,7 +653,7 @@ static void player_strike(edict_t *p) {
     AW_CombatSwing(&aw_combat_settings,&you,&s->f,attack,player_strength(),bearing(t,p,90),!s->f.moving,&rng,&out);
     s->f.aware=1;cost.swings++;
     if(out.outcome==AW_HIT_BLOCKED){
-        totals.player_misses++;shield_sound(&s->f);
+        totals.player_misses++;totals.npc_blocks++;shield_sound(&s->f);
         if(s->state!=S_KNOCK && !s->f.dead)start_block(s);
     }else if(out.outcome==AW_HIT_MISS){
         totals.player_misses++;
@@ -777,7 +842,7 @@ void AW_CombatPhysics(void) {
     /* Battle music while anyone fights the player (OpenMW music.lua:
      * the battle playlist is active while an actor has combat targets). */
     if(music.value){
-        int want=AW_CombatHostiles()>0 && !you.dead;
+        int want=AW_PlayerInCombat();
         if(you_valid && you.dead){if(!dead_music){dead_music=1;AW_MusicDeath();}}
         else if(want!=battle){battle=want;AW_MusicCombat(want);}
     }
@@ -787,7 +852,7 @@ void AW_CombatPhysics(void) {
  * fNPCHealthBarFade seconds. */
 int AW_CombatEnemyBar(float *fraction,float *alpha) {
     slot_t *s;float left;
-    if(!enemy || !(s=slot_of(enemy)) || !sv.active)return 0;
+    if(!enemy || !(s=slot_of(enemy)) || !sv.active || AW_PlayerDead())return 0;
     left=enemy_until-(float)sv.time;if(left<0)return 0;
     *fraction=s->f.health_max>0?s->f.health/s->f.health_max:0;
     *alpha=aw_combat_settings.fNPCHealthBarFade>0?left/aw_combat_settings.fNPCHealthBarFade:1;
@@ -797,8 +862,8 @@ int AW_CombatEnemyBar(float *fraction,float *alpha) {
 /* aw_scene.c: a new map; the old edicts are gone. */
 void AW_CombatSceneSpawn(void) {
     int i;for(i=0;i<SLOTS;i++)memset(&slots[i],0,sizeof(slots[i]));
-    memset(&pv,0,sizeof(pv));
-    enemy=NULL;you_valid=0;
+    memset(&pv,0,sizeof(pv));block_shown_until=0;
+    enemy=NULL;you_valid=0;memset(&retry,0,sizeof(retry));
     if(battle){battle=0;AW_MusicCombat(0);}
 }
 
@@ -807,6 +872,8 @@ static void report(void) {
     int i;double span=sv.time-totals.started;if(span<.001)span=.001;
     Con_Printf("Combat %s, readout %s, music %s, seed %lu (aw_combat_seed %ld)\n",combat_on.value?"on":"off",
         readout.value?"on":"off",music.value?"on":"off",seed_used,(long)seed_cvar.value);
+    Con_Printf("Blocking: %s%s; blocks: you %lu, NPCs %lu; guards %lu\n",block_cvar.value?"hold to block (AmiWind)":"automatic (original)",
+        AW_CombatGuarding()?", guarding":"",totals.player_blocks,totals.npc_blocks,totals.guards);
     for(i=0;i<SLOTS;i++)if(slots[i].e)Con_Printf(" %s: health %ld/%ld fatigue %ld/%ld %s\n",slots[i].f.name,
         (long)slots[i].f.health,(long)slots[i].f.health_max,(long)slots[i].f.fatigue,(long)slots[i].f.fatigue_max,
         slots[i].f.dead?"dead":slots[i].f.knocked?"down":"fighting");
@@ -816,14 +883,33 @@ static void report(void) {
     Con_Printf("bytes: per hostile NPC %ld, all slots %ld, player sheet %ld; no allocation\n",(long)sizeof(slot_t),
         (long)sizeof(slots),(long)sizeof(you));
 }
-/* +aw_alt (the Amiga right mouse button, keymaps.cfg): one context action. Pick mode:
- * pick the companion under the crosshair. In a fight: reserved for the held block, an
- * AmiWind extension not yet built (the original blocks automatically;
- * COMBAT-SETUP-DICE-BLOCK-33). Otherwise nothing. */
-static void alt_down(void) {
-    if(AW_CompanionPickAim())return;
+/* +aw_alt (the Amiga right mouse button, keymaps.cfg): one context action. Pick mode
+ * (dbg companion pick): pick the companion under the crosshair (the left button picks
+ * too). Otherwise the block button (COMBAT-BLOCKING-36): with aw_combat_block 1 the
+ * player guards while it is held. */
+static int shield_ready(void) {
+    aw_fighter_t f;const aw_fighter_t *o=&f;
+    if(you_valid)o=&you;else{if(!settings_ok && !AW_CombatSettingsLoad())return 0;AW_CombatPlayerSheet(&f);}
+    return o->shield && !AW_TWO_HANDED(o->weapon) && !o->dead && !o->knocked;
 }
-static void alt_up(void) {}
+int AW_CombatGuarding(void) {
+    return guard_key && block_cvar.value && combat_on.value && player()!=NULL && !AW_PlayerDead() && shield_ready();
+}
+float AW_CombatBlockShown(void) {
+    float left=block_shown_until-(float)sv.time;
+    return sv.active && left>0 && left<10?left:0;
+}
+static void alt_down(void) {
+    if(AW_PlayerDead())return;
+    if(AW_CompanionPickAim())return;
+    guard_key=1;
+    if(!block_cvar.value || !player())return;
+    if(!shield_ready()){if(readout.value)Con_Printf("Combat: no shield to block with (a shield and a one-handed weapon or none)\n");}
+    else{totals.guards++;if(readout.value && AW_CombatHostiles())Con_Printf("Combat: you raise your shield\n");}
+}
+static void alt_up(void) {guard_key=0;}
+/* No swing while guarding (release the block button to attack). */
+static int guard_buttons(int bits) {return AW_CombatGuarding()?bits&~1:bits;}
 /* dbg combat loadout NAME: a test loadout of arena/player.txt for fights in the
  * world (the arena sets its own); "off" = the character again. */
 static aw_fighter_t world_loadout;
@@ -854,18 +940,24 @@ static void command(void) {
         if(on>=0){Cvar_SetValue(miss_cvar.name,(float)on);
             Con_Printf("Combat style: %s.\n",on?"AmiWind (a missed blow is dodged or blocked; AmiWind extension)":"Original Morrowind (the swish)");return;}
     }
+    if(Cmd_Argc()==3 && !Q_strcasecmp(a,"block")){
+        if(!Q_strcasecmp(Cmd_Argv(2),"hold"))on=1;else if(!Q_strcasecmp(Cmd_Argv(2),"auto") || !Q_strcasecmp(Cmd_Argv(2),"original"))on=0;else on=-1;
+        if(on>=0){Cvar_SetValue(block_cvar.name,(float)on);
+            Con_Printf("Blocking: %s.\n",on?"hold the block button (AmiWind extension; the original formula decides each blow)":"automatic (Original Morrowind)");return;}
+    }
     if(Cmd_Argc()==3 && !Q_strcasecmp(a,"bestattack") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){Cvar_SetValue(best_cvar.name,(float)on);return;}
     if(!Q_strcasecmp(a,"calm") && Cmd_Argc()==2){AW_CombatClear();if(battle){battle=0;AW_MusicCombat(0);}Con_Printf("Combat: everyone calms down.\n");return;}
     if((on=AW_CompanionToggleWord(a))>=0 && Cmd_Argc()==2){Cvar_SetValue(combat_on.name,(float)on);if(!on)AW_CombatClear();return;}
-    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | bestattack on/off | loadout NAME/off | calm]\n");
+    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | bestattack on/off | loadout NAME/off | calm]\n");
 }
 void AW_CombatInit(void) {
     Cvar_RegisterVariable(&combat_on);Cvar_RegisterVariable(&readout);Cvar_RegisterVariable(&music);
     Cvar_RegisterVariable(&seed_cvar);Cvar_RegisterVariable(&punch_hit);Cvar_RegisterVariable(&think_interval);
     Cvar_RegisterVariable(&chase_speed);
     Cvar_RegisterVariable(&miss_cvar);Cvar_RegisterVariable(&dice_cvar);Cvar_RegisterVariable(&best_cvar);
+    Cvar_RegisterVariable(&block_cvar);aw_combat_buttons=guard_buttons;aw_combat_guard_marker=AW_CombatGuarding;
     aw_combat_input_locked=player_locked;
-    Cmd_AddCommand("aw_combat",command);
+    Cmd_AddCommand("aw_combat_cmd",command);   /* not "aw_combat": the cvar of that name would shadow it (CONSOLE-COMMAND-SHADOWED-BY-CVAR-36) */
     Cmd_AddCommand("+aw_alt",alt_down);Cmd_AddCommand("-aw_alt",alt_up);
     aw_combat_enemy_bar=AW_CombatEnemyBar;aw_combat_scene=AW_CombatSceneSpawn;
 }

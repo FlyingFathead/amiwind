@@ -80,7 +80,9 @@ class SeamGateTests(unittest.TestCase):
         if not KNOWN.is_file():
             self.skipTest('no known torn meshes recorded')
         data = json.loads(KNOWN.read_text(encoding='utf-8'))
-        bugs = {b['id'] for b in json.loads((KNOWN.parents[1] / 'docs/bugs/bugs.json').read_text(encoding='utf-8'))}
+        docs = KNOWN.parents[1] / 'docs/bugs'
+        files = [docs / 'bugs.json'] + sorted((docs / 'archive').glob('*.json'))
+        bugs = {b['id'] for f in files for b in json.loads(f.read_text(encoding='utf-8'))}
         for row in data['known']:
             self.assertIn(row['bug'], bugs, row['model'])
             self.assertIn(row['space'], ('group', 'town', 'world', 'interior'))

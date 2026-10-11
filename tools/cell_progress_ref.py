@@ -18,7 +18,7 @@ STAT_KEYS = ('records.refs_total', 'faces.chim_placed', 'bytes.chim', 'chunks.co
 # Status order for the compare layer (higher = further along). Empty sea is as good as it gets.
 RANK = {'not_started': 0, 'not_converted': 1, 'converted_failing': 2, 'hull_policy_pending': 3, 'converted_unmeasured': 3,
         'audits_passed': 4, 'playtested': 4, 'approved': 4, 'terrain_complete_unlit': 5, 'terrain_complete': 6,
-        'complete_unlit': 6, 'complete': 7, 'empty_sea': 7}
+        'complete_unlit': 6, 'complete': 7, 'empty_sea': 7, 'ocean': 0}
 PRIVATE = (re.compile(r'\b[A-Za-z]:[\\/]'), re.compile(r'(^|[\s"(`])/(vol|src|out|owned|trk|met|perf|work|input)\b'),
            re.compile(r'amiwind-[a-z0-9-]*-\d{3}'), re.compile(r'@[a-z0-9.-]+\.[a-z]{2,}', re.I))
 
@@ -34,7 +34,7 @@ def dotted(d, name):
 def build(doc):
     cells = {}
     for k, c in sorted(doc['cells'].items()):
-        if c.get('island') is None or not (c['land'] or c['chim']['bucket'] == 'empty_sea'):
+        if c.get('island') is None or not (c['land'] or c['chim']['bucket'] in ('empty_sea', 'ocean')):
             continue
         row = {'name': c.get('name') or c.get('region'), 'status': c['chim']['bucket'], 'ring': c.get('ring'), 'island': c['island'],
                'lighting': (c.get('lighting') or {}).get('status'), 'release': (c.get('release') or {}).get('name')}

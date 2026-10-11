@@ -254,26 +254,38 @@ class ArenaFootprint(unittest.TestCase):
 
 
 class TownTable(unittest.TestCase):
-    def test_handoff_core_stays_in_quakes_coordinate_range(self):
-        """CHIM-FRAME-COORD-RANGE-33: a frame core past +/-4,000 is refused by the generator, the bound
-        matches the engine's checks, and the engine still sends positions as 1/8-unit shorts."""
+    def test_handoff_core_stays_in_the_coordinate_range(self):
+        """CHIM-FRAME-COORD-RANGE-33: the generator refuses a frame core past the wide bound (+/-32,000, the
+        engine default since v0.0.36), the bound matches the engine's checks, and the narrow method (1/8-unit
+        shorts, +/-4,000) stays selectable: a core past +/-4,000 is a wide-only area (coord_range.core_problem)."""
         import re
+        import coord_range
         import town_table
-        row = {'name': 'vivec', 'handoff': 1, 'core': [[-4992, -4608], [4992, 4608]]}
+        row = {'name': 'vivec', 'handoff': 1, 'core': [[-32768, -4608], [4992, 4608]]}
         with self.assertRaisesRegex(ValueError, 'CHIM-FRAME-COORD-RANGE-33'):
             town_table.check_core(row)
-        town_table.check_core({**row, 'core': [[-4000, -4000], [4000, 4000]]})
+        town_table.check_core({**row, 'core': [[-4992, -4608], [4992, 4608]]})   # all of Vivec: wide only
         town_table.check_core({**row, 'handoff': 0})
+        self.assertIsNone(coord_range.core_problem([[-4096, -4608], [4096, 4608]], 'wide'))
+        self.assertIn('needs --coord-range wide', coord_range.core_problem([[-4096, -4608], [4096, 4608]], 'narrow'))
+        self.assertIsNone(coord_range.core_problem([[-1440, -1440], [1440, 1440]], 'narrow'))
         for r in runtime_towns():
             town_table.check_core(r)
         src = ROOT / 'engine/aga/src'
         world = (src / 'aw_world.c').read_text(encoding='utf-8')
-        bound = town_table.FRAME_BOUND
-        self.assertIn(f't->core[k]>=-{bound} && t->core[k+2]<={bound}', world)
-        self.assertIn(f'fabs(arrival[k])<{bound}', world)
-        self.assertLessEqual(bound, town_table.COORD_RANGE)
+        self.assertEqual(town_table.FRAME_BOUND, coord_range.WIDE_BOUND)
+        # the engine names the bound once (aw_coord.h): wide by default, narrow with AW_COORD_NARROW
+        self.assertIn('t->core[k]>=-AW_COORD_BOUND && t->core[k+2]<=AW_COORD_BOUND', world)
+        self.assertIn('fabs(arrival[k])<AW_COORD_BOUND', world)
+        header = (src / 'aw_coord.h').read_text(encoding='utf-8')
+        wide, narrow = header.split('#ifndef AW_COORD_NARROW', 1)[1].split('#endif', 1)[0].split('#else', 1)
+        self.assertRegex(wide, rf'#define AW_COORD_BOUND {coord_range.WIDE_BOUND}\b')
+        self.assertRegex(narrow, rf'#define AW_COORD_BOUND {coord_range.NARROW_BOUND}\b')
+        self.assertLessEqual(coord_range.NARROW_BOUND, town_table.COORD_RANGE)
         common = (src / 'common.c').read_text(encoding='utf-8')
-        self.assertRegex(common, re.compile(r'MSG_WriteCoord \(sizebuf_t \*sb, float f\)\s*\{\s*MSG_WriteShort \(sb, \(int\)\(f\*8\)\);'))
+        # the narrow build still sends Quake's 1/8-unit shorts
+        self.assertRegex(common, re.compile(r'MSG_WriteCoord \(sizebuf_t \*sb, float f\)\s*\{\s*'
+                                            r'#if AW_COORD_BYTES == 3[^#]*#else\s*MSG_WriteShort \(sb, \(int\)\(f\*8\)\);\s*#endif'))
 
     def test_checked_in_engine_table_matches_configs(self):
         import town_table

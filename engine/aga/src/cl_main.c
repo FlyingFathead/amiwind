@@ -434,9 +434,12 @@ SetPal(2);
 CL_RelinkEntities
 ===============
 */
+/* aw_view.c: the drawn player body for the view entity, or NULL (nothing drawn). */
+entity_t *(*aw_view_body)(entity_t *ent);
+
 void CL_RelinkEntities (void)
 {
-	entity_t	*ent;
+	entity_t	*ent, *draw;
 	int			i, j;
 	float		frac, f, d;
 	vec3_t		delta;
@@ -605,14 +608,22 @@ void CL_RelinkEntities (void)
 
 		if (i == cl.viewentity && !chase_active.value)
 			continue;
+		/* Third person (aw_view.c): the player's body in place of the view entity's model.
+		 * The body goes into its own pointer: `ent` is this loop's cursor over cl_entities,
+		 * and pointing it at the body made every later entity (every NPC) be read and written
+		 * past aw_view.c's body (CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36,
+		 * CHIM-FRAME-EDGE-EFRAG-CRASH-36). */
+		draw = ent;
+		if (i == cl.viewentity && aw_view_body && !(draw = aw_view_body (ent)))
+			continue;
 
 #ifdef QUAKE2
-		if ( ent->effects & EF_NODRAW )
+		if ( draw->effects & EF_NODRAW )
 			continue;
 #endif
 		if (cl_numvisedicts < MAX_VISEDICTS)
 		{
-			cl_visedicts[cl_numvisedicts] = ent;
+			cl_visedicts[cl_numvisedicts] = draw;
 			cl_numvisedicts++;
 		}
 		else

@@ -630,12 +630,24 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
         points = np.array([(x, y, l['bottom']) for x, y in l['hull']] +
                           [(x, y, l['bottom'] - lava_bed) for x, y in l['hull']])
         pieces.append((points, SimpleNamespace(equations=ConvexHull(points).equations), [], 0.))
+    hull_check = None
     if hull == 'compiled':
-        from collision_bsp import compile_standing
+        from collision_bsp import compile_standing_checked
         if qbsp is None or collision_cache is None:
             raise ValueError('The compiled terrain hull needs qbsp and a collision cache')
-        compiled = compile_standing(hull_pieces(pieces), qbsp, collision_cache, grid=TERRAIN_HULL_GRID)
-        croot = w.collider(hull_pieces(pieces), compiled=compiled, point_hull=False)[1]
+        # qbsp snaps and merges planes: on small irregular pieces the compiled top can lie units below the exact
+        # union (CHIM-COMPILED-HULL-SHORT-36). compile_standing checks it against the pieces over the chunk
+        # (collision_bsp.standing_check, the one check for terrain and models) and patches lost pieces with the
+        # pieces themselves; a chunk whose hull still fails keeps the routed hull of the same pieces.
+        compiled, check = compile_standing_checked(hull_pieces(pieces), qbsp, collision_cache, grid=TERRAIN_HULL_GRID,
+                                                   check_box=(x0, y0, x1, y1))
+        if check['short'] > 0 or check['over'] > 0:
+            hull = 'routed'
+            hull_check = dict(check, fallback='routed')
+            croot = w.routed_hull(hull_pieces(pieces), (x0, y0, x1, y1))
+        else:
+            hull_check = dict(check) if check.get('patched_rounds') else None     # recorded when patched
+            croot = w.collider(hull_pieces(pieces), compiled=compiled, point_hull=False)[1]
     elif hull == 'routed':
         croot = w.routed_hull(hull_pieces(pieces), (x0, y0, x1, y1))
     else:
@@ -648,7 +660,7 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
             'lava_faces': counts['lava_faces'], 'lava_leaves': counts['lava_leaves'],
             'pieces': len(pieces), 'ring_tiles': ring,
             'hull_chain_max': max(getattr(w, 'hull_chains', None) or [0]),
-            'clipnodes': len(w.lumps[9]) // 8, 'hull': hull, 'zmin': zmin, 'zmax': zmax, 'nodes': len(node_rows),
+            'clipnodes': len(w.lumps[9]) // 8, 'hull': hull, **({'hull_check': hull_check} if hull_check else {}), 'zmin': zmin, 'zmax': zmax, 'nodes': len(node_rows),
             'leaves': len(tree.leaves) - 1, 'depth': tree.depth(), 'tree': tree, 'texture_keys': list(w.textures)}
     return lumps, info
 

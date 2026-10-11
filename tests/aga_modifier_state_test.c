@@ -27,13 +27,17 @@ int main(void){
  Key_Event(K_SHIFT,true);Key_AmigaQualifiers(0);
  tap('d');tap('b');tap('g');tap(' ');tap('1');
  assert(!strcmp(key_lines[edit_line],"]dbg 1"));
+ Key_AmigaQualifierKey(0x62);   /* the Caps Lock key: its qualifier bit counts from now on */
  Key_AmigaQualifiers(4);tap('a');tap('2'); /* Caps changes letters only. */
  assert(!strcmp(key_lines[edit_line],"]dbg 1A2"));
+ Key_AmigaQualifierKey(0x60);   /* left Shift down */
  Key_AmigaQualifiers(5);tap('a');tap('1'); /* Caps+Shift lowercases letters. */
  assert(!strcmp(key_lines[edit_line],"]dbg 1A2a!"));
- Key_AmigaQualifiers(3);assert(keydown[K_SHIFT]);
- Key_AmigaQualifiers(2);assert(keydown[K_SHIFT]);
- Key_AmigaQualifiers(0);assert(!keydown[K_SHIFT]);
+ Key_AmigaQualifierKey(0x61);Key_AmigaQualifiers(3);assert(keydown[K_SHIFT]);
+ Key_AmigaQualifierKey(0x60|0x80);Key_AmigaQualifiers(2);assert(keydown[K_SHIFT]);
+ Key_AmigaQualifierKey(0x61|0x80);Key_AmigaQualifiers(0);assert(!keydown[K_SHIFT]);
+ /* ENGINE-CRASH-EXIT-KEYBOARD-36: a Shift bit latched without a held Shift key is ignored. */
+ Key_AmigaQualifiers(1);assert(!keydown[K_SHIFT]);Key_AmigaQualifiers(0);
  Key_AmigaQualifiers(0xc0);assert(!keydown[K_CTRL] && !keydown[K_SHIFT]);
  assert(Key_AmigaRaw(0x30)=='<' && Key_AmigaRaw(0x67)==0);
  Key_AmigaQualifiers(1);Key_ClearStates();assert(!keydown[K_SHIFT]);

@@ -17,7 +17,7 @@ Everything here is pure Python on bytes; no game data is involved.
 import struct
 import zlib
 
-from chim import FORMAT_VERSION
+from chim import FORMAT_VERSION, REFS_FORMAT_VERSION
 
 MAGIC = b'CHIM'
 KINDS = (b'INDX', b'FRAM', b'SECT')
@@ -34,6 +34,12 @@ RECORD_ENTRY = struct.Struct('>4sIII')            # 16 bytes, sector file
 CHUNK_HEAD = struct.Struct('>4sHHIIHHHH')         # 24 bytes
 PLACEMENT = struct.Struct('>IIIffffHbb6hHH')      # 48 bytes
 CHUNK_MAGIC = b'CHK0'
+# Format 0.7 (terrain references, docs/chim/WORLD_FORMAT.md "Terrain references"): a chunk whose terrain image
+# is a TERR record stored once in the world and placed at an offset. Its record ends in a reference block.
+CHUNK_MAGIC_REF = b'CHK1'
+TERRAIN_REF = struct.Struct('>IHHIIIfff')        # 32 bytes: id, file row, 0, offset, bytes, render, dx, dy, dz
+RECORD_KINDS = (b'CHNK', b'TERR', b'MODL', b'TEXR')   # sector record kinds, in file order
+READ_VERSIONS = (FORMAT_VERSION, REFS_FORMAT_VERSION)
 
 # BSP29 lumps. File order of a brush image is the order AW_LoadBrushSection
 # decodes them (model.c Mod_LoadBrushModel), so a streamed load reads it
@@ -50,6 +56,10 @@ BSPVERSION = 29
 
 # Classic FFS rules (hard requirements of every file the builder writes).
 FFS_NAME_CHARS = 30
+# Rows of the index file table the engine reads (chim_local.h CHIM_MAX_FILES; a model/texture record names its
+# file in 16 bits). Was 4096 in the engine while this writer had no limit: the v0.0.36-dev3 coast world has 7,236
+# rows and every CHIM frame map was refused (CHIM-DEV3-MAPLOAD-CRASH-36).
+MAX_INDEX_FILES = 65535
 FFS_MAX_PACK = 1 << 30            # files stay well under 2 GiB: at most 1 GiB
 FFS_MAX_DIRECTORY_ENTRIES = 72    # one FFS directory block has 72 hash chains
 
@@ -80,8 +90,10 @@ def pad(data, a=4):
     return bytes(data) + bytes(align(len(data), a) - len(data))
 
 
-def header(kind, count, directory_offset, data_offset, file_bytes):
-    return HEADER.pack(MAGIC, kind, FORMAT_VERSION[0], FORMAT_VERSION[1], HEADER.size, count,
+def header(kind, count, directory_offset, data_offset, file_bytes, version=FORMAT_VERSION):
+    if version not in READ_VERSIONS:
+        raise ValueError('CHIM world format %d.%d is not written by this builder' % tuple(version))
+    return HEADER.pack(MAGIC, kind, version[0], version[1], HEADER.size, count,
                        directory_offset, data_offset, file_bytes)
 
 
@@ -93,11 +105,12 @@ def read_header(data, kind=None):
         raise ValueError('Not a CHIM file')
     if kind is not None and k != kind:
         raise ValueError('Expected a CHIM %s file, found %s' % (kind.decode(), k.decode()))
-    if (major, minor) != FORMAT_VERSION:
-        raise ValueError('CHIM world format %d.%d, expected %d.%d' % (major, minor, *FORMAT_VERSION))
+    if (major, minor) not in READ_VERSIONS:
+        raise ValueError('CHIM world format %d.%d, expected %s' % (major, minor, ' or '.join(
+            '%d.%d' % v for v in READ_VERSIONS)))
     if size != HEADER.size or total != len(data) or not size <= diro <= datao <= total:
         raise ValueError('CHIM header offsets do not match the file')
-    return {'kind': k, 'count': count, 'directory': diro, 'data': datao, 'bytes': total}
+    return {'kind': k, 'count': count, 'directory': diro, 'data': datao, 'bytes': total, 'version': (major, minor)}
 
 
 # ---------------------------------------------------------------- brush images
@@ -149,6 +162,53 @@ def render_extent(data):
     if collision_start < render_end:
         raise ValueError('Collision lumps must follow the render part')
     return collision_start
+
+
+def translate_image(data, shift):
+    """A brush image moved by shift (dx, dy, dz): what the engine's graft makes of a referenced chunk terrain
+    (chim_graft.c CopyGraft, format 0.7). Planes (dist += normal . shift), vertexes, node and leaf bounds
+    (shorts) and the model bounds move; texinfo, faces, edges, clipnodes and the rest are unchanged. The
+    bounds and a face's texture minimums move by whole units: refuse_shift checks that first."""
+    dx, dy, dz = (float(v) for v in shift)
+    lumps = [bytearray(x) for x in read_brush_image(data)]
+    planes = lumps[1]
+    for at in range(0, len(planes), 20):
+        nx, ny, nz, dist, kind = struct.unpack_from('<ffffi', planes, at)
+        struct.pack_into('<f', planes, at + 12, dist + (nx * dx + ny * dy + nz * dz))
+    verts = lumps[3]
+    for at in range(0, len(verts), 12):
+        x, y, z = struct.unpack_from('<fff', verts, at)
+        struct.pack_into('<fff', verts, at, x + dx, y + dy, z + dz)
+    step = (int(dx), int(dy), int(dz))
+    for lump, size, first, skip in ((5, 24, 8, 0), (10, 28, 8, 1)):
+        rows = lumps[lump]
+        for at in range(skip * size, len(rows), size):      # leaf 0 is the world's shared solid leaf: kept
+            box = struct.unpack_from('<6h', rows, at + first)
+            struct.pack_into('<6h', rows, at + first, *(box[k] + step[k % 3] for k in range(6)))
+    models = lumps[14]
+    if any(struct.unpack_from('<3f', models, at + 24) != (0.0, 0.0, 0.0) for at in range(0, len(models), 64)):
+        raise ValueError('A referenced terrain image has a model origin')
+    for at in range(0, len(models), 64):
+        box = struct.unpack_from('<6f', models, at)
+        struct.pack_into('<6f', models, at, *(box[k] + (dx, dy, dz)[k % 3] for k in range(6)))
+    image, _ = brush_image(lumps)
+    return image
+
+
+def refuse_shift(data, shift):
+    """Why a terrain image cannot be placed at shift, or None: the shift must be whole units (shorts move by
+    it) and move every face's texture coordinates by a multiple of 16 texels (the engine adds it to the
+    surface's texture minimums instead of measuring the face again: model.c CalcSurfaceExtents)."""
+    if any(float(v) != int(v) for v in shift):
+        return 'shift %s is not in whole units' % (list(shift),)
+    texinfo = read_brush_image(data)[6]
+    for at in range(0, len(texinfo), 40):
+        vecs = struct.unpack_from('<8f', texinfo, at)
+        for axis in (vecs[0:3], vecs[4:7]):
+            moved = sum(a * b for a, b in zip(axis, shift))
+            if moved % 16:
+                return 'a texture axis %s moves %g texels at shift %s' % (list(axis), moved, list(shift))
+    return None
 
 
 def texture_refs(global_ids):
@@ -256,10 +316,28 @@ def chunk_record(owned, reach, pvs, image, image_render, leaves, pvl=b''):
     return data, render, len(data) - render
 
 
+def terrain_ref(tid, file_row, offset, nbytes, render, shift):
+    """The reference block of a CHK1 chunk (format 0.7): TERR record `tid` at `offset` of file row
+    `file_row` (nbytes, render bytes), placed at `shift` (dx, dy, dz, local units)."""
+    return TERRAIN_REF.pack(tid, file_row, 0, offset, nbytes, render, *shift)
+
+
+def read_terrain_ref(data):
+    tid, row, _, offset, nbytes, render, dx, dy, dz = TERRAIN_REF.unpack_from(data)
+    return {'id': tid, 'file': row, 'offset': offset, 'bytes': nbytes, 'render': render, 'shift': (dx, dy, dz)}
+
+
+def chunk_record_ref(owned, reach, pvs, ref, leaves, pvl=b''):
+    """A chunk whose terrain is a reference (format 0.7): as chunk_record, magic CHK1, and the 32-byte
+    reference block (terrain_ref) where the image would be. Returns (bytes, render_bytes, 0)."""
+    data, render, collision = chunk_record(owned, reach, pvs, ref, len(ref), leaves, pvl)
+    return CHUNK_MAGIC_REF + data[4:], render, collision
+
+
 def read_chunk(raw):
-    """A chunk record's parts (see chunk_record)."""
+    """A chunk record's parts (see chunk_record; a CHK1 record also has 'ref', its terrain reference)."""
     magic, n_owned, n_reach, image_at, image_render, pvs_bytes, leaves, pvl_bytes, _ = CHUNK_HEAD.unpack_from(raw)
-    if magic != CHUNK_MAGIC:
+    if magic not in (CHUNK_MAGIC, CHUNK_MAGIC_REF):
         raise ValueError('Not a chunk record')
     recs = [read_placement(raw, CHUNK_HEAD.size + k * PLACEMENT.size) for k in range(n_owned + n_reach)]
     pvs_at = CHUNK_HEAD.size + (n_owned + n_reach) * PLACEMENT.size
@@ -268,14 +346,16 @@ def read_chunk(raw):
     return {'owned': recs[:n_owned], 'reach': recs[n_owned:], 'pvs': raw[pvs_at:pvs_at + pvs_bytes],
             'pvl': raw[pvs_at + pvs_bytes:pvs_at + pvs_bytes + pvl_bytes],
             'leaves': leaves, 'image': raw[image_at:], 'image_render': image_render,
-            'render': image_at + image_render}
+            'render': image_at + image_render,
+            **({'ref': read_terrain_ref(raw[image_at:])} if magic == CHUNK_MAGIC_REF else {})}
 
 
 # ---------------------------------------------------------------- sector files
 
-def sector_file(records):
-    """records: [(kind, id, data)] in pack order; kind b'CHNK' (chunk index in the frame),
-    b'MODL' (model id) or b'TEXR' (texture id). Every record starts on a 4-byte boundary."""
+def sector_file(records, version=FORMAT_VERSION):
+    """records: [(kind, id, data)] in pack order; kind b'CHNK' (chunk index in the frame), b'TERR'
+    (terrain id, format 0.7), b'MODL' (model id) or b'TEXR' (texture id). Every record starts on a 4-byte
+    boundary."""
     diro = HEADER.size
     datao = align(diro + len(records) * RECORD_ENTRY.size)
     body = bytearray()
@@ -284,7 +364,7 @@ def sector_file(records):
         entries.append(RECORD_ENTRY.pack(kind, rid, datao + len(body), len(data)))
         body += pad(data)
     total = datao + len(body)
-    out = bytearray(header(b'SECT', len(records), diro, datao, total)) + b''.join(entries)
+    out = bytearray(header(b'SECT', len(records), diro, datao, total, version)) + b''.join(entries)
     out += bytes(datao - len(out)) + body
     return bytes(out)
 
@@ -297,7 +377,7 @@ def read_sector(data):
     at = h['data']
     for i in range(h['count']):
         kind, rid, o, n = RECORD_ENTRY.unpack_from(data, h['directory'] + i * RECORD_ENTRY.size)
-        if kind not in (b'CHNK', b'MODL', b'TEXR'):
+        if kind not in RECORD_KINDS:
             raise ValueError('Sector record %d has an unknown kind' % i)
         if o != at or o + n > len(data):
             raise ValueError('Sector record %d is not where the previous one ended' % i)
@@ -310,7 +390,7 @@ def read_sector(data):
 
 # ---------------------------------------------------------------- frame files
 
-def frame_file(frame, chunks, sectors):
+def frame_file(frame, chunks, sectors, version=FORMAT_VERSION):
     """frame: dict(cell, centre, low, grain, nx, ny, sector_chunks, owned_total);
     chunks: [(cx, cy, sector, offset, render, collision, owned, reach, zmin, zmax)] in pack order;
     sectors: [(sx, sy, bytes, crc)] in pack order."""
@@ -320,7 +400,7 @@ def frame_file(frame, chunks, sectors):
     diro = HEADER.size + FRAME_BLOCK.size
     sectors_at = diro + len(chunks) * CHUNK_ENTRY.size
     total = sectors_at + len(sectors) * SECTOR_ENTRY.size
-    out = header(b'FRAM', len(chunks), diro, sectors_at, total) + block
+    out = header(b'FRAM', len(chunks), diro, sectors_at, total, version) + block
     out += b''.join(CHUNK_ENTRY.pack(cx, cy, sector, 0, offset, render, coll, owned, reach, zmin, zmax)
                     for cx, cy, sector, offset, render, coll, owned, reach, zmin, zmax in chunks)
     out += b''.join(SECTOR_ENTRY.pack(*s) for s in sectors)
@@ -355,7 +435,7 @@ def sector_name(index):
 
 # ---------------------------------------------------------------- the index
 
-def index_file(settings, files, models, textures):
+def index_file(settings, files, models, textures, version=FORMAT_VERSION):
     """settings: dict; files: [dict(kind, sector, cell, bytes, crc, entries, path)] (frames and sectors);
     models: [(name, file, offset, bytes, render)] by model id; textures: [(name, file, offset, bytes, w, h)]
     by texture id. `file` is a row of the file table."""
@@ -369,6 +449,8 @@ def index_file(settings, files, models, textures):
         at = len(names)
         names.extend(name.encode('utf-8') + b'\0')
         return at
+    if len(files) > MAX_INDEX_FILES:
+        raise ValueError('Index file table has %d rows; the engine reads at most %d' % (len(files), MAX_INDEX_FILES))
     rows = []
     for f in files:
         path = f['path'].encode('ascii')
@@ -386,7 +468,7 @@ def index_file(settings, files, models, textures):
     names_at = textures_at + len(trows) * TEXTURE_DIR.size
     total = align(names_at + len(names))
     toc = INDEX_TOC.pack(files_at, len(rows), models_at, len(mrows), order_at, textures_at, len(trows), names_at)
-    out = (header(b'INDX', len(rows), files_at, names_at, total) + s + toc + b''.join(rows) + b''.join(mrows)
+    out = (header(b'INDX', len(rows), files_at, names_at, total, version) + s + toc + b''.join(rows) + b''.join(mrows)
            + struct.pack('>%dI' % len(order), *order) + b''.join(trows) + bytes(names))
     return out + bytes(total - len(out))
 

@@ -243,15 +243,18 @@ void AW_IntroTick(void) {
 /* aw_combat.c: the player is knocked down or out (controls locked). Defined
  * here, beside its callers, NULL in fixtures without the combat layer. */
 int (*aw_combat_input_locked)(void);
+/* aw_view.c: the player is dead (PLAYER-DEATH-LIMBO-35): no talk, activate, attack or movement. */
+int (*aw_death_input_locked)(void);
+static int dead_locked(void){return aw_death_input_locked && aw_death_input_locked();}
 /* Character panels: the census menus and the quick character screen (aw_quickchar.c). */
 static int character_modal(void){return AW_CharacterActive() || AW_QuickCharActive();}
 void AW_IntroMove(usercmd_t *cmd) {
-    if(aw_combat_input_locked && aw_combat_input_locked()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;return;}
+    if((aw_combat_input_locked && aw_combat_input_locked()) || dead_locked()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;return;}
     if(AW_DebugTestInputActive() && !character_modal())return;
     if((active && !failed && !unlocked) || AW_OpeningLocked() || character_modal()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;}
 }
 int AW_IntroButtons(int bits){
-    if(aw_combat_input_locked && aw_combat_input_locked())return 0;
+    if((aw_combat_input_locked && aw_combat_input_locked()) || dead_locked())return 0;
     if(AW_DebugTestInputActive() && !character_modal())return bits;
     if((active && !failed) || AW_OpeningLocked() || character_modal())return 0;
     if(!AW_StoryFighting())bits&=~1;
@@ -259,11 +262,11 @@ int AW_IntroButtons(int bits){
     return bits;
 }
 int AW_IntroImpulse(int impulse){
-    if(aw_combat_input_locked && aw_combat_input_locked())return 0;
+    if((aw_combat_input_locked && aw_combat_input_locked()) || dead_locked())return 0;
     if(AW_DebugTestInputActive() && !character_modal())return impulse;
     return ((active && !failed) || !AW_StoryFighting() || AW_OpeningLocked() || character_modal()) && impulse==202?0:impulse;
 }
-int AW_IntroUse(void){return (active && !failed && !unlocked) || AW_OpeningLocked() || character_modal();}
+int AW_IntroUse(void){return (active && !failed && !unlocked) || AW_OpeningLocked() || character_modal() || dead_locked();}
 int AW_IntroPromptActive(void){return prompt!=0;}
 /* The original name entry's editing, shared by the ship's prompt and the quick
  * character screen's name page (aw_quickchar.c): 1 when Enter accepts a name. */

@@ -289,8 +289,21 @@ def hull_seams(chunk, box, source, fails):
             samples += [(x0 + d, y0 + t * (y1 - y0)), (x1 - d, y0 + t * (y1 - y0)),
                         (x0 + t * (x1 - x0), y0 + d), (x0 + t * (x1 - x0), y1 - d)]
     checked = 0
+    outer = source.get('terrain_outer')
+    if 'ref' not in chunk or not outer or [chunk['cx'], chunk['cy']] not in outer['chunks']:
+        outer = None
+    else:
+        # a referenced chunk (format 0.7) at the frame's edge holds the ground one tile past the frame in its
+        # standing hull (the same content as inside a neighbouring frame): a box reaching past the frame is
+        # checked against those heights (the manifest's terrain_outer)
+        step, (lx, ly) = source['terrain_step'], source['terrain_low']
+        h = source['terrain_heights']
+        hx, hy = lx + (len(h[0]) - 1) * step, ly + (len(h) - 1) * step
+        wide = {'terrain_step': step, 'terrain_low': outer['low'], 'terrain_heights': outer['heights']}
     for x, y in samples:
-        top = ground_max(source, x + MINS[0], y + MINS[1], x + MAXS[0], y + MAXS[1])
+        past = outer is not None and not (x + MINS[0] >= lx and x + MAXS[0] <= hx and y + MINS[1] >= ly
+                                          and y + MAXS[1] <= hy)
+        top = ground_max(wide if past else source, x + MINS[0], y + MINS[1], x + MAXS[0], y + MAXS[1])
         stand = top - MINS[2]                       # lowest origin whose box clears the ground
         low = (x, y, stand - SEAM_TOLERANCE)
         high = (x, y, stand + SEAM_TOLERANCE)
@@ -377,9 +390,9 @@ def load_world(out, fails):
             continue
         fails.check(len(recs) == f['entries'], 'sector record count differs from its index row: ' + f['path'])
         kinds = [r['kind'] for r in recs]
-        fails.check(kinds == sorted(kinds, key=lambda k: (b'CHNK', b'MODL', b'TEXR').index(k)),
-                    f['path'] + ': records not in the order chunks, models, textures')
-        for kind in (b'MODL', b'TEXR'):
+        fails.check(kinds == sorted(kinds, key=F.RECORD_KINDS.index),
+                    f['path'] + ': records not in the order chunks, terrain, models, textures')
+        for kind in (b'TERR', b'MODL', b'TEXR'):
             ids = [r['id'] for r in recs if r['kind'] == kind]
             fails.check(ids == sorted(ids), f['path'] + ': %s records not in id order' % kind.decode())
         sectors[(tuple(f['cell']), f['sector'])] = {'row': row, 'path': f['path'], 'records': recs}
@@ -401,6 +414,7 @@ def load_world(out, fails):
         fails.check(sum(1 for k in stored if k[0] == kind) == len(directory),
                     '%s records without a directory entry' % kind.decode())
     frames = []
+    terrain_used = set()
     for f in files:
         if f['kind'] != b'FRAM':
             continue
@@ -440,11 +454,95 @@ def load_world(out, fails):
                 continue
             fails.check(parts['render'] == c['render'] and len(parts['owned']) == c['owned_count']
                         and len(parts['reach']) == c['reach_count'], 'chunk %d: head differs from its entry' % c['index'])
+            if 'ref' in parts:
+                # format 0.7: the chunk's terrain is a TERR record placed at the reference's shift; every
+                # reader below sees it where the engine's graft puts it (chim.format.translate_image)
+                ref = parts['ref']
+                t = records.get((ref['file'], ref['offset']))
+                if not fails.check(t is not None and t['kind'] == b'TERR' and t['id'] == ref['id']
+                                   and t['bytes'] == ref['bytes'] and c['collision'] == 0,
+                                   f['path'] + ': chunk %d terrain reference does not point at its record'
+                                   % c['index']):
+                    continue
+                why = F.refuse_shift(t['data'], ref['shift'])
+                if not fails.check(why is None, f['path'] + ': chunk %d: %s' % (c['index'], why)):
+                    continue
+                terrain_used.add(ref['id'])
+                parts = dict(parts, image=F.translate_image(t['data'], ref['shift']), image_render=ref['render'],
+                             terrain_record=t['data'])
             out_chunks.append(dict(c, **parts, file=sec['path']))
         frames.append((f['path'], frame, out_chunks))
     fails.check(settings['models'] == len(models) and settings['textures'] == len(textures)
                 and settings['frames'] == len(frames), 'index totals do not match the files')
+    stored_terrain = {k[1] for k in stored if k[0] == b'TERR'}
+    fails.check(stored_terrain == terrain_used and stored_terrain == set(range(len(stored_terrain))),
+                'terrain records %s are not each referenced, or ids not 0..n-1'
+                % sorted(stored_terrain ^ terrain_used)[:5])
     return settings, files, sizes, textures, models, frames
+
+
+_FRAME_FILES = {}          # per process: (path, size, mtime) -> bytes, for load_frame
+_FRAME_FILES_MAX = 96
+
+
+def _world_file(root, rel):
+    """The bytes of one CHIM world file, kept per process (a small cache: the stair gate's workers read a
+    frame's sectors and the model records it places, often again for the next core of the same frame)."""
+    p = Path(root) / rel
+    st = p.stat()
+    key = (str(p), st.st_size, st.st_mtime_ns)
+    data = _FRAME_FILES.get(key)
+    if data is None:
+        if len(_FRAME_FILES) >= _FRAME_FILES_MAX:
+            _FRAME_FILES.pop(next(iter(_FRAME_FILES)))
+        data = _FRAME_FILES[key] = p.read_bytes()
+    return data
+
+
+def load_frame(out, frame_index):
+    """One frame of a CHIM world read from its own files only (CHIM-STAIR-GATE-WORLD-RELOAD-36): (frame row, models) where
+    the frame row is load_world's frames[frame_index] (path, frame, chunks), byte for byte, and models is
+    {model id: load_world's model entry} for every model its chunks place. Reads the index, the frame file,
+    its sector files, the records its terrain references point at and the records of its models; no
+    checks (the caller has validated the world: load_world / validate). The stair gate's workers used to
+    read and check the whole world (8.9 s for 273 frames) for every frame they walked."""
+    root = Path(out) / 'chim'
+    _, files, mdir, _ = F.read_index(_world_file(root, 'world.cwi'))
+    fram = [f for f in files if f['kind'] == b'FRAM']
+    f = fram[frame_index]
+    frame, chunks, _ = F.read_frame(_world_file(root, f['path']))
+    cell = tuple(f['cell'])
+    rows = {(tuple(s['cell']), s['sector']): (row, s) for row, s in enumerate(files) if s['kind'] == b'SECT'
+            and tuple(s['cell']) == cell}
+    sectors = {}
+
+    def sector(si):
+        if si not in sectors:
+            row, s = rows[(cell, si)]
+            sectors[si] = (row, s['path'], {r['offset']: r for r in F.read_sector(_world_file(root, s['path']))})
+        return sectors[si]
+
+    def record(row, offset, size):
+        return _world_file(root, files[row]['path'])[offset:offset + size]
+    out_chunks = []
+    for c in chunks:
+        _, path, recs = sector(c['sector'])
+        parts = F.read_chunk(recs[c['offset']]['data'])
+        if 'ref' in parts:
+            ref = parts['ref']
+            t = record(ref['file'], ref['offset'], ref['bytes'])
+            parts = dict(parts, image=F.translate_image(t, ref['shift']), image_render=ref['render'],
+                         terrain_record=t)
+        out_chunks.append(dict(c, **parts, file=path))
+    models = {}
+    for c in out_chunks:
+        for r in c['owned'] + c['reach']:
+            i = r['model']
+            if i not in models and 0 <= i < len(mdir):
+                e = mdir[i]
+                models[i] = dict(e, file=files[e['file']]['path'] if e['file'] < len(files) else '?',
+                                 file_row=e['file'], image=record(e['file'], e['offset'], e['bytes']))
+    return (f['path'], frame, out_chunks), models
 
 
 def first_met(chunks, models_tex):
@@ -518,7 +616,190 @@ def sky_bank_texels(textures, palette, exempt=()):
     return found
 
 
-def validate(out, source=None, palette=None):
+def _early_chunks(args):
+    """Worker of early_frame_failures: the checks of a group of chunks."""
+    items, section = args
+    fails = Failures()
+    for chunk, box in items:
+        terrain_coverage(chunk, box, section, fails)
+        hull_seams(chunk, box, section, fails)
+    return list(fails)
+
+
+def early_frame_failures(spec, section, name, jobs=1):
+    """The frame's terrain geometry checks (hull seams, ground coverage) on its terrain units, as soon as they are
+    built and before the world is assembled (BUILD-CHIM-VALIDATE-LATE-36): the same checks validate() runs on
+    the finished world, so a bad chunk stops the chim stage at its frame instead of at the end. A referenced
+    unit (format 0.7) is placed first (chim.format.translate_image). Chunks are checked in up to `jobs`
+    processes. Returns failure lines naming the frame."""
+    frame = spec['frame']
+    g = frame['span'][0] / (max(cx for cx, _ in spec['terrain']) + 1)       # the chunk grain
+    lx, ly = frame['low']
+    items = []
+    for (cx, cy), unit in sorted(spec['terrain'].items()):
+        image = F.brush_image(unit['lumps'])[0]
+        chunk = {'cx': cx, 'cy': cy}
+        if unit.get('offset'):
+            image = F.translate_image(image, unit['offset'])
+            chunk['ref'] = {'shift': tuple(unit['offset'])}
+        chunk['image'] = image
+        items.append((chunk, (lx + cx * g, ly + cy * g, lx + (cx + 1) * g, ly + (cy + 1) * g)))
+    label = 'frame of %s (cell %d,%d)' % (name, frame['cell'][0], frame['cell'][1])
+    # the frame's checks are one unit keyed by SHA-256 of exactly what they read (every chunk's placed image,
+    # place and reference flag, and the frame's source section): reused from the hashed pool while unchanged
+    cache = check_cache()
+    key = None
+    if cache is not None:
+        h = hashlib.sha256(json.dumps(['early', section], sort_keys=True, default=str).encode())
+        for chunk, box in items:
+            h.update(hashlib.sha256(chunk['image']).digest())
+            h.update(json.dumps([chunk['cx'], chunk['cy'], list(box), 'ref' in chunk]).encode())
+        key = h.hexdigest()
+        hit = cache.load(key)
+        if hit is not None:
+            return ['%s: %s' % (label, f) for f in hit[0]]
+    from build_parallel import live_jobs        # the stage's workers now, not its start share
+    jobs = max(1, min(int(live_jobs(jobs or 1)), len(items)))
+    groups = [(items[k::jobs], section) for k in range(jobs)]
+    found = []
+    if jobs > 1:
+        import multiprocessing
+        from concurrent.futures import ProcessPoolExecutor
+        try:
+            context = multiprocessing.get_context('fork')
+        except ValueError:
+            context = None
+    if jobs > 1 and context is not None:
+        with ProcessPoolExecutor(jobs, mp_context=context) as pool:
+            for lines in pool.map(_early_chunks, groups):
+                found += lines
+    else:
+        for group in groups:
+            found += _early_chunks(group)
+    if key is not None:
+        import cache_provenance
+        cache_provenance.name_unit(cache, key, lambda: label, lambda: [('section', section)] + [('chunk %d,%d' % (c['cx'], c['cy']), c['image']) for c, _ in items])
+        cache.store(key, sorted(found))
+    return ['%s: %s' % (label, f) for f in sorted(found)]
+
+
+def frame_label(path, frame, section=None):
+    """A failing frame's name in a failure line: its file, cell and area (a CHIM region frame's area names
+    its region cell: rcpX_mY is cell X,-Y)."""
+    area = (section or {}).get('town')
+    return 'frame %s (cell %d,%d%s)' % (path, frame['cell'][0], frame['cell'][1], ', area %s' % area if area else '')
+
+
+def _chunk_checks(task):
+    """Worker of validate(): one frame's per-chunk checks (brush image, world subtree, ground coverage, hull
+    seams), each chunk's failures kept apart so validate() lists them in its own order. Pure: the same
+    results in any worker and any order (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
+    chunks, ntextures, section, cache = task
+    key = None
+    if cache is not None:
+        # the frame's checks are a unit keyed by SHA-256 of exactly what they read: every chunk's brush image,
+        # place and reference flag, the texture count and the frame's source section (reused while unchanged)
+        h = hashlib.sha256(json.dumps([ntextures, section], sort_keys=True, default=str).encode())
+        for c, box in chunks:
+            h.update(hashlib.sha256(c['image']).digest())
+            h.update(json.dumps([c['cx'], c['cy'], list(box), 'ref' in c]).encode())
+        key = h.hexdigest()
+        found = cache.load(key)
+        if found is not None:
+            return [dict(r, tree=_tree_from_json(r['tree'])) for r in found[0]]
+    out = []
+    for c, box in chunks:
+        lumps = F.read_brush_image(c['image'])
+        bc = Failures()
+        refs = brush_checks(lumps, ntextures, 'chunk %d,%d terrain' % (c['cx'], c['cy']), bc)
+        tf = Failures()
+        tree = world_tree(lumps, 'chunk %d,%d' % (c['cx'], c['cy']), tf)
+        cov, seam, tiles, samples = Failures(), Failures(), 0, 0
+        if section is not None:
+            tiles = terrain_coverage(c, box, section, cov) or 0
+            samples = hull_seams(c, box, section, seam) or 0
+        out.append({'faces': len(lumps[7]) // 20, 'texture_refs': F.read_texture_refs(lumps[2]),
+                    'brush_fails': list(bc), 'refs': refs, 'tree': tree, 'tree_fails': list(tf),
+                    'coverage_fails': list(cov), 'tiles': tiles, 'seam_fails': list(seam), 'samples': samples})
+    if key is not None:
+        import cache_provenance
+        cache_provenance.name_unit(cache, key, lambda: 'terrain chunks ' + ' '.join('%d,%d' % (c['cx'], c['cy']) for c, _ in chunks), lambda: [('textures', ntextures), ('section', section)] + [('chunk %d,%d' % (c['cx'], c['cy']), c['image']) for c, _ in chunks])
+        cache.store(key, [dict(r, tree=_tree_to_json(r['tree'])) for r in out])
+    return out
+
+
+def _tree_to_json(tree):
+    nodes, leaves = tree
+    return [[[float(v) for v in n[0]], n[1], n[2], n[3]] for n in nodes], list(leaves)
+
+
+def _tree_from_json(value):
+    import numpy as np
+    nodes, leaves = value
+    return [(np.array(n[0]), n[1], n[2], n[3]) for n in nodes], list(leaves)
+
+
+def _model_checks(task):
+    """Worker of validate(): brush checks and bounds of a group of models (index, name, image, render)."""
+    items, ntextures, cache = task
+    key = None
+    if cache is not None:
+        h = hashlib.sha256(json.dumps(ntextures).encode())
+        for i, name, image, render in items:
+            h.update(json.dumps([i, name, render]).encode())
+            h.update(hashlib.sha256(image).digest())
+        key = h.hexdigest()
+        found = cache.load(key)
+        if found is not None:
+            return [(f, r, (tuple(b[0]), tuple(b[1]))) for f, r, b in found[0]]
+    out = []
+    for i, name, image, render in items:
+        fails = Failures()
+        lumps = F.read_brush_image(image)
+        fails.check(F.render_extent(image) <= render + 3 and render <= F.render_extent(image),
+                    'model %d: render part does not end at the collision lumps' % i)
+        refs = brush_checks(lumps, ntextures, 'model %d (%s)' % (i, name), fails)
+        d = struct.unpack('<9f7i', lumps[14][:64]) if len(lumps[14]) >= 64 else (0,) * 16
+        # the engine loads a placed model's point hull as hull 0's clipnodes from headnode[0]: it needs a node
+        # (an empty node lump is refused on load) and a node root (a leaf root reads as contents: -2 is solid)
+        # (CHIM-EMPTY-POINT-HULL-36)
+        fails.check(len(lumps[5]) >= 24 and 0 <= d[9] < len(lumps[5]) // 24,
+                    'model %d (%s): point hull without a node (%d nodes, root %d); the engine refuses it or reads '
+                    'it as solid' % (i, name, len(lumps[5]) // 24, d[9]))
+        out.append((list(fails), refs, (d[0:3], d[3:6])))
+    if key is not None:
+        import cache_provenance
+        cache_provenance.name_unit(cache, key, lambda: 'models %s-%s' % (items[0][0], items[-1][0]) if items else 'models', lambda: [('textures', ntextures)] + [('model %d %s' % (i, name), image) for i, name, image, _ in items])
+        cache.store(key, [[f, r, [list(b[0]), list(b[1])]] for f, r, b in out])
+    return out
+
+
+def check_cache(counted=False):
+    """The validation's unit cache (pass_cache.PassCache 'chim-validate', AMIWIND_PASS_CACHE: the stage's
+    hashed pool), or None when off. Keyed by validate.py's sources and everything they read. counted: with a
+    hit/miss tally (the caller reads it with summary(), which removes it)."""
+    from pass_cache import PassCache, folder, source_digest
+    options = {'units': 'frame-checks, model-checks'}
+    if counted:
+        return PassCache.open('chim-validate', options, __file__)
+    root = folder()
+    return None if root is None else PassCache('chim-validate', options, source_digest(__file__), root)
+
+
+def _pool_map(function, tasks, jobs, cost):
+    """function over tasks, results in input order, on the shared worker pool (build_parallel.ordered_map:
+    largest first, follows the stage's live allowance); serially when jobs is 1."""
+    jobs = max(1, int(jobs or 1))
+    if jobs == 1 or len(tasks) < 2:
+        return [function(t) for t in tasks]
+    from build_parallel import ordered_map
+    return list(ordered_map(function, tasks, min(jobs, len(tasks)), cost=cost))
+
+
+MODEL_GROUP = 64          # models per validation task
+
+
+def validate(out, source=None, palette=None, jobs=1):
     from world_chunk_estimate import placed_box
     fails = Failures()
     settings, files, sizes, textures, models, frames = load_world(out, fails)
@@ -549,14 +830,28 @@ def validate(out, source=None, palette=None):
                 % sum(v - 1 for v in model_hash.values() if v > 1))
     fails.check(len({m['name'] for m in models}) == len(models), 'models: duplicate names')
     model_bounds, models_tex = [], []
-    for i, m in enumerate(models):
-        lumps = F.read_brush_image(m['image'])
-        fails.check(F.render_extent(m['image']) <= m['render'] + 3 and m['render'] <= F.render_extent(m['image']),
-                    'model %d: render part does not end at the collision lumps' % i)
-        models_tex.append(brush_checks(lumps, len(textures), 'model %d (%s)' % (i, m['name']), fails))
-        used_tex.update(models_tex[-1])
-        d = struct.unpack('<9f7i', lumps[14][:64]) if len(lumps[14]) >= 64 else (0,) * 16
-        model_bounds.append((d[0:3], d[3:6]))
+    # brush checks of every model on the worker pool, MODEL_GROUP models per task
+    rows = [(i, m['name'], m['image'], m['render']) for i, m in enumerate(models)]
+    cache = check_cache(counted=True)
+    groups = [(rows[k:k + MODEL_GROUP], len(textures), cache) for k in range(0, len(rows), MODEL_GROUP)]
+    for group in _pool_map(_model_checks, groups, jobs, lambda t: sum(len(m[2]) for m in t[0])):
+        for found, refs, bounds in group:
+            fails.extend(found)
+            models_tex.append(refs)
+            used_tex.update(refs)
+            model_bounds.append(bounds)
+    del rows, groups
+    # every baked variant against its mesh's base (chim.variant_audit, CHIM-STRIDER-SCALED-SEAMS-36): a reference
+    # model's variants must all be its base transformed, with its vertices and edges; other meshes are reported
+    from chim.variant_audit import audit_models, reference_stems
+    references = reference_stems()
+    variant_report = audit_models([{'name': m['name'], 'image': m['image']} for m in models], references)
+    for row in variant_report['failures']:
+        fails.append('model %s: %s (base %s)' % (row['variant'], row['reason'], row['base']))
+    for row in variant_report['topology_differences']:
+        if row['mesh'] in references:
+            fails.append('model %s: %d open edges, its base %s %d (vertices not shared as in the base)' % (
+                row['variant'], row['topology']['open_edges'], row['base'], row['base_topology']['open_edges']))
     # chunks and placements
     all_refs = set()
     used_models = set()
@@ -571,7 +866,21 @@ def validate(out, source=None, palette=None):
         fails.check(len(sections) == len(frames) and (len(frames) == 1 or len(source.get('frames', [])) == len(frames)),
                     'source manifest: %d frame sections for %d frames' % (len(sections), len(frames)))
     met_models, met_textures = [], []
+    # the per-chunk checks of every frame on the worker pool, a frame per task, largest first
+    tasks = []
     for path, frame, chunks in frames:
+        g, (lx, ly) = frame['grain'], frame['low']
+        tasks.append(([({k: c[k] for k in ('cx', 'cy', 'image', 'ref') if k in c},
+                        (lx + c['cx'] * g, ly + c['cy'] * g, lx + (c['cx'] + 1) * g, ly + (c['cy'] + 1) * g))
+                       for c in chunks], len(textures), sections.get(path), cache))
+    checked = _pool_map(_chunk_checks, tasks, jobs, lambda t: sum(len(c['image']) for c, _ in t[0]))
+    del tasks
+    if cache is not None:
+        used = cache.summary()
+        print('CHIM validation units: %d reused, %d checked (frame and model checks, by SHA-256 of their inputs)'
+              % (used['hits'], used['misses']), file=sys.stderr, flush=True)
+    for (path, frame, chunks), results in zip(frames, checked):
+        first_failure = len(fails)          # this frame's failures get its name (BUILD-CHIM-VALIDATE-LATE-36)
         g, (lx, ly), nx, ny = frame['grain'], frame['low'], frame['nx'], frame['ny']
         order = F.sector_order(nx, ny, frame['sector_chunks'])[0]
         owners = collections.defaultdict(list)
@@ -579,12 +888,13 @@ def validate(out, source=None, palette=None):
         trees, vis = {}, {}
         nbytes = (len(order) + 7) // 8
         frame_chunks = []
-        for c in chunks:
+        for c, done in zip(chunks, results):
             fails.check(F.render_extent(c['image']) >= c['image_render'], path + ': chunk %d collision before render'
                         % c['index'])
-            lumps = F.read_brush_image(c['image'])
-            used_tex.update(brush_checks(lumps, len(textures), 'chunk %d,%d terrain' % (c['cx'], c['cy']), fails))
-            trees[(c['cx'], c['cy'])] = world_tree(lumps, 'chunk %d,%d' % (c['cx'], c['cy']), fails)
+            fails.extend(done['brush_fails'])
+            used_tex.update(done['refs'])
+            fails.extend(done['tree_fails'])
+            trees[(c['cx'], c['cy'])] = done['tree']
             fails.check(c['leaves'] == len(trees[(c['cx'], c['cy'])][1]) - 1,
                         'chunk %d,%d: head leaf count differs from its subtree' % (c['cx'], c['cy']))
             try:
@@ -595,8 +905,10 @@ def validate(out, source=None, palette=None):
                 vis[(c['cx'], c['cy'])] = set()
             box = (lx + c['cx'] * g, ly + c['cy'] * g, lx + (c['cx'] + 1) * g, ly + (c['cy'] + 1) * g)
             if sections.get(path) is not None:
-                terrain_tiles += terrain_coverage(c, box, sections[path], fails) or 0
-                seam_samples += hull_seams(c, box, sections[path], fails) or 0
+                fails.extend(done['coverage_fails'])
+                terrain_tiles += done['tiles']
+                fails.extend(done['seam_fails'])
+                seam_samples += done['samples']
             for r in c['owned']:
                 owners[r['ref']].append((path, c['index'], r))
                 fails.check(r['owner'] == c['index'], 'placement %d: owner record names another chunk' % r['ref'])
@@ -607,9 +919,9 @@ def validate(out, source=None, palette=None):
                     used_models.add(r['model'])
             entry = {'file': c['file'], 'frame': path, 'index': c['index'], 'cell': (c['cx'], c['cy']),
                      'sector': c['sector'], 'offset': c['offset'], 'render': c['render'],
-                     'collision': c['collision'], 'faces': len(lumps[7]) // 20, 'owned': c['owned'],
+                     'collision': c['collision'], 'faces': done['faces'], 'owned': c['owned'],
                      'reach': c['reach'], 'records': c['owned'] + c['reach'],
-                     'terrain_textures': F.read_texture_refs(lumps[2])}
+                     'terrain_textures': done['texture_refs']}
             per_chunk.append(entry)
             frame_chunks.append(entry)
         # home rule: every model and texture lives in the sector where the pack walk first meets it
@@ -691,6 +1003,9 @@ def validate(out, source=None, palette=None):
                            'ring': {c: {(c[0] + dx, c[1] + dy) for dx, dy in offs} & set(vis) for c in vis}})
         all_refs |= set(owners)
         pids += [rows[0][2]['pid'] for rows in owners.values()]
+        name = frame_label(path, frame, sections.get(path))
+        for k in range(first_failure, len(fails)):
+            fails[k] = '%s: %s' % (name, fails[k])
     pids.sort()
     fails.check(pids == list(range(len(pids))) and len(pids) == settings['placements'],
                 'placement ids are not 0..n-1 once each')
@@ -708,8 +1023,19 @@ def validate(out, source=None, palette=None):
         fails.check(terrain_tiles == tiles, 'terrain: %d tiles checked, source has %d' % (terrain_tiles, tiles))
     world = {'settings': settings, 'files': files, 'sizes': sizes, 'textures': textures, 'models': models,
              'frames': frames, 'chunks': per_chunk, 'leaf_counts': leaf_counts, 'chunk_counts': chunk_counts,
-             'visibility': visibility, 'seam_samples': seam_samples}
+             'visibility': visibility, 'seam_samples': seam_samples, 'variant_audit': variant_summary(variant_report)}
     return fails, world
+
+
+def variant_summary(report, limit=50):
+    """The validation report's part of the variant audit: counts and the first rows of each list."""
+    return {'meshes': report['meshes'], 'variants': report['variants'], 'compared': report['compared'],
+            'derived': report['derived'], 'other_reductions': report['other_reductions'][:limit],
+            'other_reduction_count': len(report['other_reductions']),
+            'topology_differences': [{k: r[k] for k in ('variant', 'base', 'base_topology', 'topology')}
+                                     for r in report['topology_differences'][:limit]],
+            'topology_difference_count': len(report['topology_differences']),
+            'references': report['references'], 'failures': report['failures']}
 
 
 # ---------------------------------------------------------------- measurements
@@ -1013,6 +1339,25 @@ def write_replays(folder, replays, volume, legacy_volume='AW_LEGACY:'):
                         for r in rows], indent=0) + '\n', encoding='utf-8', newline='\n')
 
 
+def report_world(out, source=None, palette=None, legacy_maps=None, legacy_regions=None, cost=None, cameras=(),
+                 jobs=1):
+    """(report, world, replays): the validation report as `validate.py --json` writes it, the validated world
+    (None when it fails) and the walk's reads per crossing. chim_build keeps the world for the stats, so a build
+    validates its world once (BUILD-CHIM-STATS-SERIAL-TAIL-36)."""
+    fails, world = validate(out, source, palette, jobs)
+    report = {'ok': not fails, 'failures': fails[:200], 'failure_count': len(fails),
+              'source_checked': source is not None, 'variant_audit': world.get('variant_audit')}
+    replays = {}
+    if not fails:
+        report['measured'] = measure(world, source, legacy_maps, legacy_regions, cost, list(cameras))
+        replays = report['measured'].get('walk', {}).pop('_replay', {})
+    return report, (world if not fails else None), replays
+
+
+def report_text(report):
+    return json.dumps(report, indent=1, sort_keys=True) + '\n'
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('out', type=Path, help='builder output folder (holds chim/)')
@@ -1035,21 +1380,17 @@ def main(argv=None):
     a = ap.parse_args(argv)
     src_path = a.source or (a.out / 'chim-source.json')
     source = json.loads(src_path.read_text(encoding='utf-8')) if src_path.is_file() else None
-    fails, world = validate(a.out, source, a.palette.read_bytes() if a.palette else None)
-    report = {'ok': not fails, 'failures': fails[:200], 'failure_count': len(fails),
-              'source_checked': source is not None}
-    if not fails:
-        cost = json.loads(a.read_cost.read_text(encoding='utf-8')) if a.read_cost else None
-        cameras = [(n, float(x), float(y)) for n, x, y in a.camera]
-        report['measured'] = measure(world, source, a.legacy_maps, a.legacy_regions, cost, cameras)
-        replays = report['measured'].get('walk', {}).pop('_replay', {})
-        if a.replay_dir:
-            write_replays(a.replay_dir, replays, a.replay_volume, a.replay_legacy_volume)
-    text = json.dumps(report, indent=1, sort_keys=True) + '\n'
+    cost = json.loads(a.read_cost.read_text(encoding='utf-8')) if a.read_cost else None
+    cameras = [(n, float(x), float(y)) for n, x, y in a.camera]
+    report, world, replays = report_world(a.out, source, a.palette.read_bytes() if a.palette else None,
+                                          a.legacy_maps, a.legacy_regions, cost, cameras)
+    if world is not None and a.replay_dir:
+        write_replays(a.replay_dir, replays, a.replay_volume, a.replay_legacy_volume)
+    text = report_text(report)
     if a.json:
         a.json.write_bytes(text.encode('utf-8'))
     sys.stdout.write(text)
-    return 0 if not fails else 1
+    return 0 if report['ok'] else 1
 
 
 if __name__ == '__main__':

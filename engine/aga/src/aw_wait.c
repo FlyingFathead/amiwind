@@ -8,6 +8,7 @@
 #include "aw_character.h"
 #include "aw_clock.h"
 #include "aw_sky.h"
+#include "aw_mappath.h"
 static int modal,hours=1,help_page;
 static const char *help_commands[]={"+forward","+back","+moveleft","+moveright","+attack","+aw_use","impulse 202","aw_torch","aw_wait","aw_quicksave","aw_quickload","toggleconsole","aw_quick_help","togglemenu","aw_worldmap","aw_journal"};
 static const char *help_actions[]={"Move forward","Move back","Move left","Move right","Attack","Activate","Ready hands","Toggle torch","Wait","Quicksave","Quickload","Console","Quick help","Pause menu","World map","Journal"};
@@ -198,7 +199,7 @@ int AW_DayGalleryView(float *origin,float *angles) {
     /* Only the exact loaded BSP establishes the known coordinate basis.
      * sv.name may remain "seyda" while the catalogue changes region BSPs. */
     if((!strcmp(sv.name,"seyda") || !strcmp(sv.name,"sn045")) &&
-       !strcmp(gallery_world,"maps/sn045.bsp")){
+       AW_MapPathIs(gallery_world,"sn045")){
         origin[0]=100+1.0f/32;origin[1]=-180+1.0f/32;
         origin[2]=gallery_height[gallery_step]+cl.viewheight+1.0f/32;
     }
@@ -239,6 +240,20 @@ static void daycycle_gallery(void){gallery_command(0);}
 static void night_gallery(void){gallery_command(1);}
 extern char *keybindings[256];
 extern int scr_copyeverything;
+int AW_PlayerInCombat(void);   /* aw_combat.c */
+/* The refusal while enemies fight the player: the game's own text (sNotifyMessage2, written to view/settings.txt
+ * by the builder), read from disk only when it is shown; an AmiWind line when the image has none. */
+static void enemies_notice(void) {
+    FILE *f=NULL;char line[200];const char *key="sNotifyMessage2 ";size_t n=strlen(key);
+    if(COM_FOpenFile("view/settings.txt",&f)>=0 && f){
+        while(fgets(line,sizeof(line),f)){
+            line[strcspn(line,"\r\n")]=0;
+            if(!strncmp(line,key,n) && line[n]){fclose(f);AW_UISubtitle("",line+n,5);return;}
+        }
+        fclose(f);
+    }
+    AW_UISubtitle("","Enemies are nearby: you cannot wait now.",5);
+}
 static int allowed(void) {
     edict_t *p;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
@@ -252,6 +267,7 @@ static void close_modal(void){modal=0;key_dest=return_dest;IN_AWClearButtons();}
 static void open_modal(int kind){return_dest=key_dest;modal=kind;key_dest=key_menu;IN_AWClearButtons();}
 static void wait_open(void) {
     if(modal || gallery_active || key_dest!=key_game)return;
+    if(AW_PlayerInCombat()){enemies_notice();return;}   /* WAIT-DURING-COMBAT-36: no waiting in a fight */
     if(!allowed()){AW_UISubtitle("","Wait after registration, on dry ground, when no one is speaking.",5);return;}
     if(!AW_ClockEnsure()){Con_Printf("Clock state unavailable.\n");return;}
     if(daynight_hold){AW_UISubtitle("","Time is held at 12:00 (dbg daynight on).",4);return;}
@@ -401,7 +417,7 @@ int AW_WaitKey(int key) {
     if(key==K_LEFTARROW || key==K_DOWNARROW || key=='a' || key=='s'){if(hours>1)hours--;}
     if(key==K_RIGHTARROW || key==K_UPARROW || key=='d' || key=='w'){if(hours<24)hours++;}
     if(key==K_ENTER){
-        if(!allowed() || daynight_hold){close_modal();return 1;}
+        if(!allowed() || daynight_hold || AW_PlayerInCombat()){close_modal();return 1;}
         if(!AW_ClockAdvance(hours*3600000)){close_modal();AW_UISubtitle("","Could not advance the clock.",4);return 1;}
         clock_fraction=0;
         AW_ClockDate(&y,&m,&d,&h,&n);close_modal();

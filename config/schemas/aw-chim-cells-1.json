@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aw-chim-cells-1",
+  "title": "AmiWind CHIM region cell list (aw-chim-cells-1)",
+  "description": "Exterior cells to put on CHIM inside the legacy open world (tools/build.py --chim-regions @FILE; docs/chim/CHIM_REGIONS.md). Cells and/or whole regions; the build's preflight checks every cell.",
+  "type": "object",
+  "required": ["format"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {"const": "aw-chim-cells-1"},
+    "cells": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
+          {"type": "string", "pattern": "^-?[0-9]+,-?[0-9]+$"}
+        ]
+      }
+    },
+    "regions": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "reason": {"type": "string"},
+    "notes": {"type": "string"}
+  }
+}

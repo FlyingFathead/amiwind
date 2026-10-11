@@ -193,6 +193,31 @@ class HarvestBuild(unittest.TestCase):
         self.assertEqual(list(id1.glob('harvest-*.txt')), [])
         self.assertFalse((id1 / 'progs/harvest').exists())
 
+    def test_chim_town_catalogues_are_written_after_the_heap_check(self):
+        # BUILD-HARVEST-NATIVE-TOWN-ORDER-36: a CHIM town's frame map is written later in the image step, so its
+        # catalogues must not be on disk while the per-map heap check reads every catalogue in the image.
+        self.prepare()
+        id1 = stage(self.root / 's')
+        real = harvest_build.map_selections
+        seen = {}
+
+        def selections(id1_, refs, native=()):
+            rows, found = real(id1_, refs, native)
+            return [dict(r, chim=True) if r['name'] == 'vf0001' else r for r in rows], found
+
+        def admission(id1_, names, sizes, jobs=None):
+            seen['names'] = sorted(names)
+            seen['files'] = sorted(p.name for p in id1_.glob('harvest-*.txt'))
+            return gates()(id1_, names, sizes, jobs)
+
+        work = id1.parent / 'work'
+        with patch('harvest_build.map_selections', selections), patch('harvest_build.heap_admission', admission):
+            harvest_build.clear_baked(self.root / 'harvest', id1, work, data_files=self.data, jobs=1)
+            staging = harvest_build.install(self.root / 'harvest', id1, work, data_files=self.data, sizes={}, jobs=1)
+        self.assertEqual(seen, {'names': ['vf0000'], 'files': ['harvest-vf0000.txt']})
+        self.assertEqual(staging['admitted'], 2)
+        self.assertTrue((id1 / 'harvest-vf0001.txt').is_file())
+
     def test_heap_check_estimates_only_the_named_maps(self):
         from check_world_map_heap import inspect_maps
         id1 = stage(self.root / 's')

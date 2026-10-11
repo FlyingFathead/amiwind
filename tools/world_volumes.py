@@ -353,7 +353,13 @@ def pack(id1, out, version, xdftool, rdbtool=None, jobs=1):
     if raw[:4]!=b'AWR2' or len(raw)<64:raise ValueError('Invalid region directory')
     count=struct.unpack_from('<I',raw,4)[0]
     if not 1<=count<=8192 or len(raw)!=64+count*52:raise ValueError('Invalid region directory count')
-    paths=[id1/'maps'/f'vf{i:04d}.bsp' for i in range(count)]
+    # maps/vfNNNN.bsp, or vfNNNN.chim for a CHIM region frame (the one map path helper, tools/map_files.py)
+    from map_files import map_file
+    # a divided CHIM region cell's alias rows have no map of their own (chim.frame_map.alias_rows)
+    from chim.frame_map import alias_rows
+    aliases=alias_rows(raw)
+    paths=[map_file(id1/'maps',f'vf{i:04d}') for i in range(count)]
+    paths=[p for i,p in enumerate(paths) if f'vf{i:04d}' not in aliases or p.is_file()]
     # Preserve the original two-partition layout when it fits. Larger worlds
     # use additional bounded partitions discovered through volumes.awv.
     terrain_bytes=sum(p.stat().st_size for p in paths)

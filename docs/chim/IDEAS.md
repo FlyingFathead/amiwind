@@ -14,6 +14,7 @@ measuring them again.
 - [NPC pathfinding](#npc-pathfinding)
 - [The distant view: far terrain and mold shells](#the-distant-view-far-terrain-and-mold-shells)
 - [M3: Vivec on CHIM](#m3-vivec-on-chim)
+  - [M3 preflight (10 October 2026)](#m3-preflight-10-october-2026)
 - [M4: the open world](#m4-the-open-world)
   - [The frame grid](#the-frame-grid)
   - [The memory estimator](#the-memory-estimator)
@@ -161,10 +162,91 @@ format, "Planned: all of Vivec (M3) and the open world (M4)"](WORLD_FORMAT.md#pl
   open world and later joined to it. 39 x 43 chunks give 195 sector files,
   more than a classic FFS directory block holds, so **format 0.6** puts
   sectors in one folder per sector row; nothing else in the format changes.
+  One city frame does not fit the engine's coordinate range
+  ([CHIM-FRAME-COORD-RANGE-33](../bugs/CHIM-FRAME-COORD-RANGE-33.md)): the
+  frame layout is an open decision (see the preflight below).
 - **Vis.** Canton bodies and the Temple are the first big closed masses CHIM
   meets: real occluders that hide whole streets. Visibility rows and
   placements per view are measured, and the counters may not get worse than
   the legacy preview.
+
+### M3 preflight (10 October 2026)
+
+**Status: measured without a build; nothing of Vivec is in a v0.0.36 build yet.**
+The Arena is still withdrawn from images, and every Vivec memory figure below
+comes from CHIM builds of 9 October, so the first step is to measure again on
+the current builder.
+
+- **The city.** The union of the eight district frames is 36 cells
+  (39 x 43 chunks), 15 of them Vivec's own; about 4,200 placed objects with
+  233 distinct meshes and 1.0 million placed source triangles, 1,159 flora
+  placements, 32 NPCs and 118 doors in the Vivec cells, 144 interiors listed
+  in the district settings. The district frames overlap in 16 of 28 pairs,
+  so one world cannot hold them as they are: stage B needs merged frames.
+- **Large models.** 18 meshes (26 placements) are wider than the 512-unit cut:
+  the canton bodies (about 1,780 units), the High Fane quarters (1,414), the
+  Temple pool water (1,369), the Ministry of Truth (915), four more Temple
+  district meshes (728-933), and also 24 wide trees and 31 parasols, which an
+  area-wide cut would tile too (to measure, or keep flora whole).
+- **Memory, one hotspot.** With the cut, five district frames fit the
+  6,242,304-byte chunk room (3.71-5.72 MB); the Temple, St. Delyn and
+  St. Olms frames are 1.5-2.0 MB over, all at the north end of the Temple
+  plaza (the two Vivec statues, the Ministry of Truth, the High Fane). The
+  'vivec-deep' detail budget fits the Temple frame with 20,016 bytes to spare
+  (0.3 %). The load ring is over the room in 5 of 7 measured frames.
+- **Stairs.** The Temple's palace steps and the High Fane quarters' flights
+  ([VIVEC-TEMPLE-STAIRS-33](../bugs/VIVEC-TEMPLE-STAIRS-33.md)) are the only
+  failing flights in the district frames; the other five frames pass
+  (2,665-3,793 steps and ramps each).
+- **Frame layout.** One city frame is 96 x 608 units past the engine's
+  coordinate bound; of two frames, the north one is 96 units over on each
+  side; three frames fit
+  ([CHIM-FRAME-COORD-RANGE-33](../bugs/CHIM-FRAME-COORD-RANGE-33.md)). This
+  section is the one Vivec frame plan
+  ([DOCS-VIVEC-FRAME-PLAN-36](../bugs/DOCS-VIVEC-FRAME-PLAN-36.md)). Owner
+  decision (10 October 2026): widen the coordinates first, as a measured
+  spike (in source behind the engine switch `AW_EXP_WIDECOORD`, off by
+  default), then one city frame; the Arena returns to default builds after
+  its stage A playtest; 'vivec-deep' becomes the Vivec default after the A/B
+  shots and its seam audit; flora stays out of the cut until measured.
+- **Tools.** The memory predictor reads Vivec 28-54 % low
+  ([CHIM-PREDICT-VIVEC-LOW-36](../bugs/CHIM-PREDICT-VIVEC-LOW-36.md)), so
+  Vivec memory is decided by built heap gates only; the seam audit does not
+  cover the detail budgets yet
+  ([CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36](../bugs/CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36.md)).
+
+- **Measured on the 9 October Temple world** ('vivec-deep', cut on):
+  collision is 6.2 % of the model bytes; 30.7 % of the placed faces lie
+  wholly below the water plane (kelp, seabed rocks, waterspouts); at the
+  memory peak 80 % of the ring's model bytes belong to placements more than
+  300 units away, so a coarse distance level is the largest lever measured;
+  inside the ring the chunk visibility culls almost nothing (99.9 % of the
+  ring visible on average). One city frame would hold 69 actors (600 allowed)
+  and 118 teleport doors (128 rows in the door bank). The placements sent
+  from one view position (all directions, before the view frustum) hold up
+  to 37,112 faces, against 12,288 surfaces the renderer draws per frame
+  ([RENDER-SURFACE-OVERFLOW-SILENT-36](../bugs/RENDER-SURFACE-OVERFLOW-SILENT-36.md)).
+
+Steps, each gated before the next:
+
+1. Stage A preflight (seconds): the area check with Balmora and Seyda Neen,
+   the town table's hand-over rules and the reuse plan, without a build.
+2. The cut as an Arena area setting (512 units), so Balmora and Seyda Neen
+   keep their models whole, flora kept whole; a test for it (in source,
+   10 October 2026).
+3. A build with the Arena as a CHIM-native town (requested as a MiniWind
+   build through the build server, `aw request --kind miniwind`) and every
+   gate on its frame:
+   validation, heap (active, load, largest block), stair walk, hull chains,
+   residents on the frame's collision, the arrival point, the closed edge,
+   doors and `dbg tp`, far terrain, sky-bank texels, seams.
+4. A MiniWind sandbox at the Arena: A/B against the v0.0.32 preview (as a
+   labelled regression test) and OpenMW at fixed poses, headlamp pairs,
+   renderer counters, the five v0.0.32-dev3 findings at their poses.
+5. Stage B: the wide-coordinate measurements (sign-on size, bytes and time
+   per frame, narrow against wide), then one city frame (1,596 chunks, 182
+   sector files in format 0.6 rows), 'vivec-deep' with its seam audit, the
+   Temple district first.
 
 ## M4: the open world
 
@@ -282,8 +364,9 @@ Detail: [CHIM engine, "Memory"](ENGINE.md#memory) and the heap gate in the
   Rounding mappings changes the pixels and saves little. Unmeasured
   leftover: dropping one decoded field that can be computed when needed
   (about 9 % of the mappings, same pixels).
-- **Other open memory items:** the zone size itself (a 7,680 KiB interim
-  zone vs a bank size the builder writes per world, owner decision pending,
+- **Other open memory items:** the zone size itself (the engine's 6,864 KiB
+  zone less the 2 x 384 KiB frame-world pool, which the heap gate reads from
+  the engine source, vs a zone the builder writes per world,
   [CHIM-ZONE-BUDGET-33](../bugs/CHIM-ZONE-BUDGET-33.md)); pack directories
   that would grow to about 400 KB island-wide if kept whole
   ([CHIM-PACK-DIRS-33](../bugs/CHIM-PACK-DIRS-33.md)); collision data read

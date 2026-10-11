@@ -1,0 +1,40 @@
+{
+  "schema": "build-recipe-1",
+  "name": "release-coast2",
+  "description": "The v0.0.36 release build (rc and final): the release recipe plus the whole coastline on CHIM - coast2, the closed ring (rings 1 and 2: 325 region cells, 222 land + 103 seabed; 6 more inside the Seyda Neen and Vivec city frames) - with Balmora, Seyda Neen, the whole city of Vivec and the Bitter Coast town on CHIM, compiled terrain hulls and terrain references. The status input comes from a CHIMport run (see its \"how\"); point the recipe at your own with --recipe-input ROLE=PATH. Run it with --developer-mode, as release builds are.",
+  "options": {
+    "check_hashes": "full",
+    "chim_native_towns": "on",
+    "chim_frame_ext": "chim",
+    "chim_areas": [
+      "balmora",
+      "seyda",
+      "vivec_city",
+      "bcoast_x7y2"
+    ],
+    "extra_town": [
+      "bcoast_x7y2"
+    ],
+    "no_npc_gallery": true,
+    "chim_regions": [
+      "coast2"
+    ],
+    "chim_regions_status": "cell-progress.json",
+    "chim_terrain_hull": "compiled",
+    "chim_terrain_refs": "on",
+    "chim_model_hull_patch": "on"
+  },
+  "inputs": [
+    {
+      "option": "chim_regions_status",
+      "role": "chim-regions-status",
+      "path": "cell-progress.json",
+      "sha256": "6404538743d723c0cb73aef80afe4bb413635c13938b225aa9581584ed528381",
+      "kind": "file",
+      "how": "The CHIM progress tracker file of the CHIMport run that closed the coast2 ring: TRACKER/cell-progress.json, written by python3 tools/cell_progress.py ingest (docs/chim/PROGRESS_TRACKER.md); python3 tools/chim/regions.py coast2 --status cell-progress.json lists the 325 cells"
+    }
+  ],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

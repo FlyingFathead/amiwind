@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * CHIM world format 0.4 to 0.6 decoders (chim_format.h). Byte access only, so the
+ * CHIM world format 0.4 to 0.7 decoders (chim_format.h). Byte access only, so the
  * same code reads the big-endian structures on the 68k and on a host test.
  * Every decoder checks what it can see on its own; the caller checks offsets
  * against the file it read them from.
@@ -182,8 +182,9 @@ void ChimFormat_ChunkEntry (const unsigned char *p, chim_chunk_entry_t *c)
 
 int ChimFormat_ChunkHead (const unsigned char *p, chim_chunk_head_t *h)
 {
-	if (memcmp (p, "CHK0", 4))
+	if (memcmp (p, "CHK0", 4) && memcmp (p, "CHK1", 4))
 		return 0;
+	h->ref = p[3] == '1';
 	h->owned = ChimFormat_U16 (p+4);
 	h->reach = ChimFormat_U16 (p+6);
 	h->image_at = ChimFormat_U32 (p+8);
@@ -192,6 +193,26 @@ int ChimFormat_ChunkHead (const unsigned char *p, chim_chunk_head_t *h)
 	h->terrain_leaves = ChimFormat_U16 (p+18);
 	h->pvl_bytes = ChimFormat_U16 (p+20);
 	return 1;
+}
+
+/* 0.7: a CHK1 chunk's reference block. The shift is whole units, finite and
+ * inside the frame range (a bad block fails the load, never the game). */
+int ChimFormat_TerrainRef (const unsigned char *p, chim_terrain_ref_t *t)
+{
+	int k;
+	t->id = ChimFormat_U32 (p);
+	t->file = (unsigned)ChimFormat_U16 (p+4);
+	t->offset = ChimFormat_U32 (p+8);
+	t->bytes = ChimFormat_U32 (p+12);
+	t->render = ChimFormat_U32 (p+16);
+	for (k=0 ; k<3 ; k++)
+	{
+		t->shift[k] = ChimFormat_F32 (p+20+4*k);
+		if (!Finite (t->shift[k]) || t->shift[k] <= -8192 || t->shift[k] >= 8192 ||
+			t->shift[k] != (float)(int)t->shift[k])
+			return 0;
+	}
+	return ChimFormat_U16 (p+6) == 0 && t->render <= t->bytes && (t->offset & 3) == 0;
 }
 
 int ChimFormat_Record (const unsigned char *p, chim_record_t *r)

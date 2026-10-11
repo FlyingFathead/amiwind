@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "vivec-arena-chim",
+  "description": "MiniWind preset --miniwind-vivec-arena-chim: Vivec on CHIM (whole city) from the Arena arrival",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "full",
+    "miniwind_description": "Vivec on CHIM (whole city) from the Arena arrival",
+    "direct_to_game_map": "vivec_city",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

@@ -1,0 +1,683 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AmiWind Toolkit · Monitor</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101923;color:#edf3fa;font:14px system-ui,sans-serif}
+#bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;border-bottom:1px solid #345;background:#13202d}
+select,button,label.chk{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:5px;padding:6px 8px;font:inherit}
+button{cursor:pointer}button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff}
+label.chk{display:inline-flex;gap:6px;align-items:center}
+#run{max-width:min(100%,560px)}
+main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:12px;padding:12px 14px}
+@media (max-width:820px){main{grid-template-columns:1fr}main>div.right{order:-1}#log{height:55vh}}
+section{background:#162433;border:1px solid #2c4256;border-radius:8px;padding:10px 12px;min-width:0}
+h2{font-size:15px;margin:0 0 8px;color:#ffe28a}
+.muted{color:#9fb3c8;font-size:12px}
+.big{font-size:22px;font-weight:700}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}
+.kv b{color:#9fb3c8;font-weight:400}
+#status.running{color:#8bd5ff}#status.passed{color:#7dffa6}#status.failed{color:#ff7070}
+.stage{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:6px;align-items:center;font-size:12px;margin:2px 0}
+.stage .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{position:relative;height:10px;background:#0d1620;border-radius:3px;overflow:hidden}
+.track i{position:absolute;top:0;bottom:0;left:0;border-radius:3px}
+.track i.exp{background:#2c4256}
+.s-passed{background:#3fbf7a}.s-running{background:#38a9e8}.s-failed{background:#e04848}.s-pending{background:#56677a}.s-skipped,.s-reused{background:#6f8a5f}
+#log{margin:0;height:min(62vh,640px);overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:8px;
+  font:12px/1.35 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+#logbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+td,th{padding:3px 6px;border-bottom:1px solid #243649;text-align:left;vertical-align:top}
+td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
+.right{min-width:0}#timeline{max-width:100%}#acttail{margin:6px 0 4px;max-height:12em;overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:6px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}.silent{color:#ffb070;font-weight:600}.red{color:#ff5050;font-weight:700}#timelinechart{overflow:hidden;touch-action:none;cursor:crosshair}#timelinechart svg{display:block}#tlbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}#tlbar input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:4px}#timelinedetail{margin:6px 0 0;white-space:pre-wrap;font:11px/1.35 ui-monospace,Consolas,monospace;color:#ffe9b0}#timelinedetail:empty{display:none}#timeline.maximized{position:fixed;inset:0;z-index:1000;margin:0;border-radius:0;overflow:auto;background:#162433}#timeline:fullscreen{overflow:auto;background:#162433}#timelinechart rect{cursor:pointer}#timelinetip{min-height:1.4em;margin-top:4px}
+.error{color:#ffaaaa}
+</style>
+<script src="header.js"></script>
+</head>
+<body>
+<div id="bar">
+  <label class="muted" for="run">Build run</label>
+  <select id="run" aria-label="Build run"></select>
+  <button id="runrefresh" title="Read the run list again">&#x21bb; Refresh</button>
+  <label class="chk"><input type="checkbox" id="followlatest"> follow latest</label>
+  <span id="status" class="big">-</span>
+  <span id="updated" class="muted"></span>
+  <span class="muted" style="margin-left:auto">Read-only: this page only reads build files through the Toolkit server; it cannot start, stop or change anything.</span>
+</div>
+<main>
+  <div>
+    <section>
+      <h2>Progress</h2>
+      <div class="kv" id="facts"><b>Run</b><span>-</span></div>
+    </section>
+    <section style="margin-top:12px">
+      <h2>Stages</h2>
+      <div class="muted" id="stagenote">Elapsed (colour) against expected (grey).</div>
+      <div id="stages"></div>
+    </section>
+    <section style="margin-top:12px">
+      <h2>Recent builds and gates</h2>
+      <div id="results" class="muted">No master builder results configured.</div>
+    </section>
+  </div>
+  <div class="right">
+  <section id="activity" style="margin-bottom:12px">
+    <h2>Activity</h2>
+    <div class="kv" id="actfacts"><b>Stage</b><span>-</span></div>
+    <pre id="acttail" aria-live="off"></pre>
+    <div class="muted">From the running stage's read/write trace (profile/reads): <code>&gt;</code> written, <code>&lt;</code> read, <code>@</code> code entered.</div>
+  </section>
+  <section>
+    <h2>Log</h2>
+    <div id="logbar">
+      <select id="logpick" aria-label="Log"></select>
+      <label class="chk"><input type="checkbox" id="follow" checked> follow the running stage</label>
+      <button id="pause" aria-pressed="false">Pause</button>
+      <button id="bottom">Jump to end</button>
+      <span id="loginfo" class="muted"></span>
+    </div>
+    <pre id="log" tabindex="0" aria-live="off"></pre>
+  </section>
+  <section style="margin-top:12px" id="timeline">
+    <h2>Stage timeline</h2>
+    <div id="tlbar">
+      <button id="tlfull" title="Fullscreen (Esc leaves)" aria-label="Fullscreen">&#x26F6; Fullscreen</button>
+      <button id="tlreset" title="Show the whole run">Reset zoom</button>
+      <label class="muted">red under <input id="redth" type="number" min="0.5" step="0.5" value="2.5" style="width:4em"> cores</label>
+      <label class="muted">for <input id="redmin" type="number" min="0" step="5" value="30" style="width:4em"> s</label>
+    </div>
+    <div class="muted" id="timelinenote">Waiting for the build's stage times.</div>
+    <div id="timelinechart" tabindex="0" aria-label="Stage timeline: arrows step through red stretches"></div>
+    <div id="timelinetip" class="muted" aria-live="polite"></div>
+    <pre id="timelinedetail" aria-live="polite"></pre>
+  </section>
+  </div>
+</main>
+<script>
+'use strict';
+// The AmiWind Toolkit Monitor: a build as it runs, read-only. Everything comes from the Toolkit server's /monitor/
+// endpoints (tools/toolkit_serve.py --builds or --builds-command, --results, --console-logs); nothing is sent back.
+if (window.AmiWindToolkitHeader) window.AmiWindToolkitHeader.mount('Monitor');
+const $ = id => document.getElementById(id);
+const POLL_MS = 2000, LIST_MS = 10000, LOG_KEEP = 400000, FIRST_TAIL = 65536;
+const S = {run: null, log: null, next: -1, size: 0, paused: false, progress: null, lastList: 0, files: [], console: false,
+  timelineFor: null, timer: null, reading: false, token: 0, traces: [], trace: null, tnext: -1, tsize: 0, tgrew: 0, tlines: [], tool: '',
+  tbuf: '', logGrewAt: 0};
+const fmtS = s => { if (!Number.isFinite(s)) return '-'; s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return ((h ? h + ' h ' : '') + (h || m ? m + ' min ' : '') + (h ? '' : (s % 60) + ' s')).trim(); };
+const fmtB = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(0) + ' KB' : n + ' B';
+async function get(path) {
+  const r = await fetch(path, {cache: 'no-store'});
+  let d = null;
+  try { d = await r.json(); } catch (e) { d = null; }
+  if (!d) throw Error('no answer from ' + path + ' (open the Monitor through tools/toolkit_serve.py)');
+  return d;
+}
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function kv(rows) {
+  const box = $('facts'); box.replaceChildren();
+  for (const [k, v] of rows) { box.append(el('b', '', k)); box.append(el('span', '', v)); }
+}
+function stageLog(stage) {
+  return S.files.map(f => f.name).find(n => n.replace(/^\d+-/, '') === stage + '.log') || null;
+}
+// The live cores readout: red when the build has been under the red threshold for the red minimum or longer.
+function lowNow() {
+  const c = S.liveCores || [], rs = redStretches(c, redSettings().threshold, redSettings().min), last = rs[rs.length - 1];
+  return last && c.length && last.end === c[c.length - 1][0] ? ' · UNDER ' + redSettings().threshold + ' CORES FOR ' + fmtS(last.end - last.start) : '';
+}
+function renderProgress(p) {
+  const status = p ? p.status || '-' : 'no build-progress.json';
+  $('status').textContent = status; $('status').className = 'big ' + (p ? p.status : '');
+  if (!p) { kv([['Run', S.run || '-']]); $('stages').replaceChildren(); return; }
+  const c = p.counts || {}, running = (p.stages || []).filter(s => s.status === 'running').map(s => s.name);
+  const ageS = p.updated_epoch ? Date.now() / 1000 - p.updated_epoch : NaN;
+  $('updated').textContent = p.updated_at ? 'updated ' + p.updated_at.replace('T', ' ').replace('+00:00', ' UTC') + (Number.isFinite(ageS) ? ' (' + fmtS(ageS) + ' ago)' : '') : '';
+  kv([['Run', p.run || S.run], ['Done', (p.percent != null ? p.percent + ' %' : '-') + ' · ' + (c.passed || 0) + ' passed, ' + (c.running || 0) + ' running, ' +
+      (c.pending || 0) + ' pending, ' + (c.failed || 0) + ' failed of ' + (c.total || 0)],
+    ['Running', running.join(', ') || '-'], ['Elapsed', fmtS(p.elapsed_seconds)],
+    ['ETA', p.status === 'running' ? fmtS(p.eta_seconds) + (p.eta_at ? ' (at ' + p.eta_at.replace('T', ' ').replace('+00:00', ' UTC') + ')' : '') : '-'],
+    ['ETA basis', (p.eta_basis || '-') + (p.critical_path ? ' · ' + p.critical_path.join(' > ') : '')],
+    ['Cores now', (p.cores_now != null ? p.cores_now : '-') + (p.budget ? ' of ' + p.budget : '') + lowNow()]]);
+  const cn = $('facts').children[$('facts').children.length - 1];
+  if (cn && lowNow()) cn.className = 'red';
+  const box = $('stages'); box.replaceChildren();
+  const stages = p.stages || [], top = Math.max(1, ...stages.map(s => Math.max(s.elapsed_seconds || 0, s.expected_seconds || 0)));
+  for (const s of stages) {
+    const row = el('div', 'stage'), track = el('div', 'track'), exp = el('i', 'exp'), done = el('i', 's-' + (s.status || 'pending'));
+    exp.style.width = (100 * (s.expected_seconds || 0) / top) + '%';
+    done.style.width = (100 * Math.min(top, s.elapsed_seconds || 0) / top) + '%';
+    track.append(exp, done);
+    const name = el('span', 'name', s.name); name.title = s.name + ' · ' + (s.status || '') + ' · expected ' + fmtS(s.expected_seconds) + ' (' + (s.expected_basis || '') + ')';
+    row.append(name, track, el('span', 'muted', fmtS(s.elapsed_seconds)));
+    box.append(row);
+  }
+  if ($('follow').checked && running.length) {
+    const want = stageLog(running[running.length - 1]);
+    if (want && want !== S.log && S.log !== 'console') switchLog(want);
+  }
+}
+// The stage timeline: one shared time axis from the build's start, each stage a bar from its start to its end
+// (reused stages thin marks, the running stage growing to now, failed red), overlapping stages on their own rows
+// so the parallelism shows, a "now" line while running, and the cores over time when the profile has them.
+// One drawing for both sources: live build-state.json steps, and a finished run's build-profile.json.
+function lanes(bars) {
+  const ends = [];
+  for (const b of bars.slice().sort((p, q) => p.start - q.start || p.end - q.end)) {
+    let k = ends.findIndex(e => e <= b.start + 1e-6);
+    if (k < 0) { k = ends.length; ends.push(0); }
+    ends[k] = Math.max(b.end, b.start + 0.001); b.lane = k;
+  }
+  return ends.length;
+}
+// Sections inside a stage (BUILD-SILENT-PHASES-36): the profiler's section timer when the run has it, and, under it,
+// sections derived from the stage's read/write trace (code entered, timed by the files the stage wrote). A section
+// that used fewer than LOW_CORES cores on average for more than LOW_SECONDS is drawn hatched red with its name shown.
+const LOW_CORES = 4, LOW_SECONDS = 60;
+function isLow(sec) { return sec.cores != null && sec.cores < LOW_CORES && (sec.end - sec.start > LOW_SECONDS || sec.low_run >= LOW_SECONDS); }
+function sectionTip(sec, stage, source) {
+  return stage + ' > ' + sec.name + ' · ' + source + ' · ' + fmtS(sec.start) + ' to ' + fmtS(sec.end) + ' (' + ((sec.end - sec.start) / 60).toFixed(1) +
+    ' min)' + (sec.cores != null ? ' · ' + sec.cores + ' cores mean' : ' · cores not recorded') + (sec.calls > 1 ? ' · ' + sec.calls + ' calls' : '') +
+    (sec.items ? ' · ' + sec.items + ' items' : '') + (sec.code && sec.code.length ? ' · code: ' + sec.code.join(', ') : '') +
+    (sec.files_written ? ' · wrote ' + sec.files_written + ' files' + (sec.last_written && sec.last_written.length ? ' (last: ' + sec.last_written.join(', ') + ')' : '') : '') +
+    (isLow(sec) ? ' · UNDER ' + LOW_CORES + ' CORES' + (sec.low_run ? ' (part of a ' + (sec.low_run / 60).toFixed(1) + ' min low-core stretch)' : '') : '');
+}
+// Red stretches: where the build's cores stay under THRESHOLD for at least MIN seconds (owner: "wherever utilization
+// drops to 1-2 cores"). SERIES: [[t, cores], ...] in time order. Returns [{start, end, mean}].
+function redStretches(series, threshold, min) {
+  const out = [];
+  let cur = null;
+  for (const [t, c] of series || []) {
+    if (!Number.isFinite(t) || !Number.isFinite(c)) continue;
+    if (c < threshold) {
+      if (cur) { cur.end = t; cur.sum += c; cur.n++; } else cur = {start: t, end: t, sum: c, n: 1};
+    } else if (cur) { if (cur.end - cur.start >= min) out.push(cur); cur = null; }
+  }
+  if (cur && cur.end - cur.start >= min) out.push(cur);
+  return out.map(r => ({start: r.start, end: r.end, mean: Math.round(100 * r.sum / r.n) / 100}));
+}
+function redSettings() {
+  const th = Number($('redth') && $('redth').value), mn = Number($('redmin') && $('redmin').value);
+  return {threshold: Number.isFinite(th) && th > 0 ? th : 2.5, min: Number.isFinite(mn) && mn >= 0 ? mn : 30};
+}
+// What ran at time T: the stages and their sections (both lanes) covering it.
+function runningAt(t) {
+  const tl = S.tl || {}, out = [];
+  for (const b of tl.bars || []) {
+    if (!(b.start <= t && t <= b.end) || b.reused) continue;
+    const sx = (S.sections || {})[b.name] || {}, here = [...(sx.sections || []), ...(sx.trace || [])].filter(s => s.start <= t && t <= s.end);
+    out.push({stage: b.name, sections: here});
+  }
+  return out;
+}
+// Everything that ran inside [A, B]: per stage, the sections overlapping it with the minutes of overlap.
+function ranDuring(a, b) {
+  const tl = S.tl || {}, out = [];
+  for (const bar of tl.bars || []) {
+    if (bar.reused || bar.end < a || bar.start > b) continue;
+    const sx = (S.sections || {})[bar.name] || {};
+    const secs = [...(sx.sections || []).map(s => [s, sx.source === 'profile' ? 'section timer' : 'derived from trace (approximate)']),
+      ...(sx.trace || []).map(s => [s, 'derived from trace (approximate)'])].filter(([s]) => s.end >= a && s.start <= b)
+      .map(([s, src]) => ({name: s.name, source: src, minutes: (Math.min(b, s.end) - Math.max(a, s.start)) / 60, cores: s.cores, code: s.code || []}));
+    out.push({stage: bar.name, minutes: (Math.min(b, bar.end) - Math.max(a, bar.start)) / 60, sections: secs});
+  }
+  return out;
+}
+function selectStretch(i) {
+  const list = S.red || [];
+  if (!list.length) { S.sel = null; return null; }
+  if (i == null) { S.sel = null; renderTimeline(S.tl.bars, S.tl.opts); $('timelinedetail').textContent = ''; return null; }
+  i = ((i % list.length) + list.length) % list.length;
+  const r = list[i];
+  S.sel = {start: r.start, end: r.end};
+  const L = ['Red stretch ' + (i + 1) + ' of ' + list.length + ': ' + fmtS(r.start) + ' to ' + fmtS(r.end) + ' (' + ((r.end - r.start) / 60).toFixed(1) +
+    ' min), mean ' + r.mean + ' cores. Arrows: next / previous; Esc: clear.'];
+  for (const s of ranDuring(r.start, r.end)) {
+    L.push('  ' + s.stage + ' · ' + s.minutes.toFixed(1) + ' min in this stretch');
+    for (const x of s.sections) L.push('    ' + x.name + ' · ' + x.source + ' · ' + x.minutes.toFixed(1) + ' min' + (x.cores != null ? ' · ' + x.cores + ' cores' : '') +
+      (x.code.length ? ' · code: ' + x.code.slice(0, 4).join(', ') : ''));
+  }
+  $('timelinedetail').textContent = L.join('\n');
+  renderTimeline(S.tl.bars, S.tl.opts);
+  return r;
+}
+function selectedIndex() { return S.sel ? (S.red || []).findIndex(r => r.start === S.sel.start) : -1; }
+// Fullscreen: the Fullscreen API, or a maximised overlay where it is not available.
+function toggleFullscreen() {
+  const sec = $('timeline');
+  const doc = typeof document !== 'undefined' ? document : {};
+  if (doc.fullscreenElement) { doc.exitFullscreen(); S.full = false; }
+  else if (S.full && !doc.fullscreenElement) { sec.className = (sec.className || '').replace(/\s*maximized/g, ''); S.full = false; }
+  else if (sec.requestFullscreen) { sec.requestFullscreen().catch(() => { sec.className = (sec.className || '') + ' maximized'; }); S.full = true; }
+  else { sec.className = (sec.className || '') + ' maximized'; S.full = true; }
+  if (S.tl) setTimeout(() => renderTimeline(S.tl.bars, S.tl.opts), 50);
+  return S.full;
+}
+function resetZoom() { S.view = null; if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); }
+function renderTimeline(bars, opts) {
+  opts = opts || {};
+  S.tl = {bars, opts};
+  const note = $('timelinenote'), chart = $('timelinechart'), secs = S.sections || {}, esc = t => String(t).replace(/[<&"]/g, '');
+  bars = (bars || []).filter(b => Number.isFinite(b.start));
+  if (!bars.length) { chart.innerHTML = ''; note.textContent = opts.empty || 'No stage times yet.'; return; }
+  for (const b of bars) if (!Number.isFinite(b.end)) b.end = Number.isFinite(opts.now) ? Math.max(b.start, opts.now) : b.start;
+  const span = Math.max(1, opts.now || 0, ...bars.map(b => b.end));
+  const view = S.view && S.view.t1 > S.view.t0 ? S.view : {t0: 0, t1: span};
+  const cores = opts.cores && opts.cores.length > 1 ? opts.cores : (opts.live && S.liveCores && S.liveCores.length > 1 ? S.liveCores : null);
+  const red = cores ? redStretches(cores, redSettings().threshold, redSettings().min) : [];
+  S.red = red;
+  const anySections = bars.some(b => secs[b.name] && ((secs[b.name].sections || []).length || (secs[b.name].trace || []).length));
+  const rows = lanes(bars), full = !!S.full;
+  const W = Math.max(600, (chart.clientWidth || 900) - 2);
+  const coreH = cores ? (full ? 140 : 70) : 0, top = 16 + coreH;
+  const avail = full && typeof window !== 'undefined' && window.innerHeight ? window.innerHeight - 140 : 0;
+  const rowH = Math.max(anySections ? 50 : 14, avail ? Math.floor((avail - top - 18) / Math.max(1, rows)) : 0);
+  const H = top + rows * rowH + 18;
+  const x = v => 4 + (W - 8) * (v - view.t0) / (view.t1 - view.t0), vis = (a, b) => b >= view.t0 && a <= view.t1;
+  const cx = v => Math.max(-2, Math.min(W + 2, x(v)));
+  let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stage timeline">' +
+    '<defs><pattern id="lowhatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#5a1a1a"/><line x1="0" y1="0" x2="0" y2="6" stroke="#ff5050" stroke-width="3"/></pattern></defs>';
+  const wspan = view.t1 - view.t0, steps = [1, 5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600];
+  const step = steps.find(s => wspan / s <= 14) || 3600;
+  for (let t = Math.ceil(view.t0 / step) * step; t <= view.t1; t += step) {
+    svg += '<line x1="' + x(t).toFixed(1) + '" x2="' + x(t).toFixed(1) + '" y1="' + (top - 4) + '" y2="' + (H - 14) + '" stroke="#243649"/>' +
+      '<text x="' + (x(t) + 2).toFixed(1) + '" y="' + (H - 4) + '" fill="#9fb3c8" font-size="9">' + fmtS(t) + '</text>';
+  }
+  if (cores) {
+    const cap = Math.max(1, opts.budget || 0, ...cores.map(c => c[1])), y = c => 12 + (coreH - 8) * (1 - c / cap);
+    const pts = cores.filter(c => c[0] >= view.t0 - 60 && c[0] <= view.t1 + 60);
+    for (const r of red) if (vis(r.start, r.end)) {
+      const inside = pts.filter(c => c[0] >= r.start && c[0] <= r.end);
+      if (inside.length) svg += '<polygon data-red="' + red.indexOf(r) + '" points="' + cx(r.start).toFixed(1) + ',' + (12 + coreH - 8) + ' ' + inside.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') +
+        ' ' + cx(r.end).toFixed(1) + ',' + (12 + coreH - 8) + '" fill="#ff3b3b" fill-opacity="0.45"/>';
+    }
+    svg += '<polyline fill="none" stroke="#8bd5ff" stroke-width="1" points="' + pts.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') + '"/>';
+    for (const r of red) if (vis(r.start, r.end)) {
+      const inside = pts.filter(c => c[0] >= r.start && c[0] <= r.end);
+      if (inside.length > 1) svg += '<polyline fill="none" stroke="#ff4040" stroke-width="2" points="' + inside.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') + '"/>';
+    }
+    svg += '<text x="4" y="10" fill="#9fb3c8" font-size="9">cores (max ' + cap + '); red: under ' + redSettings().threshold + ' cores for ' + redSettings().min + ' s or more · ' + red.length + ' stretch' + (red.length === 1 ? '' : 'es') + '</text>';
+  }
+  if (S.sel && vis(S.sel.start, S.sel.end)) svg += '<rect x="' + cx(S.sel.start).toFixed(1) + '" y="0" width="' + Math.max(2, cx(S.sel.end) - cx(S.sel.start)).toFixed(1) + '" height="' + (H - 14) +
+    '" fill="#ffe28a" fill-opacity="0.16" stroke="#ffe28a" stroke-width="1"/>';
+  const items = [], selHit = (a, b) => S.sel && b >= S.sel.start && a <= S.sel.end;
+  // a label cut to the pixels it has, with an ellipsis; the full text stays in the hover
+  const fit = (text, px) => { const n = Math.floor(px / 4.5); return n < 3 ? '' : text.length <= n ? text : text.slice(0, n - 1) + '\u2026'; };
+  let redLabels = [];
+  const lane = (list, y, h, stage, source) => {
+    list = list.filter(sec => Number.isFinite(sec.start) && Number.isFinite(sec.end) && vis(sec.start, sec.end));
+    let labels = '';
+    list.forEach((sec, k) => {
+      const low = isLow(sec), x0 = cx(sec.start), w = Math.max(1, cx(sec.end) - x0), dh = sec.depth ? Math.max(3, h - 3 * sec.depth) : h;
+      const prevLow = k > 0 && isLow(list[k - 1]) && Math.abs(list[k - 1].end - sec.start) < 2;
+      let runLabel = null, runW = w;
+      if (low && !prevLow) {
+        let j = k;
+        const names = [];
+        while (j < list.length && isLow(list[j]) && (j === k || Math.abs(list[j - 1].end - list[j].start) < 2)) { names.push(list[j].name.replace(/ \(.*\)$/, '')); j++; }
+        const last = list[j - 1];
+        runW = Math.max(w, cx(last.end) - x0);
+        runLabel = 'UNDER ' + LOW_CORES + ' CORES ' + ((last.end - sec.start) / 60).toFixed(1) + ' min: ' + [...new Set(names)].join(' > ');
+      }
+      items.push({tip: sectionTip(sec, stage, source)});
+      svg += '<rect data-s="' + (items.length - 1) + '" x="' + x0.toFixed(1) + '" y="' + (y + h - dh) + '" width="' + w.toFixed(1) + '" height="' + dh + '" fill="' +
+        (low ? 'url(#lowhatch)' : sec.depth ? '#3b6a8c' : '#2c5372') + '" stroke="' + (selHit(sec.start, sec.end) ? '#ffe28a' : '#0b121a') + '" stroke-width="' +
+        (selHit(sec.start, sec.end) ? 1.6 : 0.8) + '"><title>' + esc(sec.name) + '</title></rect>';
+      if (runLabel) redLabels.push({x: x0, text: runLabel});        // red-stretch names go on the row's own label line
+      else if (!low && w > 30) labels += '<text x="' + (x0 + 2).toFixed(1) + '" y="' + (y + h - 2) + '" fill="#dfeaf5" font-size="8" pointer-events="none">' +
+        esc(fit(sec.name, w - 4)) + '</text>';
+    });
+    svg += labels;
+  };
+  bars.forEach((b, i) => {
+    if (!vis(b.start, b.end)) return;
+    const y = top + b.lane * rowH, col = {passed: '#3fbf7a', failed: '#e04848', running: '#38a9e8', pending: '#56677a'}[b.status] || '#6f8a5f';
+    const w = b.reused ? 2 : Math.max(2, cx(b.end) - cx(b.start)), barH = anySections ? 12 : rowH - 3;
+    svg += '<rect data-i="' + i + '" x="' + cx(b.start).toFixed(1) + '" y="' + y + '" width="' + w.toFixed(1) + '" height="' + barH + '" fill="' + col + '"' +
+      (b.reused ? ' opacity="0.7"' : '') + (selHit(b.start, b.end) && !b.reused ? ' stroke="#ffe28a" stroke-width="2"' : '') + '><title>' + esc(b.name) + '</title></rect>';
+    if (!b.reused && w > 60) svg += '<text x="' + (Math.max(0, cx(b.start)) + 3).toFixed(1) + '" y="' + (y + barH - 3) + '" fill="#0b121a" font-size="9" pointer-events="none">' + esc(b.name) + '</text>';
+    const sx = secs[b.name];
+    if (anySections && sx && !b.reused) {
+      redLabels = [];
+      lane(sx.sections || [], y + 13, 12, b.name, sx.source === 'profile' ? 'section timer' : 'derived from trace (approximate)');
+      if (sx.source === 'profile') lane(sx.trace || [], y + 26, 9, b.name, 'derived from trace (approximate)');
+      // one line for the red-stretch names of this row: each gets the room up to the next one, never overprinted
+      redLabels.sort((p, q) => p.x - q.x);
+      redLabels.forEach((l, k) => {
+        const room = (k + 1 < redLabels.length ? redLabels[k + 1].x : W) - l.x - 6;
+        const t = fit(l.text, room);
+        if (t) svg += '<text x="' + (l.x + 2).toFixed(1) + '" y="' + (y + 45) + '" fill="#ff8080" font-size="8" font-weight="700" pointer-events="none">' + esc(t) + '</text>';
+      });
+    }
+  });
+  if (opts.live && Number.isFinite(opts.now) && vis(opts.now, opts.now)) svg += '<line x1="' + x(opts.now).toFixed(1) + '" x2="' + x(opts.now).toFixed(1) + '" y1="0" y2="' + (H - 14) + '" stroke="#ffe28a" stroke-dasharray="3 2"/>';
+  svg += '<line id="tlcursor" x1="-10" x2="-10" y1="0" y2="' + (H - 14) + '" stroke="#ffffff" stroke-width="1" pointer-events="none" opacity="0.8"/>';
+  chart.innerHTML = svg + '</svg>';
+  S.tlGeom = {W, H, top, coreH, view, span};
+  const tip = b => b.name + ' · ' + (b.reused ? 'reused' : b.status) + ' · start ' + fmtS(b.start) + ', end ' + (b.status === 'running' ? 'running' : fmtS(b.end)) +
+    ' · ' + fmtS(b.end - b.start) + (b.cores != null ? ' · ' + b.cores + ' cores' : '') + (b.jobs != null ? ' · ' + b.jobs + ' jobs' : '');
+  for (const r of chart.querySelectorAll ? chart.querySelectorAll('rect[data-i],rect[data-s]') : []) {
+    const show = () => { const si = r.getAttribute('data-s'); $('timelinetip').textContent = si != null ? items[Number(si)].tip : tip(bars[Number(r.getAttribute('data-i'))]); };
+    r.addEventListener('mouseenter', show);
+  }
+  const low = Object.entries(secs).reduce((n, [, v]) => n + [...(v.sections || []), ...(v.trace || [])].filter(isLow).length, 0);
+  note.textContent = opts.label + ': ' + bars.length + ' stages on ' + rows + ' row' + (rows === 1 ? '' : 's') + ' (stages side by side ran in parallel), ' +
+    fmtS(span) + (opts.live ? ' so far' : '') + '.' + (anySections ? ' Under each stage: its sections (section timer, then "derived from trace" from the code it entered, timed by the files it wrote); ' +
+    low + ' sections under ' + LOW_CORES + ' cores for over a minute are hatched red.' : '') + (cores ? ' Red on the cores line: ' + red.length + ' stretches; click one to see what ran.' : '') +
+    ' Wheel: zoom, drag: pan.';
+}
+// Time under the pointer, from the chart's own geometry (zoom included).
+function timeAtX(px) { const g = S.tlGeom; return g ? g.view.t0 + (px - 4) / (g.W - 8) * (g.view.t1 - g.view.t0) : NaN; }
+function coresAt(t) {
+  const c = (S.tl && S.tl.opts && S.tl.opts.cores && S.tl.opts.cores.length > 1) ? S.tl.opts.cores : S.liveCores || [];
+  let best = null;
+  for (const p of c) if (!best || Math.abs(p[0] - t) < Math.abs(best[0] - t)) best = p;
+  return best ? best[1] : null;
+}
+function hoverAt(px) {
+  const t = timeAtX(px), g = S.tlGeom;
+  if (!g || !Number.isFinite(t)) return '';
+  const line = typeof document !== 'undefined' && document.getElementById ? document.getElementById('tlcursor') : null;
+  if (line && line.setAttribute) { line.setAttribute('x1', px); line.setAttribute('x2', px); }
+  const r = (S.red || []).find(r => r.start <= t && t <= r.end), here = runningAt(t), c = coresAt(t);
+  const text = fmtS(t) + (c != null ? ' · ' + c + ' cores (red: under ' + redSettings().threshold + ' for ' + redSettings().min + ' s+)' : '') + (r ? ' · RED STRETCH ' + ((r.end - r.start) / 60).toFixed(1) + ' min (click to select)' : '') +
+    (here.length ? ' · ' + here.map(h => h.stage + (h.sections.length ? ' > ' + h.sections.map(s => s.name).join(' / ') : '')).join(' | ') : ' · no stage');
+  $('timelinetip').textContent = text;
+  return text;
+}
+function clickAt(px) {
+  const t = timeAtX(px), k = (S.red || []).findIndex(r => r.start <= t && t <= r.end);
+  if (k >= 0) return selectStretch(k);
+  return null;
+}
+// The sections of every stage that has a log or trace (NN-stage): loaded once for finished stages, every 30 s for running ones.
+async function loadSections(bars) {
+  if (!S.run) return false;
+  S.sections = S.sections || {};
+  S.sectionsAt = S.sectionsAt || {};
+  const ids = {};
+  for (const f of [...S.files, ...(S.traces || [])]) { const m = /^(\d+-(.+))\.(log|txt)$/.exec(f.name); if (m) ids[m[2]] = m[1]; }
+  let changed = false;
+  for (const b of bars || []) {
+    const id = ids[b.name];
+    if (!id || b.reused) continue;
+    const age = Date.now() - (S.sectionsAt[b.name] || 0);
+    if (S.sections[b.name] && (b.status !== 'running' || age < 30000)) continue;
+    S.sectionsAt[b.name] = Date.now();
+    try {
+      const d = await get('/monitor/run/' + encodeURIComponent(S.run) + '/sections/' + encodeURIComponent(id) + '.json');
+      if (d.ok) { S.sections[b.name] = d; changed = true; }
+    } catch (e) { /* the next round tries again */ }
+  }
+  return changed;
+}
+// Live bars from build-state.json steps (started_seconds, elapsed_seconds), with reuse from build-progress.json.
+function liveBars(state, progress) {
+  const reused = new Set((progress && progress.stages || []).filter(s => s.expected_basis === 'reused' || s.expected_source === 'reused').map(s => s.name));
+  return ((state && state.steps) || []).filter(s => Number.isFinite(s.started_seconds)).map(s => ({name: s.name, status: s.status || 'running',
+    start: s.started_seconds, end: Number.isFinite(s.elapsed_seconds) && s.status !== 'running' ? s.started_seconds + s.elapsed_seconds : NaN,
+    reused: reused.has(s.name) && s.status === 'passed' && (s.elapsed_seconds || 0) < 5, jobs: s.jobs}));
+}
+function profileBars(t) {
+  return (t && t.stages || []).map(s => ({name: s.name, status: s.status, start: s.start, end: s.end, cores: s.cores_avg, jobs: s.jobs,
+    reused: (s.wall || 0) < 1 && s.status === 'passed'}));
+}
+function renderResults(rows) {
+  if (!rows || !rows.length) { $('results').textContent = 'No results.'; return; }
+  const table = el('table'), head = el('tr');
+  for (const h of ['finished', 'kind', 'status', 'time', 'run']) head.append(el('th', '', h));
+  table.append(head);
+  for (const r of rows.slice(0, 15)) {
+    const tr = el('tr');
+    tr.append(el('td', '', String(r.finished || '').slice(5, 16)), el('td', '', (r.kind || '') + (r.gate ? ' ' + r.gate : '') + (r.dry_run ? ' (dry run)' : '')),
+      el('td', r.status || '', r.status || ''), el('td', '', fmtS(r.seconds)), el('td', '', String(r.run_name || '').replace(/^\d{4}_\d\d_\d\d_/, '')));
+    table.append(tr);
+  }
+  $('results').replaceChildren(table);
+}
+function appendLog(text, reset) {
+  const pre = $('log'), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+  if (reset) pre.textContent = '';
+  if (text) {
+    let all = pre.textContent + text;
+    if (all.length > LOG_KEEP) all = all.slice(all.length - LOG_KEEP);
+    pre.textContent = all;
+  }
+  if (reset || atEnd) pre.scrollTop = pre.scrollHeight;
+}
+function logUrl(next, max) {
+  return S.log === 'console' ? '/monitor/console/' + encodeURIComponent(S.run) + '?offset=' + next + '&max=' + max
+    : '/monitor/run/' + encodeURIComponent(S.run) + '/log/' + encodeURIComponent(S.log) + '?offset=' + next + '&max=' + max;
+}
+async function readLog(first) {
+  if (!S.run || !S.log || (!first && (S.paused || S.reading || S.next < 0))) return;
+  const log = S.log, run = S.run, token = first ? ++S.token : S.token;
+  S.reading = true;
+  try {
+    const d = await get(logUrl(first ? -1 : S.next, first ? FIRST_TAIL : 262144));
+    if (S.log !== log || S.run !== run || S.token !== token) return;       // another log was chosen meanwhile
+    if (!d.ok) { $('loginfo').textContent = d.error || 'not readable'; return; }
+    if (!first && d.size < S.next) { S.reading = false; return readLog(true); }   // the log was replaced: start again from its end
+    appendLog((first && d.offset > 0 ? '[... ' + fmtB(d.offset) + ' earlier; showing the end]\n' : '') + d.text, first);
+    if (!first && d.size > S.size) S.logGrewAt = Date.now();
+    if (first) { const f = S.files.find(x => x.name === S.log); S.logGrewAt = f && f.mtime ? f.mtime * 1000 : Date.now(); }
+    S.next = d.next; S.size = d.size;
+    $('loginfo').textContent = fmtB(d.size) + (S.paused ? ' · paused' : '');
+  } catch (e) { $('loginfo').textContent = e.message; } finally { if (S.token === token) S.reading = false; }
+}
+function switchLog(name) { S.log = name; S.next = -1; $('logpick').value = name; readLog(true); }
+// Activity: the running stage's read/write trace (profile/reads/NN-stage.txt) grows while the stage works, even when
+// its log is silent. The page reads it in byte ranges as it grows and counts what arrived in the last 10 seconds.
+const ACT_WINDOW = 10000, ACT_KEEP = 30, ACT_READ = 65536;
+async function activity(running) {
+  const stage = running[running.length - 1];
+  const t = stage && S.traces.find(x => x.name.replace(/^\d+-/, '') === stage + '.txt');
+  const name = t ? t.name : null;
+  if (name !== S.trace) { S.trace = name; S.tnext = -1; S.tlines = []; S.tool = ''; S.tbuf = ''; S.tgrew = t ? t.mtime * 1000 : 0; }
+  if (S.trace) {
+    try {
+      const behind = S.tnext >= 0 ? (t.size - S.tnext) : 0;
+      const first = S.tnext < 0 || behind > 4 * ACT_READ;          // far behind: jump to the end instead of crawling
+      const d = await get('/monitor/run/' + encodeURIComponent(S.run) + '/trace/' + encodeURIComponent(S.trace) + '?offset=' + (first ? -1 : S.tnext) + '&max=' + (first ? 16384 : ACT_READ));
+      if (d.ok && S.trace === name) {
+        if (!first && d.size > S.tsize) S.tgrew = Date.now();
+        const now = first ? 0 : Date.now();
+        let text = (first ? '' : S.tbuf) + d.text;
+        const cut = text.lastIndexOf('\n');
+        S.tbuf = cut < 0 ? text : text.slice(cut + 1);
+        text = cut < 0 ? '' : text.slice(0, cut);
+        const lines = text.split('\n');
+        if (first && d.offset > 0) lines.shift();                    // the first line of a tail is partial
+        for (const line of lines) {
+          if (!line) continue;
+          const kind = line[0] === '>' ? 'w' : line[0] === '<' ? 'r' : line[0] === '@' ? 'c' : '?';
+          if (kind === 'c') S.tool = line.slice(1).replace('\t', ' · ');
+          S.tlines.push({t: now, kind, text: line});
+        }
+        if (S.tlines.length > 2000) S.tlines = S.tlines.slice(-2000);
+        S.tnext = d.next; S.tsize = d.size;
+      }
+    } catch (e) { /* the next poll tries again */ }
+  }
+  const nowMs = Date.now(), recent = S.tlines.filter(l => l.t && nowMs - l.t <= ACT_WINDOW);
+  const count = k => recent.filter(l => l.kind === k).length;
+  const ago = ms => ms ? fmtS((nowMs - ms) / 1000) + ' ago' : '-';
+  const p = S.progress || {};
+  const box = $('actfacts'); box.replaceChildren();
+  const row = (k, v, cls) => { box.append(el('b', '', k)); box.append(el('span', cls || '', v)); };
+  row('Stage', stage || '-');
+  row('Last log line', S.logGrewAt ? ago(S.logGrewAt) : '-', S.logGrewAt && nowMs - S.logGrewAt > 60000 ? 'silent' : '');
+  row('Trace', S.trace ? S.trace + ' · ' + fmtB(S.tsize) + ' · grew ' + ago(S.tgrew) : 'no trace for this stage', S.tgrew && nowMs - S.tgrew > 60000 ? 'silent' : '');
+  row('Last 10 s', count('w') + ' files written · ' + count('r') + ' read · ' + count('c') + ' code entries');
+  row('Code now', S.tool || '-');
+  row('Cores now', p.cores_now != null ? p.cores_now + (p.budget ? ' of ' + p.budget : '') : '-');
+  const tail = $('acttail'), atEnd = tail.scrollTop + tail.clientHeight >= tail.scrollHeight - 10;
+  tail.textContent = S.tlines.slice(-ACT_KEEP).map(l => l.text).join('\n');
+  if (atEnd) tail.scrollTop = tail.scrollHeight;
+}
+function fillLogs() {
+  const pick = $('logpick'), keep = S.log; pick.replaceChildren();
+  if (S.console) { const o = el('option', '', 'console (master builder)'); o.value = 'console'; pick.append(o); }
+  for (const f of S.files) { const o = el('option', '', f.name + ' · ' + fmtB(f.size)); o.value = f.name; pick.append(o); }
+  if (keep && [...pick.options].some(o => o.value === keep)) pick.value = keep;
+}
+async function refreshLists(force) {
+  if (!S.run || (!force && Date.now() - S.lastList < LIST_MS)) return;
+  S.lastList = Date.now();
+  try {
+    const f = await get('/monitor/run/' + encodeURIComponent(S.run) + '/files.json');
+    S.files = f.ok ? f.logs : [];
+    S.traces = f.ok ? f.traces || [] : [];
+    const c = await get('/monitor/console/' + encodeURIComponent(S.run) + '?offset=0&max=1');
+    S.console = !!c.ok;
+    fillLogs();
+    const r = await get('/monitor/results.json');
+    renderResults(r.results);
+  } catch (e) { /* shown by the next poll */ }
+}
+async function tick() {
+  clearTimeout(S.timer);
+  try {
+    if (S.run) {
+      const p = await get('/monitor/run/' + encodeURIComponent(S.run) + '/progress.json');
+      S.progress = p.ok ? p.progress : null;
+      if (S.progress && Number.isFinite(S.progress.cores_now) && Number.isFinite(S.progress.elapsed_seconds)) {
+        S.liveCores = S.liveCores || [];
+        const lastT = S.liveCores.length ? S.liveCores[S.liveCores.length - 1][0] : -1;
+        if (S.progress.elapsed_seconds > lastT) S.liveCores.push([S.progress.elapsed_seconds, S.progress.cores_now]);
+      }
+      await refreshLists(false);
+      renderProgress(S.progress);
+      if (S.progress && S.progress.status === 'running') await activity((S.progress.stages || []).filter(s => s.status === 'running').map(s => s.name));
+      else $('activity').hidden = !S.trace;
+      if (!S.log) {
+        const running = (S.progress && S.progress.stages || []).filter(s => s.status === 'running').map(s => s.name);
+        const pick = S.console ? 'console' : (running.length && stageLog(running[running.length - 1])) || (S.files.length ? S.files[S.files.length - 1].name : null);
+        if (pick) switchLog(pick);
+      } else await readLog(false);
+      if (S.progress && S.progress.status === 'running') {
+        if (Date.now() - (S.stateAt || 0) > 5000) {
+          S.stateAt = Date.now();
+          const st = await get('/monitor/run/' + encodeURIComponent(S.run) + '/state.json');
+          S.state = st.ok ? st.state : null;
+        }
+        const bars = liveBars(S.state, S.progress), o = {live: true, now: S.progress.elapsed_seconds, label: 'Live, from build-state.json',
+          budget: S.progress.budget, empty: 'No stage start times in build-state.json yet.'};
+        renderTimeline(bars, o);
+        if (await loadSections(bars)) renderTimeline(liveBars(S.state, S.progress), o);
+      } else if (S.timelineFor !== S.run) {
+        S.timelineFor = S.run;
+        const t = await get('/monitor/run/' + encodeURIComponent(S.run) + '/timeline.json');
+        if (t.ok && t.timeline) {
+          const o = {now: t.timeline.wall_seconds, cores: t.timeline.cores, budget: t.timeline.budget, label: 'Finished run, from build-profile.json'};
+          renderTimeline(profileBars(t.timeline), o);
+          if (await loadSections(profileBars(t.timeline))) renderTimeline(profileBars(t.timeline), o);
+        }
+        else {
+          const st = await get('/monitor/run/' + encodeURIComponent(S.run) + '/state.json');
+          renderTimeline(liveBars(st.ok ? st.state : null, S.progress), {label: 'From build-state.json'});
+        }
+      }
+    }
+  } catch (e) { $('updated').textContent = e.message; $('updated').className = 'error'; }
+  S.timer = setTimeout(tick, document.hidden ? POLL_MS * 5 : POLL_MS);
+}
+function chooseRun(run) {
+  S.run = run; S.log = null; S.next = -1; S.files = []; S.lastList = 0; S.timelineFor = null;
+  S.sections = {}; S.sectionsAt = {}; S.tl = null; S.view = null; S.sel = null; S.red = []; S.liveCores = []; $('timelinedetail').textContent = '';
+  S.trace = null; S.tlines = []; S.tool = ''; S.logGrewAt = 0; S.traces = []; $('activity').hidden = false;
+  S.state = null; S.stateAt = 0; S.timelineScrolled = false; $('timelinechart').innerHTML = ''; $('log').textContent = '';
+  const u = new URL(location.href); u.searchParams.set('run', run); history.replaceState(null, '', u);
+  refreshLists(true).then(tick);
+}
+// The run list: read again by the Refresh button and every 15 s, keeping the selection; runs that appeared since the
+// page loaded are marked "new"; "follow latest" switches to the newest running build by itself.
+async function refreshRuns() {
+  const runs = (await get('/monitor/runs.json')).runs || [];
+  const sel = $('run'), keep = S.run || sel.value;
+  if (!S.seenRuns) S.seenRuns = new Set(runs.map(x => x.run));
+  sel.replaceChildren();
+  for (const x of runs) {
+    const o = el('option', '', (S.seenRuns.has(x.run) ? '' : '● new  ') + x.run + (x.progress ? '' : ' (no progress file)'));
+    o.value = x.run;
+    sel.append(o);
+  }
+  if (keep && runs.some(x => x.run === keep)) sel.value = keep;
+  S.runList = runs;
+  if ($('followlatest').checked && runs.length) {
+    for (const x of runs.slice(0, 5)) {
+      if (!x.progress) continue;
+      const p = await get('/monitor/run/' + encodeURIComponent(x.run) + '/progress.json');
+      if (p.ok && p.progress && p.progress.status === 'running') {
+        if (x.run !== S.run) { sel.value = x.run; chooseRun(x.run); }
+        break;
+      }
+    }
+  }
+  return runs;
+}
+async function start() {
+  try {
+    const cfg = await get('/monitor/config.json');
+    if (!cfg.builds) { $('status').textContent = 'no build source'; $('updated').textContent = 'start the Toolkit server with --builds DIR (or --builds-command)'; }
+    const r = await get('/monitor/results.json'); renderResults(r.results);
+    if (!cfg.builds) return;
+    const runs = await refreshRuns();
+    const want = new URLSearchParams(location.search).get('run');
+    const sel = $('run');
+    const first = runs.find(x => x.run === want) || runs[0];
+    if (first) { sel.value = first.run; chooseRun(first.run); }
+    else { $('status').textContent = 'no build runs yet'; setTimeout(start, 5000); }         // the build source may still be starting
+  } catch (e) { $('status').textContent = 'not connected'; $('updated').textContent = e.message + ' (trying again)'; $('updated').className = 'error'; setTimeout(start, 5000); }
+}
+$('run').onchange = () => { $('followlatest').checked = false; chooseRun($('run').value); };
+$('runrefresh').onclick = () => { refreshRuns().catch(() => {}); };
+$('followlatest').onchange = () => { refreshRuns().catch(() => {}); };
+if (typeof setInterval === 'function') setInterval(() => { if (S.runList) refreshRuns().catch(() => {}); }, 15000);
+$('logpick').onchange = () => { $('follow').checked = false; switchLog($('logpick').value); };
+$('pause').onclick = () => { S.paused = !S.paused; $('pause').setAttribute('aria-pressed', String(S.paused)); $('pause').textContent = S.paused ? 'Resume' : 'Pause'; if (!S.paused) readLog(false); };
+// Timeline interaction: hover cursor, click a red stretch, wheel zoom and drag pan on the time axis, arrows step stretches.
+(function () {
+  const chart = $('timelinechart');
+  const px = e => { const r = chart.getBoundingClientRect(); return (e.touches ? e.touches[0].clientX : e.clientX) - r.left; };
+  let drag = null;
+  chart.addEventListener('mousemove', e => {
+    if (drag && S.tlGeom) {
+      const g = S.tlGeom, dt = (drag.x - px(e)) / (g.W - 8) * (drag.t1 - drag.t0);
+      if (Math.abs(drag.x - px(e)) > 3) { drag.moved = true; S.view = {t0: drag.t0 + dt, t1: drag.t1 + dt}; renderTimeline(S.tl.bars, S.tl.opts); }
+      return;
+    }
+    hoverAt(px(e));
+  });
+  chart.addEventListener('mousedown', e => { if (S.tlGeom) drag = {x: px(e), t0: S.tlGeom.view.t0, t1: S.tlGeom.view.t1, moved: false}; });
+  if (window.addEventListener) window.addEventListener('mouseup', () => { setTimeout(() => { drag = null; }, 0); });
+  chart.addEventListener('click', e => { if (drag && drag.moved) return; chart.focus(); clickAt(px(e)); });
+  chart.addEventListener('wheel', e => {
+    if (!S.tlGeom) return;
+    e.preventDefault();
+    const g = S.tlGeom, t = timeAtX(px(e)), f = e.deltaY > 0 ? 1.25 : 0.8, w = Math.max(2, Math.min(g.span, (g.view.t1 - g.view.t0) * f));
+    const a = Math.max(0, t - (t - g.view.t0) * w / (g.view.t1 - g.view.t0));
+    S.view = {t0: a, t1: Math.min(g.span, a + w)};
+    renderTimeline(S.tl.bars, S.tl.opts);
+  }, {passive: false});
+  chart.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const i = selectedIndex(); selectStretch(i < 0 ? (e.key === 'ArrowRight' ? 0 : -1) : i + (e.key === 'ArrowRight' ? 1 : -1)); }
+    if (e.key === 'Escape') selectStretch(null);
+  });
+  $('tlfull').onclick = toggleFullscreen;
+  $('tlreset').onclick = resetZoom;
+  $('redth').onchange = $('redmin').onchange = () => { if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); };
+  document.addEventListener('fullscreenchange', () => { S.full = !!document.fullscreenElement || ($('timeline').className || '').includes('maximized'); if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); });
+  if (window.addEventListener) window.addEventListener('resize', () => { if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); });
+})();
+$('bottom').onclick = () => { const pre = $('log'); pre.scrollTop = pre.scrollHeight; };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+start();
+</script>
+</body>
+</html>

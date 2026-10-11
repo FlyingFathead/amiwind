@@ -26,16 +26,24 @@ and do not require disk swapping.
 Supply `--kickstart-file /path/to/owned.rom` to the build to fill both local
 ROM paths, or select your licensed ROM in the emulator afterward. ROMs and
 playable images are private build outputs, never public source assets.
-Configurations use host-local absolute paths. After moving the image directory,
-keep `build.json` and every listed HDF together and regenerate the configurations
-on the destination host:
+At the end of the build the same step also copies `AmiWind-FS-UAE-launcher.py`
+beside the image. The FS-UAE configuration names its HDFs relative to itself, so
+the folder can be moved or copied as a whole; the WinUAE configuration needs
+absolute drive paths, so edit the `hardfile2=` lines or regenerate it after a move.
+Without `--kickstart-file` the FS-UAE file holds the placeholder
+`/path/to/your/kickstart-3.1-a1200.rom` and the WinUAE file an empty
+`kickstart_rom_file=`: the build prints a warning, you fill in your own ROM (no ROM is
+ever shipped). JIT is on in both files, with a comment on how to turn it off.
+After moving a WinUAE setup, keep `build.json` and every listed HDF together and
+regenerate the configurations on the destination host:
 
 ```sh
 python tools/emulator_configs.py --image /path/to/AmiWind-v0.0.27-rc1.hdf --kickstart-file /path/to/owned.rom
 ```
 
-The generator preserves a differing existing configuration instead of overwriting
-custom settings; move that configuration to a backup name before regenerating.
+When a configuration or the launcher already exists and differs, the generator keeps
+it as `<name>.bak` (then `.bak2`, ...) before writing the new one; an identical file
+is left untouched.
 The portable FS-UAE launcher updates moved paths with its existing backup workflow.
 Both FS-UAE launchers now use every drive listed in `build.json`. A missing required
 world disk stops configuration instead of silently launching an incomplete world.

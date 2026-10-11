@@ -1018,8 +1018,11 @@ void Host_Name_f (void)
 
 void Host_Version_f (void)
 {
-	Con_Printf ("Version %4.2f\n", VERSION);
-	Con_Printf ("Exe: AmiWind v" AMIWIND_VERSION "\n");	// not the compile time (ENGINE-BUILD-REPRO-31)
+	// AmiWind: the game and CHIM versions, then the AmiQuake line (not the
+	// compile time, ENGINE-BUILD-REPRO-31)
+	Con_Printf (AMIWIND_TITLE "\n");
+	Con_Printf (AMIQUAKE_VERSION_LINE_OF (VERSION) "\n");
+	Con_Printf (AW_CONSOLE_HELP_LINE "\n");
 }
 
 #ifdef IDGODS

@@ -18,7 +18,14 @@
 
 <!-- END GENERATED FACTS -->
 
-## Status: 9 October 2026
+## Status: 11 October 2026
+
+Repaired for the Vivec Arena Pit: the importer's interior step converts it (`vai000`), and it shipped in v0.0.35
+(eecb4eb, owner decision D1). A CHIM-native Arena build (the default since v0.0.36) runs no stage that makes it:
+BUILD-MINIWIND-ARENA-PIT-REFUSED-36. The direct start no longer cites this ID for the Pit. The other 27 of 29 Arena door
+rows (Waistworks, Underworks) stay unavailable until those rooms are listed.
+
+9 October 2026:
 
 Partly repaired in source on v0.0.33-arena-interiors, not shipped at the time of writing. The
 importer's interior step exists since the Vivec canton change; the Arena now lists its first room,
@@ -94,11 +101,16 @@ Importer test with a synthetic interior behind a door.
 Family: Town and interior import (`town-import`). The town importer converts every town and interior within engine limits; doors lead somewhere. See [families](README.md#families).
 
 - AW-20260928-08 (no report page): Census wall/hanging texture quality or mapping
+- [IMPORT-DOORBANK-CITY-36](IMPORT-DOORBANK-CITY-36.md): The whole-city Vivec frame holds 157 load doors, over the engine's 128-row door bank
 - [IMPORT-TEST-CELLS-31](IMPORT-TEST-CELLS-31.md): Development test cells would be imported with the world
 - TOWN-ARRIVAL-002 (no report page): Town flora fallback picked the wrong Balmora region
 - TOWN-FLORA-BINDING-003 (no report page): Town flora staging rejected a valid legacy sprite binding
 - [TOWN-FRAME-CEILING-32](TOWN-FRAME-CEILING-32.md): Ground above the town frame ceiling (2,048 units) leaks the map
 - [TOWN-INTERIOR-SAVEID-ORDER-33](TOWN-INTERIOR-SAVEID-ORDER-33.md): Town interior save IDs are numbered across towns: listing a room for an earlier town renumbers every later town's rooms
 - [VIVEC-ROOMS-UNREACHABLE-32](VIVEC-ROOMS-UNREACHABLE-32.md): Excluded Vivec hub rooms leave converted rooms unreachable
+
+Related bugs in other categories:
+
+- [BUILD-MINIWIND-ARENA-PIT-REFUSED-36](BUILD-MINIWIND-ARENA-PIT-REFUSED-36.md): Regression against v0.0.35: the Vivec Arena Pit is in no CHIM build (no CHIM-native stage made the Arena's rooms), and its start was refused as not converted
 
 <!-- END GENERATED CATEGORY -->

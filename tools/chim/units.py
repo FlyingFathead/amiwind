@@ -40,6 +40,9 @@ TOOLS = {
     'terrain': ['tools/chim/terrain.py', 'tools/chim/models.py', 'tools/mesh_geometry.py', 'tools/surface_grid.py',
                 'tools/collision_bsp.py',
                 'tools/prepare_mesh_bsp.py', 'tools/chim/format.py', 'tools/player_hull.py'],
+    'ocean': ['tools/chim/ocean.py', 'tools/chim/terrain.py', 'tools/chim/models.py', 'tools/mesh_geometry.py',
+              'tools/surface_grid.py', 'tools/prepare_mesh_bsp.py', 'tools/chim/format.py', 'tools/player_hull.py',
+              'tools/sky_palette_overlay.py'],
     'pvs': ['tools/chim/visibility.py', 'tools/asset_census.py', 'tools/chim/occluders.py', 'tools/chim/ground.py'],
 }
 # Build switches read from the environment by the converter functions (the stair rule:
@@ -92,6 +95,8 @@ def _canonical(value):
 def fingerprint(kind, *parts):
     """Fingerprint of one unit: its kind's tool hash and its own inputs."""
     blob = json.dumps([tool_fingerprint(kind), _canonical(list(parts))], sort_keys=True, separators=(',', ':'))
+    import cache_provenance
+    cache_provenance.remember_unit(kind, blob)
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
@@ -113,10 +118,14 @@ class UnitCache:
             if not path.is_file():
                 return None
             stored_fp, value = pickle.loads(path.read_bytes())
+            import cache_provenance
+            cache_provenance.verify_file(path)
         except Exception:  # noqa: BLE001 - a damaged entry is rebuilt and counted
             self.stats.setdefault(kind, {}).setdefault('damaged', 0)
             self.stats[kind]['damaged'] += 1
             return None
+        import cache_provenance
+        cache_provenance.reused(self.folder, kind, fp, stored_fp == fp)
         return value if stored_fp == fp else None
 
     def put(self, kind, fp, value):
@@ -131,6 +140,8 @@ class UnitCache:
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp.write_bytes(pickle.dumps((fp, value), protocol=4))
             tmp.replace(path)
+            import cache_provenance
+            cache_provenance.sidecar_unit(path, kind, fp)
         except OSError as exc:
             try:
                 tmp.unlink(missing_ok=True)

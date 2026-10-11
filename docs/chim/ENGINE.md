@@ -71,7 +71,7 @@ built from them), and everything structural into the chunks.
 ## Towns
 
 Any town of the town table (`aw_region.c`: Balmora, Seyda Neen, Vivec and
-the rest) runs as one CHIM frame map when `maps/<town>-chim.bsp` exists and
+the rest) runs as one CHIM frame map when `maps/<town>-chim.chim` exists and
 the cvar `chim_towns` is 1 (the default). The region code asks CHIM through
 one hook, `aw_chim_town_map`: the town's world model is then the frame map
 instead of a region map, no region crossing or prefetch happens, and every
@@ -84,10 +84,10 @@ in the hook names a town: a town gets CHIM by its builder writing its frame
 map, and the open-world exteriors use the same `_chim_frame` maps.
 
 Seyda Neen's intro docks (world format 0.5) have their own frame map over
-the town's frame, `maps/intro_docks-chim.bsp`: while the intro runs, the
+the town's frame, `maps/intro_docks-chim.chim`: while the intro runs, the
 region code loads it instead of the legacy docks map when it exists (the
 same chunks, the docks' own entities and clip walls). Likewise a door
-arrival in Seyda Neen's enclosed courtyard loads `maps/sncourt-chim.bsp`
+arrival in Seyda Neen's enclosed courtyard loads `maps/sncourt-chim.chim`
 when it exists (the legacy `sncourt` region); neither crosses regions. Placements flagged
 story hidden (0.5) are neither drawn nor solid while the opening story
 hides them, by the rule `aw_opening.c` applies to `aw_story_hidden`
@@ -114,8 +114,8 @@ the town (`sv.name`), so a save in CHIM Balmora loads in either kind of
 image.
 
 Which mode a town runs in is always stated: loading a town prints
-`<Town>: CHIM frame map maps/<town>-chim.bsp.` or `<Town>: legacy region map
-maps/<region>.bsp.`; start-up prints `CHIM 0.1.0: N of M towns on CHIM`; the
+`<Town>: CHIM frame map maps/<town>-chim.chim.` or `<Town>: legacy region map
+maps/<region>.bsp.`; start-up prints `CHIM <version>: N of M towns on CHIM`; the
 `chim` command lists every town of the table as `CHIM: <map>` or `legacy`
 with the reason (no CHIM world, no frame map, `chim_towns 0`). The boot
 check's title carries both versions in the short form `AmiWind vX / CHIM vY`
@@ -504,7 +504,7 @@ used/free KiB, `ev` evictions, `rd` KiB and reads, `op` file opens. Every
 map adds `vd`, entities refused for a full `cl_visedicts`.
 
 `tools/chim/frame_map.py` (the builder's image step) writes the map a town's
-frame runs in, `maps/<town>-chim.bsp`: an empty world with the frame's
+frame runs in, `maps/<town>-chim.chim`: an empty world with the frame's
 bounds, the worldspawn with `_chim_frame`, and every entity of the town's
 region maps that the chunks do not hold (actors, the player start); see
 "Towns" and the world format's "Activation" section.

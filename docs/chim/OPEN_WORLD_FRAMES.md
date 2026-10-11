@@ -1,6 +1,9 @@
 # CHIM frames in the open world (design)
 
-Status: design, 9 October 2026. Nothing here is built yet.
+Status: design, 9 October 2026. The first step is built differently (10 October 2026, experimental):
+[CHIM regions](CHIM_REGIONS.md) puts finished cells on CHIM as one-cell frames whose frame maps replace the
+cells' open-world maps under the same names, with no town-table rows. The 3 x 3 grid frames below remain
+the plan for fewer margins (CHIM-REGION-MARGIN-STORAGE-36).
 
 Live conversion status of every cell: [CHIM cell tracker](CELL_TRACKER.md); the island-wide
 conversion tool that fills it (CHIMport) comes with the next release.
@@ -20,7 +23,7 @@ open world (M4)"), which later replaces the hand-over at frame edges with crossi
   hull depth, seams, sky-bank texels and heap rings. Of its first 166 cells, 69 passed, 86 are empty
   (water) and 11 failed with "measure-empty-world".
 - The image step takes one CHIM world, and the engine runs CHIM only for towns of the town table: a
-  town's `maps/<town>-chim.bsp` replaces its region maps (`chim_world.c` TownFile / TownMap).
+  town's `maps/<town>-chim.chim` replaces its region maps (`chim_world.c` TownFile / TownMap).
 - The engine's open-world hand-over (`aw_world.c` AW_WorldDestination) already treats town-table frames
   as destinations. A point inside a table frame's core box goes to that frame (with its `-chim` map when
   it exists); any other point goes to the legacy region `vfNNNN` whose core holds it. Balmora's CHIM
@@ -51,7 +54,7 @@ open world (M4)"), which later replaces the hand-over at frame edges with crossi
   lights, sounds), with the same accounting, parity and actor-ground checks as a town frame map. The
   statics parity compares the CHIM frame's placements with the legacy statics inside the frame.
 - Each frame map states `_chim_frame`, `_chim_hunk_rest` and, from the streaming setting, the streamed
-  statics. Its name is `f<i>_<j>-chim.bsp` on the grid (short names, under the 30-character limit).
+  statics. Its name is `f<i>_<j>-chim.chim` on the grid (short names, under the 30-character limit).
 
 ### 3. Frame selection and hand-over to the legacy world
 
@@ -68,6 +71,8 @@ open world (M4)"), which later replaces the hand-over at frame edges with crossi
   open world.
 
 ### 4. Edge checks
+
+Measured first by the border audit ([STITCH_AUDIT.md](STITCH_AUDIT.md), `tools/chim/stitch.py audit`).
 
 At every frame edge that meets the legacy world, in the image step:
 

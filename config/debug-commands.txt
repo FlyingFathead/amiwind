@@ -1,7 +1,9 @@
 AWDC1
 # Group|debug words|registered handler|help arguments
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
+AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
 AUDIO|ost play|aw_music_play|00..98 / original music filename stem (spaces as underscores)
+VIDEO|camera|aw_camera|[first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md)
 VIDEO|crosshair|aw_crosshair|[on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs)
 VIDEO|crosshairs|aw_crosshair|same as crosshair
 VIDEO|cull|aw_cull|0/1 or on/off (default 1)
@@ -15,10 +17,14 @@ VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clea
 VIDEO|photomode|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode)
 VIDEO|playvid|playvid|<1..17 / 01..17 / catalogue name> (drains queued game audio first)
 VIDEO|playvideo|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
+VIDEO|pov|aw_camera|same as camera
 VIDEO|render order|aw_surface_order|1 legacy / 2 mesh intersections (default)
+VIDEO|thirdperson|aw_camera|same as camera
+VIDEO|vanitycam|aw_vanitycam|same as vanitycamera
+VIDEO|vanitycamera|aw_vanitycam|[auto / off / on (now) / delay N/default / fullview on/off] the vanity camera (idle orbit): no argument = state; auto = the original (orbit after fVanityDelay, 30 s idle, 3 deg/s; default); off = never (saved); on = orbit now until any input; delay N = test delay (not saved); fullview on/off: full screen, no HUD (aw_vanity_fullview)
 VIDEO|videoplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|vidplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
-PLAYTESTING|animkit|aw_animkit|[on/off / list / play <group> / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off = walk, run and swim by speed (off: movers play idle); list = the groups of the NPC under the crosshair and Morrowind's whole table (wired / not wired yet); play forces a group on that NPC until stop; speed scales playback (not saved)
+PLAYTESTING|animkit|aw_animkit_cmd|[on/off / list / play <group> / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off = walk, run and swim by speed (off: movers play idle); list = the groups of the NPC under the crosshair and Morrowind's whole table (wired / not wired yet); play forces a group on that NPC until stop; speed scales playback (not saved)
 PLAYTESTING|arena|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
 PLAYTESTING|arenapit|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
 PLAYTESTING|arenatest|aw_arenapit|same as arenapit
@@ -26,7 +32,7 @@ PLAYTESTING|aw charplane|aw_charplane|[number/name/ID; next/previous/body/exit]
 PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census)
 PLAYTESTING|battlearena|aw_arenapit|same as arenapit
 PLAYTESTING|choosecompanion|aw_pickcompanion|same as companion pick
-PLAYTESTING|combat|aw_combat|[on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / bestattack on/off / loadout NAME/off / calm] melee combat for every NPC: no argument = status, costs and bytes per NPC; readout = one console line per swing (chance, roll, outcome, damage); seed 0 = a new seed per fight (defaults: on, readout on, music on)
+PLAYTESTING|combat|aw_combat_cmd|[on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / bestattack on/off / loadout NAME/off / calm] melee combat: no argument = status and costs; readout = a console line per swing; seed 0 = a new seed per fight; block hold = right button blocks (defaults: on, readout on, music on, block hold)
 PLAYTESTING|combattest|aw_combattest|[opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit
 PLAYTESTING|companion|aw_companion|[pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on)
 PLAYTESTING|companiontest|aw_companiontest|[on/off] same as companion test / companion off; no argument: status
@@ -37,22 +43,28 @@ PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]
 PLAYTESTING|nightgallery|aw_nightgallery|[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)
 PLAYTESTING|npcgallery|aw_charplane|[number/name/ID]
 PLAYTESTING|pickcompanion|aw_pickcompanion|same as companion pick (again or Escape leaves pick mode)
+PLAYTESTING|quickchar|aw_quickchar|[name race class birthsign review / all] the quick character screen over the current scene (default: all pages; the New Game screen of --skip-census builds)
 PLAYTESTING|shroompicker|aw_shroompicker|[1..10/list] (default 1; preserves inventory and picked state)
 PLAYTESTING|shroomtracker|aw_shroomtracker|(picked mushrooms in this save; excludes empty plants)
 PLAYTESTING|torchgallery|aw_torchtest|[npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch
 PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
 PLAYTESTING|tpscene|aw_tpscene|[list/headselection] (fresh debug scene; resets unsaved progress)
+WORLD / TRAVEL|god|aw_godmode|[on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved)
+WORLD / TRAVEL|godmode|aw_godmode|same as god
+WORLD / TRAVEL|map format|aw_map_format|2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only)
+WORLD / TRAVEL|map lava|aw_map_lava|1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved)
 WORLD / TRAVEL|map tp|aw_teleport_map|select a destination on the world map (alias)
 WORLD / TRAVEL|noclip|noclip|
 WORLD / TRAVEL|recover|aw_recover|
 WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
-WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / seydaneen / prisonship / balmora / vivec (Vivec Arena) / <map name>; no argument opens menu]
+WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / <map name>; no argument opens menu]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
 WORLD / TRAVEL|unstuck|aw_unstuck|(nearest clear standing spot below or beside you; never into a wall or water; leaves noclip)
 WORLD / TRAVEL|view|aw_view|x y z yaw pitch
+WORLD / TRAVEL|worldbounds|aw_worldbounds|[on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved)
 SKY / LIGHTING|24hrcycle|aw_24hrcycle|[seconds per hour 0.25..60, default 1; off] steps through 24 game hours, showing each hour that long (default 24 s in all); Esc stops
 SKY / LIGHTING|cloudcontrol|aw_cloud_control_set|legacy/new or 1/2 (legacy also disables midnight clearing)
 SKY / LIGHTING|clouds|aw_clouds|on/off true/false 1/0 (default on, independent of sun)

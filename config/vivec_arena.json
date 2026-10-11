@@ -22,6 +22,7 @@
     ]
   ],
   "reference_margin": 0,
+  "handoff_core": "inset",
   "core_size": 768,
   "overlap": 896,
   "hysteresis": 96,
@@ -31,6 +32,7 @@
   "entity_budget": 1000,
   "model_budget": 220,
   "collision_margin": 224,
+  "cut_models_over": 512,
   "region_core_overrides": {},
   "town": {
     "id": "vivec_arena",

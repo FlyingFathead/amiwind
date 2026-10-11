@@ -13,6 +13,7 @@ game-audio acceptance to the original debugger probe.
 <!-- contents start -->
 ## Contents
 
+- [Engine boot and map-load smoke](#engine-boot-and-map-load-smoke)
 - [Which interface does what?](#which-interface-does-what)
 - [Start with an isolated development configuration](#start-with-an-isolated-development-configuration)
 - [Inspect guest state before automating mutations](#inspect-guest-state-before-automating-mutations)
@@ -41,6 +42,30 @@ unverified as a build. The PTY smoke verified `r`, `dm`, `d`, fresh display
 captures and one bounded memory-read command. It did not exercise stepping,
 breakpoints, a watchpoint hit, memory writes, game progress or game audio.
 See [playtesting](FS-UAE-PLAYTESTING.md) for the complete machine/disk setup.
+
+## Engine boot and map-load smoke
+
+`tools/engine_smoke.py` checks one engine binary in a finished image, in FS-UAE with the accelerated (JIT) preset:
+the engine goes into a fresh copy of the image's boot disk (the image itself is not touched, the world disk is
+mounted read-only), the game boots to the console, loads a map with the music playing and runs for 10 s, the music
+must keep reading, `dbg music off` must stop the reads while the game goes on, a second map loads (`dbg tp` into
+Balmora), and `dbg music on` must start the reads again. If the emulator exits, the game clock stops or a step is
+missing, the smoke fails (exit 1). The emulator side is the shell script `PROBE` in the same tool.
+
+`--script FILE` replaces the music and second-load steps with a scripted session after the first map, for evidence
+shots and replays. It takes one step per line:
+
+- `cmd TEXT`: a console command.
+- `key NAME`: a key press.
+- `wait S`: S seconds of game time; the game clock must keep moving.
+- `shot NAME`: a screenshot, saved as `shots/NAME.png`.
+- `state KEY`: logs that value of the game's state file.
+
+Any other line is a comment. The run passes if the game survives the whole script.
+
+Every engine gate runs it on the engine it has just built. It would have stopped the v0.0.36-dev3 playtest, whose
+engine corrupted memory on every music read and made the emulator exit a few seconds after a map load
+([CHIM-DEV3-MAPLOAD-CRASH-36](bugs/CHIM-DEV3-MAPLOAD-CRASH-36.md)).
 
 ## Which interface does what?
 

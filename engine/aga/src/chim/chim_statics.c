@@ -460,9 +460,10 @@ static void Unplace (chim_static_t *s)
 	{
 		st.efrags -= s->leaves;
 		st.linked--;
-		if (s->ent.efrag && st.link_world && cl.worldmodel == st.link_world && cls.signon == SIGNONS)
-			ChimGraft_RemoveEfrags (&s->ent);
 	}
+	/* Whatever the leaf count says: no link may outlive the model (CHIM-FRAME-EDGE-EFRAG-CRASH-36). */
+	if (s->ent.efrag && st.link_world && cl.worldmodel == st.link_world && cls.signon == SIGNONS)
+		ChimGraft_RemoveEfrags (&s->ent);
 	s->ent.efrag = NULL;
 	s->leaves = 0;
 	if (s->placed)
@@ -572,6 +573,16 @@ void ChimStatics_PoolReset (void)
 
 /* The frame world took an entity out of its leaves: when it is a static,
  * ChimStatics_Link links it again. */
+const char *ChimStatics_Describe (const entity_t *ent, char *out, int size)
+{
+	const chim_static_t *s = (const chim_static_t *)ent;
+	(void)size;
+	if (!st.count || s < st.list || s >= st.list + st.count)
+		return NULL;
+	sprintf (out, "CHIM static %ld (chunk %d, placed %d, leaves %d)", (long)(s - st.list), s->chunk, s->placed, s->leaves);
+	return out;
+}
+
 int ChimStatics_Forget (entity_t *ent)
 {
 	chim_static_t *s = (chim_static_t *)ent;

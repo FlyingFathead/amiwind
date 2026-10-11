@@ -19,7 +19,10 @@ archive preserves mode 0755; Windows can continue using `python` or `py`.
 local images. It requires no Python packages. Install FS-UAE separately and
 provide your own playable HDF and suitable Kickstart ROM.
 
-Copy the script beside your versioned HDFs and run:
+A finished build already puts a copy of this script, plus
+`AmiWind-v<version>-FS-UAE.fs-uae` and `AmiWind-v<version>-WinUAE.uae`, beside the
+image (see [WinUAE setup](WINUAE.md#automatically-generated-image-configurations)).
+Otherwise copy the script beside your versioned HDFs and run:
 
 ```sh
 python3 AmiWind-FS-UAE-launcher.py

@@ -1,0 +1,83 @@
+# ENGINE-DEAD-FIXEDPOINT-GRADIENTS-36: The 68040 build converts every drawn surface's gradients to fixed point that nothing reads
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | review |
+| First noticed | 10 October 2026, in v0.0.36-dev3 |
+| Where | d_scan.c D_SetupFixedPointGradients, called from d_edge.c for every drawn surface |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.36-dev3 (last seen) |
+| Severity | low: nine multiplications and nine float-to-int conversions per drawn surface; only the 68020 assembly spans read the results |
+| Family | Rendering cost and visibility (`render-performance`) |
+| Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
+| From commit | source and engine e35345a |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
+
+## Status: 10 October 2026
+
+Open. Found by an independent read-only engine review; confirmed in the source. Part of the "engine C speed pass".
+
+## Symptom
+
+No visible symptom: `D_SetupFixedPointGradients` converts nine gradients to 16.16 fixed point for every drawn
+surface (nine multiplications and nine float-to-int conversions, each with the control register sequence of
+[ENGINE-FPCR-DANCE-36](ENGINE-FPCR-DANCE-36.md)). Only upstream's no-FPU span assembly (`d_scan_68k_nofpu.s`, the
+68020 build) reads the results; no C code and nothing in the 68040 build does.
+
+## Where
+
+`engine/aga/src/d_scan.c` (`D_SetupFixedPointGradients`), called from `d_edge.c`.
+
+## How it happened
+
+Upstream added it for its no-FPU assembly and called it unconditionally; AmiWind's engine came from that tree.
+
+## Why it was not caught
+
+The function looks like part of the gradient setup.
+
+## Reproduction
+
+Source reading: no reader of `d_*_fp` outside `D_SetupFixedPointGradients` in the 68040 build.
+
+## Repair
+
+Proposed (not done): call it only in builds that link the no-FPU span assembly.
+
+## Verification
+
+Pending.
+
+## Prevention
+
+Pending.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Rendering cost and visibility (`render-performance`). Read the visibility data and renderer counters before any performance claim. See [families](README.md#families).
+
+- AW-20260928-07 (no report page): Slow opening exterior / excessive residency
+- [CHIM-SLOWCPU-FRAMETIME-33](CHIM-SLOWCPU-FRAMETIME-33.md): Balmora on CHIM runs at about 1 frame per second on a slow 68040 (cycle-exact emulation)
+- [CHIM-TRACE-TAIL-33](CHIM-TRACE-TAIL-33.md): A few CHIM collision traces visit thousands of clipnodes
+- [ENGINE-C2P-ROWSTRIDE-35](ENGINE-C2P-ROWSTRIDE-35.md): The display conversion ignored the bitmap row stride: a screen whose rows are padded for the fetch mode rendered skewed
+- [ENGINE-CEILF-PER-EDGE-36](ENGINE-CEILF-PER-EDGE-36.md): R_EmitEdge calls the C library ceil twice per edge
+- [ENGINE-FLOATTIME-DIV64-35](ENGINE-FLOATTIME-DIV64-35.md): Sys_FloatTime made two 64-bit library divisions per call to build seconds and microseconds
+- [ENGINE-FPCR-DANCE-36](ENGINE-FPCR-DANCE-36.md): Every float-to-int conversion in the engine saves, changes and restores the FPU control register
+- [ENGINE-UPSTREAM-ASM-UNUSED-36](ENGINE-UPSTREAM-ASM-UNUSED-36.md): The engine is built without AmiQuake's 68k assembly: spans, fixed point and maths run as C at -O1
+- [ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36](ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36.md): Upstream AmiQuake's assembly D_DrawSpans8 has the shape of the sprite span loop; it never runs at the default d_subdiv16 1
+- [ENGINE-VID-UPDATE-FIRST-RECT-35](ENGINE-VID-UPDATE-FIRST-RECT-35.md): VID_Update converted only the first rectangle of the update list
+- MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
+- [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
+- [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
+- [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views
+- [RENDER-SURFCACHE-THRASH-32](RENDER-SURFCACHE-THRASH-32.md): Seyda Neen views rebuild the surface cache every frame at a fixed camera
+- [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+
+<!-- END GENERATED CATEGORY -->

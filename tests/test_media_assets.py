@@ -183,6 +183,32 @@ class MediaAssetsTests(unittest.TestCase):
             self.assertEqual(result['lookups']['sounds'][0]['output'],'sound/pool/a1.wav')
             self.assertEqual((payload/'sound/pool/a1.wav').read_bytes(),b'validated converted sound')
 
+    def test_staging_on_the_pool_is_the_same_with_any_worker_count(self):
+        # BUILD-IMAGE-AUDIO-SERIAL-36: many files staged by the shared worker pool, rows in catalogue order, the
+        # payload the same bytes with one worker or several; staged files are hard links of the checked outputs.
+        import os
+        from unittest import mock
+        results = []
+        for jobs in ('1', '3'):
+            with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'AMIWIND_BUILD_JOBS': jobs}):
+                media, payload, music = self.staged_fixture(Path(d))
+                report = json.loads((media/'media-coverage.json').read_text())
+                for n in range(12):
+                    data = b'voice %d' % n
+                    (media/'id1/sound/vo').mkdir(parents=True, exist_ok=True)
+                    (media/('id1/sound/vo/v%02d.wav' % n)).write_bytes(data)
+                    report['entries'].append({'source': 'sound/vo/v%02d.wav' % n, 'category': 'voices',
+                                              'status': 'included', 'path': 'sound/vo/v%02d.wav' % n,
+                                              'sha256': hashlib.sha256(data).hexdigest()})
+                (media/'media-coverage.json').write_text(json.dumps(report))
+                result = stage_catalogue(media, payload, music)
+                files = {p.relative_to(payload).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                         for p in sorted(payload.rglob('*')) if p.is_file()}
+                linked = os.path.samefile(media/'id1/sound/vo/v05.wav', payload/'sound/vo/v05.wav')
+                results.append((files, [(r['path'], r['status'], r.get('sha256')) for r in result['entries']], linked))
+        self.assertEqual(results[0][:2], results[1][:2])
+        self.assertTrue(results[0][2] and results[1][2])
+
     def test_changed_missing_or_conflicting_output_never_claims_inclusion(self):
         for failure in ('changed','missing','conflict'):
             with self.subTest(failure=failure),tempfile.TemporaryDirectory() as d:

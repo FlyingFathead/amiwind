@@ -108,6 +108,9 @@ int main(void){
     assert(!strcmp(target,"vivec_telvanni") && b[0]==-676 && b[1]==-1140 && b[2]==40);
     a[0]=1100;a[1]=0;assert(AW_WorldDestination("vivec_redoran",a,target,b));
     assert(!strcmp(target,"vivec_arena") && b[0]==-820 && b[1]==256 && b[2]==40);
-    a[0]=1500;a[1]=-1500;assert(!AW_WorldDestination("vivec_arena",a,target,b)); /* No town or terrain region there. */
+    /* Outside every canton core: the whole-city frame (vivec_city, wide coordinates) holds it when its map is
+     * installed (every map is in this test); the arrival keeps the shared world position. */
+    a[0]=1500;a[1]=-1500;assert(AW_WorldDestination("vivec_arena",a,target,b));
+    assert(!strcmp(target,"vivec_city") && b[0]==2396 && b[1]==-220 && b[2]==40);
     return 0;
 }

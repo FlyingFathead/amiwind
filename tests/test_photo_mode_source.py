@@ -29,20 +29,23 @@ def body(text, name):
 class PhotoModeSourceTests(unittest.TestCase):
     def test_full_screen_view_uses_the_intermission_size(self):
         calc = body(source('screen.c'), 'SCR_CalcRefdef')
-        self.assertRegex(calc, r'if \(cl\.intermission \|\| AW_PhotoModeActive\(\)\)\s*size = 120;')
+        # Photo mode and the vanity orbit share one full-view predicate (aw_vanity_fullview).
+        self.assertIn('AW_PhotoModeActive ()', body(source('screen.c'), 'static int SCR_AWFullView'))
+        self.assertRegex(calc, r'if \(cl\.intermission \|\| SCR_AWFullView \(\)\)\s*size = 120;')
         # Neither the reserved HUD strip nor the coordinate strip shrinks the view.
-        self.assertIn('!cl.intermission && !AW_PhotoModeActive() && sb_lines < 48', calc)
-        self.assertIn('AW_DebugCoordsEnabled() && !AW_PhotoModeActive() && sb_lines < 12', calc)
+        self.assertIn('!cl.intermission && !SCR_AWFullView () && sb_lines < 48', calc)
+        self.assertIn('AW_DebugCoordsEnabled() && !SCR_AWFullView () && sb_lines < 12', calc)
 
     def test_prompts_names_subtitles_and_pause_are_skipped_and_notice_drawn(self):
         update = body(source('screen.c'), 'SCR_UpdateScreen')
         self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\)\)\s*SCR_DrawPause \(\);')
-        self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\)\)\s*AW_SceneDraw\(\);')
+        # (the vanity orbit's full view hides them too: !vanity)
+        self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\) && !vanity\)\s*AW_SceneDraw\(\);')
         # PHOTO-GALLERY-TEXT-33: test-room and gallery instruction text is hidden.
-        self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\)\)\s*AW_GalleryDraw\(\);')
+        self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\) && !vanity\)\s*AW_GalleryDraw\(\);')
         # The message box is drawn in photo mode only for photo mode's own notice.
-        self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\) \|\| AW_PhotoNoticeShowing\(\)\)\s*AW_UIDraw\(\);')
-        self.assertLess(update.index('AW_PhotoDraw ()'), update.index('SCR_CheckDrawCenterString ();\n        Sbar_Draw ();'))
+        self.assertRegex(update, r'if \(\(!AW_PhotoModeActive\(\) && !vanity\) \|\| AW_PhotoNoticeShowing\(\)\)\s*AW_UIDraw\(\);')
+        self.assertLess(update.index('AW_PhotoDraw ()'), update.index('if (!vanity)\n            Sbar_Draw ();'))
         # Notices use AmiWind's message box (the Wait refusal's), not a centre print.
         photo = source('aw_photo.c')
         self.assertIn('AW_UISubtitle("",text,seconds);', body(photo, 'show'))

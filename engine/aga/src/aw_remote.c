@@ -75,6 +75,11 @@ static void write_state(void)
     if(AW_ClockEnsure()){AW_ClockDate(&year,&month,&day,&hour,&minute);fprintf(f,"time %02d:%02d\nday %d %d %d\n",hour,minute,day,month,year);}
     fprintf(f,"daynight %s\n",AW_DayNightFrozen()?"off":"on");
     fprintf(f,"daylight %d\nlamps_lit %d\nexterior %d\nguard_night %d\n",r_daylight,AW_LampLitCount(),R_SkyExterior(),AW_GuardTorchNight());
+    {extern int aw_efrags_bad;fprintf(f,"efrags_bad %d\n",aw_efrags_bad);}
+    /* What the screen shows (SMOKE-PASSES-WITHOUT-MAP-36): a loaded server under the title menu
+     * is not a played map. screen game = in play; world_leafs = the client's world model. */
+    fprintf(f,"screen %s\nsignon %d\nworld_leafs %d\n",key_dest==key_game?"game":key_dest==key_menu?"menu":
+        key_dest==key_console?"console":"message",cls.signon,cl.worldmodel?cl.worldmodel->numleafs:0);   /* the efrag safety net (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
     if(*AW_RCountLine())fprintf(f,"rcount %s\n",AW_RCountLine());
     fputs("end\n",f);
     fclose(f);

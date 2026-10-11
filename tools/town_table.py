@@ -47,11 +47,15 @@ def c_list(name, values, per_line):
 
 
 # Handoff frames: the engine (aw_world.c valid_town and the arrival checks) accepts a core box only
-# within +/-FRAME_BOUND local units of the frame origin. The bound is Quake's coordinate range, not a
-# format limit: positions travel as shorts of eighths of a unit (MSG_WriteCoord), so they wrap past
-# COORD_RANGE (CHIM-FRAME-COORD-RANGE-33). A row outside it would be silently dropped at run time.
-FRAME_BOUND = 4000
-COORD_RANGE = 32767 / 8
+# within +/-AW_COORD_BOUND local units of the frame origin (engine/aga/src/aw_coord.h). The bound is the
+# coordinate range positions travel in (MSG_WriteCoord, CHIM-FRAME-COORD-RANGE-33): wide (the default since
+# v0.0.36) 24 bits of 1/256 units, +/-32,768; narrow (--coord-range narrow, the method before) shorts of
+# eighths, which wrap past COORD_RANGE. The table is the same for both engines, so it holds rows up to the
+# wide bound; a narrow engine drops a row past 4,000 at run time, and the builder refuses to build such an
+# area with --coord-range narrow (chim.areas.area_problems, coord_range.core_problem).
+from coord_range import NARROW_BOUND, WIDE_BOUND
+FRAME_BOUND = WIDE_BOUND
+COORD_RANGE = 32767 / 8          # the narrow range (positions as 1/8-unit shorts)
 
 
 def check_core(row):
@@ -60,9 +64,8 @@ def check_core(row):
         return
     (x0, y0), (x1, y1) = row['core']
     if not (-FRAME_BOUND <= x0 < x1 <= FRAME_BOUND and -FRAME_BOUND <= y0 < y1 <= FRAME_BOUND):
-        raise ValueError(f"Town {row['name']}: core box {row['core']} is outside +/-{FRAME_BOUND} local units; "
-                         f"Quake positions wrap past {COORD_RANGE:.0f} (CHIM-FRAME-COORD-RANGE-33): "
-                         "split the frame or move its origin")
+        raise ValueError(f"Town {row['name']}: core box {row['core']} is outside +/-{FRAME_BOUND} local units, "
+                         f"the wide coordinate range (CHIM-FRAME-COORD-RANGE-33): split the frame or move its origin")
 
 
 def render_header(root=None):

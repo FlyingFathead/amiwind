@@ -181,6 +181,8 @@ int ChimChunks_Begin (int cx, int cy)
 		e->high[1] = e->low[1] + chim_frame.frame.grain;
 		e->distance = e->priority = 1e30f;
 		e->graft = -1;
+		e->shift[0] = e->shift[1] = e->shift[2] = 0;
+		e->terrain_bytes = 0;
 	}
 	chim_frame.count = n;
 	ticks = 0;
@@ -641,6 +643,10 @@ static int LoadCatalogue (int index, long *budget)
 			goto bad;
 		*budget -= head.pvs_bytes + head.pvl_bytes;
 	}
+	/* 0.7: a referenced terrain's bytes, for the prefetch room (its own
+	 * directory sizes hold only the reference block). */
+	if (ChimModels_TerrainPlace (index, NULL, NULL, &e->terrain_bytes) < 0)
+		goto bad;
 	ChimZone_Trim (c, sizeof(*c) + n*sizeof(chim_place_t) + c->models*sizeof(chim_chunk_model_t) +
 		head.pvs_bytes + head.pvl_bytes);
 	e->state = CHIM_STATE_LOADED;
@@ -677,8 +683,10 @@ static int Activate (int index, int partial)
 	e->partial = missing != 0;
 	ChimZone_Lock (c);
 	ChimZone_Lock (terrain);
-	VectorCopy (terrain->model.mins, c->mins);
-	VectorCopy (terrain->model.maxs, c->maxs);
+	/* A referenced terrain (0.7) is chunk-local: its box moves by the shift,
+	 * as the graft moves the terrain itself (chim_graft.c CopyGraft). */
+	VectorAdd (terrain->model.mins, e->shift, c->mins);
+	VectorAdd (terrain->model.maxs, e->shift, c->maxs);
 	if (terrain->leafs - 1 != c->terrain_leaves)
 		Con_DPrintf ("CHIM: chunk %ld terrain leaves differ from its head\n", (long)index);
 	for (i=0 ; i<c->models ; i++)
@@ -724,6 +732,10 @@ static void Deactivate (int index)
 	for (i=0 ; i<c->records ; i++)
 	{
 		Unlink (&c->places[i]);
+		/* Whatever the counters say: no link may outlive the model
+		 * (CHIM-FRAME-EDGE-EFRAG-CRASH-36). */
+		DropEfrags (&c->places[i].ent);
+		c->places[i].leaves = 0;
 		c->places[i].ent.model = NULL;
 	}
 	ChimStatics_Deactivate (index);
@@ -876,7 +888,7 @@ static int PrefetchRoom (int index, int need, unsigned model, float active2)
 	if (need == 1)
 		bytes = 16384;
 	else if (need == 2)
-		bytes = (long)e->disk.render + e->disk.collision;
+		bytes = e->terrain_bytes ? e->terrain_bytes : (long)e->disk.render + e->disk.collision;
 	else if (need == 3 && ChimStatics_IsStatic (model))
 		bytes = ChimStatics_Bytes (model);
 	else if (need == 3)
@@ -1409,9 +1421,11 @@ void ChimChunks_End (void)
 	grid = NULL;
 }
 
+extern const char *(*aw_efrag_describe)(const entity_t *ent, char *out, int size);	/* r_efrag.c */
 void ChimChunks_Init (void)
 {
 	ChimZone_SetEvict (CHIM_KIND_CHUNK, ChunkEvicted);
+	aw_efrag_describe = ChimChunks_Describe;
 }
 
 /* What the renderer did with the placements in its last frame: stored for
@@ -1482,6 +1496,24 @@ void ChimChunks_Counts (int *linked, int *efrags, int *one_leaf, int *max_leaves
 
 /* ---------------------------------------------------------------- frame world support */
 
+/* The efrag safety net (r_efrag.c): which placement or static an entity is, read only. */
+const char *ChimChunks_Describe (const entity_t *ent, char *out, int size)
+{
+	int i;
+	(void)size;
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_chunk_t *c = chim_frame.entries[i].chunk.data;
+		const chim_place_t *p = (const chim_place_t *)ent;
+		if (chim_frame.entries[i].state == CHIM_STATE_ABSENT || !c || p < c->places || p >= c->places + c->records)
+			continue;
+		sprintf (out, "CHIM placement %lu (chunk %d, state %d, linked %d, leaves %d)",
+			(unsigned long)p->pid, i, chim_frame.entries[i].state, p->linked, p->leaves);
+		return out;
+	}
+	return ChimStatics_Describe (ent, out, size);
+}
+
 /* An entity the frame world took out of its leaves (R_RemoveEfrags): when
  * it is a placement, ChimChunks_Link links it again. */
 int ChimChunks_Forget (entity_t *ent)
@@ -1525,7 +1557,7 @@ void ChimChunks_ReleaseEfrags (void)
 		if (chim_frame.entries[i].state != CHIM_STATE_ACTIVE)
 			continue;
 		for (j=0 ; j<c->records ; j++)
-			if (c->places[j].leaves)
+			if (c->places[j].leaves || c->places[j].ent.efrag)
 			{
 				ChimGraft_ReleaseEfrags (&c->places[j].ent);
 				c->places[j].leaves = 0;

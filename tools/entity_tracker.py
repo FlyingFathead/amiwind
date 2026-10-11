@@ -155,8 +155,9 @@ def refs_by_map(dirs, jobs=1):
     serial order (directory order, then sorted paths; a later stem wins).
     """
     from build_parallel import ordered_map
+    from map_files import is_map_name      # x.bsp and the CHIM frame maps x.chim
     paths = [path for d in dirs for path in sorted(Path(d).rglob('*'))
-             if path.suffix.lower() == '.bsp' and path.is_file()]
+             if is_map_name(path.name) and path.is_file()]
     out = {}
     for path, refs in zip(paths, ordered_map(_path_refs, [str(p) for p in paths], max(1, min(jobs, len(paths) or 1)))):
         out[path.stem.lower()] = refs

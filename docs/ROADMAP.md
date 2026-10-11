@@ -3,10 +3,15 @@
 <!-- contents start -->
 ## Contents
 
-- [v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (in development)](#v0035---chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore-in-development)
+- [v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)](#v0036---36-lessons-of-vivecs-cantons-and-vvardenfell-shorelines)
+- [v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (released)](#v0035---chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore-released)
   - [Next: build system](#next-build-system)
+  - [Build pipeline speed (very near term, after Vivec)](#build-pipeline-speed-very-near-term-after-vivec)
+  - [Perf, profiler and optimizer (future)](#perf-profiler-and-optimizer-future)
   - [Next: CHIMport region by region, coast first](#next-chimport-region-by-region-coast-first)
   - [Gameplay](#gameplay)
+  - [CHIM maps become their own format (approved 10 October 2026)](#chim-maps-become-their-own-format-approved-10-october-2026)
+  - [Tiny squeezes: memory that stays resident](#tiny-squeezes-memory-that-stays-resident)
   - [Roadmap horizon: one partition with CHIM](#roadmap-horizon-one-partition-with-chim)
 - [v0.0.34 - CHIM: Tightening the Bolts (released)](#v0034---chim-tightening-the-bolts-released)
 - [v0.0.33 - Towards CHIM: Replacing the Engine Block (released)](#v0033---towards-chim-replacing-the-engine-block-released)
@@ -15,6 +20,8 @@
   - [Near future: fires and lava across the world](#near-future-fires-and-lava-across-the-world)
 - [Planned: heap size matched to the host machine, 7 October 2026](#planned-heap-size-matched-to-the-host-machine-7-october-2026)
 - [Other ideas and wildcards](#other-ideas-and-wildcards)
+  - [Sky fading into the horizon](#sky-fading-into-the-horizon)
+  - [Sea skirt: the sea runs to the horizon](#sea-skirt-the-sea-runs-to-the-horizon)
   - [Weather: ash storms and blight winds](#weather-ash-storms-and-blight-winds)
   - [Long-term possibility: a reusable Amiga game engine](#long-term-possibility-a-reusable-amiga-game-engine)
   - [Long-term possibility: Lua scripting](#long-term-possibility-lua-scripting)
@@ -140,17 +147,84 @@
 
 <!-- contents end -->
 
-## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (in development)
+## v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)
+
+v0.0.36 starts moving the open world onto CHIM inside the game itself. Converted areas sit inside
+the legacy island, the border between the two is measured and made seamless, and CHIM takes over
+cell by cell, from the sea and the coast inward. Draft notes: [release notes](RELEASE-v0.0.36.md).
+
+Scope: v0.0.36 = the whole coastline on CHIM (every cell of the outer ring and every passing cell of the second ring),
+the open ocean placed in the game (one shared ocean chunk), the whole city of Vivec by default, and Seyda Neen and
+Balmora. After v0.0.36 comes v0.0.37, which moves every green zone on the map onto CHIM (see below).
+
+Steps, each one a playtest build:
+
+1. One CHIM block inside the legacy island (a 3 x 3 Bitter Coast area): the handover between CHIM
+   and legacy land, the border audit ([STITCH_AUDIT.md](chim/STITCH_AUDIT.md)) and its fixes
+   (shoreline detail, a terrain margin around the frame). Measured after the fixes: no height
+   step and no gap on any edge of the test area.
+2. The sea and the shoreline ring: the seabed cells, the open sea (one shared ocean chunk stored
+   once) and the coastal cells, chosen as cell lists (region names, a CSV or JSON list, or a
+   selection exported from the Toolkit's World Map). Their legacy region maps leave the image.
+3. Vivec, which closes the ring on the south coast: the existing canton split as CHIM areas, with
+   very large models cut into chunk-sized pieces and the densest meshes simplified. If Vivec is
+   not ready in time, it moves to the next release instead of holding this one.
+
+Measured on the way (10 October 2026): with shared terrain stored once and referenced by each cell
+(`--chim-terrain-refs on`, with `--chim-terrain-hull compiled`; experimental, off by default), CHIM cells
+in the open world take 0.91 to 0.93 times the bytes of the legacy maps they replace, where each cell's
+own terrain copy took about 3.5 times. Cells the legacy builder split over several maps cannot switch
+yet (CHIM-REGION-DIVIDED-CELLS-36).
+
+World bounds (on by default, `--world-bounds off` to turn off; `dbg worldbounds` in game): a player who
+swims or sails out past the island meets a sea current along the edge of the world and is pushed back, instead
+of the invisible wall at the end of the outer maps; out of the water the push back works the same way, and the
+edge moves out by itself as more cells join the world. Quake's own current, applied by position. The original
+game has no such limit; this is an AmiWind addition ([WORLD_BOUNDS.md](WORLD_BOUNDS.md)).
+
+Still to do along the way: buildings of a CHIM area appear only when the player crosses into it
+(seen from legacy land the area shows its ground and rocks); harvestable plants in extra CHIM
+areas; collision for thin underwater plants; and rebuild cascades in the builder.
+
+Next, v0.0.37: all green zones. Every cell shown green (finished) on the CHIM Progress Tracker map, about 670 cells,
+moves onto CHIM in the game and is tested there, with bug fixes along the way. The first item is the lava
+stale-source fix (CHIMPORT-RETRY-LAVA-STALE-SOURCE-36). The tracker already shows this plan in pale gold.
+Also for v0.0.37, from the owner's dev5 playtest: the NPC you are fighting must stay visible in third person
+(CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36), and, longer term, blocking: NPCs block by their Block skill with a block animation, and the player
+blocks with the right mouse button, with the companion pick on another key (COMBAT-BLOCKING-36; the original rules are
+researched first).
+Then the rest of the island follows the conversion spiral, ring by ring from the coast inward. Each ring gets the
+same border checks and a playtest.
+
+## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (released)
 
 v0.0.35 gathers in the work that was finished over the last releases but left on side
 branches: builder improvements (resumable image step, unit caches and output hashes, a
 shared storage pool, a build preflight, tighter reuse keys), lava, the CHIMport tracker
 and more. Unfinished or experimental work ships behind a switch that is off by default.
-Draft notes: [release notes](RELEASE-v0.0.35.md).
+Release notes: [RELEASE-v0.0.35.md](RELEASE-v0.0.35.md).
 
 After v0.0.35, with no dates promised:
 
 ### Next: build system
+
+**Very near term: a fast build system (11 October 2026, top priority after the current fixes).**
+
+- Fast and parallel everywhere it is safe: no phase runs on one core while the others wait; any phase over 30 s below
+  half of its core budget is flagged by the build itself.
+- No useless runs and no re-runs: every step is computed once, recorded by the SHA-256 of its inputs, and reused by
+  every build and every developer job; only what changed is computed again.
+- Checks that have passed stay passed: the stair walk becomes a lookup of recorded results (walked again only when a
+  frame's collision changes, with a small random spot check); smoke tests run on fuller builds when they are needed,
+  not on every build.
+- Every phase shows what it is doing and how long it took.
+
+Build speed (10-11 October 2026): a rebuild should cost only what changed, and a first build should keep every core busy.
+Every step keyed by the SHA-256 of its inputs and reused (stair walks, CHIM statistics per frame, image passes per map);
+CHIM region frames prepared side by side; the worker pool resizes while it runs; side jobs back off during a release
+build; no silent phases (start and end lines with timings, progress counters, a heartbeat; quiet only as an option);
+honest per-phase time estimates; the live stage timeline in the Toolkit Monitor. Engine side: the float-to-integer
+conversion overhead, the edge and clip code, then hand-written 68k routines where measurements point.
 
 - One build tool with the stages described as a table, so a stage's inputs and outputs are
   declared once and checked by the builder.
@@ -159,6 +233,37 @@ After v0.0.35, with no dates promised:
 - One shared content store for every cache, with clear cache keys, and a checked build
   environment.
 - A test harness and continuous checks that run the same way locally and on a second machine.
+
+### Build pipeline speed (very near term, after Vivec)
+
+A build should spend time only on what changed, and the first build should keep the whole machine busy. In order:
+
+1. A world map manifest first. One list decides, for every map, CHIM or legacy before the first stage runs; every stage
+   reads it. The image step's replace-in-place becomes a check that must find no legacy map of a CHIM cell
+   (a v0.0.36 development build converted and optimized 270 such maps, 194.7 MB, and threw them out at the end).
+2. Dead weight out: legacy maps of CHIM cells are neither built nor processed (a development build built 335 of them,
+   65 Seyda Neen maps and 270 CHIM region cells, and removed them again before packing; this saves build time, not
+   image size).
+3. Every phase parallel: the image step (maps, audio, video), the statistics step and the optimizer, through the shared
+   worker pool, with results identical for 1 and for 24 workers.
+4. Incremental rebuilds by hash for every unit, and the optimizer cache key fixed so a small change redoes only its units.
+5. No silent phases: verbose by default with a heartbeat, quiet only as an option.
+6. One profiler (`tools/build_profile.py`): the timeline and the optimize sweep in one tool.
+7. The Toolkit Monitor shows the activity of each phase.
+8. Honest estimates: a time estimate is based on measured earlier runs and says how reliable it is.
+9. A measured build that proves it: cores used per section, what was reused, and the time against the earlier build.
+
+These problems are persisting, not resolved: several were found and fixed in part since 8 October 2026 and came back. Tracker: BUILD-PIPELINE-UNDERUTILIZATION-36, whose page indexes these as the eight build rules with every earlier entry, and the bugs linked from it.
+
+### Perf, profiler and optimizer (future)
+
+A better pipeline for finding and removing slow or idle build sections:
+
+- A perf database of every run (stage times, cores used, what was reused, host load).
+- Automatic detection of sections that leave cores idle, with each one turned into a tracker item automatically.
+- Per-section core use in every build summary.
+- Comparison across runs, so a slower section shows up at once.
+- A CI or gate check on a benchmark build that fails on new underutilization.
 
 ### Next: CHIMport region by region, coast first
 
@@ -171,14 +276,91 @@ After v0.0.35, with no dates promised:
 
 - Combat and companion leftovers: hit chance, block, voices, death animation and sound,
   first-person weapons.
+- Background music on/off in the audio settings menu (and dbg / config), saved with the settings (later, not
+  v0.0.36; ENGINE-MUSIC-NO-OFF-SWITCH-36).
 - More of Morrowind's animation groups wired ([ANIMKIT.md](ANIMKIT.md) lists them).
 - Modular NPCs: a shared parts library converted once, with per-character recipes.
+- A third-person view, following the original game's camera (the original and OpenMW as the references),
+  which also gives the death scene its original look: the view leaves the player and fades out.
+  In v0.0.36-dev: Tab, the held orbit, the wheel zoom, the vanity camera and the death camera with a stand-in
+  body per race and sex ([THIRD_PERSON.md](THIRD_PERSON.md)). Next: the character's own head and hair, the
+  worn clothes and armour, a jump group and smoother walk/run cycles.
+- After a lost fight: the original's choices (load a save, main menu) plus an optional quick retry (in
+  v0.0.36-dev: `--death-retry`, default on).
+- The original's on-screen display, bottom corners (planned for a later version, agreed 10 October 2026;
+  OpenMW frames as the reference): bottom left the player's health, magicka and fatigue bars, the equipped weapon box and the
+  selected spell box; bottom right the local map with the player's arrow and the active magic effect icons.
+  The original draws its local map live from the world; here the builder pre-draws one small map picture per
+  exterior cell and per interior, and the engine shows the current one and turns the arrow. If that proves too
+  heavy, a simple compass in the same frame replaces it (both kept selectable). Drawn with Quake's own status
+  bar pictures, converted at build time from the owner's game data; memory measured against the town limits
+  first.
+  Layout: sizes and positions from OpenMW's HUD files, scaled to the AmiWind screen, A/B'd at the same pose.
+- Waiting and resting with the original's rules (planned, 10 October 2026). Today **T** only moves the clock
+  forward ([DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md)); nothing is restored while waiting. To be taken from the
+  original's own rules (OpenMW's source, the game settings in the master file and the original's documentation),
+  never invented: rest versus wait (where sleeping is allowed, enemies nearby, owned beds), what each restores per
+  hour (health, magicka, fatigue) and from which attributes, what blocks it (for example a birthsign that stops
+  magicka returning), what does not heal with time (diseases, blight), timed spell effects running out, sleep
+  interrupted by a creature in the wilderness, and levelling up when sleeping. Each rule records its source.
+  The study with numbers and sources: [WAIT_AND_REST.md](WAIT_AND_REST.md).
+  Memory: nothing about where sleeping is allowed stays in memory. The builder writes one bit per exterior cell into a
+  small table indexed by the cell's coordinates; pressing T reads the one byte that holds the current cell's bit from
+  disk. An interior carries its flag in its own map, which is loaded anyway. Rare rule lookups in general follow the
+  same pattern: coordinates to an index, read on demand.
+- Living towns: every NPC that can move or fight gets walk, run, swim and attack animations (checked by the
+  builder for every NPC), and residents follow their original Wander packages - strolling within their
+  authored radius along the cells' path grids and playing their idles, as in the original.
+
+### CHIM maps become their own format (approved 10 October 2026)
+
+CHIM maps are `.chim` files and never Quake `.bsp` maps. Next, after v0.0.36-dev3: a `.chim` gets its own header
+(CHIM magic, map version, world format) and its own loader in the engine, a CHIM major-version step; then its
+contents leave BSP29 one measured step at a time: entities as a compact binary table, no dummy BSP parts, no BSP29
+limits where CHIM needs more, precomputed tables. Interiors stay Quake `.bsp` maps until they move to CHIM. Design and
+measurements: [.chim map format](chim/CHIM_MAP_FORMAT.md).
+
+### Tiny squeezes: memory that stays resident
+
+Small savings that add up, and a guard so they cannot grow back (10 October 2026; candidates with numbers in
+[MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md)):
+
+- A ratchet test: every command, setting and permanent name table the engine registers is counted with its exact
+  byte cost against a committed budget. Growing past it fails the gate; moving something to disk lowers the budget
+  for good. In place (ENGINE-RESIDENT-REGISTRY-GROWTH-36, `tests/test_resident_registry.py`); budget of 10
+  October 2026: 266 commands (32 bytes each, 8,512 bytes of hunk) and 321 settings (7,704 bytes of structures and
+  10,496 bytes of zone for their values).
+- Console commands behind on-disk routes: the `dbg` names, aliases and help are already read from disk only when a
+  command is submitted; most of the commands behind them can follow, leaving a few dispatchers per module (keys
+  that are held, such as Tab, keep real commands).
+- Rare rule lookups from disk: coordinates to an index, one byte read when the question comes up (where sleeping is
+  allowed first, then similar rules).
+- Disk-backed console history instead of the resident 16 KiB output ring.
+- About 13 KB in Balmora's CHIM ring, so that exact building collision can be switched on for every model.
 
 ### Roadmap horizon: one partition with CHIM
 
 With the whole island on CHIM, the whole game on one disk image, with the world in a single
 partition. This is a horizon, not a promise for a release: the image stays as it is until the
 whole island runs on CHIM. Details and measurements: [IMAGE_SIZE.md](IMAGE_SIZE.md).
+
+The goal is one image file, not two. v0.0.36-dev3 ships as two image files (4,026,564,608 and 1,610,645,504 bytes, 5.25 GiB
+together) with three world partitions (the system partition and one world partition on the first disk, two world partitions
+on the second). Every partition is under 2 GiB and starts below 2 GiB, so the platform limits hold, but the target is not
+met. One image of about 3.75 GiB means the payload must shrink by about 1.5 GiB. The path: dead weight out (see the
+build pipeline section above, which saves build time, not image size), store-once CHIM for the open world, and a payload breakdown by kind printed by every image
+summary so each kind has a visible budget:
+
+| Kind | dev3 today | Budget for one image |
+| --- | --- | --- |
+| World maps (CHIM and legacy) | not yet measured per kind | to be set from the breakdown |
+| Audio: voices (6,447 files) | not yet measured per kind | to be set from the breakdown |
+| Audio: effects (717) and music (18) | not yet measured per kind | to be set from the breakdown |
+| Video (17 files) | not yet measured per kind | to be set from the breakdown |
+| Interiors | not yet measured per kind | to be set from the breakdown |
+| Total | 5,637,210,112 bytes | about 3.75 GiB (4,026,531,840 bytes) |
+
+Tracker: IMAGE-ONE-HDF-TARGET-36 and BUILD-PARTITION-GROWTH-UNGATED-36 (nothing gates the number of world partitions or the image size yet).
 
 ## v0.0.34 - CHIM: Tightening the Bolts (released)
 
@@ -401,6 +583,17 @@ acceptance stay measured there, and nothing may depend on the larger heap.
 
 Ideas worth keeping, not scheduled. They wait until the work they depend on
 exists.
+
+### Sky fading into the horizon
+
+At its lowest points the sky should fade into a gradient, not end in a crude cut-out. This pairs with the sea skirt
+being prototyped for the open ocean (off by default until the owner approves it): both fade into the same horizon colour.
+
+### Sea skirt: the sea runs to the horizon
+
+The sea runs to the horizon and fades into it: flat colour bands beyond the draw distance, going from the sea colour to
+the horizon colour. Views over water from high places, such as Vivec's cantons, then show sea instead of a flat fog band.
+Targeted at v0.0.36 if it is ready in time, otherwise first in v0.0.37.
 
 ### Weather: ash storms and blight winds
 

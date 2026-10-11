@@ -96,6 +96,18 @@ int main(int count,char **values){
     assert(AW_DebugTranslate(4,fill,output,sizeof(output))==1 && !strcmp(output,"aw_skyline_fill 0\n"));
     assert(AW_DebugTranslate(3,guard,output,sizeof(output))==1 && !strcmp(output,"aw_guardtorch on\n"));
   }
+  { /* dbg god / dbg godmode: one handler, the usual toggle words reach it unchanged. */
+    char *god[3]={"dbg","god","true"},*mode[3]={"dbg","godmode","off"};
+    assert(AW_DebugTranslate(3,god,output,sizeof(output))==1 && !strcmp(output,"aw_godmode true\n"));
+    assert(AW_DebugTranslate(3,mode,output,sizeof(output))==1 && !strcmp(output,"aw_godmode off\n"));
+    assert(AW_DebugTranslate(2,mode,output,sizeof(output))==1 && !strcmp(output,"aw_godmode\n"));
+  }
+  { /* dbg music on|off (ENGINE-MUSIC-NO-OFF-SWITCH-36): the stream status handler takes the switch words. */
+    char *music[3]={"dbg","music","off"};
+    assert(AW_DebugTranslate(3,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status off\n"));
+    music[2]="1";assert(AW_DebugTranslate(3,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status 1\n"));
+    assert(AW_DebugTranslate(2,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status\n"));
+  }
   { /* Photo mode (dbg photomode / dbg killhud) and dbg crosshair(s): one handler each, words kept. */
     char *photo[3]={"dbg","photomode","off"},*kill[3]={"dbg","killhud","on"},*cross[3]={"dbg","crosshairs","on"};
     assert(AW_DebugTranslate(3,photo,output,sizeof(output))==1 && !strcmp(output,"aw_photomode off\n"));

@@ -61,23 +61,51 @@ def setting(version, workspace, allow_release_reuse=False, release_reuse=None):
 
 
 _DIGESTS = {}
+# Key form of the pass and unit caches (BUILD-PASS-KEY-OVERBROAD-36). 2: a module's import-time code counts only
+# default values that run code on import (build_cache TOP_FORMATS, as the stage keys since
+# BUILD-KEY-FUNCTION-DEFAULTS-TOP-36), so a new function in a shared module (build_parallel.create_run, round 4)
+# no longer rekeys every pass that imports the module; and this module, the cache's own key and storage code, is
+# left out of its keys (PASS_KEY_NEUTRAL): its results never depend on how they are keyed or stored (FORMAT
+# names a change of meaning). Form 1 (every function's defaults, this module counted) is what the keys were
+# before: a miss is looked up under it once and the hit recorded under the new key (PassCache.load), so the
+# change costs no pass a rerun.
+PASS_KEY_FORM = 2
+PASS_KEY_NEUTRAL = frozenset({'tools/pass_cache.py'})
 
 
-def source_digest(*scripts):
+def source_digest(*scripts, form=PASS_KEY_FORM):
     """SHA-256 of the repository sources the given pass modules read, transitively
-    (computed once per process: the repository index hashes every source file)."""
-    key = tuple(str(Path(script).resolve()) for script in scripts)
+    (computed once per process: the repository index hashes every source file). A script given as
+    (path, function) counts only the code that function reaches: the pass's per-map worker.
+    FORM: the key form (PASS_KEY_FORM; 1 = the keys written before BUILD-PASS-KEY-OVERBROAD-36)."""
+    key = (form,) + tuple((str(Path(script[0]).resolve()), script[1]) if isinstance(script, tuple)
+                          else str(Path(script).resolve()) for script in scripts)
     if key not in _DIGESTS:
-        _DIGESTS[key] = _source_digest(scripts)
+        _DIGESTS[key] = _source_digest(scripts, form)
     return _DIGESTS[key]
 
 
-def _source_digest(scripts):
+def previous_digests(*scripts):
+    """The source digests the same scripts had in older key forms (empty when they equal the current one)."""
+    current = source_digest(*scripts)
+    older = source_digest(*scripts, form=1)
+    return () if older == current else (older,)
+
+
+def _source_digest(scripts, form=PASS_KEY_FORM):
     from build_cache import SourceIndex
-    index = SourceIndex(ROOT)
+    index = SourceIndex(ROOT, top_format=form)
+    exclude = PASS_KEY_NEUTRAL if form >= 2 else ()
     parts = []
     for script in scripts:
-        value, _, uncertain = index.digest(Path(script).resolve())
+        if isinstance(script, tuple):
+            # (module path, worker function): only the code that function reaches (build_cache entry_digest),
+            # so an edit elsewhere in the tool keeps every recorded result
+            path, function = script
+            value, _, uncertain = index.entry_digest(Path(path).resolve(), function, exclude)
+            parts.append([str(Path(path).name), function, value, uncertain])
+            continue
+        value, _, uncertain = index.digest(Path(script).resolve(), exclude)
         parts.append([str(Path(script).name), value, uncertain])
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
@@ -85,10 +113,12 @@ def _source_digest(scripts):
 class PassCache:
     """One pass's view of the cache; picklable, so pool workers get it in their task."""
 
-    def __init__(self, name, options, sources, root=None, tally=None):
+    def __init__(self, name, options, sources, root=None, tally=None, previous=()):
         self.name = name
         self.options = options
         self.sources = sources
+        # Source digests of older key forms (previous_digests): looked up on a miss, never written.
+        self.previous = tuple(previous)
         self.root = None if root is None else str(root)
         # Hit and miss counts across pool workers: one character per lookup, appended to a
         # per-process file in a folder of this pass run (summary() sums and removes it).
@@ -107,7 +137,7 @@ class PassCache:
             tally = tempfile.mkdtemp(prefix=name + '-', dir=Path(root) / '.tally')
         except OSError:
             pass
-        return cls(name, options, source_digest(*scripts), root, tally)
+        return cls(name, options, source_digest(*scripts), root, tally, previous_digests(*scripts))
 
     def _count(self, hit):
         if self.tally is None:
@@ -133,12 +163,13 @@ class PassCache:
             shutil.rmtree(folder, ignore_errors=True)
         return {'sources_sha256': self.sources, 'hits': hits, 'misses': misses}
 
-    def key(self, input_sha256):
-        return hashlib.sha256(json.dumps([FORMAT, self.name, self.options, self.sources, input_sha256],
+    def key(self, input_sha256, sources=None):
+        sources = self.sources if sources is None else sources
+        return hashlib.sha256(json.dumps([FORMAT, self.name, self.options, sources, input_sha256],
                                          sort_keys=True).encode()).hexdigest()
 
-    def _paths(self, input_sha256, root=None):
-        key = self.key(input_sha256)
+    def _paths(self, input_sha256, root=None, sources=None):
+        key = self.key(input_sha256, sources)
         base = Path(root or self.root) / self.name / key[:2]
         return base / (key + '.json'), base / (key + '.bin')
 
@@ -147,6 +178,13 @@ class PassCache:
         --reuse-from workspace's cache (file_cache.fallback_root, read-only) and pooled here on a hit
         (BUILD-CACHE-PER-WORKSPACE-33)."""
         found = self._load(input_sha256)
+        for sources in self.previous if found is None else ():
+            # the same result recorded under an older key form (BUILD-PASS-KEY-OVERBROAD-36): verified like any
+            # entry, then recorded under the current key
+            found = self._load(input_sha256, sources=sources)
+            if found is not None:
+                self.store(input_sha256, found[0], found[1])
+                break
         if found is None:
             from file_cache import fallback_root
             other = fallback_root(self.root)
@@ -155,10 +193,12 @@ class PassCache:
                 if found is not None:
                     self.store(input_sha256, found[0], found[1])
         self._count(found is not None)
+        import cache_provenance
+        cache_provenance.reused(self.root, self.name, self.key(input_sha256), found is not None)
         return found
 
-    def _load(self, input_sha256, root=None):
-        meta_path, blob_path = self._paths(input_sha256, root)
+    def _load(self, input_sha256, root=None, sources=None):
+        meta_path, blob_path = self._paths(input_sha256, root, sources)
         try:
             meta = json.loads(meta_path.read_text(encoding='utf-8'))
             if meta.get('format') != FORMAT or meta.get('input_sha256') != input_sha256:
@@ -168,6 +208,8 @@ class PassCache:
                 output = blob_path.read_bytes()
                 if hashlib.sha256(output).hexdigest() != meta['output_sha256']:
                     return None
+            import cache_provenance
+            cache_provenance.verify_pass(meta, output)
             return meta['row'], output
         except (OSError, ValueError, KeyError, TypeError):
             return None
@@ -185,6 +227,8 @@ class PassCache:
             meta = {'format': FORMAT, 'pass': self.name, 'input_sha256': input_sha256,
                     'output_sha256': None if output is None else hashlib.sha256(output).hexdigest(),
                     'row': row}
+            import cache_provenance
+            cache_provenance.attach_pass(meta, output, 'image-passes/' + self.name, self.key(input_sha256), self.options, self.sources, self)
             partial = meta_path.with_name(meta_path.name + suffix)
             # Key order kept: rows go into receipts exactly as the pass made them.
             partial.write_text(json.dumps(meta) + '\n', encoding='utf-8', newline='\n')
@@ -228,7 +272,8 @@ class UnitCache(PassCache):
         root = folder()
         if root is None:
             return None
-        return cls(name, dict(options, environment=environment(*scripts)), source_digest(*scripts), root)
+        return cls(name, dict(options, environment=environment(*scripts)), source_digest(*scripts), root,
+                   previous=previous_digests(*scripts))
 
     def _blob(self, sha256):
         return Path(self.root) / self.name / 'files' / sha256[:2] / (sha256 + '.bin')
@@ -264,6 +309,8 @@ class UnitCache(PassCache):
                     partial.write_bytes(data)
                     os.replace(partial, blob)
                 files[path.relative_to(directory).as_posix()] = sha256
+            import cache_provenance
+            cache_provenance.name_unit(self, input_digest(inputs), lambda: unit_label(inputs) or None, lambda: sorted(inputs.items()) if isinstance(inputs, dict) else [('inputs', inputs)])
             self.store(input_digest(inputs), {'row': row, 'files': files, 'label': unit_label(inputs)})
         except (OSError, TypeError, ValueError):
             pass

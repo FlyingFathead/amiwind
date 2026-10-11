@@ -1,0 +1,50 @@
+{
+ "schema": "amiwind-perf-guard-policy-v1",
+ "about": "Perf guard policy (docs/BUILD_PROFILE.md \"Perf guard\"). independent_units: sections that work through independent units (frames, maps) but do not record a unit count; they get the FIX-NOW check. waivers: known violations, each with its bug ID, the job that owns the fix and an expiry date; a waiver ends at its date or when the bug register marks its bug fixed.",
+ "independent_units": {
+  "Image: stair walk": "maps",
+  "Image: CHIM frame-map heap": "frame maps",
+  "CHIM heap gate": "frames",
+  "CHIM validation": "frames",
+  "CHIM zone walk gate": "frames",
+  "CHIM stair gate": "frames"
+ },
+ "waivers": [
+  {
+   "id": "BUILD-IMAGE-STAIR-WALK-SERIAL-36",
+   "owner": "stairs-rc1",
+   "stage": "image",
+   "sections": [
+    "Image: stair walk",
+    "parallel map: check_map_cached"
+   ],
+   "since": "2026-10-11",
+   "expires": "2026-10-14",
+   "reason": "the image stair walk on 1-2 of 24 cores (11.6 cores in the dev4 full build); the stairs-rc1 job fixes the walk"
+  },
+  {
+   "id": "BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36",
+   "owner": "vivec-b",
+   "stage": "image",
+   "sections": [
+    "Image: CHIM frame-map heap"
+   ],
+   "since": "2026-10-11",
+   "expires": "2026-10-14",
+   "reason": "the frame-map heap check on one core; the vivec-b job parallelizes it"
+  },
+  {
+   "id": "BUILD-CHIM-STAGE-SERIAL-TAIL-36",
+   "owner": "vivec-b",
+   "stage": "chim",
+   "sections": [
+    "CHIM heap gate",
+    "CHIM validation",
+    "CHIM zone walk gate"
+   ],
+   "since": "2026-10-11",
+   "expires": "2026-10-14",
+   "reason": "PERSISTING: the chim stage's heap gate, validation and zone walk on one core; repaired in source on v0.0.36-chim-speed, not on the line yet"
+  }
+ ]
+}

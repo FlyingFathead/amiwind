@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -36,6 +36,9 @@ float			d_scalemip[NUM_MIPS-1];
 static float	basemip[NUM_MIPS-1] = {1.0, 0.5*0.8, 0.25*0.8};
 
 extern int			d_aflatcolor;
+#if AW_ASM_DSCAN && !AW_ASM_SPANS
+void D_DrawSpans8_C (espan_t *pspan);
+#endif
 
 void (*d_drawspans) (espan_t *pspan);
 
@@ -149,7 +152,11 @@ void D_SetupFrame (void)
 				if (d_subdiv16.value)
 					d_drawspans = D_DrawSpans16;
 				else
+#if AW_ASM_DSCAN && !AW_ASM_SPANS
+					d_drawspans = D_DrawSpans8_C;	/* d_scan.c: the C spans beside upstream's assembly */
+#else
 					d_drawspans = D_DrawSpans8;
+#endif
 //#else
 //				d_drawspans = D_DrawSpans8;
 //#endif
@@ -170,4 +177,3 @@ void D_UpdateRects (vrect_t *prect)
 
 	UNUSED(prect);
 }
-

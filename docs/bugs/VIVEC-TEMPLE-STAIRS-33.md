@@ -1,5 +1,15 @@
 # VIVEC-TEMPLE-STAIRS-33: Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.36-dev4 at 2026-10-11 05:32 +0300: PERSISTING: whole-city frame vivec_city fails the stair gate on the same refs 428484, 428530, 484457, 484458 (11 of 18 failed flight steps)
+- Reported with v0.0.36-dev5 at 2026-10-11 09:41 +0300: PERSISTING: whole-city Vivec with rooms f6e08fe (dev5), accepted by ID for the dev MiniWind: same refs 428484, 428530, 484457, 484458 (11 flight steps)
+- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: owner order (TG): fix for rc1
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +19,7 @@
 | Where | Vivec Temple frame (vivec_temple): ex_v_palace_steps_01, ex_vivec_hfq_01, ex_vivec_hfq_04 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: Flights the player climbs in the original are blocked; the Temple frame cannot pass its stair gate until repaired. |
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -22,10 +32,11 @@
 
 ## Status: 9 October 2026
 
-Open; measured. CHIM area: stairs. Found while measuring the whole of Vivec on CHIM (the canton cut work).
-A private -devN DEBUG ONLY sandbox may accept these four placements by ID
-(`--accept-known-stair-findings VIVEC-TEMPLE-STAIRS-33`, config/known-stair-findings.json) for the
-in-engine walk that decides the repair; rc and final builds refuse it.
+Open; persisting since v0.0.33-dev (9 October 2026), reported again on the whole-city frame in v0.0.36-dev4
+and v0.0.36-dev5 (accepted by ID for the dev MiniWinds only). 11 October 2026: repaired in source on the
+v0.0.36-stairs-rc1 line (two shared rules below), verification build pending. A private -devN test could
+accept these placements by ID (`--accept-known-stair-findings VIVEC-TEMPLE-STAIRS-33`); rc and final builds
+refuse it.
 
 ## Symptom
 
@@ -44,16 +55,21 @@ large-model cut, so the cut is not the cause.
 
 ## How it happened
 
-Partly known (9 October 2026). The High Fane quarters use their authored collision
-(`RootCollisionNode`, "approximate convex conversion"): a 26.7-degree ramp over the visible steps, which
-the stair rule leaves alone. A traced walk on the frame's standing hull (at 1615.0, ref 484457, going -y)
-stands on that ramp; the move up it meets a steep side surface (64 degrees, normal mostly sideways),
-apparently the ramp's own side, so the authored ramp is narrower than the standing box. The engine's
-movement (SV_FlyMove) slides along such a side plane; the gate's straight walker does not, so it reports
-"blocked". Whether a player is really stopped there needs an in-engine walk and an OpenMW A/B. The palace
-steps (`ex_v_palace_steps_01`, stair rule "vertical risers") start in solid or meet a vertical surface
-64 units over the step: not yet traced. The legacy builder never converted the Temple frame
-(VIVEC-HEAP-31 blocked it), so these meshes never met the stair gate before.
+Traced 11 October 2026 on the f6e08fe whole-city frame (all 11 flight steps reproduced offline):
+
+- High Fane quarters (`ex_vivec_hfq_01`, `ex_vivec_hfq_04`, refs 484457 and 484458; authored plates, exact
+  bevels): the authored collision (RootCollisionNode) puts a steep wedge (60-69 degrees, up to 92 units high)
+  over the left part of the visible flight: the 26.7-degree authored ramp is 150 units wide, the wedge covers
+  x 200-257 of it in the model, and the walk's line through the middle of the riser runs 2.8 units from the
+  wedge, closer than the standing box's half width. The original game collides with the same authored
+  surfaces, so the player climbs the open part (78 units wide); the gate only tried lines 1-3 units to the side.
+- Palace steps (`ex_v_palace_steps_01`, refs 428484 and 428530): the convex approximation leaves pieces of
+  three triangles that close 4.96 and 5.49 units of space (more than the tolerance 2, but a piece of at most
+  four triangles is never split further); their hulls invent 67-degree faces over the treads, where a
+  standing box stepping up comes down (and the first step starts in that solid).
+
+The legacy builder never converted the Temple frame (VIVEC-HEAP-31 blocked it), so these meshes never met
+the stair gate before.
 
 ## Why it was not caught
 
@@ -65,17 +81,33 @@ The Temple frame had never been built.
 
 ## Repair
 
-Not yet: inspect the meshes' collision pieces over the failing treads (convex proxy over the steps, or a
-slope piece reaching over the riser) and fix at the shared stair rule.
+Two shared rules (tools/mesh_geometry.py, tools/stair_walk.py), for every mesh with the mechanism:
+
+- `collision_parts(..., plates, fill_plates)`: on a mesh with stairs (stair rule on), a piece that still
+  closes more than the tolerance when it cannot be split further (at most four triangles) and whose hull
+  invents a face too steep to stand on that no source triangle lies in becomes the authored plates of its
+  triangles (exact standing bevels), as the stair rule already does for pieces that bury a tread
+  (palace steps: 6 plates). The deep-fill test that keeps a whole mesh's authored surfaces
+  (`surface_collision_beyond`) is measured on the plain convex proxies first: measured after the plates, it
+  missed the Vivec palace stairs' 9.05 units, and the first whole-city build on the fix failed six of their
+  flight steps (ex_vivec_ps_01, start in solid); a test pins the order.
+- `stair_walk.other_lines`: a flight step whose line through the middle of the riser fails is walked along
+  the other lines across the riser's width (every 4 units, nearest the middle first, the standing box within
+  the riser); the first line walked up and down passes the step and is recorded in the row as `line` (its
+  offset). A flight closed over its whole width still fails (the High Fane quarters pass at 4 units from the
+  middle, as the player climbs them).
 
 ## Verification
 
-Pending: the stair gate on the Temple frame passes; A/B against OpenMW on the palace steps and a High
-Fane quarter flight.
+Offline on the f6e08fe frame with the recomputed collision: all 11 flight steps pass (the High Fane
+quarters along a line 4 units from the middle; the palace steps' first step through the middle, the other
+two at 4 units). Synthetic tests: tests/test_stair_rc1_fixes.py (FillPlateTests, OtherLinesTests). Pending:
+the whole-city MiniWind on the fixed builder with no accepted stair findings.
 
 ## Prevention
 
-Every Vivec frame runs the stair gate; the frame list grows with the whole-city build.
+Every Vivec frame runs the stair gate; a convex piece that closes more than the tolerance on a mesh with
+stairs is no longer kept; a flight passes only along a line the standing box really walks.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -83,6 +115,8 @@ Every Vivec frame runs the stair gate; the frame list grows with the whole-city 
 
 Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`). Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. See [families](README.md#families).
 
+- [BUILD-ACTOR-GATE-CHIM-FRAMES-36](BUILD-ACTOR-GATE-CHIM-FRAMES-36.md): The actor placement gate ignores CHIM frame residents: a CHIM-only build fails with no actors, and a blocked frame resident passes silently
+- [BUILD-FLORA-STAIR-PLATES-BUDGET-36](BUILD-FLORA-STAIR-PLATES-BUDGET-36.md): The stair-plate collision rules raised a legacy open-world map past the BSP clip-node limit: world-flora failed on vf0779 (33,172 aggregate clipnodes > 32,767)
 - [BUILD-HULL-ROUTE-BUDGET-33](BUILD-HULL-ROUTE-BUDGET-33.md): Routed standing hulls with copies overflow a legacy map's shared clipnode budget
 - [BUILD-ROUTED-FLORA-RESERVE-33](BUILD-ROUTED-FLORA-RESERVE-33.md): Routed standing hulls push a legacy open-world map past the flora collision reserve: the full build stops in world-flora (vf0779)
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
@@ -91,15 +125,19 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
 - [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only
+- [COLLISION-ROUTE-NO-SPLIT-36](COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending
 - [COLLISION-SEYDA-PREVIEW-BYPASS-32](COLLISION-SEYDA-PREVIEW-BYPASS-32.md): The legacy Seyda Neen preview builds its own convex collision
 - [COLLISION-STAIR-SLOPE-32](COLLISION-STAIR-SLOPE-32.md): Convex collision proxies make stairs unclimbable
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
+- [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot
+- [STAIRS-EBONHEART-CHIM-36](STAIRS-EBONHEART-CHIM-36.md): Three Ebonheart flights fail the CHIM stair gate in the whole-city Vivec frame
 - [STAIRS-SEYDA-LIGHTHOUSE-32](STAIRS-SEYDA-LIGHTHOUSE-32.md): Seyda Neen lighthouse stairs are blocked (outside and inside)
 - [STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md): A spiral stair in the Seyda Neen warehouse tower is blocked
+- [STAIRS-VIVEC-ROOMS-JOINT-36](STAIRS-VIVEC-ROOMS-JOINT-36.md): Six flight steps in three Vivec rooms are blocked where one stair piece meets the next
 - TERRAIN-TRAP-29 (no report page): v0.0.29-dev1: Player reportedly stuck on rocks beside structures
 - [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water

@@ -201,7 +201,7 @@ class DoorBanks(unittest.TestCase):
         text = ti.bank_text(rows)
         self.assertTrue(text.startswith('AWD3\ntai000 ta 11 ') and text.endswith('\n'))
         with self.assertRaises(ValueError):
-            ti.bank_text(rows * 40)
+            ti.bank_text(rows * (ti.BANK_ROWS // len(rows) + 1))
 
     def test_exterior_bank_links_listed_rooms_only(self):
         import importlib.util
@@ -225,6 +225,11 @@ class DoorBanks(unittest.TestCase):
         many = references[:1] * (ti.BANK_ROWS + 1)
         with self.assertRaises(ValueError):
             import_town.door_bank_text(s, many, index)
+        # the builder's limit is the engine's own (aw_scene.c AW_SCENE_LINKS; whole-city Vivec holds 157 doors)
+        scene = (ROOT / 'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
+        self.assertIn('#define AW_SCENE_LINKS %d\n' % ti.BANK_ROWS, scene)
+        self.assertEqual(scene.count('count<AW_SCENE_LINKS'), 2)
+        self.assertGreaterEqual(ti.BANK_ROWS, 157)
 
     def test_available_rooms_skip_excluded_and_failed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -306,3 +311,34 @@ class TownTableInteriors(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class WholeCityRooms(unittest.TestCase):
+    """All of Vivec in one CHIM frame (vivec_city) takes the eight district rows' rooms (interiors_from) with their
+    map names and save IDs; their exits lead back into the city frame; a room past an engine limit ships as
+    unavailable (room_failures)."""
+
+    def test_the_city_lists_every_district_room_once(self):
+        import town_interiors as ti
+        city = load_settings('vivec_city')
+        rooms = ti.listed_rooms(city)
+        districts = [room for town in city['interiors_from'] for room in interiors(load_settings(town))]
+        self.assertEqual(rooms, districts)
+        self.assertEqual(len({r['map'] for r in rooms}), len(rooms))
+        self.assertEqual(interiors(city), [])      # the town table lists each room once, under its district
+        self.assertEqual(city['room_failures'], 'unavailable')
+        import chim_rooms
+        self.assertEqual(chim_rooms.listed_rooms('vivec_city'), [r for r in rooms if r['exclude'] is None])
+
+    def test_room_exits_prefer_the_town_of_the_build(self):
+        import town_interiors as ti
+        plain = [t[0] for t in ti.frame_towns()]
+        preferred = [t[0] for t in ti.frame_towns(prefer=('vivec_city',))]
+        self.assertEqual(preferred[0], 'vivec_city')
+        self.assertEqual(sorted(plain), sorted(preferred))
+        city = load_settings('vivec_city')
+        # the Temple district's centre: the first table frame holding it is a district row, unless the city leads
+        temple = load_settings('vivec_temple')['centre'] + [0]
+        self.assertTrue(ti.exit_town(temple, ti.frame_towns())[0].startswith('vivec_'))
+        self.assertEqual(ti.exit_town(temple, ti.frame_towns(prefer=('vivec_city',)))[0], 'vivec_city')
+        self.assertIn('interiors_from', city)

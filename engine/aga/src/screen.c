@@ -220,6 +220,15 @@ Must be called whenever vid changes
 Internal use only
 =================
 */
+/* aw_view.c: the vanity orbit draws the full-screen view with nothing over it (aw_vanity_fullview). */
+int (*aw_view_fullscreen)(void);
+static int scr_aw_full_view;
+/* Photo mode or the vanity orbit: the intermission's full-screen view (view size 120, no status lines). */
+static int SCR_AWFullView (void)
+{
+    return AW_PhotoModeActive () || (aw_view_fullscreen && aw_view_fullscreen ());
+}
+
 static void SCR_CalcRefdef (void)
 {
     vrect_t		vrect;
@@ -248,8 +257,8 @@ static void SCR_CalcRefdef (void)
     r_refdef.fov_x = scr_fov.value;
     r_refdef.fov_y = CalcFov (r_refdef.fov_x, r_refdef.vrect.width, r_refdef.vrect.height);
 
-// intermission is always full screen; so is photo mode (dbg photomode)
-    if (cl.intermission || AW_PhotoModeActive())
+// intermission is always full screen; so are photo mode (dbg photomode) and the vanity orbit (aw_vanity_fullview)
+    if (cl.intermission || SCR_AWFullView ())
         size = 120;
     else
         size = scr_viewsize.value;
@@ -262,10 +271,10 @@ static void SCR_CalcRefdef (void)
         sb_lines = 24+16+8;
 
     /* Keep normal HUD/dialogue entirely below the 3D view. */
-    if (!cl.intermission && !AW_PhotoModeActive() && sb_lines < 48) sb_lines = 48;
+    if (!cl.intermission && !SCR_AWFullView () && sb_lines < 48) sb_lines = 48;
     /* Keep the optional diagnostic strip outside the rendered world
      * (in photo mode Ctrl+H draws it over the full-screen view). */
-    if (AW_DebugCoordsEnabled() && !AW_PhotoModeActive() && sb_lines < 12) sb_lines = 12;
+    if (AW_DebugCoordsEnabled() && !SCR_AWFullView () && sb_lines < 12) sb_lines = 12;
 
 // these calculations mirror those in R_Init() for r_refdef, but take no
 // account of water warping
@@ -842,11 +851,15 @@ WARNING: be very careful calling this from elsewhere, because the refresh
 needs almost the entire 256k of stack space!
 ==================
 */
+/* aw_view.c: the death prompt (docs/THIRD_PERSON.md); NULL in fixtures without it. */
+void (*aw_view_draw)(void);
+
 void SCR_UpdateScreen (void)
 {
     static float	oldscr_viewsize;
     static float	oldlcd_x;
     vrect_t		vrect;
+    int			vanity;
 
     if (scr_skipupdate || block_drawing)
         return;
@@ -892,6 +905,14 @@ void SCR_UpdateScreen (void)
         D_DisableBackBufferAccess();V_UpdatePalette();
         vrect.x=vrect.y=0;vrect.width=vid.width;vrect.height=vid.height;vrect.pnext=NULL;
         VID_Update(&vrect);scr_fullupdate=0;return;
+    }
+
+    /* The vanity orbit's full view starts and ends without a cvar change. */
+    if (SCR_AWFullView () != scr_aw_full_view)
+    {
+        scr_aw_full_view = SCR_AWFullView ();
+        vid.recalc_refdef = 1;
+        scr_copyeverything = 1;
     }
 
     if (scr_viewsize.value != oldscr_viewsize)
@@ -997,18 +1018,25 @@ void SCR_UpdateScreen (void)
             SCR_DrawPause ();
         AW_PhotoDraw ();
         SCR_CheckDrawCenterString ();
-        Sbar_Draw ();
-        if (!AW_PhotoModeActive())
+        /* The vanity orbit's full view: nothing over the world, as the original hides its HUD
+         * (aw_vanity_fullview 1, the default; photo mode keeps its own rules below). */
+        vanity = SCR_AWFullView () && !AW_PhotoModeActive ();
+        if (!vanity)
+            Sbar_Draw ();
+        if (!AW_PhotoModeActive() && !vanity)
             AW_SceneDraw();
         /* In photo mode the message box shows only photo mode's own notice. */
-        if (!AW_PhotoModeActive() || AW_PhotoNoticeShowing())
+        if ((!AW_PhotoModeActive() && !vanity) || AW_PhotoNoticeShowing())
             AW_UIDraw();
         AW_IntroDraw();
+        if (aw_view_draw)
+            aw_view_draw ();
         /* Test-room and gallery instruction text is not part of a photo
          * (PHOTO-GALLERY-TEXT-33); the light gallery strip stays, it is a tool. */
-        if (!AW_PhotoModeActive())
+        if (!AW_PhotoModeActive() && !vanity)
             AW_GalleryDraw();
-        AW_UIOuterFrame();
+        if (!vanity)
+            AW_UIOuterFrame();
         SCR_DrawConsole ();
         M_Draw ();
     }

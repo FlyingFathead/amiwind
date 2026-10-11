@@ -3,7 +3,9 @@
  * (docs/chim/WORLD_FORMAT.md). 0.5 adds the story-hidden placement flag and
  * irregular ground with the same layout; 0.6 puts the sector files of a large
  * frame into one folder per sector row, which the index's file table names,
- * so the records are unchanged:
+ * so the records are unchanged; 0.7 adds terrain references: a CHK1 chunk
+ * record ends in a reference block naming a TERR record (chunk terrain stored
+ * once, in chunk-local units) and the shift it is placed at:
  * decoders for the big-endian CHIM structures (index, frame file, sector
  * files, chunk records and placement records). Brush images inside the
  * sector files stay little-endian BSP29 and go through model.c's section
@@ -14,7 +16,7 @@
 #define CHIM_FORMAT_H
 
 #define CHIM_FORMAT_MAJOR	0
-#define CHIM_FORMAT_MINOR	6
+#define CHIM_FORMAT_MINOR	7
 #define CHIM_FORMAT_MINOR_OLDEST	4	/* the oldest minor of this major the engine reads */
 
 #define CHIM_HEADER_BYTES		32
@@ -28,6 +30,7 @@
 #define CHIM_SECTOR_ENTRY_BYTES	12
 #define CHIM_RECORD_ENTRY_BYTES	16
 #define CHIM_CHUNK_HEAD_BYTES	24
+#define CHIM_TERRAIN_REF_BYTES	32	/* 0.7: the reference block of a CHK1 chunk */
 #define CHIM_RECORD_BYTES		48
 #define CHIM_RECORD_OVER_16_LEAVES	1	/* record flag: reaches more than MAX_ENT_LEAFS */
 #define CHIM_RECORD_STORY_HIDDEN	2	/* record flag (0.5): hidden by the opening story */
@@ -91,7 +94,15 @@ typedef struct
 	unsigned	image_at, image_render;
 	int			pvs_bytes, terrain_leaves;
 	int			pvl_bytes;			/* the placements a view from the chunk may see */
+	int			ref;				/* 0.7 CHK1: the image is a terrain reference block */
 } chim_chunk_head_t;
+
+/* 0.7: where a referenced chunk's terrain is stored and where it is placed. */
+typedef struct
+{
+	unsigned	id, file, offset, bytes, render;
+	float		shift[3];			/* local units, added when the chunk is grafted */
+} chim_terrain_ref_t;
 
 typedef struct
 {
@@ -116,6 +127,7 @@ void ChimFormat_TextureDir (const unsigned char *p, chim_asset_t *out);
 int ChimFormat_Frame (const unsigned char *p, chim_frame_t *out);
 void ChimFormat_ChunkEntry (const unsigned char *p, chim_chunk_entry_t *out);
 int ChimFormat_ChunkHead (const unsigned char *p, chim_chunk_head_t *out);
+int ChimFormat_TerrainRef (const unsigned char *p, chim_terrain_ref_t *out);
 int ChimFormat_Record (const unsigned char *p, chim_record_t *out);
 
 #endif

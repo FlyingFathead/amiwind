@@ -9,6 +9,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -428,7 +429,40 @@ def prepare(data, output, ffmpeg='ffmpeg', jobs=None, videos=True, voices=True, 
     return report
 
 
-def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=()):
+def _stage_media_file(task):
+    """Pool worker: stage one converted media file into the payload (stage_catalogue). Returns {'sha256', 'bytes',
+    'how': linked|copied|present} or {'error'}. The source must have its recorded SHA-256; an existing target must be
+    the same bytes (the story intro: its own validated higher-resolution file with the same original source)."""
+    _, src, target, want, relative, intro_source, row_source = task
+    src, target = Path(src), Path(target)
+    try:
+        if not src.is_file() or sha(src) != want:
+            raise ValueError('Converted media file absent or changed')
+        result = {}
+        if target.exists() and relative == 'intro/mw_intro.awv':
+            if not intro_source or intro_source != row_source:
+                raise ValueError('Existing story intro lacks matching source provenance')
+            from prepare_video import validate
+            validate(target)
+            result.update(reused_story_intro=True, how='present')
+        elif target.exists():
+            if sha(target) != want:raise ValueError('Conflicting existing media payload')
+            result['how'] = 'present'
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.link(src, target)          # same bytes, stored once (hashed pool rule); nothing writes media in place
+                result['how'] = 'linked'
+            except OSError:
+                shutil.copyfile(src, target)
+                result['how'] = 'copied'
+        # a link is the checked source itself (same file); a copy or an existing file is read again
+        return dict(result, sha256=want if result['how'] == 'linked' else sha(target), bytes=target.stat().st_size)
+    except (OSError, ValueError) as error:
+        return {'error': str(error)[:400]}
+
+
+def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=(), jobs=None):
     """Copy only validated outputs; bind coverage to the final prepared payload.
 
     Preserve the higher-resolution story intro when its original source digest
@@ -441,29 +475,39 @@ def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=())
     if report.get('format') != 'AWMEDIA1':
         raise ValueError('Unsupported media catalogue')
     report['excluded'] = sorted(set(report.get('excluded') or ()) | set(excluded))
-    seen = set()
-    for row in report['entries']:
+    seen, tasks = set(), []
+    for index, row in enumerate(report['entries']):
         if row['status'] != 'included':continue
         relative = key(row['path'])
         if relative in seen:raise ValueError('Duplicate converted media output path')
         seen.add(relative)
-        src, target = media/'id1'/relative, id1/relative
-        try:
-            if not src.is_file() or sha(src) != row['sha256']:
-                raise ValueError('Converted media file absent or changed')
-            if target.exists() and relative == 'intro/mw_intro.awv':
-                if not intro_receipt or intro_receipt.get('source_sha256') != row.get('source_sha256'):
-                    raise ValueError('Existing story intro lacks matching source provenance')
-                from prepare_video import validate
-                validate(target)
-                row['reused_story_intro'] = True
-            elif target.exists():
-                if sha(target) != row['sha256']:raise ValueError('Conflicting existing media payload')
+        tasks.append((index, str(media/'id1'/relative), str(id1/relative), row['sha256'], relative,
+                      (intro_receipt or {}).get('source_sha256') if relative == 'intro/mw_intro.awv' else None,
+                      row.get('source_sha256')))
+    # Every file on the shared worker pool, results in catalogue order (BUILD-IMAGE-AUDIO-SERIAL-36): the source
+    # checked by SHA-256, then hard-linked into the payload (copied where a link is not possible) and checked again.
+    from build_parallel import ordered_map
+    import build_profile
+    import progress_line
+    jobs = max(1, min(resolve_jobs(jobs), len(tasks) or 1))   # jobs: the image step's worker budget
+    staged = {'linked': 0, 'copied': 0, 'present': 0}
+    with build_profile.phase('Media payload', detail='%d files, %d workers' % (len(tasks), jobs),
+                             total=len(tasks), unit='files') as timer:
+        for done, ((index, *_), result) in enumerate(zip(tasks, ordered_map(_stage_media_file, tasks, jobs)), 1):
+            row = report['entries'][index]
+            if 'error' in result:
+                row.update(status='missing_output', error=result['error'])
             else:
-                target.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(src, target)
-            row['sha256'], row['bytes'] = sha(target), target.stat().st_size
-        except (OSError, ValueError) as error:
-            row.update(status='missing_output', error=str(error)[:400])
+                row['sha256'], row['bytes'] = result['sha256'], result['bytes']
+                if result.get('reused_story_intro'):
+                    row['reused_story_intro'] = True
+                staged[result['how']] += 1
+            timer.step()
+            if done % 500 == 0 or done == len(tasks):
+                build_profile.progress(progress_line.line('Media payload', None, '%(linked)d linked, %(copied)d copied, '
+                                                          '%(present)d present' % staged, (done, len(tasks), 'files')))
+        timer.done('Media payload: %d files (%d linked, %d copied, %d present)'
+                   % (len(tasks), staged['linked'], staged['copied'], staged['present']))
     inventory = json.loads((media/'source-inventory.json').read_text())['assets']
     music_by_source = {key(r['source']): r for r in music_manifest['tracks']}
     for source in sorted(k for k in inventory if k.startswith('music/') and 'music' not in report['excluded']):

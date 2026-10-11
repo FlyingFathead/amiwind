@@ -1,0 +1,14 @@
+{
+  "schema": "build-recipe-1",
+  "name": "release",
+  "description": "A release build (rc or final): every shipped feature at its default, nothing left out; every input file hashed (--check-hashes full). Run it with --developer-mode, as release builds are.",
+  "options": {
+    "check_hashes": "full",
+    "chim_native_towns": "on",
+    "chim_frame_ext": "chim"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

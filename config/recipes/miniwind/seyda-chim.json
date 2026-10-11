@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "seyda-chim",
+  "description": "MiniWind preset --miniwind-seyda-chim: Seyda Neen on CHIM, CHIM-native: arrival, residents, doors, docks",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "full",
+    "miniwind_description": "Seyda Neen on CHIM (CHIM-native): arrival, residents, doors",
+    "direct_to_game_map": "seyda_neen",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

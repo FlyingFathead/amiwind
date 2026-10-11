@@ -79,7 +79,8 @@ class ImageStairAcceptanceTests(unittest.TestCase):
 
     def test_every_known_finding_is_a_tracker_entry_with_its_placements(self):
         table = json.loads((ROOT / 'config/known-stair-findings.json').read_text(encoding='utf-8'))['findings']
-        bugs = {e['id']: e for e in json.loads((ROOT / 'docs/bugs/bugs.json').read_text(encoding='utf-8'))}
+        files = [ROOT / 'docs/bugs/bugs.json'] + sorted((ROOT / 'docs/bugs/archive').glob('*.json'))
+        bugs = {e['id']: e for f in files for e in json.loads(f.read_text(encoding='utf-8'))}
         for fid, entry in table.items():
             with self.subTest(fid=fid):
                 self.assertIn(fid, bugs)

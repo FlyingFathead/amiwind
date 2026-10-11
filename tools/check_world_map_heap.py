@@ -609,7 +609,9 @@ def heap_capacity(heap_mb=None):
 
 def _map_reports(task):
     """Worker: complete heap rows for a chunk of maps (independent per map)."""
-    paths, sizes, guards, harvest, efrag_policy, baseline_reserve_bytes, safety_headroom_bytes, budget = task
+    paths, sizes, guards, harvest, efrag_policy, baseline_reserve_bytes, safety_headroom_bytes, budget, *rest = task
+    # the engine's static entity limit, read once by inspect_maps (None: read per map, as before)
+    static_limit = rest[0] if rest else None
     from guard_torch_heap import map_cost as guard_cost, apply as apply_guard_cost
     from harvest_heap import apply as apply_harvest_cost
     from sprite_heap import inspect_sprites, inspect_efrags
@@ -620,7 +622,7 @@ def _map_reports(task):
         raw = path.read_bytes()
         table = lump_table(raw, path)
         entity_bytes = table['entities']
-        sprites = inspect_sprites(entity_bytes, path.parent.parent, sizes)
+        sprites = inspect_sprites(entity_bytes, path.parent.parent, sizes, static_limit)
         captured = catalogue_count(path.stem, entity_bytes)
         catalogue_bytes = hunk_alloc_bytes(captured * sizes['scenery'], sizes['hunk']) if captured else 0
         report['scenery_catalogue'] = {'placements':captured,'hunk_bytes':catalogue_bytes,
@@ -678,6 +680,20 @@ def _map_reports(task):
     return reports
 
 
+# Chunks per worker of the map audit: enough that the slow maps (a region frame with many statics costs
+# ~25x a median map; map size says little: correlation 0.17 on the dev5 maps) spread over every worker.
+CHUNKS_PER_WORKER = 8
+
+
+def map_chunks(count, jobs):
+    """Index lists for the audit's chunks: map i goes to chunk i mod C (C = min(count, CHUNKS_PER_WORKER x
+    jobs)), so neighbouring maps (one region's frames, one town's interiors: similar costs) are dealt over
+    every chunk instead of filling one; rows still come back in map order (BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36:
+    contiguous chunks ran on 5.3 of 24 cores)."""
+    chunks = max(1, min(count, CHUNKS_PER_WORKER * max(1, jobs)))
+    return [list(range(start, count, chunks)) for start in range(chunks)]
+
+
 def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
                  safety_headroom_bytes=SAFETY_HEADROOM_BYTES, jobs=1, only=None, heap_mb=None):
     # only: map names (no .bsp) to estimate, e.g. harvest admission candidates.
@@ -686,7 +702,8 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
     if safety_headroom_bytes <= 0:
         raise ValueError('Safety headroom must be positive')
     maps = Path(maps)
-    candidates = sorted(p for p in maps.glob('*.bsp') if p.is_file() and (only is None or p.stem in only))
+    from map_files import map_files      # x.bsp and the CHIM frame maps x.chim
+    candidates = [p for p in map_files(maps) if only is None or p.stem in only]
     if not candidates:
         raise ValueError(f'No BSP maps found in {maps}')
     budget, budget_source = heap_capacity(heap_mb)
@@ -699,11 +716,16 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
     # Every map's estimate is independent: chunks run in up to `jobs` workers
     # (shared pool, tools/build_parallel.py); rows keep sorted map order.
     from build_parallel import ordered_map
-    size = max(1, -(-len(candidates) // (4 * max(1, jobs))))
-    chunks = [[str(p) for p in candidates[i:i + size]] for i in range(0, len(candidates), size)]
-    reports = [row for rows in ordered_map(_map_reports, [
-        (chunk, sizes, guards, harvest, efrag_policy, baseline_reserve_bytes, safety_headroom_bytes, budget)
-        for chunk in chunks], max(1, min(jobs, len(chunks)))) for row in rows]
+    from engine_limits import limits as engine_limits
+    static_limit = engine_limits()['max_static_entities']
+    count = len(candidates)
+    reports = [None] * count
+    lanes = map_chunks(count, jobs)
+    tasks = [([str(candidates[index]) for index in lane], sizes, guards, harvest, efrag_policy,
+              baseline_reserve_bytes, safety_headroom_bytes, budget, static_limit) for lane in lanes]
+    for lane, rows in zip(lanes, ordered_map(_map_reports, tasks, max(1, min(jobs, len(lanes))))):
+        for index, row in zip(lane, rows):
+            reports[index] = row
     worst = max(reports, key=lambda row: row['estimated_total_bytes'])
     return {'format': 'AmiWind target BSP heap estimate 1',
             'acceptance': 'estimate-only; not target or gameplay validation',

@@ -33,8 +33,8 @@ class EmulatorConfigTests(unittest.TestCase):
         fs, win = [self.root / name for name in names]
         parser = configparser.ConfigParser(interpolation=None)
         parser.read(fs, encoding='utf-8')
-        self.assertEqual(parser['config']['hard_drive_0'], str(self.image.resolve()))
-        self.assertEqual(parser['config']['hard_drive_1'], str(self.world.resolve()))
+        self.assertEqual(parser['config']['hard_drive_0'], self.image.name)
+        self.assertEqual(parser['config']['hard_drive_1'], self.world.name)
         self.assertEqual(parser['config']['hard_drive_1_type'], 'hdf')
         lines = [line for line in win.read_text(encoding='utf-8').splitlines() if line.startswith('hardfile2=')]
         self.assertEqual(len(lines), 2)
@@ -75,8 +75,8 @@ class EmulatorConfigTests(unittest.TestCase):
         old.write_text('[config]\nhard_drive_0 = /work/container/disk.hdf\n', encoding='utf-8')
         names = write_configs(self.image, config_suffix='-Host')
         self.assertIn('/work/container/disk.hdf', old.read_text(encoding='utf-8'))
-        self.assertIn(str(self.image.resolve()), (self.root / names[0]).read_text(encoding='utf-8'))
-        self.assertIn(str(self.world.resolve()), (self.root / names[0]).read_text(encoding='utf-8'))
+        self.assertIn('hard_drive_0 = ' + self.image.name, (self.root / names[0]).read_text(encoding='utf-8'))
+        self.assertIn('hard_drive_1 = ' + self.world.name, (self.root / names[0]).read_text(encoding='utf-8'))
 
     def test_real_cli_generates_configs_and_prints_footer(self):
         script = Path(__file__).resolve().parents[1] / 'tools/emulator_configs.py'
@@ -135,8 +135,48 @@ class EmulatorConfigTests(unittest.TestCase):
         names = write_configs(self.image)
         win = self.root / names[1]
         win.write_text('user customization\n', encoding='utf-8')
-        with self.assertRaisesRegex(ValueError, 'preserved'): write_configs(self.image)
-        self.assertEqual(win.read_text(encoding='utf-8'), 'user customization\n')
+        write_configs(self.image)
+        self.assertEqual(win.with_name(win.name + '.bak').read_text(encoding='utf-8'), 'user customization\n')
+        self.assertIn('hardfile2=', win.read_text(encoding='utf-8'))
+
+    def test_no_rom_gives_placeholder_and_warning_and_never_a_rom(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            names = write_configs(self.image)
+        self.assertIn('WARNING: no Kickstart ROM', out.getvalue())
+        fs = (self.root / names[0]).read_text(encoding='utf-8')
+        win = (self.root / names[1]).read_text(encoding='utf-8')
+        self.assertIn('kickstart_file = /path/to/your/kickstart-3.1-a1200.rom', fs)
+        self.assertIn('\nkickstart_rom_file=\n', win)
+        self.assertEqual([p.name for p in self.root.iterdir() if p.suffix.lower() in ('.rom', '.bin')], [])
+
+    def test_given_rom_must_exist(self):
+        with self.assertRaisesRegex(ValueError, 'ROM missing'):
+            write_configs(self.image, self.root / 'nope.rom')
+
+    def test_jit_is_on_and_commented(self):
+        names = write_configs(self.image)
+        fs = (self.root / names[0]).read_text(encoding='utf-8')
+        win = (self.root / names[1]).read_text(encoding='utf-8')
+        self.assertIn('# JIT is on', fs)
+        self.assertIn('jit_compiler = 1', fs)
+        self.assertIn('; JIT is on', win)
+        self.assertIn('cachesize=8192', win)
+
+    def test_python_launcher_written_beside_image_and_kept_on_change(self):
+        write_configs(self.image)
+        script = self.root / 'AmiWind-FS-UAE-launcher.py'
+        source = Path(__file__).resolve().parents[1] / 'tools/AmiWind-FS-UAE-launcher.py'
+        self.assertEqual(script.read_bytes(), source.read_bytes())
+        script.write_text('# edited\n', encoding='utf-8')
+        write_configs(self.image)
+        self.assertEqual(script.read_bytes(), source.read_bytes())
+        self.assertEqual(script.with_name(script.name + '.bak').read_text(encoding='utf-8'), '# edited\n')
+
+    def test_second_run_is_idempotent_without_backups(self):
+        write_configs(self.image)
+        write_configs(self.image)
+        self.assertEqual(list(self.root.glob('*.bak*')), [])
 
 
 if __name__ == '__main__':

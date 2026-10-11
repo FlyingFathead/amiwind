@@ -113,10 +113,11 @@ int AW_CombatBestAttackPlayer(const aw_fighter_t *f) {
     return AW_ATTACK_CHOP;
 }
 /* Can the victim block at all: a shield with a one-handed weapon (fists and
- * two-handed weapons hide it), facing the attacker, not down, staggered,
+ * two-handed weapons hide it), ready to block (block_off: the player not guarding
+ * under the AmiWind held block), facing the attacker, not down, staggered,
  * swinging or dead (combat.cpp blockMeleeAttack, npcanimation.cpp). */
 int AW_CombatCanBlock(const aw_combat_settings_t *s,const aw_fighter_t *v,float angle) {
-    if(!v->shield || AW_TWO_HANDED(v->weapon) || v->knocked || v->staggered || v->attacking || v->dead)return 0;
+    if(!v->shield || v->block_off || AW_TWO_HANDED(v->weapon) || v->knocked || v->staggered || v->attacking || v->dead)return 0;
     return angle>=s->fCombatBlockLeftAngle && angle<=s->fCombatBlockRightAngle;
 }
 static float ratio(float now,float most) {return most>0?(now>0?now/most:0):1;}

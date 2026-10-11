@@ -7,6 +7,7 @@
 
 - [Public source notice](#public-source-notice)
 - [The CHIM engine (from v0.0.33)](#the-chim-engine-from-v0033)
+- [Owner decision: upstream AmiQuake assembly, 10 October 2026](#owner-decision-upstream-amiquake-assembly-10-october-2026)
 - [Renderer adoption review, 27 September 2026](#renderer-adoption-review-27-september-2026)
 - [Acknowledgements](#acknowledgements)
 - [Primary references](#primary-references)
@@ -92,6 +93,31 @@ files is GPLv3.
   the AmiQuake authors, Bethesda Softworks or ZeniMax. "CHIM" is a word from
   Morrowind's lore, used here as the name of a free fan engine.
 
+## Owner decision: upstream AmiQuake assembly, 10 October 2026
+
+AmiWind adopts upstream AmiQuake's own licence reading for its 68k assembly: the port and every file in it are GPL v2
+"as per original Quake source code license"; NovaCoder's AmiQuake is a port of GPL Quake, and the routines recovered
+from its v1.36 binary are published by upstream as readable, commented source. This replaces the 27 September 2026
+exclusion below. The files concerned: `d_scan_68k.s`, `d_scan_68k_nofpu.s`, `mathlib_68k.s`, `c2p8.s` (credited to
+NovaCoder's original AmiQuake, recovered and ported by Stephen Leary) and `fixedpoint_asm.s` (Stephen Leary). They are
+measured against AmiWind's C paths before any of them ships, kept under their GPL v2 terms with their notices, and the
+C paths stay selectable ([ENGINE-UPSTREAM-ASM-UNUSED-36](bugs/ENGINE-UPSTREAM-ASM-UNUSED-36.md)).
+
+Since 10 October 2026 the five files are in the source tree, linked only by the experimental `upstream` engine
+profile ([ENGINE_PROFILES.md](ENGINE_PROFILES.md)); the default `c` profile links none of them:
+
+| File in `engine/aga/src` | Credit | Linked by the `upstream` profile |
+| --- | --- | --- |
+| `c2p8.s` | NovaCoder's original AmiQuake chunky-to-planar routine, recovered and ported by Stephen Leary | yes |
+| `d_scan_68k.s` | NovaCoder's original AmiQuake span routines, recovered and ported by Stephen Leary | yes (its turbulent span loop) |
+| `d_scan_68k_nofpu.s` | Stephen Leary, after NovaCoder's FPU version | the 68020 build only |
+| `fixedpoint_asm.s` | Stephen Leary | the 68020 build only |
+| `mathlib_68k.s` | NovaCoder's original AmiQuake maths routine, recovered and adapted by Stephen Leary | no (selectable) |
+
+Each file starts with a header naming upstream AmiQuake (TerribleFire's GCC port), the file and revision
+`9c62d905151614af3e788ae3145a0d4ecc8a7bb8`; below it the text is upstream's, except five lines marked `AmiWind:` in
+the two span files that assemble to the same machine code.
+
 ## Renderer adoption review, 27 September 2026
 
 | Source | Observed licence/provenance | Current decision |
@@ -99,7 +125,7 @@ files is GPLv3.
 | OpenMW | Repository declares GPLv3; review individual reused files/dependencies | Suitable candidate for a GPL host exporter; current converters are standalone; opening captures and reference checks run OpenMW externally, with no OpenMW source bundled |
 | id Software Quake | Inspected engine headers grant GPL v2 or later | Reusable engine foundation under applicable GPL terms; preserve id Software notices |
 | terriblefire/AmiQuake | README declares GPLv2 for port additions; inherited `r_main.c`, `d_scan.c`, `vid_amiga.c` headers say v2 or later | Review selected modifications before combining with GPLv3-only code; keep a separately licensed runtime option |
-| `src/c2p8.s` and `src/d_scan_68k.s` in that fork | Comments identify code extracted from NovaCoder's v1.36 binary; README asserts GPL compliance | Excluded from the AmiWind release build; independent C2P and GPL C spans are selected |
+| `src/c2p8.s` and `src/d_scan_68k.s` in that fork | Comments identify code extracted from NovaCoder's v1.36 binary; README asserts GPL compliance | Excluded from the AmiWind release build; independent C2P and GPL C spans are selected. **Superseded 10 October 2026** (owner decision, below) |
 | PyFFI | External Niftools dependency, package classifier identifies BSD licence | Not vendored; retain its licence if a later tool bundle distributes it |
 
 GPLv2-only and GPLv3 code should not be treated as interchangeable. The
@@ -133,6 +159,14 @@ Created by **FlyingFathead a.k.a. Horstator**. Thanks to **ChaosWhisperer**.
   above; this acknowledgement does not claim reuse of the excluded routines.
 - Timo Heimonen for the Hunter 68060 performance-patch study.
 - The Niftools/PyFFI developers for the external static-model reader.
+- Arseny Kapoulkine for [meshoptimizer](https://github.com/zeux/meshoptimizer) (MIT): its mesh simplifier
+  (v1.3, `src/simplifier.cpp`, `src/allocator.cpp`, `src/meshoptimizer.h`) is vendored unchanged in
+  `third_party/meshoptimizer` with its licence, compiled on the build host and used by the CHIM mesh method
+  `meshopt+merge` ([mesh methods](chim/MESH_METHODS.md)). It is a host build tool: nothing of it is linked
+  into the Amiga runtime.
+- Michael Garland and Paul S. Heckbert, "Surface Simplification Using Quadric Error Metrics" (SIGGRAPH
+  1997), the method of AmiWind's own boundary-locked reducer; Stefan Hertel and Kurt Mehlhorn's convex
+  partition, the method of AmiWind's own planar merge. Both are AmiWind implementations, not copies.
 - vasm, amitools and FS-UAE contributors for the separately installed build and
   validation tools. These acknowledgements do not imply endorsement.
 
@@ -149,7 +183,7 @@ Created by **FlyingFathead a.k.a. Horstator**. Thanks to **ChaosWhisperer**.
 
 External tools recorded for AGA development include the pinned AmigaPorts GCC SDK,
 ericw-tools 0.18.1 (GPLv3 host tools), id Software Quake-Tools qcc (GPLv2-or-later),
-fast-simplification 0.2.0 (MIT), SciPy (BSD), and NumPy (BSD). They are not linked
+fast-simplification 0.2.0 (MIT), meshoptimizer 1.3 (MIT, vendored, see above), SciPy (BSD), and NumPy (BSD). They are not linked
 into the Amiga runtime. The default readable interface glyphs are original AmiWind 5x7 bitmap designs
 in an 8x8 atlas. The unchanged optional retro atlas is generated locally from
 the host DejaVu Sans Mono font. No Amiga ROM/system font is extracted and no

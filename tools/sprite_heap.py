@@ -78,13 +78,20 @@ def estimate_sprite(raw,sizes):
             'temporary_input_bytes':temporary,
             'input_loader_mode':'streamed' if sizes.get('sprite_streaming',0) else 'staged'}
 
-def inspect_sprites(entity_bytes,asset_root,sizes):
+def inspect_sprites(entity_bytes,asset_root,sizes,static_limit=None):
+    """static_limit: the engine's MAX_STATIC_ENTITIES when the caller read it once for many maps
+    (engine_limits.limits() reads eight engine headers: per map it was a quarter of the world map
+    heap audit, BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36); None reads it here."""
     instances=[];signon=0;entity_count=0
+    # wide coordinates (the default, coord_range): three more bytes per baseline or static entity (its
+    # origin goes as three MSG_WriteCoord); aw_flora sends floats and is the same in both ranges
+    from coord_range import extra_baseline_bytes
+    wide=extra_baseline_bytes()
     for block in re.findall(rb'\{[^{}]*\}',entity_bytes):
         ent={a.decode('cp1252'):b.decode('cp1252') for a,b in re.findall(rb'"([^"\n]+)"\s+"([^"\n]*)"',block)}
         entity_count+=1
         classname=ent.get('classname','')
-        signon += 33 if classname=='aw_flora' else 14 if classname=='aw_static' else 16
+        signon += 33 if classname=='aw_flora' else (14 if classname=='aw_static' else 16)+wide
         model=ent.get('model','')
         if not model.lower().endswith('.spr'):continue
         p=PurePosixPath(model)
@@ -96,8 +103,10 @@ def inspect_sprites(entity_bytes,asset_root,sizes):
             if not math.isfinite(scale) or scale<=0:raise ValueError('Invalid flora scale')
         instances.append(model)
     # The engine's static entity budget (client.h MAX_STATIC_ENTITIES, tools/engine_limits.py).
-    from engine_limits import limits as engine_limits
-    if len(instances)>engine_limits()['max_static_entities']:raise ValueError('Static sprite entity limit exceeded')
+    if static_limit is None:
+        from engine_limits import limits as engine_limits
+        static_limit=engine_limits()['max_static_entities']
+    if len(instances)>static_limit:raise ValueError('Static sprite entity limit exceeded')
     # Reserve room for player/world baselines and signon control messages.
     # Count even model-less map records conservatively; no content is omitted.
     signon += 1024
@@ -139,72 +148,170 @@ def efrag_pool_profile(source):
     return values
 
 
-def inspect_efrags(table,sprites,sizes,policy):
-    """Replay static bounds against world BSP planes; charge only extra pages.
+# Static entity leaf-link replay (inspect_efrags): 'vector' walks every static entity through the BSP at
+# once with float32 arrays (numpy), 'python' is the earlier per-entity walk (kept, selectable with
+# AMIWIND_HEAP_AUDIT_METHOD=python or method='python', which also selects the earlier edge-cache prefix
+# loop, edge_cache_heap.prefix; both give the same report: tests/test_sprite_heap.py, and every map of
+# the dev5 full build). The per-entity walk was half of the world map heap audit
+# (BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36).
+EFRAG_METHODS=('vector','python')
 
-    The base pool is existing process BSS. Every overflow page has a next
-    pointer followed by efrags, plus Hunk payload alignment and its header.
-    Model loading precedes client static linking; no frame allocates pages.
-    """
+def efrag_method(method=None):
+    import os
+    method=method or os.environ.get('AMIWIND_HEAP_AUDIT_METHOD') or 'vector'
+    if method not in EFRAG_METHODS:raise ValueError('Unknown heap audit method: '+method)
+    return method
+
+def _static_bounds(table,sprites,policy):
+    """[(lo, hi)] per static entity (float32 values as Python floats), in entity order."""
     statics=[]
     for block in re.findall(rb'\{[^{}]*\}',table['entities']):
         ent={a.decode('cp1252'):b.decode('cp1252') for a,b in re.findall(rb'"([^"\n]+)"\s+"([^"\n]*)"',block)}
         if ent.get('classname') in ('aw_static','aw_flora'):statics.append(ent)
     if len(statics)>policy['max_statics']:raise ValueError('Static entity limit exceeded')
+    bounds=[]
+    if not statics:
+        return bounds
+    models=list(struct.iter_unpack('<9f7i',table['models']))
+    radii={a['model']:a['bounding_radius'] for a in sprites['sprite_assets']}
+    for ent in statics:
+        origin=[float32(float(v)) for v in ent.get('origin','0 0 0').split()]
+        scale=float32(float(ent['aw_scale'])) if ent['classname']=='aw_flora' else 1
+        if len(origin)!=3 or not all(math.isfinite(v) for v in origin) or not math.isfinite(scale) or scale<=0:
+            raise ValueError('Invalid static pose/scale for efrag estimate')
+        if ent['classname']=='aw_static':
+            # Legacy MSG_WriteCoord/MSG_ReadCoord uses signed 1/8 units.
+            origin=[((int(v*8)+32768)%65536-32768)/8 for v in origin]
+        model=ent.get('model','')
+        if model in radii:
+            extent=float32(radii[model]*scale)
+            lo=[float32(v-extent) for v in origin];hi=[float32(v+extent) for v in origin]
+        elif re.fullmatch(r'\*\d+',model) and int(model[1:])<len(models):
+            box=models[int(model[1:])]
+            lo=[float32(v+b-1) for v,b in zip(origin,box[:3])]
+            hi=[float32(v+b+1) for v,b in zip(origin,box[3:6])]
+        else:raise ValueError('Unsupported static model bounds for efrag estimate: '+model)
+        if not all(math.isfinite(v) for v in lo+hi):raise ValueError('Nonfinite static bounds')
+        bounds.append((lo,hi))
+    return bounds
+
+def _links_python(bounds,nodes,leaves,planes,policy):
+    """The earlier walk: one entity at a time, float32 rounding by struct (method 'python')."""
     required=0
-    if statics:
+    for lo,hi in bounds:
+        stack=[0];visits=0
+        while stack:
+            node=stack.pop();visits+=1
+            if visits>2*(len(nodes)+len(leaves))+1:raise ValueError('Cyclic/shared BSP traversal in efrag estimate')
+            if node<0:
+                leaf=-1-node
+                if leaf>=len(leaves):raise ValueError('Invalid BSP leaf in efrag estimate')
+                if leaves[leaf][0]!=-2:required+=1
+                if required>policy['max_links']:raise ValueError('Static entity leaf-link limit exceeded: '+str(required))
+                continue
+            if node>=len(nodes):raise ValueError('Invalid BSP node in efrag estimate')
+            row=nodes[node]
+            if not 0<=row[0]<len(planes):raise ValueError('Invalid BSP plane in efrag estimate')
+            p=planes[row[0]];axis=p[4];distance=p[3]
+            if 0<=axis<3:sides=1 if distance<=lo[axis] else 2 if distance>=hi[axis] else 3
+            else:
+                near=[hi[i] if p[i]>=0 else lo[i] for i in range(3)]
+                far=[lo[i] if p[i]>=0 else hi[i] for i in range(3)]
+                high=float32(float32(float32(p[0]*near[0])+float32(p[1]*near[1]))+float32(p[2]*near[2]))
+                low=float32(float32(float32(p[0]*far[0])+float32(p[1]*far[1]))+float32(p[2]*far[2]))
+                sides=(1 if high>=distance else 0)|(2 if low<distance else 0)
+            if sides&2:stack.append(row[2])
+            if sides&1:stack.append(row[1])
+    return required
+
+_NODE=_PLANE=_LEAF=None
+
+def _links_vector(bounds,table,node_count,leaf_count,plane_count,policy):
+    """Every entity walks the BSP at once: a frontier of (entity, node) pairs, one array step per tree level.
+
+    Same rounding as the per-entity walk: every operand is a float32 value and each product and sum is
+    rounded to float32 once; numpy's float32 arithmetic is correctly rounded, and the earlier walk's
+    binary64 result of binary32 operands rounded to binary32 is the same value (53 >= 2 x 24 + 2).
+    Comparisons are on the same values. The leaf-link count does not depend on the visiting order: for
+    valid maps the report is the same; for broken ones the same checks raise (which fault is named
+    first may differ when a map has several)."""
+    import numpy as np
+    global _NODE,_PLANE,_LEAF
+    if _NODE is None:
+        _NODE=np.dtype([('plane','<i4'),('c0','<i2'),('c1','<i2'),('box','<i2',(6,)),('faces','<u2',(2,))])
+        _PLANE=np.dtype([('normal','<f4',(3,)),('dist','<f4'),('type','<i4')])
+        _LEAF=np.dtype([('contents','<i4'),('rest','V24')])
+    node_rows=np.frombuffer(table['nodes'],dtype=_NODE,count=node_count)
+    plane_rows=np.frombuffer(table['planes'],dtype=_PLANE,count=plane_count)
+    contents=np.frombuffer(table['leafs'],dtype=_LEAF,count=leaf_count)['contents']
+    node_plane=node_rows['plane'].astype(np.int64)
+    child0=node_rows['c0'].astype(np.int64);child1=node_rows['c1'].astype(np.int64)
+    normal=np.ascontiguousarray(plane_rows['normal']);dist=plane_rows['dist'].copy();kind=plane_rows['type'].copy()
+    lo=np.array([b[0] for b in bounds],dtype=np.float32);hi=np.array([b[1] for b in bounds],dtype=np.float32)
+    count=len(bounds)
+    entity=np.arange(count,dtype=np.int64);node=np.zeros(count,dtype=np.int64)
+    visits=np.zeros(count,dtype=np.int64);visit_limit=2*(node_count+leaf_count)+1
+    required=0
+    while entity.size:
+        visits+=np.bincount(entity,minlength=count)
+        if (visits>visit_limit).any():raise ValueError('Cyclic/shared BSP traversal in efrag estimate')
+        leaf=node<0
+        if leaf.any():
+            index=-1-node[leaf]
+            if (index>=leaf_count).any():raise ValueError('Invalid BSP leaf in efrag estimate')
+            required+=int(np.count_nonzero(contents[index]!=-2))
+            if required>policy['max_links']:
+                # the per-entity walk stops at the first link over the limit
+                raise ValueError('Static entity leaf-link limit exceeded: '+str(policy['max_links']+1))
+            inner=~leaf
+            entity=entity[inner];node=node[inner]
+            if not entity.size:break
+        if (node>=node_count).any():raise ValueError('Invalid BSP node in efrag estimate')
+        plane=node_plane[node]
+        if ((plane<0)|(plane>=plane_count)).any():raise ValueError('Invalid BSP plane in efrag estimate')
+        axis=kind[plane];distance=dist[plane]
+        sides=np.empty(entity.size,dtype=np.int8)
+        axial=(axis>=0)&(axis<3)
+        if axial.any():
+            where=np.flatnonzero(axial);a=axis[where].astype(np.int64);e=entity[where];d=distance[where]
+            sides[where]=np.where(d<=lo[e,a],1,np.where(d>=hi[e,a],2,3))
+        if not axial.all():
+            where=np.flatnonzero(~axial);e=entity[where];n=normal[plane[where]];d=distance[where]
+            positive=n>=0
+            near=np.where(positive,hi[e],lo[e]);far=np.where(positive,lo[e],hi[e])
+            high=(n[:,0]*near[:,0]+n[:,1]*near[:,1])+n[:,2]*near[:,2]
+            low=(n[:,0]*far[:,0]+n[:,1]*far[:,1])+n[:,2]*far[:,2]
+            sides[where]=np.where(high>=d,1,0)|np.where(low<d,2,0)
+        back=(sides&2)!=0;front=(sides&1)!=0
+        entity=np.concatenate((entity[back],entity[front]))
+        node=np.concatenate((child1[node[back]],child0[node[front]]))
+    return required
+
+def inspect_efrags(table,sprites,sizes,policy,method=None):
+    """Replay static bounds against world BSP planes; charge only extra pages.
+
+    The base pool is existing process BSS. Every overflow page has a next
+    pointer followed by efrags, plus Hunk payload alignment and its header.
+    Model loading precedes client static linking; no frame allocates pages.
+    method: 'vector' (default) or 'python' (EFRAG_METHODS; env AMIWIND_HEAP_AUDIT_METHOD).
+    """
+    method=efrag_method(method)
+    bounds=_static_bounds(table,sprites,policy)
+    required=0
+    if bounds:
         nodes=list(struct.iter_unpack('<i2h6h2H',table['nodes']))
         leaves=list(struct.iter_unpack('<ii6h2H4B',table['leafs']))
         planes=list(struct.iter_unpack('<4fi',table['planes']))
-        models=list(struct.iter_unpack('<9f7i',table['models']))
-        radii={a['model']:a['bounding_radius'] for a in sprites['sprite_assets']}
-        for ent in statics:
-            origin=[float32(float(v)) for v in ent.get('origin','0 0 0').split()]
-            scale=float32(float(ent['aw_scale'])) if ent['classname']=='aw_flora' else 1
-            if len(origin)!=3 or not all(math.isfinite(v) for v in origin) or not math.isfinite(scale) or scale<=0:
-                raise ValueError('Invalid static pose/scale for efrag estimate')
-            if ent['classname']=='aw_static':
-                # Legacy MSG_WriteCoord/MSG_ReadCoord uses signed 1/8 units.
-                origin=[((int(v*8)+32768)%65536-32768)/8 for v in origin]
-            model=ent.get('model','')
-            if model in radii:
-                extent=float32(radii[model]*scale)
-                lo=[float32(v-extent) for v in origin];hi=[float32(v+extent) for v in origin]
-            elif re.fullmatch(r'\*\d+',model) and int(model[1:])<len(models):
-                bounds=models[int(model[1:])]
-                lo=[float32(v+b-1) for v,b in zip(origin,bounds[:3])]
-                hi=[float32(v+b+1) for v,b in zip(origin,bounds[3:6])]
-            else:raise ValueError('Unsupported static model bounds for efrag estimate: '+model)
-            if not all(math.isfinite(v) for v in lo+hi):raise ValueError('Nonfinite static bounds')
-            stack=[0];visits=0
-            while stack:
-                node=stack.pop();visits+=1
-                if visits>2*(len(nodes)+len(leaves))+1:raise ValueError('Cyclic/shared BSP traversal in efrag estimate')
-                if node<0:
-                    leaf=-1-node
-                    if leaf>=len(leaves):raise ValueError('Invalid BSP leaf in efrag estimate')
-                    if leaves[leaf][0]!=-2:required+=1
-                    if required>policy['max_links']:raise ValueError('Static entity leaf-link limit exceeded: '+str(required))
-                    continue
-                if node>=len(nodes):raise ValueError('Invalid BSP node in efrag estimate')
-                row=nodes[node]
-                if not 0<=row[0]<len(planes):raise ValueError('Invalid BSP plane in efrag estimate')
-                p=planes[row[0]];axis=p[4];distance=p[3]
-                if 0<=axis<3:sides=1 if distance<=lo[axis] else 2 if distance>=hi[axis] else 3
-                else:
-                    near=[hi[i] if p[i]>=0 else lo[i] for i in range(3)]
-                    far=[lo[i] if p[i]>=0 else hi[i] for i in range(3)]
-                    high=float32(float32(float32(p[0]*near[0])+float32(p[1]*near[1]))+float32(p[2]*near[2]))
-                    low=float32(float32(float32(p[0]*far[0])+float32(p[1]*far[1]))+float32(p[2]*far[2]))
-                    sides=(1 if high>=distance else 0)|(2 if low<distance else 0)
-                if sides&2:stack.append(row[2])
-                if sides&1:stack.append(row[1])
+        if method=='python':
+            required=_links_python(bounds,nodes,leaves,planes,policy)
+        else:
+            required=_links_vector(bounds,table,len(nodes),len(leaves),len(planes),policy)
     pages=(max(0,required-policy['base_links'])+policy['page_links']-1)//policy['page_links']
     payload=sizes['pointer']+policy['page_links']*sizes['efrag'] if pages else 0
     if pages and sizes.get('efrag_page',payload)!=payload:
         raise ValueError('Target efrag page layout does not match allocation policy')
     page_bytes=allocation(payload,sizes['hunk']) if pages else 0
-    return {**policy,'static_entities':len(statics),'required_links':required,'overflow_pages':pages,
+    return {**policy,'static_entities':len(bounds),'required_links':required,'overflow_pages':pages,
             'page_payload_bytes':payload,'page_alignment_bytes':(-payload)%16 if pages else 0,
             'page_hunk_header_bytes':sizes['hunk'] if pages else 0,'page_hunk_bytes':page_bytes,
             'resident_hunk_bytes':pages*page_bytes,'allocated_links':policy['base_links']+pages*policy['page_links'],

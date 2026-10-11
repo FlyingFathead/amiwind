@@ -61,6 +61,14 @@ def reduce_for_profile(vertices, faces, profile, materials=None, name='mesh'):
             if not matched:
                 raise ValueError('Missing preserved structural shape in ' + name)
             keep |= matched
+    if profile.get('reducer') == 'meshopt':
+        # CHIM mesh method meshopt+merge (config/mesh-methods.json, docs/chim/MESH_METHODS.md): meshoptimizer's
+        # simplifier per material with locked borders (tools/meshopt.py); the default reducer stays below
+        from meshopt import simplify_locked
+        rv, rf = simplify_locked(np.asarray(vertices, float), np.asarray(faces), ratio, keep)
+        return rv, rf, {'reducer': 'meshopt', 'reduced_triangles': int(len(rf))}
+    if profile.get('reducer', 'default') != 'default':
+        raise ValueError('Unknown reducer: %s' % profile['reducer'])
     return reduce_mesh(vertices, faces, ratio, keep, **profile_reduction(profile))
 
 

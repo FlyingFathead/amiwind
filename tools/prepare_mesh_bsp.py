@@ -167,7 +167,13 @@ def _prepare_model(task):
     else:
         budget = scenery_reduce.snap_budget()
         stats = {}
-        polys = surface_polygons(visual_v, visual_f, snap=None if budget is None else budget[0]/texsize, stats=stats)
+        if profile.get('faces') == 'merge' and budget is None:
+            # CHIM mesh methods merge / meshopt+merge (planar_merge.py): the merged faces when they are fewer;
+            # returned already split at 240 texels, so the split below leaves them as they are
+            from planar_merge import polygons as merged_polygons
+            polys, lod['faces'] = merged_polygons(visual_v, visual_f, texsize)
+        else:
+            polys = surface_polygons(visual_v, visual_f, snap=None if budget is None else budget[0]/texsize, stats=stats)
         if budget is not None:
             lod['texinfo_snap'] = {'tolerance_texels': budget[0], 'triangles': stats.get('triangles', 0),
                                    'mapping_clusters': stats.get('mapping_clusters', 0),

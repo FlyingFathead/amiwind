@@ -20,6 +20,7 @@
 - [Build 020: sub-cell cuts and divider](#build-020-sub-cell-cuts-and-divider)
   - [Overlay format `aw-cuts-1`](#overlay-format-aw-cuts-1)
   - [Sub-cell divider](#sub-cell-divider)
+- [CHIM maps and CHIM worlds](#chim-maps-and-chim-worlds)
 
 <!-- contents end -->
 
@@ -43,13 +44,20 @@ animation scheduler. Shader and runtime errors appear in the viewport.
 Open `amiwind-toolkit/map-inspector.html` (or the toolkit page,
 `amiwind-toolkit/index.html`) in a desktop browser with WebGL enabled.
 This standalone tool needs no server, package install, CDN or network access.
-Click **Open local BSP / scene JSON** and choose a locally converted Quake BSP
-version 29. **Synthetic cube** supplies a tiny asset-free demonstration.
+Click **Open BSP / CHIM / JSON** and choose a locally converted Quake BSP
+version 29, a CHIM map (`.chim`) or an exported scene; **Open CHIM world** (left)
+reads a build's CHIM world ([CHIM maps and CHIM worlds](#chim-maps-and-chim-worlds)).
+**Synthetic cube** supplies a tiny asset-free demonstration.
 
 The viewport shows actual compiled polygon edges. Fly with **WASD**, use **E/Q**
-to ascend/descend, **Shift** for double speed, **Ctrl** for fast flight and the
-left/right arrows to turn. These key assignments follow AmiWind's default
-`keymaps-default.cfg` and `cl_input.c`. **Enter mouse look** captures the cursor;
+to ascend/descend and the left/right arrows to turn; hold **Shift** to fly 4x
+faster, **Ctrl** or **Alt** to fly 4x slower. The **Speed** slider sets the
+flying speed from 0.05x to 4x (logarithmic, default 1x, shown next to it) of a
+base speed scaled to the size of the loaded map, so a small room and a whole
+town frame both fly at a usable pace; the browser remembers it. The movement
+keys follow AmiWind's default `keymaps-default.cfg` and `cl_input.c`. The orbit,
+zoom and speed controls are shared with [Mesh Compare](AMIWIND_TOOLKIT.md#mesh-compare)
+(`amiwind-toolkit/view-camera.js`). **Enter mouse look** captures the cursor;
 **Escape** releases it. Alternatively drag to look. Scroll changes the field of
 view without moving the camera; **Overview** resets it. This is a noclip
 inspection camera, not an exact simulation of game movement or collision.
@@ -653,3 +661,40 @@ The browser check on `bm019` covered drawing in both views, hover text,
 overhead drag with one undo level and no pan or selection, export and import
 round trips, and a two-section plan accepted by `region_cuts.py check --plan`.
 GPU appearance on other machines is unverified.
+
+## CHIM maps and CHIM worlds
+
+Build 021 (v0.0.36) reads CHIM data with its own reader, `amiwind-toolkit/chim-reader.js`, next to the
+Quake BSP reader. It is a port of the builder's reader (`tools/chim/format.py`) and of the CHIM heap gate's
+ring model (`tools/chim/heap.py`); `tests/test_toolkit_chim.py` checks it against them. The file types are
+in [CHIM world format: file types](chim/WORLD_FORMAT.md#file-types).
+
+- **A CHIM map (`.chim`)** is a CHIM area's map: its entities and the `"_chim_frame"` key that names its
+  frame, with no ground or objects of its own. The inspector shows the frame bounds, the collision-only
+  clip walls and every point entity as a marker, and says which CHIM frame holds the geometry. A file
+  named `.bsp` whose worldspawn has `"_chim_frame"` (a frame map of a build before v0.0.36) is read the
+  same way, never as a Quake map. Its layout today is BSP29-shaped; a CHIM map with another layout is
+  refused with a message ([.chim map format](chim/CHIM_MAP_FORMAT.md)).
+- **Open CHIM world** takes the build's `chim-world` folder (or its `chim` folder, or a zip of either;
+  zip64 archives are not read). Only the files a frame needs are read: the index, the frame file, its
+  sector files and the sector files of other frames that hold its terrain records, models or textures.
+  `?world=<url>&frame=frames/x-03/y-02` opens a world served over HTTP.
+- **Frame** lists the frames, worst headroom first when a `chim-heap.json` is in the folder (or loaded
+  with **Heap report**). **Show frame** draws each chunk's ground (terrain references placed where the
+  engine grafts them) and every placement (owned records; a reach copy is the same placement), in
+  frame-local units, with the textures. Selecting an object shows its CHIM facts: the chunk's record
+  bytes, render and collision parts, terrain reference and zone block; a placement's model, record
+  bytes and zone block.
+- **Memory overlay.** The page recomputes the heap gate's active ring at every position of the gate's
+  64-unit grid and colours the ground: green below 80 % of the CHIM zone budget, yellow to 90 %,
+  orange to 100 %, red over it. The report's peak and load-ring peak are marked. **Pick ring position**
+  (then click the ground; From above is exact) or **Ring here** with X and Y shows one position's ring:
+  its chunks outlined, and its bytes as chunks + models + textures against the budget, with the largest
+  models. The zone block sizes use the target ABI sizes; load the image's `world-map-heap.json` with
+  **Target sizes** to use the build's own (the page's defaults are labelled as such). The panel says
+  whether the recomputed peak matches the report.
+
+Asset-free checks: `python3 -m unittest tests/test_toolkit_chim.py` (synthetic CHIM worlds with and
+without terrain references, built by `tools/chim`: the same records, byte counts, zone blocks and ring
+scan as the Python reader and the heap gate; the CHIM map reader; the page's CHIM code with stubbed DOM
+and WebGL). GPU appearance is unverified by the tests.

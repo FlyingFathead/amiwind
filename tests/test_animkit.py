@@ -47,8 +47,8 @@ class Console(unittest.TestCase):
 
     def test_command_is_registered_catalogued_and_ticked(self):
         catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
-        self.assertRegex(catalogue, r'(?m)^PLAYTESTING\|animkit\|aw_animkit\|\[on/off / list / play <group> / stop')
-        self.assertIn('Cmd_AddCommand("aw_animkit",command);', (SRC / 'aw_animkit.c').read_text(encoding='utf-8'))
+        self.assertRegex(catalogue, r'(?m)^PLAYTESTING\|animkit\|aw_animkit_cmd\|\[on/off / list / play <group> / stop')
+        self.assertIn('Cmd_AddCommand("aw_animkit_cmd",command);', (SRC / 'aw_animkit.c').read_text(encoding='utf-8'))
         self.assertIn('AW_AnimKitInit();', (SRC / 'aw_debug.c').read_text(encoding='utf-8'))
         self.assertIn('AW_AnimKitTick();', (SRC / 'host.c').read_text(encoding='utf-8'))
         makefile = (ROOT / 'engine/aga/Makefile').read_text(encoding='utf-8')
@@ -57,8 +57,8 @@ class Console(unittest.TestCase):
 
 class Preset(unittest.TestCase):
     def test_animkit_sandbox_row(self):
-        rows = json.loads((ROOT / 'config/miniwind-presets.json').read_text(encoding='utf-8'))['presets']
-        row = next(r for r in rows if r['name'] == 'animkit')
+        import miniwind_presets
+        row = miniwind_presets.find('animkit')  # the recipe config/recipes/miniwind/animkit.json
         self.assertEqual(row['scope'], 'exterior')
         self.assertEqual(row['start'], 'balmora')
         args = build.parser().parse_args(['--miniwind-animkit'])

@@ -98,18 +98,22 @@ class BrushLumps:
             self.lumps[6] += struct.pack('<8fii', *ax[:, 0], off[0], *ax[:, 1], off[1], t, flags)
         return self.texinfo[key]
 
-    def faces(self, surfaces, texture_of, flags_of=lambda s: 0, light_of=lambda s: None, plane_of=None):
+    def faces(self, surfaces, texture_of, flags_of=lambda s: 0, light_of=lambda s: None, plane_of=None, weld=None):
         """Append faces; surfaces: (q, n, ax, off, material, ...) with q counter-clockwise about n.
 
         Vertices are shared within this call (rounded to 1e-5), as within one
         placement of a region map; faces store them clockwise (q reversed).
+        weld: a point's position in the prepared mesh's own frame (base_frame): vertices are then
+        shared where they are shared in that frame, so every variant of a mesh (any scale or
+        tilt) has the vertices and edges of its base (CHIM-STRIDER-SCALED-SEAMS-36). None: shared
+        by the placed position, as a region map does.
         Returns (firstface, numfaces)."""
         lumps = self.lumps
         first = len(lumps[7]) // 20
         vmap, emap = {}, {}
 
         def vertex(p):
-            key = tuple(np.round(p, 5))
+            key = tuple(np.round(p if weld is None else weld(p), 5))
             if key not in vmap:
                 vmap[key] = len(lumps[3]) // 12
                 lumps[3] += struct.pack('<3f', *p)
@@ -153,7 +157,15 @@ class BrushLumps:
         from prepare_mesh_bsp import standing_planes
         lumps = self.lumps
         if not pieces:
-            return -EMPTY_LEAF_INDEX - 1, -1
+            # No collision (e.g. a render-only tile of a cut model): one real point-hull node whose both
+            # sides are the empty leaf. The engine reads headnode[0] as hull 0's first clipnode, so a leaf
+            # root would be read as contents (-2 = solid) and an empty node lump is refused on load
+            # (model.c Mod_LoadNodes); CHIM-EMPTY-POINT-HULL-36.
+            noderoot = len(lumps[5]) // 24
+            if point_hull:
+                empty = -EMPTY_LEAF_INDEX - 1
+                lumps[5] += struct.pack('<ihh6h2H', self.plane((0., 0., 1.), 0.), empty, empty, *[0] * 6, 0, 0)
+            return noderoot, -1
         roots, noderoots = [], []
         for k, (points, hull, ids, error) in enumerate(pieces):
             point_eq = np.unique(np.round(hull.equations, 5), axis=0)
@@ -242,7 +254,7 @@ def hull_pieces(parts):
 
 
 def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled=None, entities=b'',
-                      hull=None, report=None):
+                      hull=None, report=None, weld=None):
     """Lumps of one shared model (faces, collision chain, dmodel) and its texture list.
 
     texture_of(material) gives a global texture id or a texture key; the
@@ -251,9 +263,10 @@ def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled
     (every piece in one chain, as the converters wrote it before), 'routed' / 'balanced' (axial routing
     over the model's box, routed_hull.routing: the same solid set, short chains) or 'auto' (routed for
     more than MODEL_ROUTE_PIECES pieces; the chain when the routing exceeds the clipnode budget). The
-    variant unit compiles a large model's hull with qbsp when it can (variant_unit)."""
+    variant unit compiles a large model's hull with qbsp when it can (variant_unit). weld: BrushLumps.faces'
+    (the variant's base frame, base_frame)."""
     w = BrushLumps()
-    first, num = w.faces(surfaces, texture_of)
+    first, num = w.faces(surfaces, texture_of, weld=weld)
     pieces = hull_pieces(parts)
     from routed_hull import CHIM_ROUTE_PIECES, wants_route
     if hull is None:
@@ -282,7 +295,7 @@ def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled
                 raise
             # too many parts for the routing: the chain, as the legacy converter writes it
             w = BrushLumps()
-            first, num = w.faces(surfaces, texture_of)
+            first, num = w.faces(surfaces, texture_of, weld=weld)
             nroot, croot = w.collider(pieces, exact, compiled)
     else:
         nroot, croot = w.collider(pieces, exact, compiled)
@@ -301,19 +314,65 @@ def _routed_model(w, surfaces, pieces, exact, lo, hi, first, num, entities, mode
     return w.finish(lo, hi, nroot, croot, first, num, entities), list(w.textures)
 
 
+MODEL_WELD = ('base', 'placed')
+
+
+def variant_ref(ref):
+    """The placement a variant is built from, without what the variant does not hold: an untilted variant leaves
+    the yaw to the entity (prepare_mesh_bsp._instance_key has no yaw for it), so its record is built at yaw 0.
+    Built at the first placement's own yaw instead, the variant's points carried that yaw's rounding (rotation
+    and its inverse are not exact in floating point), and the same variant from two frames with differently
+    turned first placements differed in the last bits of planes, texture vectors and vertices: stored twice
+    under one name (#2, island-wide 253 records, 5.15 MB in v0.0.36-dev3)."""
+    rot = ref['rotation_radians']
+    tilted = any(abs(math.sin(a)) > 1e-7 or math.cos(a) < 0 for a in rot[:2])
+    return ref if tilted or rot[2] == 0 else dict(ref, rotation_radians=[rot[0], rot[1], 0.0])
+
+
+def base_frame(ref, centre):
+    """A variant point back in its prepared mesh's own frame: the inverse of the placement transform of
+    prepare_mesh_bsp._prepare_placement (scale, tilt with the yaw removed, visual offset), or None when the
+    variant is not one rigid transform with one scale (a flattening shift moves each face along its own normal).
+
+    Every variant of a mesh is the same prepared mesh (one reduction) transformed. Sharing its vertices by the
+    placed position, rounded to 1e-5, decides differently at each scale and tilt: a pair of points 1e-6 apart
+    lands in one rounding cell at one scale and in two at another, so the variant gets an unshared vertex and
+    open edges its base does not have (island-wide 961 of 2,350 variants in v0.0.36-dev3, the Seyda Neen silt
+    strider 926 open edges against 898 at scale 1; CHIM-STRIDER-SCALED-SEAMS-36). Shared by the position in
+    this frame, every variant has its base's vertices and edges exactly."""
+    if ref.get('_flatten_shift', 0):
+        return None
+    from prepare_mesh_bsp import _placement_frame
+    from prepare_scenery import reference_rotation
+    _, rotation = _placement_frame(ref, centre)
+    r = rotation.T @ reference_rotation(ref)
+    scale = float(ref['scale'])
+    delta = r @ np.asarray(ref.get('_visual_offset', [0, 0, 0]), dtype=float) * scale
+    return lambda p: ((np.asarray(p, dtype=float) - delta) / scale) @ r
+
+
 def variant_unit(task):
     """One shared model variant from its prepared mesh (a pool worker; see chim.units).
 
     task: ref, data (prepare_mesh_bsp._prepare_model result), texsize, centre,
-    model (scenery index record), exact, hollow, qbsp, collision_cache."""
+    model (scenery index record), exact, hollow, qbsp, collision_cache; weld (MODEL_WELD, default
+    'base': built at yaw 0 when untilted (variant_ref) with vertices shared as in the base (base_frame);
+    'placed': at the first placement's yaw, vertices shared by the placed position, the method before
+    v0.0.36-dev3)."""
     from prepare_mesh_bsp import NO_EMISSIVE, _prepare_placement, flame_entities
     ref, model, centre, size = task['ref'], task['model'], task['centre'], task['texsize']
+    weld_mode = task.get('weld', 'base')
+    if weld_mode not in MODEL_WELD:
+        raise ValueError('Unknown model weld mode: %s' % weld_mode)
+    if weld_mode == 'base':
+        ref = variant_ref(ref)
     surfaces, parts, lo, hi = _prepare_placement((ref, task['data'], size, centre, None, False))
     keys = {}
     for s in surfaces:
         keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE, task.get('texture_shas'))
     compiled = None
     fallback = None
+    hull_check = None
     # A large model's standing hull is routed (model_image_lumps), not compiled by qbsp: a compiled union
     # takes more bytes than the chain, and every byte is in the ring (Balmora's south-west ring went
     # 136,160 B over the zone; BUILD-CHIM-HULL-RING-33). Mode 'compiled' keeps the qbsp union for large
@@ -322,16 +381,22 @@ def variant_unit(task):
     from routed_hull import CHIM_ROUTE_PIECES
     big = len(parts) > CHIM_ROUTE_PIECES and task.get('model_hull', model_hull_mode()) == 'compiled'
     if (task['exact'] or big) and task.get('qbsp') and parts:
-        from collision_bsp import compile_standing
+        from collision_bsp import compile_standing_checked
         try:
-            compiled = compile_standing(hull_pieces(parts), task['qbsp'], task['collision_cache'])
+            # the compiled union is checked against its pieces (CHIM-COMPILED-HULL-SHORT-36); pieces the compiler
+            # lost under a walkable top are patched in only with the build setting model_hull_patch (they cost
+            # zone bytes Balmora's ring does not have yet), otherwise the hull stays as compiled and the check
+            # is recorded
+            compiled, hull_check = compile_standing_checked(hull_pieces(parts), task['qbsp'], task['collision_cache'],
+                                                            patch=bool(task.get('hull_patch')))
         except ValueError as error:
             fallback = str(error)[-200:]
     local = dict(ref, position=[*centre, 0.0])
     flames = variant_flames(flame_entities(local, model, centre), local, centre)
     form = {}
+    weld = base_frame(ref, centre) if weld_mode == 'base' else None
     lumps, tkeys = model_image_lumps(surfaces, parts, lo, hi, lambda m: keys[m], task['exact'], compiled, flames,
-                                     hull='chain' if task.get('keep_chain') else None, report=form)
+                                     hull='chain' if task.get('keep_chain') else None, report=form, weld=weld)
     occluder_grid = None
     if task['hollow']:
         # hollow collision shells do not occlude; the closed render mesh does (CHIM-PVS-HOLLOW-33)
@@ -341,7 +406,7 @@ def variant_unit(task):
             'hi': [float(v) for v in hi], 'occluders': [] if task['hollow'] else [p for p, *_ in parts],
             'occluder_grid': occluder_grid,
             'materials': {k: m for m, k in keys.items()}, 'collision_fallback': fallback,
-            'hull_form': form.get('hull')}
+            'hull_form': form.get('hull'), **({'hull_check': hull_check} if hull_check else {})}
 
 
 def texture_unit(task):

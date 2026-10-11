@@ -3,7 +3,8 @@
   "builder": "chim",
   "chim_areas": [
     "balmora",
-    "seyda"
+    "seyda",
+    "vivec_city"
   ],
   "chim_texture_effects": [],
   "chim_lighting_type": "hybrid",
@@ -11,6 +12,7 @@
   "chim_stream_statics": true,
   "model_hull": "chain",
   "lava": "quake",
+  "world_map": "v2",
   "npc_lod": "off",
   "npc_lod_levels": 3,
   "npc_face_lod": "all",

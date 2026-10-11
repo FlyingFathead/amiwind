@@ -132,6 +132,11 @@ def unit_cache(scenery, palette):
     return cache, {key: sha256_file(path) if path.is_file() else None for key, path in names.items()}
 
 
+def chim_cells_of(baseline):
+    """The CHIM region cells the terrain stage made no map for (its receipt rows marked chim_region)."""
+    return {tuple(r['cell']) for r in baseline['regions'] if r.get('chim_region')}
+
+
 def prepare(terrain, scenery, palette, out, jobs, only=None):
     from mwad.paths import ensure_external
     terrain, scenery, palette = terrain.resolve(), scenery.resolve(), palette.resolve()
@@ -151,19 +156,32 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
     started = time.monotonic()
     results = []
     cache, shared = unit_cache(scenery, palette)
+    # CHIM region cells (docs/BUILD_MANIFEST.md step 2): the terrain stage made no map for them, so neither does this
+    # stage; their placements are in the CHIM world.
+    chim_cells = chim_cells_of(baseline)
+    made = [e for e in entries if not e.get('chim_region')]
+    rows = {}
     for result in ordered_map(convert_region_cached, [(terrain, scenery, palette, out, e, cache, shared)
-                                                      for e in entries], jobs):
-        results.append(result)
-        print(f"REGION {len(results)}/{len(entries)} {result['name']} references={result['instances']}", flush=True)
+                                                      for e in made], jobs):
+        rows[result['name']] = result
+        print(f"REGION {len(rows)}/{len(made)} {result['name']} references={result['instances']}", flush=True)
+    for e in entries:
+        if e.get('chim_region'):
+            rows[e['name']] = {'name': e['name'], 'chim_region': True, 'instances': 0, 'source_references': []}
+    results = [rows[e['name']] for e in entries]
+    if chim_cells:
+        print('World scenery: %d maps of CHIM region cells not made' % (len(entries) - len(made)), flush=True)
     covered = {(tuple(r['cell']), r['number']) for result in results for r in result['source_references']}
     expected = {(tuple(r['cell']), r['number']) for r in index['references']}
-    if not only and covered != expected:
+    # placements of CHIM region cells may be missing (the CHIM world places them); every other one must be covered
+    if not only and (covered - expected or {k for k in expected - covered if k[0] not in chim_cells}):
         raise ValueError('Full-world overlay omitted source references')
     receipt = {'format': 'AmiWind world scenery overlay 1', 'diagnostic_subset': bool(only),
                'terrain_directory_sha256': hashlib.sha256((terrain / 'world-regions.json').read_bytes()).hexdigest(),
                'scenery_index_sha256': hashlib.sha256((scenery / 'scenery-index.json').read_bytes()).hexdigest(),
                'palette_sha256': hashlib.sha256(palette.read_bytes()).hexdigest(),
                'covered_source_references': len(covered),
+               **({'chim_region_cells': sorted([list(c) for c in chim_cells])} if chim_cells else {}),
                'scope': 'Retained terrain BSPs with original rock/giant-mushroom placements. Town handoff and emulator acceptance remain separate.',
                'regions': results}
     (out / 'world-scenery.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
@@ -171,11 +189,24 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
     return receipt
 
 
+def check_chim_cells(text, terrain):
+    """Refuse a run whose --chim-regions-cells differ from the cells the terrain stage left out (one owner per cell)."""
+    import json
+    from chim.regions import decode_cells
+    given = set(decode_cells(text)) if text else set()
+    receipt = json.loads((Path(terrain) / 'world-regions.json').read_text(encoding='utf-8'))
+    made = {tuple(r['cell']) for r in receipt['regions'] if r.get('chim_region')}
+    if given != made:
+        raise ValueError('CHIM region cells differ from the terrain stage (%d given, %d left out by terrain)'
+                         % (len(given), len(made)))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('terrain', 'scenery', 'palette', 'out'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--only', nargs='+')
+    parser.add_argument('--chim-regions-cells', metavar='CELLS', help='CHIM region cells ("x,y:k ...", tools/build.py): checked against the terrain stage\'s receipt, which made no map for them (docs/BUILD_MANIFEST.md)')
     add_jobs(parser)
     from scenery_reduce import add_options, apply_options
     add_options(parser)
@@ -183,6 +214,7 @@ def main():
     apply_options(args)
     import build_profile
     build_profile.instrument('world-scenery')
+    check_chim_cells(args.chim_regions_cells, args.terrain)
     result = prepare(args.terrain, args.scenery, args.palette, args.out, resolve_jobs(args.jobs), args.only)
     print('OVERLAY PASSED', len(result['regions']), 'regions;', result['covered_source_references'], 'source references', flush=True)
 

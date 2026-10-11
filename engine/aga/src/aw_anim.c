@@ -350,6 +350,9 @@ int AW_VoiceSay(edict_t *e,int topic,int odds) {
     const aw_anim_t *a;int k,free_slot=-1,line,player;char name[32];sfx_t *sfx;sfxcache_t *sc;double now=realtime;
     edict_t *p=svs.maxclients>0?EDICT_NUM(1):NULL;
     if(!e || e->free || !voices_on.value || cls.state!=ca_connected)return 0;
+    /* Dead: nobody talks to the player any more (OpenMW Actors greets only a living player; no idle or fight
+     * lines either: an AmiWind rule, PLAYER-DEATH-LIMBO-35). */
+    if(AW_PlayerDead())return 0;
     if(odds<10000 && (rand()%10000)>=odds)return 0;
     if(topic==AW_VOICE_IDLE_LINE){                             /* OpenMW Actors::playIdleDialogue */
         vec3_t from,to,d;trace_t tr;

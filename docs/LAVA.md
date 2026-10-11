@@ -14,6 +14,7 @@ the converter, and the engine side (damage, view tint, glow, embers). Tracked as
 - [Conversion: one implementation for every builder](#conversion-one-implementation-for-every-builder)
 - [Engine settings](#engine-settings)
 - [Visibility and memory](#visibility-and-memory)
+- [On the world map](#on-the-world-map)
 
 <!-- contents end -->
 
@@ -163,3 +164,15 @@ and its faces live in the world model like Quake's own water: they are drawn onl
 warp face costs no surface cache and no lightmap; its texture is one 64 x 64 miptex per map (5,440 bytes). The
 per-pixel cost of the warp drawer on the 68040 is measured in the lava sandbox before the conversion becomes a
 default.
+
+## On the world map
+
+From v0.0.36 the in-game world map (M) shows the molten lava pools of the exterior cells, in both map views,
+by default. The builder writes them into the v2 map file (`--world-map v2`, the default; `--world-map v1`
+keeps the earlier map) from the same pool reader the CHIM glow uses (`tools/lava.py` `exterior_pools`): each
+pool's visible lava: the part of its footprint where the land lies below the pool surface (a pool the land buries
+is not drawn; `tools/lava_map.py`). The build audits every pool against the land and stops on a mismatch (349 pools
+in 27 cells, 27 buried, on the Game of the Year masters). Pools
+indoors are not on the exterior map. The engine settings are `aw_map_lava` (default 1; 0 hides the layer) and
+`aw_map_format` (default 2; 1 draws the map as v1). Format and costs:
+[World map](WORLD_MAP_AND_JOURNAL.md#map-file-formats-v1-and-v2-lava-pools).

@@ -106,6 +106,53 @@ class ExteriorSkyTests(unittest.TestCase):
             self.assertEqual((root / 'id1/gfx/aw_shared_sky.lmp').read_bytes(), bytes([17]) * 32768)
             self.assertEqual((root / 'work/originals/outside.bsp').read_bytes(), raw)
 
+    def test_chim_frame_only_image_still_gets_the_shared_sky(self):
+        # CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36: a CHIM-native image (a MiniWind of one town) stages no legacy
+        # exterior; its frame maps, written later, name the shared sky, which must be installed all the same
+        raw = sky_fixture()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            maps = root / 'id1' / 'maps'
+            maps.mkdir(parents=True)
+            (maps / 'inside.bsp').write_bytes(raw)
+            source = root / 'sky.lmp'
+            source.write_bytes(bytes([9]) * 32768)
+            configure_staged_maps(root / 'id1', exterior_maps=[], interior_maps=['inside'], work_dir=root / 'w1',
+                                  shared_sky_source=source, frame_exterior=True)
+            self.assertEqual((root / 'id1/gfx/aw_shared_sky.lmp').read_bytes(), bytes([9]) * 32768)
+            (root / 'id1/gfx/aw_shared_sky.lmp').unlink()
+            configure_staged_maps(root / 'id1', exterior_maps=[], interior_maps=['inside'], work_dir=root / 'w2',
+                                  shared_sky_source=source)   # rooms name it too (BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36)
+            self.assertEqual((root / 'id1/gfx/aw_shared_sky.lmp').read_bytes(), bytes([9]) * 32768)
+            (root / 'id1/gfx/aw_shared_sky.lmp').unlink()
+            with self.assertRaises(ValueError):
+                configure_staged_maps(root / 'id1', exterior_maps=[], interior_maps=['inside'], work_dir=root / 'w3',
+                                      frame_exterior=True)
+
+    def test_prepared_sky_is_installed_without_exterior_maps(self):
+        # BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36: an area build of a CHIM town has no exterior BSP map, but its CHIM
+        # frame and its rooms name the shared sky: the prepared one is installed for them
+        raw = sky_fixture()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            maps = root / 'id1/maps'
+            maps.mkdir(parents=True)
+            (maps / 'room.bsp').write_bytes(raw)
+            prepared = root / 'owned-cloud-sky.lmp'
+            prepared.write_bytes(bytes([9]) * 32768)
+            receipt = configure_staged_maps(root / 'id1', exterior_maps=[], interior_maps=['room'],
+                                            shared_sky_source=prepared, work_dir=root / 'work')
+            self.assertEqual((root / 'id1/gfx/aw_shared_sky.lmp').read_bytes(), bytes([9]) * 32768)
+            self.assertIn('no exterior BSP map', receipt['shared_resource_source'])
+            self.assertEqual(entities(lumps((maps / 'room.bsp').read_bytes())[0])[0]['_aw_sky_asset'],
+                             'gfx/aw_shared_sky.lmp')
+        with tempfile.TemporaryDirectory() as tmp:  # no prepared sky and no exterior map: nothing installed
+            root = Path(tmp)
+            (root / 'id1/maps').mkdir(parents=True)
+            (root / 'id1/maps/room.bsp').write_bytes(raw)
+            configure_staged_maps(root / 'id1', exterior_maps=[], interior_maps=['room'], work_dir=root / 'work')
+            self.assertFalse((root / 'id1/gfx/aw_shared_sky.lmp').exists())
+
     def test_conflicting_resources_fail_before_staging_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

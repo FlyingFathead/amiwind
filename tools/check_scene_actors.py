@@ -18,7 +18,7 @@ from build_jobs import add_jobs, resolve_jobs
 
 
 def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_land_source=None, vis_mode='fast',
-          jobs=None, seyda_recorded=None, seyda_terrain_cull=True):
+          jobs=None, seyda_recorded=None, seyda_terrain_cull=True, seyda_chim_native=False):
     scene = Path(scene)
     jobs = resolve_jobs(jobs)  # --jobs exactly; otherwise the stage budget or auto
     output = ensure_external(output, 'actor preflight')
@@ -35,12 +35,20 @@ def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_l
     for name in [town['regions'] for town in runtime_towns()[FIXED_TOWNS.index('balmora'):]]:
         source = scene/'id1'/name
         if source.is_file(): shutil.copyfile(source, id1/name)
-    shutil.copyfile(scene/'seyda.bsp', maps/'seyda.bsp')
-    # The image step's own conversion call, with this scene's inputs.
-    convert_builder_scene(maps, scene_map=scene/'seyda.map', palette=scene/'id1/gfx/palette.lmp',
-                          ericw_bin=ericw_bin, work_dir=output/'bounded-seyda',
-                          canonical_land_source=canonical_land_source, vis_mode=vis_mode, jobs=jobs,
-                          recorded=seyda_recorded, terrain_cull=seyda_terrain_cull)
+    if seyda_chim_native:
+        # A CHIM-native Seyda Neen (tools/chim_town.py prepare_seyda) cuts no region maps: its actors are fitted
+        # on the CHIM frame by the chim-town-seyda stage, which the image's actor gate judges. The scene's
+        # complete town is no map of the game and is not checked here.
+        (maps/'seyda.bsp').unlink(missing_ok=True)
+        print('Seyda Neen is CHIM-native: no Seyda Neen region maps are made here (chim-town-seyda fits its actors '
+              'on the CHIM frame)', flush=True)
+    else:
+        shutil.copyfile(scene/'seyda.bsp', maps/'seyda.bsp')
+        # The image step's own conversion call, with this scene's inputs.
+        convert_builder_scene(maps, scene_map=scene/'seyda.map', palette=scene/'id1/gfx/palette.lmp',
+                              ericw_bin=ericw_bin, work_dir=output/'bounded-seyda',
+                              canonical_land_source=canonical_land_source, vis_mode=vis_mode, jobs=jobs,
+                              recorded=seyda_recorded, terrain_cull=seyda_terrain_cull)
     # Recorded-stage maps (BUILD-SEYDA-REGEN-30) keep their recorded placements.
     frozen = frozen_maps(output/'bounded-seyda')
     annotate(maps, child_ci(data_files, 'Morrowind.esm'), jobs=jobs, exclude=frozen)
@@ -68,6 +76,8 @@ def main():
     parser.add_argument('--seyda-terrain-cull', choices=('on', 'off'), default='on',
                         help='off: convert Seyda Neen without the terrain visual cull (a CHIM build, whose Seyda Neen '
                              'region maps are a check reference and do not ship)')
+    parser.add_argument('--seyda-chim-native', action='store_true',
+                        help='Seyda Neen is CHIM-native (the default CHIM build): make no Seyda Neen region maps')
     add_vis_option(parser)
     add_jobs(parser)
     args = parser.parse_args()
@@ -75,7 +85,7 @@ def main():
     try: check(args.scene, args.data_files, args.out, args.allow_known_actor_ground_findings,
                ericw_bin=args.ericw_bin, canonical_land_source=args.canonical_land_source, vis_mode=args.vis_mode,
                jobs=args.jobs, seyda_recorded=args.seyda_recorded,
-               seyda_terrain_cull=args.seyda_terrain_cull == 'on')
+               seyda_terrain_cull=args.seyda_terrain_cull == 'on', seyda_chim_native=args.seyda_chim_native)
     except (ValueError, OSError) as exc: parser.exit(1, f'Error: {exc}\n')
 
 

@@ -90,12 +90,29 @@ int		keyshift[256];		// key to map to if shift held down in console
 int		key_repeats[256];	// if > 1, it is autorepeating
 qboolean	keydown[256];
 
-/* Intuition qualifiers are authoritative, even after a lost key-up event.
+/* Intuition qualifiers are authoritative for a lost key-up event, but a qualifier
+ * bit counts only while this run saw its key go down (raw 0x60-0x65), and the Caps
+ * Lock bit only once this run saw the Caps Lock key: a qualifier latched in the
+ * input stream before the game started (left by a crashed program's input handler)
+ * otherwise turned every key into Shift+key (ENGINE-CRASH-EXIT-KEYBOARD-36).
  * Values are from the NDK devices/inputevent.h; Amiga keys are not Ctrl.
  * Called outside the input.device interrupt, before dispatching raw input. */
+static unsigned int raw_qualifiers;     /* qualifier bits whose key this run saw held */
+static int caps_seen;
+void Key_AmigaQualifierKey(int code)
+{
+    static const unsigned int bit[6]={1,2,4,8,16,32};  /* 0x60 LShift .. 0x65 RAlt */
+    int key=code&0x7f;
+    if(key<0x60 || key>0x65)return;
+    if(key==0x62){caps_seen=1;return;}
+    if(code&0x80)raw_qualifiers&=~bit[key-0x60];
+    else raw_qualifiers|=bit[key-0x60];
+}
 void Key_AmigaQualifiers(unsigned int qualifier)
 {
-    int shift=(qualifier&3)!=0,control=(qualifier&8)!=0,alt=(qualifier&48)!=0;
+    int shift,control,alt;
+    qualifier&=raw_qualifiers|(caps_seen?4u:0u);
+    shift=(qualifier&3)!=0;control=(qualifier&8)!=0;alt=(qualifier&48)!=0;
     if(keydown[K_SHIFT]!=shift || shift_down!=shift)Key_Event(K_SHIFT,shift);
     if(keydown[K_CTRL]!=control)Key_Event(K_CTRL,control);
     if(keydown[K_ALT]!=alt)Key_Event(K_ALT,alt);
@@ -752,6 +769,10 @@ void AW_ControlsMigrate(void)
     if(!keybindings[K_DOWNARROW] || !*keybindings[K_DOWNARROW])Key_SetBinding(K_DOWNARROW,"+back");
     /* The Amiga right button is K_MOUSE3: the context action (aw_combat.c +aw_alt). */
     if(!keybindings[K_MOUSE3] || !*keybindings[K_MOUSE3])Key_SetBinding(K_MOUSE3,"+aw_alt");
+    /* Toggle POV (OpenMW default Tab) and the third-person zoom (the wheel; aw_view.c). */
+    if(!keybindings[K_TAB] || !*keybindings[K_TAB])Key_SetBinding(K_TAB,"+aw_pov");
+    if(!keybindings[K_MWHEELUP] || !*keybindings[K_MWHEELUP])Key_SetBinding(K_MWHEELUP,"aw_view_zoom 1");
+    if(!keybindings[K_MWHEELDOWN] || !*keybindings[K_MWHEELDOWN])Key_SetBinding(K_MWHEELDOWN,"aw_view_zoom -1");
 }
 
 void Key_Init (void)
@@ -840,6 +861,10 @@ Called by the system between frames for both key up and key down events
 Should NOT be called during an interrupt!
 ===================
 */
+/* aw_view.c (docs/THIRD_PERSON.md): every key event resets the idle (vanity) clock; the death
+ * prompt takes its keys. NULL in fixtures without it. */
+void (*aw_view_input)(int key,int down);
+int (*aw_view_key)(int key);
 void Key_Event (int key, qboolean down)
 {
     char	*kb;
@@ -849,6 +874,8 @@ void Key_Event (int key, qboolean down)
      * Console typing and modal panels keep the literal M. */
     if(key=='m' && ((down && key_dest==key_game && keydown[K_ALT]) ||
                    (!down && keydown[K_ALTM])))key=K_ALTM;
+    if (aw_view_input)
+        aw_view_input (key, down);
     keydown[key] = down;
 
     if (!down)
@@ -896,6 +923,8 @@ void Key_Event (int key, qboolean down)
     if (down && AW_TravelKey(shift_down?keyshift[key]:key)) return;
     if (down && AW_WaitKey(shift_down?keyshift[key]:key)) return;
     if (down && AW_IntroKey(shift_down?keyshift[key]:key)) return;
+    /* aw_view.c: the death prompt (load the last save / main menu / retry). */
+    if (down && aw_view_key && aw_view_key(key)) return;
 
     if (down && key_dest == key_game && keydown[K_SHIFT] && key == 'v') {
         Cbuf_AddText("aw_viewdistance_cycle\n");return;
@@ -1038,6 +1067,7 @@ void Key_ClearStates (void)
     int		i;
     shift_down=false;
     caps_down=false;
+    raw_qualifiers=0;	/* key-ups go to another window now */
 
     for (i=0 ; i<256 ; i++)
     {

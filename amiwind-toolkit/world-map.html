@@ -8,7 +8,7 @@
 <style>
 :root{--bg:#101923;--panel:#162433;--ink:#edf3fa;--muted:#9fb3c8;--line:#345;--empty:#1c2a38}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif}
+body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif}
 header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
 h1{font-size:18px;margin:0 8px 0 0}
 label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
@@ -31,6 +31,7 @@ main{display:flex;flex-wrap:wrap;gap:16px;padding:8px 16px 16px}
 .sbar{position:absolute;background:#0b1118cc;border-radius:5px;display:none;z-index:3}
 .sbar div{position:absolute;background:#9fb3c8aa;border-radius:5px;cursor:grab}
 .sbar div:hover,.sbar div.on{background:#ffd24acc}
+#map{width:100%;max-width:100%;touch-action:none;cursor:crosshair}
 canvas{width:100%;height:auto;display:block;margin:0 auto;background:var(--empty);border:1px solid var(--line)}
 aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;line-height:1.6}
 #ctlbar{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:4px 16px;border-bottom:1px solid var(--line);background:#13202d}
@@ -206,8 +207,10 @@ table.mt small{opacity:.8}
       <span class="lbtns"><button id="legall" title="Tick every legend row">all</button><button id="legnone" title="Untick every legend row">none</button></span>
       <label>Version <select id="chimrelease" aria-label="Release filter"></select></label>
       <div id="relsummary" class="muted"></div>
+      <div id="plansummary" class="muted"></div>
     </div>
     <div id="legend"></div>
+    <p class="muted"><a id="legendhelp" href="../docs/chim/CHIM_PROGRESS_MAP.md" target="_blank" rel="noopener">What do these colours mean?</a> Each colour, the problems usually behind it and who decides: the CHIM progress map guide.</p>
     <p class="muted">North is up; one square per exterior cell. The topomap (open-world
     terrain, converted for the whole island) is the basis; every other layer sits on
     top of it. The island image is rendered on your machine from your own game data
@@ -387,14 +390,20 @@ $('ctltoggle').onclick = () => {
 };
 ctlApply(ctlState());
 const MIN_ZOOM = 0.2, MAX_ZOOM = 16, LABEL_MIN_PX = 16;
-function fitCanvas(g) {
-  const st = $('stage'), avail = st.clientWidth;
-  if (!avail) return;
-  const docTop = st.getBoundingClientRect().top + window.scrollY, availH = Math.max(160, window.innerHeight - docTop - 8), aspect = g.w / g.h;
-  const w = Math.max(240, Math.floor(Math.min(avail, availH * aspect)));
-  canvas.style.width = w + 'px'; canvas.style.height = Math.floor(w / aspect) + 'px';
+// The map fills the stage: full width, and the window height below the controls (at least 420 px). chim-legend.js mapLayout.
+let layout = null;
+function curLayout(g) {
+  const st = $('stage');
+  if (!st.clientWidth) return layout;
+  const docTop = st.getBoundingClientRect().top + window.scrollY;
+  return layout = window.ChimLegend.mapLayout(st.clientWidth, window.innerHeight, docTop, g, window.devicePixelRatio || 1);
 }
-function cellPx(g) { return g.s * view.z * (canvas.clientWidth || g.w) / g.w; }   // one cell's size on the screen, in CSS pixels
+function fitCanvas(g) {
+  const L = curLayout(g); if (!L) return;
+  canvas.style.width = L.cssW + 'px'; canvas.style.height = L.cssH + 'px';
+}
+function vsize(g) { const L = layout || curLayout(g); return L ? [L.vw, L.vh] : [g.w, g.h]; }   // viewport in base map pixels
+function cellPx(g) { return g.s * view.z * (layout ? layout.f : 1); }   // one cell's size on the screen, in CSS pixels
 let viewSaveTimer = null;
 function viewSaveSoon() {
   if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
@@ -402,7 +411,7 @@ function viewSaveSoon() {
   viewSaveTimer = setTimeout(() => {
     try {
       const g = geometry();
-      window.localStorage.setItem('amiwind-map-view-1', JSON.stringify(view.z === 1 && view.x === 0 && view.y === 0 ? {fit: true} :
+      window.localStorage.setItem('amiwind-map-view-1', JSON.stringify(view.z === 1 ? {fit: true} :
         {z: view.z, fx: view.x / g.w, fy: view.y / g.h}));
     } catch (_) { /* no storage: fine */ }
   }, 400);
@@ -413,14 +422,15 @@ function viewRestore() {      // the first load: fit, unless this viewer left th
     if (v && !v.fit && isFinite(v.z)) { view.z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.z)); view.x = v.fx * g.w; view.y = v.fy * g.h; clampView(); }
   } catch (_) { /* start fitted */ }
 }
-function viewFit() { view.z = 1; view.x = view.y = 0; draw(); }
+function viewFit() { const g = geometry(), [vw, vh] = vsize(g); window.ChimLegend.fitView(view, g, vw, vh); draw(); }
 function draw() {
   if (!data && !metrics && !chim) return;
   const g = geometry();
   fitCanvas(g);
   // Backing store at display size x device pixels, so text and lines stay sharp.
-  const ratio = Math.max(1, (canvas.clientWidth || g.w) * (window.devicePixelRatio || 1) / g.w);
-  const bw = Math.round(g.w * ratio), bh = Math.round(g.h * ratio);
+  const L = layout || {ratio: 1, cssW: g.w, cssH: g.h, vw: g.w, vh: g.h}, ratio = L.ratio;
+  clampView();
+  const bw = Math.round(L.cssW * (window.devicePixelRatio || 1)), bh = Math.round(L.cssH * (window.devicePixelRatio || 1));
   if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -627,10 +637,10 @@ window.addEventListener('resize', () => draw());
 // Zoom and pan. The view maps base map pixels to the canvas: canvas = base * z + (x, y).
 const view = {z: 1, x: 0, y: 0};
 // Scrollbars: shown when zoomed in; the thumb is the visible part of the island.
-const SB = 10;
+const SB = 10, SCROLLBARS = false;     // the map has no inner scrollbars: drag to pan, wheel or +/- to zoom, fit/reset to start over
 function scrollbars() {
   const h = $('hbar'), v = $('vbar');
-  if (view.z <= 1) { h.style.display = v.style.display = 'none'; return; }
+  if (!SCROLLBARS || view.z <= 1) { h.style.display = v.style.display = 'none'; return; }
   const cw = canvas.offsetWidth, ch = canvas.offsetHeight, l = canvas.offsetLeft, t = canvas.offsetTop, g = geometry();
   h.style.display = v.style.display = 'block';
   Object.assign(h.style, {left: l + 'px', top: (t + ch - SB) + 'px', width: (cw - SB) + 'px', height: SB + 'px'});
@@ -662,27 +672,21 @@ for (const [id, axis] of [['hbar', 'x'], ['vbar', 'y']]) {
   });
 }
 window.addEventListener('resize', () => { draw(); scrollbars(); });
-function clampView() {
-  view.z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, view.z));
-  const g = geometry();
-  if (view.z < 1) { view.x = g.w * (1 - view.z) / 2; view.y = g.h * (1 - view.z) / 2; return; }    // zoomed out: centred
-  view.x = Math.min(0, Math.max(g.w * (1 - view.z), view.x));
-  view.y = Math.min(0, Math.max(g.h * (1 - view.z), view.y));
+// The map follows its box: a resize of the stage (window, side panel) redraws at the new size and device pixel ratio.
+if (typeof ResizeObserver === 'function') {
+  let lastStageW = 0;
+  new ResizeObserver(() => { const w = $('stage').clientWidth; if (w !== lastStageW) { lastStageW = w; draw(); } }).observe($('stage'));
 }
-function zoomAt(f, cx, cy) {
-  const z = view.z;
-  view.z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z * f));
-  view.x = cx - (cx - view.x) * view.z / z; view.y = cy - (cy - view.y) * view.z / z;
-  clampView(); draw();
-}
-$('zoomin').onclick = () => { const g = geometry(); zoomAt(1.6, g.w / 2, g.h / 2); };
-$('zoomout').onclick = () => { const g = geometry(); zoomAt(1 / 1.6, g.w / 2, g.h / 2); };
+function clampView() { const g = geometry(), [vw, vh] = vsize(g); window.ChimLegend.clampView(view, g, vw, vh); }
+function zoomAt(f, cx, cy) { const g = geometry(), [vw, vh] = vsize(g); window.ChimLegend.zoomAt(view, f, cx, cy, g, vw, vh); draw(); }
+$('zoomin').onclick = () => { const [vw, vh] = vsize(geometry()); zoomAt(1.6, vw / 2, vh / 2); };
+$('zoomout').onclick = () => { const [vw, vh] = vsize(geometry()); zoomAt(1 / 1.6, vw / 2, vh / 2); };
 $('zoomreset').onclick = viewFit;
 $('zoomfit').onclick = viewFit;
 canvas.addEventListener('wheel', e => {
   if (!data && !metrics && !chim) return;
   e.preventDefault();
-  const r = canvas.getBoundingClientRect(), k = geometry().w / r.width;
+  const r = canvas.getBoundingClientRect(), k = vsize(geometry())[0] / r.width;
   zoomAt(e.deltaY < 0 ? 1.25 : 1 / 1.25, (e.clientX - r.left) * k, (e.clientY - r.top) * k);
 }, {passive: false});
 let drag = null, dragMoved = false;
@@ -707,9 +711,9 @@ canvas.addEventListener('mousedown', e => {
 window.addEventListener('mousemove', e => {
   if (paint) { paint.moved = true; paintCell(e); return; }
   if (!drag) return;
-  const r = canvas.getBoundingClientRect(), k = geometry().w / r.width, dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
+  const r = canvas.getBoundingClientRect(), k = vsize(geometry())[0] / r.width, dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
   if (Math.abs(dx) + Math.abs(dy) > 4) dragMoved = true;
-  if (dragMoved && view.z > 1) { view.x = drag.vx + dx; view.y = drag.vy + dy; clampView(); draw(); canvas.style.cursor = 'grabbing'; }
+  if (dragMoved) { view.x = drag.vx + dx; view.y = drag.vy + dy; clampView(); draw(); canvas.style.cursor = 'grabbing'; }
 });
 window.addEventListener('mouseup', () => {
   if (paint) { paint = null; dragMoved = true; setTimeout(() => { dragMoved = false; }, 0); return; }
@@ -906,7 +910,7 @@ function metricHeaders() {
     '<br><small>limit ' + fmtMetric(k, metricLimit(k)) + '</small></th>').join('');
 }
 function map3dButton(id) {
-  return hasMap(id) ? '<button data-map="' + escapeHtml(id) + '" title="Open ' + escapeHtml(id) + '.bsp in the 3D Inspector">3D</button>'
+  return hasMap(id) ? '<button data-map="' + escapeHtml(id) + '" title="Open ' + escapeHtml(id) + ' (.bsp or .chim) in the 3D Inspector">3D</button>'
     : '<span class="muted" title="No built map with this id in the maps folder">–</span>';
 }
 function metricsCellState(x, y) {
@@ -995,7 +999,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.0'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.1'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1050,7 +1054,11 @@ $('copystate').onclick = async () => {
 const mapFiles = {};
 let pendingOpen = null;  // map asked for before a maps folder was chosen
 $('mapsdir').onchange = e => {
-  for (const f of e.target.files) if (/\.bsp$/i.test(f.name)) mapFiles[f.name.replace(/\.bsp$/i, '').toLowerCase()] = f;
+  // x.bsp (a Quake map) and x.chim (a CHIM map): one name each, the .chim first, as the engine resolves a map name
+  for (const f of e.target.files) {
+    const m = /^(.*)\.(bsp|chim)$/i.exec(f.name);
+    if (m && !(/\.chim$/i.test((mapFiles[m[1].toLowerCase()] || {}).name || '') && /\.bsp$/i.test(f.name))) mapFiles[m[1].toLowerCase()] = f;
+  }
   if (pendingOpen && mapFiles[pendingOpen]) { const f = mapFiles[pendingOpen]; pendingOpen = null; openInInspector(f); }
   draw();
   if (picked) showSelected(picked.x, picked.y, data && data.cells.find(c => c.x === picked.x && c.y === picked.y));
@@ -1074,7 +1082,7 @@ function fillMapSelect(maps) {
   const sel = $('mapselect'); sel.innerHTML = '';
   for (const m of maps) {
     const o = document.createElement('option'); o.value = m;
-    o.textContent = m + '.bsp' + (hasMap(m) ? '' : ' (choose maps folder)'); sel.appendChild(o);
+    o.textContent = (mapFiles[m] ? mapFiles[m].name : m) + (hasMap(m) ? '' : ' (choose maps folder)'); sel.appendChild(o);
   }
   sel.disabled = $('open3d').disabled = !maps.length;
   $('localhint').textContent = !maps.length ? 'No AmiWind map covers this cell.' :
@@ -1125,7 +1133,7 @@ window.addEventListener('message', e => {
 });
 function escapeHtml(t) { return String(t).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
 function cellAt(e) {
-  const g = geometry(), r = canvas.getBoundingClientRect(), k = g.w / r.width;
+  const g = geometry(), r = canvas.getBoundingClientRect(), k = vsize(g)[0] / r.width;
   const wx = ((e.clientX - r.left) * k - view.x) / view.z, wy = ((e.clientY - r.top) * k - view.y) / view.z;
   const x = Math.floor(wx / g.s) + g.b[0], y = g.b[3] - Math.floor(wy / g.s);
   return {x, y, c: data ? data.cells.find(c => c.x === x && c.y === y) : undefined};
@@ -1140,6 +1148,10 @@ function describe(x, y, c, sep, noMetrics) {
   const base = describeBase(x, y, c, sep, noMetrics), ct = noMetrics ? '' : chimTip(x, y, sep);
   return base + (ct ? sep + ct : '');
 }
+// Placed entities as "placed / original"; a cell with nothing placed in the original says what it holds instead of a bare 0 / 0.
+function placedLabel(placed, original, terrain) {
+  return placed + ' / ' + original + (original ? '' : terrain ? ' (terrain only)' : ' (empty)');
+}
 function describeBase(x, y, c, sep, noMetrics) {
   const named = placeName(x, y), head = (named ? named + sep : '') + 'cell ' + x + ', ' + y;
   const mt = noMetrics ? '' : metricsTip(x, y, sep);
@@ -1148,13 +1160,13 @@ function describeBase(x, y, c, sep, noMetrics) {
   const here = poisIn(x, y), poiText = here.length ? sep + 'places: ' + here.slice(0, 4).map(p => p.name).join(', ') +
     (here.length > 4 ? ' +' + (here.length - 4) : '') : '';
   return head + poiText + sep + 'map: ' + (c.map === 'full' ? 'full town/area' : c.map === 'terrain' ? 'topomap terrain' : 'no terrain') +
-    sep + 'entities placed: ' + c.placed + ' / ' + c.original + sep + 'interiors converted: ' + c.interiors_converted + ' / ' + c.interiors +
+    sep + 'entities placed: ' + placedLabel(c.placed, c.original, c.map !== 'none') + sep + 'interiors converted: ' + c.interiors_converted + ' / ' + c.interiors +
     sep + 'named places: ' + c.places + (c.checked ? sep + 'owner checked' : '');
 }
 // The interior-entrance marker under the cursor, if any (same transform as cellAt).
 function poiAt(e) {
   if (!cellsDetail || !cellsDetail.pois || !on('poi')) return null;
-  const g = geometry(), r = canvas.getBoundingClientRect(), k = g.w / r.width;
+  const g = geometry(), r = canvas.getBoundingClientRect(), k = vsize(g)[0] / r.width;
   const wx = ((e.clientX - r.left) * k - view.x) / view.z, wy = ((e.clientY - r.top) * k - view.y) / view.z;
   const reach = poiRadius(g) + 3 / view.z;
   let best = null, bestD = reach * reach;
@@ -1212,6 +1224,7 @@ const CHIM_FORMAT = 'aw-cell-progress-1';
 // "Awaiting lighting" cells: the complete green crossed by cyan stripes (zebra.js, the inspector's zebra tile).
 const CHIM_ZEBRA = '#00e5ff';
 // Eligible for the next release (tools/cell_progress.py ELIGIBLE): every done cell, empty sea included, lighting done or not.
+const CHIM_SEA = new Set(['empty_sea', 'ocean']);    // sea cells drawn beside the land cells
 const CHIM_ELIGIBLE = new Set(['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'empty_sea']);
 const CHIM_BUCKETS = {
   complete: ['#7dffa6', 'Cell complete: terrain and every placed object converted, all audits passed (solid white border around a group)'],
@@ -1220,7 +1233,8 @@ const CHIM_BUCKETS = {
   terrain_complete_unlit: ['#7dffa6', 'Terrain complete, awaiting lighting: everything but actors and the lighting audit (zebra)', CHIM_ZEBRA],
   approved: ['#ffd23f', 'owner-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],
   converted_failing: ['#e5484d', 'converted, failing audits'], not_converted: ['#c2185b', 'not converted (tried, could not finish)'], converted_unmeasured: ['#6ea4df', 'converted, nothing measured'],
-  not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'], hull_policy_pending: ['#b07ae0', 'hull policy pending']};
+  not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'], hull_policy_pending: ['#b07ae0', 'hull policy pending'],
+  ocean: ['#c0c6cc', 'Open ocean: shared ocean chunk made, not yet placed in the game (no LAND record)']};
 const CHIM_GRADES = {A: '#32cfa0', B: '#7fd36b', C: '#e0c341', D: '#c8803c', E: '#5a2a2a'};
 const CHIM_AUDIT = {passed: '#46c37b', failed: '#e5484d', accepted: '#ffcf55', not_measured: '#4a5d72'};
 // Lighting audit (tools/cell_lighting.py): lit like the original is required for both completion levels.
@@ -1236,7 +1250,7 @@ let legendOff = new Set(), legendKeys = [], relFilter = '', chimRef = null;
 const CHIM_COMPARE = {same: ['#6c7a89', 'same status as the project reference'], better: ['#35d07f', 'better than the project reference'],
   worse: ['#ff7a3d', 'worse than the project reference'], missing: ['#2a3a4c', 'no counterpart in the reference']};
 function chimCompareClass(c) { return window.ChimLegend.compareClass(c, chimRef && chimRef.cells[c.x + ',' + c.y], chimRef && chimRef.rank || {}); }
-function legendState() { return {colour: cset.colour, off: [...legendOff].filter(k => k.startsWith(cset.colour === 'lighting' ? 'chim:lighting:' : cset.colour === 'lava' ? 'chim:lava:' : 'chim:status:')), rel: relFilter}; }
+function legendState() { return {colour: cset.colour, off: [...legendOff].filter(k => k.startsWith(cset.colour === 'lighting' ? 'chim:lighting:' : cset.colour === 'lava' ? 'chim:lava:' : cset.colour === 'plan' ? 'chim:plan:' : 'chim:status:')), rel: relFilter}; }
 function legendSave() {
   try { window.ChimLegend.save(window.localStorage, {colour: cset.colour, off: [...legendOff], rel: relFilter}); } catch (_) { /* no storage: fine */ }
 }
@@ -1257,18 +1271,24 @@ function legendCtl() {
   box.hidden = !chimOn();
   if (!chimOn()) return;
   const rel = chim.headline && chim.headline.eligible_release, L = window.ChimLegend;
-  const cur = L.matchPreset(legendState(), rel);
-  $('chimpreset').innerHTML = L.presets(rel).map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('') +
+  const planNext = chim.plan_next || null, cur = L.matchPreset(legendState(), rel, planNext);
+  $('chimpreset').innerHTML = L.presets(rel, planNext).map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('') +
     '<option value="custom">Custom (your ticks)</option>';
   $('chimpreset').value = cur;
   const names = (chim.releases || []).filter(r => r.release);
   $('chimrelease').innerHTML = '<option value="">All versions</option>' + names.map(r => '<option value="' + escapeHtml(r.release) + '">' + escapeHtml(r.release) + (r.shipped ? ' (shipped)' : '') + '</option>').join('') +
-    '<option value="__none">Unassigned</option><option value="__any">Assigned to any version</option>';
+    '<option value="__none">Unassigned</option><option value="__any">Assigned to any version</option>' +
+    ((chim.plans || []).filter(r => r.release).map(r => '<option value="plan:' + escapeHtml(r.release) + '">Planned for ' + escapeHtml(r.release) + (r.shipped ? ' (shipped)' : r.next ? ' (next, gold)' : ' (later)') + '</option>').join('')) +
+    (planNext ? '<option value="__planned">In any release plan</option>' : '');
   if (![...$('chimrelease').options].some(o => o.value === relFilter)) relFilter = '';
   $('chimrelease').value = relFilter;
   const rows = (chim.releases || []).filter(r => r.approved && (!relFilter || relFilter === '__any' ? !!r.release : relFilter === '__none' ? !r.release : r.release === relFilter));
   $('relsummary').textContent = rows.length ? rows.map(r => (r.release || 'unassigned') + (r.shipped ? ' (shipped)' : '') + ': ' + r.approved.toLocaleString() + ' cells · ' + r.complete +
     ' complete · ' + r.awaiting_lighting + ' awaiting lighting · ' + r.lit + ' lit · ' + r.failing + ' failing').join(' | ') : 'No cells are assigned to a release yet.';
+  // "Planned for ..." counts per release with a TOTALS row; nothing is shown while no release plan exists.
+  const pt = L.planTable(chim.plans, chim.headline && chim.headline.ocean != null ? chim.headline.ocean : null);
+  $('plansummary').innerHTML = pt.length ? '<table class="mt"><thead><tr><th class="l">Release plan</th><th class="l">State</th><th>Planned</th><th>Complete</th><th>Awaiting lighting</th><th>Failing</th><th>Hull pending</th><th>Not started</th><th>Open ocean (not done)</th></tr></thead><tbody>' +
+    pt.map(r => '<tr' + (r[0] === 'TOTALS' ? ' style="font-weight:700"' : String(r[0]).startsWith('OPEN OCEAN') ? ' style="font-weight:700;color:' + L.OCEAN_SILVER + '"' : '') + '><td class="l">' + escapeHtml(String(r[0])) + '</td><td class="l">' + escapeHtml(r[1]) + '</td>' + r.slice(2).map(v => '<td>' + (v === '' ? '' : Number(v).toLocaleString()) + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
 }
 function legendSet(state) { legendOff = new Set([...legendOff].filter(k => !k.startsWith('chim:')).concat(state.off)); relFilter = state.rel; cset.colour = state.colour; }
 let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, chimBucket = null, chimSource = null,
@@ -1280,10 +1300,12 @@ function chimOpenBugs(c) {
   return (c.bugs || []).filter(id => { const b = chim.bugs && chim.bugs[id]; return !b || (b.state !== 'fixed' && b.state !== 'closed'); });
 }
 function chimMech(id) { const m = chim.mechanisms.find(m => m.id === id); return m ? m.label : id; }
+function chimColour2(c, m) { const keep = cset.colour; cset.colour = m; try { return chimColour(c); } finally { cset.colour = keep; } }
 function chimColour(c) {
   const m = cset.colour;
-  if (m === 'compare') return chimRef && (c.land || c.chim.bucket === 'empty_sea') ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
-  if (m === 'status') return c.land || c.chim.converted || c.chim.bucket === 'empty_sea' ? CHIM_BUCKETS[c.chim.bucket][0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
+  if (m === 'compare') return chimRef && (c.land || CHIM_SEA.has(c.chim.bucket)) ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
+  if (m === 'status') return c.land || c.chim.converted || CHIM_SEA.has(c.chim.bucket) ? CHIM_BUCKETS[c.chim.bucket][0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
+  if (m === 'plan') return window.ChimLegend.planColour(c) || chimColour2(c, 'status');
   if (m === 'ring') {
     if (c.ring == null) return null;
     return c.ring === 0 ? '#7a7a7a' : 'hsl(' + Math.round(205 - 195 * (c.ring - 1) / Math.max(1, chimMaxRing - 1)) + ',68%,48%)';
@@ -1315,9 +1337,11 @@ function chimMatch(c) {
 }
 function chimLegend() {
   const m = cset.colour;
-  if (m === 'status') return Object.entries(CHIM_BUCKETS).map(([k, [c, t, z]]) => [z ? chimZebraCss(c, z) : c, t, 'chim:status:' + k]);
+  if (m === 'status') return window.ChimLegend.planRows(chim.plans).slice(0, 1).map(r => [r[0], 'Gold outline: ' + r[1].replace(/: .*$/, ''), null]).concat(
+    Object.entries(CHIM_BUCKETS).map(([k, [c, t, z]]) => [z ? chimZebraCss(c, z) : c, k === 'ocean' && chim.headline ? t.replace(' (no LAND record)', '') + ': ' + (chim.headline.ocean || 0).toLocaleString() + ' cells' : t, 'chim:status:' + k]));
   if (m === 'lighting') return Object.entries(CHIM_LIGHTING).map(([k, [c, t]]) => [c, t, 'chim:lighting:' + k]);
   if (m === 'lava') return Object.entries(CHIM_LAVA).map(([k, [c, t]]) => [c, t, 'chim:lava:' + k]);
+  if (m === 'plan') return window.ChimLegend.planRows(chim.plans).concat([['#3a4f66', 'All other cells (shipped or not planned): drawn in their status colours', 'chim:plan:other']]);
   if (m === 'compare') return Object.entries(CHIM_COMPARE).map(([k, [c, t]]) => [c, t, 'chim:compare:' + k]);
   if (m === 'ring') return [['hsl(205,68%,48%)', 'ring 1 (coast)'], ['hsl(110,68%,48%)', 'inner rings'], ['hsl(10,68%,48%)', 'innermost ring'], ['#7a7a7a', 'ring 0: sea-only cells with content']];
   if (m === 'scout') return [['#e8f1fb', 'share of the tightest engine limit, up to 50 %'], ['#4387d2', '80-90 %'], ['#c8423f', 'over a limit (risk > 100 %)']];
@@ -1330,19 +1354,21 @@ function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucke
 // Zebra only for the awaiting-lighting statuses, only in the status colouring.
 function chimZebra(c) { const b = CHIM_BUCKETS[c.chim.bucket]; return cset.colour === 'status' && b && b[2] ? b[2] : null; }
 function chimZebraCss(base, stripe) { return 'repeating-linear-gradient(135deg,' + base + ' 0 4px,' + stripe + ' 4px 7px)'; }
-function chimPx(g) { return g.s * view.z * (canvas.clientWidth || g.w) / g.w; }
+function chimPx(g) { return cellPx(g); }
 function drawChim(g) {
   const px = chimPx(g), dim = chimBucket || cset.filter || legendActive();
   for (const c of chimCellList) {
     const col = chimColour(c); if (!col) continue;
-    const hit = chimVisible(c) && (!cset.filter || chimMatch(c)) && (!chimBucket || (c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket);
+    const hit = chimVisible(c) && (!cset.filter || chimMatch(c)) && (!chimBucket || (c.land || CHIM_SEA.has(c.chim.bucket)) && c.chim.bucket === chimBucket);
     const zebra = chimZebra(c);
     ctx.globalAlpha = (anyImage() ? .85 : 1) * (dim && !hit ? .14 : 1); ctx.fillStyle = zebra ? ZebraPattern(ctx, col, zebra) : col;
     ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1);
   }
   ctx.globalAlpha = 1;
   groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));
-  if (chimBucket) for (const c of chimCellList) if ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket) outline(g, c, '#ffe28a', 2.5);
+  // Planned for the next release: a gold outline on every other colouring (the plan colouring fills them gold instead).
+  if (cset.colour !== 'plan' && chim.plan_next) for (const c of chimCellList) if (window.ChimLegend.planTier(c) === 'next' && chimVisible(c)) outline(g, c, window.ChimLegend.PLAN_GOLD, 2);
+  if (chimBucket) for (const c of chimCellList) if ((c.land || CHIM_SEA.has(c.chim.bucket)) && c.chim.bucket === chimBucket) outline(g, c, '#ffe28a', 2.5);
   const showOrder = cset.next ? chimNext[cset.order] : new Map(), other = cset.next ? chimNext[cset.order === 'spiral' ? 'risk' : 'spiral'] : new Map();
   if (cset.next) {
     for (const [k] of showOrder) { const c = chimCells.get(k); if (c) outline(g, c, '#ffffff', 3); }
@@ -1353,7 +1379,7 @@ function drawChim(g) {
       ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
   }
-  if (cset.nums && px >= 24) {
+  if (cset.nums && window.ChimLegend.ringLabelsVisible(px)) {     // ring numbers hide below a zoom level instead of overlapping
     ctx.font = '600 ' + Math.min(g.s * .5, 14 / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const c of chimCellList) {
@@ -1371,6 +1397,7 @@ function drawChim(g) {
 function chimTip(x, y, sep) {
   const c = chimCell(x, y); if (!c) return '';
   const lines = ['CHIM Progress Tracker: ' + CHIM_BUCKETS[c.chim.bucket][1] + (c.chim.build ? ' (build ' + c.chim.build + ')' : '')];
+  if (c.plan) lines.push(window.ChimLegend.planLine(c.plan));
   if (c.ring != null) lines.push('sweep: ring ' + c.ring + ', spiral #' + c.spiral_rank + (c.risk_rank ? ', scout #' + c.risk_rank : ''));
   if (c.risk) lines.push('risk ' + pct(c.risk.score, 1) + ' of the ' + c.risk.limiting + ' limit');
   if (c.legacy) lines.push('legacy mapping: grade ' + c.legacy.grade + ' (' + c.legacy.grade_label + ')');
@@ -1520,7 +1547,7 @@ $('chimsearch').addEventListener('keydown', ev => {
 $('chimresults').addEventListener('click', ev => { const d = ev.target.closest('div[data-i]'); if (d) chimGo(chimIndex[+d.dataset.i]); });
 document.addEventListener('click', ev => { if (!ev.target.closest('#chimsearchwrap')) $('chimresults').hidden = true; });
 // Export what is shown: CSV (status, audits and every numeric stat) or JSON (records in full).
-function chimShown() { return chimCellList.filter(c => chimVisible(c) && chimMatch(c) && (!chimBucket || ((c.land || c.chim.bucket === 'empty_sea') && c.chim.bucket === chimBucket))); }
+function chimShown() { return chimCellList.filter(c => chimVisible(c) && chimMatch(c) && (!chimBucket || ((c.land || CHIM_SEA.has(c.chim.bucket)) && c.chim.bucket === chimBucket))); }
 function flatNums(o, pre, out) {
   for (const [k, v] of Object.entries(o || {})) {
     if (typeof v === 'number') out[pre + k] = v;
@@ -1714,12 +1741,13 @@ function showChimCell(x, y) {
     (c.chim.owner ? ' · owner: ' + escapeHtml(c.chim.owner) + (c.chim.owner_date ? ' ' + escapeHtml(c.chim.owner_date) : '') : '') +
     (c.chim.partial_terrain ? ' · terrain only in a CHIM build (no placements owned here)' : '') + '</p>' +
     '<p class="muted">Release: ' + (c.release ? escapeHtml(c.release.name) + (c.release.shipped ? ' (shipped)' : ' (approved)') + ' · set ' + escapeHtml(c.release.date || '') + ' by ' + escapeHtml(c.release.who || 'owner') : 'not assigned to a release') + '</p>' +
+    '<p style="' + (window.ChimLegend.planTier(c) === 'next' ? 'color:' + window.ChimLegend.PLAN_GOLD : 'color:var(--muted,#9fb3c8)') + '">' + escapeHtml(window.ChimLegend.planLine(c.plan)) + '</p>' +
     '<p class="muted">Sweep: ' + (c.ring == null ? 'not in the sweep' : 'ring ' + c.ring + ', spiral #' + c.spiral_rank) + (c.risk_rank ? ' · scout #' + c.risk_rank : '') +
     ' · risk: ' + escapeHtml(r) + (c.cost && c.cost.heap_bytes ? ' · estimated heap ' + Math.round(c.cost.heap_bytes / 1048576 * 10) / 10 + ' MiB' : '') + '</p>' +
     '<h3>Contents</h3><table class="mt"><tbody>' + [0, 2, 4, 6, 8].map(i => '<tr>' + facts[i] + facts[i + 1] + '</tr>').join('') + '</tbody></table>' +
     '<h3>Objects by type</h3>' + chimCatTable(c.categories) + chimLightingBlock(c) + chimLavaBlock(c) +
     '<h3>Stats</h3>' + chimStatsTable(c.stats, c.chim.converted) + chimErrorsBlock(c) +
-    '<h3>Legacy mapping quality (before CHIM)</h3>' + (lg ? '<p>' + chimSpan(CHIM_GRADES[lg.grade], 'grade ' + lg.grade + ': ' + lg.grade_label) + '<br>entities placed ' + lg.placed + ' / ' + lg.original +
+    '<h3>Legacy mapping quality (before CHIM)</h3>' + (lg ? '<p>' + chimSpan(CHIM_GRADES[lg.grade], 'grade ' + lg.grade + ': ' + lg.grade_label) + '<br>entities placed ' + placedLabel(lg.placed, lg.original, !!c.land) +
       (lg.placed_share == null ? '' : ' (' + pct(lg.placed_share, 1) + ')') + ' · interiors converted ' + lg.interiors_converted + ' / ' + lg.interiors + ' · named places ' + lg.places +
       (lg.checked ? ' · owner checked' : '') + '</p>' : '<p>not measured</p>') +
     '<h3>Audits</h3>' + (c.chim.converted ? '<table class="mt"><thead><tr><th class="l">Mechanism</th><th class="l">Result</th><th class="l">Detail</th><th class="l">Build</th></tr></thead><tbody>' + audits + '</tbody></table>' : '<p>not converted yet: nothing to audit</p>') +
@@ -1772,8 +1800,8 @@ function setChim(doc, source, keepView) {
     chimNext[o] = new Map(list.map((c, i) => [c.x + ',' + c.y, i + 1]));
   }
   const cur = cset.colour, flt = cset.filter;
-  $('chimcolour').innerHTML = [['status', 'CHIM status'], ['lighting', 'Lighting (lit / partial / unlit)'], ['lava', 'Lava (mapped / converted)'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
-    ['bugs', 'Open bugs linked'], ['lastbuild', 'Last build time']].concat(doc.mechanisms.map(m => ['audit:' + m.id, 'Audit: ' + m.label]))
+  $('chimcolour').innerHTML = [['status', 'CHIM status']].concat(doc.plan_next ? [['plan', 'Release plan (gold = planned for ' + doc.plan_next + ')']] : []).concat([['lighting', 'Lighting (lit / partial / unlit)'], ['lava', 'Lava (mapped / converted)'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
+    ['bugs', 'Open bugs linked'], ['lastbuild', 'Last build time']]).concat(doc.mechanisms.map(m => ['audit:' + m.id, 'Audit: ' + m.label]))
     .map(([v, t]) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>').join('');
   if (chimRef) $('chimcolour').insertAdjacentHTML('beforeend', '<option value="compare">Compare with the project reference</option>');
   $('chimcolour').value = cset.colour = [...$('chimcolour').options].some(o => o.value === cur) ? cur : 'status';
@@ -1834,7 +1862,7 @@ $('legall').onclick = () => { for (const k of legendKeys) legendOff.delete(k); l
 $('legnone').onclick = () => { for (const k of legendKeys) legendOff.add(k); legendSave(); draw(); };
 $('chimpreset').onchange = () => {
   const v = $('chimpreset').value; if (v === 'custom') return;
-  const st = window.ChimLegend.presetState(v, chim.headline && chim.headline.eligible_release);
+  const st = window.ChimLegend.presetState(v, chim.headline && chim.headline.eligible_release, chim.plan_next || null);
   legendSet(st); legendSave();
   $('chimcolour').value = cset.colour; chimUi(); draw();
 };
@@ -1908,7 +1936,10 @@ function liveStart() { liveStop(false); if (typeof setInterval === 'function') l
 $('chimlive').onchange = () => { if ($('chimlive').checked) { liveTick(); liveStart(); } else liveStop(false); stripRender(); };
 if (typeof setInterval === 'function') setInterval(stripRender, 1000);                 // the "N s ago" ticks
 if (FILE_LIVE) { setChim(window.AW_PROGRESS, 'live build folder (file, no server)', false); liveApply(window.AW_LIVE); $('chimlive').checked = true; liveStart(); stripRender(); }
-else if (SERVED) fetch('../data/live-status.json', {cache: 'no-store'}).then(r => r.status === 200 ? r.json() : null).then(st => { if (st) { liveApply(st); $('chimlive').checked = true; liveStart(); } }).catch(() => {});
+// Served by the Toolkit server: auto-update is ON by default (the server re-reads the tracker on every request, so the page
+// follows CHIMport feeds and builds without a reload); the switch still turns it off.
+else if (SERVED) { $('chimlive').checked = true; liveStart();   // the 1 s strip timer draws it once the legend is loaded
+  fetch('../data/live-status.json', {cache: 'no-store'}).then(r => r.status === 200 ? r.json() : null).then(st => { if (st) liveApply(st); }).catch(() => {}); }
 window.addEventListener('focus', () => { if (SERVED) loadChim(false); });
 window.addEventListener('message', e => {
   if (e.source === window.parent && e.data && e.data.type === 'amiwind-chim-pick') chimPickBucket(e.data.bucket || null);

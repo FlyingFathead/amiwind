@@ -198,8 +198,11 @@ def certified_sea_extent(text, sky_top):
 
 
 def build_candidate(source_map, texture_bsp, source_bsp, palette, coverage, out_dir,
-                    ericw_bin, target_sizes, *, core=None, threads=1, vis_mode='fast'):
+                    ericw_bin, target_sizes, *, core=None, threads=1, vis_mode='fast', path_root=None):
     """Return report; estimate when supplied ABI sizes, otherwise require the final build gate.
+
+    path_root: the written report.json names paths under it relative to it, so a build's record does not
+    change with its run folder (BUILD-SEYDA-BOUNDED-RUN-PATHS-36); the returned report keeps full paths.
 
     Source BSP should be the full town when evaluating different cores, so a
     previously selected derivative cannot silently omit required scenery.
@@ -268,7 +271,11 @@ def build_candidate(source_map, texture_bsp, source_bsp, palette, coverage, out_
                          'Source MAP and BSP coordinate/palette provenance is a caller contract.',
                          'Static allocator estimate is not target runtime clearance.',
                          'No runtime region tables or HDFs were changed.']}
-    (out/'report.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
+    written = report
+    if path_root is not None:
+        from prepare_seyda_regions import neutral_paths
+        written = neutral_paths(report, path_root)
+    (out/'report.json').write_text(json.dumps(written, indent=2)+'\n', encoding='utf-8')
     return report
 
 

@@ -214,6 +214,8 @@ def _sky_map(task):
         output, detail = transform(raw, scene_kind=kind, local_skybox=local_skybox)
         if cache is not None:
             detail = json.loads(json.dumps(detail))  # the form a cached detail has
+            import cache_provenance
+            cache_provenance.name_unit(cache, key, lambda: path.name, lambda: [('map bytes', digest(raw)), ('scene kind', kind)])
             cache.store(key, detail, None if output == raw else output)
     else:
         output, detail = raw, {'scene_kind': 'unknown', 'unchanged': True, 'not_claimed_complete': True}
@@ -225,8 +227,12 @@ def _sky_map(task):
 
 
 def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=False,
-                          shared_sky_source=None, work_dir, jobs=1):
+                          shared_sky_source=None, work_dir, jobs=1, frame_exterior=False):
     """Prepare/validate every result, then replace derived staging maps only.
+
+    frame_exterior: the image's exteriors are CHIM frame maps written later in the image step (a CHIM-native
+    image may stage no legacy exterior map at all); their worldspawns name the shared sky, so it is installed
+    from the prepared shared source (or the staged one) as for staged exteriors (CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36).
 
     Maps are independent: up to `jobs` workers transform them (shared pool,
     tools/build_parallel.py); results, receipt order and bytes equal jobs=1.
@@ -248,6 +254,17 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
             raise ValueError('Staged maps must be regular local files')
     resource = None
     source = 'none: no exterior maps'
+    if not exterior and frame_exterior and not boolean(local_skybox):
+        if shared_sky_source is not None:
+            resource = Path(shared_sky_source).read_bytes()
+            source = str(Path(shared_sky_source).resolve()) + ' (for the CHIM frame maps)'
+        elif (id1 / SHARED_SKY_PATH).exists():
+            resource = (id1 / SHARED_SKY_PATH).read_bytes()
+            source = 'existing staged shared resource (for the CHIM frame maps)'
+        else:
+            raise ValueError('CHIM frame maps name the shared sky, and no shared sky source was prepared')
+        if len(resource) != SHARED_SKY_BYTES:
+            raise ValueError('Shared sky resource must be exactly 32768 indexed bytes')
     if exterior:
         if shared_sky_source is not None:
             resource = Path(shared_sky_source).read_bytes()
@@ -264,8 +281,13 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
                     raise ValueError('Require one consistent reserved sky resource or explicit shared-sky-source')
                 resource = next(iter(resources.values()))
                 source = 'consistent staged reserved sky mip0'
-        if len(resource) != SHARED_SKY_BYTES:
-            raise ValueError('Shared sky resource must be exactly 32768 indexed bytes')
+    elif shared_sky_source is not None and resource is None:
+        # No exterior BSP map (an area build of a CHIM town: its CHIM frame map and its rooms name the shared sky
+        # all the same): the prepared shared sky is installed for them (BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36).
+        resource = Path(shared_sky_source).read_bytes()
+        source = str(Path(shared_sky_source).resolve()) + ' (no exterior BSP map: for the CHIM frames and rooms)'
+    if resource is not None and len(resource) != SHARED_SKY_BYTES:
+        raise ValueError('Shared sky resource must be exactly 32768 indexed bytes')
     work.mkdir(parents=True, exist_ok=False)
     (work / 'originals').mkdir()
     (work / 'candidates').mkdir()
@@ -275,7 +297,7 @@ def configure_staged_maps(id1, *, exterior_maps, interior_maps=(), local_skybox=
     # Development builds, and release builds with --allow-release-reuse, reuse results for unchanged map
     # bytes (tools/pass_cache.py; BUILD-IMAGE-NO-RESUME-33).
     from pass_cache import PassCache
-    cache = PassCache.open('exterior-sky', {'local_skybox': local_skybox}, __file__)
+    cache = PassCache.open('exterior-sky', {'local_skybox': local_skybox}, (__file__, '_sky_map'))  # per-map worker only
     tasks = [(str(path), 'exterior' if path.stem in exterior else 'interior' if path.stem in interior else None,
               local_skybox, str(work), cache) for path in inputs]
     # Largest maps first, results as they finish (no wait behind one slow map);

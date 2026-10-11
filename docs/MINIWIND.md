@@ -75,8 +75,9 @@ and the stages left out, with reasons, without building.
 
 ## The presets
 
-The table is `config/miniwind-presets.json`; the builder makes one
-`--miniwind-<name>` option per row.
+Each preset is a build recipe in `config/recipes/miniwind/` (one file per
+preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
+`--miniwind-<name>` option per recipe.
 
 <!-- presets start -->
 | Preset | Option | Scene |
@@ -84,14 +85,19 @@ The table is `config/miniwind-presets.json`; the builder makes one
 | `balmora` | `--miniwind-balmora` | Balmora: exterior and interiors |
 | `balmora-exterior` | `--miniwind-balmora-exterior` | Balmora exterior (map only) |
 | `vivec-arena-pit` | `--miniwind-vivec-arena-pit` | Vivec Arena Pit: combat test |
+| `vivec-arena-chim` | `--miniwind-vivec-arena-chim` | Vivec on CHIM (whole city) from the Arena arrival |
+| `vivec-city-chim` | `--miniwind-vivec-city-chim` | All of Vivec on CHIM, one frame: cantons, Temple, frame edge |
 | `opening-ship` | `--miniwind-opening-ship` | Opening ship: lantern and ship lighting check |
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |
+| `seyda-chim` | `--miniwind-seyda-chim` | Seyda Neen on CHIM (CHIM-native): arrival, residents, doors |
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says
-"Area unavailable". `vivec-arena-pit` stops before any stage with the start
-point's own message until the Vivec Arena interiors are converted.
-`opening-ship` shows the quick character screen on arrival. A test
+"Area unavailable". `vivec-arena-pit` builds all of Vivec (one CHIM frame) with its rooms and starts inside
+the Arena Pit (`vai000`); `vivec-arena-chim` and `vivec-city-chim` start at the Arena arrival.
+`opening-ship` shows the quick character screen on arrival. `seyda-chim` (since v0.0.36-dev5: Seyda Neen is
+CHIM-native, so it is a MiniWind town) starts at Seyda Neen's arrival with its houses; the Census office and the
+prison ship are left out. A test
 (`tests/test_miniwind_docs.py`) fails when a preset is missing from this table.
 
 ## What is left out
@@ -113,26 +119,33 @@ build](MINIWIND_PLAYTESTER.md#what-it-builds), and the exclusion groups are in
 
 ## Add a new sandbox
 
-A new sandbox is a new row in `config/miniwind-presets.json`, never a new
-script:
+A new sandbox is a new recipe file in `config/recipes/miniwind/`, named
+after the preset (`balmora-council-club.json`), never a new script:
 
 ```json
 {
+  "schema": "build-recipe-1",
   "name": "balmora-council-club",
-  "description": "Council Club: talk test",
-  "scope": "full",
-  "start": "interior:Balmora, Council Club",
-  "exclude": [],
-  "unreferenced": "voice,npcs",
-  "character": "Dark Elf,Battlemage,Ilmeni",
-  "skip_census": null
+  "description": "MiniWind preset --miniwind-balmora-council-club: Council Club: talk test",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "full",
+    "miniwind_description": "Council Club: talk test",
+    "direct_to_game_map": "interior:Balmora, Council Club",
+    "exclude_unreferenced": "voice,npcs",
+    "quick_character": "Dark Elf,Battlemage,Ilmeni"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
 }
 ```
 
-`--miniwind-balmora-council-club` then exists. Every row has exactly these
-keys, and the builder checks each with the same rules as the options
-(`tests/test_miniwind_presets.py`). Add the row to the table above too; the
-docs test insists. The key reference is in the
+`--miniwind-balmora-council-club` then exists. A preset recipe sets `miniwind`
+and only the MiniWind options; the builder checks each with the same rules as
+the options (`tests/test_miniwind_presets.py`, `tests/test_build_recipe.py`).
+Add the preset to the table above too; the docs test insists. The key reference is in the
 [MiniWind build guide](chim/build_guide/MINIWIND.md#adding-a-test-spot).
 
 ## The startup screen and the menu

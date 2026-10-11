@@ -89,7 +89,7 @@ are left out by default (`--with-video` keeps them; see
 [Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md#miniwind-builds-are-quick-test-builds-by-default)). Balmora's own region maps stay on the
 disk: they are the source of the CHIM frame map, the town's door and arrival
 data, and the `chim_towns 0` comparison. By default the Balmora exterior runs on CHIM
-(`maps/balmora-chim.bsp`). The pruning is recorded in
+(`maps/balmora-chim.chim`). The pruning is recorded in
 `image/miniwind-prune.json`.
 
 ## Scope: the Balmora exterior only
@@ -117,7 +117,7 @@ Why the rest stays:
   walk poses), and census writes the palette every later stage reads. Their
   maps (the prison ship, Census) leave the image as in the full scope.
 - `balmora`: the residents (they live in the exterior frame map,
-  `maps/balmora-chim.bsp`) and the region maps the frame map is made and
+  `maps/balmora-chim.chim`) and the region maps the frame map is made and
   checked from.
 - `character`: the character catalogue the quick start's Hors preset needs.
 - `reading`, `opening-references`, `dialogue-lookup`: residents' dialogue and

@@ -5,6 +5,17 @@ choice, with a ready-made character: no intro movie, no prison ship, no
 character creation. Use it to test one place again and again. A normal build
 without these options still starts with the full intro.
 
+<!-- contents start -->
+## Contents
+
+- [The four kinds of start point](#the-four-kinds-of-start-point)
+- [The character: `--quick-character`](#the-character---quick-character)
+- [The startup screen](#the-startup-screen)
+- [Worked example: the Vivec Arena Pit](#worked-example-the-vivec-arena-pit)
+- [With `--exclude-unreferenced`](#with---exclude-unreferenced)
+
+<!-- contents end -->
+
 ```sh
 ./build.sh --data-files "/path/to/Morrowind" --direct-to-game-map balmora
 ```
@@ -41,8 +52,9 @@ Cell IDs contain commas and spaces: put the whole start point in quotes.
 
 Before any stage runs:
 
-- the area or room must be in the build: a MiniWind build holds Balmora and
-  (in its full scope) Balmora's rooms; a normal build holds Seyda Neen,
+- the area or room must be in the build: a MiniWind build holds its town
+  (`--miniwind-town`, default Balmora) and, in its full scope, that town's
+  rooms; a normal build holds Seyda Neen,
   Balmora, the shipped towns, their converted rooms and the open world. With
   `--exclude interiors` only the prison ship and the Census and Excise Office
   remain;
@@ -60,6 +72,30 @@ When the image is made, on the final maps:
 
 The resolved start is written to `direct-start.json` beside the image and to
 `build.json` (`direct_start`).
+
+### The player starts in what the build holds
+
+A build of one area starts the player in that area, for every partial-area
+build (MiniWind presets and recipes, `--miniwind-town`, direct starts):
+
+- **The start follows the content.** A MiniWind build without
+  `--miniwind-town` whose start lies in a town (the area itself, one of its
+  rooms or a cell of its grid) holds that town: `--miniwind-preset
+  vivec-arena-chim` (start `vivec_arena`) is a Vivec Arena build with no
+  further option. A MiniWind build with no start begins at its town's own
+  arrival point.
+- **A start outside the build is refused before any stage**, with what the
+  build holds: its areas, its rooms and its cells. There is no fallback to
+  another town.
+- **The image checks it again**, in seconds, after every map is written and
+  before the image is packed: the start map (or the town's CHIM frame map,
+  `maps/<town>-chim.chim`) is in the image, and a start spot on a Quake map
+  has a place to stand on its collision (`start-check.json`, `build.json`
+  `start`).
+
+The start and why it was chosen (explicit, from a recipe, or the town's
+arrival) are recorded in `build-state.json` (`start`); the game's quick-start
+notice (`id1/miniwind.txt`) carries the town and the start line it boots into.
 
 ## The character: `--quick-character`
 
@@ -108,18 +144,16 @@ Cells, Fighters Quarters, Fighters Training, Storage and Hidden Area):
 or, with the preset, `--miniwind-vivec-arena-pit`
 (see [MiniWind](MINIWIND.md#presets)).
 
-**The interior must be in the build.** Today the Vivec Arena interiors are not
-converted (towns imported from `config/towns.json` have no interiors yet,
-IMPORT-TOWN-NO-INTERIORS-32), so the builder refuses this start before any
-stage runs:
-
-```text
---direct-to-game-map "interior:Vivec, Arena Pit": the interior "Vivec, Arena Pit"
-is not in this build. Towns imported from config/towns.json (the Vivec Arena)
-have no converted interiors yet (IMPORT-TOWN-NO-INTERIORS-32). ...
-```
-
-It works as soon as a builder converts the Arena's rooms.
+**The interior must be in the build.** The Arena Pit is the Arena's first
+room in `config/vivec_arena.json` (map `vai000`), and the start resolver finds it
+there; the start makes the build a Vivec Arena build. A CHIM-native town's listed
+rooms are made by its own stage, `chim-rooms-<town>` (`tools/chim_rooms.py`,
+after `chim-town-<town>`): the same room converter as the legacy chain, one
+hashed unit per room, with the doors into the rooms and out to the town's CHIM
+frame linked. The game starts inside the Pit, at the arrival of the door that
+leads into it. A room whose town has no such stage in the plan is refused before
+any stage, naming the room and the missing stage
+(BUILD-MINIWIND-ARENA-PIT-REFUSED-36).
 
 ## With `--exclude-unreferenced`
 

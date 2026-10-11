@@ -15,6 +15,7 @@
 #include "aw_rcount.h"
 #include "chim_local.h"
 #include "aw_town.h"
+#include "aw_mappath.h"
 #ifdef AMIGA
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -142,8 +143,7 @@ static void RestRemember (const char *map, int bytes)
 	}
 	i = rest_next;
 	rest_next = (rest_next + 1) % CHIM_REST_MAPS;
-	strncpy (rest_seen[i].map, map, MAX_QPATH-1);
-	rest_seen[i].map[MAX_QPATH-1] = 0;
+	Q_strcpy_bounded (rest_seen[i].map, map, sizeof (rest_seen[i].map));
 	rest_seen[i].bytes = bytes;
 }
 /* CHIM work per host frame (the ring tick and the client link), for dbg
@@ -324,7 +324,7 @@ static int ReadIndex (void)
 	if (!ChimFormat_Settings (head + CHIM_HEADER_BYTES, &chim_world.settings))
 		goto done;
 	ChimFormat_Toc (head + CHIM_HEADER_BYTES + CHIM_SETTINGS_BYTES, t);
-	if (t->files_at != sizeof(head) || t->files != h.count || t->files < 1 || t->files > 4096 ||
+	if (t->files_at != sizeof(head) || t->files != h.count || t->files < 1 || t->files > CHIM_MAX_FILES ||
 		t->models_at != t->files_at + t->files*CHIM_FILE_BYTES || t->models > 65536 ||
 		t->order_at != t->models_at + t->models*CHIM_MODEL_DIR_BYTES ||
 		t->textures_at != t->order_at + 4*t->models || t->textures > 65536 ||
@@ -486,6 +486,23 @@ static void Fail (const char *why)
 	hunk_mark = -1;
 }
 
+/* A frame map whose CHIM world does not hold its frame is not a playable map
+ * (an empty world: all its geometry is in the CHIM world): refused loudly
+ * instead of running as a void. Memory shortfalls keep Fail's fallback. */
+static void Refuse (int cx, int cy, const char *why)
+{
+	strncpy (failure, why, sizeof(failure)-1);
+	failure[sizeof(failure)-1] = 0;
+	active = 1;
+	MapEnd ();
+	far_only = 0;
+	if (hunk_mark >= 0)
+		Hunk_FreeToLowMark (hunk_mark);
+	hunk_mark = -1;
+	Host_Error ("CHIM frame map %s (frame %ld %ld): %s; it is a BSP29 file but not a playable map without its CHIM world",
+		sv.modelname, (long)cx, (long)cy, why);
+}
+
 static void MapBegin (const char *entities)
 {
 	int cx, cy, size, free_bytes;
@@ -544,12 +561,12 @@ static void MapBegin (const char *entities)
 	chim_world.buffer = buffer_user.data;
 	if (!ReadIndex ())
 	{
-		Fail ("invalid chim/world.cwi");
+		Refuse (cx, cy, "its CHIM world (chim/world.cwi) cannot be read");
 		return;
 	}
 	if (!ChimChunks_Begin (cx, cy))
 	{
-		Fail ("invalid CHIM frame pack");
+		Refuse (cx, cy, "the CHIM world has no valid pack for this frame");
 		return;
 	}
 	/* The frame's far terrain (chim_far.c, low Hunk, given back with the
@@ -748,7 +765,9 @@ int Chim_Active (void)
 
 /* ---------------------------------------------------------------- towns */
 
-/* A town of the town table runs as one CHIM frame map, maps/<town>-chim.bsp,
+/* A town of the town table runs as one CHIM frame map, maps/<town>-chim.chim
+ * (or maps/<town>-chim.bsp from a builder run with --chim-frame-ext bsp; the
+ * one resolver, aw_mappath.c, picks the file),
  * when that map exists: the region code (aw_region.c) then loads it instead
  * of the town's region maps and crosses no regions. Door links, sky, fog and
  * every other per-town table keep the town's name. Asked every frame, so the
@@ -756,9 +775,11 @@ int Chim_Active (void)
 static int TownFile (const char *town, char *path)
 {
 	FILE *f = NULL;
+	char name[32];
 	if (!town || !*town || strlen (town) > 24)
 		return 0;
-	sprintf (path, "maps/%s-chim.bsp", town);
+	sprintf (name, "%s-chim", town);
+	AW_MapPath (name, path, MAX_QPATH+16);
 	COM_FOpenFile (path, &f);
 	if (!f)
 		return 0;
@@ -1076,6 +1097,7 @@ void Chim_Init (void)
 		return;		/* legacy data: no hook is set, nothing changes */
 	fclose (f);
 	available = 1;
+	aw_chim_world = 1;		/* the map path resolver may now pick .chim frame maps */
 	CacheBank ();
 	aw_chim_map_begin = MapBegin;
 	aw_chim_map_end = MapEnd;
