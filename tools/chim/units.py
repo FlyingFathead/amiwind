@@ -22,7 +22,7 @@ UNIT_FORMAT = 1           # bump when a unit's pickled result changes shape
 
 # Tool sources whose bytes are part of each unit's fingerprint.
 _GEOMETRY = ['tools/prepare_mesh_bsp.py', 'tools/mesh_geometry.py', 'tools/static_lod.py', 'tools/scenery_reduce.py',
-             'tools/routed_hull.py',
+             'tools/routed_hull.py', 'tools/visual_primitives.py',
              'tools/surface_flatten.py', 'tools/exterior_visibility.py', 'tools/player_hull.py', 'src/mwad/scene.py',
              'config/surface-flattening.json']
 TOOLS = {

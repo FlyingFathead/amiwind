@@ -20,6 +20,76 @@
       ],
       "divisions": 2,
       "reason": "v0.0.28-rc1 flora overlay clipnode reserve failure; preserve all original collision"
+    },
+    {
+      "parent": "vf1177",
+      "cell": [
+        2,
+        -3
+      ],
+      "parent_divisions": 1,
+      "divisions": 2,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
+    },
+    {
+      "parent": "vf1179",
+      "cell": [
+        2,
+        -2
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
+    },
+    {
+      "parent": "vf1258",
+      "cell": [
+        3,
+        -2
+      ],
+      "parent_divisions": 1,
+      "divisions": 2,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
+    },
+    {
+      "parent": "vf1457",
+      "cell": [
+        6,
+        -2
+      ],
+      "parent_divisions": 1,
+      "divisions": 2,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
+    },
+    {
+      "parent": "vf1695",
+      "cell": [
+        9,
+        0
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
+    },
+    {
+      "parent": "vf1696",
+      "cell": [
+        9,
+        0
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
+    },
+    {
+      "parent": "vf1819",
+      "cell": [
+        10,
+        -1
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.38 lava terrain exceeds 4 MiB; measured four-child split preserves original core triangles and 896-unit apron (BUILD-LAVA-TERRAIN-BUDGET-38)"
     }
   ]
 }

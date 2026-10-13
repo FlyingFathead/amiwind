@@ -415,6 +415,7 @@ void AW_SceneDraw(void);
 void AW_SceneSpawn(edict_t *p);
 void AW_SceneSignon(void);
 int AW_InteriorPlace(edict_t *p,vec3_t preferred);
+int AW_RecoverPlace(edict_t *p,vec3_t preferred);
 int AW_Unstuck(edict_t *p);
 void AW_SceneInit(void);
 void AW_DoorAudioInit(void);

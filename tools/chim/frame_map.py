@@ -410,6 +410,39 @@ def stream_enabled():
     return value == '1'
 
 
+def startup_sound_scratch(id1):
+    """Quick-character startup uses AmiQuake S_LoadSound's 1 KiB stack buffer.
+
+    Larger WAVs use COM_LoadStackFile -> Hunk_TempAlloc(length + 1).
+    Reserve the largest sequential temporary buffer, not their sum. Ordinary
+    images without skip-census retain their existing frame reserve.
+    """
+    import hashlib
+    root = Path(id1)
+    config = root / 'default-game.cfg'
+    raw = config.read_bytes() if config.is_file() else b''
+    enabled = False
+    for line in raw.decode('utf-8').splitlines():
+        fields = line.split('//', 1)[0].split()
+        if len(fields) == 2 and fields[0] == 'aw_skip_census':
+            enabled = float(fields[1].strip('"')) != 0
+    inputs = {'config': hashlib.sha256(raw).hexdigest()}
+    peak = 0
+    if enabled:
+        for name in ('intro/chargen_class1.wav', 'intro/chargendock2.wav',
+                     'pool/a5db2581e86f75e13.wav'):
+            path = root / 'sound' / name
+            if not path.is_file():
+                inputs[name] = None
+                continue
+            data = path.read_bytes()
+            inputs[name] = hashlib.sha256(data).hexdigest()
+            if len(data) > 44 and len(data) + 1 > 1024:
+                # 16-byte hunk header; payload aligned to 16 by Hunk_TempAlloc.
+                peak = max(peak, 16 + ((len(data) + 1 + 15) & ~15))
+    return {'bytes': peak, 'inputs': inputs}
+
+
 def hunk_rest(id1, rows):
     """HUNK_KEY: bytes the map loads into the Hunk after the CHIM zone: the client's per-map
     allocations (engine_limits.MEASURED_HUNK), the sprites of the frame map's entities that are not
@@ -418,7 +451,7 @@ def hunk_rest(id1, rows):
     from engine_limits import MEASURED_HUNK
     models = {e['model'] for e in rows if e.get('model', '').endswith('.spr') and CHUNK_KEY not in e
               and (Path(id1) / e['model']).is_file()}
-    return (MEASURED_HUNK['client_per_map_bytes'] + HUNK_REST_MARGIN
+    return (MEASURED_HUNK['client_per_map_bytes'] + HUNK_REST_MARGIN + startup_sound_scratch(id1)['bytes']
             + sum((Path(id1) / m).stat().st_size + SPRITE_HUNK_OVERHEAD for m in models))
 
 
@@ -819,7 +852,8 @@ def set_region_origin_z(id1, name, z):
     set_region_origins_z(id1, {name: z})
 
 
-def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, hand_fields=None):
+def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, hand_fields=None,
+                source_sections=None):
     """The inputs of one CHIM region frame map (build_region), checked and picklable for a pool worker:
     the open-world map the frame replaces (exactly one, covering exactly the frame's cell), its origin and
     core, and the frame's CHIM placement references. world: the CHIM world already loaded (load);
@@ -867,6 +901,34 @@ def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, ha
     task = {'id1': str(id1), 'frame': frame, 'name': name, 'origin': list(origin), 'core': list(core),
             'placed': placed, 'bounds': [list(lo), list(hi)], 'grid': json.loads(json.dumps(grid)), 'stream': stream,
             'rows': mode, 'aliases': list(aliases)}
+    if source_sections is None:
+        source_sections = region_source_sections(world_dir)
+    if cell in source_sections:
+        section = source_sections[cell]
+        sprite_rows = section.get('sprite_entities', [])
+        if sprite_rows:
+            if task['rows'] != 'game-data':
+                raise ValueError('Recipe sprites require game-data frame rows')
+            assets = {}
+            for asset in section['sprite_assets']:
+                path = asset['path']
+                if not re.fullmatch(r'progs/aw_flora/f_[0-9a-f]{16}\.spr', path):
+                    raise ValueError('Invalid recipe sprite path')
+                src = (Path(world_dir) / asset['file']).resolve()
+                if not src.is_relative_to(Path(world_dir).resolve()):
+                    raise ValueError('Recipe sprite escapes build output')
+                raw = src.read_bytes()
+                if _sha256(raw) != asset['sha256'] or len(raw) != asset['bytes']:
+                    raise ValueError('Recipe sprite checksum mismatch: ' + path)
+                target = id1 / path
+                if target.is_file() and target.read_bytes() != raw:
+                    raise ValueError('Conflicting shared sprite asset: ' + path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+                assets[path] = asset['sha256']
+            if any(r.get('classname') != 'aw_flora' or r.get('model') not in assets for r in sprite_rows):
+                raise ValueError('Unbound recipe sprite entity')
+            task['sprite_rows'], task['sprite_assets'] = sprite_rows, assets
     if task['rows'] == 'game-data':
         if world is None or hand_fields is None:
             raise ValueError('CHIM region frame %s: rows from the game data need the CHIM world and the hand fields'
@@ -933,8 +995,28 @@ def frame_ground(world, cell, point=(0.0, 0.0), top=None, bottom=None):
     bottom = min(c['zmin'] for c in chunks) - FLOOR_MARGIN if bottom is None else bottom
     from chim.collision import FrameScene
     index = next(i for i, (_, frame, _) in enumerate(world['frames']) if tuple(frame['cell']) == tuple(cell))
-    hit = FrameScene(world, index, hull=0).trace((point[0], point[1], top), (point[0], point[1], bottom))
-    return None if not hit else top + (bottom - top) * hit['fraction']
+    return ground_trace(FrameScene(world, index, hull=0), point, top, bottom)
+
+
+def ground_trace(scene, point, top, bottom):
+    """First solid height, searched top-down with bounded exact hull sweeps.
+
+    CHIM-FRAME-GROUND-TRACE-38: a ceiling-to-floor sweep through a shared
+    point-hull DAG can exceed the offline visit guard despite having no cycle.
+    Reuse the same tracer over contiguous 256-unit segments, retaining its
+    cycle/visit checks and returning the first hit. No hull or runtime change.
+    """
+    if not all(math.isfinite(v) for v in (*point, top, bottom)):
+        raise ValueError('Invalid ground trace bounds')
+    z = top
+    direction = -1 if bottom < top else 1
+    while z != bottom:
+        end = max(bottom, z - 256.0) if direction < 0 else min(bottom, z + 256.0)
+        hit = scene.trace((point[0], point[1], z), (point[0], point[1], end))
+        if hit is not None:
+            return z + (end - z) * hit['fraction']
+        z = end
+    return None
 
 
 def region_cache():
@@ -962,8 +1044,10 @@ def region_inputs(task, legacy):
                              'placed': _sha256(json.dumps(task['placed']).encode()), 'bounds': task['bounds'],
                              'grid': _sha256(json.dumps(task['grid']).encode()), 'worldspawn': task['worldspawn'],
                              'start_z': task['start_z'], 'activated': _sha256(Path(ACTIVATED_HEADER).read_bytes()),
-                             'stream_statics': task['stream'],
-                             **({'aliases': task['aliases']} if task.get('aliases') else {})})
+                             'stream_statics': task['stream'], 'startup_sound': startup_sound_scratch(id1),
+                             **({'aliases': task['aliases']} if task.get('aliases') else {}),
+                             **({'sprite_rows': task['sprite_rows'], 'sprite_assets': task['sprite_assets']}
+                                if task.get('sprite_rows') else {})})
     models = {}
     for e in entities(legacy):
         model = e.get('model', '')
@@ -974,7 +1058,7 @@ def region_inputs(task, legacy):
                          'placed': _sha256(json.dumps(task['placed']).encode()), 'bounds': task['bounds'],
                          'grid': _sha256(json.dumps(task['grid']).encode()),
                          'models': models, 'activated': _sha256(Path(ACTIVATED_HEADER).read_bytes()),
-                         'stream_statics': task['stream']})
+                         'stream_statics': task['stream'], 'startup_sound': startup_sound_scratch(id1)})
 
 
 def region_map(task):
@@ -1084,6 +1168,10 @@ def _region_map_game_data(task):
         raise ValueError('CHIM region frame map %s (%s): %s' % (name, frame['id'], '; '.join(refused[:6])))
     rows = [dict(task['worldspawn']),
             {'angle': '90', 'classname': 'info_player_start', 'origin': '%g %g %g' % (0, 0, task['start_z'])}]
+    rows.extend(dict(r) for r in task.get('sprite_rows', []))
+    problems, _ = static_check(rows)
+    if problems:
+        raise ValueError('; '.join(problems))
     rows[0][FRAME_KEY] = '%d %d' % cell
     lo, hi = (tuple(v) for v in task['bounds'])
     streamed, streamed_bytes = 0, 0
@@ -1167,6 +1255,17 @@ def build_region(id1, frame, world_dir, world=None, rows=None, hand_fields=None)
     return record
 
 
+def region_source_sections(world_dir):
+    """Read sprite provenance once per batch, preserving the first section for each cell."""
+    source_path = Path(world_dir) / 'chim-source.json'
+    sections = {}
+    if source_path.is_file():
+        source = json.loads(source_path.read_text(encoding='utf-8'))
+        for section in source['frames']:
+            sections.setdefault(tuple(section['cell']), section)
+    return sections
+
+
 def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progress=None, rows=None,
                   hand_fields=None):
     """build_region for every CHIM region frame: the frame maps are made on the shared worker pool
@@ -1177,7 +1276,9 @@ def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progre
     from build_parallel import ordered_map
     id1 = Path(id1)
     directory = world_directory(id1)
-    tasks = [region_task(id1, frame, world_dir, world=world, directory=directory, rows=rows, hand_fields=hand_fields)
+    source_sections = region_source_sections(world_dir)
+    tasks = [region_task(id1, frame, world_dir, world=world, directory=directory, rows=rows,
+                         hand_fields=hand_fields, source_sections=source_sections)
              for frame in frames]
     if len({t['name'] for t in tasks}) != len(tasks):
         raise ValueError('CHIM region frames: two frames replace the same open-world map')

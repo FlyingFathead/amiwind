@@ -75,8 +75,10 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - AW-20260928-11 (no report page): Census missing floor and wall / falling into void
 - AW-20260928-20 (no report page): Census clipped outside room near captain wing
 - [CENSUS-ENTITIES-30](CENSUS-ENTITIES-30.md): Census Office objects misplaced (upright rug, ceiling hole, tapestry)
+- [CHIM-TERRAIN-ROCK-EXEMPT-38](CHIM-TERRAIN-ROCK-EXEMPT-38.md): Terrain-named placed rocks bypass experimental buried-surface clipping
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+- [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges
 
 Related bugs in other categories:
 

@@ -132,9 +132,9 @@ n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((200*K)) ]; do
   alive || finish "FAIL emulator exited during boot"; con "aw_remote 1"; sleep 2; key Escape; sleep $((8*K)); n=$((n+2+8*K)); done
 [ -s $R/awctl/state.txt ] || finish "FAIL no remote control after boot"
 log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
-if [ "${START:-map}" = enter ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
-  key Return; loaded "$MAP1"; i=0  # until the view renders (local origin not 0 0 0), at most 20 pages
-  while [ $i -lt 20 ] && { [ "$(st map)" = none ] || [ "$(st local)" = "0 0 0" ]; }; do sleep $((2*K)); key Return; i=$((i+1)); done
+if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
+  [ "${START:-map}" = auto ] || key Return; loaded "$MAP1"; i=0  # until the view renders (local origin not 0 0 0), at most 20 pages
+  while [ "${START:-map}" != auto ] && [ $i -lt 20 ] && { [ "$(st map)" = none ] || [ "$(st local)" = "0 0 0" ]; }; do sleep $((2*K)); key Return; i=$((i+1)); done
   sleep $((2*K)); [ "$(st map)" != none ] && [ "$(st local)" != "0 0 0" ] || finish "FAIL $MAP1 runs but the game never started (client map $(st map))"
   log "in game after $i Enter presses: local $(st local)"
 else rc "map $MAP1"; loaded "$MAP1"; case "$AFTER" in key:*) sleep $((3*K)); key "${AFTER#key:}"; log "after load: key ${AFTER#key:}";; ?*) rc "$AFTER"; log "after load: $AFTER";; esac; fi
@@ -156,7 +156,9 @@ if [ -s $R/script.txt ]; then
     esac
     alive || finish "FAIL emulator exited after script step: $line"
   done 3< $R/script.txt
-  finish "PASS script, $MAP1 running, $(( $(date +%s) - t0 )) s"
+  [ "$(st screen)" = game ] && [ "$(st signon)" = 4 ] && [ "$(st world_leafs)" -gt 0 ] 2>/dev/null ||
+    finish "FAIL scripted run ended outside play: map $(st map), signon $(st signon), world leaves $(st world_leafs)"
+  finish "PASS script, $(st map) running, $(( $(date +%s) - t0 )) s"
 fi
 rc "aw_music_status"; sleep $((3*K)); a=$(reads); sleep $((5*K)); rc "aw_music_status"; sleep $((3*K)); b=$(reads)
 [ -n "$a" ] && [ -n "$b" ] && [ "$b" -gt "$a" ] || finish "FAIL music not reading in $MAP1 (reads $a -> $b)"
@@ -228,7 +230,7 @@ def main(argv=None):
                     'e.g. key:Return for a MiniWind image, which holds its startup screen until Enter')
     ap.add_argument('--log-illegal', action='store_true',
                     help='FS-UAE logs the 68k PC of every unmapped memory access (uae_log_illegal_mem; with --prof interp)')
-    ap.add_argument('--start', choices=('map', 'enter'), default='map',
+    ap.add_argument('--start', choices=('map', 'enter', 'auto'), default='map',
                     help='map: load --map from the console (default); enter: press Enter on a MiniWind startup screen, which starts '
                          'its own scene (--map names the map it must load)')
     ap.add_argument('--script', type=Path,

@@ -1,9 +1,9 @@
 {
-  "version": "0.0.36",
-  "published": "a81ad911d15374135b33b24f2e5bb0d7ccd949b6",
+  "version": "0.0.37",
+  "published": "6196335f93a5495d2b1e49b6e3849f2f565185c2",
   "commits": [
-    "a81ad911d15374135b33b24f2e5bb0d7ccd949b6",
-    "961d762c7e64b391f55922d00c815abb0d12ded3"
+    "6196335f93a5495d2b1e49b6e3849f2f565185c2",
+    "fad40848912bb9c42e04392fd4f35388aee30c71"
   ],
-  "note": "The previous release: a release candidate or final must contain the published commit (tag v0.0.36, a81ad91); 961d762 is its private release-line commit with the same tree, accepted only together with the published one (tools/previous_release.py). Move the pin when a release ships."
+  "note": "The previous release: a release candidate or final must contain the published commit (tag v0.0.37, 6196335); fad4084 is its private release-line commit with the same tree, accepted only together with the published one (tools/previous_release.py). Move the pin when a release ships."
 }

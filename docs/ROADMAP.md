@@ -3,6 +3,8 @@
 <!-- contents start -->
 ## Contents
 
+- [v0.0.39 - Cell By Cell, Piece By Piece (working title)](#v0039---cell-by-cell-piece-by-piece-working-title)
+- [v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith) (in preparation)](#v0038---lava-is-all-you-need-and-a-hint-of-tel-uvirith-in-preparation)
 - [v0.0.37 - Proofreading the Cantons (fix release)](#v0037---proofreading-the-cantons-fix-release)
 - [v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines) (released)](#v0036---36-lessons-of-vivecs-cantons-and-vvardenfell-shorelines-released)
 - [v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (released)](#v0035---chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore-released)
@@ -145,18 +147,42 @@
 - [Main-quest milestone: Just an Old Man with a Skooma Problem](#main-quest-milestone-just-an-old-man-with-a-skooma-problem)
   - [Conditional v0.0.29 release checkpoint -- More Mushrooms](#conditional-v0029-release-checkpoint----more-mushrooms)
 - [Mandatory roadmap and bug tracking](#mandatory-roadmap-and-bug-tracking)
+  - [Player and NPC animation coverage follow-up](#player-and-npc-animation-coverage-follow-up)
+  - [Optional cloud-horizon experiment](#optional-cloud-horizon-experiment)
+  - [Optional rising lava smoke and plumes](#optional-rising-lava-smoke-and-plumes)
+- [Owner-reported follow-up queue, 13 October 2026](#owner-reported-follow-up-queue-13-october-2026)
 
 <!-- contents end -->
+
+## v0.0.39 - Cell By Cell, Piece By Piece (working title)
+
+Tentative title for the release following completion of v0.0.38, primarily focused on bugfixes. Included cells remain to be confirmed from build and package evidence. Landmark debug teleports should make reproduction easier; Tel Uvirith has the source aliases `dbg tp tel_uvirith` and `dbg tp teluvirith`, with native arrival verification pending.
+
+
+## v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith) (in preparation)
+
+Finish the full-game image with both lava conversion paths and the completed
+Tel Uvirith stronghold in cell (10,1). The full-world conversion includes all
+27 original lava-bearing cells and the optimized stronghold; final HDF readback,
+native checks and delivery remain pending. See the
+[release checklist](RELEASE-v0.0.38.md) for acceptance requirements and the
+[bug register](BUGS.md) for current issue status.
+
+The Toolkit's Included counts must come from verified package contents.
+Conversion plans, passing offline checks and packaged coverage remain distinct.
+Further coast coverage, gameplay repairs and measured streaming/cache work
+continue after this release; they are not implied to be shipped in v0.0.38.
 
 ## v0.0.37 - Proofreading the Cantons (fix release)
 
 The v0.0.36 release notes and README brought in line with the released code, and the logo images fixed. No
-game change. The next feature release is v0.0.38, "Piece By Piece, Cell By Cell": the lava cells first, then the
-objects still missing in the CHIM coast, then every green cell on the map.
-For real machines with lots of Fast RAM (first tester: A4000 with a 68060 accelerator), v0.0.38 also sizes the CHIM
-cache and heap from the free Fast RAM at start and makes CHIM disk reads non-blocking; the cache, prefetch and
-lookahead themselves exist already ([real hardware](REAL_HARDWARE.md)).
-The v0.0.38 work is adaptive CHIM caching and non-blocking world streaming: keep `-chimcache` as the manual
+game change. Its earlier roadmap assigned a working title and broader feature
+plans to v0.0.38; the release sections above supersede that assignment.
+For real machines with lots of Fast RAM (first tester: A4000 with a 68060 accelerator),
+adaptive cache sizing and non-blocking CHIM disk reads remain follow-up work;
+the cache, prefetch and lookahead themselves exist already
+([real hardware](REAL_HARDWARE.md)).
+The proposed follow-up is adaptive CHIM caching and non-blocking world streaming: keep `-chimcache` as the manual
 override; detect usable Fast RAM and grow the cache conservatively without touching the tested baseline heap; count
 cache hits, misses and evictions; and turn CHIM's blocking pack reads (`Chim_PackRead`,
 [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)) into reads that complete in the background,
@@ -289,6 +315,14 @@ A better pipeline for finding and removing slow or idle build sections:
 - Heightmap terrain collision: a prototype, measured first.
 
 ### Gameplay
+
+- [ ] Small improvement: add a saved noclip-only walking-bob control,
+  `dbg noclipwobble [on|off]` with alias `dbg noclipbob`, default **off**
+  (`0` / `false`). Noclip should
+  provide a steady inspection view by default; walking outside noclip keeps
+  its existing behavior. Reuse AmiQuake's view-bob machinery in `view.c` and
+  the existing debug command dispatcher. Verify off/on and return to normal
+  walking. Requested; not yet implemented.
 
 - Combat and companion leftovers: hit chance, block, voices, death animation and sound,
   first-person weapons.
@@ -2329,6 +2363,13 @@ exact generated apply/publish script before packaging or posting commands.
 
 ### Transport and resident voices
 
+- [ ] Vivec gondola travel between cantons: owner-reported not implemented in
+  v0.0.38-dev2. Reconcile original gondolier routes and fares, then verify the
+  interaction and successful destination transition. An NPC and talk prompt
+  alone do not establish a working service. Track dock access separately in
+  [WORLD-SLOPE-STUCK-38](bugs/WORLD-SLOPE-STUCK-38.md), and service coverage in
+  [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md).
+
 After the interior inspection checkpoint, expose Darvame Hleran's source travel
 routes in an interaction screen beside the Silt Strider. Show destination, fare
 and current gold; check affordability before travel. An unconverted destination
@@ -2967,3 +3008,65 @@ The planned release title is **AmiWind v0.0.29 -- More Mushrooms**. Ship only af
 ## Mandatory roadmap and bug tracking
 
 Maintain this roadmap with [BUGS.md](BUGS.md) and the [current release plan](PLAN-v0.0.29.md). Each active or deferred milestone needs its current scope, next action and acceptance gate; each defect needs an ID, evidence and status. Reconcile both against the exact package before release. Current priority remains final More Mushrooms before the combat-arena milestone.
+
+### Player and NPC animation coverage follow-up
+
+Keep incomplete animation coverage active alongside the v0.0.38 work. Audit
+original animation groups through conversion, packaging and runtime selection
+for the player and relevant NPCs, including companion movement. Explicit gaps
+reported in the current playtest include swimming/diving poses and third-person
+jumping; walk/run/attack coverage alone does not complete the animation kit.
+Track current status in [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md),
+[PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md), and
+[WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md).
+
+### Optional cloud-horizon experiment
+
+Investigate a cheaper, gentler cloud fade near the horizon, where the current
+layer appears abruptly cut. Preserve the current sky as the baseline. Prototype
+optional styles, for example the proposed `horizonclouds` control (style 2), before selecting any
+new default; type 1 should retain the current appearance. These commands are proposals, not implemented controls. Compare a
+subtle veil or one/two gradient transitions using existing sky rendering first.
+Measure baseline CPU, memory, palette/banding, horizon visibility and gameplay
+impact at matched views and times against the original. This is exploratory
+follow-up work, not a reason to change the current sky during lava repairs.
+
+### Optional rising lava smoke and plumes
+
+Add independently switchable rising smoke sprites over lava, with proposed
+`lavasmoke` and `lavaplumes` controls accepting `1/0`, `on/off` and `true/false`. Default-on is
+conditional on suitable converted sprites and verified visibility and resource
+cost. Inspect original effects and compare matched views before acceptance.
+Reuse AmiQuake sprite rendering and bounded effect allocation where suitable;
+existing lava embers already use `AW_EmberSpawn` and the `r_part.c` particle
+pool, but embers do not provide smoke sprites. Keep smoke separate from damage
+and surface rendering, cap nearby emitters, and measure baseline CPU/memory.
+Preserve an off control and verify both legacy and CHIM regions. Implementation
+and source-asset discovery remain pending.
+
+## Owner-reported follow-up queue, 13 October 2026
+
+Finish v0.0.38 delivery first. Then work through these reports; current status
+remains in the bug register, and this list does not claim repairs or acceptance.
+
+- [INTRO-CAMERA-GATING-38](bugs/INTRO-CAMERA-GATING-38.md): Race selection / vanity and third-person gating.
+- [COMBAT-AMBIENT-SPEECH-GATING-38](bugs/COMBAT-AMBIENT-SPEECH-GATING-38.md): Suppress unrelated greetings and subtitles during combat.
+- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): Torch pose and underwater torch rules.
+- [PLAYER-READY-THIRDPERSON-38](bugs/PLAYER-READY-THIRDPERSON-38.md): Weapon-ready and fists-up animation.
+- [PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md): Jump animation.
+- [PLAYER-READY-WATER-MOVEMENT-38](bugs/PLAYER-READY-WATER-MOVEMENT-38.md): Readied state walking on water.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Swimming/diving and original water behavior; preserve existing underwater visuals.
+- [WORLD-SLOPE-STUCK-38](bugs/WORLD-SLOPE-STUCK-38.md): Ashlands slope and Vivec dock/gondola access.
+- [STAIRS-MOLAG-ACCESS-38](bugs/STAIRS-MOLAG-ACCESS-38.md): Tel Uvirith walkway and door stairs.
+- [WORLD-SHORE-OPEN-GEOMETRY-38](bugs/WORLD-SHORE-OPEN-GEOMETRY-38.md): Broken shore/rock geometry.
+- [HORIZON-HOLES-31](bugs/HORIZON-HOLES-31.md): Distant LAND holes.
+- [MESH-VIVEC-CAP-GAP-38](bugs/MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap.
+- [INTERIOR-HULL-CHAIN-33](bugs/INTERIOR-HULL-CHAIN-33.md): Arena pit performance observation; cause not yet proved.
+- [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): Gondola travel service missing; feature coverage.
+- [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md): Menu/key help including F10.
+- [TREE-VIEW-FLOAT-38](bugs/TREE-VIEW-FLOAT-38.md): direction-dependent floating tree.
+
+Additional improvements: optional, measured cloud-horizon fading; terrain-texture
+fidelity measured for CPU and memory; preserve approved distant-tree silhouettes;
+continue exterior CHIM coverage with exact packaged inclusion; retain the
+requested debug landmark teleports, inspection startup and noclip bob controls.

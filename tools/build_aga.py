@@ -1037,6 +1037,44 @@ def chim_town_grounding(args):
     return out
 
 
+def empty_miniwind_actor_evidence(args, maps):
+    """Prove no resident contact is expected; retain deferred creature spawns as missing coverage."""
+    if not getattr(args, 'miniwind', False) or getattr(args, 'miniwind_scope', None) != 'exterior':
+        return None
+    town = getattr(args, 'miniwind_town', None)
+    frames = chim_town_grounding(args)
+    if not town or set(frames) != {town} or frames[town]:
+        return None
+    if any(p.stem != 'torchtest' for p in Path(maps).glob('*.bsp')):
+        return None
+    from mwad.audit import load_esm
+    from mwad.paths import child_ci
+    from town_config import load_settings
+    from import_town import in_frame
+    master = child_ci(args.data_files, 'Morrowind.esm')
+    original = load_esm(master)
+    settings = load_settings(town)
+    deferred_spawns = []
+    # Scan every exterior cell: actor ownership is by origin, including cross-cell placements.
+    for cell, record in original['cells'].items():
+        for ref in record['refs']:
+            if ref.get('deleted'):
+                continue
+            obj = original['objects'].get(ref['id'].casefold())
+            placed = dict(ref, cell=list(cell))
+            if in_frame(placed, settings):
+                if obj is None or obj['type'] in ('NPC_', 'CREA'):
+                    return None
+                if obj['type'] == 'LEVC':
+                    # import_town.split_references defers these markers: no creature is instantiated.
+                    # This is missing gameplay coverage, not a supported or contact-tested actor.
+                    deferred_spawns.append({'reference': ref['number'], 'id': ref['id'],
+                                            'position': ref['position'], 'status': 'unconverted creature spawn'})
+    return {'scope': 'MiniWind exterior without ground residents; creature spawns remain unconverted', 'town': town,
+            'source_master_sha256': hashlib.sha256(master.read_bytes()).hexdigest(),
+            'source_resident_count': 0, 'deferred_creature_spawns': deferred_spawns, 'bounds': settings['bounds']}
+
+
 def chim_town_placements(args, id1):
     """{'<town>-chim': reference numbers} for each --chim-town town: its CHIM world placements, its frame
     actors and its region harvest catalogues (the entity tracker counts them as the legacy region maps
@@ -1295,7 +1333,7 @@ def miniwind_options(args):
     if not getattr(args, 'miniwind', False):
         if getattr(args, 'miniwind_features', None) or getattr(args, 'miniwind_description', None) or \
                 getattr(args, 'miniwind_scope', None) or getattr(args, 'miniwind_town', None) or \
-                getattr(args, 'miniwind_debug', False) or getattr(args, 'default_draw_distance', None):
+                getattr(args, 'miniwind_debug', False) or getattr(args, 'miniwind_map_inspection', False) or getattr(args, 'default_draw_distance', None):
             raise ValueError('--miniwind-features/--miniwind-description/--miniwind-scope/--miniwind-town/'
                              '--miniwind-debug/--default-draw-distance require --miniwind')
         if getattr(args, 'world_scenery', None) is None:
@@ -1309,6 +1347,9 @@ def miniwind_options(args):
     town = miniwind.check_town(getattr(args, 'miniwind_town', None) or miniwind.TOWN)
     debug = bool(getattr(args, 'miniwind_debug', False))
     boot = miniwind.boot_line([c for c in (getattr(args, 'miniwind_boot', None) or '').split(';') if c.strip()])
+    inspection = bool(getattr(args, 'miniwind_map_inspection', False))
+    if inspection:
+        boot = miniwind.inspection_boot(boot)
     miniwind.data_file(features, town, debug=debug, boot=boot)
     for name in ('world_scenery', 'world_terrain', 'world_flora', 'seyda_recorded', 'gallery'):
         if getattr(args, name, None) is not None:
@@ -1320,6 +1361,7 @@ def miniwind_options(args):
     if draw is not None and (not debug or not 128 <= draw <= 540):
         raise ValueError('--default-draw-distance is DEBUG ONLY (--miniwind-debug) and 128..540')
     return {'features': features, 'scope': scope, 'town': town, 'debug': debug, 'draw_distance': draw or 540, 'boot': boot,
+            'map_inspection': inspection,
             'description': miniwind.check_description(getattr(args, 'miniwind_description', None))}
 
 
@@ -1689,6 +1731,8 @@ def image(args):
     else:
         print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
     (boot/'id1/quake.rc').write_text('exec default.cfg\nexec default-game.cfg\nexec config.cfg\nexec keymap.cfg\nexec keymaps.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_horizon_migrate\naw_startup\n', newline='\n')
+    if mini and mini.get('map_inspection'):
+        mini['inspection_setup'] = miniwind.install_map_inspection(boot/'id1')
     if mini:
         # The engine reads the notice and starts in the town (aw_miniwind.c, aw_scene.c aw_quick_start).
         mini['header']=test_header(mini,None,boot/'id1/gfx/magic16.awf')[1]
@@ -2103,7 +2147,8 @@ def finalize_image(args):
     # residents of CHIM-native town frames: their town stage's fit on the frame collision, judged by the same gate
     actor_report = require_actor_ground(boot/'id1/maps', out/'actor-initial-contact.json',
                                        getattr(args, 'allow_known_actor_ground_findings', None),
-                                       findings_only=True, jobs=jobs, chim_frames=chim_town_grounding(args))
+                                       findings_only=True, jobs=jobs, chim_frames=chim_town_grounding(args),
+                                       empty_scene=empty_miniwind_actor_evidence(args, boot/'id1/maps'))
     actor_acceptance = actor_report['acceptance']
     (out/'actor-ground-acceptance.json').write_text(json.dumps(actor_acceptance, indent=2)+'\n', newline='\n')
     # Count original versus placed entities on the final maps; an unexplained
@@ -2161,6 +2206,11 @@ def finalize_image(args):
         # CHIM region frames (EXPERIMENTAL): the open-world maps replaced in place (and their harvest catalogues)
         region_replaced = [row for record in chim_frames['region_maps'] for row in record['replaced']]
         removed_legacy += region_replaced
+        # Town-first world routing can also make neighbouring legacy region
+        # cores unreachable. Keep explicit payload dependencies and all partial
+        # cores; record the remaining removals before image gates and packing.
+        from world_payload import prune as prune_world_payload
+        removed_legacy += prune_world_payload(boot/'id1', out/'world-payload-pruning.json')
         if chim_frames['region_maps']:
             print('[chim] CHIM region frames: %d open-world maps replaced in place by CHIM frame maps (%d legacy '
                   'bytes out, %d frame-map bytes in)' % (len(chim_frames['region_maps']),
@@ -2486,6 +2536,7 @@ def main():
     i.add_argument('--miniwind-description',help='With --miniwind: optional "Scene:" line of the startup screen')
     i.add_argument('--miniwind-boot',metavar='CMD[;CMD]',help='With --miniwind: dbg commands run once on arrival')
     i.add_argument('--miniwind-town',help='With --miniwind: the town the image holds and boots into (default balmora)')
+    i.add_argument('--miniwind-map-inspection',action='store_true',help='With --miniwind: direct inspection with god, noclip and debug HUD')
     i.add_argument('--miniwind-debug',action='store_true',help='With --miniwind: a DEBUG ONLY image, not a playtest')
     i.add_argument('--default-draw-distance',type=int,help='DEBUG ONLY (--miniwind-debug): the starting draw distance, '
                    '128..540 (default 540)')

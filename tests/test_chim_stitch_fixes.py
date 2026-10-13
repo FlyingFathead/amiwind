@@ -189,3 +189,34 @@ class FarBandGateTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class LavaTerrainDetailTests(unittest.TestCase):
+    def test_elevated_pool_preserves_depression_and_coarse_boundary(self):
+        from chim.build import shoreline_ground
+        def sample(x, y):
+            return (20.0 if 32 <= x <= 128 and 32 <= y <= 96 else 100.0), 0
+        pool = {'hull': [[16,16],[112,16],[112,112],[16,112]], 'top':80}
+        plain = shoreline_ground(sample, [[0,0]], (0,0), (256,128), 128)
+        fixed = shoreline_ground(sample, [[0,0]], (0,0), (256,128), 128, [pool])
+        self.assertEqual(plain.height(64,64), 100)
+        self.assertEqual(fixed.height(64,64), 20)
+        self.assertEqual(fixed.height(256,64), plain.height(256,64))
+        self.assertEqual(fixed.refined, {(0,0),(1,0)})
+        edges = []
+        for tile in [(0,0),(1,0)]:
+            edges.append({tuple(p) for tri, _ in fixed.tile_list(*tile)
+                          for p in tri if p[0] == 128})
+        self.assertEqual(edges[0], edges[1])
+        self.assertIn((128.0,64.0,20.0), edges[0])
+        no_shore = shoreline_ground(sample, [[0,0]], (0,0), (256,128), 128,
+                                   [pool], shoreline=False)
+        self.assertEqual(no_shore.rows(), fixed.rows())
+
+    def test_no_pool_preserves_existing_triangle_bytes(self):
+        from chim.build import shoreline_ground
+        sample = lambda x,y: (100+x/16+y/32,0)
+        old = shoreline_ground(sample, [[0]], (0,0), (128,128),128)
+        explicit = shoreline_ground(sample, [[0]], (0,0), (128,128),128, [])
+        self.assertEqual(old.rows(), explicit.rows())
+        self.assertFalse(explicit.refined)

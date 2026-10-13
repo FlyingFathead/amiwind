@@ -351,6 +351,13 @@ def base_frame(ref, centre):
     return lambda p: ((np.asarray(p, dtype=float) - delta) / scale) @ r
 
 
+def depth_compile_candidate(source, mode, keep_chain=False):
+    """Measured fire-fern chains only; explicit hull selections and heap fallbacks remain unchanged."""
+    from routed_hull import mesh_stem
+    return (mode == 'auto' and not keep_chain and mesh_stem(source) in
+            ('o/flora_fire_fern_01', 'o/flora_fire_fern_02'))
+
+
 def variant_unit(task):
     """One shared model variant from its prepared mesh (a pool worker; see chim.units).
 
@@ -379,8 +386,15 @@ def variant_unit(task):
     # models selectable; exact models are compiled as before.
     from mesh_geometry_env import model_hull_mode
     from routed_hull import CHIM_ROUTE_PIECES
-    big = len(parts) > CHIM_ROUTE_PIECES and task.get('model_hull', model_hull_mode()) == 'compiled'
-    if (task['exact'] or big) and task.get('qbsp') and parts:
+    mode = task.get('model_hull', model_hull_mode())
+    big = len(parts) > CHIM_ROUTE_PIECES and mode == 'compiled'
+    deep_fern = False
+    if parts and task.get('qbsp') and depth_compile_candidate(model['source'], mode, task.get('keep_chain')):
+        from routed_hull import chain_depth_limit
+        probe = BrushLumps()
+        probe.collider(hull_pieces(parts), task['exact'], None, point_hull=False)
+        deep_fern = len(probe.lumps[9]) // 8 > chain_depth_limit()
+    if (task['exact'] or big or deep_fern) and task.get('qbsp') and parts:
         from collision_bsp import compile_standing_checked
         try:
             # the compiled union is checked against its pieces (CHIM-COMPILED-HULL-SHORT-36); pieces the compiler
@@ -389,20 +403,36 @@ def variant_unit(task):
             # is recorded
             compiled, hull_check = compile_standing_checked(hull_pieces(parts), task['qbsp'], task['collision_cache'],
                                                             patch=bool(task.get('hull_patch')))
+            if deep_fern:
+                # The existing checked union, not a larger routing budget. Refuse unresolved losses;
+                # the ordinary hull/depth and whole-ring memory gates still apply to the result.
+                from collision_bsp import StandingHullInexact
+                if hull_check['short'] > 0 or hull_check['over'] > 0:
+                    raise StandingHullInexact(hull_check)
         except ValueError as error:
+            compiled = None
             fallback = str(error)[-200:]
     local = dict(ref, position=[*centre, 0.0])
     flames = variant_flames(flame_entities(local, model, centre), local, centre)
     form = {}
     weld = base_frame(ref, centre) if weld_mode == 'base' else None
+    original_surfaces = surfaces
+    cull_counts = None
+    if task.get('terrain_clip'):
+        from terrain_visual_cull import TerrainVolume, cull_surfaces
+        c = task['terrain_clip']
+        if not c['placements']:
+            raise ValueError('Terrain clipping requires every placement of this variant')
+        volume = TerrainVolume(c['triangles'], c['bottom'], c['overlap'])
+        surfaces, cull_counts = cull_surfaces(surfaces, volume, c['placements'])
     lumps, tkeys = model_image_lumps(surfaces, parts, lo, hi, lambda m: keys[m], task['exact'], compiled, flames,
                                      hull='chain' if task.get('keep_chain') else None, report=form, weld=weld)
     occluder_grid = None
     if task['hollow']:
         # hollow collision shells do not occlude; the closed render mesh does (CHIM-PVS-HOLLOW-33)
         from chim.occluders import solid_columns
-        occluder_grid = solid_columns([s[0] for s in surfaces])
-    return {'lumps': [bytes(x) for x in lumps], 'texture_keys': tkeys, 'lo': [float(v) for v in lo],
+        occluder_grid = solid_columns([s[0] for s in original_surfaces])
+    return {'terrain_clip': cull_counts, 'lumps': [bytes(x) for x in lumps], 'texture_keys': tkeys, 'lo': [float(v) for v in lo],
             'hi': [float(v) for v in hi], 'occluders': [] if task['hollow'] else [p for p, *_ in parts],
             'occluder_grid': occluder_grid,
             'materials': {k: m for m, k in keys.items()}, 'collision_fallback': fallback,

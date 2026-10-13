@@ -62,7 +62,7 @@ CUT_KEEP_WHOLE = ('f/flora_',)
 # area (chim_build --cut-models-over).
 # detail_budget: a named per-mesh triangle budget (config/chim-detail-budgets.json) as an area setting, so one area
 # (all of Vivec in one frame: 'vivec-deep') takes it and the others stay whole; the build-wide --detail-budget wins
-AREA_CUT_KEYS = ('cut_models_over', 'cut_mode', 'cut_keep_whole', 'detail_budget')
+AREA_CUT_KEYS = ('cut_models_over', 'cut_mode', 'cut_keep_whole', 'detail_budget', 'clip_to_terrain')
 
 
 def cut_candidate(variant, cut_over, keep_whole=CUT_KEEP_WHOLE):
@@ -199,13 +199,33 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     frame, so a chunk at the frame's edge gets the whole ring of its standing hull and the same content as
     the same ground inside a neighbouring frame.
     Returns the receipt."""
-    from chim.models import texture_unit, variant_ref, variant_unit, yaw_degrees
+    from chim.models import texture_unit, variant_ref, variant_unit, yaw_degrees, depth_compile_candidate
     timer = timer or Timer()
     cache = cache or UnitCache()
     firsts = {}
     for ref in references:
         firsts.setdefault(variant_key(ref), ref)
     order = list(firsts)
+    clip_spec = None
+    if (settings or {}).get('clip_to_terrain', False):
+        if (settings or {}).get('cut_models_over', 0):
+            raise ValueError('Terrain clipping requires whole shared models')
+        triangles = []
+        if ground is not None:
+            triangles = [t for j in range(ground.size[1]) for i in range(ground.size[0])
+                         for t, material in ground.tile_list(i, j)]
+        elif heights is not None:
+            from chim.terrain import tile_polygons
+            for j in range(len(heights)-1):
+                for i in range(len(heights[0])-1):
+                    corners = [[frame['low'][0]+(i+dx)*step, frame['low'][1]+(j+dy)*step,
+                                heights[j+dy][i+dx]] for dx,dy in ((0,0),(1,0),(1,1),(0,1))]
+                    for poly in tile_polygons(corners):
+                        triangles.extend([[poly[0],poly[k],poly[k+1]] for k in range(1,len(poly)-1)])
+        triangles = np.asarray(triangles, dtype=float).tolist()
+        if not triangles:
+            raise ValueError('No authoritative terrain for clip_to_terrain')
+        clip_spec = dict(triangles=triangles, bottom=float(floor), overlap=0.5)
     qbsp_hash = hashlib.sha256(Path(qbsp).read_bytes()).hexdigest() if qbsp else None
     # texture keys in unit results are content hashes; index_of_sha maps them back to this stage's list
     texture_shas = [t.get('sha256') for t in texture_records]
@@ -234,7 +254,8 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             # compiled model hull mode) gets the lost pieces patched in (CHIM-COMPILED-HULL-SHORT-36): other bytes,
             # another key. Off, the compiled bytes are unchanged and so is the key; the check is recorded when built.
             checked = (('hull-check-1', 'patch') if task['hull_patch'] and qbsp_hash
-                       and (exact or model_hull_mode() == 'compiled') else None)
+                       and (exact or model_hull_mode() == 'compiled'
+                            or depth_compile_candidate(model['source'], model_hull_mode(), task['keep_chain'])) else None)
             fp = fingerprint('variant', mesh_fps[mi], list(k), size, exact, task['hollow'], qbsp_hash, model_hull_mode(), chain_depth_limit(),
                              task['keep_chain'], 'hull-form-v1',
                              model.get('flames'), canonical_materials(model['materials'], texture_records),
@@ -246,6 +267,11 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 # vertices shared as in the base (chim.models.base_frame, CHIM-STRIDER-SCALED-SEAMS-36): other bytes
                 # than the placed-position sharing for most scaled and tilted variants, so another key
                 fp = fingerprint('variant', fp, 'weld-base-1')
+            if clip_spec is not None:
+                poses = [(tuple(float(v) for v in (np.array(r['position'])-np.array([*centre,0]))*.25), yaw_degrees(r))
+                         for r in references if variant_key(r)==k]
+                task['terrain_clip'] = dict(clip_spec, placements=poses)
+                fp = fingerprint('variant', fp, 'terrain-render-clip-v1', task['terrain_clip'])
             items.append((fp, task))
         results = run_units('variant', items, variant_unit, jobs, cache)
         variant_fps = {k: fp for k, (fp, _) in zip(order, items)}
@@ -559,14 +585,28 @@ def lava_section(pools):
 def source_stage(data, work, jobs, settings):
     """import_town.collect, or its verified earlier result."""
     from import_town import collect, source_receipt
-    if (work / 'source-receipt.json').is_file():
-        if json.loads((work / 'source-receipt.json').read_text()) != source_receipt(data, settings):
+    expected = source_receipt(data, settings)
+    path = work / 'source-receipt.json'
+    if path.is_file():
+        previous = json.loads(path.read_text())
+        if previous == expected:
+            _log('source stage reused (inputs verified)')
+            return json.loads((work / 'scenery/scenery-index.json').read_text())
+        if any(previous.get(key) != expected[key] for key in ('geometry', 'files')):
             raise ValueError('Existing source stage was made from other inputs; use a new work folder')
-        _log('source stage reused (inputs verified)')
-        return json.loads((work / 'scenery/scenery-index.json').read_text())
+        # A converter change invalidates only this source stage. Preserve the
+        # earlier evidence without copying it or discarding the shared unit pool.
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        archive = work.with_name(work.name + '.stale-' + digest)
+        suffix = 0
+        while archive.exists():
+            suffix += 1
+            archive = work.with_name(work.name + '.stale-' + digest + '-' + str(suffix))
+        work.rename(archive)
+        _log('source conversion changed; earlier stage preserved in ' + archive.name)
     work.mkdir(parents=True, exist_ok=True)
     collect(data, work, jobs, settings)
-    (work / 'source-receipt.json').write_text(json.dumps(source_receipt(data, settings), indent=2) + '\n')
+    (work / 'source-receipt.json').write_text(json.dumps(expected, indent=2) + '\n')
     return json.loads((work / 'scenery/scenery-index.json').read_text())
 
 
@@ -892,7 +932,7 @@ def detail_budget(name):
 SHORELINE_MODES = ('on', 'off')   # chim_build.py --terrain-shoreline (CHIM-STITCH-SHORELINE-36)
 
 
-def shoreline_ground(sample, materials, low, high, step):
+def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=True):
     """The frame's ground as the legacy region maps triangulate it: every tile through
     prepare_world_regions.terrain_triangles (the shared sampler; Seyda Neen's frame uses it too), over
     sample(x, y) -> (height, material) in frame-local units. A tile where land and water flip between
@@ -913,13 +953,29 @@ def shoreline_ground(sample, materials, low, high, step):
             return sample(x, y)
 
     terrain = _Sampler()
+    if not shoreline:
+        terrain.shoreline_detail = lambda x, y: False
+    # CHIM-LAVA-TERRAIN-SPIKES-38: use the legacy lava sampler locally,
+    # including intermediate samples on adjoining coarse tiles' edges.
+    detailed = set()
+    for pool in liquids:
+        xs, ys = zip(*pool['hull'])
+        for y in range(math.floor(min(ys) / step) * step,
+                       math.floor(max(ys) / step) * step + step, step):
+            for x in range(math.floor(min(xs) / step) * step,
+                           math.floor(max(xs) / step) * step + step, step):
+                detailed.add((x, y))
     tris, refined = [], set()
     for j, y in enumerate(range(int(low[1]), int(high[1]), step)):
         for i, x in enumerate(range(int(low[0]), int(high[0]), step)):
-            if terrain.shoreline_detail(x, y):
+            neighbours = ((x, y-step), (x+step, y), (x, y+step), (x-step, y))
+            edges = [edge for edge, neighbour in enumerate(neighbours) if neighbour in detailed]
+            full_detail = (x, y) in detailed
+            if full_detail or edges or terrain.shoreline_detail(x, y):
                 refined.add((i, j))
             m = int(materials[j][i])
-            tris.extend(([list(p) for p in tri], m) for tri in terrain_triangles(terrain, x, y))
+            tris.extend(([list(p) for p in tri], m)
+                        for tri in terrain_triangles(terrain, x, y, edges, full_detail))
     size = ((int(high[0]) - int(low[0])) // step, (int(high[1]) - int(low[1])) // step)
     ground = TriangleGround(tris, step, low, size)
     ground.refined = refined
@@ -1020,6 +1076,9 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     group = index['groups'][town_field(settings, 'visual_group')]['visual_profiles']
     flatten = load_profiles(scene_kind='exterior')
     profiles, items = {}, []
+    from visual_recipes import load_recipes, apply_recipe
+    recipe_name = settings.get('visual_recipe')
+    recipes = load_recipes() if recipe_name else None
     archive = work / 'scenery/scenery.mwpak'
     budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
     for mi, model in enumerate(index['models']):
@@ -1038,6 +1097,8 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                            lod_preserve_border=True)
         # the mesh's CHIM mesh method (config/mesh-methods.json; build setting mesh_method)
         profile = apply_mesh_method(profile, model['source'], settings_override)
+        if recipe_name:
+            profile = apply_recipe(profile, model, recipe_name, recipes)
         profiles[model['source']] = profile
         fp = mesh_fingerprint(model, profile, index['textures'])
         if model['source'] in rebuild_meshes:
@@ -1063,6 +1124,12 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         if found:
             parity['town_flora_added'] = add_town_flora(found, flora, models, textures, prepared, mesh_fps,
                                                         selected, jobs, cache)
+    # Flora may come from an independent source index. Apply the same explicit
+    # stage after merging it; do not let it restore hidden construction stages.
+    from import_town import fixed_state_references
+    before_state = {r['number'] for r in selected}
+    selected = fixed_state_references(work, settings, selected)
+    parity['fixed_state_removed'] = sorted(before_state - {r['number'] for r in selected})
     if harvest_set:
         removed = harvest_set & {r['number'] for r in selected}
         selected = [r for r in selected if r['number'] not in removed]
@@ -1093,8 +1160,9 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         mode = (settings_override or {}).get('terrain_shoreline', 'on')
         if mode not in SHORELINE_MODES:
             raise ValueError('Unknown terrain shoreline mode: %s' % mode)
-        tri_ground = (shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high, step)
-                      if mode == 'on' else None)
+        tri_ground = (shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high, step,
+                                       frame_liquids(pools, centre), shoreline=mode == 'on')
+                      if mode == 'on' or pools else None)
         if tri_ground is not None and not tri_ground.refined:
             tri_ground = None          # no shoreline tile: the plain grid is the same ground (frame unchanged)
         height_at = None
@@ -1112,6 +1180,9 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         # (chim.world.frame_box; adjacent CHIM region frames, docs/chim/CHIM_REGIONS.md)
         (olx, oly), (ohx, ohy) = settings['bounds']
         frame['owned'] = ((float(olx), float(oly)), (float(ohx), float(ohy)))
+    from visual_recipes import prepare_sprite_replacements
+    prepared, mesh_fps, sprite_rows, sprite_assets = prepare_sprite_replacements(
+        recipe_name, index, archive, pal_bytes, selected, prepared, mesh_fps, centre, work / 'sprites')
     spec = frame_input(frame=frame, centre=centre, models=models, references=selected,
                        prepared=prepared, profiles=profiles, mesh_fps=mesh_fps, texture_records=textures,
                        archive=archive, palette=pal_bytes, heights=heights, materials=materials, step=step,
@@ -1129,7 +1200,11 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                **({'terrain_size': list(tri_ground.size), 'terrain_triangles': tri_ground.rows(),
                    'terrain_refined_tiles': len(tri_ground.refined)} if tri_ground is not None else {}),
                # lava pools carved into the chunks as Quake liquid (docs/LAVA.md), by source cell
-               'lava': lava_section(pools)}
+               'lava': lava_section(pools), 'terrain_liquids': frame_liquids(pools, centre), 'lava_depth': 8.0}
+    if sprite_rows:
+        section['sprite_entities'] = sprite_rows
+        section['sprite_assets'] = [dict(a, file=(work / 'sprites' / a['path']).relative_to(work.parent.parent).as_posix())
+                                    for a in sprite_assets]
     if spec.get('outer_ring_chunks'):
         # terrain references: the heights one tile past the ground that the edge chunks' hull rings hold, so
         # the validator checks those rings (chim.validate.hull_seams) instead of stopping at the frame edge

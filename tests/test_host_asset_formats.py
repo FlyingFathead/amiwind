@@ -36,15 +36,22 @@ class HostAssetFormats(unittest.TestCase):
                       [[0., 0., 0.], [1., 1., 0.]], [])
             ref = {'number': 1, 'model': 'fictional.nif', 'position': [0., 0., 0.],
                    'rotation_radians': [0., 0., 0.], 'scale': 1.}
+            # Host parity intentionally has only NumPy/Pillow. Real NIF markers
+            # are covered by converter tests; here verify metadata propagation.
+            collision = {'mode': 'nonsolid', 'no_collision_markers': ['NCO']}
             with patch.object(scenery, 'BSA', return_value=bsa), \
+                 patch.object(scenery, 'nif_reader', return_value=None), \
+                 patch.object(scenery, 'source_collision_metadata', return_value=collision), \
                  patch.object(scenery, 'ordered_map', return_value=[
-                     ('meshes/fictional.nif', b'fictional model', (result, None), None, None)]), \
+                     ('meshes/fictional.nif', b'', (result, None), None, None)]), \
                  contextlib.redirect_stdout(io.StringIO()):
                 scenery.export_refs(root, root/'scene', [ref], {}, [0., 0., 0.], jobs=1)
             index = json.loads((root/'scene/scenery-index.json').read_text())
             self.assertEqual(index['errors'], [])
             self.assertEqual(len(index['references']), 1)
             self.assertEqual(index['textures'][0]['source'], 'textures/fictional.dds')
+            self.assertEqual(index['models'][0]['source_collision'],
+                             {'mode': 'nonsolid', 'no_collision_markers': ['NCO']})
 
     def test_generated_amiga_startup_has_no_carriage_returns(self):
         """Exercise staging; external assemblers/disk tools are not needed."""

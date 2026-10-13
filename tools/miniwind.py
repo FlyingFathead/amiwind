@@ -511,3 +511,32 @@ def record(stage_names, left_out, description=None, scope=DEFAULT_SCOPE, town=TO
             'features': features(stage_names, town, scope), 'description': description,
             'debug_only': bool(debug), 'debug_settings': dict(debug_settings or {}) if debug else None,
             'stages': list(stage_names), 'left_out': dict(left_out)}
+
+
+MAP_INSPECTION_OPTION = '--miniwind-map-inspection'
+
+def inspection_boot(boot=None):
+    """Fresh quick-start arrivals begin walking; enable existing Quake cheats once."""
+    commands = [c.strip() for c in (boot or '').split(';') if c.strip()]
+    if any(c in ('dbg noclip', 'dbg tcl') for c in commands):
+        raise ValueError('Map inspection supplies noclip; remove the duplicate boot toggle')
+    return boot_line(commands + ['dbg godmode on', 'dbg noclip', 'dbg hud on'])
+
+def install_map_inspection(id1):
+    """Opt-in image setup; use existing test-start and scripted-character machinery."""
+    id1 = Path(id1)
+    rc = id1 / 'quake.rc'
+    text = rc.read_text()
+    if text.count('aw_startup\n') != 1:
+        raise ValueError('Map inspection requires one normal startup entry')
+    setup = ('// Map inspection only: no logo, menus or character pages.\n'
+             'aw_test_start 1\n'
+             'aw_quickchar_set race Nord\n'
+             'aw_quickchar_set class Barbarian\n'
+             'aw_quickchar_set birthsign "The Steed"\n'
+             'aw_quickchar_set name Inspector\n')
+    (id1 / 'map-inspection.cfg').write_text(setup, encoding='ascii', newline='\n')
+    rc.write_text(text.replace('aw_startup\n', 'exec map-inspection.cfg\naw_startup\n'), encoding='utf-8', newline='\n')
+    return {'enabled': True, 'startup': 'direct quick start', 'character_pages': False,
+            'god': True, 'noclip': True, 'debug_hud': True,
+            'mechanisms': ['aw_test_start', 'aw_quickchar_set', 'MiniWind arrival boot commands']}

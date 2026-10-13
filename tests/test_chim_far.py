@@ -178,8 +178,10 @@ class FarLayerEngineContractTests(unittest.TestCase):
         self.assertIn('void (*aw_chim_far_draw)(byte colour,int distance);', fog)
         body = fog[fog.index('void AW_FogDraw(void)'):]
         body = body[:body.index('\n}\n')]
-        # after the fog pass, only with fog on, in the full fog colour, as the LAND pass
-        self.assertGreater(body.index('if(fog && aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);'),
+        # After the colour pass, controlled independently of fog. Behaviour of
+        # both fog states and disabled fill is covered by aga_horizon_test.c.
+        self.assertIn('if(aw_land_fill.value){', body)
+        self.assertGreater(body.index('if(aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);'),
                            body.index('for(y=r_refdef.vrect.y;'))
         far_c = (SRC / 'chim/chim_far.c').read_text()
         self.assertIn('cvar_t\tchim_far = {"chim_far", "1"};', far_c)       # default on; 0 = no far land

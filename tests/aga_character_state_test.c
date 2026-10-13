@@ -68,6 +68,7 @@ int main(void)
     setup();assert(!AW_CharacterHors());
     strcpy(aw_races[0].id,"Nord");strcpy(aw_classes[0].id,"Barbarian");strcpy(aw_births[0].id,"Charioteer");
     assert(AW_CharacterHors());assert(!strcmp(aw_story.name,"Hors") && aw_character.valid && !aw_character.female);
+    assert(AW_StoryViewAllowed()); /* dbg aw hors 0 restores camera permissions */
     assert(aw_story.stage==AW_STAGE_RELEASED && !AW_StoryRestricted() && AW_Ring() && AW_Package());
     assert(AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87 && aw_character.maximum[0]==50);
     /* A direct start's ready-made character (tools/direct_start.py --quick-character):

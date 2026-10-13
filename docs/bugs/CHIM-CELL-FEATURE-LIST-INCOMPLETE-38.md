@@ -1,0 +1,139 @@
+# CHIM-CELL-FEATURE-LIST-INCOMPLETE-38: Cell feature list incomplete
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 12 October 2026, in v0.0.38-dev2 |
+| Where | Exterior CHIM cell coverage and release feature lists |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.38-dev2 (last seen) |
+| Severity | medium: Coverage reporting can hide deferred authored features despite passed geometry audits. |
+| Family | Content silently missing from a build (`build-content-missing`) |
+| CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
+| Playtest version | source-only |
+| From commit | source c2eaa5a, engine unknown, CHIM world unknown |
+| CHIM engine version | CHIM unknown, engine unknown, world format unknown |
+| Unknown because | Source and tracker audit; no exact-package native reproduction. |
+| Platform or emulator | not in game (Original master and source audit.) |
+
+<!-- END GENERATED FACTS -->
+
+## Symptom
+
+Passed measured audits do not establish that every authored exterior-cell feature is present and functional in the playable release. Existing deferred category counts need a per-reference chain from original data through conversion, packaging and gameplay acceptance.
+
+## Where
+
+Exterior CHIM cells and release feature lists. The immediate target is every exterior cell in rings 0, 1 and 2. Interiors may remain BSP29, CHIM or a mixture; converting all interiors to CHIM is not required.
+
+## How it happened
+
+import_town.split_references defers NPC_, CREA, LEVC and LEVI references. NPC residents have a separate path; creature simulation is deferred in the inspected cell. The world validator compares packed references against selected conversion inputs, not an independent inventory of every original reference. Planned coverage is also distinct from final packaged inclusion.
+
+## Why it was not caught
+
+Geometry and format checks answer narrower questions than feature completeness. The tracker exposes deferred categories, but a passed overview can be mistaken for playable feature coverage. This does not establish that every dedicated placement is missing.
+
+## Reproduction
+
+The original CREA record mudcrab_unique has authored reference 404350 in exterior cell (9,-10), with merchant-related dialogue entries. It is a direct placement rather than a leveled random spawn. The inspected tracker places that cell in ring 6 with audits_passed status and all seven creatures deferred. This example is outside the immediate rings 0-2 target. Native presence, dialogue and trading are not accepted.
+
+The flora category is a documented subset of statics with a placed-only count; its zero converted counter does not establish missing vegetation. Some inspected light rows contain both legacy marker and meshless-light deferral counts, so their summed outcomes exceed their original placements. Reconcile unique reference IDs before reporting missing totals; the tracker recursively merged complete accounting snapshots and retained obsolete reasons from older receipts.
+
+An independent base-master census of all 333 target exterior cells found 12,060 original references. Against the dev2 CHIM source manifest, 520 non-light references required explanation: 62 have explicit harvest-removal receipts (an alternate representation), while 458 remain unresolved across cells (-3,-11), (-2,-11), (-1,-11), (0,-11) and (6,-14). These five cells were excluded from regional CHIM ownership by the town-overlap rule. This is a manifest-level finding; legacy-map coverage and final packaged/native presence still need checking. The 383 meshless lights and 430 actor or leveled references are tracked separately.
+
+Exact-package follow-up: 51 map and harvest files covering the five cells were extracted from the sealed dev2 disks and matched their readback hashes. They account for 235 of the 458 unresolved references. The remaining 223 are absent from those maps/catalogues as well as the CHIM source manifest: 183 STAT, 26 CONT, four DOOR and ten ACTI references. Original native/OpenMW scene comparison remains pending. This is a known dev2 content limitation, not a repaired or accepted cell set.
+
+## Repair
+
+Owner feedback on 12 October identifies Vivec gondola travel as not implemented.
+The dev2 image shows Dalse Adren with a talk prompt at global 33524,-89237,643
+in cell (4,-11), heading 281, pitch 11, time 06:50. Visible NPC presence is not
+travel-service acceptance. Track inter-canton destinations, fares and successful
+transitions separately from the blocked dock approach in
+[WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md). The service remains planned;
+this report does not establish that every gondolier or route was tested.
+
+An independent original-master census finds five Gondolier-class NPCs with
+16 authored travel destinations in total. Dalse Adren has four destinations
+and exterior placement 259456 in cell (4,-11). This establishes source service
+data, not fare calculations, interaction implementation or playable travel.
+
+The mutable follow-up now replaces a supplied reference-accounting snapshot instead of recursively merging its obsolete reasons. The tracker suite ran 92 tests with no failures or errors and three skips. Reading preserved results through the repaired loader gives 588 accounting rows for rings 0-2 with no outcome-total discrepancies; 385 lights comprise two converted and 383 deferred. The live tracker was regenerated with the repaired loader and full dev2 build inputs; all 333 target cells retain their ring membership. This repairs reporting only and adds no missing game content.
+
+Remaining: reconcile original IDs and record types: statics, doors, containers, items, flora, lights, NPCs, creatures, leveled lists and markers. Record converted, intentionally nonvisual, deferred, failed, packaged and native-verified outcomes with reasons. Separate visible presence from collision, interaction, dialogue, trading and spawning. Verify town overlaps and ocean coverage against the final package.
+
+## Verification
+
+Source inspection confirms actor/leveled-reference deferral and selected-input placement validation. Original data confirms the merchant reference and dialogue links. No repair, complete original-reference census or native merchant functionality is claimed. The active dev2 build remains pinned independently of this documentation follow-up.
+
+## Prevention
+
+The dev2 world-directory follow-up separates terrain frame bounds from runtime handoff cores. All 223 unresolved references lie outside every configured town handoff core and resolve to eight open-world directory rows. This includes all 53 references inside a larger town frame box. The CHIM preflight currently drops a whole cell on any town-frame intersection, while runtime destination selection prioritizes the smaller town core. Neither intersection nor the town's terrain apron establishes object coverage. The legacy world-scenery census includes rocks and giant mushrooms only; it is not a fallback census for all original reference types. These are source and directory findings, not a native repair acceptance.
+
+The dev2 omission audit must distinguish whole-cell selection from town source coverage. Of the 223 references absent from the checked package paths, 170 have origins outside all selected town frame boxes and 53 have origins inside a town frame box. All 53 inside-box entries are absent from the Seyda source audit and exported scenery index. They are also outside its scenery origin margin; 52 are beyond its export radius, and 15 are outside the ordinary STAT/DOOR type filter. These are overlapping predicates, not additive missing counts. A town-frame overlap therefore does not establish reference coverage. Repair must reconcile per-reference ownership before suppressing a whole coast cell and must preserve alternate asset and gameplay paths.
+
+Generate feature manifests independently from original references and account for every reference before claiming playable completeness. Preserve converted, audited, native-checked and packaged states separately. See [CHIM-COAST-OBJECTS-MISSING-36](CHIM-COAST-OBJECTS-MISSING-36.md) for separate coastline observations whose causes remain unverified.
+
+12 October script and topology investigation: original Stronghold scripts control 139 references in this cell. Their predicates enable respectively 0, 3, 9, 18, 53, 65 and 106 of these references at stages 0 through 6; the event-dependent foreman script is excluded from those counts. These are reference counts, not measured memory savings. Several heavy root and sprout models belong to mutually exclusive construction stages. The unchanged baseline still counts the resident models together. Its two largest root variants each contain 872 compiled faces and 2,600 BSP nodes, plus 13,654 and 13,655 clipnodes. This identifies both conditional-content and compiled-topology contributors; it does not establish a native fix. Effective initial runtime state, phase transitions, render/collision parity and matched OpenMW evidence remain pending. All original assets remain retained.
+
+12 October stage-residency diagnostic: matched original-game views at requested Stronghold stages 0 and 6 show the structure absent and present respectively; logged camera position, yaw, base pitch and field of view agree. A hypothetical residency calculation retaining catalogue allocation and unchanged on-disk assets estimates active-ring peaks for stages 0-6 of 825,344; 1,376,976; 1,489,216; 5,307,184; 5,929,168; 7,141,088; and 7,638,112 bytes. The budget remains 6,242,304 bytes. Stages 5 and 6 still exceed it by 898,784 and 1,395,808 bytes. These are diagnostic estimates, not passing production audits: activation metadata, transition overlap, adjacent-frame demand and deferred actors remain unaccounted. Proposed repair needs both correct stage-aware drawing/collision/residency and further model-memory reduction for the later stages. Existing CHIM Hidden handles opening-story drawing/collision, while Need requests the chunk model list without that filter; hiding alone cannot establish the proposed saving. No engine change, native fix or packaged acceptance is claimed.
+
+12 October source visibility audit: the conservative audit now recognizes complete global-conditioned enable/disable templates and leaves event-driven or unsupported scripts unresolved. A private audit of Molag Mar exterior (10,1) records 139 conditional references, one unresolved event-driven script and 18 references with no attached script. At an explicitly requested Stronghold value of 6, 106 of those conditional references evaluate enabled. This does not infer the initial game state or prove that references without attached scripts are unconditional. Six focused regression tests passed in Docker, covering comparison operators, inverted branches, unknown logic, reference types, ambiguous input and nonfinite CLI state rejection. This is audit metadata only: runtime activation, model residency, gameplay, native and package acceptance remain pending.
+
+12 October whole-region script census: all 123 Molag Mar exterior cells now have per-reference source-script audit receipts covering 15,162 placements. Counts are 139 recognized conditional references, 652 unresolved by the narrow visibility classifier and 14,371 with no attached script. Unresolved includes 310 lava, 262 steam-sound and 33 rotating-sign references; it does not establish that the corresponding engine feature is absent. Cross-reference each script with its implemented geometry, effects, audio or gameplay path and test that path independently. Actor/script support, conversion, residency, native and packaged states remain separate. No original initial global state was inferred.
+
+12 October feature-path reconciliation: all 310 lava-script references in 24 Molag Mar exterior cells are deferred from static geometry with reason lava liquid. Their per-cell counts match the separate CHIM liquid records and generated terrain-liquid prisms, with zero count mismatches across all 123 cells. This establishes count coverage, not an independent reference-to-prism geometry match or native damage/audio acceptance. The same reference-ID join finds converted geometry for 262 steam-sound objects, 33 rotating signs and nine outside banners; sound looping and script-driven animation must be verified separately. The original steam script requests a positional loop, the sign script swings around its starting angle, and the banner script selects animations using weather and randomness. Static geometry alone does not implement these behaviors.
+
+
+## Owner evidence reconciliation, 13 October 2026
+
+The following owner screenshot evidence was visually reviewed. Original images
+remain in the private evidence archive; identifiers bind this report to those
+originals. This records reported symptoms and comparison controls, not a repair
+or runtime acceptance. Missing build or pose information remains unknown.
+
+- `OWNER-20261012-184648`: SHA-256 `432c07a628db9bdc39ea69f33b68a21c4a55c225d37f60a8ae51ea48eca88ed9`. Gondolier and talk prompt visible; still frame does not prove absence of travel interaction.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Content silently missing from a build (`build-content-missing`). Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. See [families](README.md#families).
+
+- [ARENA-PIT-NO-INTERIOR-33](ARENA-PIT-NO-INTERIOR-33.md): The Vivec Arena minigame fights on the test floor: the Arena Pit interior is not in v0.0.33 builds
+- [AUDIO-MISSING-SOURCES-32](AUDIO-MISSING-SOURCES-32.md): The image step reports missing sources for 7 voices and 2 effects
+- [BUILD-CHIM-ROOMS-IMAGE-RACE-36](BUILD-CHIM-ROOMS-IMAGE-RACE-36.md): The image step ran beside a CHIM town's room stage and read its record before it existed
+- [BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36](BUILD-CHIM-SANDBOX-NO-SHARED-SKY-36.md): An area build of a CHIM town without exterior BSP maps ships no shared sky although its CHIM frame names it
+- [BUILD-DRESSING-EXCLUDED-32](BUILD-DRESSING-EXCLUDED-32.md): The repository builder drops lantern hooks and other dressing in Seyda Neen maps without a receipt
+- [BUILD-EXTRA-TOWN-OPTIN-32](BUILD-EXTRA-TOWN-OPTIN-32.md): A default build leaves out the Vivec Arena preview that v0.0.32 ships
+- [BUILD-FLORA-OPTIN-32](BUILD-FLORA-OPTIN-32.md): A from-scratch build without --tree-sprites leaves out the trees and grass every release ships
+- [BUILD-HANDS-NOT-BUILT-32](BUILD-HANDS-NOT-BUILT-32.md): Per-race first-person hands are not built by the builder
+- [BUILD-HARVEST-NATIVE-TOWN-ORDER-36](BUILD-HARVEST-NATIVE-TOWN-ORDER-36.md): The image step's harvest check refused a CHIM-native town's catalogues before its frame map was written
+- [BUILD-HARVEST-NOT-BUILT-32](BUILD-HARVEST-NOT-BUILT-32.md): Mushroom harvest data is not built by the builder
+- [BUILD-IMAGE-NATIVE-BALMORA-CACHE-36](BUILD-IMAGE-NATIVE-BALMORA-CACHE-36.md): The image step asked for the legacy Balmora cache when Balmora is CHIM-native
+- [BUILD-LAVA-COVERAGE-38](BUILD-LAVA-COVERAGE-38.md): Full dev2 world omits the reported lava cells
+- [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36](BUILD-LEGACY-TOWN-MAPS-SHIPPED-36.md): CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload)
+- [BUILD-MINIWIND-ARENA-PIT-REFUSED-36](BUILD-MINIWIND-ARENA-PIT-REFUSED-36.md): Regression against v0.0.35: the Vivec Arena Pit is in no CHIM build (no CHIM-native stage made the Arena's rooms), and its start was refused as not converted
+- [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
+- [BUILD-MINIWIND-DIRECT-START-TOWN-36](BUILD-MINIWIND-DIRECT-START-TOWN-36.md): A MiniWind build of another town refuses its own direct start: the start check assumed Balmora
+- [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-RUN-FOLDER-PRECREATED-36](BUILD-RUN-FOLDER-PRECREATED-36.md): Every real CHIM build is refused at its start: the plan writes the world map manifest into the run folder before the run makes it
+- [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
+- [CHIM-COAST-OBJECTS-MISSING-36](CHIM-COAST-OBJECTS-MISSING-36.md): Objects including Dwemer ruins are reported missing from the CHIM coast
+- [CHIM-LAVA-TERRAIN-SPIKES-38](CHIM-LAVA-TERRAIN-SPIKES-38.md): Angular terrain wedges cross a lava pool in the final-image inspection
+- [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
+- [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
+- [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
+- [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
+
+Related bugs in other categories:
+
+- [CHIM-MOLAG-MEMORY-38](CHIM-MOLAG-MEMORY-38.md): Tel Uvirith exterior cell (10,1) exceeds the CHIM active-ring memory budget
+
+<!-- END GENERATED CATEGORY -->

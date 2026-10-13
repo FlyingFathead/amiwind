@@ -62,6 +62,15 @@ tests/test_unit_cache.py `ChimUnitCacheRefusalTests` (refused writes build local
 unreadable entry is a miss); tests/test_build_preflight.py (ownership, free space, game data, and that the image
 build runs the preflight before any stage).
 
+On 13 October 2026, a standalone v0.0.38 CHIM conversion ran with a different
+user from the regular builder and left 123,873 cache entries owned by root.
+The existing preflight correctly refused the next full image before any stage,
+reporting seven unwritable directories. The cache entries were reassigned to
+the regular build user without deleting cached outputs. Future standalone
+conversions must use the same user and group as the regular builder. This is
+an operational recurrence caught by the repaired preflight, not evidence that
+the old late-stage failure returned. The image retry remains a separate gate.
+
 ## Prevention
 
 The preflight runs on every real image build. The other caches (file cache, pass cache, storage pool) already

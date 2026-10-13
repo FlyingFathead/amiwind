@@ -94,6 +94,10 @@ floor from wall to wall.
 (COLLISION-HULL-CHAINS-33); `tests/test_routed_hull.py` covers the routing and the engine's node
 order.
 
+
+
+12 October owner follow-up: severe performance drop reported inside the Vivec Arena Pit. Exact installed hashes, frame times, position, movement state and room format are not yet bound. This is a new performance observation alongside this investigation, not proof that the old hull chain is its cause. Measure idle versus movement, collision trace cost, visibility and render work with the AmiQuake mechanisms before selecting a repair. Keep interiors eligible for BSP29, CHIM or a mixture.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -122,6 +126,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
 - [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md): Static mesh reduction pulls open parts apart: the Silt Strider's hull shows the sky through its shell seams
 - [MESH-LOD-TORN-MESHES-33](MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)
+- [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
 - [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
 - [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"

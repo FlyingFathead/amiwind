@@ -165,6 +165,18 @@
         "ground_place"
       ],
       "travel": null
+    },
+    {
+      "id": "lava_x1ym2",
+      "config": "lava_x1ym2.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
     }
   ]
 }

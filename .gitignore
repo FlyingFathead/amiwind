@@ -110,6 +110,8 @@ unins*
 
 # Explicitly selected documentation screenshots; no other PNGs are source.
 !/docs/images/amiwind-v0.0.31-toolkit-header.png
+!/docs/images/amiwind-v0.0.38-molag-lantern-arch.png
+!/docs/images/amiwind-v0.0.38-molag-walkways.png
 !/docs/images/amiwind-v0.0.31-toolkit-world.png
 !/docs/images/amiwind-v0.0.15-dev2-dock.png
 !/docs/images/amiwind-v0.0.15-dev2-npc.png
@@ -245,3 +247,6 @@ AmiWind-launcher.json
 !/docs/images/amiwind-v0.0.33-fix-ship-light-before.png
 !/docs/images/amiwind-v0.0.33-fix-ship-light-after.png
 !/docs/images/amiwind-v0.0.33-fix-ship-light-openmw.png
+
+!docs/images/amiwind-v0.0.38-lava-east-clean.png
+!docs/images/amiwind-v0.0.38-lava-pool-clean.png

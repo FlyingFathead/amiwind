@@ -47,9 +47,9 @@ edict_t *SV_TestEntityPosition(edict_t *e){return solid?e:NULL;}
 int AW_WorldToSource(const char *name,const float *p,float *out){int i;if(strcmp(name,"seyda"))return 0;for(i=0;i<3;i++)out[i]=p[i]*4;return 1;}
 int AW_MapTeleport(const float *p){int i;teleports++;for(i=0;i<3;i++)teleported[i]=p[i];return 1;}
 static edict_t player;static client_t local;
-static const char *names[]={"crosshair","aw_fog","_aw_debug_all","_aw_debug_coords","aw_ui_hud","aw_compass","aw_ui_frame","r_drawviewmodel"};
-static const char *before[]={"1","0.75","1","0","1","1","1","1"};
-#define NAMES 8
+static const char *names[]={"crosshair","aw_fog","_aw_debug_all","_aw_debug_coords","aw_ui_hud","aw_compass","aw_ui_frame","r_drawviewmodel","aw_noclipwobble"};
+static const char *before[]={"1","0.75","1","0","1","1","1","1","1"};
+#define NAMES 9
 #define HANDS 7
 static void settings(void){int i;for(i=0;i<NAMES;i++)Cvar_Set((char *)names[i],(char *)before[i]);}
 static void assert_restored(void){int i;for(i=0;i<NAMES;i++)assert(!strcmp(str(names[i]),before[i]));}
@@ -68,7 +68,7 @@ static void fly(void){
 }
 int main(void){
  cvar_t extra[]={{"crosshair","0",true},{"aw_fog","1",true},{"_aw_debug_all","0",true},{"_aw_debug_coords","0",true},
-  {"aw_ui_hud","1",true},{"aw_compass","0",true},{"aw_ui_frame","0",true},{"r_drawviewmodel","1"}};
+  {"aw_ui_hud","1",true},{"aw_compass","0",true},{"aw_ui_frame","0",true},{"r_drawviewmodel","1"},{"aw_noclipwobble","0",true}};
  int i;
  for(i=0;i<NAMES;i++)Cvar_RegisterVariable(&extra[i]);
  AW_PhotoInit();assert(photo && crosshair);

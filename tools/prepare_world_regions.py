@@ -99,23 +99,33 @@ def refine_entries(entries, refinements):
     for rule in refinements:
         matches=[i for i,e in enumerate(result) if e['cell']==rule['cell']]
         if not matches:continue  # Synthetic surveys can omit this source cell.
-        if len(matches)!=1 or result[matches[0]]['divisions']!=1:
+        parent_divisions=rule.get('parent_divisions',1)
+        if parent_divisions==1 and (len(matches)!=1 or result[matches[0]]['divisions']!=1):
             raise ValueError('Refinement parent must be an unsplit cell: cell %s is split into %d regions by the survey'
                              %(rule['cell'],len(matches)))
-        slot=matches[0];parent=result[slot]
+        if parent_divisions not in (1,2,4):raise ValueError('Invalid refinement parent divisions')
+        selected=[i for i in matches if result[i]['name']==rule['parent']]
+        if len(selected)!=1:raise ValueError('Refinement parent differs from measured layout: '+rule['parent'])
+        slot=selected[0];parent=result[slot]
+        if parent['divisions']!=parent_divisions:
+            raise ValueError('Refinement parent divisions differ from measured layout')
         if parent['name']!=rule['parent']:
             raise ValueError('Refinement parent differs from measured layout: cell %s is %s, expected %s'
                              %(rule['cell'],parent['name'],rule['parent']))
         n=rule['divisions']
-        if n not in (2,4,8):raise ValueError('Invalid refinement divisions')
+        if n not in (2,4,8) or n<=parent_divisions:raise ValueError('Invalid refinement divisions')
+        ratio=n//parent_divisions
+        parent_size=2048//parent_divisions
+        if parent['core']!=[[-parent_size//2]*2,[parent_size//2]*2]:
+            raise ValueError('Refinement parent core differs from measured layout')
         size=2048//n;children=[]
-        for y in range(n):
-            for x in range(n):
+        for y in range(ratio):
+            for x in range(ratio):
                 child=copy.deepcopy(parent)
                 for field in ('converted','input_sha256','storage'):child.pop(field,None)
                 child.update(name=parent['name'] if not children else f'vf{len(result)+len(children)-1:04d}',
-                    divisions=n,subcell=[x,y],
-                    origin=[parent['origin'][0]-1024+size*(x+.5),parent['origin'][1]-1024+size*(y+.5),parent['origin'][2]],
+                    divisions=n,subcell=[parent['subcell'][0]*ratio+x,parent['subcell'][1]*ratio+y],
+                    origin=[parent['origin'][0]-parent_size/2+size*(x+.5),parent['origin'][1]-parent_size/2+size*(y+.5),parent['origin'][2]],
                     core=[[-size//2,-size//2],[size//2,size//2]],
                     coverage=[[-size//2-OVERLAP,-size//2-OVERLAP],[size//2+OVERLAP,size//2+OVERLAP]],
                     refinement={'parent':parent['name'],'reason':rule['reason'],
@@ -213,7 +223,7 @@ class Terrain:
         return False
 
 
-def terrain_triangles(terrain, x, y, required_edge_samples=()):
+def terrain_triangles(terrain, x, y, required_edge_samples=(), full_detail=False):
     """Insert shoreline samples and required coarse/fine boundary samples.
 
     Required edges are south (0), east (1), north (2), and west (3).
@@ -227,6 +237,15 @@ def terrain_triangles(terrain, x, y, required_edge_samples=()):
     if any(type(edge) is not int or edge not in range(4) for edge in required_edge_samples):
         raise ValueError("Required terrain edges must be integers from 0 through 3")
     point = lambda xx, yy: [xx, yy, terrain.sample(xx, yy)[0]]
+    if full_detail:
+        # Keep original LAND samples locally around elevated liquids. Sea-level
+        # identity alone cannot protect a lava depression from coarse terrain.
+        for dy in range(0, STEP, 32):
+            for dx in range(0, STEP, 32):
+                q = [point(x+dx+u, y+dy+v) for u,v in ((0,0),(32,0),(32,32),(0,32))]
+                for ids in ((0,1,2),(0,2,3)):
+                    yield [q[i] for i in ids]
+        return
     corners = [point(x+dx, y+dy) for dx, dy in ((0,0),(STEP,0),(STEP,STEP),(0,STEP))]
     triangles = [[corners[i] for i in ids] for ids in ((0,1,2),(0,2,3))]
     if not required_edge_samples and not terrain.shoreline_detail(x, y):
@@ -295,7 +314,7 @@ def ground_textures(data, keys, palette):
     return {'g'+str(key): ground_miptex(master, assets, key, pal) for key in sorted(keys)}
 
 
-def terrain_wad(data, survey, palette):
+def terrain_wad(data, survey, palette, pools=()):
     master = load_esm(child_ci(data, 'Morrowind.esm'))
     assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
     pal = Image.new('P', (1, 1)); pal.putpalette(palette)
@@ -307,21 +326,72 @@ def terrain_wad(data, survey, palette):
               if name == '*water' else Image.new('RGB', size, color))
         im = im.quantize(palette=pal, dither=Image.Dither.NONE)
         textures.append((name, 68, miptex(name, im)))
+    if pools:
+        import lava
+        textures.extend(lava.wad_entries(assets.texture, pools[0]['layers'], pal))
     return wad(textures)
+
+
+def region_lava(entry, pools):
+    """World-space pools clipped to this map's apron, including neighbouring-cell pools.
+
+    Reuse the CHIM polygon clipper and shared Quake liquid conversion. A reference
+    may have apron copies in adjacent maps; the directory still owns the cell once.
+    """
+    from chim.terrain import clip_convex_xy, clean_xy
+    low, high = entry['coverage']; ox, oy = entry['origin'][:2]
+    x0, y0 = (low[0]+ox)/SCALE, (low[1]+oy)/SCALE
+    x1, y1 = (high[0]+ox)/SCALE, (high[1]+oy)/SCALE
+    rect = [(x0,y0),(x1,y0),(x1,y1),(x0,y1)]
+    out = []
+    for p in pools:
+        hull = clean_xy(clip_convex_xy(p['hull'], rect))
+        if len(hull) >= 3:
+            out.append(dict(p, hull=[list(v) for v in hull]))
+    return out
+
+
+def region_terrain_triangles(entry, terrain):
+    """Original detail at lava, with matching edges and unchanged distant terrain."""
+    low, high = entry['coverage']; ox, oy, _ = entry['origin']
+    detailed = set()
+    for pool in entry.get('lava_pools', ()):
+        xs, ys = zip(*pool['hull'])
+        for y in range(math.floor(min(ys)*SCALE/STEP)*STEP,
+                       math.floor(max(ys)*SCALE/STEP)*STEP+STEP, STEP):
+            for x in range(math.floor(min(xs)*SCALE/STEP)*STEP,
+                           math.floor(max(xs)*SCALE/STEP)*STEP+STEP, STEP):
+                detailed.add((x,y))
+    for y in range(low[1], high[1], STEP):
+        for x in range(low[0], high[0], STEP):
+            gx, gy = x+ox, y+oy
+            neighbours = ((gx,gy-STEP),(gx+STEP,gy),(gx,gy+STEP),(gx-STEP,gy))
+            edges = [i for i,p in enumerate(neighbours) if p in detailed]
+            yield from terrain_triangles(terrain,gx,gy,edges,(gx,gy) in detailed)
 
 
 def map_text(entry, terrain):
     low, high = entry['coverage']; ox, oy, _ = entry['origin']
-    triangles = [tri for y in range(low[1], high[1], STEP) for x in range(low[0], high[0], STEP)
-                 for tri in terrain_triangles(terrain, x+ox, y+oy)]
+    triangles = list(region_terrain_triangles(entry, terrain))
     zmin = min(p[2] for tri in triangles for p in tri)
     zmax = max(p[2] for tri in triangles for p in tri)
+    pools = entry.get('lava_pools', ())
+    if pools:
+        import lava
+        zmin = min(zmin, min(p['top']*SCALE-lava.LIQUID_DEPTH-lava.BED_THICKNESS for p in pools))
+        zmax = max(zmax, max(p['top']*SCALE for p in pools))
     oz = round((zmin+zmax)/256)*128
     entry['origin'][2] = oz
     bottom = zmin-oz-64; top = max(zmax,0)-oz+256
     if max(abs(bottom-32), abs(top+32), abs(-oz)) >= coord_bound():   # the build's coordinate bound (coord_range)
         raise ValueError('Local coordinate budget requires a finer region: '+entry['name'])
     brushes = []
+    lava_entities = []
+    if pools:
+        centre = [ox/SCALE, oy/SCALE, oz/SCALE]
+        lava_brushes, lava_entities, _ = lava.map_parts(pools, centre, SCALE)
+        brushes.extend(lava_brushes)
+        lava_entities.extend(lava.loop_entities(pools, centre, SCALE, entry.get('lava_volumes', {})))
     for source_tri in triangles:
         cx, cy = [sum(p[k] for p in source_tri)/3 for k in (0,1)]
         material = terrain.sample(cx, cy)[1]
@@ -342,7 +412,8 @@ def map_text(entry, terrain):
     return ('{\n"classname" "worldspawn"\n"wad" "terrain.wad"\n"message" "Vvardenfell"\n'
             +'\n'.join(brushes)+'\n}\n{\n"classname" "info_player_start"\n'
             +f'"origin" "0 0 {spawn}"\n"angle" "90"\n}}\n'
-            +'{\n"classname" "info_null"\n'+f'"origin" "0 0 {max(zmax,0)-oz+96}"\n'+ '}\n')
+            +'{\n"classname" "info_null"\n'+f'"origin" "0 0 {max(zmax,0)-oz+96}"\n'+ '}\n'
+            +'\n'.join(lava_entities))
 
 
 def unit_cache_identity(bindir):
@@ -541,7 +612,10 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
         raise ValueError('Original inputs differ from the measured survey')
     if (out/'world-regions.json').exists():
         raise ValueError('Completed conversion is immutable; choose a fresh directory')
-    (out/'terrain.wad').write_bytes(terrain_wad(data,survey,(scene/'id1/gfx/palette.lmp').read_bytes()))
+    import lava
+    pools = lava.exterior_pools(data) if lava.lava_mode() == 'quake' else []
+    volumes, sound_receipts = lava.convert_sounds(data, pools, scene/'id1/sound') if pools else ({}, [])
+    (out/'terrain.wad').write_bytes(terrain_wad(data,survey,(scene/'id1/gfx/palette.lmp').read_bytes(),pools))
     if only:
         entries=[e for e in entries if e['name'] in only]
         if len(entries)!=len(set(only)):raise ValueError('Unknown diagnostic region')
@@ -567,6 +641,11 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
         raise ValueError('CHIM region cells without an open-world map: %s'
                          %' '.join('%d,%d'%c for c in sorted(cells-found)))
     compiled=[e for e in entries if e['name'] not in skipped]
+    for e in compiled:
+        local = region_lava(e, pools)
+        if local:
+            e['lava_pools'] = local
+            e['lava_volumes'] = volumes
     rows={}
     for result in costed_map('world-terrain-regions',compile_region,[(survey,out,e,bindir,threads,vis_mode,*extra) for e in compiled],
                              [e['name'] for e in compiled],jobs,fallback=triangles.get):
@@ -594,7 +673,9 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     receipt=dict(format='AmiWind playable terrain regions 1',master_sha256=report['master_sha256'],
         survey_sha256=digest(survey/'world-survey.json'),terrain_sha256=digest(survey/'terrain-source.npz'),
         scale=SCALE,sample_stride=4,overlap=OVERLAP,draw_distance=540,
-        scope='Terrain and water; existing town geometry remains separate. Other scenery and actors are not converted.',
+        scope='Terrain, water and molten lava; existing town geometry remains separate. Other scenery and actors are not converted.',
+        lava=dict(mode=lava.lava_mode(), source_pools=len(pools), sounds=sound_receipts,
+                  references=sorted({p['reference'] for e in compiled for p in e.get('lava_pools',())})),
         diagnostic_subset=bool(only),regions=results)
     if skipped:
         receipt['chim_region_cells']=sorted([list(c) for c in cells])

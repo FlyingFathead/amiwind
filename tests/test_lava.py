@@ -414,6 +414,86 @@ class ChimChunkTests(unittest.TestCase):
         self.assertEqual(self.contents(tree, (250, 250, 15)), -1)  # outside every square
         self.assertEqual(self.contents(tree, (60, 60, 30)), -1)    # above the highest top
 
+    @staticmethod
+    def audit_fixture(ground=10.0, pools=None, actual_pools=None):
+        from chim.terrain import chunk_terrain
+        from chim import format as F
+        pools = pools if pools is not None else [
+            {'hull': [[-16, -16], [272, -16], [272, 272], [-16, 272]], 'top': 20.0}]
+        height = ground if callable(ground) else lambda x, y: ground
+        lumps, _ = chunk_terrain((0, 0, 256, 256), 128, height, lambda x, y: 1,
+                                -1024, lambda m: 0, 1, liquids=pools if actual_pools is None else actual_pools,
+                                lava_texture_id=2)
+        source = {'terrain_step': 128, 'terrain_low': [0, 0], 'terrain_heights': [[height(x * 128, y * 128) for x in range(3)] for y in range(3)],
+                  'water_level': 0.0, 'terrain_liquids': pools, 'lava_depth': 8.0}
+        return {'image': F.brush_image(lumps)[0], 'cx': 0, 'cy': 0}, source
+
+    def test_terrain_coverage_accepts_lava_independently_of_water(self):
+        from chim.validate import Failures, terrain_coverage
+        chunk, source = self.audit_fixture()
+        fails = Failures()
+        self.assertEqual(terrain_coverage(chunk, (0, 0, 256, 256), source, fails), 4)
+        self.assertEqual(list(fails), [])
+
+    def test_hull_seams_expect_the_lava_bed_under_the_standing_box(self):
+        from chim.validate import Failures, hull_seams
+        chunk, source = self.audit_fixture()
+        fails = Failures()
+        self.assertGreater(hull_seams(chunk, (0, 0, 256, 256), source, fails), 0)
+        self.assertEqual(list(fails), [])
+
+    def test_missing_lava_surface_and_bed_remain_failures(self):
+        from chim.validate import Failures, terrain_coverage, hull_seams
+        chunk, source = self.audit_fixture(actual_pools=[])
+        coverage, seams = Failures(), Failures()
+        terrain_coverage(chunk, (0, 0, 256, 256), source, coverage)
+        hull_seams(chunk, (0, 0, 256, 256), source, seams)
+        self.assertTrue(coverage, 'missing lava surface must fail')
+        self.assertTrue(seams, 'missing solid lava bed must fail')
+
+    def test_overlapping_lava_and_water_keep_separate_coverage_checks(self):
+        from chim.validate import Failures, terrain_coverage
+        pools = [{'hull': [[20, 20], [180, 20], [180, 180], [20, 180]], 'top': 20.0},
+                 {'hull': [[80, 80], [240, 80], [240, 240], [80, 240]], 'top': 24.0}]
+        chunk, source = self.audit_fixture(ground=-10.0, pools=pools)
+        fails = Failures()
+        self.assertEqual(terrain_coverage(chunk, (0, 0, 256, 256), source, fails), 4)
+        self.assertEqual(list(fails), [])
+
+    def test_lava_faces_crossing_sloped_ground_are_checked_at_each_sample(self):
+        from chim.validate import Failures, terrain_coverage
+        chunk, source = self.audit_fixture(ground=lambda x, y: x * 30.0 / 256.0)
+        fails = Failures()
+        self.assertEqual(terrain_coverage(chunk, (0, 0, 256, 256), source, fails), 4)
+        self.assertEqual(list(fails), [])
+
+    def test_lava_render_faces_end_at_the_ground_intersection(self):
+        from chim import format as F
+        from chim.validate import face_polygons
+        chunk, _ = self.audit_fixture(ground=lambda x, y: x * 30.0 / 256.0)
+        lava = [p for p, _, flags, _ in face_polygons(F.read_brush_image(chunk['image'])) if flags & 1]
+        self.assertTrue(lava)
+        for poly in lava:
+            self.assertTrue(all(abs(z - 20.0) < 1e-5 for x, y, z in poly))
+            self.assertTrue(all(z >= x * 30.0 / 256.0 - 1e-5 for x, y, z in poly))
+        self.assertAlmostEqual(max(float(p[:, 0].max()) for p in lava), 256.0 * 20 / 30, places=4)
+
+    def test_world_format_accepts_lava_leaves_but_rejects_unknown_contents(self):
+        from chim import format as F
+        from chim.validate import Failures, world_tree
+        chunk, _ = self.audit_fixture()
+        lumps = list(F.read_brush_image(chunk['image']))
+        fails = Failures()
+        world_tree(lumps, 'lava terrain', fails)
+        self.assertEqual(list(fails), [])
+        leaves = bytearray(lumps[10])
+        at = next(i for i in range(0, len(leaves), 28) if struct.unpack_from('<i', leaves, i)[0] == -5)
+        struct.pack_into('<i', leaves, at, -99)
+        lumps[10] = bytes(leaves)
+        fails = Failures()
+        world_tree(lumps, 'corrupt terrain', fails)
+        self.assertTrue(any('leaf contents' in f for f in fails), list(fails))
+
     def test_lava_under_the_ground_gets_no_face(self):
         from chim.terrain import chunk_terrain
         _, info = chunk_terrain((0, 0, 128, 128), 128, lambda x, y: 10.0, lambda x, y: 1, -1024, lambda m: 0, 1,

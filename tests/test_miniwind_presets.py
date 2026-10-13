@@ -39,10 +39,66 @@ def run_main(argv, version=DEV):
 
 
 class Table(unittest.TestCase):
+    def test_empty_actor_evidence_checks_original_master_and_scope(self):
+        from types import SimpleNamespace
+        from build_aga import empty_miniwind_actor_evidence
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'Morrowind.esm').write_bytes(b'synthetic master')
+            args = SimpleNamespace(miniwind=True, miniwind_scope='exterior',
+                                   miniwind_town='lava_x1ym2', data_files=root)
+            original = {'cells': {(1, -2): {'refs': []}}, 'objects': {}}
+            with patch('build_aga.chim_town_grounding', return_value={'lava_x1ym2': []}), \
+                    patch('mwad.audit.load_esm', return_value=original):
+                self.assertEqual(empty_miniwind_actor_evidence(args, root)['source_resident_count'], 0)
+                original['cells'][(1, -2)]['refs'] = [
+                    {'id': 'npc', 'position': [12288, -12288, 0]}]
+                original['objects']['npc'] = {'type': 'NPC_'}
+                self.assertIsNone(empty_miniwind_actor_evidence(args, root))
+                original['objects']['npc'] = {'type': 'CREA'}
+                self.assertIsNone(empty_miniwind_actor_evidence(args, root))
+                original['objects']['npc'] = {'type': 'LEVC'}
+                original['cells'][(1, -2)]['refs'][0]['number'] = 123
+                proof = empty_miniwind_actor_evidence(args, root)
+                self.assertEqual(proof['deferred_creature_spawns'][0]['reference'], 123)
+                self.assertEqual(proof['deferred_creature_spawns'][0]['status'], 'unconverted creature spawn')
+                original['cells'][(1, -2)]['refs'] = []
+                args.miniwind = False
+                self.assertIsNone(empty_miniwind_actor_evidence(args, root))
+                args.miniwind = True
+                args.miniwind_scope = 'full'
+                self.assertIsNone(empty_miniwind_actor_evidence(args, root))
+
+    def test_exterior_without_residents_writes_empty_manifest(self):
+        from import_town import residents
+        from town_config import load_settings
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / 'id1').mkdir()
+            entities = residents(out, out, out, [], load_settings('lava_x1ym2'),
+                                 {'NPC_': {}}, {}, b'', 'ffmpeg', 4)
+            self.assertEqual(entities, [])
+            manifest = json.loads((out / 'residents.json').read_text())
+            self.assertEqual(manifest['cast'], [])
+            self.assertEqual(manifest['models'], {})
+
+    def test_lava_scene_constructs_both_region_and_chim_grids(self):
+        from town_config import load_settings, frame_ground_bounds, handoff_core
+        from town_regions import regions
+        from chim.world import World
+        settings = load_settings('lava_x1ym2')
+        self.assertEqual(len(regions(settings)), 4)
+        low, high = frame_ground_bounds(settings)
+        frame = {'cell': tuple(settings['source_cell']), 'centre': settings['centre'],
+                 'low': low, 'span': [high[k] - low[k] for k in range(2)]}
+        world = World(frame, {'grain': 256})
+        self.assertEqual(len(world.order), world.nx * world.ny)
+        self.assertEqual(handoff_core(settings), settings['bounds'])
+
     def test_every_preset_parses(self):
         rows = mp.presets()
         self.assertEqual(sorted(row['name'] for row in rows),
-                         ['animkit', 'balmora', 'balmora-exterior', 'opening-ship', 'seyda-chim',
+                         ['animkit', 'balmora', 'balmora-exterior', 'lava-pools', 'opening-ship', 'seyda-chim',
                           'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim'])
         seyda = mp.find('seyda-chim')            # v0.0.36-dev5: Seyda Neen CHIM-native, starts at its arrival
         self.assertEqual(seyda['start'], 'seyda_neen')

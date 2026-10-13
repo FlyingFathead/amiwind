@@ -63,8 +63,7 @@ static void recover(void) {
         if(!strcmp(pr_strings+start->v.classname,"info_player_start"))break;
     }
     if(i==sv.num_edicts){Con_Printf("No spawn point in this scene.\n");return;}
-    if(AW_Interior()){if(!AW_InteriorPlace(p,start->v.origin))return;}
-    else if(!AW_PlacePlayer(p,start->v.origin))return;
+    if(!AW_RecoverPlace(p,start->v.origin))return;
     p->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
     VectorCopy(start->v.angles,p->v.angles);p->v.fixangle=1;
     SV_LinkEdict(p,false);Con_Printf("Returned to scene spawn.\n");

@@ -25,6 +25,7 @@
 #include "aw_character.h"
 #include "aw_save.h"
 #include "aw_combat.h"
+#include "aw_story.h"
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -328,6 +329,15 @@ void AW_ViewFrame(void) {
     if(dt>.25f)dt=.25f;
     p=local_player();
     if(!p){if(death.stage!=AW_DEATH_NONE)end_death();set_chase(0);return;}
+    /* Story permission is separate from the saved camera preferences and
+     * body availability. Clear pending input so locked Tab taps cannot fire
+     * when registration ends, and cancel an orbit carried across new game. */
+    if(!AW_StoryViewAllowed()){
+        view.mode=view.primary=AW_VIEW_FIRST;view.idle=view.pov_held=0;
+        view.orbit_yaw=view.orbit_pitch=0;vanity_forced=0;
+        pov_down=pov_tapped=input_seen=0;last_view=0;
+        VectorCopy(cl.viewangles,last_angles);set_chase(0);return;
+    }
     if(distance_cvar.value>=rules.min_distance && distance_cvar.value<=rules.max_distance && distance_cvar.value!=view.distance &&
        view.mode!=AW_VIEW_DEATH)view.distance=distance_cvar.value;
     /* aw_view_third set from the console or a config: the primary mode */
@@ -393,6 +403,7 @@ void AW_ViewSceneSpawn(void) {
 /* The vanity orbit now, until any input (dbg vanitycamera on, dbg camera vanity now). */
 static void vanity_start(void) {
     if(!ready)load_settings();
+    if(!AW_StoryViewAllowed()){Con_Printf("Vanity camera: character registration is not complete.\n");return;}
     if(!body_ready()){Con_Printf("No player body in this image (--player-body on builds it): no vanity camera.\n");return;}
     if(death.stage!=AW_DEATH_NONE || !local_player()){Con_Printf("Vanity camera: not now.\n");return;}
     view.idle=rules.vanity_delay+1;VectorCopy(cl.viewangles,anchor);

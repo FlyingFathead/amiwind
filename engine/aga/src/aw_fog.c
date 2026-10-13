@@ -11,6 +11,9 @@ extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t aw_drawdistance;
 static cvar_t aw_fog={"aw_fog","1",true};
+/* Land Fill Independence v1: disabling colour fog must not disable an
+ * enabled geometric LAND pass. 0 disables LAND fill for a measured A/B. */
+static cvar_t aw_land_fill={"aw_land_fill","1",true};
 /* Source candidate: retain classic rendering until target cost/visual acceptance. */
 static cvar_t aw_terrain_horizon={"aw_terrain_horizon","0",true};
 /* Skyline fill: in each column, sky below far scenery (fog level at least
@@ -101,7 +104,7 @@ static void cycle_distance(void) {
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
@@ -121,7 +124,7 @@ void AW_FogDraw(void) {
     if(AW_Interior())return;
     environment=R_DayNightFogColours();ramp=environment?environment:colours;
     fog=colours && aw_fog.value;
-    if(!fog && !environment)return;
+    if(!ramp || (!fog && !environment && !aw_land_fill.value))return;
     distance=AW_DrawDistance();
     if(fog && distance!=old_distance){old_distance=distance;AW_FogDepths(depths,distance);}
     w=r_refdef.vrect.width;h=r_refdef.vrect.height;extent=w>h?w:h;
@@ -129,7 +132,7 @@ void AW_FogDraw(void) {
     step=2.0f/extent;for(k=0;k<3;k++)delta[k]=vright[k]*step;
     fill=fog && aw_skyline_fill.value>0 && w<=SKYLINE_MAX;
     if(fill)memset(skyline,0,w);
-    for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
+    if(fog || environment)for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
         pixels=vid.buffer+y*vid.rowbytes+r_refdef.vrect.x;
         z=d_pzbuffer+y*d_zwidth+r_refdef.vrect.x;
         u=(r_refdef.vrect.x-((int)vid.width>>1))*step;
@@ -148,8 +151,10 @@ void AW_FogDraw(void) {
             for(k=0;k<3;k++)ray[k]+=delta[k];
         }
     }
-    if(fog && aw_terrain_horizon.value==1)AW_HorizonDraw(ramp[15<<8],distance);
-    if(fog && aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);
+    if(aw_land_fill.value){
+        if(aw_terrain_horizon.value==1)AW_HorizonDraw(ramp[15<<8],distance);
+        if(aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);
+    }
 }
 
 /* Far clipping uses the same forward depth as palette fog. Radial/cubic

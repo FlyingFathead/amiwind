@@ -60,6 +60,34 @@ def variant(scale, rotation=(0.0, 0.0, 0.0), weld='base'):
 SCALES = [round(0.5 + 0.01 * k, 2) for k in range(151)]
 
 
+class TerrainVariantTests(unittest.TestCase):
+    def test_buried_rock_render_removed_without_changing_collision(self):
+        import struct
+        from test_chim_model_hull import walk
+        task = {'ref': {'model_index': 0, 'number': 1, 'scale': 1,
+                       'rotation_radians': [0., 0., 0.], 'position': [0., 0., 0.]},
+                'data': plates(), 'texsize': TEXSIZE, 'centre': [0., 0.],
+                'model': dict(MODEL, source='terrain_rock_synthetic.nif'),
+                'exact': False, 'hollow': False, 'qbsp': None,
+                'collision_cache': None, 'keep_chain': True}
+        before = variant_unit(task)
+        clip = {'triangles': [[[-100., -100., 10.], [100., -100., 10.], [100., 100., 10.]],
+                              [[-100., -100., 10.], [100., 100., 10.], [-100., 100., 10.]]],
+                'bottom': -100., 'overlap': .5, 'placements': [([0., 0., 0.], 0.)]}
+        after = variant_unit(dict(task, terrain_clip=clip))
+        self.assertEqual(after['terrain_clip']['output_faces'], 0)
+        self.assertGreater(after['terrain_clip']['fully_buried_removed'], 0)
+        roots = [struct.unpack_from('<9f7i', r['lumps'][14])[10] for r in (before, after)]
+        points = np.random.default_rng(248).uniform((-10., -10., -10.), (50., 15., 10.), (500, 3))
+        for point in points:
+            self.assertEqual(walk(before['lumps'], roots[0], point)[0],
+                             walk(after['lumps'], roots[1], point)[0])
+        shared = variant_unit(dict(task, terrain_clip=dict(clip, placements=[([0., 0., 0.], 0.), ([300., 0., 0.], 0.)])))
+        self.assertEqual(shared['lumps'], before['lumps'])
+        with self.assertRaisesRegex(ValueError, 'every placement'):
+            variant_unit(dict(task, terrain_clip=dict(clip, placements=[])))
+
+
 class VariantWeldTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

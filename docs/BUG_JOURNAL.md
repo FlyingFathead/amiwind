@@ -1,6 +1,6 @@
 # Bug journal
 
-Entries for v0.0.35 (from 10 October 2026). Older entries are frozen: [8 October 2026 to the v0.0.34 release](journals/BUG_JOURNAL-v0.0.34.md), [7 October 2026](journals/BUG_JOURNAL-v0.0.31.md) and [v0.0.29 and earlier](journals/BUG_JOURNAL-v0.0.29.md). The current status of every bug is in the [register](BUGS.md).
+13 October 2026 - BUILD-SHADOWED-WORLD-MAPS-38: Final routing audit flagged 135 retained maps; dependency review and used-map-only acceptance remain open.
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ Entries for v0.0.35 (from 10 October 2026). Older entries are frozen: [8 October
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36 fixed, 11 October 2026](#chim-frame-edge-efrag-crash-36-fixed-11-october-2026)
 - [AW-LEASE-MEMORY-DEADLOCK-36 fixed, 11 October 2026](#aw-lease-memory-deadlock-36-fixed-11-october-2026)
 - [TRACKER-REGISTER-SIZE-36, 11 October 2026](#tracker-register-size-36-11-october-2026)
+- [SMOKE-PASSES-WITHOUT-MAP-36, 13 October 2026](#smoke-passes-without-map-36-13-october-2026)
 - [SMOKE-PASSES-WITHOUT-MAP-36, 11 October 2026](#smoke-passes-without-map-36-11-october-2026)
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36 (persisting) and ENGINE-CRASH-EXIT-KEYBOARD-36, 11 October 2026](#chim-frame-edge-efrag-crash-36-persisting-and-engine-crash-exit-keyboard-36-11-october-2026)
 - [TEST-PROFILE-OVERHEAD-SAMPLES-36, 11 October 2026](#test-profile-overhead-samples-36-11-october-2026)
@@ -146,8 +147,112 @@ Entries for v0.0.35 (from 10 October 2026). Older entries are frozen: [8 October
 - [BUILD-SEYDA-REGEN-30 fixed in source: no recorded Seyda Neen input, 10 October 2026](#build-seyda-regen-30-fixed-in-source-no-recorded-seyda-neen-input-10-october-2026)
 - [TOOLKIT-MAP-SCALING-36, 11 October 2026](#toolkit-map-scaling-36-11-october-2026)
 - [TRACKER-OCEAN-COUNTED-DONE-36, 11 October 2026](#tracker-ocean-counted-done-36-11-october-2026)
+- [CHIM-LAVA-TERRAIN-AUDIT-37, 12 October 2026](#chim-lava-terrain-audit-37-12-october-2026)
+- [BUILD-LAVA-PRESET-FIXTURE-38, 12 October 2026](#build-lava-preset-fixture-38-12-october-2026)
+- [CHIM-COAST-OBJECTS-MISSING-36, 12 October 2026](#chim-coast-objects-missing-36-12-october-2026)
+- [BUILD-VERSION-EMULATOR-PRESETS-38: 12 October 2026](#build-version-emulator-presets-38-12-october-2026)
+- [BUILD-LAVA-CORE-BOUNDS-38: 12 October 2026](#build-lava-core-bounds-38-12-october-2026)
+- [BUILD-LAVA-TERRAIN-BUDGET-38, 12 October 2026: complete scenery scan](#build-lava-terrain-budget-38-12-october-2026-complete-scenery-scan)
+- [CHIM-MOLAG-MEMORY-38, 12 October 2026](#chim-molag-memory-38-12-october-2026)
+- [2026-10-12 — TOOLKIT-CULL-DIAGNOSTICS-38](#2026-10-12--toolkit-cull-diagnostics-38)
+- [2026-10-12 — CHIM-TERRAIN-ROCK-EXEMPT-38](#2026-10-12--chim-terrain-rock-exempt-38)
+- [STAIRS-MOLAG-ACCESS-38, 13 October 2026](#stairs-molag-access-38-13-october-2026)
 
 <!-- contents end -->
+
+13 October 2026 - RELEASE-LAVA-IMAGE-ALLOWLIST-38: Source preflight caught two unapproved image types; narrow allowlist repair prepared before packaging.
+
+13 October 2026 - TOOLKIT-TEXT-ENCODING-38: 13 October 2026 recurrence in release documentation: a locale-decoded text edit damaged historical README punctuation and a heading anchor. The anchor gate detected it before packaging. Historical content was restored from the previous commit using explicit UTF-8 byte decoding; all 1,008 document checks pass. This is a source-editing workflow failure, not a game-runtime change.
+
+13 October 2026 - CHIM-LAVA-TERRAIN-SPIKES-38: Final full-image verification, 13 October 2026: all 349 original lava references across 27 cells survive conversion and final HDF readback matches the rebuilt CHIM world. Scoped native views show a continuous shoreline with HUD and crosshair off. Contact with god mode and noclip off records health 100 -> 76.9 -> 64.8 -> 52.8, water level 1 and lava contents -5. This supersedes pending integration notes; sound, wider traversal and owner acceptance remain open.
+
+13 October 2026 - CHIM-MOLAG-MEMORY-38: Final full-image verification, 13 October 2026: completed-stage Tel Uvirith and all four sprite assets passed HDF readback. Both teleport aliases reach its CHIM frame. Active-ring memory is 5,596,320 bytes and load-ring memory 5,767,824 bytes against 6,242,304 bytes. Arrival and scoped scene verified; normal staircase traversal and owner acceptance remain open.
+
+13 October 2026 - BUILD-IMAGE-CHIM-MAPS-SERIAL-36: Full-image verification, 13 October 2026: 360 regional frame maps generated in 4.3 seconds at 1.5 reported cores with zero pass-cache hits, compared with 267 seconds in the preceding build. The complete image passed the performance guard without waivers. Earlier byte-equivalence verification remains applicable; final map readback also passed.
+
+13 October 2026 - BUILD-FLORA-BSP-BYTES-38: Open: vf1099 exceeds the BSP byte budget by 72,048 bytes; vf2551 by 150,360 bytes. CHIM replacement and final package verification pending.
+
+BUILD-CACHE-OWNER-FAILS-STAGE-34, 13 October 2026: a standalone v0.0.38
+conversion wrote 123,873 root-owned cache entries. The normal image preflight
+caught seven unwritable directories before any stage. Repaired ownership
+without deleting cache data; require the regular builder user for standalone
+conversions too. Full image retry pending; the early rejection worked as designed.
+
+13 October 2026 - TOOLKIT-TEXT-ENCODING-38: Corrected in local source, including both Local view button variants; whole Toolkit text scan clean for observed corruption patterns. Packaged release verification pending.
+
+13 October 2026 — TOOLKIT-CELL-HIGHLIGHT-SCALE-38: owner reported a displaced selected-cell outline. Corrected CSS/device-pixel scaling; verified alignment and checkbox behavior in the browser. Packaging pending.
+
+12 October 2026 — CHIM-MOLAG-MEMORY-38: compiled door-panel test map loaded
+and ran for 33 seconds in FS-UAE with both panels visible. The close and
+oblique noclip captures do not establish appearance or door interaction;
+matched reference and normal movement checks remain pending.
+
+12 October 2026 — CHIM-MOLAG-MEMORY-38: compiled two bitmap-panel door types
+for six placements. Active and load peaks fall 23,840 B each, leaving only
+1,808 B nominal load-ring headroom against the old budget before separate
+sprite Hunk costs. Collision graphs match; native door use and appearance
+are pending. No memory-fit or release acceptance.
+
+12 October 2026 — CHIM-MOLAG-MEMORY-38: compiled lantern/hook trial reduces
+placed polygons 30,985 to 27,007; fixed-stage-6 ash sprites bring active peak
+to 6,032,032 B but load peak remains 6,264,336 B, 22,032 over the old budget
+before sprite Hunk allocation. Native 31-second load/run is a limited diagnostic;
+reference appearance, movement, runtime stage selection and package acceptance
+remain pending.
+
+12 October 2026 — CHIM-MOLAG-MEMORY-38: stronger all-nonterrain reduction
+plus terrain clipping reaches 30,985 placed faces and a 9,045,776 B modelled
+all-stage peak, still 2,803,472 B over budget. A hypothetical stage-6 filter
+misses the budget by 80 B at one position; runtime residency and native visual
+checks are pending. No deployment or fixed status.
+
+12 October 2026 — CHIM-MOLAG-MEMORY-38: targeted 128-unit root/slavemarket
+tiling after optimizer and terrain cut raises the modelled peak 2,317,856 B
+and fails three hull-limit checks. This setting is rejected; broader geometry
+strategies and native acceptance remain open.
+
+12 October 2026 — CHIM-MOLAG-MEMORY-38: lantern/support model audit finds
+7,434 placement-expanded faces but 140,352 B across four distinct resident
+models. A 512-unit tile trial after optimization and terrain clipping raises
+the modelled all-stage peak by 670,208 B; this setting is not adopted.
+
+12 October 2026 — CHIM-HIDDEN-FACES-33 / CHIM-MOLAG-MEMORY-38: opt-in Molag Mar
+(10,1) terrain cut after optimizer removes 1,510 placed and 1,244 stored faces
+and lowers the modelled peak by 149,408 B. Combined reduction from the original
+is 6,905 placed / 6,247 stored faces and 1,005,680 B modelled peak. The cell
+still exceeds the fixed memory budget; native/reference acceptance is pending.
+
+12 October 2026 — BUILD-LAVA-TERRAIN-BUDGET-38: full candidate3fac049 reached scenery overlay but vf1397 exceeds the4MiB storage cap; no bypass or delivery.
+
+12 October 2026 — MESH-VIVEC-CAP-GAP-38: candidate parasol town profile fails sampled material-boundary checks; boundary-lock diagnostic passes at160 versus135 triangles. Native comparison pending.
+
+12 October 2026 — INTERIOR-HULL-CHAIN-33: owner reports severe Arena Pit interior slowdown; retain as a performance observation pending measured cause.
+
+12 October 2026 — MESH-VIVEC-CAP-GAP-38: owner screenshot shows a cap opening at Vivec cell 5,-10. Exact model, installed build and cause unknown; matched original/native comparison pending. Separate regression from historical GEO-01.
+
+12 October 2026 — CONFIG-COMMENT-29: the unshipped dev3 LAND-fill comment
+reintroduced a semicolon, caught by the existing loading-delay source regression.
+Quake splits command-buffer semicolons before discarding comments. Replaced
+the separator with a period; final full-suite validation is pending. No shipped
+config was changed and this does not promote the historical issue's status.
+
+12 October 2026 — WORLD-SLOPE-STUCK-38: owner reports jumping cannot pass
+the Vivec Arena boat-path obstruction; other docks remain untested.
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38: added owner-reported missing gondola
+travel as a planned service, distinct from visible Dalse Adren and dock access.
+HORIZON-HOLES-31: accounted for the requested persistent LAND-fill toggle in
+the resident registry: one cvar, 24 structure bytes and 32 zone bytes; native
+frame-time and complete terrain coverage remain unaccepted.
+
+12 October 2026 — HORIZON-HOLES-31: added the cell 0,17 distant-terrain
+reproduction sequence and Land Fill Independence v1 candidate. Saved
+`aw_land_fill` and `dbg land fill 0/1` separate enabled LAND passes from fog;
+the legacy rasterizer selector remains experimental. Five focused Docker
+tests pass; target visual and CPU/RAM acceptance are pending.
+WORLD-SHORE-OPEN-GEOMETRY-38: added the cell 0,18 rock-opening pose; source
+reference identification and matched original/native repair evidence remain pending.
+
+Entries for v0.0.35 (from 10 October 2026). Older entries are frozen: [8 October 2026 to the v0.0.34 release](journals/BUG_JOURNAL-v0.0.34.md), [7 October 2026](journals/BUG_JOURNAL-v0.0.31.md) and [v0.0.29 and earlier](journals/BUG_JOURNAL-v0.0.29.md). The current status of every bug is in the [register](BUGS.md).
 
 ## Stair fixes verified, AW-LEASE-NO-GROW-36, 11 October 2026
 
@@ -176,6 +281,14 @@ waiting request reads the config again each time it checks.
 TRACKER-REGISTER-SIZE-36: bugs.json passed 75 % of its 1 MiB release text limit (789,008 bytes). The rotation rule
 frees under 3 KB, so the warning for bugs.json is 85 % for now (the hard limit is unchanged); a second archive for
 fixed bugs of v0.0.34 and v0.0.35 follows right after the v0.0.36 release, and the warning returns to 75 %.
+
+## SMOKE-PASSES-WITHOUT-MAP-36, 13 October 2026
+
+SMOKE-PASSES-WITHOUT-MAP-36: scripted sessions also accepted an alive emulator
+after Host_Error disconnected the game. Added final screen/signon/world-leaf
+checks and a shell reproduction; seven smoke-harness tests pass. Diagnostic
+image construction had omitted the changed CHIM index; correcting that fixture
+allowed the lava cell to run. Its earlier PASS is invalid evidence.
 
 ## SMOKE-PASSES-WITHOUT-MAP-36, 11 October 2026
 
@@ -1208,3 +1321,222 @@ controls. Fixed and verified in the browser (11 October 2026): the map fills its
 
 [TRACKER-OCEAN-COUNTED-DONE-36](bugs/TRACKER-OCEAN-COUNTED-DONE-36.md): the tracker counted the open-ocean cells as done although the
 engine does not place the ocean chunk yet. Fixed and verified in the browser (11 October 2026): they are silver, on their own line and totals row, and no longer done.
+
+- 2026-10-12 CHIMPORT-RETRY-LAVA-STALE-SOURCE-36: synthetic pre-lava resume regression reproduced. Candidate adds converter identity and preserves/recollects stale source stages; affected-cell rerun and native visible-lava acceptance remain pending.
+
+## CHIM-LAVA-TERRAIN-AUDIT-37, 12 October 2026
+
+CHIM-LAVA-TERRAIN-AUDIT-37: all 25 targeted lava retries now reach frame validation and fail. Standing-floor and liquid-coverage checks do not account for lava beds and lava warp faces. Registered open; source-stage repair remains separate, and no cells or visible lava are accepted.
+
+CHIM-LAVA-TERRAIN-AUDIT-37: the first candidate passed gate 2220 but failed actual sloping-ground cells. A fifth synthetic regression reproduced its face-centroid assumption; per-sample exposed-surface and contents checks pass the regression and the first actual cell. The wider retry and final gate remain pending; the issue stays open.
+
+CHIM-LAVA-TERRAIN-AUDIT-37 and CHIMPORT-RETRY-LAVA-STALE-SOURCE-36: source 95db832 converts all 25 affected cells (one reused, 24 computed, zero failures). Revised full gate and visible native/reference acceptance remain pending; no release is claimed.
+
+CHIM-LAVA-TERRAIN-AUDIT-37: readback finds all 25 cells converted but their format audit still rejects CONTENTS_LAVA (-5). Process conversion counts are not acceptance. Registered the additional validator omission under the same ID and reproduced it synthetically; unsupported contents must remain refused.
+
+CHIM-LAVA-TERRAIN-AUDIT-37 and CHIMPORT-RETRY-LAVA-STALE-SOURCE-36: individual receipt readback at source 73c8441 confirms 25 conversions and 25 passing format reports; 19 recorded audit passes and six hull-policy holds. Unmeasured checks, native/reference acceptance and release remain outstanding.
+
+## BUILD-LAVA-PRESET-FIXTURE-38, 12 October 2026
+
+BUILD-LAVA-PRESET-FIXTURE-38: full validation caught an omitted expected preset name in the new lava sandbox candidate. Corrected the inventory; retain failed evidence and rerun the gate before building a playtest.
+
+## CHIM-COAST-OBJECTS-MISSING-36, 12 October 2026
+
+CHIM-COAST-OBJECTS-MISSING-36: reconciled the 11 October owner report and roadmap into the canonical register and report under the same ID. Missing coast objects and Dwemer ruins remain unresolved; exact references and matched native reproduction are pending.
+
+## BUILD-VERSION-EMULATOR-PRESETS-38: 12 October 2026
+
+Full gate caught missing version-named presets before playtest delivery. Added both matching presets without changing hardware settings; validation pending.
+
+## BUILD-LAVA-CORE-BOUNDS-38: 12 October 2026
+
+The first lava sandbox image build rejected a 768-unit core in 2048-unit bounds. Changed to the established single-cell core size of 1024; native acceptance pending.
+
+- BUILD-LAVA-CORE-BOUNDS-38 (12 October 2026): image retry exposed an incompatible terrain margin after the core repair. Adopted the existing single-cell CHIM region margin and added direct grid construction regression; native validation remains pending.
+
+- BUILD-EMPTY-RESIDENT-POOL-38 (12 October 2026): lava scene packaging exposed zero-worker resident conversion. Added a lower bound and a regression for empty resident manifests; native validation pending.
+
+- BUILD-EMPTY-ACTOR-GATE-38 (12 October 2026): lava exterior without NPC residents failed the image contact gate. Five original leveled-creature markers remain unconverted and individually recorded. Candidate limits not-applicable to resident contact without granting production actor acceptance; image and native verification pending.
+
+- CHIM-LAVA-HUNK-GAP-38 (12 October 2026): lava MiniWind boots but leaves 2,004,064 bytes of hunk gap at first presentation; 93,088 bytes below the safety threshold. Cause and repair pending.
+
+- CHIM-LAVA-HUNK-GAP-38 (12 October 2026): fresh voice-off control removes the 108,384-byte cold temporary peak; packaged character greeting size and existing sound-loader allocation match exactly. Production voice remains enabled; reserve repair pending.
+
+CHIM-HULL-CHAIN-COST-33, 12 October 2026: scoped fire-fern checked-union candidate; 19 focused tests pass. Fifteen sampled variants reach depths 19-28; fresh cell audits and native collision remain pending. No hold cleared.
+
+CHIM-LAVA-RECOVER-38 (2026-10-12): Native lava contact reduced health and showed the damage tint, but debug recovery found no clear town spawn. Observed once; cause and repair pending.
+
+CHIM-LAVA-RECOVER-38 (2026-10-12): Recovery also fails at the initial spawn before lava exposure while unstuck succeeds. Candidate reuses checked CHIM arrival placement and primes/restores collision residency; compiled host regression passes, target verification pending.
+
+CHIM-FERN-NCO-SOLID-38 (12 October 2026): Normal-movement comparison in cell (3,-1) identifies a solid fire fern where the original walks through. Both source fern models carry NCO markers; mesh export loses that intent although the sprite path honors it. Repair pending; six holds retained.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 (12 October 2026): Owner requested complete exterior-cell feature accounting. Authored merchant placement and deferred creature category verified; source-to-package and gameplay coverage pending. Rings 0-2 are exterior only; interiors may use BSP29, CHIM or both. No repair shipped.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 (2026-10-12): Corrected the mutable tracker loader to replace complete reference-accounting snapshots; obsolete light-deferral reasons no longer accumulate. Tracker suite: 92 tests, three skips, no failures/errors. Preserved rings 0-2 result readback: 588 rows, zero accounting discrepancies. Live regeneration and original-to-package feature reconciliation remain pending.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 (2026-10-12): Exact dev2 package readback of 51 map/harvest files accounts for 235 of 458 town-overlap references absent from the CHIM source manifest. Another 223 remain absent (183 statics, 26 containers, four doors, ten activators); native/OpenMW comparison is pending. No sealed package was changed.
+
+CHIM-FERN-NCO-SOLID-38 â€” 2026-10-12: Candidate preserves authored NC/NCO collision metadata through scenery export and mesh preparation; 41 focused Docker tests passed. Fresh six-cell conversion and native walking remain pending; all six holds stay open. Delivered dev2 unchanged.
+
+CHIM-FERN-NCO-SOLID-38 â€” 2026-10-12: All six fresh cell conversions pass offline audits; 24 fern variants have empty point/standing hulls with visible faces retained. Native cell (3,-1) passes the former obstruction; matched traversal and remaining native cell checks pending. Holds remain open.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 â€” 2026-10-12: Of 223 package-path omissions, 170 origins are outside town boxes and 53 inside. All 53 inside-box entries are absent from Seyda's source audit; frame overlap is not coverage. Per-reference ownership repair remains pending.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 â€” 2026-10-12: dev2 directory audit places all 223 unresolved references outside town handoff cores, in eight open-world rows. Town terrain-frame intersection does not establish reference coverage. No native repair acceptance.
+
+CHIM-FERN-NCO-SOLID-38 â€” 2026-10-12: controlled walking crosses reference 163515 in cell (2,-2), adding a second scoped candidate route. Noclip-only attempts are explicitly excluded. Matched acceptance and four remaining cell routes stay pending; no hold cleared.
+
+- 2026-10-12 CHIM-FERN-NCO-SOLID-38: Candidate walking crossings now cover four of six diagnostic cells. Two obstructed setups need alternative approaches; one remained in noclip and is explicitly excluded. Original-game comparisons and per-route evidence retained. All six holds remain open; not packaged in dev2.
+
+- 2026-10-12 CHIM-FERN-NCO-SOLID-38: Alternative routes establish normal-walking crossings in the remaining two diagnostic cells. All six now have scoped route evidence with original-game comparisons; exact pose and package acceptance remain pending. Holds remain open.
+
+- 2026-10-12 CI-HOSTDEPS-30: A candidate fern-marker fixture reintroduced PyFFI into the minimal host-parity test. Restored the mocked parser boundary while retaining real marker coverage in converter tests. Failed integration receipt retained; targeted host checks rerun.
+
+- INTRO-CAMERA-GATING-38 (2026-10-12): Owner reports default Argonian visible through Tab and idle vanity before race selection. Record separate original camera unlock checks and coherent dbg aw hors 0 bypass state; reproduction and repair pending.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Owner report recorded as open, needs fixing. Full dev2 world omits the reported lava cells. No repaired-package acceptance.
+
+- COMBAT-AMBIENT-SPEECH-GATING-38 (2026-10-12): Owner report recorded as open, needs fixing. Ambient greetings and subtitles interrupt combat. No repaired-package acceptance.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Source inspection finds no lava integration in the legacy regional terrain/WAD builder. Owner requires both legacy and CHIM support; adding CHIM areas alone is insufficient. Shared Quake lava conversion is the repair basis; implementation and native gates pending.
+
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-12): Owner reports a regression in v0.0.38-dev2: equip a torch and switch to third person; illumination remains, but the torch model, torch animation and raised holding pose are absent. Open, needs fixing; native reproduction pending.
+
+- PLAYER-READY-THIRDPERSON-38 (2026-10-12): Owner reports no fists-up pose or weapon unsheathing animation on the third-person player body. Exact weapon and race are not yet identified. Open, needs fixing; native reproduction pending.
+
+- PLAYER-READY-WATER-MOVEMENT-38 (2026-10-12): Owner reports apparent water-walking with weapon/torch ready. Record original swimming and Water Walking override comparison; cause unknown.
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-12): Owner adds lighting a torch underwater to this report; original equipment/water rules and native reproduction pending.
+
+- WATER-GAMEPLAY-PARITY-38 (2026-10-12): Owner requests full surface/swimming/submerged gameplay comparison and CPU/memory prudence. Preserve approved underwater visuals. Screenshot binds underwater torch report to cell 12,6; reference/native matrix pending.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Legacy candidate lava is visible in target noclip diagnostic; spawn death reaches lava damage. Matched camera, scenery, controlled gameplay and package gates remain open.
+- WATER-GAMEPLAY-PARITY-38 (2026-10-12): Owner reports missing drowning damage and requests original feedback, swimming/diving and lava-entry behavior; reuse existing physics and measure cost.
+- ANIMKIT-COVERAGE-35 (2026-10-12): Owner reports walking poses while swimming/diving; include player and NPC companion animation coverage in original comparison.
+
+- PLAYER-JUMP-THIRDPERSON-38 (2026-10-12): Owner reports missing third-person jump animation; diagnosis and native/original comparison pending.
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Owner requests explicit lava-height/topomap verification. Original transformed surface, converted surface, terrain and native contact height remain separate gates.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Partial one-region elevation audit preserves all 16 source pool heights, but 47/208 exposed-LAND samples have solid contents instead of expected lava. Suspect geometry; capture and terrain reconciliation pending, no height acceptance.
+- ANIMKIT-COVERAGE-35 (2026-10-12): Roadmap explicitly retains full player/NPC animation coverage, including swimming/diving and companion needs.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Exact generated terrain explains all 47 flagged samples; sea-level refinement does not protect elevated lava shores. Local refinement candidate and cost/native gates remain pending.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Local original-resolution terrain candidate passes49 focused tests,208 exposed and467 buried sample controls, and23-second baseline noclip run. Geometry and heap costs increased; full acceptance pending.
+- LAND-HORIZON-GAPS-29 (2026-10-12): Owner supplies dev2 Grazelands horizon screenshots; retain as provisional related report pending current native diagnosis.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Corrected local terrain passes reference-aligned native capture and scoped contact check (health 78.0 to 58.7). Full scene, exact rate/boundary, coverage and package gates remain open.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-12): Pinned cold/warm single-map cache control produces identical BSP and lava WAV hashes in fresh scenes. Whole-stage restore and final package audio remain pending.
+
+- BUILD-DIAGNOSTIC-PALETTE-38 (2026-10-12): Flora guard caught mixed conversion/runtime palettes in isolated lava diagnostic. Rebuilt layers consistently and verified production pixel remap; fresh native check pending.
+
+- CHIM-LAVA-HUNK-GAP-38 (2026-10-12 13:44 UTC): Addressed from v0.0.38-dev2: startup WAV scratch reserve integrated. Scoped voice-on native cold peak gap 2112448 bytes and warm2220640 exceed2097152; cold margin15296. No observed chunk failure or partial activation. Wider cell/performance and owner acceptance remain open.
+
+- CHIM-LAVA-RECOVER-38 (2026-10-12 13:44 UTC): Addressed from v0.0.38-dev2: checked arrival/collision recovery integrated. Native initial and displaced recovery returned to369,688,149 with walking movement state3. Screenshot-state lag and scripted final noclip limit evidence; broader traversal and owner acceptance remain open.
+
+- CHIM-FERN-NCO-SOLID-38 (2026-10-12 13:44 UTC): Addressed in v0.0.38-dev3 candidate, not delivered: authored NC/NCO collision policy retained; six fresh offline audits and one scoped normal-walking crossing in each affected cell, with original-game corridor comparisons. Exact pose/terrain parity, whole-cell and final-package acceptance remain open; six holds not cleared.
+
+- CHIMPORT-RETRY-LAVA-STALE-SOURCE-36 (2026-10-12 13:44 UTC): Addressed in v0.0.38-dev1 candidate source: all25 formerly stale-source cells converted and passed format validation;19 passed measured offline audits and6 retained hull holds. Retry/source invalidation is repaired at the tested boundary; complete visible/gameplay coverage and owner acceptance remain open.
+
+- CHIM-HULL-CHAIN-COST-33 (2026-10-12 13:44 UTC): Scoped fern work addressed in v0.0.38-dev3 candidate: six fresh offline cell audits and six selected native crossing routes now recorded. This does not resolve the original routed-canton trace-cost issue or establish native performance; broad issue and six cell holds remain open.
+
+- BUILD-ACTOR-CONTACT-REGRESSION-38 (2026-10-12): Full dev3 actor gate reports116 blocked contacts versus116 grounded in dev2; build stopped before packaging. Cause under investigation.
+
+- BUILD-ACTOR-CONTACT-REGRESSION-38 (2026-10-12): Empty point-hull root was interpreted as solid. Candidate writes an empty node; old-writer regression fails, candidate and 15 related tests pass. Full build/native verification pending.
+
+- UI-KEY-HELP-STALE-38 (2026-10-12): Owner reports sparse key help and raw action labels; F10/grave handlers verified in source. Multi-column layout requested; repair pending.
+- PLAYER-JUMP-THIRDPERSON-38 (2026-10-12): Owner repeats that third-person jumping has no visible jump animation; existing report retained, no duplicate or closure.
+
+- WORLD-SLOPE-STUCK-38 (2026-10-12): Owner reports being stuck beside a steep terrain face; slope involvement is suggested, not established. Exact HUD positions recorded; no repair or closure.
+
+- WORLD-SHORE-OPEN-GEOMETRY-38 (2026-10-12): Owner reports broken shoreline objects and missing textures. Two screenshots show broad open-looking sections, thin edges and background visible through the objects. Texture loss versus omitted faces, orientation or visibility is not yet isolated. Exact HUD positions recorded; no repair or closure.
+
+WORLD-SHORE-OPEN-GEOMETRY-38, 12 October 2026: preserved additional owner shoreline poses and repeated-model hypothesis. Read-only 153-model rim diagnostic identifies a simplification lead; no production geometry changed and no native repair acceptance. Findings added to WHAT_ARE_ROCKS.md.
+
+BUILD-LAVA-TERRAIN-BUDGET-38, 12 October 2026: full dev3 terrain stage stopped; seven outputs exceed 4 MiB. Preserved evidence, no limit bypass, no package delivery.
+
+
+## BUILD-LAVA-TERRAIN-BUDGET-38, 12 October 2026: complete scenery scan
+
+12 October whole-region follow-up: the next full build confirms cells (5,-2) and (5,-1) are selected as CHIM, but stops at BSP29 scenery vf1516, cell (7,-4). A complete scenery-only scan of 2,103 legacy regions finds two storage failures: vf1516 is 4,384,176 bytes with 17,986 faces and 22,671 clipnodes; vf1907, cell (11,-1), is 4,551,576 bytes with 16,395 faces and 15,690 clipnodes. Both exceed the 4,194,304-byte cap while passing the face and clipnode limits. Both belong to Molag Mar Region. The current selection contains 26 of its 123 exterior cells. Whole-region CHIM coverage, collision validation, later overlays and exact-package native acceptance remain pending.
+
+
+## CHIM-MOLAG-MEMORY-38, 12 October 2026
+
+Whole Molag Mar conversion exposed a CHIM heap failure in exterior cell (10,1): 11,970,016 B against 6,242,304 B. Model allocation breakdown recorded; original references retained. Spatial model-cut investigation pending, no budget waiver or native acceptance.
+
+CHIM-MOLAG-MEMORY-38 / CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 — 2026-10-12: traced 139 original stronghold phase-controlled references and heavy compiled root variants in Tel Uvirith (10,1). Script predicates and topology recorded; no native fix or package acceptance.
+
+CHIM-MOLAG-MEMORY-38 — 2026-10-12: original-game stage0/6 views and per-stage residency estimates recorded. Stage6 still exceeds the fixed budget by 1,395,808 bytes; repair remains pending.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 — 2026-10-12: Added conservative original-script visibility audit and six passing focused Docker regressions. Tel Uvirith (10,1): 139 conditional references; event-driven script remains unresolved. Runtime and packaging pending.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 — 2026-10-12: Whole Molag Mar script census covers 123 exterior cells and 15,162 references; 139 recognized predicates, 652 unresolved by the visibility classifier, 14,371 without attached scripts. Feature-path and runtime acceptance remain separate.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38 — 2026-10-12: Reconciled 310 deferred lava meshes against separate liquid counts in 24 Molag Mar cells, zero count mismatches. Steam/sign/banner geometry accounted separately from unverified sound/animation.
+
+## 2026-10-12 — TOOLKIT-CULL-DIAGNOSTICS-38
+
+TOOLKIT-CULL-DIAGNOSTICS-38: Known collision-only tree boxes have no render polygons. A global missing-polygon guard disabled every terrain culling check. Synthetic buried-face and diagnostic-box regression passes; full browser visual verification remains pending. Candidate only.
+
+## 2026-10-12 — CHIM-TERRAIN-ROCK-EXEMPT-38
+
+CHIM-TERRAIN-ROCK-EXEMPT-38: The experimental compiler excluded every placed mesh with a terrain_ filename prefix, conflating rock props with authoritative LAND. Isolated cell (10,1) compile passed; 59 collision models match baseline. Active peak saves 34,112 bytes and load peak saves 32,864 bytes. Native terrain-contact and matched original comparison remain pending. Candidate only.
+
+## STAIRS-MOLAG-ACCESS-38, 13 October 2026
+
+STAIRS-MOLAG-ACCESS-38: Owner reports a blocked walkway step and door stair approaches in the Tel Uvirith diagnostic playtest. Original screenshots retained privately. Added to staircase/access fixes; cause and matched original-game traversal remain unverified.
+
+CHIM-MOLAG-MEMORY-38 / STAIRS-MOLAG-ACCESS-38 — 2026-10-13: Corrected the inspected cell (10,1) location to Tel Uvirith / Uvirith's Grave, Molag Amur. Earlier diagnostic names said Molag Mar incorrectly; IDs retained. Owner selected the completed stronghold state for the full-world local playtest. Dynamic quest construction remains unimplemented.
+
+TREE-VIEW-FLOAT-38: 13 October 2026: registered the 12 October owner report and first screenshot pose; direction-dependent follow-up and native reproduction remain pending.
+
+BUILD-LAVA-COVERAGE-38: 13 October 2026: reconciled 2 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+WATER-GAMEPLAY-PARITY-38: 13 October 2026: reconciled 1 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+PLAYER-TORCH-THIRDPERSON-38: 13 October 2026: reconciled 1 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+TREE-VIEW-FLOAT-38: 13 October 2026: reconciled 2 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+HORIZON-HOLES-31: 13 October 2026: reconciled 10 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+UI-KEY-HELP-STALE-38: 13 October 2026: reconciled 2 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+WORLD-SLOPE-STUCK-38: 13 October 2026: reconciled 4 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+WORLD-SHORE-OPEN-GEOMETRY-38: 13 October 2026: reconciled 25 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+CHIM-CELL-FEATURE-LIST-INCOMPLETE-38: 13 October 2026: reconciled 1 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+MESH-VIVEC-CAP-GAP-38: 13 October 2026: reconciled 2 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+CHIM-MOLAG-MEMORY-38: 13 October 2026: reconciled 1 owner screenshot(s) with evidence IDs and original hashes. Originals remain private; no fix acceptance implied.
+
+- CHIM-FRAME-GROUND-TRACE-38 (13 October 2026): Full v0.0.38 base image from 026caf4 failed in the regional frame ground trace. Isolated all 359 frames: cell (6,-5), rcp6_m5 is the sole failing probe. Traversal guard exceeded; cause unknown, release blocked, no fix claimed.
+
+- CHIM-FRAME-GROUND-TRACE-38 (13 October 2026): Reference 244841, ex_dae_ruin_01, has an acyclic 4,579-node point hull. Bounded offline frame-start sweeps pass all 359 exact-world probes with previous heights preserved within 3.98e-13; source proposal only, final image/native pending.
+
+- CHIM-MOLAG-MEMORY-38 (13 October 2026): Regular-builder recipe omitted the prototype 1% default tolerance, restoring faces and exceeding the active budget by 226192 B. Restored the cell-scoped tolerance: full-margin active/load peaks 5794080/6108240 B now pass the unchanged 6242304 B limit. Five sprite placements pass isolated frame-map binding; final image/native/package gates remain pending.
+
+- TOOLKIT-INCLUSION-PACKAGE-38 (13 October 2026): Gate 2406 refuses the new inclusion script; exact auxiliary-file and live-tracker copy entries added. Final gate/package pending.
+
+- AW-RUN-NAME-LONG-REASON-36 (13 October 2026): Reopened for the stricter 100-character build-name limit; request-ID length repair did not cover it. Identical source/selection starts with a short-label retry. Payload unchanged; fix queued after current release.
+
+- BUILD-SCRATCH-DISK-GROWTH-32 (13 October 2026): Full v0.0.38 image assembly paused by the existing storage guard at 692 GiB against its 689 GiB cap; 1,304/2,278 surface checks completed. Build preserved, no guard bypass or image/native completion claim.
+
+- BUILD-IMAGE-CHIM-MAPS-SERIAL-36 (13 October 2026): Full v0.0.38 at c2c2050 completed image assembly but failed the regional-frame CPU guard: 360 frames,267 seconds,1.01/16 cores. Existing issue persists; outputs retained for native validation. Serial input preparation versus worker execution requires profiling.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-13): Candidate full image includes all27 original lava-bearing CHIM regions and349 references; final HDF regional readback passes. Native vf1703 contact with noclip/god off reports lava contents and health100 to52.6. Original comparison shows lava; steam, terrain-detail and lighting differences remain. Final package delivery, sound and complete parity remain pending.
+
+- BUILD-LAVA-TERRAIN-BUDGET-38 (2026-10-13): Full image assembly completed with the overflowing regions converted to CHIM; production map-memory gate passes. All360 regional CHIM cells pass final HDF frame/chunk readback. Release delivery remains pending; conversion is not complete gameplay acceptance.
+
+- BUILD-LAVA-COVERAGE-38 (2026-10-13): Retained a final-image suspect-geometry capture at source XY (81472,21952); original comparison pending before visual acceptance.
+
+- CHIM-LAVA-TERRAIN-SPIKES-38 (2026-10-13): Final-image raised-camera lava inspection differs from the calibrated original slope. Captures retained; cause and affected faces pending.
+
+- CHIM-LAVA-TERRAIN-SPIKES-38 (2026-10-13): Found missing CHIM lava-detail integration. Shared triangulator candidate passes11 stitching tests; affected frame1800 to5454ground triangles. Memory and native gates pending.
+
+- BUILD-SHADOWED-WORLD-MAPS-38 (13 October 2026): implemented candidate default pruning with explicit dependency retention. Exact HDF audit identifies 135 removable BSP maps (141,790,676 bytes); four focused Docker tests pass. Fresh assembly and native routing remain pending.
+
+- BUILD-SHADOWED-WORLD-MAPS-38 (13 October 2026): full gate caught direct CHIM filename construction in the new helper. Reused the canonical map resolver and extension list; eleven map-helper tests pass. Stopped the superseded build and suite, retaining failure evidence.

@@ -503,6 +503,14 @@
       "to": "on",
       "source": "tools/build.py (owner decision 2026-10-11 10:11 +0300)",
       "note": "terrain references (world format 0.7) by default (owner decision 2026-10-11); off keeps a terrain copy per chunk (format 0.5)"
+    },
+    {
+      "version": "0.0.38",
+      "option": "miniwind_map_inspection",
+      "flag": "--miniwind-map-inspection",
+      "change": "added",
+      "to": false,
+      "source": "tools/miniwind.py: optional direct map inspection startup"
     }
   ],
   "current": {
@@ -605,7 +613,8 @@
       "vis_mode": "fast",
       "with_video": false,
       "world_bounds": null,
-      "world_map": null
+      "world_map": null,
+      "miniwind_map_inspection": false
     },
     "build_defaults": {
       "bitmap_paper_ink": "filled",

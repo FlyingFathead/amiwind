@@ -27,6 +27,27 @@ from unittest.mock import patch  # noqa: E402
 ORIGIN = [CENTRE[0] * 0.25, CENTRE[1] * 0.25, 0.0]       # the fixture town's region-map origin
 ORIGINS = {r['ref']: r['origin'] for r in ROWS}
 
+
+class RegionSourceBatchTests(unittest.TestCase):
+    def test_batch_reads_provenance_once_and_keeps_first_cell_section(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            first = {'cell': [10, 1], 'sprite_entities': [{'model': 'first'}]}
+            (root / 'chim-source.json').write_text(json.dumps({'frames': [
+                first, {'cell': [10, 1], 'sprite_entities': [{'model': 'later'}]},
+                {'cell': [9, 2]},
+            ]}), encoding='utf-8')
+            original = M.region_source_sections
+            with patch.object(M, 'region_source_sections', wraps=original) as read, \
+                    patch.object(M, 'world_directory', return_value=[]), \
+                    patch.object(M, 'region_task', side_effect=lambda *a, **kw: {'name': str(a[1]['cell'])}) as task, \
+                    patch('build_parallel.ordered_map', return_value=[]):
+                M.build_regions(root, [{'cell': [10, 1]}, {'cell': [9, 2]}], root)
+            self.assertEqual(read.call_count, 1)
+            sections = task.call_args_list[0].kwargs['source_sections']
+            self.assertIs(sections, task.call_args_list[1].kwargs['source_sections'])
+            self.assertEqual(sections[(10, 1)], first)
+
 WORLDSPAWN = {'classname': 'worldspawn', 'message': 'Balmora', 'aw_hull': 'tes3-humanoid-v1'}
 # the fixture's ground (its tile corner heights), for actors and the arrival standing on it
 GROUND = {'terrain_step': STEP, 'terrain_low': list(LOW),
@@ -353,6 +374,25 @@ class StreamedStaticsTests(unittest.TestCase):
         with patch.dict('os.environ', {M.STREAM_VARIABLE: 'yes'}):
             with self.assertRaises(ValueError):
                 M.stream_enabled()
+
+    def test_quick_character_sound_scratch_is_scoped_and_content_bound(self):
+        config = self.id1 / 'default-game.cfg'
+        sound = self.id1 / 'sound/intro/chargen_class1.wav'
+        sound.parent.mkdir(parents=True, exist_ok=True)
+        sound.write_bytes(b'a' * 108366)
+        config.write_text('aw_skip_census 0\n')
+        self.assertEqual(M.startup_sound_scratch(self.id1)['bytes'], 0)
+        baseline = M.hunk_rest(self.id1, [])
+        config.write_text('aw_skip_census 0\naw_skip_census 1 // startup\n')
+        first = M.startup_sound_scratch(self.id1)
+        self.assertEqual(first['bytes'], 108384)
+        self.assertEqual(M.hunk_rest(self.id1, []), baseline + 108384)
+        sound.write_bytes(b'b' * 108366)
+        self.assertNotEqual(first['inputs'], M.startup_sound_scratch(self.id1)['inputs'])
+        sound.write_bytes(b'a' * 1023)
+        self.assertEqual(M.startup_sound_scratch(self.id1)['bytes'], 0)
+        config.write_text('aw_skip_census 1\naw_skip_census 0\n')
+        self.assertEqual(M.startup_sound_scratch(self.id1)['bytes'], 0)
 
     def test_hunk_rest_counts_sprites_that_do_not_stream(self):
         from engine_limits import MEASURED_HUNK
@@ -768,3 +808,31 @@ class ActivatedObjectTests(unittest.TestCase):
         self.assertRegex(refused[0], 'r1: activated object 11 .* differs between regions')
         self.region(root, 'r1')
         self.assertEqual(M.activated_entities(root, ['r0', 'r1'], self.REFS)[1], [])
+
+
+class BoundedGroundTraceTests(unittest.TestCase):
+    def test_contiguous_sweeps_stop_at_first_hit(self):
+        from chim.frame_map import ground_trace
+        from unittest.mock import Mock
+        scene = Mock()
+        scene.trace.side_effect = [None, {'fraction': 0.5}, {'fraction': 0}]
+        self.assertEqual(ground_trace(scene, (7., 9.), 600., -20.), 216.)
+        self.assertEqual(scene.trace.call_args_list[0].args, ((7., 9., 600.), (7., 9., 344.)))
+        self.assertEqual(scene.trace.call_args_list[1].args, ((7., 9., 344.), (7., 9., 88.)))
+        self.assertEqual(scene.trace.call_count, 2)
+
+    def test_empty_column_reaches_exact_bottom(self):
+        from chim.frame_map import ground_trace
+        from unittest.mock import Mock
+        scene = Mock(); scene.trace.return_value = None
+        self.assertIsNone(ground_trace(scene, (0., 0.), 300., -10.))
+        self.assertEqual(scene.trace.call_args.args, ((0., 0., 44.), (0., 0., -10.)))
+
+    def test_guards_still_fail_and_boundary_hit_is_retained(self):
+        from chim.frame_map import ground_trace
+        from unittest.mock import Mock
+        scene = Mock(); scene.trace.side_effect = ValueError('Cyclic collision tree')
+        with self.assertRaisesRegex(ValueError, 'Cyclic'):
+            ground_trace(scene, (0., 0.), 300., -10.)
+        scene.trace.side_effect = [None, {'fraction': 0.0}]
+        self.assertEqual(ground_trace(scene, (0., 0.), 300., -10.), 44.)

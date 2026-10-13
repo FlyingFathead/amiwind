@@ -375,7 +375,9 @@ def frame_settings(frame, margin=TERRAIN_MARGIN):
     margin and an explicit handoff core (the cell box), as the stitcher's margin rule asks."""
     x, y = frame['cell']
     name = frame['id']
+    from visual_recipes import cell_settings
     return {
+        **cell_settings((x, y)),
         'format': 1, 'source_cell': [x, y], 'source_radius': 0,
         'centre': [x * CELL_UNITS + CELL_UNITS // 2, y * CELL_UNITS + CELL_UNITS // 2], 'scale': SCALE,
         'bounds': [[-HALF, -HALF], [HALF, HALF]], 'reference_margin': 0,

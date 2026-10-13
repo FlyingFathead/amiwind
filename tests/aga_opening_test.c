@@ -42,6 +42,20 @@ int SV_ModelIndex(char *s){return 0;}
 int main(void)
 {
     edict_t player;client_t client;int i;
+    /* Original camera unlock is after the papers instruction, not race
+     * selection, office entry, or merely making the papers visible. */
+    AW_StoryReset(1);
+    for(i=AW_STAGE_SHIP;i<=AW_STAGE_PAPERS;i++){
+        aw_story.stage=i;aw_story.census=30;
+        assert(!AW_StoryViewAllowed());
+    }
+    aw_story.census=-1;assert(AW_StoryViewAllowed());
+    aw_story.stage=AW_STAGE_COURTYARD;aw_story.census=0;
+    assert(AW_StoryViewAllowed()); /* restore a later-stage save */
+    AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);
+    aw_story.stage=AW_STAGE_RELEASED;assert(AW_StoryViewAllowed());
+    AW_StoryReset(0);assert(AW_StoryViewAllowed()); /* diagnostic start */
+    AW_StoryReset(1);assert(!AW_StoryViewAllowed()); /* new game relocks */
     memset(&player,0,sizeof(player));memset(&guard,0,sizeof(guard));
     client.edict=&player;svs.clients=&client;strcpy(sv.name,"seyda");
     player.v.mins[2]=-16.625f;player.v.origin[2]=38.625f;guard.v.origin[2]=22;

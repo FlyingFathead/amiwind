@@ -10,6 +10,7 @@ releases and whole-island checks; a MiniWind build is for everything else.
 
 - [What it is](#what-it-is)
 - [Build one](#build-one)
+- [Map inspection start](#map-inspection-start)
 - [The presets](#the-presets)
 - [What is left out](#what-is-left-out)
 - [Add a new sandbox](#add-a-new-sandbox)
@@ -69,9 +70,28 @@ and you choose the rest with options:
 | `--quick-character RACE,CLASS[,NAME]` | the ready-made character (default: the Hors preset) |
 | `--with-video` | keep the videos, which a MiniWind build leaves out |
 | `--miniwind-debug` | a DEBUG ONLY sandbox, never a playtest |
+| `--miniwind-map-inspection` | opt-in direct inspection start with god mode, noclip and debug HUD |
 
 Options you give yourself win over a preset's. `--plan` prints the stage plan
 and the stages left out, with reasons, without building.
+
+## Map inspection start
+
+Use `--miniwind-map-inspection` with `--miniwind` to enter the selected test
+scene without the logo, menus or character pages. It uses the existing quick
+character and test-start path, then enables god mode, noclip and the debug
+HUD. It is an inspection aid for private development builds; omit the option
+for the normal MiniWind start. Choose the scene with the existing
+`--direct-to-game-map` option, for example:
+
+```sh
+./build.sh --data-files "/path/to/Morrowind" --miniwind \
+  --direct-to-game-map "interior:Vivec, Arena Pit" --miniwind-map-inspection
+```
+
+The option does not select arbitrary asset files or create a custom file-list
+import. A saved preset or explicit build options still determine the content
+included in the MiniWind image.
 
 ## The presets
 
@@ -90,6 +110,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `opening-ship` | `--miniwind-opening-ship` | Opening ship: lantern and ship lighting check |
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |
 | `seyda-chim` | `--miniwind-seyda-chim` | Seyda Neen on CHIM (CHIM-native): arrival, residents, doors |
+| `lava-pools` | `--miniwind-lava-pools` | Molag Mar lava pools: visibility, contact and damage |
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says
@@ -204,6 +225,33 @@ configuration.
 - [Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md): exclusions.
 
 ## Setting the scene up on arrival
+
+### Map inspection preset
+
+Add `--miniwind-map-inspection` to a development MiniWind build to skip the
+startup screens and character creation, then enable god mode, noclip and the
+debug HUD on arrival. Omitting this flag keeps the regular MiniWind startup.
+The preset reuses the existing quick-start, scripted-character and debug
+commands; it does not require a different engine executable.
+
+Select the included area with `--miniwind-town TOWN` and choose the initial
+view with `--direct-to-game-map START`. START accepts a supported town,
+`interior:<cell id>`, `cell:X,Y`, or `pos:X,Y,Z@HEADING`; see the
+[direct-start guide](chim/build_guide/DIRECT_START.md) for coordinate units
+and build-coverage checks. The full MiniWind scope includes the chosen town's
+available interiors; the exterior scope omits them.
+
+For another map already included in the image, the console command
+`aw_quick_start map MAP X Y Z YAW` starts a fresh inspection there using local
+map coordinates. It reapplies the inspection arrival commands. The map must
+be recognized by the runtime and have its matching compiled resources in the
+image. This option does not yet import an arbitrary list of loose map files.
+
+Generate game data locally from your own game installation. The public
+builder distributes code and documentation, not the original game assets.
+Noclip inspection does not verify walking collision, and a successful local
+scene load does not establish full-world memory or traversal safety.
+
 
 A preset row may list `boot_commands`: debug console commands (`dbg ...`) the sandbox runs once when it
 arrives, for example `["dbg companion test", "dbg combat on"]` in the `animkit` row. `--miniwind-boot

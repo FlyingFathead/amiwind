@@ -111,6 +111,7 @@ class WorldFloraIntegrationTests(unittest.TestCase):
     def test_source_no_collision_markers_and_ground_policy(self):
         import io
         from prepare_scenery import nif_reader
+        from prepare_scenery import source_collision_metadata
         from prepare_tree_sprites import collision_metadata, unique_reference_numbers
         N = nif_reader()
         def raw(marker=None, authored=False):
@@ -124,11 +125,49 @@ class WorldFloraIntegrationTests(unittest.TestCase):
         self.assertEqual(collision_metadata(raw(authored=True),N,'bush')['mode'],'authored')
         self.assertEqual(collision_metadata(raw(),N,'fern')['mode'],'nonsolid')
         self.assertEqual(collision_metadata(raw(),N,'tree')['mode'],'visual_fallback')
+        self.assertEqual(source_collision_metadata(raw(), N)['mode'], 'unchanged')
+        for marker in (b'NC', b'NCO'):
+            for authored in (False, True):
+                self.assertEqual(source_collision_metadata(raw(marker, authored), N),
+                                 {'mode': 'nonsolid', 'no_collision_markers': [marker.decode()]})
         with self.assertRaises(ValueError):unique_reference_numbers([ref(),{**ref(),'cell':[1,1]}])
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);model,index=packet_fixture(root)
             _, prepared=_prepare_model((0,model,{'collision_none':True},root/'source/scenery.mwpak',[]))
             self.assertTrue(prepared[2]);self.assertEqual(prepared[3],[])
+
+    def test_authored_nonsolid_mesh_keeps_visuals_and_changes_cache_identity(self):
+        from chim.build import canonical_model
+        from chim.units import fingerprint
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); model, _ = packet_fixture(root)
+            archive = root/'source/scenery.mwpak'
+            _, solid = _prepare_model((0, model, {}, archive, []))
+            marked = {**model, 'source_collision': {'mode': 'nonsolid', 'no_collision_markers': ['NCO']}}
+            _, soft = _prepare_model((0, marked, {}, archive, []))
+            self.assertTrue(solid[3]); self.assertEqual(soft[3], [])
+            self.assertTrue(soft[2])
+            self.assertEqual(repr(solid[:3]), repr(soft[:3]))
+            self.assertNotEqual(fingerprint('mesh', canonical_model(model, [])),
+                                fingerprint('mesh', canonical_model(marked, [])))
+
+    def test_nonsolid_mesh_point_hull_does_not_become_infinite_solid(self):
+        from prepare_mesh_bsp import append_meshes
+        from audit_walkability import Scene
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);model,index=packet_fixture(root)
+            model['source_collision']={'mode':'nonsolid','no_collision_markers':['NCO']}
+            (root/'source/scenery-index.json').write_text(json.dumps(index))
+            base=root/'base.bsp';base.write_bytes(fixture(inline=True))
+            palette=root/'palette.lmp';palette.write_bytes(PALETTE)
+            out=root/'nonsolid.bsp'
+            append_meshes(base,out,root/'source',palette,centre=[0,0],jobs=1,retain_dressing=True)
+            for hull in (0,1):
+                scene=Scene(out.read_bytes(),hull=hull)
+                scene.brushes=[b for b in scene.brushes if b[3]=='1']
+                self.assertTrue(scene.brushes)
+                for start,end in [([0,0,100],[0,0,-100]),([1000,0,0],[-1000,0,0])]:
+                    self.assertIsNone(scene.trace(start,end))
 
     def test_nonsolid_sprite_overlay_avoids_collision_and_bad_float_pose(self):
         with tempfile.TemporaryDirectory() as tmp:

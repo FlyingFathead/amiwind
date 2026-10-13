@@ -644,7 +644,12 @@ def load_results(out):
     for d in docs:
         for k, v in d['cells'].items():
             e = got.setdefault(k, {'stats': {}, 'audits': {}, 'errors': [], 'converted': None, 'empty': False, 'ocean': False, 'policy_pending': None, 'failed': False, 'provenance': None})
-            deep_merge(e['stats'], v.get('stats') or {})
+            stats = v.get('stats') or {}
+            # Reference accounting is a complete snapshot, not incremental reasons.
+            # Keep earlier unrelated measurements, but discard obsolete types/reasons.
+            if 'records_by_type' in stats:
+                e['stats'].pop('records_by_type', None)
+            deep_merge(e['stats'], stats)
             for m, a in (v.get('audits') or {}).items():
                 e['audits'][m] = dict(a, build=a.get('build') or d.get('build'))      # numbers etc. ride along
                 if a.get('outcome') == KEPT_CHAIN_OUTCOME:
@@ -1402,6 +1407,7 @@ def main(argv=None):
     md.add_argument('--out', type=Path, required=True)
     md.add_argument('--md', type=Path, help='page to write (default: docs/chim/CELL_TRACKER.md of this repo)')
     md.add_argument('--now', help='generated stamp to print (tests; default: the host clock)')
+    md.add_argument('--inclusion', type=Path, help='packaged inclusion ledger (default: Toolkit ledger)')
     pb = sub.add_parser('publish', help='write the project reference progress file (cell IDs, statuses, audit results only)')
     pb.add_argument('--out', type=Path, required=True)
     pb.add_argument('--file', type=Path, help='file to write (default: docs/chim/cell-progress-reference.json of this repo)')
@@ -1455,7 +1461,8 @@ def main(argv=None):
             print('no tracker data in %s yet; run ingest' % a.out)
             return 1
         page.parent.mkdir(parents=True, exist_ok=True)
-        page.write_bytes(MD.render(doc, a.now).encode('utf-8'))
+        ledger = a.inclusion or Path(__file__).resolve().parents[1] / 'amiwind-toolkit' / 'chim-inclusion.json'
+        page.write_bytes(MD.render(doc, a.now, read_json(ledger)).encode('utf-8'))
         print('wrote', page)
         return 0
     if a.cmd == 'export':

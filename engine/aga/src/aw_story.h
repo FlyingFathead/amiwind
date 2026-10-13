@@ -21,6 +21,7 @@ void AW_StoryReset(int new_game);
 int AW_StoryTransition(int next);
 int AW_StoryRestricted(void);
 int AW_StoryFighting(void);
+int AW_StoryViewAllowed(void);
 int AW_StoryDoor(unsigned reference);
 void AW_ExpandPlayerName(char *out, unsigned capacity, const char *text);
 #endif

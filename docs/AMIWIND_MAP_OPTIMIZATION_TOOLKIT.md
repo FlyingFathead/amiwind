@@ -6,10 +6,16 @@
 ## Contents
 
 - [Identity and scope](#identity-and-scope)
+- [Placement-aware terrain clipping and residency](#placement-aware-terrain-clipping-and-residency)
 - [Geometry policy](#geometry-policy)
+  - [Canonical terrain is the reference](#canonical-terrain-is-the-reference)
+  - [Combined exposure decisions do not require a welded world](#combined-exposure-decisions-do-not-require-a-welded-world)
+  - [Exterior maps retain exterior-visible surfaces](#exterior-maps-retain-exterior-visible-surfaces)
+  - [Sharing and sky remain distinct concerns](#sharing-and-sky-remain-distinct-concerns)
 - [Host optimizer/profiler research](#host-optimizerprofiler-research)
 - [Inspector contract](#inspector-contract)
 - [Matched A/B protocol](#matched-ab-protocol)
+  - [Read-only three-phase storage comparison CLI](#read-only-three-phase-storage-comparison-cli)
 - [Acceptance and publication](#acceptance-and-publication)
 - [Current implementation and next steps](#current-implementation-and-next-steps)
 
@@ -53,8 +59,101 @@ Preserved source and baseline
     -> accept or retain as a rejected experiment
 ```
 
+For each converted exterior cell, include a terrain-aware render-face clipping
+check in this workflow, especially when placed face counts or the memory gate
+are high. Record an unchanged-input clipping-off and clipping-on comparison:
+placed and stored faces, crossing faces and generated fragments, terrain faces,
+collision representation, serialized bytes and modelled ring peaks. Preserve
+the visible ground, the recorded contact overlap, collision and the behavior of
+shared models at every placement. A count-only collision match is insufficient;
+compare resolved hull graphs and verify native gameplay. Keep the pass opt-in
+until matching in-game views against the original and target memory and movement
+checks support wider use. The bounded Tel Uvirith (10,1) measurement is recorded
+in [CHIM mesh methods](chim/MESH_METHODS.md#tel-uvirith-cell-101-diagnostic-12-october-2026).
+
+Use the 3D Map Inspector's [Filter density range](POLYCOUNT_INSPECTOR.md)
+to find candidate placements and nearby geometry before choosing a cut. For
+Tel Uvirith (10,1), 64-unit bins and the inclusive 311–463 range isolate the
+lantern/support cluster and nearby roots. Reset the filter and review the
+unfiltered silhouette, seams and surroundings before accepting any edit.
+Density counts placed vertices, not resident bytes; measure compiled model
+records and ring memory separately, accounting for shared placements.
+
+For CHIM candidates, report active-ring and wider load-ring peaks separately.
+Keep sprite file bytes, sprite runtime allocation and model-zone bytes distinct;
+a file-size total cannot establish available runtime memory. A fixed-stage
+filter is a diagnostic until runtime state changes and transitions are
+implemented and checked.
+
+Substantial optimization work in Seyda Neen, Balmora and Vivec already has its
+own [CHIM measurements](chim/FEATURES.md) and issue evidence. Keep those
+results and gates. After the current cell's visual and native validation, revisit
+only residual opportunities that measured counts or performance justify,
+including terrain clipping in other cells; do not start a broad reconversion
+on the strength of this one diagnostic.
+
 Current evidence and outstanding work are recorded in
 [the findings snapshot](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
+
+## Placement-aware terrain clipping and residency
+
+The opt-in CHIM area setting `visual_recipe: tel-uvirith-v1` selects the
+checksum-bound rules in `config/visual-recipes.json`. Each rule requires both
+the normalized model path and the SHA-256 of its converted source geometry
+packet. Unmatched or modified inputs retain their ordinary conversion profile.
+The public recipe contains reduction parameters and a procedural lantern shell;
+it contains no original mesh arrays or texture pixels. Materials are read from
+the user's own game data. Collision preparation continues to use the original
+source geometry or its authored collision mesh.
+
+Eleven reduction rules reproduced the retained diagnostic geometry exactly;
+the procedural lantern reproduced its 32-triangle diagnostic shell, including
+UVs. Two door-panel rules also reproduced their baked pixels and two-sided
+polygons, with unchanged source collision pieces. Optimizer revision and recipe parameters participate in the mesh cache
+identity. These checks establish reproducibility, not full-world acceptance.
+The recipe is not enabled by default and does not yet provide the complete
+diagnostic scene's sprite or fixed-stage selection pipeline.
+
+In a bounded CHIM exterior cell (10,1) trial, clipping a placed rock against
+the authoritative LAND changed one selected model from 64 to 39 render faces.
+With the other candidate settings held fixed, modelled active-ring peak changed
+from 5,839,936 to 5,805,824 bytes (34,112 saved), and wider load-ring peak
+from 6,072,240 to 6,039,376 bytes (32,864 saved). All 59 resolved model
+collision graphs matched the preceding candidate. These are offline ring
+measurements, not native terrain-contact or movement acceptance.
+
+The rock's `terrain_` mesh name does not make it authoritative LAND. Preserve
+the original shared asset and derive a cut representation keyed by source,
+terrain and clipping context. A face in a shared variant is removable only if
+it is buried at every placement using that variant; retain exposed or uncertain
+geometry. The measured trial clipped already-existing variants. It did not
+test creating additional per-placement variants from a previously shared model.
+
+World disk bytes and simultaneous residency answer different questions.
+Specialized variants can increase total stored world data yet reduce a sampled
+ring if only some variants are resident together; adjacent cells can also load
+several variants at once and erase that saving. Compare the union of distinct
+resident models in worst active and load rings, including metadata, textures,
+collision and streaming overlap. Do not multiply a shared model's bytes by
+its placement count or infer heap savings from face counts alone.
+
+Before wider use, compare clipping off/on with the optimizer fixed, then
+review unfiltered silhouettes, ground-contact skirts, cracks, slopes,
+overhangs, exposed sides and cell boundaries from ordinary player positions.
+Check shared rocks at different heights and headings, water, accessible
+underground space and geometry below the finite clip depth. Match the same
+views in the original game and target, and repeat collision and worst-ring
+measurements for the exact candidate. The current rock result has no such
+native acceptance or public deployment.
+
+A subsequent normal-start MiniWind diagnostic loaded the candidate CHIM frame
+and ran for 61 seconds. It included three seconds of ordinary walking before
+noclip views of rock contact, underside and nearby structures. The frame kept
+running; this establishes a bounded load/run observation, not a terrain
+appearance comparison or normal collision acceptance at the viewed poses.
+The normal quick-character route reported a 2,014,640-byte free Hunk gap,
+below the 2 MiB warning threshold; no allocation crash occurred in this run.
+Matched original-game views and wider traversal remain pending.
 
 ## Geometry policy
 

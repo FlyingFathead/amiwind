@@ -438,6 +438,21 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(c['errors'], [])
         self.assertTrue(c['chim']['converted'])
 
+    def test_accounting_snapshot_replaces_old_reasons_and_removed_types(self):
+        old = {'LIGH': {'placed': 11, 'converted': 0, 'deferred': {'old marker reason': 11}},
+               'STAT': {'placed': 1, 'converted': 1}}
+        new = {'LIGH': {'placed': 11, 'converted': 0, 'deferred': {'meshless light': 11}}}
+        cp.record_result(self.out, self.result(**{'0,0': {'stats': {
+            'records_by_type': old, 'time': {'convert_s': 4.5}}}}))
+        cp.record_result(self.out, dict(self.result(**{'0,0': {'stats': {'records_by_type': new}}}),
+                                        generated='2026-10-09T07:00:00+03:00'))
+        stats = cp.load_results(self.out)['0,0']['stats']
+        self.assertEqual(stats['records_by_type'], new)
+        self.assertEqual(stats['time']['convert_s'], 4.5)
+        cp.record_result(self.out, dict(self.result(**{'0,0': {'stats': {'records_by_type': {}}}}),
+                                        generated='2026-10-09T08:00:00+03:00'))
+        self.assertEqual(cp.load_results(self.out)['0,0']['stats']['records_by_type'], {})
+
     def test_structured_errors_and_audit_numbers_survive(self):
         doc = self.result(**{'0,0': {'converted': True,
                                      'errors': [{'stage': 'qbsp', 'mechanism': 'hull_bevels', 'message': 'leak'}, 'plain text'],
@@ -803,7 +818,7 @@ class CompleteAndPageTests(unittest.TestCase):
         self.assertEqual(d['headline']['done'], 5)                        # both awaiting-lighting cells count as done
         self.assertEqual((d['headline']['complete_unlit'], d['headline']['terrain_complete_unlit']), (1, 1))
         self.assertEqual((d['headline']['eligible'], d['headline']['eligible_release']), (5, cp.ELIGIBLE_RELEASE))
-        self.assertIn('**Eligible for %s: 5 of 25**' % cp.ELIGIBLE_RELEASE, text)
+        self.assertIn('**Conversion-eligible: 5 of 25**', text)
         self.assertIn('Eligible for the next release = every done cell', md.policy_section(text))
         self.assertIn('empty_sea', cp.ELIGIBLE)
         self.assertEqual(d['headline']['eligible'], d['headline']['done'])
@@ -857,7 +872,7 @@ class CompleteAndPageTests(unittest.TestCase):
         md, d, text = self.render()
         self.assertEqual(text, md.render(d, '2026-10-09 06:00 +0300'))
         self.assertTrue(text.startswith(md.HEADER))
-        self.assertRegex(text, r'\*\*Done: \d+ of 25 \(')
+        self.assertRegex(text, r'\*\*Conversion/audit progress: \d+ of 25 \(')
         for needle in ('Cell complete: 1', 'Terrain complete: 1', 'Empty sea: 1', 'Hull policy pending', 'Per object type',
                        'Failures by mechanism class', 'Seam tears', 'Generated 2026-10-09 06:00 +0300', 'Tracker data generated'):
             self.assertIn(needle, text)
@@ -877,6 +892,20 @@ class CompleteAndPageTests(unittest.TestCase):
             self.assertIn(word, pol)
         self.assertEqual(md.check(text), [])
         self.assertTrue(md.check(text.replace('Import policy', 'Import policies')))
+
+    def test_inclusion_requires_packaged_evidence_not_a_plan_or_audit(self):
+        md, d, _ = self.render()
+        key = next(k for k, c in d['cells'].items() if cp.on_map(c) and c['chim']['bucket'] != 'ocean')
+        ledger = {'builds': [
+            {'version': 'planned', 'state': 'planned', 'evidence_sha256': 'a' * 64,
+             'cells': {key: {'state': 'included'}}},
+            {'version': 'no-receipt', 'state': 'packaged', 'cells': {key: {'state': 'included'}}},
+            {'version': 'verified', 'state': 'packaged', 'evidence_sha256': 'b' * 64,
+             'cells': {key: {'state': 'included'}, '999,999': {'state': 'included'}}}]}
+        text = '\n'.join(md.inclusion_lines(d, ledger))
+        self.assertIn('| verified | packaged | 1 (4.0 %) |', text)
+        self.assertNotIn('| planned |', text)
+        self.assertNotIn('| no-receipt |', text)
 
     def test_page_has_no_private_content(self):
         md, d, text = self.render()
@@ -997,13 +1026,13 @@ class ReleaseUiTests(unittest.TestCase):
         d = self.doc()
         for r in d['cells'].values():
             r['island'] = 1
-        self.assertIn('No cells are assigned to a release yet.', md.render(d, 'now'))
+        self.assertIn('No cells are assigned in this planning ledger.', md.render(d, 'now'))
         self.release('--version', 'v0.0.34', '--cells', 'eligible')
         d = ingest(self.out)
         for r in d['cells'].values():
             r['island'] = 1
         text = md.render(d, 'now')
-        self.assertIn('## Releases', text)
+        self.assertIn('## Release assignments', text)
         self.assertRegex(text, r'\| v0\.0\.34 \| open \| 3 \|')
         self.assertEqual(md.private_hits(text), [])
 
@@ -1273,14 +1302,14 @@ class PlanTests(ReleaseUiTests):
         self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0'), 0)
         d = self.read()
         self.assertEqual(d['headline']['eligible_release'], 'v0.0.36')
-        self.assertIn('**Eligible for v0.0.36:', md.render(d, 'now'))
+        self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
         self.assertNotIn('Eligible for %s:' % cp.ELIGIBLE_RELEASE, md.render(d, 'now'))
         self.assertEqual(self.plan('--release', 'v0.0.37', '--cells', '1,0'), 0)
         self.assertEqual(self.read()['headline']['eligible_release'], 'v0.0.36')        # the lowest unshipped
         self.assertEqual(self.ship('v0.0.36'), 0)
         d = self.read()
         self.assertEqual(d['headline']['eligible_release'], 'v0.0.37')                  # no code change after a release
-        self.assertIn('**Eligible for v0.0.37:', md.render(d, 'now'))
+        self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
         page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
         self.assertIn("doc.headline.eligible_release || 'the next release'", page)      # the page takes the label from the data
 

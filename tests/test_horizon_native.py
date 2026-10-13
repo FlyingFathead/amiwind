@@ -13,7 +13,7 @@ class HorizonNativeTests(unittest.TestCase):
             [Path(native.SOURCE)/'src'/name for name in ('aw_horizon.c','mathlib.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
-    def test_fog_hook_is_opt_in_and_preserves_legacy_interiors_and_disabled_fog(self):
+    def test_fog_independent_land_with_rollback_and_interior_palette_guards(self):
         native.NativeSourceTests().compile_run('aga_horizon_test.c',
             [Path(native.SOURCE)/'src'/name for name in ('aw_horizon.c','aw_fog.c','mathlib.c')],
             defines=['HORIZON_FOG_TEST'],

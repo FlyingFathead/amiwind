@@ -57,8 +57,15 @@ def write_json(path, value):
 def source_receipt(data, settings):
     files = [child_ci(data, 'Morrowind.esm'), child_ci(data, 'Morrowind.bsa')]
     files += [p for p in data.rglob('*') if p.is_file() and p.relative_to(data).parts[0].casefold() in ('meshes', 'textures')]
+    import lava
     return {'geometry': {k: settings[k] for k in ('source_cell', 'source_radius', 'centre', 'scale')},
-            'files': {p.relative_to(data).as_posix(): input_sha256(p) for p in sorted(files)}}
+            'fixed_visibility_state': settings.get('fixed_visibility_state'),
+            'visibility_code_sha256': hashlib.sha256(
+                (ROOT / 'src/mwad/script_visibility.py').read_bytes()).hexdigest(),
+            'files': {p.relative_to(data).as_posix(): input_sha256(p) for p in sorted(files)},
+            'conversion': {'lava_mode': lava.lava_mode(),
+                           'code_sha256': {name: hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
+                                           for name in ('import_town.py', 'lava.py')}}}
 
 
 def in_frame(reference, settings):
@@ -100,8 +107,20 @@ def frame_references(out, settings):
     index = out / 'scenery/scenery-index.json'
     footprint = ({r['number'] for r in json.loads(index.read_text())['references']}
                  if settings.get('reference_margin') is not None and index.is_file() else set())
-    return [r for r in json.loads((out / 'audit/placements.json').read_text())
-            if in_frame(r, settings) or r['number'] in footprint]
+    references = [r for r in json.loads((out / 'audit/placements.json').read_text())
+                  if in_frame(r, settings) or r['number'] in footprint]
+    return fixed_state_references(out, settings, references)
+
+
+def fixed_state_references(out, settings, references):
+    if settings.get('fixed_visibility_state') is None:
+        return references
+    from mwad.script_visibility import filter_references
+    report = json.loads((out / 'fixed-visibility.json').read_text())
+    if (report['requested_state'] != settings['fixed_visibility_state']
+            or report['cell'] != list(settings['source_cell'])):
+        raise ValueError('Fixed visibility receipt does not match the requested state')
+    return filter_references(references, report)
 
 
 def split_references(references):
@@ -183,6 +202,17 @@ def collect(data, out, jobs, settings):
     footprint = (footprint_references(data, out, placements, settings, jobs)
                  if settings.get('reference_margin') is not None else set())
     references = [r for r in placements if in_frame(r, settings) or r['number'] in footprint]
+    state = settings.get('fixed_visibility_state')
+    if state is not None:
+        from mwad.script_visibility import audit_cell
+        if (settings['source_radius'] != 0 or not isinstance(state, dict) or not state
+                or any(not isinstance(k, str) or not k or isinstance(v, bool)
+                       or not isinstance(v, (int, float)) or not math.isfinite(v)
+                       for k, v in state.items())):
+            raise ValueError('Fixed visibility needs one source cell and finite explicit globals')
+        report = audit_cell(child_ci(data, 'Morrowind.esm').read_bytes(), settings['source_cell'], state)
+        write_json(out / 'fixed-visibility.json', report)
+        references = fixed_state_references(out, settings, references)
     selected, deferred = split_references(references)
     selected, deferred, pools = lava_split(data, selected, deferred)
     import lava
@@ -346,7 +376,7 @@ def residents(data, scene, out, references, settings, kinds, topics, palette, ff
         appearance['foot'] = foot_class(kinds, appearance)
         appearance['voices'] = voices_of(topics, appearance)
         tasks.append((data, palette, appearance, greeting_fixture(topics, appearance), ffmpeg, npc_lod.task_settings()))
-    for identifier, raw, voice, record in ordered_map(build_resident, tasks, min(jobs, len(tasks))):
+    for identifier, raw, voice, record in ordered_map(build_resident, tasks, max(1, min(jobs, len(tasks)))):
         stem = 'a_' + hashlib.sha256(identifier.encode()).hexdigest()[:12]
         record.update(model='progs/' + stem + '.mdl', voice='npc/' + stem + '.wav')
         (scene / 'id1' / record['model']).write_bytes(raw)

@@ -6,11 +6,11 @@
  * list order of its town) from AW_TOWN_INTERIOR_BASE (aw_maps.h). */
 #ifndef AW_TOWN_TABLE_H
 #define AW_TOWN_TABLE_H
-#define AW_TOWN_COUNT 12
+#define AW_TOWN_COUNT 13
 #define AW_TOWN_FIXED_COUNT 2
-#define AW_TOWN_EXTRA_COUNT 10
-#define AW_TOWN_EXTRA_NAMES {"vivec_arena","vivec_foreign","vivec_hlaalu","vivec_redoran","vivec_telvanni","vivec_temple","vivec_delyn","vivec_olms","bcoast_x7y2","vivec_city"}
-#define AW_TOWN_EXTRA_TITLES {"Vivec, Arena","Vivec, Foreign Quarter","Vivec, Hlaalu","Vivec, Redoran","Vivec, Telvanni","Vivec, Temple","Vivec, St. Delyn","Vivec, St. Olms","Bitter Coast (CHIMport test)","Vivec"}
+#define AW_TOWN_EXTRA_COUNT 11
+#define AW_TOWN_EXTRA_NAMES {"vivec_arena","vivec_foreign","vivec_hlaalu","vivec_redoran","vivec_telvanni","vivec_temple","vivec_delyn","vivec_olms","bcoast_x7y2","vivec_city","lava_x1ym2"}
+#define AW_TOWN_EXTRA_TITLES {"Vivec, Arena","Vivec, Foreign Quarter","Vivec, Hlaalu","Vivec, Redoran","Vivec, Telvanni","Vivec, Temple","Vivec, St. Delyn","Vivec, St. Olms","Bitter Coast (CHIMport test)","Vivec","Molag Mar lava test"}
 #define AW_TOWN_INTERIOR_COUNT 144
 #define AW_TOWN_INTERIOR_NAMES {\
     "vai000","vqi000","vqi001","vqi002","vqi003","vqi004","vqi005","vqi006",\
@@ -200,6 +200,7 @@
     {"vivec_delyn","Vivec, St. Delyn","vd","vivec_delyn-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{7168,-23552,0},{-1024,-1024,1024,1024}},\
     {"vivec_olms","Vivec, St. Olms","vo","vivec_olms-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{9216,-23552,0},{-1024,-1024,1024,1024}},\
     {"bcoast_x7y2","Bitter Coast (CHIMport test)","bc","bcoast_x7y2-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{-13312,5120,0},{-3072,-3072,3072,3072}},\
-    {"vivec_city","Vivec","vc","vivec_city-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{8192,-23040,0},{-4096,-4608,4096,4608}}\
+    {"vivec_city","Vivec","vc","vivec_city-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{8192,-23040,0},{-4096,-4608,4096,4608}},\
+    {"lava_x1ym2","Molag Mar lava test","lv","lava_x1ym2-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{3072,-3072,0},{-1024,-1024,1024,1024}}\
 }
 #endif

@@ -120,3 +120,27 @@ class SurfaceFlattenTests(unittest.TestCase):
             self.assertTrue(data[3])
             self.assertEqual(p.read_bytes(),raw)
             np.testing.assert_array_equal(data[0],v)
+
+    def test_two_sided_door_panel_keeps_original_collision(self):
+        from mwad.scene import pack_geometry
+        from prepare_mesh_bsp import _prepare_model
+        from chim.units import _canonical
+        import hashlib
+        v=[[x,y,z,u,w,255,255,255,255] for y in (-2,2)
+           for x,z,u,w in [(0,0,0,0),(8,0,1,0),(8,8,1,1),(0,8,0,1)]]
+        f=[[0,1,2,0],[0,2,3,0],[4,5,6,0],[4,6,7,0]]
+        raw=pack_geometry(v,f,1)
+        record={'source':'door.nif','offset':0,'bytes':len(raw),
+                'sha256':hashlib.sha256(raw).hexdigest(),
+                'materials':[{'texture_index':None,'diffuse':[1,1,1]}]}
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'scene.mwpak';p.write_bytes(raw)
+            _,base=_prepare_model((0,record,{},p,[]))
+            _,panel=_prepare_model((0,record,{'visual_panel':{'axis':1,'facing':-1,
+                                  'front_offset':-.1,'two_sided':True,'type':'door-panel'}},p,[]))
+            self.assertEqual(len(panel[2]),2)
+            self.assertEqual(_canonical(base[3]),_canonical(panel[3]))
+            self.assertNotIn('flatten',panel[4])  # no facade mounting shift for a door
+            self.assertEqual(panel[4]['visual_panel']['mounting_plane'],-2.1)
+            np.testing.assert_array_equal(panel[0],v)
+            self.assertEqual(p.read_bytes(),raw)

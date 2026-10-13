@@ -271,7 +271,7 @@ class NoticeAndLogoTests(unittest.TestCase):
     def test_description_validation(self):
         self.assertIsNone(miniwind.check_description(None))
         self.assertEqual(miniwind.check_description('  Balmora   on CHIM '), 'Balmora on CHIM')
-        for bad in ('', '   ', 'café', 'tab\there', 'x' * 70):
+        for bad in ('', '   ', 'cafÃ©', 'tab\there', 'x' * 70):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 miniwind.check_description(bad)
         # pixel wrap: two lines at most, or a clear refusal
@@ -1008,3 +1008,26 @@ class DocsTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class MapInspectionTest(unittest.TestCase):
+    def test_opt_in_plan_and_default_unchanged(self):
+        normal, _ = plan(['--miniwind'])
+        inspect, _ = plan(['--miniwind', '--miniwind-map-inspection'])
+        before = dict(normal)['image']
+        after = dict(inspect)['image']
+        self.assertNotIn('--miniwind-map-inspection', before)
+        self.assertIn('--miniwind-map-inspection', after)
+
+    def test_generated_startup_uses_existing_mechanisms(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'quake.rc').write_text('exec config.cfg\naw_startup\n')
+            result = miniwind.install_map_inspection(root)
+            self.assertTrue(result['noclip'])
+            self.assertEqual((root/'quake.rc').read_text(), 'exec config.cfg\nexec map-inspection.cfg\naw_startup\n')
+            self.assertIn('aw_test_start 1', (root/'map-inspection.cfg').read_text())
+            self.assertIn('aw_quickchar_set name Inspector', (root/'map-inspection.cfg').read_text())
+        self.assertEqual(miniwind.inspection_boot(), 'dbg godmode on;dbg noclip;dbg hud on')
+        with self.assertRaises(ValueError):
+            miniwind.inspection_boot('dbg noclip')

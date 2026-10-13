@@ -9,7 +9,7 @@
 | Where | Docker build scratch volumes on the development host |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | v0.0.38 (last seen) |
 | Severity | medium: Container disk image grew about 63 GiB in 40 minutes and is never returned to the drive. |
 | Family | Development tooling, receipts and packaging (`tracker-tooling`) |
 
@@ -65,6 +65,22 @@ Pending.
 Each job declares a scratch budget and reports its volume size; the disk watch includes the
 container disk image size and alerts on growth rate, not only on free space.
 
+## Image assembly recurrence, 13 October 2026
+
+The full v0.0.38 build reached image assembly after conversion completed.
+At 1,304 of 2,278 hidden-surface checks, the existing storage guard paused
+the build: the physical container disk was 692 GiB against its 689 GiB cap.
+The volume still reported 283 GiB free internally. These measure different
+limits; internal free space does not mean the physical-size guard has cleared.
+
+The process and conversion outputs remain preserved. No complete image,
+native acceptance or release delivery follows from the completed conversion.
+The guard was not disabled, its cap was not raised, and no build was restarted.
+Safe recovery requires resolving the physical-size limit under the existing
+storage policy. Deleting cached files alone does not shrink the virtual disk.
+Per-job scratch budgeting and earlier cap prediction remain open. This is
+host build infrastructure; no AmiQuake engine mechanism is involved.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -89,6 +105,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker
+- [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
 - [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
 - [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test

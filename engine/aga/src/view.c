@@ -52,6 +52,8 @@ cvar_t	cl_bobcycle = {"cl_bobcycle","0.6", false};
 cvar_t	cl_bobup = {"cl_bobup","0.5", false};
 
 /* Torch V1 keeps Quake forward depth bob;0 avoids revealing clipped arm ends. */
+/* Saved inspection preference; only explicit 1 restores noclip stride bob. */
+cvar_t aw_noclipwobble = {"aw_noclipwobble","0", true};
 cvar_t aw_torch_depth_bob = {"aw_torch_depth_bob","0", true};
 
 cvar_t	v_kicktime = {"v_kicktime", "0.5", false};
@@ -123,6 +125,8 @@ float V_CalcBob (void)
 {
     float	bob;
     float	cycle;
+
+    if(noclip_anglehack && aw_noclipwobble.value != 1)return 0;
 
     cycle = cl.time - (int)(cl.time/cl_bobcycle.value)*cl_bobcycle.value;
     cycle /= cl_bobcycle.value;
@@ -885,7 +889,8 @@ void V_CalcViewRoll (void)
 {
     float		side;
 
-    side = V_CalcRoll (cl_entities[cl.viewentity].angles, cl.velocity);
+    side = (noclip_anglehack && aw_noclipwobble.value != 1) ? 0 :
+        V_CalcRoll (cl_entities[cl.viewentity].angles, cl.velocity);
     r_refdef.viewangles[ROLL] += side;
 
     if (v_dmg_time > 0)
@@ -1222,6 +1227,7 @@ void V_Init (void)
     Cvar_RegisterVariable (&cl_bobcycle);
     Cvar_RegisterVariable (&cl_bobup);
     Cvar_RegisterVariable (&aw_torch_depth_bob);
+    Cvar_RegisterVariable (&aw_noclipwobble);
 
     Cvar_RegisterVariable (&v_kicktime);
     Cvar_RegisterVariable (&v_kickroll);

@@ -30,6 +30,39 @@ Have a real Amiga? [Running AmiWind on real hardware](docs/REAL_HARDWARE.md).
 
 More in the [gallery](docs/GALLERY.md).
 
+<!-- v0.0.38 preview -->
+## v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)
+
+See the [v0.0.38 release notes](docs/RELEASE-v0.0.38.md) for changes and remaining verification limits.
+
+Release preparation brings lava conversion repairs, reduced Tel Uvirith geometry,
+collision fixes and updated Toolkit inspection controls together. The full image has passed build and readback checks, with native lava contact
+and Tel Uvirith arrival verified. Package validation remains in progress;
+known issues remain in the [bug tracker](docs/BUGS.md).
+
+![Tel Uvirith lantern and arched walkway in the v0.0.38 development playtest](docs/images/amiwind-v0.0.38-molag-lantern-arch.png)
+
+![Tel Uvirith elevated walkways in the v0.0.38 development playtest](docs/images/amiwind-v0.0.38-molag-walkways.png)
+
+In-game development playtest screenshots, cropped to the rendered viewport.
+The stronghold is Tel Uvirith, exterior cell (10,1), in Molag Amur.
+Uvirith's Grave is the site on which the stronghold is built, not its alternative name.
+This playtest uses the completed stronghold state (internal stage 6);
+quest-driven construction transitions are not implemented. Earlier diagnostic
+filenames used "Molag"; these screenshots do not show Molag Mar or its temple.
+
+These views show the reduced Tel Uvirith scene; they do not establish full-world
+or staircase traversal acceptance. See the [current CHIM cell tracker](docs/chim/CELL_TRACKER.md)
+for conversion and audit progress; release plans remain separate from packaged coverage.
+![Lava pool shoreline in the v0.0.38 full image](docs/images/amiwind-v0.0.38-lava-pool-clean.png)
+
+![Lava below the surrounding terrain in the v0.0.38 full image](docs/images/amiwind-v0.0.38-lava-east-clean.png)
+
+Original in-game captures with photo mode enabled and HUD/crosshair disabled.
+A separate normal-movement test verified lava damage with god mode and noclip off.
+These views do not establish sound or complete world-traversal acceptance.
+<!-- /v0.0.38 preview -->
+
 **v0.0.37 - Proofreading the Cantons:** a small fix release: the v0.0.36 release notes and this page now match the released code, and the logo images are fixed. Release notes: [docs/RELEASE-v0.0.37.md](docs/RELEASE-v0.0.37.md).
 
 **v0.0.36, running on CHIM Engine v0.2.0:** the whole coastline and the next ring inland are on CHIM, all of Vivec is one CHIM map with 130 of its rooms, Seyda Neen and Balmora are CHIM-native, terrain is stored once, and the engine gets wider coordinates, third person, blocking and a death scene. Release notes: [docs/RELEASE-v0.0.36.md](docs/RELEASE-v0.0.36.md).
@@ -277,6 +310,9 @@ look at its geometry, polygon density and planning zones. Shift-click or
 shift-drag selects several cells, and the selection copies out as JSON for
 planning work such as the next town to import. See
 [AmiWind Toolkit](docs/AMIWIND_TOOLKIT.md).
+The [v0.0.38 controls](amiwind-toolkit/README.md#v0038-inspection-controls)
+add remembered Names on/off, per-panel inspection JSON and direct scene links;
+the public viewer uses the same features with your own converted data.
 
 ![AmiWind Toolkit world map](docs/images/amiwind-v0.0.31-toolkit-world.png)
 

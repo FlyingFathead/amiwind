@@ -124,7 +124,7 @@ def brush_checks(lumps, ntextures, label, fails):
 def world_tree(lumps, label, fails):
     """A chunk's world subtree as plain (nodes, leaf contents) for box_leaves, checked by Quake world rules.
 
-    Leaf 0 solid; leaf contents empty, solid or water; every face on exactly one
+    Leaf 0 solid; leaf contents empty, solid, water or lava; every face on exactly one
     node and on that node's plane; marksurfaces in range; head node 0 is node 0."""
     import numpy as np
     planes = list(struct.iter_unpack('<4fi', lumps[1]))
@@ -135,7 +135,7 @@ def world_tree(lumps, label, fails):
     d = struct.unpack('<9f7i', lumps[14][:64]) if len(lumps[14]) >= 64 else None
     ok = fails.check(bool(nodes) and d is not None and d[9] == 0, label + ': head node 0 must be the subtree root')
     fails.check(bool(leafs) and leafs[0][0] == -2, label + ': leaf 0 must be solid')
-    fails.check(all(lf[0] in (-1, -2, -3) for lf in leafs), label + ': leaf contents other than empty, solid, water')
+    fails.check(all(lf[0] in (-1, -2, -3, -5) for lf in leafs), label + ': leaf contents other than empty, solid, water, lava')
     fails.check(all(lf[8] + lf[9] <= len(marks) for lf in leafs) and all(m < len(faces) for m in marks),
                 label + ': marksurfaces out of range')
     owner = [0] * len(faces)
@@ -268,6 +268,20 @@ def ground_max(source, x0, y0, x1, y1):
     return max(terrain_height(source, min(max(x, lx), hx - eps), min(max(y, ly), hy - eps)) for x, y in points)
 
 
+def standing_surface_max(source, x0, y0, x1, y1, ground_source=None):
+    """Highest solid surface under the standing box: terrain plus the converter's lava beds."""
+    from chim.terrain import clip_convex_xy
+    top = ground_max(ground_source or source, x0, y0, x1, y1)
+    box = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    for liquid in source.get('terrain_liquids', ()):
+        piece = clip_convex_xy(liquid['hull'], box)
+        if len(piece) >= 3:
+            area = abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(piece, piece[1:] + piece[:1])))
+            if area > 1e-6:
+                top = max(top, liquid['top'] - source.get('lava_depth', 8.0))
+    return top
+
+
 SEAM_DEPTHS = (0.25, 2.0, 5.0)        # sample distances inside a chunk edge (the box reaches 7.32)
 SEAM_ALONG = (0.03, 0.2, 0.4, 0.6, 0.8, 0.97)
 SEAM_TOLERANCE = 0.25                 # exact standing hull: solid just below the stand height, empty just above
@@ -303,7 +317,8 @@ def hull_seams(chunk, box, source, fails):
     for x, y in samples:
         past = outer is not None and not (x + MINS[0] >= lx and x + MAXS[0] <= hx and y + MINS[1] >= ly
                                           and y + MAXS[1] <= hy)
-        top = ground_max(wide if past else source, x + MINS[0], y + MINS[1], x + MAXS[0], y + MAXS[1])
+        top = standing_surface_max(source, x + MINS[0], y + MINS[1], x + MAXS[0], y + MAXS[1],
+                                   wide if past else None)
         stand = top - MINS[2]                       # lowest origin whose box clears the ground
         low = (x, y, stand - SEAM_TOLERANCE)
         high = (x, y, stand + SEAM_TOLERANCE)
@@ -320,10 +335,14 @@ def hull_seams(chunk, box, source, fails):
 
 
 def terrain_coverage(chunk, box, source, fails):
-    """Each ground sample covered once by a ground face; water once where the ground is below it."""
-    polys = face_polygons(F.read_brush_image(chunk['image']))
+    """Ground and water coverage plus lava coverage at the manifest pool height, checked independently."""
+    from chim.stitch import node_contents
+    lumps = F.read_brush_image(chunk['image'])
+    polys = face_polygons(lumps)
     ground = [p for p in polys if not p[2] & 1]
-    water_up = [p for p in polys if p[2] & 1 and p[1][2] > 0]
+    # A pool face may cross sloping ground: classify the liquid at each exposed sample, not at a face centroid.
+    root = struct.unpack_from('<9f7i', lumps[14])[9]
+    liquid_up = [p for p in polys if p[2] & 1 and p[1][2] > 0]
     step = source['terrain_step']
     level = source['water_level']
     label = 'chunk %d,%d' % (chunk['cx'], chunk['cy'])
@@ -352,10 +371,28 @@ def terrain_coverage(chunk, box, source, fails):
                     if not fails.check(hits == 1, '%s: ground sample %.1f %.1f covered %d times' % (label, x, y, hits)):
                         return
                     wet = terrain_height(source, x, y) < level - 1e-6
-                    whits = sum(1 for p in water_up if inside_convex_xy(p[0], x, y))
+                    whits = sum(1 for p in liquid_up if abs(float(p[0][0][2]) - level) < 0.01
+                                and inside_convex_xy(p[0], x, y))
                     if abs(terrain_height(source, x, y) - level) > 1e-3 and not fails.check(
                             whits == (1 if wet else 0), '%s: water sample %.1f %.1f covered %d times' % (label, x, y, whits)):
                         return
+                    pools = [p for p in source.get('terrain_liquids', ()) if inside_convex_xy(p['hull'], x, y)]
+                    lava_top = max((p['top'] for p in pools), default=None)
+                    expected_lava = lava_top is not None and lava_top > terrain_height(source, x, y) + 1e-6
+                    zground = terrain_height(source, x, y)
+                    lhits = [p for p in liquid_up if float(p[0][0][2]) > max(zground, level) + 1e-6
+                             and inside_convex_xy(p[0], x, y)]
+                    if not fails.check(len(lhits) == (1 if expected_lava else 0),
+                                       '%s: lava sample %.1f %.1f covered %d times' % (label, x, y, len(lhits))):
+                        return
+                    if expected_lava and not fails.check(abs(float(lhits[0][0][0][2]) - lava_top) < 0.01,
+                                                        '%s: lava sample %.1f %.1f at wrong height' % (label, x, y)):
+                        return
+                    if expected_lava:
+                        bottom = max(zground, level, lava_top - source.get('lava_depth', 8.0))
+                        if not fails.check(node_contents(lumps, root, (x, y, (bottom + lava_top) * 0.5)) == -5,
+                                           '%s: lava sample %.1f %.1f lacks lava contents' % (label, x, y)):
+                            return
     return tiles
 
 

@@ -63,6 +63,15 @@ To do: Fargoth walks, runs and punches in a MiniWind Seyda Neen sandbox; the aud
 
 The coverage audit runs in every build that bakes NPCs.
 
+
+## Swimming follow-up, 12 October 2026
+
+The owner reports that the player uses walking poses at the surface and when
+submerged in v0.0.38-dev2. Audit original swim/dive animation groups and their
+state selection for the player and relevant NPCs, including companion movement.
+See WATER-GAMEPLAY-PARITY-38 for movement and breath/damage verification; visual
+pose alone does not establish missing swimming physics. No repair accepted.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

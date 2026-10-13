@@ -127,7 +127,7 @@ def _prepare_model(task):
          lod['exterior_visibility']={'source_triangles':len(f),'visible_triangles':len(visual_f),
                                     'excluded_triangles':len(f)-len(visual_f),
                                     'collision':'original input unchanged'}
-        if len(visual_f)!=len(f) and profile.get('flatten'):
+        if len(visual_f)!=len(f) and (profile.get('flatten') or profile.get('visual_panel')):
          raise VisibilityPolicyError('Combine flattening and source exclusions only after explicit pipeline validation')
         if profile.get('ratio'):
          visual_v,visual_f,details=reduce_for_profile(v,visual_f,profile,m['materials'],name)
@@ -138,7 +138,7 @@ def _prepare_model(task):
          # Visual only: collision below keeps the original source mesh.
          visual_v,visual_f,details=scenery_reduce.reduce_scenery(visual_v,visual_f,reduction[0],reduction[1]/texsize)
          lod['scenery_reduce']=details
-        if profile.get('flatten'):
+        if profile.get('flatten') or profile.get('visual_panel'):
          from surface_flatten import bake_panel
          texture_records=extras[0]
          def source_image(material):
@@ -146,14 +146,33 @@ def _prepare_model(task):
           if ti is None:return np.full((1,1,3),180,dtype=np.uint8)
           raw=read_asset(archive,texture_records[ti]);_,w,h=struct.unpack_from('>4sHH',raw)
           return np.frombuffer(raw[8:],np.uint8).reshape(h,w,4)
-         visual_v,visual_f,baked,details=bake_panel(v,f,m['materials'],source_image,profile['flatten'])
-         lod['flatten']=details;lod['_flat_rgb']=baked
+         panel=profile.get('visual_panel')
+         if panel:
+          axis=int(panel['axis'])
+          if axis not in (0,1,2):raise ValueError('Invalid visual panel axis')
+          projection=dict(panel,plane=float(v[:,axis].min())+float(panel['front_offset']))
+         else:projection=profile['flatten']
+         visual_v,visual_f,baked,details=bake_panel(v,f,m['materials'],source_image,projection)
+         if panel and panel.get('two_sided'):
+          visual_f=np.concatenate([visual_f,visual_f[:,[0,2,1,3]]])
+          details['visual_triangles']=len(visual_f)
+         lod['visual_panel' if panel else 'flatten']=details;lod['_flat_rgb']=baked
+        if profile.get('visual_primitive'):
+         from visual_primitives import make_visual
+         visual_v,visual_f=make_visual(profile['visual_primitive'])
+         if not set(visual_f[:,3]).issubset(range(len(m['materials']))):
+          raise ValueError('Visual primitive material outside source palette: '+name)
+         lod['visual_primitive']=profile['visual_primitive']['kind']
         collision_v,collision_f=v,f
         if m.get('collision'):
          cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
          collision_v,collision_f=np.array(cv),np.array(cf)
          lod['collision']='authored RootCollisionNode, approximate convex conversion'
-        pieces,exact,note=collision_pieces(collision_v,collision_f,profile)
+        collision_profile = profile
+        if m.get('source_collision', {}).get('mode') == 'nonsolid':
+         collision_profile = {**profile, 'collision_none': True}
+         lod['source_collision'] = m['source_collision']
+        pieces,exact,note=collision_pieces(collision_v,collision_f,collision_profile)
         if note:lod['collision'] = note
         if exact is True:
          lod['collision_bevels'] = 'exact standing-box convex sum'
@@ -454,7 +473,15 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     def collider(pieces, exact=False, model_name='', reference=0):
      # exact: True (every piece; a compiled union when a compiler is given) or
      # the set of piece positions that get exact standing bevels.
-     if not pieces:return -empty_leaf-1,-1
+     if not pieces:
+      # AmiQuake copies headnode[0] directly into hull.firstclipnode.
+      # A negative BSP leaf index there would be read as a CONTENTS code.
+      # Keep a real node so Mod_MakeHull0 resolves both empty leaf children.
+      root=len(lumps[5])//24
+      if root>32767:raise ValueError('Point node budget exceeded')
+      leaf=-empty_leaf-1
+      lumps[5]+=struct.pack('<ihh6h2H',plane((1,0,0),0),leaf,leaf,-32768,-32768,-32768,32767,32767,32767,0,0)
+      return root,-1
      # A union of convex volumes. Outside each piece tries the next one.
      compiled=None
      if exact is True and collision_compiler:

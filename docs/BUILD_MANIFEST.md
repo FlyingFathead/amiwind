@@ -1,6 +1,6 @@
 # World map manifest (design)
 
-Status: design, 11 October 2026. Nothing below is built yet except where marked.
+Status: default build policy, updated 13 October 2026. The historical measurements below describe earlier builds; current builds use the manifest and final-payload gates described here.
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +17,8 @@ Status: design, 11 October 2026. Nothing below is built yet except where marked.
 - [Order of work](#order-of-work)
 
 <!-- contents end -->
+
+CHIM replaces the selected exterior BSP maps by default: no additional cleanup flag is needed. Terrain, scenery and flora stages skip those legacy maps. The image step rejects duplicate legacy maps before partition packing, and records removed files and payload counts in `chim-removed-legacy.json` and `legacy-maps-of-chim-cells.json`. Required BSP interiors and other routed BSP cells remain. Historical build caches are separate from the playable HDF payload.
 
 ## The rule
 

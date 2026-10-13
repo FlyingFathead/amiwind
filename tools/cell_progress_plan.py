@@ -44,11 +44,13 @@ def load(out):
 
 def next_release(doc):
     """The lowest-numbered plan release that has not shipped (None without a plan)."""
-    open_ = [v for v, r in doc['releases'].items() if not r.get('shipped')]
+    open_ = [v for v, r in doc['releases'].items() if not r.get('shipped') and not r.get('documentation_only')]
     return sorted(open_, key=version_key)[0] if open_ else None
 
 
 def tier(doc, release, state):
+    if (doc['releases'].get(release) or {}).get('documentation_only'):
+        return 'deferred'
     if state == 'shipped' or (doc['releases'].get(release) or {}).get('shipped'):
         return 'shipped'
     return 'next' if release == next_release(doc) else 'later'
@@ -150,6 +152,8 @@ def attach(cells, doc):
     for k, rec in cells.items():
         e = doc['cells'].get(k)
         rec['plan'] = dict(e, tier=tier(doc, e.get('release'), e.get('state'))) if e else None
+        if e and (doc['releases'].get(e.get('release')) or {}).get('documentation_only'):
+            rec['plan']['documentation_only'] = True
 
 
 def summary(cells, doc):
@@ -168,5 +172,7 @@ def summary(cells, doc):
                'states': {s: sum(1 for r in mine if r['plan']['state'] == s) for s in STATES} if name else {}}
         if name and doc['releases'][name].get('title'):
             row['title'] = doc['releases'][name]['title']
+        if name and doc['releases'][name].get('documentation_only'):
+            row['documentation_only'] = True
         rows.append(row)
     return rows

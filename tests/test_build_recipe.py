@@ -430,8 +430,8 @@ class Receipts(Base):
 
 class Presets(Base):
     def test_every_preset_is_its_recipe(self):
-        # every old table row is a recipe; seyda-chim (v0.0.36-dev5) is the one preset that never had a table row
-        self.assertEqual(sorted(row['name'] for row in mp.presets() if row['name'] != 'seyda-chim'),
+        # every old table row is a recipe; seyda-chim and lava-pools were added after the old table
+        self.assertEqual(sorted(row['name'] for row in mp.presets() if row['name'] not in ('seyda-chim', 'lava-pools')),
                          sorted(row['name'] for row in OLD_PRESETS))
         for row in OLD_PRESETS:
             with self.subTest(preset=row['name']):

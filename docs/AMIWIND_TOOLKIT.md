@@ -5,6 +5,7 @@
 <!-- contents start -->
 ## Contents
 
+- [v0.0.38 controls](#v0038-controls)
 - [Starting it](#starting-it)
 - [Your data](#your-data)
 - [The tabs](#the-tabs)
@@ -38,6 +39,13 @@ output, and stays there.
 The header line "Last updated with AmiWind v..." names the AmiWind version the
 Toolkit was last updated and tested with. It is changed by hand when the
 Toolkit itself is next worked on, not with every release.
+
+## v0.0.38 controls
+
+The [Toolkit README](../amiwind-toolkit/README.md#v0038-inspection-controls)
+describes Names on/off, per-panel Copy JSON, textured heatmaps and direct
+CHIM archive links. Names default to on and remember your choice. These
+controls are included in the public source and operate on your own data.
 
 ## Starting it
 

@@ -175,3 +175,58 @@ def contextlib_quiet():
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class DeepFernUnionTests(unittest.TestCase):
+    def test_scope_preserves_explicit_modes_and_heap_fallback(self):
+        from chim.models import depth_compile_candidate
+        self.assertTrue(depth_compile_candidate('meshes/o/Flora_Fire_Fern_02.NIF', 'auto'))
+        for mode in ('chain', 'routed', 'balanced', 'compiled'):
+            self.assertFalse(depth_compile_candidate('o/flora_fire_fern_02', mode))
+        self.assertFalse(depth_compile_candidate('o/flora_fire_fern_02', 'auto', True))
+        self.assertFalse(depth_compile_candidate('x/terrain_rock_ma_02', 'auto'))
+
+    def test_deep_fern_union_preserves_point_hull_and_rejects_failed_check(self):
+        import os
+        import tempfile
+        from unittest.mock import patch
+        from chim.models import variant_unit
+        from hull_chain_audit import hull_depth
+        qbsp = os.environ.get('AMIWIND_TEST_QBSP')
+        if not qbsp:
+            self.skipTest('requires external qbsp')
+        # Many overlapping pieces defeat routing but have a simple exact union.
+        parts = boxes(1) * 60
+        ref = {'scale': 1., 'rotation_radians': [0., 0., 0.], 'position': [0., 0., 0.]}
+        task = {'ref': ref, 'data': None, 'texsize': 64, 'centre': [0., 0.],
+                'model': {'source': 'meshes/o/flora_fire_fern_02.nif'}, 'exact': False,
+                'hollow': False, 'qbsp': qbsp, 'hull_patch': True}
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {'AMIWIND_MODEL_HULL': 'auto'}), \
+                patch('prepare_mesh_bsp._prepare_placement', return_value=([], parts, (0., 0., 0.), (30., 30., 20.))), \
+                patch('prepare_mesh_bsp.flame_entities', return_value=[]):
+            task['collision_cache'] = tmp
+            chain = variant_unit(dict(task, keep_chain=True))
+            result = variant_unit(task)
+            self.assertEqual(result['hull_form'], 'compiled')
+            self.assertEqual(result['hull_check']['short'], 0)
+            self.assertEqual(result['hull_check']['over'], 0)
+            for lump in (3, 10):
+                self.assertEqual(chain['lumps'][lump], result['lumps'][lump])
+            def point_contents(lumps, point):
+                node = struct.unpack_from('<i', lumps[14], 36)[0]
+                while node >= 0:
+                    plane, front, back = struct.unpack_from('<i2h', lumps[5], node * 24)
+                    x, y, z, distance = struct.unpack_from('<4f', lumps[1], plane * 20)
+                    node = front if x*point[0] + y*point[1] + z*point[2] >= distance else back
+                return struct.unpack_from('<i', lumps[10], (-node-1)*28)[0]
+            for point in np.random.default_rng(38).uniform((-20, -20, -20), (60, 60, 60), (500, 3)):
+                self.assertEqual(point_contents(chain['lumps'], point), point_contents(result['lumps'], point))
+            root = struct.unpack_from('<i', result['lumps'][14], 40)[0]
+            self.assertLessEqual(hull_depth(result['lumps'][9], root)[1], 256)
+            for point in ((0., 0., 0.), (15., 15., 10.), (100., 100., 100.)):
+                oldroot = struct.unpack_from('<i', chain['lumps'][14], 40)[0]
+                self.assertEqual(walk(chain['lumps'], oldroot, point)[0], walk(result['lumps'], root, point)[0])
+            with patch('collision_bsp.compile_standing_checked', return_value=(([], -1), {'short': 1., 'over': 0.})):
+                refused = variant_unit(task)
+            self.assertNotEqual(refused['hull_form'], 'compiled')
+            self.assertIn('inexact', refused['collision_fallback'])

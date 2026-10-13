@@ -133,6 +133,19 @@ class GroundGateTests(unittest.TestCase):
         self.put(actor());(self.id1/'progs/test.mdl').write_bytes(b'bad')
         self.assertEqual(audit(self.maps)['status'],'failed')
 
+    def test_source_proven_empty_scene_is_not_actor_acceptance(self):
+        output = self.id1 / 'empty-audit.json'
+        proof = {'scope': 'actor-free MiniWind exterior', 'source_actor_count': 0}
+        report = require(self.maps, output, empty_scene=proof)
+        self.assertEqual(report['status'], 'not-applicable')
+        self.assertFalse(report['acceptance']['production_gate_passed'])
+        with self.assertRaises(ValueError):
+            require(self.maps, output)
+        self.put(actor())
+        (self.id1/'progs/test.mdl').write_bytes(b'bad')
+        with self.assertRaises(ValueError):
+            require(self.maps, output, empty_scene=proof)
+
     def test_baker_fits_actual_model_feet_and_retains_authored_coordinates(self):
         from check_actor_ground import entities
         self.put(actor());(self.id1/'progs/test.mdl').write_bytes(alias(4))

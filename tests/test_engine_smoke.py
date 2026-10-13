@@ -116,7 +116,7 @@ class ScriptedSessionTests(unittest.TestCase):
             Path(tmp, 'script.txt').write_text('cmd noclip\nshot a\nwait 1\nkey Return\n# note\nxdo mousedown 1 mouseup 1\nstate local\ncmd aw_view 1 2 3 0 0\n',
                                               encoding='utf-8', newline='\n')
             stubs = ('R=%s\nlog(){ echo "log $*"; }\nrc(){ echo "rc $1"; }\nkey(){ :; }\nxdo(){ echo "xdo $1"; }\nplay(){ echo "play $1"; }\n'
-                     'shot(){ cat > /dev/null; echo "shot $1"; }\nst(){ echo 0; }\nalive(){ return 0; }\n'
+                     'shot(){ cat > /dev/null; echo "shot $1"; }\nst(){ case "$1" in screen) echo game;; signon) echo 4;; *) echo 1;; esac; }\nalive(){ return 0; }\n'
                      'finish(){ echo "finish $1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
             script = Path(tmp, 'run.sh')
             script.write_text(stubs + block, encoding='utf-8', newline='\n')
@@ -125,3 +125,18 @@ class ScriptedSessionTests(unittest.TestCase):
         self.assertEqual([l for l in lines if l.startswith(('rc ', 'shot ', 'play ', 'xdo '))],
                          ['rc noclip', 'shot a', 'play 1', 'xdo mousedown 1 mouseup 1', 'rc aw_view 1 2 3 0 0'])
         self.assertTrue(lines[-1].startswith('finish PASS script'), done.stdout + done.stderr)
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_script_rejects_disconnected_game_after_host_error(self):
+        text = engine_smoke.PROBE
+        start = text.index('if [ -s $R/script.txt ]; then')
+        block = text[start:text.index('\nfi\n', start) + 4]
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'script.txt').write_text('cmd dbg tp 77348 17749\nwait 1\n')
+            # Reproduce Host_Error: emulator and realtime remain alive, but the map is gone.
+            stubs = ('R=%s\nrc(){ :; }\nplay(){ :; }\nalive(){ return 0; }\n'
+                     'st(){ case "$1" in screen) echo game;; map) echo none;; *) echo 0;; esac; }\n'
+                     'finish(){ echo "$1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
+            result = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30)
+        self.assertIn('FAIL scripted run ended outside play', result.stdout)
+        self.assertNotIn('PASS', result.stdout)

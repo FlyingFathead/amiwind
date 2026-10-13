@@ -317,6 +317,18 @@ def _flames(flames):
     return [] if flames is None else flames
 
 
+def source_collision_metadata(raw, N):
+    """Retain explicit TES3 collision markers independently of visual geometry."""
+    if not raw.startswith(NIF_MAGIC):
+        return {'mode': 'unchanged', 'no_collision_markers': []}
+    data = N.Data(); data.read(io.BytesIO(raw))
+    markers = sorted({bytes(b.string_data).decode('ascii', errors='replace').strip().upper()
+                      for b in data.get_global_iterator() if isinstance(b, N.NiStringExtraData)})
+    disabled = [m for m in markers if m in ('NC', 'NCO')]
+    return {'mode': 'nonsolid' if disabled else 'unchanged',
+            'no_collision_markers': disabled}
+
+
 def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None,jobs=None,
                 visibility_policy=None):
     from PIL import Image
@@ -387,6 +399,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                                         'vertices': len(unpack_geometry(packet)[0]), 'triangles': len(unpack_geometry(packet)[1]),
                                         'bounds': bounds, 'materials': materials, 'textures': sorted(set(texture_refs)),
                                         'collision': collision_record,
+                                        'source_collision': source_collision_metadata(raw, nif_reader()),
                                         'source_visibility_issues': source_visibility_issues(materials),
                                         'exterior_visibility': visibility_selection,
                                         'skipped_shapes': skipped,

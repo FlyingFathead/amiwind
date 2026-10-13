@@ -28,6 +28,7 @@ the generated [CHIM cell tracker](CELL_TRACKER.md).
 - [Owner marks: approved, playtested, accepted](#owner-marks-approved-playtested-accepted)
 - [Problems that are not a colour](#problems-that-are-not-a-colour)
 - [Who decides what](#who-decides-what)
+- [Package inclusion](#package-inclusion)
 
 <!-- contents end -->
 
@@ -334,3 +335,7 @@ Some problems keep a cell from being converted or from switching to CHIM without
 | What ships in which release | Owner (the release plan, gold) | The v0.0.36 and v0.0.37 plans |
 | Playtested, approved, accepted | Owner only | An accepted audit failure in a development build |
 | The engine does not use the output yet | Engine work | Placing the ocean piece |
+
+## Package inclusion
+
+Use **Included in build** in the Toolkit to view verified package coverage independently of plans. Green marks region frames whose files match final HDF readback. Amber marks selected cells of an unfinished build. Grey means coverage is not established in the displayed dataset, not necessarily absent from the game. The initial verified record covers 325 region cells in v0.0.36; town-frame boundaries and earlier releases remain to be reconciled. Conversion, actors, lighting and traversal are separate checks.

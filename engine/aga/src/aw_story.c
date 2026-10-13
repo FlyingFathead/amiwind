@@ -49,6 +49,16 @@ int AW_StoryFighting(void)
     return !AW_StoryRestricted() || aw_story.hall;
 }
 
+int AW_StoryViewAllowed(void)
+{
+    /* CharGen disables both view switching and vanity. CharGenClassNPC
+     * enables both after the papers instruction (census state 30 -> -1).
+     * Use existing saved state: old saves and completed character presets
+     * need no new permission bit or save-format migration. */
+    return !AW_StoryRestricted() || aw_story.stage>AW_STAGE_PAPERS ||
+        (aw_story.stage==AW_STAGE_PAPERS && aw_story.census==-1);
+}
+
 void AW_ExpandPlayerName(char *out,unsigned capacity,const char *text)
 {
     unsigned n=0;

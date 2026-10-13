@@ -1,0 +1,92 @@
+# TOOLKIT-CULL-DIAGNOSTICS-38: Collision-only diagnostics disable terrain culling preview
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | owner |
+| First noticed | 12 October 2026, in v0.0.38 |
+| Where | Toolkit terrain preview |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.38 (last seen) |
+| Severity | medium: Buried render geometry remains and expected memory savings are absent. |
+| Family | Development tooling, receipts and packaging (`tracker-tooling`) |
+| Playtest version | unknown |
+| From commit | source unknown, engine unknown, CHIM world unknown |
+| CHIM engine version | CHIM unknown, engine unknown, world format unknown |
+| Unknown because | Observed in an unshipped experimental build and mutable inspector; no single release commit identifies both. |
+| Platform or emulator | not in game (Observed in inspector and experimental compiler output.) |
+
+<!-- END GENERATED FACTS -->
+
+## Symptom
+
+Buried placed geometry remains visible from beneath the terrain despite enabling the clipping workflow.
+
+## Where
+
+Toolkit terrain preview; exterior cell (10,1).
+
+## How it happened
+
+Known collision-only tree boxes have no render polygons. A global missing-polygon guard disabled every terrain culling check.
+
+## Why it was not caught
+
+Earlier coverage did not combine collision-only sprite diagnostics and terrain-named placed rocks with this scene.
+
+## Reproduction
+
+Load a converted scene with these cases, enable terrain preview and compare buried object counts. Compile the same cell with experimental clipping enabled.
+
+## Repair
+
+Skip explicitly identified collision-only diagnostics in render completeness checks; unknown incomplete meshes still fail closed.
+
+## Verification
+
+Synthetic buried-face and diagnostic-box regression passes; full browser visual verification remains pending.
+
+## Prevention
+
+Use explicit geometry roles, preserve shared asset identity, and record compiled face counts, collision equality and resident-byte changes independently.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipts, packaging, development tools and the tracker itself. See [families](README.md#families).
+
+- ACTOR-RECEIPT-01 (no report page): Windows actor-audit receipt hash did not match the CRLF-written file
+- AW25-07 (no report page): Python FS-UAE launcher not executable after extraction
+- [BUILD-END-USER-LAUNCHERS-36](BUILD-END-USER-LAUNCHERS-36.md): Requested: the builder's simple mode writes a Python launcher, an FS-UAE config and a WinUAE config for the end user, matching the build
+- [BUILD-MOJIBAKE-32](BUILD-MOJIBAKE-32.md): A builder error message contains mojibake
+- [BUILD-NAME-MOJIBAKE-32](BUILD-NAME-MOJIBAKE-32.md): A builder error message shows mojibake
+- BUILD-REPAIR-01 (no report page): Image-repair retry omitted region-ownership files
+- BUILD-REPAIR-02 (no report page): Retry assertion rejected an empty failure list as a failure
+- [BUILD-SCRATCH-DISK-GROWTH-32](BUILD-SCRATCH-DISK-GROWTH-32.md): Build scratch volumes grow the container disk image on the system drive
+- [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
+- DOC-STATE-01 (no report page): Published release documentation retained stale candidate/current-version claims
+- [DOCS-DEAD-ANCHORS-32](DOCS-DEAD-ANCHORS-32.md): Seven documentation links point at headings that no longer exist
+- [DOCS-TOC-RENDER-FIGHT-33](DOCS-TOC-RENDER-FIGHT-33.md): The contents-list writer and the bug register renderer move each other's blocks on bug pages
+- [DRYRUN-LIBS-LABEL-32](DRYRUN-LIBS-LABEL-32.md): A dry-run image built with --amiga-libs still says it contains no game assets or ROMs only
+- [ESTIMATE-EVR-BELOW-CUR-31](ESTIMATE-EVR-BELOW-CUR-31.md): World estimate: "everything" comes out below "current content" in some regions
+- HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
+- PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
+- [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
+- [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
+- [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker
+- [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
+- [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
+- [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
+- [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
+- [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
+- [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet
+- [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
+- [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
+- [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation
+- [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
+- WIN-02 (no report page): Cancelled Windows stage leaves child workers alive
+
+<!-- END GENERATED CATEGORY -->

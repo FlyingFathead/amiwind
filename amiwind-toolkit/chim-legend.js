@@ -53,7 +53,7 @@
   // The legend rows of the plan colouring, generated from the data; empty without a plan ("when available").
   // Each row: [colour, text, key].
   function planRows(plans) {
-    const rel = (plans || []).filter(r => r.release && !r.shipped);
+    const rel = (plans || []).filter(r => r.release && !r.shipped && !r.documentation_only);
     if (!rel.length) return [];
     const rows = [];
     for (const r of rel) {
@@ -65,7 +65,7 @@
   // Per-release count rows plus a TOTALS row: [name, state, planned, complete, awaiting lighting, failing, hull pending, not started, open ocean].
   function planTable(plans, oceanTotal) {
     const rows = (plans || []).filter(r => r.release).map(r => [r.release + (r.title ? ' - ' + r.title : ''),
-      r.shipped ? 'shipped' : r.next ? 'next' : 'later', r.planned, r.complete, r.awaiting_lighting, r.failing, r.hull_policy_pending, r.not_started, r.ocean || 0]);
+      r.documentation_only ? 'documentation only' : r.shipped ? 'shipped' : r.next ? 'next' : 'later', r.planned, r.complete, r.awaiting_lighting, r.failing, r.hull_policy_pending, r.not_started, r.ocean || 0]);
     if (!rows.length) return [];
     const tot = ['TOTALS', ''];
     for (let i = 2; i < 9; i++) tot.push(rows.reduce((a, r) => a + r[i], 0));
@@ -77,6 +77,7 @@
   // One text line for the cell panel: every key of the plan record is shown, unknown ones too.
   function planLine(plan) {
     if (!plan) return 'not in any release plan';
+    if (plan.documentation_only) return 'Superseded geometry plan for ' + plan.release + ': this release changed documentation, not game content. Cell inclusion is recorded separately.';
     const extra = Object.keys(plan).filter(k => !PLAN_CORE.includes(k)).sort().map(k => k + ' ' + (typeof plan[k] === 'object' ? JSON.stringify(plan[k]) : plan[k]));
     return 'Plan: ' + plan.release + ' (' + plan.state + (plan.tier === 'next' ? ', next release' : plan.tier === 'later' ? ', later release' : '') + ')' +
       (plan.since ? ' · since ' + plan.since : '') + (plan.source ? ' · by ' + plan.source : '') + (extra.length ? ' · ' + extra.join(' · ') : '');

@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "comment": "Opt-in single-cell lava sandbox for MiniWind. Cell (1,-2) contains twenty source lava pools. Not part of default builds. Native lava visibility, contact and damage must be checked separately from offline conversion audits.",
+  "source_cell": [
+    1,
+    -2
+  ],
+  "source_radius": 0,
+  "centre": [
+    12288,
+    -12288
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "reference_margin": 0,
+  "terrain_margin": 896,
+  "handoff_core": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "core_size": 1024,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "town": {
+    "id": "lava_x1ym2",
+    "title": "Molag Mar lava test",
+    "map": "lava_x1ym2",
+    "map_prefix": "lv",
+    "region_cap": 64,
+    "message": "Molag Mar lava test",
+    "region_file": "lava_x1ym2-regions.txt",
+    "door_file": "scene-doors-lava_x1ym2.txt",
+    "visual_group": "lava_x1ym2",
+    "arrival": {
+      "source_position": [
+        13700,
+        -9600,
+        512
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "Approach south-west of the source lava pools; final arrival is checked against converted collision."
+    },
+    "return": null
+  },
+  "interiors": []
+}

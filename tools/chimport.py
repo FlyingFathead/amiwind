@@ -291,7 +291,9 @@ def cell_settings(cell, missing_land='flat'):
     """Converter settings of a one-cell frame (the town settings shape of docs/TOWN_IMPORT.md)."""
     x, y = cell
     ident = 'c%s%d_%s%d' % ('m' if x < 0 else 'p', abs(x), 'm' if y < 0 else 'p', abs(y))
+    from visual_recipes import cell_settings as recipe_cell_settings
     return {
+        **recipe_cell_settings((x, y)),
         'format': 1, 'source_cell': [x, y], 'source_radius': 0,
         'centre': [x * CELL_UNITS + CELL_UNITS // 2, y * CELL_UNITS + CELL_UNITS // 2], 'scale': SCALE,
         'bounds': [[-HALF, -HALF], [HALF, HALF]], 'core_size': 1024, 'overlap': 896, 'hysteresis': 96,

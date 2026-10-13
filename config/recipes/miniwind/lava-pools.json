@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "lava-pools",
+  "description": "Single-cell Molag Mar lava visibility, collision and damage sandbox.",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Molag Mar lava pools: visibility, contact and damage",
+    "direct_to_game_map": "lava_x1ym2",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

@@ -37,7 +37,7 @@ iframe.active{display:block}
 <body>
 <header>
   <img src="../resources/media/AmiWind_logo_name_only.png" alt="AmiWind">
-  <h1>Toolkit<small id="toolkit-version" title="Set by hand when the Toolkit is next updated">Last updated with AmiWind v0.0.36</small></h1>
+  <h1>Toolkit<small id="toolkit-version" title="Set by hand when the Toolkit is next updated">Last updated with AmiWind v0.0.38</small></h1>
   <nav role="tablist">
     <button role="tab" id="tab-world" aria-selected="true">World</button>
     <button role="tab" id="tab-local" aria-selected="false">Local</button>
@@ -77,7 +77,9 @@ function showInspector(file) {
   mark('inspector');
   if (!inspector.src) {
     inspector.onload = () => { inspectorReady = true; send(); };
-    inspector.src = 'map-inspector.html';
+    const args=new URLSearchParams(location.search),link=new URLSearchParams();
+    for(const key of ['worldzip','world','map','maps','frame'])if(args.has(key))link.set(key,args.get(key));
+    inspector.src = 'map-inspector.html'+(link.size?'?'+link.toString():'');
   } else send();
 }
 function send() {
@@ -110,6 +112,7 @@ window.addEventListener('message', e => {
       !meshFrame.classList.contains('active')) mark(e.data.mode);
   if (e.data.type === 'amiwind-open-inspector' && e.data.file instanceof File) showInspector(e.data.file);
 });
+if(!new URLSearchParams(location.search).has('cell') && ['worldzip','world','map'].some(k=>new URLSearchParams(location.search).has(k)))showInspector(null);
 </script>
 </body>
 </html>

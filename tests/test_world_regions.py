@@ -10,10 +10,60 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from prepare_world_regions import plan, Terrain, map_text, town_handoffs, terrain_triangles
 from world_volumes import balanced
 from prepare_world_regions import layout_refinements
+from prepare_world_regions import region_lava, region_terrain_triangles
 CEILING=layout_refinements()['survey_source_triangle_limit']
 
 
 class WorldRegionsTests(unittest.TestCase):
+    def test_elevated_lava_keeps_land_depression_and_shared_edge(self):
+        terrain=Terrain.__new__(Terrain)
+        terrain.cells={(0,0):0};terrain.heights=np.full((1,65,65),600,np.float32)
+        terrain.materials=np.ones((1,16,16),np.uint16)
+        terrain.heights[0,2,2]=136
+        terrain.heights[0,1,4]=136
+        entry=dict(origin=[0,0,0],coverage=[[0,0],[512,128]],
+                   lava_pools=[dict(hull=[[32,32],[500,32],[500,400],[32,400]],top=480)])
+        tris=list(region_terrain_triangles(entry,terrain))
+        vertices={tuple(p) for tri in tris for p in tri}
+        self.assertIn((64,64,34),vertices)
+        self.assertIn((128,32,34),vertices)
+        left=[tri for tri in tris if max(p[0] for p in tri)<=128]
+        right=[tri for tri in tris if min(p[0] for p in tri)>=128 and max(p[0] for p in tri)<=256]
+        edge=lambda ts:{tuple(p) for tri in ts for p in tri if p[0]==128}
+        self.assertEqual(edge(left),edge(right))
+        remote=[tri for tri in tris if min(p[0] for p in tri)>=384]
+        self.assertEqual(remote,list(terrain_triangles(terrain,384,0)))
+        self.assertEqual(len(remote),2)
+        # The same world-space samples must survive a shifted overlapping map.
+        shifted=copy.deepcopy(entry);shifted['origin'][0]=128
+        shifted['coverage']=[[-128,0],[384,128]]
+        self.assertEqual(tris,list(region_terrain_triangles(shifted,terrain)))
+
+    def test_lava_crosses_cell_boundary_and_is_clipped_to_each_map(self):
+        pool = dict(reference=7, hull=[[400,0],[800,0],[800,400],[400,400]], top=256,
+                    id='molten', model='pool.nif', dps=20, sound='')
+        left = dict(origin=[0,0,0], coverage=[[0,0],[128,128]])
+        right = dict(origin=[128,0,0], coverage=[[0,0],[128,128]])
+        a, b = region_lava(left,[pool]), region_lava(right,[pool])
+        self.assertEqual([p['reference'] for p in a], [7])
+        self.assertEqual([p['reference'] for p in b], [7])
+        self.assertEqual(max(p[0] for p in a[0]['hull']),512)
+        self.assertEqual(min(p[0] for p in b[0]['hull']),512)
+        self.assertEqual(pool['hull'][1][0],800)  # original remains immutable
+        self.assertEqual(region_lava(dict(origin=[512,0,0],coverage=[[0,0],[128,128]]),[pool]),[])
+
+    def test_legacy_map_has_lava_liquid_bed_and_effect_at_source_height(self):
+        terrain=Terrain.__new__(Terrain)
+        terrain.cells={(0,0):0};terrain.heights=np.zeros((1,65,65),np.float32)
+        terrain.materials=np.ones((1,16,16),np.uint16)
+        entry=dict(name='test',origin=[0,0,0],coverage=[[0,0],[128,128]])
+        entry['lava_pools']=region_lava(entry,[dict(reference=7,hull=[[100,100],[300,100],[300,300],[100,300]],
+                    top=256,id='molten',model='pool.nif',dps=20,sound='')])
+        text=map_text(entry,terrain)
+        self.assertIn('*lava',text);self.assertIn('lavabed',text)
+        self.assertIn('"classname" "aw_lava"',text)
+        self.assertIn('"origin" "50.00 50.00 64.00"',text)
+
     def test_measured_splits_stable_names_and_matching_shared_vertices(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
@@ -113,6 +163,27 @@ class ContentPreservingRefinementTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,r'unsplit cell: cell \[1, 0\] is split into 4'):
             refine_entries(split,[{'parent':'vf0001','cell':[1,0],'divisions':2,'reason':'again'}])
 
+    def test_explicit_subcell_refinement_preserves_other_cores_and_global_grid(self):
+        from prepare_world_regions import refine_entries
+        original=[dict(name='vf0000',cell=[-2,3],divisions=1,subcell=[0,0],origin=[-3072,7168,128],core=[[-1024,-1024],[1024,1024]],coverage=[[-1920,-1920],[1920,1920]])]
+        split=refine_entries(original,[dict(parent='vf0000',cell=[-2,3],divisions=2,reason='initial')])
+        result=refine_entries(split,[dict(parent='vf0001',cell=[-2,3],parent_divisions=2,divisions=4,reason='dense lava')])
+        self.assertEqual(len(result),7)
+        for i in (0,2,3):self.assertEqual(result[i],split[i])
+        children=[result[i] for i in (1,4,5,6)]
+        self.assertEqual([e['subcell'] for e in children],[[2,0],[3,0],[2,1],[3,1]])
+        covered=set()
+        for e in result:
+            self.assertEqual(e['coverage'][0],[v-896 for v in e['core'][0]])
+            lo=[int(e['origin'][k]+e['core'][0][k]) for k in (0,1)]
+            hi=[int(e['origin'][k]+e['core'][1][k]) for k in (0,1)]
+            tiles={(x,y) for x in range(lo[0],hi[0],128) for y in range(lo[1],hi[1],128)}
+            self.assertFalse(covered & tiles)
+            covered.update(tiles)
+        self.assertEqual(covered,{(x,y) for x in range(-4096,-2048,128) for y in range(6144,8192,128)})
+        with self.assertRaisesRegex(ValueError,'parent divisions differ'):
+            refine_entries(split,[dict(parent='vf0001',cell=[-2,3],parent_divisions=4,divisions=8,reason='stale')])
+
     def test_survey_with_another_ceiling_is_refused(self):
         # BUILD-WORLD-LAYOUT-DRIFT-32: a different ceiling lays out a different world.
         with tempfile.TemporaryDirectory() as tmp:
@@ -129,7 +200,10 @@ class ContentPreservingRefinementTests(unittest.TestCase):
     def test_recorded_ceiling_is_the_shipped_layout(self):
         layout=layout_refinements()
         self.assertEqual(layout['survey_source_triangle_limit'],140801)
-        self.assertEqual([r['parent'] for r in layout['regions']],['vf0698','vf0791'])
+        self.assertEqual([r['parent'] for r in layout['regions']],
+                         ['vf0698','vf0791','vf1177','vf1179','vf1258','vf1457','vf1695','vf1696','vf1819'])
+        self.assertEqual([(r.get('parent_divisions',1),r['divisions']) for r in layout['regions'][2:]],
+                         [(1,2),(2,4),(1,2),(1,2),(2,4),(2,4),(2,4)])
 
 if __name__=='__main__':unittest.main()
 

@@ -19,7 +19,7 @@ qboolean noclip_anglehack;
 cvar_t cl_forwardspeed={"cl_forwardspeed","200",false,false,200};
 cvar_t chase_active={"chase_active","0",false,false,0};
 cvar_t scr_viewsize={"viewsize","100",false,false,100};
-extern cvar_t aw_torch_depth_bob, cl_rollangle;
+extern cvar_t aw_torch_depth_bob, cl_rollangle, aw_noclipwobble;
 extern mdl_t *pmdl;
 static mdl_t synthetic_model;
 static int torch_equipped, bob_registered;
@@ -97,6 +97,13 @@ int main(void){
   aw_torch_depth_bob.value=i==0?NAN:(i==1?-1:2);V_CalcRefdef();
   for(n=0;n<3;n++)assert(cl.viewent.origin[n]==stable_origin[n]);
  }
+ /* Noclip keeps a steady eye and hand anchor by default, with an opt-in rollback. */
+ assert(aw_noclipwobble.archive && aw_noclipwobble.value==0);
+ setup(.15,320,0,0);noclip_anglehack=false;bob=V_CalcBob();assert(fabs(bob)>.01);
+ noclip_anglehack=true;V_CalcRefdef();assert(V_CalcBob()==0);
+ assert(fabs(r_refdef.vieworg[2]-cl.viewheight-1.0/32)<.0001);
+ aw_noclipwobble.value=1;assert(fabs(V_CalcBob()-bob)<.0001);
+ aw_noclipwobble.value=0;noclip_anglehack=false;assert(fabs(V_CalcBob()-bob)<.0001);
  puts("torch view depth stable through stride; legacy rollback, camera, anchors and unarmed placement passed");
  return 0;
 }

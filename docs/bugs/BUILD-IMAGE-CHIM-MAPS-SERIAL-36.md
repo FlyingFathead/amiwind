@@ -82,6 +82,24 @@ image step.
 
 ## Verification
 
+13 October 2026, source c2c2050: full v0.0.38 image assembly completed, but
+the post-build performance guard rejected regional frame generation: 360
+frames in 267 seconds at 1.01 of 16 usable cores. Image outputs remain valid
+and reusable according to the guard; this is not a runtime-memory failure.
+The code already dispatches `region_map` through `ordered_map`, but constructs
+all `region_task` inputs serially before worker dispatch. Determine which part
+accounts for the measured time before changing parallelism or waiving the gate.
+The existing issue remains open; native image acceptance is a separate check.
+
+Source inspection found that sprite provenance preparation parsed the complete
+`chim-source.json` once for every regional cell before dispatch. The candidate
+now reads and indexes it once per batch, retaining first-section selection and
+all sprite checksum/path checks. All 47 frame-map tests pass, including a
+single-read batch regression. A read-only full-world regeneration reproduced all
+360 frame-map hashes exactly: 3.49 seconds preparing inputs and 5.09 seconds
+total, compared with the original 267-second phase. This is a scoped diagnostic
+measurement; final source gates remain pending and this is not a shipped fix.
+
 In source: tests/test_chim_regions.py (ManyRegions) makes the same region frame maps with one worker and with three
 (SHA-256 of every file equal) and with the pass cache (an unchanged map taken from it, a changed legacy map made again,
 a change to the worker's code rekeying every map). On the v0.0.36-dev3 run's own files (read only): all 270 region frame
@@ -94,6 +112,8 @@ To do on the next build: the phase uses the available cores; an unchanged rebuil
 ## Prevention
 
 A profile gate flags any phase that runs far below its core budget.
+
+Full-image verification, 13 October 2026: 360 regional frame maps generated in 4.3 seconds at 1.5 reported cores with zero pass-cache hits, compared with 267 seconds in the preceding build. The complete image passed the performance guard without waivers. Earlier byte-equivalence verification remains applicable; final map readback also passed.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

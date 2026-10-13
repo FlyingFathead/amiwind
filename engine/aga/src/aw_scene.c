@@ -514,6 +514,18 @@ int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
     }
     Con_Printf("Interior spawn blocked; use dbg noclip to inspect.\n");return 0;
 }
+/* Debug recovery uses CHIM's checked arrival floor, after loading its ring.
+ * A refused destination restores collision residency around the unchanged player. */
+int AW_RecoverPlace(edict_t *p,vec3_t preferred) {
+    if(Chim_Active()) {
+        if(aw_chim_spawn)aw_chim_spawn(preferred);
+        if(AW_InteriorPlace(p,preferred))return 1;
+        if(aw_chim_spawn)aw_chim_spawn(p->v.origin);
+        return 0;
+    }
+    if(AW_Interior())return AW_InteriorPlace(p,preferred);
+    return AW_PlacePlayer(p,preferred);
+}
 /* dbg unstuck: the nearest clear standing spot below or beside the player
  * (then one storey up); never into a wall or water, otherwise nothing moves. */
 int AW_Unstuck(edict_t *p) {
@@ -894,6 +906,14 @@ static void shroompicker_command(void) {
 }
 static void teleport_command(void) {
     vec3_t source;
+    if(Cmd_Argc()==2 && (!strcmp(Cmd_Argv(1),"tel_uvirith") || !strcmp(Cmd_Argv(1),"teluvirith"))) {
+        /* Recorded exterior approach; reuse the checked coordinate route and
+         * standing-surface placement rather than resetting the character. */
+        source[0]=85676;source[1]=11440;source[2]=1852;
+        if(!AW_MapTeleportAt(source,1))
+            Con_Printf("Tel Uvirith teleport unavailable; start play on a disk containing this location.\n");
+        return;
+    }
     if(Cmd_Argc()==3 || Cmd_Argc()==4) {
         if(!teleport_coordinate(Cmd_Argv(1),&source[0]) ||
            !teleport_coordinate(Cmd_Argv(2),&source[1]) ||

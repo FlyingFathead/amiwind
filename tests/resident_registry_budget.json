@@ -7,9 +7,9 @@
    "hunk_bytes": 8512
   },
   "cvars": {
-   "count": 324,
-   "static_bytes": 7776,
-   "zone_bytes": 10592
+   "count": 326,
+   "static_bytes": 7824,
+   "zone_bytes": 10656
   },
   "tables": {
    "count": 0,
@@ -20,7 +20,9 @@
   "2026-10-10: first budget = the engine of v0.0.36-dev 6f0d219 (third-person view and vanity camera included): 266 console commands (8512 bytes of hunk), 321 console variables (7704 bytes of structures, 10496 bytes of zone), no static name table of 1 KiB or more (ENGINE-RESIDENT-REGISTRY-GROWTH-36).",
   "2026-10-11: +1 console variable aw_music (dbg music on/off, ENGINE-MUSIC-NO-OFF-SWITCH-36), ordered by the owner stand-in; the switch reuses the existing aw_music_status command (no new command)",
   "2026-10-11: aw_vanity_fullview, the owner-requested saved switch for the vanity camera full view (owner request 14:15)",
-  "2026-10-11: aw_combat_block, the saved Blocking option (hold to block / automatic), COMBAT-BLOCKING-36"
+  "2026-10-11: aw_combat_block, the saved Blocking option (hold to block / automatic), COMBAT-BLOCKING-36",
+  "2026-10-12: Owner-requested persistent independent LAND fill toggle, enabled by default; aw_land_fill adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases use the on-disk catalogue. These are registry accounting costs, not measured native frame-time costs.",
+  "2026-10-13: Owner-requested saved noclip wobble control, disabled by default and suppressed during photo mode; aw_noclipwobble adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases reuse the on-disk catalogue. This records registry costs and does not increase the CHIM heap cap."
  ],
  "entries": {
   "commands": [
@@ -79,7 +81,7 @@
    "amiwind_show_debug",
    "aw_24hrcycle",
    "aw_aim",
-   "aw_animkit",
+   "aw_animkit_cmd",
    "aw_arenapit",
    "aw_blockers",
    "aw_camera",
@@ -87,7 +89,7 @@
    "aw_charplane",
    "aw_cloud_control_set",
    "aw_cloud_type_set",
-   "aw_combat",
+   "aw_combat_cmd",
    "aw_combattest",
    "aw_companion",
    "aw_companiontest",
@@ -374,6 +376,7 @@
    "aw_intro_text_overlay",
    "aw_lamp_lights",
    "aw_lamp_radius",
+   "aw_land_fill",
    "aw_lava",
    "aw_lava_dps",
    "aw_lava_embers",
@@ -397,6 +400,7 @@
    "aw_night_window_lights",
    "aw_nightsky",
    "aw_nightsky_mode",
+   "aw_noclipwobble",
    "aw_npc_footstep_volume",
    "aw_npc_footsteps",
    "aw_npc_lod",

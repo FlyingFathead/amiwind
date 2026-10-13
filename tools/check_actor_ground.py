@@ -303,7 +303,8 @@ def evidence(report, before_world=False, findings_only=False):
     return json.dumps(view, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
-def require(maps, output, allow_known=None, before_world=False, findings_only=False, jobs=1, chim_frames=None):
+def require(maps, output, allow_known=None, before_world=False, findings_only=False, jobs=1, chim_frames=None,
+            empty_scene=None):
     approved = None
     if before_world and findings_only:
         raise ValueError('Choose one actor comparison scope')
@@ -312,14 +313,17 @@ def require(maps, output, allow_known=None, before_world=False, findings_only=Fa
             raise ValueError('Approved actor report must be separate from the new audit output')
         approved, approved_hash = load_approved_report(allow_known)
     report = audit(maps, jobs=jobs, chim_frames=chim_frames)
+    if empty_scene and report['errors'] == [{'error': 'No actor placements found'}]:
+        report.update(status='not-applicable', errors=[], empty_scene=empty_scene)
     raw = json.dumps(report, indent=2) + '\n'
     Path(output).write_bytes(raw.encode('utf-8'))
-    acceptance = {'status': 'passed', 'unresolved': len(report['errors']),
+    acceptance = {'status': 'not-applicable' if report['status'] == 'not-applicable' else 'passed',
+                  'unresolved': len(report['errors']),
                   'production_gate_passed': report['status'] == 'passed',
                   'report_sha256': hashlib.sha256(raw.encode('utf-8')).hexdigest(),
                   'comparison_scope': ('before-world; vf payload not yet present' if before_world else
                                        FINDINGS_SCOPE if findings_only else 'complete packaged BSP/actor payload')}
-    if report['status'] != 'passed':
+    if report['status'] not in ('passed', 'not-applicable'):
         if approved is None:
             raise ValueError(f"Actor placement gate failed: {len(report['errors'])} unresolved cases; see {output}")
         if evidence(report, before_world, findings_only) != evidence(approved, before_world, findings_only):

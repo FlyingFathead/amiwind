@@ -24,6 +24,11 @@
 
 <!-- contents end -->
 
+Updated alongside v0.0.38: [loading scene links and copying inspection evidence](../amiwind-toolkit/README.md#v0038-inspection-controls).
+The terrain, selection and scene panels each have their own Copy JSON button.
+Selection evidence distinguishes stored model costs from repeated placements;
+heap overlays remain estimates until checked against the native runtime.
+
 The standalone browser inspector is AmiWind's current tool for viewing compiled
 BSP geometry, placements and density, and preparing review plans. It sits within
 the aspirational **AmiWind Map Optimization Toolkit** direction. The inspector

@@ -30,6 +30,7 @@ recorded with the reason, and the run moves on.
 - [Running CHIMport yourself](#running-chimport-yourself)
 - [Release plan of the cells](#release-plan-of-the-cells)
 - [Feeding the CHIM Progress Tracker](#feeding-the-chim-progress-tracker)
+  - [Converter changes during retries](#converter-changes-during-retries)
 
 <!-- contents end -->
 
@@ -469,3 +470,7 @@ cells: passed / total" headline and the per-cell figures.
 
 `RUN/progress.jsonl` has one line per finished cell (time, CPU, result) for
 the build and perf ledger.
+
+### Converter changes during retries
+
+Source-stage reuse verifies owned input hashes, geometry settings, lava mode, and converter SHA-256. A converter-only change preserves the previous source stage in a sibling `work.stale-<receipt-hash>` folder and collects a fresh stage. Verified shared mesh units remain available. Changed owned inputs or geometry require a new work folder. Preserved stages remain until explicitly retired; they are never overwritten by a retry.

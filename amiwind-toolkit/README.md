@@ -7,6 +7,45 @@ ships with the Toolkit.
 
 Full guide: [docs/AMIWIND_TOOLKIT.md](../docs/AMIWIND_TOOLKIT.md).
 
+## v0.0.38 inspection controls
+
+The public Toolkit includes the same inspection controls used with local build
+output. Supply your own converted maps, CHIM world data and optional palette;
+there is no separate reduced-feature public viewer. Raw Morrowind assets first
+go through the conversion tools; the inspector does not directly load an ESM
+or BSA as a 3D scene.
+
+- **World: Names on/off** sits beside **Grid on/off**. Names default to on;
+  an explicit choice is remembered in this browser. Hiding names keeps the
+  location markers. Other metric/ring numbers have their own layer controls.
+- **Direct cell links** such as `index.html?served=1&cell=3,-3` open World,
+  center the cell and select it after its data loads. **Layers > Highlight cell**
+  defaults to on and pulses a yellow outline for both linked and clicked cells.
+  Untick it to hide the outline without clearing the selection. Reduced-motion
+  browser preferences use a steady outline. Without served mode, import your
+  data first; the pending cell link is then applied.
+- **3D Inspector: Copy JSON** appears on the terrain-preview, selected-object
+  and scene-summary panels. Each copies evidence for that panel, including
+  source identity, camera and display settings. The selection export includes
+  object/reference identity, bounds and original/current counts when available.
+  Successful copying shows a green **Copied** confirmation for four seconds;
+  clipboard denial offers selectable JSON instead. Preview-only counts do not
+  imply the compiled map changed.
+- **Textures and heatmap** can be shown together. Load an owned palette for
+  original indexed colors; the built-in grayscale preview is labelled. These
+  are unlit base textures, not a native lighting comparison.
+- **Direct scene links** open the Inspector tab and forward `map`, `maps`,
+  `world`, `worldzip` and `frame`. For example, with a CHIM archive served
+  locally at the same origin:
+  `index.html?worldzip=world.zip&frame=frames%2Fx%2B10%2Fy%2B01`.
+  `worldzip` accepts HTTP(S) URLs without credentials and rejects archives over
+  128 MiB. Another local origin must permit browser access (CORS). File-picker
+  loading remains available without a server.
+
+Inspection JSON references source files; it does not embed mesh, texture or
+palette pixels. Keep generated game data, exports and captures with your owned
+installation. This update adds viewer code and documentation, not game assets.
+
 ## Start it
 
 From the repository root, with your data preloaded (recommended; Python standard library only, bound to this
@@ -74,3 +113,9 @@ compatible with Quake's `.bsp` ([CHIM file format](../docs/CHIM_FILE_FORMAT.md))
 The island picture and the layers are made from your own `Morrowind.esm` with the tools in `tools/`
 (for example `tools/world_progress_background.py`); the guide lists every one. Keep what they make with your own
 files: it is derived from the game and is not for sharing.
+
+### Included in build
+
+The World map has an **Included in build** selector, independent of release plans and conversion colours. Green means a region frame and its chunks were verified against final HDF readback; amber means selected for an unfinished build; grey means coverage is not established by this dataset. Select Conversion / plan view to return to the normal layers. Cell details identify verified versions; they do not invent a first version when earlier history has not been reconciled.
+
+`chim-inclusion.json` contains only version labels, cell coordinates, frame identifiers, scope and receipt digests. The initial v0.0.36 record covers 325 region cells. Town-frame cell boundaries and earlier versions still need reconciliation. Package inclusion does not certify actors, lighting or traversal.

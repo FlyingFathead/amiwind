@@ -14,6 +14,10 @@ VIDEO|fog distance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
 VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
 VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode)
+VIDEO|land fill|aw_land_fill|1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B
+VIDEO|land method|aw_terrain_horizon|1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer
+VIDEO|noclipbob|aw_noclipwobble|same as noclipwobble
+VIDEO|noclipwobble|aw_noclipwobble|[on/off, true/false or 1/0; no argument = status] walking bob and movement roll in noclip (saved; default off); photo mode temporarily disables it
 VIDEO|photomode|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode)
 VIDEO|playvid|playvid|<1..17 / 01..17 / catalogue name> (drains queued game audio first)
 VIDEO|playvideo|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)

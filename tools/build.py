@@ -296,6 +296,8 @@ def parser():
                    help='With --miniwind: the town the sandbox holds and boots into (default balmora; any town '
                         'table row but seyda, e.g. vivec_city): its exterior on CHIM, its residents and, in the '
                         'full scope, its interiors.' + ' ' + retired_flags.vivec_help())
+    p.add_argument('--miniwind-map-inspection', action='store_true',
+                   help='With --miniwind: skip startup/character screens; enable god, noclip and debug HUD on arrival')
     p.add_argument('--miniwind-debug', action='store_true',
                    help='With --miniwind: a DEBUG ONLY sandbox, not a playtest (notice, startup screen, marker, '
                         'HDF and run names say so); the only build type that takes --chim-draw-distance')
@@ -1574,6 +1576,7 @@ def miniwind_commands(args, steps):
                        *([miniwind.SCOPE_OPTION, scope] if scope != miniwind.DEFAULT_SCOPE else []),
                        *([miniwind.TOWN_OPTION, town] if town != miniwind.TOWN else []),
                        *([miniwind.DEBUG_OPTION] if debug else []),
+                       *([miniwind.MAP_INSPECTION_OPTION] if getattr(args, 'miniwind_map_inspection', False) else []),
                        *(['--default-draw-distance', str(args.chim_draw_distance)]
                          if getattr(args, 'chim_draw_distance', None) else [])]
         image.append((name, command))
@@ -2381,7 +2384,7 @@ def main(argv=None):
         # MiniWind test spots (--miniwind-preset NAME, --miniwind-NAME) are recipes in config/recipes/miniwind/,
         # folded into the options above with every other recipe (tools/build_recipe.py configure).
         if (args.miniwind or args.miniwind_description is not None or args.miniwind_scope is not None
-                or args.miniwind_town is not None or args.miniwind_debug):
+                or args.miniwind_town is not None or args.miniwind_debug or args.miniwind_map_inspection):
             configure_miniwind(args)  # refused for rc/final and contradictory options, before any work
         if args.chim_draw_distance is not None and not args.miniwind:
             raise ValueError('--chim-draw-distance is DEBUG ONLY: a --miniwind --miniwind-debug build')

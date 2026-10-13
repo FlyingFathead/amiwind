@@ -34,6 +34,9 @@ Type: "dbg help" for help.
 | `dbg fog` | - | on/off or 1/0 (default on) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
 | `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode) |
+| `dbg land fill` | - | 1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B |
+| `dbg land method` | - | 1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer |
+| `dbg noclipbob` | `dbg noclipwobble` | same as noclipwobble |
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
 | `dbg render order` | - | 1 legacy / 2 mesh intersections (default) |
 | `dbg vanitycam` | `dbg vanitycamera` | same as vanitycamera |

@@ -65,7 +65,11 @@ def reduce_for_profile(vertices, faces, profile, materials=None, name='mesh'):
         # CHIM mesh method meshopt+merge (config/mesh-methods.json, docs/chim/MESH_METHODS.md): meshoptimizer's
         # simplifier per material with locked borders (tools/meshopt.py); the default reducer stays below
         from meshopt import simplify_locked
-        rv, rf = simplify_locked(np.asarray(vertices, float), np.asarray(faces), ratio, keep)
+        error = float(profile.get('meshopt_error_share', 0.0025))
+        if not np.isfinite(error) or not 0 <= error <= 0.05:
+            raise ValueError('Invalid meshopt error share: ' + name)
+        rv, rf = simplify_locked(np.asarray(vertices, float), np.asarray(faces), ratio, keep,
+                                 error_share=error)
         return rv, rf, {'reducer': 'meshopt', 'reduced_triangles': int(len(rf))}
     if profile.get('reducer', 'default') != 'default':
         raise ValueError('Unknown reducer: %s' % profile['reducer'])

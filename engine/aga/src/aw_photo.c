@@ -26,7 +26,7 @@ static cvar_t photo_noclip={"aw_photomode_noclip","1",true};
 static cvar_t photo_hands={"aw_photomode_hands","0",true};
 /* Settings photo mode switches off on entry; restored as text on exit. */
 static const char *const saved_names[]={"crosshair","aw_fog","_aw_debug_all","_aw_debug_coords",
-    "aw_ui_hud","aw_compass","aw_ui_frame","r_drawviewmodel"};
+    "aw_ui_hud","aw_compass","aw_ui_frame","r_drawviewmodel","aw_noclipwobble"};
 #define SAVED ((int)(sizeof(saved_names)/sizeof(saved_names[0])))
 #define SAVED_CROSSHAIR 0
 #define SAVED_FOG 1

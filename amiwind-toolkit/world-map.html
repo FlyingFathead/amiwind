@@ -27,6 +27,11 @@ input[type=file],button{background:#203346;color:var(--ink);border:1px solid #45
 #options[hidden]{display:none}
 #options h2{font-size:14px;margin:0 0 2px;color:#ffe28a}
 main{display:flex;flex-wrap:wrap;gap:16px;padding:8px 16px 16px}
+#cell-highlight{position:absolute;pointer-events:none;overflow:hidden;z-index:1}
+#cell-highlight[hidden]{display:none}
+#cell-highlight-box{position:absolute;box-sizing:border-box;border:3px solid #fff04a;box-shadow:0 0 0 2px #151515,inset 0 0 0 2px #151515;animation:cell-pulse 1.6s ease-in-out infinite}
+@keyframes cell-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){#cell-highlight-box{animation:none}}
 #stage{position:relative;flex:1 1 560px;min-width:0}
 .sbar{position:absolute;background:#0b1118cc;border-radius:5px;display:none;z-index:3}
 .sbar div{position:absolute;background:#9fb3c8aa;border-radius:5px;cursor:grab}
@@ -173,8 +178,10 @@ table.mt small{opacity:.8}
   <button id="interiorsbtn" aria-pressed="false">Interiors table</button>
   <span id="metricscount"></span>
 </div>
+<p id="inclusionsummary" class="muted"></p>
 <div id="chimbar">
   <label><input type="checkbox" id="layer-chim"> <b>CHIM Progress Tracker</b></label>
+  <label>Included in build <select id="inclusionbuild" aria-label="Included in build"><option value="">Loading package coverage</option></select></label>
   <label>Colour by <select id="chimcolour" aria-label="Colour by"></select></label>
   <label>Sweep order <select id="chimorder" aria-label="Sweep order">
     <option value="spiral">Spiral: coast inwards, ring by ring</option><option value="risk">Risk: scout list, riskiest first</option></select></label>
@@ -193,9 +200,9 @@ table.mt small{opacity:.8}
 <div id="selected">Selected area: click a cell on the map</div>
 <div id="multi" class="muted" style="color:#ffd24a"></div>
 <main>
-  <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="tip"></div>
+  <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="cell-highlight" hidden aria-hidden="true"><div id="cell-highlight-box"></div></div><div id="tip"></div>
     <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
-    <div id="gridtoggle" role="group" aria-label="Cell grid">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button></div>
+    <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button></div>
     <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomfit" title="Fit the whole map to the window">fit</button><button id="zoomreset" title="Back to the fitted view">reset</button><button id="zoomin" title="Zoom in">+</button></div>
     <div id="picked" class="muted">Click a cell to show it here.</div></div>
   <aside>
@@ -253,6 +260,7 @@ table.mt small{opacity:.8}
 <script src="zebra.js"></script>
 <script src="header.js"></script>
 <script src="chim-legend.js"></script>
+<script src="chim-inclusion.js"></script>
 <!--AW-LIVE-DATA-->
 <script>
 const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
@@ -301,6 +309,7 @@ const LAYERS = [
    legend: [['#32cfa0', 'walked and accepted (thick outline)']],
    mark: (g, c) => { if (c.checked) outline(g, c, '#32cfa0', 3); }},
   {id: 'grid', name: 'Cell grid', on: false, kind: 'grid'},
+  {id: 'highlight', name: 'Highlight cell', on: true, kind: 'selection'},
 ];
 function ramp(t) {
   t = Math.max(0, Math.min(1, t));
@@ -437,7 +446,7 @@ function draw() {
   ctx.setTransform(ratio * view.z, 0, 0, ratio * view.z, ratio * view.x, ratio * view.y);
   const legend = [];
   for (const L of LAYERS) {
-    if (!on(L.id)) continue;
+    if (!on(L.id) || L.kind === 'selection') continue;
     if (L.legend) legend.push(...L.legend.map((r, i) => [r[0], r[1], L.id + ':' + i]));
     if (legendOff.has(L.id + ':0') && L.kind !== 'fill' && L.kind !== 'chim' && L.kind !== 'metrics' && L.kind !== 'base') continue;
     if (L.kind === 'base') {
@@ -473,7 +482,19 @@ function draw() {
       ctx.fillRect(g.px(x) + 1, g.py(y) + 1, g.s - 2, g.s - 2); ctx.strokeRect(g.px(x) + 1, g.py(y) + 1, g.s - 2, g.s - 2);
     }
   }
-  if (picked) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / view.z; ctx.strokeRect(g.px(picked.x) + 1, g.py(picked.y) + 1, g.s - 2, g.s - 2); }
+  // Animate only this overlay: no terrain redraw or data refresh per pulse.
+  const highlight = $('cell-highlight'), box = $('cell-highlight-box');
+  highlight.hidden = !picked || !on('highlight');
+  if (!highlight.hidden) {
+    highlight.style.left = canvas.offsetLeft + 'px';
+    highlight.style.top = canvas.offsetTop + 'px';
+    highlight.style.width = L.cssW + 'px';
+    highlight.style.height = L.cssH + 'px';
+    const cssScale = L.f || ratio / (window.devicePixelRatio || 1);
+    box.style.left = cssScale * (view.x + view.z * g.px(picked.x)) + 'px';
+    box.style.top = cssScale * (view.y + view.z * g.py(picked.y)) + 'px';
+    box.style.width = box.style.height = cssScale * view.z * g.s + 'px';
+  }
   scrollbars();
   viewSaveSoon();
   legendKeys = legend.filter(r => r[2]).map(r => r[2]);
@@ -491,6 +512,24 @@ function emptyMessage() {
 emptyMessage();
 // Served by tools/toolkit_serve.py (?served=1): load everything from it at once.
 const SERVED = new URLSearchParams(location.search).has('served');
+const cellQuery = new URLSearchParams(location.search).get('cell');
+let linkedCellPending = !!(cellQuery && /^\s*-?\d+\s*,\s*-?\d+\s*$/.test(cellQuery));
+function openLinkedCell() {
+  if (!linkedCellPending) return;
+  const [x, y] = cellQuery.split(',').map(Number);
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) { linkedCellPending = false; return; }
+  const c = data && data.cells.find(c => c.x === x && c.y === y);
+  if (!c && !(chim && chimCells.has(x + ',' + y))) return; // wait for imported data
+  linkedCellPending = false;
+  setMode('world');
+  if (chim) { chimJump(x, y); return; }
+  const g = geometry(); view.z = Math.max(view.z, 6);
+  view.x = g.w / 2 - view.z * (g.px(x) + g.s / 2);
+  view.y = g.h / 2 - view.z * (g.py(y) + g.s / 2);
+  clampView(); picked = {x, y};
+  $('picked').textContent = describe(x, y, c, ' · ');
+  showSelected(x, y, c); draw();
+}
 let servedMaps = new Set();
 async function autoload() {
   const get = async (name, kind) => {
@@ -512,6 +551,7 @@ async function autoload() {
   const cells = await get('island-cells.json', 'json');
   if (cells) { cellsDetail = cells; if (chim) chimBuildIndex(); draw(); if (metricPick) showMetricsCell(metricPick.x, metricPick.y); }
   try { const r = await fetch('../maps/index.json'); if (r.ok) servedMaps = new Set(await r.json()); } catch (_) {}
+  openLinkedCell();
 }
 if (SERVED) autoload();
 // Standalone (not inside the toolkit page): offer the inspector as a link.
@@ -528,6 +568,21 @@ $('layers').innerHTML = '<span class="bottomsel"><b>Bottom layer</b><button id="
   '<span id="optwrap"><button id="optbtn" aria-label="Options" aria-expanded="false" aria-controls="options">&#9881;</button>' +
   '<div id="options" hidden role="dialog" aria-label="Options"><h2>Options</h2>' + LAYERS.filter(L => L.option).map(layerBox).join('') + '</div></span>';
 for (const L of LAYERS) if (L.kind !== 'base') $('layer-' + L.id).onchange = draw;
+// Place and town names can be hidden without removing map markers.
+let mapNames = true;
+try { mapNames = localStorage.getItem('amiwind-map-names-1') !== 'off'; } catch (_) { /* no storage */ }
+function syncNames() {
+  $('nameson').setAttribute('aria-pressed', String(mapNames));
+  $('namesoff').setAttribute('aria-pressed', String(!mapNames));
+}
+function setNames(on) {
+  mapNames = on; syncNames();
+  try { localStorage.setItem('amiwind-map-names-1', on ? 'on' : 'off'); } catch (_) { /* no storage */ }
+  draw();
+}
+$('nameson').onclick = () => setNames(true);
+$('namesoff').onclick = () => setNames(false);
+syncNames();
 // Grid on/off on the map itself, in step with the Cell grid checkbox.
 function syncGrid() {
   const g = $('layer-grid').checked;
@@ -559,7 +614,7 @@ function setData(d) {
   const s = data.summary;
   $('summary').innerHTML = s.cells + ' cells · ' + s.terrain + ' with topomap terrain · ' + s.full + ' full maps · ' +
     s.checked + ' checked<br>Entities placed: ' + s.placed.toLocaleString() + ' / ' + s.original.toLocaleString();
-  draw();
+  draw(); if (!SERVED) openLinkedCell();
 }
 $('status').onchange = e => { statusFileName = e.target.files[0] && e.target.files[0].name; load(e.target.files[0], text => setData(JSON.parse(text))); };
 $('island').onchange = e => {
@@ -758,7 +813,7 @@ function drawPois(g) {
   }
   ctx.font = '600 ' + (Math.max(10, Math.round(g.s * .55)) / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const p of cellsDetail.pois) {
-    if (p.kind !== 'place' || cellPx(g) < LABEL_MIN_PX) continue;      // small labels are hidden when zoomed far out
+    if (!mapNames || p.kind !== 'place' || cellPx(g) < LABEL_MIN_PX) continue;      // small labels are hidden when zoomed far out
     ctx.lineWidth = 3; ctx.strokeStyle = '#000000cc'; ctx.strokeText(p.name, px(p.x), py(p.y));
     ctx.fillStyle = '#ffe28a'; ctx.fillText(p.name, px(p.x), py(p.y));
   }
@@ -832,7 +887,7 @@ function drawMetrics(g) {
   }
   ctx.globalAlpha = 1; ctx.strokeStyle = '#000000'; ctx.lineWidth = 1.5 / view.z;
   for (const c of metrics.cells) if (c.set === 'bloodmoon') ctx.strokeRect(g.px(c.x) + 1, g.py(c.y) + 1, g.s - 2, g.s - 2);
-  if (!$('townlabels').checked || cellPx(g) < LABEL_MIN_PX) return;
+  if (!mapNames || !$('townlabels').checked || cellPx(g) < LABEL_MIN_PX) return;
   // Town labels as on the chart: a cell name held by two or more cells, at their centre.
   for (const [name, cs] of townGroups()) {
     if (cs.length < 2) continue;
@@ -999,7 +1054,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.1'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.2'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1071,7 +1126,7 @@ function showSelected(x, y, c) {
   const maps = (c && c.maps) || [];
   const go = document.createElement('button');
   go.className = 'cta';
-  go.textContent = maps.length ? '▶ Local view (2D + 3D)' : '▶ Local view (2D only; no AmiWind map here)';
+  go.textContent = maps.length ? '\u25b6 Local view (2D + 3D)' : '\u25b6 Local view (2D only; no AmiWind map here)';
   go.onclick = () => { setMode('local'); if (maps.length) showMap(); };
   $('ctaslot').innerHTML = ''; $('ctaslot').appendChild(go);
   fillMapSelect(maps);
@@ -1144,9 +1199,41 @@ function placeName(x, y) {
   if (!d || !(d.name || d.region)) return '';
   return (d.name || d.region) + (d.name && d.region ? ' (' + d.region + ')' : '');
 }
+let inclusionBuilds = [], inclusionSelected = '';
+function inclusionBuild() { return inclusionBuilds.find(b => b.version === inclusionSelected); }
+function inclusionCell(c) { const b = inclusionBuild(); return b && b.cells[c.x + ',' + c.y]; }
+function inclusionCountLabel(b, count) {
+  return count.toLocaleString() + (b.coverage_total > 0 ? ' (' + (100 * count / b.coverage_total).toFixed(1) + '%)' : '');
+}
+function inclusionSummary() {
+  const b = inclusionBuild();
+  $('inclusionsummary').textContent = b ? b.version + ': ' + inclusionCountLabel(b, Object.keys(b.cells).length) +
+    (b.state === 'packaged' ? ' region cells verified in package (green). ' : ' cells selected, packaging pending (amber). ') +
+    (b.coverage_total ? 'Percentage of ' + b.coverage_total.toLocaleString() + ' ' + b.coverage_basis + '. ' : '') + 'Grey = coverage not established here. ' + b.scope + (b.evidence_sha256 ? ' Readback SHA-256: ' + b.evidence_sha256 : '') : 'Choose a build to inspect package coverage separately from plans.';
+}
+async function loadInclusion() {
+  try {
+    const d = window.ChimInclusionMetadata; if (d.format !== 'aw-chim-inclusion-1') throw new Error('unsupported coverage');
+    inclusionBuilds = d.builds;
+    $('inclusionbuild').innerHTML = '<option value="">Conversion / plan view</option>' + inclusionBuilds.map(b => '<option value="' + escapeHtml(b.version) + '">' + escapeHtml(b.version) + (b.state === 'packaged' ? ' - packaged' : ' - pending') + '</option>').join('');
+    inclusionSelected = inclusionBuilds[0]?.version || ''; $('inclusionbuild').value = inclusionSelected;
+    inclusionSummary(); if (chim) { legendCtl(); draw(); if (chimClicked) showChimCell(chimClicked.x, chimClicked.y); }
+  } catch (_) { $('inclusionsummary').textContent = 'Package coverage unavailable; plans are not inclusion evidence.'; }
+}
+function chimInclusionLine(c) {
+  const key = c.x + ',' + c.y;
+  const found = inclusionBuilds.filter(b => b.state === 'packaged' && b.cells[key]?.state === 'included');
+  const b = inclusionBuild(), row = b && b.cells[key];
+  return 'CHIM package coverage: ' + (found.length ? found.map(b => b.version).join(', ') + ' verified; earlier history not reconciled' : 'not verified in recorded packages') +
+    (b ? ' · selected build: ' + (row ? row.state : 'not established') : '');
+}
+function chimIncludedCount(release) {
+  const b = inclusionBuilds.find(b => b.version === release);
+  return b && b.state === 'packaged' ? inclusionCountLabel(b, Object.values(b.cells).filter(c => c.state === 'included').length) : 'not verified';
+}
 function describe(x, y, c, sep, noMetrics) {
   const base = describeBase(x, y, c, sep, noMetrics), ct = noMetrics ? '' : chimTip(x, y, sep);
-  return base + (ct ? sep + ct : '');
+  return base + (ct ? sep + ct : '') + (chimCell(x, y) ? sep + chimInclusionLine(chimCell(x, y)) : '');
 }
 // Placed entities as "placed / original"; a cell with nothing placed in the original says what it holds instead of a bare 0 / 0.
 function placedLabel(placed, original, terrain) {
@@ -1262,6 +1349,7 @@ function legendRestore() {
 }
 function legendActive() { return relFilter !== '' || [...legendOff].some(k => k.startsWith('chim:')); }
 function chimVisible(c) {
+  if (inclusionBuild()) return true;
   const cmp = cset.colour === 'compare' ? chimCompareClass(c) : null;
   return window.ChimLegend.visible(legendOff, relFilter, cset.colour, c, cmp);
 }
@@ -1287,8 +1375,8 @@ function legendCtl() {
     ' complete · ' + r.awaiting_lighting + ' awaiting lighting · ' + r.lit + ' lit · ' + r.failing + ' failing').join(' | ') : 'No cells are assigned to a release yet.';
   // "Planned for ..." counts per release with a TOTALS row; nothing is shown while no release plan exists.
   const pt = L.planTable(chim.plans, chim.headline && chim.headline.ocean != null ? chim.headline.ocean : null);
-  $('plansummary').innerHTML = pt.length ? '<table class="mt"><thead><tr><th class="l">Release plan</th><th class="l">State</th><th>Planned</th><th>Complete</th><th>Awaiting lighting</th><th>Failing</th><th>Hull pending</th><th>Not started</th><th>Open ocean (not done)</th></tr></thead><tbody>' +
-    pt.map(r => '<tr' + (r[0] === 'TOTALS' ? ' style="font-weight:700"' : String(r[0]).startsWith('OPEN OCEAN') ? ' style="font-weight:700;color:' + L.OCEAN_SILVER + '"' : '') + '><td class="l">' + escapeHtml(String(r[0])) + '</td><td class="l">' + escapeHtml(r[1]) + '</td>' + r.slice(2).map(v => '<td>' + (v === '' ? '' : Number(v).toLocaleString()) + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
+  $('plansummary').innerHTML = pt.length ? '<table class="mt"><thead><tr><th class="l">Release plan</th><th class="l">State</th><th>Planned</th><th title="Percentage of Vvardenfell’s 1,292 terrain cells; package coverage only">Included</th><th>Complete</th><th>Awaiting<br>lighting</th><th>Failing</th><th>Hull pending</th><th>Not started</th><th>Open ocean</th></tr></thead><tbody>' +
+    pt.map(r => '<tr' + (r[0] === 'TOTALS' ? ' style="font-weight:700"' : String(r[0]).startsWith('OPEN OCEAN') ? ' style="font-weight:700;color:' + L.OCEAN_SILVER + '"' : '') + '><td class="l">' + escapeHtml(String(r[0])) + '</td><td class="l">' + escapeHtml(r[1]) + '</td>' + r.slice(2).map((v, i) => '<td>' + (v === '' ? '' : Number(v).toLocaleString()) + '</td>' + (i === 0 ? '<td>' + (String(r[0]).startsWith('OPEN OCEAN') ? 'not verified' : r[0] === 'TOTALS' ? 'see releases' : escapeHtml(chimIncludedCount(String(r[0]).split(' - ')[0]))) + '</td>' : '')).join('') + '</tr>').join('') + '</tbody></table><p class="muted">Included counts verified region cells in each package, independently of the cells assigned to that release plan. Unknown does not mean absent. Open ocean: shared chunk generated; runtime placement remains unverified.</p>' : '';
 }
 function legendSet(state) { legendOff = new Set([...legendOff].filter(k => !k.startsWith('chim:')).concat(state.off)); relFilter = state.rel; cset.colour = state.colour; }
 let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, chimBucket = null, chimSource = null,
@@ -1302,6 +1390,7 @@ function chimOpenBugs(c) {
 function chimMech(id) { const m = chim.mechanisms.find(m => m.id === id); return m ? m.label : id; }
 function chimColour2(c, m) { const keep = cset.colour; cset.colour = m; try { return chimColour(c); } finally { cset.colour = keep; } }
 function chimColour(c) {
+  if (inclusionBuild()) { const r = inclusionCell(c); return r ? (r.state === 'included' ? '#35cf80' : '#f4b942') : '#536170'; }
   const m = cset.colour;
   if (m === 'compare') return chimRef && (c.land || CHIM_SEA.has(c.chim.bucket)) ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
   if (m === 'status') return c.land || c.chim.converted || CHIM_SEA.has(c.chim.bucket) ? CHIM_BUCKETS[c.chim.bucket][0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
@@ -1352,7 +1441,7 @@ function chimLegend() {
 }
 function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucket === 'complete_unlit'; }
 // Zebra only for the awaiting-lighting statuses, only in the status colouring.
-function chimZebra(c) { const b = CHIM_BUCKETS[c.chim.bucket]; return cset.colour === 'status' && b && b[2] ? b[2] : null; }
+function chimZebra(c) { if (inclusionBuild()) return null; const b = CHIM_BUCKETS[c.chim.bucket]; return cset.colour === 'status' && b && b[2] ? b[2] : null; }
 function chimZebraCss(base, stripe) { return 'repeating-linear-gradient(135deg,' + base + ' 0 4px,' + stripe + ' 4px 7px)'; }
 function chimPx(g) { return cellPx(g); }
 function drawChim(g) {
@@ -1740,6 +1829,7 @@ function showChimCell(x, y) {
     '<p>' + chimSpan(CHIM_BUCKETS[c.chim.bucket][2] ? chimZebraCss(CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][2]) : CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][1]) + (c.land ? '' : ' · not land (sea-only cell with content)') +
     (c.chim.owner ? ' · owner: ' + escapeHtml(c.chim.owner) + (c.chim.owner_date ? ' ' + escapeHtml(c.chim.owner_date) : '') : '') +
     (c.chim.partial_terrain ? ' · terrain only in a CHIM build (no placements owned here)' : '') + '</p>' +
+    '<p><strong>' + escapeHtml(chimInclusionLine(c)) + '</strong></p>' +
     '<p class="muted">Release: ' + (c.release ? escapeHtml(c.release.name) + (c.release.shipped ? ' (shipped)' : ' (approved)') + ' · set ' + escapeHtml(c.release.date || '') + ' by ' + escapeHtml(c.release.who || 'owner') : 'not assigned to a release') + '</p>' +
     '<p style="' + (window.ChimLegend.planTier(c) === 'next' ? 'color:' + window.ChimLegend.PLAN_GOLD : 'color:var(--muted,#9fb3c8)') + '">' + escapeHtml(window.ChimLegend.planLine(c.plan)) + '</p>' +
     '<p class="muted">Sweep: ' + (c.ring == null ? 'not in the sweep' : 'ring ' + c.ring + ', spiral #' + c.spiral_rank) + (c.risk_rank ? ' · scout #' + c.risk_rank : '') +
@@ -1814,6 +1904,7 @@ function setChim(doc, source, keepView) {
   if (first) viewRestore();
   chimBuildIndex();
   chimUi(); chimHeadSend(); draw(); loadChimCurve();
+  if (!SERVED) openLinkedCell();
   return true;
 }
 // Served by toolkit_serve.py --progress: read again on reload, on window focus and on the Reload button.
@@ -1944,6 +2035,8 @@ window.addEventListener('focus', () => { if (SERVED) loadChim(false); });
 window.addEventListener('message', e => {
   if (e.source === window.parent && e.data && e.data.type === 'amiwind-chim-pick') chimPickBucket(e.data.bucket || null);
 });
+$('inclusionbuild').onchange = () => { inclusionSelected = $('inclusionbuild').value; inclusionSummary(); draw(); if (chimClicked) showChimCell(chimClicked.x, chimClicked.y); };
+loadInclusion();
 </script>
 </body>
 </html>

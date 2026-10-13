@@ -30,7 +30,7 @@ INTERVAL = 10
 STATUS_FILE = 'live-status.json'
 DATA_FILE = 'cell-progress-data.js'
 LIVE_FOLDER = 'live'
-PAGE_FILES = ('world-map.html', 'header.js', 'chim-legend.js', 'zebra.js', 'chim-head.js')
+PAGE_FILES = ('world-map.html', 'header.js', 'chim-legend.js', 'chim-inclusion.js', 'chim-inclusion.json', 'zebra.js', 'chim-head.js')
 DATA_MARKER = '<!--AW-LIVE-DATA-->'
 MODES = ('file', 'server')
 

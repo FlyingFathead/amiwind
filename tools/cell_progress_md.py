@@ -164,11 +164,11 @@ def policy_lines():
 def release_lines(doc):
     """Per-release table: which cells the owner approved for which release, and how they stand."""
     rows = doc.get('releases') or []
-    out = ['## Releases', '',
+    out = ['## Release assignments', '',
            'Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results '
            'never change it).', '']
     if not any(r['approved'] for r in rows if r['release']):
-        return out + ['No cells are assigned to a release yet.', '']
+        return out + ['No cells are assigned in this planning ledger. Packaged inclusion is recorded separately above.', '']
     body = [(r['release'] or 'unassigned', 'shipped' if r['shipped'] else ('open' if r['release'] else '-'), n(r['approved']),
              n(r['complete']), n(r['awaiting_lighting']), n(r['lit']), n(r['empty_sea']), n(r['failing']),
              n(r['hull_policy_pending'])) for r in rows if r['approved']]
@@ -206,7 +206,28 @@ def category_lines(group):
     return out + ([''] + reasons if reasons else []) + note
 
 
-def render(doc, today=None):
+def inclusion_lines(doc, inclusion):
+    """Readback-backed packaging counts, independently of conversion and plans."""
+    cells = doc.get('cells', {})
+    eligible = {key for key, cell in cells.items()
+                if cell.get('island') == MAIN_ISLAND and cp.on_map(cell)
+                and cell['chim']['bucket'] != 'ocean'}
+    rows = []
+    for build in (inclusion or {}).get('builds', []):
+        if build.get('state') not in ('packaged', 'released') or not build.get('evidence_sha256'):
+            continue
+        count = len({key for key, value in build.get('cells', {}).items()
+                     if value.get('state') == 'included'} & eligible)
+        rows.append((build['version'], build['state'], '%s (%s)' % (n(count), pct(count, len(eligible)))))
+    out = ['## Included in builds', '',
+           'Included means verified in a packaged image. Packaged does not mean published or fully playtested. '
+           'Conversion audits and release plans do not establish inclusion. Percentages use the %s land and '
+           'empty-sea cells; open ocean is separate. Counts are per build, not additive.' % n(len(eligible)), '']
+    return out + (table(['Version', 'Evidence state', 'Included'], rows) if rows else
+                  ['No packaged inclusion evidence supplied.']) + ['']
+
+
+def render(doc, today=None, inclusion=None):
     """The page text (LF, no trailing whitespace) for one aw-cell-progress-1 document."""
     today = today or datetime.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M %z')
     cells = island_cells(doc, MAIN_ISLAND)
@@ -219,7 +240,8 @@ def render(doc, today=None):
     out = [HEADER, '', '# CHIM Cell Tracker', '',
            'Live status of the open world on CHIM, Vvardenfell (island %d). Generated page: do not edit by hand. '
            'Per-cell detail is in the Toolkit and its CSV export.' % MAIN_ISLAND, '',
-           '**Done: %s of %s (%s)**' % (n(done), n(total), pct(done, total)), '',
+           '**Conversion/audit progress: %s of %s (%s)**' % (n(done), n(total), pct(done, total)), '',
+           'These audit totals do not count cells included in a playable build; see Included in builds below.', '',
            'Map cells %s: land and empty-sea cells %s (done %s, %s) and open-ocean cells %s (shared ocean chunk made, not yet placed in the game: not counted as done).' % (
                n(map_total), n(land_total), n(land_done), pct(land_done, land_total), n(cl['ocean'])), '',
            '- %s: %s' % (cp.COMPLETE_LABEL, n(cl['complete'])),
@@ -229,8 +251,8 @@ def render(doc, today=None):
            '- Passed (something still deferred): %s' % n(cl['audits_passed']),
            '- Empty sea: %s' % n(cl['empty_sea']),
            '- Open ocean (silver, not counted as done): %s' % n(cl['ocean']), '',
-           '**Eligible for %s: %s of %s** (every done cell, lighting done or not; definition in the import policy).' % (
-               doc.get('plan_next') or (doc.get('headline') or {}).get('eligible_release') or cp.ELIGIBLE_RELEASE, n(eligible), n(total)), ''] + lighting_lines(cells) + [
+           '**Conversion-eligible: %s of %s** (every audit-done cell, lighting done or not; this is not a release assignment).' % (
+               n(eligible), n(total)), ''] + lighting_lines(cells) + [
            '',
            'Generated %s. Tracker data generated %s.' % (today, doc.get('generated', 'unknown')), '',
            '## Totals', '']
@@ -239,7 +261,7 @@ def render(doc, today=None):
               'hull_policy_pending': 'Hull policy pending', 'converted_failing': 'Failed',
               'not_converted': 'Not converted', 'not_started': 'Not started'}
     out += table(['Status', 'Cells', 'Share'], [(labels[k], n(v), pct(v, total)) for k, v in cl.items()])
-    out += ['', 'Definitions are in the import policy below.', ''] + release_lines(doc)
+    out += ['', 'Definitions are in the import policy below.', ''] + inclusion_lines(doc, inclusion) + release_lines(doc)
     out += ['## Per ring (ring 1 touches the sea)', '']
     rings = sorted({c['ring'] for c in cells if c.get('ring') is not None})
     rows = []

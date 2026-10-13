@@ -9,7 +9,7 @@
 | Where | tools/aw.py make_run_name (gate and build run names) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.36-dev5 |
+| Persists in | v0.0.38 (last seen) |
 | Severity | low: one gate number spent and nothing run; the worker gates again with a shorter reason |
 | Family | Gates, CI and tests (`tests-ci`) |
 
@@ -54,6 +54,20 @@ first and third try).
 
 The name length limit is a constant next to the function (`RUN_NAME_MAX`), read by the test.
 
+
+## Reopened build-name boundary, 13 October 2026
+
+The earlier v0.0.36-dev5 repair bounded names for request IDs, but a full
+v0.0.38 build request with a long reason still reaches the stricter downstream
+build-name check. It refuses names longer than 100 characters before starting
+conversion. Source c2c2050 reproduced the rejection. Resubmitting the identical
+selection and source with the short reason `lava-teluvirith-chim366` starts
+successfully. No payload was produced by the refused request.
+
+Repair should reconcile the name generator with both consumers and test a
+long-reason build request end to end. The short-label workaround unblocks this
+release; the source repair remains pending. No AmiQuake mechanism is involved.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -61,7 +75,13 @@ The name length limit is a constant next to the function (`RUN_NAME_MAX`), read 
 Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. See [families](README.md#families).
 
 - [AW-RESULT-RECIPE-SAVED-36](AW-RESULT-RECIPE-SAVED-36.md): The master builder's result of a failed build from a requested recipe does not validate (recipe.saved left in)
+- [BUILD-EMPTY-ACTOR-GATE-38](BUILD-EMPTY-ACTOR-GATE-38.md): Actor contact gate rejects a MiniWind exterior without residents
+- [BUILD-EMPTY-RESIDENT-POOL-38](BUILD-EMPTY-RESIDENT-POOL-38.md): Town conversion starts a zero-worker pool when no residents are present
 - [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
+- [BUILD-LAVA-CORE-BOUNDS-38](BUILD-LAVA-CORE-BOUNDS-38.md): Lava sandbox bounds are not divisible by its core size
+- [BUILD-LAVA-PRESET-FIXTURE-38](BUILD-LAVA-PRESET-FIXTURE-38.md): Lava sandbox addition omitted the preset inventory fixture
+- [BUILD-SHADOWED-WORLD-MAPS-38](BUILD-SHADOWED-WORLD-MAPS-38.md): Full image retains BSP maps shadowed by higher-priority world routes
+- [BUILD-VERSION-EMULATOR-PRESETS-38](BUILD-VERSION-EMULATOR-PRESETS-38.md): Version bump omitted matching emulator presets
 - CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
 - [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
 - [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
@@ -83,6 +103,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- [RELEASE-LAVA-IMAGE-ALLOWLIST-38](RELEASE-LAVA-IMAGE-ALLOWLIST-38.md): Lava documentation images were listed without image-type approval
 - [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
 - [SMOKE-PASSES-WITHOUT-MAP-36](SMOKE-PASSES-WITHOUT-MAP-36.md): The engine boot smoke passed while its first map ran under the title menu: a loaded server was taken for a played map
 - [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a busy host

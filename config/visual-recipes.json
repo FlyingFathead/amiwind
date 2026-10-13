@@ -1,0 +1,127 @@
+{
+  "format": 1,
+  "recipes": {
+    "tel-uvirith-v1": {
+      "status": "Measured diagnostic reductions; full-world native acceptance pending. Requires explicit area visual_recipe selection. Collision remains original.",
+      "models": {
+        "meshes/x/ex_t_housepod_01.nif": {
+          "sha256": "5aafbba6727de7df1e7345d07483a04ad3afec8a481b41d0b9d44e296e3f62a3",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_housepod_02.nif": {
+          "sha256": "c6d9e2f4dde564757441f5be1f314c81d90922584e45f72eeaf47fdf3cba473a",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_housepod_03.nif": {
+          "sha256": "c0a5f176d58858d98be44c54f3a238797c00e52c1c3790eacbe795af17ec4a57",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_housestem_02.nif": {
+          "sha256": "2b14e290860b344483cc6cfa014b438cde98f98a3e7f56f003b6da4000fb60b6",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_slavemarket.nif": {
+          "sha256": "eb824e7b583652852752d0d54c491b412f4ece8e17df0b9b829df07460c7131c",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_tower_seedling.nif": {
+          "sha256": "2cca992a4ce435206eed3636bbbae230258a8c1e02dbcf42dba553b1571f3a2d",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_turret_01.nif": {
+          "sha256": "912e800f05152496757978d7ce0aea8601043c4bfdd6868d711b76a135f35bb9",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_turret_03.nif": {
+          "sha256": "c71f1702dc7c01511100f852c6f3b8464653df6cc1a49559f3afd0be0d27d03a",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_doorway_01.nif": {
+          "sha256": "dbc8772dfa7eeaa700b9da565fea1dc66815f0841e4681c355c5534a4ce2e1b2",
+          "ratio": 0.15,
+          "error_share": 0.05
+        },
+        "meshes/x/ex_t_root_spikes_01.nif": {
+          "sha256": "d7ad39350552abb73a3599aa2e0b2c1e1f4ead317f2fadeabb4e9ae8fb2cd44d",
+          "ratio": 0.1,
+          "error_share": 0.05
+        },
+        "meshes/x/ex_t_root_hook.nif": {
+          "sha256": "bbb5026d55823b7cc26f9de63f576db082970f8ecb76e3bac96af29f790ecda2",
+          "ratio": 0.2,
+          "error_share": 0.025
+        },
+        "meshes/l/light_de_streetlight_01.nif": {
+          "sha256": "263615adcaf6805ca408a9572c96c96aef8646b0798ae090d9b4e69057772d8a",
+          "primitive": {
+            "kind": "lantern_shell",
+            "half_width": 10.620099,
+            "top": 0.9711,
+            "bottom": -49.094872,
+            "body_bottom": -36.0,
+            "neck_z": -40.0,
+            "neck_half_width": 1.35,
+            "roof_width_ratio": 1.15,
+            "paper_material": 2,
+            "frame_material": 0
+          }
+        },
+        "meshes/d/ex_t_door_01.nif": {
+          "sha256": "be1c439b057414d78f98be273479224333ea8de6255dc229398788ddefdcdfd5",
+          "panel": {
+            "axis": 1,
+            "facing": -1,
+            "texture_size": 64,
+            "front_offset": -0.1,
+            "two_sided": true,
+            "type": "door-panel"
+          }
+        },
+        "meshes/d/ex_t_door_02.nif": {
+          "sha256": "58b339b10b25cd831cf25f5bc6bdbd873afca31d0cb653d8866b5317b6727ee0",
+          "panel": {
+            "axis": 1,
+            "facing": -1,
+            "texture_size": 64,
+            "front_offset": -0.1,
+            "two_sided": true,
+            "type": "door-panel"
+          }
+        }
+      },
+      "sprites": {
+        "meshes/x/flora_ashtree_03.nif": {
+          "geometry_sha256": "1730f7b22218ca87828e1bf927a0452b245ae8ff5f1b4b7c4fe97435b8dc44e3"
+        },
+        "meshes/x/flora_ashtree_04.nif": {
+          "geometry_sha256": "fdb941560c684ca770c3d24df79afd81fb22c9c8b8abcd373e1269903fd7db33"
+        },
+        "meshes/x/flora_ashtree_06.nif": {
+          "geometry_sha256": "2fce4e0492423ca4f583c1d7f95a644a81c9751d97fc58a0de450c67656af56c"
+        },
+        "meshes/x/flora_ashtree_07.nif": {
+          "geometry_sha256": "2cb16ac1ecdfe6688b0b889e4616db30576bcfbd97598c330b926fabf9af91b0"
+        }
+      },
+      "default_visual_ratio": 0.2,
+      "default_error_share": 0.01
+    }
+  },
+  "cell_settings": {
+    "10,1": {
+      "visual_recipe": "tel-uvirith-v1",
+      "fixed_visibility_state": {
+        "stronghold": 6
+      },
+      "clip_to_terrain": true
+    }
+  }
+}

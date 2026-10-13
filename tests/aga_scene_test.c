@@ -4,6 +4,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_region.h"
+#include "chim/chim.h"
 #include "aw_harvest_runtime.h"
 aw_character_t aw_character;
 void AW_HeapAuditReport(const char *scene){}
@@ -226,7 +227,11 @@ eval_t *GetEdictFieldValue(edict_t *p,char *name){
  if(!strcmp(name,"aw_voice"))return &voice;
  return NULL;
 }
-qboolean AW_PlacePlayer(edict_t *p,vec3_t v){return false;}
+static int recover_chim,recover_legacy,recover_primes;
+static vec3_t recover_last;
+int Chim_Active(void){return recover_chim;}
+static void recover_prime(vec3_t v){recover_primes++;VectorCopy(v,recover_last);}
+qboolean AW_PlacePlayer(edict_t *p,vec3_t v){recover_legacy++;return false;}
 void SV_LinkEdict(edict_t *p,qboolean touch){}
 static int all_solid,water_feet,calls_mark;
 int SV_PointContents(vec3_t p){return water_feet?CONTENTS_WATER:CONTENTS_EMPTY;}
@@ -270,6 +275,22 @@ int main(void){
  finish_signon(&p);assert(cl.viewangles[0]==0 && cl.viewangles[1]==90);
  assert(!cl.nodrift); /* A door keeps the authored arrival policy. */
  assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>50 && p.v.origin[2]<51);
+ /* CHIM recovery reuses dry standing clearance; failure preserves the player
+  * and re-primes the old ring. The legacy exterior path remains unchanged. */
+ {
+  edict_t q;vec3_t dest={32,32,77};memset(&q,0,sizeof(q));
+  q.v.origin[0]=150;q.v.origin[2]=50;q.v.movetype=MOVETYPE_NOCLIP;q.v.health=37;
+  recover_chim=1;aw_chim_spawn=recover_prime;
+  assert(AW_RecoverPlace(&q,dest));assert(recover_primes==1 && q.v.origin[0]==32);
+  assert(q.v.movetype==MOVETYPE_NOCLIP && q.v.health==37);
+  q.v.origin[0]=150;all_solid=1;
+  assert(!AW_RecoverPlace(&q,dest));assert(recover_primes==3 && recover_last[0]==150 && q.v.origin[0]==150);
+  all_solid=0;water_feet=1;
+  assert(!AW_RecoverPlace(&q,dest));assert(recover_primes==5 && q.v.origin[0]==150);
+  water_feet=0;recover_chim=0;aw_chim_spawn=NULL;recover_legacy=0;
+  assert(!AW_RecoverPlace(&q,dest));assert(recover_legacy==1);
+ }
+
  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;queued[0]=0;
  assert(AW_SceneUse());assert(!strcmp(notice,"Interior not found."));
  assert(!queued[0] && clear_buttons==1 && p.v.health==100); /* no transition or state loss */

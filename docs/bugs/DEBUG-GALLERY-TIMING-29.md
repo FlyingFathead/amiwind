@@ -82,6 +82,8 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - HAND-IDLE-BLINK-29 (no report page): Fists disappear once per idle breathing cycle
 - HAND-PUNCH-COVERAGE-29 (no report page): Near-plane opening at maximum punch extension
 - HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation
+- [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
+- [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

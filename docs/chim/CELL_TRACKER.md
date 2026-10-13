@@ -4,25 +4,27 @@
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
 
-**Done: 1,240 of 1,292 (96.0 %)**
+**Conversion/audit progress: 1,265 of 1,292 (97.9 %)**
 
-Map cells 2,158: land and empty-sea cells 1,292 (done 1,240, 96.0 %) and open-ocean cells 866 (shared ocean chunk made, not yet placed in the game: not counted as done).
+These audit totals do not count cells included in a playable build; see Included in builds below.
+
+Map cells 2,157: land and empty-sea cells 1,292 (done 1,265, 97.9 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
 - Cell complete, awaiting lighting: 98
-- Terrain complete, awaiting lighting: 451
-- Passed (something still deferred): 588
+- Terrain complete, awaiting lighting: 450
+- Passed (something still deferred): 614
 - Empty sea: 103
-- Open ocean (silver, not counted as done): 866
+- Open ocean (silver, not counted as done): 865
 
-**Eligible for v0.0.36: 1,240 of 1,292** (every done cell, lighting done or not; definition in the import policy).
+**Conversion-eligible: 1,265 of 1,292** (every audit-done cell, lighting done or not; this is not a release assignment).
 
-Lighting: lit 0, partial 133, unlit 1,027, not measured 132 (cells; lit is required for both completion levels).
+Lighting: lit 0, partial 133, unlit 1,052, not measured 107 (cells; lit is required for both completion levels).
 
-Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 647 night lamps only, 2,207 not represented.
+Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 647 night lamps only, 2,279 not represented.
 
-Generated 2026-10-11 13:09 +0300. Tracker data generated 2026-10-11T10:09:55+00:00.
+Generated 2026-10-13 08:02 +0300. Tracker data generated 2026-10-12T23:17:17+00:00.
 
 ## Totals
 
@@ -31,41 +33,50 @@ Generated 2026-10-11 13:09 +0300. Tracker data generated 2026-10-11T10:09:55+00:
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
 | Cell complete, awaiting lighting | 98 | 7.6 % |
-| Terrain complete, awaiting lighting | 451 | 34.9 % |
-| Passed (something still deferred) | 588 | 45.5 % |
+| Terrain complete, awaiting lighting | 450 | 34.8 % |
+| Passed (something still deferred) | 614 | 47.5 % |
 | Empty sea | 103 | 8.0 % |
-| Open sea | 866 | 67.0 % |
+| Open sea | 865 | 67.0 % |
 | Hull policy pending | 0 | 0.0 % |
 | Failed | 23 | 1.8 % |
-| Not converted | 29 | 2.2 % |
+| Not converted | 4 | 0.3 % |
 | Not started | 0 | 0.0 % |
 
 Definitions are in the import policy below.
 
-## Releases
+## Included in builds
+
+Included means verified in a packaged image. Packaged does not mean published or fully playtested. Conversion audits and release plans do not establish inclusion. Percentages use the 1,292 land and empty-sea cells; open ocean is separate. Counts are per build, not additive.
+
+| Version | Evidence state | Included |
+| :-- | --: | --: |
+| v0.0.36 | packaged | 325 (25.2 %) |
+| v0.0.38 | packaged | 360 (27.9 %) |
+
+## Release assignments
 
 Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results never change it).
 
-No cells are assigned to a release yet.
+No cells are assigned in this planning ledger. Packaged inclusion is recorded separately above.
 
 ## Per ring (ring 1 touches the sea)
 
 | Ring | Cells | Cell complete | Terrain complete | Cell complete, awaiting lighting | Terrain complete, awaiting lighting | Passed (something still deferred) | Empty sea | Open sea | Hull policy pending | Failed | Not converted | Not started |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
+| 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
 | 1 | 171 | 0 | 0 | 56 | 5 | 8 | 102 | 0 | 0 | 0 | 0 | 0 |
 | 2 | 160 | 0 | 0 | 38 | 9 | 112 | 1 | 0 | 0 | 0 | 0 | 0 |
 | 3 | 149 | 0 | 0 | 0 | 7 | 135 | 0 | 0 | 0 | 7 | 0 | 0 |
 | 4 | 138 | 0 | 0 | 1 | 29 | 103 | 0 | 0 | 0 | 4 | 1 | 0 |
-| 5 | 125 | 0 | 0 | 1 | 48 | 70 | 0 | 0 | 0 | 5 | 1 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 48 | 71 | 0 | 0 | 0 | 5 | 0 | 0 |
 | 6 | 114 | 0 | 0 | 0 | 53 | 59 | 0 | 0 | 0 | 1 | 1 | 0 |
 | 7 | 104 | 0 | 0 | 1 | 64 | 38 | 0 | 0 | 0 | 1 | 0 | 0 |
-| 8 | 94 | 0 | 0 | 1 | 68 | 22 | 0 | 0 | 0 | 0 | 3 | 0 |
-| 9 | 81 | 0 | 0 | 0 | 66 | 8 | 0 | 0 | 0 | 2 | 5 | 0 |
-| 10 | 66 | 0 | 0 | 0 | 44 | 12 | 0 | 0 | 0 | 1 | 9 | 0 |
-| 11 | 50 | 0 | 0 | 0 | 30 | 12 | 0 | 0 | 0 | 2 | 6 | 0 |
-| 12 | 33 | 0 | 0 | 0 | 23 | 8 | 0 | 0 | 0 | 0 | 2 | 0 |
-| 13 | 7 | 0 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
+| 8 | 94 | 0 | 0 | 1 | 68 | 24 | 0 | 0 | 0 | 0 | 1 | 0 |
+| 9 | 81 | 0 | 0 | 0 | 66 | 12 | 0 | 0 | 0 | 2 | 1 | 0 |
+| 10 | 66 | 0 | 0 | 0 | 43 | 22 | 0 | 0 | 0 | 1 | 0 | 0 |
+| 11 | 50 | 0 | 0 | 0 | 30 | 18 | 0 | 0 | 0 | 2 | 0 | 0 |
+| 12 | 33 | 0 | 0 | 0 | 23 | 10 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 13 | 7 | 0 | 0 | 0 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Failures by mechanism class
 
@@ -81,23 +92,27 @@ A cell can fail more than one mechanism. Hull policy pending cells are not failu
 
 | Object type | Placed | Converted | Deferred | Skipped | Failed |
 | :-- | --: | --: | --: | --: | --: |
-| Statics | 103,593 | 103,571 | 0 | 22 | 0 |
-| Flora | 57,686 | in statics | - | - | - |
-| Lights | 2,854 | 643 | 4,422 | 0 | 0 |
-| Doors | 1,031 | 1,031 | 0 | 0 | 0 |
-| Containers | 22,007 | 22,007 | 0 | 0 | 0 |
-| Activators | 2,245 | 2,244 | 0 | 1 | 0 |
-| Items | 351 | 351 | 0 | 0 | 0 |
-| NPCs | 544 | 0 | 544 | 0 | 0 |
-| Creatures | 5,293 | 0 | 5,293 | 0 | 0 |
+| Statics | 106,813 | 106,791 | 0 | 3,242 | 0 |
+| Flora | 58,565 | in statics | - | - | - |
+| Lights | 2,926 | 643 | 4,566 | 0 | 0 |
+| Doors | 1,041 | 1,041 | 0 | 10 | 0 |
+| Containers | 22,193 | 22,193 | 0 | 186 | 0 |
+| Activators | 2,762 | 2,421 | 340 | 180 | 0 |
+| Items | 364 | 364 | 0 | 13 | 0 |
+| NPCs | 546 | 0 | 546 | 0 | 0 |
+| Creatures | 5,409 | 0 | 5,409 | 0 | 0 |
 | Markers | 15 | not drawn, not required | - | - | - |
 
-- Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (22)
-- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (2,211)
-- Lights, deferred: nonvisual source marker (2,211)
-- Activators, skipped: not in the frame (outside the cell bounds or removed by a selection) (1)
-- NPCs, deferred: resident conversion (544)
-- Creatures, deferred: creature simulation pending (5,293)
+- Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (3,242)
+- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (2,283)
+- Lights, deferred: nonvisual source marker (2,283)
+- Doors, skipped: not in the frame (outside the cell bounds or removed by a selection) (10)
+- Containers, skipped: not in the frame (outside the cell bounds or removed by a selection) (186)
+- Activators, deferred: lava liquid (tools/lava.py) (340)
+- Activators, skipped: not in the frame (outside the cell bounds or removed by a selection) (180)
+- Items, skipped: not in the frame (outside the cell bounds or removed by a selection) (13)
+- NPCs, deferred: resident conversion (546)
+- Creatures, deferred: creature simulation pending (5,409)
 
 Counts are every placed reference in converted cells, from the conversion job. Door and light figures in the Toolkit contents panel (original census) and the door audit (links per cell) are different measures. Light emitters without a mesh stay under Lights: they cast light, so the lighting audit keeps a cell from both completion levels until it is lit.
 

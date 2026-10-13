@@ -146,6 +146,7 @@ OPTIONS = {
     'miniwind': 'opt-in, not shipped', 'miniwind_description': 'opt-in, not shipped',
     'miniwind_scope': 'opt-in, not shipped',
     'miniwind_town': 'opt-in, not shipped', 'miniwind_debug': 'opt-in, not shipped',
+    'miniwind_map_inspection': 'opt-in, not shipped',
     'chim_detail_budget': 'opt-in, not shipped', 'chim_cut_models_over': 'opt-in, not shipped',
     # EXPERIMENTAL engine compile switches (docs/EXPERIMENTAL_FLAGS.md; widecoord: CHIM-FRAME-COORD-RANGE-33)
     'engine_experiment': 'opt-in, not shipped',

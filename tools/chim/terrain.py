@@ -371,6 +371,7 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
         # a pool under this ground gets no face inside the solid
         plan = lava_plan(area, [l for l in lavas if l['top'] > zfloor])
         up = np.array([0., 0., 1.])
+        ground_normal, ground_dist = ground_plane(poly)
         extra = []
 
         def walk(p):
@@ -379,7 +380,12 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
                 walk(p[4])
             elif p[0] == 'lava':
                 flat = np.array([(x, y, p[2]) for x, y in p[1]])
-                ids = emit([(flat, up, quake_texture_axes(up), np.zeros(2), ('lava', None)),
+                # Like the sea surface, lava must end where it meets the ground.
+                # The parent BSP plane clips contents, not a child's face edges.
+                flat = np.array(split_keep(flat, ground_normal, ground_dist - ground_normal[2] * p[2], 1))
+                ids = []
+                if len(flat) >= 3 and abs(polygon_area_xy(flat)) > 1e-9:
+                    ids = emit([(flat, up, quake_texture_axes(up), np.zeros(2), ('lava', None)),
                             (flat[::-1].copy(), -up, quake_texture_axes(-up), np.zeros(2), ('lava', None))],
                            w.plane(up, p[2]), lambda s: 0 if s[1][2] > 0 else 1)
                 counts['lava_faces'] += len(ids)
@@ -403,7 +409,7 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
         up = np.array([0., 0., 1.])
         me = add_node(up, top, bounds)
         w.plane(up, top)
-        node_rows[me][5:7] = [ids[0], len(ids)]
+        node_rows[me][5:7] = [ids[0] if ids else 0, len(ids)]
         node_rows[me][2] = add_leaf(CONTENTS_EMPTY, bounds, faces)
         low = add_node(-up, -bottom, bounds)
         w.plane(-up, -bottom)

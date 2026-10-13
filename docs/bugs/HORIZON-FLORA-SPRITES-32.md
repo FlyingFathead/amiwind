@@ -159,7 +159,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - GEO-02 (no report page): Seyda Neen ground ends before the world terrain handoff
 - [HORIZON-HOLES-31](HORIZON-HOLES-31.md): Distant buildings break up against the sky
 - HORIZON-POP-29 (no report page): Ashlands horizon pops or breaks up while turning
-- LAND-HORIZON-GAPS-29 (no report page): Sky visible through gaps in distant resident ground
+- [LAND-HORIZON-GAPS-29](LAND-HORIZON-GAPS-29.md): Sky visible through gaps in distant resident ground
 - [RENDER-FOG-PASS-COST-33](RENDER-FOG-PASS-COST-33.md): The per-pixel fog and day-night sky pass costs 150-210 ms per frame on a slow 68040
 - [SEYDA-WALL-SHAPE-31](SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
 - [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
@@ -167,5 +167,6 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog
 - TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
+- [TREE-VIEW-FLOAT-38](TREE-VIEW-FLOAT-38.md): Sprite tree appears detached from terrain from particular viewing directions
 
 <!-- END GENERATED CATEGORY -->
